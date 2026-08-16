@@ -23,6 +23,7 @@ import { PickerFlow } from "./flows/PickerFlow";
 import { RestoreBackupFlow } from "./flows/RestoreBackupFlow";
 import { Spinner } from "../components";
 import { Screen, PhoneColumn } from "../components";
+import { ToastHost } from "../components/ToastHost";
 
 /** Synthetic slotMap key for the active (sole-Unlocked under SYNC-1) slot. */
 const ACTIVE_SLOT = "active-slot";
@@ -49,6 +50,30 @@ type JoinEntry = keyof typeof JOIN_SUCCESS;
  * design gallery is a separate dev route (see App.tsx).
  */
 export function AppShell() {
+  return (
+    <>
+      <StageSwitch />
+      {/* The mobile client's one toast surface (myne-md/myne#455), mounted at the
+          ROOT rather than inside the editor flow. That placement is the point:
+          the desktop client had its `<Toaster />` inside the post-unlock screen,
+          so vault creation and unlock could not reach it and grew silences
+          instead, and putting mobile's first host anywhere shallower would
+          reproduce exactly that. `ShareImportToast` stays where it is, it is a
+          single-purpose notice with its own trigger, not a general surface. */}
+      <ToastHost />
+    </>
+  );
+}
+
+/**
+ * The stage machine itself.
+ *
+ * Split out of {@link AppShell} only so a root-level surface can be mounted
+ * beside it: this function returns early in several places (the join flow, the
+ * boot shim) and then returns from a `switch`, so there is no single element to
+ * hang a sibling off without restructuring every arm.
+ */
+function StageSwitch() {
   const [stage, setStage] = useState<Stage | null>(null);
   // The stage `dispatch` reduces from. It mirrors `stage` and is written
   // SYNCHRONOUSLY by `enterStage` — which the functional `setStage(prev => …)`

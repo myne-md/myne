@@ -22,11 +22,12 @@
 //
 // Spec: account-number.md § 7 (bearer-token semantics, "treat like cash").
 
-import { useEffect, useRef, useState, type Dispatch } from "react";
+import { useRef, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Spinner } from "../../components/Spinner";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { CopyStatus, useCopyStatus } from "../../components/CopyStatus";
 import {
   copySecretToClipboard,
   saveSecretAsTextFile,
@@ -50,27 +51,46 @@ export function AccountStep({
   dispatch,
 }: AccountStepProps) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
+  // myne-md/myne#390: this used to be a bare `copied` flag reset only when the
+  // step COMMITTED, so the label read "Copied" for the rest of the step no matter
+  // what the user did next, a stale confirmation the user reads as the result of
+  // the tap they just made. The shared hook reverts on its own and carries the
+  // live region, so a screen reader hears the outcome too.
+  const { outcome, flashing, markCopied, markFailed } = useCopyStatus();
+  // The button LABEL uses the momentary half, so it reverts; the status line
+  // below uses the persistent half, so the outcome stays readable.
+  const copied = flashing && outcome === "copied";
 
-  useEffect(() => {
-    if (committing) setCopied(false);
-  }, [committing]);
-
-  // Cancel any pending clipboard auto-clear on unmount so the timer's
-  // closure (which captures the bearer-token account number) is released.
+  // NO unmount cancel, and the omission is the point, matching PhraseStep.
+  //
+  // Cancelling on unmount looks like hygiene and is the opposite: advancing off
+  // this step is the INTENDED next action, so the cancel fired on the normal
+  // path and left the account number on the system clipboard indefinitely,
+  // while the line above it had just promised a 30 s clear. The heap argument
+  // that motivated it is also gone: `copySecret` releases the value on both
+  // exits, so what a pending timer holds is a reference in a process that
+  // already has the account number in React state.
+  //
+  // Letting it fire after unmount is safe for the same reason it is on the
+  // phrase step: the clear is the host-side compare-and-clear, so it wipes the
+  // clipboard only if the account number is still on it, and a user who copied
+  // something else in the window keeps what they copied.
   const cancelAutoClearRef = useRef<(() => void) | null>(null);
-  useEffect(
-    () => () => {
-      cancelAutoClearRef.current?.();
-    },
-    [],
-  );
 
   const handleCopy = async () => {
     cancelAutoClearRef.current?.();
-    const cancel = await copySecretToClipboard(accountNumber);
+    // A once-only, secret-bearing surface, so both arms are INLINE rather than
+    // toasts: the confirmation belongs next to the button the user just pressed,
+    // and a transient toast on a screen shown once is the weakest affordance
+    // available. `vaultCreation.account.copyFailed` finally has a desktop
+    // consumer, it has existed in all 32 catalogs since it was written, with its
+    // only caller on the mobile client, because this branch was checked here and
+    // then dropped.
+    const cancel = await copySecretToClipboard(accountNumber, {
+      onSuccess: { kind: "inline", run: markCopied },
+      onFailure: { kind: "inline", run: markFailed },
+    });
     cancelAutoClearRef.current = cancel;
-    if (cancel) setCopied(true);
   };
 
   const handleSave = () =>
@@ -122,6 +142,22 @@ export function AccountStep({
           {t("vaultCreation.account.saveAsFile")}
         </Button>
       </div>
+
+      {/* The failure line, and the announcement for BOTH outcomes. The success
+          case is already visible as the button's label swap, so it is announced
+          without being drawn twice; the failure case has no other surface, so it
+          renders. */}
+      <CopyStatus
+        testId="create.account-copy-status"
+        visuallyHidden={outcome === "copied"}
+        message={
+          outcome === "copied"
+            ? t("vaultCreation.account.copied")
+            : outcome === "failed"
+              ? t("vaultCreation.account.copyFailed")
+              : null
+        }
+      />
 
       <label
         style={{

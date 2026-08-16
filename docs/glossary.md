@@ -2048,6 +2048,16 @@ The device-local cache that lets the locked [vault picker](#vault-picker) show a
 
 Used in: `spec/protocol.md` §9.22, §10.3; `threat-model.md` §7; `decisions.md` 2026-08-15
 
+### **secret tier** &nbsp; 📦 *Product*
+
+*(Aliases: clipboard sensitivity tier. Myne-divergent: yes, the classification is project-specific.)*
+
+The classification a caller declares when copying a value to the system clipboard, and the thing that decides how hard the OS is asked to hold it. Three values. **Plain** is ordinary content (a note body, a [wikilink](#wikilink), a code block): no device confinement and no expiry, because someone copying a note may legitimately want it on another of their devices. **Tier 1** is the [recovery phrase](#recovery-phrase): OS sensitivity marking is *required for the affordance to exist*, so where a platform cannot confine the item to the device and expire it, the Copy control does not render at all, which in practice means iOS and no Android version. As shipped the iOS arm is held behind a verified-on-hardware constant, so today the control renders nowhere. **Tier 2** is the [account number](#account-number): it ships on every platform with a best-effort clear.
+
+The line between the two secret tiers is the one the threat model already draws. The recovery phrase alone reconstructs the vault; the account number alone does not, because unlocking also needs the master password. The tier is always the caller's statement about the value and is never inferred from its content: a content heuristic fails open on precisely the value nobody anticipated.
+
+Used in: `decisions.md` 2026-08-15 (two secret tiers; recovery-phrase Copy is iOS-only)
+
 ### **SHA-256** &nbsp; 🔐 *Primitive*
 
 The 256-bit Secure Hash Algorithm 2 (FIPS 180-4). Used in Myne for: salt construction (§3.1), the CTX commitment outer hash (§5.1), the account-number hash (§8), and HMAC underlying HKDF-SHA-256 (§3.2).

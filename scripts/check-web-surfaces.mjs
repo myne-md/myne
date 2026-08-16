@@ -296,6 +296,10 @@ const V = {
     "ported",
     "Wraps the event seam's `listen`. Written FOR web: the rejected-subscription branch is dead on desktop (the IPC bridge is up before React mounts) and live in a browser, where a dropped rejection reaches `global-failure` and takes the page down.",
   ],
+  "src/lib/clipboard.ts": [
+    "ported",
+    "The copy-policy chokepoint (myne-md/myne#390). Runs on web as written because it holds no transport: the platform write, the clear and the error sink are all injected, and the module imports nothing at all. On web the injected write IS `web/src/platform/clipboardManager.ts`, so the same code makes the same decision about what the user is told and only the byte-mover underneath it differs. The `os-managed` clear arm is mobile-only and simply has no web caller; the `host` arm's clear is the web dispatcher's refusal, exactly as `secret-export.ts` below describes.",
+  ],
   "src/lib/secret-export.ts": [
     "adapted",
     "Ships for `saveJsonAsFile` (theme export, through the download seam) — its SECRET callers are the two creation steps, both substituted. The clipboard auto-clear it also exports is web-hostile in a way worth naming, and myne#379 changed WHERE that shows up rather than removing it: the read-back that checks the clipboard still holds the secret now runs host-side, so on web the refusal is the dispatcher's (`plugin:secret-export|clipboard_clear_if_matches` is `Class::Unsupported`, backed by the absent `vaultCreation` capability) instead of a browser permission the page would never get — page content cannot be granted clipboard READ in Firefox at all and is gesture-gated elsewhere, so a clear would silently never fire. No web path reaches it, and a web client has no recovery phrase to copy in the first place.",

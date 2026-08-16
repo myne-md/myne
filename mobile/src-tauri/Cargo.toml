@@ -103,6 +103,15 @@ tauri-plugin-qr-scan = { path = "tauri-plugin-qr-scan" }
 # library, AppCompat and Material, and added three install-time permissions.
 # Zero external crates.
 tauri-plugin-reminders = { path = "tauri-plugin-reminders" }
+# The clipboard transport (myne-md/myne#390 + myne-md/myne#455). Replaces
+# `tauri-plugin-clipboard-manager`, which was declared in `mobile/package.json`
+# and registered nowhere, no Cargo dependency, no `.plugin()` call, no
+# capability grant, so every call through it was dispatched to a plugin that
+# does not exist and rejected at runtime. That is why the account-number Copy on
+# the vault-creation screen has never worked on any device. This crate also does
+# what the generic one cannot: ask the OS to confine a secret to this device and
+# expire it. Zero external crates.
+tauri-plugin-sensitive-clipboard = { path = "tauri-plugin-sensitive-clipboard" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "v7"] }

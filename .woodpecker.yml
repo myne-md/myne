@@ -347,6 +347,7 @@ steps:
       # on. Backstop for the pre-commit hook — `--no-verify` must not land a
       # setter whose change the open editor never receives.
       - node scripts/check-prefs-nonce.mjs
+      - node scripts/check-clipboard-feedback.mjs
       # Unwired-module ratchet (#272): a module with no production importer does
       # not run, and nothing else in the toolchain says so — the single-tab vault
       # lock shipped that way while the OPFS write path skipped its TOCTOU guard
@@ -1151,8 +1152,8 @@ steps:
         git ca-certificates pkg-config libssl-dev
         libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
       - rustup component add clippy
-      - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders --all-targets -- -D warnings
-      - cargo test -p myne-mobile --no-fail-fast
+      - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
+      - cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard --no-fail-fast
 
   # ─── Hosted web-client deploy (MYND-574 task 112) ────────────────────────────
   # The repo's first deployable artefact. Same shape every sibling repo already

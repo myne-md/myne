@@ -156,6 +156,15 @@ pub fn run() {
         // On the macOS dev host it registers the command surface but returns
         // Unsupported; the desktop client has its own native adapters.
         .plugin(tauri_plugin_reminders::init())
+        // The clipboard transport (myne-md/myne#390 + myne-md/myne#455). Note
+        // what is NOT here and must stay absent: `tauri_plugin_clipboard_manager`.
+        // Its JS package was declared in `mobile/package.json` while the plugin
+        // itself was registered nowhere, so every call through it rejected at
+        // runtime and the account-number Copy has never worked on any device.
+        // This plugin DOES grant a clipboard read, mobile-only and for one
+        // caller (the recovery screen's Paste); the argument for it, and what it
+        // costs, are in its `permissions/default.toml`.
+        .plugin(tauri_plugin_sensitive_clipboard::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())

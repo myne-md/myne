@@ -8,6 +8,7 @@ import { invoke } from "../platform/core";
 import { has } from "../platform/capabilities";
 import { deliverFile } from "../platform/download";
 import { logErrorKind } from "./vault-creation-logging";
+import { copySecret, type CancelClear, type Feedback } from "./clipboard";
 
 const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
 
@@ -22,34 +23,52 @@ const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
  */
 export async function copySecretToClipboard(
   value: string,
-): Promise<(() => void) | null> {
-  try {
-    await clipboardWriteText(value);
-  } catch (e) {
-    logErrorKind(e, "clipboard-write-failed");
-    return null;
-  }
-  // The read+compare+clear runs HOST-side (myne#379). `recovery-flow.md` §2.2
-  // requires the clear to verify the clipboard still holds the phrase — a
-  // comparison requirement, not a requirement that the WebView be the one
-  // comparing — and doing it here cost a process-lifetime OS-clipboard READ
-  // grant on the main window for this one `setTimeout` body. Read is the more
-  // dangerous direction than write: a write destroys the user's clipboard, a
-  // read harvests whatever they last copied from a password manager. Same
-  // narrow-seam move `saveSecretAsTextFile` below makes for the filesystem.
+  feedback: Feedback,
+): Promise<CancelClear | null> {
+  // Delegates to the shared copy-policy chokepoint (myne-md/myne#390). What
+  // used to live here, try the write, log the kind on rejection, return `null`
+  // with nothing scheduled, otherwise schedule the clear and return a canceller
+  //, is that module's `copySecret` verbatim, with the three environmental parts
+  // lifted into parameters. This function is now the DESKTOP binding of them:
+  // the platform seam's write, the host-side clear, and the vault-creation log
+  // discipline.
   //
-  // The command returns nothing and swallows a non-text clipboard (which
-  // already means our value is gone) exactly as this code did; the `catch` is
-  // now for an ACL refusal, not for the clipboard's state.
-  const timer = setTimeout(async () => {
-    try {
-      await invoke("plugin:secret-export|clipboard_clear_if_matches", { value });
-    } catch (e) {
-      logErrorKind(e, "clipboard-clear-failed");
-    }
-  }, CLIPBOARD_AUTO_CLEAR_MS);
-  return () => clearTimeout(timer);
+  // The `feedback` parameter is the point of the exercise. This function
+  // previously reported nothing and left every caller to decide, and two of them
+  // decided nothing at all, on the screen where a recovery phrase is shown once.
+  return copySecret(
+    clipboardWriteText,
+    value,
+    feedback,
+    {
+      kind: "host",
+      delayMs: CLIPBOARD_AUTO_CLEAR_MS,
+      clear: (v) => invoke("plugin:secret-export|clipboard_clear_if_matches", { value: v }),
+    },
+    {
+      onError: (e) => logErrorKind(e, "clipboard-write-failed"),
+      // A distinct label, because this is the only outcome here that leaves the
+      // secret exposed: the write landed, the window passed, and the clear did
+      // not run. Collapsing it into the write label made the exposure case
+      // unreadable in the one place it is recorded.
+      onClearError: (e) => logErrorKind(e, "clipboard-clear-failed"),
+    },
+  );
 }
+
+// Why the clear is a HOST call and not a read-back here (myne#379), kept because
+// the reasoning outlives the code that used to sit below it. `recovery-flow.md`
+// §2.2 requires the clear to verify the clipboard still holds the phrase, a
+// comparison requirement, not a requirement that the WebView be the one
+// comparing, and doing it in this file cost a process-lifetime OS-clipboard READ
+// grant on the main window for one `setTimeout` body. Read is the more dangerous
+// direction than write: a write destroys the user's clipboard, a read harvests
+// whatever they last copied from a password manager. Same narrow-seam move
+// `saveSecretAsTextFile` below makes for the filesystem.
+//
+// The command returns nothing and swallows a non-text clipboard (which already
+// means our value is gone); a rejection from it is an ACL refusal, not a
+// statement about the clipboard's contents.
 
 export async function saveSecretAsTextFile(
   defaultPath: string,
