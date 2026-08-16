@@ -57,11 +57,30 @@ class ReadArgs: Decodable {}
 class SensitiveClipboardPlugin: Plugin {
   /// The tier string the Rust side sends for a credential.
   private static let secretTier = "secret"
+  private static let plainTier = "plain"
 
   @objc public func writeText(_ invoke: Invoke) throws {
     let args = try invoke.parseArgs(WriteArgs.self)
 
     // The pasteboard is main-thread work.
+    // An unrecognised tier is REFUSED, not treated as plain.
+    //
+    // This arm used to be `if secret { confine } else { plain }`, so any value
+    // that was not exactly "secret" took the plain path and wrote the value
+    // unconfined and non-expiring. A rename, a casing drift or a future third
+    // tier would therefore downgrade a credential silently, on the only
+    // platform where Tier 1 ever ships. That is the fails-open-on-the-value-
+    // nobody-anticipated shape the tier design rejects a content heuristic for,
+    // reproduced in the transport.
+    //
+    // Kotlin already rejected the same drift, and the comment beside it claimed
+    // this mirror did too. Non-optional decoding catches a missing KEY, never an
+    // unknown VALUE, so the claim was wrong until this check existed.
+    guard args.sensitivity == Self.secretTier || args.sensitivity == Self.plainTier else {
+      invoke.reject("unknown clipboard sensitivity tier")
+      return
+    }
+
     DispatchQueue.main.async {
       let type = Self.plainTextTypeIdentifier()
       let item: [String: Any] = [type: args.value]

@@ -1,4 +1,12 @@
-// The mobile clipboard seam (myne-md/myne#390 + myne-md/myne#455).
+// The mobile clipboard TRANSPORT (myne-md/myne#390 + myne-md/myne#455).
+//
+// Named `clipboardTransport` rather than `clipboard` on purpose. The shared
+// POLICY module is `src/lib/clipboard.ts`, aliased into this tree as
+// `@myne/clipboard`, and it decides what the user is told. This file decides
+// how the bytes reach the OS. Two different questions, and while the two files
+// shared a basename the twin sweep paired them as one module answered twice,
+// which is the opposite of true: neither is a copy of the other, and a verdict
+// saying they should converge would have been wrong.
 //
 // One module, so the transport has one home. Before this, the mobile tree had
 // three: `secret-export.ts` reached `@tauri-apps/plugin-clipboard-manager`, the
@@ -34,7 +42,7 @@
 // destroys the user's clipboard, a read harvests whatever they last copied from
 // a password manager.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { devicePlatform } from "./prefs";
 
 /**
@@ -109,7 +117,7 @@ export async function canHoldSecretOnClipboard(): Promise<boolean> {
  *
  * The platform check above is written and correct. What is missing is evidence:
  * `.localOnly` and `.expirationDate` have been read in Apple's documentation and
- * never watched working. `design-notes/clients/0499-…` closes on "Blocked on a
+ * never watched working. `design-notes/clients/0511-…` closes on "Blocked on a
  * hardware check", and `docs/dev/clipboard-sensitivity-verification.md` says in
  * as many words that if check 1 or check 2 fails, Tier 1 is reconsidered rather
  * than shipped with a caveat.

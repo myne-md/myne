@@ -938,14 +938,6 @@ const ROSTER = [
     reason:
       "Path arithmetic. The two clients address DIFFERENT directories on purpose: desktop re-exports `appDataDir`, mobile `documentDir`, because desktop picks an export destination through the OS save dialog and mobile has no dialog to pick with (myne-md/myne#491). Making the member lists match would be wrong on both sides.",
   },
-  {
-    a: "src/platform/clipboardManager.ts",
-    b: "mobile/src/platform/clipboardManager.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "The only seam pair that is NOT per-client by construction. `Should the main window hold a process-lifetime OS-clipboard READ grant to run a comparison` is one question with one answer, and desktop answered it (myne-md/myne#379: the read-back moved host-side to `plugin:secret-export|clipboard_clear_if_matches`, and `clipboard-manager:allow-read-text` plus `allow-clear` left the capability file in the same change). Mobile still exports all three. Mobile's own header records this as a finding and adds a second one measured while writing it: the Rust half of the plugin is not registered on mobile at all, so none of the three calls can reach a command on a device and the caller's `catch` hid it. Destination waits on the port or the removal; myne-md/myne#390 is adjacent.",
-  },
 
   // ── The two Rust/TS pairs the merge brought in
   {

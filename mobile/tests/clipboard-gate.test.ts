@@ -33,7 +33,7 @@ beforeEach(() => {
 describe("canHoldSecretOnClipboard", () => {
   it("answers NO on iOS while the pasteboard behaviour is unverified", async () => {
     devicePlatform.mockResolvedValue("ios");
-    const { canHoldSecretOnClipboard } = await import("../src/lib/clipboard");
+    const { canHoldSecretOnClipboard } = await import("../src/lib/clipboardTransport");
 
     // The shipped answer today. Not "the platform check is wrong", the flag is
     // shut, and a shut flag outranks the platform by design.
@@ -42,7 +42,7 @@ describe("canHoldSecretOnClipboard", () => {
 
   it("answers NO on Android, and would still answer NO with the flag open", async () => {
     devicePlatform.mockResolvedValue("android");
-    const { canHoldSecretOnClipboard } = await import("../src/lib/clipboard");
+    const { canHoldSecretOnClipboard } = await import("../src/lib/clipboardTransport");
 
     await expect(canHoldSecretOnClipboard()).resolves.toBe(false);
   });
@@ -52,7 +52,7 @@ describe("canHoldSecretOnClipboard", () => {
     // platform probe cannot accidentally open the gate, and it makes the flag
     // the single thing a reviewer has to look at to know the answer.
     devicePlatform.mockResolvedValue("ios");
-    const { canHoldSecretOnClipboard } = await import("../src/lib/clipboard");
+    const { canHoldSecretOnClipboard } = await import("../src/lib/clipboardTransport");
 
     await canHoldSecretOnClipboard();
     expect(devicePlatform).not.toHaveBeenCalled();

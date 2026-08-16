@@ -45,7 +45,14 @@ export async function copySecretToClipboard(
       delayMs: CLIPBOARD_AUTO_CLEAR_MS,
       clear: (v) => invoke("plugin:secret-export|clipboard_clear_if_matches", { value: v }),
     },
-    { onError: (e) => logErrorKind(e, "clipboard-write-failed") },
+    {
+      onError: (e) => logErrorKind(e, "clipboard-write-failed"),
+      // A distinct label, because this is the only outcome here that leaves the
+      // secret exposed: the write landed, the window passed, and the clear did
+      // not run. Collapsing it into the write label made the exposure case
+      // unreadable in the one place it is recorded.
+      onClearError: (e) => logErrorKind(e, "clipboard-clear-failed"),
+    },
   );
 }
 

@@ -31,7 +31,7 @@ import {
   copySecretToClipboard,
   saveSecretToDocuments,
 } from "../../lib/secret-export";
-import { canHoldSecretOnClipboard } from "../../lib/clipboard";
+import { canHoldSecretOnClipboard } from "../../lib/clipboardTransport";
 import type { CreateVaultFlowProps } from "./types";
 
 // Browser-dev placeholders (no Tauri host → no IPC). Let the multi-step flow

@@ -26,7 +26,7 @@ import {
 } from "./lib/attachments";
 import { attachmentSrc } from "./lib/attachmentRef";
 import { prefsRead } from "./lib/prefs";
-import { writeText as clipboardWriteText } from "./lib/clipboard";
+import { writeText as clipboardWriteText } from "./lib/clipboardTransport";
 import { currentEditorTagTree } from "./lib/editor-tag-bridge";
 import { requestVoiceRecording } from "./lib/voice-record-bridge";
 import {

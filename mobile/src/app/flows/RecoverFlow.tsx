@@ -24,7 +24,7 @@ import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 import { HAS_TAURI } from "../../lib/app-window";
 import { RECOVERY_NON_DISTINGUISHING_BANNER } from "../../lib/load-bearing-copy";
 import { ioBanner } from "../../lib/io-banner";
-import { readText } from "../../lib/clipboard";
+import { readText } from "../../lib/clipboardTransport";
 import type { IoFailureKind, RecoverSubStep } from "../../lib/stage";
 import type { RecoverFlowProps } from "./types";
 

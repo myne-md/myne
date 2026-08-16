@@ -3835,7 +3835,7 @@
     "phrase": {
       "back": "Back",
       "continue": "I've saved this — confirm phrase",
-      "copied": "Copied to the clipboard. It clears itself in 30 seconds, even if you move on.",
+      "copied": "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
       "copy": "Copy",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
       "eyebrow": "Step 2 of 4 — recovery phrase",
@@ -4077,7 +4077,7 @@
     "wordNumber": "WORD #{{position}}",
     "commitError": "Couldn't save your vault. Please try again.",
     "copyPhrase": "Copy",
-    "phraseCopied": "Copied. It stays on this device and clears itself in 30 seconds.",
+    "phraseCopied": "Copied. It stays on this device, and the system drops it after 30 seconds.",
     "phraseCopyFailed": "Couldn't copy. Use \"Save to file\" instead.",
     "savedToFile": "Saved to {{label}}",
     "saveFileError": "Couldn't save the file.",

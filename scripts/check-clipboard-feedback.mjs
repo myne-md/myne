@@ -127,8 +127,21 @@ const silentViolations = [];
 // A `silent` arm with an empty or whitespace-only reason. Written to tolerate the
 // formatting a call site may use (the arm often spans lines), which is why the
 // `kind` and the `reason` are matched as a pair rather than line by line.
-const SILENT_NO_REASON =
-  /kind\s*:\s*["']silent["']\s*,\s*reason\s*:\s*(["'`])\s*\1/g;
+//
+// BOTH property orders, and a type assertion between them, because the first
+// version of this matched exactly one spelling. Injected and confirmed: with a
+// single `kind` then `reason` pattern, `{ reason: "", kind: "silent" }` and
+// `{ kind: "silent" as const, reason: "" }` both printed ok, and a comment
+// between the two properties evaded it too. Those are ordinary TypeScript, not
+// contrivances, and `as const` on a discriminant is common in this tree. A
+// guard that catches one spelling of a two-spelling defect is the shape this
+// file's own header apologises for.
+const SILENT_TAIL = String.raw`\s*(?:as\s+const\s*)?,\s*(?:(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)\s*)*`;
+const SILENT_NO_REASON = new RegExp(
+  `kind\\s*:\\s*["']silent["']${SILENT_TAIL}reason\\s*:\\s*(["'\`])\\s*\\1` +
+    `|reason\\s*:\\s*(["'\`])\\s*\\2${SILENT_TAIL}kind\\s*:\\s*["']silent["']`,
+  "g",
+);
 
 for (const file of files) {
   const rel = relative(ROOT, file);
