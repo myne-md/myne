@@ -144,7 +144,7 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
           // `not written` every time — which is what CI measured, and it says
           // nothing about the port. The three outcomes only separate once the
           // fake has had a chance to reach either branch of its listen.
-          const bound = await session.waitUntil(
+          const bound = await s.waitUntil(
             async () => {
               const outcome = tor.bindOutcome();
               return outcome === "not written" ? null : outcome;
