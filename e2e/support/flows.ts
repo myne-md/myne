@@ -68,10 +68,20 @@ export async function bootDiagnostic(session: Session): Promise<string> {
         "  var v = seen[i].getAttribute('data-testid');" +
         "  if (ids.indexOf(v) === -1) ids.push(v);" +
         "}" +
+          // The fail-closed REASON, when that screen is what mounted. It is the
+        // single most useful fact this probe can carry: `Unlock.tsx` renders
+        // `<FailClosedError>` INSTEAD of the password form for a boot-time
+        // `Corrupted` or `IoError` status, so a scenario waiting on
+        // `unlock.password-input` there is waiting for a field the app has
+        // decided not to draw. That is a terminal routing outcome, not
+        // slowness, and no budget reaches it. `io-error` in particular is what
+        // a single transient `vault_list` read failure produces.
+        "var fc = document.querySelector('[data-testid=\"fail-closed.root\"]');" +
         "return JSON.stringify({" +
         "  readyState: document.readyState," +
         "  rootChildren: root ? root.childElementCount : -1," +
         "  bodyChars: (document.body && document.body.innerHTML.length) || 0," +
+        "  failClosedReason: fc ? fc.getAttribute('data-reason') : null," +
         "  testids: ids" +
         "});",
     );
