@@ -626,6 +626,16 @@ export async function waitForInlineImage(session: Session): Promise<void> {
           // present means the bytes are still coming, chip gone with the image
           // still hidden means the load FAILED.
           "var chip = !!document.querySelector('.cm-attachment-progress');" +
+          // **Is the embed SOURCE even in the document?** With no widget at all
+          // there are two very different stories: the `![[att:…]]` text never
+          // landed (a typing problem), or it landed and the decoration declined
+          // to build a widget for it (an attachment/catalog problem). The
+          // rendered readout hides the source once a widget replaces it, so a
+          // present marker with no widget is the second story and an absent one
+          // is the first. Length only, never the id.
+          "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+          "var src = content ? content.textContent || '' : '';" +
+          "var marker = src.indexOf('att:') !== -1;" +
           "var ids = [];" +
           "var seen = document.querySelectorAll('[data-testid^=\"attachment\"], .cm-widgetBuffer, [data-testid=\"editor.content\"]');" +
           "for (var n = 0; n < seen.length && ids.length < 8; n++) {" +
