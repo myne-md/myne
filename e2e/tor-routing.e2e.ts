@@ -137,8 +137,28 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
           // later. That reads as a bootstrap that failed rather than as a
           // process that was never listening, which is how this scenario came
           // to be quarantined as a 20 s budget problem.
+          //
+          // **Polled, not read once, and the first version of this was read
+          // once.** `connecting` is published the instant the child is spawned,
+          // before it has run a line, so a single read right after it reports
+          // `not written` every time — which is what CI measured, and it says
+          // nothing about the port. The three outcomes only separate once the
+          // fake has had a chance to reach either branch of its listen.
+          const bound = await session.waitUntil(
+            async () => {
+              const outcome = tor.bindOutcome();
+              return outcome === "not written" ? null : outcome;
+            },
+            {
+              label: () =>
+                "the fake sidecar to report its bind outcome; still 'not written', so it " +
+                "never reached either branch of listen — it is not the process the host " +
+                "spawned, or it exited before running",
+              timeoutMs: 15_000,
+            },
+          );
           expect(
-            tor.bindOutcome(),
+            bound,
             "the fake sidecar must own its SOCKS port before a bootstrap can be probed",
           ).toMatch(/^listening /);
 
