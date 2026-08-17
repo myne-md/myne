@@ -142,6 +142,16 @@ pre-commit:
       # nothing called it. A RATCHET with reason-carrying exemptions.
       run: node scripts/check-ipc-binding-callers.mjs
 
+    playwright-image:
+      # myne#529: the CI Playwright image tag against the version the lockfile
+      # resolves. A tag one minor behind is not a stale toolchain: the image
+      # bakes browsers at a revision the installed Playwright does not ask for,
+      # so every test dies in `browserType.launch` before its first assertion.
+      # It shipped that way and took the whole `mobile-flow-logic` lane with it,
+      # 179 tests across 44 files, red on develop and on every branch. Same
+      # two-halves-pinned-by-hand shape as `e2e-toolchain` below.
+      run: node scripts/check-playwright-image.mjs
+
     frontend-lock-teardown:
       # myne#529: the WebView half of `check-lock-teardown.mjs`, which held only
       # the Rust side. A module-scope store outlives every unmount, and neither

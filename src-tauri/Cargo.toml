@@ -112,13 +112,13 @@ zeroize = { version = "1.8", features = ["alloc", "derive"] }
 # the protocol crate uses for AEAD tag verification; already in the shared lock.
 subtle = { version = "2", default-features = false }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
-# `tracing` for structured ops-side logging (stage tags + bounded
-# variant-name fields only; see src-tauri/CLAUDE.md
-# "Secret-handling logging discipline").
 # Implementing `myne-core`'s agent seams (myne-md/myne#529). Same crate and
 # version the core already uses for its `VaultIo` seam, so this adds no new
 # transitive surface to the shared lockfile.
 async-trait = "0.1"
+# `tracing` for structured ops-side logging (stage tags + bounded
+# variant-name fields only; see src-tauri/CLAUDE.md
+# "Secret-handling logging discipline").
 tracing = "0.1"
 # `tracing-subscriber` installs the actual log sink so `tracing::*!` events
 # reach stdout (env-filtered via `RUST_LOG`, default `info`). Promoted

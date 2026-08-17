@@ -357,6 +357,11 @@ steps:
       # above. A command declared, permitted, registered and mirrored in TS can
       # still be called by nothing, and then the feature behind it ships inert.
       - node scripts/check-ipc-binding-callers.mjs
+      # Playwright image vs lockfile (myne#529): the image bakes browsers for
+      # its own version, so a tag behind the lockfile fails every test inside
+      # `browserType.launch`. It took the whole mobile-flow-logic lane down,
+      # 179 tests, and looked like a broken suite rather than a missing binary.
+      - node scripts/check-playwright-image.mjs
       # Frontend lock teardown (myne#529): the WebView half of the Rust-side
       # `check-lock-teardown.mjs`. A vault-leaving path that skips one clear
       # leaves a module-scope store resident into the next vault's session.
@@ -1154,7 +1159,20 @@ steps:
   # repo would have let `reuseExistingServer` attach these specs to the DESKTOP
   # app and report green about the wrong client.
   mobile-flow-logic:
-    image: mcr.microsoft.com/playwright:v1.61.1-noble
+    # The image tag MUST match the `@playwright/test` version `pnpm-lock.yaml`
+    # resolves, and `scripts/check-playwright-image.mjs` is what holds it there.
+    # The image bakes browser binaries under `/ms-playwright/<name>-<revision>/`,
+    # and the revision a Playwright release looks for is pinned inside that
+    # release. So a tag one minor behind the lockfile is not "slightly old": the
+    # installed Playwright looks for a revision the image does not carry and
+    # every test dies in `browserType.launch` before its first assertion.
+    #
+    # That is exactly what shipped. `mobile/package.json` asked for `^1.61.1`,
+    # the lockfile drifted to 1.62.1, the tag stayed at v1.61.1, and all 179
+    # flow-logic tests across 44 files failed with `Executable doesn't exist at
+    # /ms-playwright/chromium_headless_shell-1234/...` on develop and on every
+    # branch. The lane was red for so long that its redness stopped being read.
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
     # `status: [success, failure]` — see the lane header above (#458).
     when:
       - path: *code-path-globs

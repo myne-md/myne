@@ -18,10 +18,15 @@
 //! `ai_enabled` opt-in host-side**: `agent_start`, `agent_approve_scope`,
 //! `agent_preview_grant`, `agent_apply` and `agent_capability`, the last
 //! because asking a model whether it can hold the edit format is still asking a
-//! model. `agent_last_run` deliberately does not: reading which notes a run
-//! already wrote is how a user reverses it, and gating that on an opt-in they
-//! may have just turned OFF would strand them with changes they cannot undo in
-//! one act. `agent_cancel` touches only the run table, and a run that outlived
+//! model. **`agent_undo` and `agent_last_run` deliberately do not, and it is
+//! one reason rather than two.** `agent_undo` WRITES, so its omission is the
+//! one that needs arguing: it writes to put notes back, and gating the single
+//! act that reverses a run on an opt-in the user may have just switched off
+//! would leave the applied edits standing with no way to take them back. The
+//! consent being withdrawn is consent to run the model, not consent to keep
+//! what it already wrote. `agent_last_run` reads the record undo needs, so it
+//! follows undo for the same reason: gating the read would disable the write it
+//! feeds. `agent_cancel` touches only the run table, and a run that outlived
 //! a lock is a teardown bug rather than something to refuse here.
 //! `agent_capability`'s probe prompt is a compile-time constant, so no vault
 //! data is involved even though it is gated. Borrowing

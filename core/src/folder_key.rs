@@ -3,7 +3,8 @@
 //!
 //! Both lived in the desktop AI plugin's `vector_store.rs`, which is where the
 //! `ai_excluded_folders` (SYNC-14) test was first needed. The agent plugin core
-//! needs exactly the same test on the same set, and it lives in this crate: //! so the functions move here and the desktop re-exports them. A second copy
+//! needs exactly the same test on the same set, and it lives in this crate,
+//! so the functions move here and the desktop re-exports them. A second copy
 //! would be the failure this module exists to prevent: a note under `Private/`
 //! passing one matcher while the other excluded it under a `private/` entry is
 //! not a compile error on either side, and only one of the two paths is the one
