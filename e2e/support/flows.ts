@@ -615,6 +615,8 @@ export async function waitForInlineImage(session: Session): Promise<void> {
         found: boolean;
         width: number;
         chip: boolean;
+        marker: boolean;
+        chars: number;
         testids: string[];
       }>(
         "var i = document.querySelector('[data-testid=\"attachment-image\"]');" +
@@ -642,17 +644,31 @@ export async function waitForInlineImage(session: Session): Promise<void> {
           "  var v = seen[n].getAttribute('data-testid');" +
           "  if (v && ids.indexOf(v) === -1) ids.push(v);" +
           "}" +
-          "return { found: !!i, width: i ? i.offsetWidth : -1, chip: chip, testids: ids };",
+          "return { found: !!i, width: i ? i.offsetWidth : -1, chip: chip," +
+          "  marker: marker, chars: src.length, testids: ids };",
       );
       if (state.found && state.width > 0) return true;
       if (state.found) {
         lastReason = state.chip
           ? `the image is present, hidden, and its progress chip is still up, so the bytes have not arrived`
           : `the image is present, hidden, and its progress chip is GONE, which the widget does only on a load ERROR — the attachment did not decrypt or decode`;
+      } else if (!state.marker) {
+        lastReason =
+          `no embed source in the buffer at all (${state.chars} chars in the editor), so the ` +
+          `\`att:\` text never landed; testids present: ${
+            state.testids.length === 0 ? "none" : state.testids.join(", ")
+          }`;
       } else {
-        lastReason = `no attachment-image element; embed-related testids present: ${
-          state.testids.length === 0 ? "none" : state.testids.join(", ")
-        }`;
+        // The catalog loads ONCE per editor mount over an async IPC, and until
+        // it resolves the decoration draws a neutral progress chip rather than
+        // an image. So a chip with no image means the catalog has not answered
+        // yet; no chip and no image means it answered WITHOUT this id, which is
+        // the tombstone case and a different bug entirely.
+        lastReason = state.chip
+          ? `the embed source is in the buffer and a progress chip is up, so the attachment ` +
+            `catalog has not resolved this id yet`
+          : `the embed source is in the buffer with no widget and no progress chip, so the ` +
+            `catalog resolved WITHOUT this id and the decoration drew a tombstone`;
       }
       return null;
     },
