@@ -200,6 +200,16 @@ const ALLOWED = new Map([
   ["src-tauri/src/plugins/local_inference/hydrate.rs#kek", [1, "cache: vault.embeddings (AiEmbeddingsKey), dropped by the migration"]],
   ["src-tauri/src/plugins/local_inference/commands.rs#kek", [2, "cache: attachments-text (AttachmentTextKey), dropped by the migration"]],
   ["src-tauri/src/plugins/attachments/read_text.rs#kek", [1, "cache: attachments-text (AttachmentTextKey)"]],
+  // The WRITER of that same cache, and it belongs in this table for exactly the
+  // reason its six readers do. `attachments-text/` is device-local, never
+  // synced and rebuildable, so §10.4.1 point 2's treatment applies: the KEK
+  // re-derives through the v0.1 context on a v0.2 root, self-consistent because
+  // a cache never crosses a generation boundary. It called
+  // `derive_subkey_versioned` until myne-md/myne#529, which made the writer
+  // disagree with every reader on a v0.2 vault and left the cache write-only —
+  // an OCR'd image never reached search, a voice transcript never rendered, and
+  // both misses look exactly like "there is nothing cached".
+  ["core/src/plugins/attachments/commands.rs#kek", [1, "cache: attachments-text (AttachmentTextKey), the write side of the six readers below"]],
 
   // ── legitimately v0.1: SYNC-PLANE IDENTITY AND AUTH ───────────────────────
   // The reserved sync-ids (`catalog-`/`prefs-`/`themes-sync-id`) and the SCRAM
