@@ -38,11 +38,30 @@ const POSTURE_TIMEOUT_MS = 20_000;
 
 /** Wait until the settings posture row reports `posture`, and return the label
  *  text it renders — the two are asserted together so a row that changes its
- *  `data-posture` without changing what the user reads cannot pass. */
+ *  `data-posture` without changing what the user reads cannot pass.
+ *
+ *  **On timeout it names the posture the row was ACTUALLY showing**, because
+ *  the four postures fail for four unrelated reasons and the bare wait
+ *  distinguished none of them. `unavailable` means the supervisor declared the
+ *  run failed (its SOCKS greeting probe refused, or the child was reaped), and
+ *  it is a TERMINAL verdict — no amount of extra budget recovers it, which is
+ *  the thing a timeout message alone cannot say. `connecting` means the fake
+ *  never emitted its readiness line, `inactive` means the toggle came back off,
+ *  and no row at all means the panel unmounted. This scenario was quarantined as
+ *  a contention victim on the assumption it was merely late; that assumption has
+ *  never been checked against the posture it was stuck on. */
 async function waitForPosture(session: Session, posture: string): Promise<string> {
-  await session.waitForElement(testIdSelector("settings.tor-posture", { "data-posture": posture }), {
-    timeoutMs: POSTURE_TIMEOUT_MS,
-  });
+  const selector = testIdSelector("settings.tor-posture", { "data-posture": posture });
+  try {
+    await session.waitForElement(selector, { timeoutMs: POSTURE_TIMEOUT_MS });
+  } catch (raw) {
+    const rows = await session.byTestIdAll("settings.tor-posture");
+    const actual =
+      rows.length === 0 ? "no posture row rendered" : await rows[0].attribute("data-posture");
+    throw new Error(
+      `${(raw as Error).message} | waited for "${posture}", the row was showing "${actual}"`,
+    );
+  }
   return await (await session.byTestId("settings.tor-posture-label")).text();
 }
 
