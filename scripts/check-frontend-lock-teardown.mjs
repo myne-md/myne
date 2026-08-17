@@ -126,7 +126,7 @@ const TEARDOWN_CALLS = [
  * over-capture assertion at the call site bounds the damage, and a
  * comment-and-string-aware walk is the thing this repo has already been burned
  * by writing twice (root `CLAUDE.md`, the `'` problem in both directions). */
-function bodyOf(src, at) {
+export function bodyOf(src, at) {
   // The body's opening brace is the first `{` whose preceding non-whitespace
   // character is `)` or `>`. That covers all four shapes these files use:
   // `f(...) {`, `f(...): Promise<void> {`, `async () => {`, and the

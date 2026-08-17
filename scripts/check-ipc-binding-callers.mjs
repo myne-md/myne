@@ -73,9 +73,11 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** Exported function names in `file` whose body invokes a `plugin:x|y` command. */
-function bindingsIn(file) {
-  const src = readFileSync(file, "utf8");
+/** Exported function names in `src` whose body invokes a `plugin:x|y` command.
+ *
+ * Takes TEXT rather than a path so `tests/scripts/ipcBindingCallers.test.ts` can
+ * inject each defect class as a synthetic source string. */
+export function bindingsInSource(src) {
   const found = [];
   // Each exported async function, with its body up to the next top-level
   // `export` or end of file. Deliberately a text scan rather than a parser: the
@@ -112,7 +114,7 @@ const callerFiles = [...new Set(CALLER_ROOTS.flatMap((r) => walk(join(ROOT, r)))
  *
  * `tsc --noUnusedLocals` would catch the plain case, but not a name used only in
  * a type position or inside code no branch reaches, so this cannot lean on it. */
-function withoutImports(text) {
+export function withoutImports(text) {
   return text
     .replace(/^\s*import\s+type\s[\s\S]*?from\s*["'][^"']+["'];?\s*$/gm, "")
     .replace(/^\s*import\s[\s\S]*?from\s*["'][^"']+["'];?\s*$/gm, "")
@@ -129,7 +131,7 @@ const dead = [];
 let checked = 0;
 for (const file of bindingFiles) {
   const rel = relative(ROOT, file);
-  for (const name of bindingsIn(file)) {
+  for (const name of bindingsInSource(readFileSync(file, "utf8"))) {
     checked += 1;
     const word = new RegExp(`\\b${name}\\b`);
     let called = false;
