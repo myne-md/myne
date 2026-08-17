@@ -25,6 +25,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import { installFakeTorSidecar, torSidecarControl } from "./support/fake-tor-sidecar";
 import {
+  bootDiagnostic,
   closeSettings,
   dismissImporterOffer,
   enableDeveloperMode,
@@ -56,10 +57,21 @@ async function waitForPosture(session: Session, posture: string): Promise<string
     await session.waitForElement(selector, { timeoutMs: POSTURE_TIMEOUT_MS });
   } catch (raw) {
     const rows = await session.byTestIdAll("settings.tor-posture");
-    const actual =
-      rows.length === 0 ? "no posture row rendered" : await rows[0].attribute("data-posture");
+    if (rows.length > 0) {
+      throw new Error(
+        `${(raw as Error).message} | waited for "${posture}", the row was showing ` +
+          `"${await rows[0].attribute("data-posture")}"`,
+      );
+    }
+    // NO row at all is the answer that needs the screen, not the row. The panel
+    // renders the row whenever the posture is known, so its absence means
+    // either the panel is not mounted (Settings closed, the vault locked under
+    // us, the tab moved) or the hook has not published yet on a FRESH mount —
+    // and those are the same observation from here. What separates them is what
+    // else is on screen, which is exactly what the boot probe reports.
     throw new Error(
-      `${(raw as Error).message} | waited for "${posture}", the row was showing "${actual}"`,
+      `${(raw as Error).message} | waited for "${posture}", no posture row rendered; ` +
+        `screen: ${await bootDiagnostic(session)}`,
     );
   }
   return await (await session.byTestId("settings.tor-posture-label")).text();
