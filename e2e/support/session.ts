@@ -27,6 +27,11 @@ const DRIVER_HOST = "127.0.0.1";
 const DEFAULT_DRIVER_PORT = 4444;
 const DEFAULT_NATIVE_PORT = 4445;
 const DRIVER_READY_TIMEOUT_MS = 15_000;
+/** How long to wait for a previous driver to release the port. Generous, because
+ *  the alternative to waiting is the silent wrong-data-directory launch
+ *  `waitForDriverGone` documents; a scenario that pays ten seconds here is far
+ *  cheaper than one that burns its whole budget on the wrong app. */
+const DRIVER_FREE_TIMEOUT_MS = 10_000;
 
 /** Repo root (this file lives at e2e/support/). */
 export const REPO_ROOT = resolve(import.meta.dirname, "..", "..");
@@ -154,6 +159,60 @@ async function waitForDriver(baseUrl: string, proc: ChildProcess): Promise<void>
 }
 
 /**
+ * Block until nothing is answering WebDriver on `baseUrl`.
+ *
+ * **This is the fix for the worst failure the suite had, and the failure looked
+ * like nothing to do with ports.** Every scenario in a worker launches its own
+ * `tauri-driver` on the SAME port (per worker, keyed on `VITEST_POOL_ID`), and
+ * `waitForDriver` can only ask "is something answering there" — it cannot tell
+ * the driver it just spawned from the previous scenario's driver still dying.
+ * `teardown` sent SIGTERM, slept 200 ms, sent SIGKILL and returned WITHOUT
+ * waiting for the process to go, so under load the old one was routinely still
+ * listening.
+ *
+ * When that happened, `newSession` went to the OLD driver, which spawns the app
+ * with the OLD environment — an `XDG_DATA_HOME` pointing at the `dataHome` that
+ * same teardown had just `rmSync`'d. The app found no `vaults/` directory,
+ * which is the legitimate fresh-install path, and rendered WELCOME. The
+ * scenario then waited its full budget for an unlock screen that was never
+ * coming, on a vault it had correctly seeded, in a directory the app was not
+ * looking at.
+ *
+ * That is `sd1`, `gp1`, `gp2` and `nav1`, all quarantined for months as runner
+ * contention. It also explains every property that diagnosis could not: more
+ * timeout never helped (the app is pointed at a deleted directory forever), it
+ * got worse at the tail of a run (more load, slower process death), and it
+ * reproduced on an idle machine now and then (the race is small, not absent).
+ *
+ * Waiting on the PORT rather than on the process is deliberate: the port is what
+ * the next launch keys on, and it covers the paths a process wait does not — a
+ * teardown that never ran because its worker died, or a driver whose child
+ * outlived it.
+ *
+ * `probe` defaults to the real `GET /status` and is a parameter only so a unit
+ * test can drive the loop without standing up an HTTP server. Note that a bare
+ * TCP listener is NOT enough to stand in for a driver here: `driverStatus`
+ * throws on any non-2xx, so anything that answers something other than a
+ * WebDriver status already reads as gone.
+ */
+export async function waitForDriverGone(
+  baseUrl: string,
+  timeoutMs: number,
+  probe: (url: string) => Promise<unknown> = driverStatus,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      await probe(baseUrl);
+    } catch {
+      return true; // nothing is answering — the port is ours
+    }
+    if (Date.now() >= deadline) return false;
+    await sleep(100);
+  }
+}
+
+/**
  * Launch tauri-driver + the production app with an isolated data dir.
  *
  * The fresh `XDG_DATA_HOME` is exported on the DRIVER process (the app
@@ -187,6 +246,20 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   mkdirSync(tmpDir, { recursive: true });
   if (opts.seed) await opts.seed(appDataDir);
   if (opts.seedConfig) await opts.seedConfig(appConfigDir);
+
+  // **Refuse to start on a port somebody else is still holding.** See
+  // `waitForDriverGone`: attaching to a previous scenario's dying driver hands
+  // this scenario an app pointed at a deleted data directory, and the only
+  // symptom is a screen that says the vault does not exist. Checking here rather
+  // than only in `teardown` covers the paths a teardown cannot: a worker that
+  // died mid-scenario, a driver whose child outlived it, a stray manual run.
+  if (!(await waitForDriverGone(baseUrl, DRIVER_FREE_TIMEOUT_MS))) {
+    throw new Error(
+      `a WebDriver is still answering on ${baseUrl} after ${DRIVER_FREE_TIMEOUT_MS} ms. ` +
+        "Launching now would attach this scenario to somebody else's driver, and the app " +
+        "would come up against that driver's data directory rather than this one's seed.",
+    );
+  }
 
   const proc = spawn(
     driverBinary(),
@@ -240,6 +313,13 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       killTree(proc, "SIGTERM");
       await sleep(200);
       if (proc.exitCode === null) killTree(proc, "SIGKILL");
+      // SIGKILL is asynchronous: the listener closes when the kernel actually
+      // reaps the process, not when the signal is sent. Returning here is what
+      // let the NEXT scenario see this driver still answering and attach to it
+      // — see `waitForDriverGone`. Best-effort, because a teardown must never
+      // mask the scenario's own error; the launch-side check is the one that
+      // refuses to proceed.
+      await waitForDriverGone(baseUrl, DRIVER_FREE_TIMEOUT_MS);
       try {
         if (!opts.keepDataDir) rmSync(dataHome, { recursive: true, force: true });
       } catch {
