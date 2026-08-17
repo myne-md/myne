@@ -592,6 +592,48 @@ export async function enableAi(session: Session): Promise<void> {
  * scenario had already located is gone. Nine of that file's ten tests pass; the
  * tenth spent 10 s on a button that existed the whole time under a new handle. */
 /**
+ * Wait until an inline `att:` embed has rendered a DECODED image, so what
+ * follows is acting on real bytes rather than on the widget's error fallback.
+ *
+ * Three copies of this wait existed, byte-identical, in `attachment-zoom` and
+ * `embed-overflow-menu` (twice), all under the label `inline image decoded`.
+ * That label describes only the success case, and the wait has three failures
+ * behind it: the widget never rendered at all (the embed source did not become
+ * a widget), it rendered its error fallback (the attachment bytes did not
+ * load), or the image element is there and still measures zero. `za1` and `eo2`
+ * have each spent their whole budget on it in CI, on different pipelines, and
+ * the report named none of the three.
+ *
+ * Shared rather than diagnosed three times, because the next copy would inherit
+ * the silent version again.
+ */
+export async function waitForInlineImage(session: Session): Promise<void> {
+  let lastReason = "never polled";
+  await session.waitUntil(
+    async () => {
+      const state = await session.execute<{ found: boolean; width: number; testids: string[] }>(
+        "var i = document.querySelector('[data-testid=\"attachment-image\"]');" +
+          "var ids = [];" +
+          "var seen = document.querySelectorAll('[data-testid^=\"attachment\"], .cm-widgetBuffer, [data-testid=\"editor.content\"]');" +
+          "for (var n = 0; n < seen.length && ids.length < 8; n++) {" +
+          "  var v = seen[n].getAttribute('data-testid');" +
+          "  if (v && ids.indexOf(v) === -1) ids.push(v);" +
+          "}" +
+          "return { found: !!i, width: i ? i.offsetWidth : -1, testids: ids };",
+      );
+      if (state.found && state.width > 0) return true;
+      lastReason = state.found
+        ? `the image element is present and measures ${state.width}px wide`
+        : `no attachment-image element; embed-related testids present: ${
+            state.testids.length === 0 ? "none" : state.testids.join(", ")
+          }`;
+      return null;
+    },
+    { label: () => `inline image decoded (last poll: ${lastReason})`, timeoutMs: 20_000 },
+  );
+}
+
+/**
  * Why a click at an element's centre would not land: its box, whether that box
  * is inside the viewport, and what the document says is actually at that point.
  *

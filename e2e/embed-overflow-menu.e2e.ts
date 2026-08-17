@@ -43,6 +43,7 @@ import {
   dismissImporterOffer,
   pageSeatInvoke,
   unlockToEditor,
+  waitForInlineImage,
   waitForSaved,
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
@@ -141,15 +142,7 @@ describeE2E("eo1 embed overflow menu on an image embed (myne#409)", () => {
 
         // Wait until the inline image has decoded, so the widget is rendering
         // against real bytes rather than its error fallback.
-        await s.waitUntil(
-          async () =>
-            (await s.execute<boolean>(
-              `const i = document.querySelector('[data-testid="attachment-image"]'); return !!i && i.offsetWidth > 0;`,
-            ))
-              ? true
-              : null,
-          { label: "inline image decoded", timeoutMs: 20_000 },
-        );
+        await waitForInlineImage(s);
 
         // Read the stored name off the widget rather than assuming the one we
         // imported. `Compress images on import` is ON by default and re-encodes
@@ -219,15 +212,7 @@ describeE2E("eo2 embed layout rows write into the note (myne#409)", () => {
         await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
         await waitForSaved(s);
 
-        await s.waitUntil(
-          async () =>
-            (await s.execute<boolean>(
-              `const i = document.querySelector('[data-testid="attachment-image"]'); return !!i && i.offsetWidth > 0;`,
-            ))
-              ? true
-              : null,
-          { label: "inline image decoded", timeoutMs: 20_000 },
-        );
+        await waitForInlineImage(s);
 
         // Pick a size preset. The note bytes are the assertion: this is the
         // only authoring path for a layout segment, because a form-C embed is
