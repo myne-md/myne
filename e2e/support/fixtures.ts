@@ -21,6 +21,7 @@
 import { execFileSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -32,6 +33,40 @@ import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { REPO_ROOT } from "./session";
 import { scanForPlaintext } from "./plaintext-scan";
+
+/**
+ * A one-line, content-free description of what is under `<appDataDir>/vaults`,
+ * for a failure message.
+ *
+ * Reports each vault directory's name and whether it still holds a `vault.meta`
+ * — the file `vault_list` keys on, so an entry without one is invisible to the
+ * app exactly as an absent directory is. It never opens the file, so nothing it
+ * prints can carry vault content into a CI log.
+ *
+ * It exists because the boot probe added to `unlockToEditor` reported six
+ * scenarios sitting on the WELCOME screen, which `initialStageFromProbe`
+ * reaches on exactly one input: `vault_list` answered with zero vaults. The
+ * seed runs to completion before the app process spawns, so "the seed was late"
+ * is already ruled out, and the remaining explanations split on the one fact
+ * this supplies: whether the vault is on disk at the moment of failure.
+ * Populated means the app read a different place or dropped what it read; empty
+ * means something removed it after the generator wrote it.
+ */
+export function vaultDirState(appDataDir: string): string {
+  const vaults = join(appDataDir, "vaults");
+  if (!existsSync(appDataDir)) return "appDataDir itself is gone";
+  if (!existsSync(vaults)) return "no vaults/ directory";
+  try {
+    const names: string[] = readdirSync(vaults);
+    const dirs = names.filter((n: string) => statSync(join(vaults, n)).isDirectory());
+    if (dirs.length === 0) return "vaults/ is EMPTY";
+    return dirs
+      .map((n: string) => `${n}:${existsSync(join(vaults, n, "vault.meta")) ? "meta" : "NO-META"}`)
+      .join(" ");
+  } catch (raw) {
+    return `unreadable (${(raw as Error).message})`;
+  }
+}
 
 export interface SeededVault {
   vaultId: string;

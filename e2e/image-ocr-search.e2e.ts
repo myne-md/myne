@@ -161,6 +161,34 @@ describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)",
         // OCR runs inside this call.
         const attachmentId = await importImage(s);
 
+        // **Split the chain before asserting the end of it.** The palette wait
+        // reported `the query landed but no row matched; re-running the search`
+        // — so the query was intact, the palette re-ran the search, and the note
+        // still was not a hit. That rules out the input and leaves two very
+        // different bugs wearing one failure: OCR produced no text for this
+        // image, or it produced text that never reached the search index. This
+        // gate answers the first directly, through the same production command
+        // the attachment-text preview uses, so a model that read nothing fails
+        // HERE by name instead of 45 s later as a missing palette row.
+        //
+        // Assertion shapes are boolean and length only: the extracted text is
+        // note-body-class plaintext and must not land in a CI log even though
+        // this image is a repo fixture.
+        const extracted = await pageSeatInvoke(
+          s,
+          "plugin:attachments|attachment_read_extracted_text",
+          { id: attachmentId },
+          IPC_TIMEOUT,
+        );
+        expect(extracted.err, "reading the MYE1 extraction cache must succeed").toBeUndefined();
+        const text = (extracted.ok as { text?: string } | null)?.text ?? "";
+        expect(text.length, "OCR must have written a non-empty MYE1 entry").toBeGreaterThan(0);
+        expect(
+          text.toLowerCase().includes(IMAGE_WORD_EN),
+          `the extraction must contain the English word the image renders ` +
+            `(${text.length} characters were extracted)`,
+        ).toBe(true);
+
         await createNote(s, "Taranmis belge");
         const noteId = await selectedNoteId(s);
         await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);

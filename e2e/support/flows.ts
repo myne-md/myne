@@ -591,6 +591,40 @@ export async function enableAi(session: Session): Promise<void> {
  * mid-ceremony sync the compare screen re-renders, and the match button the
  * scenario had already located is gone. Nine of that file's ten tests pass; the
  * tenth spent 10 s on a button that existed the whole time under a new handle. */
+/**
+ * Why a click at an element's centre would not land: its box, whether that box
+ * is inside the viewport, and what the document says is actually at that point.
+ *
+ * The three answers WebKit collapses into "element not interactable" need three
+ * different fixes — a zero-sized box is a render bug, an out-of-viewport box
+ * wants a scroll, and a different node at the centre names the overlay to close
+ * — and the driver's error code distinguishes none of them. Reports the covering
+ * node by tag plus its testid where it has one, never by its text.
+ */
+async function hitTest(session: Session, testId: string): Promise<string> {
+  try {
+    return await session.execute<string>(
+      "var el = document.querySelector('[data-testid=\"' + arguments[0] + '\"]');" +
+        "if (!el) return 'the element vanished between the click and this read';" +
+        "var r = el.getBoundingClientRect();" +
+        "if (r.width === 0 || r.height === 0) return 'its box is ' + r.width + 'x' + r.height;" +
+        "var cx = r.left + r.width / 2, cy = r.top + r.height / 2;" +
+        "if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight)" +
+        "  return 'its centre (' + Math.round(cx) + ',' + Math.round(cy) + ') is outside the " +
+        "viewport ' + window.innerWidth + 'x' + window.innerHeight;" +
+        "var at = document.elementFromPoint(cx, cy);" +
+        "if (!at) return 'nothing is at its centre';" +
+        "if (at === el || el.contains(at)) return 'its centre is clear, so the refusal is not an overlay';" +
+        "var id = at.getAttribute('data-testid');" +
+        "return 'covered at its centre by <' + at.tagName.toLowerCase() + '>' +" +
+        "  (id ? ' [' + id + ']' : ' with no testid');",
+      [testId],
+    );
+  } catch (raw) {
+    return `hit-test unreadable (${(raw as Error).message})`;
+  }
+}
+
 export async function clickByTestId(
   session: Session,
   testId: string,
@@ -623,7 +657,16 @@ export async function clickByTestId(
             e.code === "element not interactable" ||
             e.code === "element click intercepted")
         ) {
-          lastReason = `found, but the click reported "${e.code}"`;
+          // **Name what is in the way, not just that something is.** The first
+          // version of this reason got `sync.sas-match` as far as
+          // `element not interactable`, which is a whole class of causes: a
+          // zero-sized box, an element scrolled out of the viewport, or another
+          // node sitting on top of the click point. Reading the rect and asking
+          // the document what is actually AT the centre separates them in one
+          // round trip, and the answer is the fix. Structural only, so a covered
+          // control cannot leak its own contents into a CI log.
+          lastReason =
+            `found, but the click reported "${e.code}"; ` + (await hitTest(session, testId));
           return null; // replaced or not hit-testable yet — re-find next poll
         }
         throw e;
