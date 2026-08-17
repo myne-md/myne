@@ -413,6 +413,49 @@ export async function enableAi(session: Session): Promise<void> {
   });
 }
 
+/** Click the element carrying `testId`, RE-LOCATING it on every poll.
+ *
+ * **`Element.click()` retries the CLICK, not the LOOKUP, and that is a different
+ * thing.** Its own comment says it retries while WebKit reports the node is in
+ * the DOM but not yet hit-testable, which is right for an overlay animating in.
+ * It cannot help when the node is REPLACED mid-retry: the handle it holds is
+ * then permanently stale, and it burns its whole budget clicking a dead node
+ * before reporting `element interactable + clicked` timed out. `flows.ts` already
+ * learned this once, in `typeIntoEditor`, where the fix was to re-find inside the
+ * poll; the knowledge just never became a helper.
+ *
+ * `sync-replication` line 205 is the case that made it one: after a
+ * mid-ceremony sync the compare screen re-renders, and the match button the
+ * scenario had already located is gone. Nine of that file's ten tests pass; the
+ * tenth spent 10 s on a button that existed the whole time under a new handle. */
+export async function clickByTestId(
+  session: Session,
+  testId: string,
+  opts?: { timeoutMs?: number },
+): Promise<void> {
+  await session.waitUntil(
+    async () => {
+      const [el] = await session.byTestIdAll(testId);
+      if (el === undefined) return null;
+      try {
+        await el.clickOnce();
+      } catch (e) {
+        if (
+          e instanceof WebDriverError &&
+          (e.code === "stale element reference" ||
+            e.code === "element not interactable" ||
+            e.code === "element click intercepted")
+        ) {
+          return null; // replaced or not hit-testable yet — re-find next poll
+        }
+        throw e;
+      }
+      return true;
+    },
+    { label: `${testId} located + clicked`, timeoutMs: opts?.timeoutMs ?? 20_000 },
+  );
+}
+
 /** Set the auto-tag sub-switch via Settings → AI (MYND-651). Off by default, and
  *  the host re-reads BOTH it and `ai_enabled` before any model touch — so a
  *  caller that wants the inline suggestion band must have called {@link enableAi}

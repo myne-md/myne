@@ -77,11 +77,19 @@ const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip
  * the race. */
 async function bufferText(session: Session): Promise<string> {
   await pressKey(session, KEY.ESCAPE);
-  const rendered = await editorText(session);
-  let buffer = rendered;
+  let buffer = await editorText(session);
   for (const ghost of await session.byTestIdAll("ai.ghost-text")) {
     const text = await ghost.textContent();
-    if (text.length > 0) buffer = buffer.split(text).join("");
+    if (text.length === 0) continue;
+    // Only a TRAILING occurrence, and the narrowing is the whole correctness
+    // argument. Removing every occurrence deleted the accepted text too, and
+    // `lastIndexOf` was no better: after Tab the suggestion's words are IN the
+    // document, so a re-armed ghost carrying the same words makes the accepted
+    // copy and the decoration indistinguishable by content alone. Position is
+    // what separates them: the ghost is a widget rendered AFTER the cursor, and
+    // this scenario types at the end of the document, so a ghost contribution
+    // can only ever be the readout's SUFFIX. Anything earlier is real text.
+    if (buffer.endsWith(text)) buffer = buffer.slice(0, -text.length);
   }
   return buffer;
 }
@@ -143,9 +151,16 @@ aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)",
           { label: "slash set a frontmatter title", timeoutMs: 15_000 },
         );
 
-        // ── (c) select-all → `ai.rewrite-selection` replaces the selection ──
+        // ── (c) select a span → `ai.rewrite-selection` replaces the selection ──
+        // Shift+End from the line start, not Ctrl+A: `Mod-a` here is the SCOPED
+        // select-all (`editor/src/keymap.ts` narrows it to the frontmatter block
+        // or the body by caret position) and it is rebindable, so a scenario
+        // that needs "a non-empty selection" should not route through it. ad3
+        // failed for exactly that reason: the selection came out empty and the
+        // rewrite no-opped, which read as a broken backend.
         await content.click();
-        await pressChord(s, KEY.CONTROL, "a");
+        await pressKey(s, KEY.HOME);
+        await pressKey(s, KEY.END, { shift: true });
         const beforeRewrite = await editorText(s);
         await runPaletteAction(s, "ai.rewrite-selection", "rewrite");
         await s.waitUntil(

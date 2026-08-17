@@ -396,9 +396,22 @@ pub(crate) async fn hydrate_ai_vectors<R: Runtime>(app: &AppHandle<R>, state: &V
             }
         }
 
-        if store.is_empty() {
-            return;
-        }
+        // **An empty store is an OUTCOME, not a reason to say nothing.** This
+        // return carried no comment, unlike every other guard in this function,
+        // and it is the one that made the walk unobservable at its most
+        // confusing moment: a hydrate that embedded nothing emitted nothing, so
+        // the only observer there is (`AiHydrationProbe`, and through it
+        // `ai-embeddings-persistence.e2e.ts`) could not tell "the walk finished
+        // with zero" from "the walk never ran". The scenario waited 30 s for an
+        // event that was never coming and reported a timeout, which reads as a
+        // hung backend rather than as an empty result.
+        //
+        // The payload already carries the zero honestly: `embedded` is
+        // documented as "total notes resident in the store AFTER the walk", and
+        // `loaded_from_blob` plus `reembedded` are meaningful at zero too. The
+        // publish guards below still apply, so a walk that raced a lock stays
+        // silent for the reason those guards state, which is a different reason
+        // and keeps its own comment.
         let embedded = store.embedded_note_ids().len();
 
         // Publish guarded: only if the vault is STILL unlocked (an idle auto-lock

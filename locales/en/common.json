@@ -1386,6 +1386,9 @@
       "attachFailed": "Couldn't attach that file.",
       "archiveFailed": "Couldn't archive this note.",
       "aiRewriteFailed": "The rewrite could not be completed, so your selection is unchanged.",
+      "aiRewriteNoSelection": "Select the text you want rewritten first, then run Rewrite selection again.",
+      "aiRewriteUnavailable": "Rewrite selection could not run just now. Nothing in your note was changed.",
+      "aiRewriteExcluded": "This note is in a folder you excluded from AI, so nothing was rewritten.",
       "aiRewriteNoProvider": "No AI provider is set up, so nothing was rewritten. Set one up in Settings → Developer → AI.",
       "trashFailed": "Couldn't move this note to Trash."
     },

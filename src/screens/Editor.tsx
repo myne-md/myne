@@ -3130,14 +3130,39 @@ function CommandPaletteHost({
       // core, then replace it in place as plain markdown (`ai.rewrite`, one undo
       // step). A no-op on an empty selection.
       onRewriteSelection: () => {
+        // **Every exit from here ANSWERS.** These four returns were silent, and
+        // they reproduced exactly the failure the comment below records as
+        // fixed: no toast, no error and no document change, indistinguishable
+        // from the action never having fired. Moving the orchestration into
+        // `rewriteSelectionToEditor` closed the engine-rejection path and left
+        // these four open, one layer up, which is the shape this repo keeps
+        // finding.
+        //
+        // The first three are internal inconsistencies rather than user
+        // mistakes: the action's own `visibility` already requires the editor
+        // stage and a selected note, so reaching them means the palette offered
+        // something the app then could not do. The user cannot act on the cause,
+        // but they can act on knowing it did not happen.
         const view = getActiveEditorView();
-        if (view === null) return;
-        // SYNC-14 fail-closed: never rewrite a note in an excluded folder, and
-        // never when the folder is unknown (see onSummarizeNote).
-        if (ctx.selectedId === null) return;
+        if (view === null || ctx.selectedId === null) {
+          setToast({ message: t("editor.flow.aiRewriteUnavailable"), variant: "error" });
+          return;
+        }
         const cached = ctx.cache.get(ctx.selectedId);
-        if (cached === undefined) return;
-        if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) return;
+        if (cached === undefined) {
+          setToast({ message: t("editor.flow.aiRewriteUnavailable"), variant: "error" });
+          return;
+        }
+        // SYNC-14 fail-closed: never rewrite a note in an excluded folder, and
+        // never when the folder is unknown (see onSummarizeNote). **Said out
+        // loud**, because this one is not an internal fault: the user
+        // configured the exclusion, so naming it is the difference between
+        // "Myne honoured my setting" and "this command is broken". It leaks
+        // nothing they did not already choose.
+        if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) {
+          setToast({ message: t("editor.flow.aiRewriteExcluded"), variant: "error" });
+          return;
+        }
         // Snapshot the note + the immutable pre-inference state, so the
         // multi-second blocking infer cannot land a stale range onto a document
         // the user edited (or a different note they switched to) in the meantime.
