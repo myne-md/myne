@@ -126,6 +126,22 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
           const connectingLabel = await waitForPosture(s, "connecting");
           expect(await bannerPosture(s)).toBe("connecting");
 
+          // **The fake must actually be LISTENING before its bootstrap means
+          // anything, and nothing here could see that before.** The host picks
+          // the SOCKS port by binding `:0`, reading the number and DROPPING the
+          // listener before handing it to the child, so the child races
+          // everything else on the box for it. A lost race makes the fake exit
+          // at once, and the phase has ALREADY reached `connecting` by then —
+          // it is set right after the spawn, before any stderr is read — so the
+          // assertion above passes and the posture goes `unavailable` a moment
+          // later. That reads as a bootstrap that failed rather than as a
+          // process that was never listening, which is how this scenario came
+          // to be quarantined as a 20 s budget problem.
+          expect(
+            tor.bindOutcome(),
+            "the fake sidecar must own its SOCKS port before a bootstrap can be probed",
+          ).toMatch(/^listening /);
+
           // ── The client finishes bootstrapping: the tunnel is up ───────
           tor.bootstrap();
           const activeLabel = await waitForPosture(s, "active");
