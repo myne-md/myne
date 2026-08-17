@@ -22,7 +22,6 @@ import {
   createNote,
   dismissImporterOffer,
   editorText,
-  reopenNoteAfterReload,
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -121,7 +120,28 @@ describeE2E("di1 inline drawing embed: create → edit-in-place → collapse →
         // Survive a WebView reload: the `![[Drawing 1]]` is real markdown in the
         // host note and the drawing note round-trips, so the embed re-renders.
         await s.refresh();
-        await reopenNoteAfterReload(s);
+        // **Reopen the HOST note by name, not "the first row".**
+        // `reopenNoteAfterReload` clicks the first `notes.row` and waits for
+        // `.cm-content`. That is right for a one-note vault and wrong here: this
+        // scenario has minted a SECOND note, "Drawing 1", and a drawing opens the
+        // Excalidraw canvas rather than CodeMirror. Whenever the drawing sorts
+        // first, the helper opens it, `.cm-content` never appears, and the wait
+        // burns 30 s on a note that was never the one under test. It is the last
+        // step of the scenario, so it read as "the embed did not survive a
+        // reload" when the embed was fine and the wrong note was open.
+        await s.waitUntil(
+          async () => {
+            const rows = await s.byTestIdAll("notes.row");
+            for (const row of rows) {
+              if ((await row.textContent()).includes("Notlar")) {
+                await row.click();
+                break;
+              }
+            }
+            return (await s.findElements(CM_CONTENT)).length > 0 ? true : null;
+          },
+          { label: "the host note reopened after reload", timeoutMs: 30_000 },
+        );
         await s.waitForElement(EMBED);
       },
     );

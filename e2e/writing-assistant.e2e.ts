@@ -35,7 +35,7 @@
 //
 // KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
 
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
@@ -124,10 +124,35 @@ aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)",
         await s.waitForElement(testIdSelector("ai.ghost-text"), { timeoutMs: 15_000 });
 
         // Tab accepts the suggestion as plain markdown (one `ai.insert` undo step).
-        await pressKey(s, KEY.TAB);
+        //
+        // **Sent to the ELEMENT and re-fired, and asserted on the TEXT.** Three
+        // things were wrong with the single `pressKey(TAB)` + length check.
+        // `pressKey` goes through `POST /actions`, which needs focus, and this
+        // file lands its text with `Element.sendKeys`, which does not prove any
+        // (the same confusion cost `ad3` three rounds). One press cannot recover
+        // if the ghost was between re-arms at that instant. And a length check
+        // passes on a Tab that merely INDENTED, so the weaker assertion could
+        // have hidden the very failure it was meant to catch.
+        //
+        // Asserting the ghost's own text landed is both stronger and cheaper to
+        // read: an indent does not contain it.
+        const editorContent = await s.waitForElement(CM_CONTENT);
+        const ghostText = (
+          await (await s.byTestId("ai.ghost-text")).textContent()
+        ).trim();
+        expect(ghostText.length, "the stub suggestion must not be empty").toBeGreaterThan(0);
         await s.waitUntil(
-          async () => ((await bufferText(s)).length > beforeGhost.length ? true : null),
-          { label: "ghost suggestion accepted into the buffer", timeoutMs: 10_000 },
+          async () => {
+            // **Tab BEFORE the read, and that ordering is the whole loop.** The
+            // first version read `bufferText` first, and `bufferText` presses
+            // Escape, which DISMISSES the ghost. So every poll cleared the
+            // suggestion, then looked for one, found none, and sent no Tab: a
+            // loop that could only ever time out, written to fix a timeout.
+            const showing = await s.byTestIdAll("ai.ghost-text");
+            if (showing.length > 0) await editorContent.sendKeys(KEY.TAB);
+            return (await bufferText(s)).includes(ghostText) ? true : null;
+          },
+          { label: "ghost suggestion accepted into the buffer", timeoutMs: 20_000 },
         );
 
         // Ctrl+Z reverses the accept in exactly one step — the buffer returns to
