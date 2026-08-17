@@ -131,16 +131,22 @@ describeE2E("di1 inline drawing embed: create → edit-in-place → collapse →
         // reload" when the embed was fine and the wrong note was open.
         await s.waitUntil(
           async () => {
-            const rows = await s.byTestIdAll("notes.row");
-            for (const row of rows) {
-              if ((await row.textContent()).includes("Notlar")) {
-                await row.click();
-                break;
-              }
+            // Chosen by OUTCOME, not by title. Matching on "Notlar" looked
+            // obvious and does not work: `createNote`'s inline rename does not
+            // always commit here, so the host row can carry an EMPTY title while
+            // the drawing carries "Drawing 1" (the failure artefact shows exactly
+            // that pair). What the scenario actually needs is "the row that opens
+            // a MARKDOWN editor", and a drawing opens the Excalidraw canvas
+            // instead, so trying rows until `.cm-content` appears asks the
+            // question directly and survives whatever the titles turn out to be.
+            for (const row of await s.byTestIdAll("notes.row")) {
+              if ((await row.textContent()).includes("Drawing")) continue;
+              await row.click();
+              if ((await s.findElements(CM_CONTENT)).length > 0) return true;
             }
-            return (await s.findElements(CM_CONTENT)).length > 0 ? true : null;
+            return null;
           },
-          { label: "the host note reopened after reload", timeoutMs: 30_000 },
+          { label: "a markdown note reopened after reload", timeoutMs: 30_000 },
         );
         await s.waitForElement(EMBED);
       },

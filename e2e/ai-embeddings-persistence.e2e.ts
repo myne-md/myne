@@ -218,6 +218,27 @@ aiDescribe("aep1 AI embedding-index persistence (cold build → hit → model-sw
             "would explain the missing event",
         ).not.toBe("remote");
 
+        // The third precondition, and the one the first two do not cover: the
+        // walk opens with a `embed("ready?")` probe purely to learn the vector
+        // DIMENSION, and a `None` there returns silently (`hydrate.rs`). So an
+        // embedding engine that cannot answer at all looks exactly like a walk
+        // that never started. Asked here through the real command, so a stub
+        // that stops embedding fails by name rather than as a 30 s wait.
+        const probe = await pageSeatInvoke(
+          s,
+          "plugin:local-inference|embed",
+          { text: "ready?" },
+          15_000,
+        );
+        expect(
+          probe.err,
+          "the embedding engine must answer before the walk can learn its dimension",
+        ).toBeUndefined();
+        expect(
+          (probe.ok as number[] | undefined)?.length,
+          "a zero-length vector gives the walk no dimension, which it treats as no engine",
+        ).toBeGreaterThan(0);
+
         // ── (a) COLD BUILD: lock → re-unlock #1 ──
         // With ai_enabled + model set + one note on disk but NO blob yet, this
         // hydrate does a cold build and WRITES vault.embeddings.
