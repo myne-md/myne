@@ -158,8 +158,26 @@ export async function openPalette(session: Session): Promise<void> {
       // real editor surface before firing — prefer the note content, fall back
       // to the editor pane (always present once unlocked, even with no note
       // open). Best-effort.
+      //
+      // **Skipped when the editor ALREADY holds focus, and that exemption is
+      // the whole reason a selection can survive this helper.** A click
+      // COLLAPSES a selection to a caret. Every palette action that operates on
+      // one (`ai.rewrite-selection` is the live case) therefore arrived with
+      // `state.selection.main.empty`, and the command no-opped. `ad3` chased it
+      // through three selection methods and three probe kinds before the cause
+      // turned out to be the helper that opens the palette, not the palette and
+      // not the keys: the scenario's own probe showed a focused editor with a
+      // non-empty selection immediately before this line ran.
+      //
+      // When `.cm-editor.cm-focused` is present the chord already has somewhere
+      // to land, so the re-anchor buys nothing and costs the selection.
+      const focused = await session.execute<boolean>(
+        "return !!document.querySelector('.cm-editor.cm-focused');",
+      );
       try {
-        await (await session.byTestId("editor.content", { timeoutMs: 400 })).click();
+        if (!focused) {
+          await (await session.byTestId("editor.content", { timeoutMs: 400 })).click();
+        }
       } catch {
         try {
           await (await session.byTestId("editor.pane", { timeoutMs: 400 })).click();

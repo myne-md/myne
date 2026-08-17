@@ -158,9 +158,14 @@ aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)",
         // that needs "a non-empty selection" should not route through it. ad3
         // failed for exactly that reason: the selection came out empty and the
         // rewrite no-opped, which read as a broken backend.
+        // Sent to the ELEMENT, for the reason ad3 records: `pressKey` goes
+        // through `POST /actions`, which delivers to whatever holds focus, and
+        // a scenario that lands its text with `Element.sendKeys` has proved
+        // nothing about focus. `Element.sendKeys` takes W3C sticky modifiers, so
+        // U+E008 stays down across the sequence.
         await content.click();
-        await pressKey(s, KEY.HOME);
-        await pressKey(s, KEY.END, { shift: true });
+        await content.sendKeys(KEY.HOME);
+        await content.sendKeys(KEY.SHIFT + KEY.END);
         const beforeRewrite = await editorText(s);
         await runPaletteAction(s, "ai.rewrite-selection", "rewrite");
         await s.waitUntil(

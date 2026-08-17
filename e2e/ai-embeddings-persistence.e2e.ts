@@ -192,6 +192,32 @@ aiDescribe("aep1 AI embedding-index persistence (cold build → hit → model-sw
         await typeIntoEditor(s, "The mitochondria is the powerhouse of the cell.");
         await waitForSaved(s);
 
+        // **Diagnostic gate, and it earns its place.** The hydrate walk has SIX
+        // silent early returns before it can emit (`hydrate.rs`
+        // `hydrate_ai_vectors`: no active vault, prefs read failure,
+        // `ai_enabled` off, no `LocalInferenceState`, a remote-refused
+        // `embedding_engine`, `notes_dir_for`). When the event does not arrive,
+        // the scenario's only report is a 30 s timeout, which names none of
+        // them and reads as a hung backend. Asserting the two preconditions the
+        // scenario itself SET means a broken setup fails here, by name, instead
+        // of as an unexplained wait later.
+        const prefsNow = await pageSeatInvoke(s, "plugin:prefs|prefs_read", {}, 10_000);
+        expect(
+          (prefsNow.ok as { ai_enabled?: boolean } | undefined)?.ai_enabled,
+          "ai_enabled must be on before the walk can run at all",
+        ).toBe(true);
+        const capability = await pageSeatInvoke(
+          s,
+          "plugin:local-inference|ai_capability_report",
+          {},
+          10_000,
+        );
+        expect(
+          (capability.ok as { backend_class?: string } | undefined)?.backend_class,
+          "the walk refuses a remote backend outright, so a remote class here " +
+            "would explain the missing event",
+        ).not.toBe("remote");
+
         // ── (a) COLD BUILD: lock → re-unlock #1 ──
         // With ai_enabled + model set + one note on disk but NO blob yet, this
         // hydrate does a cold build and WRITES vault.embeddings.
