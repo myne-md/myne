@@ -1,8 +1,8 @@
 {
-  "note": "Measured from a complete build. Regenerate deliberately with `node scripts/check-web-bundle-budget.mjs --update`, and say why in the commit.",
+  "note": "Measured from a complete build. Regenerate deliberately with `node scripts/check-web-bundle-budget.mjs --update`, and say why in the commit. Re-baselined 2026-08-17 for myne-md/myne#529: agentic note editing added 91 user-facing strings to locales/en/common.json, and the English catalog is statically imported, so it is first load. Measured contribution 1.3 KiB gzip (350.5 -> 351.8), which crossed a cap the tree was already 0.7 KiB under. The previous baseline was the Phase-3 web-client measurement (319.3 KiB) and had absorbed 9.8% of drift without ever being re-recorded, so this records where the tree actually is rather than granting new room. KNOWN AND NOT FIXED HERE: the agent is `Class::Unsupported` on web (web/wasm/src/capability.rs), so those 91 strings are dead weight in the web bundle. The catalog is one file for every client and has no per-client split, so every desktop-only feature pays this on web. That is a structural issue this feature exposed rather than created, and it wants its own change.",
   "marginPct": 10,
   "initial": {
-    "rawBytes": 1023872,
-    "gzipBytes": 326925
+    "rawBytes": 1125528,
+    "gzipBytes": 360220
   }
 }
