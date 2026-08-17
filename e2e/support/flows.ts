@@ -611,22 +611,39 @@ export async function waitForInlineImage(session: Session): Promise<void> {
   let lastReason = "never polled";
   await session.waitUntil(
     async () => {
-      const state = await session.execute<{ found: boolean; width: number; testids: string[] }>(
+      const state = await session.execute<{
+        found: boolean;
+        width: number;
+        chip: boolean;
+        testids: string[];
+      }>(
         "var i = document.querySelector('[data-testid=\"attachment-image\"]');" +
+          // The widget starts the <img> at `display:none` and reveals it on the
+          // `load` event, while a progress chip stands in. On `error` it removes
+          // the chip and leaves the image HIDDEN, so a failed decrypt or decode
+          // measures zero forever and no budget reaches it. The chip is
+          // therefore the discriminator, and the reason this reads it: chip
+          // present means the bytes are still coming, chip gone with the image
+          // still hidden means the load FAILED.
+          "var chip = !!document.querySelector('.cm-attachment-progress');" +
           "var ids = [];" +
           "var seen = document.querySelectorAll('[data-testid^=\"attachment\"], .cm-widgetBuffer, [data-testid=\"editor.content\"]');" +
           "for (var n = 0; n < seen.length && ids.length < 8; n++) {" +
           "  var v = seen[n].getAttribute('data-testid');" +
           "  if (v && ids.indexOf(v) === -1) ids.push(v);" +
           "}" +
-          "return { found: !!i, width: i ? i.offsetWidth : -1, testids: ids };",
+          "return { found: !!i, width: i ? i.offsetWidth : -1, chip: chip, testids: ids };",
       );
       if (state.found && state.width > 0) return true;
-      lastReason = state.found
-        ? `the image element is present and measures ${state.width}px wide`
-        : `no attachment-image element; embed-related testids present: ${
-            state.testids.length === 0 ? "none" : state.testids.join(", ")
-          }`;
+      if (state.found) {
+        lastReason = state.chip
+          ? `the image is present, hidden, and its progress chip is still up, so the bytes have not arrived`
+          : `the image is present, hidden, and its progress chip is GONE, which the widget does only on a load ERROR — the attachment did not decrypt or decode`;
+      } else {
+        lastReason = `no attachment-image element; embed-related testids present: ${
+          state.testids.length === 0 ? "none" : state.testids.join(", ")
+        }`;
+      }
       return null;
     },
     { label: () => `inline image decoded (last poll: ${lastReason})`, timeoutMs: 20_000 },
