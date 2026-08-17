@@ -115,6 +115,33 @@ async function embedAudioAndReopen(s: Session, id: string): Promise<void> {
   await s.waitForElement(testIdSelector("attachment-audio"), { timeoutMs: 15_000 });
 }
 
+
+/** Open the audio widget's ⋮ menu and click `testId`, RE-OPENING until the row
+ *  is actually there.
+ *
+ * **A single click is not enough, and tr2 in this same file already knew.** Its
+ * comment records that the menu is body-portaled and self-closes on any
+ * scroll/resize reflow (`actionMenu.ts`), so one click can race a layout shift
+ * on a cold app, and it polls with a re-open for exactly that reason. tr1 and
+ * tr3 clicked once and then waited the full 45 s budget on a row that was never
+ * going to appear, with nothing to re-click. That is the same shape
+ * `e2e/CLAUDE.md` records for `clickNewMenuItem`: the victim looks like a broken
+ * feature, and the fix is to re-fire the trigger rather than to wait longer. */
+async function openAudioMenuItem(s: Session, testId: string): Promise<void> {
+  const row = await s.waitUntil(
+    async () => {
+      const open = await s.byTestIdAll(testId);
+      if (open.length > 0) return open[0];
+      // Not up (or it closed under us) — fire the trigger again and re-poll.
+      const button = (await s.byTestIdAll("attachment-audio.menu-button")).at(0);
+      if (button !== undefined) await button.click();
+      return null;
+    },
+    { label: `the audio menu showing ${testId}`, timeoutMs: 30_000 },
+  );
+  await row.click();
+}
+
 aiDescribe("tr1 transcribe chain — progress → transcript → insert (transcription-ui)", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
   it("transcribes an embedded audio note and inserts the transcript into the note body", async () => {
@@ -136,8 +163,7 @@ aiDescribe("tr1 transcribe chain — progress → transcript → insert (transcr
         await enableAi(s);
 
         // ── Trigger Transcribe from the audio ⋮ menu ──
-        await (await s.byTestId("attachment-audio.menu-button")).click();
-        await (await s.waitForElement(testIdSelector("attachment-audio.transcribe"))).click();
+        await openAudioMenuItem(s, "attachment-audio.transcribe");
 
         // Progress affordance appears while the stub streams segments.
         await s.waitForElement(testIdSelector("attachment-audio.transcript-progress"), {
@@ -185,8 +211,7 @@ aiDescribe("tr3 attachments-library transcription viewer (#231)", () => {
         const id = await recordFixtureAudio(s);
         await embedAudioAndReopen(s, id);
         await enableAi(s);
-        await (await s.byTestId("attachment-audio.menu-button")).click();
-        await (await s.waitForElement(testIdSelector("attachment-audio.transcribe"))).click();
+        await openAudioMenuItem(s, "attachment-audio.transcribe");
         const widgetTranscript = await (
           await s.waitForElement(testIdSelector("attachment-audio.transcript"), {
             timeoutMs: 20_000,

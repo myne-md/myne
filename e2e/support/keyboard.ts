@@ -24,6 +24,13 @@ export const KEY = {
   SHIFT: String.fromCharCode(0xe008),
   CONTROL: String.fromCharCode(0xe009),
   DELETE: String.fromCharCode(0xe017),
+  /** W3C `Home`. Selecting with Shift+Home is how a scenario gets a
+   *  selection without depending on the app's `Mod-a` binding, which is
+   *  rebindable AND scoped (`editor/src/keymap.ts` narrows select-all to
+   *  the frontmatter block or the body depending on where the caret is). */
+  HOME: String.fromCharCode(0xe011),
+  /** W3C `End`, the sibling of HOME above. */
+  END: String.fromCharCode(0xe010),
 } as const;
 
 /** Press a single key (optionally with Shift held) at the focused element. */

@@ -111,10 +111,46 @@ describe("rewriteSelectionToEditor", () => {
     expect(view.state.doc.toString()).toBe(DOC);
   });
 
-  it("is silent when the pipeline declines — an empty rewrite is not a failure", async () => {
+  it("is silent when the ENGINE declines — an empty rewrite is not a failure", async () => {
+    // Unchanged contract, narrowed: the engine ran and had nothing to put back.
+    // Not a failure, not the user's mistake, nothing actionable to say.
     const h = harness(() => Promise.resolve(""));
     await expect(h.run()).resolves.toBe(false);
     expect(h.toasts).toEqual([]);
     expect(h.view.state.doc.toString()).toBe(DOC);
+  });
+
+  it("ANSWERS when there is no selection — the engine never ran", async () => {
+    // **The half that used to share the silent return above, and should not
+    // have.** `computeRewrite` returns null out of `resolveRewriteRange`, before
+    // the engine is called, which means exactly one thing: nothing was selected.
+    // Collapsing that into the engine-declined case left a user who ran
+    // "Rewrite selection" with no selection staring at an unchanged document
+    // with nothing to read, which is the ambiguity this module exists to remove
+    // and the one `ad3` asserts against.
+    let inferCalls = 0;
+    const view = new EditorView({
+      // A cursor, not a range: `resolveRewriteRange` has nothing to work on.
+      state: EditorState.create({ doc: DOC, selection: { anchor: 0, head: 0 } }),
+    });
+    const toasts: string[] = [];
+    const changed = await rewriteSelectionToEditor({
+      view,
+      stateAtStart: view.state,
+      activeView: () => view,
+      stillSameNote: () => true,
+      infer: () => {
+        inferCalls += 1;
+        return Promise.resolve("SHOULD NOT RUN");
+      },
+      showToast: (m) => toasts.push(m),
+      t: (key) => key,
+    });
+    expect(changed).toBe(false);
+    // The document is untouched and the engine was never asked, which is what
+    // makes the toast the ONLY thing the user could have noticed.
+    expect(view.state.doc.toString()).toBe(DOC);
+    expect(inferCalls).toBe(0);
+    expect(toasts).toEqual(["editor.flow.aiRewriteNoSelection"]);
   });
 });

@@ -25,8 +25,9 @@
 import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { KEY, pressChord } from "./support/keyboard";
+import { KEY, pressKey } from "./support/keyboard";
 import {
+  createNote,
   closeSettings,
   dismissImporterOffer,
   enableDeveloperMode,
@@ -180,11 +181,45 @@ aiDescribe("ad3 an explicit AI action always answers, even when it cannot run", 
           await dismissImporterOffer(s);
           await openChatWithAiOn(s);
 
+          // **A note has to be OPEN before anything can be typed.** `unlockToEditor`
+          // lands on the editor stage with no tab active, so `.cm-content` does not
+          // exist and `typeIntoEditor` waits out its whole budget on
+          // `editor located + focused`. This scenario is the only one in the file
+          // that types, which is why it was the only one red; the artefact shows
+          // the chat tab present and no CodeMirror node at all.
+          await createNote(s, "ad3notealfa7k2m9qx4w8e5rj0aa");
+
           // Type something and select it, then run the palette action.
           await typeIntoEditor(s, "the quick brown fox");
           // Select it — the rewrite acts on a selection and no-ops without one,
           // which would make the toast's absence mean the wrong thing.
-          await pressChord(s, KEY.CONTROL, "a");
+          // **Shift+Home, not Ctrl+A.** `Mod-a` in this editor is not plain
+          // select-all: `editor/src/keymap.ts` scopes it to the frontmatter
+          // block or to the body depending on where the caret sits, and it is
+          // rebindable. Whatever it did here, it left `state.selection.main`
+          // EMPTY, so `resolveRewriteRange` returned null and the rewrite
+          // no-opped -- which is how this scenario came to be blaming a backend
+          // for a selection that was never made. Shift+Home selects from the
+          // caret (end of the line just typed) back to the line start with
+          // plain navigation, depending on no app binding at all.
+          await pressKey(s, KEY.HOME, { shift: true });
+          // **Verify the selection rather than assume it.** The comment above
+          // says the rewrite no-ops without one, and that is exactly why the
+          // absence has to be ruled out HERE: without this the scenario cannot
+          // tell "the backend failed and said nothing" from "there was nothing
+          // selected", and it spent its budget blaming the first for the second.
+          // Read through the DOM selection, which is what a user would see
+          // highlighted — no app hook, same class as the harness's other
+          // `execute` reads.
+          await s.waitUntil(
+            async () =>
+              (await s.execute<number>(
+                "return String(window.getSelection() || '').length;",
+              )) > 0
+                ? true
+                : null,
+            { label: "the editor selection Ctrl+A made", timeoutMs: 5_000 },
+          );
           await runPaletteAction(s, "ai.rewrite-selection", "rewrite");
 
           // The whole point: BEFORE this fix the user got no toast, no error and
