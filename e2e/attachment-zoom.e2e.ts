@@ -24,6 +24,7 @@ import {
   dismissImporterOffer,
   pageSeatInvoke,
   unlockToEditor,
+  waitForInlineImage,
   waitForSaved,
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
@@ -98,15 +99,7 @@ describeE2E("za1 attachment image lightbox zoom/pan (MYND-594)", () => {
 
         // Wait until the inline chip's image has decoded + is displayed, then
         // click it to open the lightbox.
-        await s.waitUntil(
-          async () =>
-            (await s.execute<boolean>(
-              `const i = document.querySelector('[data-testid="attachment-image"]'); return !!i && i.offsetWidth > 0;`,
-            ))
-              ? true
-              : null,
-          { label: "inline image decoded", timeoutMs: 20_000 },
-        );
+        await waitForInlineImage(s);
         await (await s.byTestId("attachment-image")).click();
 
         // The lightbox is open with its image + zoom controls.
