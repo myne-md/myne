@@ -39,6 +39,7 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
   renameSync,
   rmSync,
@@ -80,6 +81,7 @@ if (!argv.includes("proxy") || !Number.isInteger(port) || port <= 0 || !configFi
 }
 
 const control = path.join(path.dirname(configFile), "e2e-control");
+const bindReport = path.join(path.dirname(configFile), "e2e-bind");
 
 const server = net.createServer((socket) => {
   socket.on("error", () => {});
@@ -104,12 +106,22 @@ const server = net.createServer((socket) => {
   });
 });
 
+// **Whether the bind SUCCEEDED, written where the scenario can read it.**
+// Until this existed the only report was stderr, which goes to the supervisor's
+// pipe and nowhere a scenario can reach — so a fake that failed to bind was
+// indistinguishable from one that bootstrapped late. That matters because the
+// host picks the port by binding :0, reading the number and DROPPING the
+// listener before handing it over, so the child races anything else on the box
+// for it. The scenario reaching \`connecting\` proves only that the process was
+// spawned: the phase is set right after spawn, before any stderr is read.
 server.on("error", (e) => {
+  try { fs.writeFileSync(bindReport, "failed " + e.message); } catch {}
   console.error("fake myne-tor: listen failed: " + e.message);
   process.exit(1);
 });
 
 server.listen(port, "127.0.0.1", () => {
+  try { fs.writeFileSync(bindReport, "listening " + port); } catch {}
   // Deliberately NOT the readiness marker: the supervisor must stay in
   // \`Starting\` until the scenario writes "bootstrap". Mirrors arti's own
   // startup chatter, which is_bootstrap_line() drops.
@@ -177,6 +189,7 @@ export function installFakeTorSidecar(): () => void {
 export function torSidecarControl(appDataDir: string): {
   bootstrap(): void;
   die(): void;
+  bindOutcome(): string;
 } {
   const torDir = join(appDataDir, "tor");
   const write = (word: ControlWord) => {
@@ -190,5 +203,22 @@ export function torSidecarControl(appDataDir: string): {
     bootstrap: () => write("bootstrap"),
     /** Kill the fake from the inside — an exit the host did not ask for. */
     die: () => write("die"),
+    /**
+     * What the fake's own `listen` reported: `listening <port>`, `failed <why>`,
+     * or `not written` when it never got that far.
+     *
+     * The scenario cannot otherwise tell a fake that bound its port from one
+     * that lost the race for it, because the phase reaches `connecting` right
+     * after the spawn and before any stderr is read. A lost race then presents
+     * as `unavailable` a moment later, which reads like a bootstrap that failed
+     * rather than a process that was never listening.
+     */
+    bindOutcome: () => {
+      try {
+        return readFileSync(join(torDir, "e2e-bind"), "utf8").trim();
+      } catch {
+        return "not written";
+      }
+    },
   };
 }
