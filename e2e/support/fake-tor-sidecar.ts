@@ -39,6 +39,7 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -65,7 +66,21 @@ const net = require("node:net");
 const fs = require("node:fs");
 const path = require("node:path");
 
+// **The very first thing it does, before the argv assert can exit.** Without
+// this, "no bind report" has two answers that need opposite fixes: the fake is
+// not the process the host spawned at all, or it IS and it exited before
+// listening. The -c argument is the only place the per-run directory is known,
+// so the marker goes next to it, and it is best-effort.
 const argv = process.argv.slice(2);
+try {
+  const ci = argv.indexOf("-c");
+  if (ci >= 0 && ci + 1 < argv.length) {
+    require("node:fs").writeFileSync(
+      require("node:path").join(require("node:path").dirname(argv[ci + 1]), "e2e-started"),
+      argv.join(" "),
+    );
+  }
+} catch {}
 function flag(name) {
   const i = argv.indexOf(name);
   return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null;
@@ -160,6 +175,28 @@ function poll() {
  * `myne-tor` staged there. Returns the uninstall — call it in a `finally`, so a
  * failing scenario cannot leave the build output holding a fixture.
  */
+export function installedFakePath(): string {
+  return join(dirname(realpathSync(defaultAppPath())), "myne-tor");
+}
+
+/**
+ * Whether the file the app will spawn is THIS fixture rather than a real sidecar.
+ *
+ * The fake writes a start marker before anything in it can fail, and a run
+ * measured that marker absent while the host had clearly spawned something (the
+ * phase reached `connecting` and the tor directory held the generated config).
+ * The only way both are true is that the process spawned was not the fake, so
+ * the install needs an assertion rather than an assumption: the fixture is a
+ * Node script and begins with a shebang, a real `myne-tor` is an ELF.
+ */
+export function fakeIsInstalled(): boolean {
+  try {
+    return readFileSync(installedFakePath(), "utf8").startsWith("#!");
+  } catch {
+    return false;
+  }
+}
+
 export function installFakeTorSidecar(): () => void {
   // `realpathSync` because the app resolves its own location with
   // `std::env::current_exe()`, which follows symlinks. A `MYNE_E2E_APP` pointing
@@ -169,13 +206,28 @@ export function installFakeTorSidecar(): () => void {
   const exeDir = dirname(realpathSync(defaultAppPath()));
   const target = join(exeDir, "myne-tor");
   const parked = target + PARKED_SUFFIX;
-  const hadReal = existsSync(target);
-  if (hadReal) renameSync(target, parked);
+  // **Park the REAL one, never a fixture, and restore whatever is parked.**
+  //
+  // The original pair asked `existsSync(target)` and treated any answer as "a
+  // real sidecar is here". A run killed before its `finally` leaves the fixture
+  // in place AND the real one parked, and the next install then renamed the
+  // FIXTURE over the parked real binary, destroying it. Its uninstall restored
+  // that fixture as though it were the sidecar, and one round later the file was
+  // gone from the build output entirely — measured, on this machine: `myne-tor`
+  // absent and a 19.7 MB ELF sitting at `myne-tor.e2e-parked`.
+  //
+  // Two changes make it idempotent. Parking is keyed on the file being a real
+  // binary rather than merely present, so a leftover fixture is overwritten
+  // instead of promoted. Restoring is keyed on a parked file EXISTING rather
+  // than on what this call happened to observe, so a crashed predecessor's
+  // parked binary is put back by whoever runs next.
+  const leftoverFixture = existsSync(target) && !fakeIsInstalled();
+  if (leftoverFixture) renameSync(target, parked);
   writeFileSync(target, fakeSidecarSource());
   chmodSync(target, 0o755);
   return () => {
     rmSync(target, { force: true });
-    if (hadReal) renameSync(parked, target);
+    if (existsSync(parked)) renameSync(parked, target);
   };
 }
 
@@ -217,7 +269,25 @@ export function torSidecarControl(appDataDir: string): {
       try {
         return readFileSync(join(torDir, "e2e-bind"), "utf8").trim();
       } catch {
-        return "not written";
+        // **What IS in the directory, when the report is not.** The fake writes
+        // its outcome beside the `arti.toml` the host generated, so the presence
+        // of that config proves the host prepared the directory and got as far
+        // as spawning something; the absence of the report then says the thing
+        // it spawned was not this fake. Without this the failure is
+        // indistinguishable from the host never having started a sidecar at all.
+        let listing: string;
+        try {
+          listing = readdirSync(torDir).sort().join(" ") || "empty";
+        } catch {
+          listing = "no tor/ directory";
+        }
+        // `e2e-started` is written by the fake before its argv assert can exit,
+        // so its presence separates "the fake ran and died" from "the fake is
+        // not what the host spawned" — two answers needing opposite fixes.
+        const started = existsSync(join(torDir, "e2e-started"))
+          ? "the fake DID start"
+          : "the fake never started";
+        return `not written (${started}; tor dir holds: ${listing})`;
       }
     },
   };

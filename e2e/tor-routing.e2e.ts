@@ -23,7 +23,11 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { installFakeTorSidecar, torSidecarControl } from "./support/fake-tor-sidecar";
+import {
+  fakeIsInstalled,
+  installFakeTorSidecar,
+  torSidecarControl,
+} from "./support/fake-tor-sidecar";
 import {
   bootDiagnostic,
   closeSettings,
@@ -102,6 +106,15 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
           const s = app.session;
           const tor = torSidecarControl(app.appDataDir);
 
+          // The app spawns whatever sits at that path, so this scenario is
+          // about a real Tor client unless the fixture is actually there. A run
+          // measured the fake's start marker absent while the host had clearly
+          // spawned something, which is the one shape that says the file was not
+          // ours.
+          expect(fakeIsInstalled(), "the fake sidecar must be the file the app will spawn").toBe(
+            true,
+          );
+
           await unlockToEditor(s, password);
           await dismissImporterOffer(s);
 
@@ -144,16 +157,22 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
           // `not written` every time — which is what CI measured, and it says
           // nothing about the port. The three outcomes only separate once the
           // fake has had a chance to reach either branch of its listen.
+          let lastBind = "never polled";
           const bound = await s.waitUntil(
             async () => {
               const outcome = tor.bindOutcome();
-              return outcome === "not written" ? null : outcome;
+              lastBind = outcome;
+              return outcome.startsWith("not written") ? null : outcome;
             },
             {
+              // The observation goes in the LABEL, because the label is the only
+              // part of a timeout the reader sees. A fixed sentence here would
+              // repeat the same guess every run; the directory listing says
+              // whether the host even prepared a sidecar directory.
               label: () =>
-                "the fake sidecar to report its bind outcome; still 'not written', so it " +
-                "never reached either branch of listen — it is not the process the host " +
-                "spawned, or it exited before running",
+                `the fake sidecar to report its bind outcome; last read: ${lastBind}. ` +
+                "Nothing written means it reached neither branch of listen, so it is not " +
+                "the process the host spawned or it exited before running",
               timeoutMs: 15_000,
             },
           );
