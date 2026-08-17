@@ -153,6 +153,40 @@
   bar that proved the fix. `tor1` and `ci1`'s spec do NOT use the helper, so
   they are separate debts: `tor1` is a fake-sidecar posture timeout (raise its
   20 s budget or fix a handshake bug), not a network limit.
+- **The contention diagnosis was wrong a second time, and the real cause was the
+  driver PORT** (myne-md/myne#529). `gp1`, `gp2`, `nav1` and `sd1` were all
+  sitting on the **Welcome screen** with a correctly seeded vault, which
+  `initialStageFromProbe` reaches on exactly one input: `vault_list` answering
+  zero. Every scenario in a worker launches its own `tauri-driver` on the same
+  port, `teardown` sent SIGTERM, slept 200 ms, sent SIGKILL and returned WITHOUT
+  waiting, and `waitForDriver` can only ask whether SOMETHING is answering
+  there. So a scenario routinely attached to the previous scenario's dying
+  driver, and that driver spawns the app with ITS environment — an
+  `XDG_DATA_HOME` pointing at the `dataHome` the same teardown had just deleted.
+  The app found no `vaults/`, took the legitimate fresh-install path, and the
+  scenario waited its whole budget for an unlock screen that was never coming.
+  It explains every property contention could not: more timeout never helped
+  (the app is pointed at a deleted directory forever), it worsened at the tail
+  of a run (process death is slower under load), and it reproduced on an idle
+  machine now and then (the race is small, not absent). `launchApp` now RESOLVES
+  a free port rather than insisting on one, because a full local run proved
+  waiting is not enough: something held 4544 more than twenty seconds after
+  being SIGKILLed as a group. Measured either side of the fix, same warm
+  container: 2 failures then 0, and the suite got 62 s FASTER (758 s → 696 s),
+  because a burned 45 s budget costs more than the fix does.
+- **Every one of those failures was a permanent state a bigger budget cannot
+  reach, and the family is larger than the port.** The same shape turned up
+  seven times in one pass: an event emitted before its listener existed (Tauri
+  `emit` has no replay), the deleted-directory launch above, a control below the
+  fold of a nested `overflow` container (WebDriver's own pre-click scroll does
+  not reliably reach one in WebKit), a query the driver truncated during a focus
+  settle, an `<img>` the widget leaves hidden forever on a load `error`, a widget
+  never built because the per-mount catalog had not resolved, and a fake sidecar
+  that never reached either branch of its `listen`. **When a wait times out,
+  ask what would have to CHANGE for it to succeed, and if the answer is
+  "nothing", raising the number is the one fix guaranteed not to work.** The
+  helpers now say which of their several silent arms kept firing, and that is
+  what turned six of these from guesses into measurements.
 - **Hunt flake with `--retry=0`.** With retries on, a failing attempt is erased
   from the report and the flake rate reads as zero no matter how bad it is.
   Repeat the spec in ONE warm container and always discard a warm-up run: the
