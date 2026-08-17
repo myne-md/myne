@@ -31,7 +31,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { waitForDriverGone } from "../../e2e/support/session";
+import { freeDriverPorts, waitForDriverGone } from "../../e2e/support/session";
 
 /** A probe that resolves (something is answering) until `alive` is flipped. */
 function seededProbe(state: { alive: boolean }): () => Promise<unknown> {
@@ -76,5 +76,45 @@ describe("waitForDriverGone", () => {
       Date.now() - started,
       "must return shortly after the listener closes, not at the deadline",
     ).toBeLessThan(5_000);
+  });
+});
+
+describe("freeDriverPorts", () => {
+  /** A probe that answers (port busy) for the listed ports and refuses for the rest. */
+  function busy(ports: number[]): (url: string) => Promise<unknown> {
+    return async (url: string) => {
+      const port = Number(new URL(url).port);
+      if (ports.includes(port)) return { ready: true };
+      throw new Error("connection refused");
+    };
+  }
+
+  it("keeps the configured pair when nothing is holding it", async () => {
+    const got = await freeDriverPorts(4444, 4445, busy([]));
+    expect(got).toEqual({ driverPort: 4444, nativePort: 4445, movedFrom: undefined });
+  });
+
+  it("moves to the next stride when the configured port is still answering", async () => {
+    // The measured case, from a full local run:
+    // `a WebDriver is still answering on http://127.0.0.1:4544 after 10000 ms`.
+    // The teardown had already waited its own ten seconds, so something held the
+    // port more than twenty seconds after being SIGKILLed. Waiting longer is not
+    // the answer; not needing that number is.
+    const got = await freeDriverPorts(4544, 4545, busy([4544]), 200);
+    expect(got.driverPort).toBe(5544);
+    expect(got.nativePort, "the native port must move with its driver").toBe(5545);
+    expect(got.movedFrom, "a move is reported, never absorbed silently").toBe(4544);
+  });
+
+  it("keeps stepping past several held ports", async () => {
+    const got = await freeDriverPorts(4444, 4445, busy([4444, 5444]), 200);
+    expect(got.driverPort).toBe(6444);
+    expect(got.nativePort).toBe(6445);
+  });
+
+  it("fails by name when every candidate is held", async () => {
+    await expect(
+      freeDriverPorts(4444, 4445, busy([4444, 5444, 6444, 7444]), 200),
+    ).rejects.toThrow(/every candidate WebDriver port from 4444/);
   });
 });

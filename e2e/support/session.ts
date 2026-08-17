@@ -212,6 +212,62 @@ export async function waitForDriverGone(
   }
 }
 
+/** How far apart the fallback ports are. A worker's band is 100 wide
+ *  (`worker-ports.ts`), so stepping by 1000 lands outside every band rather
+ *  than inside a neighbour's. */
+const PORT_FALLBACK_STRIDE = 1000;
+/** How many alternates to try before giving up and saying so. */
+const PORT_FALLBACK_ATTEMPTS = 4;
+
+/**
+ * A driver/native port pair nothing is answering on: the configured one when it
+ * is free, else a deterministic alternate.
+ *
+ * **Waiting was not enough, which the suite proved rather than suggested.** The
+ * first version of this refused to launch while a previous driver still held the
+ * port, and a full local run hit exactly that:
+ * `a WebDriver is still answering on http://127.0.0.1:4544 after 10000 ms`. The
+ * teardown had already waited its own ten seconds before that, so something was
+ * holding the port more than twenty seconds after being SIGKILLed as a process
+ * group — a lingering driver, or one whose teardown never ran because its
+ * worker died mid-scenario.
+ *
+ * Refusing is still better than the silent alternative it replaced, where the
+ * scenario attached to that driver and got an app pointed at a deleted data
+ * directory. But there is no reason to insist on one number: moving to a free
+ * port makes a lingering driver unable to affect the next scenario at all.
+ *
+ * Deterministic steps rather than an ephemeral `:0` bind, because a bind-then-
+ * release handover has the same race it is meant to avoid — `tor_sidecar`'s
+ * `pick_loopback_port` is the worked example of that going wrong.
+ */
+export async function freeDriverPorts(
+  driverPort: number,
+  nativePort: number,
+  // Both injectable for the unit test only; production probes for real and
+  // waits the full budget on the port it was actually configured with.
+  probe: (url: string) => Promise<unknown> = driverStatus,
+  firstWaitMs: number = DRIVER_FREE_TIMEOUT_MS,
+): Promise<{ driverPort: number; nativePort: number; movedFrom?: number }> {
+  for (let attempt = 0; attempt < PORT_FALLBACK_ATTEMPTS; attempt += 1) {
+    const candidate = driverPort + attempt * PORT_FALLBACK_STRIDE;
+    const budget = attempt === 0 ? firstWaitMs : 500;
+    if (await waitForDriverGone(`http://${DRIVER_HOST}:${candidate}`, budget, probe)) {
+      return {
+        driverPort: candidate,
+        nativePort: nativePort + attempt * PORT_FALLBACK_STRIDE,
+        movedFrom: attempt === 0 ? undefined : driverPort,
+      };
+    }
+  }
+  throw new Error(
+    `every candidate WebDriver port from ${driverPort} in steps of ` +
+      `${PORT_FALLBACK_STRIDE} is still answering. Launching on one would attach this ` +
+      "scenario to somebody else's driver, and the app would come up against that " +
+      "driver's data directory rather than this one's seed.",
+  );
+}
+
 /**
  * Launch tauri-driver + the production app with an isolated data dir.
  *
@@ -223,11 +279,10 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   const support = harnessSupported();
   if (!support.ok) throw new Error(support.reason);
 
-  const driverPort =
+  const wantedDriverPort =
     opts.driverPort ?? Number(process.env.MYNE_E2E_DRIVER_PORT ?? DEFAULT_DRIVER_PORT);
-  const nativePort =
+  const wantedNativePort =
     opts.nativePort ?? Number(process.env.MYNE_E2E_NATIVE_PORT ?? DEFAULT_NATIVE_PORT);
-  const baseUrl = `http://${DRIVER_HOST}:${driverPort}`;
 
   const dataHome = mkdtempSync(join(tmpdir(), "myne-e2e-"));
   const appDataDir = join(dataHome, "md.myne.desktop");
@@ -247,17 +302,23 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   if (opts.seed) await opts.seed(appDataDir);
   if (opts.seedConfig) await opts.seedConfig(appConfigDir);
 
-  // **Refuse to start on a port somebody else is still holding.** See
+  // **Never start on a port somebody else is still holding.** See
   // `waitForDriverGone`: attaching to a previous scenario's dying driver hands
   // this scenario an app pointed at a deleted data directory, and the only
-  // symptom is a screen that says the vault does not exist. Checking here rather
-  // than only in `teardown` covers the paths a teardown cannot: a worker that
-  // died mid-scenario, a driver whose child outlived it, a stray manual run.
-  if (!(await waitForDriverGone(baseUrl, DRIVER_FREE_TIMEOUT_MS))) {
-    throw new Error(
-      `a WebDriver is still answering on ${baseUrl} after ${DRIVER_FREE_TIMEOUT_MS} ms. ` +
-        "Launching now would attach this scenario to somebody else's driver, and the app " +
-        "would come up against that driver's data directory rather than this one's seed.",
+  // symptom is a screen that says the vault does not exist. Resolving here
+  // rather than only in `teardown` covers the paths a teardown cannot: a worker
+  // that died mid-scenario, a driver whose child outlived it, a stray manual run.
+  const ports = await freeDriverPorts(wantedDriverPort, wantedNativePort);
+  const driverPort = ports.driverPort;
+  const nativePort = ports.nativePort;
+  const baseUrl = `http://${DRIVER_HOST}:${driverPort}`;
+  if (ports.movedFrom !== undefined) {
+    // Said out loud rather than absorbed: a scenario that had to move ports is
+    // evidence a driver outlived its teardown, and a silent workaround would
+    // hide the thing worth fixing.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[e2e] port ${ports.movedFrom} was still answering; launched on ${driverPort} instead`,
     );
   }
 
