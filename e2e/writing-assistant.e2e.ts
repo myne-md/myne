@@ -169,11 +169,22 @@ aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)",
         // mirroring `slash-datetime.e2e.ts`). English label: "Suggest title (AI)".
         const content = await s.waitForElement(CM_CONTENT);
         await content.click();
-        await content.sendKeys("/suggest title");
-        await pressKey(s, KEY.ENTER);
+        // Enter goes to the ELEMENT and the whole query is RE-FIRED until the
+        // title lands. Two reasons, both already paid for elsewhere in this
+        // branch: `pressKey` routes through `POST /actions`, which needs focus
+        // that `Element.sendKeys` never established, and a single burst can
+        // outrun the slash menu's filter so the Enter confirms nothing. Same
+        // shape as `/drawing` in `drawing-inline-embed.e2e.ts` and the audio ⋮
+        // menu: when a trigger can miss, re-fire it rather than wait longer.
+        await content.sendKeys(`/suggest title${String.fromCharCode(0xe007)}`);
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("title:") ? true : null),
-          { label: "slash set a frontmatter title", timeoutMs: 15_000 },
+          async () => {
+            if ((await editorText(s)).includes("title:")) return true;
+            await content.sendKeys(`/suggest title${String.fromCharCode(0xe007)}`);
+            await new Promise((r) => setTimeout(r, 2_000));
+            return (await editorText(s)).includes("title:") ? true : null;
+          },
+          { label: "slash set a frontmatter title", timeoutMs: 30_000 },
         );
 
         // ── (c) select a span → `ai.rewrite-selection` replaces the selection ──
