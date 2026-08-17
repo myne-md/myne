@@ -667,6 +667,24 @@ async function hitTest(session: Session, testId: string): Promise<string> {
   }
 }
 
+/** Scroll `testId` to the middle of whatever scroll container holds it.
+ *
+ *  `scrollIntoView` walks every ancestor scroller, which is the part WebDriver's
+ *  own pre-click scroll does not reliably do in WebKit. Best-effort: a failure
+ *  here must not turn into the caller's error, because the click that follows is
+ *  the assertion. */
+async function scrollIntoView(session: Session, testId: string): Promise<void> {
+  try {
+    await session.execute(
+      "var el = document.querySelector('[data-testid=\"' + arguments[0] + '\"]');" +
+        "if (el) el.scrollIntoView({ block: 'center', inline: 'center' });",
+      [testId],
+    );
+  } catch {
+    // The element may have gone between the find and this call; the poll re-finds.
+  }
+}
+
 export async function clickByTestId(
   session: Session,
   testId: string,
@@ -690,6 +708,16 @@ export async function clickByTestId(
         lastReason = "no element carries that testid";
         return null;
       }
+      // **Bring it into view inside its OWN scroll container before clicking.**
+      // WebDriver's click scrolls the element into view, but WebKit's notion of
+      // that does not reliably reach a nested `overflow: auto` body, and the
+      // Settings modal is exactly that. `sync-replication`'s SAS match button
+      // sits below the fold of the modal's scrolling body: the driver refused
+      // the click with `element not interactable`, and the hit-test added here
+      // reported the modal container itself painted at the button's centre. No
+      // budget fixes that, because the button never moves on its own. Cheap and
+      // best-effort, so it runs on every poll rather than only after a refusal.
+      await scrollIntoView(session, testId);
       try {
         await el.clickOnce();
       } catch (e) {
