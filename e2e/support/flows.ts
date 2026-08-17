@@ -49,6 +49,40 @@ export async function ipcOk(
 }
 
 /**
+ * One round trip that reports what the WebView is actually showing, for the
+ * failure path of a wait that expected a specific screen.
+ *
+ * Deliberately free of app hooks: it reads `document`, the same way the rest of
+ * the harness's `execute` probes do, so it keeps working on a build where the
+ * app's own state is unreachable — which is precisely the case it exists for.
+ * Values are structural only (counts, a readyState, a testid roster), never
+ * content, so nothing it prints can carry vault material into a CI artefact.
+ */
+export async function bootDiagnostic(session: Session): Promise<string> {
+  try {
+    return await session.execute<string>(
+      "var root = document.getElementById('root');" +
+        "var ids = [];" +
+        "var seen = document.querySelectorAll('[data-testid]');" +
+        "for (var i = 0; i < seen.length && ids.length < 12; i++) {" +
+        "  var v = seen[i].getAttribute('data-testid');" +
+        "  if (ids.indexOf(v) === -1) ids.push(v);" +
+        "}" +
+        "return JSON.stringify({" +
+        "  readyState: document.readyState," +
+        "  rootChildren: root ? root.childElementCount : -1," +
+        "  bodyChars: (document.body && document.body.innerHTML.length) || 0," +
+        "  testids: ids" +
+        "});",
+    );
+  } catch (raw) {
+    // The probe itself failing is a fourth answer and a useful one: the page
+    // is gone, not merely empty.
+    return `unreadable (${(raw as Error).message})`;
+  }
+}
+
+/**
  * Unlock the currently-targeted vault and wait for the editor: the
  * canonical password → submit → `editor.root` sequence shared by every
  * suite that needs an unlocked editor as a step (not as the assertion
@@ -78,10 +112,29 @@ export async function unlockToEditor(
   // configures a PIN would hang the full budget on a field that is not there.
   // Suites ASSERTING which surface won must drive the screen directly (qu2/qu3);
   // this helper is for the ones where unlocking is a step, not the story.
-  await session.waitForElement(
-    `${testIdSelector("unlock.password-input")}, ${testIdSelector("unlock.use-password-link")}`,
-    { timeoutMs },
-  );
+  //
+  // **On timeout this says WHAT was on screen instead of only that nothing
+  // was.** The bare wait reported `waitUntil(waitForElement(…)) timed out`, and
+  // that message cannot distinguish the three explanations this failure has —
+  // the app is still on `App.tsx`'s loading shim (which is a literal `return
+  // null`, so a boot probe that never settles renders a blank window forever
+  // and no timeout can outlast it), the app routed somewhere ELSE (welcome,
+  // picker, fail-closed) and the scenario is waiting for a screen it will never
+  // get, or the WebView really did not paint. Those need three different fixes
+  // and the message named none of them, which is why the family
+  // (nav1/tp1/ci1/gp1/gp2/slash-datetime) has been quarantined as "contention"
+  // on an assumption nobody could check. The probe is read only in the failure
+  // path, so a passing run pays nothing for it.
+  try {
+    await session.waitForElement(
+      `${testIdSelector("unlock.password-input")}, ${testIdSelector("unlock.use-password-link")}`,
+      { timeoutMs },
+    );
+  } catch (raw) {
+    throw new Error(
+      `${(raw as Error).message} | boot state: ${await bootDiagnostic(session)}`,
+    );
+  }
   const reveal = await session.byTestIdAll("unlock.use-password-link");
   if (reveal.length > 0) await reveal[0].click();
   const input = await session.byTestId("unlock.password-input", { timeoutMs });
@@ -451,10 +504,24 @@ export async function clickByTestId(
   testId: string,
   opts?: { timeoutMs?: number },
 ): Promise<void> {
+  // **The last swallowed reason, so the timeout can name a cause.** Every arm
+  // below returns `null` and polls again, which is right — but it made the
+  // failure message `<testId> located + clicked timed out`, which does not
+  // distinguish "the element is not in the DOM" from "it is there and something
+  // is covering it" from "it is there and WebKit says it is not interactable".
+  // Those are three different bugs and the message named none of them, so
+  // `sync-replication`'s SAS click was read as a re-render race and given more
+  // budget, which measurably did not fix it (45 s, still red). Recorded here
+  // rather than probed on failure because the reason is only observable INSIDE
+  // the poll, and the whole point is that it is the recurring one.
+  let lastReason = "never polled";
   await session.waitUntil(
     async () => {
       const [el] = await session.byTestIdAll(testId);
-      if (el === undefined) return null;
+      if (el === undefined) {
+        lastReason = "no element carries that testid";
+        return null;
+      }
       try {
         await el.clickOnce();
       } catch (e) {
@@ -464,6 +531,7 @@ export async function clickByTestId(
             e.code === "element not interactable" ||
             e.code === "element click intercepted")
         ) {
+          lastReason = `found, but the click reported "${e.code}"`;
           return null; // replaced or not hit-testable yet — re-find next poll
         }
         throw e;
@@ -478,7 +546,10 @@ export async function clickByTestId(
     // rather than idling. Measured: `sync-replication` passes isolated and timed
     // out here at 20 s in the full 2-shard suite, on the compare screen that
     // re-renders after a mid-ceremony sync the scenario deliberately provokes.
-    { label: `${testId} located + clicked`, timeoutMs: opts?.timeoutMs ?? 45_000 },
+    {
+      label: () => `${testId} located + clicked (last poll: ${lastReason})`,
+      timeoutMs: opts?.timeoutMs ?? 45_000,
+    },
   );
 }
 
