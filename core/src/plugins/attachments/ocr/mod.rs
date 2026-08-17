@@ -288,6 +288,64 @@ pub fn bundled_models_dir_for_tests() -> PathBuf {
         .join(OCR_MODELS_DIR_NAME)
 }
 
+/// Whether this checkout actually HAS the weights, as opposed to the Git-LFS
+/// pointers a `GIT_LFS_SKIP_SMUDGE=1` clone leaves in their place.
+///
+/// A pointer is a short text file whose first line is the LFS spec URL, so the
+/// check is the same one `scripts/check-desktop-payload-budget.mjs` makes on the
+/// packaging side, in the one place a Rust test can make it.
+#[cfg(any(test, feature = "test-support"))]
+pub fn bundled_weights_are_real() -> bool {
+    const LFS_HEADER: &[u8] = b"version https://git-lfs.github.com/spec/v1";
+    let dir = bundled_models_dir_for_tests();
+    for f in [DET_MODEL_FILE, REC_MODEL_FILE, CLS_MODEL_FILE, DICT_FILE] {
+        let path = dir.join(f);
+        let Ok(meta) = std::fs::metadata(&path) else {
+            return false;
+        };
+        // Only a small file can be a pointer; a real weight is megabytes.
+        if meta.len() < 1024 {
+            match std::fs::read(&path) {
+                Ok(bytes) if bytes.starts_with(LFS_HEADER) => return false,
+                Err(_) => return false,
+                Ok(_) => {}
+            }
+        }
+    }
+    true
+}
+
+/// Install the bundled models for a test, reporting whether OCR is available —
+/// and PANICKING when the weights are present and still will not load.
+///
+/// **The distinction is the whole point, and its absence hid a real failure.**
+/// Every OCR test opened with `Err(_) => return` or an equivalent bare `return`,
+/// which skips on a checkout without Git-LFS blobs and skips identically on a
+/// genuine load failure, saying nothing either way. CI fetches the blobs, and
+/// `check-desktop-payload-budget.mjs` already fails there on a pointer, so in CI
+/// a failed load is a real failure that was being swallowed by the same line
+/// that makes these tests convenient on a laptop.
+///
+/// What that cost: `image-ocr-search`'s io1 measured an EMPTY extraction against
+/// the production binary while `cargo test` was green on the very tests that
+/// claim OCR reads this exact fixture. A suite that reports success for a
+/// component it never exercised is the failure `CLAUDE.md` calls a silent-green
+/// skip, and this is the shape of it.
+///
+/// Returns `false` only for the honest case: this checkout has no weights.
+#[cfg(any(test, feature = "test-support"))]
+pub fn init_bundled_models_for_tests() -> bool {
+    if !bundled_weights_are_real() {
+        return false; // no Git-LFS blobs here — nothing to exercise
+    }
+    assert!(
+        init_from_base(&bundled_models_dir_for_tests()),
+        "the OCR weights are present and are not Git-LFS pointers, so failing to \
+         load them is a real failure rather than a checkout without blobs",
+    );
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
