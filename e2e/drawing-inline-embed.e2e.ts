@@ -60,7 +60,29 @@ async function insertInlineDrawing(s: Session): Promise<void> {
     },
     { label: "keystroke pipeline established at a line start", timeoutMs: 10_000 },
   );
-  await content.sendKeys(`/drawing${ENTER}`);
+  // **Re-fire until the embed is actually there.** `/drawing` and its Enter go
+  // out as ONE burst, and the slash menu has to open, filter to `drawing` and
+  // have a selection before that Enter lands. When the burst outruns it the
+  // Enter confirms nothing, no sibling is minted, and the scenario waits 45 s
+  // for a thumbnail that was never coming. It showed up as instability rather
+  // than as a clean failure: across two runs this spec died at the FIRST embed
+  // assertion once and at the last reload step once, which is the signature of
+  // a race, not of a stale assertion.
+  //
+  // Same shape as `clickNewMenuItem` (`e2e/CLAUDE.md`) and the audio ⋮ menu:
+  // when a trigger can miss, the fix is to re-fire it, not to wait longer.
+  // Re-sending is safe precisely BECAUSE a missed burst mints nothing: the loop
+  // only repeats while no embed exists, and the per-attempt settle below gives a
+  // slow-but-successful attempt time to land before another is tried.
+  await s.waitUntil(
+    async () => {
+      if ((await s.findElements(EMBED)).length > 0) return true;
+      await content.sendKeys(`/drawing${ENTER}`);
+      await new Promise((r) => setTimeout(r, 3_000));
+      return (await s.findElements(EMBED)).length > 0 ? true : null;
+    },
+    { label: "the /drawing slash command minting an inline embed", timeoutMs: 45_000 },
+  );
 }
 
 describeE2E("di1 inline drawing embed: create → edit-in-place → collapse → reload", () => {

@@ -25,7 +25,7 @@
 import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { KEY, pressKey } from "./support/keyboard";
+import { KEY } from "./support/keyboard";
 import {
   createNote,
   closeSettings,
@@ -193,16 +193,25 @@ aiDescribe("ad3 an explicit AI action always answers, even when it cannot run", 
           await typeIntoEditor(s, "the quick brown fox");
           // Select it — the rewrite acts on a selection and no-ops without one,
           // which would make the toast's absence mean the wrong thing.
-          // **Shift+Home, not Ctrl+A.** `Mod-a` in this editor is not plain
-          // select-all: `editor/src/keymap.ts` scopes it to the frontmatter
-          // block or to the body depending on where the caret sits, and it is
-          // rebindable. Whatever it did here, it left `state.selection.main`
-          // EMPTY, so `resolveRewriteRange` returned null and the rewrite
-          // no-opped -- which is how this scenario came to be blaming a backend
-          // for a selection that was never made. Shift+Home selects from the
-          // caret (end of the line just typed) back to the line start with
-          // plain navigation, depending on no app binding at all.
-          await pressKey(s, KEY.HOME, { shift: true });
+          // **Sent to the ELEMENT, not through the Actions API, and that is the
+          // whole fix.** Two selection attempts failed here before this one:
+          // `Ctrl+A` (which is anyway the SCOPED select-all in this editor,
+          // `editor/src/keymap.ts`) and then `pressKey(HOME, {shift})`. Both go
+          // through `POST /actions`, which delivers to whatever holds FOCUS.
+          // `typeIntoEditor` lands its text with `Element.sendKeys`, which
+          // targets the element directly and works with or without focus, so
+          // the text arriving proved nothing about where focus was. The
+          // selection keys went somewhere else, `state.selection.main` stayed
+          // empty, `resolveRewriteRange` returned null, and the scenario blamed
+          // the backend for a selection nobody had made.
+          //
+          // `Element.sendKeys` takes W3C sticky modifiers: U+E008 (Shift) stays
+          // down for the rest of the sequence, so this is Shift+Home at the
+          // editor, independent of focus.
+          const content = await s.waitForElement(
+            '[data-testid="editor.content"] .cm-content',
+          );
+          await content.sendKeys(KEY.SHIFT + KEY.HOME);
           // **Verify the selection rather than assume it.** The comment above
           // says the rewrite no-ops without one, and that is exactly why the
           // absence has to be ruled out HERE: without this the scenario cannot
@@ -211,14 +220,31 @@ aiDescribe("ad3 an explicit AI action always answers, even when it cannot run", 
           // Read through the DOM selection, which is what a user would see
           // highlighted — no app hook, same class as the harness's other
           // `execute` reads.
+          // **Assert the selection is INSIDE the editor, not merely non-empty.**
+          // A length-only check passed while the rewrite still saw an empty
+          // `state.selection`, which is the ambiguity that cost three attempts:
+          // a DOM selection somewhere else on the page satisfies "length > 0"
+          // and tells CodeMirror nothing. Anchoring it to `.cm-content` is what
+          // makes the check mean what the next line depends on.
           await s.waitUntil(
             async () =>
-              (await s.execute<number>(
-                "return String(window.getSelection() || '').length;",
-              )) > 0
+              (await s.execute<boolean>(
+                "var sel = window.getSelection();" +
+                  "if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;" +
+                  "var n = sel.anchorNode;" +
+                  "var el = n && n.nodeType === 1 ? n : n && n.parentElement;" +
+                  // `.cm-focused` is the load-bearing half. CodeMirror owns a
+                  // selection in its STATE only while it holds focus; a native
+                  // DOM selection inside `.cm-content` on an unfocused editor
+                  // satisfies every weaker check and tells CM6 nothing, which is
+                  // exactly what the previous two probes here passed on while
+                  // `resolveRewriteRange` still read `main.empty`.
+                  "if (!el || !el.closest('.cm-content')) return false;" +
+                  "return !!document.querySelector('.cm-editor.cm-focused');",
+              ))
                 ? true
                 : null,
-            { label: "the editor selection Ctrl+A made", timeoutMs: 5_000 },
+            { label: "a non-empty selection inside a FOCUSED editor", timeoutMs: 5_000 },
           );
           await runPaletteAction(s, "ai.rewrite-selection", "rewrite");
 
