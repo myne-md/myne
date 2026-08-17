@@ -58,12 +58,32 @@ const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
  *  testids never appear there. The feature-flagged build sets `MYNE_E2E_AI=1`. */
 const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
 
-/** Read the settled BUFFER text: Escape clears any showing ghost widget first,
- *  so `editorText()` reflects the document, not the inline suggestion decoration.
- *  Escape is a no-op when nothing is showing (the keymap falls through). */
+/** Read the settled BUFFER text, with any ghost suggestion SUBTRACTED.
+ *
+ * **Escape alone is not enough, and that is why the undo assertion never
+ * passed.** `editorText()` reads `.cm-content`'s textContent, and the ghost
+ * suggestion is a widget INSIDE it, so its dimmed text is part of the readout.
+ * Escape dismisses whatever is showing, but the assistant re-suggests on a
+ * 700 ms debounce, and an undo moves the caret, which is exactly the event that
+ * arms it again. So the ghost could reappear between the Escape and the read,
+ * and the equality against the pre-suggestion baseline would fail forever. The
+ * failure artefact confirms it: `ai.ghost-text` is still in the DOM at the
+ * moment the wait gives up.
+ *
+ * Nothing about the product is wrong here. Undo does reverse the accept in one
+ * step; the reading was measuring the document plus a suggestion that had
+ * legitimately come back. Escape stays (it settles the common case and costs
+ * nothing), and the subtraction makes the reading correct even when it loses
+ * the race. */
 async function bufferText(session: Session): Promise<string> {
   await pressKey(session, KEY.ESCAPE);
-  return editorText(session);
+  const rendered = await editorText(session);
+  let buffer = rendered;
+  for (const ghost of await session.byTestIdAll("ai.ghost-text")) {
+    const text = await ghost.textContent();
+    if (text.length > 0) buffer = buffer.split(text).join("");
+  }
+  return buffer;
 }
 
 aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)", () => {
