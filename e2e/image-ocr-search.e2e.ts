@@ -49,7 +49,7 @@
 // Linux-only — authored on macOS to the conventions and run green in the
 // container (`./scripts/e2e-local.sh`). See e2e/CLAUDE.md "definition of done".
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "vitest";
@@ -146,17 +146,35 @@ describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)",
   // Vault-count precondition: 1 (weak KDF).
   it("finds a note by words that exist only inside an embedded image", async () => {
     let password = "";
+    let vaultId = "";
     await scenario(
       "io1-image-ocr-search",
       {
         seed: (dir) => {
-          password = seedVault(dir).password;
+          const v = seedVault(dir);
+          password = v.password;
+          vaultId = v.vaultId;
         },
       },
       async (app) => {
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+
+        // **The one link between the passing unit test and this failing
+        // scenario, asserted before the thing that depends on it.**
+        // `attachment_import_desktop` reads `attachment_ocr_enabled` and picks
+        // `extract_deferring_ocr` when it is off, which produces exactly the
+        // empty cache entry this scenario reports. The Rust test that covers
+        // the same import path passes `extract::extract` directly and so cannot
+        // see this gate at all. The pref defaults ON, but the vault here is
+        // seeded by the fixture generator rather than created by the app, and
+        // nothing until now checked what that blob actually says.
+        const prefs = await pageSeatInvoke(s, "plugin:prefs|prefs_read", {}, 10_000);
+        expect(
+          (prefs.ok as { attachment_ocr_enabled?: boolean } | undefined)?.attachment_ocr_enabled,
+          "the seeded vault must have image OCR on, or import defers it and the cache stays empty",
+        ).toBe(true);
 
         // OCR runs inside this call.
         const attachmentId = await importImage(s);
@@ -181,7 +199,35 @@ describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)",
           IPC_TIMEOUT,
         );
         expect(extracted.err, "reading the MYE1 extraction cache must succeed").toBeUndefined();
+
+        // **Which of the two empties is it?** The import caches every extraction
+        // result EXCEPT `Unsupported`, so the presence of the blob on disk is
+        // the one observable that separates them, and neither the command nor
+        // the UI exposes the status itself:
+        //   - no blob  → `Unsupported`, which for an image means `models()` was
+        //                None, i.e. the running app never loaded the OCR weights
+        //                from its resource directory.
+        //   - a blob   → OCR ran and cleared nothing, a recognition result.
+        // Eight other explanations have already been refuted by measurement
+        // (weights present and real, image above the 96px floor, pipeline reads
+        // the fixture, compression preserves it, `is_ocr_image` accepts the
+        // compressed container, the full import path passes as a Rust test on
+        // this very runner, the stub features do not touch OCR, and the pref
+        // above is on), so this is the fork that is left.
+        const cachePath = join(
+          app.appDataDir,
+          "vaults",
+          vaultId,
+          "attachments-text",
+          attachmentId,
+        );
+        const cached = existsSync(cachePath);
         const text = (extracted.ok as { text?: string } | null)?.text ?? "";
+        expect(
+          cached,
+          "no MYE1 blob at all means the extraction was Unsupported, which for an image " +
+            "means the running app has no OCR weights loaded — not that OCR read nothing",
+        ).toBe(true);
         expect(text.length, "OCR must have written a non-empty MYE1 entry").toBeGreaterThan(0);
         expect(
           text.toLowerCase().includes(IMAGE_WORD_EN),
