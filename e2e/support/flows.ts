@@ -470,7 +470,15 @@ export async function clickByTestId(
       }
       return true;
     },
-    { label: `${testId} located + clicked`, timeoutMs: opts?.timeoutMs ?? 20_000 },
+    // 45 s, and the number needs its argument because `e2e/CLAUDE.md` records a
+    // budget rise that fixed nothing: raising `DEFAULT_TIMEOUT_MS` 20 s -> 45 s
+    // for the `clickNewMenuItem` flake only made each occurrence twice as
+    // expensive, because that wait was STUCK with nothing to re-fire. This one
+    // re-locates and re-clicks every poll, so the extra budget buys retries
+    // rather than idling. Measured: `sync-replication` passes isolated and timed
+    // out here at 20 s in the full 2-shard suite, on the compare screen that
+    // re-renders after a mid-ceremony sync the scenario deliberately provokes.
+    { label: `${testId} located + clicked`, timeoutMs: opts?.timeoutMs ?? 45_000 },
   );
 }
 
