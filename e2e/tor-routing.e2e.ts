@@ -56,9 +56,28 @@ const POSTURE_TIMEOUT_MS = 20_000;
  *  a contention victim on the assumption it was merely late; that assumption has
  *  never been checked against the posture it was stuck on. */
 async function waitForPosture(session: Session, posture: string): Promise<string> {
-  const selector = testIdSelector("settings.tor-posture", { "data-posture": posture });
   try {
-    await session.waitForElement(selector, { timeoutMs: POSTURE_TIMEOUT_MS });
+    // **The posture and its label are read in ONE round trip, from the same
+    // render.** They used to be two: wait for the row carrying the posture, then
+    // look the label up again. Two WebDriver round trips are not within a
+    // render, and the posture moves on its own — so a label could be read after
+    // the row had already advanced, and two of the four reads came back
+    // identical. The scenario then reported a copy collapse (three distinct
+    // labels where four were expected) that does not exist in the catalog.
+    // `ai-degradation`'s resting-state reader carries the same lesson for the
+    // same reason.
+    const label = await session.waitUntil(
+      async () =>
+        session.execute<string | null>(
+          "var row = document.querySelector('[data-testid=\"settings.tor-posture\"]');" +
+            "if (!row || row.getAttribute('data-posture') !== arguments[0]) return null;" +
+            "var el = row.querySelector('[data-testid=\"settings.tor-posture-label\"]');" +
+            "return el ? (el.textContent || '') : null;",
+          [posture],
+        ),
+      { label: `posture ${posture} with its label, read together`, timeoutMs: POSTURE_TIMEOUT_MS },
+    );
+    return label;
   } catch (raw) {
     const rows = await session.byTestIdAll("settings.tor-posture");
     if (rows.length > 0) {
@@ -78,7 +97,6 @@ async function waitForPosture(session: Session, posture: string): Promise<string
         `screen: ${await bootDiagnostic(session)}`,
     );
   }
-  return await (await session.byTestId("settings.tor-posture-label")).text();
 }
 
 /** The editor-chrome banner's posture, or `null` when it renders nothing. */
@@ -158,10 +176,18 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
           // nothing about the port. The three outcomes only separate once the
           // fake has had a chance to reach either branch of its listen.
           let lastBind = "never polled";
+          let lastNotice = "none";
           const bound = await s.waitUntil(
             async () => {
               const outcome = tor.bindOutcome();
               lastBind = outcome;
+              // The panel already tells the USER when the sidecar would not
+              // start, and that notice is the one thing that separates a spawn
+              // which failed from a bootstrap which has not finished. The phase
+              // reaches Starting BEFORE the spawn is attempted, so seeing
+              // `connecting` is not evidence the child exists; this is.
+              const notices = await s.byTestIdAll("settings.tor-routing-notice");
+              lastNotice = notices.length === 0 ? "none" : (await notices[0].text()).trim();
               return outcome.startsWith("not written") ? null : outcome;
             },
             {
@@ -170,9 +196,10 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
               // repeat the same guess every run; the directory listing says
               // whether the host even prepared a sidecar directory.
               label: () =>
-                `the fake sidecar to report its bind outcome; last read: ${lastBind}. ` +
-                "Nothing written means it reached neither branch of listen, so it is not " +
-                "the process the host spawned or it exited before running",
+                `the fake sidecar to report its bind outcome; last read: ${lastBind}; ` +
+                `the panel's own notice says: ${lastNotice}. Nothing written means it ` +
+                "reached neither branch of listen, so it is not the process the host " +
+                "spawned or it exited before running",
               timeoutMs: 15_000,
             },
           );
