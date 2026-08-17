@@ -6,7 +6,7 @@
 // class (not credentials; see the notes suite header).
 
 import { expect } from "vitest";
-import { testIdSelector, WebDriverError, type Session } from "./webdriver";
+import { testIdSelector, WebDriverError, type Element, type Session } from "./webdriver";
 
 /**
  * Fire one production IPC from the page seat and settle-poll its result
@@ -249,6 +249,88 @@ export async function openPalette(session: Session): Promise<void> {
   );
 }
 
+/**
+ * Open the palette, get `query` into its input, and return the row matching
+ * `optionSelector` — re-asserting the query on every poll instead of typing it
+ * once and then waiting.
+ *
+ * **`openPalette` already learned this lesson; the two lines after it did not.**
+ * That helper re-fires the chord until the input exists, because a wait with
+ * nothing to re-fire is a wait that can never recover. What followed was one
+ * `sendKeys` and one `waitForElement`, which has exactly the failure
+ * `e2e/CLAUDE.md` records for `clickNewMenuItem`: the whole budget spent on a
+ * row that a re-fire would have produced in a second.
+ *
+ * Two things can go wrong after the palette is up, and neither gets better with
+ * time, which is why `image-ocr-search`'s budget was raised to 120 s and bought
+ * nothing:
+ *
+ *  1. **A truncated query.** WebKit's driver drops leading keystrokes while an
+ *     input settles focus. This repo already guards that trap twice (the
+ *     password field re-enters on mismatch, `typeIntoEditor` probes with a
+ *     throwaway char), and the palette had no guard at all. A truncated query
+ *     never becomes the right one on its own: nothing types again.
+ *  2. **Results computed before the index caught up.** The list is derived from
+ *     the input's `onChange`, so a note indexed a moment after the query ran is
+ *     not in the rendered rows and nothing re-runs the search. `replaceText`
+ *     clears to empty and retypes, which does re-run it.
+ *
+ * The nudge is rate-limited rather than per-poll: retyping is `BACKSPACE × n`
+ * plus the text, and doing it ten times a second would be its own denial of
+ * service on the surface under test.
+ */
+export async function palettePick(
+  session: Session,
+  query: string,
+  optionSelector: string,
+  what: string,
+  // Exposed ONLY so the unit test can exercise the give-up path in a couple of
+  // seconds instead of the real 45. No scenario passes it; a scenario that
+  // wanted a shorter palette budget would be trading the retries this helper
+  // exists to provide for a faster red.
+  opts?: { timeoutMs?: number },
+): Promise<Element> {
+  await openPalette(session);
+  await (await session.byTestId("palette.input")).sendKeys(query);
+  let lastReason = "never polled";
+  let lastNudge = Date.now();
+  return session.waitUntil(
+    async () => {
+      const [found] = await session.findElements(optionSelector);
+      if (found !== undefined) return found;
+      const [input] = await session.byTestIdAll("palette.input");
+      if (input === undefined) {
+        // The palette is gone: a stray Escape, a backdrop click, a re-render
+        // that closed it. A closed palette renders no rows at all, so waiting
+        // is pointless and reopening is the only move that can succeed.
+        lastReason = "the palette was not open";
+        await openPalette(session);
+        await (await session.byTestId("palette.input")).sendKeys(query);
+        lastNudge = Date.now();
+        return null;
+      }
+      const value = await input.property<string>("value");
+      // Length, not content: the queries are scenario constants today, and a
+      // helper that prints whatever was typed into a search box is one refactor
+      // away from printing something SYNC-13 forbids.
+      if (value !== query) {
+        lastReason = `the input held ${value.length} of ${query.length} typed characters`;
+        await input.replaceText(query);
+        lastNudge = Date.now();
+      } else if (Date.now() - lastNudge > 3_000) {
+        lastReason = "the query landed but no row matched; re-running the search";
+        await input.replaceText(query);
+        lastNudge = Date.now();
+      }
+      return null;
+    },
+    {
+      label: () => `${what} (last poll: ${lastReason})`,
+      timeoutMs: opts?.timeoutMs ?? 45_000,
+    },
+  );
+}
+
 /** Open the command palette via Ctrl+K (retrying the chord), then filter by
  *  typing `query` and run the matching action row by its `data-action-id`. */
 export async function runPaletteAction(
@@ -256,13 +338,13 @@ export async function runPaletteAction(
   actionId: string,
   query: string,
 ): Promise<void> {
-  await openPalette(session);
-  await (await session.byTestId("palette.input")).sendKeys(query);
-  await (
-    await session.waitForElement(
-      testIdSelector("palette.option", { "data-action-id": actionId }),
-    )
-  ).click();
+  const row = await palettePick(
+    session,
+    query,
+    testIdSelector("palette.option", { "data-action-id": actionId }),
+    `palette action ${actionId}`,
+  );
+  await row.click();
 }
 
 /** Open the command palette, type `query`, and click the NOTES-section hit
@@ -277,13 +359,13 @@ export async function searchAndOpenNote(
   query: string,
   noteId: string,
 ): Promise<void> {
-  await openPalette(session);
-  await (await session.byTestId("palette.input")).sendKeys(query);
-  await (
-    await session.waitForElement(
-      testIdSelector("palette.option", { "data-kind": "note", "data-note-id": noteId }),
-    )
-  ).click();
+  const row = await palettePick(
+    session,
+    query,
+    testIdSelector("palette.option", { "data-kind": "note", "data-note-id": noteId }),
+    `palette note row for the searched note`,
+  );
+  await row.click();
 }
 
 /** A fresh vault's first unlocked editor shows the importer onboarding
