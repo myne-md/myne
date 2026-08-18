@@ -664,11 +664,21 @@ export async function waitForInlineImage(session: Session): Promise<void> {
         // an image. So a chip with no image means the catalog has not answered
         // yet; no chip and no image means it answered WITHOUT this id, which is
         // the tombstone case and a different bug entirely.
+        // The document LENGTH is the discriminator between the two stories the
+        // tombstone case still collapses, and it is the one datum the failing CI
+        // run could not answer. The catalog is loaded per editor mount and the
+        // import happens between two of them, so a stale map means the text
+        // landed in the note that was open BEFORE the import rather than in the
+        // freshly created one. A fresh note is tens of characters; a seeded one
+        // is hundreds. Length only, never content, per SYNC-13.
         lastReason = state.chip
           ? `the embed source is in the buffer and a progress chip is up, so the attachment ` +
-            `catalog has not resolved this id yet`
+            `catalog has not resolved this id yet (${state.chars} chars in the editor)`
           : `the embed source is in the buffer with no widget and no progress chip, so the ` +
-            `catalog resolved WITHOUT this id and the decoration drew a tombstone`;
+            `catalog resolved WITHOUT this id and the decoration drew a tombstone ` +
+            `(${state.chars} chars in the editor: a fresh note is tens, so hundreds means ` +
+            `the embed landed in the note that was open before the import, whose catalog ` +
+            `map predates it)`;
       }
       return null;
     },
