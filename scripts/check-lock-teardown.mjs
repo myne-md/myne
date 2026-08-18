@@ -130,6 +130,14 @@ const PAIRS = [
   { hook: "zeroize_attachment_refs", holder: { kind: "state", type: "AttachmentRefsState" } },
   { hook: "abort_active_recording", holder: { kind: "state", type: "VoiceRecordState" } },
   { hook: "pdf_export_teardown_on_lock", holder: { kind: "state", type: "PdfExportState" } },
+  // Two rows, one hook. The unit here is <hook, holder>, and the agent holds
+  // TWO plaintext-derived tables that are cleared together: core's run table
+  // (a note-id set derived from decrypted plaintext, plus the frozen scope) and
+  // the host's session table (the transcript, which carries whole note bodies).
+  // One row would leave the other state's arrival silent, which is the shape
+  // this guard exists to refuse.
+  { hook: "agent_teardown_on_lock", holder: { kind: "state", type: "AgentRunState" } },
+  { hook: "agent_teardown_on_lock", holder: { kind: "state", type: "AgentSessionState" } },
   { hook: "clear_staged_descriptor", holder: { kind: "command", name: "workspace_stage" } },
 ];
 

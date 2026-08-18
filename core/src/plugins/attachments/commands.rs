@@ -666,6 +666,23 @@ where
     // every current vault. `scripts/check-version-routing.mjs` records those six
     // as legitimate v0.1 sites, which is the intent this line now matches;
     // `image-ocr-search`'s io1 is what measured it from the outside.
+    //
+    // **Blobs already written under the wrong key are NOT purged here, and that
+    // is a decision rather than an omission** (myne#531 review). They are
+    // ciphertext nobody holds a key for, not plaintext, and their lifetime is
+    // already bounded three ways: `write_extracted` writes BY PATH, so the next
+    // successful extraction for that attachment overwrites the dead blob; both
+    // delete paths (`attachment_delete` and `attachment_clean_unused`) unlink
+    // the cache by path with no decryption involved, so an attachment's cache
+    // never outlives the attachment; and the search rebuild's
+    // `backfill_note_attachment_text` re-extracts for every embedded
+    // attachment. What is left is disk held by a cache for an attachment no
+    // rebuild reaches, until that attachment is deleted.
+    //
+    // Purging on a read miss instead — which is the obvious alternative — would
+    // make `read_extracted` DESTRUCTIVE, and a decrypt miss is also what a torn
+    // write and a partial read look like. Trading unreadable bytes on disk for
+    // a delete on a read path is the wrong direction on a data path.
     #[cfg(not(target_arch = "wasm32"))]
     let attachment_text_key = protocol::derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
     let filename_for_extract = filename.clone();
