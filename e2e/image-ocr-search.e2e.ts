@@ -22,9 +22,10 @@
 //     through a native file picker WebDriver cannot drive — the gf1 /
 //     attachment-text-preview precedent. It runs BEFORE the note is created so
 //     the editor's per-mount catalog load sees the row.
-//   - The form-C embed is typed with `typeEmbedIntoEditor` rather than
-//     `typeIntoEditor`, because the decoration REPLACES the raw source with a
-//     widget and a word-based landed-check would false-negative and double-type.
+//   - The form-C embed is written with `seedEmbedIntoNote` (real `note_update`
+//     IPC + reopen) rather than typed: driving `![[` through WebDriver races
+//     CodeMirror's bracket auto-close, which cost four CI rounds before the
+//     input method itself was replaced. See that helper's header.
 //   - Search goes through the real command palette and asserts on the note's own
 //     option row (`data-note-id`), so an `att:` doc that failed to index cannot
 //     satisfy it.
@@ -59,9 +60,8 @@ import {
   dismissImporterOffer,
   pageSeatInvoke,
   searchAndOpenNote,
-  typeEmbedIntoEditor,
+  seedEmbedIntoNote,
   unlockToEditor,
-  waitForSaved,
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
 import { type Session } from "./support/webdriver";
@@ -221,8 +221,11 @@ describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)",
 
         await createNote(s, "Taranmis belge");
         const noteId = await selectedNoteId(s);
-        await typeEmbedIntoEditor(s, `![[att:${attachmentId}|${FILENAME}]]`);
-        await waitForSaved(s);
+        // No `waitForSaved` after this: the write went through `note_update`,
+        // not through the editor, so the autosave badge never leaves its
+        // pre-edit state and the wait burns its whole budget before failing.
+        // The IPC call is already durable when it returns.
+        await seedEmbedIntoNote(s, `![[att:${attachmentId}|${FILENAME}]]`);
 
         // 1. Base capability: a word only the pixels contain.
         await searchAndOpenNote(s, IMAGE_WORD_EN, noteId);

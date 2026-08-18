@@ -20,16 +20,16 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickByTestId,
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
-  typeEmbedIntoEditor,
+  seedEmbedIntoNote,
   unlockToEditor,
   waitForInlineImage,
-  waitForSaved,
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
-import { testIdSelector, type Session } from "./support/webdriver";
+import { type Session } from "./support/webdriver";
 
 const FILENAME = "diagram.png";
 const IPC_TIMEOUT = 60_000;
@@ -82,16 +82,29 @@ describeE2E("za1 attachment image lightbox zoom/pan (MYND-594)", () => {
 
         const attachmentId = await importImage(s);
         await createNote(s, "Diagram note");
-        await typeEmbedIntoEditor(s, `![[att:${attachmentId}|${FILENAME}]]`);
-        await waitForSaved(s);
+        // No `waitForSaved` after this: the write went through `note_update`,
+        // not through the editor, so the autosave badge never leaves its
+        // pre-edit state and the wait burns its whole budget before failing.
+        // The IPC call is already durable when it returns.
+        await seedEmbedIntoNote(s, `![[att:${attachmentId}|${FILENAME}]]`);
 
         // Wait until the inline chip's image has decoded + is displayed, then
         // click it to open the lightbox.
         await waitForInlineImage(s, attachmentId);
-        await (await s.byTestId("attachment-image")).click();
-
-        // The lightbox is open with its image + zoom controls.
-        await s.waitForElement(testIdSelector("attachment-lightbox.image"));
+        // Re-click until the lightbox is up rather than clicking once and
+        // waiting: a wait with nothing to re-fire spends its whole budget and
+        // reports a timeout that reads like a dead surface. `clickByTestId`
+        // hit-tests and scrolls the control into its own container first, which
+        // a raw `.click()` does not, and `eo1` failed exactly this way on the
+        // same widget until it was given this shape.
+        await s.waitUntil(
+          async () => {
+            if ((await s.byTestIdAll("attachment-lightbox.image")).length > 0) return true;
+            await clickByTestId(s, "attachment-image", { timeoutMs: 10_000 });
+            return (await s.byTestIdAll("attachment-lightbox.image")).length > 0 ? true : null;
+          },
+          { label: "the attachment lightbox is open", timeoutMs: 30_000 },
+        );
         await s.byTestId("attachment-lightbox.zoom-in");
         // The controller initialises to fit on load — wait for a real percentage.
         await s.waitUntil(
