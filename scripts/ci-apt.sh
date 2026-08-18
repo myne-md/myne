@@ -10,6 +10,13 @@
 # holds `sccache`, `CARGO_HOME` and the pnpm store — turns the second install of
 # a package set into an unpack from local disk.
 #
+# **What this can and cannot buy, measured rather than hoped.** Of that 67 s,
+# roughly 22 s is the 220 MB download; the rest is dpkg unpacking 929 MB. So the
+# ceiling here is about 22 s per step, ~44 s of critical path, not the "half the
+# time" a download-shaped guess would suggest. Removing the unpack too would
+# mean a prebuilt image, which is a registry and a build pipeline and belongs to
+# its own change.
+#
 # WHY IT IS A SCRIPT. `.woodpecker.yml` states the rule twice for its own
 # reasons: Woodpecker runs env substitution over that file, and a shell
 # expansion in a step (or even in a comment) errors the WHOLE pipeline config
@@ -51,7 +58,14 @@ install_now() {
 
 # `partial/` is apt's staging directory and it creates neither it nor its parent.
 if mkdir -p "$SHARED/partial" 2>/dev/null; then
-  printf 'Dir::Cache::archives "%s";\n' "$SHARED" > "$CACHE_CONF"
+  # BOTH directives, and the second is the one the first run proved is needed.
+  # Debian's images ship `/etc/apt/apt.conf.d/docker-clean`, which sets
+  # `Binary::apt::APT::Keep-Downloaded-Packages "false"` — so apt DELETES every
+  # .deb after installing it, wherever the archive directory points. Redirecting
+  # the path alone therefore cached nothing: measured on pipeline 666, where
+  # `cargo-test-tauri` still reported "Need to get 220 MB of archives" one stage
+  # after `tauri-compile` had downloaded the identical set through this script.
+  printf 'Dir::Cache::archives "%s";\nBinary::apt::APT::Keep-Downloaded-Packages "true";\n' "$SHARED" > "$CACHE_CONF"
   if install_now "$@"; then
     exit 0
   fi
