@@ -21,7 +21,7 @@ use myne_core::plugins::agent::prompt::{Proposal, ProposedNote};
 use myne_core::plugins::agent::run::{AgentRunState, AgentRunView, AppliedRun, GrantOrigin};
 use myne_core::plugins::agent::run_loop::{drive, LoopDeps, LoopEnd, LoopOutcome};
 use myne_core::plugins::agent::scope::{
-    expand_run, preview_grant, start_run, ScopeGrant, ScopeSource,
+    expand_run, preview_grant, start_run, ExclusionSource, ScopeGrant, ScopeSource,
 };
 use myne_core::plugins::agent::{apply_approved, edit::ProposedEdit};
 use myne_core::plugins::prefs::commands::prefs_read_from_host;
@@ -281,7 +281,15 @@ pub struct AgentStepResult {
     pub proposal: Proposal,
     /// Why the loop stopped.
     pub end: LoopEnd,
-    /// How many model round-trips this run has made in total.
+    /// How many model round-trips THIS STEP made.
+    ///
+    /// Per-step rather than per-run, like `chars_off_device` three lines down and
+    /// for the same reason: `drive()` starts its counter at zero on every call,
+    /// and the surface accumulates. The comment used to say "in total", which is
+    /// a different contract than the value carries; nothing user-visible was
+    /// wrong (`src/notes/agent/agentStore.ts` accumulates correctly), but a later
+    /// reader hanging a cap or a warning off this field would have read it as a
+    /// run total.
     pub iterations: usize,
     /// How many notes it has read in full.
     pub notes_read: usize,
@@ -357,11 +365,41 @@ impl<R: Runtime> ScopeSource for DesktopScopeSource<'_, R> {
     }
 
     async fn excluded_folders(&self) -> Result<Vec<String>, AgentError> {
-        let host = TauriHost::new(self.app.clone());
-        let view = prefs_read_from_host(&host, self.vault, &StdVaultIo)
-            .await
-            .map_err(|_| AgentError::ReadFailed)?;
-        Ok(view.ai_excluded_folders)
+        read_excluded(&self.app, self.vault).await
+    }
+}
+
+/// The `ai_excluded_folders` set, from `vault.prefs`, at this moment.
+///
+/// One reader for both seams. `ScopeSource` uses it when a grant is resolved and
+/// `ExclusionSource` uses it on every read tool inside the loop, and a second copy
+/// of this three-line body is how the two would eventually disagree about where
+/// the set comes from.
+async fn read_excluded<R: Runtime>(
+    app: &AppHandle<R>,
+    vault: &VaultRuntimeState,
+) -> Result<Vec<String>, AgentError> {
+    let host = TauriHost::new(app.clone());
+    let view = prefs_read_from_host(&host, vault, &StdVaultIo)
+        .await
+        .map_err(|_| AgentError::ReadFailed)?;
+    Ok(view.ai_excluded_folders)
+}
+
+/// The loop's half of the seam: the exclusion set and nothing else.
+///
+/// Deliberately NOT `DesktopScopeSource`, which also answers `records()`. The
+/// loop must not re-read the index (`LoopDeps::records` says why), so it is handed
+/// a source that cannot.
+struct DesktopExclusions<'a, R: Runtime> {
+    app: AppHandle<R>,
+    vault: &'a VaultRuntimeState,
+}
+
+#[async_trait::async_trait]
+impl<R: Runtime> ExclusionSource for DesktopExclusions<'_, R> {
+    async fn excluded_now(&self) -> Result<Vec<String>, AgentError> {
+        read_excluded(&self.app, self.vault).await
     }
 }
 
@@ -398,11 +436,16 @@ async fn step<R: Runtime>(
     };
     let searcher = SearchAdapter { state: ai, vectors };
     let records = indices.snapshot();
+    let exclusions = DesktopExclusions {
+        app: app.clone(),
+        vault,
+    };
     let deps = LoopDeps {
         engine: &engine,
         reader: &reader,
         searcher: &searcher,
         records: &records,
+        exclusions: &exclusions,
     };
 
     // **Not `?`.** The transcript and the proposal were taken out of the session

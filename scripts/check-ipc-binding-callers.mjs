@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Every IPC binding a shared tree exports has a PRODUCTION caller.
+// Every IPC binding the BINDING LAYER exports has a PRODUCTION caller.
 //
 // THE FAILURE THIS PREVENTS. A Tauri command is wired through five places that
 // each look complete on their own: `build.rs`, the plugin's permission file, the
@@ -33,6 +33,35 @@
 // is not the declaring module and not a test. A re-export does not count: it
 // moves the problem rather than solving it, so the chain has to end at a real
 // call.
+//
+// WHY THE SCOPE IS `src/lib` + `mobile/src/lib` AND NOT EVERY SHARED TREE.
+// `scripts/lib/shared-roots.mjs` is the one roster of shared trees, and its rule
+// is that a guard claiming shared-tree scope imports it while a guard that scopes
+// narrower says so in its own header. This one scopes narrower deliberately, and
+// the reason is the caller rule directly above.
+//
+// Those two directories ARE the binding layer: a module there exists to wrap
+// `invoke` for somebody else, so a wrapper referenced only from inside its own
+// file is by definition unused. Everywhere else in the shared trees the shape is
+// different: a module declares a binding AND consumes it in the same file, which
+// is the wiring rather than a symptom. `src/notes/import/ports.ts` declares
+// `importReadDir` at its top and installs it into the port record 200 lines
+// down; `src/notes/vaultIndices.ts` and `src/notes/loadNoteBatch.ts` do the same.
+//
+// Measured rather than assumed (myne-md/myne#529 review): widening `BINDING_ROOTS`
+// to `presentSharedRoots().present` reports FOUR bindings with no caller, and all
+// four are that shape. Zero real defects, four false positives, and recording them
+// in `ipc-binding-callers.json` would put non-defects in a list whose every entry
+// is supposed to describe one. Widening therefore costs accuracy and buys nothing
+// today. If the binding layer ever grows a third directory, add it here; if the
+// same-file-consumer shape ever needs covering, that is a change to the caller
+// rule above, not to this roster.
+//
+// The neighbouring guards cover what this one does not: `check-unwired.mjs`
+// requires every module under `src/lib`, `src/hooks`, `web/src`, `mobile/src/lib`
+// and `mobile/src/hooks` to have a production importer, and
+// `check-web-command-coverage.mjs` holds every `plugin:x|y` literal in the shared
+// tree to a web classification.
 //
 // USAGE
 //   node scripts/check-ipc-binding-callers.mjs
