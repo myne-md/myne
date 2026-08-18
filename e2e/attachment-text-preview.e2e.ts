@@ -18,9 +18,9 @@
 //     created: the editor's attachment catalog loads once per editor mount
 //     (catalog.ts), so the fresh mount that opens the new note sees the row.
 //   - The form-C embed `![[att:<id>|name.txt]]` is typed through the real
-//     CodeMirror surface (the hc1/ma1 `typeRaw` shape — the decoration
-//     REPLACES the raw source with the widget, so `typeIntoEditor`'s
-//     landed-check would false-negative and double-type).
+//     CodeMirror surface via `typeEmbedIntoEditor` — the decoration REPLACES
+//     the raw source with the widget, so `typeIntoEditor`'s landed-check would
+//     false-negative and double-type.
 //   - The preview body is asserted by the CARD's own textContent carrying the
 //     decrypted marker (element-scoped — the raw embed alias can't satisfy it,
 //     the widget replaced that range).
@@ -46,13 +46,11 @@ import {
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
+  typeEmbedIntoEditor,
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
-const CM_CONTENT = `${EDITOR} .cm-content`;
-const BACKSPACE = String.fromCharCode(0xe003); // W3C key codepoint (Backspace)
 
 const IPC_TIMEOUT = 15_000;
 
@@ -76,24 +74,6 @@ async function importTxt(s: Session): Promise<string> {
   return (r.ok as { id: string }).id;
 }
 
-/** Establish the CM key pipeline (probe char then deleted), then send the raw
- *  embed source. The decoration replaces the `![[att:…]]` source with the
- *  preview widget, so the observable is the widget element, not the raw text
- *  (the hc1/ma1 typeRaw shape — NOT typeIntoEditor, whose landed-check would
- *  never match a replaced range and would double-type the doc). */
-async function typeRaw(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement(CM_CONTENT);
-  await content.click();
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      return (await content.textContent()).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  await content.sendKeys(BACKSPACE); // drop the probe char
-  await content.sendKeys(text);
-}
 
 // QUARANTINED (flaky-test epic): the #1 cross-branch flake — the
 // `attachment-text-preview` widget mount timed out on a contended CI runner
@@ -118,7 +98,7 @@ describeE2E.flaky("tp1 inline txt attachment preview decrypts read-only (MYND-26
         const id = await importTxt(s);
 
         await createNote(s, "Onizleme Notu");
-        await typeRaw(s, `![[att:${id}|${FILENAME}]]`);
+        await typeEmbedIntoEditor(s, `![[att:${id}|${FILENAME}]]`);
 
         // The Tier-1 widget mounts…
         await s.byTestId("attachment-text-preview");

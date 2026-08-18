@@ -22,10 +22,9 @@
 //     through a native file picker WebDriver cannot drive — the gf1 /
 //     attachment-text-preview precedent. It runs BEFORE the note is created so
 //     the editor's per-mount catalog load sees the row.
-//   - The form-C embed is typed with the `typeRaw` shape (probe char, then the
-//     payload) rather than `typeIntoEditor`, because the decoration REPLACES the
-//     raw source with a widget and a landed-check would false-negative and
-//     double-type.
+//   - The form-C embed is typed with `typeEmbedIntoEditor` rather than
+//     `typeIntoEditor`, because the decoration REPLACES the raw source with a
+//     widget and a word-based landed-check would false-negative and double-type.
 //   - Search goes through the real command palette and asserts on the note's own
 //     option row (`data-note-id`), so an `att:` doc that failed to index cannot
 //     satisfy it.
@@ -60,15 +59,13 @@ import {
   dismissImporterOffer,
   pageSeatInvoke,
   searchAndOpenNote,
+  typeEmbedIntoEditor,
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
 import { type Session } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
-const CM_CONTENT = `${EDITOR} .cm-content`;
-const BACKSPACE = String.fromCharCode(0xe003); // W3C key codepoint (Backspace)
 
 /** OCR of one small image runs three model passes; generous but bounded. */
 const IPC_TIMEOUT = 60_000;
@@ -115,19 +112,6 @@ async function selectedNoteId(s: Session): Promise<string> {
 
 /** Type raw source into CM6 without a landed-check (the decoration replaces the
  *  embed source with a widget, so a landed-check would never match). */
-async function typeRaw(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement(CM_CONTENT);
-  await content.click();
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      return (await content.textContent()).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  await content.sendKeys(BACKSPACE); // drop the probe char
-  await content.sendKeys(text);
-}
 
 // QUARANTINED — runner-contention victim, not a broken assertion. It passes
 // locally (~32 s uncontended) and passed CI outright in pipeline #402; it fails
@@ -237,7 +221,7 @@ describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)",
 
         await createNote(s, "Taranmis belge");
         const noteId = await selectedNoteId(s);
-        await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
+        await typeEmbedIntoEditor(s, `![[att:${attachmentId}|${FILENAME}]]`);
         await waitForSaved(s);
 
         // 1. Base capability: a word only the pixels contain.

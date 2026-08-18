@@ -607,14 +607,47 @@ export async function enableAi(session: Session): Promise<void> {
  * Shared rather than diagnosed three times, because the next copy would inherit
  * the silent version again.
  */
-export async function waitForInlineImage(session: Session): Promise<void> {
+/** What `catalog_list` says about one id, as a clause to append to a reason.
+ *
+ * Never prints the id or a filename: the count and two booleans are the whole
+ * discriminator, and SYNC-13 keeps vault content out of failure output. A failed
+ * probe says so rather than reading as an absent row, because "the backend
+ * refused to answer" and "the backend answered without it" are the two verdicts
+ * this exists to tell apart. */
+async function backendCatalogVerdict(session: Session, id: string): Promise<string> {
+  try {
+    const r = await pageSeatInvoke(session, "plugin:attachments|catalog_list", {}, 15_000);
+    if (r.err !== undefined) return `; the backend REFUSED catalog_list, so the empty map is a host-side failure`;
+    const rows = (r.ok ?? []) as ReadonlyArray<{ id?: string }>;
+    return rows.some((x) => x.id === id)
+      ? `; the backend catalog HAS the row (${rows.length} row(s)), so the editor's map is stale rather than the read being wrong`
+      : `; the backend catalog does NOT have the row (${rows.length} row(s)), so the import's catalog write is the problem, not the editor`;
+  } catch {
+    return `; the backend catalog probe itself failed to run`;
+  }
+}
+
+export async function waitForInlineImage(
+  session: Session,
+  attachmentId?: string,
+): Promise<void> {
   let lastReason = "never polled";
+  // The tombstone branch asks the BACKEND once, and once only, because it is the
+  // one question the DOM cannot answer: the tombstone widget is DELIBERATELY
+  // shared between "the catalog has not loaded yet" and "the catalog loaded
+  // without this id" (`attachment-embed.ts` renders the same widget for both, to
+  // avoid a broken-image flash), so from the page the two are identical. One
+  // `catalog_list` separates them. Done in the poll rather than in the timeout
+  // label because `waitUntil`'s lazy label is synchronous.
+  let probed = false;
+  let backend = "";
   await session.waitUntil(
     async () => {
       const state = await session.execute<{
         found: boolean;
         width: number;
         chip: boolean;
+        tomb: boolean;
         marker: boolean;
         chars: number;
         testids: string[];
@@ -628,13 +661,19 @@ export async function waitForInlineImage(session: Session): Promise<void> {
           // present means the bytes are still coming, chip gone with the image
           // still hidden means the load FAILED.
           "var chip = !!document.querySelector('.cm-attachment-progress');" +
-          // **Is the embed SOURCE even in the document?** With no widget at all
-          // there are two very different stories: the `![[att:…]]` text never
-          // landed (a typing problem), or it landed and the decoration declined
-          // to build a widget for it (an attachment/catalog problem). The
-          // rendered readout hides the source once a widget replaces it, so a
-          // present marker with no widget is the second story and an absent one
-          // is the first. Length only, never the id.
+          // **Is a TOMBSTONE up?** This has to be asked before the source text,
+          // and asking it second is how the first version of this helper blamed
+          // typing for a catalog problem. Every embed widget is an ATOMIC
+          // `Decoration.replace`, so the moment any of them builds, the
+          // `![[att:…]]` text leaves the rendered DOM. Reading `att:` alone
+          // therefore reports "the text never landed" for a note whose text
+          // landed perfectly and is being drawn as a tombstone.
+          "var tomb = !!document.querySelector('.cm-attachment-tombstone');" +
+          // **Is the embed SOURCE even in the document?** With no widget of any
+          // kind there are two very different stories: the `![[att:…]]` text
+          // never landed (a typing problem), or it landed and no decoration has
+          // been built over it yet (a parse/viewport problem). Length only,
+          // never the id.
           "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
           "var src = content ? content.textContent || '' : '';" +
           "var marker = src.indexOf('att:') !== -1;" +
@@ -645,40 +684,34 @@ export async function waitForInlineImage(session: Session): Promise<void> {
           "  if (v && ids.indexOf(v) === -1) ids.push(v);" +
           "}" +
           "return { found: !!i, width: i ? i.offsetWidth : -1, chip: chip," +
-          "  marker: marker, chars: src.length, testids: ids };",
+          "  tomb: tomb, marker: marker, chars: src.length, testids: ids };",
       );
       if (state.found && state.width > 0) return true;
       if (state.found) {
         lastReason = state.chip
           ? `the image is present, hidden, and its progress chip is still up, so the bytes have not arrived`
           : `the image is present, hidden, and its progress chip is GONE, which the widget does only on a load ERROR — the attachment did not decrypt or decode`;
+      } else if (state.tomb) {
+        // The decoration built and chose the tombstone. That is the shared
+        // widget for BOTH unresolved cases, so the backend is what splits them.
+        if (attachmentId !== undefined && !probed) {
+          probed = true;
+          backend = await backendCatalogVerdict(session, attachmentId);
+        }
+        lastReason =
+          `the embed rendered as a TOMBSTONE, so the editor's catalog map has no row for this ` +
+          `id — either it has not loaded yet or it loaded without it (${state.chars} chars in ` +
+          `the editor)${backend}`;
       } else if (!state.marker) {
         lastReason =
-          `no embed source in the buffer at all (${state.chars} chars in the editor), so the ` +
-          `\`att:\` text never landed; testids present: ${
+          `no embed source in the buffer and no widget of any kind (${state.chars} chars in ` +
+          `the editor), so the \`att:\` text never landed; testids present: ${
             state.testids.length === 0 ? "none" : state.testids.join(", ")
           }`;
       } else {
-        // The catalog loads ONCE per editor mount over an async IPC, and until
-        // it resolves the decoration draws a neutral progress chip rather than
-        // an image. So a chip with no image means the catalog has not answered
-        // yet; no chip and no image means it answered WITHOUT this id, which is
-        // the tombstone case and a different bug entirely.
-        // The document LENGTH is the discriminator between the two stories the
-        // tombstone case still collapses, and it is the one datum the failing CI
-        // run could not answer. The catalog is loaded per editor mount and the
-        // import happens between two of them, so a stale map means the text
-        // landed in the note that was open BEFORE the import rather than in the
-        // freshly created one. A fresh note is tens of characters; a seeded one
-        // is hundreds. Length only, never content, per SYNC-13.
-        lastReason = state.chip
-          ? `the embed source is in the buffer and a progress chip is up, so the attachment ` +
-            `catalog has not resolved this id yet (${state.chars} chars in the editor)`
-          : `the embed source is in the buffer with no widget and no progress chip, so the ` +
-            `catalog resolved WITHOUT this id and the decoration drew a tombstone ` +
-            `(${state.chars} chars in the editor: a fresh note is tens, so hundreds means ` +
-            `the embed landed in the note that was open before the import, whose catalog ` +
-            `map predates it)`;
+        lastReason =
+          `the embed source is still raw text in the buffer with no widget over it ` +
+          `(${state.chars} chars in the editor), so no decoration has been built for it yet`;
       }
       return null;
     },
@@ -1173,6 +1206,92 @@ export async function typeIntoEditor(
     await content.sendKeys(keys);
     await session.waitUntil(landed, {
       label: "typed text landed in the document (after re-send)",
+    });
+  }
+}
+
+/** Type an ATTACHMENT EMBED into the live CodeMirror document.
+ *
+ * Separate from {@link typeIntoEditor} for a reason that is not style. That
+ * helper proves delivery by looking for the typed WORDS in the rendered DOM,
+ * which works because Live preview only HIDES markdown syntax. An attachment
+ * embed is the case its own doc comment warns about: every embed decoration is
+ * an ATOMIC `Decoration.replace`, so the moment one builds, `![[att:…]]` leaves
+ * the DOM entirely and no word of it survives. `typeIntoEditor` would therefore
+ * conclude the text never landed and type the whole embed a SECOND time.
+ *
+ * Six near-identical private copies of a naive `typeRaw` grew up around that,
+ * each carrying BOTH defects below. The four EMBED ones —
+ * `embed-overflow-menu`, `attachment-zoom`, `image-ocr-search` and
+ * `attachment-text-preview` — are collapsed into this helper, for the reason
+ * `waitForInlineImage` was collapsed: the next copy would inherit them. The two
+ * non-embed ones (`math`, `highlight-color`) stay private because their payload
+ * survives rendering and so their arrival check is not this one; they got the
+ * probe fix in place, with a pointer back here.
+ *
+ * **Defect 1: N probes, one Backspace.** The pipeline probe types `q` on EVERY
+ * poll and the copies always sent exactly one Backspace. Under load the poll
+ * routinely runs more than once, so the surplus `q`s stay in the document ahead
+ * of the payload. Harmless for an `includes` assertion, not harmless for a
+ * position-sensitive one, and it is the shape behind the recorded `slash-datetime`
+ * trap where a leading `q` stops `/date` being a slash command at all. Fixed by
+ * counting the probes and sending that many Backspaces.
+ *
+ * **Defect 2: the payload was never verified.** `sendKeys` resolving means the
+ * driver accepted the keys, not that CodeMirror applied them. Under full-suite
+ * load a garbled payload leaves the raw text sitting in the buffer with no
+ * decoration over it, because a malformed target is not a Wikilink node and the
+ * embed decoration never builds — a permanent state that no budget reaches, and
+ * exactly what CI pipeline 653 reported for `eo1`. Fixed by proving arrival in
+ * the one way that survives the atomic replace: the raw source is present OR an
+ * embed widget of any kind is, with a single bounded re-send. */
+export async function typeEmbedIntoEditor(session: Session, text: string): Promise<void> {
+  const content = await session.waitForElement(CM_CONTENT);
+  await content.click();
+  let probes = 0;
+  await session.waitUntil(
+    async () => {
+      await content.sendKeys("q");
+      probes += 1;
+      return (await content.textContent()).includes("q") || null;
+    },
+    { label: "keystroke pipeline established", timeoutMs: 10_000 },
+  );
+  // One Backspace PER probe. The caret sits after the last one, and they are
+  // contiguous, so this removes exactly what the probe added.
+  for (let i = 0; i < probes; i += 1) {
+    await content.sendKeys(String.fromCharCode(0xe003));
+  }
+
+  // Arrival, proven in a decoration-proof way. Either reading alone is wrong:
+  // the raw text disappears the instant a widget replaces it, and a widget from
+  // an EARLIER embed in the same note would answer for a payload that never
+  // landed — so this runs on notes that hold one embed, which is what every
+  // caller does.
+  const arrived = async () =>
+    (await session.execute<boolean>(
+      "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+        "var raw = c ? (c.textContent || '').indexOf('att:') !== -1 : false;" +
+        "var w = !!document.querySelector('.cm-attachment-tombstone, .cm-attachment-progress, [data-testid=\"attachment-image\"]');" +
+        "return raw || w;",
+    ))
+      ? true
+      : null;
+
+  await content.sendKeys(text);
+  try {
+    await session.waitUntil(arrived, {
+      label: "the embed source landed in the document",
+      timeoutMs: 5_000,
+    });
+  } catch {
+    // ONE re-send, on the same reasoning `typeIntoEditor` re-sends: the async
+    // note-content load can reset the document mid-stream. A second failure is
+    // a real failure and says so.
+    await content.sendKeys(text);
+    await session.waitUntil(arrived, {
+      label: "the embed source landed in the document (after re-send)",
+      timeoutMs: 10_000,
     });
   }
 }
