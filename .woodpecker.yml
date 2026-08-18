@@ -227,33 +227,66 @@ steps:
       # `classify` report a DISPATCHED command as unported — the roster test
       # caught it locally, and would have caught nothing here.
       - cargo test -p myne-web-wasm
-      # Reproducible wasm artefact (MYND-574 task 16). Two cold builds into
-      # separate target directories must produce the same digest.
-      #
-      # This runs in CI as well as locally on purpose: CI is a DIFFERENT machine
-      # — different user, different checkout path, a Linux container rather than
-      # macOS — so a path remap that only works on the author's box fails here.
-      # That cross-machine difference is most of the value; a same-machine check
-      # can only prove independence from the target directory.
-      #
-      # `threat-model.md` §6 makes reproducible builds the substitute for the
-      # missing third-party audit, and A15/TB11 makes the published bundle hash
-      # the web client's only defence against hostile code delivery. A hash
-      # nobody can reproduce is a number the publisher asserts about itself.
-      #
-      # All logic in a COMMITTED script, never inline — the same rule
-      # `ai-no-network-check.sh` and `hooks-parity-check.sh` follow, because
-      # Woodpecker's config-compile runs env substitution over this file and a
-      # shell expansion in a step (or even in a comment) can error the whole
-      # pipeline config.
-      #
-      # `nodejs` because `build-wasm.sh` reads cargo's `--message-format=json`
-      # artefact record with it, and `rust:slim` has no node. Added 2026-07-29
-      # after this step ran for the FIRST TIME: it landed with MYND-574 and every
-      # pipeline since errored at config-compile, so it was written, reviewed and
-      # merged without once executing. A gate that has never run is a gate whose
-      # result nobody has seen — which is the same failure class the step itself
-      # exists to catch, one layer up.
+
+  # ─── Reproducible wasm artefact ──────────────────────────────
+  # Two cold builds into separate target directories must produce the same
+  # digest (MYND-574 task 16).
+  #
+  # This runs in CI as well as locally on purpose: CI is a DIFFERENT machine —
+  # different user, different checkout path, a Linux container rather than
+  # macOS — so a path remap that only works on the author's box fails here. That
+  # cross-machine difference is most of the value; a same-machine check can only
+  # prove independence from the target directory.
+  #
+  # `threat-model.md` §6 makes reproducible builds the substitute for the missing
+  # third-party audit, and A15/TB11 makes the published bundle hash the web
+  # client's only defence against hostile code delivery. A hash nobody can
+  # reproduce is a number the publisher asserts about itself.
+  #
+  # All logic in a COMMITTED script, never inline — the same rule
+  # `ai-no-network-check.sh` and `hooks-parity-check.sh` follow, because
+  # Woodpecker's config-compile runs env substitution over this file and a shell
+  # expansion in a step (or even in a comment) can error the whole pipeline
+  # config.
+  #
+  # `nodejs` because `build-wasm.sh` reads cargo's `--message-format=json`
+  # artefact record with it, and `rust:slim` has no node. Added 2026-07-29 after
+  # this step ran for the FIRST TIME: it landed with MYND-574 and every pipeline
+  # since errored at config-compile, so it was written, reviewed and merged
+  # without once executing. A gate that has never run is a gate whose result
+  # nobody has seen — which is the same failure class the step itself exists to
+  # catch, one layer up.
+  #
+  # ─── Why this is its OWN step, and why it depends on a step it does not use ──
+  # Woodpecker compiles `depends_on` into STAGES and runs them one after another:
+  # every step in a stage starts together and the next stage waits for the
+  # SLOWEST one, whether or not anything connects them. Measured on pipelines
+  # 649, 655 and 661 — `vitest` starts at the exact second `wasm-protocol` ends
+  # every time, though it depends only on `pnpm-build`, which finished 160 s
+  # earlier.
+  #
+  # These two commands are 120 s of `wasm-protocol`'s 222 s, in the first stage,
+  # whose second-slowest step is `pnpm-build` at 64 s. Nothing depends on them.
+  # So they were 120 s of pure waiting for every other step in the pipeline.
+  # `depends_on: [cargo-test-tauri]` lands them in the `e2e` stage, where 1118 s
+  # are already being spent and this costs nothing.
+  #
+  # Only the REPRODUCIBILITY half moved. The correctness gates above — the
+  # CSPRNG-hook check, the wasm dependency graph, both wasm clippys, the entry
+  # crate's tests — stay in the first stage and still fail at minute two. This
+  # one is a publish-time property, and the trade it makes is explicit: it now
+  # surfaces at minute ~15 instead of minute ~4.
+  wasm-repro:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    depends_on: [cargo-test-tauri]
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
       - apt-get update && apt-get install -y --no-install-recommends nodejs
       - bash scripts/wasm-repro-check.sh
 
@@ -511,7 +544,19 @@ steps:
       # low default soft limit, which surfaces as a `tauri build` panic
       # (`Os code 24 / Too many open files`, EMFILE → core dump, exit 134).
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
+      # Downloaded .debs land on the shared `/cache` volume, so the next run of
+      # this step and of `cargo-test-tauri` (which installs the IDENTICAL set)
+      # unpacks from disk instead of the network. Measured on pipeline 661: this
+      # line is 68 s here and 67 s there, and both steps are ALONE in their
+      # stage, so all of it is critical path.
+      #
+      # The script, not an inline `-o Dir::Cache::archives`, and its header says
+      # why: apt takes an EXCLUSIVE lock inside its archive directory, so a
+      # second pipeline running concurrently would make this step go RED rather
+      # than slow. It retries without the shared cache instead, which is the one
+      # trade worth making — a CI step that reddens for an infrastructure reason
+      # wears the name of whatever it was gating.
+      - bash scripts/ci-apt.sh curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
@@ -576,7 +621,11 @@ steps:
     environment:
       CI: "true"
     commands:
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
+      # The other half of the shared apt archive cache. `tauri-compile` installs
+      # this exact set one stage earlier, so by the time this runs the .debs are
+      # already on `/cache`; `scripts/ci-apt.sh` carries the reasoning and the
+      # fallback for a contended cache.
+      - bash scripts/ci-apt.sh curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
       # vault_delete / vault_unlock tests assert UNIX permission-denial and
@@ -1553,6 +1602,12 @@ steps:
       - name: hooks-parity
         optional: true
       - name: wasm-protocol
+        optional: true
+      # Split out of `wasm-protocol` so its 120 s double build leaves the first
+      # stage. It can still go red on its own, and this file is the only thing
+      # that pushes a failure to the maintainer, so it needs its own slot: a
+      # step split off without one is a gate that goes quiet.
+      - name: wasm-repro
         optional: true
       # RESERVED SLOT — vector-verification is commented out (see the step
       # above, part 3 of its re-enable procedure). Uncomment the two lines
