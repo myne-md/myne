@@ -63,9 +63,10 @@ async function typeRaw(session: Session, text: string): Promise<void> {
   await content.click();
   // ONE Backspace PER probe. The `waitUntil` types "q" on every poll, and under
   // load it polls more than once, so a single Backspace leaves the surplus in
-  // the document ahead of the payload. `typeEmbedIntoEditor` in
-  // `support/flows.ts` carries the full account; this copy stays private only
-  // because its arrival check is not the embed one.
+  // the document ahead of the payload. This copy stays private because its
+  // payload is ordinary prose: the embed scenarios stopped typing altogether
+  // (`seedEmbedIntoNote` in `support/flows.ts`), and nothing here goes near a
+  // bracket that CodeMirror would auto-close.
   let probes = 0;
   await session.waitUntil(
     async () => {

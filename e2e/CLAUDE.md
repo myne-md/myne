@@ -203,6 +203,34 @@
   by `tests/scripts/e2eEmbedTyping.test.ts` against a fake `Session` running the
   real `waitUntil`, because the mechanism of the first one IS "the poll ran more
   than once" and no container run reproduces it on demand.
+- **When four rounds of hardening a helper each fix the shape CI just showed, the
+  defect is the INPUT METHOD, not the check.** Typing `![[att:…]]` races
+  CodeMirror's bracket auto-close: `[` inserts a closing `]`, and under
+  full-suite load the caret update and the incoming characters interleave. Two
+  permanent outcomes, both measured on the SAME commit — pipeline 661 got an
+  empty-target `cm-wikilink-chip-broken` with the payload behind it as plain
+  text, pipeline 664 got an unterminated span that is not a Wikilink node at all,
+  so nothing ever decorates it. Each round's check was correct about the shape it
+  had been shown and blind to the next one. The embed scenarios now WRITE the
+  embed through the real `note_update` IPC (`seedEmbedIntoNote`) and reopen the
+  note, which three scenarios in this suite already did for the reason
+  `sync-replication.e2e.ts` states in one line: "deterministic note_update IPC,
+  no flaky editor typing". What that gives up is stated in the helper: these
+  scenarios never meant to prove a user can type an embed, and typing is covered
+  where it IS the subject.
+- **A helper that owns a reload owns everything the reload undoes.** Two
+  scenarios broke the moment seeding started calling `refresh()`, in ways that
+  looked nothing like a reload problem: `waitForSaved` burned its full budget
+  (the write no longer goes through the editor, so the autosave badge never
+  leaves its pre-edit state), and `attachment-image.menu` "never rendered"
+  because the fresh-vault importer OVERLAY came back and swallowed the click.
+- **A raw `.click()` followed by a wait is the single most common shape behind a
+  timeout that reads like a dead surface**, and it kept being written after
+  `clickNewMenuItem` had already been fixed for it. `eo1` and `za1` both clicked
+  a widget control once and then waited 45 s for a surface that a missed click
+  can never produce. `clickByTestId` hit-tests and scrolls the control into its
+  own container; wrapping it in a re-click loop keyed on the surface appearing is
+  what makes the wait an assertion rather than a hope.
 - **Diagnose the DOM the way the code renders it, or the diagnostic lies with
   confidence.** The same helper's first message read the source text and
   reported "the `att:` text never landed" whenever it was absent. Every embed

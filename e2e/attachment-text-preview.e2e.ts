@@ -18,9 +18,10 @@
 //     created: the editor's attachment catalog loads once per editor mount
 //     (catalog.ts), so the fresh mount that opens the new note sees the row.
 //   - The form-C embed `![[att:<id>|name.txt]]` is typed through the real
-//     CodeMirror surface via `typeEmbedIntoEditor` — the decoration REPLACES
-//     the raw source with the widget, so `typeIntoEditor`'s landed-check would
-//     false-negative and double-type.
+//     real `note_update` IPC via `seedEmbedIntoNote`, then the note is
+//     reopened so the fresh editor mount loads a catalog that HAS the import.
+//     Not typed: driving `![[` through WebDriver races CodeMirror's bracket
+//     auto-close, which cost four CI rounds (see that helper's header).
 //   - The preview body is asserted by the CARD's own textContent carrying the
 //     decrypted marker (element-scoped — the raw embed alias can't satisfy it,
 //     the widget replaced that range).
@@ -46,7 +47,7 @@ import {
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
-  typeEmbedIntoEditor,
+  seedEmbedIntoNote,
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -98,7 +99,7 @@ describeE2E.flaky("tp1 inline txt attachment preview decrypts read-only (MYND-26
         const id = await importTxt(s);
 
         await createNote(s, "Onizleme Notu");
-        await typeEmbedIntoEditor(s, `![[att:${id}|${FILENAME}]]`);
+        await seedEmbedIntoNote(s, `![[att:${id}|${FILENAME}]]`);
 
         // The Tier-1 widget mounts…
         await s.byTestId("attachment-text-preview");

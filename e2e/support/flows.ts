@@ -6,7 +6,6 @@
 // class (not credentials; see the notes suite header).
 
 import { expect } from "vitest";
-import { KEY } from "./keyboard";
 import { testIdSelector, WebDriverError, type Element, type Session } from "./webdriver";
 
 /**
@@ -1260,236 +1259,91 @@ export async function typeIntoEditor(
  * appending a second attempt to a broken first. It measures the growth in the
  * rendered text and sends that many Backspaces, capped at the payload length so
  * a mis-measure can never eat into the note that was already there. */
-/** What the rendered text must contain for an embed payload to have arrived.
+/**
+ * Put an attachment embed into a note through the real note IPC, then reopen it.
  *
- * **`att:`, not `![[att:`, and getting here took three wrong answers.** The
- * markers cannot be part of the needle: a wikilink chip is an atomic
- * `Decoration.replace` that HIDES `![[` and `]]`, so the moment any chip renders
- * the prefix is not in the DOM whether the payload was right or wrong. Measured
- * in CI pipeline 661, on a document the check was rejecting: `` `![[` false,
- * `[[` x0, `att:` true ``, with a chip up.
+ * **This replaces typing the embed, and the four rounds it took to get here are
+ * the argument.** A form-C embed is `![[att:<id>|<name>]]`, and driving those
+ * brackets through WebDriver races CodeMirror's bracket auto-close: typing `[`
+ * inserts a closing `]`, and under full-suite load the caret update and the
+ * incoming characters interleave. Both outcomes are permanent states no budget
+ * reaches, and CI measured each of them on the SAME commit:
  *
- * The thing `![[att:` was reaching for — is the payload WELL FORMED — is not
- * something the source text can answer once a decoration is up. It is answered
- * by {@link EMBED_BROKEN_CHIP_CLASS} instead, which is the editor's own verdict.
+ *   * pipeline 661 — the payload landed outside the auto-closed pair, giving an
+ *     empty-target wikilink chip (`cm-wikilink-chip-broken`) with the rest as
+ *     plain text behind it;
+ *   * pipeline 664 — the payload came out unterminated, so it is not a Wikilink
+ *     node at all, no decoration is ever built, and the raw text just sits there.
  *
- * Exported because `tests/scripts/e2eEmbedTyping.test.ts` asserts its VALUE.
- * The test drives a fake `Session` whose `execute` MODELS this check rather
- * than running the browser script above, so weakening the string would
- * otherwise weaken the fake with it and leave the suite green. Asserting the
- * constant is what closes that. */
-export const EMBED_ARRIVAL_NEEDLE = "att:";
+ * Four rounds of hardening the typing helper each fixed the shape CI had just
+ * shown and were overtaken by the next one, because the defect is in the input
+ * method rather than in the check.
+ *
+ * So the embed is written the way three other scenarios in this suite already
+ * write note content, for the reason `sync-replication.e2e.ts` states in one
+ * line: "deterministic note_update IPC, no flaky editor typing".
+ * `cards-cover-picker` and `editor-scroll-slack` do the same. It is production
+ * IPC through the page seat, which `e2e/CLAUDE.md` sanctions explicitly, and it
+ * is NOT a test hook.
+ *
+ * **What this gives up, stated rather than glossed:** the scenarios no longer
+ * prove that a user can type an embed. They never meant to. `eo1` is about the
+ * overflow menu, `eo2` about the layout segments the menu writes, `za1` about
+ * the lightbox and `tp1` about the text-preview card; in every one the embed is
+ * scaffolding to get a widget on screen. Typing itself is covered by the specs
+ * whose subject it is (`slash-datetime`, `math`, `highlight-color`, and
+ * `typeIntoEditor`'s own callers).
+ *
+ * The reopen is not optional and not a settle: the editor loads the attachment
+ * catalog ONCE per mount, so the note has to be re-opened after the write for
+ * the embed to resolve against a catalog that contains the import.
+ */
+export async function seedEmbedIntoNote(
+  session: Session,
+  embed: string,
+  timeoutMs = 30_000,
+): Promise<void> {
+  // The note `createNote` just made is the highlighted row, and its id is on the
+  // row rather than anywhere in the editor. Same reading `editor-scroll-slack`
+  // uses.
+  const row = await session.waitForElement('[data-testid="notes.row"][aria-current="true"]');
+  const noteId = (await row.attribute("data-note-id")) ?? "";
+  if (noteId === "") throw new Error("seedEmbedIntoNote: the active note row carries no id");
 
-/** The class the wikilink chip carries when it could not parse its target.
- *
- * **This is the editor telling us the payload is malformed, and it is the only
- * reading that survives the decoration.** `parseAttachmentTarget` rejecting a
- * target means the attachment-embed decoration returns without building
- * anything and the ordinary wikilink chip renders instead, marked broken. So a
- * broken chip present is a payload that will NEVER resolve, no matter the
- * budget, and a plain `att:` in the text cannot distinguish it from a good one.
- *
- * What breaks the payload is bracket auto-close racing the keystrokes: typing
- * `[` inserts a closing `]`, and under load the caret and the incoming
- * characters interleave so the target lands outside the auto-closed pair. The
- * signature in 661 was exactly that shape: an empty-target chip with the rest
- * of the payload sitting after it as plain text (`att:` present, one stray
- * `]]`). */
-export const EMBED_BROKEN_CHIP_CLASS = "cm-wikilink-chip-broken";
+  // Append rather than replace: `createNote` writes a title and frontmatter, and
+  // a scenario that silently dropped them would be testing a different note.
+  const cur = await pageSeatInvoke(session, "plugin:notes|note_read", { noteId }, timeoutMs);
+  const base = typeof cur.ok === "string" ? cur.ok : "";
+  const up = await pageSeatInvoke(
+    session,
+    "plugin:notes|note_update",
+    { noteId, plaintext: `${base}\n${embed}` },
+    timeoutMs,
+  );
+  expect(up.err, "note_update should accept the embed").toBeUndefined();
 
-/** The class prefix every attachment embed widget carries.
- *
- * A prefix rather than a list of widget classes, and the difference is not
- * style: naming three of them (tombstone, progress chip, image testid) is a
- * selector that is incomplete the moment a fourth embed type exists, and one
- * already did — `tp1`'s `.txt` embed renders the text-preview card, so the
- * check saw neither the raw source (replaced) nor a known widget, and failed
- * on a document that was perfectly correct.
- *
- * Every widget in `editor/src/attachments/widgets.ts` uses this prefix.
- * Exported and asserted for the same reason as the needle above: the unit test
- * models the check rather than running it. */
-export const EMBED_WIDGET_CLASS_PREFIX = "cm-attachment-";
-
-/** The three facts the page can report about an embed payload's arrival. */
-export interface EmbedArrivalFacts {
-  /** {@link EMBED_ARRIVAL_NEEDLE} is in the rendered text. */
-  readonly raw: boolean;
-  /** An attachment widget is up, so a decoration replaced the source. */
-  readonly widget: boolean;
-  /** A wikilink chip is up and marked broken: the target did not parse. */
-  readonly broken: boolean;
-}
-
-/** Has the embed payload arrived, given what the page reports?
- *
- * **`broken` is a VETO and outranks the other two**, which is the fact CI
- * pipeline 661 measured and no earlier version of this check encoded: a broken
- * chip means `parseAttachmentTarget` rejected the target, so the attachment
- * embed decoration returns without building anything and no budget changes
- * that. The source text still contains `att:` in that state, so `raw` alone
- * calls a permanently wrong payload arrived.
- *
- * A pure function on purpose. The verdict used to live inside the string
- * evaluated in the WebView, where no unit test can reach it. */
-export function embedArrived(f: EmbedArrivalFacts): boolean {
-  return !f.broken && (f.raw || f.widget);
-}
-
-export async function typeEmbedIntoEditor(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement(CM_CONTENT);
-  await content.click();
-  let probes = 0;
+  await session.refresh();
+  await session.byTestId("editor.root", { timeoutMs });
+  // The reload re-mounts the first editor, and on a fresh vault that brings the
+  // importer onboarding OVERLAY back. It covers the editor, so every click after
+  // this one lands on it: measured as `attachment-image.menu` never appearing
+  // after its button was "clicked". The helper owns the reload, so it owns this.
+  await dismissImporterOfferIfPresent(session);
+  // Re-click until the note is actually open. A single click can land before the
+  // row is wired after a reload, which leaves the empty note-switcher up and
+  // makes every following assertion measure nothing.
   await session.waitUntil(
     async () => {
-      await content.sendKeys("q");
-      probes += 1;
-      return (await content.textContent()).includes("q") || null;
+      const tabs = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+      if (tabs.length > 0) return true;
+      await session.execute<number>(
+        "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +
+          JSON.stringify(noteId) +
+          "]'); if (e) { e.click(); return 1; } return 0;",
+      );
+      return null;
     },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  // One Backspace PER probe. The caret sits after the last one, and they are
-  // contiguous, so this removes exactly what the probe added.
-  for (let i = 0; i < probes; i += 1) {
-    await content.sendKeys(String.fromCharCode(0xe003));
-  }
-
-  // Arrival, proven in a decoration-proof way. Either reading alone is wrong:
-  // the raw text disappears the instant a widget replaces it, and a widget from
-  // an EARLIER embed in the same note would answer for a payload that never
-  // landed — so this runs on notes that hold one embed, which is what every
-  // caller does. The prefix is the WHOLE `![[att:`, because that is the part a
-  // dropped leading character destroys and `att:` alone would still match.
-  //
-  // **The widget half is a PREFIX, not a list, and the list is what broke it.**
-  // The first version named three classes — the tombstone, the progress chip
-  // and the image testid — which is a selector that is incomplete by
-  // construction: a `.txt` embed renders the text-preview card, so `tp1` typed
-  // its embed perfectly, watched the card replace the source, and then failed
-  // here forever because neither reading matched. Every widget in
-  // `editor/src/attachments/widgets.ts` carries the `cm-attachment-` prefix
-  // (image, frame, pdf, tombstone, url chip, file card, audio, warning), so
-  // matching the prefix covers the ones nobody has written yet as well.
-  // The script GATHERS, TypeScript DECIDES. Splitting it this way is not a
-  // refactor: the verdict used to live inside the browser string, and a string
-  // evaluated in the WebView is unreachable to any unit test, so the fake
-  // `Session` in `tests/scripts/e2eEmbedTyping.test.ts` had to model it. Removing
-  // the broken-chip veto from that string then left all seven cases green,
-  // which is exactly the non-evidence the repo rule warns about. With the
-  // decision in {@link embedArrived}, breaking it fails a test.
-  const arrived = async () =>
-    embedArrived(
-      await session.execute<EmbedArrivalFacts>(
-        "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
-          `var raw = c ? (c.textContent || '').indexOf(${JSON.stringify(EMBED_ARRIVAL_NEEDLE)}) !== -1 : false;` +
-          `var w = !!document.querySelector('[class*=${JSON.stringify(EMBED_WIDGET_CLASS_PREFIX)}]');` +
-          `var broken = !!document.querySelector('.${EMBED_BROKEN_CHIP_CLASS}');` +
-          "return { raw: raw, widget: w, broken: broken };",
-      ),
-    ) || null;
-
-  // The document as it stands BEFORE the payload, so the repair below can
-  // delete exactly what the payload added rather than guessing.
-  const before = (await content.textContent()).length;
-  let lastShape = "not measured";
-
-  await content.sendKeys(text);
-  try {
-    await session.waitUntil(arrived, {
-      label: "the embed source landed in the document",
-      timeoutMs: 5_000,
-    });
-  } catch {
-    // Clear the LINE, then retype. Counting characters to delete was the first
-    // repair and it cannot work here: once a chip renders, the rendered text
-    // and the document have different lengths, so the count is measured against
-    // the wrong thing. Selecting to the line start is exact regardless, and it
-    // is bounded to the one line the payload was typed on, so a note that
-    // already held content keeps it.
-    //
-    // Shift is sticky in the W3C protocol until sent again, hence the trailing
-    // release: leaving it down turns every following keystroke into a
-    // shifted one, which is its own silent corruption.
-    void before;
-    await content.sendKeys(`${KEY.SHIFT}${KEY.HOME}${KEY.SHIFT}`);
-    await content.sendKeys(KEY.BACKSPACE);
-    await content.sendKeys(text);
-    // Measured BEFORE the wait, because the wait is what throws and its lazy
-    // label is synchronous. One reading is enough: the state this names is a
-    // permanent one by the time we are here.
-    lastShape = await editorShape(session, content);
-    await session.waitUntil(arrived, {
-      label: () =>
-        `the embed source landed in the document (after re-send; ${lastShape})`,
-      timeoutMs: 10_000,
-    });
-  }
-}
-
-/** What the editor holds, in a form that names a cause and prints no content.
- *
- * **Two sends failing is not a dropped keystroke, and the message has to be able
- * to say which of several very different things it is.** The probe `q` lands, so
- * keys reach A document; the payload then does not appear in the one the check
- * reads. Every reading below separates a pair of explanations that no budget and
- * no re-send tells apart:
- *
- *   * `contents` — how many `.cm-content` nodes the page holds. The typing
- *     handle is located ONCE and the arrival check queries fresh, so with two
- *     editors up (a split pane, or an old one still attached mid-remount) the
- *     two can address different nodes forever.
- *   * `handleIsFirst` / `handleAttached` — whether the handle IS the node the
- *     check reads, and whether it is still in the document at all.
- *   * `handleChars` against `queriedChars` — the same question measured rather
- *     than inferred: keys landing somewhere the check never looks.
- *   * `bang` / `openers` / `att` / `closers` — which PART of the payload
- *     survived. A lost leading `!` leaves `[[att:` (an ordinary wikilink, which
- *     never builds an embed decoration); a completion popup that fired would
- *     leave neither `att:` nor the closers.
- *   * `decorations` — the class names actually rendered, so a wikilink chip
- *     standing where an embed was expected says so by name.
- *
- * Booleans, counts and class names only: no document text, no attachment id.
- * SYNC-13 is about credentials and a scratch note holds none, but a failure
- * message is CI-artefact-visible and there is no reason for it to carry content
- * it does not need. */
-async function editorShape(session: Session, handle: Element): Promise<string> {
-  let handleChars = -1;
-  let handleAttached = true;
-  try {
-    handleChars = (await handle.textContent()).length;
-  } catch {
-    handleAttached = false;
-  }
-  const s = await session.execute<{
-    contents: number;
-    handleIsFirst: boolean;
-    queriedChars: number;
-    bang: boolean;
-    openers: number;
-    att: boolean;
-    closers: number;
-    decorations: string[];
-  }>(
-    "var all = document.querySelectorAll('.cm-content');" +
-      "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
-      "var t = c ? (c.textContent || '') : '';" +
-      "var deco = [];" +
-      "var nodes = document.querySelectorAll('[class*=\"cm-attachment\"], [class*=\"cm-wikilink\"], .cm-tooltip-autocomplete');" +
-      "for (var i = 0; i < nodes.length && deco.length < 6; i++) {" +
-      "  var n = String(nodes[i].className || '');" +
-      "  if (n && deco.indexOf(n) === -1) deco.push(n);" +
-      "}" +
-      "return { contents: all.length, handleIsFirst: all.length > 0 && all[0] === c," +
-      "  queriedChars: t.length, bang: t.indexOf('![[') !== -1," +
-      "  openers: (t.match(/\\[\\[/g) || []).length, att: t.indexOf('att:') !== -1," +
-      "  closers: (t.match(/\\]\\]/g) || []).length, decorations: deco };",
-  );
-  return (
-    `cm-content nodes: ${s.contents}; the queried one is the first: ${s.handleIsFirst}; ` +
-    `typing handle attached: ${handleAttached}, chars ${handleChars} against queried ${s.queriedChars}; ` +
-    `markers: \`![[\` ${s.bang}, \`[[\` x${s.openers}, \`att:\` ${s.att}, \`]]\` x${s.closers}; ` +
-    `decorations: ${s.decorations.length === 0 ? "none" : s.decorations.join(" | ")}`
+    { label: "the seeded note is open", timeoutMs: 20_000 },
   );
 }
 
