@@ -30,7 +30,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { EMBED_ARRIVAL_NEEDLE, typeEmbedIntoEditor } from "../../e2e/support/flows";
+import {
+  EMBED_ARRIVAL_NEEDLE,
+  EMBED_WIDGET_CLASS_PREFIX,
+  typeEmbedIntoEditor,
+} from "../../e2e/support/flows";
 import { Session } from "../../e2e/support/webdriver";
 
 const EMBED = "![[att:0123456789abcdef0123456789abcdef|diagram.png]]";
@@ -88,12 +92,33 @@ function fakeSession(opts: {
   Object.assign(session, {
     waitForElement: async () => content,
     findElements: async () => [content],
-    // The helper's arrival probe, MODELLED rather than run: the real one is a
-    // JavaScript string evaluated in the WebView, and nothing here has a DOM.
-    // That is a real limit of this file and the reason for the assertion on
-    // `EMBED_ARRIVAL_NEEDLE` below: without it, weakening the needle weakens
-    // this model with it and every case here stays green.
-    execute: async () => rec.doc.includes(EMBED_ARRIVAL_NEEDLE) || widget,
+    // Two scripts reach `execute`, and both are MODELLED rather than run: the
+    // real ones are JavaScript strings evaluated in the WebView and nothing here
+    // has a DOM. That is a real limit of this file and the reason for the
+    // assertion on `EMBED_ARRIVAL_NEEDLE` below: without it, weakening the
+    // needle weakens this model with it and every case here stays green.
+    //
+    // The second script is the failure-shape probe. It is answered with a
+    // structurally valid reading rather than a real one, because what this file
+    // tests is the helper's control flow; the probe's own accuracy is a claim
+    // about the DOM and only a container run can carry it.
+    execute: async (script: string) =>
+      // Keyed on a token ONLY the shape probe carries. Keying on `cm-content`
+      // instead matched the arrival script too, which then returned this object
+      // — truthy — so every case reported arrival and the two failure tests
+      // resolved instead of rejecting.
+      script.includes("handleIsFirst")
+        ? {
+            contents: 1,
+            handleIsFirst: true,
+            queriedChars: rec.doc.length,
+            bang: rec.doc.includes("![["),
+            openers: (rec.doc.match(/\[\[/g) || []).length,
+            att: rec.doc.includes("att:"),
+            closers: (rec.doc.match(/\]\]/g) || []).length,
+            decorations: [],
+          }
+        : rec.doc.includes(EMBED_ARRIVAL_NEEDLE) || widget,
     send: async () => undefined,
   });
   return { session: session as unknown as Session, rec };
@@ -113,6 +138,28 @@ describe("typeEmbedIntoEditor", () => {
         "needle has to carry the `![[` that distinguishes them",
     ).toBe(true);
     expect(EMBED_ARRIVAL_NEEDLE).toBe("![[att:");
+  });
+
+  it("recognises any attachment widget by prefix, not a list of three", () => {
+    // `tp1` is the reason. Its `.txt` embed renders the text-preview card, which
+    // the first version of this check did not name, so the helper saw neither
+    // the raw source (an atomic widget had replaced it) nor a known widget and
+    // failed on a document that was perfectly correct. Every widget in
+    // `editor/src/attachments/widgets.ts` carries this prefix, so matching it
+    // covers the embed types nobody has written yet.
+    expect(EMBED_WIDGET_CLASS_PREFIX).toBe("cm-attachment-");
+    for (const cls of [
+      "cm-attachment-img",
+      "cm-attachment-tombstone",
+      "cm-attachment-file-card",
+      "cm-attachment-pdf",
+      "cm-attachment-audio",
+    ]) {
+      expect(
+        cls.startsWith(EMBED_WIDGET_CLASS_PREFIX),
+        `${cls} is a real widget class and the prefix has to reach it`,
+      ).toBe(true);
+    }
   });
 
   it("sends one Backspace per probe, so a looping probe leaves no stray character", async () => {
@@ -158,7 +205,7 @@ describe("typeEmbedIntoEditor", () => {
     // shape rather than the shorter one.
     const { session, rec } = fakeSession({ probeLandsAfter: 1, payloadLands: "garbled" });
     await expect(typeEmbedIntoEditor(session, EMBED)).rejects.toThrow(
-      /embed source landed in the document \(after re-send\)/,
+      /embed source landed in the document \(after re-send; /,
     );
 
     const backspaces = rec.sent.filter((k) => k === BACKSPACE).length;
@@ -180,7 +227,7 @@ describe("typeEmbedIntoEditor", () => {
     // name of an attachment problem rather than a typing one.
     const { session, rec } = fakeSession({ probeLandsAfter: 1, payloadLands: "never" });
     await expect(typeEmbedIntoEditor(session, EMBED)).rejects.toThrow(
-      /embed source landed in the document \(after re-send\)/,
+      /embed source landed in the document \(after re-send; /,
     );
     expect(
       rec.sent.filter((k) => k === EMBED),
