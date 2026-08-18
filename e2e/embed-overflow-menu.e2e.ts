@@ -42,6 +42,7 @@ import {
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
+  typeEmbedIntoEditor,
   unlockToEditor,
   waitForInlineImage,
   waitForSaved,
@@ -70,19 +71,6 @@ async function importImage(s: Session): Promise<string> {
   return (r.ok as { id: string }).id;
 }
 
-async function typeRaw(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement('[data-testid="editor.content"] .cm-content');
-  await content.click();
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      return (await content.textContent()).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  await content.sendKeys(String.fromCharCode(0xe003)); // Backspace: drop the probe
-  await content.sendKeys(text);
-}
 
 /** The embed frame's inline width, which the layout segment drives. */
 async function frameWidth(s: Session): Promise<string> {
@@ -137,12 +125,12 @@ describeE2E("eo1 embed overflow menu on an image embed (myne#409)", () => {
 
         const attachmentId = await importImage(s);
         await createNote(s, "Diagram note");
-        await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
+        await typeEmbedIntoEditor(s, `![[att:${attachmentId}|${FILENAME}]]`);
         await waitForSaved(s);
 
         // Wait until the inline image has decoded, so the widget is rendering
         // against real bytes rather than its error fallback.
-        await waitForInlineImage(s);
+        await waitForInlineImage(s, attachmentId);
 
         // Read the stored name off the widget rather than assuming the one we
         // imported. `Compress images on import` is ON by default and re-encodes
@@ -209,10 +197,10 @@ describeE2E("eo2 embed layout rows write into the note (myne#409)", () => {
 
         const attachmentId = await importImage(s);
         await createNote(s, "Layout note");
-        await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
+        await typeEmbedIntoEditor(s, `![[att:${attachmentId}|${FILENAME}]]`);
         await waitForSaved(s);
 
-        await waitForInlineImage(s);
+        await waitForInlineImage(s, attachmentId);
 
         // Pick a size preset. The note bytes are the assertion: this is the
         // only authoring path for a layout segment, because a form-C embed is

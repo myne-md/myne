@@ -187,6 +187,33 @@
   "nothing", raising the number is the one fix guaranteed not to work.** The
   helpers now say which of their several silent arms kept firing, and that is
   what turned six of these from guesses into measurements.
+- **A helper that VERIFIES nothing is the same family, and it hides behind the
+  helper that comes after it.** `eo1` failed CI pipeline 653 three attempts
+  running, reporting the raw `![[att:…]]` text sitting in the buffer with no
+  widget over it. Nothing about that message points at typing, and every embed
+  scenario had a private `typeRaw` that sent the payload with `sendKeys` and then
+  returned: `sendKeys` resolving means the DRIVER accepted the keys, not that
+  CodeMirror applied them, and a garbled payload is not a Wikilink node, so the
+  embed decoration is never built and the raw text stays forever. The failure
+  then surfaces inside the NEXT helper, wearing the name of an attachment
+  problem. Same file, second defect, same shape: the keystroke probe types `q`
+  on every poll of its `waitUntil` and all six copies sent exactly one
+  Backspace, so a poll that looped left surplus characters ahead of the payload.
+  Both are now `typeEmbedIntoEditor` in `support/flows.ts`, and both are pinned
+  by `tests/scripts/e2eEmbedTyping.test.ts` against a fake `Session` running the
+  real `waitUntil`, because the mechanism of the first one IS "the poll ran more
+  than once" and no container run reproduces it on demand.
+- **Diagnose the DOM the way the code renders it, or the diagnostic lies with
+  confidence.** The same helper's first message read the source text and
+  reported "the `att:` text never landed" whenever it was absent. Every embed
+  widget is an ATOMIC `Decoration.replace`, so the moment any of them builds the
+  source leaves the DOM: a note whose text landed perfectly and is being drawn
+  as a tombstone reported as a typing failure. Worse, the tombstone is
+  DELIBERATELY shared between "the catalog has not loaded yet" and "the catalog
+  loaded without this id" (a broken-image flash is the alternative), so the two
+  are indistinguishable from the page and only a `catalog_list` from the page
+  seat separates them. A probe has to enumerate the states the RENDERER can be
+  in, not the ones the test author was thinking about.
 - **Hunt flake with `--retry=0`.** With retries on, a failing attempt is erased
   from the report and the flake rate reads as zero no matter how bad it is.
   Repeat the spec in ONE warm container and always discard a warm-up run: the

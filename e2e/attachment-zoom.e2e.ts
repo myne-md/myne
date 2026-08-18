@@ -23,6 +23,7 @@ import {
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
+  typeEmbedIntoEditor,
   unlockToEditor,
   waitForInlineImage,
   waitForSaved,
@@ -50,19 +51,6 @@ async function importImage(s: Session): Promise<string> {
   return (r.ok as { id: string }).id;
 }
 
-async function typeRaw(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement('[data-testid="editor.content"] .cm-content');
-  await content.click();
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      return (await content.textContent()).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  await content.sendKeys(String.fromCharCode(0xe003)); // Backspace — drop the probe
-  await content.sendKeys(text);
-}
 
 /** The lightbox zoom percentage as a number (reads "NN%"). */
 async function zoomPercent(s: Session): Promise<number> {
@@ -94,12 +82,12 @@ describeE2E("za1 attachment image lightbox zoom/pan (MYND-594)", () => {
 
         const attachmentId = await importImage(s);
         await createNote(s, "Diagram note");
-        await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
+        await typeEmbedIntoEditor(s, `![[att:${attachmentId}|${FILENAME}]]`);
         await waitForSaved(s);
 
         // Wait until the inline chip's image has decoded + is displayed, then
         // click it to open the lightbox.
-        await waitForInlineImage(s);
+        await waitForInlineImage(s, attachmentId);
         await (await s.byTestId("attachment-image")).click();
 
         // The lightbox is open with its image + zoom controls.
