@@ -1237,14 +1237,44 @@ export async function typeIntoEditor(
  * trap where a leading `q` stops `/date` being a slash command at all. Fixed by
  * counting the probes and sending that many Backspaces.
  *
- * **Defect 2: the payload was never verified.** `sendKeys` resolving means the
- * driver accepted the keys, not that CodeMirror applied them. Under full-suite
- * load a garbled payload leaves the raw text sitting in the buffer with no
- * decoration over it, because a malformed target is not a Wikilink node and the
- * embed decoration never builds — a permanent state that no budget reaches, and
- * exactly what CI pipeline 653 reported for `eo1`. Fixed by proving arrival in
- * the one way that survives the atomic replace: the raw source is present OR an
- * embed widget of any kind is, with a single bounded re-send. */
+ * **Defect 2: the payload was never verified, and a weak check is barely
+ * better.** `sendKeys` resolving means the driver accepted the keys, not that
+ * CodeMirror applied them. Under full-suite load the leading character is
+ * dropped during the focus settle, which is the exact defect the `q` probe
+ * exists to absorb and does not always absorb, and `![[att:…]]` arriving as
+ * `[[att:…]]` is an ORDINARY WIKILINK: `parts.isEmbed` is false, the embed
+ * decoration returns without building anything, and the raw text sits there
+ * forever. A permanent state no budget reaches, and what CI pipelines 653 and
+ * 657 reported for `eo1`.
+ *
+ * The first version of this check looked for `att:`, which a payload missing its
+ * leading `!` still satisfies — it passed the garbled document straight through
+ * to `waitForInlineImage`, which then timed out wearing the name of an
+ * attachment problem. The check is now the full `![[att:` prefix, so a dropped
+ * leading character fails HERE, at the helper that caused it. Arrival is proven
+ * in the one way that survives the atomic replace: that prefix is in the raw
+ * source, OR an embed widget of any kind exists.
+ *
+ * The repair deletes what actually landed before retyping, rather than
+ * appending a second attempt to a broken first. It measures the growth in the
+ * rendered text and sends that many Backspaces, capped at the payload length so
+ * a mis-measure can never eat into the note that was already there. */
+/** What the raw source must contain for an embed payload to count as arrived.
+ *
+ * **The whole prefix, and the length of it is the point.** A payload that lost
+ * its leading `!` during the focus settle still contains `att:`, and the first
+ * version of this check looked for exactly that — so it passed the garbled
+ * document through to `waitForInlineImage`, which timed out 20 s later wearing
+ * the name of an attachment problem. `[[att:…]]` is an ordinary wikilink:
+ * `parts.isEmbed` is false, no embed decoration is built, and nothing recovers.
+ *
+ * Exported because `tests/scripts/e2eEmbedTyping.test.ts` asserts its VALUE.
+ * The test drives a fake `Session` whose `execute` MODELS this check rather
+ * than running the browser script above, so weakening the string would
+ * otherwise weaken the fake with it and leave the suite green. Asserting the
+ * constant is what closes that. */
+export const EMBED_ARRIVAL_NEEDLE = "![[att:";
+
 export async function typeEmbedIntoEditor(session: Session, text: string): Promise<void> {
   const content = await session.waitForElement(CM_CONTENT);
   await content.click();
@@ -1267,16 +1297,21 @@ export async function typeEmbedIntoEditor(session: Session, text: string): Promi
   // the raw text disappears the instant a widget replaces it, and a widget from
   // an EARLIER embed in the same note would answer for a payload that never
   // landed — so this runs on notes that hold one embed, which is what every
-  // caller does.
+  // caller does. The prefix is the WHOLE `![[att:`, because that is the part a
+  // dropped leading character destroys and `att:` alone would still match.
   const arrived = async () =>
     (await session.execute<boolean>(
       "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
-        "var raw = c ? (c.textContent || '').indexOf('att:') !== -1 : false;" +
+        `var raw = c ? (c.textContent || '').indexOf(${JSON.stringify(EMBED_ARRIVAL_NEEDLE)}) !== -1 : false;` +
         "var w = !!document.querySelector('.cm-attachment-tombstone, .cm-attachment-progress, [data-testid=\"attachment-image\"]');" +
         "return raw || w;",
     ))
       ? true
       : null;
+
+  // The document as it stands BEFORE the payload, so the repair below can
+  // delete exactly what the payload added rather than guessing.
+  const before = (await content.textContent()).length;
 
   await content.sendKeys(text);
   try {
@@ -1285,9 +1320,20 @@ export async function typeEmbedIntoEditor(session: Session, text: string): Promi
       timeoutMs: 5_000,
     });
   } catch {
-    // ONE re-send, on the same reasoning `typeIntoEditor` re-sends: the async
-    // note-content load can reset the document mid-stream. A second failure is
-    // a real failure and says so.
+    // Delete the garbled attempt, then retype. Appending instead would leave a
+    // stray `[[att:…]]` fragment in the note, and the whole reason a caller
+    // reaches for this helper is that the note bytes are the thing under test.
+    //
+    // Reading LENGTH is sound on exactly this path: it is taken only when no
+    // decoration built, so the rendered text still IS the document. The cap is
+    // the belt: if the measurement is wrong in the unsafe direction, the worst
+    // case is a leftover fragment ahead of a well-formed embed, never a bite
+    // taken out of the note that was already there.
+    const grew = (await content.textContent()).length - before;
+    const back = Math.max(0, Math.min(grew, text.length));
+    for (let i = 0; i < back; i += 1) {
+      await content.sendKeys(String.fromCharCode(0xe003));
+    }
     await content.sendKeys(text);
     await session.waitUntil(arrived, {
       label: "the embed source landed in the document (after re-send)",
