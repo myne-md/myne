@@ -6,6 +6,7 @@
 // class (not credentials; see the notes suite header).
 
 import { expect } from "vitest";
+import { KEY } from "./keyboard";
 import { testIdSelector, WebDriverError, type Element, type Session } from "./webdriver";
 
 /**
@@ -1259,21 +1260,42 @@ export async function typeIntoEditor(
  * appending a second attempt to a broken first. It measures the growth in the
  * rendered text and sends that many Backspaces, capped at the payload length so
  * a mis-measure can never eat into the note that was already there. */
-/** What the raw source must contain for an embed payload to count as arrived.
+/** What the rendered text must contain for an embed payload to have arrived.
  *
- * **The whole prefix, and the length of it is the point.** A payload that lost
- * its leading `!` during the focus settle still contains `att:`, and the first
- * version of this check looked for exactly that — so it passed the garbled
- * document through to `waitForInlineImage`, which timed out 20 s later wearing
- * the name of an attachment problem. `[[att:…]]` is an ordinary wikilink:
- * `parts.isEmbed` is false, no embed decoration is built, and nothing recovers.
+ * **`att:`, not `![[att:`, and getting here took three wrong answers.** The
+ * markers cannot be part of the needle: a wikilink chip is an atomic
+ * `Decoration.replace` that HIDES `![[` and `]]`, so the moment any chip renders
+ * the prefix is not in the DOM whether the payload was right or wrong. Measured
+ * in CI pipeline 661, on a document the check was rejecting: `` `![[` false,
+ * `[[` x0, `att:` true ``, with a chip up.
+ *
+ * The thing `![[att:` was reaching for — is the payload WELL FORMED — is not
+ * something the source text can answer once a decoration is up. It is answered
+ * by {@link EMBED_BROKEN_CHIP_CLASS} instead, which is the editor's own verdict.
  *
  * Exported because `tests/scripts/e2eEmbedTyping.test.ts` asserts its VALUE.
  * The test drives a fake `Session` whose `execute` MODELS this check rather
  * than running the browser script above, so weakening the string would
  * otherwise weaken the fake with it and leave the suite green. Asserting the
  * constant is what closes that. */
-export const EMBED_ARRIVAL_NEEDLE = "![[att:";
+export const EMBED_ARRIVAL_NEEDLE = "att:";
+
+/** The class the wikilink chip carries when it could not parse its target.
+ *
+ * **This is the editor telling us the payload is malformed, and it is the only
+ * reading that survives the decoration.** `parseAttachmentTarget` rejecting a
+ * target means the attachment-embed decoration returns without building
+ * anything and the ordinary wikilink chip renders instead, marked broken. So a
+ * broken chip present is a payload that will NEVER resolve, no matter the
+ * budget, and a plain `att:` in the text cannot distinguish it from a good one.
+ *
+ * What breaks the payload is bracket auto-close racing the keystrokes: typing
+ * `[` inserts a closing `]`, and under load the caret and the incoming
+ * characters interleave so the target lands outside the auto-closed pair. The
+ * signature in 661 was exactly that shape: an empty-target chip with the rest
+ * of the payload sitting after it as plain text (`att:` present, one stray
+ * `]]`). */
+export const EMBED_BROKEN_CHIP_CLASS = "cm-wikilink-chip-broken";
 
 /** The class prefix every attachment embed widget carries.
  *
@@ -1288,6 +1310,31 @@ export const EMBED_ARRIVAL_NEEDLE = "![[att:";
  * Exported and asserted for the same reason as the needle above: the unit test
  * models the check rather than running it. */
 export const EMBED_WIDGET_CLASS_PREFIX = "cm-attachment-";
+
+/** The three facts the page can report about an embed payload's arrival. */
+export interface EmbedArrivalFacts {
+  /** {@link EMBED_ARRIVAL_NEEDLE} is in the rendered text. */
+  readonly raw: boolean;
+  /** An attachment widget is up, so a decoration replaced the source. */
+  readonly widget: boolean;
+  /** A wikilink chip is up and marked broken: the target did not parse. */
+  readonly broken: boolean;
+}
+
+/** Has the embed payload arrived, given what the page reports?
+ *
+ * **`broken` is a VETO and outranks the other two**, which is the fact CI
+ * pipeline 661 measured and no earlier version of this check encoded: a broken
+ * chip means `parseAttachmentTarget` rejected the target, so the attachment
+ * embed decoration returns without building anything and no budget changes
+ * that. The source text still contains `att:` in that state, so `raw` alone
+ * calls a permanently wrong payload arrived.
+ *
+ * A pure function on purpose. The verdict used to live inside the string
+ * evaluated in the WebView, where no unit test can reach it. */
+export function embedArrived(f: EmbedArrivalFacts): boolean {
+  return !f.broken && (f.raw || f.widget);
+}
 
 export async function typeEmbedIntoEditor(session: Session, text: string): Promise<void> {
   const content = await session.waitForElement(CM_CONTENT);
@@ -1323,15 +1370,23 @@ export async function typeEmbedIntoEditor(session: Session, text: string): Promi
   // `editor/src/attachments/widgets.ts` carries the `cm-attachment-` prefix
   // (image, frame, pdf, tombstone, url chip, file card, audio, warning), so
   // matching the prefix covers the ones nobody has written yet as well.
+  // The script GATHERS, TypeScript DECIDES. Splitting it this way is not a
+  // refactor: the verdict used to live inside the browser string, and a string
+  // evaluated in the WebView is unreachable to any unit test, so the fake
+  // `Session` in `tests/scripts/e2eEmbedTyping.test.ts` had to model it. Removing
+  // the broken-chip veto from that string then left all seven cases green,
+  // which is exactly the non-evidence the repo rule warns about. With the
+  // decision in {@link embedArrived}, breaking it fails a test.
   const arrived = async () =>
-    (await session.execute<boolean>(
-      "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
-        `var raw = c ? (c.textContent || '').indexOf(${JSON.stringify(EMBED_ARRIVAL_NEEDLE)}) !== -1 : false;` +
-        `var w = !!document.querySelector('[class*=${JSON.stringify(EMBED_WIDGET_CLASS_PREFIX)}]');` +
-        "return raw || w;",
-    ))
-      ? true
-      : null;
+    embedArrived(
+      await session.execute<EmbedArrivalFacts>(
+        "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+          `var raw = c ? (c.textContent || '').indexOf(${JSON.stringify(EMBED_ARRIVAL_NEEDLE)}) !== -1 : false;` +
+          `var w = !!document.querySelector('[class*=${JSON.stringify(EMBED_WIDGET_CLASS_PREFIX)}]');` +
+          `var broken = !!document.querySelector('.${EMBED_BROKEN_CHIP_CLASS}');` +
+          "return { raw: raw, widget: w, broken: broken };",
+      ),
+    ) || null;
 
   // The document as it stands BEFORE the payload, so the repair below can
   // delete exactly what the payload added rather than guessing.
@@ -1345,20 +1400,19 @@ export async function typeEmbedIntoEditor(session: Session, text: string): Promi
       timeoutMs: 5_000,
     });
   } catch {
-    // Delete the garbled attempt, then retype. Appending instead would leave a
-    // stray `[[att:…]]` fragment in the note, and the whole reason a caller
-    // reaches for this helper is that the note bytes are the thing under test.
+    // Clear the LINE, then retype. Counting characters to delete was the first
+    // repair and it cannot work here: once a chip renders, the rendered text
+    // and the document have different lengths, so the count is measured against
+    // the wrong thing. Selecting to the line start is exact regardless, and it
+    // is bounded to the one line the payload was typed on, so a note that
+    // already held content keeps it.
     //
-    // Reading LENGTH is sound on exactly this path: it is taken only when no
-    // decoration built, so the rendered text still IS the document. The cap is
-    // the belt: if the measurement is wrong in the unsafe direction, the worst
-    // case is a leftover fragment ahead of a well-formed embed, never a bite
-    // taken out of the note that was already there.
-    const grew = (await content.textContent()).length - before;
-    const back = Math.max(0, Math.min(grew, text.length));
-    for (let i = 0; i < back; i += 1) {
-      await content.sendKeys(String.fromCharCode(0xe003));
-    }
+    // Shift is sticky in the W3C protocol until sent again, hence the trailing
+    // release: leaving it down turns every following keystroke into a
+    // shifted one, which is its own silent corruption.
+    void before;
+    await content.sendKeys(`${KEY.SHIFT}${KEY.HOME}${KEY.SHIFT}`);
+    await content.sendKeys(KEY.BACKSPACE);
     await content.sendKeys(text);
     // Measured BEFORE the wait, because the wait is what throws and its lazy
     // label is synchronous. One reading is enough: the state this names is a

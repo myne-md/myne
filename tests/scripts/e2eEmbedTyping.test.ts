@@ -32,13 +32,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMBED_ARRIVAL_NEEDLE,
+  EMBED_BROKEN_CHIP_CLASS,
   EMBED_WIDGET_CLASS_PREFIX,
+  embedArrived,
   typeEmbedIntoEditor,
 } from "../../e2e/support/flows";
 import { Session } from "../../e2e/support/webdriver";
 
 const EMBED = "![[att:0123456789abcdef0123456789abcdef|diagram.png]]";
 const BACKSPACE = String.fromCharCode(0xe003);
+const SHIFT = String.fromCharCode(0xe008);
+const HOME = String.fromCharCode(0xe011);
 
 interface Recorder {
   sent: string[];
@@ -64,6 +68,7 @@ function fakeSession(opts: {
   const rec: Recorder = { sent: [], doc: "" };
   let probeSends = 0;
   let widget = false;
+  let broken = false;
 
   const content = {
     click: async () => undefined,
@@ -82,8 +87,19 @@ function fakeSession(opts: {
       // produce: intact (the editor decorates it, so the raw source leaves the
       // DOM and a widget replaces it), garbled (the leading "!" is dropped, so
       // the text is in the document and nothing decorates it), or absent.
-      if (opts.payloadLands === "intact") widget = true;
-      else if (opts.payloadLands === "garbled") rec.doc += text.slice(1);
+      if (opts.payloadLands === "intact") {
+        // The widget replaces the source, so the document the DOM reports keeps
+        // only what the probe left, which is nothing. That is what lets the two
+        // probe-balance cases assert emptiness.
+        widget = true;
+      } else if (opts.payloadLands === "garbled") {
+        // What CI measured: the text is in the document, `att:` and all, and the
+        // editor has rendered a BROKEN chip over it because the target did not
+        // parse. Nothing about the raw text distinguishes this from a good
+        // payload, which is the whole reason the chip is consulted.
+        rec.doc += text.slice(1);
+        broken = true;
+      }
     },
     textContent: async () => rec.doc,
   };
@@ -94,9 +110,12 @@ function fakeSession(opts: {
     findElements: async () => [content],
     // Two scripts reach `execute`, and both are MODELLED rather than run: the
     // real ones are JavaScript strings evaluated in the WebView and nothing here
-    // has a DOM. That is a real limit of this file and the reason for the
-    // assertion on `EMBED_ARRIVAL_NEEDLE` below: without it, weakening the
-    // needle weakens this model with it and every case here stays green.
+    // has a DOM. What the model supplies is FACTS, not a verdict — the verdict
+    // is `embedArrived`, which is ordinary TypeScript and is tested directly
+    // below. That split is deliberate: while the verdict lived inside the
+    // browser string, deleting the broken-chip veto from it left all seven cases
+    // green, because this fake was quietly re-implementing the rule it was
+    // supposed to be checking.
     //
     // The second script is the failure-shape probe. It is answered with a
     // structurally valid reading rather than a real one, because what this file
@@ -118,26 +137,48 @@ function fakeSession(opts: {
             closers: (rec.doc.match(/\]\]/g) || []).length,
             decorations: [],
           }
-        : rec.doc.includes(EMBED_ARRIVAL_NEEDLE) || widget,
+        : {
+            raw: rec.doc.includes(EMBED_ARRIVAL_NEEDLE),
+            widget,
+            broken,
+          },
     send: async () => undefined,
   });
   return { session: session as unknown as Session, rec };
 }
 
 describe("typeEmbedIntoEditor", () => {
-  it("requires the whole embed prefix, not just the `att:` inside it", () => {
-    // The threshold, asserted directly, because the fake above MODELS the check
+  it("treats a broken chip as a veto over everything else", () => {
+    // The verdict itself, not a model of it. A broken chip means the target did
+    // not parse, so the attachment embed decoration never builds and no budget
+    // recovers — even though the source text still reads `att:`, which is the
+    // exact state CI pipeline 661 measured while the check called it arrival.
+    expect(embedArrived({ raw: true, widget: false, broken: true })).toBe(false);
+    expect(embedArrived({ raw: true, widget: true, broken: true })).toBe(false);
+    // And the other direction, so a veto that swallowed the healthy cases would
+    // fail here rather than turning every scenario into a timeout.
+    expect(embedArrived({ raw: true, widget: false, broken: false })).toBe(true);
+    expect(embedArrived({ raw: false, widget: true, broken: false })).toBe(true);
+    expect(embedArrived({ raw: false, widget: false, broken: false })).toBe(false);
+  });
+
+  it("asks the editor whether the payload parsed, not the source text", () => {
+    // The thresholds, asserted directly, because the fake above MODELS the check
     // rather than running it: the real one is a string evaluated in the WebView.
-    // Injected the weaker `att:` needle into `flows.ts` and watched all five
-    // behavioural cases stay green, which is exactly the non-evidence the repo
-    // rule warns about. This assertion is what fails on that edit.
+    //
+    // The needle deliberately does NOT carry `![[`. A wikilink chip is an atomic
+    // Decoration.replace that hides the markers, so once any chip renders they
+    // are absent whether the payload was right or wrong. CI pipeline 661
+    // measured exactly that on a document this check was rejecting: `![[` false,
+    // `[[` x0, `att:` true, with a chip up. The question `![[att:` was reaching
+    // for — is this payload well formed — is answered by the broken-chip class,
+    // which is the editor's own verdict and survives the decoration.
+    expect(EMBED_ARRIVAL_NEEDLE).toBe("att:");
     expect(
-      EMBED_ARRIVAL_NEEDLE.startsWith("![["),
-      "a payload that lost its leading `!` still contains `att:`, and `[[att:…]]` " +
-        "is an ordinary wikilink that never builds an embed decoration — so the " +
-        "needle has to carry the `![[` that distinguishes them",
-    ).toBe(true);
-    expect(EMBED_ARRIVAL_NEEDLE).toBe("![[att:");
+      EMBED_ARRIVAL_NEEDLE.includes("["),
+      "a needle carrying a wikilink marker can never match once a chip renders",
+    ).toBe(false);
+    expect(EMBED_BROKEN_CHIP_CLASS).toBe("cm-wikilink-chip-broken");
   });
 
   it("recognises any attachment widget by prefix, not a list of three", () => {
@@ -197,7 +238,7 @@ describe("typeEmbedIntoEditor", () => {
     expect(rec.sent.filter((k) => k === EMBED)).toHaveLength(1);
   });
 
-  it("deletes a payload that lost its leading character before retyping", { timeout: 25_000 }, async () => {
+  it("clears the line and retypes when the editor marks the payload broken", { timeout: 25_000 }, async () => {
     // The failure CI reported twice. `![[att:...]]` arriving as `[[att:...]]` is
     // an ordinary wikilink, so the embed decoration never builds and the raw
     // text stays in the buffer forever. An `att:` check passes this; the `![[att:`
@@ -208,13 +249,13 @@ describe("typeEmbedIntoEditor", () => {
       /embed source landed in the document \(after re-send; /,
     );
 
-    const backspaces = rec.sent.filter((k) => k === BACKSPACE).length;
     expect(
-      backspaces,
-      "one Backspace for the probe, then one per character of the garbled attempt: " +
-        "appending a second embed instead would leave a stray fragment in a note " +
-        "whose bytes are what the caller is testing",
-    ).toBe(1 + (EMBED.length - 1));
+      rec.sent,
+      "the repair must CLEAR THE LINE before retyping: appending a second embed " +
+        "would leave the broken one in a note whose bytes are what the caller " +
+        "is testing, and counting characters to delete cannot work once a chip " +
+        "renders, because the rendered text and the document differ in length",
+    ).toContain(`${SHIFT}${HOME}${SHIFT}`);
     expect(rec.sent.filter((k) => k === EMBED)).toHaveLength(2);
   });
 
