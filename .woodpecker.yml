@@ -544,19 +544,22 @@ steps:
       # low default soft limit, which surfaces as a `tauri build` panic
       # (`Os code 24 / Too many open files`, EMFILE → core dump, exit 134).
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
-      # Downloaded .debs land on the shared `/cache` volume, so the next run of
-      # this step and of `cargo-test-tauri` (which installs the IDENTICAL set)
-      # unpacks from disk instead of the network. Measured on pipeline 661: this
-      # line is 68 s here and 67 s there, and both steps are ALONE in their
-      # stage, so all of it is critical path.
+      # 68 s, and it stays 68 s. A shared apt archive cache on `/cache` was tried
+      # here and reverted after two pipelines measured no change at all (666 and
+      # 668, both still "Need to get 220 MB of archives"). Two causes stacked:
+      # Debian's images ship `/etc/apt/apt.conf.d/docker-clean` setting
+      # `Binary::apt::APT::Keep-Downloaded-Packages "false"`, so apt deletes every
+      # .deb after installing it wherever the archive path points; and files in
+      # `apt.conf.d` are read in LEXICAL order with later ones winning, so
+      # `docker-clean` overrode a `01`-prefixed override of that setting.
       #
-      # The script, not an inline `-o Dir::Cache::archives`, and its header says
-      # why: apt takes an EXCLUSIVE lock inside its archive directory, so a
-      # second pipeline running concurrently would make this step go RED rather
-      # than slow. It retries without the shared cache instead, which is the one
-      # trade worth making — a CI step that reddens for an infrastructure reason
-      # wears the name of whatever it was gating.
-      - bash scripts/ci-apt.sh curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
+      # Not worth a third attempt at this size. Of the 68 s only ~22 s is the
+      # 220 MB download; the rest is dpkg unpacking 929 MB, which no download
+      # cache touches. The whole 68 s comes back with a PREBUILT IMAGE that has
+      # these packages baked in, which is a registry plus a build pipeline plus
+      # an image-freshness gate, and belongs to its own change rather than to a
+      # line hidden in this step.
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
@@ -621,11 +624,11 @@ steps:
     environment:
       CI: "true"
     commands:
-      # The other half of the shared apt archive cache. `tauri-compile` installs
-      # this exact set one stage earlier, so by the time this runs the .debs are
-      # already on `/cache`; `scripts/ci-apt.sh` carries the reasoning and the
-      # fallback for a contended cache.
-      - bash scripts/ci-apt.sh curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
+      # 67 s, the same set `tauri-compile` installs one stage earlier, and sharing
+      # the downloads between them does NOT work — see that step for the two
+      # stacked causes and for why a prebuilt image rather than a cache is the
+      # answer at this size.
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
       # vault_delete / vault_unlock tests assert UNIX permission-denial and
