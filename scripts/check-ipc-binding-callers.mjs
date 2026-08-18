@@ -74,6 +74,7 @@
 // an argument rather than a silent entry.
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join, relative, resolve } from "node:path";
 
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
@@ -127,11 +128,6 @@ export function bindingsInSource(src) {
   return found;
 }
 
-const bindingFiles = BINDING_ROOTS.flatMap((r) => walk(join(ROOT, r)));
-const callerFiles = [...new Set(CALLER_ROOTS.flatMap((r) => walk(join(ROOT, r))))].filter(
-  (f) => !IS_TEST.test(relative(ROOT, f)),
-);
-
 /** A file's text with its import statements removed.
  *
  * **An import is not a call**, and matching one is how this guard passed while
@@ -150,90 +146,147 @@ export function withoutImports(text) {
     .replace(/^\s*import\s*["'][^"']+["'];?\s*$/gm, "");
 }
 
-// Read every caller file once. Re-reading per binding is what turns a 1 s guard
-// into a 40 s one on a tree this size.
-const callerText = new Map(
-  callerFiles.map((f) => [f, withoutImports(readFileSync(f, "utf8"))]),
-);
+/** The tree as `deadBindings` wants it.
+ *
+ * Both maps are keyed by the SAME relative path, because the `other === rel`
+ * identity check is what stops a module calling itself into liveness, and it is
+ * silently false when one side is absolute. Every file is read ONCE:
+ * re-reading per binding is what turns a 1 s guard into a 40 s one on a tree
+ * this size. */
+function readTree() {
+  const bindingFiles = BINDING_ROOTS.flatMap((r) => walk(join(ROOT, r)));
+  const callerFiles = [...new Set(CALLER_ROOTS.flatMap((r) => walk(join(ROOT, r))))].filter(
+    (f) => !IS_TEST.test(relative(ROOT, f)),
+  );
+  const read = (fs) => new Map(fs.map((f) => [relative(ROOT, f), readFileSync(f, "utf8")]));
+  return {
+    bindings: read(bindingFiles),
+    callers: read(callerFiles),
+    moduleCount: bindingFiles.length,
+  };
+}
 
-const dead = [];
-let checked = 0;
-for (const file of bindingFiles) {
-  const rel = relative(ROOT, file);
-  for (const name of bindingsInSource(readFileSync(file, "utf8"))) {
-    checked += 1;
-    const word = new RegExp(`\\b${name}\\b`);
-    let called = false;
-    for (const [other, text] of callerText) {
-      if (other === file) continue;
-      // A re-export moves the problem rather than solving it.
-      if (new RegExp(`export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`).test(text)) continue;
-      if (word.test(text)) {
-        called = true;
-        break;
+/** The bindings with no production caller, given the whole world as an argument.
+ *
+ * Takes `{name → source}` maps rather than walking the tree, on the same rule
+ * `check-mobile-export-backup.mjs`'s `analyse(io)` follows: the half of this
+ * guard worth testing is the caller decision, and a decision function that
+ * reads the disk can only be tested by mutating the real tree. Every case in
+ * `tests/scripts/ipcBindingCallers.test.ts` is a synthetic file set instead, so
+ * there is no `git restore` to forget and the cases run on every commit.
+ *
+ * `bindings` is keyed by the path the failure message should name;
+ * `callers` is keyed by anything, since only identity against a binding key
+ * matters (a module does not call itself into liveness). */
+export function deadBindings({ bindings, callers }) {
+  // Stripped ONCE, not per binding. Re-stripping inside the inner loop is what
+  // turns a 1 s guard into a 40 s one, for the same reason the read is hoisted.
+  const stripped = [...callers].map(([k, v]) => [k, withoutImports(v)]);
+  const dead = [];
+  let checked = 0;
+  for (const [rel, src] of bindings) {
+    for (const name of bindingsInSource(src)) {
+      checked += 1;
+      const word = new RegExp(`\\b${name}\\b`);
+      let called = false;
+      for (const [other, text] of stripped) {
+        if (other === rel) continue;
+        // A re-export moves the problem rather than solving it.
+        if (new RegExp(`export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`).test(text)) continue;
+        if (word.test(text)) {
+          called = true;
+          break;
+        }
       }
+      if (!called) dead.push(`${rel}:${name}`);
     }
-    if (!called) dead.push(`${rel}:${name}`);
   }
+  dead.sort();
+  return { dead, checked };
 }
-dead.sort();
 
-if (process.argv.includes("--record")) {
-  writeFileSync(
-    RECORD,
-    `${JSON.stringify(
-      {
-        $comment: [
-          "IPC bindings with no production caller. Each entry needs a REASON,",
-          "because an entry without one is indistinguishable from a defect",
-          "somebody recorded instead of fixing. Ratchet: may shrink, never grow.",
-        ],
-        exempt: Object.fromEntries(dead.map((d) => [d, "REASON REQUIRED"])),
-      },
-      null,
-      2,
-    )}\n`,
+/** The ratchet's verdict on a measured `dead` list against a recorded `exempt`.
+ *
+ * Three failures, and the last two are the ones a "does it still pass" check
+ * cannot see: a NEW dead binding, an exemption carrying no reason, and a STALE
+ * exemption whose binding has since acquired a caller. A guard that only
+ * reported the first would let the record drift into a list of licences nobody
+ * re-argued. */
+export function ratchet(dead, exempt) {
+  return {
+    news: dead.filter((d) => !(d in exempt)),
+    unreasoned: Object.entries(exempt)
+      .filter(([, why]) => typeof why !== "string" || why.trim().length < 12)
+      .map(([k]) => k),
+    stale: Object.keys(exempt).filter((k) => !dead.includes(k)),
+  };
+}
+
+// Run the check only when this file IS the command, the shape
+// `check-mobile-export-backup.mjs` already uses. Without it, importing
+// `deadBindings` or `ratchet` to test them walks the whole tree as a side
+// effect and, on a real failure, calls `process.exit(1)` from inside the test
+// runner: the suite dies mid-file with a bare exit code instead of reporting a
+// failing test, and the guard's own message scrolls past as stray stdout.
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  main();
+}
+
+function main() {
+  const tree = readTree();
+  const { dead, checked } = deadBindings(tree);
+
+  if (process.argv.includes("--record")) {
+    writeFileSync(
+      RECORD,
+      `${JSON.stringify(
+        {
+          $comment: [
+            "IPC bindings with no production caller. Each entry needs a REASON,",
+            "because an entry without one is indistinguishable from a defect",
+            "somebody recorded instead of fixing. Ratchet: may shrink, never grow.",
+          ],
+          exempt: Object.fromEntries(dead.map((d) => [d, "REASON REQUIRED"])),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    console.log(`ipc-binding-callers: recorded ${dead.length} exemption(s)`);
+    process.exit(0);
+  }
+
+  const record = existsSync(RECORD) ? JSON.parse(readFileSync(RECORD, "utf8")) : { exempt: {} };
+  const exempt = record.exempt ?? {};
+
+  const { news, unreasoned, stale } = ratchet(dead, exempt);
+
+  // A recorded exemption with no reason is not an exemption.
+  if (unreasoned.length > 0) {
+    console.error(
+      `ipc-binding-callers: ${unreasoned.length} recorded exemption(s) carry no reason:\n  ${unreasoned.join("\n  ")}`,
+    );
+    process.exit(1);
+  }
+
+  if (news.length > 0) {
+    console.error(
+      `ipc-binding-callers: ${news.length} IPC binding(s) have NO production caller:\n  ${news.join("\n  ")}\n\n` +
+        "  A command can be declared, permitted, registered, mirrored in TypeScript\n" +
+        "  and still never run. Call it, or record it in scripts/ipc-binding-callers.json\n" +
+        "  WITH A REASON.",
+    );
+    process.exit(1);
+  }
+  if (stale.length > 0) {
+    console.error(
+      `ipc-binding-callers: ${stale.length} recorded exemption(s) are stale (the binding now has a caller):\n  ${stale.join("\n  ")}\n\n` +
+        "  Remove them with --record so the list keeps describing the tree.",
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `ipc-binding-callers: ok (${checked} binding(s) across ${tree.moduleCount} module(s); ${Object.keys(exempt).length} recorded exemption(s))`,
   );
-  console.log(`ipc-binding-callers: recorded ${dead.length} exemption(s)`);
-  process.exit(0);
 }
-
-const record = existsSync(RECORD) ? JSON.parse(readFileSync(RECORD, "utf8")) : { exempt: {} };
-const exempt = record.exempt ?? {};
-
-// A recorded exemption with no reason is not an exemption.
-const unreasoned = Object.entries(exempt)
-  .filter(([, why]) => typeof why !== "string" || why.trim().length < 12)
-  .map(([k]) => k);
-if (unreasoned.length > 0) {
-  console.error(
-    `ipc-binding-callers: ${unreasoned.length} recorded exemption(s) carry no reason:\n  ${unreasoned.join("\n  ")}`,
-  );
-  process.exit(1);
-}
-
-const news = dead.filter((d) => !(d in exempt));
-// The ratchet's other direction: an exemption whose binding now HAS a caller is
-// stale, and a stale exemption is a licence nobody re-argued.
-const stale = Object.keys(exempt).filter((k) => !dead.includes(k));
-
-if (news.length > 0) {
-  console.error(
-    `ipc-binding-callers: ${news.length} IPC binding(s) have NO production caller:\n  ${news.join("\n  ")}\n\n` +
-      "  A command can be declared, permitted, registered, mirrored in TypeScript\n" +
-      "  and still never run. Call it, or record it in scripts/ipc-binding-callers.json\n" +
-      "  WITH A REASON.",
-  );
-  process.exit(1);
-}
-if (stale.length > 0) {
-  console.error(
-    `ipc-binding-callers: ${stale.length} recorded exemption(s) are stale (the binding now has a caller):\n  ${stale.join("\n  ")}\n\n` +
-      "  Remove them with --record so the list keeps describing the tree.",
-  );
-  process.exit(1);
-}
-
-console.log(
-  `ipc-binding-callers: ok (${checked} binding(s) across ${bindingFiles.length} module(s); ${Object.keys(exempt).length} recorded exemption(s))`,
-);
