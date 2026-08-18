@@ -41,6 +41,7 @@
 //   node scripts/check-frontend-lock-teardown.mjs
 
 import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
@@ -60,7 +61,7 @@ const ROOT = resolve(new URL("..", import.meta.url).pathname);
  * ones nobody has written yet. `leaveActiveVault` stays on the roster for the
  * store whose reason is a vault CHANGE rather than a lock, which `lockVault`
  * cannot speak for. */
-const LEAVING_PATHS = [
+export const LEAVING_PATHS = [
   {
     file: "src/lib/vault-unlock.ts",
     fn: "lockVault",
@@ -87,7 +88,7 @@ const LEAVING_PATHS = [
  * A store that applies to fewer paths says which, and says why for each one it
  * skips. The reason is the load-bearing field: it is what a later reader checks
  * when the store's contents change. */
-const TEARDOWN_CALLS = [
+export const TEARDOWN_CALLS = [
   {
     call: "clearAgentForLock",
     declaredIn: "src/notes/agent/agentStore.ts",
@@ -159,96 +160,120 @@ export function bodyOf(src, at) {
   return null;
 }
 
-let failed = false;
+/** Every failure the two rosters imply, given the whole world as an argument.
+ *
+ * `files` is a `{path → source}` record standing in for the tree, on the rule
+ * `check-mobile-export-backup.mjs`'s `analyse(io)` follows: the half of a guard
+ * worth testing is its decision, and a decision that reads the disk can only be
+ * tested by mutating the real tree, which leaves a `git restore` to forget.
+ * `tests/scripts/ipcBindingCallers.test.ts` injects each defect class below as a
+ * synthetic file set instead, so every case runs on every commit.
+ *
+ * A path absent from `files` is an absent FILE, which is itself one of the
+ * failures (a roster that has outlived its subject is worse than no roster).
+ * Returns the messages rather than printing them, so a test can assert WHICH
+ * defect was named rather than only that something failed. */
+export function analyse({ files, leavingPaths, teardownCalls }) {
+  const errors = [];
 
-// A roster that has outlived its subject is worse than no roster.
-for (const { call, declaredIn } of TEARDOWN_CALLS) {
-  const p = join(ROOT, declaredIn);
-  if (!existsSync(p)) {
-    console.error(`frontend-lock-teardown: ${declaredIn} does not exist (roster is stale)`);
-    failed = true;
-    continue;
-  }
-  if (!new RegExp(`\\b(export\\s+function|export\\s+const)\\s+${call}\\b`).test(readFileSync(p, "utf8"))) {
-    console.error(
-      `frontend-lock-teardown: ${declaredIn} no longer exports ${call} (roster is stale)`,
-    );
-    failed = true;
-  }
-}
-
-for (const path of LEAVING_PATHS) {
-  const p = join(ROOT, path.file);
-  if (!existsSync(p)) {
-    console.error(`frontend-lock-teardown: ${path.file} does not exist (roster is stale)`);
-    failed = true;
-    continue;
-  }
-  const src = readFileSync(p, "utf8");
-  // The function's body: from its declaration to the next top-level `}` at
-  // column 0, which is the shape every function in these files has. A text scan
-  // rather than a parser, matching the other guards in this directory.
-  const decl = new RegExp(
-    `(?:export\\s+)?(?:async\\s+)?(?:function\\s+${path.fn}\\b|const\\s+${path.fn}\\s*=)`,
-  );
-  const at = src.search(decl);
-  if (at < 0) {
-    console.error(
-      `frontend-lock-teardown: ${path.file} no longer declares ${path.fn} (roster is stale)`,
-    );
-    failed = true;
-    continue;
-  }
-  const body = bodyOf(src, at);
-  if (body === null) {
-    console.error(
-      `frontend-lock-teardown: could not extract ${path.fn}'s body in ${path.file}`,
-    );
-    failed = true;
-    continue;
-  }
-  // Over-capture would make this guard pass by swallowing a SIBLING function
-  // that does call the teardown, which is a false green rather than a false
-  // red. Assert the extraction did not run past its own function.
-  if (/\n(?:export\s+)?(?:async\s+)?function\s/.test(body)) {
-    console.error(
-      `frontend-lock-teardown: ${path.fn}'s extracted body in ${path.file} spans another function`,
-    );
-    failed = true;
-    continue;
-  }
-  for (const t of TEARDOWN_CALLS) {
-    if (!t.appliesTo.includes(path.fn)) {
-      // A skip needs a stated reason, on the same rule the exemption list in
-      // the sibling guard follows: a silent absence is indistinguishable from
-      // an oversight.
-      const why = t.skips?.[path.fn];
-      if (typeof why !== "string" || why.trim().length < 20) {
-        console.error(
-          `frontend-lock-teardown: ${t.call} does not apply to ${path.fn} and gives no reason`,
-        );
-        failed = true;
-      }
+  // A roster that has outlived its subject is worse than no roster.
+  for (const { call, declaredIn } of teardownCalls) {
+    const src = files[declaredIn];
+    if (src === undefined) {
+      errors.push(`${declaredIn} does not exist (roster is stale)`);
       continue;
     }
-    if (!new RegExp(`\\b${t.call}\\s*\\(`).test(body)) {
-      console.error(
-        `frontend-lock-teardown: ${path.file}::${path.fn} does not call ${t.call}()\n` +
-          `  That path ends a vault session (${path.why})\n` +
-          `  and ${t.call} drops ${t.holds}.\n` +
-          `  Module-scope state survives an unmount, and neither a lock nor a switch reloads the WebView.`,
-      );
-      failed = true;
+    if (!new RegExp(`\\b(export\\s+function|export\\s+const)\\s+${call}\\b`).test(src)) {
+      errors.push(`${declaredIn} no longer exports ${call} (roster is stale)`);
     }
   }
+
+  for (const path of leavingPaths) {
+    const src = files[path.file];
+    if (src === undefined) {
+      errors.push(`${path.file} does not exist (roster is stale)`);
+      continue;
+    }
+    const decl = new RegExp(
+      `(?:export\\s+)?(?:async\\s+)?(?:function\\s+${path.fn}\\b|const\\s+${path.fn}\\s*=)`,
+    );
+    const at = src.search(decl);
+    if (at < 0) {
+      errors.push(`${path.file} no longer declares ${path.fn} (roster is stale)`);
+      continue;
+    }
+    const body = bodyOf(src, at);
+    if (body === null) {
+      errors.push(`could not extract ${path.fn}'s body in ${path.file}`);
+      continue;
+    }
+    // Over-capture would make this guard pass by swallowing a SIBLING function
+    // that does call the teardown, which is a false green rather than a false
+    // red. Assert the extraction did not run past its own function.
+    if (/\n(?:export\s+)?(?:async\s+)?function\s/.test(body)) {
+      errors.push(`${path.fn}'s extracted body in ${path.file} spans another function`);
+      continue;
+    }
+    for (const t of teardownCalls) {
+      if (!t.appliesTo.includes(path.fn)) {
+        // A skip needs a stated reason, on the same rule the exemption list in
+        // the sibling guard follows: a silent absence is indistinguishable from
+        // an oversight.
+        const why = t.skips?.[path.fn];
+        if (typeof why !== "string" || why.trim().length < 20) {
+          errors.push(`${t.call} does not apply to ${path.fn} and gives no reason`);
+        }
+        continue;
+      }
+      if (!new RegExp(`\\b${t.call}\\s*\\(`).test(body)) {
+        errors.push(
+          `${path.file}::${path.fn} does not call ${t.call}()\n` +
+            `  That path ends a vault session (${path.why})\n` +
+            `  and ${t.call} drops ${t.holds}.\n` +
+            `  Module-scope state survives an unmount, and neither a lock nor a switch reloads the WebView.`,
+        );
+      }
+    }
+  }
+  return errors;
 }
 
-if (failed) process.exit(1);
-const asserted = TEARDOWN_CALLS.reduce((n, t) => n + t.appliesTo.length, 0);
-const skipped = TEARDOWN_CALLS.reduce(
-  (n, t) => n + Object.keys(t.skips ?? {}).length,
-  0,
-);
-console.log(
-  `frontend-lock-teardown: ok (${LEAVING_PATHS.length} leaving path(s), ${asserted} call(s) asserted, ${skipped} reasoned skip(s))`,
-);
+/** The tree as `analyse` wants it: every rostered path, present ones only. */
+function rosterFiles() {
+  const files = {};
+  for (const rel of [
+    ...TEARDOWN_CALLS.map((t) => t.declaredIn),
+    ...LEAVING_PATHS.map((p) => p.file),
+  ]) {
+    const p = join(ROOT, rel);
+    if (existsSync(p)) files[rel] = readFileSync(p, "utf8");
+  }
+  return files;
+}
+
+// Run the check only when this file IS the command, the shape
+// `check-mobile-export-backup.mjs` already uses. Without it, importing
+// `analyse` or a roster to test it runs the whole check as a side effect, and a
+// real failure calls `process.exit(1)` from inside the test runner: the suite
+// dies mid-file with a bare exit code instead of reporting a failing test, and
+// the guard's own message scrolls past as stray stdout.
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  const errors = analyse({
+    files: rosterFiles(),
+    leavingPaths: LEAVING_PATHS,
+    teardownCalls: TEARDOWN_CALLS,
+  });
+
+  if (errors.length > 0) {
+    for (const e of errors) console.error(`frontend-lock-teardown: ${e}`);
+    process.exit(1);
+  }
+  const asserted = TEARDOWN_CALLS.reduce((n, t) => n + t.appliesTo.length, 0);
+  const skipped = TEARDOWN_CALLS.reduce(
+    (n, t) => n + Object.keys(t.skips ?? {}).length,
+    0,
+  );
+  console.log(
+    `frontend-lock-teardown: ok (${LEAVING_PATHS.length} leaving path(s), ${asserted} call(s) asserted, ${skipped} reasoned skip(s))`,
+  );
+}
