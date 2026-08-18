@@ -160,6 +160,27 @@ pub trait ScopeSource: Send + Sync {
     ) -> Result<Vec<String>, crate::plugins::agent::error::AgentError>;
 }
 
+/// The `ai_excluded_folders` set, asked for again, by the READ path.
+///
+/// **Narrower than [`ScopeSource`] on purpose.** That trait answers two questions
+/// and the loop must only ask one of them: `LoopDeps::records` is documented as an
+/// index snapshot that is never re-read mid-loop, because a list tool answering
+/// differently between two iterations would make a run's view of its scope drift
+/// from the frozen set. Handing the loop a `ScopeSource` would put `records()`
+/// within reach of exactly the code that must not call it.
+///
+/// The exclusion set is the opposite: it MUST be re-read, because SYNC-14 carries
+/// no in-flight carve-out. `apply.rs` re-reads it at the write boundary for that
+/// reason and says so; before myne-md/myne#529's review the read half did not,
+/// so a folder the user excluded while a run was executing kept being read and,
+/// on the remote arm, kept being sent off device.
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+pub trait ExclusionSource: Send + Sync {
+    /// The set as it is at this moment, not as it was when the run started.
+    async fn excluded_now(&self) -> Result<Vec<String>, crate::plugins::agent::error::AgentError>;
+}
+
 /// Start a run from a grant, resolving and clamping it here.
 ///
 /// The one entry point for beginning a run. `AgentRunState::start` takes an

@@ -102,6 +102,16 @@ pub enum AgentError {
         /// The id the caller sent, echoed back so the UI can mark it.
         note_id: String,
     },
+    /// A note in the run's frozen scope now sits in an `ai_excluded_folders`
+    /// folder, so the READ tool refused it.
+    ///
+    /// The read-side twin of [`EditRejection::ExcludedNow`], and distinct from
+    /// `OutOfScope` for the same reason that one is: the user DID grant this
+    /// note, and then excluded it, or moved it into an excluded folder, while the
+    /// run was open. SYNC-14 carries no in-flight carve-out, so the newest answer
+    /// decides for reads exactly as it already did for writes.
+    #[error("note now sits in an excluded folder")]
+    ExcludedNow,
     /// The grant resolved to nothing the run may use: every note in it was
     /// excluded, or the folder holds none.
     #[error("grant resolved to no usable notes")]

@@ -25,6 +25,7 @@ use super::engine::{AgentEngine, Content, Message, Role, AGENT_REQUEST_CLASS};
 use super::error::AgentError;
 use super::prompt::{build_request, parse_actions, AgentAction, Proposal, ProposedNote};
 use super::run::AgentRunState;
+use super::scope::ExclusionSource;
 use super::tools::{list_scope, read_note, search_scope, NoteReader, ScopeSearcher};
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
@@ -94,6 +95,17 @@ pub struct LoopDeps<'a> {
     /// tool answering differently between two iterations of the same run would
     /// make the run's own view of its scope drift from the frozen set.
     pub records: &'a BTreeMap<String, NoteRecord>,
+    /// The `ai_excluded_folders` set, asked for AGAIN by every read tool.
+    ///
+    /// The opposite property to `records` above, and deliberately so. The index
+    /// is frozen because a scope that drifts mid-run is not the scope the user
+    /// approved; the exclusion set is re-read because SYNC-14 carries no
+    /// in-flight carve-out, so a folder the user excludes while a run is
+    /// executing must stop being read at once. `apply.rs` re-reads it at the
+    /// write boundary for exactly that reason, and until myne-md/myne#529's
+    /// review the read half did not, which left a tightened control governing
+    /// writes and not reads.
+    pub exclusions: &'a dyn ExclusionSource,
 }
 
 /// Run the loop until it stops.
@@ -182,7 +194,7 @@ pub async fn drive(
             }
             match action {
                 AgentAction::ListScope => {
-                    let entries = list_scope(runs, run_id, deps.records)?;
+                    let entries = list_scope(runs, run_id, deps.records, deps.exclusions).await?;
                     let rendered = entries
                         .iter()
                         .map(|e| {
@@ -201,7 +213,7 @@ pub async fn drive(
                     });
                 }
                 AgentAction::ReadNote { note_id } => {
-                    match read_note(runs, run_id, &note_id, deps.reader).await {
+                    match read_note(runs, run_id, &note_id, deps.reader, deps.exclusions).await {
                         Ok(body) => {
                             notes_read += 1;
                             transcript.push(Message {
@@ -227,12 +239,43 @@ pub async fn drive(
                                 ],
                             });
                         }
+                        Err(AgentError::ExcludedNow) => {
+                            // Not a run-ending error, and not the same sentence
+                            // as out-of-scope. The note IS in the approved
+                            // scope; the user excluded its folder since, so the
+                            // model must stop asking for it rather than be told
+                            // to request a scope it already has. The refusal
+                            // stays generic on purpose: naming the folder would
+                            // put a folder the user just excluded into the
+                            // transcript, which on the remote arm is the very
+                            // thing the exclusion is for.
+                            transcript.push(Message {
+                                role: Role::User,
+                                content: vec![
+                                    Content::Trusted("Note ".into()),
+                                    Content::note(note_id),
+                                    Content::Trusted(
+                                        " is no longer available to this run. \
+                                         Continue with the others."
+                                            .into(),
+                                    ),
+                                ],
+                            });
+                        }
                         Err(e) => return Err(e),
                     }
                 }
                 AgentAction::SearchScope { query } => {
-                    let hits =
-                        search_scope(runs, run_id, &query, SEARCH_LIMIT, deps.searcher).await?;
+                    let hits = search_scope(
+                        runs,
+                        run_id,
+                        &query,
+                        SEARCH_LIMIT,
+                        deps.searcher,
+                        deps.records,
+                        deps.exclusions,
+                    )
+                    .await?;
                     let rendered = hits
                         .iter()
                         .map(|h| h.note_id.clone())
@@ -405,12 +448,26 @@ mod tests {
         .collect()
     }
 
+    /// The exclusion seam for the loop tests, answering a fixed set.
+    struct Excl(Vec<String>);
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl ExclusionSource for Excl {
+        async fn excluded_now(&self) -> Result<Vec<String>, AgentError> {
+            Ok(self.0.clone())
+        }
+    }
+
+    static NO_EXCL: std::sync::LazyLock<Excl> = std::sync::LazyLock::new(|| Excl(Vec::new()));
+
     fn deps<'a>(engine: &'a ScriptEngine, recs: &'a BTreeMap<String, NoteRecord>) -> LoopDeps<'a> {
         LoopDeps {
             engine,
             reader: &Reader,
             searcher: &Searcher,
             records: recs,
+            exclusions: &*NO_EXCL,
         }
     }
 
@@ -589,6 +646,7 @@ mod tests {
         }
         let recs = records();
         let d = LoopDeps {
+            exclusions: &*NO_EXCL,
             engine: &Forever,
             reader: &Reader,
             searcher: &Searcher,

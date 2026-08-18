@@ -21,9 +21,37 @@
 
 use super::error::AgentError;
 use super::run::AgentRunState;
+use super::scope::ExclusionSource;
+use crate::folder_key::{canonical_excluded, folder_matches_excluded};
+use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
 use std::collections::BTreeMap;
+use zeroize::Zeroizing;
+
+/// The SYNC-14 set as it is right now, canonicalised for comparison.
+///
+/// Asked through the seam rather than taken as an argument: this module's header
+/// records that a tool accepting an excluded-folder set from its caller would be
+/// trusting the caller, which `decisions/ai/0462` already settled is not
+/// available. Each tool therefore pays one prefs read, which is nothing against
+/// the model round trip that precedes it.
+async fn excluded_now(source: &dyn ExclusionSource) -> Result<Vec<String>, AgentError> {
+    Ok(canonical_excluded(&source.excluded_now().await?))
+}
+
+/// Whether the note this record describes sits in an excluded folder.
+///
+/// Uses the snapshot's `folder`, which is what the list and search tools have.
+/// The read tool does better (it has the body, so it sees a note MOVED into an
+/// excluded folder mid-run) and says so at its own call.
+fn record_excluded(records: &BTreeMap<String, NoteRecord>, id: &str, excluded: &[String]) -> bool {
+    let folder = records
+        .get(id)
+        .and_then(|r| r.folder.clone())
+        .unwrap_or_default();
+    folder_matches_excluded(&folder, excluded)
+}
 
 /// One row of the list tool: enough for the model to choose, and no body.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -76,14 +104,20 @@ pub trait ScopeSearcher: Send + Sync {
 }
 
 /// Tool 1: the run's scope, by title.
-pub fn list_scope(
+pub async fn list_scope(
     runs: &AgentRunState,
     run_id: &str,
     records: &BTreeMap<String, NoteRecord>,
+    exclusions: &dyn ExclusionSource,
 ) -> Result<Vec<ScopeEntry>, AgentError> {
     let scope = runs.scope(run_id)?;
+    // The SYNC-14 clamp, on the set as it is NOW. The frozen grant is about what
+    // the user approved; an exclusion added since is a control they TIGHTENED,
+    // and `apply.rs` re-reads for the same reason at the write boundary.
+    let excluded = excluded_now(exclusions).await?;
     Ok(scope
         .into_iter()
+        .filter(|note_id| !record_excluded(records, note_id, &excluded))
         .map(|note_id| {
             let title = records.get(&note_id).and_then(|r| r.title.clone());
             ScopeEntry { note_id, title }
@@ -97,13 +131,35 @@ pub async fn read_note(
     run_id: &str,
     note_id: &str,
     reader: &dyn NoteReader,
+    exclusions: &dyn ExclusionSource,
 ) -> Result<String, AgentError> {
     if !runs.contains(run_id, note_id)? {
         return Err(AgentError::OutOfScope {
             note_id: note_id.to_string(),
         });
     }
-    reader.read_body(note_id).await
+    // **The clamp reads the FOLDER OFF THE BODY, exactly as `apply.rs` does.**
+    // A note's folder lives in its frontmatter, so the body is the first point at
+    // which it is knowable, and reading it here is what makes this tool catch the
+    // two cases the write side already catches: a folder the user excluded since
+    // the run started, and a note MOVED into an excluded one. The list and search
+    // tools settle for the index snapshot's folder, which cannot see the move;
+    // this is the tool that hands a whole note to a model, so it is the one worth
+    // the extra read.
+    //
+    // `Zeroizing` because a refused body is AI-path plaintext that must not
+    // outlive the decision (`threat-model.md` §7), and on the refusal path it is
+    // dropped without ever reaching the transcript.
+    let body = Zeroizing::new(reader.read_body(note_id).await?);
+    let excluded = excluded_now(exclusions).await?;
+    let folder = extract_title_slices(body.as_bytes())
+        .frontmatter_bytes
+        .and_then(fm_folder)
+        .unwrap_or_default();
+    if folder_matches_excluded(&folder, &excluded) {
+        return Err(AgentError::ExcludedNow);
+    }
+    Ok((*body).clone())
 }
 
 /// Tool 3: search, clamped to the run's scope.
@@ -120,6 +176,8 @@ pub async fn search_scope(
     query: &str,
     limit: usize,
     searcher: &dyn ScopeSearcher,
+    records: &BTreeMap<String, NoteRecord>,
+    exclusions: &dyn ExclusionSource,
 ) -> Result<Vec<SearchHit>, AgentError> {
     // Resolve the run BEFORE searching. Filtering only inside the result loop
     // looks equivalent and is not: an empty result set never enters the loop, so
@@ -136,9 +194,14 @@ pub async fn search_scope(
     // membership question.
     let ids: Vec<String> = ranked.iter().map(|h| h.note_id.clone()).collect();
     let in_scope = runs.contains_all(run_id, &ids)?;
+    // The SYNC-14 clamp rides with the scope clamp rather than after it, so a hit
+    // the user has since excluded never occupies a slot. The header above already
+    // argues why an excluded note must not even be ranked into view: surfacing it
+    // would leak its existence.
+    let excluded = excluded_now(exclusions).await?;
     let mut out = Vec::new();
     for (hit, keep) in ranked.into_iter().zip(in_scope) {
-        if keep {
+        if keep && !record_excluded(records, &hit.note_id, &excluded) {
             out.push(hit);
             if out.len() == limit {
                 break;
@@ -183,6 +246,36 @@ mod tests {
         }
     }
 
+    /// A reader whose bodies carry a frontmatter `folder:`, so the read tool's
+    /// clamp has something to read the folder OFF, the way it does in production.
+    struct FolderReader(&'static str);
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl NoteReader for FolderReader {
+        async fn read_body(&self, note_id: &str) -> Result<String, AgentError> {
+            Ok(format!(
+                "---\nfolder: {}\n---\n\nbody of {note_id}\n",
+                self.0
+            ))
+        }
+    }
+
+    /// The exclusion seam, answering whatever the test set it to.
+    struct StubExclusions(Vec<String>);
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl ExclusionSource for StubExclusions {
+        async fn excluded_now(&self) -> Result<Vec<String>, AgentError> {
+            Ok(self.0.clone())
+        }
+    }
+
+    fn no_exclusions() -> StubExclusions {
+        StubExclusions(Vec::new())
+    }
+
     struct StubSearcher(Vec<SearchHit>);
 
     #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -202,12 +295,103 @@ mod tests {
 
     use crate::test_support::block_on as block;
 
+    // ── SYNC-14 on the READ path (myne-md/myne#529 review) ──────────────────
+    //
+    // The write half re-reads `ai_excluded_folders` at the command boundary and
+    // says why in `apply.rs`: an exclusion the user adds while a run is open is a
+    // control they TIGHTENED, and `threat-model.md` §7 states the rule with no
+    // in-flight carve-out. The read half did not, so a folder excluded mid-run
+    // kept being read and, on the remote arm, kept being sent off device. These
+    // four pin both directions of the fix.
+
+    #[test]
+    fn read_refuses_a_note_whose_folder_was_excluded_mid_run() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        // In scope, and the user has since excluded the folder it sits in.
+        let err = block(read_note(
+            &runs,
+            "r",
+            "a",
+            &FolderReader("Private"),
+            &StubExclusions(vec!["Private".into()]),
+        ))
+        .unwrap_err();
+        assert!(
+            matches!(err, AgentError::ExcludedNow),
+            "expected the read-side twin of EditRejection::ExcludedNow, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn read_still_answers_when_nothing_is_excluded() {
+        // The other direction. Without this the test above passes for a
+        // `read_note` that refuses everything.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let body = block(read_note(
+            &runs,
+            "r",
+            "a",
+            &FolderReader("Private"),
+            &no_exclusions(),
+        ))
+        .unwrap();
+        assert!(body.contains("body of a"));
+    }
+
+    #[test]
+    fn read_refuses_a_note_moved_into_an_excluded_folder() {
+        // The case the index snapshot cannot see, and the reason the read tool
+        // takes the folder off the BODY rather than off `records`: the note's
+        // folder changed after the run froze its scope.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let err = block(read_note(
+            &runs,
+            "r",
+            "a",
+            // The body says Archive; the snapshot (unused here) would still say
+            // whatever it said when the run started.
+            &FolderReader("Archive"),
+            &StubExclusions(vec!["Archive".into()]),
+        ))
+        .unwrap_err();
+        assert!(matches!(err, AgentError::ExcludedNow));
+    }
+
+    #[test]
+    fn list_drops_a_note_whose_folder_is_excluded_now() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let mut recs = records(&[("a", "Kept"), ("b", "Gone")]);
+        recs.get_mut("b").unwrap().folder = Some("Private".into());
+        let listed = block(list_scope(
+            &runs,
+            "r",
+            &recs,
+            &StubExclusions(vec!["Private".into()]),
+        ))
+        .unwrap();
+        assert_eq!(
+            listed
+                .iter()
+                .map(|e| e.note_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a"],
+            "an excluded note must not even be named to the model"
+        );
+        // And the reverse: with the set empty, both are listed.
+        let all = block(list_scope(&runs, "r", &recs, &no_exclusions())).unwrap();
+        assert_eq!(all.len(), 2);
+    }
+
     #[test]
     fn list_returns_only_notes_in_the_runs_set() {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a"]));
         let recs = records(&[("a", "In"), ("b", "Out")]);
-        let listed = list_scope(&runs, "r", &recs).unwrap();
+        let listed = block(list_scope(&runs, "r", &recs, &no_exclusions())).unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].note_id, "a");
         assert_eq!(listed[0].title.as_deref(), Some("In"));
@@ -217,7 +401,13 @@ mod tests {
     fn list_carries_no_body_only_a_title() {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a"]));
-        let listed = list_scope(&runs, "r", &records(&[("a", "T")])).unwrap();
+        let listed = block(list_scope(
+            &runs,
+            "r",
+            &records(&[("a", "T")]),
+            &no_exclusions(),
+        ))
+        .unwrap();
         let json = serde_json::to_string(&listed).unwrap();
         assert!(json.contains("\"title\""));
         assert!(!json.contains("body"));
@@ -228,7 +418,7 @@ mod tests {
     fn read_refuses_a_note_outside_the_set_by_name() {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a"]));
-        let err = block(read_note(&runs, "r", "b", &StubReader)).unwrap_err();
+        let err = block(read_note(&runs, "r", "b", &StubReader, &no_exclusions())).unwrap_err();
         assert!(matches!(err, AgentError::OutOfScope { ref note_id } if note_id == "b"));
     }
 
@@ -237,7 +427,7 @@ mod tests {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a"]));
         assert_eq!(
-            block(read_note(&runs, "r", "a", &StubReader)).unwrap(),
+            block(read_note(&runs, "r", "a", &StubReader, &no_exclusions())).unwrap(),
             "body of a"
         );
     }
@@ -251,7 +441,16 @@ mod tests {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a"]));
         let searcher = StubSearcher(vec![hit("b", 0.9), hit("a", 0.5), hit("c", 0.4)]);
-        let out = block(search_scope(&runs, "r", "q", 10, &searcher)).unwrap();
+        let out = block(search_scope(
+            &runs,
+            "r",
+            "q",
+            10,
+            &searcher,
+            &BTreeMap::new(),
+            &no_exclusions(),
+        ))
+        .unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].note_id, "a");
     }
@@ -261,7 +460,16 @@ mod tests {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a", "b", "c"]));
         let searcher = StubSearcher(vec![hit("a", 0.9), hit("b", 0.8), hit("c", 0.7)]);
-        let out = block(search_scope(&runs, "r", "q", 2, &searcher)).unwrap();
+        let out = block(search_scope(
+            &runs,
+            "r",
+            "q",
+            2,
+            &searcher,
+            &BTreeMap::new(),
+            &no_exclusions(),
+        ))
+        .unwrap();
         assert_eq!(out.len(), 2);
     }
 
@@ -269,15 +477,28 @@ mod tests {
     fn every_tool_refuses_an_unknown_run_rather_than_defaulting_open() {
         let runs = AgentRunState::default();
         assert!(matches!(
-            list_scope(&runs, "nope", &BTreeMap::new()),
+            block(list_scope(
+                &runs,
+                "nope",
+                &BTreeMap::new(),
+                &no_exclusions()
+            )),
             Err(AgentError::NoSuchRun)
         ));
         assert!(matches!(
-            block(read_note(&runs, "nope", "a", &StubReader)),
+            block(read_note(&runs, "nope", "a", &StubReader, &no_exclusions())),
             Err(AgentError::NoSuchRun)
         ));
         assert!(matches!(
-            block(search_scope(&runs, "nope", "q", 5, &StubSearcher(vec![]))),
+            block(search_scope(
+                &runs,
+                "nope",
+                "q",
+                5,
+                &StubSearcher(vec![]),
+                &BTreeMap::new(),
+                &no_exclusions(),
+            )),
             Err(AgentError::NoSuchRun)
         ));
     }
