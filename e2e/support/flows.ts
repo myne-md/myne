@@ -1275,6 +1275,20 @@ export async function typeIntoEditor(
  * constant is what closes that. */
 export const EMBED_ARRIVAL_NEEDLE = "![[att:";
 
+/** The class prefix every attachment embed widget carries.
+ *
+ * A prefix rather than a list of widget classes, and the difference is not
+ * style: naming three of them (tombstone, progress chip, image testid) is a
+ * selector that is incomplete the moment a fourth embed type exists, and one
+ * already did — `tp1`'s `.txt` embed renders the text-preview card, so the
+ * check saw neither the raw source (replaced) nor a known widget, and failed
+ * on a document that was perfectly correct.
+ *
+ * Every widget in `editor/src/attachments/widgets.ts` uses this prefix.
+ * Exported and asserted for the same reason as the needle above: the unit test
+ * models the check rather than running it. */
+export const EMBED_WIDGET_CLASS_PREFIX = "cm-attachment-";
+
 export async function typeEmbedIntoEditor(session: Session, text: string): Promise<void> {
   const content = await session.waitForElement(CM_CONTENT);
   await content.click();
@@ -1299,11 +1313,21 @@ export async function typeEmbedIntoEditor(session: Session, text: string): Promi
   // landed — so this runs on notes that hold one embed, which is what every
   // caller does. The prefix is the WHOLE `![[att:`, because that is the part a
   // dropped leading character destroys and `att:` alone would still match.
+  //
+  // **The widget half is a PREFIX, not a list, and the list is what broke it.**
+  // The first version named three classes — the tombstone, the progress chip
+  // and the image testid — which is a selector that is incomplete by
+  // construction: a `.txt` embed renders the text-preview card, so `tp1` typed
+  // its embed perfectly, watched the card replace the source, and then failed
+  // here forever because neither reading matched. Every widget in
+  // `editor/src/attachments/widgets.ts` carries the `cm-attachment-` prefix
+  // (image, frame, pdf, tombstone, url chip, file card, audio, warning), so
+  // matching the prefix covers the ones nobody has written yet as well.
   const arrived = async () =>
     (await session.execute<boolean>(
       "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
         `var raw = c ? (c.textContent || '').indexOf(${JSON.stringify(EMBED_ARRIVAL_NEEDLE)}) !== -1 : false;` +
-        "var w = !!document.querySelector('.cm-attachment-tombstone, .cm-attachment-progress, [data-testid=\"attachment-image\"]');" +
+        `var w = !!document.querySelector('[class*=${JSON.stringify(EMBED_WIDGET_CLASS_PREFIX)}]');` +
         "return raw || w;",
     ))
       ? true
@@ -1312,6 +1336,7 @@ export async function typeEmbedIntoEditor(session: Session, text: string): Promi
   // The document as it stands BEFORE the payload, so the repair below can
   // delete exactly what the payload added rather than guessing.
   const before = (await content.textContent()).length;
+  let lastShape = "not measured";
 
   await content.sendKeys(text);
   try {
@@ -1335,11 +1360,83 @@ export async function typeEmbedIntoEditor(session: Session, text: string): Promi
       await content.sendKeys(String.fromCharCode(0xe003));
     }
     await content.sendKeys(text);
+    // Measured BEFORE the wait, because the wait is what throws and its lazy
+    // label is synchronous. One reading is enough: the state this names is a
+    // permanent one by the time we are here.
+    lastShape = await editorShape(session, content);
     await session.waitUntil(arrived, {
-      label: "the embed source landed in the document (after re-send)",
+      label: () =>
+        `the embed source landed in the document (after re-send; ${lastShape})`,
       timeoutMs: 10_000,
     });
   }
+}
+
+/** What the editor holds, in a form that names a cause and prints no content.
+ *
+ * **Two sends failing is not a dropped keystroke, and the message has to be able
+ * to say which of several very different things it is.** The probe `q` lands, so
+ * keys reach A document; the payload then does not appear in the one the check
+ * reads. Every reading below separates a pair of explanations that no budget and
+ * no re-send tells apart:
+ *
+ *   * `contents` — how many `.cm-content` nodes the page holds. The typing
+ *     handle is located ONCE and the arrival check queries fresh, so with two
+ *     editors up (a split pane, or an old one still attached mid-remount) the
+ *     two can address different nodes forever.
+ *   * `handleIsFirst` / `handleAttached` — whether the handle IS the node the
+ *     check reads, and whether it is still in the document at all.
+ *   * `handleChars` against `queriedChars` — the same question measured rather
+ *     than inferred: keys landing somewhere the check never looks.
+ *   * `bang` / `openers` / `att` / `closers` — which PART of the payload
+ *     survived. A lost leading `!` leaves `[[att:` (an ordinary wikilink, which
+ *     never builds an embed decoration); a completion popup that fired would
+ *     leave neither `att:` nor the closers.
+ *   * `decorations` — the class names actually rendered, so a wikilink chip
+ *     standing where an embed was expected says so by name.
+ *
+ * Booleans, counts and class names only: no document text, no attachment id.
+ * SYNC-13 is about credentials and a scratch note holds none, but a failure
+ * message is CI-artefact-visible and there is no reason for it to carry content
+ * it does not need. */
+async function editorShape(session: Session, handle: Element): Promise<string> {
+  let handleChars = -1;
+  let handleAttached = true;
+  try {
+    handleChars = (await handle.textContent()).length;
+  } catch {
+    handleAttached = false;
+  }
+  const s = await session.execute<{
+    contents: number;
+    handleIsFirst: boolean;
+    queriedChars: number;
+    bang: boolean;
+    openers: number;
+    att: boolean;
+    closers: number;
+    decorations: string[];
+  }>(
+    "var all = document.querySelectorAll('.cm-content');" +
+      "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+      "var t = c ? (c.textContent || '') : '';" +
+      "var deco = [];" +
+      "var nodes = document.querySelectorAll('[class*=\"cm-attachment\"], [class*=\"cm-wikilink\"], .cm-tooltip-autocomplete');" +
+      "for (var i = 0; i < nodes.length && deco.length < 6; i++) {" +
+      "  var n = String(nodes[i].className || '');" +
+      "  if (n && deco.indexOf(n) === -1) deco.push(n);" +
+      "}" +
+      "return { contents: all.length, handleIsFirst: all.length > 0 && all[0] === c," +
+      "  queriedChars: t.length, bang: t.indexOf('![[') !== -1," +
+      "  openers: (t.match(/\\[\\[/g) || []).length, att: t.indexOf('att:') !== -1," +
+      "  closers: (t.match(/\\]\\]/g) || []).length, decorations: deco };",
+  );
+  return (
+    `cm-content nodes: ${s.contents}; the queried one is the first: ${s.handleIsFirst}; ` +
+    `typing handle attached: ${handleAttached}, chars ${handleChars} against queried ${s.queriedChars}; ` +
+    `markers: \`![[\` ${s.bang}, \`[[\` x${s.openers}, \`att:\` ${s.att}, \`]]\` x${s.closers}; ` +
+    `decorations: ${s.decorations.length === 0 ? "none" : s.decorations.join(" | ")}`
+  );
 }
 
 /** Wait until the autosave badge settles on "Saved" AFTER having seen
