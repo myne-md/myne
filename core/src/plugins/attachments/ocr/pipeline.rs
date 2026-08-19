@@ -632,11 +632,14 @@ mod tests {
 
     #[test]
     fn a_blank_image_yields_nothing_and_never_panics() {
-        let models = match OcrModels::load_from_base(&super::super::bundled_models_dir_for_tests())
-        {
-            Ok(m) => m,
-            Err(_) => return, // no LFS blobs in this checkout; covered elsewhere
-        };
+        // Skips ONLY on a checkout without Git-LFS blobs; a load failure where
+        // the weights are real is a panic, not a silent pass. See
+        // `init_bundled_models_for_tests`.
+        if !super::super::bundled_weights_are_real() {
+            return;
+        }
+        let models = OcrModels::load_from_base(&super::super::bundled_models_dir_for_tests())
+            .expect("weights are present and not pointers, so this load must succeed");
         let white =
             DynamicImage::ImageRgb8(RgbImage::from_pixel(64, 64, image::Rgb([255, 255, 255])));
         let out = recognize(&models, &white);
@@ -653,11 +656,14 @@ mod tests {
     /// encode today's model and fail on any future swap for no good reason.
     #[test]
     fn reads_known_text_from_a_fixture_image() {
-        let models = match OcrModels::load_from_base(&super::super::bundled_models_dir_for_tests())
-        {
-            Ok(m) => m,
-            Err(_) => return, // no LFS blobs in this checkout
-        };
+        // Skips ONLY on a checkout without Git-LFS blobs; a load failure where
+        // the weights are real is a panic, not a silent pass. See
+        // `init_bundled_models_for_tests`.
+        if !super::super::bundled_weights_are_real() {
+            return;
+        }
+        let models = OcrModels::load_from_base(&super::super::bundled_models_dir_for_tests())
+            .expect("weights are present and not pointers, so this load must succeed");
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests")
             .join("fixtures")
@@ -684,11 +690,14 @@ mod tests {
 
     #[test]
     fn a_zero_sized_image_is_handled() {
-        let models = match OcrModels::load_from_base(&super::super::bundled_models_dir_for_tests())
-        {
-            Ok(m) => m,
-            Err(_) => return,
-        };
+        // Skips ONLY on a checkout without Git-LFS blobs; a load failure where
+        // the weights are real is a panic, not a silent pass. See
+        // `init_bundled_models_for_tests`.
+        if !super::super::bundled_weights_are_real() {
+            return;
+        }
+        let models = OcrModels::load_from_base(&super::super::bundled_models_dir_for_tests())
+            .expect("weights are present and not pointers, so this load must succeed");
         let empty = DynamicImage::ImageRgb8(RgbImage::new(0, 0));
         assert_eq!(recognize(&models, &empty), OcrOutput::default());
     }

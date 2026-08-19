@@ -699,3 +699,73 @@ mod tests {
         }
     }
 }
+
+/// Ingest compression must not cost the image its searchability.
+///
+/// **This is the property `image-ocr-search`'s io1 measured to be broken, from
+/// the outside and without being able to say where.** That scenario imports a
+/// scanned-document fixture through the real IPC and then cannot find the note
+/// by a word only the pixels contain; the gate added to it reported an EMPTY
+/// MYE1 entry, and the OCR pipeline's own test reads the same fixture correctly.
+/// The one thing between them is this module: `attachment_import` compresses
+/// FIRST and extracts from the compressed bytes, so whatever compression does to
+/// a page of text is what OCR sees.
+///
+/// The rule under test is the composition, not either half. Both halves have
+/// tests and both pass; a lossless-by-design re-encode that OCR then cannot read
+/// would satisfy every one of them.
+#[cfg(test)]
+mod ocr_survives_compression {
+    use super::*;
+
+    #[test]
+    fn a_compressed_scan_is_still_readable_by_ocr() {
+        // Skips only on a checkout without Git-LFS blobs, never on a real
+        // failure — see `ocr::init_bundled_models_for_tests`.
+        if !super::super::ocr::bundled_weights_are_real() {
+            return;
+        }
+        assert!(super::super::ocr::init_bundled_models_for_tests());
+
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("ocr-sample.png");
+        let original = std::fs::read(&path).expect("fixture reads");
+
+        // Sanity: the fixture is readable BEFORE compression, so a failure below
+        // is attributable to this module rather than to the fixture or the
+        // weights.
+        let before = super::super::ocr::extract_image(&original);
+        assert!(
+            before.text.to_lowercase().contains("invoice"),
+            "precondition: OCR reads the uncompressed fixture, got {:?}",
+            before.text
+        );
+
+        // **Non-vacuity, asserted rather than assumed.** `Unchanged` is a
+        // legitimate outcome of this transform and it preserves searchability
+        // trivially, so an early return there would leave this test green while
+        // exercising nothing — which is the same silent-skip shape the OCR tests
+        // above were just fixed for. This fixture is a PNG, and rule 2 re-encodes
+        // a PNG unconditionally, so a no-op here means the transform stopped
+        // doing what its own documentation says.
+        let stored = match compress_for_import(&original, "image/png") {
+            CompressOutcome::Compressed { bytes, .. } => bytes,
+            CompressOutcome::Unchanged => panic!(
+                "a PNG must be re-encoded by rule 2, so an unchanged result means \
+                 this test would have proved nothing about the composition"
+            ),
+        };
+
+        let after = super::super::ocr::extract_image(&stored);
+        assert!(
+            after.text.to_lowercase().contains("invoice"),
+            "ingest compression destroyed the text OCR could read before it: \
+             {} bytes in, {} bytes stored, extracted {:?}",
+            original.len(),
+            stored.len(),
+            after.text
+        );
+    }
+}

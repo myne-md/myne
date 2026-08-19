@@ -8,6 +8,7 @@ import { resetGraphLayoutOnLock } from "../notes/graphLayoutPersist";
 import { resetVimStateOnLock } from "../editor/vim";
 import { releaseAttachmentUrls } from "../platform/attachments";
 import { resetTaskIndexCache } from "../notes/taskIndex";
+import { clearAgentForLock } from "../notes/agent/agentStore";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -31,6 +32,15 @@ export async function lockVault(): Promise<void> {
   // after a re-unlock cannot paint a revoked URL. Same category as the two calls
   // above: platform state that outlives the slot.
   releaseAttachmentUrls();
+  // The agent run's proposal, on the same leg and for the strongest version of
+  // the same reason: `proposal.edits` holds anchors and replacements copied
+  // VERBATIM out of note bodies, `agentStore` is module scope, and no lock path
+  // reloads the WebView. It sits HERE rather than at each caller because the
+  // callers are the problem: four paths lock the vault (the Lock button, the
+  // vault switch, the StorageLost takeover, the invalid-state fail-closed CTA)
+  // and only two of them remembered. A choke point cannot be forgotten by the
+  // fifth one.
+  clearAgentForLock();
   // The task list is the one nonce consumer that answers from MODULE state
   // rather than refetching in its own mount effect, so unlike every other
   // reader surface it does not self-heal on remount (myne#277). The backend

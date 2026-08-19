@@ -31,6 +31,7 @@ import { patchDeletedField, patchFrontmatterField } from "../src/dialect";
 import {
   closeSettings,
   createNote,
+  clickByTestId,
   dismissImporterOffer,
   ipcOk,
   openSettings,
@@ -202,9 +203,9 @@ describeCanary("two-device sync canary (MYND-428)", () => {
 
         // Close the compare on both sides, and prove the hold RELEASED: the note
         // A wrote must still reach B.
-        await (await a.session.byTestId("sync.sas-match")).click();
+        await clickByTestId(a.session, "sync.sas-match");
         await closeSettings(a.session);
-        await (await b.session.byTestId("join.sas-match")).click();
+        await clickByTestId(b.session, "join.sas-match");
         await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
         await dismissImporterOffer(b.session);
 

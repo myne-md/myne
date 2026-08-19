@@ -446,6 +446,238 @@ impl StubEngine {
     }
 }
 
+/// The opening sentence of the agent loop's system instructions.
+///
+/// Matched rather than imported so this file does not depend on
+/// `myne-core`'s prompt module for a test double's routing decision. It is a
+/// prefix of a `const`-built string on the other side, so a reword there makes
+/// [`agent_script`] return `None` and every agent E2E scenario fail loudly on
+/// an empty proposal, which is the failure direction to prefer.
+const AGENT_INSTRUCTIONS_OPENER: &str = "You edit the user's notes by proposing changes.";
+
+/// The most recent user turn, or `""`.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn last_user_of(messages: &[ChatMessage]) -> &str {
+    messages
+        .iter()
+        .rev()
+        .find(|m| m.role == ChatRole::User)
+        .map(|m| m.content.as_str())
+        .unwrap_or("")
+}
+
+/// The answer to `probe::probe_request`, or `None` when this is not the probe.
+///
+/// The probe names the note, quotes the line to change and quotes what it
+/// should become, so all three are read out of the prompt. Hard-coding them
+/// would make the stub pass a probe it was no longer being asked.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn probe_answer(user: &str) -> Option<String> {
+    const MARK: &str = "This is the whole of note ";
+    let note_id = user.split(MARK).nth(1)?.split(':').next()?.trim();
+    // `changes the line "<target>" to "<replacement>"`.
+    let tail = user.split("changes the line ").nth(1)?;
+    let mut quoted = tail.split('"');
+    quoted.next()?; // before the first quote
+    let target = quoted.next()?;
+    quoted.next()?; // ` to `
+    let replacement = quoted.next()?;
+    Some(format!(
+        "{{\"action\":\"propose_edit\",\"note_id\":\"{note_id}\",\"anchor\":\"{target}\",\
+         \"replacement\":\"{replacement}\"}}"
+    ))
+}
+
+/// Body lines that occur EXACTLY ONCE in the whole note, frontmatter skipped.
+///
+/// Both halves were learned from a failing test, and both are the rule `place`
+/// enforces rather than stub convenience: "first non-empty line" picks `---`,
+/// which appears twice and refuses with `AnchorAmbiguous`; adding only the
+/// occurs-once rule then picks `title: <name>`, so the stub would rewrite a
+/// MANAGED frontmatter field (`markdown-dialect.md` §3.6.1) instead of the body.
+///
+/// Shared by the trash branch and by step 3 below, because the two producing
+/// different anchors from the same note is a difference nothing would report.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn unique_body_lines(body: &str) -> impl Iterator<Item = &str> {
+    let after_frontmatter = body
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.split_once("\n---\n"))
+        .map(|(_, rest)| rest)
+        .unwrap_or(body);
+    after_frontmatter
+        .lines()
+        .map(str::trim_end)
+        .filter(|l| !l.is_empty() && body.matches(*l).count() == 1)
+}
+
+/// A deterministic action script for an agent-loop request, or `None` when the
+/// request is not one.
+///
+/// **Takes the STRUCTURE, not a rendered prompt.** The first version parsed a
+/// flat string for `<|im_start|>user` markers, which worked only because the
+/// agent adapter was flattening its request and calling `infer`. Fixing that
+/// (the adapter now uses the role-structured surface, so the app's own
+/// instruction reaches the system slot instead of sitting in a user turn beside
+/// note text) would have silently broken this: the default `chat_streaming`
+/// renders `User: ` / `Assistant: ` prefixes and no ChatML markers at all, so
+/// every rsplit here would have matched nothing and the anchor would have come
+/// out of the wrong part of the transcript. Reading `(system, messages)` is
+/// what the real engines get, so the stub cannot drift from them by shape.
+///
+/// **The plain echo cannot drive an agent run**, which is why any of this
+/// exists: the agent's system instructions list all seven actions as literal
+/// JSON lines so a model can copy the shape, so echoing them back parses as all
+/// seven at once, ending at `finish` with an empty proposal. Three scenarios
+/// asserted a non-empty proposal and could never have passed.
+///
+/// The script, driven by the transcript so it stays a pure function:
+///
+/// 1. nothing said yet, so ask what is in scope;
+/// 2. a scope listing arrived, so read its first note;
+/// 3. a body arrived, so propose one anchored edit per eligible line and finish.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
+    if !system.contains(AGENT_INSTRUCTIONS_OPENER) {
+        return None;
+    }
+    // **The probe comes through here too, and it is not a run.** `probe_request`
+    // uses the same system instructions, so without this branch the script
+    // answered the probe with `list_scope`, the probe graded that `WrongAction`,
+    // every attempt failed and the composer refused to offer agent mode at all.
+    // Every agent E2E scenario went red on a Send button that never enabled.
+    //
+    // That is the capability gate WORKING: it is supposed to refuse a backend
+    // that cannot produce one anchored edit on demand. The stub has to be able
+    // to, or it is modelling a model Myne would decline.
+    //
+    // Answered by READING the request rather than by echoing a memorised
+    // constant: the target and replacement are quoted in the prompt, so the stub
+    // replies to what it was asked. A probe reworded past this parse fails
+    // loudly, at the gate, rather than passing on a stale answer.
+    if let Some(reply) = probe_answer(last_user_of(messages)) {
+        return Some(reply);
+    }
+
+    let last_assistant = messages
+        .iter()
+        .rev()
+        .find(|m| m.role == ChatRole::Assistant)
+        .map(|m| m.content.as_str())
+        .unwrap_or("");
+    let last_user = last_user_of(messages);
+
+    // **Two task-keyed branches, so `ag3` and `ag5` exercise something.**
+    // Both scenarios returned early with a `console.warn` when the stub did not
+    // produce their condition, and the stub never did: the script emitted only
+    // `list_scope`, `read_note`, `propose_edit` and `finish`. They passed green
+    // while testing nothing, permanently, and one of them covers the trash
+    // carve-out, which is the single control `0515` and `threat-model.md` §7
+    // call structural rather than behavioural. The scenario comment said the
+    // engine's script was not the suite's to set; the stub lives in this repo
+    // and this branch already scripts it, so that was not true either.
+    //
+    // Keyed off the task text rather than off a flag, so the scenario asks for
+    // what it needs in the same sentence a user would type, and a scenario that
+    // stops asking stops getting it.
+    let task = messages
+        .iter()
+        .find(|m| m.role == ChatRole::User)
+        .map(|m| m.content.as_str())
+        .unwrap_or("");
+
+    // A scope expansion, asked once: after the listing, before any read.
+    if task.contains("other folders")
+        && last_assistant.contains("\"action\":\"list_scope\"")
+        && !messages
+            .iter()
+            .any(|m| m.content.contains("\"action\":\"request_scope\""))
+    {
+        return Some(
+            "{\"action\":\"request_scope\",\"folder\":\"Projects\",\
+             \"reason\":\"the task mentions other folders\"}"
+                .to_string(),
+        );
+    }
+
+    // A trashing edit, and an ORDINARY one beside it.
+    //
+    // The pair is the whole point. The carve-out under review is "the bulk
+    // approve carries the rest and leaves the trashing edit alone", and a
+    // proposal holding only the trashing edit cannot show the "rest" half:
+    // `approveAll` sends an empty list, the apply returns early on it, and no
+    // report renders. The scenario then times out on a report that was never
+    // going to appear, which reads as a product defect and is a harness one.
+    if task.contains("trash this") && last_assistant.contains("\"action\":\"read_note\"") {
+        let id = last_assistant
+            .split("\"note_id\":\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())?;
+        let body = last_user;
+        // The frontmatter's own title line is the anchor for the trashing edit,
+        // because appending a `trashed:` line after it is what trashing a note
+        // actually looks like at the byte level (`markdown-dialect.md` §3.6.1).
+        let title_line = body
+            .lines()
+            .map(str::trim_end)
+            .find(|l| l.starts_with("title:") && body.matches(*l).count() == 1)?;
+        // The ordinary one anchors in the BODY, under the same occurs-exactly-
+        // once rule `place` enforces.
+        let plain = unique_body_lines(body).next()?;
+        return Some(format!(
+            "{{\"action\":\"propose_edit\",\"note_id\":\"{id}\",\"anchor\":\"{plain}\",\
+             \"replacement\":\"{plain} (edited by the stub)\"}}\n\
+             {{\"action\":\"propose_edit\",\"note_id\":\"{id}\",\"anchor\":\"{title_line}\",\
+             \"replacement\":\"{title_line}\\ntrashed: 2026-08-16T12:00:00Z\"}}\n\
+             {{\"action\":\"finish\",\"summary\":\"stub trash run\"}}"
+        ));
+    }
+
+    // Step 3: the previous turn asked to read a note, so this user turn is the
+    // body. Checked before step 2 so each check stays a simple containment.
+    if last_assistant.contains("\"action\":\"read_note\"") {
+        // The id the previous turn named, rather than re-derived, so the edit
+        // and the read cannot name different notes.
+        let id = last_assistant
+            .split("\"note_id\":\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())?;
+        let body = last_user;
+        // Up to TWO edits, one per eligible line. Not richness for its own
+        // sake: "reject one, approve the rest" is a real user path and an
+        // acceptance criterion, and with a single proposed edit rejecting it
+        // leaves nothing to apply, so the apply returns early and no report
+        // renders. `ag1` failed exactly that way.
+        let anchors: Vec<&str> = unique_body_lines(body).take(2).collect();
+        if anchors.is_empty() {
+            return None;
+        }
+        let mut out = String::new();
+        for anchor in anchors {
+            out.push_str(&format!(
+                "{{\"action\":\"propose_edit\",\"note_id\":\"{id}\",\"anchor\":\"{anchor}\",\
+                 \"replacement\":\"{anchor} (edited by the stub)\"}}\n"
+            ));
+        }
+        out.push_str("{\"action\":\"finish\",\"summary\":\"stub run\"}");
+        return Some(out);
+    }
+
+    // Step 2: the scope listing is in, so read its first entry. `list_scope`
+    // renders one `"{note_id} {title}"` line per note.
+    if last_assistant.contains("\"action\":\"list_scope\"") {
+        let id = last_user
+            .lines()
+            .find(|l| !l.trim().is_empty())?
+            .split_whitespace()
+            .next()?;
+        return Some(format!("{{\"action\":\"read_note\",\"note_id\":\"{id}\"}}"));
+    }
+
+    // Step 1.
+    Some("{\"action\":\"list_scope\"}".to_string())
+}
+
 impl Engine for StubEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
         if let Some(e) = self.fault() {
@@ -453,7 +685,37 @@ impl Engine for StubEngine {
         }
         // Echo, not a model. The marker lets a test assert the value came
         // through the trait against the stub (not a real completion).
+        //
+        // The agent does NOT come through here: it uses the role-structured
+        // surface, so its script lives in this type's `chat_streaming` below.
+        // Intercepting an agent-shaped prompt here as well would be a branch
+        // nothing reaches, which is the kind of code that outlives its reason.
         Ok(format!("stub-infer: {prompt}"))
+    }
+
+    /// The role-structured surface, which is what the agent uses.
+    ///
+    /// Implemented rather than inherited: the trait default flattens
+    /// `(system, messages)` into one `User: ` / `Assistant: ` string and calls
+    /// `infer`, which would throw away exactly the structure an agent script has
+    /// to read, and would also make this stub a worse model of the two real
+    /// arms than it needs to be. A non-agent caller falls through to that
+    /// default's behaviour, so the chat scenarios keep asserting the echo.
+    fn chat_streaming(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        if let Some(e) = self.fault() {
+            return Err(e);
+        }
+        if let Some(script) = agent_script(system, messages) {
+            let _ = on_token(&script);
+            return Ok(script);
+        }
+        let prompt = flatten_chat_to_prompt(system, messages);
+        self.infer_streaming(&prompt, on_token)
     }
 
     fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
@@ -908,5 +1170,351 @@ mod tests {
         }
         let engine: &dyn Engine = &BareEngine;
         assert_eq!(engine.transcribe(&[0.0; 8]), Err(EngineError::NoModel));
+    }
+}
+
+#[cfg(test)]
+mod agent_script_tests {
+    //! Whether the stub can actually DRIVE an agent run.
+    //!
+    //! These exist because three E2E scenarios were written against an engine
+    //! that could not produce their input, and nothing said so: the suite is
+    //! Linux-only, `failure: ignore`, and a scenario that fails on an empty
+    //! proposal reads exactly like a flake. The assertions below run on every
+    //! platform, in both builds, in `cargo test`.
+    //!
+    //! They drive `chat_streaming`, which is the surface the agent adapter
+    //! actually calls, rather than the helper underneath it. An earlier version
+    //! tested a flat-prompt helper, and it would have kept passing after the
+    //! adapter moved to the role-structured surface while the stub answered
+    //! nothing usable.
+
+    use super::*;
+    use myne_core::plugins::agent::prompt::{parse_actions, system_instructions, AgentAction};
+
+    fn turn(role: ChatRole, content: &str) -> ChatMessage {
+        ChatMessage {
+            role,
+            content: content.to_string(),
+        }
+    }
+
+    /// Ask the stub the way the agent adapter does.
+    fn ask(messages: &[ChatMessage]) -> String {
+        let mut sink = |_: &str| ControlFlow::Continue(());
+        StubEngine
+            .chat_streaming(&system_instructions(), messages, &mut sink)
+            .expect("the stub answers")
+    }
+
+    /// The regression that motivated the whole module: echoing the prompt back
+    /// parses as EVERY example action, ending at `finish`, so a run that used
+    /// the echo produced an empty proposal on iteration one.
+    /// The stub must PASS the capability probe, driven through the real
+    /// `run_probe` and the real grader.
+    ///
+    /// This is the test the composer's gate made necessary and its absence made
+    /// expensive: wiring `agentCapability()` into the composer (which is what
+    /// makes the anchored format's right to refuse a near-miss mean anything)
+    /// disabled Send until the probe passes, and the stub answered the probe
+    /// with `list_scope` because `probe_request` carries the same system
+    /// instructions a run does. Every agent E2E scenario went red on a button
+    /// that never enabled, one container build later.
+    ///
+    /// Asserted through `run_probe` rather than by inspecting the reply, because
+    /// the reply being well-formed is not the claim. The claim is that the
+    /// grader accepts it.
+    #[test]
+    fn the_stub_passes_the_capability_probe_it_is_asked() {
+        use myne_core::plugins::agent::engine::{
+            AgentCompletion, AgentEngine, AgentRequest, AgentRequestClass,
+        };
+        use myne_core::plugins::agent::error::AgentError;
+        use myne_core::plugins::agent::probe::{run_probe, ProbeThreshold};
+
+        /// The stub behind the agent seam, mapped by the REAL `chat_shape` the
+        /// desktop adapter uses. A second mapping written here would let this
+        /// test pass while the shipped one was wrong, which is the whole shape
+        /// this suite exists to catch.
+        struct StubBehindTheSeam;
+        #[async_trait::async_trait]
+        impl AgentEngine for StubBehindTheSeam {
+            async fn complete(
+                &self,
+                _class: AgentRequestClass,
+                request: &AgentRequest,
+            ) -> Result<AgentCompletion, AgentError> {
+                let (system, messages) =
+                    crate::plugins::agent::adapters::chat_shape(request, &|s: &str| s.to_string());
+                let mut sink = |_: &str| ControlFlow::Continue(());
+                let reply = StubEngine
+                    .chat_streaming(&system, &messages, &mut sink)
+                    .map_err(|_| AgentError::ReadFailed)?;
+                Ok(AgentCompletion {
+                    reply,
+                    chars_off_device: None,
+                })
+            }
+        }
+
+        let verdict = myne_core::test_support::block_on(run_probe(
+            &StubBehindTheSeam,
+            ProbeThreshold {
+                attempts: 3,
+                required: 2,
+                provisional: false,
+            },
+        ))
+        .expect("the probe runs");
+        assert!(
+            verdict.passed,
+            "the stub must be a backend Myne would offer agent mode on: {verdict:?}"
+        );
+        assert_eq!(verdict.passes, 3, "and every attempt should be clean");
+    }
+
+    #[test]
+    fn a_reworded_probe_is_not_answered_from_memory() {
+        // The answer is READ out of the prompt. A probe this parse no longer
+        // understands must fail at the gate rather than pass on a stale reply.
+        assert!(probe_answer("nothing like the probe").is_none());
+    }
+
+    #[test]
+    fn the_plain_echo_could_never_have_driven_a_run() {
+        let echo = format!("stub-infer: {}", system_instructions());
+        let actions = parse_actions(&echo);
+        assert!(
+            actions.len() > 1,
+            "the echo parses as many actions, not one: {}",
+            actions.len()
+        );
+        assert!(
+            matches!(actions.last(), Some(AgentAction::Finish { .. })),
+            "and the last of them is `finish`, which is why every run ended \
+             immediately with nothing proposed"
+        );
+    }
+
+    #[test]
+    fn a_non_agent_chat_still_gets_the_echo() {
+        // The chat scenarios assert the marker, so routing must not capture
+        // them. Driven through `chat_streaming` because that is where the
+        // agent branch now lives and therefore where it could over-reach.
+        let mut sink = |_: &str| ControlFlow::Continue(());
+        let out = StubEngine
+            .chat_streaming(
+                "You are a helpful assistant.",
+                &[turn(ChatRole::User, "summarise this")],
+                &mut sink,
+            )
+            .unwrap();
+        assert!(out.contains("stub-infer: "), "got: {out}");
+    }
+
+    #[test]
+    fn infer_is_a_pure_echo_again() {
+        // The agent no longer reaches `infer`, so it carries no agent branch.
+        let out = StubEngine.infer(&system_instructions()).unwrap();
+        assert!(out.starts_with("stub-infer: "), "got: {}", &out[..40]);
+    }
+
+    /// The two task-keyed branches `ag3` and `ag5` depend on, asserted here so a
+    /// failure names the branch rather than arriving as a container timeout
+    /// forty minutes later.
+    #[test]
+    fn a_task_naming_other_folders_requests_a_scope_expansion() {
+        let reply = ask(&[
+            turn(ChatRole::User, "look in my other folders too"),
+            turn(ChatRole::Assistant, r#"{"action":"list_scope"}"#),
+            turn(ChatRole::User, "note-aaa My note"),
+        ]);
+        let actions = parse_actions(&reply);
+        assert_eq!(actions.len(), 1, "got {actions:?}");
+        match &actions[0] {
+            AgentAction::RequestScope { folder, reason } => {
+                assert!(!folder.is_empty());
+                assert!(!reason.is_empty());
+            }
+            other => panic!("expected a scope request, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_task_naming_trash_proposes_an_edit_that_writes_the_marker() {
+        let body = "---\ntitle: My note\n---\n\nalpha beta gamma\n";
+        let reply = ask(&[
+            turn(ChatRole::User, "trash this note"),
+            turn(ChatRole::Assistant, r#"{"action":"list_scope"}"#),
+            turn(ChatRole::User, "note-aaa My note"),
+            turn(
+                ChatRole::Assistant,
+                r#"{"action":"read_note","note_id":"note-aaa"}"#,
+            ),
+            turn(ChatRole::User, body),
+        ]);
+        let actions = parse_actions(&reply);
+        // **BOTH halves, and the pair is the point.** The scenario this feeds
+        // asserts that a bulk approve carries the ordinary edits and leaves the
+        // trashing one alone, so a proposal holding only the trashing edit
+        // cannot show the "carries" half at all: the bulk action sends an empty
+        // list, the apply returns early on it, and no report renders.
+        let mut trashing = 0;
+        let mut ordinary = 0;
+        for action in &actions {
+            let AgentAction::ProposeEdit {
+                anchor,
+                replacement,
+                ..
+            } = action
+            else {
+                continue;
+            };
+            // Checked through the real placer and the real detector rather than
+            // by reading the string, so the claim is about what applying the
+            // edit DOES.
+            let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+                .expect("the anchor must place");
+            if myne_core::plugins::agent::hide::edit_hides_note(body, &placed) {
+                trashing += 1;
+            } else {
+                ordinary += 1;
+            }
+        }
+        assert_eq!(
+            trashing, 1,
+            "exactly one edit the carve-out refuses: {actions:?}"
+        );
+        assert_eq!(
+            ordinary, 1,
+            "and exactly one the bulk approve carries: {actions:?}"
+        );
+    }
+
+    #[test]
+    fn step_one_asks_what_is_in_scope() {
+        let actions = parse_actions(&ask(&[turn(ChatRole::User, "tidy this")]));
+        assert_eq!(actions.len(), 1, "one action per step: {actions:?}");
+        assert!(matches!(actions[0], AgentAction::ListScope));
+    }
+
+    #[test]
+    fn step_two_reads_the_first_note_the_listing_named() {
+        let reply = ask(&[
+            turn(ChatRole::User, "tidy this"),
+            turn(ChatRole::Assistant, r#"{"action":"list_scope"}"#),
+            turn(ChatRole::User, "note-aaa My note\nnote-bbb Another"),
+        ]);
+        let actions = parse_actions(&reply);
+        assert_eq!(actions.len(), 1);
+        match &actions[0] {
+            AgentAction::ReadNote { note_id } => assert_eq!(note_id, "note-aaa"),
+            other => panic!("expected a read, got {other:?}"),
+        }
+    }
+
+    fn after_read(body: &str) -> Vec<AgentAction> {
+        parse_actions(&ask(&[
+            turn(ChatRole::User, "tidy this"),
+            turn(ChatRole::Assistant, r#"{"action":"list_scope"}"#),
+            turn(ChatRole::User, "note-aaa My note"),
+            turn(
+                ChatRole::Assistant,
+                r#"{"action":"read_note","note_id":"note-aaa"}"#,
+            ),
+            turn(ChatRole::User, body),
+        ]))
+    }
+
+    #[test]
+    fn step_three_proposes_an_anchor_that_is_really_in_the_body() {
+        let body = "alpha beta gamma delta\n\nsecond line";
+        let actions = after_read(body);
+        assert!(
+            matches!(actions.last(), Some(AgentAction::Finish { .. })),
+            "the script must end by finishing: {actions:?}"
+        );
+        let AgentAction::ProposeEdit {
+            note_id,
+            anchor,
+            replacement,
+        } = &actions[0]
+        else {
+            panic!("expected an edit, got {:?}", actions[0]);
+        };
+        assert_eq!(note_id, "note-aaa");
+        assert!(
+            body.contains(anchor.as_str()),
+            "anchor {anchor:?} not in body"
+        );
+        assert_eq!(body.matches(anchor.as_str()).count(), 1, "must place once");
+        assert_ne!(anchor, replacement, "an edit has to change something");
+    }
+
+    /// The shape a note in the app actually has.
+    ///
+    /// Every note the E2E scenarios create carries frontmatter, so the body's
+    /// first line is `---` and it appears twice. A script that took "the first
+    /// non-empty line" produced an anchor that refused with `AnchorAmbiguous`,
+    /// and the only place that would have shown up is a Linux-only suite forty
+    /// minutes into a container build.
+    #[test]
+    fn a_note_with_frontmatter_still_yields_an_anchor_that_places_once() {
+        let body = "---\ntitle: My note\n---\n\nalpha beta gamma delta\n";
+        let actions = after_read(body);
+        let AgentAction::ProposeEdit {
+            anchor,
+            replacement,
+            ..
+        } = &actions[0]
+        else {
+            panic!("expected an edit");
+        };
+        assert_ne!(anchor, "---", "the frontmatter fence occurs twice");
+        assert_eq!(
+            body.matches(anchor.as_str()).count(),
+            1,
+            "anchor {anchor:?} must place exactly once"
+        );
+        let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+            .expect("the stub's anchor must place in a frontmattered note");
+        assert_ne!(placed, body);
+        // And the frontmatter is intact, so the edit is a body edit rather than
+        // something that rewrote the note's managed fields. This assertion is
+        // the one that caught the second wrong version; checking that the
+        // anchor placed was not enough.
+        assert!(placed.starts_with("---\ntitle: My note\n---\n"));
+    }
+
+    /// The premise `ag1` rests on: "reject one, approve the rest" needs at least
+    /// two proposed edits, and with one the rejection leaves nothing to apply,
+    /// so the apply returns early and no report ever renders. That is exactly
+    /// how the scenario failed on its first real run.
+    #[test]
+    fn two_eligible_lines_yield_two_edits_so_rejecting_one_leaves_work() {
+        let body = "---\ntitle: My note\n---\n\nalpha beta gamma\nepsilon zeta eta\n";
+        let actions = after_read(body);
+        let edits: Vec<&AgentAction> = actions
+            .iter()
+            .filter(|a| matches!(a, AgentAction::ProposeEdit { .. }))
+            .collect();
+        assert_eq!(edits.len(), 2, "got {actions:?}");
+        // And BOTH have to place, or approving the rest applies nothing.
+        for e in edits {
+            let AgentAction::ProposeEdit {
+                anchor,
+                replacement,
+                ..
+            } = e
+            else {
+                unreachable!()
+            };
+            assert!(
+                !anchor.starts_with("title:"),
+                "an anchor may not be a managed frontmatter field: {anchor:?}"
+            );
+            myne_core::plugins::agent::edit::place(body, anchor, replacement)
+                .unwrap_or_else(|e| panic!("anchor {anchor:?} must place: {e:?}"));
+        }
     }
 }

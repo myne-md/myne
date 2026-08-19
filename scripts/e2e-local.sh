@@ -10,7 +10,17 @@
 # node_modules never leak into the Linux container and (b) re-runs are
 # incremental. tauri-driver itself cannot run on macOS — this container
 # IS the local Linux seat (docs/dev/e2e.md).
-
+#
+# THREE ENVIRONMENT KNOBS, all of them opt-in and all of them the difference
+# between a run that verified something and a run that reported green having
+# verified nothing:
+#   MYNE_E2E_RETRIES=0    hunt flake. The vitest config retries twice, which is
+#                         right for a gate and wrong for a measurement: a failing
+#                         attempt is erased and the flake rate reads as zero.
+#   MYNE_E2E_QUARANTINE=1 run ONLY the `describeE2E.flaky` specs. Without it a
+#                         quarantined spec self-skips and this reports success.
+#   MYNE_E2E_AI=1         run the inference suites. Needs the
+#                         `local-inference-stub` build too: use e2e-ai-buildrun.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -76,6 +86,20 @@ RUN_FLAGS=(
 # (clobbering the rust image's PATH) — export explicitly, same idiom as
 # .woodpecker.yml's cargo-test-tauri step.
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
+
+# Forwarded HOST-side, because the container inherits neither and a spec gated on
+# one of them SELF-SKIPS rather than failing: a run that verified nothing reports
+# the same green as a run that verified everything. `MYNE_E2E_QUARANTINE=1` is
+# the only way to reach a `describeE2E.flaky` spec from here; `MYNE_E2E_AI=1`
+# needs the `local-inference-stub` build as well (see `e2e-ai-buildrun.sh`).
+E2E_ENV="$E2E_ENV MYNE_E2E_QUARANTINE=${MYNE_E2E_QUARANTINE:-0} MYNE_E2E_AI=${MYNE_E2E_AI:-0}"
+# `MYNE_E2E_RETRIES=0` is how `e2e/CLAUDE.md` says to hunt flake, and no runner
+# used to offer it: with the config's default of 2, a failing attempt is erased
+# from the report and the flake rate reads as zero however bad it is.
+RETRY_FLAG=""
+if [ -n "${MYNE_E2E_RETRIES:-}" ]; then
+  RETRY_FLAG="--retry=${MYNE_E2E_RETRIES}"
+fi
 # Point the multi-device sync harness at the Linux server binary built above so it
 # spawns the REAL server in-container instead of the host-arch one (MYND-428 task 5).
 if [[ -n "$SERVER_BIN" ]]; then
@@ -101,6 +125,6 @@ exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&
-    xvfb-run -a pnpm test:e2e
+    xvfb-run -a pnpm test:e2e $RETRY_FLAG
   '
 "

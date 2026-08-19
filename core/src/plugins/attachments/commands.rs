@@ -644,13 +644,47 @@ where
     let blob_path = attachments_dir.join(&id_hex);
     let content_type_owned = content_type.to_string();
     // MYND-328: eager text extraction → MYE1 cache, done on the same blocking
-    // thread (extraction is CPU work) right after the source blob lands. Derive
-    // the attachment-text KEK + clone the inputs the closure needs. The KEK has
-    // exactly one consumer — the cache write below — which task 90 compiled out
-    // of wasm32, so on that target deriving it would be work with no reader.
+    // thread (extraction is CPU work) right after the source blob lands.
+    //
+    // **v0.1 context on purpose, even on a v0.2 vault, and the neighbouring
+    // catalog KEK above is versioned for a reason that does not apply here.**
+    // `attachments-text/` is a device-local, never-synced, rebuildable cache, so
+    // it takes the treatment `protocol.md` §10.4.1 point 2 gives that family:
+    // the KEK re-derives through the v0.1 `derive_subkey` context on the v0.2
+    // root, which is self-consistent because a cache never crosses a generation
+    // boundary. The catalog is the opposite case — it is synced content, so it
+    // must follow the vault's own generation (#420).
+    //
+    // This used to call `derive_subkey_versioned`, and the comment here said the
+    // KEK had "exactly one consumer". It has six: `read_text`, two in
+    // `local_inference`, two in `search_sync` and two in `ocr_queue`, and every
+    // one of them derives v0.1. On a v0.2 vault the writer and the readers
+    // therefore produced DIFFERENT keys, so the cache was write-only: an OCR'd
+    // image never reached search, a voice transcript never rendered, and the
+    // miss is indistinguishable from "there is nothing cached" because both are
+    // the same `None`. A vault created today is v0.2 throughout, so this was
+    // every current vault. `scripts/check-version-routing.mjs` records those six
+    // as legitimate v0.1 sites, which is the intent this line now matches;
+    // `image-ocr-search`'s io1 is what measured it from the outside.
+    //
+    // **Blobs already written under the wrong key are NOT purged here, and that
+    // is a decision rather than an omission** (myne#531 review). They are
+    // ciphertext nobody holds a key for, not plaintext, and their lifetime is
+    // already bounded three ways: `write_extracted` writes BY PATH, so the next
+    // successful extraction for that attachment overwrites the dead blob; both
+    // delete paths (`attachment_delete` and `attachment_clean_unused`) unlink
+    // the cache by path with no decryption involved, so an attachment's cache
+    // never outlives the attachment; and the search rebuild's
+    // `backfill_note_attachment_text` re-extracts for every embedded
+    // attachment. What is left is disk held by a cache for an attachment no
+    // rebuild reaches, until that attachment is deleted.
+    //
+    // Purging on a read miss instead — which is the obvious alternative — would
+    // make `read_extracted` DESTRUCTIVE, and a decrypt miss is also what a torn
+    // write and a partial read look like. Trading unreadable bytes on disk for
+    // a delete on a read path is the wrong direction on a data path.
     #[cfg(not(target_arch = "wasm32"))]
-    let attachment_text_key =
-        derive_subkey_versioned(meta_version, &root_key, SubkeyRole::AttachmentTextKey);
+    let attachment_text_key = protocol::derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
     let filename_for_extract = filename.clone();
     // Only the CPU work stays inside `run_blocking` (task 44): the AEAD seal and
     // the text extraction. Every byte that reaches storage now goes through the

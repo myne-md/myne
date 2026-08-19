@@ -25,8 +25,9 @@
 import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { KEY, pressChord } from "./support/keyboard";
+import { KEY } from "./support/keyboard";
 import {
+  createNote,
   closeSettings,
   dismissImporterOffer,
   enableDeveloperMode,
@@ -180,11 +181,71 @@ aiDescribe("ad3 an explicit AI action always answers, even when it cannot run", 
           await dismissImporterOffer(s);
           await openChatWithAiOn(s);
 
+          // **A note has to be OPEN before anything can be typed.** `unlockToEditor`
+          // lands on the editor stage with no tab active, so `.cm-content` does not
+          // exist and `typeIntoEditor` waits out its whole budget on
+          // `editor located + focused`. This scenario is the only one in the file
+          // that types, which is why it was the only one red; the artefact shows
+          // the chat tab present and no CodeMirror node at all.
+          await createNote(s, "ad3notealfa7k2m9qx4w8e5rj0aa");
+
           // Type something and select it, then run the palette action.
           await typeIntoEditor(s, "the quick brown fox");
           // Select it — the rewrite acts on a selection and no-ops without one,
           // which would make the toast's absence mean the wrong thing.
-          await pressChord(s, KEY.CONTROL, "a");
+          // **Sent to the ELEMENT, not through the Actions API, and that is the
+          // whole fix.** Two selection attempts failed here before this one:
+          // `Ctrl+A` (which is anyway the SCOPED select-all in this editor,
+          // `editor/src/keymap.ts`) and then `pressKey(HOME, {shift})`. Both go
+          // through `POST /actions`, which delivers to whatever holds FOCUS.
+          // `typeIntoEditor` lands its text with `Element.sendKeys`, which
+          // targets the element directly and works with or without focus, so
+          // the text arriving proved nothing about where focus was. The
+          // selection keys went somewhere else, `state.selection.main` stayed
+          // empty, `resolveRewriteRange` returned null, and the scenario blamed
+          // the backend for a selection nobody had made.
+          //
+          // `Element.sendKeys` takes W3C sticky modifiers: U+E008 (Shift) stays
+          // down for the rest of the sequence, so this is Shift+Home at the
+          // editor, independent of focus.
+          const content = await s.waitForElement(
+            '[data-testid="editor.content"] .cm-content',
+          );
+          await content.sendKeys(KEY.SHIFT + KEY.HOME);
+          // **Verify the selection rather than assume it.** The comment above
+          // says the rewrite no-ops without one, and that is exactly why the
+          // absence has to be ruled out HERE: without this the scenario cannot
+          // tell "the backend failed and said nothing" from "there was nothing
+          // selected", and it spent its budget blaming the first for the second.
+          // Read through the DOM selection, which is what a user would see
+          // highlighted — no app hook, same class as the harness's other
+          // `execute` reads.
+          // **Assert the selection is INSIDE the editor, not merely non-empty.**
+          // A length-only check passed while the rewrite still saw an empty
+          // `state.selection`, which is the ambiguity that cost three attempts:
+          // a DOM selection somewhere else on the page satisfies "length > 0"
+          // and tells CodeMirror nothing. Anchoring it to `.cm-content` is what
+          // makes the check mean what the next line depends on.
+          await s.waitUntil(
+            async () =>
+              (await s.execute<boolean>(
+                "var sel = window.getSelection();" +
+                  "if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;" +
+                  "var n = sel.anchorNode;" +
+                  "var el = n && n.nodeType === 1 ? n : n && n.parentElement;" +
+                  // `.cm-focused` is the load-bearing half. CodeMirror owns a
+                  // selection in its STATE only while it holds focus; a native
+                  // DOM selection inside `.cm-content` on an unfocused editor
+                  // satisfies every weaker check and tells CM6 nothing, which is
+                  // exactly what the previous two probes here passed on while
+                  // `resolveRewriteRange` still read `main.empty`.
+                  "if (!el || !el.closest('.cm-content')) return false;" +
+                  "return !!document.querySelector('.cm-editor.cm-focused');",
+              ))
+                ? true
+                : null,
+            { label: "a non-empty selection inside a FOCUSED editor", timeoutMs: 5_000 },
+          );
           await runPaletteAction(s, "ai.rewrite-selection", "rewrite");
 
           // The whole point: BEFORE this fix the user got no toast, no error and

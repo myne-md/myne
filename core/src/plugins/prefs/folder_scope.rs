@@ -3,19 +3,15 @@
 //! MYND-490) — the single canonicalization rule every CLI-bridge enforcement
 //! point (`src-tauri/src/cli_bridge/scope.rs`) matches against.
 //!
-//! Deliberately a **fresh, independent copy** of the canonicalization the
-//! `ai_excluded_folders` store already applies
-//! (`src-tauri/src/plugins/local_inference/vector_store.rs::canonical_folder`
-//! / `folder_matches_excluded`), not a shared dependency on it: that module
-//! lives behind the `local-inference` cargo feature (default-on, but a
-//! `--no-default-features` build compiles it out entirely — see
-//! `src-tauri/CLAUDE.md` "Cryptographically load-bearing identifiers" /
-//! `docs/decisions.md` 2026-07-02), and the CLI door must keep working in
-//! that build. Both copies apply the SAME rule (structural path
-//! normalization + NFC-normalize + lowercase, equal-or-nested
-//! trailing-slash prefix match, empty entries ignored) so the two
-//! independently-evolving exclusion features stay behaviourally identical
-//! without a compile-time link between them.
+//! **No longer an independent copy, and the reason it was one has expired.**
+//! This module used to carry its own canonicalization, deliberately duplicated
+//! from the `ai_excluded_folders` store's, because that store lives behind the
+//! `local-inference` cargo feature and the CLI door must keep working in a
+//! `--no-default-features` build. That argument was sound and it no longer
+//! applies: the rule now lives in [`crate::folder_key`], at the crate root,
+//! behind no feature, and both this door and the AI store delegate to it. Two
+//! copies of a security predicate that agree today are two copies that can
+//! disagree tomorrow, and neither side's tests would notice.
 //!
 //! Pure and allocation-light; no IO, no `VaultRuntimeState`. Every enforcement
 //! point (today: `cli_bridge::scope::filter_note_ids_by_scope` for `list`;
@@ -23,8 +19,6 @@
 //! one function, so "central enforcement" means "one predicate", not "one
 //! call site" — there will be several call sites, one per command, but all of
 //! them defer to this same canonicalization rather than reimplementing it.
-
-use unicode_normalization::UnicodeNormalization;
 
 /// Structurally normalize + NFC-normalize + lowercase a folder path into the
 /// comparison key both sides of [`folder_is_excluded`] are measured in. The
@@ -44,15 +38,7 @@ use unicode_normalization::UnicodeNormalization;
 /// covers it. Case/diacritic folding is the second half: an excluded
 /// `Private/` also excludes `private/` and any differently-normalized Unicode
 /// form of the same name.
-pub fn canonical_folder(folder: &str) -> String {
-    let segments: Vec<&str> = folder.split('/').filter(|s| !s.is_empty()).collect();
-    if segments.is_empty() {
-        return String::new();
-    }
-    let mut key: String = segments.join("/").nfc().collect::<String>().to_lowercase();
-    key.push('/');
-    key
-}
+pub use crate::folder_key::canonical_folder;
 
 /// Whether `folder` (raw, un-canonicalized; `None` or empty = vault root)
 /// falls under any entry in `excluded` (raw; canonicalized here). BOTH sides
@@ -68,6 +54,13 @@ pub fn canonical_folder(folder: &str) -> String {
 /// otherwise exclude the whole vault) — which also means a note with no
 /// folder (root) is never excluded by any real entry.
 pub fn folder_is_excluded(folder: Option<&str>, excluded: &[String]) -> bool {
+    // Canonicalize the entries LAZILY, inside the `any`, so a match on the first
+    // entry costs one canonicalization rather than one per entry. This function
+    // is called once per note by the CLI scope filter, so the eager form
+    // (`canonical_excluded` up front) allocated a fresh Vec of Strings per note
+    // and gave up the short-circuit. A caller testing many notes against one set
+    // should hoist `canonical_excluded` itself and use
+    // `folder_key::folder_matches_excluded` directly.
     let folder = canonical_folder(folder.unwrap_or_default());
     excluded.iter().any(|raw| {
         let ex = canonical_folder(raw);

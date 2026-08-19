@@ -1424,10 +1424,16 @@ mod tests {
         assert!(r.char_count > 0);
     }
 
+    /// Install the bundled OCR weights, reporting whether this checkout has any.
+    ///
+    /// Delegates rather than calling `init_from_base` directly, and the
+    /// difference is load-bearing: the old form returned `false` both for a
+    /// checkout with no Git-LFS blobs and for weights that are present and will
+    /// not load, so every caller's `return` skipped a real failure as silently
+    /// as an expected one. `io1` measured an empty extraction against the
+    /// production binary while these tests were green.
     fn init_ocr_for_tests() -> bool {
-        myne_core::plugins::attachments::ocr::init_from_base(
-            &myne_core::plugins::attachments::ocr::bundled_models_dir_for_tests(),
-        )
+        myne_core::plugins::attachments::ocr::init_bundled_models_for_tests()
     }
 
     /// A valid but tiny PNG, encoded in-memory so the fixture stays out of git.

@@ -35,7 +35,7 @@
 //
 // KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
 
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
@@ -58,12 +58,40 @@ const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
  *  testids never appear there. The feature-flagged build sets `MYNE_E2E_AI=1`. */
 const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
 
-/** Read the settled BUFFER text: Escape clears any showing ghost widget first,
- *  so `editorText()` reflects the document, not the inline suggestion decoration.
- *  Escape is a no-op when nothing is showing (the keymap falls through). */
+/** Read the settled BUFFER text, with any ghost suggestion SUBTRACTED.
+ *
+ * **Escape alone is not enough, and that is why the undo assertion never
+ * passed.** `editorText()` reads `.cm-content`'s textContent, and the ghost
+ * suggestion is a widget INSIDE it, so its dimmed text is part of the readout.
+ * Escape dismisses whatever is showing, but the assistant re-suggests on a
+ * 700 ms debounce, and an undo moves the caret, which is exactly the event that
+ * arms it again. So the ghost could reappear between the Escape and the read,
+ * and the equality against the pre-suggestion baseline would fail forever. The
+ * failure artefact confirms it: `ai.ghost-text` is still in the DOM at the
+ * moment the wait gives up.
+ *
+ * Nothing about the product is wrong here. Undo does reverse the accept in one
+ * step; the reading was measuring the document plus a suggestion that had
+ * legitimately come back. Escape stays (it settles the common case and costs
+ * nothing), and the subtraction makes the reading correct even when it loses
+ * the race. */
 async function bufferText(session: Session): Promise<string> {
   await pressKey(session, KEY.ESCAPE);
-  return editorText(session);
+  let buffer = await editorText(session);
+  for (const ghost of await session.byTestIdAll("ai.ghost-text")) {
+    const text = await ghost.textContent();
+    if (text.length === 0) continue;
+    // Only a TRAILING occurrence, and the narrowing is the whole correctness
+    // argument. Removing every occurrence deleted the accepted text too, and
+    // `lastIndexOf` was no better: after Tab the suggestion's words are IN the
+    // document, so a re-armed ghost carrying the same words makes the accepted
+    // copy and the decoration indistinguishable by content alone. Position is
+    // what separates them: the ghost is a widget rendered AFTER the cursor, and
+    // this scenario types at the end of the document, so a ghost contribution
+    // can only ever be the readout's SUFFIX. Anything earlier is real text.
+    if (buffer.endsWith(text)) buffer = buffer.slice(0, -text.length);
+  }
+  return buffer;
 }
 
 aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)", () => {
@@ -96,10 +124,35 @@ aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)",
         await s.waitForElement(testIdSelector("ai.ghost-text"), { timeoutMs: 15_000 });
 
         // Tab accepts the suggestion as plain markdown (one `ai.insert` undo step).
-        await pressKey(s, KEY.TAB);
+        //
+        // **Sent to the ELEMENT and re-fired, and asserted on the TEXT.** Three
+        // things were wrong with the single `pressKey(TAB)` + length check.
+        // `pressKey` goes through `POST /actions`, which needs focus, and this
+        // file lands its text with `Element.sendKeys`, which does not prove any
+        // (the same confusion cost `ad3` three rounds). One press cannot recover
+        // if the ghost was between re-arms at that instant. And a length check
+        // passes on a Tab that merely INDENTED, so the weaker assertion could
+        // have hidden the very failure it was meant to catch.
+        //
+        // Asserting the ghost's own text landed is both stronger and cheaper to
+        // read: an indent does not contain it.
+        const editorContent = await s.waitForElement(CM_CONTENT);
+        const ghostText = (
+          await (await s.byTestId("ai.ghost-text")).textContent()
+        ).trim();
+        expect(ghostText.length, "the stub suggestion must not be empty").toBeGreaterThan(0);
         await s.waitUntil(
-          async () => ((await bufferText(s)).length > beforeGhost.length ? true : null),
-          { label: "ghost suggestion accepted into the buffer", timeoutMs: 10_000 },
+          async () => {
+            // **Tab BEFORE the read, and that ordering is the whole loop.** The
+            // first version read `bufferText` first, and `bufferText` presses
+            // Escape, which DISMISSES the ghost. So every poll cleared the
+            // suggestion, then looked for one, found none, and sent no Tab: a
+            // loop that could only ever time out, written to fix a timeout.
+            const showing = await s.byTestIdAll("ai.ghost-text");
+            if (showing.length > 0) await editorContent.sendKeys(KEY.TAB);
+            return (await bufferText(s)).includes(ghostText) ? true : null;
+          },
+          { label: "ghost suggestion accepted into the buffer", timeoutMs: 20_000 },
         );
 
         // Ctrl+Z reverses the accept in exactly one step — the buffer returns to
@@ -116,16 +169,39 @@ aiDescribe("wa1 AI writing assistant (ghost accept+undo, slash title, rewrite)",
         // mirroring `slash-datetime.e2e.ts`). English label: "Suggest title (AI)".
         const content = await s.waitForElement(CM_CONTENT);
         await content.click();
-        await content.sendKeys("/suggest title");
-        await pressKey(s, KEY.ENTER);
+        // Enter goes to the ELEMENT and the whole query is RE-FIRED until the
+        // title lands. Two reasons, both already paid for elsewhere in this
+        // branch: `pressKey` routes through `POST /actions`, which needs focus
+        // that `Element.sendKeys` never established, and a single burst can
+        // outrun the slash menu's filter so the Enter confirms nothing. Same
+        // shape as `/drawing` in `drawing-inline-embed.e2e.ts` and the audio ⋮
+        // menu: when a trigger can miss, re-fire it rather than wait longer.
+        await content.sendKeys(`/suggest title${String.fromCharCode(0xe007)}`);
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("title:") ? true : null),
-          { label: "slash set a frontmatter title", timeoutMs: 15_000 },
+          async () => {
+            if ((await editorText(s)).includes("title:")) return true;
+            await content.sendKeys(`/suggest title${String.fromCharCode(0xe007)}`);
+            await new Promise((r) => setTimeout(r, 2_000));
+            return (await editorText(s)).includes("title:") ? true : null;
+          },
+          { label: "slash set a frontmatter title", timeoutMs: 30_000 },
         );
 
-        // ── (c) select-all → `ai.rewrite-selection` replaces the selection ──
+        // ── (c) select a span → `ai.rewrite-selection` replaces the selection ──
+        // Shift+End from the line start, not Ctrl+A: `Mod-a` here is the SCOPED
+        // select-all (`editor/src/keymap.ts` narrows it to the frontmatter block
+        // or the body by caret position) and it is rebindable, so a scenario
+        // that needs "a non-empty selection" should not route through it. ad3
+        // failed for exactly that reason: the selection came out empty and the
+        // rewrite no-opped, which read as a broken backend.
+        // Sent to the ELEMENT, for the reason ad3 records: `pressKey` goes
+        // through `POST /actions`, which delivers to whatever holds focus, and
+        // a scenario that lands its text with `Element.sendKeys` has proved
+        // nothing about focus. `Element.sendKeys` takes W3C sticky modifiers, so
+        // U+E008 stays down across the sequence.
         await content.click();
-        await pressChord(s, KEY.CONTROL, "a");
+        await content.sendKeys(KEY.HOME);
+        await content.sendKeys(KEY.SHIFT + KEY.END);
         const beforeRewrite = await editorText(s);
         await runPaletteAction(s, "ai.rewrite-selection", "rewrite");
         await s.waitUntil(

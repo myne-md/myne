@@ -152,6 +152,13 @@ import { requestRevealViews } from "../notes/views/revealViewsSignal";
 import { useResolverNotes } from "../notes/resolverNotes";
 import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
 import { AiChatTab } from "../notes/components/AiChatTab";
+// myne#529: the agent surface. The composer rides the AI tab, so a run starts
+// where the user already talks to the AI. The review screen is a takeover
+// rather than a panel because approval is a separate, attention-requiring act
+// and half the feature's other decisions rest on it being one.
+import { AgentComposer } from "../notes/agent/components/AgentComposer";
+import { clearAgentForLock } from "../notes/agent/agentStore";
+import { AgentReviewTakeover } from "../notes/agent/components/AgentReviewTakeover";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
@@ -577,6 +584,7 @@ export function Editor({
           // are, so a failure part-way never leaves an unlocked session over a
           // half-erased container.
           await lockVault().catch(() => {});
+          clearAgentForLock();
           // ONE erase (task 72), not a second implementation. The target is
           // required since #250 — a lock has already emptied the slot, so the
           // id must come from the stage-resolved value captured above, not from
@@ -1713,6 +1721,18 @@ function EditorChrome({
     await lockVault().catch(() => {
       /* lock is best-effort, parent callback still fires */
     });
+    // Drop the agent run's frontend half on the SAME leg the host drops its own.
+    // The host's `teardown_on_lock` clears the run table and the transcript; this
+    // store holds the proposal, which is the anchors and replacements copied out
+    // of notes. Unconditional and after the lock attempt, for the same reason the
+    // flush chain cannot skip the lock: a failure earlier in the chain must not
+    // be what leaves plaintext resident.
+    //
+    // The FOR-LOCK variant: it additionally drops the undo offer, because the
+    // host cleared its own record on the same event and the note ids in it name
+    // a vault that is no longer open. Closing the review screen uses the plain
+    // one, since closing a screen un-applies nothing.
+    clearAgentForLock();
     onLock?.();
   }, [flushAll, persistWorkspace, persistVaultIndices, onLock]);
 
@@ -3110,14 +3130,39 @@ function CommandPaletteHost({
       // core, then replace it in place as plain markdown (`ai.rewrite`, one undo
       // step). A no-op on an empty selection.
       onRewriteSelection: () => {
+        // **Every exit from here ANSWERS.** These four returns were silent, and
+        // they reproduced exactly the failure the comment below records as
+        // fixed: no toast, no error and no document change, indistinguishable
+        // from the action never having fired. Moving the orchestration into
+        // `rewriteSelectionToEditor` closed the engine-rejection path and left
+        // these four open, one layer up, which is the shape this repo keeps
+        // finding.
+        //
+        // The first three are internal inconsistencies rather than user
+        // mistakes: the action's own `visibility` already requires the editor
+        // stage and a selected note, so reaching them means the palette offered
+        // something the app then could not do. The user cannot act on the cause,
+        // but they can act on knowing it did not happen.
         const view = getActiveEditorView();
-        if (view === null) return;
-        // SYNC-14 fail-closed: never rewrite a note in an excluded folder, and
-        // never when the folder is unknown (see onSummarizeNote).
-        if (ctx.selectedId === null) return;
+        if (view === null || ctx.selectedId === null) {
+          setToast({ message: t("editor.flow.aiRewriteUnavailable"), variant: "error" });
+          return;
+        }
         const cached = ctx.cache.get(ctx.selectedId);
-        if (cached === undefined) return;
-        if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) return;
+        if (cached === undefined) {
+          setToast({ message: t("editor.flow.aiRewriteUnavailable"), variant: "error" });
+          return;
+        }
+        // SYNC-14 fail-closed: never rewrite a note in an excluded folder, and
+        // never when the folder is unknown (see onSummarizeNote). **Said out
+        // loud**, because this one is not an internal fault: the user
+        // configured the exclusion, so naming it is the difference between
+        // "Myne honoured my setting" and "this command is broken". It leaks
+        // nothing they did not already choose.
+        if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) {
+          setToast({ message: t("editor.flow.aiRewriteExcluded"), variant: "error" });
+          return;
+        }
         // Snapshot the note + the immutable pre-inference state, so the
         // multi-second blocking infer cannot land a stale range onto a document
         // the user edited (or a different note they switched to) in the meantime.
@@ -3808,6 +3853,10 @@ function WorkspaceHotkeys({
  * container owns only the strip, the active-tab/order/hidden prefs, and the two
  * right-click menus (the per-tab move/hide + the strip-wide restore checklist).
  */
+/** Stable empty list for `agentFolders` while the AI tab is closed, so a
+ *  memo miss does not hand the composer a fresh array identity per render. */
+const EMPTY_FOLDERS: readonly string[] = [];
+
 function RightSidebar() {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
@@ -3867,6 +3916,21 @@ function RightSidebar() {
   // Healed-on-read: a stored pointer to a now-hidden/unknown tab is reinterpreted
   // (first visible), never rewritten to disk.
   const active = resolveActiveTab(prefs.right_panel_active_tab, order, effectiveHidden);
+  // Folders the composer can attach as a scope. Derived from the notes the
+  // resolver already holds, so it needs no second load; the authoritative
+  // resolution and the excluded-folder clamp are host-side either way.
+  //
+  // Gated on the AI tab being open. `notes` changes identity on every note save,
+  // so without the gate this sort ran for every user on every save, including
+  // everyone who never opens the tab it feeds.
+  const agentFolders = useMemo(
+    () =>
+      active === "ai-chat"
+        ? [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort()
+        : EMPTY_FOLDERS,
+    [notes, active],
+  );
+
 
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; edge: "before" | "after" } | null>(
@@ -4050,7 +4114,38 @@ function RightSidebar() {
             titleOf={(noteId) => notes.find((n) => n.noteUuid === noteId)?.title ?? null}
           />
         ) : null}
+        {active === "ai-chat" ? (
+          <AgentComposer
+            openNoteId={selectedId}
+            folders={agentFolders}
+            // An undo rewrites notes out-of-band of any pane's autosave, the
+            // same shape a sync pull has, so it reuses the same blanket bump.
+            // Each pane applies its own dirty guard, so this never clobbers
+            // in-flight typing. Without it the editor keeps rendering the
+            // applied text of a note that has just been reverted underneath it.
+            onRunUndone={() => ctx.reloadOpenNote()}
+          />
+        ) : null}
       </div>
+
+      {/* myne#529: the agent review takeover. Full screen rather than a panel:
+          approving is meant to be a deliberate act, and a surface at the edge of
+          the editor makes it a thing beside the work. Rendered unconditionally
+          and self-gating: whether it is on screen is DERIVED from the run rather
+          than held as a second Editor boolean somebody has to set. Its own file
+          states why. */}
+      <AgentReviewTakeover
+        titleOf={(noteId) =>
+          notes.find((n) => n.noteUuid === noteId)?.title ?? null
+        }
+        // An apply writes through the backend, out of band of any pane's own
+        // autosave loop, so without this the editor keeps showing the pre-apply
+        // text AND the pane's next autosave writes that stale buffer back over
+        // the edit the user just approved. Same blanket bump the task-write path
+        // uses; each pane applies its own dirty guard, so it never clobbers
+        // in-flight typing.
+        onNotesWritten={() => ctx.reloadOpenNote()}
+      />
 
       {/* Right-click menus (clone of the bottom-bar two-menu pattern). */}
       {tabMenu &&
