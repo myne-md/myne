@@ -275,8 +275,12 @@ mod acl_registration_guard {
 
         // The count floor, last. The comparisons above prove the four sources
         // AGREE; they cannot prove the four are not all missing the same
-        // command, which is what a whole-command deletion looks like. Nine is
-        // the roster as it stands, so shipping a tenth is an edit here too.
+        // command, which is what a whole-command deletion looks like. EIGHT is
+        // the roster as it stands, so shipping a ninth is an edit here too.
+        // (This comment said nine directly above an assertion of eight, from
+        // the round-two removal of `agent_status` — myne-md/myne#531 review
+        // round five. A prose number beside the number it describes is the one
+        // place drift is both cheapest to introduce and most misleading.)
         assert_eq!(
             (
                 granted.len(),

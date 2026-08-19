@@ -152,14 +152,37 @@ pub fn fm_deleted_value_strict(frontmatter: &[u8]) -> Option<String> {
     fm_timestamp_value_strict(frontmatter, "deleted")
 }
 
+/// Read the `archived:` marker value-strict — mirrors
+/// `readArchivedFromFmBody`, the exact value-strict twin of
+/// [`fm_trashed_value_strict`].
+pub fn fm_archived_value_strict(frontmatter: &[u8]) -> Option<String> {
+    fm_timestamp_value_strict(frontmatter, "archived")
+}
+
+/// Read the `conflict:` keep-both marker value-strict — mirrors
+/// `readConflictFromFmBody`: `true` iff the field carries the literal,
+/// unquoted `true`. The boolean twin of [`fm_template_value_strict`], not of
+/// [`fm_trashed_value_strict`].
+pub fn fm_conflict_value_strict(frontmatter: &[u8]) -> bool {
+    fm_literal_true_value_strict(frontmatter, "conflict")
+}
+
 /// Read the `template:` marker value-strict — mirrors
 /// `readTemplateFromFmBody`: `true` iff the field carries the literal,
 /// unquoted `true` (a trailing comment stripped first); everything else —
 /// `template: "true"` / `template: 1` / `template: True` / an absent field —
 /// is `false`.
 pub fn fm_template_value_strict(frontmatter: &[u8]) -> bool {
+    fm_literal_true_value_strict(frontmatter, "template")
+}
+
+/// The boolean counterpart of [`fm_timestamp_value_strict`]: `true` iff the
+/// field carries the literal, unquoted `true` with any trailing comment
+/// stripped. Shared so the two boolean markers cannot drift into different
+/// notions of strictness, the way a hand copy would.
+fn fm_literal_true_value_strict(frontmatter: &[u8], key: &str) -> bool {
     let text = String::from_utf8_lossy(frontmatter);
-    let Some(value) = find_key_line(&text, "template") else {
+    let Some(value) = find_key_line(&text, key) else {
         return false;
     };
     strip_inline_comment(value).trim() == "true"

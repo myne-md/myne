@@ -115,9 +115,11 @@ export type EditRejection =
    *  already committed: failing there would discard the run's restore points
    *  and leave the applied edits with no undo. */
   | "createFailed"
-  /** The edit would trash a note and arrived inside a bulk approval. The user
-   *  can still apply it by approving it on its own. */
-  | "trashNeedsOwnAct"
+  /** The edit would take a note OUT of the working set and arrived inside a
+   *  bulk approval. The user can still apply it by approving it on its own.
+   *  Named for the field class rather than for `trashed:` — see
+   *  {@link editHidesNote}. */
+  | "removalNeedsOwnAct"
   /** The note's folder was excluded from AI while the run was open or the
    *  review was pending. SYNC-14 carries no in-flight carve-out, so the newest
    *  answer decides and the edit is refused rather than applied. */
@@ -323,58 +325,125 @@ export async function agentCapability(): Promise<ProbeVerdict> {
   return await invoke<ProbeVerdict>("plugin:agent|agent_capability");
 }
 
-/** Whether an edit would move a note into the trash.
+/** Whether an edit would take a note OUT of the working set.
  *
- *  Trash in Myne is a `trashed:` frontmatter timestamp, so at the diff layer a
- *  deletion looks exactly like any other edit. This is the surface's half of
- *  keeping those apart: an edit whose replacement introduces the marker is
- *  excluded from bulk approve and always needs its own act.
+ *  Every way Myne removes a note from the note list is a frontmatter field, so
+ *  at the diff layer a removal looks exactly like any other edit. This is the
+ *  surface's half of keeping those apart: an edit whose replacement introduces
+ *  one of the markers is excluded from bulk approve and always needs its own
+ *  act.
+ *
+ *  **Five fields, and the roster is not hand-picked.** It is exactly what
+ *  `isLiveNote` reads (`editor/src/host/notes/selectors.ts`), which is the one
+ *  authority for "this note is in the working set". This function used to read
+ *  `trashed:` alone, which left `deleted:` — the marker that hides a note from
+ *  Trash as well as from the sidebar — in the bulk-approvable pile
+ *  (myne-md/myne#531 review round five).
  *
  *  Deliberately conservative: it looks at the replacement text rather than at
- *  the resulting note, so an edit that inserts the marker is caught even when
+ *  the resulting note, so an edit that inserts a marker is caught even when
  *  this module cannot see the whole body. Over-flagging costs a click. Under-
- *  flagging costs nothing either, because the host refuses the write anyway: *  which is the point of doing the real check there rather than here. */
-export function editWritesTrashMarker(edit: ProposedEdit): boolean {
-  return hasTrashMarker(edit.replacement) && !hasTrashMarker(edit.anchor);
+ *  flagging costs nothing either, because the host refuses the write anyway:
+ *  which is the point of doing the real check there rather than here. */
+export function editHidesNote(edit: ProposedEdit): boolean {
+  return editHidesNoteAs(edit) !== null;
 }
 
-/** `trashed:` followed by an ISO-8601 instant whose calendar fields are in
+/** WHICH marker the edit introduces, or `null` for an ordinary edit.
+ *
+ *  The screen needs the field and not only the boolean: the row's flag says
+ *  what approving it will do, and one sentence cannot be true for all five.
+ *  "Moves this note to Trash" over an edit that writes `archived:` is a false
+ *  statement to the user at the moment they are deciding.
+ *
+ *  First match wins, in `isLiveNote` order. An edit that introduces two markers
+ *  at once is pathological and already refused; naming the first is better than
+ *  naming none. */
+export function editHidesNoteAs(edit: ProposedEdit): HidingField | null {
+  const hit = HIDING_MARKERS.find(
+    (marker) => marker.test(edit.replacement) && !marker.test(edit.anchor),
+  );
+  return hit?.field ?? null;
+}
+
+/** The frontmatter fields `isLiveNote` reads. */
+export type HidingField =
+  | "trashed"
+  | "deleted"
+  | "archived"
+  | "template"
+  | "conflict";
+
+/** One working-set marker, and how to recognise it value-strict. */
+interface HidingMarker {
+  /** The frontmatter key, for the roster test and the row label to read. */
+  readonly field: HidingField;
+  test(text: string): boolean;
+}
+
+/** A `<field>:` line carrying an ISO-8601 instant whose calendar fields are in
  *  range.
  *
- *  A hand mirror of the Rust `fm_trashed_value_strict`, and the range check is
+ *  A hand mirror of the Rust `fm_timestamp_value_strict`, and the range check is
  *  the half that is easy to leave out: a shape-only pattern accepts
  *  `trashed: 2026-13-45T99:99:99Z`, which the Rust reader rejects. The Rust side
  *  is the one that decides: it re-runs the real check against the resulting
  *  note before writing, so a mismatch here is a UI-grouping bug and never a
  *  data-loss one. The mirror exists so the screen can flag the row, not so the
  *  screen can be trusted. */
-function hasTrashMarker(text: string): boolean {
-  const m = TRASHED_LINE.exec(text);
-  if (m === null) return false;
-  const [, year, month, day, hour, minute, second] = m;
-  const n = (s: string) => Number.parseInt(s, 10);
-  return (
-    n(year) >= 1 &&
-    n(month) >= 1 &&
-    n(month) <= 12 &&
-    n(day) >= 1 &&
-    n(day) <= 31 &&
-    n(hour) <= 23 &&
-    n(minute) <= 59 &&
-    // 60 for a leap second, matching what an ISO-8601 producer may emit.
-    n(second) <= 60
+function timestampMarker(field: HidingField): HidingMarker {
+  const re = new RegExp(
+    `^\\s*${field}:\\s*(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})\\s*$`,
+    "m",
   );
+  return {
+    field,
+    test(text: string): boolean {
+      const m = re.exec(text);
+      if (m === null) return false;
+      const [, year, month, day, hour, minute, second] = m;
+      const n = (v: string) => Number.parseInt(v, 10);
+      return (
+        n(year) >= 1 &&
+        n(month) >= 1 &&
+        n(month) <= 12 &&
+        n(day) >= 1 &&
+        n(day) <= 31 &&
+        n(hour) <= 23 &&
+        n(minute) <= 59 &&
+        // 60 for a leap second, matching what an ISO-8601 producer may emit.
+        n(second) <= 60
+      );
+    },
+  };
 }
 
-const TRASHED_LINE =
-  /^\s*trashed:\s*(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\s*$/m;
+/** A `<field>:` line carrying the literal, unquoted `true`.
+ *
+ *  Mirrors the Rust `fm_template_value_strict` / `fm_conflict_value_strict`:
+ *  `template: "true"` / `template: 1` / `template: True` are a user's own field
+ *  and do not mark. */
+function booleanMarker(field: HidingField): HidingMarker {
+  const re = new RegExp(`^\\s*${field}:\\s*true\\s*(?:#.*)?$`, "m");
+  return { field, test: (text: string) => re.test(text) };
+}
+
+/** The roster, in `isLiveNote` order. Exported for the mirror test, which reads
+ *  the Rust side's roster and asserts the two name the same fields. */
+export const HIDING_MARKERS: readonly HidingMarker[] = [
+  timestampMarker("trashed"),
+  timestampMarker("deleted"),
+  timestampMarker("archived"),
+  booleanMarker("template"),
+  booleanMarker("conflict"),
+];
 
 /** Split an approved set into what a bulk action may carry and what it may not.
  *
  *  **Presentation only.** This decides which row gets its own button; it is not
  *  the enforcement. The host re-derives the same question from the note as it
- *  will actually be after the edit, and refuses a trashing edit inside a `"bulk"`
- *  approval regardless of what was sent. So this mirror is allowed to
+ *  will actually be after the edit, and refuses a removing edit inside a
+ *  `"bulk"` approval regardless of what was sent. So this mirror is allowed to
  *  over-flag (that costs a click) and a divergence in the other direction
  *  costs nothing, because the host does not consult it. */
 export function splitForBulkApproval(edits: ProposedEdit[]): {
@@ -384,7 +453,7 @@ export function splitForBulkApproval(edits: ProposedEdit[]): {
   const bulkApprovable: ProposedEdit[] = [];
   const needsOwnAct: ProposedEdit[] = [];
   for (const edit of edits) {
-    (editWritesTrashMarker(edit) ? needsOwnAct : bulkApprovable).push(edit);
+    (editHidesNote(edit) ? needsOwnAct : bulkApprovable).push(edit);
   }
   return { bulkApprovable, needsOwnAct };
 }

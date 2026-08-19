@@ -44,13 +44,27 @@ RUN_FLAGS=(
   -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
   -v myne-e2e-nm-preview:/work/preview/node_modules
   -v myne-e2e-target:/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  # **At `$CARGO_HOME/registry`, not `/usr/local/cargo/registry`.** `E2E_ENV`
+  # below sets `CARGO_HOME=/home/e2e/.cargo`, so that is the only registry path
+  # cargo reads or writes; a volume mounted anywhere else is a cache nothing
+  # consults. Mounted at the image's default path, this runner re-downloaded the
+  # crates.io index and every crate source on EVERY invocation, threw the result
+  # away with `--rm`, and spent ~15 min doing it before the first line of the
+  # build appeared. Nothing reports that: the run is green, only slow, which is
+  # why it survived.
+  #
+  # The four sibling runners (`e2e-buildrun.sh`, `e2e-local.sh`, `e2e-one.sh`,
+  # `e2e-batch.sh`) still mount it at the unused path. This file was copied from
+  # them, so the defect is theirs first; fixing them is a change with its own
+  # claim to verify and does not belong in myne-md/myne#529. Deliberate
+  # divergence, recorded here rather than left to read as a typo.
+  -v myne-e2e-cargo-registry:/home/e2e/.cargo/registry
   -w /work
   --user root
 )
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true MYNE_E2E_AI=1 npm_config_store_dir=/home/e2e/.pnpm-store'
 
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/ornaments/node_modules /work/preview/node_modules /work/target /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/ornaments/node_modules /work/preview/node_modules /work/target /home/e2e/.cargo/registry'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
   $FIX_PERMS && su e2e -s /bin/bash -c '

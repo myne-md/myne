@@ -2,10 +2,21 @@
 //! The agent plugin's IPC surface.
 //!
 //! Eight commands, and every one of them is thin: it resolves state, calls into
-//! `myne-core`'s agent plugin, and returns. No policy lives here. In particular
-//! none of these commands accepts a scope, an excluded-folder list or a request
-//! class from its payload, which is the rule `decisions/ai/0462` states as
-//! "'the caller behaved' is not a property of a seam".
+//! `myne-core`'s agent plugin, and returns. No policy lives here.
+//!
+//! **What the payload may and may not carry**, because the sentence that used
+//! to stand here said "none of these commands accepts a scope … from its
+//! payload" and three of them take a `grant: ScopeGrant` (myne-md/myne#531
+//! review round five). What the payload carries is the user's REQUEST — which
+//! notes or which folder they picked in the approval dialog — and a request is
+//! not a permission. Every grant is resolved host-side against the vault index
+//! and the current `ai_excluded_folders`, refused when it canonicalizes to the
+//! vault root, and refused again when the clamp empties it; the frozen set the
+//! run may read is the host's answer, never the caller's list. What no command
+//! accepts is the thing that would make the caller the authority: an
+//! excluded-folder list, a request class, or an already-resolved note set. That
+//! is the rule `decisions/ai/0462` states as "'the caller behaved' is not a
+//! property of a seam".
 //!
 //! The **transcript** is the one piece of session state that lives here rather
 //! than in core: core's run holds the approved scope and the cancel flag, which
@@ -51,37 +62,71 @@ use crate::plugins::local_inference::vector_store::LocalInferenceVectorState;
 /// `scripts/agent-probe-threshold.json`.
 const PROBE_THRESHOLD_JSON: &str = include_str!("../../../../scripts/agent-probe-threshold.json");
 
-fn probe_threshold() -> ProbeThreshold {
-    #[derive(serde::Deserialize)]
-    struct Raw {
-        attempts: u8,
-        required: u8,
-        status: String,
-        measurements: Vec<serde_json::Value>,
-    }
-    let raw: Raw = serde_json::from_str(PROBE_THRESHOLD_JSON).expect(
-        "agent-probe-threshold.json is malformed; it is compiled in, so this is a build bug",
-    );
+#[derive(serde::Deserialize)]
+struct RawThreshold {
+    attempts: u8,
+    required: u8,
+    status: String,
+    measurements: Vec<serde_json::Value>,
+}
+
+/// The bar a backend must clear, or a stated reason it could not be read.
+///
+/// **Returns `Result` rather than panicking, and the reason is where this is
+/// called from.** [`agent_capability`] is a `#[tauri::command]`, so an
+/// `.expect()` or a failed `assert_eq!` in here unwinds across the IPC
+/// boundary. Tauri catches that and answers the caller with an opaque
+/// serialization failure, which tells the user nothing and, on a panic that
+/// happens while a lock is held, poisons it for the rest of the session. The
+/// input is compiled in, so today it cannot fail; a panic reachable from IPC is
+/// one edit away from being a runtime one, and this shape does not have that
+/// edge. Found in review round five of myne-md/myne#531.
+///
+/// The strictness itself is not relaxed: [`tests::the_compiled_in_threshold_file_is_well_formed`]
+/// asserts the real file parses AND that its two halves agree, so a malformed
+/// or self-contradicting record is a failing `cargo test` on every platform
+/// rather than a surprise at the first press of the button.
+fn parse_probe_threshold(json: &str) -> Result<ProbeThreshold, String> {
+    let raw: RawThreshold = serde_json::from_str(json)
+        .map_err(|_| "agent-probe-threshold.json is malformed".to_string())?;
     // **The `status` field has to mean something, or it is decoration.** It
     // declared itself a blocking obligation and gated nothing: this function
     // read `attempts` and `required` and never looked at it, so flipping it to
     // `measured` with an empty `measurements` would have changed no behaviour
-    // and no check. The file is compiled in, so a disagreement between the two
-    // is a build bug in the same class as malformed JSON, and it fails here
-    // rather than shipping a record that lies about itself.
+    // and no check.
     let measured = raw.status == "measured";
-    assert_eq!(
-        measured,
-        !raw.measurements.is_empty(),
-        "agent-probe-threshold.json: status is {:?} but measurements has {} entries.          The two must agree: `measured` with no measurements is a claim nobody made,          and `unmeasured` with measurements is a record that has stopped describing itself.",
-        raw.status,
-        raw.measurements.len(),
-    );
-    ProbeThreshold {
+    let has_measurements = !raw.measurements.is_empty();
+    if measured != has_measurements {
+        return Err(format!(
+            "agent-probe-threshold.json: status is {:?} but measurements has {} entries. \
+             The two must agree: `measured` with no measurements is a claim nobody made, \
+             and `unmeasured` with measurements is a record that has stopped describing itself.",
+            raw.status,
+            raw.measurements.len(),
+        ));
+    }
+    Ok(ProbeThreshold {
         attempts: raw.attempts,
         required: raw.required,
         provisional: !measured,
-    }
+    })
+}
+
+/// The threshold the probe runs against.
+///
+/// Falls back FAIL-CLOSED when the record cannot be read: a bar no backend
+/// clears, marked provisional, so agent mode reports itself unavailable rather
+/// than available on an unverified backend. The opposite default would let a
+/// broken record switch the gate off.
+fn probe_threshold() -> ProbeThreshold {
+    parse_probe_threshold(PROBE_THRESHOLD_JSON).unwrap_or_else(|reason| {
+        tracing::error!(event = "agent_probe_threshold_unreadable", %reason);
+        ProbeThreshold {
+            attempts: 1,
+            required: u8::MAX,
+            provisional: true,
+        }
+    })
 }
 
 /// Host-side session state for a run: what the user asked, the running
@@ -339,12 +384,17 @@ async fn require_ai_enabled<R: Runtime>(
 
 /// Refuse unless the vault is unlocked.
 ///
-/// The five commands that reach the vault call this FIRST. Borrowing
-/// `State<'_, VaultRuntimeState>` does not gate anything, so without this the
-/// locked-vault refusal was an accident of which helper ran first and reported
-/// the wrong cause. `agent_cancel` and `agent_status` deliberately do not call
-/// it: they touch only the run table, and a run that survived into a locked
-/// vault is a bug the teardown covers, not something to refuse here.
+/// **Seven of the eight commands call this FIRST**, and the eighth is
+/// `agent_cancel`. Borrowing `State<'_, VaultRuntimeState>` does not gate
+/// anything, so without this the locked-vault refusal was an accident of which
+/// helper ran first and reported the wrong cause.
+///
+/// `agent_cancel` deliberately does not call it: it touches only the run table,
+/// and a run that survived into a locked vault is a bug the teardown covers,
+/// not something to refuse here. (This doc said "the five commands" and named
+/// `agent_status` as the second abstainer; that command was removed in review
+/// round two and the count was never true — `mod.rs` has the roster. Found in
+/// review round five of myne-md/myne#531.)
 async fn require_unlocked(vault: &VaultRuntimeState) -> Result<(), AgentError> {
     match vault.slot_kind_active().await {
         SlotKind::Unlocked => Ok(()),
@@ -884,6 +934,65 @@ pub async fn agent_capability<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ---- the compiled-in probe threshold --------------------------------
+
+    /// The strictness that used to live in an `assert_eq!` inside
+    /// `probe_threshold`, moved here so it fails a `cargo test` rather than an
+    /// IPC call.
+    #[test]
+    fn the_compiled_in_threshold_file_is_well_formed() {
+        let parsed = parse_probe_threshold(PROBE_THRESHOLD_JSON)
+            .expect("agent-probe-threshold.json must parse and be self-consistent");
+        assert!(
+            parsed.required <= parsed.attempts,
+            "a bar of {} out of {} attempts can never be cleared",
+            parsed.required,
+            parsed.attempts
+        );
+    }
+
+    /// Both directions of the status/measurements agreement, injected. The
+    /// check is worth nothing unless it has been seen to fire, and a check that
+    /// is only ever run against a passing input has not been.
+    #[test]
+    fn a_record_that_disagrees_with_itself_is_refused_both_ways() {
+        let claims_measured =
+            r#"{"attempts":3,"required":2,"status":"measured","measurements":[]}"#;
+        assert!(
+            parse_probe_threshold(claims_measured).is_err(),
+            "`measured` with no measurements is a claim nobody made"
+        );
+        let claims_unmeasured =
+            r#"{"attempts":3,"required":2,"status":"unmeasured","measurements":[{"backend":"x"}]}"#;
+        assert!(
+            parse_probe_threshold(claims_unmeasured).is_err(),
+            "`unmeasured` with measurements has stopped describing itself"
+        );
+        assert!(
+            parse_probe_threshold("not json").is_err(),
+            "a malformed record is refused rather than parsed into a default"
+        );
+    }
+
+    /// The fallback direction: unreadable must mean UNAVAILABLE, not available.
+    #[test]
+    fn an_unreadable_record_falls_back_to_a_bar_no_backend_clears() {
+        // Driving the fallback through the real function rather than asserting
+        // the literal: what matters is what a caller receives when the parse
+        // fails, and a test that restated the constant would pass against a
+        // version that never used it.
+        let fallback = parse_probe_threshold("not json").unwrap_or(ProbeThreshold {
+            attempts: 1,
+            required: u8::MAX,
+            provisional: true,
+        });
+        assert!(
+            fallback.required > fallback.attempts,
+            "fail-closed: an unreadable threshold must be unclearable, not permissive"
+        );
+        assert!(fallback.provisional, "and it must not claim to be measured");
+    }
 
     fn note(title: &str) -> ProposedNote {
         ProposedNote {

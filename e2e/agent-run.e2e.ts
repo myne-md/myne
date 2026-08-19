@@ -179,15 +179,23 @@ aiDescribe("ag2 the running scope total is continuously visible", () => {
   });
 });
 
-aiDescribe("ag3 a trashing edit is not carried by the bulk approve", () => {
+aiDescribe("ag3 a removing edit is not carried by the bulk approve", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
   //
-  // Self-skips rather than failing when the stub proposes no trashing edit: the
-  // engine's script is not this suite's to set, and a scenario that failed on a
-  // proposal it cannot control would report a harness fact as a product defect.
-  // The skip is LOUD (it logs why) because a silently self-skipping test is
-  // the failure class `scripts/check-e2e-floor.mjs` exists to catch.
-  it("leaves the trashed note untouched until its own act is taken", async () => {
+  // **What this covers and what it does not.** The stub proposes a `trashed:`
+  // edit, so this drives ONE member of the removal class end to end: the split,
+  // the per-field label, the separate act, and the note on disk after a bulk
+  // approve. The class itself — all five of `isLiveNote`'s fields — is pinned
+  // where it can be driven directly and asserted on the written bytes, in
+  // `core/src/plugins/agent/apply.rs::a_bulk_approval_cannot_remove_a_note_by_any_marker`.
+  // Widening this scenario would mean scripting four more stub replies to
+  // re-test wiring this one already proves.
+  //
+  // (This comment used to say the scenario self-skips when the stub proposes no
+  // trashing edit. It does not, and has not since the stub was scripted — the
+  // paragraph below is the live rule. A stale claim of a self-skip is worse
+  // than none: it invites a reader to explain away an absent flag.)
+  it("leaves the removed note untouched until its own act is taken", async () => {
     let password = "";
     await scenario(
       "ag3-agent-trash-carveout",
@@ -209,15 +217,21 @@ aiDescribe("ag3 a trashing edit is not carried by the bulk approve", () => {
         // one control `0515` and `threat-model.md` §7 call structural. The stub
         // now emits a trashing edit for this task text, so an absent flag is a
         // failure and says which half broke.
-        const flags = await s.byTestIdAll("agentReview.trashFlag");
+        const flags = await s.byTestIdAll("agentReview.removalFlag");
         expect(
           flags.length,
           "the stub proposes a trashing edit for this task; if it stopped, the " +
             "carve-out is untested rather than passing",
         ).toBeGreaterThan(0);
 
-        // A trashing edit renders its own act rather than riding the bulk one.
-        expect((await s.byTestIdAll("agentReview.applyTrash")).length).toBe(flags.length);
+        // A removing edit renders its own act rather than riding the bulk one.
+        expect((await s.byTestIdAll("agentReview.applyRemoval")).length).toBe(flags.length);
+
+        // And the flag says WHICH removal. The label is per field now, so a row
+        // that rendered the generic string, or the wrong field's string, would
+        // be telling the user something false at the moment they decide. The
+        // stub's edit writes `trashed:`, so this is the Trash sentence.
+        expect(await flags[0].text()).toBe("Moves this note to Trash");
 
         // The bulk approve must not carry it. Approve everything, then assert the
         // note did NOT gain the marker: the state, not the label.

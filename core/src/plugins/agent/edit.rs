@@ -6,6 +6,15 @@
 //! Zero occurrences and more than one are separate named refusals, and neither
 //! is ever resolved by placing the replacement somewhere plausible.
 //!
+//! **"Occurs" counts OVERLAPPING occurrences.** `str::match_indices` does not:
+//! it resumes the search after each match, so `"aa"` occurs once in `"aaa"` by
+//! its count and twice by the rule this module states. That gap is a silent
+//! placement of an edit the format promises to refuse, which is the one failure
+//! class the anchored format exists to prevent, so the count is done by hand.
+//! Rare in practice (anchors are long spans copied out of a body) and the point
+//! is not the frequency: a rule with an exception nobody stated is not the rule.
+//! Found in review round five of myne-md/myne#531.
+//!
 //! **There is no fuzzy matching here and there must never be one.** Not a
 //! nearest-match fallback, not a whitespace-tolerant retry, not a "try again
 //! without the trailing newline". Every one of those looks like an ergonomics
@@ -55,14 +64,22 @@ pub fn place(body: &str, anchor: &str, replacement: &str) -> Result<String, Edit
         // one. Naming it is better than letting the count rule decide.
         return Err(EditRejection::AnchorEmpty);
     }
-    let mut it = body.match_indices(anchor);
-    let first = match it.next() {
-        Some((i, _)) => i,
-        None => return Err(EditRejection::AnchorNotFound),
-    };
-    if it.next().is_some() {
-        return Err(EditRejection::AnchorAmbiguous);
+    // Overlapping, by stepping one CHARACTER at a time rather than one match:
+    // see the module doc. `char_indices` rather than a byte walk so a resume
+    // point is always a char boundary and `find` cannot panic on a slice.
+    let mut found: Option<usize> = None;
+    for (at, _) in body.char_indices() {
+        if !body[at..].starts_with(anchor) {
+            continue;
+        }
+        if found.is_some() {
+            return Err(EditRejection::AnchorAmbiguous);
+        }
+        found = Some(at);
     }
+    let Some(first) = found else {
+        return Err(EditRejection::AnchorNotFound);
+    };
     let mut out = String::with_capacity(body.len() - anchor.len() + replacement.len());
     out.push_str(&body[..first]);
     out.push_str(replacement);
@@ -93,6 +110,39 @@ mod tests {
             place("a b a", "a", "X").unwrap_err(),
             EditRejection::AnchorAmbiguous
         );
+    }
+
+    /// The overlap case, which `str::match_indices` counts as one.
+    ///
+    /// `"aa"` occurs twice in `"aaa"` — at 0 and at 1 — so the exactly-once rule
+    /// refuses it. The shipped version counted one and placed the replacement at
+    /// the first position, which is the silent misapplication this format is the
+    /// whole answer to.
+    #[test]
+    fn an_overlapping_anchor_is_ambiguous_rather_than_placed_at_the_first_one() {
+        assert_eq!(
+            place("aaa", "aa", "X").unwrap_err(),
+            EditRejection::AnchorAmbiguous
+        );
+        assert_eq!(
+            place("abababa", "abab", "X").unwrap_err(),
+            EditRejection::AnchorAmbiguous
+        );
+        // And the non-overlapping neighbour still places, so the fix did not
+        // simply make every repeated character ambiguous.
+        assert_eq!(place("aa", "aa", "X").unwrap(), "X");
+        assert_eq!(place("a-aa-a", "aa", "X").unwrap(), "a-X-a");
+    }
+
+    /// Multi-byte input, because the walk is over char boundaries now.
+    #[test]
+    fn overlap_counting_holds_across_a_multi_byte_body() {
+        assert_eq!(place("üü", "üü", "X").unwrap(), "X");
+        assert_eq!(
+            place("üüü", "üü", "X").unwrap_err(),
+            EditRejection::AnchorAmbiguous
+        );
+        assert_eq!(place("añb", "ñ", "X").unwrap(), "aXb");
     }
 
     #[test]

@@ -64,14 +64,23 @@ pub enum EditRejection {
     /// nothing had been applied. Reporting the failed create as a refusal keeps
     /// the outcome, which is what the undo is built from.
     CreateFailed,
-    /// The edit would move a note to Trash, and it arrived inside a batch the
-    /// user approved in one action.
+    /// The edit would take a note OUT of the working set, and it arrived inside
+    /// a batch the user approved in one action.
     ///
-    /// Trashing is a `trashed:` frontmatter timestamp, so at the diff layer it
-    /// is indistinguishable from any other edit; this is the host refusing to
-    /// let one ride along inside an approve-all. The user can still apply it,
-    /// by approving it on its own.
-    TrashNeedsOwnAct,
+    /// Every removal in Myne is a frontmatter field — `trashed:`, `deleted:`,
+    /// `archived:`, `template:`, `conflict:` — so at the diff layer it is
+    /// indistinguishable from any other edit; this is the host refusing to let
+    /// one ride along inside an approve-all. The user can still apply it, by
+    /// approving it on its own. [`super::hide::edit_hides_note`] is the
+    /// predicate and carries the roster.
+    ///
+    /// **Named for the class, not for `trashed:`.** It was `TrashNeedsOwnAct`
+    /// and read only that one field, so a `deleted:` edit — which hides a note
+    /// from Trash as well as from the sidebar — passed the carve-out entirely
+    /// (myne-md/myne#531 review round five). A variant whose name says trash
+    /// also puts a sentence in front of the user that would be false for the
+    /// other four.
+    RemovalNeedsOwnAct,
 }
 
 /// The agent plugin's failure surface.

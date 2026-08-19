@@ -344,20 +344,41 @@ impl AgentRunState {
     /// just applied", and two competing offers is worse than one.
     ///
     /// But one run applies MORE THAN ONCE, and this feature forces it rather
-    /// than merely allowing it: [`super::apply::edit_trashes`] refuses a
-    /// trashing edit inside an [`Approval::Bulk`], so the user approves that
+    /// than merely allowing it: [`super::hide::edit_hides_note`] refuses a
+    /// removing edit inside an [`Approval::Bulk`], so the user approves that
     /// edit on its own and the same `run_id` arrives here a second time.
     /// Replacing then discarded the first apply's restore points while
     /// `AgentReview` still offered `Undo this run`, so the button reverted the
     /// trailing act and left everything before it standing, reporting success.
     /// Found in the review of myne-md/myne#531.
     ///
+    /// **The merge keeps the FIRST point per note and drops later ones**, and
+    /// that is the half the first fix got wrong. A run can apply twice to the
+    /// SAME note, and the second apply's snapshot is of the note as apply one
+    /// left it. Appending both put an intermediate state at the end of a list
+    /// `agent_undo` walks in order, so the undo restored the original and then
+    /// restored the intermediate ON TOP of it: the note ended up mid-run, the
+    /// first apply was not reverted, and `reverted` counted the note twice.
+    /// "Undo the run" means back to before the run, so the earliest point is
+    /// the only one that answers it. Found in review round five of the same PR,
+    /// against the fix for round four.
+    ///
     /// [`Approval::Bulk`]: super::apply::Approval::Bulk
     pub fn record_applied(&self, applied: AppliedRun) {
         let mut slot = self.applied.lock().expect("agent applied slot poisoned");
         match slot.as_mut() {
             Some(prev) if prev.run_id == applied.run_id => {
-                prev.restore_points.extend(applied.restore_points);
+                let known: BTreeSet<&str> = prev
+                    .restore_points
+                    .iter()
+                    .map(|(note_id, _)| note_id.as_str())
+                    .collect();
+                let fresh: Vec<(String, String)> = applied
+                    .restore_points
+                    .into_iter()
+                    .filter(|(note_id, _)| !known.contains(note_id.as_str()))
+                    .collect();
+                prev.restore_points.extend(fresh);
                 prev.notes_created += applied.notes_created;
             }
             _ => *slot = Some(applied),
@@ -604,7 +625,7 @@ mod tests {
 
     #[test]
     fn a_second_apply_of_the_same_run_adds_to_the_record_rather_than_replacing_it() {
-        // The trash carve-out FORCES this shape: `edit_trashes` refuses a
+        // The removal carve-out FORCES this shape: `edit_hides_note` refuses a
         // trashing edit inside a bulk approval, so the user approves it on its
         // own and the same run applies twice. Replacing lost the first apply's
         // restore points while the screen still offered "Undo this run", so the
@@ -632,6 +653,54 @@ mod tests {
         assert_eq!(
             rec.notes_created, 3,
             "created counts sum across the applies"
+        );
+    }
+
+    #[test]
+    fn a_second_apply_to_the_same_note_keeps_only_the_earliest_restore_point() {
+        // The direction the round-four fix did not test: its merge case used
+        // `note-a` and `note-b`, so nothing exercised two applies to ONE note,
+        // and `extend` with no dedup looked correct.
+        //
+        // Apply one snapshots the note as the run found it. Apply two snapshots
+        // it as apply one left it. `agent_undo` walks the list in order, so
+        // holding both means restoring the original and then restoring the
+        // INTERMEDIATE over it: the note ends up mid-run, apply one is not
+        // reverted, and `reverted` reports 2 for one note. "Undo the run" means
+        // back to before the run, which only the earliest point answers.
+        let s = AgentRunState::default();
+        s.record_applied(AppliedRun {
+            run_id: "r".into(),
+            restore_points: vec![("note-a".into(), "before-the-run".into())],
+            notes_created: 0,
+        });
+        s.record_applied(AppliedRun {
+            run_id: "r".into(),
+            // Same note, and a second note alongside it, so the test pins that
+            // dedup does not also swallow a genuinely new one.
+            restore_points: vec![
+                ("note-a".into(), "after-apply-one".into()),
+                ("note-b".into(), "before-the-run".into()),
+            ],
+            notes_created: 0,
+        });
+        let rec = s.take_applied("r").expect("the run is undoable");
+        assert_eq!(
+            rec.restore_points,
+            vec![
+                ("note-a".to_string(), "before-the-run".to_string()),
+                ("note-b".to_string(), "before-the-run".to_string())
+            ],
+            "one point per note, the earliest, and the new note still added"
+        );
+        assert_eq!(
+            rec.restore_points
+                .iter()
+                .filter(|(id, _)| id == "note-a")
+                .count(),
+            1,
+            "restoring note-a twice would leave it at the intermediate state and \
+             count it twice in `reverted`"
         );
     }
 
