@@ -69,7 +69,8 @@
       "egressLocal": "These notes go to a program running on this computer. They do not leave the device.",
       "reasonLabel": "It says:",
       "approve": "Allow",
-      "decline": "Not this time"
+      "decline": "Not this time",
+      "countsUnavailable": "The AI asked to also read {{folder}}. How many notes that adds could not be checked just now."
     },
     "review": {
       "title": "Review changes",
@@ -100,7 +101,8 @@
         "readFailed": "Could not be applied: that note could not be read.",
         "unsafeFrontmatter": "Not created: the proposed title or folder contains a line break.",
         "excludedFolder": "Not created: that folder is excluded from AI.",
-        "createFailed": "Not created: writing the new note failed. The other changes were still applied."
+        "createFailed": "Not created: writing the new note failed. The other changes were still applied.",
+        "excludedNow": "Could not be applied: that note's folder is now excluded from AI."
       },
       "applyFailed": "The changes could not be applied.",
       "undo": "Undo this run",

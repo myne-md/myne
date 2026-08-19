@@ -117,7 +117,11 @@ export type EditRejection =
   | "createFailed"
   /** The edit would trash a note and arrived inside a bulk approval. The user
    *  can still apply it by approving it on its own. */
-  | "trashNeedsOwnAct";
+  | "trashNeedsOwnAct"
+  /** The note's folder was excluded from AI while the run was open or the
+   *  review was pending. SYNC-14 carries no in-flight carve-out, so the newest
+   *  answer decides and the edit is refused rather than applied. */
+  | "excludedNow";
 
 export interface RefusedEdit {
   noteId: string;

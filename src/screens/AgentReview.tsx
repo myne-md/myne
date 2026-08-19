@@ -45,6 +45,7 @@ import {
   keptEdits,
   rejectAll,
   setUndoable,
+  landedEditIndices,
   settleApply,
   toggleEdit,
   toggleNewNote,
@@ -169,7 +170,10 @@ export function AgentReview({
         newNoteIndices,
         approval,
       );
-      settleApply(outcome, indices);
+      // The indices that actually LANDED, not the ones that were sent. The
+      // subtraction lives in `landedEditIndices` rather than here, because this
+      // is where it was missing and a call site is not testable.
+      settleApply(outcome, landedEditIndices(indices, outcome));
       // The host's list, not the one that was sent: an edit can be refused at
       // apply time, so the notes that actually changed are the ones to reload.
       const changed = [...outcome.notesWritten, ...outcome.notesCreated];

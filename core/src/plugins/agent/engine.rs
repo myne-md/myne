@@ -60,7 +60,7 @@ pub const AGENT_REQUEST_CLASS: AgentRequestClass = AgentRequestClass::UserInitia
 /// event payload without anyone deciding to put it there. Nothing about a
 /// request crosses IPC: what the user sees is the proposal, which has its own
 /// types.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Content {
     /// Written by the host. Tokenized normally.
     Trusted(String),
@@ -71,6 +71,29 @@ pub enum Content {
     /// `Zeroizing` because this is note plaintext and it lives for the length of
     /// a run.
     UntrustedNote(Zeroizing<String>),
+}
+
+/// Prints a SHAPE, never the text.
+///
+/// **The module doc one screen up argues this for `Serialize` and the argument
+/// is the same for `Debug`.** A derived `Debug` is how plaintext reaches a log
+/// line, a panic message or an `assert_eq!` diff without anyone deciding to put
+/// it there, and `Zeroizing`'s own `Debug` forwards to the inner `String`, so
+/// wrapping bought nothing here. Nothing logs these types today: this closes a
+/// trap rather than a leak, which is the cheapest moment to close one.
+///
+/// The arm name is kept because it is the security-relevant half — whether a
+/// span was trusted or note-derived is the thing a reader needs — and the length
+/// because a zero-length span is a real bug shape.
+impl std::fmt::Debug for Content {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Content::Trusted(t) => write!(f, "Trusted(<{} chars>)", t.chars().count()),
+            Content::UntrustedNote(t) => {
+                write!(f, "UntrustedNote(<{} chars>)", t.chars().count())
+            }
+        }
+    }
 }
 
 impl Content {
@@ -180,7 +203,22 @@ pub fn render_chatml(
 /// the machine. The design carries no volume bound on the remote arm, so the
 /// summary is the only place a user ever learns the size of what happened, and
 /// a summary that cannot say it is disclosure in name only.
-#[derive(Debug, Clone)]
+/// Prints a shape, for the reason [`Content`]'s `Debug` does: `reply` is model
+/// output derived from note plaintext, and a derived `Debug` puts it wherever a
+/// `{:?}` happens to be.
+impl std::fmt::Debug for AgentCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentCompletion")
+            .field(
+                "reply",
+                &format_args!("<{} chars>", self.reply.chars().count()),
+            )
+            .field("chars_off_device", &self.chars_off_device)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
 pub struct AgentCompletion {
     /// What the model said.
     pub reply: String,
