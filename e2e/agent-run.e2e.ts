@@ -26,8 +26,12 @@
 // pass against the old build too.
 //
 // The stub engine's script is fixed (`StubEngine::agent_script`): list, read,
-// propose one anchored edit, finish. It never requests a scope expansion, so ag5
-// self-skips loudly rather than asserting on a proposal it cannot cause.
+// propose one anchored edit, finish — and, for task text naming other folders,
+// a `request_scope` action, which is what ag5 drives. **No scenario here
+// self-skips.** Two comments in this file used to say ag5 did, contradicting a
+// third that said "NOT a self-skip", and the risk is concrete: the E2E floor was
+// raised on the arithmetic that all five execute, so a reader who trusted the
+// header would lower it to match (myne-md/myne#531 review round seven).
 //
 // ag3 is the one worth reading twice. Deletion in Myne is a `trashed:`
 // frontmatter timestamp, so at the diff layer it is indistinguishable from any
@@ -312,9 +316,11 @@ aiDescribe("ag4 undo after the review screen is closed", () => {
 aiDescribe("ag5 a model-requested scope expansion is approved by the user", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
   //
-  // Self-skips LOUDLY when the stub proposes no expansion, on the same rule as
-  // ag3: the engine's script is not this suite's to set, and failing on a
-  // proposal it cannot cause would report a harness fact as a product defect.
+  // NOT a self-skip, for the same reason as ag3. The stub returns a
+  // `request_scope` action for task text containing "other folders"
+  // (`local_inference/engine.rs`), and this scenario's task is "look in my other
+  // folders too", so a run that settles without pausing for approval is a
+  // product defect rather than a harness fact.
   it("shows the four facts and resumes the same run on approval", async () => {
     let password = "";
     await scenario(
