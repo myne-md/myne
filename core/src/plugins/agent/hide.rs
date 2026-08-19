@@ -101,6 +101,7 @@ pub fn edit_hides_note(before: &str, after: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     const TS: &str = "2026-08-16T10:00:00Z";
 
@@ -121,26 +122,96 @@ mod tests {
 
     // ---- the roster ----------------------------------------------------
 
-    /// The claim the module doc makes about where the roster comes from.
+    /// The TypeScript source of the authority this module derives its roster
+    /// from. Read rather than called, which is the only thing a Rust test can do
+    /// with a TS function and is enough to compare the two rosters.
+    const SELECTORS_TS: &str = include_str!("../../../../editor/src/host/notes/selectors.ts");
+
+    /// The frontmatter fields `isLiveNote` reads, parsed out of its body.
     ///
-    /// `isLiveNote` is TypeScript, so this cannot call it; what it CAN do is
-    /// fail when the two stop having the same arity, which is the event that
-    /// matters. The set-equality half is
-    /// `tests/lib/agentBulkApproval.test.ts::the marker roster`, which reads
-    /// both sides' source.
+    /// Panics rather than returning an empty set when the function cannot be
+    /// found: an empty set compares equal to an empty set, and the version of
+    /// this test that shipped was two tautologies for exactly that reason.
+    fn is_live_note_fields() -> BTreeSet<String> {
+        let start = SELECTORS_TS.find("export function isLiveNote(").expect(
+            "isLiveNote not found in editor/src/host/notes/selectors.ts. If it moved or was \
+                 renamed, this test has to follow it rather than be deleted: it is the only thing \
+                 holding the agent's removal roster to the authority the module doc names.",
+        );
+        let body = &SELECTORS_TS[start..];
+        let end = body
+            .find("\n}")
+            .expect("isLiveNote has no closing brace at column 0");
+        let body = &body[..end];
+
+        let mut fields = BTreeSet::new();
+        for (i, _) in body.match_indices("record.") {
+            let rest = &body[i + "record.".len()..];
+            let name: String = rest
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect();
+            if !name.is_empty() {
+                fields.insert(name);
+            }
+        }
+        fields
+    }
+
+    /// **The roster really is derived, and this is what says so.**
+    ///
+    /// The module doc above claims a field joining `isLiveNote` fails here
+    /// rather than silently becoming the sixth thing an approve-all can do, and
+    /// `design-notes/ai/0515` repeats that as the reason the roster is derived
+    /// instead of hand-picked. The version that shipped did not check it: it
+    /// asserted `markers("").len() == MARKER_LINES.len()` and then
+    /// `MARKER_LINES.len() == 5`, and BOTH sides are fixed at five by their own
+    /// types (`[bool; 5]` and `[(&str, &str); 5]`), so both assertions were
+    /// true by construction. Meanwhile the TypeScript twin compares the Rust
+    /// roster to `HIDING_MARKERS`, so the two rosters were held to each other
+    /// and neither to the authority. A roster compared against a second copy of
+    /// itself, which root `CLAUDE.md` names as a recurring failure here
+    /// (myne-md/myne#531 review round seven).
+    ///
+    /// Compared BOTH directions: a field added to `isLiveNote` and not here
+    /// fails, and a marker here that `isLiveNote` stopped reading fails too. The
+    /// second is the direction that would otherwise leave this module refusing
+    /// edits on a field that no longer takes a note out of the working set.
+    ///
+    /// The cross-language pair stays where it was
+    /// (`tests/lib/agentBulkApproval.test.ts::the marker roster`, which holds
+    /// `hide.rs` to `HIDING_MARKERS`). With this holding `selectors.ts` to
+    /// `hide.rs`, all three agree transitively and each test compares a real
+    /// pair rather than a copy.
     #[test]
     fn the_roster_matches_is_live_note() {
+        let authority = is_live_note_fields();
+        assert!(
+            authority.len() >= 5,
+            "parsed only {} field(s) out of isLiveNote: the parse has stopped \
+             describing the function, and an under-read set would make every \
+             comparison below vacuous. Parsed: {authority:?}",
+            authority.len()
+        );
+
+        let roster: BTreeSet<String> = MARKER_LINES
+            .iter()
+            .map(|(_, name)| (*name).to_string())
+            .collect();
+        assert_eq!(
+            roster, authority,
+            "the agent's removal roster and the fields isLiveNote reads have \
+             diverged. Add the value-strict reader, the `markers()` entry and the \
+             MARKER_LINES line in the same change as the selector, or take them \
+             out together."
+        );
+
+        // The local half, still worth its line: a marker in `markers()` with no
+        // test line would go unexercised by every test below.
         assert_eq!(
             markers("").len(),
             MARKER_LINES.len(),
             "every marker owes this file a test line"
-        );
-        assert_eq!(
-            MARKER_LINES.len(),
-            5,
-            "isLiveNote reads five fields (editor/src/host/notes/selectors.ts). \
-             If it now reads more, add the reader, the marker and the line here \
-             in the same change."
         );
     }
 
