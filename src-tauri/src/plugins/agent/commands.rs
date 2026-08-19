@@ -229,6 +229,14 @@ impl AgentSessionState {
             for note in &mut session.proposal.new_notes {
                 note.title.zeroize();
                 note.body.zeroize();
+                // The folder too. It is `Option<String>` rather than `String`,
+                // which is the whole reason it was missed: the two lines above
+                // are the shape the eye checks for. A proposed folder is a
+                // vault-structure string the model produced from note content,
+                // so it belongs with them.
+                if let Some(folder) = note.folder.as_mut() {
+                    folder.zeroize();
+                }
             }
             session.proposal.summary.zeroize();
         }
@@ -546,7 +554,18 @@ pub async fn agent_start<R: Runtime>(
         vault: vault.inner(),
         indices: indices.inner(),
     };
-    let run_id = uuid::Uuid::new_v4().to_string();
+    // **v7, not v4, and the eviction depends on it.** `AgentRunState::start`
+    // bounds the table by dropping `BTreeMap`'s first key, which it documents as
+    // the oldest run. That is only true for a time-ordered id: under v4 the
+    // first key is the lexically smallest RANDOM id, so at the cap the eviction
+    // cancelled an arbitrary run and the one the user was reviewing could go
+    // while an older idle one survived. Found in the review of myne-md/myne#531.
+    //
+    // A v7 carries a millisecond timestamp, and this one does not leave the
+    // device: the run id is RAM-only, never persisted, and never reaches the
+    // model (nothing in `prompt.rs` or `engine.rs` reads it), so it does not
+    // widen what crosses TB13.
+    let run_id = myne_core::plugins::agent::run::new_run_id();
     let (resolved, cancel) = start_run(&runs, run_id.clone(), &grant, &source).await?;
     sessions
         .sessions
@@ -793,6 +812,7 @@ pub async fn agent_undo<R: Runtime>(
     let mut reverted = 0usize;
     let mut failed = Vec::new();
     for (note_id, snapshot_id) in record.restore_points {
+        let snapshot_id_for_retry = snapshot_id.clone();
         match snapshot_restore_from_host(
             &host,
             vault.inner(),
@@ -804,9 +824,28 @@ pub async fn agent_undo<R: Runtime>(
         .await
         {
             Ok(()) => reverted += 1,
-            Err(_) => failed.push(note_id),
+            Err(_) => failed.push((note_id, snapshot_id_for_retry)),
         }
     }
+    // **Put the FAILED points back, so the undo can be retried.**
+    // `take_applied` consumes deliberately: a second undo of the same record
+    // would restore the same snapshots over whatever the user has written since,
+    // which would look successful. That reasoning covers the notes that WERE
+    // restored and not the ones that were not. Those were never touched, so a
+    // retry cannot overwrite anything, and consuming the whole record made a
+    // partial failure permanent. Found in the review of myne-md/myne#531.
+    //
+    // `notes_created` is not carried back: those notes are still there, an undo
+    // never reverted them, and re-reporting the count on a retry would say the
+    // second attempt left them behind as if that were news.
+    if !failed.is_empty() {
+        runs.record_applied(AppliedRun {
+            run_id: run_id.clone(),
+            restore_points: failed.clone(),
+            notes_created: 0,
+        });
+    }
+    let failed: Vec<String> = failed.into_iter().map(|(id, _)| id).collect();
     Ok(AgentUndoResult {
         reverted,
         failed,

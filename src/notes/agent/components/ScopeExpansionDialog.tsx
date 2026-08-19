@@ -33,12 +33,19 @@ export type ProviderArm = "none" | "local" | "remote";
 export interface ScopeExpansionDialogProps {
   /** The folder the model asked for. */
   folder: string;
-  /** How many notes that folder holds, already clamped. */
-  noteCount: number;
-  /** How many of its notes the AI-excluded-folders control removed. */
-  excludedCount: number;
-  /** The run's scope total if this grant is approved. */
-  newTotal: number;
+  /** How many notes that folder holds, already clamped. `null` when the
+   *  preview call FAILED.
+   *
+   *  Nullable rather than defaulted to zero, because the two mean opposite
+   *  things to someone deciding: zero says "this grant adds nothing", and null
+   *  says "we could not find out". The dialog renders the difference. */
+  noteCount: number | null;
+  /** How many of its notes the AI-excluded-folders control removed. `null` when
+   *  the preview failed; see {@link noteCount}. */
+  excludedCount: number | null;
+  /** The run's scope total if this grant is approved. `null` when the preview
+   *  failed; see {@link noteCount}. */
+  newTotal: number | null;
   /** The model's stated reason. Untrusted: rendered as its claim. */
   reason: string;
   /** Which arm is serving. Decides the egress line. */
@@ -92,30 +99,48 @@ export function ScopeExpansionDialog({
       </h2>
 
       {/* Fact 1: read AND change, in those words. */}
-      <p
-        data-testid="agentScope.grant"
-        style={{ margin: 0, color: "var(--fg-1)" }}
-      >
-        {t("agent.scope.grant", { folder, count: noteCount })}
-      </p>
+      {/* The counts, or the fact that they could not be fetched. The dialog is
+          rendered EITHER way: it used to be gated on a successful preview, so a
+          failed one hid the whole thing and took the decline button with it,
+          leaving a run waiting on an answer the user had no way to give. An
+          approval asked without its numbers is a worse offer than one with them,
+          and it is a far better outcome than no offer at all. */}
+      {noteCount === null || newTotal === null || excludedCount === null ? (
+        <p
+          data-testid="agentScope.countsUnavailable"
+          style={{ margin: 0, color: "var(--fg-1)" }}
+        >
+          {t("agent.scope.countsUnavailable", { folder })}
+        </p>
+      ) : (
+        <>
+          <p
+            data-testid="agentScope.grant"
+            style={{ margin: 0, color: "var(--fg-1)" }}
+          >
+            {t("agent.scope.grant", { folder, count: noteCount })}
+          </p>
 
-      {/* Fact 3: the running total the accumulation hazard needs. */}
-      <p
-        data-testid="agentScope.total"
-        style={{ margin: 0, color: "var(--fg-2)" }}
-      >
-        {t("agent.scope.newTotal", { count: newTotal })}
-      </p>
+          {/* Fact 3: the running total the accumulation hazard needs. */}
+          <p
+            data-testid="agentScope.total"
+            style={{ margin: 0, color: "var(--fg-2)" }}
+          >
+            {t("agent.scope.newTotal", { count: newTotal })}
+          </p>
 
-      {/* Fact 2's other half: what the content control removed, stated rather
-          than silently dropped. Shown even at zero, so an absent line never has
-          to be read as "no exclusions" versus "we did not check". */}
-      <p
-        data-testid="agentScope.excluded"
-        style={{ margin: 0, color: "var(--fg-2)" }}
-      >
-        {t("agent.scope.excluded", { count: excludedCount })}
-      </p>
+          {/* Fact 2's other half: what the content control removed, stated
+              rather than silently dropped. Shown even at zero, so an absent line
+              never has to be read as "no exclusions" versus "we did not
+              check". */}
+          <p
+            data-testid="agentScope.excluded"
+            style={{ margin: 0, color: "var(--fg-2)" }}
+          >
+            {t("agent.scope.excluded", { count: excludedCount })}
+          </p>
+        </>
+      )}
 
       {/* Fact 4, remote arm only. */}
       {arm === "remote" ? (

@@ -203,6 +203,29 @@ export function keptEdits(s: AgentState = state): ProposedEdit[] {
   );
 }
 
+/** Which of the SENT edit indices actually landed.
+ *
+ *  **The subtraction, as a function, because the bug was at the call site and a
+ *  call site is not testable.** `AgentReview` used to hand `settleApply` the
+ *  indices it had SENT, so an edit the host refused at apply time (a moved
+ *  anchor, a folder excluded while the review was open) was marked applied. That
+ *  is worse than a cosmetic mislabel: `keptEdits` filters `appliedEdits` out, so
+ *  the refused edit left the actionable list and the user could no longer
+ *  re-approve it. Found in the review of myne-md/myne#531.
+ *
+ *  `apply.rs` defines a refusal's `index` as its position in the APPROVED list,
+ *  which is exactly what `sent` is, so this maps by position rather than by
+ *  content. Refused NEW NOTES are not subtracted here: they are indexed against
+ *  the proposal's new-note list, a different space, and `appliedEdits` does not
+ *  track them. */
+export function landedEditIndices(
+  sent: number[],
+  outcome: Pick<AgentApplyResult, "refused">,
+): number[] {
+  const refused = new Set(outcome.refused.map((r) => sent[r.index]));
+  return sent.filter((i) => !refused.has(i));
+}
+
 /** An apply finished.
  *
  *  `applied` accumulates rather than replaces: a second apply that overwrote the

@@ -145,12 +145,15 @@ export function AgentProgress() {
 
   return (
     <>
-      {awaiting !== null && runId !== null && preview !== null ? (
+      {/* NOT gated on `preview`. The preview is a nicety; the dialog is the only
+          way to answer a run that is waiting, and gating on a successful fetch
+          meant a failed one hid the decline button too. */}
+      {awaiting !== null && runId !== null ? (
         <ScopeExpansionDialog
           folder={awaiting.folder}
-          noteCount={preview.noteCount}
-          excludedCount={preview.excludedCount}
-          newTotal={preview.newTotal}
+          noteCount={preview?.noteCount ?? null}
+          excludedCount={preview?.excludedCount ?? null}
+          newTotal={preview?.newTotal ?? null}
           reason={awaiting.reason}
           arm={arm.arm}
           providerName={arm.providerName}

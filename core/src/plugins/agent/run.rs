@@ -97,6 +97,24 @@ pub struct AppliedRun {
     pub notes_created: usize,
 }
 
+/// Mint a run id.
+///
+/// **Here rather than at the command boundary, because [`AgentRunState::start`]
+/// DEPENDS on the choice.** That function bounds the table by evicting
+/// `BTreeMap`'s first key and calls it the oldest run, which is only true for a
+/// time-ordered id. The desktop host used to mint its own with `Uuid::new_v4()`,
+/// so the first key was the lexically smallest RANDOM id and the eviction
+/// cancelled an arbitrary run: the one the user was reviewing could go while an
+/// older idle one survived. The requirement lived in a comment in this file and
+/// the implementation lived in another crate, which is how they drifted.
+///
+/// A v7 carries a millisecond timestamp. That is not a disclosure here: the run
+/// id is RAM-only, never persisted, and never reaches the model, so it does not
+/// widen what crosses TB13.
+pub fn new_run_id() -> String {
+    uuid::Uuid::now_v7().to_string()
+}
+
 /// How many runs one unlocked session may hold at once.
 ///
 /// Small on purpose: a run is a thing the user started and is reviewing, and
@@ -138,8 +156,10 @@ impl AgentRunState {
         // cap a long unlocked session accumulates every run's frozen scope. The
         // oldest goes first and is CANCELLED on the way out, so anything still
         // holding its flag stops rather than running against a table it has
-        // fallen out of. `BTreeMap` is ordered by run id, and ids are UUIDv7,
-        // so the first key is the oldest run.
+        // fallen out of. `BTreeMap` is ordered by run id, and [`new_run_id`]
+        // mints UUIDv7, so the first key is the oldest run. That helper is in
+        // this file precisely so the property this loop rests on cannot be
+        // chosen elsewhere.
         while runs.len() >= MAX_LIVE_RUNS {
             let Some(oldest) = runs.keys().next().cloned() else {
                 break;
@@ -318,11 +338,30 @@ impl AgentRunState {
 
     /// Record what an apply wrote, under the run that wrote it.
     ///
-    /// Replaces whatever was there. A second run's apply supersedes the first:
-    /// the offer the surface makes is "undo the run you just applied", and two
-    /// competing offers is worse than one.
+    /// **MERGES within a run, REPLACES across runs, and the replace branch is
+    /// the one that looks like the whole rule.** A second run's apply does
+    /// supersede the first: the offer the surface makes is "undo the run you
+    /// just applied", and two competing offers is worse than one.
+    ///
+    /// But one run applies MORE THAN ONCE, and this feature forces it rather
+    /// than merely allowing it: [`super::apply::edit_trashes`] refuses a
+    /// trashing edit inside an [`Approval::Bulk`], so the user approves that
+    /// edit on its own and the same `run_id` arrives here a second time.
+    /// Replacing then discarded the first apply's restore points while
+    /// `AgentReview` still offered `Undo this run`, so the button reverted the
+    /// trailing act and left everything before it standing, reporting success.
+    /// Found in the review of myne-md/myne#531.
+    ///
+    /// [`Approval::Bulk`]: super::apply::Approval::Bulk
     pub fn record_applied(&self, applied: AppliedRun) {
-        *self.applied.lock().expect("agent applied slot poisoned") = Some(applied);
+        let mut slot = self.applied.lock().expect("agent applied slot poisoned");
+        match slot.as_mut() {
+            Some(prev) if prev.run_id == applied.run_id => {
+                prev.restore_points.extend(applied.restore_points);
+                prev.notes_created += applied.notes_created;
+            }
+            _ => *slot = Some(applied),
+        }
     }
 
     /// The most recently applied run, if one is still undoable.
@@ -505,15 +544,28 @@ mod tests {
     fn the_run_table_is_bounded_and_evicts_the_oldest() {
         // A finished run outlives its loop on purpose, and only a vault lock
         // clears the table, so without a cap a long unlocked session keeps every
-        // run's frozen scope. Ids are UUIDv7 in production; ordered ids here.
+        // run's frozen scope.
+        //
+        // **Driven through `new_run_id`, the same generator production uses.**
+        // This test used to mint `run-000`, `run-001`, … and say "ids are UUIDv7
+        // in production; ordered ids here" — which is a test asserting the
+        // property it supplies itself. It passed for the whole time the host was
+        // minting v4, and the eviction was picking an arbitrary run.
         let s = AgentRunState::default();
         let mut flags = Vec::new();
-        for i in 0..(MAX_LIVE_RUNS + 2) {
-            flags.push((
-                format!("run-{i:03}"),
-                s.start(format!("run-{i:03}"), ids(&["a"])),
-            ));
+        for _ in 0..(MAX_LIVE_RUNS + 2) {
+            let id = new_run_id();
+            flags.push((id.clone(), s.start(id, ids(&["a"]))));
+            // v7's ordering is millisecond-resolution, and this loop is faster
+            // than that. Two ids minted inside one millisecond order by their
+            // random tail, which is not the property under test.
+            std::thread::sleep(std::time::Duration::from_millis(2));
         }
+        assert!(
+            flags.windows(2).all(|w| w[0].0 < w[1].0),
+            "the generator must produce ascending ids, or the eviction below is \
+             testing string order rather than age"
+        );
         assert_eq!(s.len(), MAX_LIVE_RUNS);
         // The evicted ones are CANCELLED on the way out, so anything still
         // holding a flag stops rather than running against a table it has
@@ -523,7 +575,7 @@ mod tests {
             "the oldest run's flag must be set when it is evicted"
         );
         assert!(matches!(
-            s.is_writable("run-000"),
+            s.is_writable(&flags[0].0),
             Err(AgentError::NoSuchRun)
         ));
         assert!(s.is_writable(&flags[MAX_LIVE_RUNS + 1].0).is_ok());
@@ -548,6 +600,60 @@ mod tests {
         s.record_applied(applied("r"));
         s.end("r");
         assert_eq!(s.last_applied(), Some(applied("r")));
+    }
+
+    #[test]
+    fn a_second_apply_of_the_same_run_adds_to_the_record_rather_than_replacing_it() {
+        // The trash carve-out FORCES this shape: `edit_trashes` refuses a
+        // trashing edit inside a bulk approval, so the user approves it on its
+        // own and the same run applies twice. Replacing lost the first apply's
+        // restore points while the screen still offered "Undo this run", so the
+        // button reverted the trailing act and reported success.
+        let s = AgentRunState::default();
+        s.record_applied(AppliedRun {
+            run_id: "r".into(),
+            restore_points: vec![("note-a".into(), "snap-1".into())],
+            notes_created: 1,
+        });
+        s.record_applied(AppliedRun {
+            run_id: "r".into(),
+            restore_points: vec![("note-b".into(), "snap-2".into())],
+            notes_created: 2,
+        });
+        let rec = s.take_applied("r").expect("the run is undoable");
+        assert_eq!(
+            rec.restore_points,
+            vec![
+                ("note-a".to_string(), "snap-1".to_string()),
+                ("note-b".to_string(), "snap-2".to_string())
+            ],
+            "an undo of this run has to reach BOTH applies, in the order they happened"
+        );
+        assert_eq!(
+            rec.notes_created, 3,
+            "created counts sum across the applies"
+        );
+    }
+
+    #[test]
+    fn a_different_run_still_supersedes_the_record() {
+        // The other direction, and it is the one the merge could have broken:
+        // the surface offers "undo the run you just applied", so a second RUN
+        // must replace rather than accumulate. Without this, the merge above
+        // would happily grow one record across unrelated runs and an undo would
+        // revert work the user never asked it to touch.
+        let s = AgentRunState::default();
+        s.record_applied(applied("r1"));
+        s.record_applied(applied("r2"));
+        assert!(matches!(s.take_applied("r1"), Err(AgentError::NoSuchRun)));
+        let rec = s
+            .take_applied("r2")
+            .expect("the newest run is the undoable one");
+        assert_eq!(
+            rec.restore_points.len(),
+            1,
+            "r1's points must not have come along"
+        );
     }
 
     #[test]
