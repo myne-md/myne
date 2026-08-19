@@ -28,9 +28,60 @@ Three files at the repo root carry the visual + strategic system. Read in this o
 
 Every Claude Code session in this repo loads `.claude/skills/adhd/SKILL.md` at start, injected by the checked-in SessionStart hook `.claude/hooks/adhd.mjs --session`, together with `.claude/skills/diverge/SKILL.md`, and the same file in `--turn` mode, wired as a UserPromptSubmit hook, re-injects a compact restatement of both on **every** turn (all wired in `.claude/settings.json`). The pair is deliberate: `adhd` shapes how an answer is written, `diverge` shapes how it is arrived at, and the first without the second yields well-shaped first drafts of the obvious answer. The second layer exists because the first decays: in a long session the start-of-session injection sits further back, survives compaction only as a summary, and the shape quietly stops being applied without anything reporting it. It shapes *how* answers are written — action first, numbered steps, state restated each turn, no preamble/recap/closers — and never what they are allowed to claim: security, crypto, spec and data-loss content is exempt from every brevity rule, and each artefact-producing skill (`/grill-me`, `/pr-review`, `/summarize`, …) keeps its own format. Read the skill for the full list of where the shape yields.
 
+**The turn injection carries a third block that is not about shape**, `WORK DISCIPLINE`: when the turn changed a repository, it names the tail (`/simplify`, `/pr-review`, `/done`) from the lane in "How work runs here" below. It is a separate block rather than a clause inside a shape rule, and it rides in the hook rather than in prose because the hook is re-injected at the submit of **every** turn, so it is in context for the turn that makes the change and is still there when that turn writes its closing line. Prose in this file is read once at session start and sits further back with every turn after it. The measurement behind that placement is in `.claude/hooks/adhd.mjs`.
+
 On by default and per-clone opt-out: `touch .claude/.adhd-off` (gitignored), `MYNE_ADHD_OFF=1` for one invocation, or "stop adhd mode" mid-session. The hook is a no-op when `CI` is set, so the unattended lanes — Woodpecker, the runner jail, the issue-triage and PR-review bots — keep their fixed-format English output.
 
+## How work runs here (pointer)
+
+**Every change to a repository runs on the same lane, whatever the request looked like.** A session
+that started from `/grill-me` and a session that started from a one-line "fix this" owe the identical
+five things. This section exists because the rules behind them live in `myne-agents/reference/`, and
+those files are read only through a skill's standing-obligations block: a session that invokes no
+skill reads none of them, which is exactly the session that then skips them. This file is loaded for
+every session in this tree, so the lane is stated here and the mechanics stay there.
+
+1. **No issue, no work.** Work that changes a repository binds to a tracked issue
+   (`issue: myne-md/<repo>#<n>`), and when none exists the first action is to file one through the
+   `issue-pm` subagent. The only exception is the user saying "no issue for this" in so many words:
+   silence is not it, and neither is "this is tiny". Reading, explaining, reviewing, researching and
+   answering a question are outside the gate, since none of them change anything. Move the issue to
+   `status: in progress` through `issue-pm` when you start: on this lane nothing else will, because
+   that transition belongs to `/do-work` and this lane skips it, so the issue would jump from
+   `triage` straight to `ready to test` and no second session would ever see it as taken.
+   `myne-agents/reference/github-issues.md`.
+2. **A session that changes a repository works in a worktree of it, never in the shared checkout.**
+   The section below is that rule in full, including where a worktree lives and what it branches from.
+3. **The planning front-half is sized, the tail is not.** Work that is large, contested or unclear
+   goes `/grill-me` then `/write-a-prd` then `/prd-to-tasks` then `/do-work`, which produces the
+   artefacts under `myne-agents/features/<feat>/`. Work that is small and already understood skips
+   those four and is implemented directly. **Size is measured in consequence, not in lines**: a
+   change touching cryptography, the on-disk format, sync, a capability ACL, an egress allowlist, or
+   any guarantee `docs/threat-model.md` states is never small, however short the diff, because the
+   threat model changes in the same PR and a design step is the only place that ordering can be
+   enforced. And skipping the front half discharges none of the standing obligations: a protocol
+   change still ships with its `myne-test-vectors` change, a user-facing change with its
+   `myne-website` user-guide PR (`myne-agents/reference/github-issues.md`).
+4. **The tail is `/simplify`, then `/pr-review`, then `/done`.** `/done` is the only committer and
+   the only PR-opener, in every repo the work touched. A branch with commits on it and no PR is
+   unfinished work, not finished work, and so is a clean checklist. `/pr-review` and `/done` both run
+   against a plain branch with no feature directory, so ad-hoc work owes the same tail.
+5. **Something coupled to the work in hand is fixed in the branch you are already in**, not filed as
+   a new issue, and coupling decides that rather than size. Work that turns out to be genuinely
+   distinct is the user's call: ask once, and never file without their answer. Two things always
+   leave the branch instead, a legal or policy requirement (a `myne-ops` issue, and change nothing)
+   and a decision the user owns, such as the threat model, the on-disk format, an anti-feature or a
+   spec reversal (stop and ask). The full table, including what an unattended run does with a
+   distinct discovery, is in `myne-agents/reference/github-issues.md`, "A discovery is implemented,
+   not filed".
+
 ## Worktrees (pointer)
+
+**Every session that changes this repository works in a worktree of it, unless the user says
+otherwise.** Not the shared checkout, not "just this one file". That checkout's branch belongs to
+every session sitting in the directory, so switching it puts their next commit on your branch, and
+committing from it lands your work on whatever branch the last session left it on. The shared
+checkout stays on the default branch and is for reading.
 
 A worktree for this repo is created **only** with `EnterWorktree`, or with `git worktree add` into
 `.claude/worktrees/<name>`, and never anywhere else. It branches from **`origin/develop`**, always:
