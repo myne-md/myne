@@ -193,6 +193,7 @@ pub async fn unlock_from_host(
         // stashed HTML payload — vault A's plaintext projection must not
         // survive the switch into vault B's session.
         hooks.pdf_export_teardown_on_lock();
+        hooks.agent_teardown_on_lock();
         hooks.zeroize_vault_indices();
         hooks.zeroize_attachment_refs();
         // MYND-259: abort any in-progress voice recording so the mic + RAM
@@ -1096,6 +1097,7 @@ pub async fn lock_from_host(
     // the same lock path — locking means locked for every plaintext surface,
     // not just "main".
     hooks.pdf_export_teardown_on_lock();
+    hooks.agent_teardown_on_lock();
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
@@ -2169,6 +2171,7 @@ mod tests {
                     "zeroize_spell",
                     "clear_staged_descriptor",
                     "pdf_export_teardown_on_lock",
+                    "agent_teardown_on_lock",
                     "zeroize_vault_indices",
                     "zeroize_attachment_refs",
                     "abort_active_recording",

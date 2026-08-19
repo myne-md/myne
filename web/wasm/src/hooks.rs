@@ -200,6 +200,7 @@ impl VaultLifecycleHooks for WebHooks {
     /// obstacle is the OUTPUT format, not the destination, and `pdf-export` is
     /// `Class::Unsupported` (task 48).
     fn pdf_export_teardown_on_lock(&self) {}
+    fn agent_teardown_on_lock(&self) {}
 
     /// **Implemented (task 65).** The staged descriptor is the WORKSPACE one —
     /// the pane tree the frontend mirrors into RAM on every layout change — and

@@ -20,14 +20,16 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickByTestId,
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
+  seedEmbedIntoNote,
   unlockToEditor,
-  waitForSaved,
+  waitForInlineImage,
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
-import { testIdSelector, type Session } from "./support/webdriver";
+import { type Session } from "./support/webdriver";
 
 const FILENAME = "diagram.png";
 const IPC_TIMEOUT = 60_000;
@@ -49,19 +51,6 @@ async function importImage(s: Session): Promise<string> {
   return (r.ok as { id: string }).id;
 }
 
-async function typeRaw(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement('[data-testid="editor.content"] .cm-content');
-  await content.click();
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      return (await content.textContent()).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  await content.sendKeys(String.fromCharCode(0xe003)); // Backspace — drop the probe
-  await content.sendKeys(text);
-}
 
 /** The lightbox zoom percentage as a number (reads "NN%"). */
 async function zoomPercent(s: Session): Promise<number> {
@@ -93,24 +82,29 @@ describeE2E("za1 attachment image lightbox zoom/pan (MYND-594)", () => {
 
         const attachmentId = await importImage(s);
         await createNote(s, "Diagram note");
-        await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
-        await waitForSaved(s);
+        // No `waitForSaved` after this: the write went through `note_update`,
+        // not through the editor, so the autosave badge never leaves its
+        // pre-edit state and the wait burns its whole budget before failing.
+        // The IPC call is already durable when it returns.
+        await seedEmbedIntoNote(s, `![[att:${attachmentId}|${FILENAME}]]`);
 
         // Wait until the inline chip's image has decoded + is displayed, then
         // click it to open the lightbox.
+        await waitForInlineImage(s, attachmentId);
+        // Re-click until the lightbox is up rather than clicking once and
+        // waiting: a wait with nothing to re-fire spends its whole budget and
+        // reports a timeout that reads like a dead surface. `clickByTestId`
+        // hit-tests and scrolls the control into its own container first, which
+        // a raw `.click()` does not, and `eo1` failed exactly this way on the
+        // same widget until it was given this shape.
         await s.waitUntil(
-          async () =>
-            (await s.execute<boolean>(
-              `const i = document.querySelector('[data-testid="attachment-image"]'); return !!i && i.offsetWidth > 0;`,
-            ))
-              ? true
-              : null,
-          { label: "inline image decoded", timeoutMs: 20_000 },
+          async () => {
+            if ((await s.byTestIdAll("attachment-lightbox.image")).length > 0) return true;
+            await clickByTestId(s, "attachment-image", { timeoutMs: 10_000 });
+            return (await s.byTestIdAll("attachment-lightbox.image")).length > 0 ? true : null;
+          },
+          { label: "the attachment lightbox is open", timeoutMs: 30_000 },
         );
-        await (await s.byTestId("attachment-image")).click();
-
-        // The lightbox is open with its image + zoom controls.
-        await s.waitForElement(testIdSelector("attachment-lightbox.image"));
         await s.byTestId("attachment-lightbox.zoom-in");
         // The controller initialises to fit on load — wait for a real percentage.
         await s.waitUntil(

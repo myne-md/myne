@@ -132,6 +132,35 @@ pre-commit:
       # list may shrink, never grow.
       run: node scripts/check-unwired.mjs
 
+    ipc-binding-callers:
+      # myne#529: the layer above `unwired`. A module can have production
+      # importers for its other exports while one IPC binding inside it has no
+      # caller at all, and then the whole feature behind that command ships
+      # inert with its ACL row, its Rust core and its tests all in place. The
+      # agent's edit-format probe gate shipped exactly that way: two module docs
+      # named it as the reason the anchored format may refuse a near-miss, and
+      # nothing called it. A RATCHET with reason-carrying exemptions.
+      run: node scripts/check-ipc-binding-callers.mjs
+
+    playwright-image:
+      # myne#529: the CI Playwright image tag against the version the lockfile
+      # resolves. A tag one minor behind is not a stale toolchain: the image
+      # bakes browsers at a revision the installed Playwright does not ask for,
+      # so every test dies in `browserType.launch` before its first assertion.
+      # It shipped that way and took the whole `mobile-flow-logic` lane with it,
+      # 179 tests across 44 files, red on develop and on every branch. Same
+      # two-halves-pinned-by-hand shape as `e2e-toolchain` below.
+      run: node scripts/check-playwright-image.mjs
+
+    frontend-lock-teardown:
+      # myne#529: the WebView half of `check-lock-teardown.mjs`, which held only
+      # the Rust side. A module-scope store outlives every unmount, and neither
+      # a lock nor a vault switch reloads the page, so a leaving path that skips
+      # one clear leaves that store resident into the NEXT vault's session. The
+      # agent's proposal, which holds note text copied verbatim, survived a
+      # vault switch exactly this way while a decision entry said it could not.
+      run: node scripts/check-frontend-lock-teardown.mjs
+
     mobile-export-backup:
       # myne#491: the mobile client writes plaintext into a device-visible
       # directory in four places (recovery phrase, vault markdown tree, note
@@ -594,6 +623,27 @@ pre-push:
       env:
         CARGO_TARGET_DIR: target/pre-push
       run: cargo test -p myne-web-wasm
+
+    desktop-ai-free:
+      # The AI-free auditable variant, which NOTHING here compiled until
+      # myne-md/myne#529 shipped a desktop crate that did not build in it.
+      #
+      # `--no-default-features` drops candle and every AI plugin, and it is the
+      # build `design-notes/ai/0337` and `threat-model.md` describe as the one
+      # that "never compiles the AI path" -- the variant an auditor or a
+      # self-hoster builds to check that claim. Every gate above builds the
+      # DEFAULT features, so a module that reaches into `local_inference`
+      # without a `#[cfg]` compiles perfectly for a developer and for
+      # `cargo test --workspace`, and fails only in CI's `tauri-compile`.
+      #
+      # That is exactly what happened: four consecutive pipelines went red on
+      # this one command while every local gate stayed green, and the failure
+      # was invisible from the PR because the bot's CI comment cannot name a
+      # step. `check`, not `build`: no link, ~10s warm, and a compile error is
+      # the whole failure mode.
+      env:
+        CARGO_TARGET_DIR: target/pre-push
+      run: cargo check -p myne-desktop --no-default-features
 
     cargo-test:
       env:

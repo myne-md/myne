@@ -29,6 +29,7 @@
 // button relies on). So a switch never silently drops an edit and never
 // needs a "you have unsaved changes" prompt.
 
+import { clearAgentForLock } from "../notes/agent/agentStore";
 import { resetSessionIgnored } from "../editor/decorations/spell";
 import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
 import type { Action, VaultId } from "./stage";
@@ -99,6 +100,14 @@ export async function leaveActiveVault(deps: {
   // "ignore this session" words from the prior vault don't suppress squiggles in
   // the target vault.
   resetSessionIgnored();
+  // And the agent run's frontend state, for the stronger version of the same
+  // reason. `proposal.edits` holds anchors and replacements copied VERBATIM out
+  // of the previous vault's note bodies, the store is module scope, and this
+  // path does not reload the WebView, so without this they stay resident into
+  // the next vault's session. The host drops its half through
+  // `teardown_on_lock` on the `lockVault()` above; this is the WebView half,
+  // and `decisions/ai/0515` rests its "nothing survives a lock" claim on both.
+  clearAgentForLock();
 }
 
 /**

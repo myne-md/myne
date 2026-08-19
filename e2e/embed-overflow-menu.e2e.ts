@@ -39,11 +39,13 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickByTestId,
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
+  seedEmbedIntoNote,
   unlockToEditor,
-  waitForSaved,
+  waitForInlineImage,
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -69,19 +71,6 @@ async function importImage(s: Session): Promise<string> {
   return (r.ok as { id: string }).id;
 }
 
-async function typeRaw(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement('[data-testid="editor.content"] .cm-content');
-  await content.click();
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      return (await content.textContent()).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  await content.sendKeys(String.fromCharCode(0xe003)); // Backspace: drop the probe
-  await content.sendKeys(text);
-}
 
 /** The embed frame's inline width, which the layout segment drives. */
 async function frameWidth(s: Session): Promise<string> {
@@ -103,8 +92,21 @@ async function frameAligned(s: Session, align: string): Promise<boolean> {
 
 /** Open the embed's overflow menu and wait for the body-mounted list. */
 async function openEmbedMenu(s: Session): Promise<void> {
-  await (await s.byTestId("attachment-image.menu-button")).click();
-  await s.waitForElement(testIdSelector("attachment-image.menu"));
+  // Re-click until the menu is actually up, the same shape `clickNewMenuItem`
+  // uses and for the same recorded reason: a wait with nothing to re-fire spends
+  // its whole budget and reports a timeout that reads like a dead surface. Here
+  // it read as `attachment-image.menu` never existing while its button was
+  // clicked, which is a click that missed rather than a menu that never renders.
+  // `clickByTestId` hit-tests and scrolls the control into its own container
+  // first, which a raw `.click()` does not.
+  await s.waitUntil(
+    async () => {
+      if ((await s.byTestIdAll("attachment-image.menu")).length > 0) return true;
+      await clickByTestId(s, "attachment-image.menu-button", { timeoutMs: 10_000 });
+      return (await s.byTestIdAll("attachment-image.menu")).length > 0 ? true : null;
+    },
+    { label: "the embed overflow menu is open", timeoutMs: 30_000 },
+  );
 }
 
 /** The embed's accessible name, which tracks the catalog filename.
@@ -136,20 +138,15 @@ describeE2E("eo1 embed overflow menu on an image embed (myne#409)", () => {
 
         const attachmentId = await importImage(s);
         await createNote(s, "Diagram note");
-        await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
-        await waitForSaved(s);
+        // No `waitForSaved` after this: the write went through `note_update`,
+        // not through the editor, so the autosave badge never leaves its
+        // pre-edit state and the wait burns its whole budget before failing.
+        // The IPC call is already durable when it returns.
+        await seedEmbedIntoNote(s, `![[att:${attachmentId}|${FILENAME}]]`);
 
         // Wait until the inline image has decoded, so the widget is rendering
         // against real bytes rather than its error fallback.
-        await s.waitUntil(
-          async () =>
-            (await s.execute<boolean>(
-              `const i = document.querySelector('[data-testid="attachment-image"]'); return !!i && i.offsetWidth > 0;`,
-            ))
-              ? true
-              : null,
-          { label: "inline image decoded", timeoutMs: 20_000 },
-        );
+        await waitForInlineImage(s, attachmentId);
 
         // Read the stored name off the widget rather than assuming the one we
         // imported. `Compress images on import` is ON by default and re-encodes
@@ -164,8 +161,7 @@ describeE2E("eo1 embed overflow menu on an image embed (myne#409)", () => {
         expect(storedName).not.toBe(RENAMED);
 
         // The "⋯" exists on the embed and opens the body-mounted menu.
-        await (await s.byTestId("attachment-image.menu-button")).click();
-        await s.waitForElement(testIdSelector("attachment-image.menu"));
+        await openEmbedMenu(s);
 
         // All four file actions are offered, at parity with the file card.
         for (const row of ["export", "rename", "remove", "reveal"]) {
@@ -216,18 +212,13 @@ describeE2E("eo2 embed layout rows write into the note (myne#409)", () => {
 
         const attachmentId = await importImage(s);
         await createNote(s, "Layout note");
-        await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
-        await waitForSaved(s);
+        // No `waitForSaved` after this: the write went through `note_update`,
+        // not through the editor, so the autosave badge never leaves its
+        // pre-edit state and the wait burns its whole budget before failing.
+        // The IPC call is already durable when it returns.
+        await seedEmbedIntoNote(s, `![[att:${attachmentId}|${FILENAME}]]`);
 
-        await s.waitUntil(
-          async () =>
-            (await s.execute<boolean>(
-              `const i = document.querySelector('[data-testid="attachment-image"]'); return !!i && i.offsetWidth > 0;`,
-            ))
-              ? true
-              : null,
-          { label: "inline image decoded", timeoutMs: 20_000 },
-        );
+        await waitForInlineImage(s, attachmentId);
 
         // Pick a size preset. The note bytes are the assertion: this is the
         // only authoring path for a layout segment, because a form-C embed is

@@ -185,6 +185,80 @@ mod tests {
         });
     }
 
+    /// Importing a scanned image makes it searchable, through the whole desktop
+    /// path rather than through any one half of it.
+    ///
+    /// **`image-ocr-search`'s io1 measured this to be broken and nothing here
+    /// could say where.** That scenario imports this exact fixture through the
+    /// real IPC and then cannot find the note by a word only the pixels contain;
+    /// the gate added to it reported an EMPTY MYE1 entry. Every unit below it
+    /// passes: the OCR pipeline reads the fixture, ingest compression preserves
+    /// what it reads, `is_ocr_image` accepts the compressed container, and the
+    /// weights are present and real. The composition had no test at all, so the
+    /// one place the failure could live was the one place nothing looked.
+    ///
+    /// This is that place: the real extractor, the real import, the real cache,
+    /// on the runner that actually builds the product. It either fails and names
+    /// the layer, or it passes and moves the search elsewhere.
+    #[test]
+    fn importing_a_scanned_image_caches_text_search_can_find() {
+        // Skips only on a checkout without Git-LFS blobs, never on a real load
+        // failure — see `ocr::init_bundled_models_for_tests`.
+        if !init_ocr_for_tests() {
+            return;
+        }
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let png = std::fs::read(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("..")
+                    .join("core")
+                    .join("tests")
+                    .join("fixtures")
+                    .join("ocr-sample.png"),
+            )
+            .expect("fixture reads");
+
+            let imported = import_desktop(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: png,
+                    filename: Some("fatura-taramasi.png".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+
+            let id = hex_decode_id(&imported.id).expect("valid id");
+            let key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentTextKey);
+            let cached =
+                text_cache::read_extracted(tmp.path(), &key, &[SEED_ACCOUNT_HASH; 16], &id).expect(
+                    "an OCR'd image must leave an MYE1 entry; its absence is what io1 sees \
+                         from the outside as a note that cannot be found by its own pixels",
+                );
+            assert_eq!(
+                cached.status,
+                extract::ExtractStatus::Ok,
+                "extracted {} char(s) with status {:?}",
+                cached.text.chars().count(),
+                cached.status
+            );
+            assert!(
+                cached.text.to_lowercase().contains("invoice"),
+                "the cached text must carry the word the image renders, got {:?}",
+                cached.text
+            );
+        });
+    }
+
+    /// Install the bundled OCR weights, reporting whether this checkout has any.
+    /// Panics when the weights are present and will not load — see
+    /// `ocr::init_bundled_models_for_tests` for why the two must not look alike.
+    fn init_ocr_for_tests() -> bool {
+        myne_core::plugins::attachments::ocr::init_bundled_models_for_tests()
+    }
+
     #[test]
     fn import_unsupported_writes_no_text_cache() {
         rt().block_on(async {

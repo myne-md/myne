@@ -431,6 +431,9 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     fn pdf_export_teardown_on_lock(&self) {
         self.record("pdf_export_teardown_on_lock");
     }
+    fn agent_teardown_on_lock(&self) {
+        self.record("agent_teardown_on_lock");
+    }
     fn clear_staged_descriptor(&self) {
         self.record("clear_staged_descriptor");
     }

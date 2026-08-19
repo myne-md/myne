@@ -6,7 +6,7 @@
 // class (not credentials; see the notes suite header).
 
 import { expect } from "vitest";
-import { testIdSelector, WebDriverError, type Session } from "./webdriver";
+import { testIdSelector, WebDriverError, type Element, type Session } from "./webdriver";
 
 /**
  * Fire one production IPC from the page seat and settle-poll its result
@@ -49,6 +49,50 @@ export async function ipcOk(
 }
 
 /**
+ * One round trip that reports what the WebView is actually showing, for the
+ * failure path of a wait that expected a specific screen.
+ *
+ * Deliberately free of app hooks: it reads `document`, the same way the rest of
+ * the harness's `execute` probes do, so it keeps working on a build where the
+ * app's own state is unreachable — which is precisely the case it exists for.
+ * Values are structural only (counts, a readyState, a testid roster), never
+ * content, so nothing it prints can carry vault material into a CI artefact.
+ */
+export async function bootDiagnostic(session: Session): Promise<string> {
+  try {
+    return await session.execute<string>(
+      "var root = document.getElementById('root');" +
+        "var ids = [];" +
+        "var seen = document.querySelectorAll('[data-testid]');" +
+        "for (var i = 0; i < seen.length && ids.length < 12; i++) {" +
+        "  var v = seen[i].getAttribute('data-testid');" +
+        "  if (ids.indexOf(v) === -1) ids.push(v);" +
+        "}" +
+          // The fail-closed REASON, when that screen is what mounted. It is the
+        // single most useful fact this probe can carry: `Unlock.tsx` renders
+        // `<FailClosedError>` INSTEAD of the password form for a boot-time
+        // `Corrupted` or `IoError` status, so a scenario waiting on
+        // `unlock.password-input` there is waiting for a field the app has
+        // decided not to draw. That is a terminal routing outcome, not
+        // slowness, and no budget reaches it. `io-error` in particular is what
+        // a single transient `vault_list` read failure produces.
+        "var fc = document.querySelector('[data-testid=\"fail-closed.root\"]');" +
+        "return JSON.stringify({" +
+        "  readyState: document.readyState," +
+        "  rootChildren: root ? root.childElementCount : -1," +
+        "  bodyChars: (document.body && document.body.innerHTML.length) || 0," +
+        "  failClosedReason: fc ? fc.getAttribute('data-reason') : null," +
+        "  testids: ids" +
+        "});",
+    );
+  } catch (raw) {
+    // The probe itself failing is a fourth answer and a useful one: the page
+    // is gone, not merely empty.
+    return `unreadable (${(raw as Error).message})`;
+  }
+}
+
+/**
  * Unlock the currently-targeted vault and wait for the editor: the
  * canonical password → submit → `editor.root` sequence shared by every
  * suite that needs an unlocked editor as a step (not as the assertion
@@ -78,10 +122,29 @@ export async function unlockToEditor(
   // configures a PIN would hang the full budget on a field that is not there.
   // Suites ASSERTING which surface won must drive the screen directly (qu2/qu3);
   // this helper is for the ones where unlocking is a step, not the story.
-  await session.waitForElement(
-    `${testIdSelector("unlock.password-input")}, ${testIdSelector("unlock.use-password-link")}`,
-    { timeoutMs },
-  );
+  //
+  // **On timeout this says WHAT was on screen instead of only that nothing
+  // was.** The bare wait reported `waitUntil(waitForElement(…)) timed out`, and
+  // that message cannot distinguish the three explanations this failure has —
+  // the app is still on `App.tsx`'s loading shim (which is a literal `return
+  // null`, so a boot probe that never settles renders a blank window forever
+  // and no timeout can outlast it), the app routed somewhere ELSE (welcome,
+  // picker, fail-closed) and the scenario is waiting for a screen it will never
+  // get, or the WebView really did not paint. Those need three different fixes
+  // and the message named none of them, which is why the family
+  // (nav1/tp1/ci1/gp1/gp2/slash-datetime) has been quarantined as "contention"
+  // on an assumption nobody could check. The probe is read only in the failure
+  // path, so a passing run pays nothing for it.
+  try {
+    await session.waitForElement(
+      `${testIdSelector("unlock.password-input")}, ${testIdSelector("unlock.use-password-link")}`,
+      { timeoutMs },
+    );
+  } catch (raw) {
+    throw new Error(
+      `${(raw as Error).message} | boot state: ${await bootDiagnostic(session)}`,
+    );
+  }
   const reveal = await session.byTestIdAll("unlock.use-password-link");
   if (reveal.length > 0) await reveal[0].click();
   const input = await session.byTestId("unlock.password-input", { timeoutMs });
@@ -158,8 +221,26 @@ export async function openPalette(session: Session): Promise<void> {
       // real editor surface before firing — prefer the note content, fall back
       // to the editor pane (always present once unlocked, even with no note
       // open). Best-effort.
+      //
+      // **Skipped when the editor ALREADY holds focus, and that exemption is
+      // the whole reason a selection can survive this helper.** A click
+      // COLLAPSES a selection to a caret. Every palette action that operates on
+      // one (`ai.rewrite-selection` is the live case) therefore arrived with
+      // `state.selection.main.empty`, and the command no-opped. `ad3` chased it
+      // through three selection methods and three probe kinds before the cause
+      // turned out to be the helper that opens the palette, not the palette and
+      // not the keys: the scenario's own probe showed a focused editor with a
+      // non-empty selection immediately before this line ran.
+      //
+      // When `.cm-editor.cm-focused` is present the chord already has somewhere
+      // to land, so the re-anchor buys nothing and costs the selection.
+      const focused = await session.execute<boolean>(
+        "return !!document.querySelector('.cm-editor.cm-focused');",
+      );
       try {
-        await (await session.byTestId("editor.content", { timeoutMs: 400 })).click();
+        if (!focused) {
+          await (await session.byTestId("editor.content", { timeoutMs: 400 })).click();
+        }
       } catch {
         try {
           await (await session.byTestId("editor.pane", { timeoutMs: 400 })).click();
@@ -178,6 +259,88 @@ export async function openPalette(session: Session): Promise<void> {
   );
 }
 
+/**
+ * Open the palette, get `query` into its input, and return the row matching
+ * `optionSelector` — re-asserting the query on every poll instead of typing it
+ * once and then waiting.
+ *
+ * **`openPalette` already learned this lesson; the two lines after it did not.**
+ * That helper re-fires the chord until the input exists, because a wait with
+ * nothing to re-fire is a wait that can never recover. What followed was one
+ * `sendKeys` and one `waitForElement`, which has exactly the failure
+ * `e2e/CLAUDE.md` records for `clickNewMenuItem`: the whole budget spent on a
+ * row that a re-fire would have produced in a second.
+ *
+ * Two things can go wrong after the palette is up, and neither gets better with
+ * time, which is why `image-ocr-search`'s budget was raised to 120 s and bought
+ * nothing:
+ *
+ *  1. **A truncated query.** WebKit's driver drops leading keystrokes while an
+ *     input settles focus. This repo already guards that trap twice (the
+ *     password field re-enters on mismatch, `typeIntoEditor` probes with a
+ *     throwaway char), and the palette had no guard at all. A truncated query
+ *     never becomes the right one on its own: nothing types again.
+ *  2. **Results computed before the index caught up.** The list is derived from
+ *     the input's `onChange`, so a note indexed a moment after the query ran is
+ *     not in the rendered rows and nothing re-runs the search. `replaceText`
+ *     clears to empty and retypes, which does re-run it.
+ *
+ * The nudge is rate-limited rather than per-poll: retyping is `BACKSPACE × n`
+ * plus the text, and doing it ten times a second would be its own denial of
+ * service on the surface under test.
+ */
+export async function palettePick(
+  session: Session,
+  query: string,
+  optionSelector: string,
+  what: string,
+  // Exposed ONLY so the unit test can exercise the give-up path in a couple of
+  // seconds instead of the real 45. No scenario passes it; a scenario that
+  // wanted a shorter palette budget would be trading the retries this helper
+  // exists to provide for a faster red.
+  opts?: { timeoutMs?: number },
+): Promise<Element> {
+  await openPalette(session);
+  await (await session.byTestId("palette.input")).sendKeys(query);
+  let lastReason = "never polled";
+  let lastNudge = Date.now();
+  return session.waitUntil(
+    async () => {
+      const [found] = await session.findElements(optionSelector);
+      if (found !== undefined) return found;
+      const [input] = await session.byTestIdAll("palette.input");
+      if (input === undefined) {
+        // The palette is gone: a stray Escape, a backdrop click, a re-render
+        // that closed it. A closed palette renders no rows at all, so waiting
+        // is pointless and reopening is the only move that can succeed.
+        lastReason = "the palette was not open";
+        await openPalette(session);
+        await (await session.byTestId("palette.input")).sendKeys(query);
+        lastNudge = Date.now();
+        return null;
+      }
+      const value = await input.property<string>("value");
+      // Length, not content: the queries are scenario constants today, and a
+      // helper that prints whatever was typed into a search box is one refactor
+      // away from printing something SYNC-13 forbids.
+      if (value !== query) {
+        lastReason = `the input held ${value.length} of ${query.length} typed characters`;
+        await input.replaceText(query);
+        lastNudge = Date.now();
+      } else if (Date.now() - lastNudge > 3_000) {
+        lastReason = "the query landed but no row matched; re-running the search";
+        await input.replaceText(query);
+        lastNudge = Date.now();
+      }
+      return null;
+    },
+    {
+      label: () => `${what} (last poll: ${lastReason})`,
+      timeoutMs: opts?.timeoutMs ?? 45_000,
+    },
+  );
+}
+
 /** Open the command palette via Ctrl+K (retrying the chord), then filter by
  *  typing `query` and run the matching action row by its `data-action-id`. */
 export async function runPaletteAction(
@@ -185,13 +348,13 @@ export async function runPaletteAction(
   actionId: string,
   query: string,
 ): Promise<void> {
-  await openPalette(session);
-  await (await session.byTestId("palette.input")).sendKeys(query);
-  await (
-    await session.waitForElement(
-      testIdSelector("palette.option", { "data-action-id": actionId }),
-    )
-  ).click();
+  const row = await palettePick(
+    session,
+    query,
+    testIdSelector("palette.option", { "data-action-id": actionId }),
+    `palette action ${actionId}`,
+  );
+  await row.click();
 }
 
 /** Open the command palette, type `query`, and click the NOTES-section hit
@@ -206,13 +369,13 @@ export async function searchAndOpenNote(
   query: string,
   noteId: string,
 ): Promise<void> {
-  await openPalette(session);
-  await (await session.byTestId("palette.input")).sendKeys(query);
-  await (
-    await session.waitForElement(
-      testIdSelector("palette.option", { "data-kind": "note", "data-note-id": noteId }),
-    )
-  ).click();
+  const row = await palettePick(
+    session,
+    query,
+    testIdSelector("palette.option", { "data-kind": "note", "data-note-id": noteId }),
+    `palette note row for the searched note`,
+  );
+  await row.click();
 }
 
 /** A fresh vault's first unlocked editor shows the importer onboarding
@@ -411,6 +574,274 @@ export async function enableAi(session: Session): Promise<void> {
     enabled: true,
     label: "ai_enabled",
   });
+}
+
+/** Click the element carrying `testId`, RE-LOCATING it on every poll.
+ *
+ * **`Element.click()` retries the CLICK, not the LOOKUP, and that is a different
+ * thing.** Its own comment says it retries while WebKit reports the node is in
+ * the DOM but not yet hit-testable, which is right for an overlay animating in.
+ * It cannot help when the node is REPLACED mid-retry: the handle it holds is
+ * then permanently stale, and it burns its whole budget clicking a dead node
+ * before reporting `element interactable + clicked` timed out. `flows.ts` already
+ * learned this once, in `typeIntoEditor`, where the fix was to re-find inside the
+ * poll; the knowledge just never became a helper.
+ *
+ * `sync-replication` line 205 is the case that made it one: after a
+ * mid-ceremony sync the compare screen re-renders, and the match button the
+ * scenario had already located is gone. Nine of that file's ten tests pass; the
+ * tenth spent 10 s on a button that existed the whole time under a new handle. */
+/**
+ * Wait until an inline `att:` embed has rendered a DECODED image, so what
+ * follows is acting on real bytes rather than on the widget's error fallback.
+ *
+ * Three copies of this wait existed, byte-identical, in `attachment-zoom` and
+ * `embed-overflow-menu` (twice), all under the label `inline image decoded`.
+ * That label describes only the success case, and the wait has three failures
+ * behind it: the widget never rendered at all (the embed source did not become
+ * a widget), it rendered its error fallback (the attachment bytes did not
+ * load), or the image element is there and still measures zero. `za1` and `eo2`
+ * have each spent their whole budget on it in CI, on different pipelines, and
+ * the report named none of the three.
+ *
+ * Shared rather than diagnosed three times, because the next copy would inherit
+ * the silent version again.
+ */
+/** What `catalog_list` says about one id, as a clause to append to a reason.
+ *
+ * Never prints the id or a filename: the count and two booleans are the whole
+ * discriminator, and SYNC-13 keeps vault content out of failure output. A failed
+ * probe says so rather than reading as an absent row, because "the backend
+ * refused to answer" and "the backend answered without it" are the two verdicts
+ * this exists to tell apart. */
+async function backendCatalogVerdict(session: Session, id: string): Promise<string> {
+  try {
+    const r = await pageSeatInvoke(session, "plugin:attachments|catalog_list", {}, 15_000);
+    if (r.err !== undefined) return `; the backend REFUSED catalog_list, so the empty map is a host-side failure`;
+    const rows = (r.ok ?? []) as ReadonlyArray<{ id?: string }>;
+    return rows.some((x) => x.id === id)
+      ? `; the backend catalog HAS the row (${rows.length} row(s)), so the editor's map is stale rather than the read being wrong`
+      : `; the backend catalog does NOT have the row (${rows.length} row(s)), so the import's catalog write is the problem, not the editor`;
+  } catch {
+    return `; the backend catalog probe itself failed to run`;
+  }
+}
+
+export async function waitForInlineImage(
+  session: Session,
+  attachmentId?: string,
+): Promise<void> {
+  let lastReason = "never polled";
+  // The tombstone branch asks the BACKEND once, and once only, because it is the
+  // one question the DOM cannot answer: the tombstone widget is DELIBERATELY
+  // shared between "the catalog has not loaded yet" and "the catalog loaded
+  // without this id" (`attachment-embed.ts` renders the same widget for both, to
+  // avoid a broken-image flash), so from the page the two are identical. One
+  // `catalog_list` separates them. Done in the poll rather than in the timeout
+  // label because `waitUntil`'s lazy label is synchronous.
+  let probed = false;
+  let backend = "";
+  await session.waitUntil(
+    async () => {
+      const state = await session.execute<{
+        found: boolean;
+        width: number;
+        chip: boolean;
+        tomb: boolean;
+        marker: boolean;
+        chars: number;
+        testids: string[];
+      }>(
+        "var i = document.querySelector('[data-testid=\"attachment-image\"]');" +
+          // The widget starts the <img> at `display:none` and reveals it on the
+          // `load` event, while a progress chip stands in. On `error` it removes
+          // the chip and leaves the image HIDDEN, so a failed decrypt or decode
+          // measures zero forever and no budget reaches it. The chip is
+          // therefore the discriminator, and the reason this reads it: chip
+          // present means the bytes are still coming, chip gone with the image
+          // still hidden means the load FAILED.
+          "var chip = !!document.querySelector('.cm-attachment-progress');" +
+          // **Is a TOMBSTONE up?** This has to be asked before the source text,
+          // and asking it second is how the first version of this helper blamed
+          // typing for a catalog problem. Every embed widget is an ATOMIC
+          // `Decoration.replace`, so the moment any of them builds, the
+          // `![[att:…]]` text leaves the rendered DOM. Reading `att:` alone
+          // therefore reports "the text never landed" for a note whose text
+          // landed perfectly and is being drawn as a tombstone.
+          "var tomb = !!document.querySelector('.cm-attachment-tombstone');" +
+          // **Is the embed SOURCE even in the document?** With no widget of any
+          // kind there are two very different stories: the `![[att:…]]` text
+          // never landed (a typing problem), or it landed and no decoration has
+          // been built over it yet (a parse/viewport problem). Length only,
+          // never the id.
+          "var content = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+          "var src = content ? content.textContent || '' : '';" +
+          "var marker = src.indexOf('att:') !== -1;" +
+          "var ids = [];" +
+          "var seen = document.querySelectorAll('[data-testid^=\"attachment\"], .cm-widgetBuffer, [data-testid=\"editor.content\"]');" +
+          "for (var n = 0; n < seen.length && ids.length < 8; n++) {" +
+          "  var v = seen[n].getAttribute('data-testid');" +
+          "  if (v && ids.indexOf(v) === -1) ids.push(v);" +
+          "}" +
+          "return { found: !!i, width: i ? i.offsetWidth : -1, chip: chip," +
+          "  tomb: tomb, marker: marker, chars: src.length, testids: ids };",
+      );
+      if (state.found && state.width > 0) return true;
+      if (state.found) {
+        lastReason = state.chip
+          ? `the image is present, hidden, and its progress chip is still up, so the bytes have not arrived`
+          : `the image is present, hidden, and its progress chip is GONE, which the widget does only on a load ERROR — the attachment did not decrypt or decode`;
+      } else if (state.tomb) {
+        // The decoration built and chose the tombstone. That is the shared
+        // widget for BOTH unresolved cases, so the backend is what splits them.
+        if (attachmentId !== undefined && !probed) {
+          probed = true;
+          backend = await backendCatalogVerdict(session, attachmentId);
+        }
+        lastReason =
+          `the embed rendered as a TOMBSTONE, so the editor's catalog map has no row for this ` +
+          `id — either it has not loaded yet or it loaded without it (${state.chars} chars in ` +
+          `the editor)${backend}`;
+      } else if (!state.marker) {
+        lastReason =
+          `no embed source in the buffer and no widget of any kind (${state.chars} chars in ` +
+          `the editor), so the \`att:\` text never landed; testids present: ${
+            state.testids.length === 0 ? "none" : state.testids.join(", ")
+          }`;
+      } else {
+        lastReason =
+          `the embed source is still raw text in the buffer with no widget over it ` +
+          `(${state.chars} chars in the editor), so no decoration has been built for it yet`;
+      }
+      return null;
+    },
+    { label: () => `inline image decoded (last poll: ${lastReason})`, timeoutMs: 20_000 },
+  );
+}
+
+/**
+ * Why a click at an element's centre would not land: its box, whether that box
+ * is inside the viewport, and what the document says is actually at that point.
+ *
+ * The three answers WebKit collapses into "element not interactable" need three
+ * different fixes — a zero-sized box is a render bug, an out-of-viewport box
+ * wants a scroll, and a different node at the centre names the overlay to close
+ * — and the driver's error code distinguishes none of them. Reports the covering
+ * node by tag plus its testid where it has one, never by its text.
+ */
+async function hitTest(session: Session, testId: string): Promise<string> {
+  try {
+    return await session.execute<string>(
+      "var el = document.querySelector('[data-testid=\"' + arguments[0] + '\"]');" +
+        "if (!el) return 'the element vanished between the click and this read';" +
+        "var r = el.getBoundingClientRect();" +
+        "if (r.width === 0 || r.height === 0) return 'its box is ' + r.width + 'x' + r.height;" +
+        "var cx = r.left + r.width / 2, cy = r.top + r.height / 2;" +
+        "if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight)" +
+        "  return 'its centre (' + Math.round(cx) + ',' + Math.round(cy) + ') is outside the " +
+        "viewport ' + window.innerWidth + 'x' + window.innerHeight;" +
+        "var at = document.elementFromPoint(cx, cy);" +
+        "if (!at) return 'nothing is at its centre';" +
+        "if (at === el || el.contains(at)) return 'its centre is clear, so the refusal is not an overlay';" +
+        "var id = at.getAttribute('data-testid');" +
+        "return 'covered at its centre by <' + at.tagName.toLowerCase() + '>' +" +
+        "  (id ? ' [' + id + ']' : ' with no testid');",
+      [testId],
+    );
+  } catch (raw) {
+    return `hit-test unreadable (${(raw as Error).message})`;
+  }
+}
+
+/** Scroll `testId` to the middle of whatever scroll container holds it.
+ *
+ *  `scrollIntoView` walks every ancestor scroller, which is the part WebDriver's
+ *  own pre-click scroll does not reliably do in WebKit. Best-effort: a failure
+ *  here must not turn into the caller's error, because the click that follows is
+ *  the assertion. */
+async function scrollIntoView(session: Session, testId: string): Promise<void> {
+  try {
+    await session.execute(
+      "var el = document.querySelector('[data-testid=\"' + arguments[0] + '\"]');" +
+        "if (el) el.scrollIntoView({ block: 'center', inline: 'center' });",
+      [testId],
+    );
+  } catch {
+    // The element may have gone between the find and this call; the poll re-finds.
+  }
+}
+
+export async function clickByTestId(
+  session: Session,
+  testId: string,
+  opts?: { timeoutMs?: number },
+): Promise<void> {
+  // **The last swallowed reason, so the timeout can name a cause.** Every arm
+  // below returns `null` and polls again, which is right — but it made the
+  // failure message `<testId> located + clicked timed out`, which does not
+  // distinguish "the element is not in the DOM" from "it is there and something
+  // is covering it" from "it is there and WebKit says it is not interactable".
+  // Those are three different bugs and the message named none of them, so
+  // `sync-replication`'s SAS click was read as a re-render race and given more
+  // budget, which measurably did not fix it (45 s, still red). Recorded here
+  // rather than probed on failure because the reason is only observable INSIDE
+  // the poll, and the whole point is that it is the recurring one.
+  let lastReason = "never polled";
+  await session.waitUntil(
+    async () => {
+      const [el] = await session.byTestIdAll(testId);
+      if (el === undefined) {
+        lastReason = "no element carries that testid";
+        return null;
+      }
+      // **Bring it into view inside its OWN scroll container before clicking.**
+      // WebDriver's click scrolls the element into view, but WebKit's notion of
+      // that does not reliably reach a nested `overflow: auto` body, and the
+      // Settings modal is exactly that. `sync-replication`'s SAS match button
+      // sits below the fold of the modal's scrolling body: the driver refused
+      // the click with `element not interactable`, and the hit-test added here
+      // reported the modal container itself painted at the button's centre. No
+      // budget fixes that, because the button never moves on its own. Cheap and
+      // best-effort, so it runs on every poll rather than only after a refusal.
+      await scrollIntoView(session, testId);
+      try {
+        await el.clickOnce();
+      } catch (e) {
+        if (
+          e instanceof WebDriverError &&
+          (e.code === "stale element reference" ||
+            e.code === "element not interactable" ||
+            e.code === "element click intercepted")
+        ) {
+          // **Name what is in the way, not just that something is.** The first
+          // version of this reason got `sync.sas-match` as far as
+          // `element not interactable`, which is a whole class of causes: a
+          // zero-sized box, an element scrolled out of the viewport, or another
+          // node sitting on top of the click point. Reading the rect and asking
+          // the document what is actually AT the centre separates them in one
+          // round trip, and the answer is the fix. Structural only, so a covered
+          // control cannot leak its own contents into a CI log.
+          lastReason =
+            `found, but the click reported "${e.code}"; ` + (await hitTest(session, testId));
+          return null; // replaced or not hit-testable yet — re-find next poll
+        }
+        throw e;
+      }
+      return true;
+    },
+    // 45 s, and the number needs its argument because `e2e/CLAUDE.md` records a
+    // budget rise that fixed nothing: raising `DEFAULT_TIMEOUT_MS` 20 s -> 45 s
+    // for the `clickNewMenuItem` flake only made each occurrence twice as
+    // expensive, because that wait was STUCK with nothing to re-fire. This one
+    // re-locates and re-clicks every poll, so the extra budget buys retries
+    // rather than idling. Measured: `sync-replication` passes isolated and timed
+    // out here at 20 s in the full 2-shard suite, on the compare screen that
+    // re-renders after a mid-ceremony sync the scenario deliberately provokes.
+    {
+      label: () => `${testId} located + clicked (last poll: ${lastReason})`,
+      timeoutMs: opts?.timeoutMs ?? 45_000,
+    },
+  );
 }
 
 /** Set the auto-tag sub-switch via Settings → AI (MYND-651). Off by default, and
@@ -777,6 +1208,143 @@ export async function typeIntoEditor(
       label: "typed text landed in the document (after re-send)",
     });
   }
+}
+
+/** Type an ATTACHMENT EMBED into the live CodeMirror document.
+ *
+ * Separate from {@link typeIntoEditor} for a reason that is not style. That
+ * helper proves delivery by looking for the typed WORDS in the rendered DOM,
+ * which works because Live preview only HIDES markdown syntax. An attachment
+ * embed is the case its own doc comment warns about: every embed decoration is
+ * an ATOMIC `Decoration.replace`, so the moment one builds, `![[att:…]]` leaves
+ * the DOM entirely and no word of it survives. `typeIntoEditor` would therefore
+ * conclude the text never landed and type the whole embed a SECOND time.
+ *
+ * Six near-identical private copies of a naive `typeRaw` grew up around that,
+ * each carrying BOTH defects below. The four EMBED ones —
+ * `embed-overflow-menu`, `attachment-zoom`, `image-ocr-search` and
+ * `attachment-text-preview` — are collapsed into this helper, for the reason
+ * `waitForInlineImage` was collapsed: the next copy would inherit them. The two
+ * non-embed ones (`math`, `highlight-color`) stay private because their payload
+ * survives rendering and so their arrival check is not this one; they got the
+ * probe fix in place, with a pointer back here.
+ *
+ * **Defect 1: N probes, one Backspace.** The pipeline probe types `q` on EVERY
+ * poll and the copies always sent exactly one Backspace. Under load the poll
+ * routinely runs more than once, so the surplus `q`s stay in the document ahead
+ * of the payload. Harmless for an `includes` assertion, not harmless for a
+ * position-sensitive one, and it is the shape behind the recorded `slash-datetime`
+ * trap where a leading `q` stops `/date` being a slash command at all. Fixed by
+ * counting the probes and sending that many Backspaces.
+ *
+ * **Defect 2: the payload was never verified, and a weak check is barely
+ * better.** `sendKeys` resolving means the driver accepted the keys, not that
+ * CodeMirror applied them. Under full-suite load the leading character is
+ * dropped during the focus settle, which is the exact defect the `q` probe
+ * exists to absorb and does not always absorb, and `![[att:…]]` arriving as
+ * `[[att:…]]` is an ORDINARY WIKILINK: `parts.isEmbed` is false, the embed
+ * decoration returns without building anything, and the raw text sits there
+ * forever. A permanent state no budget reaches, and what CI pipelines 653 and
+ * 657 reported for `eo1`.
+ *
+ * The first version of this check looked for `att:`, which a payload missing its
+ * leading `!` still satisfies — it passed the garbled document straight through
+ * to `waitForInlineImage`, which then timed out wearing the name of an
+ * attachment problem. The check is now the full `![[att:` prefix, so a dropped
+ * leading character fails HERE, at the helper that caused it. Arrival is proven
+ * in the one way that survives the atomic replace: that prefix is in the raw
+ * source, OR an embed widget of any kind exists.
+ *
+ * The repair deletes what actually landed before retyping, rather than
+ * appending a second attempt to a broken first. It measures the growth in the
+ * rendered text and sends that many Backspaces, capped at the payload length so
+ * a mis-measure can never eat into the note that was already there. */
+/**
+ * Put an attachment embed into a note through the real note IPC, then reopen it.
+ *
+ * **This replaces typing the embed, and the four rounds it took to get here are
+ * the argument.** A form-C embed is `![[att:<id>|<name>]]`, and driving those
+ * brackets through WebDriver races CodeMirror's bracket auto-close: typing `[`
+ * inserts a closing `]`, and under full-suite load the caret update and the
+ * incoming characters interleave. Both outcomes are permanent states no budget
+ * reaches, and CI measured each of them on the SAME commit:
+ *
+ *   * pipeline 661 — the payload landed outside the auto-closed pair, giving an
+ *     empty-target wikilink chip (`cm-wikilink-chip-broken`) with the rest as
+ *     plain text behind it;
+ *   * pipeline 664 — the payload came out unterminated, so it is not a Wikilink
+ *     node at all, no decoration is ever built, and the raw text just sits there.
+ *
+ * Four rounds of hardening the typing helper each fixed the shape CI had just
+ * shown and were overtaken by the next one, because the defect is in the input
+ * method rather than in the check.
+ *
+ * So the embed is written the way three other scenarios in this suite already
+ * write note content, for the reason `sync-replication.e2e.ts` states in one
+ * line: "deterministic note_update IPC, no flaky editor typing".
+ * `cards-cover-picker` and `editor-scroll-slack` do the same. It is production
+ * IPC through the page seat, which `e2e/CLAUDE.md` sanctions explicitly, and it
+ * is NOT a test hook.
+ *
+ * **What this gives up, stated rather than glossed:** the scenarios no longer
+ * prove that a user can type an embed. They never meant to. `eo1` is about the
+ * overflow menu, `eo2` about the layout segments the menu writes, `za1` about
+ * the lightbox and `tp1` about the text-preview card; in every one the embed is
+ * scaffolding to get a widget on screen. Typing itself is covered by the specs
+ * whose subject it is (`slash-datetime`, `math`, `highlight-color`, and
+ * `typeIntoEditor`'s own callers).
+ *
+ * The reopen is not optional and not a settle: the editor loads the attachment
+ * catalog ONCE per mount, so the note has to be re-opened after the write for
+ * the embed to resolve against a catalog that contains the import.
+ */
+export async function seedEmbedIntoNote(
+  session: Session,
+  embed: string,
+  timeoutMs = 30_000,
+): Promise<void> {
+  // The note `createNote` just made is the highlighted row, and its id is on the
+  // row rather than anywhere in the editor. Same reading `editor-scroll-slack`
+  // uses.
+  const row = await session.waitForElement('[data-testid="notes.row"][aria-current="true"]');
+  const noteId = (await row.attribute("data-note-id")) ?? "";
+  if (noteId === "") throw new Error("seedEmbedIntoNote: the active note row carries no id");
+
+  // Append rather than replace: `createNote` writes a title and frontmatter, and
+  // a scenario that silently dropped them would be testing a different note.
+  const cur = await pageSeatInvoke(session, "plugin:notes|note_read", { noteId }, timeoutMs);
+  const base = typeof cur.ok === "string" ? cur.ok : "";
+  const up = await pageSeatInvoke(
+    session,
+    "plugin:notes|note_update",
+    { noteId, plaintext: `${base}\n${embed}` },
+    timeoutMs,
+  );
+  expect(up.err, "note_update should accept the embed").toBeUndefined();
+
+  await session.refresh();
+  await session.byTestId("editor.root", { timeoutMs });
+  // The reload re-mounts the first editor, and on a fresh vault that brings the
+  // importer onboarding OVERLAY back. It covers the editor, so every click after
+  // this one lands on it: measured as `attachment-image.menu` never appearing
+  // after its button was "clicked". The helper owns the reload, so it owns this.
+  await dismissImporterOfferIfPresent(session);
+  // Re-click until the note is actually open. A single click can land before the
+  // row is wired after a reload, which leaves the empty note-switcher up and
+  // makes every following assertion measure nothing.
+  await session.waitUntil(
+    async () => {
+      const tabs = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+      if (tabs.length > 0) return true;
+      await session.execute<number>(
+        "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +
+          JSON.stringify(noteId) +
+          "]'); if (e) { e.click(); return 1; } return 0;",
+      );
+      return null;
+    },
+    { label: "the seeded note is open", timeoutMs: 20_000 },
+  );
 }
 
 /** Wait until the autosave badge settles on "Saved" AFTER having seen

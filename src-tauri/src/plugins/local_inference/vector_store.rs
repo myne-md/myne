@@ -274,16 +274,7 @@ impl AiVectorStore {
 /// preserves verbatim, and what a hand-edited note has) displays inside
 /// `Private/` in the app while a raw comparison would leave it outside the
 /// user's own exclusion.
-pub fn canonical_folder(folder: &str) -> String {
-    use unicode_normalization::UnicodeNormalization;
-    let segments: Vec<&str> = folder.split('/').filter(|s| !s.is_empty()).collect();
-    if segments.is_empty() {
-        return String::new();
-    }
-    let mut key: String = segments.join("/").nfc().collect::<String>().to_lowercase();
-    key.push('/');
-    key
-}
+pub use myne_core::folder_key::canonical_folder;
 
 /// Whether a note's `folder` (RAW, un-canonicalized) is under any entry in the
 /// ALREADY-canonicalized `excluded` set. Equal-or-nested test via a trailing-
@@ -292,12 +283,7 @@ pub fn canonical_folder(folder: &str) -> String {
 /// false-match a sibling (`privatestuff/` does not start with `private/`). An
 /// empty entry is ignored (would exclude the whole vault). `folder` is
 /// canonicalized here so callers pass raw folders.
-pub fn folder_matches_excluded(folder: &str, excluded: &[String]) -> bool {
-    let folder = canonical_folder(folder);
-    excluded
-        .iter()
-        .any(|ex| !ex.is_empty() && folder.starts_with(ex.as_str()))
-}
+pub use myne_core::folder_key::folder_matches_excluded;
 
 /// Overwrite a vector's elements to `0.0` in place (best-effort RAM wipe). Not
 /// `zeroize::Zeroize` because `f32` is not `DefaultIsZeroes`; a plain overwrite
