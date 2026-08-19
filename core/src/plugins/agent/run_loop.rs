@@ -353,9 +353,7 @@ pub async fn drive(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugins::agent::engine::{
-        render_chatml, AgentCompletion, AgentRequest, AgentRequestClass,
-    };
+    use crate::plugins::agent::engine::{AgentCompletion, AgentRequest, AgentRequestClass};
     use crate::plugins::agent::tools::SearchHit;
     use crate::test_support::block_on;
     use std::collections::BTreeSet;
@@ -401,11 +399,19 @@ mod tests {
             if self.remote && class == AgentRequestClass::Ambient {
                 return Err(AgentError::Cancelled);
             }
-            // Stands in for what the host does: count the rendered prompt, and
-            // only when the arm that served the request was the remote one.
-            let chars_off_device = self
-                .remote
-                .then(|| render_chatml(r, &|s: &str| s.to_string()).chars().count());
+            // Stands in for what the host does: count the text that would be
+            // sent, and only when the arm that served the request was the
+            // remote one. Counts the request's own spans rather than a rendered
+            // prompt: the host counts `(system, messages)` after `chat_shape`,
+            // and the flat renderer this used to call was removed as dead
+            // (myne-md/myne#531 review round six).
+            let chars_off_device = self.remote.then(|| {
+                r.messages
+                    .iter()
+                    .flat_map(|m| m.content.iter())
+                    .map(|span| span.text().chars().count())
+                    .sum::<usize>()
+            });
             Ok(AgentCompletion {
                 reply: self.replies.lock().unwrap().pop().unwrap_or_else(|| {
                     r#"{"action":"finish","summary":"out of script"}"#.to_string()

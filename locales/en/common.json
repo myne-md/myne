@@ -108,7 +108,8 @@
         "unsafeFrontmatter": "Not created: the proposed title or folder contains a line break.",
         "excludedFolder": "Not created: that folder is excluded from AI.",
         "createFailed": "Not created: writing the new note failed. The other changes were still applied.",
-        "excludedNow": "Could not be applied: that note's folder is now excluded from AI."
+        "excludedNow": "Could not be applied: that note's folder is now excluded from AI.",
+        "notProposed": "Could not be applied: that change is not part of this run's proposal."
       },
       "applyFailed": "The changes could not be applied.",
       "undo": "Undo this run",

@@ -24,9 +24,9 @@
 //! session concern. Both are dropped by the same lock teardown.
 
 use myne_core::host::tauri_host::TauriHost;
-use myne_core::plugins::agent::apply::{ApplyOutcome, Approval};
+use myne_core::plugins::agent::apply::{ApplyOutcome, Approval, RefusedEdit};
 use myne_core::plugins::agent::engine::{Content, Message};
-use myne_core::plugins::agent::error::AgentError;
+use myne_core::plugins::agent::error::{AgentError, EditRejection};
 use myne_core::plugins::agent::probe::{run_probe, ProbeThreshold, ProbeVerdict};
 use myne_core::plugins::agent::prompt::{Proposal, ProposedNote};
 use myne_core::plugins::agent::run::{AgentRunState, AgentRunView, AppliedRun, GrantOrigin};
@@ -136,6 +136,18 @@ struct Session {
     task: String,
     transcript: Vec<Message>,
     proposal: Proposal,
+    /// Whether a `step` is inside its model call for this run.
+    ///
+    /// `step` takes the transcript and the proposal with `mem::take` under a
+    /// scoped lock, releases it for the length of a model call, then writes both
+    /// back. Two concurrent calls on one run id therefore raced: the second
+    /// found the transcript already taken and drove from an empty one, and
+    /// whichever returned last overwrote the other's work, silently discarding a
+    /// transcript and a proposal. Not reachable from the shipped single-dialog
+    /// surface, and `agent_approve_scope` takes its `run_id` from the payload,
+    /// so reachability is a property of the caller rather than of this code
+    /// (myne-md/myne#531 review round six).
+    in_flight: bool,
 }
 
 /// The table of live sessions. Cleared by the same lock teardown that clears
@@ -146,6 +158,51 @@ pub struct AgentSessionState {
 }
 
 impl AgentSessionState {
+    /// Which of the approved EDITS the host recorded the model proposing.
+    ///
+    /// **The other half of the rule its sibling below states about itself.**
+    /// `read_approved_new_notes` resolves new notes by index into the host's own
+    /// record, so "the caller cannot invent a note the model never proposed"
+    /// holds for creates. The edits arrived as free `note_id`/`anchor`/
+    /// `replacement` strings and were never compared to anything, so the same
+    /// sentence was true of one half of the apply and false of the other
+    /// (myne-md/myne#531 review round six).
+    ///
+    /// Returns the recognised edits and, separately, the positions of the ones
+    /// that were not, so the caller can report them as refusals rather than drop
+    /// them silently: a row the user pressed Apply on that quietly does nothing
+    /// is the failure mode the whole review surface exists to avoid.
+    ///
+    /// Compared by VALUE, not by index. The screen may send any subset in any
+    /// order, and an index-based contract would mean changing what the WebView
+    /// sends, the store, the review screen and its E2E for a property this
+    /// buys outright.
+    ///
+    /// A session that is gone recognises nothing, which fails closed: the run is
+    /// over, and an apply against a record the host no longer holds is exactly
+    /// the case this refuses.
+    pub fn retain_proposed_edits(
+        &self,
+        run_id: &str,
+        approved: &[ProposedEdit],
+    ) -> (Vec<ProposedEdit>, Vec<usize>) {
+        let table = self.sessions.lock().expect("agent session table poisoned");
+        let proposed: &[ProposedEdit] = match table.get(run_id) {
+            Some(session) => &session.proposal.edits,
+            None => &[],
+        };
+        let mut kept = Vec::with_capacity(approved.len());
+        let mut unknown = Vec::new();
+        for (index, edit) in approved.iter().enumerate() {
+            if proposed.contains(edit) {
+                kept.push(edit.clone());
+            } else {
+                unknown.push(index);
+            }
+        }
+        (kept, unknown)
+    }
+
     /// The new notes the user approved, resolved against the run's own record.
     ///
     /// Two separate properties, and an earlier version conflated them. **Which
@@ -172,17 +229,6 @@ impl AgentSessionState {
     ///
     /// Consumption is now keyed off what was ACTUALLY created, by
     /// [`Self::consume_created_new_notes`], so the two cannot disagree.
-    ///
-    /// Two separate properties, and an earlier version conflated them. **Which
-    /// notes exist** is host-side: the caller names indices into the proposal the
-    /// host itself recorded, so it cannot invent a note the model never proposed.
-    /// **Which of those to create** is the user's, expressed as that index list,
-    /// because a create is a write and SYNC-17's restatement says no write
-    /// happens without a per-note approval.
-    ///
-    /// Out-of-range indices are dropped rather than erroring: they can only come
-    /// from a stale screen, and refusing the whole apply over one is worse than
-    /// applying the rest.
     pub fn read_approved_new_notes(
         &self,
         run_id: &str,
@@ -230,6 +276,15 @@ impl AgentSessionState {
                 // rather than free, on the same rule as the teardown below.
                 note.title.zeroize();
                 note.body.zeroize();
+                // And the folder, for the reason the teardown below already
+                // states about itself: it is `Option<String>` rather than
+                // `String`, so it is not the shape the eye checks for, and it
+                // was missed here for exactly that reason a second time
+                // (myne-md/myne#531 review round six). `ProposedNote` derives no
+                // `ZeroizeOnDrop`, so nothing catches it if this line goes.
+                if let Some(folder) = note.folder.as_mut() {
+                    folder.zeroize();
+                }
             }
         }
     }
@@ -245,47 +300,42 @@ impl AgentSessionState {
     pub fn clear(&self) {
         let mut table = self.sessions.lock().expect("agent session table poisoned");
         for session in table.values_mut() {
-            session.task.zeroize();
-            // Overwrite before dropping, and cover BOTH arms so the teardown
-            // is total by construction rather than by whichever arm currently
-            // holds the sensitive half. `UntrustedNote` wipes through
-            // `Zeroizing` on drop; `Trusted` is a plain `String` with no such
-            // drop, so a bare `.clear()` freed it untouched.
-            //
-            // What each arm holds today, since that is what a later reader
-            // would use to decide whether this loop can go: the model's reply
-            // is `Content::note` (`run_loop::drive`, tagged untrusted in this
-            // same change because an anchor is note text copied verbatim), and
-            // the `Trusted` spans are the host's own refusal prose. The point
-            // is that the answer moves, and a teardown keyed to today's answer
-            // is one tagging change away from being partial again.
-            for message in &mut session.transcript {
-                for span in &mut message.content {
-                    if let Content::Trusted(t) = span {
-                        t.zeroize();
-                    }
-                }
-            }
-            session.transcript.clear();
-            for edit in &mut session.proposal.edits {
-                edit.anchor.zeroize();
-                edit.replacement.zeroize();
-            }
-            for note in &mut session.proposal.new_notes {
-                note.title.zeroize();
-                note.body.zeroize();
-                // The folder too. It is `Option<String>` rather than `String`,
-                // which is the whole reason it was missed: the two lines above
-                // are the shape the eye checks for. A proposed folder is a
-                // vault-structure string the model produced from note content,
-                // so it belongs with them.
-                if let Some(folder) = note.folder.as_mut() {
-                    folder.zeroize();
-                }
-            }
-            session.proposal.summary.zeroize();
+            wipe_session(session);
         }
         table.clear();
+    }
+
+    /// Drop every session whose run the core table no longer holds, wiping it
+    /// first.
+    ///
+    /// **The bound this table was missing.** `AgentRunState` caps at
+    /// `MAX_LIVE_RUNS` and evicts the oldest, and nothing removed the evicted
+    /// run's SESSION: after nine ordinary runs, run one's task string, its
+    /// transcript of whole note bodies and its proposal of anchors copied
+    /// verbatim out of them stayed resident and unreachable until the vault
+    /// locked. The cap bounded a set of note ids and left the plaintext holder
+    /// unbounded (myne-md/myne#531 review round six).
+    ///
+    /// It could not be fixed where the eviction is: that lives in `myne-core`
+    /// and this table lives in the desktop crate, which is why core grew
+    /// `live_ids()` and this prunes to it rather than being told what was
+    /// dropped. Called at the start of a run, which is the only moment a run can
+    /// be evicted.
+    ///
+    /// Wipes through the same `wipe_session` the lock teardown uses, so the two
+    /// cannot report different notions of "gone".
+    pub fn prune_to(&self, live: &std::collections::BTreeSet<String>) {
+        let mut table = self.sessions.lock().expect("agent session table poisoned");
+        let dead: Vec<String> = table
+            .keys()
+            .filter(|id| !live.contains(*id))
+            .cloned()
+            .collect();
+        for id in dead {
+            if let Some(mut session) = table.remove(&id) {
+                wipe_session(&mut session);
+            }
+        }
     }
 
     /// How many sessions are live.
@@ -307,6 +357,56 @@ impl AgentSessionState {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+}
+
+/// Overwrite everything a session holds, before it is dropped.
+///
+/// **Overwrites before dropping**, which is the difference between this and a
+/// plain `clear()`. A transcript holds whole note bodies and a proposal holds
+/// the anchors copied out of them; dropping frees that memory without touching
+/// it, and `threat-model.md` §7 requires the AI path's RAM to be
+/// `Zeroizing`-scoped. One function rather than two copies, so the lock teardown
+/// and the eviction prune cannot drift into different notions of total.
+fn wipe_session(session: &mut Session) {
+    session.task.zeroize();
+    // Overwrite before dropping, and cover BOTH arms so the teardown
+    // is total by construction rather than by whichever arm currently
+    // holds the sensitive half. `UntrustedNote` wipes through
+    // `Zeroizing` on drop; `Trusted` is a plain `String` with no such
+    // drop, so a bare `.clear()` freed it untouched.
+    //
+    // What each arm holds today, since that is what a later reader
+    // would use to decide whether this loop can go: the model's reply
+    // is `Content::note` (`run_loop::drive`, tagged untrusted in this
+    // same change because an anchor is note text copied verbatim), and
+    // the `Trusted` spans are the host's own refusal prose. The point
+    // is that the answer moves, and a teardown keyed to today's answer
+    // is one tagging change away from being partial again.
+    for message in &mut session.transcript {
+        for span in &mut message.content {
+            if let Content::Trusted(t) = span {
+                t.zeroize();
+            }
+        }
+    }
+    session.transcript.clear();
+    for edit in &mut session.proposal.edits {
+        edit.anchor.zeroize();
+        edit.replacement.zeroize();
+    }
+    for note in &mut session.proposal.new_notes {
+        note.title.zeroize();
+        note.body.zeroize();
+        // The folder too. It is `Option<String>` rather than `String`,
+        // which is the whole reason it was missed: the two lines above
+        // are the shape the eye checks for. A proposed folder is a
+        // vault-structure string the model produced from note content,
+        // so it belongs with them.
+        if let Some(folder) = note.folder.as_mut() {
+            folder.zeroize();
+        }
+    }
+    session.proposal.summary.zeroize();
 }
 
 /// What a grant would resolve to. Every number here is the host's.
@@ -474,12 +574,19 @@ async fn step<R: Runtime>(
     cancel: Arc<AtomicBool>,
     excluded_count: usize,
 ) -> Result<AgentStepResult, AgentError> {
+    // Claimed under the SAME lock the take happens under, so there is no window
+    // between deciding to proceed and emptying the session. Released in the
+    // write-back below, on every exit from this function.
     let (task, mut transcript, mut proposal) = {
         let mut table = sessions
             .sessions
             .lock()
             .expect("agent session table poisoned");
         let s = table.get_mut(&run_id).ok_or(AgentError::NoSuchRun)?;
+        if s.in_flight {
+            return Err(AgentError::StepAlreadyRunning);
+        }
+        s.in_flight = true;
         (
             s.task.clone(),
             std::mem::take(&mut s.transcript),
@@ -531,6 +638,13 @@ async fn step<R: Runtime>(
             if let Some(s) = table.get_mut(&run_id) {
                 s.transcript = transcript;
                 s.proposal = proposal;
+                // **And the flag, on the FAILURE path too.** Releasing only on
+                // success is how an in-flight marker turns one failed model call
+                // into a permanently wedged run: the flag stays set, every later
+                // step reports `StepAlreadyRunning`, and nothing clears it short
+                // of a vault lock. Both exits from this function release it, and
+                // there is no `?` between the claim and either of them.
+                s.in_flight = false;
             }
             return Err(e);
         }
@@ -552,6 +666,7 @@ async fn step<R: Runtime>(
         if let Some(s) = table.get_mut(&run_id) {
             s.transcript = transcript;
             s.proposal = proposal.clone();
+            s.in_flight = false;
         }
     }
 
@@ -617,6 +732,14 @@ pub async fn agent_start<R: Runtime>(
     // widen what crosses TB13.
     let run_id = myne_core::plugins::agent::run::new_run_id();
     let (resolved, cancel) = start_run(&runs, run_id.clone(), &grant, &source).await?;
+    // **Prune AFTER the start, which is the only moment a run can be evicted.**
+    // `AgentRunState` caps at `MAX_LIVE_RUNS` and drops the oldest to make room
+    // for this one; nothing removed the evicted run's session, so its task, its
+    // transcript of whole note bodies and its proposal of verbatim anchors
+    // stayed resident until the vault locked. The eviction is in core and this
+    // table is desktop-side, so the prune asks core what is still live rather
+    // than being told what went (myne-md/myne#531 review round six).
+    sessions.prune_to(&runs.live_ids());
     sessions
         .sessions
         .lock()
@@ -776,6 +899,11 @@ pub async fn agent_apply<R: Runtime>(
     // READ, not take. Consumption happens after the apply, keyed off what it
     // actually created, so a failure leaves every approved note retryable.
     let new_notes = sessions.read_approved_new_notes(&run_id, &approved_new_notes);
+    // The edit-side twin: only edits the host recorded the model proposing are
+    // applied, and the rest are reported rather than dropped. The indices are
+    // positions in the APPROVED list, which is what `RefusedEdit::index` means
+    // everywhere else on this path.
+    let (approved, not_proposed) = sessions.retain_proposed_edits(&run_id, &approved);
     let reader = NoteReadAdapter {
         host: TauriHost::new(app.clone()),
         state: vault.inner(),
@@ -789,10 +917,17 @@ pub async fn agent_apply<R: Runtime>(
         state: vault.inner(),
         hooks: hooks.inner().clone(),
     };
-    let outcome = apply_approved(
+    let mut outcome = apply_approved(
         &runs, &run_id, &approved, &new_notes, &excluded, approval, &reader, &restore, &writer,
     )
     .await?;
+    for index in not_proposed {
+        outcome.refused.push(RefusedEdit {
+            note_id: String::new(),
+            index,
+            reason: EditRejection::NotProposed,
+        });
+    }
     // Now drop the ones that landed, and only those. On the `?` above nothing is
     // consumed, which is the point: the user can retry and the notes are still
     // there. A per-note `createFailed` refusal is retryable for the same reason.
@@ -934,6 +1069,7 @@ pub async fn agent_capability<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     // ---- the compiled-in probe threshold --------------------------------
 
@@ -1108,5 +1244,69 @@ mod tests {
         assert_eq!(s.len(), 1);
         s.clear();
         assert!(s.is_empty(), "no transcript survives a lock");
+    }
+
+    // ---- the session table's bound ---------------------------------------
+
+    fn session_with_task(task: &str) -> Session {
+        Session {
+            task: task.into(),
+            ..Default::default()
+        }
+    }
+
+    /// The run table caps and evicts; this table did not, so an evicted run's
+    /// plaintext stayed resident until the vault locked
+    /// (myne-md/myne#531 review round six).
+    #[test]
+    fn a_session_whose_run_was_evicted_is_dropped() {
+        let s = AgentSessionState::default();
+        {
+            let mut t = s.sessions.lock().unwrap();
+            t.insert("evicted".into(), session_with_task("old"));
+            t.insert("live".into(), session_with_task("current"));
+        }
+        assert_eq!(s.len(), 2);
+        s.prune_to(&BTreeSet::from(["live".to_string()]));
+        let table = s.sessions.lock().unwrap();
+        assert_eq!(
+            table.keys().cloned().collect::<Vec<_>>(),
+            vec!["live".to_string()],
+            "only the run core still holds keeps its session"
+        );
+    }
+
+    /// The direction a prune is most likely to break: pruning must not remove a
+    /// session whose run is live, which would take the transcript out from under
+    /// a running step.
+    #[test]
+    fn a_live_run_keeps_its_session() {
+        let s = AgentSessionState::default();
+        s.sessions
+            .lock()
+            .unwrap()
+            .insert("r".into(), session_with_task("t"));
+        s.prune_to(&BTreeSet::from(["r".to_string(), "other".to_string()]));
+        assert_eq!(s.len(), 1);
+    }
+
+    /// The prune drives the SAME wipe the lock teardown does, so the two cannot
+    /// drift into different notions of "gone". Asserted through `wipe_session`
+    /// directly, because a dropped session's memory cannot be read afterwards
+    /// and a test that claimed to check it would be claiming more than its
+    /// inputs can prove.
+    #[test]
+    fn the_prune_and_the_lock_teardown_wipe_through_one_function() {
+        let mut session = Session {
+            task: "secret task".into(),
+            ..Default::default()
+        };
+        session.proposal.summary = "secret summary".into();
+        wipe_session(&mut session);
+        assert!(session.task.bytes().all(|b| b == 0), "task overwritten");
+        assert!(
+            session.proposal.summary.bytes().all(|b| b == 0),
+            "summary overwritten"
+        );
     }
 }

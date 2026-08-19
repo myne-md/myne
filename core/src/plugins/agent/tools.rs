@@ -46,10 +46,18 @@ async fn excluded_now(source: &dyn ExclusionSource) -> Result<Vec<String>, Agent
 /// The read tool does better (it has the body, so it sees a note MOVED into an
 /// excluded folder mid-run) and says so at its own call.
 fn record_excluded(records: &BTreeMap<String, NoteRecord>, id: &str, excluded: &[String]) -> bool {
-    let folder = records
-        .get(id)
-        .and_then(|r| r.folder.clone())
-        .unwrap_or_default();
+    // **Fails CLOSED on an id the snapshot does not carry**, matching
+    // `scope.rs::resolve_grant`, which states the rule: a note id the index does
+    // not carry has no known folder, so the exclusion test cannot be applied to
+    // it. This used to fall through `unwrap_or_default()` to `""`, and
+    // `folder_key` skips empty entries, so every exclusion set answered "not
+    // excluded" for exactly the input it could not classify. Two functions
+    // applying opposite defaults to the same input, one of them arguing for its
+    // choice (myne-md/myne#531 review round six).
+    let Some(record) = records.get(id) else {
+        return true;
+    };
+    let folder = record.folder.clone().unwrap_or_default();
     folder_matches_excluded(&folder, excluded)
 }
 
@@ -441,18 +449,119 @@ mod tests {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a"]));
         let searcher = StubSearcher(vec![hit("b", 0.9), hit("a", 0.5), hit("c", 0.4)]);
+        // A REAL snapshot rather than an empty map. `record_excluded` fails
+        // closed on an id the snapshot does not carry, and an empty map made it
+        // answer "not excluded" for everything, which is what left the clamp
+        // beside it unexercised (myne-md/myne#531 review round six).
         let out = block(search_scope(
             &runs,
             "r",
             "q",
             10,
             &searcher,
-            &BTreeMap::new(),
+            &records(&[("a", "T"), ("b", "T"), ("c", "T")]),
             &no_exclusions(),
         ))
         .unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].note_id, "a");
+    }
+
+    /// **The SYNC-14 clamp on the SEARCH path, which had the clamp and no
+    /// test.** All three `search_scope` tests passed `no_exclusions()` and two
+    /// also passed an empty records map, so `record_excluded` returned false
+    /// unconditionally in every one and deleting the clamp left the suite green
+    /// (myne-md/myne#531 review round six). The sibling tools got their clamp
+    /// tests in the same change this one was missed by.
+    ///
+    /// Worth its own test rather than folded into `search_drops_hits_outside_the_set`:
+    /// that one drops a hit for being out of SCOPE, which is the run's frozen
+    /// grant. This drops a hit that IS in scope and whose folder the user has
+    /// since excluded, which is the newest-answer-decides rule and a different
+    /// control. On the remote arm a surfaced hit carries a note id and its rank
+    /// off device, so an unexercised clamp here is an untested TB13 bound.
+    #[test]
+    fn search_drops_a_hit_whose_folder_is_excluded_now() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let mut recs = records(&[("a", "Kept"), ("b", "Gone")]);
+        recs.get_mut("b").unwrap().folder = Some("Private".into());
+        let searcher = StubSearcher(vec![hit("b", 0.9), hit("a", 0.5)]);
+        let out = block(search_scope(
+            &runs,
+            "r",
+            "q",
+            10,
+            &searcher,
+            &recs,
+            &StubExclusions(vec!["Private".into()]),
+        ))
+        .unwrap();
+        assert_eq!(
+            out.iter().map(|h| h.note_id.as_str()).collect::<Vec<_>>(),
+            vec!["a"],
+            "an excluded note must not be surfaced, not even as a ranked id"
+        );
+        // The reverse, so a clamp that dropped everything would fail too.
+        let both = block(search_scope(
+            &runs,
+            "r",
+            "q",
+            10,
+            &StubSearcher(vec![hit("b", 0.9), hit("a", 0.5)]),
+            &recs,
+            &no_exclusions(),
+        ))
+        .unwrap();
+        assert_eq!(both.len(), 2, "with the set empty both are surfaced");
+    }
+
+    /// `record_excluded` fails CLOSED on a note the index snapshot does not
+    /// carry, matching `resolve_grant` (`scope.rs`), which says of the identical
+    /// input: "Unknown ids fail closed. A note id the index does not carry has
+    /// no known folder, so the exclusion test cannot be applied to it."
+    ///
+    /// It used to fail OPEN here: `records.get(id)` missing yielded `""` through
+    /// `unwrap_or_default()`, and `folder_key.rs` skips empty entries, so every
+    /// exclusion set answered "not excluded". Two functions applied opposite
+    /// defaults to the same input and only one argued for its choice
+    /// (myne-md/myne#531 review round six).
+    #[test]
+    fn a_note_missing_from_the_index_snapshot_is_treated_as_excluded() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "ghost"]));
+        // `ghost` is in the run's frozen scope and absent from the snapshot.
+        let recs = records(&[("a", "Kept")]);
+        let listed = block(list_scope(
+            &runs,
+            "r",
+            &recs,
+            &StubExclusions(vec!["Private".into()]),
+        ))
+        .unwrap();
+        assert_eq!(
+            listed
+                .iter()
+                .map(|e| e.note_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a"],
+            "a note whose folder cannot be determined must not be named to the model"
+        );
+        let found = block(search_scope(
+            &runs,
+            "r",
+            "q",
+            10,
+            &StubSearcher(vec![hit("ghost", 0.9), hit("a", 0.5)]),
+            &recs,
+            &StubExclusions(vec!["Private".into()]),
+        ))
+        .unwrap();
+        assert_eq!(
+            found.iter().map(|h| h.note_id.as_str()).collect::<Vec<_>>(),
+            vec!["a"],
+            "and not surfaced by search either"
+        );
     }
 
     #[test]
@@ -466,7 +575,7 @@ mod tests {
             "q",
             2,
             &searcher,
-            &BTreeMap::new(),
+            &records(&[("a", "T"), ("b", "T"), ("c", "T")]),
             &no_exclusions(),
         ))
         .unwrap();

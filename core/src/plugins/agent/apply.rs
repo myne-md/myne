@@ -186,6 +186,22 @@ pub async fn apply_approved(
 ) -> Result<ApplyOutcome, AgentError> {
     let mut outcome = ApplyOutcome::default();
 
+    // 0. The approval LABEL is bounded before anything else is, because the
+    //    removal carve-out in step 3 is the only reader of it and fires only on
+    //    `Bulk`. Without this, an approve-all relabelled `individual` carried
+    //    forty edits — a `deleted:` tombstone among them — past a control whose
+    //    predicate is host-side and whose trigger was the caller's. That is the
+    //    shape `threat-model.md` §7 and `decisions/ai/0515` both contrast with a
+    //    frontend filter, so it had to hold here or the claim was false
+    //    (myne-md/myne#531 review round six).
+    //
+    //    Here rather than in the IPC wrapper: this is the function every client
+    //    calls, and a desktop-side check would be one the mobile port has to
+    //    re-derive, which is the same shape one layer up.
+    if approval == Approval::Individual && approved.len() + approved_new_notes.len() > 1 {
+        return Err(AgentError::IndividualApprovalNotSingle);
+    }
+
     // 1. Scope, first, and by note rather than in a later loop: an out-of-scope
     //    note must not even be read. Classified in one pass under one lock,
     //    rather than one lock and one run lookup per edit.
@@ -677,7 +693,13 @@ mod tests {
             &[edit("a", "one", "1"), edit("a", "zzz", "9")],
             &[],
             &[],
-            Approval::Individual,
+            // `Bulk`, because the batch carries more than one item and
+            // nothing here is a removal. `Individual` is now bounded to a
+            // single change (myne-md/myne#531 review round six); these
+            // three tests had been labelling multi-item batches
+            // `individual`, which is the gap that finding is about,
+            // reachable from the suite itself.
+            Approval::Bulk,
             &disk,
             &disk,
             &disk,
@@ -726,6 +748,119 @@ mod tests {
     // assertion. This is also the test that would have caught the shipped
     // version, in which the rule lived only in the React component and
     // `apply_approved` wrote whatever list it was handed.
+    // ---- the approval label's arity ------------------------------------
+
+    /// The carve-out fires only on `Bulk`, so `Individual` must be able to carry
+    /// only one thing (myne-md/myne#531 review round six).
+    ///
+    /// Asserted on the DISK, like every other test of this control: a host that
+    /// returned the error and wrote anyway would pass a return-value check.
+    #[test]
+    fn an_individual_approval_carrying_more_than_one_edit_is_refused_and_writes_nothing() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let before_a = note_with("title: A");
+        let before_b = note_with("title: B");
+        let disk = Disk::with(&[("a", &before_a), ("b", &before_b)], true);
+        let err = block_on(apply_approved(
+            &runs,
+            "r",
+            &[
+                edit("a", "title: A", "title: A2"),
+                // The one the relabelling exists to smuggle through.
+                edit("b", "title: B", &format!("title: B\ndeleted: {TRASH_TS}")),
+            ],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap_err();
+        assert!(
+            matches!(err, AgentError::IndividualApprovalNotSingle),
+            "expected the arity refusal, got {err:?}"
+        );
+        assert_eq!(disk.read_back("a"), before_a, "nothing may be written");
+        assert_eq!(disk.read_back("b"), before_b, "nothing may be written");
+    }
+
+    /// A new note counts toward the same one, so the two halves cannot be
+    /// combined to get two writes out of one individual approval.
+    #[test]
+    fn an_individual_approval_of_one_edit_plus_one_new_note_is_refused() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[("a", &note_with("title: A"))], true);
+        let err = block_on(apply_approved(
+            &runs,
+            "r",
+            &[edit("a", "title: A", "title: A2")],
+            &[(0, new_note("N", None))],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap_err();
+        assert!(matches!(err, AgentError::IndividualApprovalNotSingle));
+    }
+
+    /// The direction the gate must NOT break: one edit on its own still applies,
+    /// including one that removes a note, which is the whole point of the label.
+    #[test]
+    fn a_single_edit_individual_approval_still_applies_including_a_removal() {
+        for line in ["title: A2", &format!("title: A\ndeleted: {TRASH_TS}")] {
+            let runs = AgentRunState::default();
+            runs.start("r".into(), ids(&["a"]));
+            let disk = Disk::with(&[("a", &note_with("title: A"))], true);
+            let out = block_on(apply_approved(
+                &runs,
+                "r",
+                &[edit("a", "title: A", line)],
+                &[],
+                &[],
+                Approval::Individual,
+                &disk,
+                &disk,
+                &disk,
+            ))
+            .unwrap();
+            assert_eq!(out.applied, 1, "{line}");
+            assert!(out.refused.is_empty(), "{line}");
+        }
+    }
+
+    /// And a BULK approval is not bounded by arity, only by the carve-out. A
+    /// gate that also capped `Bulk` would break approve-all entirely.
+    #[test]
+    fn a_bulk_approval_may_still_carry_many_edits() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let disk = Disk::with(
+            &[("a", &note_with("title: A")), ("b", &note_with("title: B"))],
+            true,
+        );
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[
+                edit("a", "title: A", "title: A2"),
+                edit("b", "title: B", "title: B2"),
+            ],
+            &[],
+            &[],
+            Approval::Bulk,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 2);
+    }
+
     /// **Every marker, not only `trashed:`.** The shipped carve-out read one
     /// field, and a `deleted:` edit — which hides the note from Trash as well as
     /// from the sidebar, so the user cannot reach it from any view — rode along
@@ -985,7 +1120,13 @@ mod tests {
             &[edit("a", "world", "there")],
             &[(0, new_note("New", None))],
             &[],
-            Approval::Individual,
+            // `Bulk`, because the batch carries more than one item and
+            // nothing here is a removal. `Individual` is now bounded to a
+            // single change (myne-md/myne#531 review round six); these
+            // three tests had been labelling multi-item batches
+            // `individual`, which is the gap that finding is about,
+            // reachable from the suite itself.
+            Approval::Bulk,
             &disk,
             &disk,
             &disk,
@@ -1269,7 +1410,13 @@ mod tests {
             &[edit("a", "x", "1"), edit("b", "y", "2")],
             &[],
             &[],
-            Approval::Individual,
+            // `Bulk`, because the batch carries more than one item and
+            // nothing here is a removal. `Individual` is now bounded to a
+            // single change (myne-md/myne#531 review round six); these
+            // three tests had been labelling multi-item batches
+            // `individual`, which is the gap that finding is about,
+            // reachable from the suite itself.
+            Approval::Bulk,
             &disk,
             &disk,
             &disk,
