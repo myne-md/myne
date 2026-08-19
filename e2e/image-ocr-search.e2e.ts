@@ -22,10 +22,10 @@
 //     through a native file picker WebDriver cannot drive — the gf1 /
 //     attachment-text-preview precedent. It runs BEFORE the note is created so
 //     the editor's per-mount catalog load sees the row.
-//   - The form-C embed is typed with the `typeRaw` shape (probe char, then the
-//     payload) rather than `typeIntoEditor`, because the decoration REPLACES the
-//     raw source with a widget and a landed-check would false-negative and
-//     double-type.
+//   - The form-C embed is written with `seedEmbedIntoNote` (real `note_update`
+//     IPC + reopen) rather than typed: driving `![[` through WebDriver races
+//     CodeMirror's bracket auto-close, which cost four CI rounds before the
+//     input method itself was replaced. See that helper's header.
 //   - Search goes through the real command palette and asserts on the note's own
 //     option row (`data-note-id`), so an `att:` doc that failed to index cannot
 //     satisfy it.
@@ -49,7 +49,7 @@
 // Linux-only — authored on macOS to the conventions and run green in the
 // container (`./scripts/e2e-local.sh`). See e2e/CLAUDE.md "definition of done".
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "vitest";
@@ -60,15 +60,12 @@ import {
   dismissImporterOffer,
   pageSeatInvoke,
   searchAndOpenNote,
+  seedEmbedIntoNote,
   unlockToEditor,
-  waitForSaved,
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
 import { type Session } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
-const CM_CONTENT = `${EDITOR} .cm-content`;
-const BACKSPACE = String.fromCharCode(0xe003); // W3C key codepoint (Backspace)
 
 /** OCR of one small image runs three model passes; generous but bounded. */
 const IPC_TIMEOUT = 60_000;
@@ -115,19 +112,6 @@ async function selectedNoteId(s: Session): Promise<string> {
 
 /** Type raw source into CM6 without a landed-check (the decoration replaces the
  *  embed source with a widget, so a landed-check would never match). */
-async function typeRaw(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement(CM_CONTENT);
-  await content.click();
-  await session.waitUntil(
-    async () => {
-      await content.sendKeys("q");
-      return (await content.textContent()).includes("q") || null;
-    },
-    { label: "keystroke pipeline established", timeoutMs: 10_000 },
-  );
-  await content.sendKeys(BACKSPACE); // drop the probe char
-  await content.sendKeys(text);
-}
 
 // QUARANTINED — runner-contention victim, not a broken assertion. It passes
 // locally (~32 s uncontended) and passed CI outright in pipeline #402; it fails
@@ -146,11 +130,14 @@ describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)",
   // Vault-count precondition: 1 (weak KDF).
   it("finds a note by words that exist only inside an embedded image", async () => {
     let password = "";
+    let vaultId = "";
     await scenario(
       "io1-image-ocr-search",
       {
         seed: (dir) => {
-          password = seedVault(dir).password;
+          const v = seedVault(dir);
+          password = v.password;
+          vaultId = v.vaultId;
         },
       },
       async (app) => {
@@ -158,13 +145,87 @@ describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)",
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
+        // **The one link between the passing unit test and this failing
+        // scenario, asserted before the thing that depends on it.**
+        // `attachment_import_desktop` reads `attachment_ocr_enabled` and picks
+        // `extract_deferring_ocr` when it is off, which produces exactly the
+        // empty cache entry this scenario reports. The Rust test that covers
+        // the same import path passes `extract::extract` directly and so cannot
+        // see this gate at all. The pref defaults ON, but the vault here is
+        // seeded by the fixture generator rather than created by the app, and
+        // nothing until now checked what that blob actually says.
+        const prefs = await pageSeatInvoke(s, "plugin:prefs|prefs_read", {}, 10_000);
+        expect(
+          (prefs.ok as { attachment_ocr_enabled?: boolean } | undefined)?.attachment_ocr_enabled,
+          "the seeded vault must have image OCR on, or import defers it and the cache stays empty",
+        ).toBe(true);
+
         // OCR runs inside this call.
         const attachmentId = await importImage(s);
 
+        // **Split the chain before asserting the end of it.** The palette wait
+        // reported `the query landed but no row matched; re-running the search`
+        // — so the query was intact, the palette re-ran the search, and the note
+        // still was not a hit. That rules out the input and leaves two very
+        // different bugs wearing one failure: OCR produced no text for this
+        // image, or it produced text that never reached the search index. This
+        // gate answers the first directly, through the same production command
+        // the attachment-text preview uses, so a model that read nothing fails
+        // HERE by name instead of 45 s later as a missing palette row.
+        //
+        // Assertion shapes are boolean and length only: the extracted text is
+        // note-body-class plaintext and must not land in a CI log even though
+        // this image is a repo fixture.
+        const extracted = await pageSeatInvoke(
+          s,
+          "plugin:attachments|attachment_read_extracted_text",
+          { id: attachmentId },
+          IPC_TIMEOUT,
+        );
+        expect(extracted.err, "reading the MYE1 extraction cache must succeed").toBeUndefined();
+
+        // **Which of the two empties is it?** The import caches every extraction
+        // result EXCEPT `Unsupported`, so the presence of the blob on disk is
+        // the one observable that separates them, and neither the command nor
+        // the UI exposes the status itself:
+        //   - no blob  → `Unsupported`, which for an image means `models()` was
+        //                None, i.e. the running app never loaded the OCR weights
+        //                from its resource directory.
+        //   - a blob   → OCR ran and cleared nothing, a recognition result.
+        // Eight other explanations have already been refuted by measurement
+        // (weights present and real, image above the 96px floor, pipeline reads
+        // the fixture, compression preserves it, `is_ocr_image` accepts the
+        // compressed container, the full import path passes as a Rust test on
+        // this very runner, the stub features do not touch OCR, and the pref
+        // above is on), so this is the fork that is left.
+        const cachePath = join(
+          app.appDataDir,
+          "vaults",
+          vaultId,
+          "attachments-text",
+          attachmentId,
+        );
+        const cached = existsSync(cachePath);
+        const text = (extracted.ok as { text?: string } | null)?.text ?? "";
+        expect(
+          cached,
+          "no MYE1 blob at all means the extraction was Unsupported, which for an image " +
+            "means the running app has no OCR weights loaded — not that OCR read nothing",
+        ).toBe(true);
+        expect(text.length, "OCR must have written a non-empty MYE1 entry").toBeGreaterThan(0);
+        expect(
+          text.toLowerCase().includes(IMAGE_WORD_EN),
+          `the extraction must contain the English word the image renders ` +
+            `(${text.length} characters were extracted)`,
+        ).toBe(true);
+
         await createNote(s, "Taranmis belge");
         const noteId = await selectedNoteId(s);
-        await typeRaw(s, `![[att:${attachmentId}|${FILENAME}]]`);
-        await waitForSaved(s);
+        // No `waitForSaved` after this: the write went through `note_update`,
+        // not through the editor, so the autosave badge never leaves its
+        // pre-edit state and the wait burns its whole budget before failing.
+        // The IPC call is already durable when it returns.
+        await seedEmbedIntoNote(s, `![[att:${attachmentId}|${FILENAME}]]`);
 
         // 1. Base capability: a word only the pixels contain.
         await searchAndOpenNote(s, IMAGE_WORD_EN, noteId);

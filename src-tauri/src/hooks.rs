@@ -172,6 +172,21 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     fn pdf_export_teardown_on_lock(&self) {
         crate::plugins::pdf_export::teardown_on_lock(&self.app);
     }
+    /// myne#529: an agent run holds a note-id set derived from decrypted
+    /// plaintext, a transcript containing whole note bodies, and a proposal
+    /// built out of them. None of it may outlive the unlocked session, and the
+    /// feature persists nothing across a lock because there is no blob to wipe.
+    ///
+    /// **This used to be two lines inside `zeroize_vault_indices`, and moving
+    /// it out is the whole point.** That body is already non-empty for its own
+    /// state, so deleting the agent lines left every gate green while a locked
+    /// vault's note bodies stayed in the transcript:
+    /// `scripts/check-lock-teardown.mjs` is keyed on `<hook, holder>` and had
+    /// no hook to key on. It now has two rows here, one per state type.
+    fn agent_teardown_on_lock(&self) {
+        #[cfg(feature = "local-inference")]
+        crate::plugins::agent::teardown_on_lock(&self.app);
+    }
     fn clear_staged_descriptor(&self) {
         crate::plugins::workspace::commands::clear_staged_descriptor();
     }

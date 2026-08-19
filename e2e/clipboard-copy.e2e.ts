@@ -43,7 +43,8 @@ const PASSWORD = "correct horse battery staple 42";
  * catalog and not here fails this scenario, which is the correct outcome for a
  * string the user reads on the screen where the phrase is shown once.
  */
-const PHRASE_COPIED = "Copied to the clipboard. It clears itself in 30 seconds, even if you move on.";
+const PHRASE_COPIED =
+  "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.";
 
 describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#390)", () => {
   it("says nothing before the copy, and the SUCCESS string after it", async () => {

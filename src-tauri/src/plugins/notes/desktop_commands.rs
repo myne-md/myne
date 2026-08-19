@@ -1548,6 +1548,7 @@ mod tests {
         fn zeroize_attachment_refs(&self) {}
         fn abort_active_recording(&self) {}
         fn pdf_export_teardown_on_lock(&self) {}
+        fn agent_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, id: &str, _: &str, body: &str) {

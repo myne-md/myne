@@ -237,6 +237,7 @@ async fn run_post_delete_teardown(
         // payload on the same delete-proceeded path — the deleted vault's
         // plaintext must not outlive the vault in a second window.
         hooks.pdf_export_teardown_on_lock();
+        hooks.agent_teardown_on_lock();
         // MYND-31: wipe the plaintext-derived VaultIndices on the same
         // delete-proceeded path so it does not outlive the deleted vault.
         hooks.zeroize_vault_indices();

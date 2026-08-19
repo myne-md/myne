@@ -40,6 +40,9 @@ pub mod double_buffer;
 #[cfg(any(test, feature = "test-support"))]
 pub mod double_buffer_fixtures;
 pub mod export_naming;
+/// The one canonical folder key and the one equal-or-nested folder test, shared
+/// by the `ai_excluded_folders` (SYNC-14) clamp in every place that applies it.
+pub mod folder_key;
 pub mod http;
 // The process-host seam (phase3-web-client task 79) — what a command core needs
 // from its host that is not already an ordinary Rust value. Sibling of `hooks`,

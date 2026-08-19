@@ -28,6 +28,7 @@ import { AI_CHAT_HONESTY_NOTE } from "../../lib/load-bearing-copy";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
+import { AgentProgress } from "../agent/components/AgentProgress";
 
 /** Why the chat surface is at rest, as a fixed identifier — never content
  *  (#191 task 3). `ready` covers both "working" and "still asking the host":
@@ -348,6 +349,10 @@ export function AiChatTab({
 
   return (
     <div data-testid="ai.chat-tab" style={{ padding: "4px 2px" }}>
+      {/* myne#529: the agent surface rides this tab rather than opening a
+          second AI place. `AgentProgress` renders nothing when no run is open,
+          so the tab is unchanged for a user who never starts one. */}
+      <AgentProgress />
       <div style={HEADER_ROW_STYLE}>
         <div style={SECTION_HEADING_STYLE}>
           {t("editor.chrome.rightPanel.tabs.aiChat")}

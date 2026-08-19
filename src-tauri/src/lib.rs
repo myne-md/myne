@@ -382,6 +382,14 @@ pub fn run() {
     #[cfg(feature = "local-inference")]
     let builder = builder.plugin(plugins::local_inference::init());
 
+    // myne#529: agentic note editing. The loop and every policy live in
+    // `myne-core`; this plugin registers the run table, the host session table
+    // (the transcript) and the eight IPC commands. Registered beside
+    // `local-inference` and under the same gate, because its adapter binds to
+    // that plugin's engine: see the comment on `plugins::agent`.
+    #[cfg(feature = "local-inference")]
+    let builder = builder.plugin(plugins::agent::init());
+
     builder
         .setup(|app| {
             use tauri::Manager;

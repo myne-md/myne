@@ -450,13 +450,28 @@ export function aiTrustDisclosure(state: AiTrustState): string {
 // a consent screen usually omits, and it is the one that makes the other three
 // honest.
 
-/** WHAT leaves. Names the content, not a euphemism for it. */
+/** WHAT leaves. Names the content, not a euphemism for it.
+ *
+ *  **The scope roster is named because nothing else names it.** An agent run
+ *  answers the model's first `list_scope` with the note ids and titles of the
+ *  whole approved scope, before a single body has been read, so a user who
+ *  grants a folder and then stops the run has still sent that folder's titles,
+ *  which are frequently the most disclosing line in a note. `threat-model.md`
+ *  says of that roster: "Naming it here because the sentence above says nothing
+ *  else and a bulk enumeration of notes the model has not read is not covered by
+ *  it." This is the sentence it meant, and it did not say so until
+ *  myne-md/myne#531 review round six. */
 export const CONSENT_WHAT_LEAVES =
-  "The text of the notes involved in each request leaves your device — the note you are working in, and any note used to answer you.";
+  "The text of the notes involved in each request leaves your device — the note you are working in, and any note used to answer you. An agent run also sends the titles and identifiers of every note in the scope you approved, before it has read any of them.";
 
-/** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for. */
+/** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for.
+ *
+ *  The agent run is the fifth trigger and was added late: this branch amends
+ *  TB12 and TB13 to widen what crosses, and this screen is the surface that
+ *  amendment is meant to reach (myne-md/myne#531 review round six). A consent
+ *  screen that enumerates four of five triggers is not one. */
 export const CONSENT_WHEN_IT_LEAVES =
-  "Only when you ask for something: chat, summarize, rewrite, edit selection. Nothing is sent as you type, and nothing is sent in the background.";
+  "Only when you ask for something: chat, summarize, rewrite, edit selection, or an agent run. Nothing is sent as you type, and nothing is sent in the background.";
 
 /** TO WHOM. Interpolates the provider because a consent screen that cannot
  *  name the recipient is not consent. */

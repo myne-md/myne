@@ -153,7 +153,104 @@
   bar that proved the fix. `tor1` and `ci1`'s spec do NOT use the helper, so
   they are separate debts: `tor1` is a fake-sidecar posture timeout (raise its
   20 s budget or fix a handshake bug), not a network limit.
-- **Hunt flake with `--retry=0`.** With retries on, a failing attempt is erased
+- **The contention diagnosis was wrong a second time, and the real cause was the
+  driver PORT** (myne-md/myne#529). `gp1`, `gp2`, `nav1` and `sd1` were all
+  sitting on the **Welcome screen** with a correctly seeded vault, which
+  `initialStageFromProbe` reaches on exactly one input: `vault_list` answering
+  zero. Every scenario in a worker launches its own `tauri-driver` on the same
+  port, `teardown` sent SIGTERM, slept 200 ms, sent SIGKILL and returned WITHOUT
+  waiting, and `waitForDriver` can only ask whether SOMETHING is answering
+  there. So a scenario routinely attached to the previous scenario's dying
+  driver, and that driver spawns the app with ITS environment — an
+  `XDG_DATA_HOME` pointing at the `dataHome` the same teardown had just deleted.
+  The app found no `vaults/`, took the legitimate fresh-install path, and the
+  scenario waited its whole budget for an unlock screen that was never coming.
+  It explains every property contention could not: more timeout never helped
+  (the app is pointed at a deleted directory forever), it worsened at the tail
+  of a run (process death is slower under load), and it reproduced on an idle
+  machine now and then (the race is small, not absent). `launchApp` now RESOLVES
+  a free port rather than insisting on one, because a full local run proved
+  waiting is not enough: something held 4544 more than twenty seconds after
+  being SIGKILLed as a group. Measured either side of the fix, same warm
+  container: 2 failures then 0, and the suite got 62 s FASTER (758 s → 696 s),
+  because a burned 45 s budget costs more than the fix does.
+- **Every one of those failures was a permanent state a bigger budget cannot
+  reach, and the family is larger than the port.** The same shape turned up
+  seven times in one pass: an event emitted before its listener existed (Tauri
+  `emit` has no replay), the deleted-directory launch above, a control below the
+  fold of a nested `overflow` container (WebDriver's own pre-click scroll does
+  not reliably reach one in WebKit), a query the driver truncated during a focus
+  settle, an `<img>` the widget leaves hidden forever on a load `error`, a widget
+  never built because the per-mount catalog had not resolved, and a fake sidecar
+  that never reached either branch of its `listen`. **When a wait times out,
+  ask what would have to CHANGE for it to succeed, and if the answer is
+  "nothing", raising the number is the one fix guaranteed not to work.** The
+  helpers now say which of their several silent arms kept firing, and that is
+  what turned six of these from guesses into measurements.
+- **A helper that VERIFIES nothing is the same family, and it hides behind the
+  helper that comes after it.** `eo1` failed CI pipeline 653 three attempts
+  running, reporting the raw `![[att:…]]` text sitting in the buffer with no
+  widget over it. Nothing about that message points at typing, and every embed
+  scenario had a private `typeRaw` that sent the payload with `sendKeys` and then
+  returned: `sendKeys` resolving means the DRIVER accepted the keys, not that
+  CodeMirror applied them, and a garbled payload is not a Wikilink node, so the
+  embed decoration is never built and the raw text stays forever. The failure
+  then surfaces inside the NEXT helper, wearing the name of an attachment
+  problem. Same file, second defect, same shape: the keystroke probe types `q`
+  on every poll of its `waitUntil` and all six copies sent exactly one
+  Backspace, so a poll that looped left surplus characters ahead of the payload.
+  Both are now `typeEmbedIntoEditor` in `support/flows.ts`, and both are pinned
+  by `tests/scripts/e2eEmbedTyping.test.ts` against a fake `Session` running the
+  real `waitUntil`, because the mechanism of the first one IS "the poll ran more
+  than once" and no container run reproduces it on demand.
+- **When four rounds of hardening a helper each fix the shape CI just showed, the
+  defect is the INPUT METHOD, not the check.** Typing `![[att:…]]` races
+  CodeMirror's bracket auto-close: `[` inserts a closing `]`, and under
+  full-suite load the caret update and the incoming characters interleave. Two
+  permanent outcomes, both measured on the SAME commit — pipeline 661 got an
+  empty-target `cm-wikilink-chip-broken` with the payload behind it as plain
+  text, pipeline 664 got an unterminated span that is not a Wikilink node at all,
+  so nothing ever decorates it. Each round's check was correct about the shape it
+  had been shown and blind to the next one. The embed scenarios now WRITE the
+  embed through the real `note_update` IPC (`seedEmbedIntoNote`) and reopen the
+  note, which three scenarios in this suite already did for the reason
+  `sync-replication.e2e.ts` states in one line: "deterministic note_update IPC,
+  no flaky editor typing". What that gives up is stated in the helper: these
+  scenarios never meant to prove a user can type an embed, and typing is covered
+  where it IS the subject.
+- **A helper that owns a reload owns everything the reload undoes.** Two
+  scenarios broke the moment seeding started calling `refresh()`, in ways that
+  looked nothing like a reload problem: `waitForSaved` burned its full budget
+  (the write no longer goes through the editor, so the autosave badge never
+  leaves its pre-edit state), and `attachment-image.menu` "never rendered"
+  because the fresh-vault importer OVERLAY came back and swallowed the click.
+- **A raw `.click()` followed by a wait is the single most common shape behind a
+  timeout that reads like a dead surface**, and it kept being written after
+  `clickNewMenuItem` had already been fixed for it. `eo1` and `za1` both clicked
+  a widget control once and then waited 45 s for a surface that a missed click
+  can never produce. `clickByTestId` hit-tests and scrolls the control into its
+  own container; wrapping it in a re-click loop keyed on the surface appearing is
+  what makes the wait an assertion rather than a hope.
+- **Diagnose the DOM the way the code renders it, or the diagnostic lies with
+  confidence.** The same helper's first message read the source text and
+  reported "the `att:` text never landed" whenever it was absent. Every embed
+  widget is an ATOMIC `Decoration.replace`, so the moment any of them builds the
+  source leaves the DOM: a note whose text landed perfectly and is being drawn
+  as a tombstone reported as a typing failure. Worse, the tombstone is
+  DELIBERATELY shared between "the catalog has not loaded yet" and "the catalog
+  loaded without this id" (a broken-image flash is the alternative), so the two
+  are indistinguishable from the page and only a `catalog_list` from the page
+  seat separates them. A probe has to enumerate the states the RENDERER can be
+  in, not the ones the test author was thinking about.
+- **Hunt flake with `MYNE_E2E_RETRIES=0`**, which all three runners now take
+  (`e2e-one.sh`, `e2e-batch.sh`, `e2e-local.sh`), along with
+  `MYNE_E2E_QUARANTINE=1` and `MYNE_E2E_AI=1`. None of them did until
+  myne-md/myne#529, which is why that round cost ten CI pipelines: this file had
+  been telling people to hunt flake with retries off while no runner could turn
+  them off, and a quarantined spec was unreachable from a developer machine at
+  all. The quarantine one has a measured failure behind it — a release run of
+  `tp1` reported PASS having executed ZERO tests, and only the batch script's
+  three-bucket tally caught it. With retries on, a failing attempt is erased
   from the report and the flake rate reads as zero no matter how bad it is.
   Repeat the spec in ONE warm container and always discard a warm-up run: the
   first suite invocation in a fresh container costs ~40 s more than every one
@@ -163,3 +260,26 @@
 - States unreachable through real UI are NOT forced into E2E: downgrade to a
   Vitest component test (mocked `invoke`) and record the downgrade on the
   tracking issue.
+- **A helper that WAITS for a surface without OPENING it fails every scenario at
+  the same line, and reads as a flake.** `agent-run.e2e.ts` shipped an
+  `openAgentComposer` that only waited for `agentComposer.root`; that component
+  renders solely while the right pane's active tab is `ai-chat`, which nothing
+  had opened, so all five scenarios timed out identically at 15 s. The file
+  compiled, the testids were correct, and none of it ran. When a surface lives
+  behind a tab, a mode or a panel, the helper's first line is the one that
+  *opens* it (`runPaletteAction(s, "ai.open-chat", "chat")` here), and the wait
+  is the assertion that opening worked.
+- **The AI lane needs BOTH halves, and until recently neither was reachable
+  locally.** A scenario gated on `MYNE_E2E_AI=1` also needs the binary built
+  `--features local-inference-stub`, or `StubEngine` is not the backend and the
+  gate is meaningless; `.woodpecker.yml` pairs them and `e2e-buildrun.sh`
+  supplies neither. That is the mechanism by which a whole family of specs was
+  written and never run once on a developer machine. `scripts/e2e-ai-buildrun.sh`
+  pairs them; repeating a spec argument runs it that many times in the same warm
+  container, which is the shape the 3x gate wants.
+- **A stub engine that ECHOES cannot drive a tool-calling loop.** The agent's
+  system instructions list every action as a literal JSON line so a model can
+  copy the shape, so echoing the prompt back parses as all of them at once and
+  ends at `finish` with an empty proposal. Three scenarios asserted a non-empty
+  proposal and could never have passed. `StubEngine::agent_script` is the fixed
+  script that fixes it, and its own tests assert the echo could not have worked.

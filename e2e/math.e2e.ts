@@ -37,14 +37,22 @@ const KATEX_TIMEOUT = 20_000;
 async function typeRaw(session: Session, text: string): Promise<void> {
   const content = await session.waitForElement(CM_CONTENT);
   await content.click();
+  // ONE Backspace PER probe. The `waitUntil` types "q" on every poll, and under
+  // load it polls more than once, so a single Backspace leaves the surplus in
+  // the document ahead of the payload. This copy stays private because its
+  // payload is ordinary prose: the embed scenarios stopped typing altogether
+  // (`seedEmbedIntoNote` in `support/flows.ts`), and nothing here goes near a
+  // bracket that CodeMirror would auto-close.
+  let probes = 0;
   await session.waitUntil(
     async () => {
       await content.sendKeys("q");
+      probes += 1;
       return (await content.textContent()).includes("q") || null;
     },
     { label: "keystroke pipeline established", timeoutMs: 10_000 },
   );
-  await content.sendKeys(BACKSPACE); // drop the probe char
+  for (let i = 0; i < probes; i += 1) await content.sendKeys(BACKSPACE);
   await content.sendKeys(text);
 }
 

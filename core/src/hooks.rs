@@ -107,6 +107,18 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     fn zeroize_attachment_refs(&self);
     fn abort_active_recording(&self);
     fn pdf_export_teardown_on_lock(&self);
+    /// Drop the agent run's plaintext-derived RAM tables (myne-md/myne#529).
+    ///
+    /// **A hook of its own rather than a line inside another body, and the
+    /// reason is what makes this class invisible.** The desktop first cleared
+    /// these inside `zeroize_vault_indices`, whose body is already non-empty for
+    /// its own state, so deleting that one line left `cargo build`, `clippy
+    /// -D warnings`, `cargo test`, `pre-commit` and CI all green while a locked
+    /// vault's note bodies stayed resident in the agent transcript.
+    /// `scripts/check-lock-teardown.mjs` is keyed on `<hook, holder>` pairs and
+    /// can only speak for a hook that exists, which is why this one does.
+    /// `pdf_export_teardown_on_lock` above is the same shape for the same reason.
+    fn agent_teardown_on_lock(&self);
     fn clear_staged_descriptor(&self);
     /// `site` is the `&'static str` tracing tag the desktop free-fn expects.
     fn apply_screen_capture(&self, enabled: bool, site: &'static str);
@@ -243,6 +255,7 @@ impl VaultLifecycleHooks for NoopHooks {
     fn zeroize_attachment_refs(&self) {}
     fn abort_active_recording(&self) {}
     fn pdf_export_teardown_on_lock(&self) {}
+    fn agent_teardown_on_lock(&self) {}
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, _: bool, _: &'static str) {}
 
@@ -367,6 +380,7 @@ pub mod test_hooks {
         fn zeroize_attachment_refs(&self) {}
         fn abort_active_recording(&self) {}
         fn pdf_export_teardown_on_lock(&self) {}
+        fn agent_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}

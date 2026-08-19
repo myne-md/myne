@@ -6,6 +6,7 @@
 
 import { afterEach, describe } from "vitest";
 import { harnessSupported, launchApp, type AppSession, type LaunchOptions } from "./session";
+import { vaultDirState } from "./fixtures";
 
 const support = harnessSupported();
 let warned = false;
@@ -71,7 +72,22 @@ export async function scenario(
     await body(app);
   } catch (e) {
     await app.saveArtifacts(label);
-    throw e;
+    // **What the app could SEE, appended to what it DID.** The boot probe added
+    // to `unlockToEditor` reported that six scenarios were sitting on the
+    // WELCOME screen, which `initialStageFromProbe` reaches on exactly one
+    // input: `vault_list` answered with zero vaults. The seed runs to
+    // completion before the process spawns, so "the seed was late" is already
+    // ruled out and the remaining explanations split on one fact this line
+    // supplies and nothing else could — whether the vault is on disk at the
+    // moment of failure. Populated means the app read a different place or
+    // dropped what it read; empty means something removed it after the
+    // generator wrote it.
+    //
+    // Structural only (names of directories the harness itself created, plus a
+    // presence bit), so nothing here can carry vault content into a CI log.
+    throw new Error(`${(e as Error).message}\n  vault dir: ${vaultDirState(app.appDataDir)}`, {
+      cause: e,
+    });
   } finally {
     current = null;
     await app.teardown();
