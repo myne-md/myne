@@ -1375,7 +1375,7 @@ mod agent_script_tests {
             // edit DOES.
             let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
                 .expect("the anchor must place");
-            if myne_core::plugins::agent::trash::edit_trashes(body, &placed) {
+            if myne_core::plugins::agent::hide::edit_hides_note(body, &placed) {
                 trashing += 1;
             } else {
                 ordinary += 1;

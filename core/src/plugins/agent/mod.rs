@@ -16,8 +16,10 @@
 //!
 //! **What this module deliberately cannot do.** It has two verbs, edit a note
 //! body and create a note, and no third. Deletion is not among them because it
-//! does not need to be: trash in Myne is a `trashed:` frontmatter timestamp, so
-//! trashing is a body edit and is reversible. Note move, note rename, folder
+//! does not need to be: every way Myne takes a note out of the working set is a
+//! frontmatter field, so doing it is a body edit and is reversible. That is
+//! also why [`hide`] exists: those edits look like any other at the diff layer,
+//! and an approve-all must not carry one. Note move, note rename, folder
 //! operations and attachment operations are all absent. Rename in particular is
 //! absent for a structural reason rather than a cautious one: it would require
 //! rewriting every note that links to the renamed one, and those notes are not
@@ -34,6 +36,7 @@ pub mod apply;
 pub mod edit;
 pub mod engine;
 pub mod error;
+pub mod hide;
 pub mod probe;
 pub mod prompt;
 pub mod run;
@@ -41,7 +44,6 @@ pub mod run;
 pub mod run_loop;
 pub mod scope;
 pub mod tools;
-pub mod trash;
 
 pub use apply::{
     apply_approved, ApplyOutcome, ApplyReader, Approval, BatchWriter, RefusedEdit,
@@ -53,6 +55,7 @@ pub use engine::{
     AGENT_REQUEST_CLASS,
 };
 pub use error::{AgentError, EditRejection};
+pub use hide::edit_hides_note;
 pub use probe::{grade, run_probe, AttemptVerdict, ProbeThreshold, ProbeVerdict};
 pub use prompt::{AgentAction, Proposal, ProposedNote};
 pub use run::{AgentRunState, AgentRunView, GrantOrigin};
@@ -64,4 +67,3 @@ pub use scope::{
 pub use tools::{
     list_scope, read_note, search_scope, NoteReader, ScopeEntry, ScopeSearcher, SearchHit,
 };
-pub use trash::edit_trashes;

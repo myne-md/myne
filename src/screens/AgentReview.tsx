@@ -9,12 +9,15 @@
 //
 // Three things here are load-bearing rather than presentational.
 //
-//   1. **Bulk approve structurally cannot carry a trash.** Deletion in Myne is a
-//      `trashed:` frontmatter timestamp, so at the diff layer it is
-//      indistinguishable from any other edit, and "the agent only edits bodies"
-//      would quietly become "a silent trash inside a forty-edit approve-all".
-//      The split is done by `splitForBulkApproval`, and the bulk path is handed
-//      only the approvable half: it has no way to reach the other one.
+//   1. **Bulk approve structurally cannot carry a removal.** Every way Myne
+//      takes a note out of the note list is a frontmatter field (`trashed:`,
+//      `deleted:`, `archived:`, `template:`, `conflict:`), so at the diff layer
+//      it is indistinguishable from any other edit, and "the agent only edits
+//      bodies" would quietly become "a silent removal inside a forty-edit
+//      approve-all". The split is done by `splitForBulkApproval`, and the bulk
+//      path is handed only the approvable half: it has no way to reach the
+//      other one. The row says WHICH removal, because one sentence cannot be
+//      true for all five.
 //   2. **The running scope total is always on screen.** With no cap on scope
 //      growth, this number is what bounds accumulation.
 //   3. **Refused edits are shown with their cause.** An edit the host could not
@@ -32,10 +35,12 @@ import { changedLineCount, diffWithSegments } from "../dialect";
 import {
   agentApply,
   agentUndo,
+  editHidesNoteAs,
   netDeletion,
   splitForBulkApproval,
   type AgentApplyResult,
   type Approval,
+  type HidingField,
   type ProposedEdit,
   type ProposedNote,
 } from "../lib/agent-run";
@@ -52,6 +57,34 @@ import {
   useAgent,
 } from "../notes/agent/agentStore";
 
+/** What approving this removal on its own will do, in the user's words.
+ *
+ *  **A `switch` over literal keys rather than a template key**, and that is not
+ *  style. `scripts/check-i18n.mjs` scans static `t("…")` literals by design (an
+ *  expression-aware scanner is a scanner with a bypass), so
+ *  ``t(`agent.review.removalFlag.${field}`)`` would put five user-facing
+ *  sentences outside every check in this repository — the exact hole
+ *  `tests/lib/editRejectionMirror.test.ts` had to be written to close for the
+ *  refusal strings. Written this way, a missing key is a `check-i18n` failure
+ *  in `pre-commit`.
+ *
+ *  Exhaustive over `HidingField`, so a sixth marker fails to typecheck here
+ *  rather than rendering an empty flag beside a destructive button. */
+function removalFlagLabel(field: HidingField, t: (key: string) => string): string {
+  switch (field) {
+    case "trashed":
+      return t("agent.review.removalFlag.trashed");
+    case "deleted":
+      return t("agent.review.removalFlag.deleted");
+    case "archived":
+      return t("agent.review.removalFlag.archived");
+    case "template":
+      return t("agent.review.removalFlag.template");
+    case "conflict":
+      return t("agent.review.removalFlag.conflict");
+  }
+}
+
 /** A deletion this large gets a visual flag.
  *
  *  A flag rather than a block, and rather than an exclusion from bulk approve: a
@@ -64,7 +97,8 @@ const LARGE_DELETION_CHARS = 240;
 interface EditRow {
   edit: ProposedEdit;
   index: number;
-  trashes: boolean;
+  /** Which working-set marker this edit introduces, or `null`. */
+  removes: HidingField | null;
   largeDeletion: boolean;
 }
 
@@ -99,16 +133,22 @@ export function AgentReview({
     notesCreatedNotReverted: number;
   } | null>(null);
 
-  const rows: EditRow[] = useMemo(() => {
-    const { needsOwnAct } = splitForBulkApproval(agent.proposal.edits);
-    const trashSet = new Set(needsOwnAct);
-    return agent.proposal.edits.map((edit, index) => ({
-      edit,
-      index,
-      trashes: trashSet.has(edit),
-      largeDeletion: netDeletion(edit) >= LARGE_DELETION_CHARS,
-    }));
-  }, [agent.proposal.edits]);
+  const rows: EditRow[] = useMemo(
+    () =>
+      // `editHidesNoteAs` rather than membership of `splitForBulkApproval`'s
+      // `needsOwnAct`: `editHidesNote` IS `editHidesNoteAs(…) !== null`, so the
+      // two can never disagree, and asking twice could. A row the split excluded
+      // but this call reported `null` for would render no flag AND no
+      // separate-act button, which is the one state that leaves an edit the
+      // user can neither approve nor understand.
+      agent.proposal.edits.map((edit, index) => ({
+        edit,
+        index,
+        removes: editHidesNoteAs(edit),
+        largeDeletion: netDeletion(edit) >= LARGE_DELETION_CHARS,
+      })),
+    [agent.proposal.edits],
+  );
 
   const byNote = useMemo(() => {
     const map = new Map<string, EditRow[]>();
@@ -122,10 +162,10 @@ export function AgentReview({
 
   const kept = useMemo(() => keptEdits(agent), [agent]);
   // Derived from `rows`, which already classified every edit. Re-partitioning
-  // here would re-run the trash regex over every anchor and replacement on every
-  // render, purely to render a count.
+  // here would re-run five marker regexes over every anchor and replacement on
+  // every render, purely to render a count.
   const bulkApprovableCount = useMemo(
-    () => rows.filter((r) => !r.trashes && !agent.rejected.has(r.index)).length,
+    () => rows.filter((r) => r.removes === null && !agent.rejected.has(r.index)).length,
     [rows, agent.rejected],
   );
   /** Whether Approve-all has anything to send.
@@ -192,10 +232,11 @@ export function AgentReview({
    *
    *  It is handed the approvable half AND tells the host this was a bulk
    *  approval. The second half is what makes the rule real: the host re-derives
-   *  whether each edit trashes a note, from the note as it will actually be, and
-   *  refuses one inside a `"bulk"` approval regardless of what this function
-   *  sent. So a future edit that changed this to `apply(kept, "bulk")` would be
-   *  refused by the host rather than silently trashing a note. */
+   *  whether each edit takes a note out of the working set, from the note as it
+   *  will actually be, and refuses one inside a `"bulk"` approval regardless of
+   *  what this function sent. So a future edit that changed this to
+   *  `apply(kept, "bulk")` would be refused by the host rather than silently
+   *  removing a note. */
   async function approveAll() {
     const { bulkApprovable } = splitForBulkApproval(kept);
     await apply(bulkApprovable, approvedNewNoteIndices(agent), "bulk");
@@ -505,18 +546,19 @@ function EditRowView({
         <span style={{ color: "var(--fg-2)" }}>
           {t("agent.review.changedLines", { count: changedLines })}
         </span>
-        {/* The structural carve-out, made visible. A trashing edit is not part
-            of the bulk action at all, so it says so and carries its own act. */}
-        {row.trashes ? (
+        {/* The structural carve-out, made visible. A removing edit is not part
+            of the bulk action at all, so it says so, says WHICH removal, and
+            carries its own act. */}
+        {row.removes !== null ? (
           <span
-            data-testid="agentReview.trashFlag"
+            data-testid="agentReview.removalFlag"
             style={{ color: "var(--fg-1)", fontWeight: "var(--weight-semibold)" }}
           >
-            {t("agent.review.trashFlag")}
+            {removalFlagLabel(row.removes, t)}
           </span>
         ) : null}
         {/* The visual-only flag. Deliberately weaker than the one above. */}
-        {row.largeDeletion && !row.trashes ? (
+        {row.largeDeletion && row.removes === null ? (
           <span data-testid="agentReview.largeDeletion" style={{ color: "var(--fg-2)" }}>
             {t("agent.review.largeDeletion")}
           </span>
@@ -532,14 +574,14 @@ function EditRowView({
             {rejected ? t("agent.review.restoreEdit") : t("agent.review.rejectEdit")}
           </Button>
         )}
-        {row.trashes && !applied ? (
+        {row.removes !== null && !applied ? (
           <Button
             variant="danger"
             disabled={busy || rejected}
             onClick={onApplyOne}
-            data-testid="agentReview.applyTrash"
+            data-testid="agentReview.applyRemoval"
           >
-            {t("agent.review.applyTrash")}
+            {t("agent.review.applyRemoval")}
           </Button>
         ) : null}
       </div>

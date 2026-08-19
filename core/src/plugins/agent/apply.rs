@@ -28,9 +28,9 @@
 
 use super::edit::{place, ProposedEdit};
 use super::error::{AgentError, EditRejection};
+use super::hide::edit_hides_note;
 use super::prompt::ProposedNote;
 use super::run::AgentRunState;
-use super::trash::edit_trashes;
 use crate::folder_key::{canonical_excluded, folder_matches_excluded};
 use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};
 use serde::{Deserialize, Serialize};
@@ -141,10 +141,13 @@ pub trait BatchWriter: Send + Sync {
 
 /// How the user approved this batch.
 ///
-/// **This is the trash carve-out, and it is here rather than in the UI on
-/// purpose.** Trashing a note is a `trashed:` frontmatter timestamp, so at the
-/// diff layer it is indistinguishable from any other edit; the rule that a bulk
-/// approve may not carry one is therefore a rule about *what the user did*, not
+/// **This is the removal carve-out, and it is here rather than in the UI on
+/// purpose.** Every way Myne takes a note out of the working set is a
+/// frontmatter field (`trashed:`, `deleted:`, `archived:`, `template:`,
+/// `conflict:` — [`super::hide::edit_hides_note`] carries the roster), so at
+/// the diff layer a removal is indistinguishable from any other edit; the rule
+/// that a bulk approve may not carry one is therefore a rule about *what the
+/// user did*, not
 /// about what the edit looks like. Expressed as a component-level filter it is
 /// only ever as true as the current component: a second caller, a refactor, or
 /// the mobile port would each have to re-derive it, and the host could not
@@ -153,11 +156,13 @@ pub trait BatchWriter: Send + Sync {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Approval {
-    /// One edit the user approved on its own. May trash a note.
+    /// One edit the user approved on its own. May remove a note from the
+    /// working set.
     Individual,
-    /// A batch the user approved in one action. **May not trash a note.** An
-    /// edit that would is refused with [`EditRejection::TrashNeedsOwnAct`],
-    /// reported like any other refusal, and the rest of the batch still applies.
+    /// A batch the user approved in one action. **May not remove a note from
+    /// the working set.** An edit that would is refused with
+    /// [`EditRejection::RemovalNeedsOwnAct`], reported like any other refusal,
+    /// and the rest of the batch still applies.
     Bulk,
 }
 
@@ -293,14 +298,15 @@ pub async fn apply_approved(
         match place(body, &edit.anchor, &edit.replacement) {
             Ok(next) => {
                 // The carve-out, checked on the RESULT rather than on the edit's
-                // text: whether a note ends up trashed is a fact about the note
-                // after the edit, and reading it here means the host never has
-                // to agree with the frontend about what a trash looks like.
-                if approval == Approval::Bulk && edit_trashes(body, &next) {
+                // text: whether a note ends up out of the working set is a fact
+                // about the note after the edit, and reading it here means the
+                // host never has to agree with the frontend about what a
+                // removal looks like.
+                if approval == Approval::Bulk && edit_hides_note(body, &next) {
                     outcome.refused.push(RefusedEdit {
                         note_id: edit.note_id.clone(),
                         index: *index,
-                        reason: EditRejection::TrashNeedsOwnAct,
+                        reason: EditRejection::RemovalNeedsOwnAct,
                     });
                     continue;
                 }
@@ -720,6 +726,52 @@ mod tests {
     // assertion. This is also the test that would have caught the shipped
     // version, in which the rule lived only in the React component and
     // `apply_approved` wrote whatever list it was handed.
+    /// **Every marker, not only `trashed:`.** The shipped carve-out read one
+    /// field, and a `deleted:` edit — which hides the note from Trash as well as
+    /// from the sidebar, so the user cannot reach it from any view — rode along
+    /// inside an approve-all (myne-md/myne#531 review round five). Asserted on
+    /// the DISK for the same reason the single-field version is: a host that
+    /// reported the refusal and wrote anyway would pass a return-value check.
+    #[test]
+    fn a_bulk_approval_cannot_remove_a_note_by_any_marker() {
+        for line in [
+            "trashed: 2026-08-16T10:00:00Z",
+            "deleted: 2026-08-16T10:00:00Z",
+            "archived: 2026-08-16T10:00:00Z",
+            "template: true",
+            "conflict: true",
+        ] {
+            let runs = AgentRunState::default();
+            runs.start("r".into(), ids(&["a"]));
+            let before = note_with("title: T");
+            let disk = Disk::with(&[("a", &before)], true);
+            let out = block_on(apply_approved(
+                &runs,
+                "r",
+                &[edit("a", "title: T", &format!("title: T\n{line}"))],
+                &[],
+                &[],
+                Approval::Bulk,
+                &disk,
+                &disk,
+                &disk,
+            ))
+            .unwrap();
+            assert_eq!(out.applied, 0, "{line}");
+            assert_eq!(out.refused.len(), 1, "{line}");
+            assert_eq!(
+                out.refused[0].reason,
+                EditRejection::RemovalNeedsOwnAct,
+                "{line}"
+            );
+            assert_eq!(
+                disk.read_back("a"),
+                before,
+                "{line}: the note must be byte-identical"
+            );
+        }
+    }
+
     #[test]
     fn a_bulk_approval_cannot_trash_a_note_and_the_note_is_unchanged() {
         let runs = AgentRunState::default();
@@ -744,7 +796,7 @@ mod tests {
         .unwrap();
         assert_eq!(out.applied, 0);
         assert_eq!(out.refused.len(), 1);
-        assert_eq!(out.refused[0].reason, EditRejection::TrashNeedsOwnAct);
+        assert_eq!(out.refused[0].reason, EditRejection::RemovalNeedsOwnAct);
         assert_eq!(disk.read_back("a"), before, "the note is byte-identical");
     }
 
