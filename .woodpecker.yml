@@ -738,7 +738,23 @@ steps:
       # sync scenarios self-skip exactly as they always have, and the drop in
       # executed count is what `e2e-floor` is there to notice.
       - test -x "$CI_WORKSPACE/myne-server-e2e" && export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server-e2e" || echo "no myne-server binary -> sync scenarios self-skip"
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=2 MYNE_E2E_AI=1 MYNE_E2E_SERVER="'"$MYNE_E2E_SERVER"'" RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+      # THREE shards, raised from two, and the number comes from a measurement
+      # rather than from taste. Pipeline 668: 125 spec files summed to 2063 s of
+      # file time and the step took 1032 s on two shards — 2063/2 = 1031.5, so
+      # sharding was running at 100 % parallel efficiency and the host was NOT
+      # the limit. A starved host shows up as efficiency BELOW the divisor, and
+      # that is the reading to take again if this is ever revisited.
+      #
+      # The floor for any shard count is the slowest single FILE, because vitest
+      # parallelises across files: that is `sync-replication` at 127 s, far below
+      # 2063/3 = 688 s, so three shards can actually be packed. Four would still
+      # clear the floor (516 s) and is the next step if three holds.
+      #
+      # **Abort condition, stated before the run.** `e2e-floor` must report 0
+      # failures. This branch spent four rounds on a load-sensitive flake, and
+      # more shards is more load; if the count moves off zero, this goes back to
+      # two rather than being investigated.
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=3 MYNE_E2E_AI=1 MYNE_E2E_SERVER="'"$MYNE_E2E_SERVER"'" RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── Quarantine lane (flaky-test epic) ──────────────────────
   # Runs ONLY the `describeE2E.flaky` contention-victim scenarios (nav1, tp1),
