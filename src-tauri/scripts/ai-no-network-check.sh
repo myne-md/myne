@@ -283,7 +283,12 @@ done
 #    CLAUDE.md guard table and every doc that cites it, for no safety gain.
 echo "== AI-path egress call sites (ratchet) =="
 
-AI_EGRESS_ROOTS="src-tauri/src/plugins/local_inference"
+# myne#529: the agent is a NEW AI path carrying note plaintext to whatever
+# backend serves the run, and it lives in two trees this ratchet did not scan.
+# No socket exists on either today, so adding them starts their allowlist empty
+# exactly as #414 landed this check: a later shortcut in `EngineAdapter` would
+# add no crate, pass checks 1 and 2, and have to argue for its own entry here.
+AI_EGRESS_ROOTS="src-tauri/src/plugins/local_inference src-tauri/src/plugins/agent core/src/plugins/agent"
 
 # One record per line: <repo-relative-path>|<exact count>|<reason>
 #

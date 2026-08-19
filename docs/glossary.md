@@ -96,6 +96,24 @@ A simple, modern file-encryption format and library by Filippo Valsorda. Myne do
 Used in: `decisions.md` 2026-04-28 (age/rage cited as the boring-crypto precedent for the RustCrypto stack); `spec/protocol.md` §2
 Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
+### **agent run** &nbsp; 📦 *Product*
+
+One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run survives a vault lock**: the run table and its transcript are dropped on the same leg as the AI vector store, which is why the feature adds no encrypted blob family and owes `myne-test-vectors` nothing. A run never writes; applying is a separate act behind the user's approval.
+
+Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
+
+### **agent scope** &nbsp; 📦 *Product*
+
+The set of notes an [agent run](#agent-run) may read and change, held as a **resolved set of note ids** rather than as the folder or list the user named. Resolution happens once, at approval time, and nothing re-evaluates it: a note added to a granted folder afterwards is not inside what the user approved. `ai_excluded_folders` (SYNC-14) is applied to every grant, host-side, and the number of notes it removed is stated on the approval screen rather than dropped silently. There is deliberately no cap on how large a scope may become; what bounds accumulation is that every widening is separately approved and the total is shown continuously.
+
+Used in: `decisions.md` 2026-08-16
+
+### **agentic note editing** &nbsp; 📦 *Product*
+
+The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Two verbs, edit a note body and create a note; deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, move, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` or `folder:` line is a rename or a move by the same mechanism trashing is. What bounds those is that each appears in the diff the user approves. Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
+
+Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
+
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
 A class of password-authenticated key exchange where the server stores no password verifier the attacker can brute-force offline after a database compromise. OPAQUE (RFC 9807) is the modern aPAKE Myne's later-major-version roadmap canonicalizes for sync-server authentication. v0.1 derives but does not transmit the relevant subkey; the actual aPAKE-vs-simple-verifier choice is deferred to Phase 2 (`spec/protocol.md` §11.1).
@@ -738,6 +756,12 @@ The EdDSA signature scheme over the twisted Edwards form of Curve25519 (RFC 8032
 
 Used in: `threat-model.md` §3 TB7
 Reference: RFC 8032.
+
+### **edit anchor** &nbsp; 📦 *Product*
+
+The exact existing text a [proposed edit](#proposed-edit) copied out of a note, used to place its replacement. The host requires it to occur **exactly once**; zero occurrences and more than one are separate named refusals, and neither is ever resolved by placing the replacement somewhere plausible. There is no fuzzy matching, no nearest-match fallback and no whitespace-tolerant retry: each of those converts a visible refusal into a silent misapplication, which is the single failure class the format exists to prevent. Because an anchor is content-addressed rather than an offset, an edit whose note changed between the model reading it and the user approving simply does not match, which is the whole of the sync-race answer.
+
+Used in: `decisions.md` 2026-08-16
 
 ### **editor typography** &nbsp; 📦 *Product*
 
@@ -1678,6 +1702,12 @@ The one-time MAC algorithm by Daniel J. Bernstein, used as the authenticator ins
 
 Used in: `spec/protocol.md` §5.1
 
+### **proposed edit** &nbsp; 📦 *Product*
+
+One anchored change an [agent run](#agent-run) suggests to a note body: an [edit anchor](#edit-anchor) plus the text that replaces it. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
+
+Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
+
 ### **quick-unlock credential** &nbsp; 🗝️ *Key/identifier*
 
 A [device-local credential](#device-local-credential) (`vault.quickunlock`, `spec/protocol.md` §9.14, magic `MYQ1`) that holds a **third wrapped copy of `root_key`** so a re-lock (auto-lock-on-idle) can be reversed with a fast second credential — Touch ID / Face ID / Windows Hello, or a PIN — instead of the full master-password Argon2id path. It wraps the already-derived `root_key`; it never participates in `root_key` derivation, so it does not touch the zero-knowledge root (the master password stays the primary credential). Its wrap key comes from a [wrap-key provider](#wrap-key-provider), not a `DeriveSubkey` role. Threat class: an **A6** convenience gate over the already-encrypted store; it does **not** defend against **A7** (active local malware), and the PIN provider's blob is offline-brute-forceable by **A4** bounded only by Argon2id cost. Introduced MYND-329.
@@ -1913,6 +1943,12 @@ The cryptographic core of a Myne vault. A 32-byte random value generated by the 
 
 Used in: `spec/protocol.md` §3.1
 
+### **run restore point** &nbsp; 📦 *Product*
+
+The snapshot set an [agent run](#agent-run) takes over every note it is about to write, grouped by the run's id so the whole run reverts as one action. Captured **before** the write, past the snapshot coalescing window, and **a failure to capture it blocks the apply**: the restore point is the only thing that makes an agent edit reversible, so writing without it would apply an irreversible change while the interface has told the user it can be undone. The existing transactional multi-note write deliberately captures no snapshot (a rename is a deterministic, mechanically reversible rewrite) and that stays true; the capture is added at the agent's own call site.
+
+Used in: `decisions.md` 2026-08-16
+
 ### **RustCrypto** &nbsp; 🛠️ *Tooling*
 
 A collection of pure-Rust cryptographic crates (`hkdf`, `chacha20poly1305`, `argon2`, `ml-kem`, `ml-dsa`, etc.). **The primary — and only — primitive provider on Myne's Rust side** (`decisions.md` 2026-04-28, which supersedes the earlier libsodium-bindings clause; `spec/protocol.md` §2 "Library"). `protocol/Cargo.toml` declares **no cryptographic primitive provider outside RustCrypto**: every KDF, AEAD, hash and MAC the protocol specifies comes from `hkdf`, `argon2`, `chacha20poly1305`, `chacha20`, `poly1305`, `sha2` and `pbkdf2` (the RFC 5802/7677 SCRAM KDF), alongside `subtle`, `zeroize` and `getrandom`. The manifest's other entries are not primitive providers and are not claimed to be — `base64` (SCRAM `AuthMessage` serialization), `bip39` (the BIP-39 wordlist and its own internal checksum; the phrase is fed **directly** to RustCrypto's `argon2`, never through BIP-39's PBKDF2 seed step), `unicode-normalization` (NFKD before Argon2id), `thiserror`, `serde`, `tracing`. The same crate is what the desktop, mobile and — compiled to `wasm32-unknown-unknown` — web clients run, so there is no fallback path and no second Rust implementation to keep in agreement. [libsodium](#libsodium) is not linked anywhere; it remains the **byte-level interoperability reference** the primitive choices are stated against, machine-checked by `myne-test-vectors/`. The `ml-kem` and `ml-dsa` crates are the likely Rust path for a later version's post-quantum primitives.
@@ -1936,6 +1972,12 @@ Used in: Saved Views (MYND-271, MYND-282); `decisions.md` 2026-06-14
 An automatic, recurring [vault backup file](#vault-backup-file) written to a user-chosen local folder on a cadence (MYND-351). Runs only while the app is open and the vault is unlocked ("Model A"), driven by an opportunistic elapsed-time check (`now − last success ≥ interval`) on unlock and periodically while unlocked — not a wall-clock timer (auto-lock would starve one). Reuses the manual export path verbatim (no new cryptography; the `.myne-backup` stays exactly as encrypted as the vault). Governed by a device-local [backup schedule](#backup-schedule). Keeps the most recent N (user-set, default 7), pruning only files it wrote. **No email or cloud delivery — ever** (`vision.md` anti-feature); the user's own folder-sync handles offsite. Distinct from [restore (from backup)](#restore-from-backup) and from the manual click-to-back-up action. Leak/egress posture is that of any backup file: `threat-model.md` §7, TB3.
 
 Used in: `decisions.md` 2026-06-18; `myne-agents/features/scheduled-local-backup/`
+
+### **scope expansion** &nbsp; 📦 *Product*
+
+A widening of an [agent scope](#agent-scope) during a run, approved by the user in an act separate from and prior to approving the diff. It grants **reading and changing** the named notes together, and the approval screen says so in those words: "include this folder" describes a smaller permission than the one being given. A grant is folder-shaped or an explicit note list and is frozen at approval; a live predicate (a tag, a saved search) is not an available shape, because its contents can change after it was granted and the agent can write the very tag that would widen its own scope. An expansion the **model** requests is the injection-reachable path; one the **user** sets is their own act, and the composer's scope control exists so ordinary folder-scale work goes through the second.
+
+Used in: `decisions.md` 2026-08-16
 
 ### **screen-capture protection** &nbsp; 📦 *Product*
 

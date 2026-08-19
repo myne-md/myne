@@ -22,7 +22,6 @@ import { seedVault } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
-  editorText,
   enableAi,
   runPaletteAction,
   typeIntoEditor,
@@ -75,12 +74,39 @@ aiDescribe("as1 AI summarize → render → insert (note-summarization)", () => 
         // The per-turn "Insert into note" appends a `## Summary` block via the
         // normal save (SYNC-17 — the insertable-turn action).
         await (await s.byTestId("ai.insert-turn")).click();
+        // **Asserted on the rendered HEADING, not on the source marker.** The
+        // previous check was `editorText(s).includes("## Summary")`, and it can
+        // never be true: `editorText` reads `.cm-content`'s textContent, and in
+        // Live preview a heading's `## ` marker is decoration-hidden on every
+        // line the cursor is not on, so the block reads back as "Summary". The
+        // insert had been working the whole time. `flows.ts` documents this
+        // exact trap for `typeIntoEditor` and normalises around it; the
+        // knowledge just never reached here, so this scenario timed out on
+        // develop and on every branch and read like a broken insert.
+        //
+        // `.cm-h2` is what `## ` MEANS after rendering, so this is the stronger
+        // assertion rather than the looser one: a plain paragraph containing the
+        // word Summary does not satisfy it.
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("## Summary") ? true : null),
+          async () => {
+            for (const h of await s.findElements(".cm-h2")) {
+              if ((await h.textContent()).trim() === "Summary") return true;
+            }
+            return null;
+          },
           { label: "summary block inserted", timeoutMs: 10_000 },
         );
         await waitForSaved(s);
-        expect(await editorText(s)).toContain("## Summary");
+        // The same trap once more, in the post-save re-read: `editorText` is the
+        // RENDERED readout, so the `## ` marker is decoration-hidden here too.
+        // Re-asserted after the save rather than dropped, because the point of
+        // this line is that the block SURVIVED the autosave round-trip, not that
+        // it appeared: a decoration can render before the write lands.
+        const headings: string[] = [];
+        for (const h of await s.findElements(".cm-h2")) {
+          headings.push((await h.textContent()).trim());
+        }
+        expect(headings).toContain("Summary");
       },
     );
   });

@@ -23,8 +23,13 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { installFakeTorSidecar, torSidecarControl } from "./support/fake-tor-sidecar";
 import {
+  fakeIsInstalled,
+  installFakeTorSidecar,
+  torSidecarControl,
+} from "./support/fake-tor-sidecar";
+import {
+  bootDiagnostic,
   closeSettings,
   dismissImporterOffer,
   enableDeveloperMode,
@@ -38,12 +43,60 @@ const POSTURE_TIMEOUT_MS = 20_000;
 
 /** Wait until the settings posture row reports `posture`, and return the label
  *  text it renders — the two are asserted together so a row that changes its
- *  `data-posture` without changing what the user reads cannot pass. */
+ *  `data-posture` without changing what the user reads cannot pass.
+ *
+ *  **On timeout it names the posture the row was ACTUALLY showing**, because
+ *  the four postures fail for four unrelated reasons and the bare wait
+ *  distinguished none of them. `unavailable` means the supervisor declared the
+ *  run failed (its SOCKS greeting probe refused, or the child was reaped), and
+ *  it is a TERMINAL verdict — no amount of extra budget recovers it, which is
+ *  the thing a timeout message alone cannot say. `connecting` means the fake
+ *  never emitted its readiness line, `inactive` means the toggle came back off,
+ *  and no row at all means the panel unmounted. This scenario was quarantined as
+ *  a contention victim on the assumption it was merely late; that assumption has
+ *  never been checked against the posture it was stuck on. */
 async function waitForPosture(session: Session, posture: string): Promise<string> {
-  await session.waitForElement(testIdSelector("settings.tor-posture", { "data-posture": posture }), {
-    timeoutMs: POSTURE_TIMEOUT_MS,
-  });
-  return await (await session.byTestId("settings.tor-posture-label")).text();
+  try {
+    // **The posture and its label are read in ONE round trip, from the same
+    // render.** They used to be two: wait for the row carrying the posture, then
+    // look the label up again. Two WebDriver round trips are not within a
+    // render, and the posture moves on its own — so a label could be read after
+    // the row had already advanced, and two of the four reads came back
+    // identical. The scenario then reported a copy collapse (three distinct
+    // labels where four were expected) that does not exist in the catalog.
+    // `ai-degradation`'s resting-state reader carries the same lesson for the
+    // same reason.
+    const label = await session.waitUntil(
+      async () =>
+        session.execute<string | null>(
+          "var row = document.querySelector('[data-testid=\"settings.tor-posture\"]');" +
+            "if (!row || row.getAttribute('data-posture') !== arguments[0]) return null;" +
+            "var el = row.querySelector('[data-testid=\"settings.tor-posture-label\"]');" +
+            "return el ? (el.textContent || '') : null;",
+          [posture],
+        ),
+      { label: `posture ${posture} with its label, read together`, timeoutMs: POSTURE_TIMEOUT_MS },
+    );
+    return label;
+  } catch (raw) {
+    const rows = await session.byTestIdAll("settings.tor-posture");
+    if (rows.length > 0) {
+      throw new Error(
+        `${(raw as Error).message} | waited for "${posture}", the row was showing ` +
+          `"${await rows[0].attribute("data-posture")}"`,
+      );
+    }
+    // NO row at all is the answer that needs the screen, not the row. The panel
+    // renders the row whenever the posture is known, so its absence means
+    // either the panel is not mounted (Settings closed, the vault locked under
+    // us, the tab moved) or the hook has not published yet on a FRESH mount —
+    // and those are the same observation from here. What separates them is what
+    // else is on screen, which is exactly what the boot probe reports.
+    throw new Error(
+      `${(raw as Error).message} | waited for "${posture}", no posture row rendered; ` +
+        `screen: ${await bootDiagnostic(session)}`,
+    );
+  }
 }
 
 /** The editor-chrome banner's posture, or `null` when it renders nothing. */
@@ -71,6 +124,15 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
           const s = app.session;
           const tor = torSidecarControl(app.appDataDir);
 
+          // The app spawns whatever sits at that path, so this scenario is
+          // about a real Tor client unless the fixture is actually there. A run
+          // measured the fake's start marker absent while the host had clearly
+          // spawned something, which is the one shape that says the file was not
+          // ours.
+          expect(fakeIsInstalled(), "the fake sidecar must be the file the app will spawn").toBe(
+            true,
+          );
+
           await unlockToEditor(s, password);
           await dismissImporterOffer(s);
 
@@ -94,6 +156,57 @@ describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)"
           );
           const connectingLabel = await waitForPosture(s, "connecting");
           expect(await bannerPosture(s)).toBe("connecting");
+
+          // **The fake must actually be LISTENING before its bootstrap means
+          // anything, and nothing here could see that before.** The host picks
+          // the SOCKS port by binding `:0`, reading the number and DROPPING the
+          // listener before handing it to the child, so the child races
+          // everything else on the box for it. A lost race makes the fake exit
+          // at once, and the phase has ALREADY reached `connecting` by then —
+          // it is set right after the spawn, before any stderr is read — so the
+          // assertion above passes and the posture goes `unavailable` a moment
+          // later. That reads as a bootstrap that failed rather than as a
+          // process that was never listening, which is how this scenario came
+          // to be quarantined as a 20 s budget problem.
+          //
+          // **Polled, not read once, and the first version of this was read
+          // once.** `connecting` is published the instant the child is spawned,
+          // before it has run a line, so a single read right after it reports
+          // `not written` every time — which is what CI measured, and it says
+          // nothing about the port. The three outcomes only separate once the
+          // fake has had a chance to reach either branch of its listen.
+          let lastBind = "never polled";
+          let lastNotice = "none";
+          const bound = await s.waitUntil(
+            async () => {
+              const outcome = tor.bindOutcome();
+              lastBind = outcome;
+              // The panel already tells the USER when the sidecar would not
+              // start, and that notice is the one thing that separates a spawn
+              // which failed from a bootstrap which has not finished. The phase
+              // reaches Starting BEFORE the spawn is attempted, so seeing
+              // `connecting` is not evidence the child exists; this is.
+              const notices = await s.byTestIdAll("settings.tor-routing-notice");
+              lastNotice = notices.length === 0 ? "none" : (await notices[0].text()).trim();
+              return outcome.startsWith("not written") ? null : outcome;
+            },
+            {
+              // The observation goes in the LABEL, because the label is the only
+              // part of a timeout the reader sees. A fixed sentence here would
+              // repeat the same guess every run; the directory listing says
+              // whether the host even prepared a sidecar directory.
+              label: () =>
+                `the fake sidecar to report its bind outcome; last read: ${lastBind}; ` +
+                `the panel's own notice says: ${lastNotice}. Nothing written means it ` +
+                "reached neither branch of listen, so it is not the process the host " +
+                "spawned or it exited before running",
+              timeoutMs: 15_000,
+            },
+          );
+          expect(
+            bound,
+            "the fake sidecar must own its SOCKS port before a bootstrap can be probed",
+          ).toMatch(/^listening /);
 
           // ── The client finishes bootstrapping: the tunnel is up ───────
           tor.bootstrap();

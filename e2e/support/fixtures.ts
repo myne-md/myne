@@ -21,6 +21,7 @@
 import { execFileSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -32,6 +33,40 @@ import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { REPO_ROOT } from "./session";
 import { scanForPlaintext } from "./plaintext-scan";
+
+/**
+ * A one-line, content-free description of what is under `<appDataDir>/vaults`,
+ * for a failure message.
+ *
+ * Reports each vault directory's name and whether it still holds a `vault.meta`
+ * — the file `vault_list` keys on, so an entry without one is invisible to the
+ * app exactly as an absent directory is. It never opens the file, so nothing it
+ * prints can carry vault content into a CI log.
+ *
+ * It exists because the boot probe added to `unlockToEditor` reported six
+ * scenarios sitting on the WELCOME screen, which `initialStageFromProbe`
+ * reaches on exactly one input: `vault_list` answered with zero vaults. The
+ * seed runs to completion before the app process spawns, so "the seed was late"
+ * is already ruled out, and the remaining explanations split on the one fact
+ * this supplies: whether the vault is on disk at the moment of failure.
+ * Populated means the app read a different place or dropped what it read; empty
+ * means something removed it after the generator wrote it.
+ */
+export function vaultDirState(appDataDir: string): string {
+  const vaults = join(appDataDir, "vaults");
+  if (!existsSync(appDataDir)) return "appDataDir itself is gone";
+  if (!existsSync(vaults)) return "no vaults/ directory";
+  try {
+    const names: string[] = readdirSync(vaults);
+    const dirs = names.filter((n: string) => statSync(join(vaults, n)).isDirectory());
+    if (dirs.length === 0) return "vaults/ is EMPTY";
+    return dirs
+      .map((n: string) => `${n}:${existsSync(join(vaults, n, "vault.meta")) ? "meta" : "NO-META"}`)
+      .join(" ");
+  } catch (raw) {
+    return `unreadable (${(raw as Error).message})`;
+  }
+}
 
 export interface SeededVault {
   vaultId: string;
@@ -276,18 +311,57 @@ export function assertBlobMagic(path: string, magic: string): void {
   }
 }
 
-/** Assert the per-attachment blob at `attachments/<id-hex>` starts with MYA1. */
+/** Which generation a vault is, read from `vault.meta`'s own magic.
+ *
+ * `MYV1` is v0.1 and `NTV5` is v0.2 (`protocol.md` §10.3). Every per-vault blob
+ * family follows the vault it belongs to, so a fixture that hardcodes one
+ * family's magic is asserting against whichever generation happened to be
+ * current the day it was written. */
+export function vaultGeneration(appDataDir: string, vaultId: string): "v0.1" | "v0.2" {
+  const head = readFileSync(vaultMetaPath(appDataDir, vaultId))
+    .subarray(0, 4)
+    .toString("latin1");
+  if (head === "MYV1") return "v0.1";
+  if (head === "NTV5") return "v0.2";
+  throw new Error(
+    `vault.meta magic is ${JSON.stringify(head)}, which is neither MYV1 (v0.1) ` +
+      "nor NTV5 (v0.2). A third value here is a format regression, not a new case " +
+      "to add: fix the writer rather than this helper.",
+  );
+}
+
+/** Assert the per-attachment blob at `attachments/<id-hex>` carries the
+ *  attachment magic for THIS VAULT'S generation: `MYA1` on v0.1, `MYA5` on v0.2.
+ *
+ * **It used to hardcode `MYA1`, and that is why three scenarios were red.** The
+ * product is right and has a test saying so: `core/src/plugins/attachments/
+ * commands.rs` writes "under the vault's OWN generation", with
+ * `an attachment imported into an NTV5 vault must be MYA5, not MYA1`. A vault
+ * created today is v0.2 throughout, so every fixture vault became NTV5 and this
+ * assertion started demanding the previous generation's magic. It failed on
+ * develop and on every branch cut from it, and it read like an at-rest format
+ * regression, which is the one thing it exists to be believed about.
+ *
+ * Deriving the expectation keeps the assertion STRONGER than relaxing it to
+ * "either magic" would: a v0.1 vault whose attachment came out `MYA5` is still
+ * a failure here, and so is the reverse. */
 export function assertAttachmentBlobMagic(
   appDataDir: string,
   vaultId: string,
   attachmentId: string,
 ): void {
-  assertBlobMagic(attachmentBlobPath(appDataDir, vaultId, attachmentId), "MYA1");
+  const magic = vaultGeneration(appDataDir, vaultId) === "v0.2" ? "MYA5" : "MYA1";
+  assertBlobMagic(attachmentBlobPath(appDataDir, vaultId, attachmentId), magic);
 }
 
-/** Assert the attachments catalog `vault.attachments` starts with MYC1. */
+/** Assert the attachments catalog `vault.attachments` carries this vault's
+ *  catalog magic: `MYC1` on v0.1, `MYC5` on v0.2. Same generation rule and the
+ *  same reason as the attachment blob above; the migration moves the catalog
+ *  and its blobs together (`core/src/plugins/vault_migrate/mod.rs`: "`MYC1`→
+ *  `MYC5` plus every `attachments/<id>` `MYA1`→`MYA5`"). */
 export function assertCatalogMagic(appDataDir: string, vaultId: string): void {
-  assertBlobMagic(attachmentsCatalogPath(appDataDir, vaultId), "MYC1");
+  const magic = vaultGeneration(appDataDir, vaultId) === "v0.2" ? "MYC5" : "MYC1";
+  assertBlobMagic(attachmentsCatalogPath(appDataDir, vaultId), magic);
 }
 
 /**

@@ -2,7 +2,6 @@
   "files": {
     "e2e-web/support/server.ts": 2,
     "e2e/accent-color.e2e.ts": 1,
-    "e2e/drawing-inline-embed.e2e.ts": 1,
     "e2e/drawing-notes.e2e.ts": 5,
     "e2e/importer-read-seam.e2e.ts": 2,
     "e2e/plaintext-residue.e2e.ts": 1,
@@ -79,6 +78,8 @@
     "tests/notes/viewsSection.test.tsx": 8,
     "tests/notes/workspaceState.test.ts": 1,
     "tests/recover/recover-variant-mapping.test.tsx": 3,
+    "tests/scripts/e2eCopyLiterals.test.ts": 1,
+    "tests/scripts/e2eEnterKey.test.ts": 1,
     "tests/scripts/token-adoption.test.ts": 1,
     "tests/settings-search-grouping.test.ts": 1,
     "tests/stage/editor-mount-guard.test.tsx": 4,
@@ -87,5 +88,5 @@
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 219
+  "total": 220
 }

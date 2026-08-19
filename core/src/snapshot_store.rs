@@ -216,6 +216,43 @@ pub fn capture_snapshot_best_effort(
     now_ms: u64,
     force: bool,
 ) -> bool {
+    // Semantics unchanged: `true` still means "could not write". The
+    // uuid-returning sibling below is what the agent's run restore point needs,
+    // and it exists so the two paths cannot drift into two capture rules.
+    matches!(
+        capture_snapshot_reporting_uuid(vault_root, note_uuid, old_blob, now_ms, force),
+        CaptureOutcome::Failed
+    )
+}
+
+/// What one capture attempt did.
+///
+/// [`capture_snapshot_best_effort`] collapses this to a bool for its existing
+/// callers, whose contract is "did it fail". The agent's run restore point needs
+/// the uuid as well, because a run reverts as one action and that means knowing
+/// which snapshot per note to restore.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CaptureOutcome {
+    /// Written. Carries the new snapshot's uuid.
+    Captured(String),
+    /// Skipped by the coalescing window. Not a failure.
+    Coalesced,
+    /// Could not be written.
+    Failed,
+}
+
+/// [`capture_snapshot_best_effort`], reporting the snapshot uuid it wrote.
+///
+/// The agent apply path calls this with `force = true`: an agent run's restore
+/// point may not be coalesced away, because the interface has told the user the
+/// run can be undone and a skipped capture would make that false.
+pub fn capture_snapshot_reporting_uuid(
+    vault_root: &Path,
+    note_uuid: &str,
+    old_blob: &[u8],
+    now_ms: u64,
+    force: bool,
+) -> CaptureOutcome {
     let sdir = match crate::paths::snapshots_dir_under(vault_root) {
         Ok(d) => d,
         Err(e) => {
@@ -224,7 +261,7 @@ pub fn capture_snapshot_best_effort(
                 io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
                 "snapshot dir create failed (best-effort; note save unaffected)"
             );
-            return true;
+            return CaptureOutcome::Failed;
         }
     };
     let existing = list_note_snapshots(&sdir, note_uuid).unwrap_or_default();
@@ -234,7 +271,7 @@ pub fn capture_snapshot_best_effort(
             stage = "snapshot_coalesced",
             "snapshot skipped: within window"
         );
-        return false;
+        return CaptureOutcome::Coalesced;
     }
     let snap_uuid = new_snapshot_uuid().to_string();
     if let Err(e) = write_snapshot_blob(&sdir, note_uuid, &snap_uuid, old_blob) {
@@ -243,7 +280,7 @@ pub fn capture_snapshot_best_effort(
             io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
             "snapshot write failed (best-effort; note save unaffected)"
         );
-        return true;
+        return CaptureOutcome::Failed;
     }
     tracing::debug!(
         stage = "snapshot_created",
@@ -265,7 +302,7 @@ pub fn capture_snapshot_best_effort(
             "snapshot prune scan failed (best-effort; snapshot already written)"
         );
     }
-    false
+    CaptureOutcome::Captured(snap_uuid)
 }
 
 #[cfg(test)]

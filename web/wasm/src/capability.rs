@@ -399,6 +399,18 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // is exactly why a wrong rationale here is invisible to every guard and
     // visible only to a reader.
     ("local-inference", Class::Unsupported),
+    // Agentic note editing (myne-md/myne#529). Unsupported for the same reason
+    // as `local-inference` directly above and by the same decision: the whole AI
+    // surface is absent on web, and this plugin has no meaning without a model
+    // to run. It carries nothing web-specific of its own: no storage, no new
+    // origin, no seam, so there is nothing here that a web port could enable
+    // independently of porting the AI surface itself, which is its own epic
+    // rather than a task under this feature.
+    //
+    // `Class::Unsupported` rather than `Class::Pending` deliberately: the
+    // feature's own PRD puts web out of scope, and Pending would advertise an
+    // affordance the client is not going to grow.
+    ("agent", Class::Unsupported),
     // Backup export/restore. `decisions.md` 2026-07-26 "Web capability set":
     // "Opening a backup file as an alternative entry path is not offered", and
     // the code lives in `src-tauri/`, so it would be net-new rather than

@@ -79,9 +79,26 @@ export async function rewriteSelectionToEditor(
     );
     return false;
   }
-  // A null result or an empty rewrite is not a failure — the pipeline declined
-  // (no selection, nothing to do). Silent, as it was.
-  if (result === null || result.text.length === 0) return false;
+  // **`null` and an empty string are two different events, and collapsing them
+  // is what left the user with nothing to read.** `computeRewrite` returns
+  // `null` from `resolveRewriteRange` BEFORE it calls the engine, which means
+  // exactly one thing: there was no selection to rewrite. An empty `text` means
+  // the engine ran and declined. Only the second is "the pipeline declined";
+  // the first is the user running "Rewrite selection" with nothing selected,
+  // and answering it is the whole point of this module existing.
+  //
+  // `ad3` is the scenario that names the standard: an explicit AI action always
+  // answers. It failed here, on this line, because a command that ran and said
+  // nothing is indistinguishable from a command that never fired -- the exact
+  // sentence the `catch` above was added to stop being true.
+  if (result === null) {
+    args.showToast(args.t("editor.flow.aiRewriteNoSelection"));
+    return false;
+  }
+  // Still silent, and still deliberate: the engine answered, it simply had
+  // nothing to put back. That is not a failure and not the user's mistake, so
+  // there is nothing actionable to say.
+  if (result.text.length === 0) return false;
 
   const original = args.stateAtStart.doc.sliceString(result.from, result.to);
   const now = args.activeView();

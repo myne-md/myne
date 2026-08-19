@@ -164,6 +164,7 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     }
     fn abort_active_recording(&self) {}
     fn pdf_export_teardown_on_lock(&self) {}
+    fn agent_teardown_on_lock(&self) {}
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, enabled: bool, site: &'static str) {
         // Native screen-capture protection lives in `crate::screen_guard`,

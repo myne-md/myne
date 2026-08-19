@@ -227,33 +227,66 @@ steps:
       # `classify` report a DISPATCHED command as unported — the roster test
       # caught it locally, and would have caught nothing here.
       - cargo test -p myne-web-wasm
-      # Reproducible wasm artefact (MYND-574 task 16). Two cold builds into
-      # separate target directories must produce the same digest.
-      #
-      # This runs in CI as well as locally on purpose: CI is a DIFFERENT machine
-      # — different user, different checkout path, a Linux container rather than
-      # macOS — so a path remap that only works on the author's box fails here.
-      # That cross-machine difference is most of the value; a same-machine check
-      # can only prove independence from the target directory.
-      #
-      # `threat-model.md` §6 makes reproducible builds the substitute for the
-      # missing third-party audit, and A15/TB11 makes the published bundle hash
-      # the web client's only defence against hostile code delivery. A hash
-      # nobody can reproduce is a number the publisher asserts about itself.
-      #
-      # All logic in a COMMITTED script, never inline — the same rule
-      # `ai-no-network-check.sh` and `hooks-parity-check.sh` follow, because
-      # Woodpecker's config-compile runs env substitution over this file and a
-      # shell expansion in a step (or even in a comment) can error the whole
-      # pipeline config.
-      #
-      # `nodejs` because `build-wasm.sh` reads cargo's `--message-format=json`
-      # artefact record with it, and `rust:slim` has no node. Added 2026-07-29
-      # after this step ran for the FIRST TIME: it landed with MYND-574 and every
-      # pipeline since errored at config-compile, so it was written, reviewed and
-      # merged without once executing. A gate that has never run is a gate whose
-      # result nobody has seen — which is the same failure class the step itself
-      # exists to catch, one layer up.
+
+  # ─── Reproducible wasm artefact ──────────────────────────────
+  # Two cold builds into separate target directories must produce the same
+  # digest (MYND-574 task 16).
+  #
+  # This runs in CI as well as locally on purpose: CI is a DIFFERENT machine —
+  # different user, different checkout path, a Linux container rather than
+  # macOS — so a path remap that only works on the author's box fails here. That
+  # cross-machine difference is most of the value; a same-machine check can only
+  # prove independence from the target directory.
+  #
+  # `threat-model.md` §6 makes reproducible builds the substitute for the missing
+  # third-party audit, and A15/TB11 makes the published bundle hash the web
+  # client's only defence against hostile code delivery. A hash nobody can
+  # reproduce is a number the publisher asserts about itself.
+  #
+  # All logic in a COMMITTED script, never inline — the same rule
+  # `ai-no-network-check.sh` and `hooks-parity-check.sh` follow, because
+  # Woodpecker's config-compile runs env substitution over this file and a shell
+  # expansion in a step (or even in a comment) can error the whole pipeline
+  # config.
+  #
+  # `nodejs` because `build-wasm.sh` reads cargo's `--message-format=json`
+  # artefact record with it, and `rust:slim` has no node. Added 2026-07-29 after
+  # this step ran for the FIRST TIME: it landed with MYND-574 and every pipeline
+  # since errored at config-compile, so it was written, reviewed and merged
+  # without once executing. A gate that has never run is a gate whose result
+  # nobody has seen — which is the same failure class the step itself exists to
+  # catch, one layer up.
+  #
+  # ─── Why this is its OWN step, and why it depends on a step it does not use ──
+  # Woodpecker compiles `depends_on` into STAGES and runs them one after another:
+  # every step in a stage starts together and the next stage waits for the
+  # SLOWEST one, whether or not anything connects them. Measured on pipelines
+  # 649, 655 and 661 — `vitest` starts at the exact second `wasm-protocol` ends
+  # every time, though it depends only on `pnpm-build`, which finished 160 s
+  # earlier.
+  #
+  # These two commands are 120 s of `wasm-protocol`'s 222 s, in the first stage,
+  # whose second-slowest step is `pnpm-build` at 64 s. Nothing depends on them.
+  # So they were 120 s of pure waiting for every other step in the pipeline.
+  # `depends_on: [cargo-test-tauri]` lands them in the `e2e` stage, where 1118 s
+  # are already being spent and this costs nothing.
+  #
+  # Only the REPRODUCIBILITY half moved. The correctness gates above — the
+  # CSPRNG-hook check, the wasm dependency graph, both wasm clippys, the entry
+  # crate's tests — stay in the first stage and still fail at minute two. This
+  # one is a publish-time property, and the trade it makes is explicit: it now
+  # surfaces at minute ~15 instead of minute ~4.
+  wasm-repro:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    depends_on: [cargo-test-tauri]
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
       - apt-get update && apt-get install -y --no-install-recommends nodejs
       - bash scripts/wasm-repro-check.sh
 
@@ -353,6 +386,19 @@ steps:
       # lock shipped that way while the OPFS write path skipped its TOCTOU guard
       # believing the lock was held.
       - node scripts/check-unwired.mjs
+      # IPC bindings with no caller (myne#529): the layer above the ratchet
+      # above. A command declared, permitted, registered and mirrored in TS can
+      # still be called by nothing, and then the feature behind it ships inert.
+      - node scripts/check-ipc-binding-callers.mjs
+      # Playwright image vs lockfile (myne#529): the image bakes browsers for
+      # its own version, so a tag behind the lockfile fails every test inside
+      # `browserType.launch`. It took the whole mobile-flow-logic lane down,
+      # 179 tests, and looked like a broken suite rather than a missing binary.
+      - node scripts/check-playwright-image.mjs
+      # Frontend lock teardown (myne#529): the WebView half of the Rust-side
+      # `check-lock-teardown.mjs`. A vault-leaving path that skips one clear
+      # leaves a module-scope store resident into the next vault's session.
+      - node scripts/check-frontend-lock-teardown.mjs
       # Mobile export-backup exclusion (myne#491): the plaintext export directory
       # (`Documents`) stays out of iCloud Backup and Android Auto Backup. Four
       # files in three languages carry that property and no compiler compares
@@ -498,6 +544,21 @@ steps:
       # low default soft limit, which surfaces as a `tauri build` panic
       # (`Os code 24 / Too many open files`, EMFILE → core dump, exit 134).
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      # 68 s, and it stays 68 s. A shared apt archive cache on `/cache` was tried
+      # here and reverted after two pipelines measured no change at all (666 and
+      # 668, both still "Need to get 220 MB of archives"). Two causes stacked:
+      # Debian's images ship `/etc/apt/apt.conf.d/docker-clean` setting
+      # `Binary::apt::APT::Keep-Downloaded-Packages "false"`, so apt deletes every
+      # .deb after installing it wherever the archive path points; and files in
+      # `apt.conf.d` are read in LEXICAL order with later ones winning, so
+      # `docker-clean` overrode a `01`-prefixed override of that setting.
+      #
+      # Not worth a third attempt at this size. Of the 68 s only ~22 s is the
+      # 220 MB download; the rest is dpkg unpacking 929 MB, which no download
+      # cache touches. The whole 68 s comes back with a PREBUILT IMAGE that has
+      # these packages baked in, which is a registry plus a build pipeline plus
+      # an image-freshness gate, and belongs to its own change rather than to a
+      # line hidden in this step.
       - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
@@ -563,6 +624,10 @@ steps:
     environment:
       CI: "true"
     commands:
+      # 67 s, the same set `tauri-compile` installs one stage earlier, and sharing
+      # the downloads between them does NOT work — see that step for the two
+      # stacked causes and for why a prebuilt image rather than a cache is the
+      # answer at this size.
       - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
@@ -673,6 +738,27 @@ steps:
       # sync scenarios self-skip exactly as they always have, and the drop in
       # executed count is what `e2e-floor` is there to notice.
       - test -x "$CI_WORKSPACE/myne-server-e2e" && export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server-e2e" || echo "no myne-server binary -> sync scenarios self-skip"
+      # TWO shards, and three was tried and reverted — the numbers are here so
+      # nobody spends another pipeline on it.
+      #
+      # The argument for raising it looked like a measurement. Pipeline 668: 125
+      # spec files summed to 2063 s of file time against a 1032 s step on two
+      # shards, i.e. 2063/2 = 1031.5, so sharding was running at 100 % parallel
+      # efficiency. That was read as "the host is not the limit". **It is not
+      # evidence of that**, and pipeline 672 is why: on three shards the step
+      # took 1627 s, LONGER than on two, and `e2e-floor` reported 22 failures
+      # against a ceiling of 0.
+      #
+      # What 100 % efficiency at N actually says is that no time is lost to
+      # SCHEDULING at N. It says nothing about whether the work itself gets
+      # slower at N+1, and here it does: the summed file time is not a constant,
+      # it expands under contention. Three concurrent WebKit apps plus their
+      # drivers push every scenario's own wall clock out far enough to swallow
+      # the division and then some, and the timing-sensitive ones start failing.
+      #
+      # If this is ever revisited, the reading that would justify it is a run at
+      # N+1 whose SUMMED FILE TIME is unchanged from N. Efficiency at N is not
+      # that reading.
       - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=2 MYNE_E2E_AI=1 MYNE_E2E_SERVER="'"$MYNE_E2E_SERVER"'" RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── Quarantine lane (flaky-test epic) ──────────────────────
@@ -1146,7 +1232,20 @@ steps:
   # repo would have let `reuseExistingServer` attach these specs to the DESKTOP
   # app and report green about the wrong client.
   mobile-flow-logic:
-    image: mcr.microsoft.com/playwright:v1.61.1-noble
+    # The image tag MUST match the `@playwright/test` version `pnpm-lock.yaml`
+    # resolves, and `scripts/check-playwright-image.mjs` is what holds it there.
+    # The image bakes browser binaries under `/ms-playwright/<name>-<revision>/`,
+    # and the revision a Playwright release looks for is pinned inside that
+    # release. So a tag one minor behind the lockfile is not "slightly old": the
+    # installed Playwright looks for a revision the image does not carry and
+    # every test dies in `browserType.launch` before its first assertion.
+    #
+    # That is exactly what shipped. `mobile/package.json` asked for `^1.61.1`,
+    # the lockfile drifted to 1.62.1, the tag stayed at v1.61.1, and all 179
+    # flow-logic tests across 44 files failed with `Executable doesn't exist at
+    # /ms-playwright/chromium_headless_shell-1234/...` on develop and on every
+    # branch. The lane was red for so long that its redness stopped being read.
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
     # `status: [success, failure]` — see the lane header above (#458).
     when:
       - path: *code-path-globs
@@ -1527,6 +1626,12 @@ steps:
       - name: hooks-parity
         optional: true
       - name: wasm-protocol
+        optional: true
+      # Split out of `wasm-protocol` so its 120 s double build leaves the first
+      # stage. It can still go red on its own, and this file is the only thing
+      # that pushes a failure to the maintainer, so it needs its own slot: a
+      # step split off without one is a gate that goes quiet.
+      - name: wasm-repro
         optional: true
       # RESERVED SLOT — vector-verification is commented out (see the step
       # above, part 3 of its re-enable procedure). Uncomment the two lines

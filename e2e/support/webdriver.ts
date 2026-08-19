@@ -505,7 +505,13 @@ export class Session {
    *  out instead, with the swallowed error named in the message. */
   async waitUntil<T>(
     fn: () => Promise<T | null | undefined | false>,
-    opts?: FindOptions & { label?: string },
+    // A LAZY label is allowed, and it is what lets a poll report why it kept
+    // failing. The label is read only on the timeout path, so a thunk costs a
+    // passing wait nothing, and the alternative — building the string up front —
+    // cannot see anything the polls learned. `clickByTestId` is the case that
+    // needed it: its three retry arms are the diagnosis, and they are only
+    // observable from inside the predicate.
+    opts?: FindOptions & { label?: string | (() => string) },
   ): Promise<T> {
     const timeout = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const interval = opts?.intervalMs ?? DEFAULT_INTERVAL_MS;
@@ -525,8 +531,10 @@ export class Session {
       }
       if (result) return result;
       if (Date.now() >= deadline) {
+        const label =
+          typeof opts?.label === "function" ? opts.label() : opts?.label ?? "predicate";
         throw new Error(
-          `waitUntil(${opts?.label ?? "predicate"}) timed out after ${timeout} ms` +
+          `waitUntil(${label}) timed out after ${timeout} ms` +
             (lastStale ? ` (last poll error: ${lastStale.message})` : ""),
         );
       }
