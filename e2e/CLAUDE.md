@@ -242,7 +242,15 @@
   are indistinguishable from the page and only a `catalog_list` from the page
   seat separates them. A probe has to enumerate the states the RENDERER can be
   in, not the ones the test author was thinking about.
-- **Hunt flake with `--retry=0`.** With retries on, a failing attempt is erased
+- **Hunt flake with `MYNE_E2E_RETRIES=0`**, which all three runners now take
+  (`e2e-one.sh`, `e2e-batch.sh`, `e2e-local.sh`), along with
+  `MYNE_E2E_QUARANTINE=1` and `MYNE_E2E_AI=1`. None of them did until
+  myne-md/myne#529, which is why that round cost ten CI pipelines: this file had
+  been telling people to hunt flake with retries off while no runner could turn
+  them off, and a quarantined spec was unreachable from a developer machine at
+  all. The quarantine one has a measured failure behind it — a release run of
+  `tp1` reported PASS having executed ZERO tests, and only the batch script's
+  three-bucket tally caught it. With retries on, a failing attempt is erased
   from the report and the flake rate reads as zero no matter how bad it is.
   Repeat the spec in ONE warm container and always discard a warm-up run: the
   first suite invocation in a fresh container costs ~40 s more than every one
