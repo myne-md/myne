@@ -64,6 +64,20 @@ pub enum EditRejection {
     /// nothing had been applied. Reporting the failed create as a refusal keeps
     /// the outcome, which is what the undo is built from.
     CreateFailed,
+    /// The edit is not one the host recorded the model proposing.
+    ///
+    /// The edits arrive from the IPC payload as free strings, unlike the new
+    /// notes, which are selected by index into the host's own record and whose
+    /// doc says the caller "cannot invent a note the model never proposed". The
+    /// same rule was stated for one half of the apply and implemented for one
+    /// half (myne-md/myne#531 review round six).
+    ///
+    /// Not a TB6 widening: a WebView that can send this already holds the notes
+    /// ACL and can write any note directly. What it costs is the integrity of
+    /// the run record, since `restore_points` and the `AppliedRun` behind
+    /// `agent_undo` would otherwise describe a run containing writes the model
+    /// never proposed, presented to the user as one action.
+    NotProposed,
     /// The edit would take a note OUT of the working set, and it arrived inside
     /// a batch the user approved in one action.
     ///
@@ -148,6 +162,37 @@ pub enum AgentError {
     /// mode is not offered on it.
     #[error("this model cannot produce the edit format agent mode needs")]
     EditFormatUnsupported,
+    /// An apply labelled [`Approval::Individual`] carried more than one item.
+    ///
+    /// **The label is a fact about the click, so the host cannot derive it, but
+    /// it must not be able to carry an unbounded batch either.** The
+    /// removal carve-out ([`super::hide::edit_hides_note`]) fires only inside an
+    /// [`Approval::Bulk`], so without this an approve-all relabelled
+    /// `individual` applied forty edits, tombstone included, in one act. The
+    /// predicate was host-side and its TRIGGER was the caller's, which is how a
+    /// control reads as structural while being one field away from off
+    /// (myne-md/myne#531 review round six).
+    ///
+    /// Not derived from the count instead: a user pressing Approve-all when one
+    /// edit remains legitimately sends one item labelled `bulk`, and deriving
+    /// would silently turn that into an individual approval and permit the
+    /// removal the label was refusing.
+    ///
+    /// [`Approval::Individual`]: super::apply::Approval::Individual
+    /// [`Approval::Bulk`]: super::apply::Approval::Bulk
+    #[error("an individual approval may carry only one change")]
+    IndividualApprovalNotSingle,
+    /// A second step arrived for a run whose model call is still in flight.
+    ///
+    /// The host holds the run's transcript and proposal, and a step takes both
+    /// out of the session for the length of the call. A concurrent second step
+    /// would drive from an empty transcript and the later write-back would
+    /// discard the other leg's work. Refused rather than serialised: the two
+    /// legs answer different user actions, and running the second one after the
+    /// first would answer it against a state the user never saw
+    /// (myne-md/myne#531 review round six).
+    #[error("this run is already working")]
+    StepAlreadyRunning,
 }
 
 #[cfg(test)]

@@ -214,12 +214,6 @@ impl AgentRunState {
         Ok(run.note_ids.contains(note_id))
     }
 
-    /// Which of `note_ids` are in the run's scope, in the same order.
-    ///
-    /// One lock and one run lookup for the whole slice. The per-id
-    /// [`Self::contains`] is still the right call for a single question, but a
-    /// caller classifying N ids with it pays N lock/unlock pairs and N string
-    /// comparisons on the run id to answer one question.
     /// Whether a run may still WRITE.
     ///
     /// `contains_all` answers scope and deliberately not this: the two questions
@@ -237,6 +231,12 @@ impl AgentRunState {
         Ok(())
     }
 
+    /// Which of `note_ids` are in the run's scope, in the same order.
+    ///
+    /// One lock and one run lookup for the whole slice. The per-id
+    /// [`Self::contains`] is still the right call for a single question, but a
+    /// caller classifying N ids with it pays N lock/unlock pairs and N string
+    /// comparisons on the run id to answer one question.
     pub fn contains_all(&self, run_id: &str, note_ids: &[String]) -> Result<Vec<bool>, AgentError> {
         let runs = self.runs.lock().expect("agent run table poisoned");
         let run = runs.get(run_id).ok_or(AgentError::NoSuchRun)?;
@@ -298,7 +298,6 @@ impl AgentRunState {
         Ok(run.cancel.load(Ordering::SeqCst))
     }
 
-    /// Drop one finished run.
     /// Drop one run.
     ///
     /// **A run deliberately OUTLIVES its loop**, which is why this is not called
@@ -405,6 +404,29 @@ impl AgentRunState {
             Some(a) if a.run_id == run_id => Ok(slot.take().expect("checked just above")),
             _ => Err(AgentError::NoSuchRun),
         }
+    }
+
+    /// The run ids the table still holds.
+    ///
+    /// **For a client that keeps its OWN per-run state**, which the desktop
+    /// does: `AgentSessionState` holds the task string, a transcript of whole
+    /// note bodies and a proposal of anchors copied verbatim out of them, and it
+    /// had no bound at all. This table caps at [`MAX_LIVE_RUNS`] and evicts, so
+    /// after nine ordinary runs the first run's SESSION stayed resident and
+    /// unreachable until the vault locked. The cap bounded a set of note ids and
+    /// left the plaintext holder unbounded (myne-md/myne#531 review round six).
+    ///
+    /// A live SET rather than an evicted list on [`Self::start`]'s return,
+    /// because a caller that prunes to this is self-correcting: it does not have
+    /// to have caught every eviction, only to ask once in a while. `start` also
+    /// has ~20 call sites whose signature would move for no gain.
+    pub fn live_ids(&self) -> BTreeSet<String> {
+        self.runs
+            .lock()
+            .expect("agent run table poisoned")
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// How many runs are live. For the lock-teardown assertion and nothing else.

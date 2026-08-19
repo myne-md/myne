@@ -123,7 +123,11 @@ export type EditRejection =
   /** The note's folder was excluded from AI while the run was open or the
    *  review was pending. SYNC-14 carries no in-flight carve-out, so the newest
    *  answer decides and the edit is refused rather than applied. */
-  | "excludedNow";
+  | "excludedNow"
+  /** The edit is not one the host recorded the model proposing. Reported rather
+   *  than dropped, so a row the user pressed Apply on never silently does
+   *  nothing. */
+  | "notProposed";
 
 export interface RefusedEdit {
   noteId: string;

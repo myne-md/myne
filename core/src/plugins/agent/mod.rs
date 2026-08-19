@@ -51,8 +51,7 @@ pub use apply::{
 };
 pub use edit::{place, ProposedEdit};
 pub use engine::{
-    render_chatml, AgentEngine, AgentRequest, AgentRequestClass, Content, Message, Role,
-    AGENT_REQUEST_CLASS,
+    AgentEngine, AgentRequest, AgentRequestClass, Content, Message, Role, AGENT_REQUEST_CLASS,
 };
 pub use error::{AgentError, EditRejection};
 pub use hide::edit_hides_note;

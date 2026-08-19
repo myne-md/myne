@@ -110,11 +110,6 @@ export function useAgent(): AgentState {
   );
 }
 
-/** Non-hook read, for callers outside a component. */
-export function getAgent(): AgentState {
-  return state;
-}
-
 /** A run is starting. */
 export function beginRun(): void {
   set({
