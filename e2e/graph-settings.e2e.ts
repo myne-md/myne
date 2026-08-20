@@ -52,6 +52,8 @@ import {
   createNote,
   dismissImporterOffer,
   lockAndReunlock,
+  openGraphPane,
+  openSettledGraphPane,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -68,24 +70,13 @@ const TITLES = ["gs1notealfa7k2m9qx4w8e5rj0aa", "gs1notebravo3f6h1zn8c2vb5kk0"];
 const CHAIN = { charlie: "Gs Charlie", alfa: "Gs Alfa", bravo: "Gs Bravo" };
 const CHAIN_TAILS = { charlie: "ctailgs4m2x", alfa: "atailgs8r6v", bravo: "btailgs1z9j" };
 
-/** Open the whole-vault graph via the BottomBar affordance and return the pane
- *  element once it renders (mirrors `graph-layout-persistence.e2e.ts`). */
-async function openGraph(s: Session) {
-  await (await s.byTestId("editor.graph-button")).click();
-  return await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
-}
-
 /** Click the gear and return the now-open settings panel. */
 async function openSettingsPanel(s: Session) {
   await (await s.byTestId("editor.graph-settings-gear")).click();
   return await s.byTestId("editor.graph-settings-panel");
 }
 
-/** Seed the three-note chain gs2/gs3 lay out, and return the graph pane +
- *  canvas once the first layout has been built. The canvas wait is NOT
- *  optional: `GraphCanvas` sits behind the app's only `React.lazy` boundary and
- *  mounts a few hundred ms AFTER the pane, so a pixel probe that only waited on
- *  `data-layout-nonce` reads a DOM with no <canvas> in it at all. */
+/** Seed the three-note chain gs2/gs3 lay out, then open the settled graph. */
 async function openSettledGraph(s: Session): Promise<{ pane: Element; canvas: Element }> {
   await createNote(s, CHAIN.charlie);
   await typeIntoEditor(s, ` ${CHAIN_TAILS.charlie}`);
@@ -96,14 +87,7 @@ async function openSettledGraph(s: Session): Promise<{ pane: Element; canvas: El
   await createNote(s, CHAIN.bravo);
   await typeIntoEditor(s, ` [[${CHAIN.alfa}]] ${CHAIN_TAILS.bravo}`);
   await waitForSaved(s);
-
-  const pane = await openGraph(s);
-  await s.waitUntil(
-    async () => ((await pane.attribute("data-layout-nonce")) === "1" ? true : null),
-    { label: "graph builds once", timeoutMs: 15_000 },
-  );
-  const canvas = await s.byTestId("editor.graph-canvas", { timeoutMs: 15_000 });
-  return { pane, canvas };
+  return openSettledGraphPane(s);
 }
 
 interface InkStats {
@@ -135,7 +119,14 @@ async function inkStats(s: Session): Promise<InkStats | null> {
 
 /** Poll until the canvas has been pixel-IDENTICAL for `stable` consecutive
  *  samples — i.e. the bounded layout run finished and the renderer went quiet.
- *  Returns the settled stats. */
+ *  Returns the settled stats.
+ *
+ *  Deliberately NOT `settleOn` (support/flows.ts), which is the generic form of
+ *  this loop: this one compares only `h`, polls at 400 ms because a repaint is
+ *  slower than a layout reflow, and counts its run from zero, so `stable = 3`
+ *  here means four agreeing samples. Those three differences are tuned against
+ *  gs2/gs3's own timings, and folding them into the shared helper would move
+ *  the stability window of a suite that is not the one under change. */
 async function waitForCanvasQuiet(
   s: Session,
   label: string,
@@ -225,7 +216,7 @@ describeE2E("gs1 graph settings panel — floats, no-relayout, toggles live, per
         await dismissImporterOffer(s);
         for (const t of TITLES) await createNote(s, t);
 
-        const pane = await openGraph(s);
+        const pane = await openGraphPane(s);
         // Let the layout settle before probing "did it re-run" — gp2's wait.
         await s.waitUntil(
           async () => ((await pane.attribute("data-layout-nonce")) === "1" ? true : null),
@@ -256,7 +247,7 @@ describeE2E("gs1 graph settings panel — floats, no-relayout, toggles live, per
 
         // Persistence: lock (flushes the staged workspace descriptor) → re-unlock.
         await lockAndReunlock(s, password);
-        await openGraph(s);
+        await openGraphPane(s);
         await openSettingsPanel(s);
         const toggle2 = await s.byTestId("editor.graph-settings-arrows-toggle");
         expect(await toggle2.attribute("aria-checked")).toBe("false");
