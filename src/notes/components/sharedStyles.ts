@@ -20,6 +20,16 @@ export const SECTION_HEADING_STYLE: CSSProperties = {
 };
 
 /**
+ * The quiet caption that annotates rather than states: source labels, scope
+ * counts, a run's cost. `--fg-3` ink at the smallest size, so it reads as an
+ * aside next to the sentence it belongs to.
+ */
+export const CAPTION_STYLE: CSSProperties = {
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+};
+
+/**
  * The right-sidebar reader-surface card chrome shared by the Backlinks rows
  * (`<RightSidebar>`) and the Unlinked-mentions rows
  * (`<UnlinkedMentionsSection>`): `--bg-1` fill, `--line-1` hairline, 6px radius,

@@ -101,6 +101,15 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+/** Read the run state outside React.
+ *
+ *  For the orchestration that has to look at a run right after settling it.
+ *  `settleStep` accumulates, so the totals a settled step reports are the
+ *  store's, not the step's. */
+export function getAgent(): AgentState {
+  return state;
+}
+
 /** Read the run state. */
 export function useAgent(): AgentState {
   return useSyncExternalStore(
@@ -110,10 +119,18 @@ export function useAgent(): AgentState {
   );
 }
 
-/** A run is starting. */
+/** A run is starting.
+ *
+ *  **`undoable` is carried over, and that is not tidiness.** The host's record
+ *  is ended by the next APPLY or by the vault lock, which is what
+ *  `design-notes/ai/0515` promises; merely starting a second run ends
+ *  neither. Resetting it here dropped the previous run's offer from the surface
+ *  while the host still held it, so the undo the user had been told about
+ *  became unreachable by the ordinary act of asking for something else. */
 export function beginRun(): void {
   set({
     ...INITIAL,
+    undoable: state.undoable,
     running: true,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
@@ -121,16 +138,31 @@ export function beginRun(): void {
   });
 }
 
-/** A step came back. */
-export function settleStep(result: {
-  view: AgentRunView;
-  proposal: Proposal;
-  end: LoopEnd;
-  iterations: number;
-  notesRead: number;
-  charsOffDevice: number | null;
-  excludedCount: number;
-}): void {
+/** A step came back.
+ *
+ *  `epoch` is what the caller captured before it awaited the host. A step whose
+ *  epoch has moved was let go of while it was in flight: the vault was left, or
+ *  the user started a new conversation. It is dropped. See the epoch note below
+ *  `clearAgentForLock`.
+ *
+ *  **Required, not defaulted to the current epoch.** A default would make the
+ *  guard opt-in: a later call site that omitted the argument would compare the
+ *  epoch to itself, always pass, and nothing would say so. Returns whether it
+ *  was applied, so a caller that mirrors the result elsewhere drops its half
+ *  too. */
+export function settleStep(
+  result: {
+    view: AgentRunView;
+    proposal: Proposal;
+    end: LoopEnd;
+    iterations: number;
+    notesRead: number;
+    charsOffDevice: number | null;
+    excludedCount: number;
+  },
+  epoch: number,
+): boolean {
+  if (epoch !== runEpoch) return false;
   set({
     view: result.view,
     proposal: result.proposal,
@@ -147,6 +179,7 @@ export function settleStep(result: {
     excludedCount: result.excludedCount,
     running: false,
   });
+  return true;
 }
 
 /** A step failed. */
@@ -253,8 +286,18 @@ export function settleApply(
  *  Set from `agentLastRun()`, never inferred. Deliberately survives
  *  `clearAgent()`: closing the review screen ends the PROPOSAL, and the applied
  *  notes are still applied. What ends it is the host clearing its own record,
- *  which happens on the next apply and on vault lock. */
-export function setUndoable(run: AppliedRun | null): void {
+ *  which happens on the next apply and on vault lock.
+ *
+ *  **`epoch` is the same guard `settleStep` takes, and this writer needs it for
+ *  the same reason.** `AppliedRun.restorePoints` carries note ids of the vault
+ *  it describes, and `agentLastRun()` is awaited: without it, a reply arriving
+ *  after the lock re-seeded the offer with the previous vault's ids, protected
+ *  only by the strip's unmount, which is the "rendering fact rather than a
+ *  guarantee" this branch's own `vault-unlock.ts` comment argues against.
+ *  Clearing it (`null`) is always allowed, because dropping the offer is never
+ *  the unsafe direction. */
+export function setUndoable(run: AppliedRun | null, epoch: number): void {
+  if (run !== null && epoch !== runEpoch) return;
   set({ undoable: run });
 }
 
@@ -270,8 +313,23 @@ export function setUndoable(run: AppliedRun | null): void {
  *  outlives the lock and is still resident during the next session, including a
  *  different vault's. */
 export function clearAgent(): void {
+  // **Letting go of a run invalidates its in-flight step, and this is the case
+  // that needs it most.** `beginRun()` nulls `view`, and only a settled step
+  // sets it, so for the whole first leg a run is `running` with no id: nothing
+  // can cancel it host-side, and without this bump the reply landed afterwards,
+  // repopulated `proposal.edits` with its verbatim anchors, and made
+  // `AgentReviewTakeover`'s derived `reviewable` true, opening a full-screen
+  // review of a conversation the user had just deleted.
+  runEpoch += 1;
   state = {
     ...INITIAL,
+    // Kept, for the reason `setUndoable` states and `beginRun` repeats: closing
+    // the review screen un-applies nothing. This used to spread `INITIAL`
+    // wholesale, so it nulled the offer and made `clearAgentForLock`, whose
+    // entire purpose is to null it, behave identically to this function. The
+    // strip papered over it by re-reading the host whenever `applied` changed
+    // identity, which is a different event and not always this one.
+    undoable: state.undoable,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
     appliedEdits: new Set(),
@@ -288,6 +346,30 @@ export function clearAgent(): void {
  *  by the same event. Separating the two is what stops "closing a screen" and
  *  "locking the vault" from being the same call. */
 export function clearAgentForLock(): void {
+  // The epoch bump comes from `clearAgent`, which every leaving path goes
+  // through: a reply that lands after the teardown cannot repopulate the store.
   clearAgent();
   set({ undoable: null });
+}
+
+// ---- the vault-leaving epoch ------------------------------------------------
+//
+// **A step in flight outlives the lock that was supposed to end the run.**
+// `agentStart` and `agentApproveScope` are awaited, and their replies carry a
+// `Proposal` whose `edits` hold anchors and replacements copied verbatim out of
+// note bodies. Nothing stopped that reply from landing after
+// `clearAgentForLock()` had run, which would leave note-derived plaintext
+// resident in a module-scope store past the event `design-notes/ai/0515` and
+// `threat-model.md` §7 both say drops it.
+//
+// The chat store has carried exactly this guard since it shipped, for the same
+// reason and under the same name. This is the agent half of it: a caller
+// captures the epoch when it starts a leg and hands it back on settle, and a
+// settle whose epoch has moved is dropped.
+
+let runEpoch = 0;
+
+/** The epoch to hand back to {@link settleStep}. Captured when a leg starts. */
+export function currentRunEpoch(): number {
+  return runEpoch;
 }
