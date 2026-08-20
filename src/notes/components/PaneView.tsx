@@ -16,6 +16,7 @@ import {
   useState,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { CMEditor, type ScrollAnchorRequest, type CMEditorProps, type EditorSwapApi } from "../../editor/CMEditor";
@@ -162,6 +163,40 @@ type OutlineTrackView = Parameters<NonNullable<CMEditorProps["onReady"]>>[0];
  *  px of the viewport top (outline-scroll-tracking) — a small lead so the
  *  highlight flips as the heading arrives at the top rather than after. */
 const OUTLINE_ACTIVE_OFFSET_PX = 8;
+
+/**
+ * What the pane body dispatch resolved to, and which FRAME it needs (myne#534).
+ *
+ * TWO independent decisions, deliberately not one flag.
+ *
+ * `fill` picks the HEIGHT regime. A filling body gets an explicit-height,
+ * non-scrolling frame and owns its own scrolling; a flowing body grows inside
+ * the markdown scroller. A body that renders a `<canvas>` must fill: a canvas
+ * has no intrinsic height, pans internally, and inside the scroller's
+ * auto-height wrapper its `height: 100%` has nothing to resolve against, so it
+ * silently collapses to its intrinsic 2:1 ratio (height = width / 2).
+ *
+ * `gutters` picks the horizontal INSET, and it is orthogonal. A canvas wants
+ * the pane edge to edge. A text body does not, at any height: PRODUCT.md's
+ * fourth principle and `docs/design/README.md` both say density is comfortable
+ * rather than compact, and the vault-wide task list is a text body that happens
+ * to fill. Folding the two into one flag is what dropped that list's inset from
+ * 24px to the 8px `TaskListPanel` carries internally, a density authored for the
+ * 280px right panel it also renders in, not for a full-width pane.
+ *
+ * Both verdicts ride WITH the element rather than being re-derived beside the
+ * dispatch, because a second expression over the same discriminants is a second
+ * thing to keep in step and it was already TWO members short: the graph tab and
+ * the vault-wide task tab were both rendering a filling body into the flowing
+ * frame. Declared here, a new body kind cannot be added without stating both.
+ */
+interface PaneBody {
+  el: ReactNode;
+  /** Explicit height, no outer scroll: the body owns its own scrolling. */
+  fill: boolean;
+  /** Keep the reading gutters. False only for a full-bleed canvas. */
+  gutters: boolean;
+}
 
 type PaneViewProps = {
   leaf: LeafPane;
@@ -1076,51 +1111,79 @@ export function PaneView({
   // is NOT a new-tab state (it renders the view host below).
   const inNewTabState = pendingNewTab || leaf.activeTab === null;
 
-  const editorEl = useMemo(() => {
+  const paneBody = useMemo<PaneBody>(() => {
     if (inNewTabState) {
-      return (
-        <NewTabChooser
-          onPick={onPickNote}
-          onCreate={onCreateNote}
-          onCreateDrawing={onCreateDrawing}
-          cancellable={leaf.tabs.length > 0}
-          onCancel={clearPending}
-        />
-      );
+      return {
+        fill: false,
+        gutters: true,
+        el: (
+          <NewTabChooser
+            onPick={onPickNote}
+            onCreate={onCreateNote}
+            onCreateDrawing={onCreateDrawing}
+            cancellable={leaf.tabs.length > 0}
+            onCancel={clearPending}
+          />
+        ),
+      };
     }
     if (activeViewId !== null) {
-      return <ViewHost viewId={activeViewId} />;
+      return { fill: false, gutters: true, el: <ViewHost viewId={activeViewId} /> };
     }
     if (isGraph) {
-      return <GraphPane />;
+      return { fill: true, gutters: false, el: <GraphPane /> };
     }
     if (isTasks && leaf.activeTab !== null) {
-      return <TasksPane paneId={leaf.id} item={leaf.activeTab} />;
+      // The third member of #534's family, found while fixing the graph.
+      // `TaskListPanel`'s root is written as a filling body (`height: 100%` over
+      // an inner `flex: 1 1 auto; min-height: 0; overflow-y: auto`), so in the
+      // flowing frame its percentage resolved to `auto`, the inner scroller
+      // never got a box to scroll inside, and the filter strip slid away with
+      // the list instead of pinning. Milder than the graph, since nothing became
+      // unreachable, and the same cause.
+      //
+      // Gutters STAY. The strip and every `TaskRow` carry `6px 8px` of their
+      // own, but that is the density this component was authored at as a 280px
+      // right-panel body, which it still is under `NoteTasksPanel`. A text list
+      // 8px from the edge of a full-width pane is the compact this product says
+      // it is not.
+      return {
+        fill: true,
+        gutters: true,
+        el: <TasksPane paneId={leaf.id} item={leaf.activeTab} />,
+      };
     }
     if (loading) {
-      return <PaneLoading />;
+      return { fill: false, gutters: true, el: <PaneLoading /> };
     }
     if (isDrawing) {
       // The Excalidraw canvas surface (SF2). Scene loads from the note body and
       // re-serializes on change back into `content`, which the existing autosave
-      // (above) debounces + persists — no separate save path. RUNTIME-FLAGGED:
+      // (above) debounces + persists, with no separate save path. RUNTIME-FLAGGED:
       // the canvas round-trip + onChange debounce need a `pnpm tauri dev` check.
-      return (
-        <div
-          data-testid="editor.content-frame"
-          style={{ height: "100%", minHeight: 0 }}
-        >
-          <DrawingCanvasLazy
-            // Key by note id so switching to a different drawing remounts the
-            // canvas with the new scene (initialData is read once at mount).
-            key={activeId ?? "drawing"}
-            initialSceneJson={extractSceneJson(content) ?? undefined}
-            onSceneChange={(json) => setContent(writeSceneJson(content, json))}
-          />
-        </div>
-      );
+      return {
+        fill: true,
+        gutters: false,
+        el: (
+          <div
+            data-testid="editor.content-frame"
+            style={{ height: "100%", minHeight: 0 }}
+          >
+            <DrawingCanvasLazy
+              // Key by note id so switching to a different drawing remounts the
+              // canvas with the new scene (initialData is read once at mount).
+              key={activeId ?? "drawing"}
+              initialSceneJson={extractSceneJson(content) ?? undefined}
+              onSceneChange={(json) => setContent(writeSceneJson(content, json))}
+            />
+          </div>
+        ),
+      };
     }
-    return (
+    // Assigned rather than inlined into the return object so the JSX below keeps
+    // its indentation. This branch is ~130 lines and re-nesting it would bury
+    // the change in whitespace.
+    const markdownBody = (
       // Editor-typography: the content max-width + the three CSS custom
       // properties (`--editor-text-size` / `--editor-line-spacing` /
       // `--editor-font-family`) come from `typographyStyle(prefs)`. The vars
@@ -1261,6 +1324,7 @@ export function PaneView({
         )}
       </div>
     );
+    return { fill: false, gutters: true, el: markdownBody };
   }, [
     prefs,
     effectiveViewMode,
@@ -1401,21 +1465,23 @@ export function PaneView({
         style={{
           flex: 1,
           minHeight: 0,
-          // A drawing needs a full-bleed, EXPLICIT-height, non-scrolling frame:
-          // Excalidraw has no intrinsic height (it fills its parent) and pans
-          // internally, so the markdown scroll + gutter padding would collapse it
-          // to a 0-height (invisible) canvas. Markdown keeps the scroll + padding.
-          overflow: isDrawing ? "hidden" : "auto",
+          // Which frame this is, and why, is on `PaneBody` above.
+          overflow: paneBody.fill ? "hidden" : "auto",
           // No TOP padding here: this div is the scroll parent of the in-note
           // find bar's sticky top panel, and a top padding leaves a band above the
           // bar where scrolled text bleeds through (MYND-299 QA). The 12px top
           // breathing-room moves onto the inner wrapper below, so it scrolls UNDER
           // the now-flush sticky bar instead of opening a gap above it.
-          padding: isDrawing ? 0 : "0 24px 32px",
+          //
+          // No BOTTOM padding on a filling body either: it is the scroll-past
+          // slack a flowing body wants at the end of its text, and under one that
+          // fills there is no end to scroll past, so it would read as a dead
+          // strip below a list that is already scrolling internally.
+          padding: paneBody.gutters ? (paneBody.fill ? "0 24px" : "0 24px 32px") : 0,
         }}
       >
-        <div style={isDrawing ? { height: "100%" } : { paddingTop: "var(--space-3)" }}>
-          {editorEl}
+        <div style={paneBody.fill ? { height: "100%" } : { paddingTop: "var(--space-3)" }}>
+          {paneBody.el}
         </div>
       </div>
       {dragActive && (

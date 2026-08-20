@@ -37,8 +37,25 @@
     "(the sync specs self-skip without a myne-server binary, and the AI family",
     "skips without MYNE_E2E_AI). Pinning it to one run's exact count would fail",
     "on the next legitimate skip while catching nothing the current number",
-    "misses."
+    "misses.",
+    "",
+    "Raised 297 -> 300 for myne-md/myne#534. Three NEW scenarios relative to",
+    "develop: gt2 and gt3 in `e2e/graph-tab.e2e.ts` (the graph body fills the",
+    "pane; the canvas follows a pane resize) and tp4 in `e2e/task-panel.e2e.ts`",
+    "(the task body fills the pane). None carries a self-skip beyond the platform",
+    "gate every scenario has, so all three execute wherever the suite does.",
+    "",
+    "Arithmetic on the CI-measured 297, not a new measurement, which is the same",
+    "basis the #529 entry above used. Locally all three pass three times",
+    "consecutively in one warm container, and all three were also run against a",
+    "build with the production fix REVERTED, where each failed on its own",
+    "assertion rather than on a timeout: 347 px for gt2, a 260 px stale backing",
+    "store for gt3, 568 px for tp4.",
+    "",
+    "Leaving the floor flat is the failure this file exists to catch, and its own",
+    "#529 note spells it out: three scenarios could later stop executing with",
+    "`e2e-floor` still green. `stable_max_failures` stays 0."
   ],
-  "stable": 297,
+  "stable": 300,
   "stable_max_failures": 0
 }
