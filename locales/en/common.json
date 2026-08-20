@@ -35,8 +35,9 @@
       "scopeOpenNote": "This note",
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
-      "send": "Send",
+      "scopeCountUnavailable": "How many notes that folder holds could not be checked just now.",
       "startFailed": "The agent could not start.",
+      "unchecked": "The edit check could not be completed, so the agent is unavailable for now. Check that your model or provider is reachable, then try again.",
       "unsupported": "This model cannot make precise edits reliably, so the agent is unavailable. Choose a larger model or a provider.",
       "unsupportedDetail": "It passed {{passes}} of {{attempts}} checks; {{required}} are needed.",
       "checking": "Checking the model…",
@@ -1053,6 +1054,12 @@
       "resizeNotesSidebar": "Resize notes sidebar",
       "rightPanel": {
         "aiChat": {
+          "agentTurn": {
+            "newNotes_one": "{{count}} new note.",
+            "newNotes_other": "{{count}} new notes.",
+            "proposed_one": "Proposed {{count}} change.",
+            "proposed_other": "Proposed {{count}} changes."
+          },
           "askPlaceholder": "Ask a question about your notes…",
           "askSubmit": "Ask",
           "assistant": "Assistant",
@@ -1064,6 +1071,10 @@
           "gettingReadyHint": "Preparing your notes for AI — one moment.",
           "insert": "Insert into note",
           "noAnswer": "No answer — try rephrasing.",
+          "modeAsk": "Ask",
+          "modeEdit": "Edit",
+          "modeLabel": "What the AI should do with this message",
+          "newChat": "New chat",
           "noModelHint": "No AI provider is set up, so chat, summaries, rewriting and semantic search have nothing to run on. Set one up in Settings → Developer → AI.",
           "unreachableHint": "The provider you set up is not answering. Check that it is running, then send again.",
           "unavailableHint": "This build of Myne was compiled without local AI, so nothing here can run.",

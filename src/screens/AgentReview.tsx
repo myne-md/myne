@@ -30,6 +30,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { DiffView } from "../notes/components/DiffView";
+import { RunCostLine } from "../notes/agent/components/RunCostLine";
 import { Button } from "../components/primitives/Button";
 import { changedLineCount, diffWithSegments } from "../dialect";
 import {
@@ -46,6 +47,7 @@ import {
 } from "../lib/agent-run";
 import {
   approvedNewNoteIndices,
+  currentRunEpoch,
   failRun,
   keptEdits,
   rejectAll,
@@ -256,7 +258,7 @@ export function AgentReview({
       const undone = await agentUndo(runId);
       setUndoReport(undone);
       // The host consumed its record, so the offer elsewhere goes with it.
-      setUndoable(null);
+      setUndoable(null, currentRunEpoch());
       // Same reason as the apply path: an undo rewrites notes behind the pane.
       if (restored.length > 0) onNotesWritten?.(restored);
     } catch {
@@ -387,18 +389,16 @@ export function AgentReview({
         }}
       >
         {/* The post-run summary. With no volume bound on the remote arm, this is
-            where an uncapped run becomes a visible one. */}
-        <span data-testid="agentReview.runSummary" style={{ color: "var(--fg-2)" }}>
-          {t("agent.review.runSummaryRequests", { count: agent.iterations })}
-          {", "}
-          {t("agent.review.runSummaryNotes", { count: agent.notesRead })}
-          {", "}
-          {agent.charsOffDevice === null
-            ? t("agent.review.runSummaryOnDevice")
-            : t("agent.review.runSummaryOffDevice", {
-                count: agent.charsOffDevice,
-              })}
-        </span>
+            where an uncapped run becomes a visible one. Shared with the
+            transcript turn, which says the same thing about a run whose
+            proposal has since been dropped. */}
+        <RunCostLine
+          testId="agentReview.runSummary"
+          iterations={agent.iterations}
+          notesRead={agent.notesRead}
+          charsOffDevice={agent.charsOffDevice}
+          style={{ color: "var(--fg-2)" }}
+        />
         <span style={{ flex: 1 }} />
         {/* Undo the whole run as one action. Only offered once something has
             been written, because there is nothing to revert before that. */}

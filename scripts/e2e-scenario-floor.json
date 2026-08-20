@@ -37,8 +37,26 @@
     "(the sync specs self-skip without a myne-server binary, and the AI family",
     "skips without MYNE_E2E_AI). Pinning it to one run's exact count would fail",
     "on the next legitimate skip while catching nothing the current number",
-    "misses."
+    "misses.",
+    "",
+    "297 -> 298 for myne-md/myne#533, which adds ag6 to `e2e/agent-run.e2e.ts`.",
+    "ag6 drives the ONE composer through both of its modes into one transcript:",
+    "the whole of what that issue changed, and the only scenario that would",
+    "catch a regression re-adding the second composer, since every other one",
+    "drives whichever input its own testid happens to find.",
+    "",
+    "Same arithmetic as the +5 above and on the same CI-measured base: ag6 sits",
+    "inside `aiDescribe`, and CI's e2e step sets MYNE_E2E_AI=1 and builds with",
+    "`local-inference-stub` (.woodpecker.yml), so it executes there.",
+    "",
+    "MEASURED, not reasoned. `scripts/e2e-ai-buildrun.sh agent-run agent-run",
+    "agent-run` ran green three consecutive times in one warm container on",
+    "2026-08-20, 6 of 6 scenarios passing each time with none skipped, which is",
+    "`e2e/CLAUDE.md`'s definition of done for a new scenario. That run also",
+    "covers ag1 to ag5, which this branch retargeted onto the new",
+    "`ai.composer-*` testids, so the +1 is the only count that moved but six",
+    "scenarios were re-proven."
   ],
-  "stable": 297,
+  "stable": 298,
   "stable_max_failures": 0
 }

@@ -103,6 +103,21 @@ export const TEARDOWN_CALLS = [
     skips: {},
   },
   {
+    call: "clearChat",
+    declaredIn: "src/notes/ai/chatStore.ts",
+    holds: "the AI chat transcript: the user's own questions about their notes and the model's answers over them",
+    // Every leaving path, for the same reason as the run's proposal above.
+    // It had NO entry here and no call on either path: the only thing clearing
+    // it was the Editor's own unmount cleanup, which does fire on a lock today
+    // and is a rendering fact rather than a guarantee. A refactor that keeps
+    // the Editor mounted across a lock would carry one vault's conversation
+    // into the next session, and nothing would say so.
+    // `docs/decisions/ai/0276` rests its "no new at-rest magic byte, KEK or
+    // format" argument on this transcript being RAM-only and dropped on lock.
+    appliesTo: ["lockVault", "leaveActiveVault"],
+    skips: {},
+  },
+  {
     call: "resetSessionIgnored",
     declaredIn: "editor/src/decorations/spell.ts",
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",

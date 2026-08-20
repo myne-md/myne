@@ -147,9 +147,11 @@ describe("check-ipc-binding-callers: the ratchet", () => {
 function healthyFiles(): Record<string, string> {
   return {
     "src/notes/agent/agentStore.ts": `export function clearAgentForLock(): void {}\n`,
+    "src/notes/ai/chatStore.ts": `export function clearChat(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
     "src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   clearAgentForLock();
+  clearChat();
   await invoke("plugin:vault_unlock|vault_lock");
 }
 `,
@@ -157,6 +159,7 @@ function healthyFiles(): Record<string, string> {
   reason: string;
 }): Promise<void> {
   clearAgentForLock();
+  clearChat();
   resetSessionIgnored();
   await lockVault();
 }
@@ -264,6 +267,26 @@ describe("check-frontend-lock-teardown: the cross product", () => {
     expect(run(files)).toEqual([
       "could not extract lockVault's body in src/lib/vault-unlock.ts",
     ]);
+  });
+
+  it("names the myne#533 defect: the chat transcript cleared on neither path", () => {
+    // `clearChat` had no roster entry and no call on either leaving path: the
+    // only thing dropping the transcript was the Editor's unmount cleanup,
+    // which is a rendering fact rather than a guarantee. Both paths are
+    // asserted, so removing either is named on its own.
+    const files = healthyFiles();
+    files["src/lib/vault-unlock.ts"] = files["src/lib/vault-unlock.ts"].replace(
+      "  clearChat();\n",
+      "",
+    );
+    files["src/lib/vault-switch.ts"] = files["src/lib/vault-switch.ts"].replace(
+      "  clearChat();\n",
+      "",
+    );
+    const errors = run(files);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain("lockVault does not call clearChat()");
+    expect(errors[1]).toContain("leaveActiveVault does not call clearChat()");
   });
 
   it("rejects a skip that gives no reason", () => {
