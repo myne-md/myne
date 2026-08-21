@@ -35,7 +35,11 @@ import { providerErrorKey } from "../../lib/engine-error";
 import { useTranslation } from "react-i18next";
 
 import { usePrefs } from "../../hooks/usePrefs";
-import { useAiBackendClass, useAiSurfaceState } from "../../hooks/useAiModelReady";
+import {
+  useAiBackendClass,
+  useAiRetrievalState,
+  useAiSurfaceState,
+} from "../../hooks/useAiModelReady";
 import {
   clearChat,
   stopChatTurn,
@@ -131,9 +135,6 @@ export interface AiChatTabProps {
   /** Resolve a note id to its title for the citation chip label (task 8). When
    *  absent, chips fall back to a short id prefix. */
   titleOf?: (noteId: string) => string | null;
-  /** Show the "getting ready" chrome (embed-on-unlock still indexing — the
-   *  compute-lock contention wait). Default false. */
-  gettingReady?: boolean;
   /** The open note: the agent's default scope in the composer's Edit mode. */
   openNoteId?: string | null;
   /** Folders the user can attach as an agent scope. */
@@ -469,7 +470,6 @@ export function AiChatTab({
   onStop,
   onOpenNote,
   titleOf,
-  gettingReady = false,
   openNoteId = null,
   folders = NO_FOLDERS,
   onRunUndone,
@@ -493,6 +493,25 @@ export function AiChatTab({
   const backendClass = useAiBackendClass(aiEnabled);
   const activeProviderName =
     backendClass === "remote" ? (providerLabelOf(prefs.ai_provider) ?? null) : null;
+  // **Asking needs a second capability, and the header used to read only the
+  // first** (myne-md/myne#545). `backend` above is the GENERATION row; asking is
+  // retrieval-grounded, retrieval is refused a remote provider outright
+  // (SYNC-16), and the embedding model is not bundled. So a user with a working
+  // provider and no local search model saw the provider's name — which reads as
+  // ready — on a surface that refused every turn.
+  //
+  // This also replaces a `gettingReady` PROP that no caller ever passed: the
+  // "Preparing…" state was documented in the user guide and unreachable in
+  // production, because its default was `false` and nothing overrode it. It is
+  // derived here instead, from the same flag the host gates the turn on.
+  const retrieval = useAiRetrievalState(aiEnabled);
+  const noSearchModel =
+    retrieval.embedding.kind === "unavailable" ||
+    retrieval.embedding.kind === "absent";
+  const gettingReady =
+    !noSearchModel &&
+    retrieval.embedding.kind === "available" &&
+    !retrieval.indexReady;
   // …and one sentence per state (#191 task 3). The old copy said "No model
   // selected. Choose one in Settings" for ALL of them, which is wrong in two:
   // it tells a user whose runtime merely is not running to redo a setup they
@@ -595,15 +614,18 @@ export function AiChatTab({
                   stopChatTurn();
                   void stopChat();
                 }
-                // **A run's FIRST leg has no id to cancel with**, because
-                // `beginRun()` nulls `view` and only a settled step sets it, so
-                // for the whole of `agentStart` the run is working and
-                // unaddressable. `clearAgent()` below therefore does the half
-                // that is always available: it bumps the run epoch, so the
-                // reply is dropped instead of repopulating the store and
-                // opening a full-screen review of a conversation that no longer
-                // exists. Cancelling is the extra the host can only be told
-                // once the run has an id.
+                // A run's first leg USED to have no id to cancel with:
+                // `beginRun()` nulls `view` and only a settled step set it, so
+                // for the whole of `agentStart` the run was working and
+                // unaddressable (myne-md/myne#544). It is addressable now — the
+                // host sends the view through `agentStart`'s `onOpen` channel
+                // before it drives the loop — but the null check stays, because
+                // the window between `beginRun()` and that first message is
+                // real, and a start that failed outright never has a view at
+                // all. `clearAgent()` below does the half that is always
+                // available: it bumps the run epoch, so a reply is dropped
+                // instead of repopulating the store and opening a full-screen
+                // review of a conversation that no longer exists.
                 if (agent.view !== null) void agentCancel(agent.view.runId);
                 // The transcript and the open run together: the two halves of
                 // what this conversation produced. NOT `clearAgentForLock`. The
@@ -633,14 +655,16 @@ export function AiChatTab({
           >
             {resting !== "ready"
               ? chipKey(resting, t)
-              : gettingReady
-                ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
-                : // At rest with a provider SERVING, the chip IS the attribution
-                  // (#191 task 4): "Ready" would be true and uninformative, and
-                  // the provider name is the one fact a user cannot get anywhere
-                  // else without opening Settings. A proper noun, not i18n'd.
-                  (activeProviderName ??
-                  t("editor.chrome.rightPanel.aiChat.statusReady"))}
+              : noSearchModel
+                ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
+                : gettingReady
+                  ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
+                  : // At rest with a provider SERVING, the chip IS the attribution
+                    // (#191 task 4): "Ready" would be true and uninformative, and
+                    // the provider name is the one fact a user cannot get anywhere
+                    // else without opening Settings. A proper noun, not i18n'd.
+                    (activeProviderName ??
+                    t("editor.chrome.rightPanel.aiChat.statusReady"))}
           </span>
         </div>
       </div>
@@ -708,9 +732,11 @@ export function AiChatTab({
           >
             {resting !== "ready"
               ? bodyKey(resting, t)
-              : gettingReady
-                ? t("editor.chrome.rightPanel.aiChat.gettingReadyHint")
-                : t("editor.chrome.rightPanel.aiChat.empty")}
+              : noSearchModel
+                ? t("editor.chrome.rightPanel.aiChat.noSearchModelHint")
+                : gettingReady
+                  ? t("editor.chrome.rightPanel.aiChat.gettingReadyHint")
+                  : t("editor.chrome.rightPanel.aiChat.empty")}
           </p>
         )}
       </div>

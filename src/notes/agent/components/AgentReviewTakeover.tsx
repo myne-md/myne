@@ -41,8 +41,8 @@ export function AgentReviewTakeover({
 }) {
   const agent = useAgent();
   // A run is reviewable once it has stopped and has NOT stopped to ask. Every
-  // other end kind (`finished`, `cancelled`, `exhaustedIterations`) leaves a
-  // proposal the user is entitled to see, including a partial one.
+  // other end kind (`finished`, `cancelled`, `exhaustedIterations`, `stalled`)
+  // leaves a proposal the user is entitled to see, including a partial one.
   const reviewable =
     agent.view !== null &&
     !agent.running &&

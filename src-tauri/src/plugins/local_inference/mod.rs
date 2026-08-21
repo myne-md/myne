@@ -645,7 +645,7 @@ mod resolve_engine_tests {
         );
         // Every model claimed present, so the only thing that can block a
         // feature here is the SYNC-14/16 bar itself.
-        let report = capability_report_from(&remote, true, true, true);
+        let report = capability_report_from(&remote, true, true, true, false);
 
         assert!(report.compiled);
         assert_eq!(report.backend_class, "remote");
@@ -680,7 +680,7 @@ mod resolve_engine_tests {
             ],
             "in-process",
         );
-        let report = capability_report_from(&both, true, true, true);
+        let report = capability_report_from(&both, true, true, true, false);
         // Nothing has authorized the remote arm, so the local one answers.
         assert_eq!(report.backend_class, "in_process_local");
         assert!(report.auto_tag.available);
@@ -785,7 +785,7 @@ mod resolve_engine_tests {
         );
 
         // NO local generation model: `false` for every model flag.
-        let report = capability_report_from(&state, false, false, false);
+        let report = capability_report_from(&state, false, false, false, false);
 
         assert!(
             report.generation.available,
@@ -830,7 +830,7 @@ mod resolve_engine_tests {
         }
 
         let local = LocalInferenceState::new(std::sync::Arc::new(DiskBacked));
-        let report = capability_report_from(&local, false, false, false);
+        let report = capability_report_from(&local, false, false, false, false);
 
         assert_eq!(report.generation.cause, Some("no_model"));
         assert_eq!(report.embedding.cause, Some("no_model"));
@@ -858,7 +858,7 @@ mod resolve_engine_tests {
         let stub = LocalInferenceState::new(std::sync::Arc::new(engine::StubEngine));
         // No selected GGUF, no bundled transcription blob — the E2E build's
         // actual on-disk situation.
-        let report = capability_report_from(&stub, false, false, false);
+        let report = capability_report_from(&stub, false, false, false, false);
 
         assert!(
             report.generation.available,

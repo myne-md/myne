@@ -69,6 +69,9 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
       "a completion is generation's output; transcription produces a transcript, and an empty one is TranscriptionFailed's business",
     local_model_missing:
       "generation-only: the stale marker this names is generation.path, and transcription resolves through effective_transcription_model, which falls back to the bundled default rather than reporting a gone override (myne#466)",
+    no_embedding_model:
+      "retrieval-only: the two refusals myne#545 split apart are raised by ask / chat_stream when the vector store is off, and transcription is grounded on nothing",
+    index_not_ready: "same — transcription retrieves nothing",
   },
   provider: {
     feature_off:
@@ -110,6 +113,9 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
       "collapses into not_ready for this surface: a tag pass that produced nothing shows no band, and there is nothing for the user to rephrase — the pass has no prompt they wrote",
     local_model_missing:
       "auto-tag runs on the BUNDLED task-model, which has no marker file and no picker at all (ModelRole::TagSuggestion), so there is no recorded path that could go stale",
+    no_embedding_model:
+      "retrieval-only (myne#545): the tag pass reads the note it was given and grounds on nothing, so the embedding index is not on its path",
+    index_not_ready: "same — the tag pass retrieves nothing",
   },
 };
 

@@ -36,6 +36,55 @@ const CHECKING: AiSurfaceState = { kind: "checking" };
  * a `catch → unavailable` on top would re-introduce the conflation this hook
  * was rewritten to remove.
  */
+/** What asking needs, in one read: can retrieval run at all, and is this
+ *  vault's index built. */
+export interface AiRetrievalState {
+  /** The `embedding` feature's state — whether asking can run at all. */
+  embedding: AiSurfaceState;
+  /** Whether the index is BUILT. Meaningless while `embedding` is
+   *  `checking`; `false` until the host answers. */
+  indexReady: boolean;
+}
+
+const RETRIEVAL_CHECKING: AiRetrievalState = {
+  embedding: CHECKING,
+  indexReady: false,
+};
+
+/**
+ * Whether asking can answer right now (myne-md/myne#545).
+ *
+ * Both halves from ONE report, rather than a `useAiSurfaceState(…, "embedding")`
+ * beside a second hook for the index: they are two fields of one answer, and
+ * splitting them across two reads would let a surface render "ready" from one
+ * and "still indexing" from the other. The chat header needs both because
+ * "asking cannot run here" and "asking cannot run yet" are different sentences
+ * with different next steps.
+ */
+export function useAiRetrievalState(enabled: boolean): AiRetrievalState {
+  const [state, setState] = useState<AiRetrievalState>(RETRIEVAL_CHECKING);
+
+  useEffect(() => {
+    if (!enabled) {
+      setState(RETRIEVAL_CHECKING);
+      return;
+    }
+    let cancelled = false;
+    void aiCapabilityReport().then((report) => {
+      if (cancelled) return;
+      setState({
+        embedding: surfaceStateOf(report, "embedding"),
+        indexReady: report.indexReady,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  return state;
+}
+
 /**
  * Which backend class is actually serving, or `null` while unasked.
  *
