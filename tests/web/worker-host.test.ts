@@ -237,6 +237,32 @@ describe("worker host — every death route settles every promise", () => {
       expect.assertions(2);
     });
 
+    it(`releases the Worker's memory on ${label}`, async () => {
+      // **The keys are in that Worker.** `root_key` and `items_key` live in its
+      // wasm linear memory, and a wasm panic ABORTS rather than unwinding, so no
+      // `Zeroizing` `Drop` runs on the way out. Declaring the instance unusable
+      // without terminating it left that memory allocated in the page, reachable
+      // by nothing and scrubbed by nothing, until the user reloaded or closed
+      // the tab. `threat-model.md` A6 records unscrubbed RAM as an accepted
+      // residual; this is the one instance of it the client can close.
+      //
+      // Asserted per route rather than once, because the four routes are four
+      // call sites and a fifth is the shape that regresses: one of them
+      // forgetting to terminate is invisible from the other three.
+      const host = await freshHost();
+      const call = host.invoke("plugin:notes|note_read");
+      await settle();
+      live!.announceReady();
+      await settle();
+      const dying = live!;
+      expect(dying.terminated).toBe(false);
+
+      kill(dying);
+      await call.catch(() => {});
+
+      expect(dying.terminated).toBe(true);
+    });
+
     it(`rejects a SUBSEQUENT call after ${label}`, async () => {
       // The half that is easy to miss: a dead Worker must keep failing. A
       // transport that only rejected in-flight calls would let the next one hang
@@ -286,6 +312,26 @@ describe("worker host — every death route settles every promise", () => {
     // fetched, or a Worker script that never ran.
     await vi.advanceTimersByTimeAsync(31_000);
     await rejects;
+  });
+
+  it("does NOT terminate the Worker when the caller's own args are uncloneable", async () => {
+    // The other direction of the case below, and the one that would make the
+    // termination above dangerous if it were wrong: a `DataCloneError` is a
+    // caller bug, the Worker is fine, and killing it would turn one bad call
+    // site into a dead vault.
+    const host = await freshHost();
+    const warmUp = host.invoke("plugin:prefs|device_platform");
+    await settle();
+    live!.announceReady();
+    await settle();
+    live!.send({ id: live!.lastId(), kind: "ok", value: "unknown" });
+    await warmUp;
+
+    live!.failClone = true;
+    await host.invoke("plugin:notes|note_read").catch(() => {});
+
+    expect(live!.terminated).toBe(false);
+    expect(host.fatalCause()).toBeNull();
   });
 
   it("does NOT declare the Worker dead when the caller's own args are uncloneable", async () => {
