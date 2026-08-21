@@ -156,7 +156,6 @@ import { AiChatTab } from "../notes/components/AiChatTab";
 // where the user already talks to the AI. The review screen is a takeover
 // rather than a panel because approval is a separate, attention-requiring act
 // and half the feature's other decisions rest on it being one.
-import { AgentComposer } from "../notes/agent/components/AgentComposer";
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { AgentReviewTakeover } from "../notes/agent/components/AgentReviewTakeover";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
@@ -4112,10 +4111,6 @@ function RightSidebar() {
             }}
             onOpenNote={(noteId) => void ctx.open(noteId as NoteId).catch(() => {})}
             titleOf={(noteId) => notes.find((n) => n.noteUuid === noteId)?.title ?? null}
-          />
-        ) : null}
-        {active === "ai-chat" ? (
-          <AgentComposer
             openNoteId={selectedId}
             folders={agentFolders}
             // An undo rewrites notes out-of-band of any pane's autosave, the

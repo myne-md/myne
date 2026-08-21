@@ -56,6 +56,7 @@ import { AgentProgress } from "../../src/notes/agent/components/AgentProgress";
 import {
   beginRun,
   clearAgentForLock,
+  currentRunEpoch,
   settleStep,
 } from "../../src/notes/agent/agentStore";
 
@@ -75,7 +76,7 @@ function awaitingScope() {
     notesRead: 1,
     charsOffDevice: null,
     excludedCount: 0,
-  });
+  }, currentRunEpoch());
 }
 
 const REPORT = {

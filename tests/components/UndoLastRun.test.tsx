@@ -34,6 +34,7 @@ vi.mock("react-i18next", () => ({
 import { UndoLastRun } from "../../src/notes/agent/components/UndoLastRun";
 import {
   clearAgentForLock,
+  currentRunEpoch,
   settleApply,
 } from "../../src/notes/agent/agentStore";
 
@@ -161,6 +162,7 @@ describe("UndoLastRun", () => {
         restorePoints: [["note-a", "snap-z"]],
       },
       [0],
+      currentRunEpoch(),
     );
     rerender(<UndoLastRun />);
 

@@ -65,6 +65,12 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears"
 
         // Send the first message via the composer (click the Send button — never
         // a synthetic Enter keystroke, which carries invisible-char footguns).
+        //
+        // The composer sends on Enter now too, and this scenario deliberately
+        // does not rely on that: `Element.sendKeys` posts exactly the string it
+        // is given and appends nothing (`support/webdriver.ts`), so the click
+        // below is the only thing that sends. A scenario that WANTS Enter writes
+        // `` itself, the way `notes.e2e.ts` does.
         const composer = await s.byTestId("ai.composer-input", { timeoutMs: 10_000 });
         await composer.sendKeys("what is this note about?");
         await (await s.byTestId("ai.composer-send")).click();
@@ -98,6 +104,9 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears"
           async () => ((await s.byTestIdAll("ai.turn")).length >= 4 ? true : null),
           { label: "follow-up appended a second exchange", timeoutMs: 15_000 },
         );
+        // Exactly four, not "at least four": a lower bound cannot fail on a
+        // double send, which is the thing the comment above is about.
+        expect((await s.byTestIdAll("ai.turn")).length).toBe(4);
 
         // Lock the vault → the RAM-only transcript is dropped. Re-unlock and
         // reveal the tab: the transcript is gone (fresh conversation).

@@ -103,6 +103,39 @@ export const TEARDOWN_CALLS = [
     skips: {},
   },
   {
+    call: "clearChat",
+    declaredIn: "src/notes/ai/chatStore.ts",
+    holds: "the AI chat transcript: the user's own questions about their notes and the model's answers over them",
+    // Every leaving path, for the same reason as the run's proposal above.
+    // It had NO entry here and no call on either path: the only thing clearing
+    // it was the Editor's own unmount cleanup, which does fire on a lock today
+    // and is a rendering fact rather than a guarantee. A refactor that keeps
+    // the Editor mounted across a lock would carry one vault's conversation
+    // into the next session, and nothing would say so.
+    // `design-notes/ai/0276` rests its "no new at-rest magic byte, KEK or
+    // format" argument on this transcript being RAM-only and dropped on lock.
+    appliesTo: ["lockVault", "leaveActiveVault"],
+    skips: {},
+  },
+  {
+    call: "clearAiOutput",
+    declaredIn: "src/notes/ai/aiOutputStore.ts",
+    holds: "the rendered AI output: a summary of a note, and every Q and A answer over note content that src/lib/ai-qa.ts routes through this same store",
+    // Every leaving path, and it was left on the OLD teardown when `clearChat`
+    // moved onto these two. It sits one line above `clearChat` in the same
+    // Editor unmount effect and had no entry here, so this roster reported ok
+    // about it by never naming it. The argument for moving `clearChat` is the
+    // argument for this one, unchanged: the Editor unmount does fire on a lock
+    // today and is a rendering fact rather than a guarantee, and the store's
+    // own header calls its contents an AS1-class RAM artifact dropped on lock.
+    //
+    // The note-SWITCH call in the Editor stays where it is. That one is about a
+    // different event (note A's summary must not be insertable into note B) and
+    // neither leaving path can speak for it.
+    appliesTo: ["lockVault", "leaveActiveVault"],
+    skips: {},
+  },
+  {
     call: "resetSessionIgnored",
     declaredIn: "editor/src/decorations/spell.ts",
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",

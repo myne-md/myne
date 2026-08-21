@@ -30,6 +30,8 @@
 // needs a "you have unsaved changes" prompt.
 
 import { clearAgentForLock } from "../notes/agent/agentStore";
+import { clearAiOutput } from "../notes/ai/aiOutputStore";
+import { clearChat } from "../notes/ai/chatStore";
 import { resetSessionIgnored } from "../editor/decorations/spell";
 import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
 import type { Action, VaultId } from "./stage";
@@ -108,6 +110,17 @@ export async function leaveActiveVault(deps: {
   // `teardown_on_lock` on the `lockVault()` above; this is the WebView half,
   // and `decisions/ai/0515` rests its "nothing survives a lock" claim on both.
   clearAgentForLock();
+  // And the chat transcript, for the reason that is specific to a CHANGE: the
+  // questions and answers describe the vault being left, so carrying them into
+  // the next one would show a second vault a first vault's conversation. The
+  // `lockVault()` above clears it too; this path is asserted separately because
+  // a later refactor could stop routing through that call without anything
+  // noticing (`scripts/check-frontend-lock-teardown.mjs`).
+  clearChat();
+  // The rendered AI output, on the same reasoning: a summary of a note in the
+  // vault being left, and the Q and A answers over its content, are as
+  // vault-specific as the conversation above.
+  clearAiOutput();
 }
 
 /**
