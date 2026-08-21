@@ -75,18 +75,39 @@ const waiters = new Map<number, Waiter>();
 const listeners = new Map<string, Set<EventListener>>();
 
 /**
- * Fail every in-flight call and mark the Worker dead.
+ * Fail every in-flight call, mark the Worker dead, and terminate it.
  *
  * Called from four places — a `fatal` message, `onerror`, `onmessageerror`, and
  * the startup timeout — because all four mean the same thing to a caller: this
  * instance will not answer. Collapsing them into one function is what keeps
- * "some paths reject and some hang" from being possible.
+ * "some paths reject and some hang" from being possible, and it is why the
+ * termination below covers all four rather than whichever one someone
+ * remembered.
  */
 function declareFatal(code: FatalCode | string, where?: string): void {
   if (fatal) return; // first cause wins; a cascade is not new information
   fatal = new WorkerFatalError(code, where);
   for (const waiter of waiters.values()) waiter.reject(fatal);
   waiters.clear();
+  // **Release the Worker's memory, because the keys are in it.**
+  //
+  // `root_key` and `items_key` live in the Worker's wasm linear memory, and a
+  // wasm panic ABORTS rather than unwinding, so no `Zeroizing` `Drop` runs on
+  // the way out. Declaring the instance unusable without terminating it left
+  // that memory allocated in the page: reachable by nothing, scrubbed by
+  // nothing, and freed only when the user reloaded or closed the tab. Every UI
+  // path is broken by then, so a reload is their only move, and nothing made it
+  // happen. `threat-model.md` A6 records unscrubbed RAM as an accepted residual;
+  // this is the one instance of it the client can actually close, so it does.
+  //
+  // Safe to do here BECAUSE there is no in-page recovery: `fatal` is never
+  // cleared, `ensureWorker` throws on it, and nothing outside this module
+  // creates a replacement. Terminating cannot cost a recovery that does not
+  // exist. `terminate()` below stays exported for the tab-lock handoff and for
+  // tests, and is idempotent with this (`worker?.terminate()` on a null).
+  worker?.terminate();
+  worker = null;
+  ready = null;
 }
 
 function ensureWorker(): { worker: Worker; ready: Promise<void> } {
@@ -332,9 +353,16 @@ export function fatalCause(): WorkerFatalError | null {
 /**
  * Tear the transport down and forget it.
  *
- * Exported for the tab-lock handoff (task 21) and for tests; task 82's recovery
- * path calls it before creating a replacement. Deliberately does NOT clear
- * `fatal` — the module-level comment on that variable says why.
+ * Exported for the tab-lock handoff (task 21) and for tests. Deliberately does
+ * NOT clear `fatal` — the module-level comment on that variable says why.
+ *
+ * This used to say "task 82's recovery path calls it before creating a
+ * replacement". No such caller exists anywhere in `web/src` or `src`, and none
+ * could work: `fatal` is never cleared and `ensureWorker` throws on it, so a
+ * page that has seen a fatal creates no replacement Worker. Recovery from a
+ * crashed Worker is a page reload, which is a different mechanism. Saying so
+ * matters because `declareFatal` now terminates, and the claim of a recovery
+ * path is exactly what would make that look unsafe.
  */
 export function terminate(): void {
   worker?.terminate();
