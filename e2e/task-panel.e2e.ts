@@ -13,13 +13,14 @@
 // The precedent followed is the graph-view and tag-browser scenarios, which ship
 // with test ids and a scenario apiece.
 
-import { it } from "vitest";
+import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
   runPaletteAction,
+  settleOn,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -185,6 +186,77 @@ describeE2E("tp3 empty-state copy is honest, not celebratory (MYND-616)", () => 
         if (/all done|congrat|caught up|🎉|✅|✓/i.test(copy)) {
           throw new Error(`empty-state copy is celebratory: ${copy}`);
         }
+      },
+    );
+  });
+});
+
+describeE2E("tp4 the task tab body fills the pane (myne-md/myne#534)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("the task list ends where the pane ends, so its filter strip pins instead of scrolling away", async () => {
+    // `TaskListPanel`'s root is written as a FILLING body (`height: 100%` over
+    // an inner `flex: 1 1 auto; min-height: 0; overflow-y: auto`), and for the
+    // life of the feature the pane handed it the flowing frame instead. The
+    // percentage resolved to `auto`, the inner scroller never got a box to
+    // scroll inside, and the filter strip slid up out of view with the list.
+    // Third member of #534's family and the same cause; nothing here was
+    // unreachable, which is why it outlived the graph's version of it.
+    //
+    // The claim is one number, for the same reason gt2's is: a panel that ends
+    // where the pane ends has a box, and a panel that ends short of it does not.
+    let password = "";
+    await scenario(
+      "tp4-task-tab-fills-pane",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Tp4 Note");
+        await typeIntoEditor(s, "- [ ] tp4taskalfa9x3k7m2q");
+        await waitForSaved(s);
+        await openTaskTab(s);
+        // The tab opens on `today` and this task carries no due date, so it is
+        // legitimately absent until the filter widens. tp1 does the same.
+        await (await s.byTestId("tasks.filter.all")).click();
+        await s.waitForElement(testIdSelector("tasks.row.text"));
+
+        const geometry = await settleOn(
+          s,
+          async () =>
+            (await s.execute<string>(
+              "var pane = document.querySelector(arguments[0]);" +
+                "var panel = document.querySelector(arguments[1]);" +
+                "if (!pane || !panel) return '';" +
+                "return JSON.stringify({" +
+                "  paneBottom: Math.round(pane.getBoundingClientRect().bottom)," +
+                "  panelBottom: Math.round(panel.getBoundingClientRect().bottom)," +
+                "  panelHeight: Math.round(panel.getBoundingClientRect().height)" +
+                "});",
+              [testIdSelector("editor.pane"), testIdSelector("tasks.panel")],
+            )) || null,
+          {
+            label: "task panel geometry settles",
+            parse: (raw) =>
+              JSON.parse(raw) as {
+                paneBottom: number;
+                panelBottom: number;
+                panelHeight: number;
+              },
+          },
+        );
+
+        expect(
+          Math.abs(geometry.paneBottom - geometry.panelBottom),
+          "the task panel ends where the pane ends",
+        ).toBeLessThanOrEqual(2);
+        // Guards the gap against holding for the wrong reason, exactly as gt2
+        // does: a collapsed panel would sit at the pane's top, but a future
+        // layout change could park a zero-height box on the bottom edge.
+        expect(
+          geometry.panelHeight,
+          "the task panel is a real box, not a collapsed one",
+        ).toBeGreaterThan(100);
       },
     );
   });
