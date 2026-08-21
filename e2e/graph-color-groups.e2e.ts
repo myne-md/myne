@@ -60,12 +60,13 @@ import {
   dismissImporterOffer,
   lockAndReunlock,
   openSettings,
+  openSettledGraphPane,
   pageSeatInvoke,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
-import { testIdSelector, type Element, type Session } from "./support/webdriver";
+import { testIdSelector, type Session } from "./support/webdriver";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -109,29 +110,6 @@ async function seedTaggedNotes(s: Session): Promise<void> {
     await typeIntoEditor(s, MARKS[i] as string);
     await waitForSaved(s);
   }
-}
-
-/** Open the whole-vault graph via the BottomBar affordance and return the pane
- *  AND the canvas, once the first layout has been built.
- *
- *  The canvas wait is NOT optional and is not the same wait as the pane's:
- *  `GraphCanvas` sits behind the app's only `React.lazy` boundary
- *  (`GraphView.tsx`) and mounts a few hundred ms AFTER the pane, while the
- *  Suspense fallback is still up. `data-layout-nonce` lives on the PANE, so a
- *  pixel probe gated only on it reads a DOM with no <canvas> in it at all —
- *  `pixelCount` then returns its −1 "not mounted" sentinel and the scenario
- *  fails on a wait it never performed. Same helper shape as
- *  `graph-settings.e2e.ts`'s `openSettledGraph`. */
-async function openSettledGraph(s: Session): Promise<{ pane: Element; canvas: Element }> {
-  await (await s.byTestId("editor.graph-button")).click();
-  const pane = await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
-  // Let the layout settle before probing "did it re-run" — gp2's wait.
-  await s.waitUntil(
-    async () => ((await pane.attribute("data-layout-nonce")) === "1" ? true : null),
-    { label: "graph builds once", timeoutMs: 15_000 },
-  );
-  const canvas = await s.byTestId("editor.graph-canvas", { timeoutMs: 15_000 });
-  return { pane, canvas };
 }
 
 /** The leading three channels of a computed `rgb(...)` / `rgba(...)` string. */
@@ -242,7 +220,7 @@ describeE2E("gc1 color groups paint the graph without re-running the layout", ()
         // Two tagged notes: only the first carries #alfagroup.
         await seedTaggedNotes(s);
 
-        const { pane } = await openSettledGraph(s);
+        const { pane } = await openSettledGraphPane(s);
         // No rules yet → every node neutral.
         expect(await pane.attribute("data-colored-node-count")).toBe("0");
 
@@ -379,7 +357,7 @@ describeE2E("gc2 color-group rules survive a restart", () => {
         await dismissImporterOffer(s);
         await seedTaggedNotes(s);
 
-        const { pane } = await openSettledGraph(s);
+        const { pane } = await openSettledGraphPane(s);
         expect(await pane.attribute("data-colored-node-count")).toBe("0");
 
         // --- Author one rule, completely: name, a non-default colour, filter.
@@ -420,7 +398,7 @@ describeE2E("gc2 color-group rules survive a restart", () => {
         // out of this session's React state.
         await lockAndReunlock(s, password);
 
-        const { pane: pane2 } = await openSettledGraph(s);
+        const { pane: pane2 } = await openSettledGraphPane(s);
 
         // The rule is LIVE again with nothing authored this session: the graph
         // paints the same node in the same group colour.

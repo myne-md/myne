@@ -225,19 +225,50 @@ export default function GraphCanvas({
     const coarse =
       window.matchMedia?.("(pointer: coarse)")?.matches === true;
 
-    // Size the backing store to the element (DPR-aware) and cache the CSS box
-    // (culling reads it every frame — never call getBoundingClientRect in the
-    // render loop; that forces a layout reflow).
-    const dpr = window.devicePixelRatio || 1;
+    // Size the backing store to the element (DPR-aware) and cache the CSS box.
+    // Culling reads that box every frame, so never call getBoundingClientRect in
+    // the render loop; it forces a layout reflow.
+    //
+    // `dpr` is re-read here rather than frozen at mount, and `render()` reads
+    // this same binding for its `ctx.scale`, so the two can never disagree. It
+    // is insurance rather than a guarantee: a move to a display of a different
+    // density that leaves the element's box alone fires no resize notification
+    // at all, so the new ratio is picked up by whatever resizes the canvas next.
+    //
+    // The boolean return is an OPTIMISATION, not a correctness condition. Two
+    // notifications arrive on a box this function has already measured (the one
+    // `observe()` delivers immediately, and a transition's tail frame at the
+    // settled size), and each would otherwise reallocate the backing store, a
+    // zero-fill of the whole surface, and queue a pixel-identical repaint.
+    // Nothing depends on it being here: what makes those notifications SAFE is
+    // that `onResize` only ever repaints, never refits.
+    //
+    // **The early return also skips the `sizeRef` write, which is the one side
+    // effect here that is not a repaint**, so "optimisation" is not the whole
+    // story and the case worth naming is the one where the two disagree.
+    // `cssW`/`cssH` are closure-local and reset to 0 on every `[model]` re-run,
+    // while `sizeRef` is a component ref only this function writes. A re-run
+    // that measures the canvas at 0x0 therefore returns early, and `sizeRef`
+    // keeps the PREVIOUS run's box while this closure believes 0x0. Culling and
+    // pointer hit-testing read `sizeRef`, so for that window they use the older
+    // box. It is left that way deliberately: writing before the return would
+    // put {0,0} there instead, which is what the unconditional version did and
+    // is not the better of the two, and the next notification corrects it
+    // either way.
+    let dpr = window.devicePixelRatio || 1;
     let cssW = 0;
     let cssH = 0;
-    const resize = () => {
+    const resize = (): boolean => {
+      const nextDpr = window.devicePixelRatio || 1;
       const r = canvas.getBoundingClientRect();
+      if (r.width === cssW && r.height === cssH && nextDpr === dpr) return false;
+      dpr = nextDpr;
       cssW = r.width;
       cssH = r.height;
       sizeRef.current = { width: cssW, height: cssH };
       canvas.width = Math.max(1, Math.floor(r.width * dpr));
       canvas.height = Math.max(1, Math.floor(r.height * dpr));
+      return true;
     };
     resize();
 
@@ -663,7 +694,7 @@ export default function GraphCanvas({
     };
 
     const onResize = () => {
-      resize();
+      if (!resize()) return; // same box, same ratio: nothing to redraw.
       schedule(); // re-render at current positions — never re-layout on resize.
     };
 
@@ -700,7 +731,36 @@ export default function GraphCanvas({
     canvas.addEventListener("pointercancel", onPointerCancel);
     canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
-    window.addEventListener("resize", onResize);
+    // Observe the ELEMENT, not the window (myne#534). Most of what resizes this
+    // canvas never resizes the window: toggling a sidebar, splitting a pane,
+    // the tab strip stacking. A window-only listener left the backing store at
+    // the old box after every one of those, which is a blurred render plus
+    // `sizeRef` (culling and pointer hit-testing read it) describing a box that
+    // is no longer there. The observer subsumes the window case, since a window
+    // resize changes this element's box too.
+    //
+    // It fires once on `observe()`, which `window.resize` never did. Safe
+    // because `onResize` only repaints: a refit here would move the camera at
+    // mount and break the fitted-view and no-rewrite guarantees the mobile flow
+    // specs pin. Keep it that way. (`resize()`'s changed-check makes that first
+    // notification free as well, but free is not what makes it safe.)
+    //
+    // The window listener is KEPT as the fallback rather than degraded to
+    // nothing. The shared package's other observers (`scroll-slack.ts`,
+    // `attachments/widgets.ts`) do degrade to nothing, and correctly so: they
+    // never had a second mechanism to lose. This one did, and dropping it would
+    // mean a host without `ResizeObserver` silently renders a stretched canvas
+    // with its hit-testing pointing somewhere else, which is a failure that
+    // reports success. Three lines is a cheap price for that not being possible,
+    // and mobile compiles this same file onto the least predictable WebView
+    // floor of the three clients.
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", onResize);
+    } else {
+      resizeObserver = new ResizeObserver(onResize);
+      resizeObserver.observe(canvas);
+    }
 
     return () => {
       scheduleRef.current = null;
@@ -716,8 +776,12 @@ export default function GraphCanvas({
       canvas.removeEventListener("pointercancel", onPointerCancel);
       canvas.removeEventListener("dblclick", onDblClick);
       canvas.removeEventListener("wheel", onWheel);
-      // Was previously leaked — the anonymous resize listener accumulated one
-      // per effect re-run (every model/filter change).
+      // Both teardowns run unconditionally: exactly one of the two was ever
+      // registered, and removing a listener that was never added is a no-op.
+      // Whichever it was is created per `[model]` effect run, so a missed
+      // teardown accumulates one per filter change, which is the leak the
+      // anonymous window listener here used to have.
+      resizeObserver?.disconnect();
       window.removeEventListener("resize", onResize);
       themeObserver.disconnect();
       colorScheme?.removeEventListener?.("change", onThemeChange);
@@ -837,6 +901,12 @@ export default function GraphCanvas({
       // (see `render()`), deliberately not declared here — the view transform
       // lives in a ref precisely so a pan does not commit React state, and
       // declaring them would undo that.
+      // `flex` AND the two percentages are all load-bearing, and none is slop:
+      // the two hosts frame this element differently. Mobile's ancestry is an
+      // unbroken flex column (`WikiGraph` → `flex: 1; minHeight: 0`), desktop's
+      // resolves a percentage height off the pane body's explicit-height frame
+      // (`PaneView`'s full-bleed wrapper). Drop either and one client's canvas
+      // collapses to its intrinsic 2:1 ratio, which is myne#534.
       style={{
         flex: 1,
         width: "100%",

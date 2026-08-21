@@ -81,8 +81,15 @@ export async function sendChat(
 ): Promise<void> {
   // Snapshot the PRIOR turns as history before appending the new turn; drop any
   // empty turn so a blank assistant slot never enters the conversation.
+  //
+  // **`text` turns only** (myne-md/myne#533). The transcript also carries agent
+  // runs now, and those are not conversation: the agent turn's own text is at
+  // most a failure sentence, and the user turn beside it is a task addressed to
+  // a different loop, sent under a scope this call knows nothing about. Feeding
+  // either to the ask model would put instructions in its context that the user
+  // aimed somewhere else.
   const history: ChatHistoryMessage[] = getChat()
-    .turns.filter((turn) => turn.text.trim().length > 0)
+    .turns.filter((turn) => turn.kind === "text" && turn.text.trim().length > 0)
     .map((turn) => ({ role: turn.role, content: turn.text }));
 
   const runToken = sendChatMessage(message);

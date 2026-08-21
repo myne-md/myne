@@ -508,6 +508,31 @@ export const CONSENT_ACCOUNT_SCOPE =
 export const AI_CHAT_HONESTY_NOTE =
   "Answers come from a small model running on your device and may be wrong — check the notes it cites.";
 
+/** The same note for a run served by a NAMED REMOTE PROVIDER.
+ *
+ *  **The one above says "running on your device", and since the remote arm
+ *  shipped (#414/#415) that is false whenever a provider is named.** The chat
+ *  surface printed it next to a status chip carrying the provider's own name,
+ *  so it said "OpenRouter" and "on your device" in the same breath.
+ *  `threat-model.md` TB13 is explicit that decrypted note plaintext leaves the
+ *  device on that arm, and §6 states the order: downgrade the claim to match
+ *  the threat model, never ship the copy and amend the model afterwards.
+ *
+ *  Two sentences rather than one edit to the constant above, on the precedent
+ *  `decisions.md` 2026-07-13 set for `REMINDER_OS_DISCLOSURE_SENTENCE`: render
+ *  the sentence that is true for the arm that is running. The local one keeps
+ *  its exact wording, so what is pinned stays pinned.
+ *
+ *  It says **less** than `aiTrustDetail`'s remote body, which is what
+ *  `decisions.md` 2026-08-09 permits: where the model runs, that Myne does not
+ *  run it, and that the answer may be wrong. The full egress disclosure lives
+ *  in the AI settings panel, and this surface points at the notes rather than
+ *  restating it. */
+export function aiChatHonestyNote(provider: string | null): string {
+  if (provider === null) return AI_CHAT_HONESTY_NOTE;
+  return `Answers come from a model at ${provider}, which Myne does not run, and may be wrong. Check the notes it cites.`;
+}
+
 /** Transcript-fallibility honesty note (voice-to-text MYND-552, SYNC-V8). A
  *  load-bearing, threat-model-bounded framing shown beneath the read-only
  *  transcript expander: the transcript comes from a SMALL on-device speech model

@@ -26,7 +26,7 @@ import {
   agentUndo,
   type AgentUndoResult,
 } from "../../../lib/agent-run";
-import { setUndoable, useAgent } from "../agentStore";
+import { currentRunEpoch, setUndoable, useAgent } from "../agentStore";
 
 export interface UndoLastRunProps {
   /** Called after an undo changed notes on disk, so the caller can reload what
@@ -56,10 +56,14 @@ export function UndoLastRun({ onReverted }: UndoLastRunProps) {
   const appliedTick = agent.applied?.applied ?? 0;
   useEffect(() => {
     let live = true;
+    // Captured before the await: a reply landing after the vault was left must
+    // not re-seed the offer with the previous vault's note ids. The unmount
+    // this used to rely on is a rendering fact, not a guarantee.
+    const epoch = currentRunEpoch();
     void agentLastRun()
       .then((run) => {
         if (!live) return;
-        setUndoable(run);
+        setUndoable(run, epoch);
         // A different run than the one the report describes means the report is
         // history. Dropping it here rather than on the undo is deliberate: the
         // report has to survive its own render, and the event that makes it
@@ -71,7 +75,7 @@ export function UndoLastRun({ onReverted }: UndoLastRunProps) {
       .catch(() => {
         // A failed read means the offer is not shown. Failing closed here is
         // right: an Undo button that cannot name a run would fail on press.
-        if (live) setUndoable(null);
+        if (live) setUndoable(null, epoch);
       });
     return () => {
       live = false;
@@ -89,15 +93,16 @@ export function UndoLastRun({ onReverted }: UndoLastRunProps) {
       setResult({ runId: run.runId, report: r });
       // The host consumed the record, so the offer goes with it rather than
       // waiting for the next read. A second press would report `noSuchRun`.
-      setUndoable(null);
+      setUndoable(null, currentRunEpoch());
       onReverted?.(run.restorePoints.map(([noteId]) => noteId));
     } catch {
       setResult(null);
       // Re-read rather than guessing: the run may be gone (a lock landed) or
       // the call may simply have failed, and those want different offers.
+      const epoch = currentRunEpoch();
       await agentLastRun()
-        .then(setUndoable)
-        .catch(() => setUndoable(null));
+        .then((r) => setUndoable(r, epoch))
+        .catch(() => setUndoable(null, epoch));
     } finally {
       setBusy(false);
     }

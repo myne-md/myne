@@ -949,6 +949,50 @@ export async function clickUntilVisible(
   triggerTestId: string,
   revealedTestId: string,
 ): Promise<void> {
+  await clickUntilTrue(session, testIdSelector(triggerTestId), {
+    done: async () => (await session.byTestIdAll(revealedTestId)).length > 0,
+    label: `${triggerTestId} reveals ${revealedTestId}`,
+    what: "clickUntilVisible",
+    trigger: `[${triggerTestId}]`,
+    outcome: `[${revealedTestId}]`,
+  });
+}
+
+/**
+ * The engine under `clickUntilVisible`, addressing the trigger by SELECTOR and
+ * the outcome by an arbitrary predicate.
+ *
+ * Split out because the testid-pair form cannot express two real cases. A
+ * control whose two states share one testid and differ only by attribute
+ * (`editor.sidebar-toggle` carries `data-side` and `data-collapsed`) has no
+ * second testid to wait for, and an outcome that is a property rather than an
+ * element (a value changed, a count moved) has none either. Both were being
+ * answered with a private re-click loop in the calling spec, which is how the
+ * per-attempt window below kept getting dropped.
+ *
+ * That window is the load-bearing part, and `clickUntilVisible`'s own header
+ * says why: the poll fires every 100 ms, so re-firing before the first click's
+ * effect has committed clicks a TOGGLE straight back and the loop oscillates.
+ * Each attempt gets 2 s of its own before it is judged to have missed.
+ *
+ * Same caller obligation as `clickUntilVisible`: never point this at a trigger
+ * that COMMITS, where a second click is a second write rather than a retry.
+ */
+export async function clickUntilTrue(
+  session: Session,
+  triggerSelector: string,
+  opts: {
+    done: () => Promise<boolean>;
+    label: string;
+    /** Helper name for the failure message. */
+    what?: string;
+    /** How to name the trigger and the outcome in the failure message. */
+    trigger?: string;
+    outcome?: string;
+    /** Omit for the harness default, `clickUntilVisible`'s standing budget. */
+    timeoutMs?: number;
+  },
+): Promise<void> {
   // Which half went missing is the whole diagnosis, and a label naming only the
   // pair loses it: "the trigger never rendered" (a missing precondition — see
   // the five Views specs that never enabled `settings.views-enabled`) and "the
@@ -958,24 +1002,28 @@ export async function clickUntilVisible(
   try {
     await session.waitUntil(
       async () => {
-        if ((await session.byTestIdAll(revealedTestId)).length > 0) return true;
-        const trigger = await session.byTestIdAll(triggerTestId);
-        if (trigger.length === 0) return null;
+        if (await opts.done()) return true;
+        const [trigger] = await session.findElements(triggerSelector);
+        if (trigger === undefined) return null;
         everSawTrigger = true;
-        await trigger[0].click();
+        await trigger.click();
         for (let i = 0; i < 20; i++) {
-          if ((await session.byTestIdAll(revealedTestId)).length > 0) return true;
+          if (await opts.done()) return true;
           await new Promise((r) => setTimeout(r, 100));
         }
         return null;
       },
-      { label: `${triggerTestId} reveals ${revealedTestId}` },
+      opts.timeoutMs === undefined
+        ? { label: opts.label }
+        : { label: opts.label, timeoutMs: opts.timeoutMs },
     );
   } catch (e) {
+    const trigger = opts.trigger ?? triggerSelector;
+    const outcome = opts.outcome ?? opts.label;
     const why = everSawTrigger
-      ? `[${triggerTestId}] rendered and was clicked, but [${revealedTestId}] never appeared`
-      : `[${triggerTestId}] NEVER RENDERED — nothing was ever clicked. This is a missing precondition, not a flaky click (e.g. a feature still behind its setting).`;
-    throw new Error(`clickUntilVisible: ${why}\n${(e as Error).message}`);
+      ? `${trigger} rendered and was clicked, but ${outcome} never appeared`
+      : `${trigger} NEVER RENDERED. Nothing was ever clicked, so this is a missing precondition rather than a flaky click (e.g. a feature still behind its setting).`;
+    throw new Error(`${opts.what ?? "clickUntilTrue"}: ${why}\n${(e as Error).message}`);
   }
 }
 
@@ -1490,4 +1538,115 @@ export async function enterRecoveryPhrase(session: Session, phrase: string): Pro
   for (let i = 0; i < 24; i++) {
     await cells[i].sendKeys(words[i]);
   }
+}
+
+/**
+ * Poll `sample` until `stable` CONSECUTIVE readings are identical, then return
+ * the last one parsed. A reading of `null` means "not measurable yet" and resets
+ * the run rather than counting toward it.
+ *
+ * Asserting on a FIRST reading is how a geometry or pixel scenario passes
+ * against a build with the fix REMOVED. `editor-scroll-slack.e2e.ts` learned
+ * that from a virtualised viewport, `graph-settings.e2e.ts` from a canvas
+ * mid-repaint, `graph-tab.e2e.ts` from a sidebar width transition. Three specs
+ * had grown three private copies of this loop with three different stability
+ * windows and no way to compare them; this is the one they share.
+ *
+ * `stable` is how many readings must AGREE, not how many are taken. Two is
+ * enough for a value that moves monotonically toward rest (a CSS transition);
+ * raise it for a sampler that can legitimately repeat a value mid-flight.
+ *
+ * The parsed value is BOXED before it goes to `waitUntil`, which returns only on
+ * a truthy predicate result. Unboxed, a `T` that settles at `0`, `""`, `false`
+ * or `NaN` reads as "not settled yet", so the helper polls out its whole budget
+ * and then reports that a value never settled when it settled immediately. Both
+ * callers today parse to objects; a scroll offset resting at 0 or a count
+ * resting at 0 is exactly what a generic helper gets asked for next.
+ *
+ * One deliberate hold-out: `graph-settings.e2e.ts`'s `waitForCanvasQuiet` keeps
+ * its own copy, and says why at its definition. Its window and interval are
+ * tuned against that suite's repaint timings, so folding it in here would move
+ * a stability window nobody is otherwise touching.
+ */
+export async function settleOn<T>(
+  session: Session,
+  sample: () => Promise<string | null>,
+  opts: { label: string; parse: (raw: string) => T; stable?: number; timeoutMs?: number },
+): Promise<T> {
+  const need = opts.stable ?? 2;
+  let previous: string | null = null;
+  let run = 0;
+  const box = await session.waitUntil<{ v: T }>(
+    async () => {
+      const raw = await sample();
+      if (raw === null) {
+        previous = null;
+        run = 0;
+        return null;
+      }
+      run = raw === previous ? run + 1 : 1;
+      previous = raw;
+      return run >= need ? { v: opts.parse(raw) } : null;
+    },
+    { label: opts.label, timeoutMs: opts.timeoutMs ?? 20_000 },
+  );
+  return box.v;
+}
+
+/** Open the whole-vault graph through the persistent BottomBar affordance and
+ *  return its pane. */
+export async function openGraphPane(session: Session): Promise<Element> {
+  await (await session.byTestId("editor.graph-button")).click();
+  return session.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
+}
+
+/**
+ * `openGraphPane`, then wait until the model has been built once AND the canvas
+ * has mounted, which is the state every graph scenario actually needs.
+ *
+ * THE CANVAS WAIT IS NOT OPTIONAL, and it is not the same wait as the pane's.
+ * `GraphCanvas` sits behind the app's only `React.lazy` boundary
+ * (`GraphView.tsx`) and mounts a few hundred ms AFTER the pane, while the
+ * Suspense fallback is still up. `data-layout-nonce` lives on the PANE, so a
+ * probe gated only on it reads a DOM with no `<canvas>` in it at all.
+ *
+ * Four specs had written this sequence out, three of them carrying a comment
+ * saying they had copied it from one of the others.
+ */
+export async function openSettledGraphPane(
+  session: Session,
+): Promise<{ pane: Element; canvas: Element }> {
+  const pane = await openGraphPane(session);
+  await session.waitUntil(
+    async () => ((await pane.attribute("data-layout-nonce")) === "1" ? true : null),
+    { label: "graph builds once", timeoutMs: 15_000 },
+  );
+  const canvas = await session.byTestId("editor.graph-canvas", { timeoutMs: 15_000 });
+  return { pane, canvas };
+}
+
+/**
+ * Collapse the notes sidebar, re-clicking until `data-collapsed` actually flips.
+ *
+ * The only way a scenario can change the editor pane's WIDTH without changing
+ * the window's. The harness has no window-resize primitive, and this is the
+ * stronger case anyway: it is exactly what a `window`-scoped resize listener
+ * cannot hear.
+ *
+ * Both sidebar states share one testid and differ only by attribute, which is
+ * why this goes through `clickUntilTrue` rather than `clickUntilVisible`.
+ */
+export async function collapseNotesSidebar(session: Session): Promise<void> {
+  const selector = testIdSelector("editor.sidebar-toggle", { "data-side": "left" });
+  const collapsed = async (): Promise<boolean> => {
+    const [el] = await session.findElements(selector);
+    return el !== undefined && (await el.attribute("data-collapsed")) === "true";
+  };
+  await clickUntilTrue(session, selector, {
+    done: collapsed,
+    label: "the notes sidebar collapses",
+    what: "collapseNotesSidebar",
+    trigger: "[editor.sidebar-toggle][data-side=left]",
+    outcome: 'data-collapsed="true"',
+  });
 }
