@@ -271,7 +271,14 @@ export function failRun(message: string): void {
 
 /** The run is resuming after a scope approval. */
 export function resumeRun(): void {
-  set({ running: true, error: null });
+  // **`end` goes too, and that is the whole fix** (myne-md/myne#559). The
+  // scope-expansion dialog derives its visibility from
+  // `end?.kind === "awaitingScope"`, so leaving `end` alone kept it mounted
+  // while the approval was in flight: the user pressed Allow, nothing appeared
+  // to happen, and the second press raced the first. The run is no longer
+  // awaiting anything the moment the approval is sent, which is exactly what
+  // `running: true` beside it says.
+  set({ running: true, error: null, end: null });
 }
 
 /** Toggle one edit's rejection. */
