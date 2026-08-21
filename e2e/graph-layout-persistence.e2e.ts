@@ -36,6 +36,7 @@ import {
   createNote,
   dismissImporterOffer,
   lockAndReunlock,
+  openGraphPane,
   unlockToEditor,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
@@ -46,13 +47,6 @@ const TITLES = [
   "gp1notebravo3f6h1zn8c2vb5kk0",
   "gp1notecharlie9d4s7yq2mx1pp5",
 ];
-
-/** Open the whole-vault graph via the BottomBar affordance and return the pane
- *  element once it renders. */
-async function openGraph(s: Session) {
-  await (await s.byTestId("editor.graph-button")).click();
-  return await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
-}
 
 /** Poll until the `vault.graph` blob exists on disk (the flush is debounced
  *  ~800 ms after the worker settles), then assert its MYG1 magic. */
@@ -89,7 +83,7 @@ describeE2E.flaky("gp1 graph layout persists across a lock/re-unlock remount", (
         for (const t of TITLES) await createNote(s, t);
 
         // Open the graph → it builds + lays out + (debounced) writes vault.graph.
-        const pane = await openGraph(s);
+        const pane = await openGraphPane(s);
         const nodeCount = await pane.attribute("data-node-count");
         expect(Number(nodeCount)).toBeGreaterThanOrEqual(TITLES.length);
 
@@ -101,7 +95,7 @@ describeE2E.flaky("gp1 graph layout persists across a lock/re-unlock remount", (
 
         // Reopen the graph → the layout is RESTORED from the encrypted blob:
         // the hydrate path ran, and the graph built the same node-set.
-        const pane2 = await openGraph(s);
+        const pane2 = await openGraphPane(s);
         expect(await pane2.attribute("data-layout-hydrated")).toBe("true");
         expect(await pane2.attribute("data-node-count")).toBe(nodeCount);
       },
@@ -127,7 +121,7 @@ describeE2E.flaky("gp2 graph layout is flashbang-free (builds once, does not re-
         await dismissImporterOffer(s);
         for (const t of TITLES) await createNote(s, t);
 
-        const pane = await openGraph(s);
+        const pane = await openGraphPane(s);
 
         // The layout effect runs exactly once per mount → nonce reaches "1".
         await s.waitUntil(
