@@ -49,6 +49,7 @@ import {
   type ProbeVerdict,
   type ScopeGrant,
 } from "../../lib/agent-run";
+import { setAutoApply, useAgent } from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
 import { CAPTION_STYLE } from "./sharedStyles";
 
@@ -68,6 +69,10 @@ export interface ChatComposerProps {
   openNoteId: string | null;
   /** Folders the user can attach as an Edit scope. */
   folders: readonly string[];
+  /** Called with the ids of notes an automatic apply wrote, so the open pane
+   *  re-reads them. Without it the editor keeps showing the pre-apply text and
+   *  the pane's next autosave writes that stale buffer back over the edit. */
+  onNotesWritten?: (noteIds: readonly string[]) => void;
 }
 
 const INPUT_STYLE: CSSProperties = {
@@ -102,12 +107,17 @@ export function ChatComposer({
   streaming,
   openNoteId,
   folders,
+  onNotesWritten,
 }: ChatComposerProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<ChatMode>("ask");
   // Whether the scope picker is expanded. Collapsed by default: the scope shows
   // as text with a control to change it, so the ordinary run reads as one line.
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The permission mode lives in the run store rather than here: it is
+  // session-scoped and has to be dropped by the same lock teardown that drops
+  // the run, which a component's own state cannot be.
+  const agent = useAgent();
   const [message, setMessage] = useState("");
   const [attached, setAttached] = useState<string | null>(null);
   const [preview, setPreview] = useState<GrantPreview | "failed" | null>(null);
@@ -204,6 +214,14 @@ export function ChatComposer({
     [t],
   );
 
+  const permissionOptions = useMemo(
+    () => [
+      { value: "ask", label: t("agent.composer.permissionAsk") },
+      { value: "auto", label: t("agent.composer.permissionAuto") },
+    ],
+    [t],
+  );
+
   const grant: ScopeGrant | null = attached
     ? { kind: "folder", value: attached }
     : openNoteId
@@ -237,11 +255,17 @@ export function ChatComposer({
     setMessage("");
     setBusy(true);
     try {
-      await startAgentRun(text, grant, {
-        scopeLabel: attached ?? t("agent.composer.scopeOpenNote"),
-        startFailed: t("agent.composer.startFailed"),
-        providerRejected: t("agent.composer.providerRejected"),
-      });
+      await startAgentRun(
+        text,
+        grant,
+        {
+          scopeLabel: attached ?? t("agent.composer.scopeOpenNote"),
+          startFailed: t("agent.composer.startFailed"),
+          autoApplyFailed: t("agent.composer.autoApplyFailed"),
+          providerRejected: t("agent.composer.providerRejected"),
+        },
+        onNotesWritten,
+      );
     } finally {
       setBusy(false);
     }
@@ -371,6 +395,23 @@ export function ChatComposer({
             </>
           ) : null}
         </div>
+      ) : null}
+
+      {/* **The permission control** (myne-md/myne#551). Edit mode only: Ask
+          proposes nothing, so there is nothing for it to decide. What the
+          automatic side is bounded by is stated where it is enforced
+          (`autoApplyRun`), not here — the summary is that it stays inside the
+          scope the user approved and that a removal still needs its own act,
+          because the host refuses one inside a bulk approval whatever the
+          caller sends. */}
+      {mode === "edit" ? (
+        <Segmented
+          testId="ai.composer-permission"
+          ariaLabel={t("agent.composer.permissionLabel")}
+          value={agent.autoApply ? "auto" : "ask"}
+          onChange={(v) => setAutoApply(v === "auto")}
+          options={permissionOptions}
+        />
       ) : null}
 
       <form

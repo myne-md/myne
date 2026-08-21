@@ -102,7 +102,12 @@ export function AgentReviewTakeover({
     agent.view !== null &&
     !agent.running &&
     agent.end !== null &&
-    agent.end.kind !== "awaitingScope";
+    agent.end.kind !== "awaitingScope" &&
+    // **And the run is not applying itself** (myne-md/myne#551). Without this
+    // clause an automatic run opens the screen it exists to skip for the frames
+    // between the step settling and the apply returning. The flag is raised
+    // before the settle for exactly that reason.
+    !agent.autoApplying;
   // Declared before the early return, because hooks must be. Enabled on the
   // same condition the render is, so a trap is never armed for a dialog that
   // is not on screen.

@@ -30,14 +30,25 @@
 // `clearChat`, the proposal through `clearAgentForLock`. Nothing here writes to
 // disk and nothing here logs the task, which is the user's own words.
 
-import { agentStart, type AgentStepResult, type ScopeGrant } from "../../lib/agent-run";
+import {
+  agentApply,
+  agentStart,
+  splitForBulkApproval,
+  type AgentStepResult,
+  type ScopeGrant,
+} from "../../lib/agent-run";
 import { engineErrorTag } from "../../lib/engine-error";
 import {
+  approvedNewNoteIndices,
+  beginAutoApply,
   beginRun,
   currentRunEpoch,
+  endAutoApply,
   failRun,
   getAgent,
+  landedEditIndices,
   openRun,
+  settleApply,
   settleStep,
 } from "../agent/agentStore";
 import { failAgentTurn, sendAgentTurn, settleAgentTurn } from "./chatStore";
@@ -52,6 +63,8 @@ export interface AgentRunCopy {
   scopeLabel: string;
   /** The sentence for a start that never landed. */
   startFailed: string;
+  /** The sentence for an automatic apply that failed outright. */
+  autoApplyFailed: string;
   /** The sentence for a start the PROVIDER refused (HTTP 400).
    *
    *  Separate because the two send the user to different places, and the
@@ -104,6 +117,9 @@ export async function startAgentRun(
   task: string,
   grant: ScopeGrant,
   copy: AgentRunCopy,
+  /** Called with the ids of notes an automatic apply wrote, so the open pane
+   *  re-reads them. Absent when the caller has nothing to tell. */
+  onNotesWritten?: (noteIds: readonly string[]) => void,
 ): Promise<void> {
   sendAgentTurn(task, copy.scopeLabel);
   beginRun();
@@ -111,15 +127,21 @@ export async function startAgentRun(
   // comes back rather than being raced by it.
   const epoch = currentRunEpoch();
   try {
-    settleRunIntoChat(
-      await agentStart(task, grant, (view) => {
-        // The run has an id now, minutes before this call resolves. Same epoch
-        // as the settle below, so a run the user let go of mid-flight cannot
-        // mount a progress strip for itself behind them.
-        openRun(view, epoch);
-      }),
-      epoch,
-    );
+    const result = await agentStart(task, grant, (view) => {
+      // The run has an id now, minutes before this call resolves. Same epoch
+      // as the settle below, so a run the user let go of mid-flight cannot
+      // mount a progress strip for itself behind them.
+      openRun(view, epoch);
+    });
+    // **Raised BEFORE the step settles**, which is the ordering the flag exists
+    // for: the review dialog derives its open state from a settled run, so a
+    // flag set afterwards lets the screen it is meant to skip open for a few
+    // frames and then close. Read from the store rather than from a parameter,
+    // so the mode in force is the one at the moment the run ends.
+    const auto = getAgent().autoApply;
+    if (auto) beginAutoApply();
+    settleRunIntoChat(result, epoch);
+    if (auto) await autoApplyRun(epoch, copy, onNotesWritten);
   } catch (failure) {
     // **The same epoch check the success path gets, spelled out.** On the
     // success path it is transitive: `settleRunIntoChat` returns early when
@@ -149,5 +171,54 @@ export async function startAgentRun(
         : copy.startFailed;
     failRun(sentence);
     failAgentTurn(sentence);
+  }
+}
+
+/** Apply a finished run without a second act (myne-md/myne#551).
+ *
+ *  **Three bounds, and two of them are mechanisms that already existed.**
+ *
+ *  The scope is the one the user approved when the run started; nothing here
+ *  widens it. The approval label is `"bulk"`, which is not cosmetic: the host
+ *  re-derives, from the note as it will actually be, whether an edit takes the
+ *  note out of the working set — `trashed:`, `deleted:`, `archived:`,
+ *  `template:`, `conflict:` — and refuses one inside a bulk approval whatever
+ *  the caller sent. So a removal still needs its own act, in automatic mode as
+ *  in manual, and the refusals come back to be shown rather than dropped. And
+ *  the mode itself is session-scoped, dropped on lock and on vault switch.
+ *
+ *  The proposal is read from the store rather than passed in, because
+ *  `settleStep` is what put it there and the epoch guard on that call is what
+ *  decides whether this run is still the one the surface is showing.
+ */
+async function autoApplyRun(
+  epoch: number,
+  copy: AgentRunCopy,
+  onNotesWritten?: (noteIds: readonly string[]) => void,
+): Promise<void> {
+  try {
+    const agent = getAgent();
+    // A step the epoch guard dropped leaves no view, and a run that stopped to
+    // ask has one but is not finished. Neither is a run to apply.
+    if (agent.view === null || agent.end?.kind === "awaitingScope") return;
+    const { bulkApprovable } = splitForBulkApproval(agent.proposal.edits);
+    const newNotes = approvedNewNoteIndices(agent);
+    if (bulkApprovable.length === 0 && newNotes.length === 0) return;
+    // Positions in the FULL proposal, which is what `landedEditIndices` and the
+    // applied-row bookkeeping are keyed on.
+    const indices = bulkApprovable.map((e) => agent.proposal.edits.indexOf(e));
+    const outcome = await agentApply(agent.view.runId, bulkApprovable, newNotes, "bulk");
+    if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch)) return;
+    const changed = [...outcome.notesWritten, ...outcome.notesCreated];
+    if (changed.length > 0) onNotesWritten?.(changed);
+  } catch {
+    // Same epoch check the success path gets. A failure here leaves the run in
+    // the store, so the review screen still opens and the user can apply by
+    // hand: an automatic apply that fails degrades to the manual path rather
+    // than losing the proposal.
+    if (epoch !== currentRunEpoch()) return;
+    failRun(copy.autoApplyFailed);
+  } finally {
+    endAutoApply();
   }
 }
