@@ -88,14 +88,23 @@ describe("clickUntilTrue", () => {
         label: "never",
         trigger: "[the toggle]",
         outcome: "[the panel]",
-        // ONE attempt's own 2 s window, and no more. `everSawTrigger` is set
-        // before the click, so a single attempt already produces the message
-        // under test, and a budget that bought two attempts put this case at
-        // 4.2 s of Vitest's 5 s default. `pnpm test` is a blocking pre-push and
-        // CI step, so a case sitting at 84 % of its budget on an idle machine
-        // is one scheduler hiccup from reddening the gate over timing rather
-        // than over what it asserts.
-        timeoutMs: 2_100,
+        // ONE attempt, and the number has to be BELOW that attempt's own length
+        // rather than just above it. `waitUntil` checks its deadline only after
+        // `fn()` RETURNS (e2e/support/webdriver.ts), and one attempt of
+        // `clickUntilTrue`'s inner loop is 20 x setTimeout(100), so it comes
+        // back at about 2005 ms. At 2100 the comparison `2005 >= 2100` is
+        // false, `waitUntil` sleeps its 100 ms interval and runs a SECOND full
+        // attempt, throwing at about 4110 ms: two attempts, which is what the
+        // previous version of this comment said it was avoiding while buying
+        // it. At 1500 the first return is already past the deadline, so the
+        // case finishes at about 2.1 s.
+        //
+        // `everSawTrigger` is set before the click, so one attempt already
+        // produces the message under test. It matters because `pnpm test` is a
+        // blocking pre-push and CI step, and a case sitting at 82 % of Vitest's
+        // 5 s default on an idle machine reddens the gate over a scheduler
+        // hiccup rather than over what it asserts.
+        timeoutMs: 1_500,
       }),
     ).rejects.toThrow(/\[the toggle\] rendered and was clicked, but \[the panel\] never appeared/);
   });

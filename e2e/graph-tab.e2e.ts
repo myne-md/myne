@@ -235,15 +235,26 @@ describeE2E("gt3 the graph canvas follows a pane resize (myne-md/myne#534)", () 
         // a `window`-resize listener never hears. The harness has no primitive
         // for a real window resize either, so this is not a substitute for one:
         // it is the stronger case.
-        expect(
-          await s.findElements(
-            testIdSelector("editor.sidebar-toggle", {
-              "data-side": "left",
-              "data-collapsed": "false",
-            }),
-          ),
-          "the notes sidebar starts expanded, so collapsing it really narrows the pane",
-        ).toHaveLength(1);
+        //
+        // Waited for rather than asserted immediately, which is the difference
+        // between a race and a bug: every other read in this file and in gt2
+        // goes through `settleOn` or `waitUntil`, and a bare `findElements` used
+        // as a hard expect turns a title bar that paints a frame later into a
+        // red pipeline reading like a product defect. `stable_max_failures` is
+        // 0 in `scripts/e2e-scenario-floor.json`, so any failure in this lane
+        // reddens the blocking `e2e-floor` step.
+        await s.waitUntil(
+          async () =>
+            (
+              await s.findElements(
+                testIdSelector("editor.sidebar-toggle", {
+                  "data-side": "left",
+                  "data-collapsed": "false",
+                }),
+              )
+            ).length === 1 || null,
+          { label: "the notes sidebar starts expanded, so collapsing it really narrows the pane" },
+        );
         await collapseNotesSidebar(s);
 
         const after = await settledGraphGeometry(s, "graph geometry re-settles");
