@@ -87,7 +87,20 @@ describe("boot routing, per client", () => {
     ).toEqual({ name: "account-entry" });
   });
 
-  it("a healthy vault unlocks the same way on both", async () => {
+  it("a healthy vault gets the password form on both; enrolment is not a boot input", async () => {
+    // Two claims in one loop, and the second arrived with myne-md/myne#535.
+    //
+    // MYND-635 had given this function a third argument, "is this device
+    // awaiting approval", read from disk as identity-present + token-absent, and
+    // routed the web client's answer to a wait screen. On this client that pair
+    // is ALSO what an approved device looks like one reload later, because its
+    // token is session-scoped (`docs/decisions/clients/0363`), so the routing
+    // could not tell the two apart, and it stranded the approved case on a
+    // screen with no password field and no way to claim a token.
+    //
+    // There is nothing left to parameterise, and that absence is the assertion:
+    // the argument is gone rather than defaulted, so a caller that still
+    // believes boot can answer this fails to compile instead of routing quietly.
     for (const absent of [DESKTOP_ABSENT, WEB_ABSENT]) {
       const { initialStageFromProbe } = await loadStage(absent);
       expect(
@@ -96,95 +109,100 @@ describe("boot routing, per client", () => {
     }
   });
 
-  // ── awaiting approval (MYND-635) ──────────────────────────────────────────
+  // ── awaiting approval (MYND-635, corrected by myne-md/myne#535) ───────────
   //
-  // The reported bug: enrol on `app.myne.md`, see "Waiting for approval",
-  // refresh, get asked for the password, and land in an EMPTY vault with the
-  // approval screen unreachable.
+  // The reported bug MYND-635 fixed: enrol on `app.myne.md`, see "Waiting for
+  // approval", refresh, get asked for the password, and land in an EMPTY vault
+  // with the approval screen unreachable.
   //
   // The trap is that nothing about the disk looks wrong. `sync_join_account`
   // fetches the account's real `vault.meta` and writes it BEFORE running the
   // enrolment that comes back pending, so the container is genuine and the
   // password genuinely opens it. It is empty because a pending device holds no
-  // token and can pull nothing — the emptiness was the honest content of a
-  // state the UI had lost track of, not corruption.
+  // token and can pull nothing.
+  //
+  // **Its fix routed on a fact boot cannot establish**, which is what #535
+  // corrects. `docs/decisions/clients/0363` makes the web token session-scoped,
+  // so "identity present, token absent" is ALSO every reload of an approved
+  // device. Routing that to a screen with no password field was a deadlock: the
+  // only exit from pending is a token claim, the claim runs inside a sync cycle,
+  // and the cycle refuses on a locked vault. The verdict now lives after unlock
+  // (`src/lib/pending-approval.ts` → `editor.awaiting-approval`), and boot's job
+  // is the password form, which the both-clients case above asserts, since
+  // there is no longer an input that could make the two clients differ here.
+  //
+  // What remains for this block is the OTHER half: the wait screen still exists,
+  // and it now has exactly one way in.
 
-  it("a pending device returns to the wait instead of being offered unlock", async () => {
-    const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
-    expect(
-      initialStageFromProbe({ ok: [{ id: "v1", status: EXISTS }] } as never, {}, true),
-    ).toEqual({ name: "pending-approval" });
+  it("the wait is reachable ONLY through the post-unlock verdict", async () => {
+    // The other half, and the one that keeps MYND-635's screen alive: the stage
+    // still exists and still has exactly one way in. A regression that dropped
+    // the transition would satisfy the test above (every probe routes to
+    // unlock) while making the wait unreachable and leaving a genuinely
+    // unapproved device in an unexplained empty editor.
+    const { transition } = await loadStage(WEB_ABSENT);
+    expect(transition({ name: "editor" } as never, { type: "editor.awaiting-approval" } as never)).toEqual(
+      { name: "pending-approval" },
+    );
   });
 
-  it("DESKTOP never routes to the wait, even when it is pending", async () => {
-    // Desktop can be pending too — enrol from Settings, quit before another
-    // device approves. Sending it to the wait would lock the user out of a
-    // vault that opens perfectly well: awaiting sync approval does not block
-    // local use there, and the wait already has a home in the Settings panel.
-    //
-    // This was a real regression, shipped and caught by re-reading rather than
-    // by a test: the branch went in ungated, and the desktop E2E suite could not
-    // see it because its vaults have sync unconfigured, which never derives
-    // `pending` at all.
-    const { initialStageFromProbe } = await loadStage(DESKTOP_ABSENT);
-    expect(
-      initialStageFromProbe({ ok: [{ id: "v1", status: EXISTS }] } as never, {}, true),
-    ).toEqual({ name: "unlock", initialStatus: EXISTS, vaultId: "v1" });
+  it("no other stage can produce the wait", async () => {
+    // The verdict is measured in the editor, with the vault open, because that
+    // is the only place a cycle can run. Accepting the action from `unlock` or
+    // `account-entry` would re-admit the pre-#535 shape through a side door.
+    const { transition } = await loadStage(WEB_ABSENT);
+    for (const prev of [
+      { name: "unlock", initialStatus: EXISTS },
+      { name: "account-entry" },
+      { name: "welcome" },
+    ] as never[]) {
+      expect(transition(prev, { type: "editor.awaiting-approval" } as never)).toEqual(prev);
+    }
   });
 
-  it("the same probe without the pending fact still routes to unlock", async () => {
-    // The pair that makes the assertion above mean something. Identical inputs
-    // apart from the third probe — so a fix that routed EVERY healthy vault to
-    // the wait would pass the test above and fail this one.
-    const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
-    const healthy = { ok: [{ id: "v1", status: EXISTS }] } as never;
-    expect(initialStageFromProbe(healthy, {}, false)).toEqual({
-      name: "unlock",
-      initialStatus: EXISTS,
-      vaultId: "v1",
-    });
-    // And omitting the argument entirely — every desktop call site — is the
-    // same as passing `false`. Desktop is untouched by construction.
-    expect(initialStageFromProbe(healthy, {})).toEqual({
-      name: "unlock",
-      initialStatus: EXISTS,
-      vaultId: "v1",
-    });
-  });
+  // Where DID the per-client difference go? Into `awaitingApprovalVerdict`,
+  // which answers `false` outright where `localOnlyVault` is present. A desktop
+  // device can be pending too, and routing it to a wait would lock the user out
+  // of a vault that opens perfectly well. That rule is driven per capability by
+  // `tests/lib/pendingApprovalVerdict.test.ts`, using this file's own
+  // substitution pattern, rather than being restated here against a function
+  // that no longer takes the input.
 
-  it("an open vault is never evicted by the pending fact", async () => {
-    // Slot-priority outranks enrolment. A user inside an unlocked vault must
-    // not be thrown back to a wait screen by a status read — whatever the
-    // enrolment says, the vault is open and the keys are in memory.
+  it("an open vault is never evicted by boot", async () => {
+    // Slot-priority outranks everything on disk. A user inside an unlocked vault
+    // must not be thrown back by a probe: the vault is open and the keys are in
+    // memory. Unchanged by #535, and load-bearing to it: this is the arm that
+    // returns the user to the editor once the token finally lands and the wait
+    // screen reprobes.
     const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
     expect(
       initialStageFromProbe(
         { ok: [{ id: "v1", status: EXISTS }] } as never,
         { v1: "Unlocked" } as never,
-        true,
       ),
     ).toEqual({ name: "editor" });
   });
 
-  it("a corrupted container is still a re-bootstrap, even while pending", async () => {
-    // Waiting for approval on a vault that cannot be opened at all is a longer
-    // dead end than the one being fixed. Corruption wins.
+  it("a corrupted container is still a re-bootstrap", async () => {
     const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
-    expect(
-      initialStageFromProbe({ ok: [{ id: "v1", status: CORRUPTED }] } as never, {}, true),
-    ).toEqual({ name: "account-entry" });
+    expect(initialStageFromProbe({ ok: [{ id: "v1", status: CORRUPTED }] } as never, {})).toEqual({
+      name: "account-entry",
+    });
   });
 
-  it("the pending stage accepts no transitions — approval is not an action", async () => {
+  it("the pending stage accepts no OUTBOUND transitions; approval is not an action", async () => {
     // Approval is granted on ANOTHER device and observed by polling. An
     // action-driven exit would mean this client deciding it is approved, which
-    // is the shape of the bug: a state believed rather than read.
+    // is the shape of the original bug: a state believed rather than read. #535
+    // gave the stage an inbound edge and deliberately no outbound one: "we
+    // measured a refusal" is establishable here, "we have been approved" is not.
     const { transition } = await loadStage(WEB_ABSENT);
     const pending = { name: "pending-approval" } as const;
     for (const action of [
       { type: "editor.lock" },
       { type: "unlock.success" },
       { type: "welcome.restore-backup" },
+      { type: "editor.awaiting-approval" },
     ] as never[]) {
       expect(transition(pending, action)).toEqual(pending);
     }
