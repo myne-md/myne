@@ -476,18 +476,47 @@ async fn drive_inner(
                         anchor,
                         replacement,
                     });
+                    // **The model is told, and this is not politeness**
+                    // (myne-md/myne#547). Every other action answers: the
+                    // listing, the body, a refusal sentence. These two used to
+                    // answer with silence, which cost two separate things.
+                    //
+                    // The model had no way to tell "recorded, keep going" from
+                    // "ignored", which is the difference between proposing the
+                    // next edit and repeating the last one.
+                    //
+                    // And the transcript ENDED on an assistant turn, so that is
+                    // how the next request went out. A provider may reject that
+                    // shape outright: Anthropic accepts a trailing assistant
+                    // turn but not one ending in whitespace, and a model's JSON
+                    // reply ends with a newline. The run this was found on got
+                    // HTTP 400 on the turn after a good edit and threw the
+                    // proposal away, reporting it as a failure to read a note.
+                    transcript.push(Message {
+                        role: Role::User,
+                        content: vec![Content::Trusted(
+                            "Edit recorded. Propose another, or finish.".into(),
+                        )],
+                    });
                 }
                 AgentAction::ProposeNote {
                     title,
                     body,
                     folder,
                 } => {
-                    // Same as the edit arm above: it reached the proposal.
+                    // Same as the edit arm above: it reached the proposal, and
+                    // the same acknowledgement for the same two reasons.
                     productive = true;
                     proposal.new_notes.push(ProposedNote {
                         title,
                         body,
                         folder,
+                    });
+                    transcript.push(Message {
+                        role: Role::User,
+                        content: vec![Content::Trusted(
+                            "New note recorded. Propose another, or finish.".into(),
+                        )],
                     });
                 }
                 AgentAction::RequestScope { folder, reason } => {
@@ -749,6 +778,45 @@ mod tests {
         let mut t = Vec::new();
         let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
         assert!(out.proposal.edits.is_empty());
+    }
+
+    #[test]
+    fn an_accepted_proposal_answers_the_model_so_the_turn_does_not_end_on_it() {
+        // myne-md/myne#547. Two properties in one, and the second is the one
+        // that cost a run: the model is told its edit landed, AND the request
+        // that goes out next does not end on an assistant turn. A provider may
+        // reject that shape (Anthropic rejects a trailing assistant turn ending
+        // in whitespace, and a JSON reply ends with a newline), which is how a
+        // good proposal was thrown away under an error blaming the note store.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"propose_edit","note_id":"a","anchor":"x","replacement":"y"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert_eq!(out.proposal.edits.len(), 1);
+
+        // The turn after the accepted edit is the model's own reply, then the
+        // acknowledgement. Assert the SHAPE the provider sees rather than the
+        // sentence: what matters is that a user turn follows the assistant one.
+        let after_edit = t
+            .iter()
+            .position(|m| {
+                m.role == Role::Assistant
+                    && m.content.iter().any(|c| c.text().contains("propose_edit"))
+            })
+            .expect("the model's proposing reply is in the transcript");
+        assert_eq!(
+            t[after_edit + 1].role,
+            Role::User,
+            "an accepted edit must be answered, or the request ends on an assistant turn"
+        );
+        // Host prose, so it is trusted content: it is not note-derived and must
+        // not be tagged as though it were.
+        assert!(matches!(t[after_edit + 1].content[0], Content::Trusted(_)));
     }
 
     #[test]

@@ -92,7 +92,15 @@ pub(super) fn agent_error_of(e: EngineError) -> AgentError {
         EngineError::RemoteBarred | EngineError::NoModel | EngineError::LocalModelMissing => {
             AgentError::EditFormatUnsupported
         }
-        _ => AgentError::ReadFailed,
+        // A 400 is the provider declining the REQUEST, which is Myne's to fix
+        // rather than the user's (myne-md/myne#547).
+        EngineError::RequestRejected => AgentError::ProviderRejected,
+        // **`ProviderFailed`, not `ReadFailed`.** The catch-all used to answer
+        // `ReadFailed`, which the loop ALSO produces for a note that could not
+        // be decrypted, so every backend failure reached the user wearing the
+        // vault's name. The two are different faults with different fixes and
+        // they no longer share a tag.
+        _ => AgentError::ProviderFailed,
     }
 }
 

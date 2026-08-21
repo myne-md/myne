@@ -237,6 +237,7 @@ export function ChatComposer({
       await startAgentRun(text, grant, {
         scopeLabel: attached ?? t("agent.composer.scopeOpenNote"),
         startFailed: t("agent.composer.startFailed"),
+        providerRejected: t("agent.composer.providerRejected"),
       });
     } finally {
       setBusy(false);
