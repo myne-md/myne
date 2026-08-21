@@ -349,17 +349,32 @@ function App() {
       // Nothing to flush here: this screen edits nothing. Lock, then re-probe,
       // which lands on the password form because the slot is empty again.
       //
-      // The last step is best-effort, and the honest statement of what a
-      // rejection costs is NOT "we still leave a screen holding live keys". If
-      // the lock IPC rejects, the slot stays unlocked, the reprobe reads it, and
-      // the user lands in the EDITOR, which holds the same live keys. What the
-      // reprobe buys is a re-armed timer, since `Editor` mounts its own
-      // `useIdleAutoLock`. `teardownStep` (`lib/vault-unlock.ts`) is what stops a
-      // throwing pre-lock reset from skipping the lock IPC entirely; nothing can
-      // stop the IPC itself rejecting.
+      // **The `catch` is not a best-effort lock, and the earlier comment here
+      // said it was.** It read: "if the lock IPC rejects, the slot stays
+      // unlocked, the reprobe reads it, and the user lands in the EDITOR, which
+      // holds the same live keys." That failure is not reachable, and a comment
+      // understating a guarantee is the same defect as one overstating it: the
+      // next reader either adds a control for nothing or stops trusting a
+      // guarantee that holds (myne-md/myne#540).
+      //
+      // `lock_with_state` takes the slot and returns `Ok(())` with no fallible
+      // step after the take, and `lock_from_host`'s only `?` is on that call, so
+      // the command cannot report a failure while leaving the slot unlocked. On
+      // web the reachable rejections are: a FATAL Worker, which is the side
+      // holding the keys, so its death is what the lock was for; `unsupported`,
+      // which `scripts/check-web-command-coverage.mjs` holds closed; and a
+      // structured-clone throw while posting, which needs a payload this command
+      // does not take. On desktop the Tauri IPC can fail transport-side, but
+      // desktop's auto-lock is the Rust timer in `auto_lock.rs` and never comes
+      // through here at all.
+      //
+      // So the `catch` exists to keep the `finally` reachable, not to absorb a
+      // half-locked vault. `teardownStep` (`lib/vault-unlock.ts`) is the guard
+      // that matters on this path: it stops a throwing pre-lock reset from
+      // skipping the lock IPC entirely.
       void lockVault()
         .catch(() => {
-          /* see above: the reprobe hands the user to the editor's own timer */
+          /* see above: no reachable rejection leaves the slot unlocked */
         })
         .finally(() => reprobe());
     },
