@@ -337,10 +337,21 @@ pub async fn ai_capability_report<R: Runtime>(
             .ok()
             .flatten()
             .is_some();
+    // **Embedding asks the VERIFIED reader**, unlike the other two rows.
+    // A recorded-but-deleted model reported the feature as available, so the
+    // chat header rendered the provider's name on a surface that could not
+    // answer a single question (myne-md/myne#545 follow-up). Generation and
+    // transcription keep the recorded reader deliberately: generation's marker
+    // is checked by its own loader, and transcription falls back to the bundled
+    // default rather than reporting a gone override.
+    let embedding_present = model_store::selected_model_verified(&base, ModelRole::Embedding)
+        .ok()
+        .flatten()
+        .is_some();
     Ok(capability_report_from(
         &state,
         has(ModelRole::Generation),
-        has(ModelRole::Embedding),
+        embedding_present,
         transcription_model,
         // The same flag `chat_stream` and `ask` gate on, read through the same
         // lock. A header derived from anything else would be a second opinion
@@ -365,7 +376,17 @@ pub async fn ai_capability_report<R: Runtime>(
 /// active local arm carry its own weights.
 fn retrieval_refusal<R: Runtime>(app: &AppHandle<R>, state: &LocalInferenceState) -> EngineError {
     let base = crate::paths::app_data_dir(app).unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let selected = model_store::selected_model(&base, ModelRole::Embedding)
+    // **Two reads, because "recorded" and "still there" are different facts and
+    // the first version asked only the first one** (myne-md/myne#545 follow-up).
+    // A marker written weeks ago for a model since deleted comes back from
+    // `selected_model` as confidently as a live one, so a user whose model file
+    // was gone was told their notes were "still being indexed" — forever, since
+    // the walk that would index them cannot load the model either.
+    let recorded = model_store::selected_model(&base, ModelRole::Embedding)
+        .ok()
+        .flatten()
+        .is_some();
+    let present = model_store::selected_model_verified(&base, ModelRole::Embedding)
         .ok()
         .flatten()
         .is_some();
@@ -376,16 +397,26 @@ fn retrieval_refusal<R: Runtime>(app: &AppHandle<R>, state: &LocalInferenceState
         .embedding_engine()
         .map(|e| e.carries_own_models())
         .unwrap_or(false);
-    retrieval_refusal_from(selected, carries_own)
+    retrieval_refusal_from(recorded, present, carries_own)
 }
 
 /// The decision itself, split from its two host reads so it is testable — the
 /// same split `capability_report_from` uses one screen up, and for the same
 /// reason: the command that would exercise this takes an `AppHandle`, five
 /// `State`s and a `Channel`, none of which a unit test can build.
-pub(super) fn retrieval_refusal_from(selected: bool, carries_own: bool) -> EngineError {
-    if selected || carries_own {
+pub(super) fn retrieval_refusal_from(
+    recorded: bool,
+    present: bool,
+    carries_own: bool,
+) -> EngineError {
+    if present || carries_own {
+        // A model that can actually be loaded: the index is a matter of time.
         EngineError::IndexNotReady
+    } else if recorded {
+        // A marker pointing at nothing. The sentence for this already exists
+        // and names the one action that helps, which is choosing again — where
+        // "still indexing" names an action that does not exist.
+        EngineError::LocalModelMissing
     } else {
         EngineError::NoEmbeddingModel
     }
@@ -1658,22 +1689,31 @@ mod tests {
 
     #[test]
     fn a_retrieval_refusal_separates_no_model_from_an_index_still_building() {
-        // Nothing selected and no arm carrying its own weights: asking can
-        // never run here, and naming another provider will not change that.
+        // Nothing recorded, nothing on disk, no arm carrying its own weights:
+        // asking can never run here, and naming another provider will not
+        // change that.
         assert_eq!(
-            retrieval_refusal_from(false, false),
+            retrieval_refusal_from(false, false, false),
             EngineError::NoEmbeddingModel
         );
-        // A model IS selected, so the index is a matter of time.
+        // A model is recorded AND present, so the index is a matter of time.
         assert_eq!(
-            retrieval_refusal_from(true, false),
+            retrieval_refusal_from(true, true, false),
             EngineError::IndexNotReady
+        );
+        // **Recorded and gone.** The case that sent a real user in circles: the
+        // marker survives, the file does not, so the walk cannot load it and
+        // "still indexing" describes work that will never start. The sentence
+        // that names the one action that helps is `LocalModelMissing`'s.
+        assert_eq!(
+            retrieval_refusal_from(true, false, false),
+            EngineError::LocalModelMissing
         );
         // …and an arm that brings its own weights counts as having one, which
         // is the case a disk check alone gets wrong: the E2E stub answers every
         // role from code with no file anywhere.
         assert_eq!(
-            retrieval_refusal_from(false, true),
+            retrieval_refusal_from(false, false, true),
             EngineError::IndexNotReady
         );
     }
