@@ -14,7 +14,7 @@
 // because the whole point of the fix is that no caller decides this any more.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 // The screen itself is not under test here and mounting it would pull in the
 // whole apply path. What matters is whether it is asked for at all.
@@ -113,5 +113,51 @@ describe("AgentReviewTakeover", () => {
     clearAgentForLock();
     mount();
     expect(screen.queryByTestId("editor.agent-review")).toBeNull();
+  });
+});
+
+// myne-md/myne#549. The review became a dialog rather than a full-window
+// takeover, and these two are the properties `docs/decisions/ai/0518` point 3
+// rests on: approving is a deliberate act, so the two dismissals every other
+// dialog in the tree offers are deliberately absent here. Closing discards a
+// proposal the user has not applied, and neither Escape nor a misplaced click
+// is a decision to throw the model's work away.
+describe("dismissal stays deliberate", () => {
+  it("does not close on Escape", () => {
+    beginRun();
+    settle({ kind: "finished" });
+    mount();
+    expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
+    expect(screen.queryByTestId("stub-review")).not.toBeNull();
+  });
+
+  it("does not close on a backdrop click", () => {
+    beginRun();
+    settle({ kind: "finished" });
+    mount();
+    const backdrop = screen.getByTestId("editor.agent-review");
+
+    fireEvent.click(backdrop);
+
+    expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
+    expect(screen.queryByTestId("stub-review")).not.toBeNull();
+  });
+
+  it("is a centred card rather than the whole window", () => {
+    // The size claim itself, since it is what the entry supersedes: the
+    // backdrop covers the window and the card inside it does not. Asserted on
+    // the inset that clears the macOS traffic lights, which is the collision
+    // that prompted the change.
+    beginRun();
+    settle({ kind: "finished" });
+    mount();
+    const backdrop = screen.getByTestId("editor.agent-review");
+    expect(backdrop.style.position).toBe("fixed");
+    expect(backdrop.style.padding).not.toBe("");
+    expect(backdrop.style.padding).not.toBe("0px");
   });
 });
