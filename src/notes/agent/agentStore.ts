@@ -128,6 +128,21 @@ export function useAgent(): AgentState {
  *  while the host still held it, so the undo the user had been told about
  *  became unreachable by the ordinary act of asking for something else. */
 export function beginRun(): void {
+  // **Starting a run is a vault-leaving event for the PREVIOUS run's step.**
+  // The epoch's own note below `clearAgentForLock` names a lock, a vault switch
+  // and a new conversation; a new RUN is the same class and was not covered,
+  // because the only other guard is `ChatComposer`'s `busy`, which is component
+  // state. `AiChatTab` mounts conditionally on the right panel's active tab, so
+  // switching that tab away and back remounts the composer with `busy` false
+  // while run one is still in flight. Run one's reply then passed the epoch
+  // check and `settleStep` wrote its view, proposal and end over run two while
+  // ACCUMULATING its iterations, notesRead and charsOffDevice onto run two's
+  // freshly zeroed counters, after which `settleRunIntoChat` froze the merged
+  // totals onto run two's turn. `charsOffDevice` is the disclosure figure
+  // `design-notes/ai/0515` names as the compensating control for the uncapped
+  // remote arm, so a merged total is a false statement about how much left the
+  // device rather than a mislabel.
+  runEpoch += 1;
   set({
     ...INITIAL,
     undoable: state.undoable,
@@ -262,7 +277,21 @@ export function landedEditIndices(
 export function settleApply(
   result: AgentApplyResult,
   appliedIndices: number[],
-): void {
+  epoch: number,
+): boolean {
+  // **The same guard `setUndoable` takes, and for the same data.**
+  // `AgentApplyResult` carries `notesWritten`, `notesCreated` and
+  // `restorePoints`, which are note ids of the vault it describes, and
+  // `agentApply` is awaited. Without this, `clearAgentForLock`'s claim that "a
+  // reply that lands after the teardown cannot repopulate the store" was false
+  // through this call site: it was the one awaited writer that had been left
+  // out when `setUndoable` was given an epoch for precisely this reason.
+  //
+  // Required rather than defaulted, per `settleStep`: a default would let a
+  // later call site compare the epoch to itself and pass, and nothing would say
+  // so. Returns whether it was applied, so a caller mirroring the result
+  // elsewhere drops its half too.
+  if (epoch !== runEpoch) return false;
   const merged: AgentApplyResult = state.applied
     ? {
         applied: state.applied.applied + result.applied,
@@ -279,6 +308,7 @@ export function settleApply(
   const nextApplied = new Set(state.appliedEdits);
   for (const i of appliedIndices) nextApplied.add(i);
   set({ applied: merged, appliedEdits: nextApplied });
+  return true;
 }
 
 /** The host's answer to "is there a run I could still undo?".

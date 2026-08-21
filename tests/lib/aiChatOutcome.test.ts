@@ -92,7 +92,7 @@ describe("what the ask model is told the conversation was", () => {
   });
 
   it("does NOT send an agent run's task, which was addressed to a different loop", async () => {
-    // The property `design-notes/ai/0517` states and `ai-chat.ts` claims. It
+    // The property `design-notes/ai/0518` states and `ai-chat.ts` claims. It
     // was false on the first pass: the turn renders as an ordinary bubble, so it
     // was built with `kind: "text"`, and the filter is keyed on the kind. A task
     // carrying instructions the user aimed at the agent, under a scope this call

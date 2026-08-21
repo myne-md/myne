@@ -148,10 +148,12 @@ function healthyFiles(): Record<string, string> {
   return {
     "src/notes/agent/agentStore.ts": `export function clearAgentForLock(): void {}\n`,
     "src/notes/ai/chatStore.ts": `export function clearChat(): void {}\n`,
+    "src/notes/ai/aiOutputStore.ts": `export function clearAiOutput(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
     "src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   clearAgentForLock();
   clearChat();
+  clearAiOutput();
   await invoke("plugin:vault_unlock|vault_lock");
 }
 `,
@@ -160,6 +162,7 @@ function healthyFiles(): Record<string, string> {
 }): Promise<void> {
   clearAgentForLock();
   clearChat();
+  clearAiOutput();
   resetSessionIgnored();
   await lockVault();
 }
@@ -267,6 +270,22 @@ describe("check-frontend-lock-teardown: the cross product", () => {
     expect(run(files)).toEqual([
       "could not extract lockVault's body in src/lib/vault-unlock.ts",
     ]);
+  });
+
+  it("names the rendered AI output left on the old teardown", () => {
+    // `clearAiOutput` sits one line above `clearChat` in the Editor's unmount
+    // effect and was left there when the transcript moved onto the two leaving
+    // paths. It had no roster entry either, so this cross product reported ok
+    // about it by never naming it, while the store holds a note's summary and
+    // every Q and A answer over note content.
+    const files = healthyFiles();
+    for (const f of ["src/lib/vault-unlock.ts", "src/lib/vault-switch.ts"]) {
+      files[f] = files[f].replace("  clearAiOutput();\n", "");
+    }
+    const errors = run(files);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain("lockVault does not call clearAiOutput()");
+    expect(errors[1]).toContain("leaveActiveVault does not call clearAiOutput()");
   });
 
   it("names the myne#533 defect: the chat transcript cleared on neither path", () => {
