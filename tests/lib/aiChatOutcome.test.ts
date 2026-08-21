@@ -26,7 +26,7 @@ vi.mock("../../src/platform/core", () => ({
 }));
 
 import { sendChat } from "../../src/lib/ai-chat";
-import { getChat, __resetChatForTest } from "../../src/notes/ai/chatStore";
+import { getChat, sendAgentTurn, __resetChatForTest } from "../../src/notes/ai/chatStore";
 
 /** The assistant turn of the transcript, which is the one under test. */
 function assistantTurn() {
@@ -73,5 +73,33 @@ describe("chat send outcome classification", () => {
       expect(turn.error, `${kind} should still be a failure`).toBe(true);
       expect(turn.errorCause).toBe(kind);
     }
+  });
+});
+
+describe("what the ask model is told the conversation was", () => {
+  /** The `history` the last `chat_stream` call carried. */
+  function sentHistory(): Array<{ role: string; content: string }> {
+    const call = invoke.mock.calls.at(-1)!;
+    return (call[1] as { history: Array<{ role: string; content: string }> }).history;
+  }
+
+  it("sends the chat's own turns", async () => {
+    invoke.mockResolvedValue({ answer: "", sources: [], served_by: { class: "x", name: null } });
+    await sendChat("first");
+    await sendChat("second");
+    // The first exchange, and not the message being sent right now.
+    expect(sentHistory().map((m) => m.content)).toEqual(["first"]);
+  });
+
+  it("does NOT send an agent run's task, which was addressed to a different loop", async () => {
+    // The property `docs/decisions/ai/0518` states and `ai-chat.ts` claims. It
+    // was false on the first pass: the turn renders as an ordinary bubble, so it
+    // was built with `kind: "text"`, and the filter is keyed on the kind. A task
+    // carrying instructions the user aimed at the agent, under a scope this call
+    // knows nothing about, went into the ask model's context.
+    invoke.mockResolvedValue({ answer: "", sources: [], served_by: { class: "x", name: null } });
+    sendAgentTurn("rewrite every heading in Projects", "Projects");
+    await sendChat("what is this note about?");
+    expect(sentHistory()).toEqual([]);
   });
 });

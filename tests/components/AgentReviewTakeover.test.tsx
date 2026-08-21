@@ -27,6 +27,7 @@ import { AgentReviewTakeover } from "../../src/notes/agent/components/AgentRevie
 import {
   beginRun,
   clearAgentForLock,
+  currentRunEpoch,
   settleStep,
 } from "../../src/notes/agent/agentStore";
 
@@ -47,7 +48,7 @@ function settle(end: LoopEnd) {
     notesRead: 1,
     charsOffDevice: null,
     excludedCount: 0,
-  });
+  }, currentRunEpoch());
 }
 
 function mount() {
