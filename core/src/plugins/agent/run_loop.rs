@@ -505,16 +505,52 @@ async fn drive_inner(
                         // model nothing it was not already told, so only the
                         // first refusal counts as movement.
                         productive |= asked.insert(format!("propose_edit_refused:{note_id}"));
+                        // **The refusal names the fix, and the order is the fix**
+                        // (myne-md/myne#559). It used to say only "use
+                        // request_scope", so a model that had merely MISTYPED an
+                        // id read a widening as the remedy and asked the user to
+                        // approve a folder the run never needed: the scope was
+                        // right, the id was not. An id that does not resolve is
+                        // almost always a copy error, and the answer to a copy
+                        // error is the correct id rather than a wider scope. So
+                        // the ids come first, widening comes last, and when the
+                        // scope holds exactly one note there is no ambiguity
+                        // left to describe: it is named outright.
+                        //
+                        // Nothing fuzzy-matches the mistyped id onto a real one.
+                        // That is the anchor rule's own failure mode in another
+                        // costume, and `design-notes/ai/0515` rules it out
+                        // there for the same reason: a near-miss that writes to
+                        // the wrong note is worse than a refusal.
+                        let scope = runs.scope(run_id)?;
+                        let mut content = vec![
+                            Content::Trusted("Note ".into()),
+                            Content::note(note_id.clone()),
+                            Content::Trusted(" is not one of the notes in your scope, so that edit was discarded. ".into()),
+                        ];
+                        if scope.len() == 1 {
+                            content.push(Content::Trusted(
+                                "Your scope holds exactly one note, and its id is ".into(),
+                            ));
+                            content.push(Content::note(
+                                scope.iter().next().cloned().unwrap_or_default(),
+                            ));
+                            content.push(Content::Trusted(
+                                ". Copy it exactly and propose the edit again.".into(),
+                            ));
+                        } else {
+                            content.push(Content::Trusted(format!(
+                                "Your scope holds {} notes; their ids are the ones list_scope returned. Copy one of them exactly and propose the edit again.",
+                                scope.len()
+                            )));
+                        }
+                        content.push(Content::Trusted(
+                            " Only ask for a wider scope if the note you need is genuinely not among them."
+                                .into(),
+                        ));
                         transcript.push(Message {
                             role: Role::User,
-                            // Same split as the read refusal above.
-                            content: vec![
-                                Content::Trusted("Note ".into()),
-                                Content::note(note_id.clone()),
-                                Content::Trusted(
-                                    " is outside the approved scope; edit discarded.".into(),
-                                ),
-                            ],
+                            content,
                         });
                         continue;
                     }
@@ -870,6 +906,45 @@ mod tests {
         // Host prose, so it is trusted content: it is not note-derived and must
         // not be tagged as though it were.
         assert!(matches!(t[after_edit + 1].content[0], Content::Trusted(_)));
+    }
+
+    #[test]
+    fn a_mistyped_note_id_is_answered_with_the_right_one_rather_than_with_widening() {
+        // myne-md/myne#559. A model that mistypes an id used to be told only
+        // "use request_scope", so it asked the user to widen a scope that was
+        // already correct: the scope held the note, the id did not name it. The
+        // refusal now leads with the fix. With one note in scope there is no
+        // ambiguity to describe, so it is named outright.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"propose_edit","note_id":"a-typo","anchor":"x","replacement":"y"}"#,
+            r#"{"action":"finish","summary":"gave up"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert!(out.proposal.edits.is_empty(), "the mistyped id is refused");
+
+        let told = t
+            .iter()
+            .filter(|m| m.role == Role::User)
+            .flat_map(|m| m.content.iter())
+            .map(|c| c.text().to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        // The correct id is offered…
+        assert!(
+            told.contains("exactly one note") && told.contains("a"),
+            "the refusal must name the id the model should have used: {told}"
+        );
+        // …and widening is mentioned last rather than as the remedy.
+        let scope_hint = told.find("wider scope").expect("widening is still offered");
+        let id_hint = told.find("exactly one note").expect("the id hint is there");
+        assert!(
+            id_hint < scope_hint,
+            "the id comes before the widening, or the model reads widening as the fix"
+        );
     }
 
     #[test]
