@@ -205,6 +205,11 @@ export function AgentReview({
     if (edits.length === 0 && newNoteIndices.length === 0) return;
     setBusy(true);
     const indices = edits.map((e) => agent.proposal.edits.indexOf(e));
+    // Captured BEFORE the await, for the reason the undo path below and
+    // `agentToChat.ts` both state: the outcome carries note ids of the vault it
+    // describes, so a reply landing after a lock or a vault switch must be
+    // dropped rather than written into a module-scope store.
+    const epoch = currentRunEpoch();
     try {
       const outcome = await agentApply(
         agent.view.runId,
@@ -215,7 +220,7 @@ export function AgentReview({
       // The indices that actually LANDED, not the ones that were sent. The
       // subtraction lives in `landedEditIndices` rather than here, because this
       // is where it was missing and a call site is not testable.
-      settleApply(outcome, landedEditIndices(indices, outcome));
+      if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch)) return;
       // The host's list, not the one that was sent: an edit can be refused at
       // apply time, so the notes that actually changed are the ones to reload.
       const changed = [...outcome.notesWritten, ...outcome.notesCreated];

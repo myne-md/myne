@@ -26,6 +26,7 @@ import {
   clearAgentForLock,
   currentRunEpoch,
   setUndoable,
+  settleApply,
   settleStep,
   useAgent,
 } from "../../src/notes/agent/agentStore";
@@ -142,5 +143,96 @@ describe("a step that lands after the vault was left", () => {
     setUndoable(RUN, currentRunEpoch());
     setUndoable(null, epoch);
     expect(state().undoable).toBeNull();
+  });
+});
+
+// ---- a second run invalidates the first run's in-flight legs -----------------
+//
+// The epoch's own note names a lock, a vault switch and "New chat". Starting a
+// second RUN is the same class and was not covered, and the only other guard is
+// `ChatComposer`'s `busy`, which is component state: `AiChatTab` mounts
+// conditionally on the right panel's active tab, so switching that tab away and
+// back remounts the composer with `busy` false while run one is still in
+// flight.
+//
+// What that cost is not cosmetic. `settleStep` ACCUMULATES `iterations`,
+// `notesRead` and `charsOffDevice`, so run one's reply added its totals to run
+// two's freshly zeroed counters and `settleRunIntoChat` froze the merged
+// figures onto run two's turn. `charsOffDevice` is the disclosure figure
+// `docs/decisions/ai/0515` names as the compensating control for the uncapped
+// remote arm, so a merged total is a false statement about how much of the
+// user's text left the device.
+describe("a second run invalidates the first run's in-flight legs", () => {
+  it("drops the first run's step after a second run has started", () => {
+    beginRun();
+    const first = currentRunEpoch();
+    beginRun();
+    expect(settleStep(STEP, first)).toBe(false);
+  });
+
+  it("leaves the second run's counters untouched by the first run's step", () => {
+    // The assertion that matters is the STATE, not the return value: a version
+    // that returned false and wrote anyway would satisfy the case above.
+    beginRun();
+    const first = currentRunEpoch();
+    beginRun();
+    const second = currentRunEpoch();
+    settleStep({ ...STEP, iterations: 7, notesRead: 5, charsOffDevice: 4000 }, first);
+    expect(state().iterations).toBe(0);
+    expect(state().notesRead).toBe(0);
+    expect(state().charsOffDevice).toBeNull();
+    // ...and the live run still settles normally, so the guard did not simply
+    // stop the store working.
+    expect(settleStep(STEP, second)).toBe(true);
+    expect(state().iterations).toBe(1);
+  });
+
+  it("still lets the run that is actually live settle", () => {
+    beginRun();
+    expect(settleStep(STEP, currentRunEpoch())).toBe(true);
+    expect(state().view).toEqual(STEP.view);
+  });
+});
+
+// ---- the apply outcome is epoch-guarded too ----------------------------------
+//
+// `AgentApplyResult` carries `notesWritten`, `notesCreated` and `restorePoints`,
+// which are note ids of the vault it describes, and `agentApply` is awaited.
+// `setUndoable` was given an epoch for exactly this data class and this writer
+// was left out, so `clearAgentForLock`'s claim that "a reply that lands after
+// the teardown cannot repopulate the store" was false through this one call
+// site.
+const APPLY = {
+  applied: 1,
+  refused: [],
+  refusedNewNotes: [],
+  notesWritten: ["n1"],
+  notesCreated: [],
+  restorePoints: [["n1", "s1"]] as [string, string][],
+};
+
+describe("an apply outcome that lands after the vault was left", () => {
+  it("is dropped rather than written into the store", () => {
+    beginRun();
+    const epoch = currentRunEpoch();
+    clearAgentForLock();
+    expect(settleApply(APPLY, [0], epoch)).toBe(false);
+    expect(state().applied).toBeNull();
+    expect(state().appliedEdits.size).toBe(0);
+  });
+
+  it("is dropped after a second run has started", () => {
+    beginRun();
+    const epoch = currentRunEpoch();
+    beginRun();
+    expect(settleApply(APPLY, [0], epoch)).toBe(false);
+    expect(state().applied).toBeNull();
+  });
+
+  it("lands while the run it belongs to is still the live one", () => {
+    beginRun();
+    expect(settleApply(APPLY, [0], currentRunEpoch())).toBe(true);
+    expect(state().applied?.notesWritten).toEqual(["n1"]);
+    expect(state().appliedEdits.has(0)).toBe(true);
   });
 });

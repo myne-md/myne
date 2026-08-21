@@ -182,7 +182,14 @@ export function AgentProgress() {
               // only at the start site would leave an approved expansion's
               // numbers stale on the turn that shows them.
               .then((result) => settleRunIntoChat(result, epoch))
-              .catch(() => failRun(t("agent.progress.expandFailed")));
+              // Epoch-checked for the reason `agentToChat.ts`'s catch states:
+              // the success path is guarded transitively by `settleStep`, and a
+              // failure that lands after the run was let go of would otherwise
+              // clear a NEWER run's `running` and record its message.
+              .catch(() => {
+                if (epoch !== currentRunEpoch()) return;
+                failRun(t("agent.progress.expandFailed"));
+              });
           }}
           onDecline={() => void agentCancel(runId)}
         />

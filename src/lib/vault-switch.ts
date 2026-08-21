@@ -30,6 +30,7 @@
 // needs a "you have unsaved changes" prompt.
 
 import { clearAgentForLock } from "../notes/agent/agentStore";
+import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
 import { resetSessionIgnored } from "../editor/decorations/spell";
 import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
@@ -116,6 +117,10 @@ export async function leaveActiveVault(deps: {
   // a later refactor could stop routing through that call without anything
   // noticing (`scripts/check-frontend-lock-teardown.mjs`).
   clearChat();
+  // The rendered AI output, on the same reasoning: a summary of a note in the
+  // vault being left, and the Q and A answers over its content, are as
+  // vault-specific as the conversation above.
+  clearAiOutput();
 }
 
 /**

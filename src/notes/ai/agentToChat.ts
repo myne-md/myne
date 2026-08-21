@@ -63,7 +63,7 @@ export interface AgentRunCopy {
  *
  * The turn takes COUNTS only. The proposal's anchors and replacements are text
  * copied verbatim out of note bodies; they stay in `agentStore`, which every
- * vault-leaving path clears (`docs/decisions/ai/0517`).
+ * vault-leaving path clears (`docs/decisions/ai/0518`).
  */
 export function settleRunIntoChat(result: AgentStepResult, epoch: number): void {
   // A step that landed after the vault was left is dropped by the run store,
@@ -104,6 +104,21 @@ export async function startAgentRun(
   try {
     settleRunIntoChat(await agentStart(task, grant), epoch);
   } catch {
+    // **The same epoch check the success path gets, spelled out.** On the
+    // success path it is transitive: `settleRunIntoChat` returns early when
+    // `settleStep` rejects the epoch, so the transcript write never happens.
+    // The failure path had no equivalent, and `failAgentTurn` writes onto
+    // whatever `lastAgentIndex` finds, so run one's "the agent could not start"
+    // was stamped as an error onto run two's live turn while run two was still
+    // working, and `failRun` cleared the newer run's `running` with it.
+    //
+    // Guarded here rather than by giving `failRun` a required epoch: its other
+    // two call sites are the apply and undo failures in `AgentReview`, which are
+    // user-initiated after the run settled and would have to pass
+    // `currentRunEpoch()`, comparing the epoch to itself. That is the shape
+    // `settleStep`'s own doc warns about, so the guard belongs at the leg that
+    // actually captured an epoch.
+    if (epoch !== currentRunEpoch()) return;
     // Two stores, one failure, and both need it. `failRun` clears `running` and
     // records the message for a run that HAS a view; a start that never landed
     // has none, because `beginRun()` nulled it, so the progress strip does not
