@@ -242,6 +242,19 @@ export default function GraphCanvas({
     // zero-fill of the whole surface, and queue a pixel-identical repaint.
     // Nothing depends on it being here: what makes those notifications SAFE is
     // that `onResize` only ever repaints, never refits.
+    //
+    // **The early return also skips the `sizeRef` write, which is the one side
+    // effect here that is not a repaint**, so "optimisation" is not the whole
+    // story and the case worth naming is the one where the two disagree.
+    // `cssW`/`cssH` are closure-local and reset to 0 on every `[model]` re-run,
+    // while `sizeRef` is a component ref only this function writes. A re-run
+    // that measures the canvas at 0x0 therefore returns early, and `sizeRef`
+    // keeps the PREVIOUS run's box while this closure believes 0x0. Culling and
+    // pointer hit-testing read `sizeRef`, so for that window they use the older
+    // box. It is left that way deliberately: writing before the return would
+    // put {0,0} there instead, which is what the unconditional version did and
+    // is not the better of the two, and the next notification corrects it
+    // either way.
     let dpr = window.devicePixelRatio || 1;
     let cssW = 0;
     let cssH = 0;
