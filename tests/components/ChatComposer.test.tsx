@@ -56,17 +56,7 @@ const STEP = {
 };
 
 function mount(props: Partial<Parameters<typeof ChatComposer>[0]> = {}) {
-  const onSend = vi.fn();
-  render(
-    <ChatComposer
-      onSend={onSend}
-      streaming={false}
-      openNoteId="n1"
-      folders={["Projects"]}
-      {...props}
-    />,
-  );
-  return { onSend };
+  render(<ChatComposer openNoteId="n1" folders={["Projects"]} {...props} />);
 }
 
 function type(text: string) {
@@ -90,15 +80,12 @@ afterEach(() => {
 });
 
 describe("ChatComposer", () => {
-  it("offers the scope control in Edit mode and not in Ask", () => {
+  it("offers the scope control, collapsed", () => {
     // The "only one composer" claim belongs to `AiChatTab` and to e2e `ag6`,
     // where the second one could actually reappear; from inside this component
     // counting its own single textarea would only restate the JSX.
     mount();
-    // Ask mode makes no grant, so it is not asked to explain one.
-    expect(screen.queryByTestId("ai.composer-scope-current")).toBeNull();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
-    // Collapsed by default (issue A): the scope reads as text with a control to
+    // Collapsed by default (#550): the scope reads as text with a control to
     // change it, and the dropdown is one step back rather than gone.
     expect(screen.getByTestId("ai.composer-scope-current")).toBeTruthy();
     expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
@@ -111,7 +98,6 @@ describe("ChatComposer", () => {
     // the mitigation `design-notes/ai/0515` names, not a nicety, so moving
     // the picker behind a control must not take the number with it.
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     const option = screen
@@ -131,26 +117,24 @@ describe("ChatComposer", () => {
 
   it("does not probe when the mode changes", async () => {
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
-    fireEvent.click(screen.getByTestId("ai.composer-mode-ask"));
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     type("something");
     // Still nothing: typing is not asking either.
     expect(agentCapability).not.toHaveBeenCalled();
   });
 
-  it("routes Ask-mode sends to the chat, never to the agent", () => {
-    const { onSend } = mount();
+  it("sends every message to the agent, questions included", async () => {
+    // The single mode (myne-md/myne#552). There is no longer a route that
+    // bypasses the agent, and a question is answered by the run rather than by
+    // a second flow: this is what the vault-search tool exists to make true.
+    mount();
     type("what did I write about tea");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
-    expect(onSend).toHaveBeenCalledWith("what did I write about tea");
-    expect(agentCapability).not.toHaveBeenCalled();
-    expect(agentStart).not.toHaveBeenCalled();
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    expect(agentStart.mock.calls[0][0]).toBe("what did I write about tea");
   });
 
-  it("probes once on the first Edit-mode send, then starts the run", async () => {
-    const { onSend } = mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
+  it("probes once on the first send, then starts the run", async () => {
+    mount();
     type("tidy the headings");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(agentStart).toHaveBeenCalled());
@@ -162,7 +146,6 @@ describe("ChatComposer", () => {
       { kind: "notes", value: ["n1"] },
       expect.any(Function),
     );
-    expect(onSend).not.toHaveBeenCalled();
     // A second send reuses the verdict rather than paying for it again.
     type("and the lists");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
@@ -172,7 +155,6 @@ describe("ChatComposer", () => {
 
   it("sends the run under the attached folder, with the host's count shown first", async () => {
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     const option = screen
@@ -197,7 +179,6 @@ describe("ChatComposer", () => {
   it("says the size could not be checked rather than showing nothing", async () => {
     agentPreviewGrant.mockRejectedValue(new Error("no"));
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     const option = screen
@@ -215,7 +196,6 @@ describe("ChatComposer", () => {
   it("names the unanswerable probe as unanswerable, not as an incapable model", async () => {
     agentCapability.mockRejectedValue(new Error("no"));
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     type("tidy the headings");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(screen.getByTestId("ai.composer-unsupported")).toBeTruthy());
@@ -229,7 +209,6 @@ describe("ChatComposer", () => {
   it("fails closed when the probe cannot be answered", async () => {
     agentCapability.mockRejectedValue(new Error("no"));
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     type("tidy the headings");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(screen.getByTestId("ai.composer-unsupported")).toBeTruthy());
@@ -242,7 +221,6 @@ describe("ChatComposer", () => {
   it("names the verdict when the model simply cannot hold the format", async () => {
     agentCapability.mockResolvedValue(FAILING);
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     type("tidy the headings");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(screen.getByTestId("ai.composer-unsupported")).toBeTruthy());
@@ -261,7 +239,6 @@ describe("ChatComposer", () => {
 
   it("puts the run into the transcript, under the scope it was sent with", async () => {
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     type("tidy the headings");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(getChat().turns).toHaveLength(2));
@@ -303,7 +280,6 @@ describe("ChatComposer", () => {
       end: { kind: "awaitingScope", folder: "Projects", reason: "why" },
     });
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     type("tidy the headings");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(getChat().turns).toHaveLength(2));
@@ -313,7 +289,6 @@ describe("ChatComposer", () => {
   it("leaves a failed start readable in the turn, said once", async () => {
     agentStart.mockRejectedValue(new Error("no"));
     mount();
-    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
     type("tidy the headings");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(getChat().turns).toHaveLength(2));
@@ -325,29 +300,23 @@ describe("ChatComposer", () => {
     expect(agentTurn.text).toBe("agent.composer.startFailed");
   });
 
-  it("sends on Enter and breaks the line on Shift+Enter", () => {
-    const { onSend } = mount();
+  it("sends on Enter and breaks the line on Shift+Enter", async () => {
+    mount();
     const input = screen.getByTestId("ai.composer-input");
     fireEvent.change(input, { target: { value: "first" } });
     fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
-    expect(onSend).not.toHaveBeenCalled();
+    expect(agentStart).not.toHaveBeenCalled();
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(onSend).toHaveBeenCalledWith("first");
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    expect(agentStart.mock.calls[0][0]).toBe("first");
   });
 
   it("does not send the first syllable an IME is still composing", () => {
-    const { onSend } = mount();
+    mount();
     const input = screen.getByTestId("ai.composer-input");
     fireEvent.change(input, { target: { value: "ç" } });
     fireEvent.keyDown(input, { key: "Enter", isComposing: true });
-    expect(onSend).not.toHaveBeenCalled();
+    expect(agentStart).not.toHaveBeenCalled();
   });
 
-  it("offers Stop instead of Send while a generation streams", () => {
-    const onStop = vi.fn();
-    mount({ streaming: true, onStop });
-    expect(screen.queryByTestId("ai.composer-send")).toBeNull();
-    fireEvent.click(screen.getByTestId("ai.composer-stop"));
-    expect(onStop).toHaveBeenCalled();
-  });
 });
