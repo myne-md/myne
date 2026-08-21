@@ -184,7 +184,7 @@ describe("AiChatTab", () => {
     it("renders transcript turns from the chat store", () => {
       const token = sendChatMessage("what did I note about rust?");
       appendChatToken(token, "You wrote about ownership.");
-      finalizeChatTurn(token, []);
+      finalizeChatTurn(token);
       render(<AiChatTab />);
       const turns = screen.getAllByTestId("ai.turn");
       expect(turns).toHaveLength(2);
@@ -200,62 +200,10 @@ describe("AiChatTab", () => {
       expect(screen.getByTestId("ai.turn-streaming")).toBeTruthy();
     });
 
-    it("renders the composer when onSend is wired and AI is on; hidden when AI off", () => {
-      render(<AiChatTab onSend={vi.fn()} />);
-      expect(screen.getByTestId("ai.composer-input")).toBeTruthy();
-      expect(screen.getByTestId("ai.composer-send")).toBeTruthy();
-      cleanup();
 
-      render(<AiChatTab />);
-      expect(screen.queryByTestId("ai.composer-input")).toBeNull();
-      cleanup();
 
-      aiEnabled = false;
-      render(<AiChatTab onSend={vi.fn()} />);
-      expect(screen.queryByTestId("ai.composer-input")).toBeNull();
-    });
 
-    it("fires onSend with the trimmed message and clears the composer", () => {
-      const onSend = vi.fn();
-      render(<AiChatTab onSend={onSend} />);
-      const input = screen.getByTestId("ai.composer-input") as HTMLInputElement;
-      fireEvent.change(input, { target: { value: "  hello there  " } });
-      fireEvent.click(screen.getByTestId("ai.composer-send"));
-      expect(onSend).toHaveBeenCalledWith("hello there");
-      expect(input.value).toBe("");
-    });
 
-    it("shows the Stop control (not Send) while streaming and fires onStop", () => {
-      const onStop = vi.fn();
-      const token = sendChatMessage("q");
-      appendChatToken(token, "streaming…");
-      render(<AiChatTab onSend={vi.fn()} onStop={onStop} />);
-      expect(screen.queryByTestId("ai.composer-send")).toBeNull();
-      fireEvent.click(screen.getByTestId("ai.composer-stop"));
-      expect(onStop).toHaveBeenCalledTimes(1);
-    });
-
-    it("renders citation chips and fires onOpenNote on click", () => {
-      const token = sendChatMessage("q");
-      appendChatToken(token, "answer");
-      finalizeChatTurn(token, [
-        { noteId: "01970e83aaaa", byteStart: 4, byteEnd: 20, score: 0.9 },
-      ]);
-      const onOpenNote = vi.fn();
-      render(<AiChatTab onOpenNote={onOpenNote} />);
-      fireEvent.click(screen.getByTestId("ai.citation"));
-      expect(onOpenNote).toHaveBeenCalledWith("01970e83aaaa", 4, 20);
-    });
-
-    it("labels a citation with the note title when titleOf resolves it", () => {
-      const token = sendChatMessage("q");
-      appendChatToken(token, "a");
-      finalizeChatTurn(token, [{ noteId: "01970e83aaaa", byteStart: 0, byteEnd: 3, score: 1 }]);
-      render(
-        <AiChatTab titleOf={(id) => (id === "01970e83aaaa" ? "My Rust Notes" : null)} />,
-      );
-      expect(screen.getByTestId("ai.citation").textContent).toBe("My Rust Notes");
-    });
 
     it("hides the empty hint once the transcript has turns", () => {
       sendChatMessage("q");
@@ -310,7 +258,7 @@ describe("AiChatTab", () => {
     it("shows an Insert action on an insertable summary turn and fires onInsert", () => {
       const token = sendChatMessage("Summarize this note", { insertable: true });
       appendChatToken(token, "This is the summary.");
-      finalizeChatTurn(token, []);
+      finalizeChatTurn(token);
       const onInsert = vi.fn();
       render(<AiChatTab onInsert={onInsert} />);
       fireEvent.click(screen.getByTestId("ai.insert-turn"));
@@ -320,14 +268,14 @@ describe("AiChatTab", () => {
     it("shows no Insert action on an ordinary (non-insertable) chat turn", () => {
       const token = sendChatMessage("hi");
       appendChatToken(token, "hello");
-      finalizeChatTurn(token, []);
+      finalizeChatTurn(token);
       render(<AiChatTab onInsert={vi.fn()} />);
       expect(screen.queryByTestId("ai.insert-turn")).toBeNull();
     });
 
     it("renders no tag chips — the chat tab is not a tag surface (MYND-651)", () => {
       const token = sendChatMessage("Suggest tags for this note");
-      finalizeChatTurn(token, []);
+      finalizeChatTurn(token);
       render(<AiChatTab />);
       expect(screen.queryByTestId("ai.tag-chip")).toBeNull();
       expect(screen.queryByTestId("ai.turn-tags")).toBeNull();
@@ -341,7 +289,7 @@ describe("AiChatTab", () => {
       // why the component tests one field rather than a boolean plus a sibling
       // string, and why the boundary owns the classification.
       const token = sendChatMessage("Hello");
-      finalizeChatTurn(token, []); // no tokens appended → empty answer
+      finalizeChatTurn(token); // no tokens appended → empty answer
       render(<AiChatTab />);
       expect(screen.getByTestId("ai.no-answer")).toBeTruthy();
       // The user turn is not treated as a no-answer placeholder.
@@ -480,7 +428,7 @@ describe("AiChatTab attribution", () => {
     // Streaming: nobody has answered yet, so nothing may claim to have.
     expect(screen.queryByTestId("ai.turn-answered-by")).toBeNull();
 
-    finalizeChatTurn(token, [], { kind: "remote", provider: "OpenRouter" });
+    finalizeChatTurn(token, { kind: "remote", provider: "OpenRouter" });
     rerender(<AiChatTab />);
     const line = screen.getByTestId("ai.turn-answered-by");
     expect(line.getAttribute("data-answered-by")).toBe("remote");
@@ -489,10 +437,10 @@ describe("AiChatTab attribution", () => {
   it("does not retroactively re-label an earlier turn when a later one comes from elsewhere", () => {
     const first = sendChatMessage("one");
     appendChatToken(first, "local answer");
-    finalizeChatTurn(first, [], { kind: "in-process" });
+    finalizeChatTurn(first, { kind: "in-process" });
     const second = sendChatMessage("two");
     appendChatToken(second, "remote answer");
-    finalizeChatTurn(second, [], { kind: "remote", provider: "OpenRouter" });
+    finalizeChatTurn(second, { kind: "remote", provider: "OpenRouter" });
 
     render(<AiChatTab />);
     const kinds = screen
@@ -507,7 +455,7 @@ describe("AiChatTab attribution", () => {
   it("renders no empty line for a turn finalized without provenance", () => {
     const token = sendChatMessage("no provenance");
     appendChatToken(token, "text");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     render(<AiChatTab />);
     expect(screen.queryByTestId("ai.turn-answered-by")).toBeNull();
   });
@@ -527,7 +475,7 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
   it("renders one transcript holding both kinds of turn", () => {
     const token = sendChatMessage("what did I write about tea");
     appendChatToken(token, "you wrote…");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn(SUMMARY);
 
@@ -671,21 +619,12 @@ describe("AiChatTab: the live run's controls", () => {
     expect(screen.queryByTestId("agentProgress.root")).toBeNull();
   });
 
-  it("New chat stops an in-flight ask generation too", () => {
-    const token = sendChatMessage("what is this note about");
-    appendChatToken(token, "partial");
-    render(<AiChatTab onSend={() => {}} />);
-    fireEvent.click(screen.getByTestId("ai.new-chat"));
-    // `clearChat()` resets `streaming`, so the Stop control disappears with the
-    // transcript. Without this the generation runs on with nothing to end it.
-    expect(stopChat).toHaveBeenCalled();
-  });
 });
 
 describe("AiChatTab: the shape of a chat", () => {
   it("puts the composer last, under one scrolling transcript", () => {
     const token = sendChatMessage("hello");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     render(<AiChatTab onSend={() => {}} />);
 
     const tab = screen.getByTestId("ai.chat-tab");
@@ -713,7 +652,7 @@ describe("AiChatTab: the shape of a chat", () => {
 
   it("keeps the honesty note and the status out of the scrolling region", () => {
     const token = sendChatMessage("hello");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     render(<AiChatTab onSend={() => {}} />);
     const scroller = screen.getByTestId("ai.transcript").parentElement!;
     // Both are standing statements about what this surface is, so neither may
@@ -736,14 +675,14 @@ describe("AiChatTab: starting a new conversation", () => {
     expect(screen.queryByTestId("ai.new-chat")).toBeNull();
     cleanup();
     const token = sendChatMessage("hello");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     render(<AiChatTab />);
     expect(screen.getByTestId("ai.new-chat")).toBeTruthy();
   });
 
   it("drops the transcript and the open run, but not the undo offer", () => {
     const token = sendChatMessage("hello");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({
       runId: "r1",

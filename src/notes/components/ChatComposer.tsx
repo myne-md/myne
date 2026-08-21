@@ -53,21 +53,10 @@ import { setAutoApply, useAgent } from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
 import { CAPTION_STYLE } from "./sharedStyles";
 
-/** What the composer does with the message. */
-type ChatMode = "ask" | "edit";
-
 export interface ChatComposerProps {
-  /** Send an Ask-mode message. Required: the parent renders nothing without it,
-   *  and an optional one turns a missing wire into a Send that silently does
-   *  nothing rather than into a compile error. */
-  onSend: (message: string) => void;
-  /** Stop an in-flight Ask generation. Shown while `streaming`. */
-  onStop?: () => void;
-  /** Whether an Ask generation is streaming right now. */
-  streaming: boolean;
-  /** The open note: the default Edit scope when nothing is attached. */
+  /** The open note: the default scope when no folder is attached. */
   openNoteId: string | null;
-  /** Folders the user can attach as an Edit scope. */
+  /** Folders the user can attach as a scope. */
   folders: readonly string[];
   /** Called with the ids of notes an automatic apply wrote, so the open pane
    *  re-reads them. Without it the editor keeps showing the pre-apply text and
@@ -102,15 +91,11 @@ const ROW_STYLE: CSSProperties = {
 };
 
 export function ChatComposer({
-  onSend,
-  onStop,
-  streaming,
   openNoteId,
   folders,
   onNotesWritten,
 }: ChatComposerProps) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<ChatMode>("ask");
   // Whether the scope picker is expanded. Collapsed by default: the scope shows
   // as text with a control to change it, so the ordinary run reads as one line.
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -206,14 +191,6 @@ export function ChatComposer({
   // literal forces a synchronous layout read AND a second commit on every
   // render. During streaming that is once per token, to move a thumb that has
   // not moved.
-  const modeOptions = useMemo(
-    () => [
-      { value: "ask", label: t("editor.chrome.rightPanel.aiChat.modeAsk") },
-      { value: "edit", label: t("editor.chrome.rightPanel.aiChat.modeEdit") },
-    ],
-    [t],
-  );
-
   const permissionOptions = useMemo(
     () => [
       { value: "ask", label: t("agent.composer.permissionAsk") },
@@ -232,21 +209,11 @@ export function ChatComposer({
   // check happens on Send. After one, it gates.
   const refused = probe === "failed" || verdict?.passed === false;
   const empty = message.trim().length === 0;
-  const blocked =
-    empty ||
-    busy ||
-    probing ||
-    streaming ||
-    (mode === "edit" && (refused || grant === null));
+  const blocked = empty || busy || probing || refused || grant === null;
 
   async function submit(): Promise<void> {
     if (blocked) return;
     const text = message.trim();
-    if (mode === "ask") {
-      setMessage("");
-      onSend(text);
-      return;
-    }
     if (grant === null) return;
     const verdict = await ensureCapability();
     // The refusal is rendered by the notice below; keep what the user typed so
@@ -274,7 +241,6 @@ export function ChatComposer({
   return (
     <div
       data-testid="ai.composer"
-      data-mode={mode}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -286,7 +252,7 @@ export function ChatComposer({
       {/* The capability verdict, stated rather than implied by a dead button.
           This is the one place a user finds out that agent mode is unavailable
           on the model they chose. */}
-      {mode === "edit" && refused ? (
+      {refused ? (
         <div
           data-testid="ai.composer-unsupported"
           style={{
@@ -322,18 +288,10 @@ export function ChatComposer({
         </div>
       ) : null}
 
-      <Segmented
-        testId="ai.composer-mode"
-        ariaLabel={t("editor.chrome.rightPanel.aiChat.modeLabel")}
-        value={mode}
-        onChange={(v) => setMode(v as ChatMode)}
-        options={modeOptions}
-      />
-
       {/* The user-originated scope control, and the size it resolves to. Only in
           Edit mode: in Ask mode the grounding is the whole vault's index and
           there is nothing here for the user to grant. */}
-      {mode === "edit" ? (
+      {
         <div style={ROW_STYLE}>
           <span style={CAPTION_STYLE}>{t("agent.composer.scopeLabel")}</span>
           {/* **The picker is one step back, and the scope is not** (issue A).
@@ -395,7 +353,7 @@ export function ChatComposer({
             </>
           ) : null}
         </div>
-      ) : null}
+      }
 
       {/* **The permission control** (myne-md/myne#551). Edit mode only: Ask
           proposes nothing, so there is nothing for it to decide. What the
@@ -404,7 +362,7 @@ export function ChatComposer({
           scope the user approved and that a removal still needs its own act,
           because the host refuses one inside a bulk approval whatever the
           caller sends. */}
-      {mode === "edit" ? (
+      {
         <Segmented
           testId="ai.composer-permission"
           ariaLabel={t("agent.composer.permissionLabel")}
@@ -412,7 +370,7 @@ export function ChatComposer({
           onChange={(v) => setAutoApply(v === "auto")}
           options={permissionOptions}
         />
-      ) : null}
+      }
 
       <form
         onSubmit={(e) => {
@@ -437,40 +395,21 @@ export function ChatComposer({
               void submit();
             }
           }}
-          placeholder={
-            mode === "edit"
-              ? t("agent.composer.placeholder")
-              : t("editor.chrome.rightPanel.aiChat.composerPlaceholder")
-          }
-          aria-label={
-            mode === "edit"
-              ? t("agent.composer.placeholder")
-              : t("editor.chrome.rightPanel.aiChat.composerPlaceholder")
-          }
-          disabled={streaming || busy}
+          placeholder={t("agent.composer.placeholder")}
+          aria-label={t("agent.composer.placeholder")}
+          disabled={busy}
           style={INPUT_STYLE}
         />
-        {streaming && onStop ? (
-          <Button
-            type="button"
-            variant="secondary"
-            data-testid="ai.composer-stop"
-            onClick={() => onStop()}
-          >
-            {t("editor.chrome.rightPanel.aiChat.stop")}
-          </Button>
-        ) : (
-          <Button
-            type="submit"
-            variant="primary"
-            data-testid="ai.composer-send"
-            disabled={blocked}
-          >
-            {probing
-              ? t("agent.composer.checking")
-              : t("editor.chrome.rightPanel.aiChat.send")}
-          </Button>
-        )}
+        <Button
+          type="submit"
+          variant="primary"
+          data-testid="ai.composer-send"
+          disabled={blocked}
+        >
+          {probing
+            ? t("agent.composer.checking")
+            : t("editor.chrome.rightPanel.aiChat.send")}
+        </Button>
       </form>
     </div>
   );

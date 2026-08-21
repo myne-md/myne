@@ -29,12 +29,6 @@ import type { AnsweredBy } from "../../components/AnsweredByIndicator";
 
 /** A source-note citation backing a grounded assistant answer (mirrors the Rust
  *  `SearchHit`; snake_case → camelCase at the IPC boundary). */
-export interface ChatCitation {
-  noteId: string;
-  byteStart: number;
-  byteEnd: number;
-  score: number;
-}
 
 export type ChatRole = "user" | "assistant";
 
@@ -100,8 +94,6 @@ export interface ChatTurn {
    * Optional because a turn can fail before any cause is known.
    */
   errorCause?: ProviderErrorCause;
-  /** Source notes the grounded answer drew from (assistant turns; may be empty). */
-  citations: ChatCitation[];
   /** Whether this assistant turn can be inserted into the open note (summaries +
    *  any answer the user chooses to keep — SYNC-17 explicit action). (task 10) */
   insertable: boolean;
@@ -142,7 +134,7 @@ export type ChatAction =
       insertable: boolean;
     }
   | { type: "TOKEN"; text: string }
-  | { type: "FINALIZE"; citations: ChatCitation[]; answeredBy?: AnsweredBy }
+  | { type: "FINALIZE"; answeredBy?: AnsweredBy }
   | { type: "FAIL"; cause?: ProviderErrorCause }
   | { type: "STOP" }
   | {
@@ -217,7 +209,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         text: action.text,
         streaming: false,
         error: false,
-        citations: [],
         insertable: false,
       };
       const assistantTurn: ChatTurn = {
@@ -227,7 +218,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         text: "",
         streaming: true,
         error: false,
-        citations: [],
         insertable: action.insertable,
       };
       return { turns: [...state.turns, userTurn, assistantTurn], streaming: true };
@@ -250,7 +240,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         turns: replaceLast(state.turns, {
           ...last,
           streaming: false,
-          citations: action.citations,
           answeredBy: action.answeredBy,
         }),
         streaming: false,
@@ -294,7 +283,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         text: action.task,
         streaming: false,
         error: false,
-        citations: [],
         insertable: false,
         scopeLabel: action.scopeLabel,
       };
@@ -308,7 +296,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         text: "",
         streaming: false,
         error: false,
-        citations: [],
         insertable: false,
       };
       return { ...state, turns: [...state.turns, userTurn, agentTurn] };
@@ -393,14 +380,15 @@ export function appendChatToken(token: number, text: string): void {
   dispatchChat({ type: "TOKEN", text });
 }
 
-/** Close the active assistant turn with its citations, iff `token` is current. */
-export function finalizeChatTurn(
-  token: number,
-  citations: ChatCitation[],
-  answeredBy?: AnsweredBy,
-): void {
+/** Close the active assistant turn, iff `token` is current.
+ *
+ *  It used to take the citation set the Ask flow retrieved. Ask is gone
+ *  (myne-md/myne#552) and the one remaining producer of a text turn is the
+ *  summarize flow, which grounds on the open note rather than on a retrieval,
+ *  so there was nothing left to cite. */
+export function finalizeChatTurn(token: number, answeredBy?: AnsweredBy): void {
   if (!isChatRunCurrent(token)) return;
-  dispatchChat({ type: "FINALIZE", citations, answeredBy });
+  dispatchChat({ type: "FINALIZE", answeredBy });
 }
 
 /** Mark the active assistant turn as errored, iff `token` is current. */
