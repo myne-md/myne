@@ -261,7 +261,7 @@ const V = {
   "src/lib/password-generator.ts": ["ported", "CSPRNG through `crypto.getRandomValues`, which a browser has."],
   "src/lib/pending-approval.ts": [
     "ported",
-    "One `sync_status` read through the seam, and the web router dispatches it. Web is in fact the client that needs it most: the password path is the only enrolment a browser has, so landing pending is the ORDINARY outcome here — `e2e-web/pending-approval.e2e.ts` drives it in a real browser.",
+    "Two device-local reads through the seam, both dispatched by the web router: `sync_head_fingerprint` (has this device ever adopted a head, the discriminator `sync-protocol.md` §6.2 names) and then, only when it has not, `sync_status` (is it enrolled at all). Order is load-bearing and asserted. It asks the network nothing, because `try_claim_token` collapses a refusal and an unreachable server into one answer. Web-ONLY by construction since myne-md/myne#535: the module answers `false` outright where `localOnlyVault` is present, so desktop pays nothing and cannot be routed to the wait. Web is the client that needs it: the password path is the only enrolment a browser has, so landing pending is the ORDINARY outcome here.",
   ],
   "src/lib/picked-file.ts": [
     "adapted",
