@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AI_CHAT_HONESTY_NOTE,
+  aiChatHonestyNote,
   AI_TRUST_A7_RESIDUAL,
   AI_TRUST_INVARIANT,
   aiTrustDetail,
@@ -132,5 +133,30 @@ describe("conversational-AI-chat honesty note (task 13, load-bearing)", () => {
     expect(lower).not.toContain("sandbox");
     expect(lower).not.toContain("fully private");
     expect(lower).not.toContain("always");
+  });
+
+  // The sentence above says "running on your device", which stopped being true
+  // for every state when the remote arm shipped (#414/#415). The surface that
+  // renders it also names the provider ten pixels away, so it said "OpenRouter"
+  // and "on your device" at once. `threat-model.md` TB13 says decrypted note
+  // plaintext leaves the device on that arm, and §6 says the claim comes down to
+  // meet the model rather than the other way round.
+  it("does not claim on-device inference once a provider is named", () => {
+    const remote = aiChatHonestyNote("OpenRouter").toLowerCase();
+    expect(remote).not.toContain("on your device");
+    expect(remote).not.toContain("on this device");
+    // …and it still admits fallibility, which is the note's own job.
+    expect(remote).toContain("may be wrong");
+    // It names where the answer came from and disclaims Myne's control of it,
+    // saying LESS than `aiTrustDetail`'s remote body, never more.
+    expect(remote).toContain("openrouter");
+    expect(remote).toContain("which myne does not run");
+    expect(remote).not.toContain("sandbox");
+  });
+
+  it("keeps the pinned local sentence exactly, on the arm it is true for", () => {
+    // Non-vacuity for the pair: the split must not have quietly rewritten the
+    // local wording, which is what the full-literal assertion above pins.
+    expect(aiChatHonestyNote(null)).toBe(AI_CHAT_HONESTY_NOTE);
   });
 });

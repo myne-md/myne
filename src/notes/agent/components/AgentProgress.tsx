@@ -22,6 +22,7 @@ import {
   agentCancel,
   agentPreviewGrant,
   type GrantPreview,
+  type LoopEnd,
 } from "../../../lib/agent-run";
 import {
   aiCapabilityReport,
@@ -29,8 +30,39 @@ import {
   providerLabelOf,
 } from "../../../lib/ai-capability";
 import { usePrefs } from "../../../hooks/usePrefs";
-import { failRun, resumeRun, settleStep, useAgent } from "../agentStore";
+import { currentRunEpoch, failRun, resumeRun, useAgent } from "../agentStore";
+import { settleRunIntoChat } from "../../ai/agentToChat";
 import { ScopeExpansionDialog, type ProviderArm } from "./ScopeExpansionDialog";
+
+/** How a stopped run is described, given the tag its loop ended on.
+ *
+ *  Exported because the transcript turn says the same thing about a run whose
+ *  proposal has since been dropped, and a second partial copy of this mapping
+ *  had already gone out of step: it covered two of the four tags and rendered
+ *  nothing for the rest, so a fifth `LoopEnd` variant would have been picked up
+ *  by one site and silently not the other.
+ *
+ *  A total switch with static `t("…")` calls rather than a lookup table, for
+ *  the reason `AiChatTab`'s own resting-cause switch states: `check-i18n.mjs`
+ *  verifies static call sites, so a key living in a `Record` is a key no guard
+ *  checks. Written this way the compiler catches a missing tag and the guard
+ *  catches a missing translation. */
+export function endStatusLabel(
+  kind: LoopEnd["kind"] | undefined,
+  t: (key: string) => string,
+): string {
+  switch (kind) {
+    case "awaitingScope":
+      return t("agent.progress.awaitingScope");
+    case "cancelled":
+      return t("agent.progress.cancelled");
+    case "exhaustedIterations":
+      return t("agent.progress.exhausted");
+    case "finished":
+    case undefined:
+      return t("agent.progress.done");
+  }
+}
 
 export function AgentProgress() {
   const { t } = useTranslation();
@@ -112,36 +144,15 @@ export function AgentProgress() {
       live = false;
     };
   }, [folder, runId]);
-  // The error is rendered even with no run. `beginRun()` clears `view`, so a
-  // failed start left `error` set and `view` null, and an early return here made
-  // the message unreachable: pressing Send on a failing backend produced no
-  // message, no spinner and no state change.
-  if (!agent.view) {
-    return agent.error ? (
-      <div
-        data-testid="agentProgress.root"
-        style={{
-          padding: "var(--space-2) var(--space-3)",
-          background: "var(--bg-1)",
-          borderBottom: "1px solid var(--line-1)",
-          color: "var(--danger)",
-        }}
-      >
-        <span data-testid="agentProgress.error">{agent.error}</span>
-      </div>
-    ) : null;
-  }
+  // This strip describes a RUN, so with no view there is nothing to describe.
+  // It used to render `agent.error` here too, for the failed-start case where
+  // `beginRun()` has nulled the view. That case now renders on the run's own
+  // transcript turn (`AiChatTab`), which is where the user is looking and which
+  // keeps the message after the next run replaces this store's copy.
+  if (!agent.view) return null;
 
   const { view, running, end } = agent;
-  const status = running
-    ? t("agent.progress.working")
-    : end?.kind === "awaitingScope"
-      ? t("agent.progress.awaitingScope")
-      : end?.kind === "cancelled"
-        ? t("agent.progress.cancelled")
-        : end?.kind === "exhaustedIterations"
-          ? t("agent.progress.exhausted")
-          : t("agent.progress.done");
+  const status = running ? t("agent.progress.working") : endStatusLabel(end?.kind, t);
 
   return (
     <>
@@ -159,12 +170,26 @@ export function AgentProgress() {
           providerName={arm.providerName}
           onApprove={() => {
             resumeRun();
+            // Captured before the await, so a vault lock during the approval
+            // invalidates the reply rather than being raced by it.
+            const epoch = currentRunEpoch();
             void agentApproveScope(runId, {
               kind: "folder",
               value: awaiting.folder,
             })
-              .then(settleStep)
-              .catch(() => failRun(t("agent.progress.expandFailed")));
+              // The transcript half comes with the settle rather than after it:
+              // this is the SECOND place a step settles, and a mirror written
+              // only at the start site would leave an approved expansion's
+              // numbers stale on the turn that shows them.
+              .then((result) => settleRunIntoChat(result, epoch))
+              // Epoch-checked for the reason `agentToChat.ts`'s catch states:
+              // the success path is guarded transitively by `settleStep`, and a
+              // failure that lands after the run was let go of would otherwise
+              // clear a NEWER run's `running` and record its message.
+              .catch(() => {
+                if (epoch !== currentRunEpoch()) return;
+                failRun(t("agent.progress.expandFailed"));
+              });
           }}
           onDecline={() => void agentCancel(runId)}
         />

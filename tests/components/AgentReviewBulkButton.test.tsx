@@ -34,6 +34,7 @@ import { AgentReview } from "../../src/screens/AgentReview";
 import {
   beginRun,
   clearAgentForLock,
+  currentRunEpoch,
   settleStep,
 } from "../../src/notes/agent/agentStore";
 
@@ -67,7 +68,7 @@ function settleWith(edits: ProposedEdit[]) {
     notesRead: 1,
     charsOffDevice: null,
     excludedCount: 0,
-  });
+  }, currentRunEpoch());
 }
 
 function mount() {

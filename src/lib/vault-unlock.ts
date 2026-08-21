@@ -9,6 +9,8 @@ import { resetVimStateOnLock } from "../editor/vim";
 import { releaseAttachmentUrls } from "../platform/attachments";
 import { resetTaskIndexCache } from "../notes/taskIndex";
 import { clearAgentForLock } from "../notes/agent/agentStore";
+import { clearAiOutput } from "../notes/ai/aiOutputStore";
+import { clearChat } from "../notes/ai/chatStore";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -41,6 +43,21 @@ export async function lockVault(): Promise<void> {
   // and only two of them remembered. A choke point cannot be forgotten by the
   // fifth one.
   clearAgentForLock();
+  // The AI chat transcript, on the same leg. It holds the user's own questions
+  // and the model's answers about their notes, `chatStore` is module scope, and
+  // it had been relying on the Editor's unmount cleanup alone, which does fire
+  // today, and is not a guarantee. The unmount is a rendering fact; the vault
+  // leaving is the event that has to drop this, and every path that ends a
+  // session comes through here. `design-notes/ai/0276` rests its
+  // no-new-blob-family argument on the transcript not outliving the session.
+  clearChat();
+  // The rendered AI output, on the same leg and for the same reason. It holds a
+  // note's summary and, through `src/lib/ai-qa.ts`, every Q and A answer over
+  // note content, and its own header calls that an AS1-class RAM artifact
+  // dropped on lock. It was left behind when the transcript moved here: the two
+  // sit one line apart in the Editor's unmount effect, and only one of them was
+  // given a leaving-path call.
+  clearAiOutput();
   // The task list is the one nonce consumer that answers from MODULE state
   // rather than refetching in its own mount effect, so unlike every other
   // reader surface it does not self-heal on remount (myne#277). The backend
