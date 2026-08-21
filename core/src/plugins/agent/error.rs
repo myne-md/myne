@@ -193,6 +193,19 @@ pub enum AgentError {
     /// (myne-md/myne#531 review round six).
     #[error("this run is already working")]
     StepAlreadyRunning,
+    /// The provider rejected the request itself (HTTP 400), rather than the
+    /// credential or the cost (myne-md/myne#547).
+    #[error("the provider rejected the request")]
+    ProviderRejected,
+    /// The backend failed for some other reason.
+    ///
+    /// Both of these exist because [`AgentError::ReadFailed`] was carrying two
+    /// unrelated meanings: a note that could not be decrypted, and ANY engine
+    /// failure, via `agent_error_of`'s catch-all. So a provider refusing a
+    /// request reached the user as "the note could not be read", which sends
+    /// them to look at their vault for a fault in the request Myne built.
+    #[error("the backend failed")]
+    ProviderFailed,
 }
 
 impl AgentError {
@@ -219,6 +232,8 @@ impl AgentError {
             Self::EditFormatUnsupported => "edit_format_unsupported",
             Self::IndividualApprovalNotSingle => "individual_approval_not_single",
             Self::StepAlreadyRunning => "step_already_running",
+            Self::ProviderRejected => "provider_rejected",
+            Self::ProviderFailed => "provider_failed",
         }
     }
 }

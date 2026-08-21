@@ -187,6 +187,15 @@ pub enum EngineError {
     /// different: wait, rather than choose a model.
     #[error("the search index is not ready yet")]
     IndexNotReady,
+    /// The provider rejected the request itself (**HTTP 400**), as distinct
+    /// from rejecting the credential or the cost (myne-md/myne#547).
+    ///
+    /// Its own variant because the fix is on Myne's side rather than the
+    /// user's: a 400 says the request Myne built is one this provider will not
+    /// take. Collapsed into the generic failure it arrived as "the note could
+    /// not be read", which blames the vault for something the request did.
+    #[error("the provider rejected the request")]
+    RequestRejected,
 }
 
 impl EngineError {
@@ -216,6 +225,7 @@ impl EngineError {
             EngineError::Deferred => "deferred",
             EngineError::NoEmbeddingModel => "no_embedding_model",
             EngineError::IndexNotReady => "index_not_ready",
+            EngineError::RequestRejected => "request_rejected",
         }
     }
 }

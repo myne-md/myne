@@ -1632,6 +1632,30 @@ mod tests {
     /// The two states the one `NotReady` refusal used to cover
     /// (myne-md/myne#545), and the reason splitting them matters: each names a
     /// different next step, and the sentence the user got named neither.
+    /// A 400 is the provider declining the REQUEST, and it must not arrive as
+    /// the generic failure that `agent_error_of` then renders as a note that
+    /// could not be read (myne-md/myne#547).
+    #[test]
+    fn a_bad_request_is_its_own_cause_rather_than_the_generic_exchange_failure() {
+        use super::super::provider_registry::engine_error_of;
+        use super::super::provider_transport::{status_cause, ProviderTransportError as T};
+
+        assert_eq!(status_cause(400), T::RequestRejected);
+        assert_eq!(
+            engine_error_of(T::RequestRejected),
+            EngineError::RequestRejected
+        );
+        // The three neighbours keep their own meanings, so the new arm cannot
+        // have been added by widening one of them.
+        assert_eq!(status_cause(401), T::Unauthorized);
+        assert_eq!(status_cause(429), T::QuotaExhausted);
+        assert_eq!(status_cause(500), T::Exchange);
+        assert_ne!(
+            EngineError::RequestRejected.kind(),
+            EngineError::InferenceFailed.kind()
+        );
+    }
+
     #[test]
     fn a_retrieval_refusal_separates_no_model_from_an_index_still_building() {
         // Nothing selected and no arm carrying its own weights: asking can

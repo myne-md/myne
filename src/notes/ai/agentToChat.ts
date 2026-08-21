@@ -31,6 +31,7 @@
 // disk and nothing here logs the task, which is the user's own words.
 
 import { agentStart, type AgentStepResult, type ScopeGrant } from "../../lib/agent-run";
+import { engineErrorTag } from "../../lib/engine-error";
 import {
   beginRun,
   currentRunEpoch,
@@ -51,6 +52,13 @@ export interface AgentRunCopy {
   scopeLabel: string;
   /** The sentence for a start that never landed. */
   startFailed: string;
+  /** The sentence for a start the PROVIDER refused (HTTP 400).
+   *
+   *  Separate because the two send the user to different places, and the
+   *  generic one used to be shown for both: a rejected request is a fault in
+   *  what Myne sent, so telling the user to check their setup is telling them
+   *  to fix something that is not broken (myne-md/myne#547). */
+  providerRejected: string;
 }
 
 /**
@@ -112,7 +120,7 @@ export async function startAgentRun(
       }),
       epoch,
     );
-  } catch {
+  } catch (failure) {
     // **The same epoch check the success path gets, spelled out.** On the
     // success path it is transitive: `settleRunIntoChat` returns early when
     // `settleStep` rejects the epoch, so the transcript write never happens.
@@ -132,7 +140,14 @@ export async function startAgentRun(
     // records the message for a run that HAS a view; a start that never landed
     // has none, because `beginRun()` nulled it, so the progress strip does not
     // mount and `failAgentTurn` is what the user actually reads.
-    failRun(copy.startFailed);
-    failAgentTurn(copy.startFailed);
+    // Which sentence, from the host's own tag. `AgentError` serializes with a
+    // `kind` field, and the two failures a user can tell apart are "the
+    // provider would not take this request" and everything else.
+    const sentence =
+      engineErrorTag(failure) === "ProviderRejected"
+        ? copy.providerRejected
+        : copy.startFailed;
+    failRun(sentence);
+    failAgentTurn(sentence);
   }
 }

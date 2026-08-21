@@ -117,6 +117,20 @@ pub enum ProviderTransportError {
     /// The provider declined the work on cost grounds (402/429).
     #[error("the provider's quota or credit is exhausted")]
     QuotaExhausted,
+    /// The provider rejected the REQUEST as one it will not accept (400).
+    ///
+    /// Split out of [`ProviderTransportError::Exchange`] because it blames the
+    /// wrong side otherwise, and the chain downstream turned that into a wrong
+    /// sentence: 400 fell to `Exchange`, `Exchange` to `InferenceFailed`, and
+    /// `agent_error_of`'s catch-all to `AgentError::ReadFailed`, so a request
+    /// the provider would not take was reported to the user as a failure to
+    /// read one of their notes (myne-md/myne#547).
+    ///
+    /// Content-free like its siblings: the body explaining the rejection is
+    /// deliberately never read, since a provider's error text is
+    /// attacker-influenceable.
+    #[error("the provider rejected the request")]
+    RequestRejected,
     /// The caller stood the request down before it finished. **Not a failure**
     /// — the UI shows nothing for this, which is why it cannot share a variant
     /// with [`ProviderTransportError::Exchange`].
@@ -138,6 +152,7 @@ impl ProviderTransportError {
             Self::Exchange => "exchange",
             Self::Unauthorized => "unauthorized",
             Self::QuotaExhausted => "quota_exhausted",
+            Self::RequestRejected => "request_rejected",
             Self::Cancelled => "cancelled",
         }
     }
@@ -161,6 +176,7 @@ impl ProviderTransportError {
 /// to read.
 pub fn status_cause(status: u16) -> ProviderTransportError {
     match status {
+        400 => ProviderTransportError::RequestRejected,
         401 | 403 => ProviderTransportError::Unauthorized,
         402 | 429 => ProviderTransportError::QuotaExhausted,
         _ => ProviderTransportError::Exchange,

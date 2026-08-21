@@ -71,6 +71,11 @@ export type ProviderErrorCause =
   /** An embedding model is selected and the vault's index is still being
    *  built. A state, not a failure: the next move is to wait. */
   | "index_not_ready"
+  /** The provider rejected the REQUEST (HTTP 400), rather than the credential
+   *  or the cost. Split out because the fix is on Myne's side, not the
+   *  user's, and because collapsed into the generic failure it reached the
+   *  user as a note that could not be read (myne-md/myne#547). */
+  | "request_rejected"
   | "failed";
 
 /**
@@ -112,6 +117,7 @@ const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
   "not_ready",
   "no_embedding_model",
   "index_not_ready",
+  "request_rejected",
   "failed",
 ]);
 
@@ -142,6 +148,7 @@ const PROVIDER_ERROR_KEY: Readonly<Record<ProviderErrorCause, string>> = {
   not_ready: "settings.ai.providerError.notReady",
   no_embedding_model: "settings.ai.providerError.noEmbeddingModel",
   index_not_ready: "settings.ai.providerError.indexNotReady",
+  request_rejected: "settings.ai.providerError.requestRejected",
   unreachable: "settings.ai.providerError.unreachable",
   refused: "settings.ai.providerError.refused",
   timeout: "settings.ai.providerError.timeout",

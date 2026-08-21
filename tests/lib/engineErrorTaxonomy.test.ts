@@ -72,6 +72,8 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     no_embedding_model:
       "retrieval-only: the two refusals myne#545 split apart are raised by ask / chat_stream when the vector store is off, and transcription is grounded on nothing",
     index_not_ready: "same — transcription retrieves nothing",
+    request_rejected:
+      "transcription is in-process only, so no request is ever built for a provider to reject (myne#547)",
   },
   provider: {
     feature_off:
@@ -116,6 +118,8 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     no_embedding_model:
       "retrieval-only (myne#545): the tag pass reads the note it was given and grounds on nothing, so the embedding index is not on its path",
     index_not_ready: "same — the tag pass retrieves nothing",
+    request_rejected:
+      "the SYNC-14 bar means auto-tag never reaches a provider, so none can reject its request (myne#547)",
   },
 };
 
