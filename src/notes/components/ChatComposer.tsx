@@ -105,6 +105,9 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<ChatMode>("ask");
+  // Whether the scope picker is expanded. Collapsed by default: the scope shows
+  // as text with a control to change it, so the ordinary run reads as one line.
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [attached, setAttached] = useState<string | null>(null);
   const [preview, setPreview] = useState<GrantPreview | "failed" | null>(null);
@@ -309,13 +312,42 @@ export function ChatComposer({
       {mode === "edit" ? (
         <div style={ROW_STYLE}>
           <span style={CAPTION_STYLE}>{t("agent.composer.scopeLabel")}</span>
-          <SearchableSelect
-            testId="ai.composer-scope"
-            aria-label={t("agent.composer.scopeLabel")}
-            options={scopeOptions}
-            selected={scopeSelected}
-            onChange={(next) => setAttached(next[0] ? next[0] : null)}
-          />
+          {/* **The picker is one step back, and the scope is not** (issue A).
+              The common run is the open note, and reading a dropdown before
+              typing is friction for a choice almost nobody changes. What may
+              NOT move is the control itself or the count beside it:
+              `docs/decisions/ai/0518` point 1 requires a user-originated scope
+              control on the composer, because removing it routes every
+              folder-scale run through the model-originated expansion instead,
+              which is the injection-reachable path. So this changes prominence
+              and nothing else, and the count below still renders whenever a
+              folder is attached. */}
+          {pickerOpen ? (
+            <SearchableSelect
+              testId="ai.composer-scope"
+              aria-label={t("agent.composer.scopeLabel")}
+              options={scopeOptions}
+              selected={scopeSelected}
+              onChange={(next) => {
+                setAttached(next[0] ? next[0] : null);
+                setPickerOpen(false);
+              }}
+            />
+          ) : (
+            <>
+              <span data-testid="ai.composer-scope-current" style={CAPTION_STYLE}>
+                {attached ?? t("agent.composer.scopeOpenNote")}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                data-testid="ai.composer-scope-change"
+                onClick={() => setPickerOpen(true)}
+              >
+                {t("agent.composer.scopeChange")}
+              </Button>
+            </>
+          )}
           {/* **A failed preview says so rather than showing nothing.** An
               absent count reads as "no folder attached", and the count before
               sending is part of the mitigation `docs/decisions/ai/0515` names,

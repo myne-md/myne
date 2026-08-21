@@ -32,6 +32,7 @@
     "composer": {
       "placeholder": "Ask the AI to change these notes",
       "scopeLabel": "Working on",
+      "scopeChange": "Change",
       "scopeOpenNote": "This note",
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
