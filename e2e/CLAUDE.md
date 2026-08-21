@@ -109,6 +109,18 @@
   fresh-container boot flake. (A no-rebuild `e2e-one.sh` loop is the wrong tool for the
   3× gate.) Persisting `RUSTUP_HOME` as a volume — or baking the pinned toolchain into
   `e2e/Dockerfile` — would remove the re-provision cost; tracked as a separate infra item.
+- **`rustc ... (signal: 9, SIGKILL)` on `myne_desktop_lib` is the OOM killer, not a compile
+  error, and the message says neither.** What the runner prints is `error: could not compile
+  myne-desktop (lib)` followed by the whole rustc invocation and `failed to build app`, which
+  reads exactly like a broken build and sends you looking at the diff. Nothing in it mentions
+  memory. The cause is the VM's ceiling against cargo's default parallelism: a colima or
+  Docker Desktop VM is commonly 8 to 10 GiB, an unrelated container stack can hold a couple of
+  those, and eight concurrent `opt-level=3` rustc jobs on the top crate do not fit in what is
+  left. The tell is that the SAME commit built minutes earlier, and that the failure moves
+  between runs rather than naming a line. Fix by capping jobs rather than by touching the
+  code: `CARGO_BUILD_JOBS=3` costs wall clock and changes nothing about the artifact, so the
+  run still proves what the 3× gate asks. `docker stats --no-stream` during the build is how
+  you confirm it, and it is worth doing before believing a red build on an unchanged tree.
 - Post-exit assertions (disk state AFTER the app quit): launch with
   `keepDataDir: true`, capture `dataHome` in the SEED callback (the
   launch-failure path leaks the dir otherwise), gate on
