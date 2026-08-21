@@ -76,13 +76,15 @@ pub trait LabelKeychain: Send + Sync {
     fn delete(&self, account: &str) -> Result<(), VaultLabelError>;
 }
 
-/// The account the availability probe reads, and the only account this module
+/// The account the availability probe writes, and the only account this module
 /// ever addresses that is not a vault's.
 ///
-/// It is never stored under: [`keychain_available`] performs a `get` and
-/// nothing else, so no item by this name is ever created. It cannot collide
-/// with a real key either, because every real account is a canonical 36-char
-/// `VaultId` rendering and this parses as none.
+/// An item by this name **can** exist: [`keychain_available`] stores one byte
+/// under it and deletes it best-effort, so a probe interrupted between the two
+/// calls leaves one behind. One fact makes that leftover harmless and rules out
+/// a collision with a real key at the same time: every real account is a
+/// canonical 36-char `VaultId` rendering and this string parses as none, so no
+/// reader in this module ever loads it as a wrap key.
 pub const KEYCHAIN_PROBE_ACCOUNT: &str = "availability-probe";
 
 /// Is there a usable keychain on this device at all?
