@@ -274,6 +274,32 @@ pub fn read_http_response<R: BufRead>(
     };
 
     let reusable = version_keepalive && !wants_close && framed;
+    // How the response was DELIMITED, which is the fact that separates "the
+    // peer is slow" from "we are waiting for an end marker that is not coming"
+    // (myne-md/myne#546). A read that hangs looks identical from the outside in
+    // both cases, and telling them apart cost a process stack sample. Counts
+    // and a compile-time framing name only: no header value and no body byte.
+    // `myne_core::*` rather than the `myne::*` product target the desktop crate
+    // uses, and the reason is testability: `tracing-test`'s capture filters on
+    // the crate name, so a line emitted under `myne::…` from this crate is
+    // invisible to every test that would assert on it. `RUST_LOG=myne_core=debug`
+    // turns these on.
+    tracing::debug!(
+        target: "myne_core::http",
+        event = "response",
+        status,
+        framing = if head_request {
+            "none"
+        } else if chunked {
+            "chunked"
+        } else if content_length.is_some() {
+            "content_length"
+        } else {
+            "eof"
+        },
+        body_bytes = body.len(),
+        reusable,
+    );
     Ok((
         TransportResponseExt {
             status,

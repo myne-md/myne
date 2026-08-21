@@ -647,6 +647,17 @@ async fn step<R: Runtime>(
                 // there is no `?` between the claim and either of them.
                 s.in_flight = false;
             }
+            // The one place a step's failure is visible at all
+            // (myne-md/myne#546). The surface renders "The agent could not
+            // start", which names no cause, and until this line the host left
+            // no trace of one either: a start that failed on a debug build with
+            // logging on produced zero output. `kind()` rather than the error,
+            // because two variants carry a note id.
+            tracing::debug!(
+                target: "myne::agent",
+                event = "step_failed",
+                error_kind = e.kind(),
+            );
             return Err(e);
         }
     };

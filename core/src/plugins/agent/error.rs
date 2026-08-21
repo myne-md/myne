@@ -195,6 +195,34 @@ pub enum AgentError {
     StepAlreadyRunning,
 }
 
+impl AgentError {
+    /// Bounded, content-free tag for structured logging.
+    ///
+    /// Mirrors `EngineError::kind` and exists for the same reason: several
+    /// variants carry a `note_id`, so a `Debug` format of this value in a log
+    /// line would put a note identifier on disk. The DENY list in
+    /// `src-tauri/CLAUDE.md` names `note_id` explicitly. A caller logs this;
+    /// there is nothing else here safe to print.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::SlotNotUnlocked => "slot_not_unlocked",
+            Self::NoSuchRun => "no_such_run",
+            Self::AiDisabled => "ai_disabled",
+            Self::Cancelled => "cancelled",
+            Self::OutOfScope { .. } => "out_of_scope",
+            Self::ExcludedNow => "excluded_now",
+            Self::EmptyGrant => "empty_grant",
+            Self::RootGrant => "root_grant",
+            Self::RestorePointFailed => "restore_point_failed",
+            Self::WriteFailed => "write_failed",
+            Self::ReadFailed => "read_failed",
+            Self::EditFormatUnsupported => "edit_format_unsupported",
+            Self::IndividualApprovalNotSingle => "individual_approval_not_single",
+            Self::StepAlreadyRunning => "step_already_running",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
