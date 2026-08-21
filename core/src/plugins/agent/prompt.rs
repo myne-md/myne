@@ -31,6 +31,13 @@ pub enum AgentAction {
     ReadNote { note_id: String },
     /// Tool 3.
     SearchScope { query: String },
+    /// Tool 4: search the WHOLE vault, and be told where the matches are.
+    ///
+    /// In-scope matches come back as ids to read; everything else comes back as
+    /// a folder name and a count, never an id and never a title. See
+    /// [`super::tools::search_vault`] for why that split is the security
+    /// boundary rather than a rendering choice.
+    SearchVault { query: String },
     /// Verb 1: propose an anchored edit to a note in scope.
     ProposeEdit {
         note_id: String,
@@ -63,6 +70,7 @@ impl AgentAction {
             Self::ListScope => "list_scope",
             Self::ReadNote { .. } => "read_note",
             Self::SearchScope { .. } => "search_scope",
+            Self::SearchVault { .. } => "search_vault",
             Self::ProposeEdit { .. } => "propose_edit",
             Self::ProposeNote { .. } => "propose_note",
             Self::RequestScope { .. } => "request_scope",
@@ -107,10 +115,18 @@ pub fn system_instructions() -> String {
         "{\"action\":\"list_scope\"}\n",
         "{\"action\":\"read_note\",\"note_id\":\"...\"}\n",
         "{\"action\":\"search_scope\",\"query\":\"...\"}\n",
+        "{\"action\":\"search_vault\",\"query\":\"...\"}\n",
         "{\"action\":\"propose_edit\",\"note_id\":\"...\",\"anchor\":\"...\",\"replacement\":\"...\"}\n",
         "{\"action\":\"propose_note\",\"title\":\"...\",\"body\":\"...\"}\n",
         "{\"action\":\"request_scope\",\"folder\":\"...\",\"reason\":\"...\"}\n",
         "{\"action\":\"finish\",\"summary\":\"...\"}\n\n",
+        "search_scope looks inside the notes you were given. search_vault looks ",
+        "at the whole vault: matches inside your scope come back as ids you can ",
+        "read, and matches outside it come back only as a folder name and a ",
+        "count. You cannot read those notes. Those counts describe the matches ",
+        "this search ranked, not the vault, so do not report them as totals. If ",
+        "the material you need is in one of those folders, use request_scope ",
+        "and say which.\n\n",
         "The anchor of an edit must be text you have READ from that note, ",
         "copied exactly, and it must occur exactly once in the note. If it does ",
         "not match exactly the edit is discarded, so read the note first and ",
@@ -341,6 +357,8 @@ mod tests {
             "\n",
             r#"{"action":"search_scope","query":"q"}"#,
             "\n",
+            r#"{"action":"search_vault","query":"q"}"#,
+            "\n",
             r#"{"action":"propose_edit","note_id":"n1","anchor":"a","replacement":"b"}"#,
             "\n",
             r#"{"action":"propose_note","title":"T","body":"B"}"#,
@@ -349,7 +367,7 @@ mod tests {
             "\n",
             r#"{"action":"finish","summary":"done"}"#,
         );
-        assert_eq!(parse_actions(lines).len(), 7);
+        assert_eq!(parse_actions(lines).len(), 8);
     }
 
     #[test]
@@ -452,5 +470,17 @@ mod tests {
         let s = system_instructions();
         assert!(s.contains("exactly once"));
         assert!(s.contains("request_scope"));
+    }
+
+    #[test]
+    fn the_instructions_say_what_a_vault_search_may_not_do() {
+        // myne-md/myne#552. The tool's whole boundary is that an out-of-scope
+        // match yields a folder and a count rather than something readable, and
+        // a model that is not told will report those counts as vault totals and
+        // try to read what it cannot.
+        let s = system_instructions();
+        assert!(s.contains("search_vault"));
+        assert!(s.contains("cannot read those notes"));
+        assert!(s.contains("not the vault"));
     }
 }

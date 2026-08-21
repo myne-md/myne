@@ -28,7 +28,7 @@ use super::prompt::{
 };
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
-use super::tools::{list_scope, read_note, search_scope, NoteReader, ScopeSearcher};
+use super::tools::{list_scope, read_note, search_scope, search_vault, NoteReader, ScopeSearcher};
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -436,6 +436,59 @@ async fn drive_inner(
                     transcript.push(Message {
                         role: Role::User,
                         content: vec![Content::Trusted(rendered)],
+                    });
+                }
+                AgentAction::SearchVault { query } => {
+                    productive |= asked.insert(format!("search_vault:{query}"));
+                    let found = search_vault(
+                        runs,
+                        run_id,
+                        &query,
+                        SEARCH_LIMIT,
+                        deps.searcher,
+                        deps.records,
+                        deps.exclusions,
+                    )
+                    .await?;
+                    // **Two spans, two provenances, and the split is the point.**
+                    // Ids are host-minted identifiers and the sentence around
+                    // them is host prose, so both are trusted. Folder names come
+                    // out of the user's vault — a `folder:` frontmatter value is
+                    // text somebody wrote — so they are tagged as note content
+                    // exactly like a title from `list_scope` is.
+                    let ids = found
+                        .in_scope
+                        .iter()
+                        .map(|h| h.note_id.clone())
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let mut content = vec![Content::Trusted(format!("In your scope:\n{ids}\n"))];
+                    if !found.elsewhere.is_empty() {
+                        content.push(Content::Trusted(
+                            "Outside your scope, by folder, counted among the \
+                             matches this search ranked rather than across the \
+                             vault. You cannot read these; ask for the scope to \
+                             be widened if you need one: "
+                                .into(),
+                        ));
+                        content.push(Content::note(
+                            found
+                                .elsewhere
+                                .iter()
+                                .map(|f| {
+                                    format!(
+                                        "{} ({})",
+                                        f.folder.as_deref().unwrap_or("no folder"),
+                                        f.count
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        ));
+                    }
+                    transcript.push(Message {
+                        role: Role::User,
+                        content,
                     });
                 }
                 AgentAction::ProposeEdit {
