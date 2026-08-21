@@ -96,9 +96,37 @@ describe("ChatComposer", () => {
     // counting its own single textarea would only restate the JSX.
     mount();
     // Ask mode makes no grant, so it is not asked to explain one.
-    expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
+    expect(screen.queryByTestId("ai.composer-scope-current")).toBeNull();
     fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
+    // Collapsed by default (issue A): the scope reads as text with a control to
+    // change it, and the dropdown is one step back rather than gone.
+    expect(screen.getByTestId("ai.composer-scope-current")).toBeTruthy();
+    expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
+    fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     expect(screen.getByTestId("ai.composer-scope")).toBeTruthy();
+  });
+
+  it("collapses the picker once a folder is chosen, and still shows its size", async () => {
+    // The property issue A may not break: the count before sending is part of
+    // the mitigation `design-notes/ai/0515` names, not a nicety, so moving
+    // the picker behind a control must not take the number with it.
+    mount();
+    fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
+    fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    const option = screen
+      .getAllByTestId("ai.composer-scope-option")
+      .find((o) => o.getAttribute("data-value") === "Projects");
+    fireEvent.click(option!);
+
+    // Back to one line, naming what was chosen.
+    expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
+    expect(screen.getByTestId("ai.composer-scope-current").textContent).toContain(
+      "Projects",
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.composer-scope-count").textContent).toContain("12"),
+    );
   });
 
   it("does not probe when the mode changes", async () => {
@@ -145,6 +173,7 @@ describe("ChatComposer", () => {
   it("sends the run under the attached folder, with the host's count shown first", async () => {
     mount();
     fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
+    fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     const option = screen
       .getAllByTestId("ai.composer-scope-option")
@@ -169,6 +198,7 @@ describe("ChatComposer", () => {
     agentPreviewGrant.mockRejectedValue(new Error("no"));
     mount();
     fireEvent.click(screen.getByTestId("ai.composer-mode-edit"));
+    fireEvent.click(screen.getByTestId("ai.composer-scope-change"));
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     const option = screen
       .getAllByTestId("ai.composer-scope-option")
