@@ -139,6 +139,10 @@ export interface AiChatTabProps {
   openNoteId?: string | null;
   /** Folders the user can attach as an agent scope. */
   folders?: readonly string[];
+  /** Called with the ids of notes an automatic apply wrote, so the open pane
+   *  re-reads them (myne-md/myne#551). The manual path reaches the same
+   *  callback through `AgentReviewTakeover`; this is the automatic one. */
+  onNotesWritten?: (noteIds: readonly string[]) => void;
   /** Called after an agent-run undo reverted notes on disk, with their ids. */
   onRunUndone?: (noteIds: readonly string[]) => void;
 }
@@ -472,6 +476,7 @@ export function AiChatTab({
   titleOf,
   openNoteId = null,
   folders = NO_FOLDERS,
+  onNotesWritten,
   onRunUndone,
 }: AiChatTabProps = {}) {
   const { t } = useTranslation();
@@ -766,6 +771,7 @@ export function AiChatTab({
           streaming={chat.streaming}
           openNoteId={openNoteId}
           folders={folders}
+          onNotesWritten={onNotesWritten}
         />
       )}
     </div>

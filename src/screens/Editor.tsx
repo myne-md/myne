@@ -4089,6 +4089,10 @@ function RightSidebar() {
           <NoteTasksPanel />
         ) : active === "ai-chat" ? (
           <AiChatTab
+            // The automatic-apply path writes out of band of any pane's own
+            // autosave loop, exactly as the manual one does, so it owes the
+            // same reload (myne-md/myne#551).
+            onNotesWritten={() => ctx.reloadOpenNote()}
             onInsert={(text) => {
               // "Insert into note" (note-summarization task 5, SYNC-17): append a
               // `## Summary` block to the focused note and let the normal autosave

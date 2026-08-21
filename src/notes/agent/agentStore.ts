@@ -56,6 +56,23 @@ export interface AgentState {
   appliedEdits: ReadonlySet<number>;
   /** The result of the last apply, or null. */
   applied: AgentApplyResult | null;
+  /** Whether a finished run applies itself (myne-md/myne#551).
+   *
+   *  **Session-scoped on purpose, and reset on lock and on vault switch.** A
+   *  persisted "write without asking" setting is one that gets turned on once
+   *  and forgotten, and persisting it would mean a `PrefsView` field: the
+   *  encoder, the parser, the sync classification table, the merge passthrough
+   *  and `protocol.md` §9.5.2, i.e. a protocol spec change for a UI
+   *  preference. `beginRun` and `clearAgent` keep it, like `undoable`, because
+   *  neither is a vault-leaving event. */
+  autoApply: boolean;
+  /** True from the moment a run's automatic apply is decided until it settles.
+   *
+   *  It exists so the review dialog never flashes: without it a finished run is
+   *  `reviewable` for the frames between the step settling and the apply
+   *  returning, so an automatic run would open the full screen it exists to
+   *  skip and then close it. */
+  autoApplying: boolean;
   /** The run the host says is still undoable, or null.
    *
    *  Read from the host rather than derived from `applied`, and that is the
@@ -82,6 +99,8 @@ const INITIAL: AgentState = {
   rejectedNewNotes: new Set(),
   appliedEdits: new Set(),
   applied: null,
+  autoApply: false,
+  autoApplying: false,
   undoable: null,
   error: null,
 };
@@ -146,6 +165,10 @@ export function beginRun(): void {
   set({
     ...INITIAL,
     undoable: state.undoable,
+    // Kept for the same reason `undoable` is: a new run is not a vault-leaving
+    // event, and the user chose this mode for the session rather than for one
+    // message.
+    autoApply: state.autoApply,
     running: true,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
@@ -174,6 +197,27 @@ export function openRun(view: AgentRunView, epoch: number): boolean {
   if (epoch !== runEpoch) return false;
   set({ view });
   return true;
+}
+
+/** Choose whether a finished run applies itself.
+ *
+ *  Session-scoped: see the field's own note for why this is not a preference. */
+export function setAutoApply(on: boolean): void {
+  set({ autoApply: on });
+}
+
+/** Mark that this run's automatic apply has been decided.
+ *
+ *  Set BEFORE the step settles, which is the whole point: the review dialog
+ *  derives `reviewable` from a settled run, so a flag raised afterwards would
+ *  let the screen open for the frames before the apply returns. */
+export function beginAutoApply(): void {
+  set({ autoApplying: true });
+}
+
+/** The automatic apply is over, whether it wrote anything or not. */
+export function endAutoApply(): void {
+  set({ autoApplying: false });
 }
 
 /** A step came back.
@@ -378,6 +422,9 @@ export function clearAgent(): void {
   runEpoch += 1;
   state = {
     ...INITIAL,
+    // Kept for the reason `beginRun` states: closing the review screen is not
+    // a vault-leaving event either.
+    autoApply: state.autoApply,
     // Kept, for the reason `setUndoable` states and `beginRun` repeats: closing
     // the review screen un-applies nothing. This used to spread `INITIAL`
     // wholesale, so it nulled the offer and made `clearAgentForLock`, whose
@@ -404,7 +451,12 @@ export function clearAgentForLock(): void {
   // The epoch bump comes from `clearAgent`, which every leaving path goes
   // through: a reply that lands after the teardown cannot repopulate the store.
   clearAgent();
-  set({ undoable: null });
+  // **And the automatic-apply mode**, which `clearAgent` deliberately keeps.
+  // The mode says a finished run may write without a second act, and the act
+  // that granted it was the user choosing it while this vault was open. A lock
+  // ends that session, so carrying the choice into the next unlock would let a
+  // run write into a vault the user has not chosen it for (myne-md/myne#551).
+  set({ undoable: null, autoApply: false, autoApplying: false });
 }
 
 // ---- the vault-leaving epoch ------------------------------------------------
