@@ -98,9 +98,9 @@ Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
 ### **agent run** &nbsp; 📦 *Product*
 
-One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run survives a vault lock**: the run table and its transcript are dropped on the same leg as the AI vector store, which is why the feature adds no encrypted blob family and owes `myne-test-vectors` nothing. A run never writes; applying is a separate act behind the user's approval.
+One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run survives a vault lock**: the run table and its transcript are dropped on the same leg as the AI vector store, which is why the feature adds no encrypted blob family and owes `myne-test-vectors` nothing. That holds for the turn it leaves in the [conversational AI chat](#conversational-ai-chat) transcript too, on both counts: the turn keeps only the run id, the counts, the scope label the task was sent under, and how the loop ended. It never keeps the [proposed edits](#proposed-edit), whose anchors are text copied verbatim out of note bodies, and the transcript itself is dropped on the same leg. A run never writes; applying is a separate act behind the user's approval.
 
-Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
+Used in: `decisions.md` 2026-08-16, 2026-08-19, `threat-model.md` §7
 
 ### **agent scope** &nbsp; 📦 *Product*
 
@@ -113,6 +113,18 @@ Used in: `decisions.md` 2026-08-16
 The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Two verbs, edit a note body and create a note; deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, move, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` or `folder:` line is a rename or a move by the same mechanism trashing is. What bounds those is that each appears in the diff the user approves. Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
+
+### **agent turn** &nbsp; 📦 *Product*
+
+How an [agent run](#agent-run) appears in the [conversational AI chat](#conversational-ai-chat) transcript: the task the user sent, carrying the [agent scope](#agent-scope) label it was sent under, and beside it the turn the run itself renders into. Both belong to the agent flow rather than to the chat, which is what keeps the task out of the ask model's conversation history. The run's turn holds counts and a closed end tag, never the [proposed edits](#proposed-edit). The run's LIVE state (its status, running scope total, Stop, and the scope-expansion approval) is deliberately not in the turn: it renders outside the scrolling transcript, so a control the threat model requires to be continuously visible cannot scroll away or be removed by clearing the conversation.
+
+Used in: `decisions.md` 2026-08-19
+
+### **Ask mode / Edit mode** &nbsp; 📦 *Product*
+
+The two settings of the one composer in the AI Chat tab (myne-md/myne#533). Ask sends a grounded chat message; Edit starts an [agent run](#agent-run) and reveals the user-originated scope control. The mode is a control the user sets rather than an intent the model infers, because the two mistakes do not cost the same: a question misread as an edit starts a scope-holding run and spends provider requests, while the reverse costs a re-send. The tab opens in Ask, and the mode is not remembered across a remount, so a user returning later is never one keystroke from a run they did not set up in this session.
+
+Used in: `decisions.md` 2026-08-19
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -1346,7 +1358,7 @@ Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **conversational AI chat** &nbsp; 📦 *Product*
 
-The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. History is **RAM-only, dropped on lock** — no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default — but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
+The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history; a run's task was addressed to a different loop, under a scope this call knows nothing about. History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
 
 ### **streaming token channel** &nbsp; 📋 *Protocol*
 

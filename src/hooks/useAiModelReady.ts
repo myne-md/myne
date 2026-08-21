@@ -36,6 +36,38 @@ const CHECKING: AiSurfaceState = { kind: "checking" };
  * a `catch → unavailable` on top would re-introduce the conflation this hook
  * was rewritten to remove.
  */
+/**
+ * Which backend class is actually serving, or `null` while unasked.
+ *
+ * **The host's verdict, never the preference**, which is the whole reason this
+ * exists as a hook rather than a `prefs.ai_provider` read at the call site.
+ * `LocalInferenceState::active()` checks seven things and falls back to the
+ * local arm the moment any one fails; naming a provider satisfies one of them.
+ * A surface that attributes an answer, or states where the model runs, has to
+ * name what happened rather than what was intended (myne-md/myne#466,
+ * `decisions.md` 2026-08-13). `AiPanel` already derives its caption this way;
+ * this is the same derivation for the surfaces outside Settings.
+ */
+export function useAiBackendClass(enabled: boolean): string | null {
+  const [backendClass, setBackendClass] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setBackendClass(null);
+      return;
+    }
+    let cancelled = false;
+    void aiCapabilityReport().then((report) => {
+      if (!cancelled) setBackendClass(report.backendClass);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  return backendClass;
+}
+
 export function useAiSurfaceState(
   enabled: boolean,
   feature: AiFeature = "generation",
