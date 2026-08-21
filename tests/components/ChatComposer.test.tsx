@@ -127,10 +127,13 @@ describe("ChatComposer", () => {
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(agentStart).toHaveBeenCalled());
     expect(agentCapability).toHaveBeenCalledTimes(1);
-    expect(agentStart).toHaveBeenCalledWith("tidy the headings", {
-      kind: "notes",
-      value: ["n1"],
-    });
+    // The third argument is the open-channel callback the run reports its id
+    // through (myne-md/myne#544); the scope is what this test is about.
+    expect(agentStart).toHaveBeenCalledWith(
+      "tidy the headings",
+      { kind: "notes", value: ["n1"] },
+      expect.any(Function),
+    );
     expect(onSend).not.toHaveBeenCalled();
     // A second send reuses the verdict rather than paying for it again.
     type("and the lists");
@@ -155,10 +158,11 @@ describe("ChatComposer", () => {
     type("rename the concept");
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(agentStart).toHaveBeenCalled());
-    expect(agentStart).toHaveBeenCalledWith("rename the concept", {
-      kind: "folder",
-      value: "Projects",
-    });
+    expect(agentStart).toHaveBeenCalledWith(
+      "rename the concept",
+      { kind: "folder", value: "Projects" },
+      expect.any(Function),
+    );
   });
 
   it("says the size could not be checked rather than showing nothing", async () => {

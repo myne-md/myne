@@ -41,6 +41,14 @@ export interface AiCapabilityReport {
   embedding: AiFeatureStatus;
   transcription: AiFeatureStatus;
   autoTag: AiFeatureStatus;
+  /** Whether the vault's embedding index is BUILT, as distinct from whether an
+   *  embedding model exists at all (myne-md/myne#545).
+   *
+   *  `embedding` says asking can run; this says it can run now. The chat header
+   *  needs both, or "still indexing" and "ready" look identical and it shows
+   *  the provider's name — which reads as ready — for a surface that will
+   *  refuse every turn. */
+  indexReady: boolean;
 }
 
 const UNCOMPILED_FEATURE: AiFeatureStatus = { available: false, cause: null };
@@ -56,6 +64,7 @@ export const UNCOMPILED_REPORT: AiCapabilityReport = {
   embedding: UNCOMPILED_FEATURE,
   transcription: UNCOMPILED_FEATURE,
   autoTag: UNCOMPILED_FEATURE,
+  indexReady: false,
 };
 
 interface WireFeature {
@@ -95,6 +104,7 @@ export async function aiCapabilityReport(): Promise<AiCapabilityReport> {
       embedding: feature(raw.embedding),
       transcription: feature(raw.transcription),
       autoTag: feature(raw.auto_tag),
+      indexReady: raw.index_ready === true,
     };
   } catch {
     return UNCOMPILED_REPORT;

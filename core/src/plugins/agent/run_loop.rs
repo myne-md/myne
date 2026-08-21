@@ -29,12 +29,27 @@ use super::scope::ExclusionSource;
 use super::tools::{list_scope, read_note, search_scope, NoteReader, ScopeSearcher};
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// How many model round-trips one run may make before it stops on its own.
 ///
 /// A liveness backstop. See the module note on what it is not.
 pub const MAX_ITERATIONS: usize = 24;
+
+/// How many **barren** iterations in a row end the run.
+///
+/// A barren iteration is one that moved nothing: the reply parsed into no
+/// action at all, or into nothing but tool calls this run has already made. See
+/// [`LoopEnd::Stalled`] for why that is worth its own stop.
+///
+/// Three rather than one, because a single barren turn is a normal recovery:
+/// the loop tells the model its reply was unusable and the next turn is often
+/// fine. Three in a row is a model that cannot hold the format, and the run has
+/// then made three requests it will not use.
+///
+/// The same liveness-not-policy note as [`MAX_ITERATIONS`] applies: this bounds
+/// wasted work, it is not a cap on scope and it is not a spend cap.
+pub const MAX_BARREN_ITERATIONS: usize = 3;
 
 /// How many search hits one `search_scope` call returns to the model.
 const SEARCH_LIMIT: usize = 10;
@@ -59,6 +74,24 @@ pub enum LoopEnd {
     Cancelled,
     /// The iteration ceiling was reached.
     ExhaustedIterations,
+    /// The model stopped making progress: [`MAX_BARREN_ITERATIONS`] replies in
+    /// a row produced no action, or only tool calls the run had already made.
+    ///
+    /// **Distinct from [`LoopEnd::ExhaustedIterations`], and the difference is
+    /// what the user does next.** Exhausting the ceiling means the run was
+    /// working and ran out of room, so widening the scope or asking for less is
+    /// the answer. Stalling means the backend cannot hold the anchored format
+    /// at all, so a different model is. Reaching the ceiling by 24 barren turns
+    /// reported the first sentence for the second situation, and each of those
+    /// turns is a request that was paid for, sent, and thrown away.
+    Stalled {
+        /// How many barren iterations in a row ended it. Surfaced so the
+        /// sentence can say what happened rather than only that it happened.
+        /// A count, never any part of a reply: the model's text is
+        /// note-derived and has no place in a status value.
+        #[serde(rename = "barrenIterations")]
+        barren_iterations: usize,
+    },
 }
 
 /// What one loop invocation produced.
@@ -123,6 +156,20 @@ pub async fn drive(
     // what keeps "nothing was transmitted" and "a transmission carried nothing"
     // separable at the surface.
     let mut chars_off_device: Option<usize> = None;
+    // **What this run has already asked for**, one signature per tool call, so
+    // a repeat can be told from a first ask. A model looping on `list_scope`
+    // learns nothing new on the second call and the loop has no way to notice
+    // that from the reply alone; the signature is how it notices.
+    //
+    // Signatures, not results: two `search_scope` calls with the same query are
+    // the same ask whatever they return, and holding the results would mean
+    // keeping note-derived text alive for the length of the run to answer a
+    // liveness question.
+    let mut asked: BTreeSet<String> = BTreeSet::new();
+    // Barren iterations SINCE THE LAST PRODUCTIVE ONE. Reset rather than
+    // cumulative: a run that recovers has not stalled, and counting every
+    // barren turn of a long healthy run would end it for being slow.
+    let mut barren = 0usize;
 
     loop {
         if runs.is_cancelled(run_id)? {
@@ -171,14 +218,25 @@ pub async fn drive(
         if actions.is_empty() {
             // Nothing usable came back. Say so in the transcript and let the
             // next iteration try, rather than failing the run on one bad reply.
+            //
+            // **No `continue` here.** The barren check at the bottom of the
+            // iteration is what ends a run whose model cannot hold the format,
+            // and skipping to the next turn skipped it: an empty parse is the
+            // most barren turn there is, and it was the one turn that never
+            // reached the counter. `actions` is empty, so the loop below runs
+            // zero times and the fall-through costs nothing.
             transcript.push(Message {
                 role: Role::User,
                 content: vec![Content::Trusted(
                     "No valid action found. Reply with one JSON action per line.".into(),
                 )],
             });
-            continue;
         }
+
+        // Whether this iteration moved anything: a tool call this run had not
+        // made before, or something added to the proposal. Set inside the loop
+        // below and read at the bottom of the iteration.
+        let mut productive = false;
 
         for action in actions {
             // Re-check between actions: a lock landing mid-iteration must not
@@ -194,6 +252,7 @@ pub async fn drive(
             }
             match action {
                 AgentAction::ListScope => {
+                    productive |= asked.insert("list_scope".to_string());
                     let entries = list_scope(runs, run_id, deps.records, deps.exclusions).await?;
                     let rendered = entries
                         .iter()
@@ -213,6 +272,10 @@ pub async fn drive(
                     });
                 }
                 AgentAction::ReadNote { note_id } => {
+                    // The signature covers the refusal arms too: a note outside
+                    // the scope answers the same sentence every time, so asking
+                    // twice is as barren as reading the same note twice.
+                    productive |= asked.insert(format!("read_note:{note_id}"));
                     match read_note(runs, run_id, &note_id, deps.reader, deps.exclusions).await {
                         Ok(body) => {
                             notes_read += 1;
@@ -266,6 +329,7 @@ pub async fn drive(
                     }
                 }
                 AgentAction::SearchScope { query } => {
+                    productive |= asked.insert(format!("search_scope:{query}"));
                     let hits = search_scope(
                         runs,
                         run_id,
@@ -296,6 +360,10 @@ pub async fn drive(
                     // told, and can correct itself, instead of the user seeing
                     // an edit that was always going to be refused.
                     if !runs.contains(run_id, &note_id)? {
+                        // Refusing the same out-of-scope note again teaches the
+                        // model nothing it was not already told, so only the
+                        // first refusal counts as movement.
+                        productive |= asked.insert(format!("propose_edit_refused:{note_id}"));
                         transcript.push(Message {
                             role: Role::User,
                             // Same split as the read refusal above.
@@ -309,6 +377,12 @@ pub async fn drive(
                         });
                         continue;
                     }
+                    // Something reached the proposal, which is the run's whole
+                    // output. Unconditionally productive: an edit the user will
+                    // see on the review screen is progress even if the model
+                    // then repeats itself, and the review screen is where a
+                    // duplicate is judged, not here.
+                    productive = true;
                     proposal.edits.push(ProposedEdit {
                         note_id,
                         anchor,
@@ -320,6 +394,8 @@ pub async fn drive(
                     body,
                     folder,
                 } => {
+                    // Same as the edit arm above: it reached the proposal.
+                    productive = true;
                     proposal.new_notes.push(ProposedNote {
                         title,
                         body,
@@ -345,6 +421,30 @@ pub async fn drive(
                         chars_off_device,
                     });
                 }
+            }
+        }
+
+        // **The barren check, at the bottom of every iteration.** A run that
+        // moved nothing this turn has one more strike; a run that moved
+        // something has none. Both halves matter: without the reset a long
+        // healthy run would end for having had three scattered bad turns, and
+        // without the increment the only stop left is the 24-iteration ceiling,
+        // which is 24 provider requests spent on a model that answered the
+        // first three unusably.
+        if productive {
+            barren = 0;
+        } else {
+            barren += 1;
+            if barren >= MAX_BARREN_ITERATIONS {
+                return Ok(LoopOutcome {
+                    proposal,
+                    end: LoopEnd::Stalled {
+                        barren_iterations: barren,
+                    },
+                    iterations,
+                    notes_read,
+                    chars_off_device,
+                });
             }
         }
     }
@@ -635,7 +735,17 @@ mod tests {
         };
         // Empty script means the stub's fallback "finish" fires, so drive a
         // never-finishing engine explicitly.
-        struct Forever;
+        //
+        // **Each turn asks something NEW**, and that is the point of the test
+        // rather than a detail of it: a model repeating one tool call now stops
+        // on `LoopEnd::Stalled` three turns in, so a `list_scope` on every turn
+        // would no longer reach the ceiling and this test would silently be
+        // testing the stall instead. A fresh query per turn is a run that is
+        // genuinely working and genuinely never finishing, which is the only
+        // shape the ceiling exists for.
+        struct Forever {
+            turn: Mutex<usize>,
+        }
         #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
         #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
         impl AgentEngine for Forever {
@@ -644,16 +754,21 @@ mod tests {
                 _c: AgentRequestClass,
                 _r: &AgentRequest,
             ) -> Result<AgentCompletion, AgentError> {
+                let mut turn = self.turn.lock().unwrap();
+                *turn += 1;
                 Ok(AgentCompletion {
-                    reply: r#"{"action":"list_scope"}"#.to_string(),
+                    reply: format!(r#"{{"action":"search_scope","query":"q{turn}"}}"#),
                     chars_off_device: None,
                 })
             }
         }
         let recs = records();
+        let forever = Forever {
+            turn: Mutex::new(0),
+        };
         let d = LoopDeps {
             exclusions: &*NO_EXCL,
-            engine: &Forever,
+            engine: &forever,
             reader: &Reader,
             searcher: &Searcher,
             records: &recs,
@@ -663,6 +778,86 @@ mod tests {
         assert_eq!(out.end, LoopEnd::ExhaustedIterations);
         assert_eq!(out.iterations, MAX_ITERATIONS);
         drop(engine);
+    }
+
+    #[test]
+    fn three_barren_replies_in_a_row_stall_the_run() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        // Prose, three times. Each one parses into nothing, so each one is as
+        // barren as an iteration gets. The fourth reply would finish the run,
+        // and the assertion that it never ran is the whole point: the stop has
+        // to fire before it.
+        let engine = ScriptEngine::new(&[
+            "I am not going to do that",
+            "Still not doing it",
+            "Nor now",
+            r#"{"action":"finish","summary":"never reached"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert_eq!(
+            out.end,
+            LoopEnd::Stalled {
+                barren_iterations: MAX_BARREN_ITERATIONS
+            }
+        );
+        assert_eq!(
+            out.iterations, MAX_BARREN_ITERATIONS,
+            "it stops at the third unusable reply, not at the 24-iteration ceiling"
+        );
+    }
+
+    #[test]
+    fn a_model_repeating_one_tool_call_stalls_rather_than_burning_the_ceiling() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        // Every reply parses, and every reply asks for something this run
+        // already has. That is the failure the empty-reply counter alone would
+        // miss: the actions are valid, so `actions.is_empty()` is false every
+        // time, and nothing else notices that the run is standing still.
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"list_scope"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert_eq!(
+            out.end,
+            LoopEnd::Stalled {
+                barren_iterations: MAX_BARREN_ITERATIONS
+            }
+        );
+        // The FIRST list_scope was new information, so it is not barren: the
+        // three that stalled the run are the repeats after it.
+        assert_eq!(out.iterations, MAX_BARREN_ITERATIONS + 1);
+    }
+
+    #[test]
+    fn a_productive_turn_resets_the_barren_counter() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        // Two barren turns, then real work, then two more barren turns, then a
+        // finish. Nine barren turns in total across the run and never three in
+        // a row, so the run must survive to its own ending.
+        let engine = ScriptEngine::new(&[
+            "nope",
+            "still nope",
+            r#"{"action":"read_note","note_id":"a"}"#,
+            "nope again",
+            "and again",
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert_eq!(out.end, LoopEnd::Finished);
+        assert_eq!(out.iterations, 6);
+        assert_eq!(out.notes_read, 1);
     }
 
     #[test]

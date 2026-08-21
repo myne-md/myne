@@ -83,11 +83,15 @@ describe("AgentReviewTakeover", () => {
 
   // The other direction, so the gate cannot pass by refusing everything. Each
   // of these leaves a proposal the user is entitled to see, including a partial
-  // one, which is why `cancelled` and `exhaustedIterations` are here too.
+  // one, which is why `cancelled`, `exhaustedIterations` and `stalled` are here
+  // too. A stalled run in particular can carry edits: it proposed something and
+  // then went round in circles, and hiding those would throw away work the user
+  // paid a provider for.
   for (const end of [
     { kind: "finished" } as const,
     { kind: "cancelled" } as const,
     { kind: "exhaustedIterations" } as const,
+    { kind: "stalled", barrenIterations: 3 } as const,
   ]) {
     it(`takes over when the run ended ${end.kind}`, () => {
       beginRun();

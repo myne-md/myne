@@ -48,7 +48,8 @@ export type AgentTurnEnd =
   | "finished"
   | "awaitingScope"
   | "cancelled"
-  | "exhaustedIterations";
+  | "exhaustedIterations"
+  | "stalled";
 
 /** What an agent turn keeps once its run is no longer the open one.
  *

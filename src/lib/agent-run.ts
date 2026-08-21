@@ -15,7 +15,7 @@
 // table and the transcript on teardown, so a proposal the user never approved
 // simply ceases to exist.
 
-import { invoke } from "../platform/core";
+import { Channel, invoke } from "../platform/core";
 
 /** What the user approved as a scope. Mirrors the Rust `ScopeGrant`.
  *
@@ -70,7 +70,12 @@ export type LoopEnd =
   | { kind: "finished" }
   | { kind: "awaitingScope"; folder: string; reason: string }
   | { kind: "cancelled" }
-  | { kind: "exhaustedIterations" };
+  | { kind: "exhaustedIterations" }
+  /** The model stopped making progress: three replies in a row produced no
+   *  action, or only tool calls the run had already made. A different end from
+   *  `exhaustedIterations` because the user's next move is different — a model
+   *  that cannot hold the format, rather than a run that ran out of room. */
+  | { kind: "stalled"; barrenIterations: number };
 
 /** What a start or a resume produced. */
 export interface AgentStepResult {
@@ -185,10 +190,21 @@ export interface ProbeVerdict {
 export async function agentStart(
   task: string,
   grant: ScopeGrant,
+  /** Called with the run's view as soon as the host has created it, which is
+   *  long before this promise resolves.
+   *
+   *  A run's first leg used to be unaddressable: this call returns only when
+   *  the loop has stopped, and its reply was the only thing that ever carried a
+   *  run id, so for minutes the surface had a `running` run with no id, no
+   *  scope total and no Stop (myne-md/myne#544). */
+  onOpen?: (view: AgentRunView) => void,
 ): Promise<AgentStepResult> {
+  const channel = new Channel<AgentRunView>();
+  if (onOpen !== undefined) channel.onmessage = onOpen;
   return await invoke<AgentStepResult>("plugin:agent|agent_start", {
     task,
     grant,
+    onOpen: channel,
   });
 }
 

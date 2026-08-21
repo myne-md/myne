@@ -188,6 +188,15 @@ aiDescribe("ag2 the running scope total is continuously visible", () => {
         // On the review screen. This is the number that bounds accumulation, and
         // the design carries no cap, so its absence is a real regression rather
         // than a cosmetic one.
+        //
+        // **This scenario covers the run once it has settled, not its first
+        // leg**, and the difference used to be the whole gap: the surface got a
+        // run id only from the step's reply, so during the run itself there was
+        // no strip, no total and no Stop (myne-md/myne#544). The stub answers in
+        // milliseconds, so racing the strip here would be a flake rather than a
+        // check; the first-leg half is pinned where it can be driven directly,
+        // in `tests/notes/agentRunOpen.test.ts` and in
+        // `plugins::agent::commands::tests::the_run_view_is_sent_before_the_loop_is_driven`.
         const total = await (await s.byTestId("agentReview.scopeTotal")).textContent();
         expect(total.length).toBeGreaterThan(0);
         expect(total).toMatch(/\d/);

@@ -45,6 +45,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
+use tauri::ipc::Channel;
 use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroize;
 
@@ -705,6 +706,7 @@ pub async fn agent_start<R: Runtime>(
     app: AppHandle<R>,
     task: String,
     grant: ScopeGrant,
+    on_open: Channel<AgentRunView>,
     runs: State<'_, Arc<AgentRunState>>,
     sessions: State<'_, AgentSessionState>,
     indices: State<'_, VaultIndicesState>,
@@ -751,6 +753,25 @@ pub async fn agent_start<R: Runtime>(
                 ..Default::default()
             },
         );
+    // **Before the loop, not after it.** This command returns once the loop has
+    // stopped, which on a remote provider is minutes, and until myne-md/myne#544
+    // that return was the only thing that ever handed the surface a run id. So
+    // for the whole first leg the run was `running` with no id: no status, no
+    // running scope total, and no Stop, on a run that is at that moment sending
+    // note text to a provider. `AgentProgress`'s own module note says the scope
+    // total "is shown continuously"; this is what makes that true.
+    //
+    // A channel rather than a second command, because the id has to arrive
+    // DURING this call, and rather than an event, because a channel is an
+    // ordinary parameter: no new command, no capability ACL change, and the
+    // same shape `chat_stream` already uses for its tokens.
+    //
+    // A send that fails is ignored on purpose: a closed channel means the
+    // surface let go of this run, and the run is unaffected either way.
+    if let Ok(view) = runs.view(&run_id) {
+        let _ = on_open.send(view);
+    }
+
     step(
         app,
         run_id,
@@ -1070,6 +1091,40 @@ pub async fn agent_capability<R: Runtime>(
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    // ---- the run id reaches the surface before the loop runs -------------
+
+    /// `agent_start` sends the run's view BEFORE it drives the loop.
+    ///
+    /// The ordering is the entire fix (myne-md/myne#544): this command returns
+    /// when the loop has stopped, so a send placed after `step(...)` would be
+    /// indistinguishable from the return value it already had, and the first
+    /// leg would stay a `running` run with no id, no scope total and no Stop.
+    ///
+    /// Read off the source, which is unusual and is the honest option here: the
+    /// command needs an `AppHandle`, a `Channel` and five `State`s, none of
+    /// which a unit test can build, so the alternative is not a better test but
+    /// no test. Both anchors are asserted to exist first, so a rename fails by
+    /// name rather than passing on a string this can no longer find.
+    #[test]
+    fn the_run_view_is_sent_before_the_loop_is_driven() {
+        let src = include_str!("commands.rs");
+        let start = src
+            .find("pub async fn agent_start<R: Runtime>")
+            .expect("agent_start is still named that");
+        let body = &src[start..];
+        let send = body
+            .find("on_open.send(view)")
+            .expect("agent_start still sends the view through the open channel");
+        let drive = body
+            .find("    step(")
+            .expect("agent_start still drives a step");
+        assert!(
+            send < drive,
+            "the view must be sent before the loop is driven, or the first leg \
+             has no id again and nothing can cancel it"
+        );
+    }
 
     // ---- the compiled-in probe threshold --------------------------------
 

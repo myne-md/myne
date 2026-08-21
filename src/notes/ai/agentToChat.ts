@@ -36,6 +36,7 @@ import {
   currentRunEpoch,
   failRun,
   getAgent,
+  openRun,
   settleStep,
 } from "../agent/agentStore";
 import { failAgentTurn, sendAgentTurn, settleAgentTurn } from "./chatStore";
@@ -102,7 +103,15 @@ export async function startAgentRun(
   // comes back rather than being raced by it.
   const epoch = currentRunEpoch();
   try {
-    settleRunIntoChat(await agentStart(task, grant), epoch);
+    settleRunIntoChat(
+      await agentStart(task, grant, (view) => {
+        // The run has an id now, minutes before this call resolves. Same epoch
+        // as the settle below, so a run the user let go of mid-flight cannot
+        // mount a progress strip for itself behind them.
+        openRun(view, epoch);
+      }),
+      epoch,
+    );
   } catch {
     // **The same epoch check the success path gets, spelled out.** On the
     // success path it is transitive: `settleRunIntoChat` returns early when

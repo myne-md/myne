@@ -7,10 +7,15 @@
 //! something nobody designed, and guessing what it meant is how a fourth
 //! capability arrives without a decision.
 //!
-//! Actions are one JSON object per line. Line-delimited rather than one JSON
-//! document because a truncated or trailing-prose reply then costs the actions
-//! after the break rather than all of them, which is the common failure on a
-//! small local model.
+//! The model is ASKED for one JSON object per line, and a stream of objects
+//! rather than one JSON document, because a truncated or trailing-prose reply
+//! then costs the actions after the break rather than all of them, which is the
+//! common failure on a small local model.
+//!
+//! What is READ is a shade wider than what is asked for: an object may span
+//! lines, since a backend that pretty-prints its JSON is answering the question
+//! correctly in a shape the first parser could not see at all. See
+//! [`parse_actions`] for where the tolerance stops.
 
 use super::edit::ProposedEdit;
 use super::engine::{AgentRequest, Content, Message, Role};
@@ -122,18 +127,95 @@ pub fn build_request(task: &str, transcript: &[Message]) -> AgentRequest {
 
 /// Parse the model's reply into actions.
 ///
-/// Unparseable lines are skipped rather than failing the whole reply, because a
+/// Unparseable input is skipped rather than failing the whole reply, because a
 /// small model routinely emits a sentence of prose alongside its JSON and
 /// discarding the valid actions with it would make the feature unusable. An
 /// object that parses but names an unknown action is skipped by the same rule:
 /// serde rejects it, and nothing here invents a meaning for it.
+///
+/// **An object may span lines.** This used to require a line that, trimmed, was
+/// itself a whole JSON object, which is what the instructions ask for and is
+/// not what every backend does: a model that pretty-prints its JSON produced
+/// ZERO actions from a perfectly good reply, every turn, and the loop's only
+/// stop was the 24-iteration ceiling (myne-md/myne#543). So the scan is
+/// brace-balanced instead, and the tolerance is deliberately narrow in two
+/// ways. An object may only START where a line starts, so an unbalanced `{` in
+/// the middle of a sentence cannot swallow the real action after it. And the
+/// vocabulary is untouched: this accepts a different SHAPE, never a verb
+/// `AgentAction` does not name.
+///
+/// The truncation property the line scan had is kept, and for the same reason:
+/// an object that never closes costs the actions after the break rather than
+/// all of them, because everything before it has already been collected.
 pub fn parse_actions(reply: &str) -> Vec<AgentAction> {
-    reply
-        .lines()
-        .map(str::trim)
-        .filter(|l| l.starts_with('{'))
-        .filter_map(|l| serde_json::from_str::<AgentAction>(l).ok())
-        .collect()
+    let mut out = Vec::new();
+    let mut rest = reply;
+    while let Some(start) = next_object_start(rest) {
+        let candidate = &rest[start..];
+        let Some(end) = object_end(candidate) else {
+            // Unbalanced from here on: a truncated reply, or prose that opened
+            // a brace and never closed it. Nothing after it can be read.
+            break;
+        };
+        if let Ok(action) = serde_json::from_str::<AgentAction>(&candidate[..end]) {
+            out.push(action);
+        }
+        rest = &candidate[end..];
+    }
+    out
+}
+
+/// Byte offset of the next `{` that begins a line (leading whitespace aside).
+///
+/// The line anchor is the whole safety of the brace scan: prose is full of
+/// braces, and one of them opening a scan that then eats the next real action
+/// is a worse failure than not reading the pretty-printed object at all.
+fn next_object_start(s: &str) -> Option<usize> {
+    let mut offset = 0usize;
+    for line in s.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('{') {
+            return Some(offset + (line.len() - trimmed.len()));
+        }
+        offset += line.len();
+    }
+    None
+}
+
+/// Byte offset one past the `}` that closes the object `s` starts with, or
+/// `None` when it never closes.
+///
+/// String-aware, because a JSON value legitimately contains braces: an anchor
+/// copied out of a note can be `if (x) {`, and counting that brace would leave
+/// the scan looking for a close that is not coming.
+fn object_end(s: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (i, c) in s.char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match c {
+            '"' => in_string = true,
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(i + c.len_utf8());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -203,6 +285,83 @@ mod tests {
     #[test]
     fn a_truncated_reply_keeps_the_lines_before_the_break() {
         let reply = "{\"action\":\"list_scope\"}\n{\"action\":\"read_no";
+        assert_eq!(parse_actions(reply), vec![AgentAction::ListScope]);
+    }
+
+    #[test]
+    fn a_pretty_printed_object_is_read_rather_than_ignored() {
+        // The shape that produced zero actions every turn and left the loop
+        // spinning to its ceiling (myne-md/myne#543).
+        let reply = "{\n  \"action\": \"read_note\",\n  \"note_id\": \"n1\"\n}";
+        assert_eq!(
+            parse_actions(reply),
+            vec![AgentAction::ReadNote {
+                note_id: "n1".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn a_fenced_pretty_printed_object_is_read_too() {
+        let reply = "```json\n{\n  \"action\": \"list_scope\"\n}\n```";
+        assert_eq!(parse_actions(reply), vec![AgentAction::ListScope]);
+    }
+
+    #[test]
+    fn several_pretty_printed_objects_all_come_back() {
+        let reply = concat!(
+            "{\n  \"action\": \"list_scope\"\n}\n",
+            "{\n  \"action\": \"read_note\",\n  \"note_id\": \"n1\"\n}\n",
+        );
+        assert_eq!(
+            parse_actions(reply),
+            vec![
+                AgentAction::ListScope,
+                AgentAction::ReadNote {
+                    note_id: "n1".into()
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn a_truncated_pretty_printed_object_keeps_the_ones_before_it() {
+        let reply = concat!(
+            "{\n  \"action\": \"list_scope\"\n}\n",
+            "{\n  \"action\": \"read_note\",\n  \"note_id\": \"n",
+        );
+        assert_eq!(parse_actions(reply), vec![AgentAction::ListScope]);
+    }
+
+    #[test]
+    fn a_brace_inside_a_value_does_not_end_the_object() {
+        // An anchor is text copied verbatim out of a note, so it can contain
+        // anything, braces included. Counting one would leave the scan hunting
+        // for a close that never comes and drop a valid edit.
+        let reply = concat!(
+            "{\n",
+            "  \"action\": \"propose_edit\",\n",
+            "  \"note_id\": \"n1\",\n",
+            "  \"anchor\": \"if (x) {\",\n",
+            "  \"replacement\": \"if (y) {\"\n",
+            "}\n"
+        );
+        assert_eq!(
+            parse_actions(reply),
+            vec![AgentAction::ProposeEdit {
+                note_id: "n1".into(),
+                anchor: "if (x) {".into(),
+                replacement: "if (y) {".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_unbalanced_brace_mid_sentence_does_not_swallow_the_action_after_it() {
+        // The reason the scan may only START at a line start. Without that
+        // anchor the prose brace opens an object that closes on the action's
+        // own `}`, and the whole reply parses to nothing.
+        let reply = "Here is my plan { and then\n{\"action\":\"list_scope\"}";
         assert_eq!(parse_actions(reply), vec![AgentAction::ListScope]);
     }
 

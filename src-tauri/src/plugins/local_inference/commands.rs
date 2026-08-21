@@ -214,6 +214,16 @@ pub struct AiCapabilityReport {
     pub embedding: FeatureStatus,
     pub transcription: FeatureStatus,
     pub auto_tag: FeatureStatus,
+    /// Whether the vault's embedding index is BUILT, as distinct from whether
+    /// an embedding model exists (myne-md/myne#545).
+    ///
+    /// Two facts, and the chat header needs both: `embedding` says the feature
+    /// can run at all, this says it can run *now*. Without it the header had no
+    /// way to tell "still indexing" from "ready", so it showed the provider's
+    /// name — which reads as ready — for a surface that would refuse every turn,
+    /// and the "Preparing…" state the user guide documents was unreachable in
+    /// production.
+    pub index_ready: bool,
 }
 
 /// Build the report from resolved values — no `AppHandle`, so it is testable.
@@ -222,6 +232,7 @@ pub(super) fn capability_report_from(
     generation_model: bool,
     embedding_model: bool,
     transcription_model: bool,
+    index_ready: bool,
 ) -> AiCapabilityReport {
     // Generation and transcription are user-initiated; embedding and auto-tag
     // carry the SYNC-14/16 bars, so ask the seam rather than re-deriving them
@@ -292,6 +303,7 @@ pub(super) fn capability_report_from(
         embedding,
         transcription,
         auto_tag,
+        index_ready,
     }
 }
 
@@ -302,6 +314,7 @@ pub(super) fn capability_report_from(
 pub async fn ai_capability_report<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, LocalInferenceState>,
+    vector_state: State<'_, LocalInferenceVectorState>,
 ) -> Result<AiCapabilityReport, EngineError> {
     // The report describes the selection as it is NOW, so it refreshes like
     // every other surface that can route remote — #191 task 1 reads this to
@@ -329,7 +342,53 @@ pub async fn ai_capability_report<R: Runtime>(
         has(ModelRole::Generation),
         has(ModelRole::Embedding),
         transcription_model,
+        // The same flag `chat_stream` and `ask` gate on, read through the same
+        // lock. A header derived from anything else would be a second opinion
+        // about whether asking can answer.
+        vector_state.lock().is_enabled(),
     ))
+}
+
+/// Why a retrieval-grounded turn cannot run when the vector store is off.
+///
+/// Two states wearing one refusal until myne-md/myne#545: Ask is grounded on
+/// the embedding index, that index is refused a remote provider outright
+/// (SYNC-16), and the embedding model is not bundled. So a user with a working
+/// provider and no local search model was told to "pick a model, or name a
+/// provider", which is the one thing they had already done — and no amount of
+/// provider configuration was ever going to help, because the missing piece is
+/// on the other side of a bar that exists on purpose.
+///
+/// Reads the same two facts `capability_report_from`'s embedding row reads, in
+/// the same order, so the sentence the user is shown and the chip in the chat
+/// header cannot disagree: is a local embedding model selected, or does the
+/// active local arm carry its own weights.
+fn retrieval_refusal<R: Runtime>(app: &AppHandle<R>, state: &LocalInferenceState) -> EngineError {
+    let base = crate::paths::app_data_dir(app).unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let selected = model_store::selected_model(&base, ModelRole::Embedding)
+        .ok()
+        .flatten()
+        .is_some();
+    // `embedding_engine()` is the SYNC-16 door: on a remote backend it hands
+    // back the local arm, and errors only when there is no local arm at all.
+    // Either way, a model that cannot be reached is a model that is not there.
+    let carries_own = state
+        .embedding_engine()
+        .map(|e| e.carries_own_models())
+        .unwrap_or(false);
+    retrieval_refusal_from(selected, carries_own)
+}
+
+/// The decision itself, split from its two host reads so it is testable — the
+/// same split `capability_report_from` uses one screen up, and for the same
+/// reason: the command that would exercise this takes an `AppHandle`, five
+/// `State`s and a `Channel`, none of which a unit test can build.
+pub(super) fn retrieval_refusal_from(selected: bool, carries_own: bool) -> EngineError {
+    if selected || carries_own {
+        EngineError::IndexNotReady
+    } else {
+        EngineError::NoEmbeddingModel
+    }
 }
 
 /// The models the **named remote provider** currently publishes (myne#415
@@ -935,11 +994,16 @@ pub async fn ask<R: Runtime>(
     let hits = {
         let store = vector_state.lock();
         if !store.is_enabled() {
-            return Ok(AskResult {
-                answer: String::new(),
-                sources: Vec::new(),
-                served_by: served_by_of(&engine_state),
-            });
+            // **A typed refusal, not an empty answer** — the correction
+            // `chat_stream` already carries (myne-md/myne#466), applied to the
+            // other retrieval-grounded command. An empty successful turn renders
+            // "No answer — try rephrasing", so a user whose index is not built
+            // was told their WORDING was the problem and rewording could never
+            // fix it. Which refusal is `retrieval_refusal`'s call
+            // (myne-md/myne#545): no local search model is a different next step
+            // from an index that is still being built.
+            drop(store);
+            return Err(retrieval_refusal(&app, &engine_state));
         }
         retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
     };
@@ -1113,7 +1177,7 @@ pub async fn chat_stream<R: Runtime>(
     //    check and the scan, which is what makes "enabled" true for the
     //    retrieval that follows. This one is an early exit, not a replacement.
     if !vector_state.lock().is_enabled() {
-        return Err(EngineError::NotReady);
+        return Err(retrieval_refusal(&app, &engine_state));
     }
 
     // 1. Embed the question off the async thread.
@@ -1140,7 +1204,11 @@ pub async fn chat_stream<R: Runtime>(
     let hits = {
         let store = vector_state.lock();
         if !store.is_enabled() {
-            return Err(EngineError::NotReady);
+            // Resolved outside the guard would be tidier and would be wrong:
+            // the lock is what makes "enabled" true for the scan below, and
+            // this arm is the one where it is not.
+            drop(store);
+            return Err(retrieval_refusal(&app, &engine_state));
         }
         retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
     };
@@ -1560,6 +1628,44 @@ fn unwrap_join<T>(
 mod tests {
     use super::super::engine::{StubEngine, STUB_EMBED_DIM};
     use super::*;
+
+    /// The two states the one `NotReady` refusal used to cover
+    /// (myne-md/myne#545), and the reason splitting them matters: each names a
+    /// different next step, and the sentence the user got named neither.
+    #[test]
+    fn a_retrieval_refusal_separates_no_model_from_an_index_still_building() {
+        // Nothing selected and no arm carrying its own weights: asking can
+        // never run here, and naming another provider will not change that.
+        assert_eq!(
+            retrieval_refusal_from(false, false),
+            EngineError::NoEmbeddingModel
+        );
+        // A model IS selected, so the index is a matter of time.
+        assert_eq!(
+            retrieval_refusal_from(true, false),
+            EngineError::IndexNotReady
+        );
+        // …and an arm that brings its own weights counts as having one, which
+        // is the case a disk check alone gets wrong: the E2E stub answers every
+        // role from code with no file anywhere.
+        assert_eq!(
+            retrieval_refusal_from(false, true),
+            EngineError::IndexNotReady
+        );
+    }
+
+    /// The refusals stay content-free and keep their own tags, which is what
+    /// the frontend narrows on. A tag collision here would render one state's
+    /// sentence for the other with nothing failing.
+    #[test]
+    fn the_two_retrieval_refusals_carry_distinct_tags() {
+        assert_eq!(EngineError::NoEmbeddingModel.kind(), "no_embedding_model");
+        assert_eq!(EngineError::IndexNotReady.kind(), "index_not_ready");
+        assert_ne!(
+            EngineError::NoEmbeddingModel.kind(),
+            EngineError::NotReady.kind()
+        );
+    }
 
     /// A manual current-thread runtime — `spawn_blocking` works on it, and this
     /// avoids adding tokio's `macros` feature just for `#[tokio::test]`.

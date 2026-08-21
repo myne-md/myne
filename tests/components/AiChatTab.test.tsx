@@ -23,9 +23,18 @@ let surfaceState: { kind: string; cause?: string | null } = { kind: "available" 
 // purpose: naming a provider and having one answer are different facts, and the
 // surface must render the second (myne-md/myne#466).
 let backendClass: string | null = "in_process_local";
+// Whether ASKING can answer, which is a second capability the header reads
+// (myne-md/myne#545): retrieval is refused a remote provider outright, and the
+// embedding model is not bundled, so a working provider says nothing about
+// whether a question can be grounded.
+let retrievalState: { embedding: { kind: string }; indexReady: boolean } = {
+  embedding: { kind: "available" },
+  indexReady: true,
+};
 vi.mock("../../src/hooks/useAiModelReady", () => ({
   useAiSurfaceState: () => surfaceState,
   useAiBackendClass: () => backendClass,
+  useAiRetrievalState: () => retrievalState,
 }));
 
 // The agent bindings the folded-in surfaces reach for. Stubbed rather than left
@@ -92,6 +101,7 @@ beforeEach(() => {
   aiProvider = null;
   backendClass = "in_process_local";
   surfaceState = { kind: "available" };
+  retrievalState = { embedding: { kind: "available" }, indexReady: true };
   __resetChatForTest();
   clearAgent();
   agentLastRun.mockReset().mockResolvedValue(null);
@@ -130,6 +140,44 @@ describe("AiChatTab", () => {
     expect(screen.getByTestId("ai.chrome-status").getAttribute("data-ai-enabled")).toBe(
       "false",
     );
+  });
+
+  // myne-md/myne#545. The header used to read the GENERATION row only, so a
+  // configuration where asking can never answer rendered the provider's name,
+  // which reads as ready. The three states below are what it reads now.
+  describe("what the header says about asking", () => {
+    it("says no search model when retrieval cannot run at all", () => {
+      // The reported configuration: a provider named and working, and no local
+      // embedding model. Retrieval is refused a provider outright (SYNC-16), so
+      // no provider setting can make asking work here.
+      aiProvider = "openrouter";
+      backendClass = "remote";
+      retrievalState = { embedding: { kind: "unavailable" }, indexReady: false };
+      render(<AiChatTab />);
+      const chip = screen.getByTestId("ai.chrome-status").textContent ?? "";
+      expect(chip).toContain("aiChat.statusNoSearchModel");
+      expect(chip).not.toContain("OpenRouter");
+    });
+
+    it("says it is preparing while the index is still being built", () => {
+      // A state the guide documents and production could not reach: the
+      // `gettingReady` prop had no caller, so its `false` default always won.
+      retrievalState = { embedding: { kind: "available" }, indexReady: false };
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.chrome-status").textContent).toContain(
+        "aiChat.statusGettingReady",
+      );
+    });
+
+    it("goes back to naming the backend once retrieval is ready", () => {
+      aiProvider = "openrouter";
+      backendClass = "remote";
+      retrievalState = { embedding: { kind: "available" }, indexReady: true };
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.chrome-status").textContent).toContain(
+        "OpenRouter",
+      );
+    });
   });
 
   describe("conversational transcript + composer", () => {

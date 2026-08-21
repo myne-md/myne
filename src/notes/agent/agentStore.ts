@@ -153,6 +153,29 @@ export function beginRun(): void {
   });
 }
 
+/** The host created the run, and said so while it is still working.
+ *
+ *  `beginRun()` nulls `view`, and before myne-md/myne#544 only a settled step
+ *  set it — so for the whole first leg the run was `running` with no id, which
+ *  is the state `clearAgent`'s note below describes and the state
+ *  `AgentProgress` cannot render at all. This is that gap closed: the strip
+ *  mounts, the running scope total is shown (which its own module note says is
+ *  continuous), and Stop has an id to send.
+ *
+ *  `running` deliberately stays true: this is not a step settling, it is the
+ *  same step reporting that it started. Returns whether it was applied, and
+ *  takes the epoch for the reason `settleStep` states in full — a run the user
+ *  let go of mid-flight must not repopulate the store behind them.
+ *
+ *  **Required epoch, never defaulted.** A default would compare the current
+ *  epoch to itself and pass unconditionally, which is the opt-in-guard shape
+ *  the root `CLAUDE.md` records. */
+export function openRun(view: AgentRunView, epoch: number): boolean {
+  if (epoch !== runEpoch) return false;
+  set({ view });
+  return true;
+}
+
 /** A step came back.
  *
  *  `epoch` is what the caller captured before it awaited the host. A step whose
@@ -344,9 +367,11 @@ export function setUndoable(run: AppliedRun | null, epoch: number): void {
  *  different vault's. */
 export function clearAgent(): void {
   // **Letting go of a run invalidates its in-flight step, and this is the case
-  // that needs it most.** `beginRun()` nulls `view`, and only a settled step
-  // sets it, so for the whole first leg a run is `running` with no id: nothing
-  // can cancel it host-side, and without this bump the reply landed afterwards,
+  // that needs it most.** `beginRun()` nulls `view`, and until myne-md/myne#544
+  // only a settled step set it, so for the whole first leg a run was `running`
+  // with no id: nothing could cancel it host-side. `openRun` closes that window
+  // to the first channel message, and the epoch bump is still what covers the
+  // rest — without it the reply landed afterwards,
   // repopulated `proposal.edits` with its verbatim anchors, and made
   // `AgentReviewTakeover`'s derived `reviewable` true, opening a full-screen
   // review of a conversation the user had just deleted.

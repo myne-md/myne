@@ -58,6 +58,8 @@ export function endStatusLabel(
       return t("agent.progress.cancelled");
     case "exhaustedIterations":
       return t("agent.progress.exhausted");
+    case "stalled":
+      return t("agent.progress.stalled");
     case "finished":
     case undefined:
       return t("agent.progress.done");

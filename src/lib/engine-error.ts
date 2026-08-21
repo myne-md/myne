@@ -63,6 +63,14 @@ export type ProviderErrorCause =
   | "empty_completion"
   | "local_model_missing"
   | "not_ready"
+  /** Asking cannot run: no on-device embedding model is selected, and a remote
+   *  provider cannot supply one (SYNC-16). Split out of `not_ready` because
+   *  that sentence sends the user to name a provider, which is exactly what
+   *  they have already done (myne-md/myne#545). */
+  | "no_embedding_model"
+  /** An embedding model is selected and the vault's index is still being
+   *  built. A state, not a failure: the next move is to wait. */
+  | "index_not_ready"
   | "failed";
 
 /**
@@ -102,6 +110,8 @@ const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
   "empty_completion",
   "local_model_missing",
   "not_ready",
+  "no_embedding_model",
+  "index_not_ready",
   "failed",
 ]);
 
@@ -130,6 +140,8 @@ const PROVIDER_ERROR_KEY: Readonly<Record<ProviderErrorCause, string>> = {
   policy_refused: "settings.ai.providerError.policyRefused",
   local_model_missing: "settings.ai.providerError.localModelMissing",
   not_ready: "settings.ai.providerError.notReady",
+  no_embedding_model: "settings.ai.providerError.noEmbeddingModel",
+  index_not_ready: "settings.ai.providerError.indexNotReady",
   unreachable: "settings.ai.providerError.unreachable",
   refused: "settings.ai.providerError.refused",
   timeout: "settings.ai.providerError.timeout",
