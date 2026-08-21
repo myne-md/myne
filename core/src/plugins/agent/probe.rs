@@ -71,6 +71,19 @@ pub enum ProbeFailure {
     WrongResult,
 }
 
+impl ProbeFailure {
+    /// The failure's name, as a compile-time string. Every variant is a unit,
+    /// so this carries nothing the model wrote.
+    pub fn tag(&self) -> &'static str {
+        match self {
+            Self::NoAction => "no_action",
+            Self::WrongAction => "wrong_action",
+            Self::AnchorDoesNotPlace => "anchor_does_not_place",
+            Self::WrongResult => "wrong_result",
+        }
+    }
+}
+
 /// One attempt's verdict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", content = "detail", rename_all = "camelCase")]
@@ -161,11 +174,34 @@ pub async fn run_probe(
         // would report characters that never came from a note.
         let reply = engine.complete(AGENT_REQUEST_CLASS, &request).await?.reply;
         let v = grade(&reply);
+        // Why an attempt did not count (myne-md/myne#546). The user meets this
+        // gate as "the agent is unavailable", and until now the reason existed
+        // only inside the returned value: a run that never started left no
+        // trace of whether the backend wrote nothing, wrote the wrong verb, or
+        // wrote an anchor that does not place. The verdict is a closed enum, so
+        // there is nothing here the model chose.
+        tracing::debug!(
+            target: "myne_core::agent",
+            event = "probe_attempt",
+            attempt = attempts.len() + 1,
+            verdict = match &v {
+                AttemptVerdict::Passed => "passed",
+                AttemptVerdict::Failed(f) => f.tag(),
+            },
+        );
         if v == AttemptVerdict::Passed {
             passes += 1;
         }
         attempts.push(v);
     }
+    tracing::debug!(
+        target: "myne_core::agent",
+        event = "probe_done",
+        passes,
+        attempts = threshold.attempts,
+        required = threshold.required,
+        passed = passes >= threshold.required,
+    );
     Ok(ProbeVerdict {
         passed: passes >= threshold.required,
         passes,

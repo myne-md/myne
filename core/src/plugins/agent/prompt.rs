@@ -51,6 +51,26 @@ pub enum AgentAction {
     Finish { summary: String },
 }
 
+impl AgentAction {
+    /// The action's name, as a `&'static str` from this file's own vocabulary.
+    ///
+    /// Safe to log by construction: it is one of seven compile-time strings and
+    /// cannot carry anything the model wrote. That is the whole reason it
+    /// exists rather than a `Debug` format of the value, which would print the
+    /// note id, the anchor and the replacement with it.
+    pub fn verb(&self) -> &'static str {
+        match self {
+            Self::ListScope => "list_scope",
+            Self::ReadNote { .. } => "read_note",
+            Self::SearchScope { .. } => "search_scope",
+            Self::ProposeEdit { .. } => "propose_edit",
+            Self::ProposeNote { .. } => "propose_note",
+            Self::RequestScope { .. } => "request_scope",
+            Self::Finish { .. } => "finish",
+        }
+    }
+}
+
 /// A proposed new note, before the user has approved it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -148,6 +168,19 @@ pub fn build_request(task: &str, transcript: &[Message]) -> AgentRequest {
 /// an object that never closes costs the actions after the break rather than
 /// all of them, because everything before it has already been collected.
 pub fn parse_actions(reply: &str) -> Vec<AgentAction> {
+    scan_objects(reply)
+        .into_iter()
+        .filter_map(|o| serde_json::from_str::<AgentAction>(o).ok())
+        .collect()
+}
+
+/// Every balanced object the scan finds, as slices of `reply`.
+///
+/// Split out of [`parse_actions`] so [`reply_shape`] counts the SAME objects
+/// the parse saw. A second scanner would be a second opinion about where an
+/// object starts, and the diagnostic would then describe a reply the parser
+/// never read.
+fn scan_objects(reply: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut rest = reply;
     while let Some(start) = next_object_start(rest) {
@@ -157,12 +190,61 @@ pub fn parse_actions(reply: &str) -> Vec<AgentAction> {
             // a brace and never closed it. Nothing after it can be read.
             break;
         };
-        if let Ok(action) = serde_json::from_str::<AgentAction>(&candidate[..end]) {
-            out.push(action);
-        }
+        out.push(&candidate[..end]);
         rest = &candidate[end..];
     }
     out
+}
+
+/// What a reply LOOKED LIKE, in counts.
+///
+/// The diagnostic for "the model answered and the loop got nothing out of it",
+/// which is myne-md/myne#543's failure and cost a code read to identify. Every
+/// field is a count.
+///
+/// **No part of the reply is carried, and the omission that matters most is the
+/// unknown verb's NAME.** A count of them is here; the string is not. The model
+/// chooses that string, note text can steer what it writes, and an `"action"`
+/// value is exactly where steered text would land. So it is treated as
+/// note-derived and stays out of the log, which is the same rule
+/// `src-tauri/CLAUDE.md` states for every other model output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ReplyShape {
+    /// Lines in the reply.
+    pub lines: usize,
+    /// Lines whose first non-whitespace character is `{`, i.e. how many places
+    /// the scan could have started.
+    pub brace_lines: usize,
+    /// Balanced objects the scan found.
+    pub objects: usize,
+    /// Objects that parsed into an action.
+    pub actions: usize,
+    /// Objects that were valid JSON and named something `AgentAction` does not.
+    /// A model using a verb nobody designed is worth seeing; WHICH verb is not
+    /// safe to print. See the type note.
+    pub unknown_verbs: usize,
+}
+
+/// Describe a reply without quoting it.
+pub fn reply_shape(reply: &str) -> ReplyShape {
+    let objects = scan_objects(reply);
+    let mut shape = ReplyShape {
+        lines: reply.lines().count(),
+        brace_lines: reply
+            .lines()
+            .filter(|l| l.trim_start().starts_with('{'))
+            .count(),
+        objects: objects.len(),
+        ..ReplyShape::default()
+    };
+    for object in objects {
+        if serde_json::from_str::<AgentAction>(object).is_ok() {
+            shape.actions += 1;
+        } else if serde_json::from_str::<serde_json::Value>(object).is_ok() {
+            shape.unknown_verbs += 1;
+        }
+    }
+    shape
 }
 
 /// Byte offset of the next `{` that begins a line (leading whitespace aside).

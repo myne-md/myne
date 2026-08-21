@@ -124,6 +124,25 @@ pub enum ProviderTransportError {
     Cancelled,
 }
 
+impl ProviderTransportError {
+    /// The cause's name, as a compile-time string, for logging. Every variant
+    /// is a unit and content-free by construction (see the type's own note), so
+    /// this adds no new exposure — it only avoids a `Debug` format drifting
+    /// into a field one day.
+    pub fn tag(&self) -> &'static str {
+        match self {
+            Self::Unreachable => "unreachable",
+            Self::Refused => "refused",
+            Self::Timeout => "timeout",
+            Self::TlsNotTrusted => "tls_not_trusted",
+            Self::Exchange => "exchange",
+            Self::Unauthorized => "unauthorized",
+            Self::QuotaExhausted => "quota_exhausted",
+            Self::Cancelled => "cancelled",
+        }
+    }
+}
+
 /// Map an HTTP status onto the transport's own cause.
 ///
 /// The three that are worth separating, and why each is its own fix:
@@ -345,12 +364,43 @@ impl ProviderTransport {
             body,
             Some(bearer),
         );
-        let mut tls = self.connect()?;
+        // **How long the exchange took and how it ended** (myne-md/myne#546).
+        // Without it, a request that is still in flight and a request that
+        // completed are the same observation from outside the process: an
+        // afternoon went into telling those two apart with a stack sample while
+        // the provider's own dashboard showed every request finishing in under
+        // seven seconds. Timings, a status integer and a closed error tag; the
+        // request body and the reply are never touched here.
+        let started = std::time::Instant::now();
+        let mut tls = self.connect().inspect_err(|e| {
+            tracing::debug!(
+                target: "myne::ai",
+                event = "provider_connect_failed",
+                error_kind = e.tag(),
+                elapsed_ms = started.elapsed().as_millis() as u64,
+            );
+        })?;
         tls.write_all(&req).map_err(|e| self.cause_from_io(&e))?;
         tls.flush().map_err(|e| self.cause_from_io(&e))?;
         let mut reader = BufReader::new(tls);
-        let (resp, _reuse) = read_http_response(&mut reader, false, MAX_RESPONSE_BYTES)
-            .map_err(|_| self.exchange_cause())?;
+        let (resp, _reuse) =
+            read_http_response(&mut reader, false, MAX_RESPONSE_BYTES).map_err(|_| {
+                let cause = self.exchange_cause();
+                tracing::debug!(
+                    target: "myne::ai",
+                    event = "provider_read_failed",
+                    error_kind = cause.tag(),
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                );
+                cause
+            })?;
+        tracing::debug!(
+            target: "myne::ai",
+            event = "provider_exchange",
+            status = resp.status,
+            body_bytes = resp.body.len(),
+            elapsed_ms = started.elapsed().as_millis() as u64,
+        );
         if resp.status != 200 {
             // The body of a non-200 is NOT read. A provider's error text is
             // attacker-influenceable and has no place in a Myne value — the

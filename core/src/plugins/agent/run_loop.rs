@@ -23,7 +23,9 @@
 use super::edit::ProposedEdit;
 use super::engine::{AgentEngine, Content, Message, Role, AGENT_REQUEST_CLASS};
 use super::error::AgentError;
-use super::prompt::{build_request, parse_actions, AgentAction, Proposal, ProposedNote};
+use super::prompt::{
+    build_request, parse_actions, reply_shape, AgentAction, Proposal, ProposedNote,
+};
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
 use super::tools::{list_scope, read_note, search_scope, NoteReader, ScopeSearcher};
@@ -94,6 +96,23 @@ pub enum LoopEnd {
     },
 }
 
+impl LoopEnd {
+    /// The end's name, as a compile-time string.
+    ///
+    /// For logging. `AwaitingScope` carries a folder name and a model-written
+    /// reason, both of which come out of note content, so a `Debug` format of
+    /// this value has no place in a log line.
+    pub fn tag(&self) -> &'static str {
+        match self {
+            Self::Finished => "finished",
+            Self::AwaitingScope { .. } => "awaiting_scope",
+            Self::Cancelled => "cancelled",
+            Self::ExhaustedIterations => "exhausted_iterations",
+            Self::Stalled { .. } => "stalled",
+        }
+    }
+}
+
 /// What one loop invocation produced.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -142,7 +161,45 @@ pub struct LoopDeps<'a> {
 }
 
 /// Run the loop until it stops.
+///
+/// A thin wrapper over [`drive_inner`] whose only job is to report the outcome
+/// once, wherever the loop left from. There are six exits and a log line at
+/// each would be six chances to add a seventh without one (myne-md/myne#546).
 pub async fn drive(
+    runs: &AgentRunState,
+    run_id: &str,
+    task: &str,
+    transcript: &mut Vec<Message>,
+    deps: &LoopDeps<'_>,
+) -> Result<LoopOutcome, AgentError> {
+    // Target note, once for this module: `myne_core::agent`, not the `myne::…`
+    // product target the desktop crate uses for `myne::ai`. `tracing-test`
+    // filters its capture on the crate name, so a `myne::…` target here would be
+    // invisible to the tests that assert these lines carry no note content —
+    // and an untested DENY-list claim is the kind this repo does not make.
+    // `RUST_LOG=myne_core=debug` turns them on.
+    let outcome = drive_inner(runs, run_id, task, transcript, deps).await;
+    match &outcome {
+        Ok(o) => tracing::debug!(
+            target: "myne_core::agent",
+            event = "run_stopped",
+            end = o.end.tag(),
+            iterations = o.iterations,
+            notes_read = o.notes_read,
+            edits = o.proposal.edits.len(),
+            new_notes = o.proposal.new_notes.len(),
+        ),
+        // `kind()`, never the error itself: two variants carry a `note_id`.
+        Err(e) => tracing::debug!(
+            target: "myne_core::agent",
+            event = "run_failed",
+            error_kind = e.kind(),
+        ),
+    }
+    outcome
+}
+
+async fn drive_inner(
     runs: &AgentRunState,
     run_id: &str,
     task: &str,
@@ -203,6 +260,37 @@ pub async fn drive(
         // Parse before the reply moves into the transcript, so the reply is not
         // cloned just to be borrowed.
         let actions = parse_actions(&reply);
+        // **What the reply looked like, in counts** (myne-md/myne#546). The
+        // failure this exists for is a model whose replies parse into nothing:
+        // from the outside that is indistinguishable from a slow backend, and
+        // identifying it once cost a code read. `objects` against `actions`
+        // separates "it wrote no JSON" from "it wrote JSON we do not accept".
+        //
+        // Counts only. `reply_shape`'s own note says why the unknown verb's
+        // name is not among them.
+        let shape = reply_shape(&reply);
+        // The verbs belong on THIS line rather than on the iteration line
+        // below, and the reason is a defect the first version had: the dispatch
+        // loop RETURNS on `finish` and on `request_scope`, so a line written
+        // after it never runs for the turn that ended the run — the one turn a
+        // reader most wants named. `verb()` is a compile-time string per
+        // variant, so this cannot carry a note id, an anchor or a replacement.
+        let verb_list = actions
+            .iter()
+            .map(AgentAction::verb)
+            .collect::<Vec<_>>()
+            .join(",");
+        tracing::debug!(
+            target: "myne_core::agent",
+            event = "reply",
+            iteration = iterations,
+            lines = shape.lines,
+            brace_lines = shape.brace_lines,
+            objects = shape.objects,
+            actions = shape.actions,
+            unknown_verbs = shape.unknown_verbs,
+            verbs = verb_list.as_str(),
+        );
         // **The reply is note-derived, so it is tagged untrusted.** It was
         // `Content::Trusted`, which `engine.rs` defines as "written by the
         // host, tokenized normally" -- and an anchor is by definition text the
@@ -431,6 +519,16 @@ pub async fn drive(
         // without the increment the only stop left is the 24-iteration ceiling,
         // which is 24 provider requests spent on a model that answered the
         // first three unusably.
+        tracing::debug!(
+            target: "myne_core::agent",
+            event = "iteration",
+            iteration = iterations,
+            productive,
+            barren_streak = if productive { 0 } else { barren + 1 },
+            notes_read,
+            edits = proposal.edits.len(),
+        );
+
         if productive {
             barren = 0;
         } else {
@@ -778,6 +876,101 @@ mod tests {
         assert_eq!(out.end, LoopEnd::ExhaustedIterations);
         assert_eq!(out.iterations, MAX_ITERATIONS);
         drop(engine);
+    }
+
+    // ---- the diagnostic trail (myne-md/myne#546) ------------------------
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_run_leaves_a_trail_naming_the_shape_of_what_came_back() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        // Prose, then a finish. The prose turn is the one the trail has to
+        // describe: it is the failure that cost a code read to identify, and
+        // from outside the process it looks exactly like a slow backend.
+        let engine = ScriptEngine::new(&[
+            "I will not be doing that",
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        // The reply that parsed into nothing says so in counts.
+        assert!(logs_contain("event=\"reply\""));
+        assert!(
+            logs_contain("objects=0 actions=0"),
+            "a reply with no JSON in it must be visible as such"
+        );
+        // …and the reply that did parse is distinguishable from it.
+        assert!(logs_contain("objects=1 actions=1"));
+        // The reply line names the verb vocabulary, not the values — including
+        // for the turn that ENDED the run, which is the turn a line written
+        // after the dispatch loop would have missed.
+        assert!(logs_contain("verbs=\"finish\""));
+        // And the run says how it ended, once.
+        assert!(logs_contain("event=\"run_stopped\" end=\"finished\""));
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn the_trail_carries_no_part_of_the_reply_or_the_note() {
+        // **The DENY-list assertion, injected rather than reasoned about.**
+        // Every marker below is a string the run genuinely handles: the model's
+        // prose, an anchor and a replacement it copied out of a note, a note
+        // id, and the task the user typed. None may reach a log line. A verb
+        // the vocabulary does not know is here too, because its name is the one
+        // field of `ReplyShape` that is deliberately a count rather than a
+        // string — a model can be steered into putting note text there.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            "PROSEMARKER the model wrote this",
+            r#"{"action":"incinerate_note","note_id":"VERBMARKER"}"#,
+            r#"{"action":"propose_edit","note_id":"a","anchor":"ANCHORMARKER","replacement":"REPLACEMENTMARKER"}"#,
+            r#"{"action":"finish","summary":"SUMMARYMARKER"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(
+            &runs,
+            "r",
+            "TASKMARKER",
+            &mut t,
+            &deps(&engine, &recs),
+        ))
+        .unwrap();
+
+        for marker in [
+            "PROSEMARKER",
+            "VERBMARKER",
+            "incinerate_note",
+            "ANCHORMARKER",
+            "REPLACEMENTMARKER",
+            "SUMMARYMARKER",
+            "TASKMARKER",
+        ] {
+            assert!(
+                !logs_contain(marker),
+                "{marker} reached a log line (DENY-list violation)"
+            );
+        }
+        // The unknown verb is COUNTED, which is the whole point of not naming
+        // it: the diagnostic survives without the string.
+        assert!(logs_contain("unknown_verbs=1"));
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_stalled_run_says_so_in_the_trail() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&["no", "still no", "nor now"]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert!(logs_contain("event=\"run_stopped\" end=\"stalled\""));
+        assert!(logs_contain("barren_streak=3"));
     }
 
     #[test]
