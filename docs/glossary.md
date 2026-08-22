@@ -560,6 +560,8 @@ Reference: Chan & Rogaway, "On Committing Authenticated Encryption", ESORICS 202
 
 The Phase 1 editor pattern where decorations on the line containing the cursor lift to expose the underlying markdown source for editing, then reapply when the cursor leaves the line. There is no separate "rendered view" / "source view" mode-switch — cursor location *is* the reveal. Headings show their leading `#`s on the active line and hide them off-line; bold and italic delimiters reveal on entry; inline link URLs become editable when the cursor enters their parent line. Wikilink chips are an exception per `spec/wikilink.md` §5.4 (chips stay atomic regardless of cursor position). **Task-field chips are a second exception** (MYND-614): they never open on caret entry — a date is a structured value, not prose, and a line carrying three chips would reflow every time the caret travelled it — but they *do* open while the find panel is open, because a search that lands on a match inside hidden text and highlights nothing is worse than not finding it. Reading mode never reveals, under either exception.
 
+**A SELECTION reveals too, where the decoration replaces its range with a widget** (myne-md/myne#560). The task checkbox lifts when a selection merely overlaps the hidden `- [ ]` run, not only when a caret is inside it, and the trigger is per-range rather than per-line. The reason is not editing but painting: the rendered checkbox has an opaque accent fill, and a translucent selection band across it, beside the same band over plain text, is two tones in one selection. Showing the source removes the opaque surface rather than working around it, and it is the honest answer: what is selected is the markup, so the markup is what belongs on screen and on the clipboard. Restyling decorations (emphasis, link, inline code) keep the older per-endpoint rule: a mark changing style under a selection is harmless where a widget vanishing is not.
+
 Used in: `spec/markdown-dialect.md`, `myne-agents/features/editor-mvp/rfc.md`; `decisions.md` 2026-07-28
 
 ### **custom folder icon** &nbsp; 📦 *Product*
@@ -2249,6 +2251,26 @@ Used in: `spec/protocol.md` §10.3.1
 Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships malicious code. Myne's mitigations are hash-pinned lockfiles, minimal direct-dependency surface, dependency-review at update time, and `cargo-vet`/`cargo-audit` in CI. Status: Best-effort — cannot fully defend against a determined attacker in the dependency graph, but the Tauri/Cargo dependency tree is materially smaller than Electron/npm would be.
 
 Used in: `threat-model.md` §1 (A8), §7
+
+### **smart-home** &nbsp; 📦 *Product*
+
+What `Cmd+←` and `Cmd+Shift+←` do on a [line-task](#line-task) or any other list row: the first press stops at the item's **content start**, past the marker, and a second press reaches the raw line start (myne-md/myne#561). On `- [x] buy milk` the line the user sees begins at `buy`, because `- [x] ` is decoration-hidden and drawn as a checkbox, so a boundary at the raw offset would select or delete markup that is not on screen.
+
+Progressive by design, which is why it is a keymap behaviour rather than a selection rewrite: the second press needs to know where the first one landed, and nothing further back in the chain does. `Cmd+Backspace` shares the same boundary, so a first press takes the label and a second takes the marker. Forward is untouched, because the end of a line is the end of a line on every kind of line.
+
+Used in: `editor/src/line-boundary.ts`
+
+### **sync arc** &nbsp; 📦 *Product*
+
+The three-state glyph that says whether Myne owes the note anything (myne-md/myne#566). One shape vocabulary in two places: beside the save readout in the bottom bar, and trailing an unsynced row in the sidebar.
+
+- **solid dot**: settled. Nothing is owed.
+- **static arc**: outstanding, and nothing is moving on it. An edit waiting on a device that is offline is this, and so is text waiting on the autosave debounce.
+- **rotating arc**: in flight, and bounded. A disk write, a push. Never a state a user can sit in, because `docs/design/README.md` bans looping animation and a calm product does not spin at someone while they write.
+
+The gap in the ring is what carries "incomplete" while the arc stands still, which is what a 6px filled dot and a 6px hollow one could not do: at that size they are the same glyph. Two independent facts drive it and are deliberately not merged. Whether the marker is SHOWN comes from the note's own sync debt, and whether it TURNS comes from whether the device is moving bytes this second. Rotating on the first alone would claim work is in flight whenever a laptop is shut.
+
+Used in: `src/components/Spinner.tsx`, `src/notes/components/SaveStatus.tsx`, `src/notes/components/NoteRow.tsx`
 
 ### **sync cursor** &nbsp; 📋 *Protocol*
 
