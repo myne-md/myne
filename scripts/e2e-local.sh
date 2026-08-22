@@ -21,6 +21,13 @@
 #                         quarantined spec self-skips and this reports success.
 #   MYNE_E2E_AI=1         run the inference suites. Needs the
 #                         `local-inference-stub` build too: use e2e-ai-buildrun.sh.
+#   MYNE_E2E_ONLY="a b"   run only these spec files. For answering one question
+#                         about one change: a shared-tree edit can move an element
+#                         an existing scenario clicks, and waiting out the whole
+#                         suite to learn whether it did is how that check gets
+#                         skipped. NOT a way to gate a branch. The gate is the
+#                         full suite, and `e2e-floor` exists because a run that
+#                         executes fewer scenarios still exits 0.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -125,6 +132,6 @@ exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&
-    xvfb-run -a pnpm test:e2e $RETRY_FLAG
+    xvfb-run -a pnpm test:e2e $RETRY_FLAG ${MYNE_E2E_ONLY:-}
   '
 "

@@ -24,7 +24,7 @@
 //    failure artefact CI keeps.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 /** Web-only rendering modules: everything under `web/src` that renders. */
 const WEB_DIR = join("web", "src");
@@ -60,6 +60,17 @@ const RENDERS_NOTHING = new Set([
 /** `<screen>.<element>`, lowercase, dot-separated, hyphens inside a segment. */
 const NAME = /^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$/;
 
+/**
+ * Fewest files the pre-unlock walk may cover before the walk itself is suspect.
+ *
+ * Recorded from a real run (15 at the time of writing), not invented, and it may
+ * rise as the tree grows.
+ * Lowering it is the edit that is never routine: it means the account-number
+ * screens compose less than they did, which is either a real simplification
+ * worth saying out loud or a walk that has stopped finding things.
+ */
+const PRE_UNLOCK_FLOOR = 15;
+
 export function webModules(dir = WEB_DIR) {
   const out = [];
   const walk = (d) => {
@@ -87,9 +98,87 @@ export function stripComments(source) {
     .replace(/^\s*\/\/.*$/gm, "");
 }
 
-/** `data-*` attributes fed an EXPRESSION rather than a string literal. */
+/**
+ * `data-*` attributes fed an EXPRESSION rather than a string literal, in BOTH
+ * forms a React tree can produce one.
+ *
+ * The JSX form (`data-x={expr}`) is the obvious one. The object form
+ * (`"data-x": expr`, inside a props object a component later spreads) is the one
+ * that shipped past this guard: `useScrollEdges` builds
+ * `{ "data-fade-top": edges.top ? "true" : undefined }` and `CenteredCard`
+ * spreads it onto the card every pre-unlock screen composes. Nothing in the
+ * scanned files ever reads `data-x={`, so the attribute reached the DOM of the
+ * screen where the account number is typed without this check seeing it.
+ *
+ * A string-literal value in either form is fine, which is what the negative
+ * lookahead on the object form is for: `"data-mode": "compact"` is a constant.
+ */
 export function dynamicDataAttrs(source) {
-  return [...stripComments(source).matchAll(/(data-[a-z0-9-]+)=\{/g)].map((m) => m[1]);
+  const clean = stripComments(source);
+  const jsx = [...clean.matchAll(/(data-[a-z0-9-]+)=\{/g)].map((m) => m[1]);
+  // The value's first non-space character is CAPTURED rather than excluded by a
+  // lookahead. `\s*(?!["'`])` looks right and is not: `\s*` backtracks to zero
+  // width, the lookahead then reads the space it gave up, the space is not a
+  // quote, and every constant string matches. Capturing cannot backtrack past
+  // itself.
+  const obj = [...clean.matchAll(/["'](data-[a-z0-9-]+)["']\s*:\s*(\S)/g)]
+    .filter((m) => !["\"", "'", "`"].includes(m[2]))
+    .map((m) => m[1]);
+  // `data-testid` has its own rule below, and a curated-prop component taking an
+  // explicit `testId` (`src/CLAUDE.md`, "Test observability") is the sanctioned
+  // shape rather than a leak. Reporting it here would say the wrong thing about
+  // it, in a message about the account number.
+  //
+  // That exemption is only honest while the other rule actually covers the same
+  // files. It did not: the interpolated-testid check ran over `webModules()` and
+  // this budget now runs over the wider `preUnlockScope`, so an interpolated
+  // `data-testid` in a shared primitive both pre-unlock screens render was
+  // exempted here and unreached there. `main` now runs that check over the union.
+  return [...jsx, ...obj].filter((a) => a !== "data-testid");
+}
+
+/**
+ * The pre-unlock leak budget's real scope: the screens, plus every module in the
+ * SHARED tree they compose, transitively.
+ *
+ * A screen is not the only file that renders it. `AccountNumberEntry` and
+ * `WebNoAccount` both render `<CenteredCard>`, which is a shared primitive
+ * outside `webModules()` entirely, so an attribute added there landed on both
+ * screens with nothing checking it. Following the relative imports is what makes
+ * the budget describe the DOM rather than a directory.
+ *
+ * Only relative specifiers are followed: a package import is not this tree's to
+ * audit, and `@myne/*` packages render no `data-*` onto a pre-unlock screen
+ * without going through one of these files first.
+ */
+export function preUnlockScope(roots) {
+  const seen = new Set();
+  const queue = [...roots];
+  while (queue.length > 0) {
+    const file = queue.pop();
+    if (seen.has(file)) continue;
+    let src;
+    try {
+      src = readFileSync(file, "utf8");
+    } catch {
+      continue; // a specifier that does not resolve to a file we scan
+    }
+    seen.add(file);
+    for (const m of src.matchAll(/from\s+["'](\.[^"']+)["']/g)) {
+      const base = join(dirname(file), m[1]);
+      for (const cand of [`${base}.tsx`, `${base}.ts`, join(base, "index.tsx"), join(base, "index.ts")]) {
+        try {
+          if (statSync(cand).isFile()) {
+            queue.push(relative(".", cand));
+            break;
+          }
+        } catch {
+          /* next candidate */
+        }
+      }
+    }
+  }
+  return [...seen].sort();
 }
 
 /**
@@ -103,7 +192,18 @@ export function dynamicDataAttrs(source) {
  * account number.
  */
 const ALLOWED_DYNAMIC = new Map([
-  ["data-wall", "WebNoAccount's `no-account` / `no-sync` variant — a closed union."],
+  ["data-wall", "WebNoAccount's `no-account` / `no-sync` variant, a closed union."],
+  [
+    "data-fade-top",
+    "Scroll geometry on `CenteredCard`: is there content above the viewport. " +
+      "`\"true\" | undefined`, computed from `scrollTop` and never from anything " +
+      "the user typed (`src/hooks/useScrollEdges.ts`).",
+  ],
+  [
+    "data-fade-bottom",
+    "The same, for content below. Both drive the `.myne-scroll-fade` mask in " +
+      "`tokens.css` and carry no value the account-number field could reach.",
+  ],
 ]);
 
 function main() {
@@ -136,19 +236,64 @@ function main() {
       );
     }
 
-    // The leak budget. Applied to the PRE-UNLOCK web screens, which is where the
-    // account number is typed; a dynamic `data-*` elsewhere (a device row's id
-    // hex, a note id) is the sanctioned discriminator pattern.
-    if (f.startsWith(join("src", "screens")) || f.startsWith(join("web", "src", "screens"))) {
-      const dynamic = dynamicDataAttrs(src).filter((a) => !ALLOWED_DYNAMIC.has(a));
-      if (dynamic.length > 0) {
-        problems.push(
-          `${f}: ${[...new Set(dynamic)].join(", ")} takes a runtime value on a pre-unlock ` +
-            `screen. The account number is pre-unlock INPUT — a data-* attribute puts it in ` +
-            `the DOM, in screenshots, and in every CI failure artefact (SYNC-7 leak budget). ` +
-            `If it is a closed-set discriminator, name it in ALLOWED_DYNAMIC with the reason.`,
-        );
-      }
+  }
+
+  // The leak budget, over the pre-unlock SCREENS plus everything in the shared
+  // tree they compose. A dynamic `data-*` outside that set (a device row's id
+  // hex, a note id) is the sanctioned discriminator pattern and is not checked.
+  const roots = [
+    ...SHARED_WEB_ONLY,
+    ...files.filter((f) => f.startsWith(join("web", "src", "screens"))),
+  ];
+  const preUnlock = preUnlockScope(roots);
+  // A COVERAGE CLAIM, not a walk that reports ok on whatever it happened to
+  // find. `check-platform-seam.mjs` derives one for the same reason: a scope
+  // that silently shrinks to nothing passes every check inside it. Two paths
+  // reach that here without the floor, and both are one rename away: the
+  // `web/src/screens` filter yielding `[]`, and a root that cannot be read.
+  if (preUnlock.length < PRE_UNLOCK_FLOOR) {
+    problems.push(
+      `pre-unlock scope covers ${preUnlock.length} file(s), below the recorded ` +
+        `floor of ${PRE_UNLOCK_FLOOR}. The leak budget checks what this walk ` +
+        `finds, so a shrunken scope is a check that passed having scanned ` +
+        `nothing. Raise the floor only when files genuinely left the tree.`,
+    );
+  }
+  for (const f of preUnlock) {
+    // The interpolated-testid rule, over the SAME set. Its exemption in
+    // `dynamicDataAttrs` names this check as the backstop, so it has to reach
+    // every file that exemption applies to.
+    //
+    // Narrowed to the CURATED-PROP shape rather than banned outright, because
+    // `src/CLAUDE.md` ("Test observability") asks for exactly that shape:
+    // `PasswordInput`, `DestructiveBanner` and `BlockingProgressStep` all take an
+    // explicit `testId` / `testIdPrefix` so their caller names them, and all
+    // three are composed by a pre-unlock screen. A value that comes from a prop
+    // the caller chose is not a value the user typed; `data-testid={account}` is,
+    // and that is what this catches.
+    for (const m of stripComments(readFileSync(f, "utf8")).matchAll(/data-testid=\{([^}]*)\}/g)) {
+      const expr = m[1].trim();
+      if (/^testId$/.test(expr) || /testIdPrefix/.test(expr)) continue;
+      problems.push(
+        `${f}: data-testid={${expr}} takes a runtime value on (or under) a ` +
+          `pre-unlock screen. Its value reaches the DOM like any other data-*, ` +
+          `and the account number is typed on one of these screens (SYNC-7 leak ` +
+          `budget). A caller-supplied \`testId\` prop is the sanctioned shape.`,
+      );
+    }
+  }
+  for (const f of preUnlock) {
+    const dynamic = dynamicDataAttrs(readFileSync(f, "utf8")).filter(
+      (a) => !ALLOWED_DYNAMIC.has(a),
+    );
+    if (dynamic.length > 0) {
+      problems.push(
+        `${f}: ${[...new Set(dynamic)].join(", ")} takes a runtime value on (or under) a ` +
+          `pre-unlock screen. The account number is pre-unlock INPUT, and a data-* attribute ` +
+          `puts it in the DOM, in screenshots, and in every CI failure artefact (SYNC-7 leak ` +
+          `budget). If it is a closed-set discriminator, name it in ALLOWED_DYNAMIC with the ` +
+          `reason.`,
+      );
     }
   }
 
@@ -160,7 +305,8 @@ function main() {
   const total = files.reduce((n, f) => n + testidsIn(readFileSync(f, "utf8")).length, 0);
   console.log(
     `web testids: ok (${files.length} web-only module(s), ${total} testid(s), ` +
-      `${RENDERS_NOTHING.size} render-nothing substitution(s))`,
+      `${RENDERS_NOTHING.size} render-nothing substitution(s), ` +
+      `${preUnlock.length} pre-unlock file(s) scanned for the leak budget)`,
   );
 }
 
