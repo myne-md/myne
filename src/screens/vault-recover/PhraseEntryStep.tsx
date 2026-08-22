@@ -52,6 +52,7 @@ import {
   type Action,
   type VaultRecoverState,
 } from "./reducer";
+import { stageRootStyle } from "../../components/primitives/stageRoot";
 
 interface PhraseEntryStepProps {
   state: VaultRecoverState;
@@ -65,10 +66,7 @@ interface PhraseEntryStepProps {
 }
 
 const ROOT_STYLE: CSSProperties = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  ...stageRootStyle,
   background: "var(--bg-1)",
   fontFamily: "var(--font-sans)",
   padding: "var(--space-6)",

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
+import { stageRootStyle } from "../components/primitives/stageRoot";
 
 interface WelcomeProps {
   onCreateVault: () => void;
@@ -22,10 +23,7 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice }: Welcom
     <div
       data-testid="welcome.root"
       style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        ...stageRootStyle,
         background: "var(--bg-1)",
         padding: "var(--space-5)",
       }}
