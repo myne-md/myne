@@ -117,6 +117,26 @@ const ROLE_STR_PASSWORD_WRAP: &[u8] = b"password-wrap";
 /// (spec § 3.1).
 const ROLE_STR_RECOVERY_WRAP: &[u8] = b"recovery-wrap";
 
+/// Registered role string for the custom-themes blob AAD (spec § 5.2).
+///
+/// Public, and module-scope rather than local to `aad_custom_themes_blob`,
+/// because a second crate has to name this value: `myne-core`'s v0.2 migration
+/// walks a table of KEK singletons and passes each family's role to
+/// `aad_singleton_blob_v0_2`. Before this it spelled the literal itself, and
+/// nothing compared the two spellings: not the compiler, not clippy, not a
+/// test. A drift there would seal the re-encrypted blob under a role nothing
+/// else uses, and the next read would fail authentication on a family that is
+/// synced vault content.
+///
+/// Only the roles a second crate must name are exported. The other registered
+/// roles in this file stay local to their builder, because nothing outside can
+/// spell them wrong. Exporting one is a decision, not a default.
+pub const ROLE_STR_CUSTOM_THEMES_BLOB: &[u8] = b"custom-themes-blob";
+
+/// Registered role string for the personal-dictionary blob AAD (spec § 5.2).
+/// Exported for the same reason as `ROLE_STR_CUSTOM_THEMES_BLOB` above.
+pub const ROLE_STR_PERSONAL_DICT_BLOB: &[u8] = b"personal-dictionary-blob";
+
 /// Build the AAD bound into the AEAD wrap of `root_key` under the
 /// password-derived wrap key (spec § 3.1).
 ///
@@ -344,7 +364,6 @@ pub fn aad_search_index_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// dictionary lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob`. DISTINCT from the subkey role `"personal-dictionary-key"`.
 pub fn aad_personal_dictionary_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
-    const ROLE_STR_PERSONAL_DICT_BLOB: &[u8] = b"personal-dictionary-blob";
     let mut aad = Vec::with_capacity(
         AAD_PREFIX_V0_1.len()
             + 1
@@ -382,7 +401,6 @@ pub fn aad_personal_dictionary_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// `"myne.v0.1 custom-themes-key"`, so it survives a later epoch rotation).
 /// DISTINCT from the subkey role `"custom-themes-key"`.
 pub fn aad_custom_themes_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
-    const ROLE_STR_CUSTOM_THEMES_BLOB: &[u8] = b"custom-themes-blob";
     let mut aad = Vec::with_capacity(
         AAD_PREFIX_V0_1.len()
             + 1
