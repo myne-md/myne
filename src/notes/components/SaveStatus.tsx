@@ -8,11 +8,12 @@
 // 5 state renders + narrow-viewport icon-only fallback (~120px text
 // budget threshold; falls back to dot/icon + tooltip).
 
-import { useEffect, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { formatRelativeTime, useTick } from "./relativeTime";
 import type { SaveStatus as SaveStatusValue } from "../useAutosave";
 import { isStorageFull } from "../../lib/storage-pressure";
+import { SyncArc } from "../../components/Spinner";
 
 const ROOT_STYLE: CSSProperties = {
   display: "inline-flex",
@@ -34,12 +35,6 @@ const DOT_BASE_STYLE: CSSProperties = {
   borderRadius: "50%",
   background: "var(--fg-3)",
   flexShrink: 0,
-};
-
-const DOT_SAVING_STYLE: CSSProperties = {
-  ...DOT_BASE_STYLE,
-  background: "var(--fg-1)",
-  animation: "myne-save-pulse 1.2s ease-in-out infinite",
 };
 
 const DOT_ERROR_STYLE: CSSProperties = {
@@ -69,21 +64,6 @@ const SEP_STYLE: CSSProperties = {
   margin: "0 4px",
 };
 
-/** Unsynced-edit marker (phase3-web-client task 23) — the hollow ring the
- *  sidebar row uses, repeated here so the state is visible while the sidebar is
- *  collapsed. Same shape and same ink deliberately: two glyphs for one fact
- *  would read as two facts. */
-const UNSYNCED_MARK_STYLE: CSSProperties = {
-  display: "inline-block",
-  boxSizing: "border-box",
-  width: 6,
-  height: 6,
-  borderRadius: "50%",
-  border: "1px solid var(--fg-3)",
-  background: "transparent",
-  flexShrink: 0,
-};
-
 export type SaveStatusProps = {
   status: SaveStatusValue;
   onRetry: () => void;
@@ -108,12 +88,23 @@ export function SaveStatus({ status, onRetry, unsynced = false }: SaveStatusProp
   return (
     <>
       <SaveStatusReadout status={status} onRetry={onRetry} />
+      {/* Never turns (myne-md/myne#566). `docs/design/README.md` bans looping
+          animation, and this marker means the same thing as the sidebar row's,
+          so it is the same static shape: one glyph, one meaning, both places.
+          "Not on the server yet" is a state, not an activity: an edit made
+          offline stays unsynced for as long as the device stays offline, and a
+          marker rotating through all of that would be claiming work is in
+          flight that is not. The gap in the ring is what says "outstanding"
+          while standing still. Same glyph and same rule as the sidebar row's,
+          so the two read as one fact seen twice rather than two facts. */}
       {unsynced && (
-        <span
-          style={UNSYNCED_MARK_STYLE}
-          data-testid="editor.unsynced-marker"
+        <SyncArc
+          announces
+          spinning={false}
+          size={7}
+          testId="editor.unsynced-marker"
+          label={t("notes.row.unsyncedLabel")}
           title={t("notes.row.unsyncedTitle")}
-          aria-label={t("notes.row.unsyncedLabel")}
         />
       )}
     </>
@@ -124,8 +115,6 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
   const { t } = useTranslation();
   // Subscribe to the shared 30s tick so "Saved · N min ago" auto-updates.
   useTick();
-  // Ensure pulse keyframes are injected once into the document.
-  useEnsurePulseKeyframes();
 
   switch (status.status) {
     case "clean":
@@ -149,7 +138,17 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
           aria-label={t("notes.saveStatus.editing")}
           title={t("notes.saveStatus.editingTitle")}
         >
-          <span style={DOT_BASE_STYLE} />
+          {/* STATIC, not spinning (myne-md/myne#566). `AUTOSAVE_IDLE_MS` is one
+              second, so `editing` is the state anyone typing is in for the whole
+              of a writing session, and an arc turning through all of it is the
+              looping ambient animation `docs/design/README.md` bans by name
+              ("No looping animations. No subtle pulses on the encrypted-status
+              indicator. The product is calm."). It is also the wrong shape under
+              this component's own grammar: a static arc means work is
+              OUTSTANDING and a turning one means work is IN FLIGHT, and text
+              waiting on a debounce is outstanding. Rotation is left to `saving`
+              and `conflict`, which are bounded and short. */}
+          <SyncArc spinning={false} size={7} label={t("notes.saveStatus.editing")} />
           {t("notes.saveStatus.editingEllipsis")}
         </span>
       );
@@ -162,7 +161,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
           aria-label={t("notes.saveStatus.saving")}
           title={t("notes.saveStatus.savingEllipsis")}
         >
-          <span style={DOT_SAVING_STYLE} />
+          <SyncArc spinning size={7} label={t("notes.saveStatus.saving")} />
           <span style={{ color: "var(--fg-1)" }}>
             {t("notes.saveStatus.savingEllipsis")}
           </span>
@@ -220,7 +219,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
 
     // §11.3 keep-both in flight: the save lost to a sync pull; the buffer is
     // being preserved as a conflict copy and the pane re-based. Transient —
-    // ends `clean` once the pulled body is adopted. Same pulsing affordance
+    // ends `clean` once the pulled body is adopted. Same moving affordance
     // as `saving` (work is happening, no action needed).
     case "conflict":
       return (
@@ -230,39 +229,11 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
           aria-label={t("notes.saveStatus.conflict")}
           title={t("notes.saveStatus.conflictTitle")}
         >
-          <span style={DOT_SAVING_STYLE} />
+          <SyncArc spinning size={7} label={t("notes.saveStatus.conflict")} />
           <span style={{ color: "var(--fg-1)" }}>
             {t("notes.saveStatus.conflict")}
           </span>
         </span>
       );
   }
-}
-
-// Pulse keyframes — inject once into `document.head` so the `saving`
-// dot can use a CSS-driven animation without requiring a global
-// stylesheet edit. Idempotent: a second mount detects the existing
-// node and skips.
-
-const PULSE_STYLE_ID = "myne-save-pulse-keyframes";
-const PULSE_KEYFRAMES = `@keyframes myne-save-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 1; }
-}`;
-
-function useEnsurePulseKeyframes() {
-  const [injected, setInjected] = useState(false);
-  useEffect(() => {
-    if (injected) return;
-    if (typeof document === "undefined") return;
-    if (document.getElementById(PULSE_STYLE_ID) !== null) {
-      setInjected(true);
-      return;
-    }
-    const node = document.createElement("style");
-    node.id = PULSE_STYLE_ID;
-    node.textContent = PULSE_KEYFRAMES;
-    document.head.appendChild(node);
-    setInjected(true);
-  }, [injected]);
 }

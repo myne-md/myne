@@ -33,6 +33,7 @@ import type { TitleRecord } from "../loadNoteBatch";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { uuidv7Ms } from "../sidebarState";
 import { Icon } from "../../components/primitives/Icon";
+import { SyncArc } from "../../components/Spinner";
 import { formatRelativeTime, useTick } from "./relativeTime";
 
 export type NoteRowProps = {
@@ -284,32 +285,36 @@ const indexConflictStyle: CSSProperties = {
   verticalAlign: "middle",
 };
 
-/** Unsynced-edit marker (phase3-web-client task 23) — a small hollow ring at the
- *  row's trailing edge on a note the server has not acknowledged. Row-level, not
- *  title-level: inline-rename swaps the title node out, and the marker must
- *  survive that.
+/** Unsynced-edit marker (phase3-web-client task 23), at the row's trailing edge
+ *  on a note the server has not acknowledged. Row-level, not title-level:
+ *  inline-rename swaps the title node out, and the marker must survive that.
  *
- *  **Hollow, and that is the whole design.** The filled shapes on this row are
- *  already spoken for (the colour dot leads, the index-conflict dot trails), and
- *  a third filled dot would read as a fourth kind of status nobody can rank. A
- *  ring reads as "open / outstanding" against them without competing, and it
- *  stays legible at 6px in both themes because it is a border, not a fill.
+ *  **Not filled, and that is the whole design.** The filled shapes on this row
+ *  are already spoken for (the colour dot leads, the index-conflict dot trails),
+ *  and a third filled dot would read as a fourth kind of status nobody can rank.
+ *
+ *  It was a closed 6px ring, and at that size a ring and a dot are the same
+ *  glyph, which is what it was reported as: a mark nobody could read anything
+ *  off (myne-md/myne#566). It is now the shared `<SyncArc>` at 8px with a gap:
+ *  the same three-quarter arc the save readout uses, so one shape means
+ *  "outstanding" everywhere in the app.
+ *
+ *  It never TURNS, and that is a design-canon decision rather than an oversight.
+ *  `docs/design/README.md` bans looping animation by name, and the sidebar draws
+ *  one of these per unsynced note: a screenful of accent rings rotating together
+ *  is the ambient motion that rule exists to keep out of a writing surface.
+ *  Rotation stays where the work is bounded and there is one of it, the save
+ *  readout in the bottom bar. This shape says "outstanding", which is what a note
+ *  the server has not seen IS, and it says it whether the machine is online or
+ *  has been shut for a week.
  *
  *  `--fg-3` rather than `--warning`: an unsynced edit is the normal state of a
  *  note you just typed, and painting it as a warning would make the ordinary
  *  case look broken — the alarm belongs to eviction and tab-close (tasks 22/93),
  *  not to the second between a save and a push. */
 const unsyncedMarkerStyle: CSSProperties = {
-  display: "inline-block",
-  boxSizing: "border-box",
-  width: 6,
-  height: 6,
-  borderRadius: "50%",
-  border: "1px solid var(--fg-3)",
-  background: "transparent",
   marginInlineStart: 6,
   verticalAlign: "middle",
-  flexShrink: 0,
 };
 
 const renameInputStyle: CSSProperties = {
@@ -513,11 +518,13 @@ export function NoteRow(props: NoteRowProps) {
           does not become safe because the user is retitling it, and that is
           exactly the moment the sidebar is being looked at. */}
       {unsynced && (
-        <span
-          style={unsyncedMarkerStyle}
-          data-testid="notes.row-unsynced"
+        <SyncArc
+          spinning={false}
+          size={8}
+          testId="notes.row-unsynced"
+          label={t("notes.row.unsyncedLabel")}
           title={t("notes.row.unsyncedTitle")}
-          aria-label={t("notes.row.unsyncedLabel")}
+          style={unsyncedMarkerStyle}
         />
       )}
       {showStar &&
