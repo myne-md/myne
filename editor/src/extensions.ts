@@ -32,12 +32,18 @@ import {
 } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import {
+  deleteMarkupBackward,
+  insertNewlineContinueMarkupCommand,
+  markdown,
+  markdownLanguage,
+} from "@codemirror/lang-markdown";
 import { Subscript, Superscript, Emoji } from "@lezer/markdown";
 import {
   Compartment,
   EditorState,
   type Extension,
+  Prec,
   type StateEffect,
 } from "@codemirror/state";
 import { Wikilink } from "@myne/dialect/lezer/wikilink";
@@ -51,6 +57,7 @@ import { TaskField } from "@myne/dialect/lezer/task-field";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { lineBoundaryKeymap } from "./line-boundary";
+import { taskRowSelection } from "./task-selection";
 import { viewModeExtension, type ViewMode } from "./view-mode";
 import { textDirectionExtension } from "./direction";
 import { tableKeymap } from "./decorations/table";
@@ -135,6 +142,7 @@ export function reconfigureEditorKeymap(
 ): StateEffect<unknown> {
   return editorKeymapCompartment.reconfigure(editorKeymapSurface(overrides));
 }
+
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
 import { completionExtension } from "./completion";
@@ -149,6 +157,48 @@ import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
 import { scrollSlackExtension } from "./scroll-slack";
 import { myneTheme } from "./theme";
+
+/**
+ * The Enter / Backspace pair `markdown()` installs by default, rebuilt with
+ * `nonTightLists: false` (myne-md/myne#562).
+ *
+ * # What the default does
+ *
+ * `insertNewlineContinueMarkup` handles "Enter on an empty list item" in two
+ * arms. The one everybody expects deletes a level of markup, so a second Enter
+ * leaves a plain line where the empty item was. The other one inserts a blank
+ * line at `line.from` and pushes the empty item DOWN a row, the CommonMark
+ * "make a tight two-item list non-tight" behaviour, which is correct for prose
+ * lists and is not what an editor with rendered checkboxes should do.
+ *
+ * The gate picking between them reads (lang-markdown 6.5.0):
+ *
+ *     first.to >= pos || second && second.to < pos ||
+ *     line.from > 0 && !/[^\s>]/.test(doc.lineAt(line.from - 1).text) ||
+ *     config.nonTightLists === false
+ *
+ * `markdown()` builds the command with NO config, so the last clause is dead and
+ * the blank-line arm wins on the second Enter. The third Enter then appears to
+ * work only because the blank line the second one inserted now satisfies the
+ * PRECEDING clause. That is the reported "the checklist slides down twice, then
+ * disappears".
+ *
+ * # Why a keymap of our own rather than a higher-precedence Enter
+ *
+ * Shadowing Enter alone would leave the library's `deleteMarkupBackward` bound
+ * to Backspace by a keymap we no longer control, so a future change to
+ * `addKeymap` semantics would silently drop or double one of the two. Declining
+ * the pair (`addKeymap: false`) and re-declaring both keeps them a pair.
+ *
+ * `Prec.high` matches what `markdown()` itself uses, so ordering against
+ * `defaultKeymap` is unchanged.
+ */
+const markdownMarkupKeymap: Extension = Prec.high(
+  keymap.of([
+    { key: "Enter", run: insertNewlineContinueMarkupCommand({ nonTightLists: false }) },
+    { key: "Backspace", run: deleteMarkupBackward },
+  ]),
+);
 
 export function myneExtensions(opts?: {
   viewMode?: ViewMode;
@@ -200,6 +250,11 @@ export function myneExtensions(opts?: {
     highlightActiveLine(),
     markdown({
       base: markdownLanguage,
+      // The library's own Enter/Backspace pair is declined here and rebuilt
+      // below with a configured `insertNewlineContinueMarkup`. See
+      // `markdownMarkupKeymap` for why the default is wrong on a task line
+      // (myne-md/myne#562).
+      addKeymap: false,
       // codeNestMarkdownExtension nests per-language Lezer parsers into closed
       // fenced blocks (MYND-154). NOT the stock `codeLanguages` option — see
       // code-highlight.ts. Do not also pass `codeLanguages` (would double-nest).
@@ -228,6 +283,13 @@ export function myneExtensions(opts?: {
         codeNestMarkdownExtension,
       ],
     }),
+    // Replaces the keymap `markdown()` would have installed itself (declined
+    // above via `addKeymap: false`). Same two chords, same precedence; only
+    // `nonTightLists` differs. myne-md/myne#562.
+    markdownMarkupKeymap,
+    // A triple-click on a list row keeps the caret on that row (myne-md/myne#560).
+    // Composed after the language so `listContentStart` has a parse tree to read.
+    taskRowSelection(),
     codeSyntaxHighlighting,
     // Attachment catalog (MYND-164): loads `catalog_list` once on mount into a
     // StateField the form-C embed decorator resolves ids against. Composed
