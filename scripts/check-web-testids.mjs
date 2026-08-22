@@ -113,6 +113,22 @@ export function stripComments(source) {
  * A string-literal value in either form is fine, which is what the negative
  * lookahead on the object form is for: `"data-mode": "compact"` is a constant.
  */
+/**
+ * Is `data-testid` given a runtime value through the props-object spelling?
+ *
+ * Separate from `dynamicDataAttrs`, which deliberately drops the name so the
+ * curated-prop shape is not reported as a leak. Both callers below need the
+ * object form as well as the JSX one, and this is the one place that knows it.
+ */
+function interpolatedTestIdObjectForm(cleanSource) {
+  for (const m of cleanSource.matchAll(/["']data-testid["']\s*:\s*([^,}\n]*)/g)) {
+    const expr = m[1].trim();
+    if (/^(["'])[^"'`]*\1$/.test(expr)) continue; // a constant name is fine
+    return true;
+  }
+  return false;
+}
+
 export function dynamicDataAttrs(source) {
   const clean = stripComments(source);
   const jsx = [...clean.matchAll(/(data-[a-z0-9-]+)=\{/g)].map((m) => m[1]);
@@ -121,9 +137,26 @@ export function dynamicDataAttrs(source) {
   // width, the lookahead then reads the space it gave up, the space is not a
   // quote, and every constant string matches. Capturing cannot backtrack past
   // itself.
-  const obj = [...clean.matchAll(/["'](data-[a-z0-9-]+)["']\s*:\s*(\S)/g)]
-    .filter((m) => !["\"", "'", "`"].includes(m[2]))
-    .map((m) => m[1]);
+  //
+  // A BACKTICK is constant only when the template interpolates nothing.
+  // Excluding it outright, which is what shipped, made `` `${account}` `` read
+  // as a literal, and that is the one value shape most likely to carry the
+  // account number into a props-object `data-*`: the whole reason this arm
+  // exists. Scanning to the closing backtick can over-report if a template
+  // contains an escaped one, and that direction is the safe one: a false report
+  // costs an argument, a false silence costs the leak.
+  const obj = [];
+  for (const m of clean.matchAll(/["'](data-[a-z0-9-]+)["']\s*:\s*(\S)/g)) {
+    const first = m[2];
+    if (first === '"' || first === "'") continue;
+    if (first === "`") {
+      const start = m.index + m[0].length;
+      const close = clean.indexOf("`", start);
+      const body = close === -1 ? clean.slice(start) : clean.slice(start, close);
+      if (!body.includes("${")) continue;
+    }
+    obj.push(m[1]);
+  }
   // `data-testid` has its own rule below, and a curated-prop component taking an
   // explicit `testId` (`src/CLAUDE.md`, "Test observability") is the sanctioned
   // shape rather than a leak. Reporting it here would say the wrong thing about
@@ -229,7 +262,14 @@ function main() {
     // pre-unlock. A selector assembled at runtime is one a scenario has to
     // reconstruct, and the reconstruction is what silently stops matching when
     // the variant set changes. The variant belongs in a `data-*`.
-    if (/data-testid=\{/.test(stripComments(src))) {
+    // BOTH forms. `data-testid={expr}` in JSX, and `{ "data-testid": expr }` in
+    // a props object, which nothing saw: `dynamicDataAttrs` filters the name out
+    // on the stated grounds that "data-testid has its own rule below", and both
+    // rules below matched only the JSX spelling. The props-object shape is
+    // exactly what this feature was written for, since `useScrollEdges` returns
+    // a `data-*` object that `CenteredCard` spreads onto every pre-unlock screen.
+    const cleanSrc = stripComments(src);
+    if (/data-testid=\{/.test(cleanSrc) || interpolatedTestIdObjectForm(cleanSrc)) {
       problems.push(
         `${f}: data-testid is interpolated. Use a stable name plus a discriminator ` +
           `attribute (src/CLAUDE.md, "Test observability").`,
@@ -271,9 +311,21 @@ function main() {
     // three are composed by a pre-unlock screen. A value that comes from a prop
     // the caller chose is not a value the user typed; `data-testid={account}` is,
     // and that is what this catches.
-    for (const m of stripComments(readFileSync(f, "utf8")).matchAll(/data-testid=\{([^}]*)\}/g)) {
-      const expr = m[1].trim();
-      if (/^testId$/.test(expr) || /testIdPrefix/.test(expr)) continue;
+    const preUnlockSrc = stripComments(readFileSync(f, "utf8"));
+    const interpolated = [
+      ...[...preUnlockSrc.matchAll(/data-testid=\{([^}]*)\}/g)].map((m) => m[1]),
+      // The props-object spelling, which the JSX pattern above never matched.
+      ...[...preUnlockSrc.matchAll(/["']data-testid["']\s*:\s*([^,}\n]*)/g)].map((m) => m[1]),
+    ];
+    for (const raw of interpolated) {
+      const expr = raw.trim();
+      // A constant string in either spelling is not a runtime value.
+      if (/^(["'])[^"'`]*\1$/.test(expr)) continue;
+      // BOTH alternatives anchored. `/testIdPrefix/` was a bare substring test,
+      // so any expression merely CONTAINING the prop name was exempt, including
+      // `` `${testIdPrefix}-${accountNumber}` ``. The exemption is for a value
+      // the caller chose, which is the bare identifier and nothing else.
+      if (/^testId$/.test(expr) || /^testIdPrefix$/.test(expr)) continue;
       problems.push(
         `${f}: data-testid={${expr}} takes a runtime value on (or under) a ` +
           `pre-unlock screen. Its value reaches the DOM like any other data-*, ` +
