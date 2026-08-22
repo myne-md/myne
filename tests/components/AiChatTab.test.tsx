@@ -464,6 +464,7 @@ describe("AiChatTab attribution", () => {
 describe("AiChatTab: the agent run is a turn in the same transcript", () => {
   const SUMMARY = {
     runId: "r1",
+    summary: "",
     edits: 4,
     newNotes: 1,
     notesRead: 6,
@@ -544,6 +545,81 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
       "agent.review.noChanges",
     );
+  });
+
+  // myne-md/myne#568. In one mode a question is a run like any other and
+  // `finish` is how it is answered, so the summary IS the reply. It used to
+  // render only inside the review dialog, which is how a question about a note
+  // got answered inside a "Review changes" screen.
+  describe("the model's answer", () => {
+    it("renders in the transcript", () => {
+      sendAgentTurn("how many personal tasks are in this note", "This note");
+      settleAgentTurn({
+        ...SUMMARY,
+        edits: 0,
+        newNotes: 0,
+        summary: "You have 16 personal tasks in this note.",
+      });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-answer").textContent).toBe(
+        "You have 16 personal tasks in this note.",
+      );
+    });
+
+    it("suppresses the no-changes line when it answered", () => {
+      // "The agent proposed no changes" is the right sentence for an edit
+      // request that produced nothing, and exactly the wrong one under an
+      // answer the user asked for: it reads as a failure report on a reply that
+      // succeeded, which is what the user saw.
+      sendAgentTurn("how many personal tasks are in this note", "This note");
+      settleAgentTurn({
+        ...SUMMARY,
+        edits: 0,
+        newNotes: 0,
+        summary: "You have 16 personal tasks in this note.",
+      });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-summary").textContent).not.toContain(
+        "agent.review.noChanges",
+      );
+    });
+
+    it("keeps the counts when the run BOTH answered and proposed", () => {
+      // The two are not alternatives. A run can explain what it did and propose
+      // the edits in the same breath, and dropping either half would be a
+      // narrower surface than before the fix.
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, summary: "I tightened four headings." });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-answer").textContent).toBe(
+        "I tightened four headings.",
+      );
+      expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+        "agentTurn.proposed:4",
+      );
+    });
+
+    it("renders nothing at all when the run finished without one", () => {
+      // Absence is a state rather than an empty paragraph: a run that proposed
+      // edits and said nothing about them should not grow a blank line.
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn(SUMMARY);
+      render(<AiChatTab />);
+      expect(screen.queryByTestId("ai.agent-answer")).toBeNull();
+    });
+
+    it("treats a whitespace-only summary as none", () => {
+      // The model can close with a bare newline. Rendering that is an empty
+      // bubble line, and worse, it would suppress the no-changes sentence on a
+      // run that really did nothing.
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, edits: 0, newNotes: 0, summary: "  \n " });
+      render(<AiChatTab />);
+      expect(screen.queryByTestId("ai.agent-answer")).toBeNull();
+      expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+        "agent.review.noChanges",
+      );
+    });
   });
 
   it("names a run that was cancelled or ran out of steps", () => {
@@ -686,6 +762,7 @@ describe("AiChatTab: starting a new conversation", () => {
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({
       runId: "r1",
+      summary: "",
       edits: 1,
       newNotes: 0,
       notesRead: 1,

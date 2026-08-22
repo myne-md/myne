@@ -95,14 +95,25 @@ export function AgentReviewTakeover({
   onNotesWritten: () => void;
 }) {
   const agent = useAgent();
-  // A run is reviewable once it has stopped and has NOT stopped to ask. Every
-  // other end kind (`finished`, `cancelled`, `exhaustedIterations`, `stalled`)
-  // leaves a proposal the user is entitled to see, including a partial one.
+  // A run is reviewable once it has stopped, has NOT stopped to ask, and has
+  // something to show. Every end kind other than `awaitingScope` (`finished`,
+  // `cancelled`, `exhaustedIterations`, `stalled`) leaves a proposal the user is
+  // entitled to see, including a partial one — that rule from
+  // `docs/decisions/ai/0518` is kept exactly.
   const reviewable =
     agent.view !== null &&
     !agent.running &&
     agent.end !== null &&
     agent.end.kind !== "awaitingScope" &&
+    // **And the run proposed something** (myne-md/myne#568). In the two-mode
+    // world every run that reached this screen had set out to produce a
+    // proposal, so "it stopped" and "there is something to review" were the same
+    // fact. One mode broke that: a question is a run too, so every question
+    // opened a review dialog whose whole content was "the agent proposed no
+    // changes", over the transcript where the answer belonged. This is the only
+    // case that changes — one edit is still enough to open the screen, whatever
+    // the end kind.
+    (agent.proposal.edits.length > 0 || agent.proposal.newNotes.length > 0) &&
     // **And the run is not applying itself** (myne-md/myne#551). Without this
     // clause an automatic run opens the screen it exists to skip for the frames
     // between the step settling and the apply returning. The flag is raised

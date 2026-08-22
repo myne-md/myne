@@ -47,13 +47,28 @@ export type AgentTurnEnd =
 
 /** What an agent turn keeps once its run is no longer the open one.
  *
- *  **Counts only, by construction.** `agentStore` holds exactly one run, so a
- *  turn that is not the newest has no live state to read; this is what it says
- *  instead. Every field is a number or a closed tag, with no note id, no title,
- *  no anchor and no replacement, so a transcript that outlives a run outlives it
- *  holding nothing the vault would miss. */
+ *  **Counts, plus the model's own closing sentence.** `agentStore` holds exactly
+ *  one run, so a turn that is not the newest has no live state to read; this is
+ *  what it says instead. Every field but `summary` is a number or a closed tag.
+ *
+ *  `summary` is the run's `finish` text, and it is here because in one mode it
+ *  is the ANSWER (myne-md/myne#568, superseding the counts-only clause of
+ *  `docs/decisions/ai/0518`). It is model output, so it can quote note text —
+ *  and that is the same class this store already holds, since a `text` turn is
+ *  the model's words about the open note. What is still excluded is the
+ *  PROPOSAL: anchors and replacements are text copied verbatim out of note
+ *  bodies, they stay in `agentStore`, and they are dropped by
+ *  `clearAgentForLock`. This store's own teardown is `clearChat`, on the same
+ *  roster and on the same paths, so nothing here outlives the unlocked
+ *  session. */
 export interface AgentTurnSummary {
   runId: string;
+  /** The model's closing summary, or "" when it finished without one.
+   *
+   *  In one mode this is what a question gets answered with, so an empty string
+   *  and a sentence are genuinely different renderings rather than a presence
+   *  check on decoration. */
+  summary: string;
   /** Proposed edits to existing notes. */
   edits: number;
   /** Proposed new notes. */

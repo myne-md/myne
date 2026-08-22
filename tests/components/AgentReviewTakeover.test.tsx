@@ -22,7 +22,7 @@ vi.mock("../../src/screens/AgentReview", () => ({
   AgentReview: () => <div data-testid="stub-review" />,
 }));
 
-import type { LoopEnd } from "../../src/lib/agent-run";
+import type { LoopEnd, Proposal } from "../../src/lib/agent-run";
 import { AgentReviewTakeover } from "../../src/notes/agent/components/AgentReviewTakeover";
 import {
   beginRun,
@@ -39,10 +39,23 @@ const VIEW = {
   cancelled: false,
 };
 
-function settle(end: LoopEnd) {
+/** One proposed edit, which is what makes a settled run reviewable at all.
+ *
+ *  The default rather than an empty proposal (myne-md/myne#568): the end-kind
+ *  cases below are about the END, and giving them nothing to review would make
+ *  them pass or fail on the other rule. */
+const ONE_EDIT: Proposal = {
+  edits: [{ noteId: "n1", anchor: "before", replacement: "after" }],
+  newNotes: [],
+  summary: "",
+};
+
+const NOTHING: Proposal = { edits: [], newNotes: [], summary: "" };
+
+function settle(end: LoopEnd, proposal: Proposal = ONE_EDIT) {
   settleStep({
     view: VIEW,
-    proposal: { edits: [], newNotes: [], summary: "" },
+    proposal,
     end,
     iterations: 1,
     notesRead: 1,
@@ -101,6 +114,61 @@ describe("AgentReviewTakeover", () => {
       expect(screen.queryByTestId("stub-review")).not.toBeNull();
     });
   }
+
+  // myne-md/myne#568. The dimension the end-kind loop above cannot see: it is
+  // not only WHY a run stopped that decides this, it is whether it left
+  // anything to look at.
+  //
+  // **This is not the `awaitingScope` rule again.** That one is about a run
+  // that has not finished proposing; this one is about a run that finished and
+  // proposed nothing, which in one mode is what every QUESTION does. Before the
+  // fix, asking "how many tasks are in this note" opened a full review dialog
+  // whose entire content was "the agent proposed no changes", over the
+  // transcript where the answer belonged.
+  for (const end of [
+    { kind: "finished" } as const,
+    { kind: "cancelled" } as const,
+    { kind: "exhaustedIterations" } as const,
+    { kind: "stalled", barrenIterations: 3 } as const,
+  ]) {
+    it(`does NOT take over when a ${end.kind} run proposed nothing`, () => {
+      beginRun();
+      settle(end, NOTHING);
+      mount();
+      expect(screen.queryByTestId("editor.agent-review")).toBeNull();
+    });
+  }
+
+  it("takes over for a proposal that is only new notes", () => {
+    // The other half of the emptiness test, so it cannot be satisfied by
+    // looking at `edits` alone: a run that proposed only new notes has as much
+    // to review as one that proposed only edits.
+    beginRun();
+    settle(
+      { kind: "finished" },
+      {
+        edits: [],
+        newNotes: [{ title: "New", body: "body", folder: null }],
+        summary: "",
+      },
+    );
+    mount();
+    expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
+  });
+
+  it("does NOT take over for a summary alone, however long", () => {
+    // A summary is an ANSWER, and the answer's home is the transcript. Pinned
+    // separately because "there is text in the proposal" is the tempting wrong
+    // condition: it would reopen this screen for every question that got a
+    // wordy reply.
+    beginRun();
+    settle(
+      { kind: "finished" },
+      { edits: [], newNotes: [], summary: "You have 16 personal tasks." },
+    );
+    mount();
+    expect(screen.queryByTestId("editor.agent-review")).toBeNull();
+  });
 
   it("stops taking over once the run is dropped", () => {
     // Closing calls `clearAgent()`, which drops the run. That is what makes the

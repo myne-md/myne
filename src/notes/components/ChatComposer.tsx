@@ -8,13 +8,14 @@
 // the composer sat outside it. Two inputs is not a smaller decision than one; it
 // is the same decision, unmade, in front of every user who opens the tab.
 //
-// **Why the mode is a control rather than an inference.** Reading the message to
-// decide whether the user wants an answer or an edit puts that routing on the
-// model, and the model is the thing the edit-format probe below exists to
-// distrust. The failure is also asymmetric: mistaking a question for an edit
-// starts a scope-holding run and spends provider requests, while the reverse
-// only costs a re-send. So the user says which, in two words, and the
-// consequence is visible before they press anything.
+// **There is no Ask/Edit control any more** (myne-md/myne#552,
+// `docs/decisions/ai/0524`). Every message starts an agent run: the agent
+// answers a question with its `finish` summary and proposes edits when that is
+// what was asked for. The segment that used to choose the flow now chooses the
+// permission mode. The asymmetry the old control was justified by has not
+// changed and is not being denied — it is that in one mode every message
+// deliberately pays the expensive side, because the expensive side can now
+// answer questions too (`search_vault`, `0523`).
 //
 // **Two things here are load-bearing rather than layout.**
 //
@@ -23,12 +24,14 @@
 //      "Removing that control does not make the feature smaller; it routes every
 //      folder-scale run through the riskier of the two mechanisms." It shows the
 //      host's note count before sending, because "Projects" is not a size.
-//   2. The probe stays on the first Edit-mode Send. Not on mount, and **not on
-//      the mode switch** either: with a remote provider configured the probe
-//      issues `threshold.attempts` requests to that provider, and TB13 bars a
-//      surface that fires without the user asking. Flipping a segmented control
-//      is not asking. Opening the tab and choosing Edit both cost nothing; the
-//      Send pays for the check.
+//   2. The probe stays on the first Send. Not on mount, and not on a control
+//      change either: with a remote provider configured the probe issues
+//      `threshold.attempts` requests to that provider, and TB13 bars a surface
+//      that fires without the user asking. Opening the tab costs nothing; the
+//      Send pays for the check. What myne-md/myne#568 changed is only how long
+//      one answer LIVES — the verdict is session state in `agentStore` rather
+//      than this component's, so a tab switch no longer re-buys it — never when
+//      it is bought.
 
 import {
   useEffect,
@@ -49,7 +52,12 @@ import {
   type ProbeVerdict,
   type ScopeGrant,
 } from "../../lib/agent-run";
-import { setAutoApply, useAgent } from "../agent/agentStore";
+import {
+  getAgent,
+  setAutoApply,
+  setProbeVerdict,
+  useAgent,
+} from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
 import { CAPTION_STYLE } from "./sharedStyles";
 
@@ -115,27 +123,40 @@ export function ChatComposer({
    *  reset path was unreachable, because once the probe has failed the composer
    *  is blocked, so `ensureCapability` can never run again to clear it.
    *
-   *  Offering Send during the window between asking and hearing back would be
-   *  the same defect the gate exists to close, so `probing` covers that window. */
-  const [probe, setProbe] = useState<ProbeVerdict | "failed" | null>(null);
+   *  **In the run store rather than here** (myne-md/myne#568). It used to be
+   *  this component's own `useState`, so every remount asked again: with a
+   *  remote provider that is `threshold.attempts` requests, 8 seconds in the
+   *  session that found it, and `AiChatTab` remounts on an ordinary tab switch
+   *  in the right panel. The store keeps it for the session and
+   *  `clearAgentForLock` drops it, which is the teardown a component cannot
+   *  have. WHEN the probe fires has not changed: still the first Send. */
+  const probe = agent.probeVerdict;
+  /** Offering Send during the window between asking and hearing back would be
+   *  the same defect the gate exists to close, so this covers that window.
+   *  Component state on purpose, unlike the verdict: it describes a call this
+   *  composer has in flight, and a composer that unmounts takes it with it. */
   const [probing, setProbing] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const verdict = typeof probe === "object" ? probe : null;
 
-  /** Run the probe, at most once per mounted composer. See the module note for
-   *  why it is not fired on mount or on the mode switch. */
+  /** Run the probe, at most once per session. See the module note for why it is
+   *  not fired on mount or on a control change. */
   async function ensureCapability(): Promise<ProbeVerdict | null> {
-    if (verdict !== null) return verdict;
+    // Read through the store rather than trusting this render's snapshot: a
+    // sibling composer, or this one after a remount, may have paid for the
+    // answer already.
+    const known = getAgent().probeVerdict;
+    if (typeof known === "object" && known !== null) return known;
     setProbing(true);
     try {
       const v = await agentCapability();
-      setProbe(v);
+      setProbeVerdict(v);
       return v;
     } catch {
       // Fail CLOSED. An unanswerable probe is not evidence that the backend can
       // hold the format, and offering the run anyway is what this gate exists
       // to prevent.
-      setProbe("failed");
+      setProbeVerdict("failed");
       return null;
     } finally {
       setProbing(false);

@@ -188,6 +188,15 @@ pub async fn drive(
             notes_read = o.notes_read,
             edits = o.proposal.edits.len(),
             new_notes = o.proposal.new_notes.len(),
+            // **How LONG the closing summary is, never what it says**
+            // (myne-md/myne#568). `edits=0` alone does not distinguish a run
+            // that failed to propose anything from a run that was never asked
+            // to: in one mode a question is a run too, and `finish` is how it is
+            // answered. `edits=0 summary_chars=120` reads as "the model
+            // answered, it proposed nothing", which took a session to work out
+            // from the surface. A count, so the DENY list holds: the summary is
+            // model output and can quote note text.
+            summary_chars = o.proposal.summary.chars().count(),
         ),
         // `kind()`, never the error itself: two variants carry a `note_id`.
         Err(e) => tracing::debug!(
@@ -1106,6 +1115,28 @@ mod tests {
         assert!(logs_contain("verbs=\"finish\""));
         // And the run says how it ended, once.
         assert!(logs_contain("event=\"run_stopped\" end=\"finished\""));
+        // **How long the closing summary was, never what it said**
+        // (myne-md/myne#568). `"ok"` is two characters. Without this figure
+        // `edits=0` is ambiguous between "the model proposed nothing" and "the
+        // model was never asked to propose anything, it answered a question" —
+        // which in one mode is most runs, and which took a whole session to work
+        // out from the surface.
+        assert!(logs_contain("summary_chars=2"));
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_run_that_answered_nothing_says_zero_rather_than_omitting_the_figure() {
+        // The other direction. A field that appears only when it is non-zero is
+        // a field a reader cannot use to distinguish "no summary" from "this
+        // build does not log it", so the absence has to be a value.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":""}"#]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert!(logs_contain("summary_chars=0"));
     }
 
     #[test]

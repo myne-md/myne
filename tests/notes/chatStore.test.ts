@@ -263,6 +263,7 @@ describe("an ask terminal may not close an agent run's turn", () => {
     s = chatReducer(s, { type: "FINALIZE" });
     const summary = {
       runId: "r1",
+      summary: "",
       edits: 2,
       newNotes: 0,
       notesRead: 3,
