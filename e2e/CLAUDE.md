@@ -57,6 +57,24 @@
 - **Load-bearing banner copy is asserted by FULL-LITERAL equality** via
   `src/lib/load-bearing-copy.ts` (or `ioBanner(...)` where production renders
   that mapping). A copy collapse must fail a test.
+- **A frontend-only change needs the crate to relink, or the binary keeps
+  ANOTHER TREE's bundle.** The frontend is embedded at compile time, so a diff
+  confined to `src/`, `editor/` or any other frontend tree touches no Rust source,
+  cargo relinks nothing, and `target/release/myne-desktop` keeps whatever
+  `dist/` it embedded when it was last compiled. With the shared
+  `myne-e2e-target` volume that can be a **different worktree's** frontend. It
+  happened on myne-md/myne#520: `pnpm build` emitted a correct `dist/`, the
+  build reported success, and the app under test loaded
+  `main-CoKDUqv9.js` out of `.claude/worktrees/554-…/dist`, whose host still
+  dispatched the pre-fix event, so a correct fix's own scenario failed and read
+  as "the fix does not work". The three `e2e-*.sh` build scripts now
+  `touch src-tauri/src/lib.rs` before `pnpm tauri build`; **`e2e-one.sh` does
+  not build at all**, so after a frontend edit it is testing the previous
+  binary, which is the same trap wearing a different hat. When a scenario
+  contradicts a fix you have read in the source, check WHICH bundle the WebView
+  loaded before you believe it: `[...document.querySelectorAll('script[src]')]`
+  from the page seat gives the hashed filename, and `find . -name '<that>'`
+  says which tree it came from.
 - **KDF policy:** weak-KDF generator fixtures by default (legal: unlock reads
   params from `vault.meta`; creation stays pinned — no code branch). The VR-1
   recovery drill + creation scenarios run PRODUCTION params every pipeline.

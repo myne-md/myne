@@ -7,7 +7,18 @@ cd "$(dirname "$0")/.."
 IMAGE=myne-e2e
 
 # `--features voice-capture-stub`: see scripts/e2e-local.sh (myne#389 item D).
-INNER='set -e; pnpm install --frozen-lockfile && pnpm tauri build --no-bundle -- --features voice-capture-stub; set +e; PASS=""; FAIL="";'
+#
+# The `touch` is load-bearing and cost an hour to find. The frontend is EMBEDDED
+# in the binary at compile time, and a change confined to `src/` (or any other
+# frontend tree) leaves every Rust source untouched, so cargo relinks nothing and
+# the binary keeps whatever bundle it embedded when it was last compiled. With a
+# shared `myne-e2e-target` volume that bundle can be ANOTHER WORKTREE's: this
+# script rebuilt cleanly, `pnpm build` emitted a correct `dist/`, and the app
+# under test loaded `main-CoKDUqv9.js` from `.claude/worktrees/554-…/dist`, whose
+# host still dispatched the pre-fix event. The scenario failed and read as "the
+# production fix does not work", which is the worst possible wrong answer from a
+# green build. Touching the crate root forces the re-embed; it costs one link.
+INNER='set -e; pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub; set +e; PASS=""; FAIL="";'
 for spec in "$@"; do
   INNER+=" echo \"==== RUN ${spec} ====\";"
   INNER+=" xvfb-run -a pnpm exec vitest run --config vitest.e2e.config.ts e2e/${spec}.e2e.ts;"
