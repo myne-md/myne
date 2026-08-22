@@ -73,6 +73,10 @@ export type UseAutosaveReturn = {
    *  render — so this answers for the buffer as it is NOW, not as it was one
    *  commit ago. */
   hasPendingWork: () => boolean;
+  /** Did the most recent save ATTEMPT fail? See the impl docstring: this is the
+   *  settled-check a caller about to read-patch-write the same note needs, and
+   *  `hasPendingWork` is not it. */
+  lastSaveFailed: () => boolean;
 };
 
 /**
@@ -307,8 +311,15 @@ export function useAutosave(
   // The fire function — handles latest-wins gate + IPC dispatch +
   // status transitions. Always called via the timers or via
   // flushIfDirty / retry.
+  /** Set true by `fireSave`'s error arm, cleared at the top of every attempt.
+   *  Read through `lastSaveFailed` below. */
+  const saveFailedRef = useRef(false);
+
   const fireSave = useCallback(async (): Promise<void> => {
     clearTimers();
+    // Cleared at the top of every attempt: the question this answers is "did the
+    // save that just ran fail", not "has anything ever failed" (myne-md/myne#520).
+    saveFailedRef.current = false;
     const id = noteIdRef.current;
     if (id === null) {
       // No selected note → can't save. Stay in current state.
@@ -453,6 +464,7 @@ export function useAutosave(
           }
         }
         dirtyRef.current = true;
+        saveFailedRef.current = true;
         setStatus({ status: "error", error: err });
       } finally {
         // Only when this invocation still owns the slot — see `handedOff`.
@@ -572,6 +584,25 @@ export function useAutosave(
     [],
   );
 
+  /**
+   * Did the most recent save ATTEMPT fail?
+   *
+   * A narrower question than `hasPendingWork`, and the difference is the whole
+   * reason this exists (myne-md/myne#520). `hasPendingWork` is a "do not clobber
+   * me" flag and answers true for a buffer that merely moved on while a
+   * perfectly successful save was in flight, which is the ordinary state right
+   * after a flush. Using it as a settled-check refused every out-of-band
+   * frontmatter write that followed a normal save: the cover never landed and
+   * the user got a write-failed toast, measured against the E2E suite before it
+   * shipped.
+   *
+   * What a caller about to read-patch-write the same note needs to know is only
+   * whether the flush it just awaited actually persisted, and `fireSave` is the
+   * one place that knows. A ref, not `status`, for the reason the whole file
+   * gives: `status` is React state written from a passive effect.
+   */
+  const lastSaveFailed = useCallback(() => saveFailedRef.current, []);
+
   // Hold the latest `saveImpl` in a ref so the unmount cleanup sees
   // the current impl, not the one captured at first render.
   const saveImplRef = useRef(saveImpl);
@@ -606,7 +637,16 @@ export function useAutosave(
       flushOutgoing,
       acceptReloadedBody,
       hasPendingWork,
+      lastSaveFailed,
     }),
-    [status, retry, flushIfDirty, flushOutgoing, acceptReloadedBody, hasPendingWork],
+    [
+      status,
+      retry,
+      flushIfDirty,
+      flushOutgoing,
+      acceptReloadedBody,
+      hasPendingWork,
+      lastSaveFailed,
+    ],
   );
 }

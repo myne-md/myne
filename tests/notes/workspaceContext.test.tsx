@@ -193,8 +193,8 @@ describe("useWorkspace — back/forward history (MYND-260)", () => {
 describe("useWorkspace — flush registry", () => {
   it("flushAll calls every registered pane flusher; unregister stops it", async () => {
     const { result } = renderHook(() => useWorkspace(), { wrapper });
-    const f1 = vi.fn().mockResolvedValue(undefined);
-    const f2 = vi.fn().mockResolvedValue(undefined);
+    const f1 = vi.fn().mockResolvedValue(true);
+    const f2 = vi.fn().mockResolvedValue(true);
 
     act(() => {
       result.current.registerFlush("p1", f1);
@@ -212,6 +212,51 @@ describe("useWorkspace — flush registry", () => {
     });
     expect(f1).toHaveBeenCalledTimes(2);
     expect(f2).toHaveBeenCalledTimes(1); // not called again
+  });
+
+  // myne-md/myne#520. `flushAll` used to swallow every per-flusher rejection,
+  // and `useAutosave.fireSave` swallows one of its own into that pane's
+  // `saveStatus`, so a pane whose `note_update` FAILED reported success to
+  // every caller: the folder rename, the inbound title rename, the frontmatter
+  // writers and vim `:w` all read stale disk bytes and wrote on top of them.
+  // The flusher now answers whether the pane SETTLED, and these three cases are
+  // what make that answer load-bearing rather than decorative.
+  it("rejects when a pane reports it did not settle", async () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => {
+      result.current.registerFlush("clean", vi.fn().mockResolvedValue(true));
+      result.current.registerFlush("dirty", vi.fn().mockResolvedValue(false));
+    });
+    await act(async () => {
+      await expect(result.current.flushAll()).rejects.toThrow(/did not settle/);
+    });
+  });
+
+  it("rejects when a flusher throws outright, and still runs the others", async () => {
+    // Both directions in one: the rejection must not be swallowed, AND it must
+    // not short-circuit `Promise.all` and hide the sibling panes.
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    const other = vi.fn().mockResolvedValue(true);
+    act(() => {
+      result.current.registerFlush("boom", vi.fn().mockRejectedValue(new Error("io")));
+      result.current.registerFlush("other", other);
+    });
+    await act(async () => {
+      await expect(result.current.flushAll()).rejects.toThrow(/did not settle/);
+    });
+    expect(other).toHaveBeenCalledTimes(1);
+  });
+
+  it("names how many panes did not settle, so one failure does not hide two", async () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => {
+      result.current.registerFlush("a", vi.fn().mockResolvedValue(false));
+      result.current.registerFlush("b", vi.fn().mockResolvedValue(false));
+      result.current.registerFlush("c", vi.fn().mockResolvedValue(true));
+    });
+    await act(async () => {
+      await expect(result.current.flushAll()).rejects.toThrow(/2 pane\(s\)/);
+    });
   });
 });
 
@@ -269,7 +314,7 @@ describe("useWorkspace — saved-view (item) tabs (MYND-274)", () => {
   it("flushAll does not error on a workspace containing view tabs", async () => {
     const { result } = renderHook(() => useWorkspace(), { wrapper });
     act(() => result.current.openView("v1")); // a view tab (no autosave/flush)
-    const f = vi.fn().mockResolvedValue(undefined);
+    const f = vi.fn().mockResolvedValue(true);
     act(() => result.current.registerFlush("note-pane", f));
     await act(async () => {
       await result.current.flushAll();
