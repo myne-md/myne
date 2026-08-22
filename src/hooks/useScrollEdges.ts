@@ -122,6 +122,14 @@ export function useScrollEdges<T extends HTMLElement>(): {
         typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
       const observeAll = (): void => {
         if (ro === null) return;
+        // `disconnect()` FIRST, then re-observe. The MutationObserver re-runs
+        // this on every `childList` change, and `observe()` alone never drops a
+        // node that has left the DOM: the observation list grows for the whole
+        // life of the mount and each entry keeps a detached element alive.
+        // Bounded only by how much the list churns, which is not a bound. This
+        // hook is now mounted by every `CenteredCard` screen as well as the
+        // vault picker.
+        ro.disconnect();
         ro.observe(node);
         for (const child of Array.from(node.children)) ro.observe(child);
       };
