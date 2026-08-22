@@ -47,6 +47,7 @@
       "unsupported": "This model cannot make precise edits reliably, so the agent is unavailable. Choose a larger model or a provider.",
       "unsupportedDetail": "It passed {{passes}} of {{attempts}} checks; {{required}} are needed.",
       "checking": "Checking the model…",
+      "checkingAt": "Checking the model… ({{attempt}}/{{of}})",
       "unsupportedProvisional": "That pass mark has not been measured across models yet, so it may be stricter or looser than it should be."
     },
     "progress": {

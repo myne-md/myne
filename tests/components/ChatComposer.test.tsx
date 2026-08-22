@@ -15,7 +15,7 @@
 // whole probe again.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -136,6 +136,49 @@ describe("ChatComposer", () => {
     expect(agentCapability).not.toHaveBeenCalled();
     type("something");
     expect(agentCapability).not.toHaveBeenCalled();
+  });
+
+  it("counts the probe's attempts on the button while it waits", async () => {
+    // myne-md/myne#575. The probe was measured at 40 seconds on a remote
+    // provider, and the button said one unchanging thing for the whole of it,
+    // which reads as a hang. Driven through the real binding's callback rather
+    // than by setting state, so deleting the `onAttempt` argument in
+    // `ensureCapability` fails this rather than leaving it green.
+    let announce: ((p: { attempt: number; of: number }) => void) | undefined;
+    let settle: ((v: unknown) => void) | undefined;
+    agentCapability.mockImplementation((onAttempt: unknown) => {
+      announce = onAttempt as (p: { attempt: number; of: number }) => void;
+      return new Promise((resolve) => {
+        settle = resolve;
+      });
+    });
+    mount();
+    type("tidy the headings");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    // Before the host has announced anything there is no number to show, and a
+    // "0 of 3" would describe nothing.
+    await waitFor(() => expect(announce).toBeDefined());
+    expect(screen.getByTestId("ai.composer-send").textContent).toContain(
+      "agent.composer.checking",
+    );
+
+    act(() => announce!({ attempt: 2, of: 3 }));
+    expect(screen.getByTestId("ai.composer-send").textContent).toContain(
+      "agent.composer.checkingAt",
+    );
+
+    // And it goes away when the probe does, rather than sticking on the last
+    // attempt it happened to see.
+    await act(async () => {
+      settle!(PASSING);
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.composer-send").textContent).not.toContain(
+        "agent.composer.checking",
+      ),
+    );
   });
 
   it("does not re-probe after a remount", async () => {

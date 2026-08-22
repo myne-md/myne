@@ -49,6 +49,7 @@ import {
   agentCapability,
   agentPreviewGrant,
   type GrantPreview,
+  type ProbeProgress,
   type ProbeVerdict,
   type ScopeGrant,
 } from "../../lib/agent-run";
@@ -136,6 +137,13 @@ export function ChatComposer({
    *  Component state on purpose, unlike the verdict: it describes a call this
    *  composer has in flight, and a composer that unmounts takes it with it. */
   const [probing, setProbing] = useState(false);
+  /** Which attempt the probe is on, while it is on one (myne-md/myne#575).
+   *
+   *  Component state beside `probing`, and for the same reason: it describes a
+   *  call THIS composer has in flight, so a composer that unmounts takes it
+   *  with it. The VERDICT is the thing that has to outlive the component, and
+   *  it lives in the store. */
+  const [probeAt, setProbeAt] = useState<ProbeProgress | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const verdict = typeof probe === "object" ? probe : null;
 
@@ -149,7 +157,7 @@ export function ChatComposer({
     if (typeof known === "object" && known !== null) return known;
     setProbing(true);
     try {
-      const v = await agentCapability();
+      const v = await agentCapability(setProbeAt);
       setProbeVerdict(v);
       return v;
     } catch {
@@ -160,6 +168,7 @@ export function ChatComposer({
       return null;
     } finally {
       setProbing(false);
+      setProbeAt(null);
     }
   }
 
@@ -428,7 +437,16 @@ export function ChatComposer({
           disabled={blocked}
         >
           {probing
-            ? t("agent.composer.checking")
+            ? // **The count, once the host has reported one.** The plain label
+              // is still what the first frames show, because the first attempt
+              // has not been announced yet at the moment Send is pressed, and a
+              // "0 of 3" would be a number describing nothing.
+              probeAt === null
+              ? t("agent.composer.checking")
+              : t("agent.composer.checkingAt", {
+                  attempt: probeAt.attempt,
+                  of: probeAt.of,
+                })
             : t("editor.chrome.rightPanel.aiChat.send")}
         </Button>
       </form>

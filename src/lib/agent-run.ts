@@ -340,9 +340,28 @@ export async function agentLastRun(): Promise<AppliedRun | null> {
   return await invoke<AppliedRun | null>("plugin:agent|agent_last_run");
 }
 
-/** Whether the configured backend can hold the anchored edit format. */
-export async function agentCapability(): Promise<ProbeVerdict> {
-  return await invoke<ProbeVerdict>("plugin:agent|agent_capability");
+/** Which probe attempt is in flight (myne-md/myne#575). Counts only. */
+export interface ProbeProgress {
+  /** 1-based. */
+  attempt: number;
+  /** The most that will be asked; the probe stops earlier once the verdict is
+   *  settled, so this is an allowance rather than a promise. */
+  of: number;
+}
+
+/** Whether the configured backend can hold the anchored edit format.
+ *
+ *  `onAttempt` is called before each request goes out. This call was measured at
+ *  40 seconds on a remote provider, and until it reported progress the surface
+ *  showed one unchanging label for the whole of it, which reads as a hang. */
+export async function agentCapability(
+  onAttempt?: (progress: ProbeProgress) => void,
+): Promise<ProbeVerdict> {
+  const channel = new Channel<ProbeProgress>();
+  if (onAttempt !== undefined) channel.onmessage = onAttempt;
+  return await invoke<ProbeVerdict>("plugin:agent|agent_capability", {
+    onAttempt: channel,
+  });
 }
 
 /** Whether an edit would take a note OUT of the working set.
