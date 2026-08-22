@@ -27,7 +27,7 @@ use myne_core::host::tauri_host::TauriHost;
 use myne_core::plugins::agent::apply::{ApplyOutcome, Approval, RefusedEdit};
 use myne_core::plugins::agent::engine::{Content, Message};
 use myne_core::plugins::agent::error::{AgentError, EditRejection};
-use myne_core::plugins::agent::probe::{run_probe, ProbeThreshold, ProbeVerdict};
+use myne_core::plugins::agent::probe::{run_probe, ProbeProgress, ProbeThreshold, ProbeVerdict};
 use myne_core::plugins::agent::prompt::{Proposal, ProposedNote};
 use myne_core::plugins::agent::run::{AgentRunState, AgentRunView, AppliedRun, GrantOrigin};
 use myne_core::plugins::agent::run_loop::{drive, LoopDeps, LoopEnd, LoopOutcome};
@@ -1105,6 +1105,13 @@ pub struct AgentUndoResult {
 #[tauri::command]
 pub async fn agent_capability<R: Runtime>(
     app: AppHandle<R>,
+    // **The wait, reported while it is a wait** (myne-md/myne#575). This command
+    // returns once, when everything is done, which was measured at 40 seconds;
+    // until then the surface showed one unchanging label and read as a hang. A
+    // `Channel` rather than an event, for the reason `agent_start`'s `on_open`
+    // gives: it is an ordinary parameter, so there is no new command and no ACL
+    // change.
+    on_attempt: Channel<ProbeProgress>,
     ai: State<'_, LocalInferenceState>,
     vault: State<'_, VaultRuntimeState>,
 ) -> Result<ProbeVerdict, AgentError> {
@@ -1125,7 +1132,12 @@ pub async fn agent_capability<R: Runtime>(
     // flag that could only ever read `false` would be a claim the code cannot
     // make.
     let started = std::time::Instant::now();
-    let verdict = run_probe(&engine, probe_threshold()).await;
+    // A failed send is ignored, exactly as `agent_start`'s is: a closed channel
+    // means the surface let go, and the probe is unaffected either way.
+    let sink = move |p: ProbeProgress| {
+        let _ = on_attempt.send(p);
+    };
+    let verdict = run_probe(&engine, probe_threshold(), &sink).await;
     tracing::debug!(
         target: "myne::agent",
         event = "probe_returned",
@@ -1135,6 +1147,10 @@ pub async fn agent_capability<R: Runtime>(
         // here.
         passed = verdict.as_ref().map(|v| v.passed).unwrap_or(false),
         passes = verdict.as_ref().map(|v| v.passes).unwrap_or(0),
+        // What was actually ASKED. Since the early exit this is the number the
+        // elapsed time above is explained by, and it differs from the threshold
+        // whenever the verdict settled early.
+        asked = verdict.as_ref().map(|v| v.attempts.len()).unwrap_or(0),
     );
     verdict
 }
