@@ -47,6 +47,7 @@
       "unsupported": "This model cannot make precise edits reliably, so the agent is unavailable. Choose a larger model or a provider.",
       "unsupportedDetail": "It passed {{passes}} of {{attempts}} checks; {{required}} are needed.",
       "checking": "Checking the model…",
+      "checkingAt": "Checking the model… ({{attempt}}/{{of}})",
       "unsupportedProvisional": "That pass mark has not been measured across models yet, so it may be stricter or looser than it should be."
     },
     "progress": {
@@ -1062,7 +1063,8 @@
       "rightPanel": {
         "aiChat": {
           "agentTurn": {
-            "newNotes_one": "{{count}} new note.",
+            "noAnswer": "The agent stopped without an answer. Try asking again, or rephrase it.",
+          "newNotes_one": "{{count}} new note.",
             "newNotes_other": "{{count}} new notes.",
             "proposed_one": "Proposed {{count}} change.",
             "proposed_other": "Proposed {{count}} changes."
