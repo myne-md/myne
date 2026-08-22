@@ -8,7 +8,7 @@ import { invoke } from "../platform/core";
 import { has } from "../platform/capabilities";
 import { deliverFile } from "../platform/download";
 import { logErrorKind } from "./vault-creation-logging";
-import { copySecret, type CancelClear, type Feedback } from "./clipboard";
+import { announce, copySecret, type CancelClear, type Feedback } from "./clipboard";
 
 const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
 
@@ -90,9 +90,50 @@ export async function copySecretToClipboard(
 // means our value is gone); a rejection from it is an ACL refusal, not a
 // statement about the clipboard's contents.
 
+/**
+ * Save `value` to a file the user can find, and tell them which way it went.
+ *
+ * **`feedback` is required, and that is the whole fix** (myne-md/myne#522). This
+ * used to return `Promise<void>` with both failure paths ending in a
+ * `console.error` nobody sees, on the two screens that show a credential once.
+ * Both call sites discarded the result, so it succeeded silently and it failed
+ * silently, and the two look identical to someone who has one chance to keep a
+ * recovery phrase.
+ *
+ * Worse than a generic missing toast, because the string myne#390 shipped for a
+ * failed Copy reads `Couldn't copy. Use "Save as file" instead.` The recovery
+ * path that message names was itself the silent one.
+ *
+ * A CANCELLED dialog reports nothing, deliberately: the user closed it, they
+ * know, and announcing it would be the app narrating their own action back at
+ * them. Only the two outcomes they did not choose are announced.
+ *
+ * **`onSuccess` means two different things on the two arms, and the CALLER owns
+ * the sentence.** On the dialog arm the Rust write returned, so the file exists.
+ * On the download arm `deliverFile` is `<a download>.click()`, which returns
+ * before the browser has written anything and throws on none of a blocked
+ * download, a cancelled destination prompt or a failed write, so the only true
+ * statement is that the browser has been handed the bytes. Both vault-creation
+ * screens therefore pick their success string off `has("nativeSaveAs")`, the
+ * same way `PhraseStep` already picks its copy string off
+ * `has("clipboardAutoClear")`: a client may not claim a guarantee it cannot
+ * perform. The failure arm stays reachable on both (a `deliverFile` throw is
+ * rare but real), and it is not the coverage here.
+ *
+ * **The success sentence does not name the destination, and the issue asked for
+ * one.** Mobile's `createVault.savedToFile` reads `Saved to {{label}}` because
+ * mobile picks the directory itself and the user would otherwise have no idea
+ * where the file went. Neither arm here is in that position: on the dialog arm
+ * the user chose the location a second ago, and on the download arm the browser
+ * owns it and this module never learns it. The only destination string
+ * available to both is `defaultPath`, which the dialog arm's user is free to
+ * have renamed, so printing it would be a guess presented as fact on the one
+ * screen whose whole problem is a message the user cannot verify.
+ */
 export async function saveSecretAsTextFile(
   defaultPath: string,
   contents: string,
+  feedback: Feedback,
 ): Promise<void> {
   // The download arm, mirroring `saveJsonAsFile` below (`decisions.md`
   // 2026-08-15). `recovery-flow.md` §2.2 requires the save-as-file affordance
@@ -108,11 +149,10 @@ export async function saveSecretAsTextFile(
   if (!has("nativeSaveAs")) {
     try {
       await deliverFile(defaultPath, new TextEncoder().encode(contents), "text/plain");
+      announce(feedback.onSuccess);
     } catch (e) {
-      // Swallowed, matching the dialog arm's write failure directly below: this
-      // affordance is a convenience beside a phrase that is on screen, and the
-      // user has not lost anything a retry cannot get.
       logErrorKind(e, "download-failed");
+      announce(feedback.onFailure);
     }
     return;
   }
@@ -124,17 +164,22 @@ export async function saveSecretAsTextFile(
       filters: [{ name: "Text", extensions: ["txt"] }],
     });
   } catch (e) {
+    // A dialog that would not OPEN is a failure, and it is one the user cannot
+    // tell apart from a cancel unless we say so. Nothing was written either way.
     logErrorKind(e, "dialog-save-failed");
+    announce(feedback.onFailure);
     return;
   }
-  if (!path) return;
+  if (!path) return; // cancelled: their own action, not news
   try {
     // Narrow seam: the Rust core does the only IO. The WebView holds NO
     // fs-write scope (removed from capabilities/default.json); the command
     // re-validates the destination and rejects the app-data / vault tree.
     await invoke("plugin:secret-export|save_secret_text", { path, contents });
+    announce(feedback.onSuccess);
   } catch (e) {
     logErrorKind(e, "fs-write-failed");
+    announce(feedback.onFailure);
   }
 }
 

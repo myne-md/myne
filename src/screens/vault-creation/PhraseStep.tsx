@@ -21,7 +21,11 @@ import { useEffect, useMemo, useRef, type CSSProperties, type Dispatch } from "r
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
-import { CopyStatus, useCopyStatus } from "../../components/CopyStatus";
+import {
+  ActionStatus,
+  type SecretAction,
+  useActionStatus,
+} from "../../components/ActionStatus";
 import {
   copySecretToClipboard,
   saveSecretAsTextFile,
@@ -100,7 +104,7 @@ export function PhraseStep({
 
   // myne-md/myne#390: this step had no copy feedback at all, and no i18n keys
   // for one, it was never given the affordance rather than given it wrongly.
-  const { outcome, markCopied, markFailed } = useCopyStatus();
+  const { outcome, feedbackFor } = useActionStatus<SecretAction>();
 
   // This used to cancel the pending auto-clear on unmount, and that was wrong in
   // a way the copy made visible (myne-md/myne#390): advancing to the confirm step
@@ -133,14 +137,43 @@ export function PhraseStep({
     // A transient toast would be the weakest option available here: on a
     // shown-once screen, a confirmation the user can miss is barely better than
     // none.
-    cancelAutoClearRef.current = await copySecretToClipboard(phraseString, {
-      onSuccess: { kind: "inline", run: markCopied },
-      onFailure: { kind: "inline", run: markFailed },
-    });
+    cancelAutoClearRef.current = await copySecretToClipboard(
+      phraseString,
+      feedbackFor("copy"),
+    );
   };
 
   const handleSave = () =>
-    saveSecretAsTextFile("myne-recovery-phrase.txt", phraseString);
+    saveSecretAsTextFile("myne-recovery-phrase.txt", phraseString, feedbackFor("save"));
+
+  // Exhaustive over `SecretAction`, so a third affordance is a compile error
+  // rather than a silent fall into the save sentence. Both arms branch on a
+  // capability, because this client may not promise either guarantee it cannot
+  // perform: the clipboard clear (`recovery-flow.md` §2.2) and, on the save
+  // half, a write it never observes.
+  //
+  // The capability test sits OUTSIDE `t(...)`, not inside it as
+  // `t(cond ? "a" : "b")`. `check-i18n.mjs` matches a STATIC `t("literal")`, so
+  // the inner form drops every key it selects out of the only check that proves
+  // they exist in the catalog. Measured: moving two keys inside took the guard's
+  // count from 2543 to 2541 while adding two keys.
+  const message: Record<SecretAction, (ok: boolean) => string> = {
+    copy: (ok) =>
+      ok
+        ? has("clipboardAutoClear")
+          ? t("vaultCreation.phrase.copied")
+          : t("vaultCreation.phrase.copiedNoAutoClear")
+        : t("vaultCreation.phrase.copyFailed"),
+    // Same capability split on the save half, and for the same reason: the
+    // download arm cannot observe whether the browser wrote the file, so it may
+    // not say it did (myne-md/myne#520 review).
+    save: (ok) =>
+      ok
+        ? has("nativeSaveAs")
+          ? t("vaultCreation.phrase.savedToFile")
+          : t("vaultCreation.phrase.downloadStarted")
+        : t("vaultCreation.phrase.saveFailed"),
+  };
 
   return (
     <StepLayout width={600}>
@@ -241,7 +274,12 @@ export function PhraseStep({
         <Button variant="ghost" icon="copy" onClick={handleCopy} data-testid="create.phrase-copy">
           {t("vaultCreation.phrase.copy")}
         </Button>
-        <Button variant="ghost" icon="download" onClick={handleSave}>
+        <Button
+          variant="ghost"
+          icon="download"
+          onClick={handleSave}
+          data-testid="create.phrase-save"
+        >
           {t("vaultCreation.phrase.saveAsFile")}
         </Button>
       </div>
@@ -259,19 +297,9 @@ export function PhraseStep({
           a paragraph saying the opposite. On the one screen where the phrase is
           shown once and never again, the false half is the one the user acts
           on. */}
-      <CopyStatus
-        testId="create.phrase-copy-status"
-        message={
-          outcome === "copied"
-            ? t(
-                has("clipboardAutoClear")
-                  ? "vaultCreation.phrase.copied"
-                  : "vaultCreation.phrase.copiedNoAutoClear",
-              )
-            : outcome === "failed"
-              ? t("vaultCreation.phrase.copyFailed")
-              : null
-        }
+      <ActionStatus
+        testId="create.phrase-action-status"
+        message={outcome === null ? null : message[outcome.action](outcome.ok)}
       />
 
       {/* The two sentences this client owes the user and the desktop does not.
