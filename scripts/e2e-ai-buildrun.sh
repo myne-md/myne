@@ -21,7 +21,8 @@ IMAGE=myne-e2e
 
 # `voice-capture-stub` is what `e2e-buildrun.sh` passes and the rest of the
 # suite expects; `local-inference-stub` is this runner's reason to exist.
-INNER='set -e; pnpm install --frozen-lockfile && pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub; set +e; PASS=""; FAIL="";'
+# The `touch` forces the frontend re-embed; scripts/e2e-buildrun.sh says why.
+INNER='set -e; pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub; set +e; PASS=""; FAIL="";'
 i=0
 for spec in "$@"; do
   i=$((i + 1))
