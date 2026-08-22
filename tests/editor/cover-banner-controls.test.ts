@@ -24,6 +24,8 @@ import {
   COVER_REMOVE_TESTID,
   coverBannerExtension,
 } from "../../src/editor/decorations/cover-banner";
+import { EditorState as CMEditorState } from "@codemirror/state";
+import { noteIdExtension, reconfigureNoteId } from "@myne/editor/note-identity";
 
 const ID = "a".repeat(64);
 const DOC = ["---", `cover: "![[att:${ID}|photo.png]]"`, "---", "", "body"].join("\n");
@@ -49,15 +51,26 @@ function withCover(cover: EditorHost["cover"]): void {
   restores.push(() => setEditorHost(host));
 }
 
-function mount(): EditorView {
+function mount(noteId: string | null = null, readOnly = false): EditorView {
   const view = new EditorView({
     state: EditorState.create({
       doc: DOC,
-      extensions: [RESOLVED_CATALOG, ...coverBannerExtension()],
+      extensions: [
+        RESOLVED_CATALOG,
+        noteIdExtension(noteId),
+        CMEditorState.readOnly.of(readOnly),
+        ...coverBannerExtension(),
+      ],
     }),
   });
   restores.push(() => view.destroy());
   return view;
+}
+
+function press(view: EditorView, testId: string): void {
+  control(view, testId)?.dispatchEvent(
+    new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+  );
 }
 
 function control(view: EditorView, testId: string): HTMLElement | null {
@@ -85,13 +98,12 @@ describe("the cover banner's hover controls", () => {
   it("asks the host to open the picker, telling it the note already has a cover", () => {
     const openPicker = vi.fn();
     withCover({ openPicker, remove: vi.fn() });
-    const view = mount();
-    control(view, COVER_CHANGE_TESTID)?.dispatchEvent(
-      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
-    );
+    const view = mount("note-1");
+    press(view, COVER_CHANGE_TESTID);
     // `true` matters: it is what makes the picker offer its own Remove action.
-    // The editor is the only side that knows it.
-    expect(openPicker).toHaveBeenCalledWith(true);
+    // The editor is the only side that knows it. The id matters for the other
+    // reason (myne-md/myne#520): the host must not have to guess from focus.
+    expect(openPicker).toHaveBeenCalledWith(true, "note-1");
   });
 
   it("removes directly rather than routing through the picker", () => {
@@ -100,11 +112,61 @@ describe("the cover banner's hover controls", () => {
     const openPicker = vi.fn();
     const remove = vi.fn();
     withCover({ openPicker, remove });
-    const view = mount();
-    control(view, COVER_REMOVE_TESTID)?.dispatchEvent(
-      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
-    );
+    const view = mount("note-1");
+    press(view, COVER_REMOVE_TESTID);
     expect(remove).toHaveBeenCalledTimes(1);
     expect(openPicker).not.toHaveBeenCalled();
+  });
+
+  it("renders NO controls on a read-only surface, banner and all", () => {
+    // myne-md/myne#564's contract, applied to the control that needed it most.
+    // These two do not go through the document, so `EditorState.readOnly` does
+    // not stop them by itself and the reading companion's `NOOP_ON_CHANGE` never
+    // sees them: they call the host, which re-encrypts the note on disk. Unlike
+    // the task checkbox, whose read-only write is thrown away, this one lands.
+    withCover({ openPicker: vi.fn(), remove: vi.fn() });
+    const view = mount("note-a", true);
+    // The banner itself still draws. Reading view shows the cover; it just
+    // offers no way to change it.
+    expect(control(view, COVER_BANNER_TESTID)).not.toBeNull();
+    expect(control(view, COVER_CHANGE_TESTID)).toBeNull();
+    expect(control(view, COVER_REMOVE_TESTID)).toBeNull();
+  });
+
+  // myne-md/myne#520. The banner's controls `preventDefault` on `mousedown`, so
+  // pressing one in an unfocused pane never focuses that pane and the shell's
+  // idea of the selected note is still the OTHER pane's. Naming the note is the
+  // fix, and these three assert the three ways it can be got wrong.
+  describe("naming its note (myne-md/myne#520)", () => {
+    it("hands Remove the note this view holds, not the focused one", () => {
+      const remove = vi.fn();
+      withCover({ openPicker: vi.fn(), remove });
+      press(mount("note-b"), COVER_REMOVE_TESTID);
+      expect(remove).toHaveBeenCalledWith("note-b");
+    });
+
+    it("passes null when the host mounted the editor without an identity", () => {
+      // The pre-#520 hosts, and the reading-mirror case where no id is wired.
+      // `null` is the explicit "you decide", not an accident, and every listener
+      // reads it as "the focused note".
+      const remove = vi.fn();
+      withCover({ openPicker: vi.fn(), remove });
+      press(mount(), COVER_REMOVE_TESTID);
+      expect(remove).toHaveBeenCalledWith(null);
+    });
+
+    it("reads the note LIVE, so a swap through one long-lived view is followed", () => {
+      // The desktop shell keeps ONE view per pane and swaps documents through
+      // it, and `CoverBannerWidget.eq` compares the resolved URL alone, so two
+      // notes sharing a cover keep the same DOM and the same button, wired at
+      // the first note's mount. A value captured in that closure would name the
+      // note the pane used to hold for the rest of the session.
+      const remove = vi.fn();
+      withCover({ openPicker: vi.fn(), remove });
+      const view = mount("note-first");
+      view.dispatch({ effects: reconfigureNoteId("note-second") });
+      press(view, COVER_REMOVE_TESTID);
+      expect(remove).toHaveBeenCalledWith("note-second");
+    });
   });
 });

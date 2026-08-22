@@ -1101,6 +1101,68 @@ export async function clickNewMenuItem(session: Session, testId: string): Promis
   );
 }
 
+// ── sidebar note rows ────────────────────────────────────────────────────────
+//
+// Lifted out of `workspace-state.e2e.ts` when a second suite needed to build a
+// split (myne-md/myne#520's cover scenario). Copying them would have been the
+// third copy of the context-menu rationale below, which is the part that has to
+// stay true rather than the three lines of driving.
+
+/** The sidebar rows' note-ids, in DOM order, once exactly `expected` exist. */
+export async function noteRowIds(
+  session: Session,
+  expected: number,
+): Promise<string[]> {
+  const rows = await session.waitUntil(
+    async () => {
+      const found = await session.byTestIdAll("notes.row");
+      return found.length === expected ? found : null;
+    },
+    { label: `${expected} note rows`, timeoutMs: 15_000 },
+  );
+  return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
+}
+
+/** The id of the note `createNote` just made: it leaves that note selected, and
+ *  the id lives on the ROW rather than anywhere in the editor. Reading it here,
+ *  rather than counting rows afterwards, is what keeps a scenario working on a
+ *  seeded vault: `seedVault({ exportSuite: true })` brings its own notes, so
+ *  "exactly N rows" is a fixture detail rather than something the scenario
+ *  controls. Same reading `seedEmbedIntoNote` below uses. */
+export async function selectedNoteId(session: Session): Promise<string> {
+  const row = await session.waitForElement(
+    testIdSelector("notes.row") + '[aria-current="true"]',
+  );
+  const noteId = (await row.attribute("data-note-id")) ?? "";
+  if (noteId === "") throw new Error("selectedNoteId: the active note row carries no id");
+  return noteId;
+}
+
+/** One sidebar row, by note id. */
+export async function noteRow(session: Session, noteId: string): Promise<Element> {
+  return session.waitForElement(testIdSelector("notes.row", { "data-note-id": noteId }));
+}
+
+/** Right-click a note row and pick a context-menu item by `data-item-id`. The
+ *  new-tab / open-to-side gestures are driven through the row's REAL context menu
+ *  (`open-in-new-tab` / `open-to-side`) rather than middle-click / Alt-click: the
+ *  WebDriver synthetic middle-click never fires `auxclick` under WebKit, and the
+ *  Alt-modifier click doesn't establish the split, both production gestures, but
+ *  not driver-addressable. The context-menu items invoke the SAME workspace
+ *  actions (openNewTabInFocused / openToSide). */
+export async function rowMenuPick(
+  session: Session,
+  noteId: string,
+  itemId: string,
+): Promise<void> {
+  await (await noteRow(session, noteId)).rightClick();
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+    )
+  ).click();
+}
+
 /** Create a note via the sidebar CTA and commit `title` through the
  *  inline-rename input (Enter). Leaves the note selected. */
 export async function createNote(session: Session, title: string): Promise<void> {

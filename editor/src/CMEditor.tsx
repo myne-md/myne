@@ -21,6 +21,7 @@ import {
   reconfigureTranscription,
   reconfigureEditorKeymap,
 } from "./extensions";
+import { reconfigureNoteId } from "./note-identity";
 import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
 import { reconfigureVaultHeadings } from "./wikilink/vault-headings";
@@ -214,6 +215,17 @@ export type CMEditorProps = {
   /** Whether speech-to-text is offered on audio attachments (MYND-592).
    *  Default TRUE — an opt-OUT independent of `aiEnabled`. */
   transcriptionEnabled?: boolean;
+  /** myne-md/myne#520: which note this view is holding. The cover banner and
+   *  the promoted title row's Add cover read it, so their calls into the host
+   *  name a target rather than leaving the host to infer one from focus, which
+   *  is wrong in a split the moment the control the user pressed is not in the
+   *  focused pane.
+   *
+   *  REQUIRED, and `null` is the explicit "this view holds no note" (a preview,
+   *  a fixture). An optional prop defaulting to `null` would be an opt-in guard:
+   *  a new mount site would silently get pre-#520 focus-guessing and nothing
+   *  would say so. Required, `tsc` names it. */
+  noteId: string | null;
   /** Mount the floating selection toolbar that appears over a text selection
    *  (MYND-559). Default TRUE — desktop's formatting surface, unchanged. A host
    *  that renders its own bar via {@link onReady} passes `false` so the two don't
@@ -242,7 +254,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -269,6 +281,7 @@ export function CMEditor(props: CMEditorProps) {
   const readOnlyRef = useRef(readOnly);
   const aiEnabledRef = useRef(aiEnabled);
   const transcriptionEnabledRef = useRef(transcriptionEnabled);
+  const noteIdRef = useRef(noteId);
   const vimModeRef = useRef(vimMode);
   const keymapOverridesRef = useRef(keymapOverrides);
   const drawingIoRef = useRef(drawingIo);
@@ -341,6 +354,7 @@ export function CMEditor(props: CMEditorProps) {
             readOnly: readOnlyRef.current,
             aiEnabled: aiEnabledRef.current,
             transcriptionEnabled: transcriptionEnabledRef.current,
+            noteId: noteIdRef.current,
             keymapOverrides: keymapOverridesRef.current,
             // Mount-read, ref-free on purpose (MYND-559): a host's formatting
             // surface is a platform constant, so every state this view ever
@@ -355,21 +369,37 @@ export function CMEditor(props: CMEditorProps) {
 
     // Re-apply every compartment to its CURRENT prop value. `view.setState(...)`
     // resets compartments to the myneExtensions seed, so after a swap we push the
-    // live config back in — a viewMode / line-numbers / note-set / AI change made
-    // while a note was backgrounded is reflected on return. Mirrors the per-prop
-    // reconfigure effects above (kept as separate dispatches for the same reason).
+    // live config back in: a viewMode / line-numbers / note-set / AI change made
+    // while a note was backgrounded is reflected on return.
+    //
+    // ONE dispatch for the unconditional compartments, not one each. CM6
+    // collects every `Compartment.reconfigure` effect in a transaction into a
+    // single map and resolves the extension tree ONCE, so seven dispatches were
+    // seven full resolves of ~75 top-level entries on a path that runs at every
+    // note swap. They target distinct compartments and no listener here reacts
+    // to a config-only transaction, so merging is observably identical. (The
+    // comment this replaces said they were "kept as separate dispatches for the
+    // same reason" as the per-prop effects below; those are separate because
+    // they fire on separate prop changes, which is not a reason that applies to
+    // a single re-apply pass.)
     const reapplyCompartments = (v: EditorView): void => {
-      v.dispatch({ effects: reconfigureLineNumbers(lineNumbersRef.current) });
-      v.dispatch({ effects: reconfigureViewMode(viewModeRef.current, readOnlyRef.current) });
-      v.dispatch({ effects: reconfigureAi(aiEnabledRef.current) });
-      v.dispatch({ effects: reconfigureTranscription(transcriptionEnabledRef.current) });
-      // #184: the editor keymap is a Compartment too, seeded from overrides at
-      // mount; `setState` resets it to that seed, so re-push the CURRENT overrides
-      // after a swap or a customised keymap silently reverts to defaults.
-      v.dispatch({ effects: reconfigureEditorKeymap(keymapOverridesRef.current ?? {}) });
-      // MYND-634: the drawing-embed IO facet is a Compartment too — re-push the
-      // current seam after a swap so inline drawings still read/save/create.
-      v.dispatch({ effects: reconfigureDrawingEmbedIo(drawingIoRef.current ?? null) });
+      v.dispatch({
+        effects: [
+          reconfigureLineNumbers(lineNumbersRef.current),
+          reconfigureViewMode(viewModeRef.current, readOnlyRef.current),
+          reconfigureAi(aiEnabledRef.current),
+          reconfigureTranscription(transcriptionEnabledRef.current),
+          reconfigureNoteId(noteIdRef.current),
+          // #184: the editor keymap is a Compartment too, seeded from overrides
+          // at mount; `setState` resets it to that seed, so re-push the CURRENT
+          // overrides or a customised keymap silently reverts to defaults.
+          reconfigureEditorKeymap(keymapOverridesRef.current ?? {}),
+          // MYND-634: the drawing-embed IO facet is a Compartment too, re-push
+          // the current seam after a swap so inline drawings still
+          // read/save/create.
+          reconfigureDrawingEmbedIo(drawingIoRef.current ?? null),
+        ].flat(),
+      });
       if (noteSetRef.current !== undefined) {
         v.dispatch({ effects: reconfigureNoteSet(noteSetRef.current) });
       }
@@ -631,6 +661,27 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null) return;
     view.dispatch({ effects: reconfigureTranscription(transcriptionEnabled) });
   }, [transcriptionEnabled]);
+
+  // myne-md/myne#520. Pushed like every other scalar because the desktop shell
+  // keeps ONE view per pane and swaps documents through it: without this, the
+  // facet names the first note the pane ever opened for the rest of the
+  // session, and the cover banner would then be confidently wrong rather than
+  // merely unhelpful.
+  //
+  // The equality guard is not decoration. `noteId` is the ONLY compartment prop
+  // that changes on every note swap, and a reconfigure dispatch resolves the
+  // whole extension tree, so an unguarded effect pays that on mount (where
+  // `myneExtensions` has already seeded the same value) and again on every swap
+  // (where `reapplyCompartments` pushes it a second time onto the state that
+  // replaces this one). The ref is initialised from the prop, so the mount pass
+  // returns here.
+  useEffect(() => {
+    if (noteIdRef.current === noteId) return;
+    noteIdRef.current = noteId;
+    const view = viewRef.current;
+    if (view === null) return;
+    view.dispatch({ effects: reconfigureNoteId(noteId) });
+  }, [noteId]);
 
   // MYND-305 deep-link scroll (SYNC-5). Keyed on BOTH the request nonce and
   // `value`: the click sets the request, but the target note's body arrives
