@@ -3,13 +3,16 @@
 // Component tests for `src/notes/components/ChatComposer.tsx`, the AI tab's ONE
 // composer (myne-md/myne#533).
 //
-// Two of these are not ergonomics tests. `does not probe when the mode changes`
-// is the TB13 property in test form: the edit-format probe issues
+// Three of these are not ergonomics tests. `does not probe on mount, or on
+// typing` is the TB13 property in test form: the edit-format probe issues
 // `threshold.attempts` requests to whatever provider is configured, so a surface
 // that fires it without the user asking sends third-party requests on their
-// account. And `fails closed when the probe cannot be answered` is the other
-// half: an unanswerable probe is not evidence the backend can hold the anchored
-// format.
+// account. `fails closed when the probe cannot be answered` is the other half:
+// an unanswerable probe is not evidence the backend can hold the anchored
+// format. And `does not re-probe after a remount` is what those requests COST:
+// the verdict is session state now (myne-md/myne#568), because holding it in
+// this component meant an ordinary tab switch in the right panel bought the
+// whole probe again.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -31,6 +34,7 @@ vi.mock("../../src/lib/agent-run", () => ({
 }));
 
 import { ChatComposer } from "../../src/notes/components/ChatComposer";
+import { clearAgentForLock, getAgent } from "../../src/notes/agent/agentStore";
 import { getChat, __resetChatForTest } from "../../src/notes/ai/chatStore";
 
 const PASSING = {
@@ -65,6 +69,14 @@ function type(text: string) {
 
 beforeEach(() => {
   __resetChatForTest();
+  // **And the run store, which `cleanup()` cannot reach** (myne-md/myne#568).
+  // The probe verdict used to be this component's own state, so unmounting was
+  // enough to unask the question; it is session state now, kept deliberately
+  // across remounts and dropped only by the vault teardown. Without this, test
+  // two inherits test one's verdict and the probe-count assertions measure the
+  // wrong thing — which is exactly the leak the field exists to create in
+  // production, so the reset belongs here rather than in the field.
+  clearAgentForLock();
   agentCapability.mockReset().mockResolvedValue(PASSING);
   agentStart.mockReset().mockResolvedValue(STEP);
   agentPreviewGrant.mockReset().mockResolvedValue({
@@ -77,6 +89,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   __resetChatForTest();
+  clearAgentForLock();
 });
 
 describe("ChatComposer", () => {
@@ -115,11 +128,56 @@ describe("ChatComposer", () => {
     );
   });
 
-  it("does not probe when the mode changes", async () => {
+  it("does not probe on mount, or on typing", async () => {
+    // The name used to say "when the mode changes", from the two-mode world
+    // that #552 removed; the property is unchanged and is the one that matters,
+    // TB13. Mounting is not asking and neither is typing.
     mount();
-    type("something");
-    // Still nothing: typing is not asking either.
     expect(agentCapability).not.toHaveBeenCalled();
+    type("something");
+    expect(agentCapability).not.toHaveBeenCalled();
+  });
+
+  it("does not re-probe after a remount", async () => {
+    // myne-md/myne#568. `AiChatTab` mounts conditionally on the right panel's
+    // active tab, so this is an ordinary tab switch away and back, and it used
+    // to cost `threshold.attempts` fresh provider requests every time: the
+    // verdict lived in this component's own state and died with it. Asserted on
+    // the CALL COUNT rather than on the store, because the store holding a
+    // value proves nothing about whether the composer consults it.
+    mount();
+    type("tidy the headings");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    expect(agentCapability).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    mount();
+    type("and the lists");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalledTimes(2));
+    expect(agentCapability).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-probes after the vault is left", async () => {
+    // The other direction, and the reason the verdict is not simply cached
+    // forever: the AI provider settings live in `vault.prefs`, so the next
+    // vault opened can be configured against a different backend. A carried-over
+    // verdict would be a claim about a model that is no longer in use.
+    mount();
+    type("tidy the headings");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    expect(agentCapability).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    clearAgentForLock();
+    expect(getAgent().probeVerdict).toBeNull();
+    mount();
+    type("and the lists");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalledTimes(2));
+    expect(agentCapability).toHaveBeenCalledTimes(2);
   });
 
   it("sends every message to the agent, questions included", async () => {
@@ -267,6 +325,33 @@ describe("ChatComposer", () => {
       charsOffDevice: null,
       end: "finished",
     });
+  });
+
+  it("carries the model's closing summary onto the turn", async () => {
+    // myne-md/myne#568, and driven through the real `settleRunIntoChat` for the
+    // reason the test above states: calling `settleAgentTurn` directly would let
+    // the line that reads `proposal.summary` be deleted with everything still
+    // green.
+    //
+    // This is the half that one mode was missing. The agent answers a question
+    // through `finish`, so the summary is the ANSWER; before this it reached
+    // only `agentStore`, whose one renderer is the review dialog, and a question
+    // about a note got answered inside a "Review changes" screen.
+    agentStart.mockResolvedValue({
+      ...STEP,
+      proposal: {
+        edits: [],
+        newNotes: [],
+        summary: "You have 16 personal tasks in this note.",
+      },
+    });
+    mount();
+    type("how many personal tasks are in this note");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(getChat().turns).toHaveLength(2));
+    expect(getChat().turns[1]!.agentSummary?.summary).toBe(
+      "You have 16 personal tasks in this note.",
+    );
   });
 
   it("does not freeze a run that stopped to ASK for more scope", async () => {
