@@ -167,7 +167,7 @@ pub struct AttEmbedSpan<'a> {
 
 /// The canonical form-C id length: 64 lowercase-hex chars = the 32-byte
 /// attachment-id (`protocol.md` §9.9).
-const ATT_ID_HEX_LEN: usize = 64;
+pub(crate) const ATT_ID_HEX_LEN: usize = 64;
 
 /// Locate every **canonical** form-C embed in `note_body`, in document
 /// order, with exact byte spans — the scanner behind the export-side
