@@ -43,9 +43,24 @@ describe("dynamicDataAttrs: the object form (what shipped past it)", () => {
     expect(dynamicDataAttrs('const p = { "data-mode": "compact" };')).toEqual([]);
   });
 
-  it("accepts single quotes and template values alike", () => {
+  it("accepts single quotes, and a template only when it interpolates nothing", () => {
     expect(dynamicDataAttrs("const p = { 'data-x': value };")).toEqual(["data-x"]);
     expect(dynamicDataAttrs('const p = { "data-x": `literal` };')).toEqual([]);
+  });
+
+  it("names an INTERPOLATING template, the one shape that can carry the account number", () => {
+    // The hole this arm shipped with. The value's first character was compared
+    // against a set that included the backtick, so every template read as a
+    // constant, and a template is the obvious way an account number reaches a
+    // props-object `data-*`. Asserted next to its own negative case above,
+    // because a matcher that reports everything is as useless as one that
+    // reports nothing.
+    expect(dynamicDataAttrs("const p = { 'data-leak': `${account}` };")).toEqual([
+      "data-leak",
+    ]);
+    expect(dynamicDataAttrs('const p = { "data-leak": `MY-${n}` };')).toEqual([
+      "data-leak",
+    ]);
   });
 });
 
