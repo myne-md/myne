@@ -53,9 +53,33 @@ async function readStatus(): Promise<SyncStatus> {
  */
 function sameStatus(a: SyncStatus | null, b: SyncStatus): boolean {
   if (a === null || a.state !== b.state) return false;
-  if (a.state === "error") return a.detail === (b as { detail: string }).detail;
-  if (a.state === "conflicts") return a.count === (b as { count: number }).count;
-  return true;
+  // EXHAUSTIVE, with a `never` default, rather than two comparisons and an
+  // unconditional `return true`. This function now decides whether a poll
+  // result reaches React at all, so the failure mode when a state gains a
+  // payload (a `lastSyncedAt` on `idle`, a progress count on `syncing`) is the
+  // indicator freezing on its first value with nothing reporting it, on the one
+  // readout a user consults to decide whether their notes are on the server.
+  // The `as` casts the old shape needed are gone with it: the compiler narrows
+  // `b` off `a.state` because the two are already known equal, so a new field
+  // is a compile error HERE instead of a silent freeze.
+  switch (a.state) {
+    case "error":
+      return a.detail === (b as Extract<SyncStatus, { state: "error" }>).detail;
+    case "conflicts":
+      return a.count === (b as Extract<SyncStatus, { state: "conflicts" }>).count;
+    case "disabled":
+    case "not_enrolled":
+    case "pending":
+    case "idle":
+    case "syncing":
+      // Payload-free today. Listed one per line rather than collapsed into a
+      // default, so adding a state to the union fails to compile below.
+      return true;
+    default: {
+      const exhaustive: never = a;
+      return exhaustive;
+    }
+  }
 }
 
 export function useSyncStatus(): SyncStatusHook {

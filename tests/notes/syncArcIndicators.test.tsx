@@ -25,14 +25,15 @@ function spins(el: Element): boolean {
   return el.classList.contains("myne-spinner");
 }
 
-function readout(
-  status: Parameters<typeof SaveStatus>[0]["status"],
-  unsynced = false,
-  syncing = false,
-) {
-  render(
-    <SaveStatus status={status} onRetry={() => {}} unsynced={unsynced} syncing={syncing} />,
-  );
+function readout(status: Parameters<typeof SaveStatus>[0]["status"], unsynced = false) {
+  // `syncing` used to be a third parameter spread onto `<SaveStatus>`, which has
+  // no such prop: React dropped it, no caller ever passed one, and `tests/` is
+  // outside `tsc`'s `include` so nothing said so. It read as coverage for the
+  // half of the sync-arc grammar that is not implemented (whether the arc TURNS
+  // comes from whether the device is moving bytes, and both unsynced markers are
+  // hardcoded `spinning={false}`). A dead parameter naming an unimplemented
+  // behaviour is residue the next reader trusts.
+  render(<SaveStatus status={status} onRetry={() => {}} unsynced={unsynced} />);
   return screen.getByTestId("editor.save-status");
 }
 
@@ -162,12 +163,28 @@ describe("the arcs do not each become a live region", () => {
     expect(screen.getByTestId("notes.row-unsynced").getAttribute("role")).toBe("img");
   });
 
-  it("announces where the arc IS the only carrier", () => {
-    // The bottom bar's unsynced marker has no labelled parent of its own, so it
-    // opts in. The other direction of the same rule: a guard that silences
-    // everything is also wrong, and green.
-    readout({ status: "saved", at: new Date() }, true);
-    expect(screen.getByTestId("editor.unsynced-marker").getAttribute("role")).toBe("status");
+  it("speaks the unsynced state from a region that was already there", () => {
+    // The arc itself is `role="img"` in every position, and the announcement is
+    // a separate always-mounted node. The shape this replaces put `role="status"`
+    // on the arc and mounted the arc only while unsynced, so the live region
+    // came into existence WITH the change it was supposed to report, which
+    // announces nothing: a region has to pre-exist and its TEXT has to change.
+    const { rerender } = render(
+      <SaveStatus status={{ status: "saved", at: new Date() }} onRetry={() => {}} unsynced={false} />,
+    );
+    const region = screen.getByTestId("editor.unsynced-announcement");
+    expect(region.getAttribute("role")).toBe("status");
+    expect(region.textContent).toBe("");
+    expect(screen.queryByTestId("editor.unsynced-marker")).toBeNull();
+
+    rerender(
+      <SaveStatus status={{ status: "saved", at: new Date() }} onRetry={() => {}} unsynced />,
+    );
+    // The SAME node, now carrying the phrase. Identity matters: a region
+    // replaced rather than updated is a new region, which is the bug.
+    expect(screen.getByTestId("editor.unsynced-announcement")).toBe(region);
+    expect(region.textContent).not.toBe("");
+    expect(screen.getByTestId("editor.unsynced-marker").getAttribute("role")).toBe("img");
   });
 
   it("does not shadow a longer tooltip with a terser one", () => {

@@ -14,6 +14,7 @@ import { formatRelativeTime, useTick } from "./relativeTime";
 import type { SaveStatus as SaveStatusValue } from "../useAutosave";
 import { isStorageFull } from "../../lib/storage-pressure";
 import { SyncArc } from "../../components/Spinner";
+import { ActionStatus } from "../../components/ActionStatus";
 
 const ROOT_STYLE: CSSProperties = {
   display: "inline-flex",
@@ -99,7 +100,6 @@ export function SaveStatus({ status, onRetry, unsynced = false }: SaveStatusProp
           so the two read as one fact seen twice rather than two facts. */}
       {unsynced && (
         <SyncArc
-          announces
           spinning={false}
           size={7}
           testId="editor.unsynced-marker"
@@ -107,6 +107,20 @@ export function SaveStatus({ status, onRetry, unsynced = false }: SaveStatusProp
           title={t("notes.row.unsyncedTitle")}
         />
       )}
+      {/* The spoken half, and it is a SEPARATE, ALWAYS-MOUNTED node on purpose.
+          The arc used to carry `role="status"` itself, which announced nothing:
+          an `aria-live` region reports a CONTENT change, the arc has no text
+          content, and it was mounted only while unsynced, so the region did not
+          exist before the change it was meant to announce. This one is always in
+          the tree and its text goes from empty to the phrase, which is the
+          change a screen reader reports. Bottom bar only: the sidebar renders
+          one marker per unsynced row, and a screenful of live regions
+          re-labelled at once when a push starts is a storm nobody can mute. */}
+      <ActionStatus
+        visuallyHidden
+        testId="editor.unsynced-announcement"
+        message={unsynced ? t("notes.row.unsyncedLabel") : null}
+      />
     </>
   );
 }
