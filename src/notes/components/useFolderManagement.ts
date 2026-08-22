@@ -438,12 +438,18 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
    */
   const applyFolderPathChange = useCallback(
     async (node: FolderNode, newPath: string) => {
-      const result = await renameFolder(
-        node.path,
-        newPath,
-        notesForOps(),
-        deliberate,
-      );
+      // `renameFolder` opens with `flushOpenPanes()`, which REJECTS when a pane
+      // did not settle (myne-md/myne#520). Declining the rename is the right
+      // answer, since the batch reads every note from disk and would write over
+      // whatever that pane still holds, but a silent decline is
+      // indistinguishable from a rename that did nothing. Say so.
+      let result;
+      try {
+        result = await renameFolder(node.path, newPath, notesForOps(), deliberate);
+      } catch {
+        setBlockNotice(i18n.t("notes.folderManagement.unsettledSave"));
+        return;
+      }
       setDeliberate(result.nextDeliberate);
       // Re-root the folder's color + icon onto the new path (and any descendant
       // folder's, since the rename re-roots the whole subtree) so a rename

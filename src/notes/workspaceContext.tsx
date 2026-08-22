@@ -247,7 +247,11 @@ export type WorkspaceApi = {
   toggleCompanion: (paneId: PaneId) => void;
 
   // ── flush registry (one entry per live pane editor) ────────────
-  registerFlush: (paneId: PaneId, flush: () => Promise<void>) => void;
+  /** Register this pane's flush. It resolves TRUE when the pane settled clean
+   *  and FALSE when it did not, which is the only way `flushAll` can tell a
+   *  save that failed from one that landed: every layer below swallows the
+   *  rejection into that pane's `saveStatus`. */
+  registerFlush: (paneId: PaneId, flush: () => Promise<boolean>) => void;
   unregisterFlush: (paneId: PaneId) => void;
   /** Flush every registered pane editor's pending save (lock / close). */
   flushAll: () => Promise<void>;
@@ -573,10 +577,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Flush registry — refs (no re-render). Keyed by paneId.
-  const flushers = useRef<Map<PaneId, () => Promise<void>>>(new Map());
+  // Flush registry. Refs, so no re-render. Keyed by paneId.
+  const flushers = useRef<Map<PaneId, () => Promise<boolean>>>(new Map());
   const registerFlush = useCallback(
-    (paneId: PaneId, flush: () => Promise<void>) => {
+    (paneId: PaneId, flush: () => Promise<boolean>) => {
       flushers.current.set(paneId, flush);
     },
     [],
@@ -584,14 +588,43 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const unregisterFlush = useCallback((paneId: PaneId) => {
     flushers.current.delete(paneId);
   }, []);
+  /**
+   * Flush every pane, and REJECT when any of them did not settle.
+   *
+   * The rejection is the whole point and it used to be impossible. This
+   * swallowed each flusher's rejection, and `useAutosave.fireSave` swallows one
+   * too, into that pane's `saveStatus`. Two layers of swallow meant every
+   * caller here, the folder rename, the inbound title rename, the frontmatter
+   * writers and vim `:w`, was told the disk matched the buffer whether or not
+   * it did. A pane whose `note_update` failed (storage full, an IPC error, a
+   * conflict handler that threw) reported success, the caller read the STALE
+   * disk bytes, patched a field and wrote, and the pane was left holding
+   * unsaved text it then had to lose or conflict on.
+   *
+   * A pane's own error UI is still its own: this reports only WHETHER it
+   * settled, so the caller can decline to write on top of it. Each flusher
+   * answers with `!hasPendingWork()` after its flush, which reads refs rather
+   * than React state and so answers for the buffer as it is now.
+   */
   const flushAll = useCallback(async () => {
-    await Promise.all(
-      [...flushers.current.values()].map((f) =>
-        f().catch(() => {
-          /* per-flush error already routed through that pane's saveStatus */
-        }),
+    const entries = [...flushers.current.entries()];
+    const settled = await Promise.all(
+      entries.map(([paneId, f]) =>
+        f().then(
+          (ok) => (ok ? null : paneId),
+          // A flusher that REJECTS outright did not settle either. Caught here
+          // rather than left to `Promise.all` so one pane's failure does not
+          // hide the others: the caller gets the full list.
+          () => paneId,
+        ),
       ),
     );
+    const unsettled = settled.filter((id): id is PaneId => id !== null);
+    if (unsettled.length > 0) {
+      throw new Error(
+        `flushOpenPanes: ${unsettled.length} pane(s) did not settle; refusing to report the disk as current`,
+      );
+    }
   }, []);
 
   // WL-8 rename auto-update seam: expose the open-note set + flush-all to the

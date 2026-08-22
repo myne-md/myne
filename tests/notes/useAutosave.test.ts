@@ -805,3 +805,75 @@ describe("a BaseMismatch that lands after a note switch (myne#335)", () => {
     });
   });
 });
+
+// myne-md/myne#520. `flushAll` refuses to report the disk current when a pane
+// did not settle, and `PaneView` answers that question with `lastSaveFailed`.
+// These pin WHY it is not `hasPendingWork`: the first version used that, and it
+// answers true for a buffer that merely moved on during a successful save, so
+// every out-of-band frontmatter write that followed a normal save was refused.
+// The E2E suite caught it; nothing here did.
+describe("lastSaveFailed, the settled-check a frontmatter writer needs", () => {
+  it("is false on a hook that has never saved", () => {
+    const { result } = renderHook(() => useAutosave("note-1", "body", vi.fn()));
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+
+  it("is false after a save that landed, even while the buffer has moved on", async () => {
+    // The case that broke three E2E scenarios. `hasPendingWork` is TRUE here and
+    // correctly so, because there is unsaved work; but nothing FAILED, so a
+    // caller about to read-patch-write this note must not be refused.
+    const saveImpl = vi.fn(async (_id: string, body: string) => body);
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    rerender({ body: "three" });
+    expect(result.current.hasPendingWork()).toBe(true);
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+
+  it("is true after a save that rejected, which is the case the guard is for", async () => {
+    const saveImpl = vi.fn(async () => {
+      throw new Error("storage full");
+    });
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+  });
+
+  it("clears on the next attempt, so one old failure does not block forever", async () => {
+    // The other direction. A latch that never resets would refuse every later
+    // cover write for the rest of the session after one transient error.
+    let fail = true;
+    const saveImpl = vi.fn(async (_id: string, body: string) => {
+      if (fail) throw new Error("transient");
+      return body;
+    });
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+
+    fail = false;
+    rerender({ body: "three" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+});
