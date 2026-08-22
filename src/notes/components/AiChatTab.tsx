@@ -226,6 +226,20 @@ function AgentTurnView({
           {turn.text}
         </p>
       ) : null}
+      {/* **The model's own answer, above the counts** (myne-md/myne#568). In one
+          mode a question is a run like any other and `finish` is how it is
+          answered, so this is the reply the user asked for. It used to render
+          only inside the review dialog, which is how a question about a note
+          got answered inside a "Review changes" screen. Not `t()`-wrapped: it
+          is model output, not copy. */}
+      {s !== undefined && s.summary.trim().length > 0 ? (
+        <p
+          data-testid="ai.agent-answer"
+          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", margin: "var(--space-1) 0 0" }}
+        >
+          {s.summary}
+        </p>
+      ) : null}
       {s !== undefined ? (
         <div
           data-testid="ai.agent-summary"
@@ -233,7 +247,14 @@ function AgentTurnView({
         >
           <div>
             {s.edits === 0 && s.newNotes === 0
-              ? t("agent.review.noChanges")
+              ? // **Suppressed when the model answered.** "The agent proposed no
+                // changes" is the right line for an edit request that produced
+                // nothing, and exactly the wrong one under an answer the user
+                // asked for: it reads as a failure report on a reply that
+                // succeeded.
+                s.summary.trim().length > 0
+                ? null
+                : t("agent.review.noChanges")
               : [
                   s.edits > 0
                     ? t("editor.chrome.rightPanel.aiChat.agentTurn.proposed", {

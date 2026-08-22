@@ -18,13 +18,16 @@
 // mirror in the settle function covers both by construction, which is what the
 // effect was approximating.
 //
-// **It deliberately does not own the capability probe.** The probe's verdict is
-// composer state: it gates whether Send is offered at all, and it must not fire
-// until the user actually sends in Edit mode, because on a remote provider the
-// probe issues `threshold.attempts` third-party requests (TB13,
-// `docs/decisions/ai/0515`). Moving it here would make "start a run" and "find
-// out whether a run is possible" the same call, which is how a mount effect
-// grows back.
+// **It deliberately does not own the capability probe.** The verdict gates
+// whether Send is offered at all, and it must not fire until the user actually
+// sends, because on a remote provider the probe issues `threshold.attempts`
+// third-party requests (TB13, `docs/decisions/ai/0515`). Firing it here would
+// make "start a run" and "find out whether a run is possible" the same call,
+// which is how a mount effect grows back. That the verdict now LIVES in
+// `agentStore` rather than in the composer's own state (myne-md/myne#568)
+// changes nothing about this: where an answer is kept and who is allowed to ask
+// the question are separate decisions, and only the second one is this
+// paragraph's.
 //
 // Both stores are AS1-class RAM, dropped on lock: the transcript through
 // `clearChat`, the proposal through `clearAgentForLock`. Nothing here writes to
@@ -83,9 +86,18 @@ export interface AgentRunCopy {
  * putting to the user, and freezing there would print "the agent proposed no
  * changes" underneath a dialog about to make it propose some.
  *
- * The turn takes COUNTS only. The proposal's anchors and replacements are text
- * copied verbatim out of note bodies; they stay in `agentStore`, which every
- * vault-leaving path clears (`docs/decisions/ai/0518`).
+ * The turn takes the counts AND the model's closing summary. It does not take
+ * the proposal: anchors and replacements are text copied verbatim out of note
+ * bodies, and they stay in `agentStore`, which every vault-leaving path clears
+ * (`docs/decisions/ai/0518`).
+ *
+ * **The summary has to come here, and that is the half one mode was missing**
+ * (myne-md/myne#568). The agent answers a question through `finish`, so in one
+ * mode the summary IS the answer; the only surface rendering it was the review
+ * screen, so asking "how many tasks are in this note" put the answer inside a
+ * "Review changes" dialog next to the words "the agent proposed no changes".
+ * Ask used to write its answer into the transcript, and when Ask was removed
+ * nothing took that over.
  */
 export function settleRunIntoChat(result: AgentStepResult, epoch: number): void {
   // A step that landed after the vault was left is dropped by the run store,
@@ -95,6 +107,7 @@ export function settleRunIntoChat(result: AgentStepResult, epoch: number): void 
   if (agent.view === null || agent.end?.kind === "awaitingScope") return;
   settleAgentTurn({
     runId: agent.view.runId,
+    summary: agent.proposal.summary,
     edits: agent.proposal.edits.length,
     newNotes: agent.proposal.newNotes.length,
     notesRead: agent.notesRead,
