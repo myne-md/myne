@@ -7,6 +7,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Icon } from "../../components/primitives/Icon";
 import type { IconName } from "../../lib/icons";
+import { stageRootStyle } from "../../components/primitives/stageRoot";
 
 interface StepLayoutProps {
   width?: number;
@@ -24,10 +25,7 @@ export function StepLayout({
   return (
     <div
       style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        ...stageRootStyle,
         background: "var(--bg-1)",
         padding: "var(--space-5)",
       }}
