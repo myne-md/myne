@@ -69,12 +69,32 @@ export function Spinner({ size = 32, style }: SpinnerProps) {
  * so it slows to half speed instead of stopping. Not applied when `spinning` is
  * false: a static arc must have no animation to slow down.
  */
+/**
+ * The one member of the design canon's **inline status mark** class
+ * (`docs/design/README.md`, "Inline status marks are a separate class from
+ * icons"). That section was written for this glyph in myne-md/myne#520's
+ * review, which found the implementation and the canon disagreeing on four
+ * rules at once: size, colour, hand-rolled geometry, and the Lucide status set.
+ * The canon now carries the carve-out and the argument for it, so a reader of
+ * either side finds the same answer.
+ *
+ * NEVER a live region, and the prop that made it one is gone.
+ *
+ * It used to take `announces`, which swapped `role="img"` for `role="status"`
+ * where the arc was the only carrier of the state. That did not work and could
+ * not: an `aria-live` region announces a CONTENT change, this span has no text
+ * content (its only accessible name is `aria-label`), and the one caller that
+ * opted in mounted it conditionally, so the region did not exist before the
+ * change it was supposed to announce. A caller that needs the state spoken
+ * renders a persistently-mounted `<ActionStatus visuallyHidden>` beside the
+ * glyph, which is what `SaveStatus` does; that component's own comment explains
+ * why a region removed from the accessibility tree announces nothing.
+ */
 export function SyncArc({
   size = 8,
   spinning,
   label,
   title,
-  announces = false,
   testId,
   style,
 }: {
@@ -95,24 +115,13 @@ export function SyncArc({
    * it twice, which is cheap and visible.
    */
   title?: string;
-  /**
-   * Whether this arc is the ONLY thing announcing the state.
-   *
-   * Off by default. `role="status"` is an `aria-live` region, and the sidebar
-   * renders one of these per unsynced row: a screenful of live regions all
-   * re-labelled at once when a push starts is an announcement storm nobody can
-   * mute. In the save readout the parent span already carries the same phrase,
-   * so a second announcement is a duplicate. Where neither is true, the caller
-   * opts in.
-   */
-  announces?: boolean;
   testId?: string;
   style?: CSSProperties;
 }) {
   return (
     <span
       className={spinning ? "myne-spinner" : undefined}
-      role={announces ? "status" : "img"}
+      role="img"
       aria-label={label}
       title={title}
       data-testid={testId}
