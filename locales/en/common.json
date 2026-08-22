@@ -1789,7 +1789,8 @@
       "illegalSegment": "A folder name can't contain / \\ | # ^ [ ] or start/end with a space.",
       "tooLong": "That folder path is too long.",
       "moveIntoSelf": "A folder can't be moved inside itself.",
-      "moveCollision": "There's already a folder with that name there."
+      "moveCollision": "There's already a folder with that name there.",
+      "unsettledSave": "An open note hasn't finished saving, so the folder was left alone. Try again once it has."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -3828,10 +3829,13 @@
       "copied": "Copied",
       "copy": "Copy",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
+      "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
       "eyebrow": "Step 4 of 4 — account number",
       "heading": "Save your account number.",
       "intro": "This is your bearer token — treat it like cash.",
       "saveAsFile": "Save as file",
+      "saveFailed": "Couldn't save the file. Copy the number instead, or write it down.",
+      "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read.",
       "shownOnceBody": "Save it now — Myne cannot recover it for you. Required to register for sync later.",
       "shownOnceEmphasis": "This is shown only once."
     },
@@ -3985,11 +3989,14 @@
       "copy": "Copy",
       "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
+      "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
       "eyebrow": "Step 2 of 4 — recovery phrase",
       "heading": "Write down these 24 words.",
       "intro": "This phrase, together with your password, is the only way to recover your vault. Store it offline — paper, password manager, hardware wallet. Treat it like cash.",
       "reveal": "Reveal phrase",
-      "saveAsFile": "Save as file"
+      "saveAsFile": "Save as file",
+      "saveFailed": "Couldn't save the file. Copy the words instead, or write them down.",
+      "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read."
     },
     "ready": {
       "backedUp": "Backed up ✓",

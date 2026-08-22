@@ -30,6 +30,7 @@
 // hands its feedback arms nothing precisely so that this cannot drift.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import type { Feedback } from "../lib/clipboard";
 
 /**
  * How long the momentary half lasts: the button's own label swap.
@@ -37,9 +38,31 @@ import { useEffect, useState, type CSSProperties } from "react";
  * Deliberately SHORT, and deliberately not the lifetime of the message. It is
  * the "your press registered" flicker, not the confirmation.
  */
-export const COPY_LABEL_FLASH_MS = 1600;
+export const ACTION_LABEL_FLASH_MS = 1600;
 
-export type CopyOutcome = "copied" | "failed" | null;
+/**
+ * The two affordances a shown-once secret screen offers over the same value.
+ *
+ * Named here rather than spelled inline at each screen because both screens
+ * carry exactly this pair and both feed it to `useActionStatus`, so the union is
+ * the thing they have to agree on. A screen with a different set pins its own;
+ * this component enumerates nothing on its own account.
+ */
+export type SecretAction = "copy" | "save";
+
+/**
+ * What the last action on a surface did, and WHICH action it was.
+ *
+ * The action half is not decoration (myne-md/myne#522). These screens carry two
+ * affordances over the same secret, Copy and Save as file, and a bare
+ * succeeded/failed cannot say which one produced the outcome. Sharing one
+ * unlabelled outcome between them renders the failed-COPY sentence after a
+ * failed save, which on the account screen reads `Couldn't copy. Use "Save as
+ * file" instead.` and sends the user back to the thing that just failed.
+ */
+export type ActionOutcome<A extends string = string> =
+  | { action: A; ok: boolean }
+  | null;
 
 /**
  * Drive an inline copy confirmation.
@@ -62,8 +85,10 @@ export type CopyOutcome = "copied" | "failed" | null;
  * effect's deps never change, and the second press produces no observable
  * change at all.
  */
-export function useCopyStatus(flashMs: number = COPY_LABEL_FLASH_MS) {
-  const [state, setState] = useState<{ outcome: CopyOutcome; seq: number }>({
+export function useActionStatus<A extends string = string>(
+  flashMs: number = ACTION_LABEL_FLASH_MS,
+) {
+  const [state, setState] = useState<{ outcome: ActionOutcome<A>; seq: number }>({
     outcome: null,
     seq: 0,
   });
@@ -76,15 +101,43 @@ export function useCopyStatus(flashMs: number = COPY_LABEL_FLASH_MS) {
     return () => window.clearTimeout(id);
   }, [state.seq, state.outcome, flashMs]);
 
+  const mark = (action: A, ok: boolean): void =>
+    setState((s) => ({ outcome: { action, ok }, seq: s.seq + 1 }));
+
   return {
-    /** Persistent: what the last copy did. */
+    /** Persistent: which action last ran here, and how it went. */
     outcome: state.outcome,
-    /** Momentary: whether that copy was JUST now. */
+    /** Momentary: whether that outcome was JUST now. */
     flashing,
-    /** For a feedback pair's `onSuccess` arm. */
-    markCopied: () => setState((s) => ({ outcome: "copied", seq: s.seq + 1 })),
-    /** For a feedback pair's `onFailure` arm. */
-    markFailed: () => setState((s) => ({ outcome: "failed", seq: s.seq + 1 })),
+    /**
+     * For a feedback pair's arms. `action` names the affordance, read back when
+     * picking the message, so two affordances can share one live region without
+     * borrowing each other's sentences.
+     *
+     * The surface pins `A` to its own union (`useActionStatus<"copy" | "save">`)
+     * rather than the component enumerating every screen's affordances. That is
+     * what makes `mark("Copy", …)` a compile error instead of a silent route
+     * into the save sentence, which is myne-md/myne#522's own failure with the
+     * affordances swapped.
+     */
+    mark,
+    /**
+     * The feedback pair for one affordance, both arms inline.
+     *
+     * A factory rather than the literal at each call site, because the literal
+     * is the same six lines four times over and its one variable part is a
+     * boolean that reads identically whichever arm it is in: an onSuccess arm
+     * calling `mark(action, false)` type-checks and inverts the report.
+     *
+     * `inline` for both arms is the surface class this hook exists for: a
+     * secret shown once gets a persistent line next to the control, not a toast
+     * that can be missed. A caller wanting anything else builds its own pair and
+     * says why, which is what `FailClosedError` does for its silent failure.
+     */
+    feedbackFor: (action: A): Feedback => ({
+      onSuccess: { kind: "inline", run: () => mark(action, true) },
+      onFailure: { kind: "inline", run: () => mark(action, false) },
+    }),
   };
 }
 
@@ -96,7 +149,7 @@ export function useCopyStatus(flashMs: number = COPY_LABEL_FLASH_MS) {
  * passes `visuallyHidden` and still gets the announcement, which is the case
  * that used to be silent for screen-reader users on every one of these surfaces.
  */
-export function CopyStatus({
+export function ActionStatus({
   message,
   visuallyHidden = false,
   style,
