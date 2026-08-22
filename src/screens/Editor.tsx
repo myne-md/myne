@@ -53,6 +53,7 @@ import {
   OPEN_COVER_PICKER_EVENT,
   REMOVE_COVER_EVENT,
   type OpenCoverPickerDetail,
+  type RemoveCoverDetail,
 } from "../notes/openCoverPickerSignal";
 import { CoverPicker, type CoverChoice } from "../components/attachments/CoverPicker";
 import { setNoteCover } from "../notes/setNoteCover";
@@ -1564,10 +1565,23 @@ function EditorChrome({
           if (cancelled) return;
           // Stop the default close; we terminate manually after the flush.
           event.preventDefault();
-          await flushAll();
-          await persistWorkspace();
-          await persistVaultIndices();
-          await flushGraphLayoutNow();
+          // The chain, not a bare await sequence, and for the same reason the
+          // lock CTA below uses it (task 93): one writer's rejection must not
+          // take the rest of the chain with it, and here it must not take
+          // `w.destroy()` either. `flushAll` rejects when a pane fails to settle
+          // (myne-md/myne#520), and the default close is ALREADY cancelled at
+          // this point, so a bare await would wedge the window unclosable
+          // exactly when a save is failing. On Windows the title-bar X is the
+          // only quit affordance, so that is the whole quit path.
+          await runFlushChain(
+            {
+              flushAll,
+              persistWorkspace,
+              persistVaultIndices,
+              flushGraphLayout: flushGraphLayoutNow,
+            },
+            "closing",
+          );
           // `destroy()`, NOT `close()`: the capability ACL grants
           // `core:window:allow-destroy` but deliberately NOT `allow-close`
           // (TB6 surface — see lib/app-window.ts). `close()` rejects under the
@@ -1676,11 +1690,20 @@ function EditorChrome({
           if (cancelled) return;
           void (async () => {
             // Content flush first (data integrity), workspace descriptor
-            // second (convenience — droppable if the grace window expires).
-            await flushAll();
-            await persistWorkspace();
-            await persistVaultIndices();
-            await flushGraphLayoutNow();
+            // second (convenience, droppable if the grace window expires). The
+            // chain isolates each step, so a `flushAll` rejection from a pane
+            // that did not settle (myne-md/myne#520) neither skips the two
+            // persists behind it nor raises an unhandled rejection inside the
+            // auto-lock grace window, where nothing would report it.
+            await runFlushChain(
+              {
+                flushAll,
+                persistWorkspace,
+                persistVaultIndices,
+                flushGraphLayout: flushGraphLayoutNow,
+              },
+              "lock",
+            );
           })();
         });
         if (cancelled) {
@@ -2840,7 +2863,13 @@ function CommandPaletteHost({
   // `| null` rather than an `open` flag, matching `picker` and
   // `emptyTrashConfirm` beside it: two booleans would encode four states for a
   // two-state thing, and every close would have to remember to reset both.
-  const [coverPicker, setCoverPicker] = useState<{ hasCover: boolean } | null>(null);
+  // `noteId` is the note the picker was opened FOR, not necessarily the focused
+  // one (myne-md/myne#520). `null` means the entry point did not name one, and
+  // `applyNoteCover` falls back to `activeNoteId` for those: the command palette
+  // and the title-row control both genuinely mean "the focused note".
+  const [coverPicker, setCoverPicker] = useState<
+    { hasCover: boolean; noteId: string | null } | null
+  >(null);
   // AI surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9): the `ai_enabled`
   // gate + the AI Chat reveal, threaded into CommandContext so AI capability
   // actions (siblings 4/6/7) gate on `stageName === "editor" && aiEnabled` and
@@ -3198,11 +3227,11 @@ function CommandPaletteHost({
       // banner control and the title-row control are both hover-revealed.
       onSetNoteCover: () => {
         onClose();
-        setCoverPicker({ hasCover: false });
+        setCoverPicker({ hasCover: false, noteId: null });
       },
       onRemoveNoteCover: () => {
         onClose();
-        applyNoteCover(null);
+        applyNoteCover(null, null);
       },
       onShowGraph,
       onShowTags,
@@ -3351,9 +3380,20 @@ function CommandPaletteHost({
   };
   // The note cover (myne-md/myne#410). `setNoteCover` writes `cover:` straight
   // to disk while the note is OPEN, so it is the same staleness class as the
-  // template convert above and settles the same way.
-  const applyNoteCover = (choice: CoverChoice | null) => {
-    const id = activeNoteId;
+  // template convert above and settles the same way. It also flushes any dirty
+  // pane first, and so does the convert; both do it inside the writer rather
+  // than here, so no caller can skip it (myne-md/myne#520,
+  // `notes/flushBeforeFrontmatterWrite.ts`).
+  //
+  // `target` is the note the CONTROL named, and reading `activeNoteId`
+  // unconditionally was the other half of #520: the banner's controls
+  // `preventDefault` on `mousedown`, so a press in an unfocused pane never
+  // focuses it and the passive effect that syncs the selection has not run
+  // either, which cleared the OTHER pane's note. `null` keeps the old meaning,
+  // "the focused note", which is what the palette and the title-row control
+  // actually mean.
+  const applyNoteCover = (choice: CoverChoice | null, target: string | null) => {
+    const id = target ?? activeNoteId;
     setCoverPicker(null);
     if (id === null) return;
     void setNoteCover(id, COVER_FIELD_KEY, choice)
@@ -3365,6 +3405,12 @@ function CommandPaletteHost({
         setToast({ message: t("editor.cover.writeFailed"), variant: "error" });
       });
   };
+  // The note the open picker will write to, resolved ONCE here rather than at
+  // each of the CoverPicker's three props below, which would be three copies of
+  // one precedence rule to keep in step. `null` when no picker is open, or when
+  // the entry point named nothing and nothing is selected either.
+  const coverPickerTarget =
+    coverPicker === null ? null : (coverPicker.noteId ?? activeNoteId);
   // The banner's two hover controls reach this component through window signals,
   // the same shape the vim `:q` ex command uses: the banner is CodeMirror DOM in
   // the shared editor package, with no route into the React context that owns
@@ -3372,9 +3418,19 @@ function CommandPaletteHost({
   useEffect(() => {
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<OpenCoverPickerDetail>).detail;
-      setCoverPicker({ hasCover: detail?.hasCover === true });
+      setCoverPicker({
+        hasCover: detail?.hasCover === true,
+        noteId: detail?.noteId ?? null,
+      });
     };
-    const onRemove = () => applyNoteCover(null);
+    // `?? null` on a possibly-absent detail rather than a destructure: the event
+    // is dispatched by whichever host build is loaded, and a bare
+    // `new CustomEvent(REMOVE_COVER_EVENT)` still has to mean "the focused note"
+    // rather than throw.
+    const onRemove = (e: Event) => {
+      const detail = (e as CustomEvent<RemoveCoverDetail>).detail;
+      applyNoteCover(null, detail?.noteId ?? null);
+    };
     window.addEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
     window.addEventListener(REMOVE_COVER_EVENT, onRemove);
     return () => {
@@ -3405,7 +3461,7 @@ function CommandPaletteHost({
       // label that guesses would be wrong half the time. The picker itself is
       // the surface that shows what is already there.
       label: t("editor.cover.add"),
-      onSelect: () => setCoverPicker({ hasCover: false }),
+      onSelect: () => setCoverPicker({ hasCover: false, noteId: null }),
     },
     {
       kind: "action",
@@ -3531,14 +3587,17 @@ function CommandPaletteHost({
         }}
       />
       <CoverPicker
-        open={coverPicker !== null && activeNoteId !== null}
+        // `coverPickerTarget` is the note the entry point named, falling back to
+        // the focused one, so a picker opened from a banner in an unfocused pane
+        // writes to that pane's note (myne-md/myne#520).
+        open={coverPickerTarget !== null}
         // Comes from whichever entry point opened it: the banner's Change
         // control passes true (a banner only renders for a note that has one),
         // the "Add cover" entries pass false.
         hasCover={coverPicker?.hasCover === true}
         onClose={() => setCoverPicker(null)}
-        onPick={(choice) => applyNoteCover(choice)}
-        onRemove={() => applyNoteCover(null)}
+        onPick={(choice) => applyNoteCover(choice, coverPickerTarget)}
+        onRemove={() => applyNoteCover(null, coverPickerTarget)}
       />
       {emptyTrashConfirm !== null && (
         <DeleteConfirmModal

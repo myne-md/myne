@@ -929,10 +929,28 @@ export function PaneView({
   // lock / close / quit.
   const { registerFlush, unregisterFlush } = ws;
   const flushIfDirty = autosave.flushIfDirty;
+  const lastSaveFailed = autosave.lastSaveFailed;
+  // Answer whether the pane SETTLED, not merely whether the flush returned.
+  // `fireSave` swallows its own rejection into `saveStatus`, so a failed
+  // `note_update` resolves this flush exactly like a successful one.
+  //
+  // `lastSaveFailed`, NOT `hasPendingWork`, and the difference cost three E2E
+  // scenarios before it shipped. `hasPendingWork` is a "do not clobber me" flag:
+  // it answers true whenever the live body differs from what the hook believes
+  // is on disk, which is the ORDINARY state right after a save whose buffer
+  // moved on, and for a clean pane `flushIfDirty` returns without saving at all.
+  // Reporting that as "did not settle" made `flushAll` reject after a perfectly
+  // normal save, so the cover write behind it was refused and the user got a
+  // write-failed toast. What a caller about to read-patch-write this note needs
+  // to know is only whether the flush it just awaited actually persisted.
+  const flushAndReport = useCallback(async () => {
+    await flushIfDirty();
+    return !lastSaveFailed();
+  }, [flushIfDirty, lastSaveFailed]);
   useEffect(() => {
-    registerFlush(leaf.id, flushIfDirty);
+    registerFlush(leaf.id, flushAndReport);
     return () => unregisterFlush(leaf.id);
-  }, [leaf.id, flushIfDirty, registerFlush, unregisterFlush]);
+  }, [leaf.id, flushAndReport, registerFlush, unregisterFlush]);
 
   // Surgical sidebar refresh after a successful save (title/H1 edits
   // propagate to the row label). Tracks the `saved.at` identity.
@@ -1218,6 +1236,13 @@ export function PaneView({
         <div style={{ minWidth: 0, flex: companionVisible ? 1 : undefined }}>
           <CMEditor
             value={content}
+            // myne-md/myne#520: which note this pane is holding. The cover
+            // banner's controls name their target with it instead of leaving
+            // the shell to infer one from focus, which was wrong the moment
+            // the banner pressed was in a pane that is not the focused one.
+            // Pushed live rather than keyed, because this view is long-lived
+            // and notes are swapped through it.
+            noteId={activeId}
             // Set only by the autosave `updated:` echo; undefined for every
             // authoritative writer, so those still apply unconditionally.
             valueBase={buffer.base}
@@ -1298,6 +1323,9 @@ export function PaneView({
           >
             <CMEditor
               value={content}
+              // Same note as the primary editor above: the reading mirror draws
+              // its own cover banner, so its controls need the same target.
+              noteId={activeId}
               // Deliberately NO `valueBase`: this mirror holds no local edits,
               // so it must adopt every value unconditionally. Handing it the
               // primary's baseline would make it silently skip `updated:`
@@ -1609,12 +1637,24 @@ function ViewHost({ viewId }: { viewId: string }) {
           if (choice !== null && def !== null && def.image === undefined) {
             await upsertSavedView({ ...def, image: coverPropertyKey });
           }
+          // Settle, the same pair `Editor.tsx`'s `settleFrontmatterWrite` runs
+          // (`src/CLAUDE.md`, "A backend write made OUTSIDE a pane's autosave
+          // loop leaves that pane holding a stale buffer"). This call site is
+          // the one that needs it most and had none: the target is a note in a
+          // VIEW RESULT, so by definition it is not the note this pane is
+          // showing and it is the likeliest of all cover writers to be open,
+          // and dirty, somewhere else. Without the re-read that pane's buffer
+          // still has no `cover:` line and its next keystroke autosaves the
+          // cover away. `setNoteCover`'s flush closed the race; this closes the
+          // staleness, which is the other half.
+          sidebar.reloadOpenNote();
+          await sidebar.refreshOne(noteId as NoteId);
         } catch {
           /* surfaced via backend tracing */
         }
       })();
     },
-    [coverNoteId, coverPropertyKey, def],
+    [coverNoteId, coverPropertyKey, def, sidebar],
   );
   // The non-mutating card context menu (task 8) — the CLOSED four-item set
   // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy

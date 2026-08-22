@@ -45,6 +45,7 @@ import { readCoverFromFmBody } from "@myne/dialect/surgery";
 import i18n from "@myne/editor/i18n";
 import { attachmentUrl } from "@myne/editor/host/notes/attachmentRef";
 import { getHost } from "../host";
+import { readNoteId } from "../note-identity";
 import { cachedLocateFrontmatter } from "../frontmatter-cache";
 import {
   catalogChanged,
@@ -174,21 +175,39 @@ class CoverBannerWidget extends WidgetType {
     frame.setAttribute("data-state", "resolved");
 
     // Change / Remove, revealed on hover. Omitted entirely when the host has no
-    // cover seam: the affordance is hidden rather than shown broken.
-    const cover = getHost().cover;
+    // cover seam (the affordance is hidden rather than shown broken), and when
+    // the surface is READ-ONLY.
+    //
+    // The read-only half is myne-md/myne#564's contract applied to the control
+    // that needed it most. These two do not go through the document, so neither
+    // `EditorState.readOnly` nor the reading mirror's `NOOP_ON_CHANGE` stops
+    // them: they call the host, which re-encrypts the note on disk. The task
+    // checkbox refuses for exactly this reason and its write is the one that
+    // gets THROWN AWAY; this one persists. `PaneView` renders the reading
+    // companion as a strict read-only mirror of the same buffer, so without
+    // this, hovering that mirror's banner and pressing Remove clears the note's
+    // cover from a surface documented as never writing.
+    const cover = view.state.readOnly ? undefined : getHost().cover;
     if (cover !== undefined) {
+      // Read the note LIVE at activation, never captured here (myne-md/myne#520).
+      // `eq()` compares the resolved URL alone, so CM6 legitimately keeps this
+      // DOM across a note swap whenever the two notes point at the same
+      // attachment, and a closure taken now would then name the note the pane
+      // used to hold. Same discipline as the task `+` affordance, which resolves
+      // its line from the DOM for the same class of reason.
+      const target = (): string | null => readNoteId(view.state);
       const controls = document.createElement("div");
       controls.className = "cm-cover-banner-controls";
       controls.appendChild(
         makeCoverControl(COVER_CHANGE_TESTID, i18n.t("editor.cover.change"), () =>
           // `true`: these controls only render on a banner, and a banner only
           // renders for a note that has a resolvable cover.
-          cover.openPicker(true),
+          cover.openPicker(true, target()),
         ),
       );
       controls.appendChild(
         makeCoverControl(COVER_REMOVE_TESTID, i18n.t("attachments.coverPicker.removeCover"), () =>
-          cover.remove(),
+          cover.remove(target()),
         ),
       );
       frame.appendChild(controls);

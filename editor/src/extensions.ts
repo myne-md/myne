@@ -76,6 +76,7 @@ import { attachmentInsertPlaceholderExtension } from "./attachments/insert-place
 import { slashMenuExtension } from "./slash/plugin";
 import { aiSlashEnabledFacet } from "./slash/aiSlash";
 import { transcriptionEnabledFacet } from "./attachments/transcription-gate";
+import { noteIdExtension } from "./note-identity";
 import { ghostTextExtension } from "./ai/ghostText";
 
 // AI surface (slash AI commands + inline ghost-text) lives in a CM6 Compartment
@@ -220,6 +221,11 @@ export function myneExtensions(opts?: {
    *  seed the rebindable editor keymap Compartment. Pushed live on change via
    *  `reconfigureEditorKeymap`. Absent → in-code defaults. */
   keymapOverrides?: Readonly<Record<string, readonly string[]>>;
+  /** myne-md/myne#520: which note this view holds. Read by the cover banner so
+   *  its Change / Remove name their target instead of leaving the host to guess
+   *  from focus. Absent → `null`, which every consumer reads as "fall back to
+   *  the focused note". */
+  noteId?: string | null;
 }): readonly Extension[] {
   const viewMode = opts?.viewMode ?? "live";
   const readOnly = opts?.readOnly ?? false;
@@ -339,6 +345,7 @@ export function myneExtensions(opts?: {
     // and the base slash menu only.
     aiCompartment.of(aiSurface(opts?.aiEnabled ?? false)),
     transcriptionCompartment.of(transcriptionSurface(opts?.transcriptionEnabled ?? true)),
+    noteIdExtension(opts?.noteId ?? null),
     // `[[` note picker (MYND-38) — fuzzy note search → canonical §3 emit. Reads
     // the WL-5 note-set facet; reuses the slash-menu surface + fuzzyFilter.
     wikilinkPickerExtension(),

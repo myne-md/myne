@@ -399,26 +399,38 @@ export interface EditorHost {
   /** OPTIONAL — the note cover's picker (myne-md/myne#410).
    *
    *  The banner is CodeMirror DOM inside this package; the picker is the host's
-   *  own modal, and the host is also the only thing that knows which note the
-   *  focused pane holds. So the editor ASKS rather than opens, exactly like
+   *  own modal. So the editor ASKS rather than opens, exactly like
    *  `workspace.closeActiveTab` above, and for the same reason.
+   *
+   *  It used to ask without naming a target, on the reasoning that "the host is
+   *  also the only thing that knows which note the focused pane holds". That
+   *  was wrong in a split (myne-md/myne#520): the banner's controls
+   *  `preventDefault` on `mousedown`, so pressing one in an UNFOCUSED pane
+   *  never focuses it, and the shell's selected note is still the other pane's.
+   *  Both members now carry the id, and `null` is the only case left where the
+   *  host still guesses.
    *
    *  A host that omits this renders no cover controls at all: the affordance is
    *  hidden rather than shown broken, which is the seam's whole contract. */
   cover?: {
-    /** Open the host's cover picker for whichever note is focused.
+    /** Open the host's cover picker for the note named by `noteId`.
      *
      *  `hasCover` flows this way round because the EDITOR knows it and the shell
      *  does not: the banner has just resolved the note's `cover:` field, while
      *  the shell's note cache carries no cover state. The picker uses it to
-     *  decide whether to offer its own Remove action. */
-    openPicker: (hasCover: boolean) => void;
-    /** Clear the focused note's cover.
+     *  decide whether to offer its own Remove action.
+     *
+     *  `noteId` is `null` when the host never supplied one (`noteIdFacet`), in
+     *  which case the host falls back to the focused note, which is the
+     *  pre-#520 behaviour and is still correct for the command palette. */
+    openPicker: (hasCover: boolean, noteId: string | null) => void;
+    /** Clear the cover of the note named by `noteId`, with the same `null`
+     *  fallback as `openPicker`.
      *
      *  A separate member rather than a trip through the picker: removing is a
      *  one-click intent, and routing it through a modal the user then has to
      *  act inside makes two controls that do the same thing. */
-    remove: () => void;
+    remove: (noteId: string | null) => void;
   };
 }
 
