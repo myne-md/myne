@@ -120,6 +120,18 @@ pub fn system_instructions() -> String {
         "{\"action\":\"propose_note\",\"title\":\"...\",\"body\":\"...\"}\n",
         "{\"action\":\"request_scope\",\"folder\":\"...\",\"reason\":\"...\"}\n",
         "{\"action\":\"finish\",\"summary\":\"...\"}\n\n",
+        // **The shape of the exchange, which the instructions never described**
+        // (myne-md/myne#574). They listed the actions and stopped, so nothing
+        // told the model that the next message it receives IS its own tool's
+        // answer. A run spent four requests calling `list_scope` four times
+        // with the answer already in its context. The per-result framing in
+        // `run_loop.rs` is the other half of this; both were needed.
+        "After each action you take, the next message you receive is the ",
+        "result of that action. Read it and move on: do not repeat a call you ",
+        "have already made, because the answer will not have changed. When you ",
+        "have what you need, finish, and put the answer to the user's question ",
+        "in the summary — finish is how you reply to a question, not only how ",
+        "you end an edit.\n\n",
         "search_scope looks inside the notes you were given. search_vault looks ",
         "at the whole vault: matches inside your scope come back as ids you can ",
         "read, and matches outside it come back only as a folder name and a ",

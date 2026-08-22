@@ -1062,7 +1062,8 @@
       "rightPanel": {
         "aiChat": {
           "agentTurn": {
-            "newNotes_one": "{{count}} new note.",
+            "noAnswer": "The agent stopped without an answer. Try asking again, or rephrase it.",
+          "newNotes_one": "{{count}} new note.",
             "newNotes_other": "{{count}} new notes.",
             "proposed_one": "Proposed {{count}} change.",
             "proposed_other": "Proposed {{count}} changes."
