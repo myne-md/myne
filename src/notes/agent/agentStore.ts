@@ -16,6 +16,7 @@ import type {
   AgentRunView,
   AppliedRun,
   LoopEnd,
+  ProbeVerdict,
   Proposal,
   ProposedEdit,
 } from "../../lib/agent-run";
@@ -66,6 +67,27 @@ export interface AgentState {
    *  preference. `beginRun` and `clearAgent` keep it, like `undoable`, because
    *  neither is a vault-leaving event. */
   autoApply: boolean;
+  /** Whether the configured backend can hold the anchored edit format,
+   *  `"failed"` when the probe itself could not be answered, or null when it has
+   *  not been asked yet (myne-md/myne#568).
+   *
+   *  **Here rather than in `ChatComposer`'s own state, and the reason is what
+   *  asking costs.** With a remote provider the probe issues
+   *  `threshold.attempts` requests to that provider, measured at 8 seconds in
+   *  the session that found this. Component state dies with the component, and
+   *  `AiChatTab` mounts conditionally on the right panel's active tab, so
+   *  switching that tab away and back paid for the whole probe again, as did
+   *  every restart. The verdict is a fact about the backend, not about a run.
+   *
+   *  It does NOT change WHEN the probe fires: still on the first Send, never on
+   *  mount and never on a control change (`design-notes/ai/0518` point 2,
+   *  TB13). What changes is only how long one answer lives.
+   *
+   *  Kept by `beginRun` and `clearAgent` for the reason `autoApply` is, and
+   *  dropped by `clearAgentForLock`: the AI provider settings live in
+   *  `vault.prefs`, so the next vault can be configured against a different
+   *  backend and this verdict would be a claim about the previous one. */
+  probeVerdict: ProbeVerdict | "failed" | null;
   /** True from the moment a run's automatic apply is decided until it settles.
    *
    *  It exists so the review dialog never flashes: without it a finished run is
@@ -100,6 +122,7 @@ const INITIAL: AgentState = {
   appliedEdits: new Set(),
   applied: null,
   autoApply: false,
+  probeVerdict: null,
   autoApplying: false,
   undoable: null,
   error: null,
@@ -169,6 +192,9 @@ export function beginRun(): void {
     // event, and the user chose this mode for the session rather than for one
     // message.
     autoApply: state.autoApply,
+    // Same: the backend has not changed because a second run started, and
+    // re-probing would spend the provider requests again for every message.
+    probeVerdict: state.probeVerdict,
     running: true,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
@@ -204,6 +230,15 @@ export function openRun(view: AgentRunView, epoch: number): boolean {
  *  Session-scoped: see the field's own note for why this is not a preference. */
 export function setAutoApply(on: boolean): void {
   set({ autoApply: on });
+}
+
+/** Record what the edit-format probe answered.
+ *
+ *  Session-scoped: the field's own note says where it is kept and where it is
+ *  dropped. There is deliberately no way to clear it to `null` from here — the
+ *  only thing that unasks the question is leaving the vault. */
+export function setProbeVerdict(verdict: ProbeVerdict | "failed"): void {
+  set({ probeVerdict: verdict });
 }
 
 /** Mark that this run's automatic apply has been decided.
@@ -432,6 +467,10 @@ export function clearAgent(): void {
     // Kept for the reason `beginRun` states: closing the review screen is not
     // a vault-leaving event either.
     autoApply: state.autoApply,
+    // Same, and this is the call site that matters most for it: closing the
+    // review screen comes through here, so dropping the verdict would make
+    // every review cost the next message a fresh probe.
+    probeVerdict: state.probeVerdict,
     // Kept, for the reason `setUndoable` states and `beginRun` repeats: closing
     // the review screen un-applies nothing. This used to spread `INITIAL`
     // wholesale, so it nulled the offer and made `clearAgentForLock`, whose
@@ -463,7 +502,19 @@ export function clearAgentForLock(): void {
   // that granted it was the user choosing it while this vault was open. A lock
   // ends that session, so carrying the choice into the next unlock would let a
   // run write into a vault the user has not chosen it for (myne-md/myne#551).
-  set({ undoable: null, autoApply: false, autoApplying: false });
+  // **And the probe verdict**, for a different reason than the mode's: it is a
+  // claim about the CONFIGURED BACKEND, the AI provider settings live in
+  // `vault.prefs`, and the next vault opened can be configured against another
+  // provider entirely. Carrying it over would gate agent mode on a measurement
+  // of a backend that is no longer the one in use, in either direction: a
+  // refusal earned by the previous vault's model would block a capable one, and
+  // a pass would let the composer skip the check on a model nobody measured.
+  set({
+    undoable: null,
+    autoApply: false,
+    autoApplying: false,
+    probeVerdict: null,
+  });
 }
 
 // ---- the vault-leaving epoch ------------------------------------------------
