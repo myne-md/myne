@@ -39,6 +39,25 @@ async function readStatus(): Promise<SyncStatus> {
   return invoke<SyncStatus>("plugin:sync|sync_status");
 }
 
+/**
+ * Whether two reads are the same answer.
+ *
+ * Every poll deserializes a fresh object, so `Object.is` never matches and each
+ * tick re-rendered every subscriber to paint an identical frame. On the editor
+ * screen that subtree is the sidebar: `NoteList` -> `VirtualList` -> ~30
+ * un-memoized `NoteRow`s, once per poller per five seconds, for nothing.
+ *
+ * `useUnsyncedEdits`, read at the same level on the same beat, has done this
+ * since it was written and says why in its own comment. This hook did not, so a
+ * caller adding one beside it silently gave back the property that one protects.
+ */
+function sameStatus(a: SyncStatus | null, b: SyncStatus): boolean {
+  if (a === null || a.state !== b.state) return false;
+  if (a.state === "error") return a.detail === (b as { detail: string }).detail;
+  if (a.state === "conflicts") return a.count === (b as { count: number }).count;
+  return true;
+}
+
 export function useSyncStatus(): SyncStatusHook {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,7 +69,7 @@ export function useSyncStatus(): SyncStatusHook {
     const tick = () => {
       readStatus()
         .then((s) => {
-          if (mounted.current) setStatus(s);
+          if (mounted.current) setStatus((prev) => (sameStatus(prev, s) ? prev : s));
         })
         .catch(() => {
           /* leave the last-known status; a transient read failure is not an
