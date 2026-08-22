@@ -1,11 +1,19 @@
 // The `+` "add task field" affordance at the end of a task line.
 //
-// A cursor-aware POINT widget (not a `replace`, not a block): it consumes no
+// A caret-aware POINT widget (not a `replace`, not a block): it consumes no
 // text, so it never participates in `atomicRanges` and the caret sits naturally
-// before or after it. It appears at `line.to` only while the caret is on that
-// task line — the same `isCursorLine` gate every edit affordance uses, which
-// also hides it in reading view and when the editor is unfocused. Source mode
-// empties the whole decoration stack, so there is no `+` there either.
+// before or after it. It appears at `line.to` only while a CARET is on that task
+// line: `isCaretLine`, which also hides it in reading view, when the editor is
+// unfocused, and while any text is selected. Source mode empties the whole
+// decoration stack, so there is no `+` there either.
+//
+// The "while any text is selected" half is not a style preference. This widget
+// enters the line's DOM in the same update that moves the selection, so
+// `drawSelection` can measure the row mid-change, conclude the selection's two
+// ends are on different visual rows, and paint the two-rectangle form: one band
+// running to the right edge, another from the left edge, overlapping over the
+// text and doubling a translucent wash where they meet. Nothing recomputes it
+// afterwards. `isCaretLine` carries the measurement (myne-md/myne#560).
 //
 // Activation mirrors the chip: `preventDefault` + a bubbling CustomEvent the
 // window-level listener (`task-chip-listener.ts`) answers by opening the
@@ -22,7 +30,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
-import { isCursorLine } from "./cursor-aware";
+import { isCaretLine } from "./cursor-aware";
 import i18n from "@myne/editor/i18n";
 
 /** Fired when the `+` affordance is activated; the host opens the add-field menu. */
@@ -94,8 +102,10 @@ function buildTaskAddDecorations(view: EditorView): DecorationSet {
       enter: (node) => {
         if (node.name !== "TaskMarker") return undefined;
         const line = view.state.doc.lineAt(node.from);
-        // Only while the caret is on this task line.
-        if (!isCursorLine(view, line.from, line.to)) return undefined;
+        // Only while a CARET is on this task line, never merely a selection.
+        // See `isCaretLine` for why the distinction is load-bearing rather than
+        // cosmetic (myne-md/myne#560).
+        if (!isCaretLine(view, line.from, line.to)) return undefined;
         decorations.push(
           Decoration.widget({ widget: new TaskAddWidget(), side: 1 }).range(line.to),
         );

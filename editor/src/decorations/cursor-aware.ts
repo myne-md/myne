@@ -106,6 +106,87 @@ export function isInsideRange(view: EditorView, from: number, to: number): boole
   return false;
 }
 
+/**
+ * Reveal predicate for a decoration that REPLACES its range with a widget: true
+ * when a caret sits inside `[from, to]`, or when a selection overlaps it.
+ *
+ * Two clauses because they answer two different questions, and a widget needs
+ * both:
+ *
+ *   - a caret inside the range means "I am editing this markup", which is the
+ *     ordinary live-preview reveal every construct here does.
+ *   - a selection OVERLAPPING the range means the user has taken the markup into
+ *     a selection, and a widget is the wrong thing to show them. The rendered
+ *     checkbox paints an opaque accent fill; a translucent selection band across
+ *     it, next to the same band over plain text, is two tones in one selection,
+ *     the "double highlight" of myne-md/myne#560. Showing the source instead
+ *     removes the opaque surface rather than working around it, and it is also
+ *     the honest answer: what is selected is `- [x] `, so that is what should be
+ *     on screen and on the clipboard.
+ *
+ * Overlap is strict at both ends (`range.from < to && range.to > from`), so a
+ * selection that merely ENDS where the run begins leaves the widget alone.
+ *
+ * `isInsideRange` is the looser sibling kept for restyling decorations
+ * (emphasis, link, inline code): those change how text looks, so revealing on a
+ * boundary touch is harmless where a widget vanishing is not.
+ */
+export function revealsRange(view: EditorView, from: number, to: number): boolean {
+  if (view.state.facet(readingModeFacet)) return false; // Reading view (MYND-299)
+  if (!view.hasFocus) return false;
+  for (const range of view.state.selection.ranges) {
+    if (range.empty) {
+      if (range.head >= from && range.head <= to) return true;
+    } else if (range.from < to && range.to > from) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Line-scoped check like {@link isCursorLine}, but satisfied only by a CARET (an
+ * empty range) on one of the lines in `[from, to]`.
+ *
+ * For an affordance that ADDS A NODE to the line, not merely restyles it. Two
+ * reasons, and the second is the one that is hard to find:
+ *
+ *  - an edit affordance belongs to a caret. While text is selected the user is
+ *    doing something else, and a button appearing inside their selection band is
+ *    noise.
+ *  - a widget inserted in the SAME update as a selection change makes the line's
+ *    DOM move while `drawSelection` is measuring it. Its `wrappedLine()` probe
+ *    then reads a transient geometry, decides the selection's two ends are on
+ *    different visual rows, and paints the two-rectangle form: one band from the
+ *    selection start to the right edge, another from the left edge to the
+ *    selection end. Over a single row those overlap, and a translucent
+ *    `--selection-bg` doubles where they do. Nothing recomputes it afterwards,
+ *    so the wrong pair of rectangles stays until the next selection change.
+ *    Measured, not reasoned: `myne-md/myne#560`.
+ *
+ * **On which of the two #560 fixes is load-bearing.** The other one is in
+ * `editor/src/task-surfaces.css`, which rebuilt `.cm-task-add`'s metrics so its
+ * block margins cancel its own height. That removed the VERTICAL line-box growth
+ * and is the root-cause fix; this is the reason the first clause above is the one
+ * that carries the rule now. Keeping both is deliberate: the widget still
+ * contributes inline WIDTH conditionally, so on a row already near the wrap width
+ * the caret can still force a wrap and the same branch. Closing that last case
+ * means taking the widget out of flow entirely, which is a bigger change than
+ * either of these and is not in this diff.
+ */
+export function isCaretLine(view: EditorView, from: number, to: number): boolean {
+  if (view.state.facet(readingModeFacet)) return false; // Reading view (MYND-299)
+  if (!view.hasFocus) return false;
+  const startLine = view.state.doc.lineAt(from).number;
+  const endLine = view.state.doc.lineAt(to).number;
+  for (const range of view.state.selection.ranges) {
+    if (!range.empty) continue;
+    const line = view.state.doc.lineAt(range.head).number;
+    if (line >= startLine && line <= endLine) return true;
+  }
+  return false;
+}
+
 // --- Editor focus, threaded into state -----------------------------------
 //
 // `StateField`-backed decorations (block / line-break-crossing replaces, which
