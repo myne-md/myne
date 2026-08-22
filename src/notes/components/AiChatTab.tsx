@@ -43,6 +43,7 @@ import {
 import {
   clearChat,
   useChat,
+  type AgentTurnEnd,
   type ChatTurn,
 } from "../ai/chatStore";
 import { agentCancel } from "../../lib/agent-run";
@@ -149,6 +150,30 @@ const bubbleStyle = (isUser: boolean): CSSProperties => ({
   padding: "var(--space-1) var(--space-2)",
 });
 
+/** What a run that proposed nothing AND answered nothing says (myne-md/myne#574).
+ *
+ *  A total switch rather than a lookup table, for the reason the file's own note
+ *  above gives: `scripts/check-i18n.mjs` verifies **static** `t("…")` call
+ *  sites, so a key assembled from a variable is a key it cannot see.
+ *
+ *  Two of the five ends mean the run never did its work — it went round in
+ *  circles, or it ran out of steps — and those get a sentence that says so and
+ *  suggests the retry. The rest kept the old line: a `finished` run with an
+ *  empty proposal really did look and decide there was nothing to change, and a
+ *  `cancelled` one stopped because the user said so. `awaitingScope` never
+ *  reaches here, because `settleRunIntoChat` does not settle a turn on it. */
+function emptyRunLabel(end: AgentTurnEnd, t: TFn): string {
+  switch (end) {
+    case "stalled":
+    case "exhaustedIterations":
+      return t("editor.chrome.rightPanel.aiChat.agentTurn.noAnswer");
+    case "finished":
+    case "cancelled":
+    case "awaitingScope":
+      return t("agent.review.noChanges");
+  }
+}
+
 /** The speaker caption above a turn's body. */
 function TurnSpeaker({ isUser, t }: { isUser: boolean; t: TFn }) {
   return (
@@ -254,7 +279,15 @@ function AgentTurnView({
                 // succeeded.
                 s.summary.trim().length > 0
                 ? null
-                : t("agent.review.noChanges")
+                : // **And the wrong one again when the run never got anywhere**
+                  // (myne-md/myne#574). A run that stalls or runs out of steps
+                  // proposed nothing AND answered nothing, so "the agent
+                  // proposed no changes" reports the less useful of the two
+                  // facts: it reads as a considered verdict on the note, when
+                  // what happened is that the run ended without doing its work.
+                  // The end line underneath says WHY; this says what the user
+                  // got, which is nothing, and what to do about it.
+                  emptyRunLabel(s.end, t)
               : [
                   s.edits > 0
                     ? t("editor.chrome.rightPanel.aiChat.agentTurn.proposed", {
