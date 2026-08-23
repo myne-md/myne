@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { formatRelativeTime, useTick } from "./relativeTime";
 import type { SaveStatus as SaveStatusValue } from "../useAutosave";
 import { isStorageFull } from "../../lib/storage-pressure";
-import { SyncArc } from "../../components/Spinner";
+import { SYNC_ARC_INLINE_PX, SyncArc } from "../../components/Spinner";
 import { ActionStatus } from "../../components/ActionStatus";
 
 const ROOT_STYLE: CSSProperties = {
@@ -97,11 +97,13 @@ export function SaveStatus({ status, onRetry, unsynced = false }: SaveStatusProp
           marker rotating through all of that would be claiming work is in
           flight that is not. The gap in the ring is what says "outstanding"
           while standing still. Same glyph and same rule as the sidebar row's,
-          so the two read as one fact seen twice rather than two facts. */}
+          so the two read as one fact seen twice rather than two facts. It is a
+          pixel smaller here because it sits inside a text run rather than at
+          row level; `SYNC_ARC_INLINE_PX` carries that reason. */}
       {unsynced && (
         <SyncArc
           spinning={false}
-          size={7}
+          size={SYNC_ARC_INLINE_PX}
           testId="editor.unsynced-marker"
           label={t("notes.row.unsyncedLabel")}
           title={t("notes.row.unsyncedTitle")}
@@ -162,7 +164,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
               OUTSTANDING and a turning one means work is IN FLIGHT, and text
               waiting on a debounce is outstanding. Rotation is left to `saving`
               and `conflict`, which are bounded and short. */}
-          <SyncArc spinning={false} size={7} label={t("notes.saveStatus.editing")} />
+          <SyncArc spinning={false} size={SYNC_ARC_INLINE_PX} label={t("notes.saveStatus.editing")} />
           {t("notes.saveStatus.editingEllipsis")}
         </span>
       );
@@ -175,7 +177,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
           aria-label={t("notes.saveStatus.saving")}
           title={t("notes.saveStatus.savingEllipsis")}
         >
-          <SyncArc spinning size={7} label={t("notes.saveStatus.saving")} />
+          <SyncArc spinning size={SYNC_ARC_INLINE_PX} label={t("notes.saveStatus.saving")} />
           <span style={{ color: "var(--fg-1)" }}>
             {t("notes.saveStatus.savingEllipsis")}
           </span>
@@ -243,7 +245,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
           aria-label={t("notes.saveStatus.conflict")}
           title={t("notes.saveStatus.conflictTitle")}
         >
-          <SyncArc spinning size={7} label={t("notes.saveStatus.conflict")} />
+          <SyncArc spinning size={SYNC_ARC_INLINE_PX} label={t("notes.saveStatus.conflict")} />
           <span style={{ color: "var(--fg-1)" }}>
             {t("notes.saveStatus.conflict")}
           </span>

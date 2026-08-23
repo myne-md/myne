@@ -33,7 +33,7 @@ import type { TitleRecord } from "../loadNoteBatch";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { uuidv7Ms } from "../sidebarState";
 import { Icon } from "../../components/primitives/Icon";
-import { SyncArc } from "../../components/Spinner";
+import { SYNC_ARC_ROW_PX, SyncArc } from "../../components/Spinner";
 import { formatRelativeTime, useTick } from "./relativeTime";
 
 export type NoteRowProps = {
@@ -295,9 +295,11 @@ const indexConflictStyle: CSSProperties = {
  *
  *  It was a closed 6px ring, and at that size a ring and a dot are the same
  *  glyph, which is what it was reported as: a mark nobody could read anything
- *  off (myne-md/myne#566). It is now the shared `<SyncArc>` at 8px with a gap:
- *  the same three-quarter arc the save readout uses, so one shape means
- *  "outstanding" everywhere in the app.
+ *  off (myne-md/myne#566). It is now the shared `<SyncArc>` at `SYNC_ARC_ROW_PX`
+ *  with a gap: the same three-quarter arc the save readout uses, so one shape
+ *  means "outstanding" everywhere in the app. The readout draws it a pixel
+ *  smaller because its arc sits inside a text run; the shape is what is shared,
+ *  not the pixel count.
  *
  *  It never TURNS, and that is a design-canon decision rather than an oversight.
  *  `docs/design/README.md` bans looping animation by name, and the sidebar draws
@@ -520,7 +522,7 @@ export function NoteRow(props: NoteRowProps) {
       {unsynced && (
         <SyncArc
           spinning={false}
-          size={8}
+          size={SYNC_ARC_ROW_PX}
           testId="notes.row-unsynced"
           label={t("notes.row.unsyncedLabel")}
           title={t("notes.row.unsyncedTitle")}

@@ -68,8 +68,9 @@ export function Spinner({ size = 32, style }: SpinnerProps) {
  * MYND-630 reduced-motion carve-out. An indicator that freezes reads as hung,
  * so it slows to half speed instead of stopping. Not applied when `spinning` is
  * false: a static arc must have no animation to slow down.
- */
-/**
+ *
+ * # The canon
+ *
  * The one member of the design canon's **inline status mark** class
  * (`docs/design/README.md`, "Inline status marks are a separate class from
  * icons"). That section was written for this glyph in myne-md/myne#520's
@@ -78,7 +79,9 @@ export function Spinner({ size = 32, style }: SpinnerProps) {
  * The canon now carries the carve-out and the argument for it, so a reader of
  * either side finds the same answer.
  *
- * NEVER a live region, and the prop that made it one is gone.
+ * # Never a live region
+ *
+ * The prop that made it one is gone.
  *
  * It used to take `announces`, which swapped `role="img"` for `role="status"`
  * where the arc was the only carrier of the state. That did not work and could
@@ -90,8 +93,22 @@ export function Spinner({ size = 32, style }: SpinnerProps) {
  * glyph, which is what `SaveStatus` does; that component's own comment explains
  * why a region removed from the accessibility tree announces nothing.
  */
+/**
+ * The two sizes the arc is drawn at, named rather than written as a literal at
+ * each call site.
+ *
+ * They differ by a pixel and both call sites' comments claim the glyph is "one
+ * fact seen twice", which read as a contradiction until it was measured: the
+ * save readout's arc sits INSIDE a text run at the readout's font size, and the
+ * sidebar's sits at row level beside a title. Optical size follows the text it
+ * sits in, so the shape is shared and the pixel count is not. Naming them says
+ * that out loud; two bare literals said the opposite.
+ */
+export const SYNC_ARC_INLINE_PX = 7;
+export const SYNC_ARC_ROW_PX = 8;
+
 export function SyncArc({
-  size = 8,
+  size = SYNC_ARC_ROW_PX,
   spinning,
   label,
   title,
