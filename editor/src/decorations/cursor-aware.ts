@@ -69,14 +69,31 @@ export function selectionTouchesLines(
   return false;
 }
 
+/**
+ * The two suppressors EVERY view-based reveal predicate in this file honours,
+ * before it looks at the selection at all.
+ *
+ *  - Reading view (MYND-299) never reveals, whatever the focus or selection. A
+ *    non-editable CM6 view can still take a selection, so gating on
+ *    `view.hasFocus` alone does not honour "Reading view never lifts source".
+ *  - When the editor loses focus (a sidebar click, a settings modal, an OS focus
+ *    change) the reveal must lift, so the markdown reads as a rendered document
+ *    again. Selection state persists across focus loss in CM6, which is why
+ *    `view.hasFocus` is the discriminator and the selection is not.
+ *
+ * One function rather than the same two lines at the top of four predicates: a
+ * third suppressor is one edit here instead of four, and the four names then
+ * differ only in what they actually differ in (line versus range, caret-only
+ * versus any selection). `revealActive` below is the STATE-only analogue for
+ * StateField decorations, which have no `view` and answer the focus question
+ * differently (the threaded field, plus an open find panel).
+ */
+function revealSuppressed(view: EditorView): boolean {
+  return view.state.facet(readingModeFacet) || !view.hasFocus;
+}
+
 export function isCursorLine(view: EditorView, from: number, to: number): boolean {
-  // Reading view (MYND-299): never reveal, whatever the focus/selection.
-  if (view.state.facet(readingModeFacet)) return false;
-  // When the editor loses focus (sidebar click, settings modal, OS focus
-  // change), the cursor-aware reveal must lift — the decorations should
-  // re-apply so the markdown reads as a rendered document. Selection state
-  // persists across focus loss in CM6, so `view.hasFocus` is the discriminator.
-  if (!view.hasFocus) return false;
+  if (revealSuppressed(view)) return false;
   const startLine = view.state.doc.lineAt(from).number;
   const endLine = view.state.doc.lineAt(to).number;
   return selectionTouchesLines(view.state, startLine, endLine);
@@ -93,12 +110,12 @@ export function isCursorLine(view: EditorView, from: number, to: number): boolea
  * considered inside so the user can backspace into the decoration or step
  * into it from the right edge to edit.
  *
- * Like `isCursorLine`, this returns `false` when the editor isn't focused
- * so the rendered view is restored as soon as focus leaves the editor.
+ * Like `isCursorLine`, it is suppressed in reading view and when the editor
+ * isn't focused (`revealSuppressed`), so the rendered view is restored as soon
+ * as focus leaves the editor.
  */
 export function isInsideRange(view: EditorView, from: number, to: number): boolean {
-  if (view.state.facet(readingModeFacet)) return false; // Reading view (MYND-299)
-  if (!view.hasFocus) return false;
+  if (revealSuppressed(view)) return false;
   for (const range of view.state.selection.ranges) {
     if (range.head >= from && range.head <= to) return true;
     if (range.anchor >= from && range.anchor <= to) return true;
@@ -132,8 +149,7 @@ export function isInsideRange(view: EditorView, from: number, to: number): boole
  * boundary touch is harmless where a widget vanishing is not.
  */
 export function revealsRange(view: EditorView, from: number, to: number): boolean {
-  if (view.state.facet(readingModeFacet)) return false; // Reading view (MYND-299)
-  if (!view.hasFocus) return false;
+  if (revealSuppressed(view)) return false;
   for (const range of view.state.selection.ranges) {
     if (range.empty) {
       if (range.head >= from && range.head <= to) return true;
@@ -175,8 +191,7 @@ export function revealsRange(view: EditorView, from: number, to: number): boolea
  * either of these and is not in this diff.
  */
 export function isCaretLine(view: EditorView, from: number, to: number): boolean {
-  if (view.state.facet(readingModeFacet)) return false; // Reading view (MYND-299)
-  if (!view.hasFocus) return false;
+  if (revealSuppressed(view)) return false;
   const startLine = view.state.doc.lineAt(from).number;
   const endLine = view.state.doc.lineAt(to).number;
   for (const range of view.state.selection.ranges) {
