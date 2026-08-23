@@ -4,6 +4,7 @@
 
 import { invoke } from "../platform/core";
 import { documentDir, join } from "../platform/path";
+import { devicePlatform } from "./prefs";
 import { logErrorKind } from "./vault-creation-logging";
 import { shareFile } from "./share";
 import { writeSecret } from "./clipboardTransport";
@@ -82,20 +83,53 @@ export async function copySecretToClipboard(
  * vault, and until that landed iCloud Backup and Google Auto Backup carried it
  * off the device. See `mobile/src-tauri/src/backup_exclude.rs`.
  *
- * Resolves to a short display label (`"Documents/<file>"`) on success, or `null`
- * on failure (the caller shows a message). `filename` should end in `.txt`.
+ * Resolves to a {@link SecretSaveOutcome} on success, or `null` on failure (the
+ * caller shows a message). `filename` should end in `.txt`.
+ *
+ * **The outcome names the DELIVERY, not a path, and the two platforms have
+ * different ones** (myne-md/myne#504). This used to answer `"Documents/<file>"`
+ * on both, and on iOS that is a location the user cannot open: the app declares
+ * no `UIFileSharingEnabled` and no `LSSupportsOpeningDocumentsInPlace` in either
+ * `Info.ios.plist` or the generated plist, so its Documents directory is not in
+ * the Files app at all. The share sheet is the only route to the file there, and
+ * a user who dismissed it was left holding a success message naming a folder
+ * that does not exist for them, for the one file the app produces that is never
+ * re-displayable (`recovery-flow.md` §2.4).
+ *
+ * Adding `UIFileSharingEnabled` is deliberately NOT the fix: it would make the
+ * claim true by making a plaintext recovery phrase browsable to anyone holding
+ * the unlocked phone.
+ *
+ * Android keeps the path, because there the share sheet is the documented no-op
+ * (`share_file.rs`) and the write IS the delivery. Note that `share_file.rs` and
+ * this file's own header disagree about whether that directory is reachable from
+ * the system Files app on a current Android; that question is myne-md/myne#505's
+ * and is not answered here, so this says only where the file went and promises
+ * nothing about which app can browse to it.
  */
+export type SecretSaveOutcome =
+  /** Written, and the path is meaningful to the user. */
+  | { readonly kind: "path"; readonly label: string }
+  /** Written inside the app, where only the share sheet can reach it. */
+  | { readonly kind: "shared" };
+
 export async function saveSecretToDocuments(
   filename: string,
   contents: string,
-): Promise<string | null> {
+): Promise<SecretSaveOutcome | null> {
   try {
     const path = await join(await documentDir(), filename);
     await invoke("plugin:secret-export|save_secret_text", { path, contents });
     // Offer the native destination chooser on top of the guaranteed Documents
     // write; additive, so a share cancel still leaves the file saved.
     await shareFile(path);
-    return `Documents/${filename}`;
+    // The platform read comes AFTER the write, so a probe failure cannot cost
+    // the save. Unknown resolves to the iOS wording, which is the one that
+    // claims less: it names no location, so it cannot name a wrong one.
+    const platform = await devicePlatform().catch(() => "ios");
+    return platform === "android"
+      ? { kind: "path", label: `Documents/${filename}` }
+      : { kind: "shared" };
   } catch (e) {
     logErrorKind(e, "secret-save-failed");
     return null;

@@ -30,6 +30,7 @@ import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
 import {
   copySecretToClipboard,
   saveSecretToDocuments,
+  type SecretSaveOutcome,
 } from "../../lib/secret-export";
 import { canHoldSecretOnClipboard } from "../../lib/clipboardTransport";
 import type { CreateVaultFlowProps } from "./types";
@@ -645,17 +646,33 @@ export function CreateVaultFlow({
     })();
   };
 
+  // The message names the DELIVERY the platform actually performed
+  // (myne-md/myne#504). Both used to say "Saved to Documents/<file>", and on iOS
+  // that folder is not in the Files app, so the sentence pointed the user at a
+  // place they cannot open for the one file that is never shown again.
+  const saveMessage = (outcome: SecretSaveOutcome | null): string =>
+    outcome === null
+      ? t("createVault.saveFileError")
+      : outcome.kind === "path"
+        ? t("createVault.savedToFile", { label: outcome.label })
+        : t("createVault.savedToShareSheet");
+
   const saveAccountFile = () => {
     void (async () => {
-      const label = await saveSecretToDocuments("myne-account-number.txt", account);
-      setFileMsg(label ? t("createVault.savedToFile", { label }) : t("createVault.saveFileError"));
+      setFileMsg(saveMessage(await saveSecretToDocuments("myne-account-number.txt", account)));
     })();
   };
 
   const savePhraseFile = () => {
     void (async () => {
-      const label = await saveSecretToDocuments("myne-recovery-phrase.txt", phraseRef.current.join(" "));
-      setFileMsg(label ? t("createVault.savedToFile", { label }) : t("createVault.saveFileError"));
+      setFileMsg(
+        saveMessage(
+          await saveSecretToDocuments(
+            "myne-recovery-phrase.txt",
+            phraseRef.current.join(" "),
+          ),
+        ),
+      );
     })();
   };
 
