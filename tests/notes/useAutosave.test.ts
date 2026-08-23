@@ -876,4 +876,84 @@ describe("lastSaveFailed, the settled-check a frontmatter writer needs", () => {
     });
     expect(result.current.lastSaveFailed()).toBe(false);
   });
+
+  // The three ways the pane stops holding the note the failed attempt was for.
+  // Each one leaves the pane CLEAN, so `flushIfDirty` returns immediately and
+  // nothing re-fires: a flag left set there is a latch that refuses every
+  // out-of-band frontmatter write for the rest of the session, on a note that
+  // never failed. The cover toasts write-failed, both template converts no-op,
+  // a folder rename reports an unsettled save, and vim `:w` reports a failure
+  // for a write that had nothing to do.
+  it("clears on a note SWITCH, because the failed save was for another note", async () => {
+    const saveImpl = vi.fn(async (_id: string, _body: string) => {
+      throw new Error("disk full");
+    });
+    const { result, rerender } = renderHook(
+      ({ id, body }) => useAutosave(id, body, saveImpl),
+      { initialProps: { id: "note-1", body: "one" } },
+    );
+    rerender({ id: "note-1", body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+
+    await act(async () => {
+      rerender({ id: "note-2", body: "other note" });
+    });
+    expect(result.current.lastSaveFailed()).toBe(false);
+    // And the pane really is clean, which is what makes the stale flag
+    // unreachable by any later attempt.
+    expect(result.current.hasPendingWork()).toBe(false);
+  });
+
+  it("clears when the buffer is re-baselined against reloaded bytes", async () => {
+    const saveImpl = vi.fn(async (_id: string, _body: string) => {
+      throw new Error("disk full");
+    });
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+
+    act(() => result.current.acceptReloadedBody("from disk"));
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+
+  it("clears when the user reverts to the last body that actually landed", async () => {
+    // `savedBodyRef` is only ever set by a save that SUCCEEDED, so matching it
+    // means the buffer equals the disk: the failure has been undone by the user
+    // rather than by a write.
+    let fail = false;
+    const saveImpl = vi.fn(async (_id: string, body: string) => {
+      if (fail) throw new Error("transient");
+      return body;
+    });
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "landed" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(false);
+
+    fail = true;
+    rerender({ body: "doomed" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+
+    act(() => {
+      rerender({ body: "landed" });
+    });
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
 });

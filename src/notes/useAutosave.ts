@@ -261,6 +261,11 @@ export function useAutosave(
       /* best-effort — a switch must never be blocked by a failed save */
     });
   }, []);
+  /** Set true by `fireSave`'s error arm, cleared at the top of every attempt and
+   *  at every point the pane stops holding the note that attempt was for.
+   *  Read through `lastSaveFailed` below. */
+  const saveFailedRef = useRef(false);
+
   const flushOutgoingRef = useRef(flushOutgoing);
   flushOutgoingRef.current = flushOutgoing;
 
@@ -302,6 +307,15 @@ export function useAutosave(
       dirtyRef.current = false;
       hasEditedRef.current = false;
       savedBodyRef.current = null;
+      // The flag answers "did the save that just ran fail", and after a switch
+      // there IS no such save: this pane now holds a different note. Leaving it
+      // set makes `flushIfDirty` return immediately (the pane is clean, nothing
+      // re-fires) while `lastSaveFailed` keeps reporting the OLD note's failure,
+      // so every out-of-band frontmatter write refuses indefinitely: the cover
+      // toasts write-failed, both template converts no-op, a folder rename
+      // reports an unsettled save and vim `:w` reports a failure for a write
+      // that had nothing to do.
+      saveFailedRef.current = false;
       setStatus({ status: "clean" });
     } else {
       noteIdRef.current = noteId;
@@ -311,10 +325,6 @@ export function useAutosave(
   // The fire function — handles latest-wins gate + IPC dispatch +
   // status transitions. Always called via the timers or via
   // flushIfDirty / retry.
-  /** Set true by `fireSave`'s error arm, cleared at the top of every attempt.
-   *  Read through `lastSaveFailed` below. */
-  const saveFailedRef = useRef(false);
-
   const fireSave = useCallback(async (): Promise<void> => {
     clearTimers();
     // Cleared at the top of every attempt: the question this answers is "did the
@@ -489,8 +499,12 @@ export function useAutosave(
 
     // A change happened.
     if (savedBodyRef.current !== null && body === savedBodyRef.current) {
-      // User reverted to last-saved state — back to clean.
+      // User reverted to last-saved state — back to clean. `savedBodyRef` is
+      // only ever set by a save that SUCCEEDED, so matching it means the buffer
+      // equals the disk and the last attempt's failure has been undone by the
+      // user rather than by a write.
       dirtyRef.current = false;
+      saveFailedRef.current = false;
       clearTimers();
       setStatus({ status: "saved", at: new Date() });
       return;
@@ -541,6 +555,10 @@ export function useAutosave(
       dirtyRef.current = false;
       hasEditedRef.current = true;
       savedBodyRef.current = reloadedBody;
+      // Same reason as the note-switch reset: the buffer has been re-baselined
+      // against bytes that ARE on disk, so whatever the last attempt did is no
+      // longer a fact about this pane.
+      saveFailedRef.current = false;
       // Bridge only: the next render's write to `latestBodyRef` is
       // authoritative. Every caller batches `setContent(reloadedBody)` with
       // this call, so that render carries the same body — this line just
