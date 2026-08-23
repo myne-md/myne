@@ -32,7 +32,7 @@
 // and nothing anywhere would have said so.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn();
 
@@ -43,20 +43,14 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
 }));
 
-import { SyncPanel } from "../../src/components/settings/SyncPanel";
-import { SidebarStateProvider } from "../../src/notes/sidebarState";
 import { ENROLL_PENDING_NOTICE } from "../../src/lib/load-bearing-copy";
-
-/** `usePrefs` consumers crash on a bare `undefined`; answer prefs-shaped. */
-const PREFS_STUB = { device_names: {} };
+import { renderSyncPanel, syncPanelCommandRouter } from "./_syncPanelHarness";
 
 /**
- * Route every command this panel's subtree issues.
- *
- * `syncState` is the whole variable under test. The roster ALWAYS rejects
- * `NotEnrolled` here, because that is what a token-less device gets and it is
- * what made the old gate stick — so any behaviour difference between the cases
- * below comes from `sync_status` alone.
+ * `syncState` is the whole variable under test. The shared router ALWAYS
+ * rejects the device roster with `NotEnrolled`, because that is what a
+ * token-less device gets and it is what made the old gate stick, so any
+ * behaviour difference between the cases below comes from `sync_status` alone.
  */
 function mountWith(
   syncState: string,
@@ -66,29 +60,10 @@ function mountWith(
     pending: false,
   },
 ) {
-  invokeMock.mockImplementation(async (cmd: string) => {
-    if (cmd === "plugin:vault-migrate|vault_migrate_settle_status") {
-      return { can_abort: false, ...migration };
-    }
-    if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
-    if (cmd === "plugin:sync|sync_status") return { state: syncState };
-    if (cmd === "plugin:sync|sync_beta_terms_accepted") return betaTermsAccepted;
-    if (cmd === "plugin:sync|sync_accept_beta_terms") return undefined;
-    if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
-    if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: null };
-    if (cmd === "plugin:sync|sync_account_status") return null;
-    if (cmd === "plugin:sync|sync_pending_conflicts") return [];
-    if (cmd === "plugin:sync|sync_list_quarantine") return [];
-    if (cmd === "plugin:notes|note_list") return [];
-    return undefined;
-  });
-  // `SyncPanel` reads the selected note through the sidebar context (its
-  // conflict view links to one), so the panel cannot mount bare.
-  return render(
-    <SidebarStateProvider>
-      <SyncPanel />
-    </SidebarStateProvider>,
+  invokeMock.mockImplementation(
+    syncPanelCommandRouter({ syncState, betaTermsAccepted, migration }),
   );
+  return renderSyncPanel();
 }
 
 beforeEach(() => {

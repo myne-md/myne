@@ -26,7 +26,8 @@
 // editor points a live session at a root that no longer opens it.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
+import { clickAndFlush } from "./_clickAndFlush";
 
 const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -36,35 +37,16 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
 }));
 
-import { SyncPanel } from "../../src/components/settings/SyncPanel";
-import { SidebarStateProvider } from "../../src/notes/sidebarState";
-
-const PREFS_STUB = { device_names: {} };
+import { renderSyncPanel, syncPanelCommandRouter } from "./_syncPanelHarness";
 
 /** Mount the panel with a staged `legacy/` snapshot, so the settle block shows. */
 function mountWithStagedSnapshot(onMigrated: () => void) {
-  invokeMock.mockImplementation(async (cmd: string) => {
-    if (cmd === "plugin:vault-migrate|vault_migrate_settle_status") {
-      return { pending: true, can_abort: true, offerable: false };
-    }
-    if (cmd === "plugin:vault-migrate|vault_migrate_abort") return undefined;
-    if (cmd === "plugin:vault-migrate|vault_migrate_confirm") return undefined;
-    if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
-    if (cmd === "plugin:sync|sync_status") return { state: "not_enrolled" };
-    if (cmd === "plugin:sync|sync_beta_terms_accepted") return true;
-    if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
-    if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: null };
-    if (cmd === "plugin:sync|sync_account_status") return null;
-    if (cmd === "plugin:sync|sync_pending_conflicts") return [];
-    if (cmd === "plugin:sync|sync_list_quarantine") return [];
-    if (cmd === "plugin:notes|note_list") return [];
-    return undefined;
-  });
-  return render(
-    <SidebarStateProvider>
-      <SyncPanel onMigrated={onMigrated} />
-    </SidebarStateProvider>,
+  invokeMock.mockImplementation(
+    syncPanelCommandRouter({
+      migration: { pending: true, can_abort: true, offerable: false },
+    }),
   );
+  return renderSyncPanel({ onMigrated });
 }
 
 /** Every command name the panel's subtree has invoked. `invoke` is called with
@@ -72,14 +54,6 @@ function mountWithStagedSnapshot(onMigrated: () => void) {
  *  argument shape that does not exist. */
 function commandsCalled(): string[] {
   return invokeMock.mock.calls.map((c) => c[0] as string);
-}
-
-/** Click and let the awaited settle plus its setState settle. */
-async function clickAndFlush(el: HTMLElement) {
-  await act(async () => {
-    fireEvent.click(el);
-    await new Promise((r) => setTimeout(r, 0));
-  });
 }
 
 beforeEach(() => invokeMock.mockReset());
