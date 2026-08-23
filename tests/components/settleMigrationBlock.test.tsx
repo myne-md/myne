@@ -19,16 +19,11 @@
 // test that cannot tell the two actions apart, which is the state this file ends.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { clickAndFlush } from "./_clickAndFlush";
 
 /** Click and flush the async handler's microtasks inside act, so a rejection is
  *  caught by the component rather than surfacing as an unhandled rejection. */
-async function clickAndFlush(el: HTMLElement) {
-  await act(async () => {
-    fireEvent.click(el);
-    await new Promise((r) => setTimeout(r, 0));
-  });
-}
 
 const abortMigration = vi.fn(async () => {});
 const confirmMigration = vi.fn(async () => {});

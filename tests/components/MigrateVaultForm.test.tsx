@@ -8,17 +8,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { clickAndFlush } from "./_clickAndFlush";
 
-/** Click and flush the async handler's microtasks inside act, so a rejection is
- *  caught by the component (not surfaced as an "unhandled" rejection by the env). */
-async function clickAndFlush(el: HTMLElement) {
-  await act(async () => {
-    fireEvent.click(el);
-    // Macrotask flush: lets the awaited call + the catch's setState settle so a
-    // rejection is handled by the component, not flagged as "unhandled".
-    await new Promise((r) => setTimeout(r, 0));
-  });
-}
 
 const migrateVault = vi.fn();
 vi.mock("../../src/lib/vault-migrate", () => ({
