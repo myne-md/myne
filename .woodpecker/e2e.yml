@@ -1,0 +1,380 @@
+# Woodpecker CI for Myne: the E2E lanes. MANUAL ONLY, run before a release.
+#
+# myne-md/myne#579. Decision: `docs/decisions/ops/0529`, "Both E2E lanes leave
+# the per-push pipeline for a manual, pre-release workflow", which supersedes
+# the merge-gate clause of `ops/0181` while leaving every other policy that
+# entry ratified (Linux-only tauri-driver, zero test hooks, weak-KDF fixtures,
+# the VR-1 drill at production KDF) untouched.
+#
+# Nothing in this file runs on a push or a pull request. Both end-to-end suites
+# live here, the desktop tauri-driver suite and the browser web lane, and both
+# are triggered by hand:
+#
+#   Woodpecker → repo → "Run pipeline" → pick the branch → add the variable
+#   RUN_E2E = true
+#
+# The release runbook (`myne-ops/runbooks/release-checklist.md`, phase 0) is
+# where that trigger is owed, and `docs/dev/e2e.md` carries the procedure.
+#
+# ─── Why the RUN_E2E variable, and not a bare `event: manual` ────────────────
+# On this repo the manual event already means something else: `web-docker-build`
+# in `main.yml` is gated `event: manual` + `branch: develop`, and that is the
+# app.myne.md deploy trigger (`docs/decisions/ops/0484`). A workflow gated on
+# the bare event would fire on every deploy, and with the agent's
+# `WOODPECKER_MAX_WORKFLOWS=2` it would park a long suite in front of a deploy
+# nobody asked to wait for. An unset RUN_E2E evaluates to the empty string, so
+# the default is "do not run" and `main.yml` carries the matching negation.
+#
+# ─── Why this workflow builds its own binaries ───────────────────────────────
+# Woodpecker workflows do not share a workspace: `main.yml`'s `tauri-compile`
+# output does not exist here. So this file compiles the release binary, the
+# fixture generator and the web bundle itself. That cost is paid only when
+# somebody triggers it. The shared `/cache` sccache + cargo mounts (see
+# `main.yml`'s `tauri-compile` comment for what provides them) make a warm run
+# cheaper; a cold one is a full release build on top of everything else.
+#
+# **Budget an hour, not "about forty minutes".** The desktop suite alone
+# measured ~1032 s in the push pipeline, and this adds a release build against a
+# cold `target/`, the web lane, and the quarantine lane's own container. The
+# repo's Woodpecker timeout is 120 minutes and `e2e/support/webdriver.ts`
+# records a 60-minute timeout having once cancelled a run mid-suite, which is
+# why that number was raised. Do not schedule this against a tight window.
+#
+# ─── Why the steps are one serial chain ──────────────────────────────────────
+# Every step below that runs `pnpm install` writes into the ONE shared workspace
+# `node_modules`, and concurrent installs corrupt it. `myne-server-build` is the
+# exception (it touches neither `node_modules` nor cargo), so it runs alongside
+# from the start. The web lane goes FIRST because it is the cheap half (no
+# binary build, no display) and gives a signal long before the desktop suite
+# lands. Strictly speaking only the INSTALLS conflict, so the web lane could run
+# beside the release build; that is deliberately not taken, because it would put
+# a chromium suite next to a full release build on the host this very file
+# documents as contention-sensitive (see the shard note in
+# `scripts/ci-e2e-lane.sh`).
+#
+# ─── Why every step but the notifier carries `status: [success, failure]` ────
+# myne-md/myne#458: a `when` entry's implicit `status: success` is PIPELINE-wide
+# rather than `depends_on`-scoped, so one red step anywhere skips every step
+# that has no dependency path to it. This lane exists to produce a pre-release
+# inventory, and in an inventory a skipped gate is worse than a red one. By
+# this repo's own sentence, a gate that did not run is indistinguishable from a
+# gate that passed. So a failure here leaves everything else running and
+# reporting. `notify-failure` is the one exception and inverts it, since it
+# exists precisely to fire on failure.
+#
+# The key is written ONCE, as the `&always` anchor on the first step, and
+# aliased everywhere else. A hand-copy would be a second place for it to drift,
+# and the omission mode is silent: a step that loses the key inherits the
+# pipeline-wide implicit `status: success` and is skipped whenever anything else
+# is red. That is myne#458 exactly, and `main.yml` records that `e2e-floor`
+# carried such a hand-copy until it bit.
+#
+# There is no `path` filter anywhere in this file, deliberately. Woodpecker
+# ignores path filters on a manual event, and writing one would suggest a
+# docs-only trigger could skip the suite it was triggered for.
+
+when:
+  - event: manual
+    evaluate: 'RUN_E2E == "true"'
+
+steps:
+  # ─── myne-server binary for the desktop sync scenarios ───────
+  # The desktop suite's multi-device sync scenarios spawn a REAL myne-server.
+  # Without the binary they SELF-SKIP, and 23 tests across 7 files did exactly that
+  # on every CI run for months, under a green step, because nothing built one.
+  #
+  # Its own step rather than more commands inside `e2e`: this touches neither
+  # `node_modules` nor cargo, which is the only reason the chain below is
+  # serial, so it runs alongside and adds nothing to the wall-clock. `e2e`
+  # depends on it optionally, and a clean skip (no token, e.g. a fork PR) still
+  # satisfies that dependency: the suite then behaves as it does without one.
+  myne-server-build:
+    image: golang:1.26
+    when: &always
+      - status: [success, failure]
+    environment:
+      # The `$$` below escapes Woodpecker's substitution pass. A bare
+      # dollar-brace token is replaced with the empty string BEFORE the shell
+      # sees it; `scripts/check-woodpecker-substitution.mjs` is the guard that
+      # keeps one out of this file entirely, comments included.
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
+    commands:
+      - |
+        if [ -z "$${MYNE_SERVER_TOKEN:-}" ]; then
+          echo "myne_server_token not provided -> no server binary; sync scenarios will self-skip";
+          exit 0;
+        fi
+      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server-src"
+      - cd "$CI_WORKSPACE/myne-server-src" && CGO_ENABLED=0 go build -o "$CI_WORKSPACE/myne-server-e2e" ./cmd/myne-server
+      - ls -la "$CI_WORKSPACE/myne-server-e2e"
+
+  # ─── Web E2E lane (the built bundle in a real browser) ───────
+  # Builds `web/dist` and drives it through chromedriver. The harness serves it
+  # with the production security headers (`e2e-web/support/server.ts` calls
+  # `securityHeaders()` from `web/csp.ts`, not a copy).
+  #
+  # ONE step, build and run together. They were two while the build half was
+  # `main.yml`'s `web-build`, which is a real gate feeding `web-docker-build`.
+  # Here the build gates nothing on its own, so a second container that repeats
+  # the pnpm install to hand the bundle across a stage boundary buys a status
+  # line and costs a stage. The artefact gates (third-party origins, the
+  # recovery phrase, test hooks, the bundle budget, the screen/surface/testid
+  # rosters) stay in `main.yml` and still run on every push.
+  #
+  # ONE shard, one driver. `e2e-web/support/worker-ports.ts` offsets
+  # MYNE_WEB_E2E_DRIVER_PORT by 100 per vitest slot, so a parallel run needs one
+  # driver PROCESS per slot (a shared one is half-right at best: chromedriver is
+  # multi-session, geckodriver is not). The reason this stayed at one is NOT the
+  # one the push pipeline had. "Serial costs wall-clock on a lane nobody is
+  # waiting on" stopped being true the moment the desktop chain started queueing
+  # behind it. It is that a second driver means a spawn loop in a file whose
+  # config-compile has twice taken the whole pipeline down, and that is a change
+  # to argue for on its own rather than one folded into a topology move. The
+  # cost is recorded as debt on myne-md/myne#579: roughly the web suite's own
+  # run time again, on the critical path.
+  #
+  # CHROMIUM ONLY, and the matrix in `docs/dev/e2e.md` also lists Firefox. That
+  # seat needs geckodriver, which Debian does not package, so it would be a
+  # downloaded release archive, and the rule this repo follows for those is a
+  # pinned version WITH its sha256. Browser and driver are installed as a PAIR
+  # from the same distro archive so their major versions match (chromedriver 151
+  # refuses a Chrome 150 session outright); that is a matched pair, NOT a pin.
+  e2e-web:
+    image: node:25
+    when: *always
+    environment:
+      CI: "true"
+      # An explicit opt-in meaning "a driver is listening". See
+      # `e2e-web/support/worker-ports.ts`, which only offsets this into the
+      # slot's band when it is already set. Without it the lane SKIPS with a
+      # reason instead of failing.
+      MYNE_WEB_E2E_DRIVER_PORT: "4544"
+      MYNE_WEB_E2E_BROWSER: chrome
+      MYNE_WEB_E2E_SHARDS: "1"
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl chromium chromium-driver
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm web:build
+      # Driver start, readiness wait and the run in ONE block: the driver is a
+      # background process, and a readiness wait in a different shell than the
+      # run proves nothing. Deliberately free of dollar-sign expansion:
+      # Woodpecker's config-compile runs env substitution over this file before
+      # any step runs.
+      - |
+        chromedriver --port=4544 >/tmp/chromedriver.log 2>&1 &
+        for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+          curl -fsS http://127.0.0.1:4544/status >/dev/null 2>&1 && break
+          sleep 0.5
+        done
+        if ! curl -fsS http://127.0.0.1:4544/status >/dev/null 2>&1; then
+          echo "chromedriver did not come up on :4544; the lane would have SKIPPED";
+          cat /tmp/chromedriver.log;
+          exit 1;
+        fi
+        pnpm test:e2e:web
+
+  # ─── Desktop release binary for the tauri-driver suite ───────
+  # The `tauri-compile` of this workflow. It exists because workflows do not
+  # share a workspace, and it is deliberately NARROWER than `main.yml`'s: that
+  # step also lints `myne-core` and `cargo check`s the `--no-default-features`
+  # AI-free variant, and both of those are gates that belong on every push, so
+  # they stay there and are not copied here. Neither emits anything into
+  # `target/release`, so nothing the suite consumes is missing.
+  #
+  # `--features voice-capture-stub,local-inference-stub`, both additive, both
+  # dependency-free, and both load-bearing for the suite: the voice scenarios
+  # need a capture source that is not a microphone the runner does not have, and
+  # nine of the ten AI scenarios gate on `MYNE_E2E_AI === "1"` and assert against
+  # the stub engine's deterministic output. `main.yml`'s `tauri-compile` builds
+  # with the SAME two features so those arms cannot bit-rot between releases,
+  # and `scripts/check-woodpecker-split.mjs` holds the two lists equal in both
+  # directions rather than leaving four prose blocks asserting it.
+  #
+  # `-c` overrides `beforeBuildCommand` to keep the sidecar half and reuse a
+  # `dist/` if one is present (in this workflow there is none, since
+  # `pnpm web:build` writes `web/dist`, so `pnpm build` really runs). BOTH
+  # sidecars, not just
+  # `myne`: `build.rs` resolves every `bundle.externalBin` entry as a resource
+  # path and PANICS on a missing one, so dropping the arti half fails the build
+  # outright.
+  e2e-compile:
+    image: rust:1.96.0-slim
+    when: *always
+    depends_on:
+      - name: e2e-web
+        optional: true
+    environment:
+      # Woodpecker sets CI=woodpecker, but the Tauri CLI's `--ci` flag is
+      # env-bound and only accepts true/false → normalize it, otherwise
+      # `tauri build` aborts with "invalid value 'woodpecker' for '--ci'".
+      CI: "true"
+      RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # Persistent compile cache: the ROOT half of the split cache. The suite
+      # steps below run unprivileged and use `/cache/*/ci` instead; mixing the
+      # two is the cross-UID trap that cost pipeline #167 (root fills the cache
+      # 0750, the `ci` user then cannot read it).
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      # Raise the open-file soft limit to the hard cap: the Tauri CLI + parallel
+      # cargo codegen open enough fds to hit the runner's low default, which
+      # surfaces as a `tauri build` panic (EMFILE → core dump, exit 134).
+      - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
+      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
+      # Cache hit-rate visibility. Never fails the step.
+      - /cache/bin/sccache --show-stats || true
+
+  # ─── Desktop E2E suite (real binary via tauri-driver) ────────
+  # Drives the production binary `e2e-compile` just built in a real WebKitGTK
+  # window under xvfb. Scenario authoring rules: `e2e/CLAUDE.md`; procedure:
+  # `docs/dev/e2e.md`. The whole container body is
+  # `scripts/ci-e2e-lane.sh`. Read its header for why it is a script and not
+  # inline YAML, and for the shard and cache decisions it carries.
+  #
+  # NON-BLOCKING, and the reason is unchanged by the move to this file. The
+  # suite mount-times-out on whatever heavy scenario happens to land at the TAIL
+  # of the serial run under the host's cumulative load. That is a contention
+  # signature (unlock/editor never paints within budget), not a logic bug, and
+  # it hits a
+  # DIFFERENT scenario each run, so quarantining named specs was whack-a-mole.
+  # `failure: ignore` keeps that flake from colouring the run while the suite
+  # still RUNS and REPORTS. What actually holds the line is `e2e-floor` below,
+  # which is blocking and whose `stable_max_failures` ceiling is 0, so a real
+  # regression still reddens this pipeline, through the step that can tell a
+  # regression from a flake by counting.
+  e2e:
+    image: rust:1.96.0-slim
+    when: *always
+    depends_on:
+      - name: e2e-compile
+        optional: true
+      - name: myne-server-build
+        optional: true
+    failure: ignore
+    environment:
+      CI: "true"
+    commands:
+      - bash scripts/ci-e2e-lane.sh stable
+
+  # ─── Quarantine lane (flaky-test epic) ──────────────────────
+  # Runs ONLY the `describeE2E.flaky` contention-victim scenarios, NON-BLOCKING.
+  # The `e2e` step above SKIPS them, so a known cross-branch mount-boot flake
+  # never colours the run; this lane keeps them VISIBLE (status still reported)
+  # until the contention fix retires the quarantine. Reuses the workspace binary
+  # `e2e-compile` built.
+  #
+  # Its own step rather than a second invocation inside `e2e`, and the cost is
+  # real: a second container, and a second `cargo install tauri-driver` from
+  # source. What it buys is the separate status line, which is the ENTIRE point
+  # of the quarantine lane: folded into a `failure: ignore` step, a quarantined
+  # scenario's result would be a line in someone else's log.
+  e2e-quarantine:
+    image: rust:1.96.0-slim
+    when: *always
+    depends_on:
+      - name: e2e
+        optional: true
+      - name: myne-server-build
+        optional: true
+    failure: ignore
+    environment:
+      CI: "true"
+    commands:
+      - bash scripts/ci-e2e-lane.sh quarantine
+
+  # ─── E2E floor (the one part of this lane that BLOCKS) ───────
+  # `e2e` above is `failure: ignore`, and that relaxation has a hole in it
+  # nobody chose: it does not distinguish "some scenarios failed" from "no
+  # scenarios ran". A suite that executes ZERO tests exits 0, and every
+  # self-skip in the harness subtracts scenarios silently: a missing binary, an
+  # unset env gate, a platform guard, a command earlier in the step that failed
+  # quietly.
+  #
+  # So the count is gated even while the results are not, and the ceiling
+  # (`stable_max_failures`, today 0) gates the results too. This step is
+  # deliberately NOT `failure: ignore`: a flaky scenario is a known cost, but a
+  # run that asserted nothing is a broken pipeline reporting success, and the
+  # two must not share a colour. It is cheap (reads a JSON file), needs no app
+  # and no display, and it runs whatever `e2e`'s result was. That matters,
+  # since the case it exists for is precisely the one where `e2e` "passed".
+  #
+  # It depends on `e2e` and NOT on `e2e-quarantine`, which it never reads:
+  # `vitest.e2e.config.ts` writes the two lanes to separate report files and
+  # this runs `--lane stable`. Waiting for the quarantine lane would put the
+  # only blocking verdict in this workflow behind a whole second container.
+  e2e-floor:
+    image: node:25
+    when: *always
+    depends_on:
+      - name: e2e
+        optional: true
+    commands:
+      # Stable lane only. The quarantine lane runs the specs that are flaky BY
+      # DEFINITION, and no honest floor for it has been measured yet. Inventing
+      # one would be the same "number that describes nothing" this guard exists
+      # to replace. Add `--lane quarantine` once a real count exists.
+      - node scripts/check-e2e-floor.mjs --lane stable
+
+  # ─── Failure notification ────────────────────────────────────
+  # This lane runs for an hour or more and the person who triggered it will not
+  # sit and watch it, so it owes the same Pushover push `main.yml` gives every
+  # other gate. The token + group come ONLY from CI secrets; a missing secret
+  # makes the step skip silently, and `failure: ignore` keeps it from ever
+  # failing the pipeline. Only bare dollar-VAR is used here, never Woodpecker
+  # brace- or paren-substitution syntax.
+  #
+  # `e2e` and `e2e-quarantine` are both `failure: ignore` and so can never reach
+  # this notifier with a failure; they are listed anyway, with `optional: true`,
+  # so notify WAITS for their terminal status rather than racing it. The steps
+  # that can actually fire it are `e2e-compile`, `e2e-web` and `e2e-floor`. The
+  # last is the one whose failure means the suite asserted less than it
+  # claims to. Every step is named rather than relying on the chain's tail: the
+  # tail is a fact about today's graph, and a step added beside it later would
+  # silently stop being waited for.
+  notify-failure:
+    image: alpine:3.21
+    depends_on:
+      - name: myne-server-build
+        optional: true
+      - name: e2e-web
+        optional: true
+      - name: e2e-compile
+        optional: true
+      - name: e2e
+        optional: true
+      - name: e2e-quarantine
+        optional: true
+      - name: e2e-floor
+        optional: true
+    environment:
+      PUSHOVER_TOKEN:
+        from_secret: pushover_token
+      PUSHOVER_GROUP:
+        from_secret: pushover_group
+    commands:
+      - apk add --no-cache curl
+      - |
+        if [ -z "$PUSHOVER_TOKEN" ]; then echo "pushover secret absent; skipping"; exit 0; fi
+        curl -fsS -m 15 \
+          --data-urlencode "token=$PUSHOVER_TOKEN" \
+          --data-urlencode "user=$PUSHOVER_GROUP" \
+          --data-urlencode "title=❌ $CI_REPO_NAME E2E failed · $CI_COMMIT_BRANCH" \
+          --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
+          --data-urlencode "url=$CI_PIPELINE_URL" \
+          https://api.pushover.net/1/messages.json
+    # No `event:` here: the workflow-level `when` above already admits only the
+    # manual event, and repeating it would silently stop this notifier firing if
+    # that gate ever gained one.
+    when:
+      - status: failure
+    failure: ignore

@@ -6,15 +6,22 @@
 # Notes:
 # - Each step runs in its own container; installed packages do NOT inherit between steps.
 # - Linux runner only; macOS + Windows checked manually before release (revisit at v1.0).
+# - THIS FILE IS ONE OF TWO WORKFLOWS. `.woodpecker/e2e.yml` is the other, and
+#   it holds BOTH end-to-end suites, the desktop tauri-driver suite and the
+#   browser web lane. Nothing in it runs on a push or a pull request: it is
+#   manual-only, triggered before a release (myne-md/myne#579, and the decision
+#   entry `docs/decisions/ops/0529`). So a green
+#   run of THIS file is not a claim that the E2E suites pass; the release
+#   runbook owns that claim.
 # - TWO lanes, one pipeline (MYND-574). The desktop lane is one serial chain
-#   (pnpm-build -> vitest -> tauri-compile -> cargo-test-tauri -> e2e) because
-#   every one of those steps runs `pnpm install` into the shared workspace
-#   node_modules and concurrent installs corrupt it. The WEB lane hangs off the
-#   end of that chain (`web-build`, alongside `sync-sim`) so it adds nothing to
-#   the desktop lane's wall-clock, plus the two Rust wasm gates that run early
-#   and independently (`wasm-protocol`). Every web step carries the same
-#   `code-paths` filter as the compile steps, so a docs-only commit runs none of
-#   them, and every step that can go red is listed in `notify-failure`.
+#   (pnpm-build -> vitest -> tauri-compile -> cargo-test-tauri) because every one
+#   of those steps runs `pnpm install` into the shared workspace node_modules and
+#   concurrent installs corrupt it. The WEB lane hangs off the end of that chain
+#   (`web-build`, alongside `sync-sim`) so it adds nothing to the desktop lane's
+#   wall-clock, plus the two Rust wasm gates that run early and independently
+#   (`wasm-protocol`). Every web step carries the same `code-paths` filter as the
+#   compile steps, so a docs-only commit runs none of them, and every step that
+#   can go red is listed in `notify-failure`.
 # - Future: cache cargo + pnpm artifacts; pre-build a custom image with rust + node + Tauri sysdeps.
 
 when:
@@ -24,7 +31,22 @@ when:
   # Allow re-triggering the whole pipeline by hand from the Woodpecker UI
   # ("Run pipeline" / manual trigger). Without a matching `manual` event the
   # UI submits an empty pipeline (no step matches) and the run is rejected.
+  #
+  # `RUN_E2E != "true"` makes the manual trigger carry ONE intent at a time.
+  # `.woodpecker/e2e.yml` claims the manual event with `RUN_E2E == "true"`, so
+  # without this negation an E2E trigger would ALSO run this whole pipeline,
+  # which costs two things rather than one. It would deploy app.myne.md, since
+  # `web-docker-build` below is gated `event: manual` + `branch: develop`
+  # (`docs/decisions/ops/0484`) and would match; and with the agent's
+  # `WOODPECKER_MAX_WORKFLOWS=2` the two workflows would run CONCURRENTLY on the
+  # shared host, which is the documented root cause of the E2E suite's mount
+  # timeouts. A lane whose whole purpose is a clean pre-release signal must not
+  # be racing a full pipeline for the same cores.
+  #
+  # An unset RUN_E2E evaluates to the empty string, so an ordinary manual
+  # re-run, the case this entry was added for, is unaffected: `"" != "true"`.
   - event: manual
+    evaluate: 'RUN_E2E != "true"'
 
 steps:
   # ─── Rust formatting ─────────────────────────────────────────
@@ -43,7 +65,8 @@ steps:
     # cannot alias `*code-paths` and add a key to it. Such a step aliases
     # `*code-path-globs` instead and writes its own `status:` beside it, so the
     # glob list stays one source of truth rather than a hand-copy per step.
-    # `e2e-floor` carried exactly that hand-copy until myne-md/myne#458.
+    # `e2e-floor` (now in `.woodpecker/e2e.yml`) carried exactly that
+    # hand-copy until myne-md/myne#458.
     when: &code-paths
       - path: &code-path-globs
           exclude: ['docs/**', '*.md', '**/CLAUDE.md', '**/README.md']
@@ -268,8 +291,18 @@ steps:
   # These two commands are 120 s of `wasm-protocol`'s 222 s, in the first stage,
   # whose second-slowest step is `pnpm-build` at 64 s. Nothing depends on them.
   # So they were 120 s of pure waiting for every other step in the pipeline.
-  # `depends_on: [cargo-test-tauri]` lands them in the `e2e` stage, where 1118 s
-  # are already being spent and this costs nothing.
+  # `depends_on: [cargo-test-tauri]` lands them in the stage that holds
+  # `web-build` and `sync-sim`. That is NOT the last stage: `web-build` still
+  # feeds the four-step mobile tail and the `web-docker-build` deploy chain, so
+  # an over-run here delays those too, not just the pipeline's end.
+  #
+  # The placement was chosen when the stage also held the 1118 s `e2e` step,
+  # under which 120 s cost nothing at all. `e2e` has since moved to
+  # `.woodpecker/e2e.yml`, so the cover is now whatever `sync-sim` and
+  # `web-build` take: `sync-sim` downloads a Go toolchain, apt-installs the full
+  # GTK dev chain, clones and builds myne-server and runs nextest, so the
+  # exposure is probably still nil. Probably is the operative word. Read the
+  # stage timings on a real pipeline before moving this step again.
   #
   # Only the REPRODUCIBILITY half moved. The correctness gates above — the
   # CSPRNG-hook check, the wasm dependency graph, both wasm clippys, the entry
@@ -436,6 +469,16 @@ steps:
       # a run that raced that provisioning reported 255 failures in 266 s — 245
       # of them one infrastructure error wearing a test's name.
       - node scripts/check-e2e-toolchain.mjs
+      # Icon asset-check (MYND-128, SYNC-19). It rode inside the `e2e` step
+      # until myne-md/myne#579 and would otherwise have become a per-release
+      # check by accident; it needs neither a binary nor a display.
+      - node scripts/check-icons.mjs
+      # The one contract the two workflow files duplicate by design: the
+      # desktop build's `--features` list. `tauri-compile` below carries the
+      # stub features purely so those arms cannot bit-rot while the suite that
+      # consumes them runs only before a release, and that protection is real
+      # only while both lists agree. Compared in both directions.
+      - node scripts/check-woodpecker-split.mjs
       # Twin-module drift (#261): a fix that lands on one client and never
       # reaches its counterpart. WARNING ONLY and exits 0 by design — most
       # one-sided changes are legitimate, so a gate here would be wrong and
@@ -584,21 +627,37 @@ steps:
       # the arti half here fails the build outright rather than shipping a
       # bundle without a Tor client. It costs one release build of `arti` on a
       # cold cache; sccache pays it once.
-      # `--features voice-capture-stub` (myne#389 item D): the `e2e` step below
-      # reuses THIS binary, and the voice scenarios need a capture source that
-      # is not a microphone the runner does not have. It is additive to the
-      # default feature set, so this build still compiles the production arm;
-      # `cargo-test-tauri` (default features) compiles the
+      # `--features voice-capture-stub` (myne#389 item D): the voice E2E
+      # scenarios need a capture source that is not a microphone the runner does
+      # not have. The suite no longer runs from this file, since
+      # `.woodpecker/e2e.yml` builds its OWN binary with the same two features,
+      # and the flag stays here anyway, deliberately: it keeps the arm COMPILING on
+      # every push, so it cannot bit-rot between releases and hand the manual
+      # lane a build failure at the one moment nobody has time for it. It is
+      # additive to the default feature set, so this build still compiles the
+      # production arm; `cargo-test-tauri` (default features) compiles the
       # `not(feature = "voice-capture-stub")` arm, so both stay covered with no
       # new step. The feature pulls no dependency, so no dep fingerprint moves.
       # `--features local-inference-stub` (SYNC-9, ai-provider-seam task 3): the
-      # same reasoning, for AI. Nine of the ten AI E2E scenarios gate on
-      # `MYNE_E2E_AI === "1"` and had NEVER run in CI — neither this feature nor
-      # that variable appeared anywhere in this file. The stub engine gives the
-      # deterministic outputs those scenarios assert against (`stub-infer: …`, a
-      # fixed embedding) with no model shipped into the repo. Also additive and
-      # dependency-free; `cargo-test-tauri` still compiles the production arm.
+      # same reasoning, for AI, and it stays here for the same bit-rot reason.
+      # Nine of the ten AI E2E scenarios gate on `MYNE_E2E_AI === "1"`; the stub
+      # engine gives the deterministic outputs those scenarios assert against
+      # (`stub-infer: …`, a fixed embedding) with no model shipped into the repo.
+      # `.woodpecker/e2e.yml` sets that variable and builds with this feature.
+      # Also additive and dependency-free; `cargo-test-tauri` still compiles the
+      # production arm.
       - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
+      # Keep the E2E fixture generator compiling on every push. `cargo build
+      # --release -p e2e-fixture-gen` inside the old `e2e` step was the ONLY
+      # place in CI that touched this workspace member (`cargo-clippy` and
+      # `cargo-test` are `-p protocol`, `cargo-test-tauri` is `-p myne-desktop
+      # -p myne-core`), so when the suite moved to `.woodpecker/e2e.yml` a Rust
+      # break in that crate would have surfaced only when somebody triggered the
+      # manual lane, in its first step, at release time. Same class as the icon
+      # guard above, and the answer is the same: a `check` is cheap and belongs
+      # here. `pre-push`'s `cargo test --workspace` covers it locally, but
+      # `--no-verify` is routine enough that the CI backstop earns its seconds.
+      - cargo check -p e2e-fixture-gen
       # Guard the AI-free auditable variant: `--no-default-features` drops candle
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.
@@ -642,207 +701,6 @@ steps:
       # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
       - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core --no-fail-fast'
 
-  # ─── E2E suite (real binary via tauri-driver) ────────────────
-  # MYND-129 (e2e-harness). Drives the production binary built by
-  # tauri-compile (shared workspace `target/release/myne-desktop`) in a
-  # real WebKitGTK window under xvfb. Merge gate by ratified decision
-  # (epic e2e-testing, SYNC-1); scenario suites: smoke + VR-1 recovery
-  # drill at production KDF (more land per MYND-124/125/126/127).
-  # Also runs the icon asset-check (folded MYND-128, SYNC-19).
-  # depends_on cargo-test-tauri keeps the pnpm-install chain serial
-  # (see the vitest step comment) and the heavy steps sequential.
-  # NOTE: `cargo install tauri-driver` recompiles each run — when the
-  # planned custom CI image lands (see header notes), bake it in.
-  # Test deps stay OUT of release-build steps (TB9) — this step only
-  # consumes the already-built binary.
-  # ─── myne-server binary for the E2E sync scenarios ───────────
-  # The desktop suite's multi-device sync scenarios spawn a REAL myne-server.
-  # Without the binary they SELF-SKIP — 23 tests across 7 files have therefore
-  # been skipping on every CI run since they were written, under a green step,
-  # because nothing in the `e2e` step ever built one. `sync-sim` already clones
-  # and builds the same companion, but it runs AFTER e2e, so its binary is no
-  # use to the suite.
-  #
-  # Its own step rather than more commands inside `e2e`: this touches neither
-  # `node_modules` nor cargo, which is the ONLY reason the desktop lane is
-  # serial, so it runs alongside that lane and adds nothing to its wall-clock.
-  # `e2e` depends on it, and a clean skip (no token, e.g. a fork PR) still
-  # satisfies that dependency — the suite then behaves exactly as it does today.
-  myne-server-build:
-    image: golang:1.26
-    when: *code-paths
-    environment:
-      # Same secret sync-sim resolves. `$$` escapes Woodpecker's substitution
-      # pass — a bare dollar-brace token is replaced with the empty string BEFORE the shell
-      # sees it, which is how sync-sim's guard came to `exit 0` on every run.
-      MYNE_SERVER_TOKEN:
-        from_secret: myne_server_token
-    commands:
-      - |
-        if [ -z "$${MYNE_SERVER_TOKEN:-}" ]; then
-          echo "myne_server_token not provided -> no server binary; sync scenarios will self-skip";
-          exit 0;
-        fi
-      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
-      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server-src"
-      - cd "$CI_WORKSPACE/myne-server-src" && CGO_ENABLED=0 go build -o "$CI_WORKSPACE/myne-server-e2e" ./cmd/myne-server
-      - ls -la "$CI_WORKSPACE/myne-server-e2e"
-
-  e2e:
-    image: rust:1.96.0-slim
-    when: *code-paths
-    depends_on:
-      - cargo-test-tauri
-      - name: myne-server-build
-        optional: true
-    # NON-BLOCKING (temporary). The suite mount-times-out on whatever heavy
-    # scenario happens to land at the TAIL of the ~20-min serial run under the
-    # shared host's cumulative load — a contention signature (unlock/editor
-    # never paints within budget), not a logic bug, and it hits a DIFFERENT
-    # scenario each run, so quarantining named specs was whack-a-mole (6→1 but
-    # never 0). `failure: ignore` stops that flake from reddening every pipeline
-    # — downstream already runs regardless (web-build/sync-sim use optional:true)
-    # and notify-failure only fires on pipeline status:failure — while the suite
-    # keeps RUNNING and reporting so a real regression is still visible. Re-block
-    # when the boot-cost root cause lands (raise the mount budget / cut boot
-    # cost; see the e2e mount-timeout debt). Ratified gate epic e2e-testing
-    # SYNC-1 — this RELAXES the gate, it does not retire the suite.
-    failure: ignore
-    environment:
-      CI: "true"
-    commands:
-      # Runtime-only set: this step consumes a PREBUILT binary, so the
-      # GTK -dev header chains are unnecessary (webkit2gtk-driver drags
-      # the runtime libs transitively); pkg-config/libssl-dev stay for
-      # the tauri-driver cargo install.
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth mold
-      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
-      - npm install -g pnpm@11.8.0
-      - cargo install tauri-driver --locked --version 2.0.6
-      - node scripts/check-icons.mjs
-      # chmod-based fault-injection scenarios require an unprivileged
-      # runner (root bypasses DAC) — same rule as cargo-test-tauri.
-      - useradd -m ci && chown -R ci:ci . /usr/local/cargo/registry
-      # Build the fixture generator as a visible step cost rather than
-      # silently inside the first seeding test's 180 s budget.
-      # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
-      # tauri-compile) inside the unprivileged shell where the build runs.
-      # MYNE_E2E_AI=1 (SYNC-9, ai-provider-seam task 3): pairs with the
-      # `local-inference-stub` feature added to `tauri-compile`. Without BOTH,
-      # nine AI scenarios stay `describe.skip` — which is what they had been in
-      # every CI run to date.
-      # MYNE_E2E_SERVER: the binary myne-server-build produced. Set only when it
-      # EXISTS — an absent path would be worse than none, since the harness
-      # reports "server missing" either way but a wrong path reads like a bug in
-      # the harness rather than an unprovisioned secret. When it is absent the
-      # sync scenarios self-skip exactly as they always have, and the drop in
-      # executed count is what `e2e-floor` is there to notice.
-      - test -x "$CI_WORKSPACE/myne-server-e2e" && export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server-e2e" || echo "no myne-server binary -> sync scenarios self-skip"
-      # TWO shards, and three was tried and reverted — the numbers are here so
-      # nobody spends another pipeline on it.
-      #
-      # The argument for raising it looked like a measurement. Pipeline 668: 125
-      # spec files summed to 2063 s of file time against a 1032 s step on two
-      # shards, i.e. 2063/2 = 1031.5, so sharding was running at 100 % parallel
-      # efficiency. That was read as "the host is not the limit". **It is not
-      # evidence of that**, and pipeline 672 is why: on three shards the step
-      # took 1627 s, LONGER than on two, and `e2e-floor` reported 22 failures
-      # against a ceiling of 0.
-      #
-      # What 100 % efficiency at N actually says is that no time is lost to
-      # SCHEDULING at N. It says nothing about whether the work itself gets
-      # slower at N+1, and here it does: the summed file time is not a constant,
-      # it expands under contention. Three concurrent WebKit apps plus their
-      # drivers push every scenario's own wall clock out far enough to swallow
-      # the division and then some, and the timing-sensitive ones start failing.
-      #
-      # If this is ever revisited, the reading that would justify it is a run at
-      # N+1 whose SUMMED FILE TIME is unchanged from N. Efficiency at N is not
-      # that reading.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=2 MYNE_E2E_AI=1 MYNE_E2E_SERVER="'"$MYNE_E2E_SERVER"'" RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
-
-  # ─── Quarantine lane (flaky-test epic) ──────────────────────
-  # Runs ONLY the `describeE2E.flaky` contention-victim scenarios (nav1, tp1),
-  # NON-BLOCKING (`failure: ignore`, the notify-failure pattern). The blocking
-  # `e2e` step SKIPS them, so an unrelated PR never goes red on a known
-  # cross-branch mount-boot flake; this lane keeps them VISIBLE (status still
-  # reported) until the contention fix retires the quarantine. depends_on e2e
-  # (optional): runs AFTER it — heavy app-driving steps stay serial on the shared
-  # host — and regardless of its result. Reuses the workspace binary e2e built.
-  e2e-quarantine:
-    image: rust:1.96.0-slim
-    when: *code-paths
-    depends_on:
-      - name: e2e
-        optional: true
-      # Same binary the stable lane consumes. Optional for the same reason it is
-      # optional there: no token (a fork PR) means no binary, and the sync
-      # scenarios self-skip rather than the lane not running.
-      - name: myne-server-build
-        optional: true
-    environment:
-      CI: "true"
-    failure: ignore
-    commands:
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth mold
-      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
-      - npm install -g pnpm@11.8.0
-      - cargo install tauri-driver --locked --version 2.0.6
-      - useradd -m ci && chown -R ci:ci . /usr/local/cargo/registry
-      # The same server export the stable `e2e` step does, and it was missing
-      # here: the quarantine lane reported "myne-server binary not found" and
-      # self-skipped device-names, sync-replication, prefs-sync and
-      # sync-attachments in the SAME pipeline where the stable lane ran them.
-      # A lane that silently covers less than the one beside it is the shape
-      # `e2e-floor` exists to notice, and no floor is recorded for this lane yet.
-      - test -x "$CI_WORKSPACE/myne-server-e2e" && export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server-e2e" || echo "no myne-server binary -> sync scenarios self-skip"
-      # MYNE_E2E_QUARANTINE=1 → scenario.ts's gate runs ONLY describeE2E.flaky specs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_QUARANTINE=1 MYNE_E2E_SERVER="'"$MYNE_E2E_SERVER"'" RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
-
-  # ─── E2E floor (the one part of the E2E lane that BLOCKS) ────
-  # `e2e` above is `failure: ignore` because of a chronic contention flake, and
-  # that relaxation has a hole in it nobody chose: it does not distinguish "some
-  # scenarios failed" from "no scenarios ran". A suite that executes ZERO tests
-  # exits 0, and every self-skip in the harness — a missing binary, an unset env
-  # gate, a platform guard, a command earlier in the step that failed quietly —
-  # subtracts scenarios silently. The desktop sync scenarios have been skipping
-  # on every run for months for exactly that reason, under a green step.
-  #
-  # So the count is gated even while the results are not. This step is
-  # deliberately NOT `failure: ignore`: a flaky scenario is a known cost, but a
-  # run that asserted nothing is a broken pipeline reporting success, and the
-  # two must not share a colour. It is cheap (reads a JSON file), needs no app
-  # and no display, and `optional: true` makes it run whatever e2e's result was
-  # — which matters, since the case it exists for is precisely the one where
-  # e2e "passed".
-  e2e-floor:
-    image: node:25
-    # NOT `*code-paths`, and the difference is the whole point. That anchor is a
-    # one-entry list carrying only `path`, and a step inherits the pipeline's
-    # default "skip me if an upstream step failed" — which skipped this one on
-    # pipeline 427 the moment `e2e` went red. That is exactly backwards: a
-    # failing `e2e` is when the floor most needs checking, because "the suite
-    # failed" and "the suite ran almost nothing and one of the few that ran
-    # failed" look identical from the outside. `status: [success, failure]` is
-    # the same mechanism `notify-failure` uses to survive an upstream failure;
-    # the glob list comes from `*code-path-globs` (see `cargo-fmt`) because a
-    # list entry cannot merge `*code-paths` and add a key, and a hand-copy of
-    # the globs is a second place for them to drift.
-    when:
-      - path: *code-path-globs
-        status: [success, failure]
-    depends_on:
-      - name: e2e
-        optional: true
-      - name: e2e-quarantine
-        optional: true
-    commands:
-      # Stable lane only. The quarantine lane runs the specs that are flaky BY
-      # DEFINITION, and no honest floor for it has been measured yet — inventing
-      # one would be the same "number that describes nothing" this guard exists
-      # to replace. Add `--lane quarantine` once a real count exists.
-      - node scripts/check-e2e-floor.mjs --lane stable
-
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
   # REAL ephemeral myne-server (the engine behavior only surfaces across two
@@ -857,10 +715,14 @@ steps:
   # (repo → Settings → Secrets):
   #   name=myne_server_token  value=<Forgejo PAT with read access to Myne/myne-server>
   #
-  # depends_on e2e: keeps the heavy compile steps serial on the shared host and
-  # reuses the warm workspace `dist/` (generate_context! embeds it at compile
-  # time). Only `sync::sim::` runs; the `#[ignore]`d RED bug-repro tests stay
-  # dormant until their fix lands and un-ignores them.
+  # depends_on cargo-test-tauri: keeps the heavy compile steps serial on the
+  # shared host and reuses the warm workspace `dist/` (generate_context! embeds
+  # it at compile time). It used to hang off `e2e`, which was the last step in
+  # that serial chain until the suite moved to `.woodpecker/e2e.yml`;
+  # `cargo-test-tauri` is now the tail, so the edge moved down one and the
+  # property it was buying is unchanged. Only `sync::sim::` runs; the
+  # `#[ignore]`d RED bug-repro tests stay dormant until their fix lands and
+  # un-ignores them.
   # ─── Web-target lane (phase3-web-client task 8) ──────────────
   # Builds the `web/` target: typecheck of the web tree against the shared
   # `src/` tree, then the production bundle with the platform seam substituted
@@ -868,7 +730,7 @@ steps:
   #
   # Placement is deliberate and is the whole point of this being a separate
   # step. The desktop lane is one SERIAL chain — pnpm-build → vitest →
-  # tauri-compile → cargo-test-tauri → e2e — and it is serial because every one
+  # tauri-compile → cargo-test-tauri, and it is serial because every one
   # of those steps runs `pnpm install` into the shared workspace node_modules,
   # which concurrent installs corrupt (see the vitest step's comment). So there
   # are exactly two options: insert this into the chain, which lengthens the
@@ -876,26 +738,27 @@ steps:
   # not. The task's constraint is that the desktop lane's steps and timings stay
   # untouched, so: off the end, alongside sync-sim.
   #
-  # `optional: true` on e2e for the same reason sync-sim uses it — e2e is
-  # chronically flaky on develop, and a web build break is independent of the
-  # desktop UI suite. This step is NOT `failure: ignore`: a broken web build is
-  # a real break and must go red.
+  # `optional: true` on cargo-test-tauri: the edge exists to SERIALISE, not
+  # because this step consumes anything cargo-test-tauri produces, and a web
+  # build break is independent of the desktop backend tests. This step is NOT
+  # `failure: ignore`: a broken web build is a real break and must go red.
   web-build:
     image: node:25
-    # Same `status: [success, failure]` as the mobile lane, and for the reason
-    # the comment above already gives. `optional: true` on the `e2e` edge only
-    # says "do not WAIT for a step that may not run"; the implicit
-    # `status: success` in a bare `when` is pipeline-wide, so this step was
-    # SKIPPED whenever `e2e` reddened, which is the common case on develop. That
-    # silently skipped the four web artefact greps, the seam contract, the
-    # bundle budget and the screen/surface/testid rosters, and by this file's own
-    # sentence a gate that did not run is indistinguishable from one that passed.
-    # Two of those greps hold A15 compensating controls.
+    # Same `status: [success, failure]` as the mobile lane. `optional: true` on
+    # the upstream edge only says "do not WAIT for a step that may not run"; the
+    # implicit `status: success` in a bare `when` is pipeline-wide, so without
+    # these keys this step is SKIPPED whenever anything upstream reddens. That
+    # silently skips the four web artefact greps, the seam contract, the bundle
+    # budget and the screen/surface/testid rosters, and by this file's own
+    # sentence a gate that did not run is indistinguishable from one that
+    # passed. Two of those greps hold A15 compensating controls, and a red
+    # backend test suite is no reason to stop asking whether the web bundle
+    # ships the recovery phrase.
     when:
       - path: *code-path-globs
         status: [success, failure]
     depends_on:
-      - name: e2e
+      - name: cargo-test-tauri
         optional: true
     commands:
       - npm install -g pnpm@11.8.0
@@ -993,89 +856,6 @@ steps:
       # Coverage is unchanged: the full suite still runs, once, in `vitest`.
       - pnpm exec vitest run tests/web tests/platform
 
-  # ─── Web E2E lane (the built bundle in a real browser, MYND-574 task 105) ────
-  # Drives `web/dist` — the SAME artefact `web-build` just produced, served by
-  # the harness with the production security headers (`e2e-web/support/server.ts`
-  # calls `securityHeaders()` from `web/csp.ts`, not a copy) — through
-  # chromedriver. Both `docs/dev/e2e.md` and `e2e-web/CLAUDE.md` describe this
-  # lane as a per-push CI gate; until this step existed, they described an
-  # intention.
-  #
-  # `depends_on: [web-build]` and nothing else. The built bundle is the only
-  # thing this lane needs, and web-build already hangs off the END of the desktop
-  # chain, so this adds nothing to the desktop lane's wall-clock — web-build's own
-  # comment makes that argument, and this is it one step further out. It is NOT
-  # `failure: ignore`: a non-blocking lane is not the coverage those docs claim.
-  #
-  # WHAT IT GATES: pipeline status, NOT the deploy. `web-docker-build` ->
-  # `web-docker-deploy` -> `web-smoke` hang off `web-build`, not off this step,
-  # so on a develop push the app.myne.md deploy runs in PARALLEL with this lane
-  # and ships whatever `web-build` produced regardless of how the browser lane
-  # ends. A red lane reddens the pipeline after the fact; it does not hold the
-  # bundle back. Making it gate the deploy is one line — add `e2e-web` to
-  # `web-docker-build`'s `depends_on` — and it is deliberately not taken here:
-  # it puts a browser suite in front of every deploy, which is a wall-clock vs
-  # safety call for the maintainer, not a side effect of adding a test lane.
-  #
-  # ONE shard, one driver, deliberately. `e2e-web/support/worker-ports.ts`
-  # offsets MYNE_WEB_E2E_DRIVER_PORT by 100 per vitest slot, so a parallel run
-  # needs one driver PROCESS per slot (a shared one is half-right at best:
-  # chromedriver is multi-session, geckodriver is not). Serial costs wall-clock
-  # on a lane nobody is waiting on; the parallel version costs a spawn loop in
-  # the file whose config-compile has twice taken the whole pipeline down.
-  #
-  # CHROMIUM ONLY, and the matrix in `docs/dev/e2e.md` also lists Firefox. That
-  # seat needs geckodriver, which Debian does not package — it would be a
-  # downloaded release archive, and the rule this repo follows for those
-  # (cargo-deny above) is a pinned version WITH its sha256. Adding it is a
-  # separate change, not a line snuck into this one.
-  #
-  # Browser and driver are installed as a PAIR from the same distro archive so
-  # their major versions match — chromedriver 151 refuses a Chrome 150 session
-  # outright. That is a matched pair, NOT a version pin: an archive update moves
-  # both together and nothing below asserts a version. Both docs say so in those
-  # words; the rule they state — no unpinned RELEASE-ARCHIVE download in a
-  # blocking step — is what rules Firefox out above, and it is untouched by a
-  # signed-archive apt install.
-  e2e-web:
-    image: node:25
-    # Inherits web-build's reasoning: it depends on web-build, so a bare `when`
-    # skipped it on exactly the pipelines web-build was skipped on.
-    when:
-      - path: *code-path-globs
-        status: [success, failure]
-    depends_on: [web-build]
-    environment:
-      CI: "true"
-      # An explicit opt-in meaning "a driver is listening" — see
-      # `e2e-web/support/worker-ports.ts`, which only offsets this into the
-      # slot's band when it is already set. Without it the lane SKIPS with a
-      # reason instead of failing, which is the honest answer on a laptop with no
-      # driver and the wrong one here.
-      MYNE_WEB_E2E_DRIVER_PORT: "4544"
-      MYNE_WEB_E2E_BROWSER: chrome
-      MYNE_WEB_E2E_SHARDS: "1"
-    commands:
-      - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl chromium chromium-driver
-      - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
-      # Driver start, readiness wait and the run in ONE block: the driver is a
-      # background process, and a readiness wait in a different shell than the run
-      # proves nothing. Deliberately free of dollar-sign expansion — Woodpecker's
-      # config-compile runs env substitution over this file before any step runs.
-      - |
-        chromedriver --port=4544 >/tmp/chromedriver.log 2>&1 &
-        for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-          curl -fsS http://127.0.0.1:4544/status >/dev/null 2>&1 && break
-          sleep 0.5
-        done
-        if ! curl -fsS http://127.0.0.1:4544/status >/dev/null 2>&1; then
-          echo "chromedriver did not come up on :4544 — the lane would have SKIPPED";
-          cat /tmp/chromedriver.log;
-          exit 1;
-        fi
-        pnpm test:e2e:web
-
   # ─── Mobile lane (the client moved in-repo; see decisions.md) ────────────────
   # These four steps replace the whole of `myne-mobile/.woodpecker.yml`, and the
   # thing worth noticing is what is NOT here: that pipeline began by cloning THIS
@@ -1111,8 +891,8 @@ steps:
   # moved in-repo. Run by hand it failed — `mobile/tests/reminder-tap.test.ts`
   # carried a ~0.7%-per-run assertion flake, fixed in `794c33e8`. `npm-licenses`,
   # the workspace-wide license gate, had likewise never run here. Same class as
-  # the `e2e-floor` rationale above: a gate that did not run is indistinguishable
-  # from a gate that passed.
+  # the `e2e-floor` rationale (that step now lives in `.woodpecker/e2e.yml`): a
+  # gate that did not run is indistinguishable from a gate that passed.
   #
   # Where it bites is narrower and worse than "a step went red once".
   # `web-docker-build` is `event: manual` + `branch: develop` (`&web-deploy`,
@@ -1299,9 +1079,11 @@ steps:
   # the HOST daemon through the mounted socket, then a second step that brings
   # up the committed stack in its deploy directory.
   #
-  # `depends_on: [web-build]` and nothing else — deliberately. The desktop `e2e`
-  # step is roughly half the pipeline's runtime, and a web deploy must not wait
-  # on the desktop UI suite to decide whether a static bundle can ship.
+  # `depends_on: [web-build]` and nothing else, deliberately. A web deploy must
+  # not wait on anything that does not decide whether a static bundle can ship.
+  # The original wording named the desktop `e2e` step, which was roughly half the
+  # pipeline's runtime; that step has moved to `.woodpecker/e2e.yml` and no
+  # longer runs on this pipeline at all, so the reasoning outlives its example.
   #
   # `manual` stays in the `when` block because a Forgejo pull-mirror sync does
   # not reliably fire the push webhook, and a deploy that only fires on an event
@@ -1416,22 +1198,26 @@ steps:
 
   sync-sim:
     image: rust:1.96.0-slim
-    # The comment below says this step runs REGARDLESS of e2e's result, and with
-    # a bare `when` that was not true: `optional: true` only removes the wait,
-    # while the implicit `status: success` is pipeline-wide and skipped this step
-    # whenever e2e was red. The claim is now enforced rather than asserted.
+    # The comment below says this step runs REGARDLESS of its upstream's result,
+    # and with a bare `when` that was not true: `optional: true` only removes the
+    # wait, while the implicit `status: success` is pipeline-wide and skipped
+    # this step whenever the upstream was red. The claim is now enforced rather
+    # than asserted.
     when:
       - path: *code-path-globs
         status: [success, failure]
-    # `optional: true`: run AFTER e2e (keeps the heavy steps serial on the
-    # shared host) but REGARDLESS of e2e's result. e2e is chronically flaky on
-    # develop (a plain `depends_on: [e2e]` skips sync-sim whenever e2e is red),
-    # and the sync engine's cross-device correctness is independent of the UI
-    # E2E suite — so gate sync-sim on the SERVER binary + its own tests, never
-    # on e2e passing. Same pattern notify-failure uses to run on upstream
-    # failure.
+    # `optional: true`: run AFTER cargo-test-tauri (keeps the heavy steps serial
+    # on the shared host) but REGARDLESS of its result. The edge used to point at
+    # `e2e`, which was the tail of the serial chain and chronically flaky on
+    # develop, so a plain `depends_on` skipped sync-sim whenever the UI suite
+    # went red; the suite has since moved to `.woodpecker/e2e.yml` and
+    # `cargo-test-tauri` is the tail. The reason for keeping the edge optional is
+    # unchanged: the sync engine's cross-device correctness is independent of
+    # whatever runs before it, so gate sync-sim on the SERVER binary + its own
+    # tests and on nothing else. Same pattern notify-failure uses to run on
+    # upstream failure.
     depends_on:
-      - name: e2e
+      - name: cargo-test-tauri
         optional: true
     environment:
       CI: "true"
@@ -1648,20 +1434,12 @@ steps:
         optional: true
       - name: cargo-test-tauri
         optional: true
-      # It skips cleanly without the secret, so a red here means the clone or
-      # the Go build actually broke — and the visible consequence is 23 sync
-      # scenarios quietly going back to self-skipping.
-      - name: myne-server-build
-        optional: true
-      - name: e2e
-        optional: true
-      # e2e-floor is the E2E lane's BLOCKING half (see the step). `e2e` itself is
-      # failure:ignore and so never reaches this notifier with a failure; the
-      # floor step is the one that can, and the run it fires on — a suite that
-      # asserted nothing while reporting success — is the one most worth waking
-      # somebody for.
-      - name: e2e-floor
-        optional: true
+      # NO E2E ENTRIES HERE, and their absence is the change rather than an
+      # oversight: `myne-server-build`, `e2e`, `e2e-quarantine`, `e2e-floor` and
+      # `e2e-web` all moved to `.woodpecker/e2e.yml`, which carries its OWN
+      # `notify-failure` step. A `depends_on` naming a step in another workflow
+      # does not resolve, so listing them here would not wait for anything. It
+      # would only read as coverage this pipeline no longer has.
       - name: bundle-record
         optional: true
       # Unfiltered like bundle-record, so it can go red on a docs-only commit,
@@ -1669,11 +1447,6 @@ steps:
       - name: twin-inventory
         optional: true
       - name: web-build
-        optional: true
-      # The web E2E lane (task 105). It can go red on its own — it is a blocking
-      # gate, not a quarantine — so leaving it out would mean a red pipeline with
-      # no push, the same hole `mobile-crosscheck` left below.
-      - name: e2e-web
         optional: true
       # The mobile lane. Every one of these five is a blocking gate with no
       # failure:ignore, so each can go red on its own — the exact hole
@@ -1702,13 +1475,7 @@ steps:
         optional: true
       # MYND-574 task 116. `mobile-crosscheck` can go red on its own (it has no
       # failure:ignore), so leaving it out meant a red pipeline with no push.
-      # `e2e-quarantine` is listed for a different reason: it CANNOT fail the
-      # pipeline (failure:ignore), but notify must still wait for its terminal
-      # status rather than racing it — the same reason every other entry is here
-      # with optional:true.
       - name: mobile-crosscheck
-        optional: true
-      - name: e2e-quarantine
         optional: true
     environment:
       PUSHOVER_TOKEN:
