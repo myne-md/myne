@@ -6,7 +6,7 @@
 
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { HOVER_TRANSITION, hoverSurface } from "./hoverSurface";
-import { scrollRegionStyle, useScrollEdges } from "../../hooks/useScrollEdges";
+import { fillingScrollRegionStyle, useScrollEdges } from "../../hooks/useScrollEdges";
 import { stageRootStyle } from "./stageRoot";
 
 interface CenteredCardProps {
@@ -50,7 +50,7 @@ const CARD_STYLE: CSSProperties = {
  * the start by masking its list.
  */
 const SCROLL_STYLE: CSSProperties = {
-  ...scrollRegionStyle,
+  ...fillingScrollRegionStyle,
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-4)",

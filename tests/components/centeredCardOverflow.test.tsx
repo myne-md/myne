@@ -48,6 +48,16 @@ describe("CenteredCard inside App's shortened column", () => {
     expect(card.style.maxHeight).toBe("100%");
     expect(card.style.overflowY).toBe("");
     expect(scroller.style.overflowY).toBe("auto");
+    // The scroller is a child of a COLUMN card, so here filling the parent's
+    // main axis IS filling vertically and the grow is load-bearing: without it
+    // the scroller is content-height, the card never overflows it, and the fade
+    // this whole primitive exists for measures `false / false` forever.
+    //
+    // Asserted because the shared style was split by axis (`scrollRegionStyle`
+    // is now axis-agnostic, `fillingScrollRegionStyle` adds the grow), and only
+    // the row-axis direction of that split had a test. A split verified in one
+    // direction is a split that can silently stop working in the other.
+    expect(scroller.style.flexGrow).toBe("1");
   });
 
   it("does not mask the card, so its frame survives an overflow", () => {

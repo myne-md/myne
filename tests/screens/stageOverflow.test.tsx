@@ -36,6 +36,14 @@ function expectScrollable(el: HTMLElement, label: string): void {
   // Without it the two above are inert: the child keeps its full height and
   // overflows the capped root anyway.
   expect(el.style.minHeight, `${label}: must be allowed to shrink`).toBe("0px");
+  // And it must NOT grow. `stageRootStyle` is a ROW, so `flex-grow: 1` on a
+  // child it centres is a full-bleed WIDTH, not a taller scroller: the whole
+  // API of `StepLayout` is its `width` prop, and a grow silently overrides it.
+  // The scroll region carried `flex: "1 1 auto"` for its three column adopters
+  // and both row-axis screens inherited it; only `maxWidth: 600` kept it
+  // invisible on the recovery card. jsdom has no layout, so this is the only
+  // place it can be caught.
+  expect(el.style.flexGrow, `${label}: must not grow on the root's ROW axis`).not.toBe("1");
 }
 
 describe("StepLayout, the vault-creation stage envelope", () => {
@@ -51,6 +59,19 @@ describe("StepLayout, the vault-creation stage envelope", () => {
     expect(root.style.flexGrow).toBe("1");
     expect(root.style.minHeight).toBe("0px");
     expectScrollable(column, "StepLayout column");
+    // The width prop is the whole API, and it must survive the scroll region.
+    expect(column.style.width, "StepLayout honours its width prop").toBe("420px");
+  });
+
+  it("honours a caller's width rather than filling the window", () => {
+    render(
+      <StepLayout width={600}>
+        <p data-testid="probe">content</p>
+      </StepLayout>,
+    );
+    const column = screen.getByTestId("probe").parentElement as HTMLElement;
+    expect(column.style.width).toBe("600px");
+    expect(column.style.flexGrow).not.toBe("1");
   });
 });
 

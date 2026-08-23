@@ -52,7 +52,7 @@ import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
 import type { TFunction } from "i18next";
 import { Icon } from "../components/primitives/Icon";
 import { MyneMark } from "../components/primitives/MyneMark";
-import { scrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
+import { fillingScrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 import { Spinner } from "../components/Spinner";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
@@ -213,7 +213,7 @@ const LIST_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-2)",
-  ...scrollRegionStyle,
+  ...fillingScrollRegionStyle,
 };
 
 function rowStyle(hovered: boolean): CSSProperties {
