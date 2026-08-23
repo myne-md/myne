@@ -889,7 +889,6 @@
         "openSettings": "打开设置",
         "settingsTitle": "设置（⌘,）",
         "showGraph": "显示关系图视图",
-        "syncStatus": "仅本地 · 未同步",
         "tagsTitle": "标签",
         "togglePreview": "切换并排预览",
         "viewModeTitle": "查看模式：{{mode}}（点击循环切换）",

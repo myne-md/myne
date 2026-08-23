@@ -889,7 +889,6 @@
         "openSettings": "설정 열기",
         "settingsTitle": "설정 (⌘,)",
         "showGraph": "그래프 보기 표시",
-        "syncStatus": "로컬 전용 · 동기화 안 됨",
         "tagsTitle": "태그",
         "togglePreview": "나란히 보기 미리보기 전환",
         "viewModeTitle": "보기 모드: {{mode}} (클릭하여 순환)",

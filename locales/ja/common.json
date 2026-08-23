@@ -889,7 +889,6 @@
         "openSettings": "設定を開く",
         "settingsTitle": "設定（⌘,）",
         "showGraph": "グラフビューを表示",
-        "syncStatus": "ローカルのみ · 未同期",
         "tagsTitle": "タグ",
         "togglePreview": "横並びプレビューを切り替え",
         "viewModeTitle": "表示モード：{{mode}}（クリックで切り替え）",

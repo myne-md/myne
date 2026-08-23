@@ -912,7 +912,6 @@
         "openSettings": "Abrir ajustes",
         "settingsTitle": "Ajustes (⌘,)",
         "showGraph": "Mostrar vista de grafo",
-        "syncStatus": "Solo local · sin sincronizar",
         "tagsTitle": "Etiquetas",
         "togglePreview": "Alternar vista previa en paralelo",
         "viewModeTitle": "Modo de vista: {{mode}} (haz clic para rotar)",

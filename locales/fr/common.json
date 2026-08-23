@@ -912,7 +912,6 @@
         "openSettings": "Ouvrir les paramètres",
         "settingsTitle": "Paramètres (⌘,)",
         "showGraph": "Afficher la vue graphe",
-        "syncStatus": "Local uniquement · non synchronisé",
         "tagsTitle": "Étiquettes",
         "togglePreview": "Afficher l'aperçu côte à côte",
         "viewModeTitle": "Mode d'affichage : {{mode}} (cliquez pour changer)",
