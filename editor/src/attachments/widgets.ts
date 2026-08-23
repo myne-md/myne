@@ -758,6 +758,10 @@ export class AttachmentFileCardWidget extends WidgetType {
     private readonly id: string,
     private readonly filename: string,
     private readonly size: number,
+    /** Segments the author wrote that this version could not read
+     *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
+     *  just the media ones (myne-md/myne#518). */
+    private readonly dropped: readonly DroppedEmbedSegment[] = [],
   ) {
     super();
   }
@@ -766,7 +770,8 @@ export class AttachmentFileCardWidget extends WidgetType {
     return (
       other.id === this.id &&
       other.filename === this.filename &&
-      other.size === this.size
+      other.size === this.size &&
+      sameDroppedSegments(other.dropped, this.dropped)
     );
   }
 
@@ -821,6 +826,9 @@ export class AttachmentFileCardWidget extends WidgetType {
     );
     this.menuTeardown = menu.teardown;
     card.appendChild(menu.wrap);
+    if (this.dropped.length > 0) {
+      card.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-file"));
+    }
     return card;
   }
 
@@ -860,6 +868,10 @@ export class AttachmentAudioWidget extends WidgetType {
   constructor(
     private readonly id: string,
     private readonly filename: string,
+    /** Segments the author wrote that this version could not read
+     *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
+     *  just the media ones (myne-md/myne#518). */
+    private readonly dropped: readonly DroppedEmbedSegment[] = [],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -869,7 +881,8 @@ export class AttachmentAudioWidget extends WidgetType {
     return (
       other.id === this.id &&
       other.filename === this.filename &&
-      other.url === this.url
+      other.url === this.url &&
+      sameDroppedSegments(other.dropped, this.dropped)
     );
   }
 
@@ -897,6 +910,9 @@ export class AttachmentAudioWidget extends WidgetType {
     // (rename/export still use the full filename).
     name.textContent = stripFileExtension(this.filename);
     root.appendChild(name);
+    if (this.dropped.length > 0) {
+      root.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-audio"));
+    }
 
     // Middle row: play button + waveform track + overflow menu, vertically
     // centered together (the play button aligns with the waveform line).
@@ -1193,6 +1209,10 @@ export class AttachmentVideoWidget extends WidgetType {
     private readonly id: string,
     private readonly filename: string,
     private readonly size: number,
+    /** Segments the author wrote that this version could not read
+     *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
+     *  just the media ones (myne-md/myne#518). */
+    private readonly dropped: readonly DroppedEmbedSegment[] = [],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -1203,7 +1223,8 @@ export class AttachmentVideoWidget extends WidgetType {
       other.id === this.id &&
       other.filename === this.filename &&
       other.size === this.size &&
-      other.url === this.url
+      other.url === this.url &&
+      sameDroppedSegments(other.dropped, this.dropped)
     );
   }
 
@@ -1294,6 +1315,9 @@ export class AttachmentVideoWidget extends WidgetType {
       this.teardown = () => fallback.destroy();
     });
 
+    if (this.dropped.length > 0) {
+      frame.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-video"));
+    }
     return frame;
   }
 
@@ -1501,12 +1525,21 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     private readonly id: string,
     private readonly filename: string,
     private readonly size: number,
+    /** Segments the author wrote that this version could not read
+     *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
+     *  just the media ones (myne-md/myne#518). */
+    private readonly dropped: readonly DroppedEmbedSegment[] = [],
   ) {
     super();
   }
 
   eq(other: AttachmentTextPreviewWidget): boolean {
-    return other.id === this.id && other.filename === this.filename && other.size === this.size;
+    return (
+      other.id === this.id &&
+      other.filename === this.filename &&
+      other.size === this.size &&
+      sameDroppedSegments(other.dropped, this.dropped)
+    );
   }
 
   // Height estimate BEFORE the first draw, so CM's height map doesn't discover
@@ -1673,6 +1706,9 @@ export class AttachmentTextPreviewWidget extends WidgetType {
       this.resizeObserver.observe(card);
     }
 
+    if (this.dropped.length > 0) {
+      card.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-text"));
+    }
     return card;
   }
 
@@ -1765,9 +1801,16 @@ export function makeResolvedWidget(
   layout: EmbedLayout = emptyEmbedLayout(),
   dropped: readonly DroppedEmbedSegment[] = [],
 ): WidgetType {
-  // Only the media widgets take a layout today. A file card, an audio player
-  // and a text preview have no meaningful width/alignment story yet, and giving
-  // them one silently would be a feature nobody specified.
+  // `layout` is media-only and `dropped` is NOT, and the two used to travel
+  // together as if they were one thing (myne-md/myne#518). A file card, an audio
+  // player and a text preview have no meaningful width/alignment story yet, so
+  // giving them a layout silently would be a feature nobody specified. A dropped
+  // SEGMENT is a different fact: it says the author wrote a known key with a
+  // value this version could not read, and that is worth telling them whatever
+  // the attachment turns out to be. `markdown-dialect.md` §3.9.3 asks for the
+  // marker without scoping it to a media type, and four of the six widgets took
+  // the list and discarded it, so a bad segment on an audio embed was reported
+  // nowhere at all.
   if (row.contentType === "application/pdf") {
     return new AttachmentPdfWidget(row.id, row.filename, layout, dropped);
   }
@@ -1775,18 +1818,18 @@ export function makeResolvedWidget(
     return new AttachmentImageWidget(row.id, row.filename, layout, dropped);
   }
   if (isPlayableAudioType(row.contentType)) {
-    return new AttachmentAudioWidget(row.id, row.filename);
+    return new AttachmentAudioWidget(row.id, row.filename, dropped);
   }
   if (isPlayableVideoType(row.contentType)) {
-    return new AttachmentVideoWidget(row.id, row.filename, row.size);
+    return new AttachmentVideoWidget(row.id, row.filename, row.size, dropped);
   }
   // Generic with a previewable extension → inline read-only preview (Tier-1
   // text/code/csv, or Tier-2 Rust-parsed docx/xlsx).
   if (isPreviewableTextFile(row.filename) || isPreviewableStructuredFile(row.filename)) {
-    return new AttachmentTextPreviewWidget(row.id, row.filename, row.size);
+    return new AttachmentTextPreviewWidget(row.id, row.filename, row.size, dropped);
   }
   // Otherwise generic / non-renderable → export-only file-card.
-  return new AttachmentFileCardWidget(row.id, row.filename, row.size);
+  return new AttachmentFileCardWidget(row.id, row.filename, row.size, dropped);
 }
 
 /** The raster/SVG content-types the `attachment://` handler serves inline. */
