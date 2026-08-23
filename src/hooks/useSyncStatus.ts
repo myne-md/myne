@@ -20,7 +20,18 @@ export type SyncStatus =
   | { state: "pending" }
   | { state: "idle" }
   | { state: "syncing" }
-  | { state: "error"; detail: string }
+  | {
+      state: "error";
+      detail: string;
+      /**
+       * Epoch ms of the last cycle that completed on this device (myne#583),
+       * absent when none ever has. Carried only on `error`, matching the Rust
+       * side: how long sync has been broken is a question that only exists
+       * while it is broken. Feed it to `isSyncStale`, never to a date format —
+       * see `src/lib/sync-staleness.ts` for why.
+       */
+      last_success_at?: number;
+    }
   | { state: "conflicts"; count: number };
 
 /** Status-poll cadence for the indicator (ms). Cheap read-only command. */

@@ -435,6 +435,9 @@ pub async fn run_active_cycle_from_host(
     }
     let notes_dir = dir.join("notes");
     let notes_dir_for_reindex = notes_dir.clone();
+    // Cloned for the same reason `notes_dir` is: `dir` moves into the blocking
+    // closure below, and the success stamp is written after it returns.
+    let vault_root_for_stamp = dir.clone();
     let dir_for_prefs = dir.clone();
 
     let res = crate::task::run_blocking_future(move || async move {
@@ -557,6 +560,12 @@ pub async fn run_active_cycle_from_host(
                     EventPayload::Unit,
                 );
             }
+            // The cycle reached the server and finished (myne#583). Stamp it,
+            // coalesced, so the staleness banner has a clock to measure from —
+            // this is the only place that knows a cycle SUCCEEDED, and until it
+            // existed nothing on disk did.
+            super::state::record_sync_success(io, &vault_root_for_stamp, host.now_unix_millis())
+                .await;
             CycleOutcome::Ran(summary)
         }
         Ok(Err(e)) => {
@@ -624,9 +633,25 @@ pub async fn sync_now_from_host(
             }
             SyncRuntimeStatus::Idle
         }
-        CycleOutcome::Failed(class) => SyncRuntimeStatus::Error {
-            detail: class.status_detail().into(),
-        },
+        CycleOutcome::Failed(class) => {
+            // The manual button's answer carries the same clock the polled
+            // status does, so a "Sync now" that fails does not blank out a
+            // staleness warning the poll had already raised.
+            let last_success_at = match crate::paths::active_vault_root_io_from_host(
+                host,
+                state.active_vault_id().await,
+            ) {
+                Ok(dir) => super::state::read_sync_state(io, &dir)
+                    .await
+                    .ok()
+                    .and_then(|s| s.last_success_at_ms),
+                Err(_) => None,
+            };
+            SyncRuntimeStatus::Error {
+                detail: class.status_detail().into(),
+                last_success_at,
+            }
+        }
     }
 }
 

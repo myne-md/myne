@@ -3589,6 +3589,10 @@
     "recovered": {
       "restoredToast": "Restored as a new note."
     },
+    "stale": {
+      "body": "Myne hasn’t reached the sync server in several days. Your notes are saving on this device, but nothing has left it, so this is the only copy. Open Settings → Sync to see why.",
+      "dismiss": "Dismiss"
+    },
     "status": {
       "awaitingApproval": "Awaiting approval",
       "conflicts_one": "{{count}} conflict to review",
