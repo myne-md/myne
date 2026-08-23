@@ -221,6 +221,60 @@ describe("renameFolder — async apply (transactional)", () => {
     expect(reindexMock).toHaveBeenCalledWith("n1", expect.stringContaining("folder: Work/"));
   });
 
+  // The `deliberate_folders` write happens PAST the commit, so a failure there
+  // has the rename on disk. Throwing would tell the caller a rename that landed
+  // did not, and skip the decoration and archived-folder re-rooting it still
+  // owes; those live in `vault.prefs` and nothing reconciles them later.
+  it("retries the post-commit deliberate write once before giving up", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock
+      .mockRejectedValueOnce(new Error("prefs busy"))
+      .mockResolvedValueOnce(undefined);
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], ["P/"]);
+
+    expect(setDeliberateFoldersMock).toHaveBeenCalledTimes(2);
+    // The retry is the difference between recoverable and permanent: a second
+    // rename cannot fix this later, because after a relaunch the stale entry is
+    // under the OLD path and `planFolderRenameBatch` keys its rewrite off the
+    // CURRENT one, so nothing matches and this block does not even run.
+    expect(result.deliberateWriteFailed).toBe(false);
+    expect(result.failed).toEqual([]);
+    expect(result.moved).toEqual(["n"]);
+  });
+
+  it("reports a twice-failed deliberate write rather than throwing it", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock.mockRejectedValue(new Error("disk full"));
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], ["P/"]);
+
+    expect(setDeliberateFoldersMock).toHaveBeenCalledTimes(2);
+    expect(result.deliberateWriteFailed).toBe(true);
+    // And the rename is still reported as landed, which is the whole reason this
+    // is a value and not a throw: the caller runs the decoration and
+    // archived-folder re-rooting off `moved` and `nextDeliberate`.
+    expect(result.failed).toEqual([]);
+    expect(result.moved).toEqual(["n"]);
+    expect(result.nextDeliberate).toEqual(["Q/"]);
+  });
+
+  it("does not report a failure when there was no deliberate entry to write", async () => {
+    // The other direction. A rename with nothing in the deliberate set skips the
+    // write entirely, and a flag that turned on there would put a notice about a
+    // setting on a rename that had none.
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock.mockRejectedValue(new Error("never called"));
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], []);
+
+    expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
+    expect(result.deliberateWriteFailed).toBe(false);
+  });
+
   it("flushes open dirty panes BEFORE reading any body (WL-8 pre-flight)", async () => {
     const order: string[] = [];
     flushMock.mockImplementation(() => {

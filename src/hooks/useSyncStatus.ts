@@ -66,10 +66,19 @@ async function readStatus(): Promise<SyncStatus> {
  * comment promised. Verified by adding `lastSyncedAt` to the `idle` variant and
  * watching `tsc` name the arm.
  */
-type AllKeys<T> = { [K in keyof T]-?: true };
+type PayloadKeys<T> = { [K in Exclude<keyof T, "state">]-?: true };
 
-/** Field-by-field equality over EVERY key of `T`, listed at the call site. */
-function sameFields<T extends object>(a: T, b: T, keys: AllKeys<T>): boolean {
+/**
+ * Field-by-field equality over every key of `T` EXCEPT the discriminant, listed
+ * at the call site.
+ *
+ * `state` is excluded because both sides were just proved equal to the same
+ * literal one line up, so listing it was a tautology repeated in seven arms and
+ * it left five of them saying nothing but `{ state: true }`. Excluding it keeps
+ * the ratchet exactly where it bites: the literal still has to name every
+ * PAYLOAD field, so a variant that grows one fails to compile at its own arm.
+ */
+function sameFields<T extends { state: string }>(a: T, b: T, keys: PayloadKeys<T>): boolean {
   return (Object.keys(keys) as Array<keyof T>).every((k) => a[k] === b[k]);
 }
 
@@ -93,22 +102,22 @@ function sameStatus(a: SyncStatus | null, b: SyncStatus): boolean {
   // compile error at that arm.
   switch (a.state) {
     case "error":
-      return b.state === "error" && sameFields(a, b, { state: true, detail: true });
+      return b.state === "error" && sameFields(a, b, { detail: true });
     case "conflicts":
-      return b.state === "conflicts" && sameFields(a, b, { state: true, count: true });
+      return b.state === "conflicts" && sameFields(a, b, { count: true });
     // Payload-free today, and listed one per line rather than collapsed into a
     // default, so adding a STATE to the union fails to compile below while
     // adding a FIELD to one of these fails to compile at its own arm.
     case "disabled":
-      return b.state === "disabled" && sameFields(a, b, { state: true });
+      return b.state === "disabled" && sameFields(a, b, {});
     case "not_enrolled":
-      return b.state === "not_enrolled" && sameFields(a, b, { state: true });
+      return b.state === "not_enrolled" && sameFields(a, b, {});
     case "pending":
-      return b.state === "pending" && sameFields(a, b, { state: true });
+      return b.state === "pending" && sameFields(a, b, {});
     case "idle":
-      return b.state === "idle" && sameFields(a, b, { state: true });
+      return b.state === "idle" && sameFields(a, b, {});
     case "syncing":
-      return b.state === "syncing" && sameFields(a, b, { state: true });
+      return b.state === "syncing" && sameFields(a, b, {});
     default: {
       const exhaustive: never = a;
       return exhaustive;

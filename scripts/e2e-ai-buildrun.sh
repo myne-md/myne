@@ -53,12 +53,9 @@ RUN_FLAGS=(
 )
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true MYNE_E2E_AI=1 npm_config_store_dir=/home/e2e/.pnpm-store'
 
-# The member `node_modules` paths come from the include, derived from the very
-# array that mounts them, so a volume cannot be mounted without being chowned.
-FIX_PERMS="chown -R e2e:e2e /work/node_modules /work/target$E2E_MEMBER_NM_PATHS"
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $INNER

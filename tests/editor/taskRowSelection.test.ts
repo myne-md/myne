@@ -6,7 +6,10 @@
 //
 //   - HERE: the decision. Given a range and a document, is this the gesture the
 //     rule applies to, and what does it become? Every refusal branch and both
-//     directions, with no view, no layout and no pointer.
+//     directions, with no view, no layout and no pointer. Three of the cases
+//     below (the plain trim, the empty task row, the prose row) do restate the
+//     mounted lane through a cheaper mechanism; the rest are reachable only
+//     here, and the reverse direction is the reason the file exists.
 //   - `taskLineEditing.test.ts`: the WIRING. A mounted CM6 view, a dispatched
 //     `select.pointer` transaction, and the resulting selection and DOM.
 //   - `e2e/task-row-selection.e2e.ts`: the GESTURE. Three real clicks, in a real
@@ -19,16 +22,26 @@
 
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
+import { ensureSyntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { trimRowNewline } from "@myne/editor/task-selection";
 
 const DOC = "- [x] milk\nplain prose\n- [ ] \nlast\n";
 
 function stateFor(doc = DOC): EditorState {
-  return EditorState.create({
+  const state = EditorState.create({
     doc,
     extensions: [markdown({ base: markdownLanguage })],
   });
+  // Parse the WHOLE document before asserting, and the reason is a flake this
+  // file produced on its second full-suite run. `syntaxTree(state)` returns
+  // whatever the incremental parser finished inside its own time budget, which
+  // on a fresh state under a loaded machine can stop short: `listMarkerEnd`
+  // then finds no `TaskMarker` on the row and `trimRowNewline` correctly
+  // declines, so the test fails on a real answer to a half-parsed document.
+  // Passing alone and failing in the suite is the signature.
+  ensureSyntaxTree(state, doc.length, 5_000);
+  return state;
 }
 
 /** The shape the filter hands `trimRowNewline`, built from two offsets. */
@@ -43,16 +56,12 @@ function range(anchor: number, head: number) {
 }
 
 describe("trimRowNewline applies", () => {
-  it("drops the trailing newline of a task row", () => {
+  it("drops the trailing newline and keeps the whole row", () => {
     // `- [x] milk\n` is 0..11; CM6's triple-click selects to 11, the next line's
-    // start. The row itself ends at 10.
+    // start. The row itself ends at 10. `anchor` staying 0 is the other half:
+    // `- [x] ` is in the selection and on the clipboard, which is what the task
+    // decoration then renders as source, so no band lands on the checkbox.
     expect(trimRowNewline(stateFor(), range(0, 11))).toEqual({ anchor: 0, head: 10 });
-  });
-
-  it("keeps the whole row, hidden marker included", () => {
-    // Not "the label": `from` stays 0, so `- [x] ` is in the selection and on the
-    // clipboard, which is what the task decoration then renders as source.
-    expect(trimRowNewline(stateFor(), range(0, 11))?.anchor).toBe(0);
   });
 
   it("works on an EMPTY task row, where the marker IS the line", () => {

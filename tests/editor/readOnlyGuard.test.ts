@@ -160,13 +160,14 @@ describe("writableMember gates one write-capable host member", () => {
     expect(writableMember(stateWith(false), "cover")).toBe(HOST.cover);
   });
 
-  it("leaves the registered host untouched, in both states", () => {
+  it.each([true, false])("leaves the registered host untouched at readOnly=%s", (ro) => {
     // The gate is not "no host in reading view", and it is not a mutation
     // either. A reading surface still resolves attachments, opens links and
     // reads prefs; only the roster members are withheld, and only from the
-    // caller that asked.
+    // caller that asked. Both states, because the title said both and the body
+    // exercised one, which is the coverage claim this branch keeps finding.
     setEditorHost(HOST);
-    writableMember(stateWith(true), "cover");
+    writableMember(stateWith(ro), "cover");
     expect(HOST.cover).toBeDefined();
     expect(getHost().cover).toBe(HOST.cover);
   });

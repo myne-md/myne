@@ -57,8 +57,20 @@ export const ATTACHMENT_FALLBACK_NAME = "attachment";
  * later unkeyed segment rejoins the filename.
  */
 export function attachmentEmbedDisplayName(filename: string): string {
-  const { filename: name } = parseEmbedAlias(filename);
-  return name !== "" ? name : ATTACHMENT_FALLBACK_NAME;
+  return attachmentDisplayNameOf(parseEmbedAlias(filename).filename);
+}
+
+/**
+ * The fallback RULE, over a name that has already been split off an alias.
+ *
+ * The emitter needs the layout from the same parse, so it cannot call
+ * `attachmentEmbedDisplayName` without parsing twice. Exporting only the
+ * constant left it spelling `name !== "" ? name : ATTACHMENT_FALLBACK_NAME`
+ * itself, which put the rule in two places while the comment beside it claimed
+ * one. This is the rule; `attachmentEmbedDisplayName` is it plus the split.
+ */
+export function attachmentDisplayNameOf(parsedName: string): string {
+  return parsedName !== "" ? parsedName : ATTACHMENT_FALLBACK_NAME;
 }
 
 /**

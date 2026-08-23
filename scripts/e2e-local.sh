@@ -110,13 +110,10 @@ fi
 if [[ -n "$SERVER_BIN" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/$SERVER_BIN"
 fi
-# The member `node_modules` paths come from the include, derived from the very
-# array that mounts them, so a volume cannot be mounted without being chowned.
-FIX_PERMS="chown -R e2e:e2e /work/node_modules /work/target$E2E_MEMBER_NM_PATHS"
 
 if [[ "$SHELL_MODE" == 1 ]]; then
   exec docker run -it "${RUN_FLAGS[@]}" "$IMAGE" \
-    bash -c "$FIX_PERMS && su e2e -s /bin/bash -c '$E2E_ENV && cd /work && exec bash -i'"
+    bash -c "$E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '$E2E_ENV && cd /work && exec bash -i'"
 fi
 
 # `--features voice-capture-stub` (myne#389 item D): the deterministic 440 Hz
@@ -132,7 +129,7 @@ if [[ "$SKIP_BUILD" == 1 ]]; then
 fi
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&

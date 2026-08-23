@@ -53,7 +53,7 @@ import {
 } from "@myne/dialect/embedLayout";
 import { escapeAttr, escapeHtml } from "./escape";
 import {
-  ATTACHMENT_FALLBACK_NAME,
+  attachmentDisplayNameOf,
   attachmentEmbedDisplayName,
   IMAGE_EXT_RE,
   type ExcludedAttachment,
@@ -1058,12 +1058,12 @@ function renderAttachmentEmbed(
   // an authored EMPTY alt marks the media decorative. HTML is the one output
   // format where both are native and free, and it was emitting the filename for
   // the first and losing the second entirely.
-  // ONE parse. `attachmentEmbedDisplayName` is `parseEmbedAlias` plus the empty
-  // fallback, so calling both parsed the same alias twice per embed; the fallback
-  // is expressed over the name this destructure already has, which keeps the
-  // rule in one place without paying for it a second time.
+  // ONE parse, and the rule still in one place. `attachmentEmbedDisplayName` is
+  // `parseEmbedAlias` plus the fallback, so calling it here parsed the same alias
+  // twice per embed; `attachmentDisplayNameOf` is the fallback alone, over the
+  // name this destructure already has.
   const { filename: parsedName, layout } = parseEmbedAlias(filename);
-  const name = parsedName !== "" ? parsedName : ATTACHMENT_FALLBACK_NAME;
+  const name = attachmentDisplayNameOf(parsedName);
   // `parsed.dropped` is deliberately NOT rendered here. `wikilink.md` §5.1's
   // reporting clause sits inside §5, which is about the editor's chip
   // rendering, and the surface it names ("the rendered block") is the one the

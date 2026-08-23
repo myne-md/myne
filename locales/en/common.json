@@ -1675,7 +1675,6 @@
     "restoreFromBackup": "Restore from backup…"
   },
   "notes": {
-    "unsettledSave": "An open note hasn't finished saving, so nothing was changed. Try again once it has.",
     "archive": {
       "cancel": "Cancel",
       "close": "Close",
@@ -2251,6 +2250,7 @@
       "thisNote": "this note",
       "untitled": "Untitled"
     },
+    "unsettledSave": "An open note hasn't finished saving, so nothing was changed. Try again once it has.",
     "views": {
       "cards": {
         "changeCover": "Change cover",

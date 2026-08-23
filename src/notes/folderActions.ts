@@ -247,7 +247,7 @@ export type FolderRenameResult = {
    * later, so the subtree silently un-archives at the next unlock. The caller
    * finishes the re-rooting and reports THIS separately.
    */
-  deliberateWriteFailed?: unknown;
+  deliberateWriteFailed?: boolean;
 };
 
 /** A note with its decrypted body — the input the transactional rename planner
@@ -455,12 +455,27 @@ export async function renameFolder(
   // rename is on disk; the caller still owes the decoration and
   // `archived_folders` re-rooting, and a throw would skip both while telling the
   // user nothing happened.
-  let deliberateWriteFailed: unknown;
+  let deliberateWriteFailed = false;
   if (plan.deliberateRewritten > 0) {
+    // Retried ONCE before it is reported, and the retry is the difference
+    // between a recoverable state and a permanent one. A second rename cannot
+    // fix this later: `planFolderRenameBatch` keys its rewrite off the folder's
+    // CURRENT path, and after a relaunch the stale entry is under the OLD one,
+    // so `deliberateRewritten` comes back 0 and this block does not even run.
+    // The residue is an empty folder that reappears under the old name at every
+    // unlock and that no rename can clear.
     try {
       await setDeliberateFolders(plan.nextDeliberate);
-    } catch (error) {
-      deliberateWriteFailed = error;
+    } catch {
+      try {
+        await setDeliberateFolders(plan.nextDeliberate);
+      } catch {
+        // A flag, not the error. Nothing downstream reads it, the sentence the
+        // caller renders is fixed, and `unknown` invited a reader to think
+        // otherwise. It also made the discriminator `!== undefined`, which
+        // reports SUCCESS for a rejection carrying `undefined`.
+        deliberateWriteFailed = true;
+      }
     }
   }
 

@@ -25,7 +25,7 @@ import {
   syncConfigSeed,
   withTwoDevices,
 } from "./support/multi-device";
-import { type Element, type Session, testIdSelector } from "./support/webdriver";
+import { type Session, testIdSelector } from "./support/webdriver";
 import { seedVault } from "./support/fixtures";
 import { patchDeletedField, patchFrontmatterField } from "../src/dialect";
 import {
@@ -37,6 +37,7 @@ import {
   openSettings,
   pageSeatInvoke,
   clickNoteRow,
+  rightClickBySelector,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -779,14 +780,6 @@ function clearConflictMarkersRaw(content: string): string {
 // ── stale-pane scenario helpers (the workspace-state suite's row/split
 //    driving pattern, scoped to what this one story needs) ────────────────
 
-/** The sidebar row for `noteId` (`data-note-id` discriminator). */
-async function noteRow(session: Session, noteId: string): Promise<Element> {
-  return session.waitForElement(
-    testIdSelector("notes.row", { "data-note-id": noteId }),
-    { timeoutMs: 20_000 },
-  );
-}
-
 /** The first sidebar row whose note-id differs from `notId` — the B-local
  *  side note created just before (two rows total in this scenario). */
 async function otherNoteRowId(session: Session, notId: string): Promise<string> {
@@ -807,7 +800,11 @@ async function otherNoteRowId(session: Session, notId: string): Promise<string> 
  *  the driver-addressable split gesture (WebDriver middle/Alt-click never
  *  reaches WebKit; see workspace-state.e2e.ts). */
 async function rowMenuPick(session: Session, noteId: string, itemId: string): Promise<void> {
-  await (await noteRow(session, noteId)).rightClick();
+  // Through the shared re-finding helper: a captured row handle goes stale the
+  // moment the sidebar re-renders, and this suite drives two app instances
+  // through a sync ceremony, so the list re-renders on a replication round trip
+  // as well as on a local save.
+  await rightClickBySelector(session, testIdSelector("notes.row", { "data-note-id": noteId }));
   await (
     await session.waitForElement(
       testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),

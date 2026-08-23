@@ -445,15 +445,13 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // whatever that pane still holds, but a silent decline is
       // indistinguishable from a rename that did nothing. Say so.
       //
-      // Narrowed to that one class, and the bare `catch` this replaces is why.
-      // `renameFolder` awaits `setDeliberateFolders` PAST its transactional
-      // batch, so it can also reject with the rename already committed to disk,
-      // and the notice says "the folder was left alone. Try again once it has",
-      // which would be the exact inverse of what happened. It would also skip
-      // the `setDeliberate` and the decoration re-rooting below, leaving the
-      // deliberate set out of step with a rename that did land. Anything that is
-      // not the flush refusal is rethrown, so it surfaces as itself rather than
-      // as a sentence about somebody's unsaved note.
+      // Two different sentences rather than one, and neither rethrows. A bare
+      // `catch` attributed every rejection to an unsettled pane; a rethrow
+      // reported nothing at all, because every route in is a `void fm.…` with no
+      // `.catch`. The third failure mode, a rejection with the rename already
+      // committed, is not here any more: `renameFolder` reports that one as
+      // `deliberateWriteFailed` precisely so this catch cannot swallow the
+      // re-rooting the landed rename still owes. See the tail of this callback.
       let result;
       try {
         result = await renameFolder(node.path, newPath, notesForOps(), deliberate);
@@ -504,7 +502,16 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // decoration map and `archived_folders` from ALSO drifting off a rename
       // that landed. Nothing reconciles `vault.prefs` against note frontmatter
       // later, so the user is the reconciliation.
-      if (result.deliberateWriteFailed !== undefined) {
+      if (result.deliberateWriteFailed === true) {
+        // The in-memory set KEEPS the new path, deliberately, and this is the one
+        // place in this file that does not revert an optimistic prefs write. The
+        // #259 shape reverts because there the write was the whole action; here
+        // the rename landed on disk, so the old path is the value that disagrees
+        // with the notes. Neither choice is right, and the message is what makes
+        // the surviving disagreement legible instead of silent: it names the
+        // residue (an empty folder back under the old name at the next unlock)
+        // and says removing it is safe, rather than promising a retry that a
+        // second rename cannot perform.
         setBlockNotice(i18n.t("notes.folderManagement.deliberateWriteFailed"));
       }
     },
