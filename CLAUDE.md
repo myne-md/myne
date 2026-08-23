@@ -156,7 +156,7 @@ myne/
 ├── mobile/              ← Phase 3 iOS + Android client (decisions.md 2026-08-13), moved in-repo from the myne-mobile companion, which was then deleted. Its OWN React tree under mobile/src, source-consuming ~25 @myne/* aliases into src/, editor/, dialect/, ornaments/ and locales/ — which is exactly why a repo boundary here was never real. pnpm workspace MEMBER (it keeps its package.json: it is a second Tauri app with its own tauri.conf.json and CLI invocations, unlike web/). Dev server :1422 — desktop holds :1420, web :1421
 │   ├── src/platform/    ← mobile's own platform seam (myne#492): the ONLY place under mobile/src allowed to import @tauri-apps/*
 │   ├── src/formfactor/  ← the iOS-vs-Android and phone-vs-tablet PRESENTATION split, renamed out of src/platform/ so <tree>/platform/ means the host seam in all three clients
-│   └── src-tauri/       ← the mobile Tauri crate + its four plugins (screen-guard, share-intent, qr-scan, reminders); all five are root-workspace members under the ONE Cargo.lock
+│   └── src-tauri/       ← the mobile Tauri crate + its five plugins (screen-guard, share-intent, qr-scan, reminders, sensitive-clipboard); all six are root-workspace members under the ONE Cargo.lock
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
 ├── dialect/             ← @myne/dialect: shared markdown-parser source pkg (source-consumed, no build), desktop+mobile WebView
@@ -178,7 +178,7 @@ myne/
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
 ├── pnpm-workspace.yaml  ← pnpm workspace members (mobile, dialect, editor, copy, ornaments, preview)
-├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, cli, tor-sidecar, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm, mobile/src-tauri + its four tauri-plugin-* crates)
+├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, cli, tor-sidecar, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm, mobile/src-tauri + its five tauri-plugin-* crates)
 ├── Cargo.lock           ← single shared lockfile (TB9 audit anchor). It became the mobile client's anchor too on 2026-08-13: mobile shipped from a SECOND lock in which 62 of 572 shared crates had drifted, `bitcoin_hashes` under `bip39` among them
 ├── rust-toolchain.toml  ← pinned Rust toolchain
 ├── package.json         ← pnpm + Vite + React 19 + TS toolchain
@@ -283,7 +283,7 @@ Not gated anywhere and run by hand: `check-web-no-ip-logging.sh` (asserts the we
 Read `docs/` before changing anything that touches cryptography, on-disk format, key handling, or sync. Order:
 
 1. `docs/vision.md` — phased plan, anti-features (commitments, not "maybe later")
-2. `docs/threat-model.md` — A1–A15 adversaries, AS1–AS19 assets, TB1–TB11 trust boundaries (A15 + TB11 are the web bundle's delivery channel, added 2026-07-26). **Normative**: marketing copy and code may not exceed its guarantees.
+2. `docs/threat-model.md`. The adversary, asset and trust-boundary tables. Cite a row by its id from that document; the ranges are not restated here, because the line that used to do so said A1 to A15 and TB1 to TB11 while the tables had already grown past both, and the boundaries it stopped short of are the two that carry decrypted note plaintext off the device. **Normative**: marketing copy and code may not exceed its guarantees.
 3. `docs/spec/protocol.md` — v0.1 cryptographic protocol
 4. `docs/spec/account-number.md` — 20-character Crockford-base32 + Damm-32 identifier
 5. `docs/glossary.md` — canonical terminology, one A–Z entry per term. Every new term in any doc gets a glossary entry in the same change.
