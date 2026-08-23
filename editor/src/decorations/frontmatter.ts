@@ -34,7 +34,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { formatYamlScalar } from "@myne/dialect";
-import { writableHost } from "../host";
+import { writableMember } from "../host";
 import { readNoteId } from "../note-identity";
 import { catalogChanged, catalogField } from "../attachments/catalog";
 import { coverIsOnScreen } from "./cover-banner";
@@ -224,7 +224,7 @@ class PropertiesWidget extends WidgetType {
     // reading mirror offering "Add cover" is a write affordance on a surface
     // documented as never writing. `writableHost` holds that rule for both
     // controls and for whatever the next write member turns out to be.
-    const cover = writableHost(view.state).cover;
+    const cover = writableMember(view.state, "cover");
     if (cover === undefined || this.coverShown) return input;
 
     const row = document.createElement("div");
