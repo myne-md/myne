@@ -33,6 +33,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { readWoodpeckerConfigs } from "./lib/woodpecker-configs.mjs";
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Every `mcr.microsoft.com/playwright:v<version>-<variant>` tag in CI config. */
@@ -53,7 +55,12 @@ export function lockedVersion(lockYaml) {
 }
 
 function main() {
-  const yml = readFileSync(join(ROOT, ".woodpecker.yml"), "utf8");
+  // EVERY workflow file. The config is a directory since myne-md/myne#579, and
+  // the tag could be named in either half; the roster fails by name when it
+  // cannot find the config, rather than scanning nothing and reporting ok.
+  const yml = readWoodpeckerConfigs()
+    .map(({ text }) => text)
+    .join("\n");
   const lock = readFileSync(join(ROOT, "pnpm-lock.yaml"), "utf8");
 
   const locked = lockedVersion(lock);
@@ -71,7 +78,7 @@ function main() {
   if (tags.length === 0) {
     console.error(
       "playwright image: FAIL — no `mcr.microsoft.com/playwright:v<version>-*` " +
-        "image found in .woodpecker.yml, but pnpm-lock.yaml still resolves " +
+        "image found in any .woodpecker/*.yml, but pnpm-lock.yaml still resolves " +
         `@playwright/test@${locked}. A renamed image would make this guard pass ` +
         "silently forever, so it fails instead.",
     );

@@ -6,7 +6,7 @@
 // docs/dependency-policy.md) plus a few npm-ecosystem-permissive additions and
 // per-package exceptions, each documented inline. Closes the standing gap that
 // cargo-deny machine-checks CARGO licenses only — the npm half of the tree was
-// entirely ungated. Runs in CI (.woodpecker.yml `npm-licenses`) after install.
+// entirely ungated. Runs in CI (.woodpecker/main.yml `npm-licenses`) after install.
 //
 // SPDX expressions are evaluated structurally: an `OR` expression passes when
 // ANY operand is allowed; an `AND` expression passes only when ALL operands are.
@@ -201,7 +201,7 @@ export function declaredDirectDeps(readJson, roots) {
  * GREEN. With `data = {}` the classification loop runs zero times, `violations`
  * is empty, and this script printed "all dependency licenses are on the
  * allowlist ✓" and exited 0 — a gate reporting success while checking nothing.
- * `.woodpecker.yml` and `check-e2e-floor.mjs` both already say, in as many
+ * `.woodpecker/main.yml` and `check-e2e-floor.mjs` both already say, in as many
  * words, that a gate which did not run is indistinguishable from one that
  * passed; that reasoning applies to a gate which ran over nothing.
  */
