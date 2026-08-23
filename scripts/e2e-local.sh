@@ -30,6 +30,8 @@
 #                         executes fewer scenarios still exits 0.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 
 IMAGE=myne-e2e
 SKIP_BUILD=0
@@ -75,30 +77,9 @@ RUN_FLAGS=(
   # (and vice versa). Latent until a member gained a real external dependency
   # (editor/ → @excalidraw); bites as `Cannot find module` on whichever side
   # ran `pnpm install` second.
-  -v myne-e2e-nm-dialect:/work/dialect/node_modules
-  -v myne-e2e-nm-editor:/work/editor/node_modules
-  -v myne-e2e-nm-copy:/work/copy/node_modules
-  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
-  -v myne-e2e-nm-preview:/work/preview/node_modules
-# The target volume is PER TREE, and that is a correctness requirement rather
-# than tidiness. Every tree is bind-mounted at the same in-container path,
-# `/work`, so two checkouts of this repo are indistinguishable to cargo: same
-# package name, same version, same absolute source path. With one shared volume
-# a build here happily reuses an rlib compiled from a DIFFERENT tree, and the
-# only symptom is a compile error in code the diff never touched. Measured:
-# `myne-desktop` refused with `run_probe` taking 2 arguments and `ProbeProgress`
-# unresolved, while `core/src/plugins/agent/probe.rs` in this tree declared 3 and
-# defined the struct. rustc's own note pointed at line 164, and line 164 of
-# `.claude/worktrees/554-manual-test-debt/core/src/plugins/agent/probe.rs` is
-# exactly that function. Worktrees live under `.claude/worktrees/` by
-# convention, so they are inside the bind mount and this is the normal case, not
-# an exotic one.
-#
-# The cost is one full rebuild per tree, once. That is what the sharing was
-# buying, at the price of results that describe another tree.
-TREE_KEY=$(pwd | shasum | cut -c1-12)
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
   # Incremental Rust builds across runs.
-  -v "myne-e2e-target-$TREE_KEY":/work/target
+  -v "$E2E_TARGET_VOLUME":/work/target
   -v myne-e2e-cargo-registry:/usr/local/cargo/registry
   -w /work
   # Volumes are created root-owned; the container user is `e2e` (the
