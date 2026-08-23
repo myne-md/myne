@@ -28,6 +28,7 @@ import {
 } from "../../components/ActionStatus";
 import {
   copySecretToClipboard,
+  saveOutcomeMessage,
   saveSecretAsTextFile,
 } from "../../lib/secret-export";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
@@ -166,13 +167,15 @@ export function PhraseStep({
         : t("vaultCreation.phrase.copyFailed"),
     // Same capability split on the save half, and for the same reason: the
     // download arm cannot observe whether the browser wrote the file, so it may
-    // not say it did (myne-md/myne#520 review).
+    // not say it did (myne-md/myne#520 review). `saveOutcomeMessage` is the one
+    // place that decision lives; the keys stay here for the same guard reason
+    // the copy half's do.
     save: (ok) =>
-      ok
-        ? has("nativeSaveAs")
-          ? t("vaultCreation.phrase.savedToFile")
-          : t("vaultCreation.phrase.downloadStarted")
-        : t("vaultCreation.phrase.saveFailed"),
+      saveOutcomeMessage(ok, {
+        saved: t("vaultCreation.phrase.savedToFile"),
+        started: t("vaultCreation.phrase.downloadStarted"),
+        failed: t("vaultCreation.phrase.saveFailed"),
+      }),
   };
 
   return (

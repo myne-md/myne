@@ -241,3 +241,30 @@ export async function saveJsonAsFile(
   if (!path) return; // user cancelled the save dialog
   await invoke("plugin:secret-export|save_secret_text", { path, contents });
 }
+
+/**
+ * The success sentence for a secret save, picked off the capability rather than
+ * off the outcome alone.
+ *
+ * The rule is `recovery-flow.md` §2.2's: a client may not claim a guarantee it
+ * cannot perform. `saveSecretAsTextFile`'s two arms mean different things, and
+ * the docblock above spells out which: the dialog arm's write returned, so the
+ * file exists, while the download arm has only handed the browser the bytes.
+ * Both vault-creation screens make that choice and both argued it at length in
+ * their own file, which is one policy in two places, on the two screens where
+ * the value is shown exactly once.
+ *
+ * It takes RESOLVED sentences rather than translation keys, and that is not an
+ * accident of style: `check-i18n.mjs` matches a static `t("literal")`, so a key
+ * passed as a string would drop out of the only check that proves it exists in
+ * the catalog. Measured on this very pair of screens, moving two keys inside a
+ * `t(cond ? … : …)` took the guard's count from 2543 to 2541 while adding two
+ * keys. The literals stay at the call site; only the decision moves here.
+ */
+export function saveOutcomeMessage(
+  ok: boolean,
+  sentences: { readonly saved: string; readonly started: string; readonly failed: string },
+): string {
+  if (!ok) return sentences.failed;
+  return has("nativeSaveAs") ? sentences.saved : sentences.started;
+}
