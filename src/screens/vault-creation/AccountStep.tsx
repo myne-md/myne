@@ -160,7 +160,12 @@ export function AccountStep({
         <Button variant="ghost" icon="copy" onClick={handleCopy}>
           {copied ? t("vaultCreation.account.copied") : t("vaultCreation.account.copy")}
         </Button>
-        <Button variant="ghost" icon="download" onClick={handleSave}>
+        <Button
+          variant="ghost"
+          icon="download"
+          onClick={handleSave}
+          data-testid="create.account-save"
+        >
           {t("vaultCreation.account.saveAsFile")}
         </Button>
       </div>
