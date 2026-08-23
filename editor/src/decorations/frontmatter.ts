@@ -34,7 +34,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { formatYamlScalar } from "@myne/dialect";
-import { getHost } from "../host";
+import { writableHost } from "../host";
 import { readNoteId } from "../note-identity";
 import { catalogChanged, catalogField } from "../attachments/catalog";
 import { coverIsOnScreen } from "./cover-banner";
@@ -222,8 +222,9 @@ class PropertiesWidget extends WidgetType {
     // this control does not go through the document, so `EditorState.readOnly`
     // does not stop it, and the host it calls re-encrypts the note on disk. A
     // reading mirror offering "Add cover" is a write affordance on a surface
-    // documented as never writing.
-    const cover = view.state.readOnly ? undefined : getHost().cover;
+    // documented as never writing. `writableHost` holds that rule for both
+    // controls and for whatever the next write member turns out to be.
+    const cover = writableHost(view.state).cover;
     if (cover === undefined || this.coverShown) return input;
 
     const row = document.createElement("div");

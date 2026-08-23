@@ -19,6 +19,7 @@
 // omitted on a platform that doesn't back them — the engine then hides those
 // affordances rather than showing one that fails on click.
 
+import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
 /** A node of the Rust-built tag tree (mirror of notes/vaultIndices). */
@@ -449,4 +450,44 @@ export function getHost(): EditorHost {
     throw new Error("@myne/editor: setEditorHost() was not called before the editor mounted.");
   }
   return current;
+}
+
+/**
+ * The host members a widget may reach only while the document is WRITABLE.
+ *
+ * The list is here, beside the members themselves, and not at the widgets that
+ * consume them. That placement is the point: a widget's write is invisible to
+ * every mechanism that makes an editor read-only, so gating it was a clause each
+ * widget had to remember.
+ *
+ * `EditorState.readOnly` stops COMMANDS, and the reading mirror's
+ * `NOOP_ON_CHANGE` stops document changes. Neither stops a DOM handler that
+ * calls the host, and the host re-encrypts the note on disk, so a control
+ * rendered on a surface documented as never writing does write. Two such
+ * controls were found by hand in myne-md/myne#520's review (the cover banner's
+ * Remove and the frontmatter panel's Add cover) and each grew its own
+ * `view.state.readOnly ? undefined : getHost().cover` line. Nothing catches the
+ * third.
+ *
+ * Adding a write-capable member to `EditorHost` therefore means adding its key
+ * here, which is one declaration next to the member rather than a remembered
+ * clause at each call site. It is still something to remember; it is one thing,
+ * in the file the member is declared in, rather than one per consumer.
+ */
+const HOST_WRITE_MEMBERS = ["cover"] as const satisfies readonly (keyof EditorHost)[];
+
+/**
+ * `getHost()`, with every write-capable member absent when `state` is read-only.
+ *
+ * Absent rather than throwing, because the seam's contract is already that a
+ * host omitting an optional member renders no affordance for it: a widget that
+ * checks `cover !== undefined` before drawing its controls needs no second
+ * branch for the read-only case, and gets the right one for free.
+ */
+export function writableHost(state: EditorState): EditorHost {
+  const host = getHost();
+  if (!state.readOnly) return host;
+  const gated: EditorHost = { ...host };
+  for (const key of HOST_WRITE_MEMBERS) delete gated[key];
+  return gated;
 }
