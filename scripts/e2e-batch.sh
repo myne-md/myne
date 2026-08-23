@@ -63,7 +63,7 @@ RUN_FLAGS=(
   -v myne-e2e-node-modules:/work/node_modules
   "${E2E_MEMBER_NM_VOLUMES[@]}"
   -v "$E2E_TARGET_VOLUME":/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  "${E2E_REGISTRY_MOUNT[@]}"
   -w /work
   --user root
 )
@@ -94,10 +94,10 @@ for arch in arm64 amd64; do
     break
   fi
 done
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/target /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/target'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $INNER

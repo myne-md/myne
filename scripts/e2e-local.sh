@@ -80,7 +80,7 @@ RUN_FLAGS=(
   "${E2E_MEMBER_NM_VOLUMES[@]}"
   # Incremental Rust builds across runs.
   -v "$E2E_TARGET_VOLUME":/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  "${E2E_REGISTRY_MOUNT[@]}"
   -w /work
   # Volumes are created root-owned; the container user is `e2e` (the
   # suites assert chmod-denial paths, which root would bypass).
@@ -110,7 +110,7 @@ fi
 if [[ -n "$SERVER_BIN" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/$SERVER_BIN"
 fi
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target'
 
 if [[ "$SHELL_MODE" == 1 ]]; then
   exec docker run -it "${RUN_FLAGS[@]}" "$IMAGE" \
@@ -130,7 +130,7 @@ if [[ "$SKIP_BUILD" == 1 ]]; then
 fi
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&

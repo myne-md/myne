@@ -49,7 +49,7 @@ RUN_FLAGS=(
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
   -v "$E2E_TARGET_VOLUME":/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  "${E2E_REGISTRY_MOUNT[@]}"
   # Per-member node_modules volumes: the container's `pnpm install` rewrites a
   # bind-mounted workspace member's symlinks and breaks the host install
   # otherwise. One per member, and `ornaments` + `preview` are members too.
@@ -59,7 +59,7 @@ RUN_FLAGS=(
 )
 
 E2E_ENV="export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store MYNE_PREVIEW_COMMIT=$PREVIEW_COMMIT"
-FIX_PERMS='chown -R e2e:e2e /work /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work'
 
 BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
 if [[ "$SKIP_BUILD" == 1 ]]; then
@@ -67,7 +67,7 @@ if [[ "$SKIP_BUILD" == 1 ]]; then
 fi
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&

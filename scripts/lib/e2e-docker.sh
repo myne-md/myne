@@ -48,3 +48,28 @@ E2E_MEMBER_NM_VOLUMES=(
   -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
   -v myne-e2e-nm-preview:/work/preview/node_modules
 )
+
+# The crates.io registry cache, at `$CARGO_HOME/registry` and NOT at the image's
+# `/usr/local/cargo/registry`.
+#
+# Every runner sets `CARGO_HOME=/home/e2e/.cargo` in its `E2E_ENV`, so that is
+# the only registry path cargo reads or writes; a volume mounted anywhere else
+# is a cache nothing consults. Six of the seven runners mounted it at the image
+# default, so each re-downloaded the crates.io index and every crate source on
+# EVERY invocation, threw the result away with `--rm`, and spent minutes doing it
+# before the first line of the build appeared. Nothing reports that: the run is
+# green, only slow, which is why it survived. Measured: the volume held 574 MB of
+# registry content that no run had read since `CARGO_HOME` was overridden, and
+# `/home/e2e/.cargo` does not exist in the image at all.
+#
+# `e2e-ai-buildrun.sh` found it first and fixed itself, recording that the four
+# siblings were still wrong and that fixing them was a change with its own claim
+# to verify. This is that change, and it lives here so the seventh runner cannot
+# get it wrong again.
+E2E_REGISTRY_MOUNT=(-v myne-e2e-cargo-registry:/home/e2e/.cargo/registry)
+
+# Docker creates the mount's PARENT root-owned, and cargo needs to write its lock
+# files (`.package-cache`, `.global-cache`) at the `CARGO_HOME` root as user
+# `e2e`. One directory, NOT `-R`: the volume's contents are already e2e-owned and
+# recursing over 574 MB of registry files costs more than the download it saves.
+E2E_CARGO_HOME_CHOWN='chown e2e:e2e /home/e2e/.cargo'

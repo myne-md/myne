@@ -86,6 +86,18 @@
   full rebuild per tree, once, which is exactly what the sharing was buying at the
   price of results that describe a different tree.
 
+  **The registry cache had the mirror-image defect, and it was six copies.** Every
+  runner sets `CARGO_HOME=/home/e2e/.cargo`, so that is the only registry path
+  cargo reads or writes, and six of the seven mounted the named volume at the
+  image's `/usr/local/cargo/registry` instead. That volume held 574 MB of crate
+  sources no run had consulted since the override was added, and
+  `/home/e2e/.cargo` does not exist in the image at all, so every containerised
+  run re-downloaded the crates.io index and every crate and then threw the result
+  away with `--rm`. Nothing reports it: the run is green, only slow, which is
+  exactly why it survived. `e2e-ai-buildrun.sh` found it, fixed itself, and wrote
+  down that its siblings were still wrong; the mount is now in the include with
+  the rest.
+
   **The key lives in one file because four copies of it was already the bug twice.**
   It has to be byte identical everywhere, since two scripts that hash the same tree
   differently get two volumes and the second rebuilds from scratch while looking
