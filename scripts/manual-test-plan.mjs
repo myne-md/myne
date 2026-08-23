@@ -351,6 +351,18 @@ export function malformedRowLines(text) {
 }
 
 /**
+ * How many GATING rows the plan's own header says it carries, or null when absent.
+ *
+ * The companion to {@link planRowCount}, and the one that makes a completeness
+ * check possible: the total tells you rows went missing, this tells you whether
+ * the rows that STOP THE TAG were walked at all.
+ */
+export function planGatingCount(text) {
+  const m = text.match(/^\*\*(\d+) of these rows \(/m);
+  return m ? Number(m[1]) : null;
+}
+
+/**
  * How many rows the plan's own header says it carries, or null when absent.
  *
  * `buildPlan` writes the count into the heading block, so the plan states its own
@@ -502,11 +514,66 @@ async function main() {
     }
     const declared = planRowCount(text);
     const present = text.split("\n").filter((l) => /^- \[/.test(l)).length;
-    if (declared !== null && declared !== present) {
+    // An ABSENT header is refused, never skipped. The first version read
+    // `declared !== null && declared !== present`, so deleting rows TOGETHER with
+    // the one header line that counts them satisfied the check by removing its
+    // own denominator: the guard turned itself off from inside its input. Same
+    // reasoning as the gating-count header below, and the same reasoning
+    // `check-e2e-floor.mjs` records for a missing report ("the suite never
+    // produced one" is the crashed-before-running case, not the clean one).
+    if (declared === null) {
+      console.error(
+        `manual-test-plan: ${recordFrom} carries no row-count header, so whether rows went missing cannot be ` +
+          `established. Regenerate the plan rather than recording against a file whose own denominator is gone.`,
+      );
+      process.exit(1);
+    }
+    if (declared !== present) {
       console.error(
         `manual-test-plan: ${recordFrom} says it carries ${declared} rows and ${present} are present. ` +
           `Rows were added or removed by hand, and a record built from it would describe a walk that did not ` +
           `happen. Regenerate the plan. Nothing recorded.`,
+      );
+      process.exit(1);
+    }
+
+    // COMPLETENESS, which is the half a verdict-shaped read cannot see. `parseRows`
+    // returns only rows carrying a verdict, so a plan on which five of 882 rows
+    // were ticked parsed five passes, recorded five stamps and exited 0. That is
+    // the shape `scripts/check-e2e-floor.mjs` exists to refuse one lane over: "some
+    // scenarios failed" and "no scenarios ran" are different states behind the same
+    // exit code, and a release gate reporting green on silence is the failure this
+    // whole system was written to end. Found by the myne-bot review of PR #576.
+    //
+    // The GATING rows are what this measures, not every row: the recorded-not-
+    // blocking half is walked and recorded and legitimately incomplete while the
+    // ratchet is still widening, so demanding all 882 would make the check unusable
+    // and it would be turned off. Demanding the 243 that stop the tag is the claim
+    // the plan actually makes about itself.
+    const declaredGating = planGatingCount(text);
+    if (declaredGating === null) {
+      console.error(
+        `manual-test-plan: ${recordFrom} carries no gating-row header, so how much of it was walked cannot be ` +
+          `established. Regenerate the plan rather than recording against a file whose own denominator is gone.`,
+      );
+      process.exit(1);
+    }
+    const gatingLines = text.split("\n").filter((l) => /^- \[.\] `[^`]+`\s+\*\*\[[^\]]*STOPS THE TAG/.test(l));
+    const gatingWalked = gatingLines.filter((l) => /^- \[[xX]\]/.test(l) || /FAIL:|OVERRIDE:/.test(l)).length;
+    if (gatingLines.length !== declaredGating) {
+      console.error(
+        `manual-test-plan: ${recordFrom} says it carries ${declaredGating} gating rows and ${gatingLines.length} ` +
+          `are present. Nothing recorded.`,
+      );
+      process.exit(1);
+    }
+    if (gatingWalked < declaredGating) {
+      console.error(
+        `manual-test-plan: ${declaredGating - gatingWalked} of ${declaredGating} GATING rows in ${recordFrom} ` +
+          `carry no verdict, so the release was not walked. Nothing recorded.\n` +
+          `  A gating row is passed by ticking it, failed with FAIL: after it, or passed anyway with ` +
+          `OVERRIDE: <reason>. Leaving it blank is none of the three, and recording it as though the walk ` +
+          `were complete is exactly the green-on-silence this gate exists to refuse.`,
       );
       process.exit(1);
     }
