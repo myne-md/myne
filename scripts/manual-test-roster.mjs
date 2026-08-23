@@ -53,9 +53,15 @@
 // A path or scenario that no longer exists also fails, because a verdict about a
 // deleted surface is a verdict about nothing.
 //
-// 186 entries, 374 manual items (138 core tier), about 156.8 hours counted per
-// (item, client). 35 entries carry no manual item at all and argue why in
-// `exemptionReason`, which is a legitimate answer that still has to be made.
+// Counts live in the GENERATED projection rather than here, because a figure
+// hand-written into the source of truth is the one nobody re-derives: this line
+// read 374 items, 138 core and 156.8 hours while the file held 383, 146 and
+// 163.7, so the projection `--emit` recomputes on every run was right and the
+// authoritative-looking copy was wrong. `node scripts/check-manual-test-roster.mjs
+// --check` prints all of them. What is worth stating here is the shape rather
+// than the size: a meaningful number of entries carry no manual item at all and
+// argue why in `exemptionReason`, which is a legitimate answer that still has to
+// be made.
 
 /** @typedef {"desktop-macos"|"desktop-linux"|"desktop-windows"|"web"|"ios"|"android"|"cli"|"clipper"} Client */
 

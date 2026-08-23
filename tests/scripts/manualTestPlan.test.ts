@@ -17,7 +17,19 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BUDGET_MIN, blockingRows, buildPlan, entryTouched, parseRows, planVersion, rollUp } from "../../scripts/manual-test-plan.mjs";
+import {
+  BUDGET_MIN,
+  blockingRows,
+  buildPlan,
+  changedSince,
+  entryTouched,
+  malformedRowLines,
+  parseRows,
+  planGatingCount,
+  planRowCount,
+  planVersion,
+  rollUp,
+} from "../../scripts/manual-test-plan.mjs";
 
 /** What `parseTicked` used to be. Composed here rather than exported, because
  * `main()` needs the rows as well as the roll-up, so the alias had no production
@@ -273,5 +285,50 @@ describe("planVersion parses back the heading buildPlan writes", () => {
 
   it("rejects prose that merely looks like the heading", () => {
     expect(planVersion("Some text\n# Manual test plan for two clients and a laptop\nmore")).toBe(null);
+  });
+});
+describe("the three headers that make a ticked plan checkable", () => {
+  // None of these was imported by any test. Emptying `malformedRowLines` to
+  // return [] or `planRowCount` to return null left the suite green while both
+  // under-report guards on the record path disappeared, and both carry doc
+  // comments explaining that a dropped row and an unparseable row are the two
+  // ways a ticked plan lies about what was walked. A fail-closed check no test
+  // can reach is inert, and these sit on the path that decides whether a tag is
+  // cut. Found by the myne-bot review of PR #576.
+
+  it("reads back the row count buildPlan wrote", () => {
+    expect(planRowCount(plan())).toBe(3);
+  });
+
+  it("reads back the gating count buildPlan wrote", () => {
+    expect(planGatingCount(plan({ ratchet: RATCHET }))).toBe(1);
+  });
+
+  it("returns null when either header is gone, which the record path treats as unverifiable", () => {
+    // Not as permission to skip: deleting rows together with the header that
+    // counts them is how a check turns itself off from inside its own input.
+    expect(planRowCount("# Manual test plan for v0.6.0\n\nno header here\n")).toBeNull();
+    expect(planGatingCount("# Manual test plan for v0.6.0\n\nno header here\n")).toBeNull();
+  });
+
+  it("names a row line whose key cannot be read, rather than dropping it", () => {
+    const good = "- [ ] `notes.editor#0@ios` **[core, 5 min]** Note editor";
+    const bad = "- [x] notes.editor#0@ios missing its backticks";
+    expect(malformedRowLines(`${good}\n${bad}\n`)).toEqual([bad]);
+  });
+
+  it("does not call an untouched or a prose line malformed", () => {
+    // `parseRows` returns only rows carrying a verdict, by design, so the test is
+    // whether the KEY is readable and never whether the box is ticked.
+    const untouched = "- [ ] `notes.editor#0@ios` **[core, 5 min]** Note editor";
+    const prose = "Tick a row, then run: `- [x] example`";
+    expect(malformedRowLines(`${untouched}\n${prose}\n`)).toEqual([]);
+  });
+
+  it("changedSince answers null on a ref git cannot resolve, rather than throwing", () => {
+    // The plan degrades to "everything is standing work" when it cannot diff,
+    // which is the safe direction: an unusable ref must not silently mark every
+    // area as untouched by this release.
+    expect(changedSince("definitely-not-a-ref-9c1f2a")).toBeNull();
   });
 });

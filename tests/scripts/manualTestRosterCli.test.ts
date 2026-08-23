@@ -107,6 +107,42 @@ describe("the ratchet file is validated before it is used", () => {
   });
 });
 
+describe("--record refuses a roster the guard has just rejected", () => {
+  // This is recorded regression 1 from the header, and until the myne-bot review
+  // of PR #576 it had no test: both --record cases above inject a deleted ceiling,
+  // which exits at the ratchet validation long before the failure gate. So
+  // deleting the failures-first block at the top of the --record branch left the
+  // entire suite green, and a ceiling could be locked in from a rejected roster
+  // with no legitimate way back down.
+
+  it("exits 1, prints the failures, and leaves the ratchet bytes untouched", () => {
+    const injected = join(ROOT, "src/screens/ZzRecordProbe.tsx");
+    const ratchetBefore = readFileSync(RATCHET, "utf8");
+    try {
+      writeFileSync(injected, "export const ZzRecordProbe = () => null;\n");
+      const { code, out } = run(["--record"]);
+      expect(out).toContain("--record refused");
+      expect(out).toContain("no roster entry claims src/screens/ZzRecordProbe.tsx");
+      expect(code).toBe(1);
+      expect(readFileSync(RATCHET, "utf8")).toBe(ratchetBefore);
+    } finally {
+      rmSync(injected, { force: true });
+      writeFileSync(RATCHET, ratchetBefore);
+    }
+  });
+
+  it("says there is nothing to lock in when the record already describes the roster", () => {
+    // The other direction: on a clean tree at the recorded numbers, --record is a
+    // no-op rather than a rewrite. A test that only proves the refusal would pass
+    // against a --record that refuses everything.
+    const before = readFileSync(RATCHET, "utf8");
+    const { code, out } = run(["--record"]);
+    expect(out).toContain("nothing to lock in");
+    expect(code).toBe(0);
+    expect(readFileSync(RATCHET, "utf8")).toBe(before);
+  });
+});
+
 describe("a surface entering the tree fails by name", () => {
   it("names an unclaimed screen, and --emit refuses to publish a projection of a rejected roster", () => {
     const injected = join(ROOT, "src/screens/ZzGuardProbe.tsx");

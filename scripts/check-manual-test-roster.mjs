@@ -304,6 +304,9 @@ export const RATCHET_BASELINE = Object.freeze({
  * @property {string[]} gatedTiers           which tiers block a release today; may only grow
  * @property {string[]} gatedClients         which client surfaces those tiers block on; may only grow
  * @property {number}   totalMinutesCeiling  minutes of manual work in total; may only fall
+ * @property {number}   gatedMinutes         minutes that block a release; may not fall by MORE than
+ *                                           the ceiling does, which is what stops a core item being
+ *                                           retiered out of the gate while the work stays in the roster
  */
 
 /**
@@ -672,6 +675,44 @@ export function analyse(io) {
           `Run --record to lock it in, and name the automation that took the work.`,
       );
     }
+
+    // The two above bound the RATCHET FILE. They do not bound the roster's
+    // COMPOSITION, and for a while four documents said they did: this repo's
+    // guard table, the ratchet's own $comment ("EITHER HALF ALONE IS GAMEABLE"),
+    // an append-only decision entry and the generated projection all claimed the
+    // blocking share goes up while the roster goes down. Retiering a `core` item
+    // to `standard` satisfies both halves and moves neither: gating minutes fall,
+    // total minutes do not, and the guard reports a gate that narrowed as a gate
+    // that did nothing. Dropping a gated client from an item's own `clients` is
+    // worse, because total minutes fall too, the note above then invites
+    // `--record`, and the smaller ceiling is locked in as though it were progress.
+    //
+    // What separates those from the move this system exists to encourage is the
+    // RELATIVE change, never either number alone:
+    //
+    //   automating an item     gating falls, total falls by AT LEAST as much   ok
+    //   core -> standard       gating falls, total unchanged                   refused
+    //   dropping a client      both fall together                              ok
+    //
+    // So `gatedMinutes` is recorded beside the ceiling and the bound is on the
+    // two DROPS rather than on the level. It cannot punish automation, which
+    // moves both together by construction, and it fires on exactly the edit that
+    // takes work out of the gate while leaving it in the roster.
+    const { gatedMinutes: recordedGated } = io.ratchet;
+    if (Number.isFinite(recordedGated) && stats.gatedMinutes < recordedGated) {
+      const gatingFell = recordedGated - stats.gatedMinutes;
+      const totalFell = ceiling - stats.totalMinutes;
+      if (gatingFell > totalFell) {
+        failures.push(
+          `the gate narrowed WITHOUT the roster shrinking: gating minutes fell by ${gatingFell} while total ` +
+            `manual minutes fell by ${totalFell}. Automating an item drops both together, so this is something ` +
+            `else: an item retiered from core to standard, or a gated client dropped from an item's own ` +
+            `clients. Either leaves the work in the roster and takes it out of the gate, which is the half of ` +
+            `"either alone is gameable" that gatedTiers and gatedClients cannot see. If the change is right, ` +
+            `say why in the ratchet $comment and re-record with --record in the same commit.`,
+        );
+      }
+    }
   }
 
   // --- Warnings: what has gone unlooked-at. --------------------------------
@@ -796,8 +837,13 @@ Not all of it does yet, and the difference is recorded rather than implied:
 The reason it starts smaller than the roster is arithmetic, not appetite. Making all of it blocking on
 day one produces a gate one maintainer cannot walk, and a gate nobody can walk gets bulk-overridden,
 which teaches the override to mean nothing. So the ratchet holds two numbers that only move one way:
-as automation debt is paid: the gate POLICY may only grow, and the ceiling on total manual minutes may
-only fall. The gate widens, the roster shrinks, and the end state is the whole file blocking.
+as automation debt is paid: the gate POLICY may only grow, the ceiling on total manual minutes may
+only fall, and a third recorded number keeps those two honest about the ROSTER rather than about the
+ratchet file. Gating minutes may not fall by more than the ceiling does, so retiering a blocking item
+down to non-blocking, or dropping a gated client from an item, is refused: both take work out of the
+gate and leave it in the roster. Automating an item moves the two together by construction, so the
+rule cannot argue against the one move this whole record exists to encourage. The gate widens, the
+roster shrinks, and the end state is the whole file blocking.
 
 ## Tiers
 
@@ -896,7 +942,7 @@ async function main() {
   // permanent, because `Math.min(undefined, N)` is `NaN` and `JSON.stringify`
   // writes that as `null`. A record with a null bound is worse than an absent
   // one: absent exits 1 loudly, null reports success with the check off.
-  for (const field of ["totalMinutesCeiling"]) {
+  for (const field of ["totalMinutesCeiling", "gatedMinutes"]) {
     if (!Number.isFinite(ratchet[field])) {
       console.error(
         `check-manual-test-roster: scripts/manual-test-ratchet.json has no finite ${field} ` +
@@ -960,20 +1006,28 @@ async function main() {
       for (const f of failures) console.error(`  - ${f}`);
       process.exit(1);
     }
-    // The ceiling only, and only downward. The gate policy is not recorded here:
-    // widening it is an edit to `RATCHET_BASELINE` in this file, made by a person
-    // who has read what they are widening.
+    // Two numbers, and only downward, because the composition rule above compares
+    // their two DROPS rather than either level. `gatedMinutes` moves in lockstep
+    // with the ceiling here for the same reason `--record` exists at all: after a
+    // legitimate shrink the record has to describe the roster again, or the next
+    // run measures the next change against a baseline two changes old. The gate
+    // POLICY is still not recorded here: widening it is an edit to
+    // `RATCHET_BASELINE` in this file, made by a person who read what they widened.
     const next = {
       ...ratchet,
       totalMinutesCeiling: Math.min(ratchet.totalMinutesCeiling, stats.totalMinutes),
+      gatedMinutes: Math.min(ratchet.gatedMinutes, stats.gatedMinutes),
     };
-    if (next.totalMinutesCeiling === ratchet.totalMinutesCeiling) {
+    const ceilingMoved = next.totalMinutesCeiling !== ratchet.totalMinutesCeiling;
+    const gatingMoved = next.gatedMinutes !== ratchet.gatedMinutes;
+    if (!ceilingMoved && !gatingMoved) {
       console.log("check-manual-test-roster: --record: nothing to lock in, the record already describes the roster.");
       return;
     }
     writeAtomically(RATCHET_PATH, `${JSON.stringify(next, null, 2)}\n`);
     console.log(
-      `check-manual-test-roster: --record: ceiling ${ratchet.totalMinutesCeiling} -> ${next.totalMinutesCeiling}. ` +
+      `check-manual-test-roster: --record: ceiling ${ratchet.totalMinutesCeiling} -> ${next.totalMinutesCeiling}, ` +
+        `gating ${ratchet.gatedMinutes} -> ${next.gatedMinutes}. ` +
         `Name the automation that took the work in the $comment.`,
     );
     return;

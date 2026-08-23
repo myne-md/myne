@@ -38,6 +38,19 @@
     "deleting items nobody wanted to run. Together they say: the share of the roster",
     "that blocks goes up, and the roster itself goes down.",
     "",
+    "gatedMinutes IS THE THIRD NUMBER, and it exists because the two above bound",
+    "                   THIS FILE and not the roster's composition. Retiering a core",
+    "                   item to standard satisfies both and moves neither: gating",
+    "                   minutes fall, total minutes do not. Dropping a gated client",
+    "                   from an item is worse, because total falls too, --record is",
+    "                   then invited, and the smaller ceiling locks in as progress.",
+    "                   So the guard compares the two DROPS: gating may not fall by",
+    "                   more than total does. Automating an item moves both together",
+    "                   by construction, so the rule cannot punish the one move this",
+    "                   whole system exists to encourage. Found by the myne-bot",
+    "                   review of PR #576, which measured this comment against the",
+    "                   code and found the comment claiming the larger property.",
+    "",
     "MEASURED 2026-08-22 against the roster as it stands (myne-md/myne#548):",
     "  882 rows and 9822 minutes in total, of which 243 rows and 3533 minutes gate.",
     "  That is 36.0% of the roster blocking today.",
@@ -117,5 +130,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 9822
+  "totalMinutesCeiling": 9822,
+  "gatedMinutes": 3533
 }
