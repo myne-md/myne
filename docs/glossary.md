@@ -1078,6 +1078,14 @@ The self-host bundle's TLS edge (a vetted Caddy reverse proxy) configured to **d
 
 Used in: `self-host-policy.md` §3, `decisions.md` 2026-06-20 (MYND-438)
 
+### **inline status mark** &nbsp; 📦 *Product*
+
+A glyph that sits **inside a text run** to say what a surface owes: the trailing slot of a sidebar note row, the bottom bar beside the save readout. It is a distinct class from an **icon**, which names a thing, and `docs/design/README.md` carves three of the icon rules out for it rather than bending them: it is 7 to 8px rather than 16 and up, it is coloured by MEANING (`--accent` while work is in flight, `--fg-3` while it is merely outstanding) rather than by `currentColor`, and it is drawn as a three-sided border ring rather than from the Lucide set, because at that size no Lucide pair distinguishes a filled dot from a hollow one and the GAP is what carries "incomplete" while the glyph stands still.
+
+The class exists so a second member argues for itself against the same rules rather than re-deciding them. Today it has exactly one: [sync arc](#sync-arc). A mark is never a live region — it has no text content, so `role="status"` on it announces nothing — and the surface renders a persistently-mounted visually-hidden region beside it instead.
+
+Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`
+
 ### **inline tag** &nbsp; 📦 *Product*
 
 A `#`-prefixed identifier appearing inside note body text (as opposed to the YAML `tags:` frontmatter list). Recognized by the Myne dialect per `spec/markdown-dialect.md` §3.7. Boundary: line-start or whitespace must precede the `#`; `abc#tag` does not match. Character set: Unicode (excluding the General/Supplemental Punctuation blocks and an explicit ASCII-punctuation set). Numeric-only forms (`#1984`) reject; `#y1984` accepts. Nested forms via `/` (`#parent/child`) supported with unbounded depth. The parser only recognizes; never rewrites — byte-stability per §6 C1 extends to inline-tag bytes. Tag identity (case-fold, NFC normalization) is the consuming index layer's responsibility, not the parser's.
