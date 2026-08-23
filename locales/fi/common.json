@@ -889,7 +889,6 @@
         "openSettings": "Avaa asetukset",
         "settingsTitle": "Asetukset (⌘,)",
         "showGraph": "Näytä kaavionäkymä",
-        "syncStatus": "Vain paikallinen · ei synkronoitu",
         "tagsTitle": "Tunnisteet",
         "togglePreview": "Vaihda rinnakkaisesikatselu",
         "viewModeTitle": "Näkymätila: {{mode}} (vaihda napsauttamalla)",

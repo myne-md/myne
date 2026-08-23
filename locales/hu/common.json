@@ -889,7 +889,6 @@
         "openSettings": "Beállítások megnyitása",
         "settingsTitle": "Beállítások (⌘,)",
         "showGraph": "Gráfnézet megjelenítése",
-        "syncStatus": "Csak helyi · nincs szinkronizálva",
         "tagsTitle": "Címkék",
         "togglePreview": "Osztott előnézet be-/kikapcsolása",
         "viewModeTitle": "Nézetmód: {{mode}} (kattints a léptetéshez)",

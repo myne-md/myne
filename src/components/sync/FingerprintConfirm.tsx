@@ -79,10 +79,17 @@ export interface FingerprintReading {
  */
 export function readFingerprintInput(raw: string): FingerprintReading {
   const trimmed = raw.trim();
-  const body =
+  const labelled =
     trimmed.startsWith("sha256:") || trimmed.startsWith("SHA256:")
       ? trimmed.slice("sha256:".length)
       : trimmed;
+  // Everything after the last `=`, mirroring `pin_confirm::normalize_fingerprint`.
+  // `openssl x509 -noout -fingerprint -sha256` — the exact command the help
+  // disclosure below hands the operator — prints `sha256 Fingerprint=6F:60:…`,
+  // with a space rather than the colon the two prefixes above strip, so a whole
+  // paste used to count as junk and the field reported it as invalid.
+  const eq = labelled.lastIndexOf("=");
+  const body = eq === -1 ? labelled : labelled.slice(eq + 1);
   let hex = "";
   let hasJunk = false;
   for (const ch of body) {
