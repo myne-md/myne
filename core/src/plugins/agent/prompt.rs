@@ -126,6 +126,16 @@ pub fn system_instructions() -> String {
         // answer. A run spent four requests calling `list_scope` four times
         // with the answer already in its context. The per-result framing in
         // `run_loop.rs` is the other half of this; both were needed.
+        // **The seed, named so it gets used** (myne-md/myne#578). The opening
+        // message already carries the scope, and its bodies when the scope is
+        // one note, because the host resolved both before the loop began. A
+        // model that calls `list_scope` anyway gets the same answer at the cost
+        // of a whole provider request, so the saving depends on it knowing the
+        // answer is already there.
+        "Your scope is listed in the first message you receive, and when it is ",
+        "a single note that message carries the note's whole text as well. Use ",
+        "what is there: do not call list_scope or read_note for anything you ",
+        "have already been given.\n\n",
         "After each action you take, the next message you receive is the ",
         "result of that action. Read it and move on: do not repeat a call you ",
         "have already made, because the answer will not have changed. When you ",
