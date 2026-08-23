@@ -650,12 +650,24 @@ export function CreateVaultFlow({
   // (myne-md/myne#504). Both used to say "Saved to Documents/<file>", and on iOS
   // that folder is not in the Files app, so the sentence pointed the user at a
   // place they cannot open for the one file that is never shown again.
-  const saveMessage = (outcome: SecretSaveOutcome | null): string =>
-    outcome === null
-      ? t("createVault.saveFileError")
-      : outcome.kind === "path"
-        ? t("createVault.savedToFile", { label: outcome.label })
-        : t("createVault.savedToShareSheet");
+  //
+  // A `switch` over the union rather than a ternary chain, so a fourth kind is
+  // a compile error here instead of falling into whichever arm happens to be
+  // last. The three sentences differ in exactly what they CLAIM, which is the
+  // point of the union: one names a folder, one names the share sheet as the
+  // route, and one names neither because the probe that would have decided
+  // between them failed.
+  const saveMessage = (outcome: SecretSaveOutcome | null): string => {
+    if (outcome === null) return t("createVault.saveFileError");
+    switch (outcome.kind) {
+      case "path":
+        return t("createVault.savedToFile", { label: outcome.label });
+      case "shared":
+        return t("createVault.savedToShareSheet");
+      case "written":
+        return t("createVault.savedFileWritten");
+    }
+  };
 
   const saveAccountFile = () => {
     void (async () => {

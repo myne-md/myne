@@ -107,21 +107,37 @@ export async function copySecretToClipboard(
  * and is not answered here, so this says only where the file went and promises
  * nothing about which app can browse to it.
  *
- * The `"shared"` sentence names no operating system, and used to name iOS. The
- * probe's failure arm resolves to that same wording deliberately, so on a phone
- * where the platform read failed the sentence would have said "iOS" without
- * anything having established that. What it needs to convey is that the file is
- * not reachable by path and the share sheet is the route, which is true wherever
- * this arm is taken.
+ * The `"shared"` sentence names no operating system, and used to name iOS. It is
+ * also no longer where a failed probe lands: that has its own arm now, because
+ * the sentence tells the user to use the share sheet and Android's is a
+ * documented no-op, so on an Android phone whose probe failed the app pointed at
+ * an affordance that never appears and offered "tap Save again" to bring it
+ * back.
  */
 export type SecretSaveOutcome =
   /** Written, and the path is meaningful to the user. */
   | { readonly kind: "path"; readonly label: string }
   /** Written inside the app, where only the share sheet can reach it. */
-  | { readonly kind: "shared" };
+  | { readonly kind: "shared" }
+  /**
+   * Written, and nothing else is known.
+   *
+   * The platform probe is an IPC read and it can fail. The two arms above are
+   * both CLAIMS about a file holding a plaintext recovery phrase, on the one
+   * screen `recovery-flow.md` §2.4 says is never re-displayable, and §2.2 in
+   * this same spec now says a success may claim only what the client observed.
+   * Routing an unknown platform into `"shared"` was the smaller claim of the
+   * two and still not an observed one: on an Android device whose probe failed
+   * it told the user to use a share sheet that `share_file.rs` documents as a
+   * no-op there, and to tap Save again to bring back a sheet that never
+   * appeared. The write is the only thing this arm witnessed, so it is the only
+   * thing it says.
+   */
+  | { readonly kind: "written" };
 
 /**
- * Can the user reach the written file by PATH, or only through the share sheet?
+ * How the platform makes the written file reachable, or `"unknown"` when the
+ * probe could not say.
  *
  * A named predicate rather than a `platform === "android"` compare at the point
  * of use, following `canHoldSecretOnClipboard` in `clipboardTransport.ts`: the
@@ -129,12 +145,15 @@ export type SecretSaveOutcome =
  * string at the call site invites the next caller to re-derive it from a
  * different premise.
  *
- * Unknown resolves to `false`, the arm that claims LESS: it names no location,
- * so it cannot name a wrong one. That matters because the probe is an IPC read
- * and its failure mode is silence.
+ * `"unknown"` is its own answer rather than folded into either real one,
+ * because both real ones are claims and a failed probe has established
+ * neither. The failure mode of an IPC read is silence, so folding it in is how
+ * a claim gets made about a device nobody asked.
  */
-async function savedFileIsReachableByPath(): Promise<boolean> {
-  return (await devicePlatform().catch(() => "ios")) === "android";
+async function savedFileDelivery(): Promise<"path" | "share-sheet" | "unknown"> {
+  const platform = await devicePlatform().catch(() => null);
+  if (platform === null) return "unknown";
+  return platform === "android" ? "path" : "share-sheet";
 }
 
 export async function saveSecretToDocuments(
@@ -148,10 +167,12 @@ export async function saveSecretToDocuments(
     // write; additive, so a share cancel still leaves the file saved.
     await shareFile(path);
     // The platform read comes AFTER the write, so a probe failure cannot cost
-    // the save.
-    return (await savedFileIsReachableByPath())
-      ? { kind: "path", label: `Documents/${filename}` }
-      : { kind: "shared" };
+    // the save. It can only cost the app the right to say where the file went,
+    // which is what the third arm is.
+    const delivery = await savedFileDelivery();
+    if (delivery === "path") return { kind: "path", label: `Documents/${filename}` };
+    if (delivery === "share-sheet") return { kind: "shared" };
+    return { kind: "written" };
   } catch (e) {
     logErrorKind(e, "secret-save-failed");
     return null;

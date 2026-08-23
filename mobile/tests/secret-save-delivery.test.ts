@@ -67,13 +67,30 @@ describe("saveSecretToDocuments names the delivery the platform performed", () =
     expect(shareFile).toHaveBeenCalledWith("/app/Documents/myne-account-number.txt");
   });
 
-  it("falls back to the claim-less wording when the platform probe fails", async () => {
-    // Unknown platform resolves to the iOS sentence on purpose: it names no
-    // location, so it cannot name a wrong one. The opposite default would print
-    // a path that may be unreachable.
+  it("claims nothing at all when the platform probe fails", async () => {
+    // A failed probe gets its OWN outcome rather than the smaller of the two
+    // real ones. It used to land on `"shared"`, whose sentence tells the user
+    // to use the share sheet, and Android's share sheet is a documented no-op
+    // (`share_file.rs`): on an Android phone whose probe failed, the app
+    // pointed at an affordance that never appears and offered "tap Save again"
+    // to bring it back. The write is the only thing this arm witnessed.
     devicePlatform.mockRejectedValue(new Error("no prefs"));
     const outcome = await saveSecretToDocuments("myne-recovery-phrase.txt", "w1 w2");
-    expect(outcome).toEqual({ kind: "shared" });
+    expect(outcome).toEqual({ kind: "written" });
+  });
+
+  it("keeps the three outcomes distinct, which is what the union is for", async () => {
+    // Stated as one comparison, because each case reads plausibly alone. Two of
+    // the three are CLAIMS about where a plaintext recovery phrase can be
+    // reached, on a screen that never shows the value again; collapsing any two
+    // makes one of those claims on a device that did not support it.
+    devicePlatform.mockResolvedValue("android");
+    const onPath = await saveSecretToDocuments("a.txt", "x");
+    devicePlatform.mockResolvedValue("ios");
+    const onIos = await saveSecretToDocuments("a.txt", "x");
+    devicePlatform.mockRejectedValue(new Error("no prefs"));
+    const unknown = await saveSecretToDocuments("a.txt", "x");
+    expect(new Set([onPath?.kind, onIos?.kind, unknown?.kind]).size).toBe(3);
   });
 
   it("still reports failure as null when the write itself rejects", async () => {
