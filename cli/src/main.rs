@@ -20,7 +20,7 @@ use std::io::Read;
 use backend::{IpcBackend, MyneBackend};
 
 const HELP: &str = "\
-myne — talk to the running Myne desktop app from the terminal
+myne: talk to the running Myne desktop app from the terminal
 
 USAGE:
     myne [--json] <command>
@@ -34,10 +34,10 @@ COMMANDS:
     daily:append <text>      Append a line to today's daily note
 
 Trashed notes and templates are not notes you are working with, so they
-are absent from list, search and show — the same notes the app itself
+are absent from list, search and show: the same notes the app itself
 leaves out of its own lists.
 
-Some folders may be excluded from these results — see Settings. An
+Some folders may be excluded from these results (see Settings). An
 excluded note's id looks identical to an unknown one everywhere above, and
 an excluded search hit is simply absent, with no count of what was hidden.
 Writing into an excluded folder with `new --folder` is refused outright.

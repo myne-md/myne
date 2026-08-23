@@ -188,15 +188,15 @@ describe("SyncStatusIndicator — sync now affordance", () => {
 // — each is separately actionable, and all three still PULL (only upload stops).
 describe("refusal classes render distinct copy", () => {
   const cases: Array<[string, string]> = [
-    ["quota_exceeded", "Storage full — uploads paused"],
+    ["quota_exceeded", "Storage full: uploads paused"],
     ["payload_too_large", "A file is too large to upload"],
-    ["frozen", "Account frozen — uploads paused"],
+    ["frozen", "Account frozen: uploads paused"],
     // myne#581. In this table rather than in one of its own because the claim
     // is the same claim: it must not collapse into "Sync error". It differs
     // from its neighbours in being certain to occur — a certificate expires on
     // a schedule, so a pinned one is replaced on a schedule — and in being the
     // only one that leaves sync entirely dead rather than pull-only.
-    ["cert_pin_mismatch", "Server certificate changed — verify it to reconnect"],
+    ["cert_pin_mismatch", "Server certificate changed: verify it to reconnect"],
   ];
 
   for (const [detail, expected] of cases) {
