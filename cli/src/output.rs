@@ -19,7 +19,7 @@ use crate::backend::{BackendError, SearchHit};
 /// result — see [`print_search`]'s doc comment for why it must never vary
 /// with the query or the result set.
 const SEARCH_SCOPE_ADVISORY: &str =
-    "Some notes may be excluded from search results — see Settings.";
+    "Some notes may be excluded from search results (see Settings).";
 
 /// `Default` is the "success, no payload" envelope: every builder below sets
 /// only the ONE field its command carries and takes the rest from here, so a
