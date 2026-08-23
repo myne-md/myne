@@ -45,6 +45,7 @@ import {
   makeResolvedWidget,
 } from "../../src/editor/attachments/widgets";
 import type { CatalogRow } from "../../src/editor/attachments/catalog";
+import { emptyEmbedLayout } from "@myne/dialect/embedLayout";
 // The ENGINE path: `src/editor/` re-exports what `src/` itself consumes and
 // carries no `host` shim, so this resolved to nothing. The sibling specs in
 // this directory already reach `@myne/editor/host` directly.
@@ -81,7 +82,7 @@ describe("AttachmentImageWidget", () => {
   // where the overflow menu and the unreadable-segment marker live, so naming
   // the frame removed both from the accessibility tree on every embed.
   it("renders an inline <img src=attachment://id> + loading chip, naming the image not the frame", () => {
-    const dom = new AttachmentImageWidget(ID, "photo.png").toDOM(fakeView);
+    const dom = new AttachmentImageWidget(ID, "photo.png", emptyEmbedLayout(), []).toDOM(fakeView);
     expect(dom.className).toBe("cm-attachment-frame");
     expect(dom.getAttribute("role")).toBeNull();
     expect(dom.getAttribute("aria-label")).toBeNull();
@@ -95,7 +96,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("reveals the <img> and drops the loading chip on load", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png").toDOM(fakeView);
+    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []).toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new Event("load"));
     expect(img.style.display).toBe("");
@@ -103,7 +104,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("drops the loading chip but keeps the <img> on error (native broken-image affordance)", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png").toDOM(fakeView);
+    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []).toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new Event("error"));
     expect(dom.querySelector(".cm-attachment-progress")).toBeNull();
@@ -111,7 +112,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("opens the lightbox with the decrypted source on image click", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png").toDOM(fakeView);
+    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []).toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(showAttachmentLightbox).toHaveBeenCalledWith({
@@ -122,9 +123,9 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("eq() is identity over id + filename; ignoreEvent stays false (lets clicks through)", () => {
-    const w = new AttachmentImageWidget(ID, "p.png");
-    expect(w.eq(new AttachmentImageWidget(ID, "p.png"))).toBe(true);
-    expect(w.eq(new AttachmentImageWidget(ID, "other.png"))).toBe(false);
+    const w = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []);
+    expect(w.eq(new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []))).toBe(true);
+    expect(w.eq(new AttachmentImageWidget(ID, "other.png", emptyEmbedLayout(), []))).toBe(false);
     expect(w.eq(new AttachmentImageWidget("b".repeat(64), "p.png"))).toBe(false);
     expect(w.ignoreEvent()).toBe(false);
   });
@@ -132,7 +133,7 @@ describe("AttachmentImageWidget", () => {
 
 describe("AttachmentPdfWidget", () => {
   it("mounts the pdf scroller and renders a pdf frame", () => {
-    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM(fakeView);
+    const dom = new AttachmentPdfWidget(ID, "doc.pdf", emptyEmbedLayout(), []).toDOM(fakeView);
     expect(dom.className).toContain("cm-attachment-pdf");
     // Named on the reader, not the frame: see the image widget's note above.
     expect(dom.getAttribute("aria-label")).toBeNull();
@@ -146,7 +147,7 @@ describe("AttachmentPdfWidget", () => {
   });
 
   it("opens the lightbox PDF reader on scroller click", () => {
-    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM(fakeView);
+    const dom = new AttachmentPdfWidget(ID, "doc.pdf", emptyEmbedLayout(), []).toDOM(fakeView);
     const scroller = dom.querySelector(".cm-attachment-pdf-scroller") as HTMLElement;
     scroller.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(showAttachmentLightbox).toHaveBeenCalledWith({
@@ -158,7 +159,7 @@ describe("AttachmentPdfWidget", () => {
   });
 
   it("renders the mandatory generic-PDF-icon fallback when the reader errors (SYNC-5)", () => {
-    const dom = new AttachmentPdfWidget(ID, "doc.pdf").toDOM(fakeView);
+    const dom = new AttachmentPdfWidget(ID, "doc.pdf", emptyEmbedLayout(), []).toDOM(fakeView);
     // Invoke the onError the widget handed the (mocked) scroller.
     const opts = mountPdfScroller.mock.calls[0][1] as { onError: () => void };
     opts.onError();
@@ -170,7 +171,7 @@ describe("AttachmentPdfWidget", () => {
   it("destroy() runs the scroller cleanup exactly once", () => {
     const cleanup = vi.fn();
     mountPdfScroller.mockReturnValueOnce(cleanup);
-    const w = new AttachmentPdfWidget(ID, "doc.pdf");
+    const w = new AttachmentPdfWidget(ID, "doc.pdf", emptyEmbedLayout(), []);
     w.toDOM(fakeView);
     w.destroy();
     w.destroy();
@@ -238,7 +239,7 @@ describe("UrlImageChipWidget", () => {
 
 describe("AttachmentFileCardWidget", () => {
   it("renders the card: icon, filename, 'type · size' meta, and an overflow menu", () => {
-    const dom = new AttachmentFileCardWidget(ID, "report.docx", 2048).toDOM(
+    const dom = new AttachmentFileCardWidget(ID, "report.docx", 2048, []).toDOM(
       fakeView,
     );
     expect(dom.getAttribute("data-testid")).toBe("attachment-card");
@@ -252,16 +253,16 @@ describe("AttachmentFileCardWidget", () => {
   });
 
   it("eq() ignores the derived label but tracks id / filename / size", () => {
-    const w = new AttachmentFileCardWidget(ID, "f.zip", 100);
-    expect(w.eq(new AttachmentFileCardWidget(ID, "f.zip", 100))).toBe(true);
-    expect(w.eq(new AttachmentFileCardWidget(ID, "f.zip", 200))).toBe(false);
-    expect(w.eq(new AttachmentFileCardWidget(ID, "g.zip", 100))).toBe(false);
+    const w = new AttachmentFileCardWidget(ID, "f.zip", 100, []);
+    expect(w.eq(new AttachmentFileCardWidget(ID, "f.zip", 100, []))).toBe(true);
+    expect(w.eq(new AttachmentFileCardWidget(ID, "f.zip", 200, []))).toBe(false);
+    expect(w.eq(new AttachmentFileCardWidget(ID, "g.zip", 100, []))).toBe(false);
   });
 });
 
 describe("AttachmentAudioWidget", () => {
   function build(): { widget: AttachmentAudioWidget; dom: HTMLElement } {
-    const widget = new AttachmentAudioWidget(ID, "Voice note 1.wav");
+    const widget = new AttachmentAudioWidget(ID, "Voice note 1.wav", []);
     const dom = widget.toDOM(fakeView);
     return { widget, dom };
   }
@@ -393,7 +394,7 @@ describe("AttachmentAudioWidget", () => {
   });
 
   it("destroy() tears down: pauses, drops the src, and releases the buffer", () => {
-    const widget = new AttachmentAudioWidget(ID, "v.wav");
+    const widget = new AttachmentAudioWidget(ID, "v.wav", []);
     const dom = widget.toDOM(fakeView);
     const audio = dom.querySelector("audio") as HTMLAudioElement;
     const pause = vi.spyOn(audio, "pause").mockImplementation(() => {});
@@ -427,12 +428,12 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
     const id = freshId();
     const readText = vi.fn(async () => ({ text: "cached body", truncated: false }));
     withHostAttachments({ readText });
-    const first = new AttachmentTextPreviewWidget(id, "notes.txt", 10).toDOM(fakeView);
+    const first = new AttachmentTextPreviewWidget(id, "notes.txt", 10, []).toDOM(fakeView);
     expect(first.querySelector(".cm-attachment-progress")).not.toBeNull();
     await flush();
     expect(first.querySelector("pre")?.textContent).toBe("cached body");
     // Re-created widget (embed scrolled back into view) — synchronous render.
-    const second = new AttachmentTextPreviewWidget(id, "notes.txt", 10).toDOM(fakeView);
+    const second = new AttachmentTextPreviewWidget(id, "notes.txt", 10, []).toDOM(fakeView);
     expect(second.querySelector(".cm-attachment-progress")).toBeNull();
     expect(second.querySelector("pre")?.textContent).toBe("cached body");
     expect(readText).toHaveBeenCalledTimes(1);
@@ -448,8 +449,8 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
         }),
     );
     withHostAttachments({ readText });
-    const a = new AttachmentTextPreviewWidget(id, "a.txt", 1).toDOM(fakeView);
-    const b = new AttachmentTextPreviewWidget(id, "a.txt", 1).toDOM(fakeView);
+    const a = new AttachmentTextPreviewWidget(id, "a.txt", 1, []).toDOM(fakeView);
+    const b = new AttachmentTextPreviewWidget(id, "a.txt", 1, []).toDOM(fakeView);
     expect(readText).toHaveBeenCalledTimes(1);
     resolveRead({ text: "shared", truncated: false });
     await flush();
@@ -464,10 +465,10 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
     });
     withHostAttachments({ readText });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const first = new AttachmentTextPreviewWidget(id, "x.txt", 1).toDOM(fakeView);
+    const first = new AttachmentTextPreviewWidget(id, "x.txt", 1, []).toDOM(fakeView);
     await flush();
     expect(first.querySelector(".cm-attachment-text-preview-body")).toBeNull();
-    const second = new AttachmentTextPreviewWidget(id, "x.txt", 1).toDOM(fakeView);
+    const second = new AttachmentTextPreviewWidget(id, "x.txt", 1, []).toDOM(fakeView);
     expect(second.querySelector(".cm-attachment-text-preview-body")).toBeNull();
     expect(second.querySelector(".cm-attachment-progress")).toBeNull();
     expect(readText).toHaveBeenCalledTimes(1);
@@ -481,7 +482,7 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
     });
     withHostAttachments({ readText });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const widget = new AttachmentTextPreviewWidget(id, "x.txt", 1);
+    const widget = new AttachmentTextPreviewWidget(id, "x.txt", 1, []);
     const before = widget.estimatedHeight;
     expect(before).toBeGreaterThan(0);
     widget.toDOM(fakeView);
@@ -496,7 +497,7 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
     const rows = Array.from({ length: 501 }, (_, i) => [String(i)]);
     const readStructured = vi.fn(async () => ({ kind: "grid" as const, rows }));
     withHostAttachments({ readStructured });
-    const dom = new AttachmentTextPreviewWidget(id, "big.xlsx", 1).toDOM(fakeView);
+    const dom = new AttachmentTextPreviewWidget(id, "big.xlsx", 1, []).toDOM(fakeView);
     await flush();
     expect(dom.querySelectorAll("tr")).toHaveLength(500);
   });
@@ -513,7 +514,7 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
     const rows = [Array.from({ length: 16_384 }, (_, i) => String(i))];
     const readStructured = vi.fn(async () => ({ kind: "grid" as const, rows }));
     withHostAttachments({ readStructured });
-    const dom = new AttachmentTextPreviewWidget(id, "wide.xlsx", 1).toDOM(fakeView);
+    const dom = new AttachmentTextPreviewWidget(id, "wide.xlsx", 1, []).toDOM(fakeView);
     await flush();
     expect(dom.querySelectorAll("td")).toHaveLength(256);
     // …and the cells that ARE rendered are the leading ones, in order.
@@ -527,7 +528,7 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
       truncated: false,
     }));
     withHostAttachments({ readText });
-    const dom = new AttachmentTextPreviewWidget(id, "wide.csv", 1).toDOM(fakeView);
+    const dom = new AttachmentTextPreviewWidget(id, "wide.csv", 1, []).toDOM(fakeView);
     await flush();
     expect(dom.querySelectorAll("td")).toHaveLength(256);
   });
@@ -542,7 +543,7 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
       ],
     }));
     withHostAttachments({ readStructured });
-    const dom = new AttachmentTextPreviewWidget(id, "doc.docx", 1).toDOM(fakeView);
+    const dom = new AttachmentTextPreviewWidget(id, "doc.docx", 1, []).toDOM(fakeView);
     await flush();
     expect(dom.querySelector(".cm-attachment-progress")).toBeNull();
     expect(dom.querySelector("h3")?.textContent).toBe("H");
@@ -552,7 +553,7 @@ describe("AttachmentTextPreviewWidget (preview cache)", () => {
 
 describe("AttachmentVideoWidget (myne#168)", () => {
   it("renders a native <video controls preload=metadata> with testid and no autoplay/loop/mute", () => {
-    const dom = new AttachmentVideoWidget(ID, "clip.mp4", 1234).toDOM(fakeView);
+    const dom = new AttachmentVideoWidget(ID, "clip.mp4", 1234, []).toDOM(fakeView);
     expect(dom.getAttribute("data-testid")).toBe("attachment-video");
     const video = dom.querySelector("video") as HTMLVideoElement;
     expect(video).not.toBeNull();
@@ -572,7 +573,7 @@ describe("AttachmentVideoWidget (myne#168)", () => {
   });
 
   it("reveals the player and drops the loading chip on loadedmetadata", () => {
-    const dom = new AttachmentVideoWidget(ID, "clip.webm", 1).toDOM(fakeView);
+    const dom = new AttachmentVideoWidget(ID, "clip.webm", 1, []).toDOM(fakeView);
     const video = dom.querySelector("video") as HTMLVideoElement;
     expect(video.style.display).toBe("none");
     expect(dom.querySelector(".cm-attachment-progress")).not.toBeNull();
@@ -582,7 +583,7 @@ describe("AttachmentVideoWidget (myne#168)", () => {
   });
 
   it("swaps to the export-only file card when the video errors (undecodable → graceful fallback)", () => {
-    const dom = new AttachmentVideoWidget(ID, "broken.webm", 42).toDOM(fakeView);
+    const dom = new AttachmentVideoWidget(ID, "broken.webm", 42, []).toDOM(fakeView);
     expect(dom.querySelector("video")).not.toBeNull();
     expect(dom.querySelector('[data-testid="attachment-card"]')).toBeNull();
     dom.querySelector("video")!.dispatchEvent(new Event("error"));
@@ -596,29 +597,34 @@ describe("makeResolvedWidget (content-type router)", () => {
   function row(contentType: string): CatalogRow {
     return { id: ID, contentType, filename: "f", size: 1 };
   }
+  // Both trailing arguments are passed explicitly because the factory takes
+  // them required. They had defaults, and a default is what let four widgets
+  // take the dropped-segment list and discard it while the tree stayed green.
+  const resolved = (contentType: string) =>
+    makeResolvedWidget(row(contentType), emptyEmbedLayout(), []);
 
   it("routes application/pdf → PDF widget", () => {
-    expect(makeResolvedWidget(row("application/pdf"))).toBeInstanceOf(AttachmentPdfWidget);
+    expect(resolved("application/pdf")).toBeInstanceOf(AttachmentPdfWidget);
   });
   it("routes image/* → image widget (png and svg both)", () => {
-    expect(makeResolvedWidget(row("image/png"))).toBeInstanceOf(AttachmentImageWidget);
-    expect(makeResolvedWidget(row("image/svg+xml"))).toBeInstanceOf(AttachmentImageWidget);
+    expect(resolved("image/png")).toBeInstanceOf(AttachmentImageWidget);
+    expect(resolved("image/svg+xml")).toBeInstanceOf(AttachmentImageWidget);
   });
   it("routes audio/* → audio widget", () => {
-    expect(makeResolvedWidget(row("audio/wav"))).toBeInstanceOf(AttachmentAudioWidget);
+    expect(resolved("audio/wav")).toBeInstanceOf(AttachmentAudioWidget);
   });
   it("routes a non-renderable type → export-only file card", () => {
-    expect(makeResolvedWidget(row("application/octet-stream"))).toBeInstanceOf(
+    expect(resolved("application/octet-stream")).toBeInstanceOf(
       AttachmentFileCardWidget,
     );
   });
   it("routes video/mp4 and video/webm → video widget", () => {
-    expect(makeResolvedWidget(row("video/mp4"))).toBeInstanceOf(AttachmentVideoWidget);
-    expect(makeResolvedWidget(row("video/webm"))).toBeInstanceOf(AttachmentVideoWidget);
+    expect(resolved("video/mp4")).toBeInstanceOf(AttachmentVideoWidget);
+    expect(resolved("video/webm")).toBeInstanceOf(AttachmentVideoWidget);
   });
   it("routes a non-allowlisted video type → file card (exact-match, not a video/ prefix)", () => {
     // MOV/other never reach here as a video/* hint (the sniffer rejects them),
     // and exact-match means even if one did it can't route to an unservable player.
-    expect(makeResolvedWidget(row("video/quicktime"))).toBeInstanceOf(AttachmentFileCardWidget);
+    expect(resolved("video/quicktime")).toBeInstanceOf(AttachmentFileCardWidget);
   });
 });
