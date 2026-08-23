@@ -4236,7 +4236,7 @@
     "phraseCopied": "Copied. It stays on this device, and the system drops it after 30 seconds.",
     "phraseCopyFailed": "Couldn't copy. Use \"Save to file\" instead.",
     "savedToFile": "Saved to {{label}}",
-    "savedToShareSheet": "Saved inside Myne, where iOS does not let you browse to it. Use the share sheet to put a copy somewhere you can reach, and tap Save again if you closed it.",
+    "savedToShareSheet": "Saved inside Myne, where the system file browser cannot reach it. Use the share sheet to put a copy somewhere you can reach, and tap Save again if you closed it.",
     "saveFileError": "Couldn't save the file.",
     "stepLabel": "Create a vault · {{current}} of {{total}}",
     "briefingTitle": "Before we begin",

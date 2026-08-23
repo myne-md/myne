@@ -106,12 +106,36 @@ export async function copySecretToClipboard(
  * the system Files app on a current Android; that question is myne-md/myne#505's
  * and is not answered here, so this says only where the file went and promises
  * nothing about which app can browse to it.
+ *
+ * The `"shared"` sentence names no operating system, and used to name iOS. The
+ * probe's failure arm resolves to that same wording deliberately, so on a phone
+ * where the platform read failed the sentence would have said "iOS" without
+ * anything having established that. What it needs to convey is that the file is
+ * not reachable by path and the share sheet is the route, which is true wherever
+ * this arm is taken.
  */
 export type SecretSaveOutcome =
   /** Written, and the path is meaningful to the user. */
   | { readonly kind: "path"; readonly label: string }
   /** Written inside the app, where only the share sheet can reach it. */
   | { readonly kind: "shared" };
+
+/**
+ * Can the user reach the written file by PATH, or only through the share sheet?
+ *
+ * A named predicate rather than a `platform === "android"` compare at the point
+ * of use, following `canHoldSecretOnClipboard` in `clipboardTransport.ts`: the
+ * fact being branched on is a property of the delivery, and a bare platform
+ * string at the call site invites the next caller to re-derive it from a
+ * different premise.
+ *
+ * Unknown resolves to `false`, the arm that claims LESS: it names no location,
+ * so it cannot name a wrong one. That matters because the probe is an IPC read
+ * and its failure mode is silence.
+ */
+async function savedFileIsReachableByPath(): Promise<boolean> {
+  return (await devicePlatform().catch(() => "ios")) === "android";
+}
 
 export async function saveSecretToDocuments(
   filename: string,
@@ -124,10 +148,8 @@ export async function saveSecretToDocuments(
     // write; additive, so a share cancel still leaves the file saved.
     await shareFile(path);
     // The platform read comes AFTER the write, so a probe failure cannot cost
-    // the save. Unknown resolves to the iOS wording, which is the one that
-    // claims less: it names no location, so it cannot name a wrong one.
-    const platform = await devicePlatform().catch(() => "ios");
-    return platform === "android"
+    // the save.
+    return (await savedFileIsReachableByPath())
       ? { kind: "path", label: `Documents/${filename}` }
       : { kind: "shared" };
   } catch (e) {
