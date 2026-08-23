@@ -187,6 +187,7 @@ import {
   trashedRecords,
   type NoteId,
 } from "../notes/sidebarState";
+import { settleFrontmatterWrite as settleFrontmatterWriteFor } from "../notes/settleFrontmatterWrite";
 import { sidebarCommands } from "../notes/sidebarCommands";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "../platform/webviewWindow";
@@ -1484,6 +1485,21 @@ function EditorChrome({
     }
   }, []);
 
+  // The four writers `runFlushChain` runs, in one object rather than one per
+  // call site. Four identical literals is four places for the fifth writer to
+  // be added to three of them, and `runFlushChain` cannot see the omission: its
+  // parameter is a complete object either way. What varies between the callers
+  // is the REASON, which is the second argument and stays at the call site.
+  const flushSteps = useMemo(
+    () => ({
+      flushAll,
+      persistWorkspace,
+      persistVaultIndices,
+      flushGraphLayout: flushGraphLayoutNow,
+    }),
+    [flushAll, persistWorkspace, persistVaultIndices],
+  );
+
   // MYND-166 / MYND-308 — mirror the current container into the backend's
   // in-RAM staging slot on every change (incl. the restored/default state on
   // mount). The backend flushes it to vault.workspace on `ExitRequested`, so an
@@ -1573,15 +1589,7 @@ function EditorChrome({
           // this point, so a bare await would wedge the window unclosable
           // exactly when a save is failing. On Windows the title-bar X is the
           // only quit affordance, so that is the whole quit path.
-          await runFlushChain(
-            {
-              flushAll,
-              persistWorkspace,
-              persistVaultIndices,
-              flushGraphLayout: flushGraphLayoutNow,
-            },
-            "closing",
-          );
+          await runFlushChain(flushSteps, "closing");
           // `destroy()`, NOT `close()`: the capability ACL grants
           // `core:window:allow-destroy` but deliberately NOT `allow-close`
           // (TB6 surface — see lib/app-window.ts). `close()` rejects under the
@@ -1614,7 +1622,7 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [flushAll, persistWorkspace, persistVaultIndices]);
+  }, [flushSteps]);
 
   // Web graceful exit (MYND-574 task 93). The Tauri close-intercept above is a
   // no-op in a browser — its own catch says so — which meant every tab close
@@ -1640,20 +1648,12 @@ function EditorChrome({
         // difference (a hidden tab must not write `vault.workspace`, whose mtime
         // is a lock/quit signal), so the divergence is a named parameter rather
         // than two sequences that happen to differ by a line.
-        await runFlushChain(
-          {
-            flushAll,
-            persistWorkspace,
-            persistVaultIndices,
-            flushGraphLayout: flushGraphLayoutNow,
-          },
-          kind,
-        );
+        await runFlushChain(flushSteps, kind);
       } finally {
         setUnsavedGuard("flushing", false);
       }
     });
-  }, [flushAll, persistWorkspace, persistVaultIndices]);
+  }, [flushSteps]);
 
   // Task 88 — the second, much longer-lived holder of the same guard.
   //
@@ -1695,15 +1695,7 @@ function EditorChrome({
             // that did not settle (myne-md/myne#520) neither skips the two
             // persists behind it nor raises an unhandled rejection inside the
             // auto-lock grace window, where nothing would report it.
-            await runFlushChain(
-              {
-                flushAll,
-                persistWorkspace,
-                persistVaultIndices,
-                flushGraphLayout: flushGraphLayoutNow,
-              },
-              "lock",
-            );
+            await runFlushChain(flushSteps, "lock");
           })();
         });
         if (cancelled) {
@@ -1719,7 +1711,7 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [flushAll, persistWorkspace, persistVaultIndices]);
+  }, [flushSteps]);
 
   // Lock button flush-then-lock — `decisions.md` 2026-05-07 canonical
   // flush-on-lock, now across all panes; persist the workspace before lock.
@@ -1730,15 +1722,7 @@ function EditorChrome({
     // failure did not merely lose a cache: it cancelled the auto-lock, leaving
     // the keys live in the Worker and the plaintext mounted, past the idle
     // deadline, with nothing said.
-    await runFlushChain(
-      {
-        flushAll,
-        persistWorkspace,
-        persistVaultIndices,
-        flushGraphLayout: flushGraphLayoutNow,
-      },
-      "lock",
-    );
+    await runFlushChain(flushSteps, "lock");
     await lockVault().catch(() => {
       /* lock is best-effort, parent callback still fires */
     });
@@ -1755,7 +1739,7 @@ function EditorChrome({
     // one, since closing a screen un-applies nothing.
     clearAgentForLock();
     onLock?.();
-  }, [flushAll, persistWorkspace, persistVaultIndices, onLock]);
+  }, [flushSteps, onLock]);
 
   // Idle auto-lock where the platform has no OS-level idle detection — the web
   // client (phase3-web-client task 43). Desktop keeps `src-tauri/src/auto_lock.rs`
@@ -3337,13 +3321,13 @@ function CommandPaletteHost({
   // frontmatter, then re-read the record so the tree settles. Skipped for a
   // dirty buffer, which the reload guards.
   //
-  // Shared by every such write in this component (template convert, note cover)
-  // rather than copied per caller: the recipe belongs to the BUG CLASS, so if it
-  // ever gains a step, one edit covers all of them.
-  const settleFrontmatterWrite = (id: string) => {
-    ctx.reloadOpenNote();
-    return ctx.refreshOne(id);
-  };
+  // Shared by every such write, and the recipe itself lives in
+  // `src/notes/settleFrontmatterWrite.ts` rather than here, because a third
+  // caller in another file hand-copied the two lines back when it was a closure
+  // in this component. It belongs to the BUG CLASS, so if it ever gains a step,
+  // one edit has to cover all of them.
+  const settleFrontmatterWrite = (id: string) =>
+    settleFrontmatterWriteFor(ctx, id as NoteId);
   // Convert with an undo toast: promoting a note to a template makes it LEAVE
   // the sidebar (templates are inverse-visibility, hidden like trash), so the
   // toast is what keeps it from reading as "my note vanished". Undo runs the
