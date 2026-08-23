@@ -191,9 +191,10 @@ export class Element {
    *  arrive with `detail: 1` and select nothing.
    *
    *  Drives `taskRowSelection` (myne-md/myne#560), whose whole subject is what
-   *  a triple-click leaves behind on a list row. That is layout-and-gesture
-   *  behaviour: jsdom has no `detail`-aware selection model, so the unit test
-   *  drives `trimRowNewline` directly and never presses anything. */
+   *  a triple-click leaves behind on a list row. jsdom has no `detail`-aware
+   *  selection model, so the two unit lanes assert the decision and the wiring
+   *  and both DISPATCH the transaction the gesture would produce; this is the
+   *  only lane where the gesture itself runs. */
   async tripleClick(): Promise<void> {
     await this.session.send("POST", "/actions", {
       actions: [

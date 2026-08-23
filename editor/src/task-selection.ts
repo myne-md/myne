@@ -50,13 +50,19 @@ import { listMarkerEnd } from "./line-boundary";
 /**
  * The row-without-its-newline range, or `null` when the rule does not apply.
  *
- * Exported for the unit test. The filter around it is plumbing; this is the
- * decision.
+ * Exported for `tests/editor/taskRowSelection.test.ts`, which is where every
+ * refusal branch and the reverse-drag direction are asserted. The filter around
+ * it is plumbing; this is the decision.
  */
 export function trimRowNewline(
   state: EditorState,
   range: { from: number; to: number; anchor: number; head: number; empty: boolean },
 ): { anchor: number; head: number } | null {
+  // Defence rather than a live branch, and `tests/editor/taskRowSelection.test.ts`
+  // says so where a reader would otherwise assume coverage: an empty range at
+  // `p` would have to satisfy `p === lineAt(p).to + 1` to reach the trim, which
+  // no position inside its own line can. Kept because it states the intent at
+  // the top, and because a future change to the shape below could make it live.
   if (range.empty) return null;
   const line = state.doc.lineAt(range.from);
   // Exactly one row plus its break. Not `>=`: a selection ending anywhere else

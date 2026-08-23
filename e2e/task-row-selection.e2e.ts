@@ -1,20 +1,23 @@
 // A triple-click on a task row selects that row and leaves the caret on it
 // (myne-md/myne#560).
 //
-// # Why this is here and not in the unit suite
+// # What this covers that the unit suite cannot
 //
-// `tests/editor/taskRowSelection.test.ts` drives `trimRowNewline` directly and
-// presses nothing, because jsdom has no `detail`-aware selection model: CM6
-// never runs its triple-click gesture there, so the transaction the filter
-// exists to rewrite is never produced. Everything the unit test can reach is the
-// pure function; everything the user can reach depends on a real pointer over a
-// real layout.
+// Two other lanes cover this and each covers a different step.
+// `tests/editor/taskRowSelection.test.ts` is the DECISION: `trimRowNewline` as a
+// pure function, every refusal branch and the reverse-drag direction.
+// `tests/editor/taskLineEditing.test.ts` is the WIRING: a mounted CM6 view, a
+// dispatched `select.pointer` transaction, the resulting selection and DOM.
+// Neither can produce that transaction from a GESTURE, because jsdom has no
+// `detail`-aware selection model and CM6 never runs its triple-click handler
+// there, so the step from three clicks to that annotated transaction is assumed
+// in both.
 //
-// The half that only a real WebView shows is where the selection ENDS. CM6's
-// triple-click takes the line plus its trailing newline, so the range ends at
-// the NEXT line's start: the caret sits one visual row below the row that was
-// clicked, and the next keystroke lands somewhere the user did not click. That
-// is an off-by-one-row in the rendered DOM, invisible to a function test.
+// This scenario is that step, and it is where the bug lived: CM6's own gesture
+// takes the line plus its trailing newline, so the range ends at the NEXT line's
+// start and the caret sits one visual row below the row that was clicked. The
+// unit test asserts what the filter does with the transaction; this asserts that
+// pressing three times is what hands it one.
 //
 // # What is deliberately NOT asserted, and why
 //
