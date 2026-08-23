@@ -61,9 +61,9 @@
   ANOTHER TREE's bundle.** The frontend is embedded at compile time, so a diff
   confined to `src/`, `editor/` or any other frontend tree touches no Rust source,
   cargo relinks nothing, and `target/release/myne-desktop` keeps whatever
-  `dist/` it embedded when it was last compiled. With the shared
-  `myne-e2e-target` volume that can be a **different worktree's** frontend. It
-  happened on myne-md/myne#520: `pnpm build` emitted a correct `dist/`, the
+  `dist/` it embedded when it was last compiled. It was found in its cross-tree
+  form, back when the cargo target volume was shared, so the stale bundle could be
+  a **different worktree's** frontend. It happened on myne-md/myne#520: `pnpm build` emitted a correct `dist/`, the
   build reported success, and the app under test loaded
   `main-CoKDUqv9.js` out of `.claude/worktrees/554-…/dist`, whose host still
   dispatched the pre-fix event, so a correct fix's own scenario failed and read
@@ -81,15 +81,29 @@
   source path. One shared volume therefore lets a build here reuse an rlib
   compiled from ANOTHER tree, and worktrees live under `.claude/worktrees/` by
   convention, so they sit inside the mount and this is the normal case rather
-  than an exotic one. The four `e2e-*.sh` scripts key the volume on `pwd`. The
-  cost is one full rebuild per tree, once, which is exactly what the sharing was
-  buying at the price of results that describe a different tree.
+  than an exotic one. `scripts/lib/e2e-docker.sh` keys the volume on `pwd` and is
+  sourced by all seven scripts that run this repo in the container. The cost is one
+  full rebuild per tree, once, which is exactly what the sharing was buying at the
+  price of results that describe a different tree.
+
+  **The key lives in one file because four copies of it was already the bug twice.**
+  It has to be byte identical everywhere, since two scripts that hash the same tree
+  differently get two volumes and the second rebuilds from scratch while looking
+  like a cache. The copies also missed three call sites entirely
+  (`e2e-batch.sh`, `capture-theme-preview.sh`, `capture-userguide.sh` kept the
+  shared volume), and in a fourth (`e2e-local.sh`) the assignment landed INSIDE the
+  `RUN_FLAGS=( … )` array literal, where bash reads it as an element rather than an
+  assignment: the subshell ran, nothing was assigned, and `set -u` aborted the
+  script on the next line. Neither `bash -n` nor any guard sees either shape.
 - **The symptom is a compile error in code you did not touch.** A build refused
   with `run_probe` taking 2 arguments while
   `core/src/plugins/agent/probe.rs` plainly declared 3, and `ProbeProgress`
   unresolved while the struct was right there. Neither file was in the diff. The
   discriminator is two commands: `cargo check -p myne-desktop` on the host, and
-  the same inside `docker run -v "$(pwd):/work" -v myne-e2e-target:/work/target`.
+  the same inside
+  `docker run -v "$(pwd):/work" -v "$E2E_TARGET_VOLUME":/work/target` (source
+  `scripts/lib/e2e-docker.sh` first, or pass the shared name to reproduce the
+  original failure).
   Host green plus container red is the volume, and the container run itself
   clears it by recompiling the crate. Read the file through the container before
   suspecting the mount (`docker run --rm -v "$(pwd):/work" -w /work myne-e2e
@@ -139,14 +153,17 @@
   keystroke, so asserting straight after `sendKeys` is both correct and
   instant. Follow it with a positive probe (send a key, assert it took effect)
   so the absence cannot pass merely because input stopped arriving.
-- **The `myne-e2e-target` Docker volume is shared across git worktrees.** A run
-  can fail to BUILD against a stale crate compiled from another branch — the
-  giveaway is a compile error naming a field that exists in neither your source
-  nor `develop` (observed: `PrefsView has no field named editor_vim_mode`, with
-  the note listing `attachment_ocr_enabled`, a field belonging to a different
-  feature branch). Fix: `docker volume rm myne-e2e-target`, then a full rebuild
-  (`--skip-build` is not enough). Same class as the shared-`CARGO_TARGET_DIR`
-  collision, one layer down.
+- **The `myne-e2e-target` Docker volume USED to be shared across git worktrees,
+  and the volume is still on disk.** A run could fail to BUILD against a stale
+  crate compiled from another branch, the giveaway being a compile error naming a
+  field that exists in neither your source nor `develop` (observed:
+  `PrefsView has no field named editor_vim_mode`, with the note listing
+  `attachment_ocr_enabled`, a field belonging to a different feature branch). The
+  per-tree keying above closed the class; this entry stays because a machine that
+  ran the suite before it still has the shared volume, and because the same
+  reasoning applies to any other volume shared across trees. Fix, then and now:
+  `docker volume rm myne-e2e-target`, then a full rebuild (`--skip-build` is not
+  enough). Same class as the shared-`CARGO_TARGET_DIR` collision, one layer down.
 - **`e2e-one.sh` re-provisions the pinned Rust toolchain per run, which flakes the boot.**
   Each `e2e-one.sh` invocation spawns a fresh `--rm` container whose `RUSTUP_HOME`
   is not a persisted volume, so `rust-toolchain.toml`'s pinned toolchain re-downloads

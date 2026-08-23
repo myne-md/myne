@@ -24,6 +24,8 @@
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 
 IMAGE=myne-e2e
 SKIP_BUILD=0
@@ -46,16 +48,12 @@ RUN_FLAGS=(
   --rm
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
-  -v myne-e2e-target:/work/target
+  -v "$E2E_TARGET_VOLUME":/work/target
   -v myne-e2e-cargo-registry:/usr/local/cargo/registry
   # Per-member node_modules volumes: the container's `pnpm install` rewrites a
   # bind-mounted workspace member's symlinks and breaks the host install
   # otherwise. One per member, and `ornaments` + `preview` are members too.
-  -v myne-e2e-nm-dialect:/work/dialect/node_modules
-  -v myne-e2e-nm-editor:/work/editor/node_modules
-  -v myne-e2e-nm-copy:/work/copy/node_modules
-  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
-  -v myne-e2e-nm-preview:/work/preview/node_modules
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
   -w /work
   --user root
 )

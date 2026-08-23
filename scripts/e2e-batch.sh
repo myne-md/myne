@@ -16,6 +16,8 @@
 #                         `local-inference-stub` build too: use e2e-ai-buildrun.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 IMAGE=myne-e2e
 
 # Build the in-container loop that runs each spec separately and tallies results.
@@ -59,7 +61,7 @@ RUN_FLAGS=(
   --rm
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
-  -v myne-e2e-target:/work/target
+  -v "$E2E_TARGET_VOLUME":/work/target
   -v myne-e2e-cargo-registry:/usr/local/cargo/registry
   -w /work
   --user root
