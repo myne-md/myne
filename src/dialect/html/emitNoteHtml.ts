@@ -45,7 +45,12 @@ import {
   attachmentUrl,
   parseAttachmentTarget,
 } from "../../notes/attachmentRef";
-import { parseEmbedAlias, type EmbedLayout } from "@myne/dialect/embedLayout";
+import {
+  embedAccessibleName,
+  embedWidthCss,
+  parseEmbedAlias,
+  type EmbedLayout,
+} from "@myne/dialect/embedLayout";
 import { escapeAttr, escapeHtml } from "./escape";
 import {
   attachmentEmbedDisplayName,
@@ -1012,7 +1017,8 @@ function collectExcluded(ctx: Ctx, id: string, filename: string): void {
  * The `class` and `style` an authored layout produces on an exported image.
  *
  * Mirrors `applyEmbedLayout` in `editor/src/attachments/widgets.ts`, which is
- * the surface this projection is a projection OF: width as a length or a
+ * the surface this projection is a projection OF, and shares the width
+ * resolution with it through `embedWidthCss`: width as a length or a
  * percentage with `max-width: 100%` beside it, alignment as a CLASS rather than
  * a margin string. The two differ in one way that is forced rather than chosen.
  * The editor styles a wrapping frame; the export has only the `<img>`, whose
@@ -1027,12 +1033,7 @@ function collectExcluded(ctx: Ctx, id: string, filename: string): void {
  */
 function embedLayoutAttrs(layout: EmbedLayout): string {
   const decls: string[] = [];
-  const width =
-    layout.widthPx !== null
-      ? `${layout.widthPx}px`
-      : layout.widthPercent !== null
-        ? `${layout.widthPercent}%`
-        : null;
+  const width = embedWidthCss(layout);
   if (width !== null) decls.push(`width:${width}`, "max-width:100%");
   if (layout.heightPx !== null) decls.push(`height:${layout.heightPx}px`);
   const cls = layout.align === null ? "att-image" : `att-image att-align-${layout.align}`;
@@ -1056,13 +1057,22 @@ function renderAttachmentEmbed(
   // an authored EMPTY alt marks the media decorative. HTML is the one output
   // format where both are native and free, and it was emitting the filename for
   // the first and losing the second entirely.
-  const { filename: parsedName, layout } = parseEmbedAlias(filename);
-  const name = parsedName !== "" ? parsedName : "attachment";
+  const { layout } = parseEmbedAlias(filename);
+  const name = attachmentEmbedDisplayName(filename);
+  // `parsed.dropped` is deliberately NOT rendered here. `wikilink.md` §5.1's
+  // reporting clause sits inside §5, which is about the editor's chip
+  // rendering, and the surface it names ("the rendered block") is the one the
+  // author can act on: the offending segment is fixable through the embed's own
+  // overflow menu, which exists only there. This is a projection handed to
+  // another program, so a warning glyph in an exported PDF would be a note about
+  // Myne printed into the user's document.
   if (IMAGE_EXT_RE.test(name)) {
-    // `layout.alt ?? name`, and the `??` is load-bearing rather than tidy: `""`
-    // is the author saying "decorative", which must survive as `alt=""`, and
-    // `||` would replace it with the filename, which is the exact bug.
-    const alt = layout.alt ?? name;
+    // `embedAccessibleName` owns the `??` rather than the `||`: `""` is the
+    // author saying "decorative", which must survive as `alt=""`, and `||`
+    // would replace it with the filename, which is the exact bug. HTML needs no
+    // second branch for the decorative case, because an empty `alt` IS how the
+    // format spells it.
+    const { name: alt } = embedAccessibleName(layout, name);
     return `<img${embedLayoutAttrs(layout)} src="${escapeAttr(ctx.attachmentUrl(id))}" alt="${escapeAttr(alt)}">`;
   }
   collectExcluded(ctx, id, name);

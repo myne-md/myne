@@ -1,5 +1,9 @@
 import { type ReactNode, useMemo, useState } from "react";
-import type { EmbedLayout } from "@myne/dialect/embedLayout";
+import {
+  embedAccessibleName,
+  embedWidthCss,
+  type EmbedLayout,
+} from "@myne/dialect/embedLayout";
 import { useTranslation } from "react-i18next";
 import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
 import { parseBlocks, type Block, type Inline } from "../lib/markdown";
@@ -17,29 +21,13 @@ export const isAudioLabel = (label: string): boolean => {
  *  an `<audio controls>` player for a voice note / audio file, an `<img>` for an
  *  image, falling back to a file chip when the bytes aren't renderable (e.g. a
  *  PDF) or fail to load. */
-/**
- * The accessible name for an embed, per `docs/spec/wikilink.md` §5.1
- * (myne-md/myne#518).
- *
- * `alt === null` is "the author wrote none", so the filename stands in.
- * `alt === ""` is "the author marked this decorative", which must survive as an
- * empty `alt` so a screen reader skips the image rather than reading a filename
- * out loud. `??` and not `||`, because `||` collapses the second case into the
- * first, which is the whole defect.
- */
-function accessibleName(label: string, alt: string | null): string {
-  return alt ?? label;
-}
-
 function AttachmentInline({
   id,
   label,
-  alt,
   layout,
 }: {
   id: string;
   label: string;
-  alt: string | null;
   layout: EmbedLayout;
 }) {
   const { t } = useTranslation();
@@ -68,22 +56,30 @@ function AttachmentInline({
   // Tap opens the shared @myne/editor lightbox (zoom/pan, MYND-594). Before this
   // there was no handler at all — an image could not be inspected on a phone.
   const src = attachmentSrc(id);
-  const name = accessibleName(label, alt);
+  // `docs/spec/wikilink.md` §5.1 has two clauses and the shared resolver owns
+  // both, because this surface had only the first: an authored alt is the
+  // accessible name, AND an authored EMPTY alt marks the media decorative,
+  // which must not fall back to reading the filename out loud.
+  //
+  // What it does NOT carry is a dropped-segment report, and neither does the
+  // token. §5.1's persistent report belongs to the surface that can FIX the
+  // segment, which is the desktop editor's embed overflow menu; mobile has no
+  // embed-layout authoring path, so a marker here would tell the reader about
+  // something they cannot act on from this device.
+  const { name, decorative } = embedAccessibleName(layout, label);
   // The author's width and alignment, applied the way `applyEmbedLayout` does in
   // the editor (myne-md/myne#518): a length or a percentage with `max-width` at
   // its side, and alignment as auto margins on a block image. A note laid out on
   // desktop rendered at default size here, which `dialect/src/index.ts` says is
-  // exactly what the shared module exists to prevent.
-  const width =
-    layout.widthPx !== null
-      ? `${layout.widthPx}px`
-      : layout.widthPercent !== null
-        ? `${layout.widthPercent}%`
-        : undefined;
+  // exactly what the shared module exists to prevent. The width itself comes
+  // from `embedWidthCss` so the value and its `max-width` cap are decided once
+  // for all three renderers rather than re-derived here.
+  const width = embedWidthCss(layout) ?? undefined;
   return (
     <img
       src={src}
       alt={name}
+      role={decorative ? "presentation" : undefined}
       data-testid="markdown.image"
       onError={() => setFailed(true)}
       onClick={() => showAttachmentLightbox({ url: src, alt: name, id })}
@@ -148,7 +144,7 @@ function renderInline(tokens: Inline[], onOpenWikilink: (target: string) => void
         );
       case "attachment":
         return (
-          <AttachmentInline key={i} id={t.id} label={t.label} alt={t.alt} layout={t.layout} />
+          <AttachmentInline key={i} id={t.id} label={t.label} layout={t.layout} />
         );
       default:
         return <span key={i}>{t.text}</span>;

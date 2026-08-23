@@ -39,6 +39,8 @@ import { buildOverflowMenu, type OverflowAction, type OverflowRow } from "./acti
 import {
   type DroppedEmbedSegment,
   type EmbedLayout,
+  embedAccessibleName,
+  embedWidthCss,
   emptyEmbedLayout,
   isAliasSafeText,
   sameEmbedLayout,
@@ -85,12 +87,7 @@ const FRAME_WIDTH = 320;
  * value that reaches here; this is defence in depth, not the only defence.
  */
 function applyEmbedLayout(frame: HTMLElement, layout: EmbedLayout): void {
-  const width =
-    layout.widthPx !== null
-      ? `${layout.widthPx}px`
-      : layout.widthPercent !== null
-        ? `${layout.widthPercent}%`
-        : null;
+  const width = embedWidthCss(layout);
   if (width !== null) {
     frame.style.width = width;
     frame.style.maxWidth = "100%";
@@ -131,10 +128,25 @@ function sameDroppedSegments(
  * loud marker would read as damage.
  */
 
-function buildDroppedSegmentMarker(
+/**
+ * Append the §3.9.3 marker to `host`, or nothing when there is nothing to
+ * report.
+ *
+ * The emptiness test lives HERE rather than at each of the six call sites, and
+ * that is the whole reason this takes a host instead of returning an element.
+ * Reporting a dropped segment is two remembered halves per widget, taking the
+ * list through the constructor and appending the marker in `toDOM`, and four of
+ * the six widgets shipped having done the first and not the second. A call site
+ * that forgets `if (dropped.length > 0)` renders an empty marker, which is a
+ * visible defect; a call site that forgets the whole block renders nothing,
+ * which is invisible. One call, one thing to remember.
+ */
+function appendDroppedSegmentMarker(
+  host: HTMLElement,
   dropped: readonly DroppedEmbedSegment[],
   testidPrefix: string,
-): HTMLElement {
+): void {
+  if (dropped.length === 0) return;
   const mark = document.createElement("span");
   mark.className = "cm-attachment-embed-warning";
   mark.setAttribute("data-testid", `${testidPrefix}.unreadable`);
@@ -147,7 +159,7 @@ function buildDroppedSegmentMarker(
   mark.setAttribute("role", "img");
   mark.setAttribute("aria-label", label);
   mark.title = label;
-  return mark;
+  host.appendChild(mark);
 }
 
 /**
@@ -178,14 +190,14 @@ function applyEmbedAltText(
   frame.removeAttribute("role");
   frame.removeAttribute("aria-label");
 
-  if (layout.alt === "") {
+  const { name, decorative } = embedAccessibleName(layout, filename);
+  if (decorative) {
     // Decorative: hide the media, keep the frame and everything inside it.
     media.setAttribute("alt", "");
     media.setAttribute("role", "presentation");
     media.removeAttribute("aria-label");
     return;
   }
-  const name = layout.alt ?? filename;
   media.setAttribute("alt", name);
   media.setAttribute("role", "img");
   media.setAttribute("aria-label", name);
@@ -211,8 +223,8 @@ export class AttachmentImageWidget extends WidgetType {
   constructor(
     private readonly id: string,
     private readonly filename: string,
-    private readonly layout: EmbedLayout = emptyEmbedLayout(),
-    private readonly dropped: readonly DroppedEmbedSegment[] = [],
+    private readonly layout: EmbedLayout,
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -287,7 +299,7 @@ export class AttachmentImageWidget extends WidgetType {
     });
     frame.appendChild(img);
 
-    if (this.dropped.length > 0) frame.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-image"));
+    appendDroppedSegmentMarker(frame, this.dropped, "attachment-image");
 
     const menu = buildEmbedOverflowMenu(view, frame, this.id, this.filename, this.dropped, "attachment-image");
     this.menuTeardown = menu.teardown;
@@ -542,8 +554,8 @@ export class AttachmentPdfWidget extends WidgetType {
   constructor(
     private readonly id: string,
     private readonly filename: string,
-    private readonly layout: EmbedLayout = emptyEmbedLayout(),
-    private readonly dropped: readonly DroppedEmbedSegment[] = [],
+    private readonly layout: EmbedLayout,
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -625,7 +637,7 @@ export class AttachmentPdfWidget extends WidgetType {
       },
     });
 
-    if (this.dropped.length > 0) frame.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-pdf"));
+    appendDroppedSegmentMarker(frame, this.dropped, "attachment-pdf");
 
     const menu = buildEmbedOverflowMenu(view, frame, this.id, this.filename, this.dropped, "attachment-pdf");
     this.menuTeardown = menu.teardown;
@@ -761,7 +773,7 @@ export class AttachmentFileCardWidget extends WidgetType {
     /** Segments the author wrote that this version could not read
      *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
      *  just the media ones (myne-md/myne#518). */
-    private readonly dropped: readonly DroppedEmbedSegment[] = [],
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
   }
@@ -826,9 +838,7 @@ export class AttachmentFileCardWidget extends WidgetType {
     );
     this.menuTeardown = menu.teardown;
     card.appendChild(menu.wrap);
-    if (this.dropped.length > 0) {
-      card.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-file"));
-    }
+    appendDroppedSegmentMarker(card, this.dropped, "attachment-file");
     return card;
   }
 
@@ -871,7 +881,7 @@ export class AttachmentAudioWidget extends WidgetType {
     /** Segments the author wrote that this version could not read
      *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
      *  just the media ones (myne-md/myne#518). */
-    private readonly dropped: readonly DroppedEmbedSegment[] = [],
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -910,9 +920,7 @@ export class AttachmentAudioWidget extends WidgetType {
     // (rename/export still use the full filename).
     name.textContent = stripFileExtension(this.filename);
     root.appendChild(name);
-    if (this.dropped.length > 0) {
-      root.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-audio"));
-    }
+    appendDroppedSegmentMarker(root, this.dropped, "attachment-audio");
 
     // Middle row: play button + waveform track + overflow menu, vertically
     // centered together (the play button aligns with the waveform line).
@@ -1212,7 +1220,7 @@ export class AttachmentVideoWidget extends WidgetType {
     /** Segments the author wrote that this version could not read
      *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
      *  just the media ones (myne-md/myne#518). */
-    private readonly dropped: readonly DroppedEmbedSegment[] = [],
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -1304,7 +1312,17 @@ export class AttachmentVideoWidget extends WidgetType {
       if (swapped) return;
       swapped = true;
       this.teardown?.(); // pause + release the buffer + tear the video menu down
-      const fallback = new AttachmentFileCardWidget(this.id, this.filename, this.size);
+      // `this.dropped` is threaded through rather than dropped: the swap does
+      // `frame.replaceChildren(card)` below, which removes the marker this
+      // widget appended, so a video that carries an unreadable segment AND
+      // fails to decode would lose its §3.9.3 report entirely. The compiler
+      // named this site the moment the parameter stopped having a default.
+      const fallback = new AttachmentFileCardWidget(
+        this.id,
+        this.filename,
+        this.size,
+        this.dropped,
+      );
       const card = fallback.toDOM(view);
       frame.classList.remove("cm-attachment-frame", "cm-attachment-video");
       frame.removeAttribute("role");
@@ -1315,9 +1333,7 @@ export class AttachmentVideoWidget extends WidgetType {
       this.teardown = () => fallback.destroy();
     });
 
-    if (this.dropped.length > 0) {
-      frame.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-video"));
-    }
+    appendDroppedSegmentMarker(frame, this.dropped, "attachment-video");
     return frame;
   }
 
@@ -1528,7 +1544,7 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     /** Segments the author wrote that this version could not read
      *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
      *  just the media ones (myne-md/myne#518). */
-    private readonly dropped: readonly DroppedEmbedSegment[] = [],
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
   }
@@ -1706,9 +1722,7 @@ export class AttachmentTextPreviewWidget extends WidgetType {
       this.resizeObserver.observe(card);
     }
 
-    if (this.dropped.length > 0) {
-      card.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-text"));
-    }
+    appendDroppedSegmentMarker(card, this.dropped, "attachment-text");
     return card;
   }
 
@@ -1798,8 +1812,8 @@ export class AttachmentTextPreviewWidget extends WidgetType {
  *  takes the export-only file-card path. */
 export function makeResolvedWidget(
   row: CatalogRow,
-  layout: EmbedLayout = emptyEmbedLayout(),
-  dropped: readonly DroppedEmbedSegment[] = [],
+  layout: EmbedLayout,
+  dropped: readonly DroppedEmbedSegment[],
 ): WidgetType {
   // `layout` is media-only and `dropped` is NOT, and the two used to travel
   // together as if they were one thing (myne-md/myne#518). A file card, an audio

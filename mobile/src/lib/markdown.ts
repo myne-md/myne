@@ -19,19 +19,21 @@ export type Inline =
       /** The display filename, with the layout segments split off. */
       label: string;
       /**
-       * The author's accessible name for this embed (myne-md/myne#518).
-       *
-       * `null` means the author wrote none, so the filename remains the
-       * accessible name. `""` means they deliberately wrote an empty one, which
-       * marks the media decorative and is NOT the same thing
+       * The author's layout choices, carried whole so a renderer can apply what
+       * it supports rather than re-parsing the alias. `layout.alt` is included,
+       * and a renderer reads it through `embedAccessibleName` rather than
+       * directly: `null` means the author wrote none, so the filename remains
+       * the accessible name, while `""` means they deliberately wrote an empty
+       * one, which marks the media decorative and is NOT the same thing
        * (`docs/spec/wikilink.md` §5.1). Mobile parsed the alias and then kept
        * only `label`, so an authored alt was not the accessible name on a phone
        * and an authored empty alt announced the filename instead of being
        * skipped.
+       *
+       * It is not ALSO copied to a sibling `alt` field. It was, briefly, and
+       * two fields holding one fact is how a later writer sets one and not the
+       * other.
        */
-      alt: string | null;
-      /** The author's layout choices, carried whole so a renderer can apply
-       *  what it supports rather than re-parsing the alias. */
       layout: EmbedLayout;
     };
 
@@ -65,9 +67,9 @@ const INLINE = [
         kind: "attachment",
         id: m[1],
         label: filename.trim(),
-        // NOT `?? ""` and not trimmed. Both would erase the distinction §5.1
-        // rests on: `null` is "no alt authored", `""` is "decorative".
-        alt: layout.alt,
+        // `layout.alt` is NOT `?? ""`-defaulted and NOT trimmed anywhere on the
+        // way here. Both would erase the distinction §5.1 rests on: `null` is
+        // "no alt authored", `""` is "decorative".
         layout,
       };
     },

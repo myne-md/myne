@@ -58,7 +58,7 @@ describe("markdown attachment token", () => {
     const para = blocks.find((b) => b.kind === "paragraph");
     expect(para?.kind).toBe("paragraph");
     const inline = para && para.kind === "paragraph" ? para.content : [];
-    // `toMatchObject`, not `toEqual`: the token also carries `alt` and `layout`
+    // `toMatchObject`, not `toEqual`: the token also carries `layout`
     // (myne-md/myne#518) and those have their own assertions below. An exact
     // match here would make every future field an edit to a test about labels.
     expect(inline).toHaveLength(1);
@@ -99,7 +99,7 @@ describe("markdown attachment token", () => {
     const inline = para && para.kind === "paragraph" ? para.content : [];
     const token = inline[0];
     expect(token.kind).toBe("attachment");
-    expect(token.kind === "attachment" ? token.alt : undefined).toBe(want);
+    expect(token.kind === "attachment" ? token.layout.alt : undefined).toBe(want);
   });
 
   it("keeps `` distinct from no alt at all, which is the decorative signal", () => {
@@ -110,7 +110,7 @@ describe("markdown attachment token", () => {
     const altOf = (bs: ReturnType<typeof parseBlocks>) => {
       const para = bs.find((b) => b.kind === "paragraph");
       const t = para && para.kind === "paragraph" ? para.content[0] : undefined;
-      return t !== undefined && t.kind === "attachment" ? t.alt : undefined;
+      return t !== undefined && t.kind === "attachment" ? t.layout.alt : undefined;
     };
     expect(altOf(decorative)).toBe("");
     expect(altOf(none)).toBeNull();
