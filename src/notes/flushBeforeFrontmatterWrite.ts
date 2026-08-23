@@ -36,11 +36,40 @@
 // of swallow meant this function could not fail, so the "abort rather than
 // clobber" contract below was a sentence about nothing and the test that
 // asserted it injected a rejection production could never produce. Each pane's
-// flusher now answers whether it SETTLED (`!hasPendingWork()` after the flush),
-// and `flushAll` rejects when any of them did not. The case that reaches it is
+// flusher now answers whether it SETTLED (`!lastSaveFailed()` after the flush,
+// which is not the same as `!hasPendingWork()`, and the comment at that call
+// site in `PaneView.tsx` says why the second one is wrong), and `flushAll`
+// rejects when any of them did not. The case that reaches it is
 // the one that matters most: a pane whose save is already failing, where
 // reading the stale disk bytes and writing a field on top of them is exactly
 // the clobber.
+
+// # Which writers call this, and which deliberately do not
+//
+// Callers today: `setNoteCover.ts`, and both converts in `templates.ts`.
+// `folderActions.ts` and `renameInbound.ts` call `renameFlushHooks()
+// .flushOpenPanes()` directly, because they flush once for a BATCH rather than
+// per note.
+//
+// Seven more writers have the identical read-patch-write shape against disk and
+// do NOT flush: `archiveNote`, `trashNote` (and their restore twins),
+// `moveNote`, `folderNote`, `renameNote`, `completeNote` and
+// `lib/writing-assistant.ts`. Every one of them is reachable from the sidebar
+// context menu or the palette while the same note is open and dirty, so the
+// race is not hypothetical there either, and on `trashNote` the losing direction
+// is worse than a reverted field: a pane still holding the pre-trash buffer
+// autosaves `trashed:` back off and the note returns from the trash.
+//
+// They are not simply wired up here, because doing so is a BEHAVIOUR change per
+// writer rather than a missing line. This function REJECTS on an unsettled
+// pane, and a caller that inherits that rejection turns "Move to trash" into an
+// action that can fail while a save is failing somewhere else. Whether that is
+// right depends on the writer: for a cover it plainly is, since the alternative
+// is losing the field silently; for a trash it is a question about what the
+// user asked for. Each needs its own answer, and answering seven of them by
+// adding one line each is how a silent revert becomes a visible failure nobody
+// designed. Recorded here rather than left implicit, so the next reader finds
+// the roster instead of concluding the class is closed.
 
 import { renameFlushHooks } from "./renameFlushHook";
 

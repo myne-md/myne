@@ -247,15 +247,26 @@ describe("useWorkspace — flush registry", () => {
     expect(other).toHaveBeenCalledTimes(1);
   });
 
-  it("names how many panes did not settle, so one failure does not hide two", async () => {
+  it("names WHICH panes did not settle, so one failure does not hide two", async () => {
     const { result } = renderHook(() => useWorkspace(), { wrapper });
     act(() => {
-      result.current.registerFlush("a", vi.fn().mockResolvedValue(false));
-      result.current.registerFlush("b", vi.fn().mockResolvedValue(false));
-      result.current.registerFlush("c", vi.fn().mockResolvedValue(true));
+      result.current.registerFlush("pane-a", vi.fn().mockResolvedValue(false));
+      result.current.registerFlush("pane-b", vi.fn().mockResolvedValue(false));
+      result.current.registerFlush("pane-settled", vi.fn().mockResolvedValue(true));
     });
     await act(async () => {
-      await expect(result.current.flushAll()).rejects.toThrow(/2 pane\(s\)/);
+      const failed = await result.current.flushAll().then(
+        () => null,
+        (e: unknown) => (e as Error).message,
+      );
+      expect(failed).not.toBeNull();
+      // The count AND the ids, read out of the parenthesised list rather than
+      // by substring: the surrounding sentence contains ordinary English words,
+      // so a `toContain` on a short id passes on the prose. A count alone
+      // cannot be acted on, and the settled pane must not appear.
+      expect(failed).toMatch(/2 pane\(s\)/);
+      const listed = /\(([^)]*)\)/.exec(failed?.replace("pane(s)", "") ?? "")?.[1];
+      expect(listed?.split(", ").sort()).toEqual(["pane-a", "pane-b"]);
     });
   });
 });
