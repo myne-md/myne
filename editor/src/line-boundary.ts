@@ -204,13 +204,12 @@ function probeLineBoundary(
   // a row change is not.
   const sameRow =
     before === null || after === null || Math.abs(after - before) <= 1;
-  const verified = sameRow
-    ? probed
-    : (() => {
-        // Only the fallback needs the line, and the fallback is the rare path.
-        const line = view.state.doc.lineAt(range.head);
-        return EditorSelection.cursor(forward ? line.to : line.from, forward ? -1 : 1);
-      })();
+  let verified = probed;
+  if (!sameRow) {
+    // Only the fallback needs the line, and the fallback is the rare path.
+    const line = view.state.doc.lineAt(range.head);
+    verified = EditorSelection.cursor(forward ? line.to : line.from, forward ? -1 : 1);
+  }
   return {
     target: forward ? verified : smartHomeBackward(view.state, range, verified),
     probeReplaced: !sameRow,
@@ -281,13 +280,15 @@ export function deleteToLineBoundary(view: EditorView, forward: boolean): boolea
       // the single-character step the at-the-boundary case already uses: too
       // little is one more keypress, too much is a paragraph.
       const boundary = probeReplaced ? range.head : target.head;
-      let towards = forward
-        ? range.head < boundary
+      // The boundary, unless the caret is already ON it, in which case step one
+      // character. Both directions reduce to that one rule; spelling it as two
+      // mirrored comparisons made the shared half look like a coincidence.
+      let towards =
+        boundary !== range.head
           ? boundary
-          : Math.min(state.doc.length, range.head + 1)
-        : range.head > boundary
-          ? boundary
-          : Math.max(0, range.head - 1);
+          : forward
+            ? Math.min(state.doc.length, range.head + 1)
+            : Math.max(0, range.head - 1);
       if (towards < from) {
         event = "delete.backward";
         towards = skipAtomic(view, towards, false);

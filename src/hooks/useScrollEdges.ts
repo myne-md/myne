@@ -85,6 +85,14 @@ export function useScrollEdges<T extends HTMLElement>(): {
   const [edges, setEdges] = useState<ScrollEdges>({ top: false, bottom: false });
   const nodeRef = useRef<T | null>(null);
 
+  // Not rAF-throttled, and that is a decision rather than an omission. The three
+  // reads below are pure geometry with no pending style change in front of them,
+  // so they do not force a layout, and `setEdges` short-circuits when the answer
+  // has not moved, so a scroll that changes nothing costs no render. A throttle
+  // would buy a coalesce the browser already does for scroll events, at the
+  // price of a scheduled callback and a cancel path in the teardown, in a hook
+  // that is inside the pre-unlock leak-budget scope. Revisit if a consumer ever
+  // measures something more expensive here than three integers.
   const measure = useCallback(() => {
     const el = nodeRef.current;
     if (el === null) return;
