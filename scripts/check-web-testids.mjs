@@ -116,6 +116,31 @@ function templateInterpolates(body) {
 }
 
 /**
+ * The value expression starting at `start`, which is NOT simply "up to the next
+ * `,` or `}`".
+ *
+ * A backtick template may contain both, and truncating one produced the wrong
+ * answer twice over. `` `row-${account}` `` was cut at the `}` that closes the
+ * interpolation, so it never ended with a backtick and was reported by the
+ * quote-shape test rather than by the rule that owns this: the RIGHT answer, for
+ * the wrong reason, which meant `templateInterpolates` was unreachable here and
+ * the predicate the docblock says decides it decided nothing. And a CONSTANT
+ * template containing a comma, `` `a, b` ``, was cut the same way and reported
+ * as a runtime value, which is a guard firing on a correct file.
+ *
+ * A backtick is therefore scanned to its close, which is what `dynamicDataAttrs`
+ * has always done by index; every other shape still stops at the delimiter.
+ */
+function valueAfter(clean, start) {
+  if (clean[start] !== "`") {
+    const m = /^[^,}\n]*/.exec(clean.slice(start));
+    return (m === null ? "" : m[0]).trim();
+  }
+  const close = clean.indexOf("`", start + 1);
+  return close === -1 ? clean.slice(start).trim() : clean.slice(start, close + 1);
+}
+
+/**
  * Is this `data-testid` value a constant, rather than something computed at
  * runtime?
  *
@@ -138,8 +163,8 @@ function isConstantTestIdExpr(expr) {
  * ban-everywhere caller reads the length.
  */
 export function interpolatedTestIdObjectForm(cleanSource) {
-  return [...cleanSource.matchAll(/["']data-testid["']\s*:\s*([^,}\n]*)/g)]
-    .map((m) => m[1].trim())
+  return [...cleanSource.matchAll(/["']data-testid["']\s*:\s*/g)]
+    .map((m) => valueAfter(cleanSource, m.index + m[0].length))
     .filter((expr) => !isConstantTestIdExpr(expr));
 }
 
@@ -350,8 +375,8 @@ function main() {
     const interpolated = [
       // A constant string in either spelling is not a runtime value, and
       // `isConstantTestIdExpr` is the one place that decides which is which.
-      ...[...preUnlockSrc.matchAll(/data-testid=\{([^}]*)\}/g)]
-        .map((m) => m[1].trim())
+      ...[...preUnlockSrc.matchAll(/data-testid=\{\s*/g)]
+        .map((m) => valueAfter(preUnlockSrc, m.index + m[0].length))
         .filter((expr) => !isConstantTestIdExpr(expr)),
       // The props-object spelling, which the JSX pattern above never matched.
       ...interpolatedTestIdObjectForm(preUnlockSrc),

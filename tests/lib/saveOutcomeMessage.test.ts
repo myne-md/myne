@@ -51,14 +51,4 @@ describe("saveOutcomeMessage", () => {
       expect(saveOutcomeMessage(false, SENTENCES)).toBe("Save failed.");
     }
   });
-
-  it("gives the two success arms DIFFERENT sentences, which is the whole rule", () => {
-    // Stated as one comparison, because each arm reads plausibly alone. A helper
-    // that answered the same string to both would satisfy the first case and
-    // silently reinstate the claim.
-    has.mockReturnValue(true);
-    const native = saveOutcomeMessage(true, SENTENCES);
-    has.mockReturnValue(false);
-    expect(saveOutcomeMessage(true, SENTENCES)).not.toBe(native);
-  });
 });

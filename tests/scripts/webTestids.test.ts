@@ -156,4 +156,23 @@ describe("interpolatedTestIdObjectForm: the props-object testid spelling", () =>
     const src = "const p = { 'data-testid': `row-${accountNumber}` };";
     expect(interpolatedTestIdObjectForm(src)).toHaveLength(1);
   });
+
+  it("names it for the RIGHT reason, which the truncation hid", () => {
+    // The value is captured whole. It used to be cut at the `}` that closes the
+    // interpolation, so it never ended with a backtick and the quote-shape test
+    // rejected it first: the right answer for the wrong reason, which left
+    // `templateInterpolates` unreachable in this scanner while the docblock said
+    // it decided the case. Asserting the captured EXPRESSION is what makes the
+    // difference observable.
+    const src = "const p = { 'data-testid': `row-${accountNumber}` };";
+    expect(interpolatedTestIdObjectForm(src)[0]).toBe("`row-${accountNumber}`");
+  });
+
+  it("passes a constant template containing a comma", () => {
+    // The false positive the same truncation produced in the other direction: a
+    // legitimate `` `a, b` `` was cut at the comma, stopped looking like a
+    // template, and was reported as a runtime value. A guard that fires on a
+    // correct file is a guard people learn to route around.
+    expect(interpolatedTestIdObjectForm("const p = { 'data-testid': `a, b` };")).toEqual([]);
+  });
 });

@@ -41,13 +41,16 @@ E2E_TARGET_VOLUME="myne-e2e-target-$E2E_TREE_KEY"
 # versa). Latent until a member gained a real external dependency
 # (editor/ -> @excalidraw); bites as `Cannot find module` on whichever side ran
 # `pnpm install` second.
-E2E_MEMBER_NM_VOLUMES=(
-  -v myne-e2e-nm-dialect:/work/dialect/node_modules
-  -v myne-e2e-nm-editor:/work/editor/node_modules
-  -v myne-e2e-nm-copy:/work/copy/node_modules
-  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
-  -v myne-e2e-nm-preview:/work/preview/node_modules
-)
+# ONE list, from which both the mounts and the chown paths below are built. Two
+# hand-kept lists is what the include exists to stop, and building the second by
+# string-splitting the first back apart was the same thing wearing a loop.
+E2E_MEMBERS=(dialect editor copy ornaments preview)
+
+E2E_MEMBER_NM_VOLUMES=()
+for _e2e_m in "${E2E_MEMBERS[@]}"; do
+  E2E_MEMBER_NM_VOLUMES+=(-v "myne-e2e-nm-$_e2e_m:/work/$_e2e_m/node_modules")
+done
+unset _e2e_m
 
 # The crates.io registry cache, at `$CARGO_HOME/registry` and NOT at the image's
 # `/usr/local/cargo/registry`.
@@ -80,14 +83,14 @@ E2E_REGISTRY_MOUNT=(-v myne-e2e-cargo-registry:/home/e2e/.cargo/registry)
 # file and the chown half stayed hand-copied in seven runners, which reproduced
 # the drift the include exists to end: the seven disagreed three ways, with
 # `e2e-batch.sh` mounting five member `node_modules` volumes and chowning none of
-# them. Deriving the paths from the same array is what makes "mounted implies
-# chowned" true by construction instead of by seven people remembering.
+# them. Both halves are built from `E2E_MEMBERS` above, and the whole chown STEP
+# is `E2E_FIX_PERMS` below rather than a string each runner interpolates, because
+# exporting only the paths still left every runner free not to use them.
 E2E_MEMBER_NM_PATHS=""
-for _e2e_v in "${E2E_MEMBER_NM_VOLUMES[@]}"; do
-  [ "$_e2e_v" = "-v" ] && continue
-  E2E_MEMBER_NM_PATHS="$E2E_MEMBER_NM_PATHS ${_e2e_v#*:}"
+for _e2e_m in "${E2E_MEMBERS[@]}"; do
+  E2E_MEMBER_NM_PATHS="$E2E_MEMBER_NM_PATHS /work/$_e2e_m/node_modules"
 done
-unset _e2e_v
+unset _e2e_m
 
 # The registry mountpoint AND its parent. The parent is where cargo writes its
 # lock files (`.package-cache`, `.global-cache`) at the `CARGO_HOME` root; the
@@ -104,3 +107,19 @@ unset _e2e_v
 # `mkdir /home/e2e/.cargo/registry/index` refused as `e2e`, and naming both paths
 # makes it succeed.
 E2E_CARGO_HOME_CHOWN='chown e2e:e2e /home/e2e/.cargo /home/e2e/.cargo/registry'
+
+# The whole ownership step, not just the paths.
+#
+# Exporting the paths and leaving each runner to interpolate them was still seven
+# people remembering, only of a shorter string: nothing forces a runner to use
+# the variable, so "mounted implies chowned" was a claim rather than a property.
+#
+# The FIVE e2e runners run `$E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS` verbatim, so
+# both live here and a runner that mounts the volumes gets the ownership with
+# them. The two capture runners deliberately do not: they `chown -R e2e:e2e
+# /work`, the whole bind mount, because they write generated artefacts back into
+# the tree rather than only into volumes. That covers the member mountpoints as
+# a side effect, so they are correct and they are the reason this says five
+# rather than seven. It is still a convention rather than a property, and the
+# honest version of that sentence is this one.
+E2E_FIX_PERMS="chown -R e2e:e2e /work/node_modules /work/target$E2E_MEMBER_NM_PATHS"

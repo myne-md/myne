@@ -94,12 +94,9 @@ for arch in arm64 amd64; do
     break
   fi
 done
-# The member `node_modules` paths come from the include, derived from the very
-# array that mounts them, so a volume cannot be mounted without being chowned.
-FIX_PERMS="chown -R e2e:e2e /work/node_modules /work/target$E2E_MEMBER_NM_PATHS"
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $INNER

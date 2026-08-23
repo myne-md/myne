@@ -3339,6 +3339,18 @@ function CommandPaletteHost({
   const convertActive = (toTemplate: boolean) => {
     if (activeNoteId === null) return;
     const id = activeNoteId;
+    // The convert and its UNDO answer the same two rejection classes with the
+    // same two sentences, so the pair is resolved once here rather than spelled
+    // twice twenty lines apart, which is what the helper it calls exists to stop.
+    const reportConvertFailure = (err: unknown) => {
+      setToast({
+        message: panesNotSettledMessage(err, {
+          unsettled: t("notes.unsettledSave"),
+          failed: t("editor.noteActions.convertFailed"),
+        }),
+        variant: "error",
+      });
+    };
     const forward = toTemplate ? convertNoteToTemplate : convertTemplateToNote;
     const inverse = toTemplate ? convertTemplateToNote : convertNoteToTemplate;
     // The convert wrote the `template:` flag straight to disk, out of band of
@@ -3363,39 +3375,21 @@ function CommandPaletteHost({
               // dismisses this toast first, so a swallowed rejection leaves the
               // user with a note that did not revert and nothing on screen at
               // all.
-              void inverse(id)
-                .then(settle)
-                .catch((err: unknown) => {
-                  setToast({
-                    message: panesNotSettledMessage(err, {
-                      unsettled: t("notes.unsettledSave"),
-                      failed: t("editor.noteActions.convertFailed"),
-                    }),
-                    variant: "error",
-                  });
-                });
+              void inverse(id).then(settle).catch(reportConvertFailure);
             },
           },
         });
       })
-      .catch((err: unknown) => {
-        // It used to say nothing, on the reasoning that a failed mutation leaves
-        // the note unchanged. That stopped being the whole story when the
-        // convert gained `flushBeforeFrontmatterWrite`: a REFUSED convert also
-        // leaves the note unchanged, and it is the app declining rather than a
-        // backend failing, which is a fact the user's own unsaved text explains
-        // and which clears itself once that save lands. Silence here is
-        // indistinguishable from a converted note whose row simply moved out of
-        // the sidebar, which is exactly what the undo toast below exists to
-        // prevent for the successful case.
-        setToast({
-          message: panesNotSettledMessage(err, {
-            unsettled: t("notes.unsettledSave"),
-            failed: t("editor.noteActions.convertFailed"),
-          }),
-          variant: "error",
-        });
-      });
+      // It used to say nothing, on the reasoning that a failed mutation leaves
+      // the note unchanged. That stopped being the whole story when the convert
+      // gained `flushBeforeFrontmatterWrite`: a REFUSED convert also leaves the
+      // note unchanged, and it is the app declining rather than a backend
+      // failing, which is a fact the user's own unsaved text explains and which
+      // clears itself once that save lands. Silence here is indistinguishable
+      // from a converted note whose row simply moved out of the sidebar, which
+      // is exactly what the undo toast above exists to prevent for the
+      // successful case.
+      .catch(reportConvertFailure);
   };
   // The note cover (myne-md/myne#410). `setNoteCover` writes `cover:` straight
   // to disk while the note is OPEN, so it is the same staleness class as the

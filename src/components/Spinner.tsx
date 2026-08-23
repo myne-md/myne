@@ -115,11 +115,14 @@ export function SyncArc({
   testId,
   style,
 }: {
-  /** `SYNC_ARC_INLINE_PX` or `SYNC_ARC_ROW_PX`. Required, not defaulted: every
-   *  caller passes one anyway, and a default is the opt-in shape `CLAUDE.md`
-   *  warns about, where the arm that never fires is the one a new call site
-   *  silently takes. */
-  size: number;
+  /** `SYNC_ARC_INLINE_PX` or `SYNC_ARC_ROW_PX`, and the TYPE says so rather than
+   *  the sentence: naming the two constants is pointless if `size={12}` still
+   *  compiles, and the pixel count is a decision the canon owns
+   *  (`docs/design/README.md`, "Inline status marks are a separate class from
+   *  icons"). Required, not defaulted: every caller passes one anyway, and a
+   *  default is the opt-in shape `CLAUDE.md` warns about, where the arm that
+   *  never fires is the one a new call site silently takes. */
+  size: typeof SYNC_ARC_INLINE_PX | typeof SYNC_ARC_ROW_PX;
   /** True only while work is actually in flight. See the state table above. */
   spinning: boolean;
   /**
