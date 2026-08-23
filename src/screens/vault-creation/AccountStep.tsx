@@ -26,7 +26,6 @@ import { useRef, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Spinner } from "../../components/Spinner";
-import { has } from "../../platform/capabilities";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import {
   ActionStatus,
@@ -35,6 +34,7 @@ import {
 } from "../../components/ActionStatus";
 import {
   copySecretToClipboard,
+  saveOutcomeMessage,
   saveSecretAsTextFile,
 } from "../../lib/secret-export";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
@@ -108,17 +108,14 @@ export function AccountStep({
       ok ? t("vaultCreation.account.copied") : t("vaultCreation.account.copyFailed"),
     // The success half branches on the capability for the same reason the phrase
     // step's copy half does: a client may not claim a guarantee it cannot make.
-    // `saveSecretAsTextFile`'s download arm is `<a download>.click()`, which
-    // returns before the browser has written anything and throws on none of a
-    // blocked download, a cancelled destination prompt or a failed write. On
-    // that arm "Saved." is a claim about a file this client never observes, on
-    // the one screen where the value is shown once (myne-md/myne#520 review).
+    // `saveOutcomeMessage` holds that decision for both screens; the `t("…")`
+    // literals stay here, where `check-i18n.mjs` can see them.
     save: (ok) =>
-      ok
-        ? has("nativeSaveAs")
-          ? t("vaultCreation.account.savedToFile")
-          : t("vaultCreation.account.downloadStarted")
-        : t("vaultCreation.account.saveFailed"),
+      saveOutcomeMessage(ok, {
+        saved: t("vaultCreation.account.savedToFile"),
+        started: t("vaultCreation.account.downloadStarted"),
+        failed: t("vaultCreation.account.saveFailed"),
+      }),
   };
 
   return (
