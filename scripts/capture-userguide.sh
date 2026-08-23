@@ -50,7 +50,7 @@ RUN_FLAGS=(
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
   -v "$E2E_TARGET_VOLUME":/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  "${E2E_REGISTRY_MOUNT[@]}"
   # Per-member node_modules volumes, matching the three e2e runners. Without
   # them the container's `pnpm install` rewrites each bind-mounted workspace
   # member's symlinks and breaks the HOST install — the documented failure mode
@@ -66,7 +66,7 @@ E2E_ENV="export ${SCALE_ENV}HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HO
 # repo root stays host-owned (root), so the unprivileged `e2e` build user can't
 # create /work/dist and `vite build` fails with EACCES. (Docker Desktop on macOS
 # masks this via ownership remapping; native Linux / CI does not.)
-FIX_PERMS='chown -R e2e:e2e /work /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work'
 
 BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
 if [[ "$SKIP_BUILD" == 1 ]]; then
@@ -74,7 +74,7 @@ if [[ "$SKIP_BUILD" == 1 ]]; then
 fi
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&

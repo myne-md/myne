@@ -40,7 +40,7 @@ RUN_FLAGS=(
   # (symptom: host tsc "Cannot find module '@excalidraw/excalidraw'").
   "${E2E_MEMBER_NM_VOLUMES[@]}"
   -v "$E2E_TARGET_VOLUME":/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  "${E2E_REGISTRY_MOUNT[@]}"
   -w /work
   --user root
 )
@@ -56,10 +56,10 @@ esac
 if [[ -f "myne-server/myne-server-linux-$SRVARCH" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/myne-server/myne-server-linux-$SRVARCH"
 fi
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $INNER
