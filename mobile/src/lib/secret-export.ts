@@ -136,8 +136,7 @@ export type SecretSaveOutcome =
   | { readonly kind: "written" };
 
 /**
- * How the platform makes the written file reachable, or `"unknown"` when the
- * probe could not say.
+ * Which {@link SecretSaveOutcome} the platform's delivery calls for.
  *
  * A named predicate rather than a `platform === "android"` compare at the point
  * of use, following `canHoldSecretOnClipboard` in `clipboardTransport.ts`: the
@@ -145,15 +144,20 @@ export type SecretSaveOutcome =
  * string at the call site invites the next caller to re-derive it from a
  * different premise.
  *
- * `"unknown"` is its own answer rather than folded into either real one,
- * because both real ones are claims and a failed probe has established
- * neither. The failure mode of an IPC read is silence, so folding it in is how
- * a claim gets made about a device nobody asked.
+ * It returns the outcome's own `kind` rather than a second three-value
+ * vocabulary, because a private `"path" | "share-sheet" | "unknown"` mapped 1:1
+ * onto the public one and the only thing between them was an if-chain at the
+ * caller: two names for each of three facts.
+ *
+ * `"written"` is its own answer rather than folded into either real one, because
+ * both real ones are CLAIMS and a failed probe has established neither. The
+ * failure mode of an IPC read is silence, so folding it in is how a claim gets
+ * made about a device nobody asked.
  */
-async function savedFileDelivery(): Promise<"path" | "share-sheet" | "unknown"> {
+async function savedFileDelivery(): Promise<SecretSaveOutcome["kind"]> {
   const platform = await devicePlatform().catch(() => null);
-  if (platform === null) return "unknown";
-  return platform === "android" ? "path" : "share-sheet";
+  if (platform === null) return "written";
+  return platform === "android" ? "path" : "shared";
 }
 
 export async function saveSecretToDocuments(
@@ -169,10 +173,8 @@ export async function saveSecretToDocuments(
     // The platform read comes AFTER the write, so a probe failure cannot cost
     // the save. It can only cost the app the right to say where the file went,
     // which is what the third arm is.
-    const delivery = await savedFileDelivery();
-    if (delivery === "path") return { kind: "path", label: `Documents/${filename}` };
-    if (delivery === "share-sheet") return { kind: "shared" };
-    return { kind: "written" };
+    const kind = await savedFileDelivery();
+    return kind === "path" ? { kind, label: `Documents/${filename}` } : { kind };
   } catch (e) {
     logErrorKind(e, "secret-save-failed");
     return null;

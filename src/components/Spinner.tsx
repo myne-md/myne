@@ -37,6 +37,20 @@ export function Spinner({ size = 32, style }: SpinnerProps) {
 }
 
 /**
+ * The two sizes the arc is drawn at, named rather than written as a literal at
+ * each call site.
+ *
+ * They differ by a pixel and both call sites' comments claim the glyph is "one
+ * fact seen twice", which read as a contradiction until it was measured: the
+ * save readout's arc sits INSIDE a text run at the readout's font size, and the
+ * sidebar's sits at row level beside a title. Optical size follows the text it
+ * sits in, so the shape is shared and the pixel count is not. Naming them says
+ * that out loud; two bare literals said the opposite.
+ */
+export const SYNC_ARC_INLINE_PX = 7;
+export const SYNC_ARC_ROW_PX = 8;
+
+/**
  * The small inline sibling of `<Spinner>`: a three-quarter arc that says whether
  * work is outstanding, and whether anything is currently moving on it
  * (myne-md/myne#566).
@@ -93,29 +107,19 @@ export function Spinner({ size = 32, style }: SpinnerProps) {
  * glyph, which is what `SaveStatus` does; that component's own comment explains
  * why a region removed from the accessibility tree announces nothing.
  */
-/**
- * The two sizes the arc is drawn at, named rather than written as a literal at
- * each call site.
- *
- * They differ by a pixel and both call sites' comments claim the glyph is "one
- * fact seen twice", which read as a contradiction until it was measured: the
- * save readout's arc sits INSIDE a text run at the readout's font size, and the
- * sidebar's sits at row level beside a title. Optical size follows the text it
- * sits in, so the shape is shared and the pixel count is not. Naming them says
- * that out loud; two bare literals said the opposite.
- */
-export const SYNC_ARC_INLINE_PX = 7;
-export const SYNC_ARC_ROW_PX = 8;
-
 export function SyncArc({
-  size = SYNC_ARC_ROW_PX,
+  size,
   spinning,
   label,
   title,
   testId,
   style,
 }: {
-  size?: number;
+  /** `SYNC_ARC_INLINE_PX` or `SYNC_ARC_ROW_PX`. Required, not defaulted: every
+   *  caller passes one anyway, and a default is the opt-in shape `CLAUDE.md`
+   *  warns about, where the arm that never fires is the one a new call site
+   *  silently takes. */
+  size: number;
   /** True only while work is actually in flight. See the state table above. */
   spinning: boolean;
   /**
