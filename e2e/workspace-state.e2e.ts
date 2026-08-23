@@ -38,7 +38,7 @@ import { seedVault, seedVaults } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
-  noteRow,
+  clickNoteRow,
   noteRowIds,
   rowMenuPick,
   selectPickerRow,
@@ -163,7 +163,7 @@ describeE2E("ws1 layout restore + at-rest (MYND-257)", () => {
         for (const t of WS1_TITLES) await createNote(s, t);
         const [n0, n1, n2] = await noteRowIds(s, 3);
 
-        await (await noteRow(s, n0)).click(); // openInFocused → pane-0 = [n0]
+        await clickNoteRow(s, n0); // openInFocused → pane-0 = [n0]
         await rowMenuPick(s, n1, "open-in-new-tab"); // new tab → [n0, n1]
         await rowMenuPick(s, n2, "open-to-side"); // open to side → split
 
@@ -223,7 +223,7 @@ describeE2E("ws2 per-vault layout isolation (MYND-257)", () => {
         await dismissImporterOffer(s);
         for (const t of WS2_A_TITLES) await createNote(s, t);
         const [a0, a1] = await noteRowIds(s, 2);
-        await (await noteRow(s, a0)).click();
+        await clickNoteRow(s, a0);
         await rowMenuPick(s, a1, "open-to-side"); // open to side → split
         const layoutA: LayoutSig = {
           panes: [
@@ -244,7 +244,7 @@ describeE2E("ws2 per-vault layout isolation (MYND-257)", () => {
         await unlockToEditor(s, b.password);
         for (const t of WS2_B_TITLES) await createNote(s, t);
         const [b0, b1] = await noteRowIds(s, 2);
-        await (await noteRow(s, b0)).click();
+        await clickNoteRow(s, b0);
         await rowMenuPick(s, b1, "open-in-new-tab"); // new tab
         const layoutB: LayoutSig = {
           panes: [{ tabs: [b0, b1], active: b1 }],

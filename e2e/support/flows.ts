@@ -1143,6 +1143,40 @@ export async function noteRow(session: Session, noteId: string): Promise<Element
   return session.waitForElement(testIdSelector("notes.row", { "data-note-id": noteId }));
 }
 
+/**
+ * Click a note row, re-finding it on every poll.
+ *
+ * `(await noteRow(s, id)).click()` captures the handle ONCE and then polls the
+ * click against it. `Element.click` retries a not-interactable element, which is
+ * the case it was written for, but a handle whose node has been REPLACED is
+ * stale on every poll and can only time out: the sidebar list re-renders on a
+ * save settling, on a sync tick and on the row's own selection, so the window
+ * between finding and clicking is real. Measured on `nco3`, which failed once in
+ * eight runs with `[stale element reference]` after two retries, then passed
+ * three consecutive times unchanged.
+ *
+ * `clickByTestId` is the same shape for a bare testid; this exists because a row
+ * is addressed by testid PLUS `data-note-id`.
+ */
+export async function clickNoteRow(session: Session, noteId: string): Promise<void> {
+  const selector = testIdSelector("notes.row", { "data-note-id": noteId });
+  await session.waitUntil(
+    async () => {
+      const [row] = await session.findElements(selector);
+      if (row === undefined) return null;
+      try {
+        await session.send("POST", `/element/${row.elementId}/click`);
+        return true;
+      } catch {
+        // Stale, covered, or not hit-testable yet. All three are answered the
+        // same way, by finding the row again on the next poll.
+        return null;
+      }
+    },
+    { label: `note row ${noteId} clicked` },
+  );
+}
+
 /** Right-click a note row and pick a context-menu item by `data-item-id`. The
  *  new-tab / open-to-side gestures are driven through the row's REAL context menu
  *  (`open-in-new-tab` / `open-to-side`) rather than middle-click / Alt-click: the

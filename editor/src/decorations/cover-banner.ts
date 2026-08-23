@@ -188,9 +188,11 @@ class CoverBannerWidget extends WidgetType {
     // this, hovering that mirror's banner and pressing Remove clears the note's
     // cover from a surface documented as never writing.
     //
-    // `writableHost` rather than a `view.state.readOnly` clause here: the rule
+    // `writableMember` rather than a `view.state.readOnly` clause here: the rule
     // belongs to the seam, which is where the write-capable members are
     // declared, so the third such control inherits it instead of re-deciding.
+    // What the roster does and does not reach is stated at `HOST_WRITE_MEMBERS`
+    // itself; it covers top-level members and names the ones it cannot.
     const cover = writableMember(view.state, "cover");
     if (cover !== undefined) {
       // Read the note LIVE at activation, never captured here (myne-md/myne#520).

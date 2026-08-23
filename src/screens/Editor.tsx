@@ -3357,7 +3357,23 @@ function CommandPaletteHost({
             label: t("notes.list.undo"),
             onAction: () => {
               setToast(null);
-              void inverse(id).then(settle).catch(() => {});
+              // The UNDO inherits the same refusal the forward path does, and it
+              // is the sixth surface rather than a special case: `inverse` is
+              // the other convert, so it opens with the same flush. Undo also
+              // dismisses this toast first, so a swallowed rejection leaves the
+              // user with a note that did not revert and nothing on screen at
+              // all.
+              void inverse(id)
+                .then(settle)
+                .catch((err: unknown) => {
+                  setToast({
+                    message: panesNotSettledMessage(err, {
+                      unsettled: t("notes.unsettledSave"),
+                      failed: t("editor.noteActions.convertFailed"),
+                    }),
+                    variant: "error",
+                  });
+                });
             },
           },
         });
@@ -3401,11 +3417,23 @@ function CommandPaletteHost({
     if (id === null) return;
     void setNoteCover(id, COVER_FIELD_KEY, choice)
       .then(() => settleFrontmatterWrite(id))
-      .catch(() => {
+      .catch((err: unknown) => {
         // Say so. A swallowed failure here is indistinguishable from "the cover
         // I picked did not apply for some reason I cannot see": the note is
         // unchanged, the picker has already closed, and nothing on screen moved.
-        setToast({ message: t("editor.cover.writeFailed"), variant: "error" });
+        //
+        // Through the shared helper, like the saved-view card's cover write one
+        // file over: this is the SAME branch on the same writer, and the two
+        // surfaces were answering it differently. A refusal is the app declining
+        // because of the user's own unsaved text and clears itself when that save
+        // lands; "could not update" gives them nothing to act on.
+        setToast({
+          message: panesNotSettledMessage(err, {
+            unsettled: t("notes.unsettledSave"),
+            failed: t("editor.cover.writeFailed"),
+          }),
+          variant: "error",
+        });
       });
   };
   // The note the open picker will write to, resolved ONCE here rather than at

@@ -28,7 +28,7 @@ import {
   createNote,
   dismissImporterOffer,
   ESCAPE_KEY,
-  noteRow,
+  clickNoteRow,
   pageSeatInvoke,
   rowMenuPick,
   runPaletteAction,
@@ -311,7 +311,7 @@ describeE2E("nco3 Remove acts on the pane whose banner was pressed (myne-md/myne
         const right = await selectedNoteId(s);
 
         // Left pane: Sol Kapak, cover = the first image.
-        await (await noteRow(s, left)).click();
+        await clickNoteRow(s, left);
         await openCoverPicker(s);
         await pickCoverImage(s, 0);
         await waitForBanners(s, 1);

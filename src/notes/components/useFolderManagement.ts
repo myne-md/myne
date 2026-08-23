@@ -49,7 +49,7 @@ import {
 import { moveNote } from "../moveNote";
 import { writeTabDrag } from "../tabDrag";
 import { itemKey, noteItem } from "../workspaceState";
-import { isPanesNotSettled } from "../workspaceContext";
+import { panesNotSettledMessage } from "../workspaceContext";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
 import {
@@ -458,11 +458,19 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       try {
         result = await renameFolder(node.path, newPath, notesForOps(), deliberate);
       } catch (err) {
-        if (!isPanesNotSettled(err)) throw err;
-        // The folder-specific sentence rather than the neutral shared one: the
-        // helper takes resolved strings precisely so a surface that can say
-        // something more useful does.
-        setBlockNotice(i18n.t("notes.folderManagement.unsettledSave"));
+        // Both arms REPORT, and neither rethrows. Every caller of this reaches it
+        // through a `void fm.moveFolderTo(...)` or `void fm.commitRenameFolder(...)`
+        // with no `.catch`, so a rethrow is an unhandled rejection and nothing on
+        // screen, which is worse than the wrong notice it replaced. The folder
+        // sentence is the folder-specific one rather than the neutral shared
+        // string, which is what `panesNotSettledMessage` taking resolved
+        // sentences is for.
+        setBlockNotice(
+          panesNotSettledMessage(err, {
+            unsettled: i18n.t("notes.folderManagement.unsettledSave"),
+            failed: i18n.t("notes.folderManagement.renameFailed"),
+          }),
+        );
         return;
       }
       setDeliberate(result.nextDeliberate);
@@ -490,6 +498,15 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         }
       }
       await Promise.all(result.moved.map((id) => ctx.refreshOne(id)));
+      // Last, and deliberately AFTER the re-rooting above. The rename committed
+      // and only the `deliberate_folders` write failed, so the notes are right
+      // and one setting is not; running the re-rooting first is what keeps the
+      // decoration map and `archived_folders` from ALSO drifting off a rename
+      // that landed. Nothing reconciles `vault.prefs` against note frontmatter
+      // later, so the user is the reconciliation.
+      if (result.deliberateWriteFailed !== undefined) {
+        setBlockNotice(i18n.t("notes.folderManagement.deliberateWriteFailed"));
+      }
     },
     [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap],
   );

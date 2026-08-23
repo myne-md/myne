@@ -36,6 +36,7 @@ import {
   ipcOk,
   openSettings,
   pageSeatInvoke,
+  clickNoteRow,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -667,7 +668,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         // suite's driver-addressable split gesture). The side pane takes focus
         // AND selection, leaving X's pane unfocused (X ≠ selectedId).
         await createNote(b.session, SPLIT_SIDE_TITLE);
-        await (await noteRow(b.session, noteId)).click();
+        await clickNoteRow(b.session, noteId);
         const sideId = await otherNoteRowId(b.session, noteId);
         await rowMenuPick(b.session, sideId, "open-to-side");
         const xPaneId = await unfocusedPaneIdShowing(b.session, noteId);

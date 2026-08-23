@@ -237,6 +237,17 @@ export type FolderRenameResult = {
   nextDeliberate: string[];
   /** True when the rename was rejected before any work (root source/target). */
   invalid?: boolean;
+  /**
+   * The `deliberate_folders` write failed, AFTER the rename committed.
+   *
+   * Reported as a value for the same reason the post-commit batch case is: past
+   * the commit, throwing tells the caller a rename that is on disk did not
+   * happen, and it skips the decoration and `archived_folders` re-rooting that
+   * still have to run. Those live in `vault.prefs` and nothing reconciles them
+   * later, so the subtree silently un-archives at the next unlock. The caller
+   * finishes the re-rooting and reports THIS separately.
+   */
+  deliberateWriteFailed?: unknown;
 };
 
 /** A note with its decrypted body — the input the transactional rename planner
@@ -440,8 +451,17 @@ export async function renameFolder(
     }
   }
 
+  // Past the commit, so a failure here is REPORTED rather than thrown. The
+  // rename is on disk; the caller still owes the decoration and
+  // `archived_folders` re-rooting, and a throw would skip both while telling the
+  // user nothing happened.
+  let deliberateWriteFailed: unknown;
   if (plan.deliberateRewritten > 0) {
-    await setDeliberateFolders(plan.nextDeliberate);
+    try {
+      await setDeliberateFolders(plan.nextDeliberate);
+    } catch (error) {
+      deliberateWriteFailed = error;
+    }
   }
 
   // The folder changed on the moved notes → re-index (live, decrypt-free) so
@@ -458,5 +478,6 @@ export async function renameFolder(
     failed: [],
     deliberateRewritten: plan.deliberateRewritten,
     nextDeliberate: plan.nextDeliberate,
+    deliberateWriteFailed,
   };
 }

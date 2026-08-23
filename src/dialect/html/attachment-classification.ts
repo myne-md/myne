@@ -26,6 +26,16 @@ export interface ExcludedAttachment {
 export const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
 
 /**
+ * What an embed with no readable filename is called.
+ *
+ * Exported so a caller that has ALREADY parsed the alias can apply the fallback
+ * without parsing it a second time, which is the emitter's case: it needs the
+ * layout off the same parse. The rule stays in one place either way, and that is
+ * what this module's header insists on.
+ */
+export const ATTACHMENT_FALLBACK_NAME = "attachment";
+
+/**
  * The display name an embed renders/reports under: the alias SPLIT to its
  * filename (myne#409), or the generic fallback when the embed is malformed
  * (alias missing/empty).
@@ -46,16 +56,6 @@ export const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
  * legitimately contains a pipe (`re|port.png`) re-splits to itself, because a
  * later unkeyed segment rejoins the filename.
  */
-/**
- * What an embed with no readable filename is called.
- *
- * Exported so a caller that has ALREADY parsed the alias can apply the fallback
- * without parsing it a second time, which is the emitter's case: it needs the
- * layout off the same parse. The rule stays in one place either way, and that is
- * what this module's header insists on.
- */
-export const ATTACHMENT_FALLBACK_NAME = "attachment";
-
 export function attachmentEmbedDisplayName(filename: string): string {
   const { filename: name } = parseEmbedAlias(filename);
   return name !== "" ? name : ATTACHMENT_FALLBACK_NAME;

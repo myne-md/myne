@@ -1794,7 +1794,9 @@
       "tooLong": "That folder path is too long.",
       "moveIntoSelf": "A folder can't be moved inside itself.",
       "moveCollision": "There's already a folder with that name there.",
-      "unsettledSave": "An open note hasn't finished saving, so the folder was left alone. Try again once it has."
+      "unsettledSave": "An open note hasn't finished saving, so the folder was left alone. Try again once it has.",
+      "renameFailed": "Couldn't rename the folder, so it is unchanged.",
+      "deliberateWriteFailed": "The folder was renamed, but one of its settings could not be saved. Renaming it again will retry."
     },
     "folderNote": {
       "defaultTitle": "Index"

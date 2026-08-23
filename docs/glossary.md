@@ -1082,7 +1082,7 @@ Used in: `self-host-policy.md` §3, `decisions.md` 2026-06-20 (MYND-438)
 
 A glyph that sits **inside a text run** to say what a surface owes: the trailing slot of a sidebar note row, the bottom bar beside the save readout. It is a distinct class from an **icon**, which names a thing, and `docs/design/README.md` carves three of the icon rules out for it rather than bending them: it is 7 to 8px rather than 16 and up, it is coloured by MEANING (`--accent` while work is in flight, `--fg-3` while it is merely outstanding) rather than by `currentColor`, and it is drawn as a three-sided border ring rather than from the Lucide set, because at that size no Lucide pair distinguishes a filled dot from a hollow one and the GAP is what carries "incomplete" while the glyph stands still.
 
-The class exists so a second member argues for itself against the same rules rather than re-deciding them. Today it has exactly one: [sync arc](#sync-arc). A mark is never a live region — it has no text content, so `role="status"` on it announces nothing — and the surface renders a persistently-mounted visually-hidden region beside it instead.
+The class exists so a second member argues for itself against the same rules rather than re-deciding them. Today it has exactly one: [sync arc](#sync-arc). A mark is never a live region. It has no text content, so `role="status"` on it announces nothing, and the surface renders a persistently-mounted visually-hidden region beside it instead.
 
 Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`
 
