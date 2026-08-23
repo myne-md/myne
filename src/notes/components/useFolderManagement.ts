@@ -49,6 +49,7 @@ import {
 import { moveNote } from "../moveNote";
 import { writeTabDrag } from "../tabDrag";
 import { itemKey, noteItem } from "../workspaceState";
+import { isPanesNotSettled } from "../workspaceContext";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
 import {
@@ -443,10 +444,21 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // answer, since the batch reads every note from disk and would write over
       // whatever that pane still holds, but a silent decline is
       // indistinguishable from a rename that did nothing. Say so.
+      //
+      // Narrowed to that one class, and the bare `catch` this replaces is why.
+      // `renameFolder` awaits `setDeliberateFolders` PAST its transactional
+      // batch, so it can also reject with the rename already committed to disk,
+      // and the notice says "the folder was left alone. Try again once it has",
+      // which would be the exact inverse of what happened. It would also skip
+      // the `setDeliberate` and the decoration re-rooting below, leaving the
+      // deliberate set out of step with a rename that did land. Anything that is
+      // not the flush refusal is rethrown, so it surfaces as itself rather than
+      // as a sentence about somebody's unsaved note.
       let result;
       try {
         result = await renameFolder(node.path, newPath, notesForOps(), deliberate);
-      } catch {
+      } catch (err) {
+        if (!isPanesNotSettled(err)) throw err;
         setBlockNotice(i18n.t("notes.folderManagement.unsettledSave"));
         return;
       }

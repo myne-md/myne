@@ -86,6 +86,43 @@ function newPaneId(): PaneId {
   return crypto.randomUUID();
 }
 
+/**
+ * `flushAll` refused: at least one pane did not settle, so the disk does not
+ * match the buffer and nothing may be written on top of it.
+ *
+ * A NAMED class rather than a bare `Error`, because five surfaces now inherit
+ * this rejection and every one of them has to tell it apart from a backend
+ * failure. They mean different things to the user and to the code: a backend
+ * failure is reported by the backend's own tracing and is retryable, while this
+ * one is the app declining, is the user's own unsaved text, and clears itself
+ * the moment that save lands. A `catch {}` that attributes both to the same
+ * cause either says nothing (four of the five did) or names a cause it has not
+ * established (the fifth did).
+ */
+export class PanesNotSettledError extends Error {
+  /** The panes that did not settle. Named, not counted: "2 panes" cannot be
+   *  acted on, and which two decides whether the user is looking at a full
+   *  disk, one bad note, or a pane they thought they had closed. */
+  readonly panes: readonly PaneId[];
+
+  constructor(panes: readonly PaneId[]) {
+    super(
+      `flushOpenPanes: ${panes.length} pane(s) did not settle (${panes.join(", ")}); ` +
+        `refusing to report the disk as current`,
+    );
+    this.name = "PanesNotSettledError";
+    this.panes = panes;
+  }
+}
+
+/** True for the rejection {@link PanesNotSettledError} describes, across a
+ *  module boundary and a `structuredClone`-free promise chain. `instanceof` is
+ *  enough today (one bundle, one class identity) and the helper is what every
+ *  call site uses, so a future transport change is one edit. */
+export function isPanesNotSettled(err: unknown): err is PanesNotSettledError {
+  return err instanceof PanesNotSettledError;
+}
+
 export type WorkspaceApi = {
   root: WorkspaceNode;
   focusedPaneId: PaneId;
@@ -624,15 +661,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ),
     );
     const unsettled = settled.filter((id): id is PaneId => id !== null);
-    if (unsettled.length > 0) {
-      // The ids, not just the count. This message is what a caller logs when it
-      // declines to write, and "2 panes did not settle" cannot be acted on:
-      // which two decides whether the user is looking at a full disk, one bad
-      // note, or a pane they thought they had closed.
-      throw new Error(
-        `flushOpenPanes: ${unsettled.length} pane(s) did not settle (${unsettled.join(", ")}); refusing to report the disk as current`,
-      );
-    }
+    if (unsettled.length > 0) throw new PanesNotSettledError(unsettled);
   }, []);
 
   // WL-8 rename auto-update seam: expose the open-note set + flush-all to the

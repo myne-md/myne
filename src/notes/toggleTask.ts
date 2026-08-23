@@ -51,6 +51,7 @@ import {
 } from "./taskWriteCore";
 import type { VaultTask } from "./taskIndex";
 import { reindexNoteFromBody } from "./vaultIndices";
+import { isPanesNotSettled } from "./workspaceContext";
 
 /**
  * The desktop write: `saveNote`, then the index refresh.
@@ -131,6 +132,28 @@ export async function toggleTask(task: VaultTask, deps?: TaskWriteDeps): Promise
  * explain one to the user pass their own handler to {@link setTaskCompleted}
  * instead; the two that don't (the task panes and the query block) share this,
  * so "what a refused toggle does" has one answer rather than one per surface.
+ *
+ * **Two refusals reach here, not one.** `TaskWriteRefusedClass` is the writer
+ * declining because the line it read does not match the record it was given.
+ * `PanesNotSettledError` is the FLUSH declining, and it arrives from
+ * `taskWriteCore`'s `await flushDirtyPanes?.()`, which is the first thing that
+ * runs. Both mean "nothing was written", and the checkbox correctly does not
+ * move in either case, because the list re-reads the index rather than assuming
+ * the toggle landed.
+ *
+ * The second one was not classified, so it propagated out of an unawaited
+ * `void toggleTaskSwallowingRefusal(...)` at all three call sites: an unhandled
+ * rejection, and a box that did not move for a reason nowhere on screen. The
+ * classification is here rather than at the three call sites for the reason
+ * above, that there is one answer to "what a refused toggle does".
+ *
+ * What is still missing is a USER-visible reason, and it is missing because
+ * neither task pane has a notice channel: the right panel owns no toast, and
+ * `announceWrite` is a reindex signal rather than a message. The editor screen's
+ * cover write says so with a toast and the folder rename with a block notice;
+ * the task panes would need a channel that does not exist yet. Recorded rather
+ * than left implicit, because the state on screen is honest here (the box stays
+ * where it was) and only the explanation is absent.
  */
 export async function toggleTaskSwallowingRefusal(
   task: VaultTask,
@@ -141,6 +164,10 @@ export async function toggleTaskSwallowingRefusal(
   } catch (err) {
     if (err instanceof TaskWriteRefusedClass) {
       console.warn(`[tasks] write refused: ${err.reason}`);
+      return;
+    }
+    if (isPanesNotSettled(err)) {
+      console.warn(`[tasks] write refused: pane(s) did not settle: ${err.panes.join(", ")}`);
       return;
     }
     throw err;

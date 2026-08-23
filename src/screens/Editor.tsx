@@ -221,7 +221,7 @@ import { useResponsiveCollapse } from "./responsiveCollapse";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
 import { REVEAL_ATTACHMENT_EVENT } from "../editor/attachments/fileCardActions";
 import { CenterViewProvider, type CenterView } from "./centerView";
-import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
+import { WorkspaceProvider, isPanesNotSettled, useWorkspace } from "../notes/workspaceContext";
 import { ClipDispatchListener } from "../clip/ClipDispatchListener";
 import { PaneTree } from "../notes/components/PaneTree";
 import { STRIP_HEIGHT } from "../notes/components/TabStrip";
@@ -3358,8 +3358,22 @@ function CommandPaletteHost({
           },
         });
       })
-      .catch(() => {
-        /* mutation failure leaves the note unchanged; no toast */
+      .catch((err: unknown) => {
+        // It used to say nothing, on the reasoning that a failed mutation leaves
+        // the note unchanged. That stopped being the whole story when the
+        // convert gained `flushBeforeFrontmatterWrite`: a REFUSED convert also
+        // leaves the note unchanged, and it is the app declining rather than a
+        // backend failing, which is a fact the user's own unsaved text explains
+        // and which clears itself once that save lands. Silence here is
+        // indistinguishable from a converted note whose row simply moved out of
+        // the sidebar, which is exactly what the undo toast below exists to
+        // prevent for the successful case.
+        setToast({
+          message: isPanesNotSettled(err)
+            ? t("notes.folderManagement.unsettledSave")
+            : t("editor.noteActions.convertFailed"),
+          variant: "error",
+        });
       });
   };
   // The note cover (myne-md/myne#410). `setNoteCover` writes `cover:` straight
