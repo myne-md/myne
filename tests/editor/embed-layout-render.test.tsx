@@ -26,9 +26,16 @@ import {
 const IMG_ID = "a".repeat(64);
 const PDF_ID = "b".repeat(64);
 
+const AUDIO_ID = "1".repeat(64);
+const FILE_ID = "2".repeat(64);
+const TEXT_ID = "3".repeat(64);
+
 const ROWS: CatalogRow[] = [
   { id: IMG_ID, contentType: "image/png", filename: "photo.png", size: 12 },
   { id: PDF_ID, contentType: "application/pdf", filename: "doc.pdf", size: 34 },
+  { id: AUDIO_ID, contentType: "audio/wav", filename: "memo.wav", size: 56 },
+  { id: FILE_ID, contentType: "application/octet-stream", filename: "blob.bin", size: 78 },
+  { id: TEXT_ID, contentType: "text/plain", filename: "notes.txt", size: 90 },
 ];
 
 
@@ -221,5 +228,44 @@ describe("the dropped-segment report (markdown-dialect.md §3.9.3)", () => {
     const doc = img("photo.png|w=abc|align=diagonal");
     await mount(doc);
     expect(mounted?.view.state.doc.toString()).toBe(doc);
+  });
+});
+
+// myne-md/myne#518. `markdown-dialect.md` §3.9.3 asks for the marker without
+// scoping it to a media type, and four of the six resolved widgets took the
+// dropped list and discarded it. A bad segment on an audio embed, a file card or
+// a text preview was therefore reported NOWHERE: not on the embed, and not in
+// its overflow menu.
+//
+// The distinction that survives is the one that was already right: a KNOWN key
+// with an unreadable value is the author's to fix and is marked; an unrecognised
+// key is version skew and is not. That is asserted per widget rather than once,
+// because each of the four had to be given the list separately and a fifth
+// forgetting is invisible from the other four.
+describe("the dropped-segment report reaches every resolved widget", () => {
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+    ["an audio player", `![[att:${AUDIO_ID}|memo.wav|w=abc]]`, "attachment-audio"],
+    ["a file card", `![[att:${FILE_ID}|blob.bin|w=abc]]`, "attachment-file"],
+    ["a text preview", `![[att:${TEXT_ID}|notes.txt|w=abc]]`, "attachment-text"],
+  ];
+
+  it.each(cases)("marks %s", async (_label, doc, prefix) => {
+    const host = await mount(doc);
+    const mark = host.querySelector(`[data-testid="${prefix}.unreadable"]`);
+    expect(mark, "an author-fixable segment should be marked here too").not.toBeNull();
+    expect(mark?.getAttribute("aria-label")).toContain("w=abc");
+  });
+
+  it.each(cases)("leaves %s unmarked when the alias is clean", async (_label, doc, prefix) => {
+    // The other direction, per widget. A marker that appeared unconditionally
+    // would satisfy every assertion above and would put a warning on every
+    // attachment in the vault.
+    const host = await mount(doc.replace("|w=abc", ""));
+    expect(host.querySelector(`[data-testid="${prefix}.unreadable"]`)).toBeNull();
+  });
+
+  it("leaves an audio embed unmarked for an unrecognised key, which is version skew", async () => {
+    const host = await mount(`![[att:${AUDIO_ID}|memo.wav|future=x]]`);
+    expect(host.querySelector('[data-testid="attachment-audio.unreadable"]')).toBeNull();
   });
 });
