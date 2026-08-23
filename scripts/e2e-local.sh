@@ -110,7 +110,9 @@ fi
 if [[ -n "$SERVER_BIN" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/$SERVER_BIN"
 fi
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target'
+# The member `node_modules` paths come from the include, derived from the very
+# array that mounts them, so a volume cannot be mounted without being chowned.
+FIX_PERMS="chown -R e2e:e2e /work/node_modules /work/target$E2E_MEMBER_NM_PATHS"
 
 if [[ "$SHELL_MODE" == 1 ]]; then
   exec docker run -it "${RUN_FLAGS[@]}" "$IMAGE" \
