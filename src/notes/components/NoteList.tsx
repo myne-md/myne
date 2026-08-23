@@ -72,7 +72,7 @@ import {
 } from "../folderNote";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
-import { isPanesNotSettled, useWorkspace } from "../workspaceContext";
+import { isPanesNotSettled, panesNotSettledMessage, useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
 import type { IconName } from "../../lib/icons";
 import { ViewsSection } from "./ViewsSection";
@@ -1789,12 +1789,14 @@ function PopulatedList({
             try {
               await executeRenameCommit(noteId, newTitle, ctx);
             } catch (err) {
+              const refused = isPanesNotSettled(err);
               setTrashError(
-                isPanesNotSettled(err)
-                  ? t("notes.folderManagement.unsettledSave")
-                  : t("notes.list.renameFailed"),
+                panesNotSettledMessage(err, {
+                  unsettled: t("notes.unsettledSave"),
+                  failed: t("notes.list.renameFailed"),
+                }),
               );
-              if (import.meta.env.DEV && !isPanesNotSettled(err)) {
+              if (import.meta.env.DEV && !refused) {
                 // eslint-disable-next-line no-console
                 console.warn("[NoteList] rename failed:", err);
               }

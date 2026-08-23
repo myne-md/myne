@@ -54,7 +54,7 @@ import {
   REMOVE_COVER_EVENT,
   type OpenCoverPickerDetail,
   type RemoveCoverDetail,
-} from "../notes/openCoverPickerSignal";
+} from "@myne/editor/cover-signal";
 import { CoverPicker, type CoverChoice } from "../components/attachments/CoverPicker";
 import { setNoteCover } from "../notes/setNoteCover";
 import { COVER_FIELD_KEY } from "../dialect";
@@ -221,7 +221,11 @@ import { useResponsiveCollapse } from "./responsiveCollapse";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
 import { REVEAL_ATTACHMENT_EVENT } from "../editor/attachments/fileCardActions";
 import { CenterViewProvider, type CenterView } from "./centerView";
-import { WorkspaceProvider, isPanesNotSettled, useWorkspace } from "../notes/workspaceContext";
+import {
+  WorkspaceProvider,
+  panesNotSettledMessage,
+  useWorkspace,
+} from "../notes/workspaceContext";
 import { ClipDispatchListener } from "../clip/ClipDispatchListener";
 import { PaneTree } from "../notes/components/PaneTree";
 import { STRIP_HEIGHT } from "../notes/components/TabStrip";
@@ -3369,9 +3373,10 @@ function CommandPaletteHost({
         // the sidebar, which is exactly what the undo toast below exists to
         // prevent for the successful case.
         setToast({
-          message: isPanesNotSettled(err)
-            ? t("notes.folderManagement.unsettledSave")
-            : t("editor.noteActions.convertFailed"),
+          message: panesNotSettledMessage(err, {
+            unsettled: t("notes.unsettledSave"),
+            failed: t("editor.noteActions.convertFailed"),
+          }),
           variant: "error",
         });
       });

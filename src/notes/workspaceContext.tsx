@@ -123,6 +123,29 @@ export function isPanesNotSettled(err: unknown): err is PanesNotSettledError {
   return err instanceof PanesNotSettledError;
 }
 
+/**
+ * Which sentence a caught rejection deserves: the app declined, or something
+ * failed.
+ *
+ * Four surfaces were spelling `isPanesNotSettled(err) ? t(a) : t(b)` verbatim,
+ * which is one distinction living in four places and a fifth surface away from
+ * inventing a fifth key for it.
+ *
+ * It takes RESOLVED sentences rather than translation keys, the shape
+ * `saveOutcomeMessage` established one commit earlier and for the same reason:
+ * `check-i18n.mjs` matches a static `t("literal")`, so a key passed as a string
+ * drops out of the only check that proves it exists in the catalog. Both
+ * sentences stay at the call site, where they can also stay SPECIFIC: the folder
+ * rename can say the folder was left alone, which is more use than a neutral
+ * sentence and is not true anywhere else.
+ */
+export function panesNotSettledMessage(
+  err: unknown,
+  sentences: { readonly unsettled: string; readonly failed: string },
+): string {
+  return isPanesNotSettled(err) ? sentences.unsettled : sentences.failed;
+}
+
 export type WorkspaceApi = {
   root: WorkspaceNode;
   focusedPaneId: PaneId;

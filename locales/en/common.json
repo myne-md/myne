@@ -1144,8 +1144,8 @@
       }
     },
     "noteActions": {
-        "convertFailed": "Couldn't change what this note is, so it is unchanged.",
       "buttonLabel": "Note actions",
+      "convertFailed": "Couldn't change what this note is, so it is unchanged.",
       "rename": "Rename",
       "move": "Move to folder…",
       "duplicate": "Duplicate",
@@ -1675,6 +1675,7 @@
     "restoreFromBackup": "Restore from backup…"
   },
   "notes": {
+    "unsettledSave": "An open note hasn't finished saving, so nothing was changed. Try again once it has.",
     "archive": {
       "cancel": "Cancel",
       "close": "Close",
@@ -1987,10 +1988,10 @@
       }
     },
     "list": {
-        "renameFailed": "Couldn't save that name, so the note kept its old one.",
       "addToFavorites": "Add to favorites",
       "archive": "Archive",
       "archiveBulkError": "Couldn't archive the notes.",
+      "renameFailed": "Couldn't save that name, so the note kept its old one.",
       "archiveFolder": "Archive folder",
       "archiveNote": "Archive",
       "archiveSingleError": "Couldn't archive the note.",
