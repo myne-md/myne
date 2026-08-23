@@ -13,10 +13,33 @@
 import { buildDiagnostics, engineLabel } from "./diagnostics";
 import { servedBuildInfo } from "../platform/build-info";
 
-/** Bytes → whole MB, or `null`. Rounded deliberately: a byte-exact figure is a
- *  finer reading of the user's storage than a support block needs. */
+/**
+ * Bytes → whole MB, or `null` (which the block renders as `unknown`).
+ *
+ * Rounded deliberately: a byte-exact figure is a finer reading of the user's
+ * storage than a support block needs. Two cases are NOT rounding, though, and
+ * both used to reach the pasted text as facts (myne-md/myne#556):
+ *
+ *   * a NON-FINITE reading. `typeof NaN === "number"`, so a partial or
+ *     in-progress `estimate()` passed the old guard and `String(NaN)` landed in
+ *     the block as the literal `NaN`. A field saying NaN says the app is broken
+ *     in a way it is not, and the honest answer for an unusable reading already
+ *     exists one line down: `unknown`.
+ *   * a NON-EMPTY store rounding to `0`. Anything under 512 KB — a small but
+ *     real vault — came out as a bare `0`, which is not a coarse version of
+ *     "some", it is the one value that says the opposite. The block exists to
+ *     be acted on, and `storageUsedMb: 0` is what a maintainer uses to rule
+ *     storage out of an investigation.
+ *
+ * So sub-megabyte usage reports as 1 rather than 0. That over-states by less
+ * than a megabyte, at a granularity where a megabyte is already the unit — and
+ * it is the only direction that cannot mislead: "at least a bit" is true of
+ * every non-empty store, "none" is true of none of them.
+ */
 function mb(bytes: number | undefined): number | null {
-  return typeof bytes === "number" ? Math.round(bytes / (1024 * 1024)) : null;
+  if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0) return null;
+  const whole = Math.round(bytes / (1024 * 1024));
+  return whole === 0 && bytes > 0 ? 1 : whole;
 }
 
 export async function collectDiagnostics(failureCode: string): Promise<string> {

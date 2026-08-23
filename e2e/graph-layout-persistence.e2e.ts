@@ -58,11 +58,31 @@ async function waitForGraphBlob(s: Session, path: string): Promise<void> {
   assertBlobMagic(path, "MYG1");
 }
 
-// QUARANTINE (contention): tail-of-suite mount-timeout — createNote's
-// `notes.rename-input` never paints within budget on a contended runner (the
-// helper is sound; 57 other files pass it). Green 2× on 2026-07-26; regressed
-// under suite-length degradation. Debt: boot-cost investigation (nav1/tp1 family).
-describeE2E.flaky("gp1 graph layout persists across a lock/re-unlock remount", () => {
+// DE-QUARANTINED (myne-md/myne#555), and the recorded reason was wrong twice
+// over.
+//
+// It was filed as a contended-runner mount timeout. Two causes were measured
+// instead, and neither is contention:
+//
+// 1. The first seeding test in a vitest process builds `e2e-fixture-gen` with
+//    `cargo build --release` inside its own budget (~171 s against a 180 s
+//    `testTimeout`). That is the shared `nav1`/`tp1`/`svc1` cause;
+//    `e2e/support/global-setup.ts` now pays it once, before any worker starts.
+//
+// 2. A residual failure survived that fix and was NOT a timeout — it failed in
+//    2.6 s with `expected 0 to be greater than or equal to 3`. `openGraphPane`
+//    resolves as soon as the pane ELEMENT exists, while the model is built
+//    asynchronously behind the app's only `React.lazy` boundary, so reading
+//    `data-node-count` straight afterwards reads a pane that has not built yet.
+//    It is the "a helper that verifies nothing hides behind the helper that
+//    comes after it" family `e2e/CLAUDE.md` records, and the harness already had
+//    the answer: every read below now waits for the attribute it is about to
+//    assert on.
+//
+// Measured after both: 15 consecutive clean runs at `--retry=0` in a warm
+// container, which is the bar `e2e/CLAUDE.md` sets for releasing a quarantined
+// spec.
+describeE2E("gp1 graph layout persists across a lock/re-unlock remount", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("opening the graph writes MYG1; a remount restores the layout from disk", async () => {
     let password = "";
@@ -83,8 +103,21 @@ describeE2E.flaky("gp1 graph layout persists across a lock/re-unlock remount", (
         for (const t of TITLES) await createNote(s, t);
 
         // Open the graph → it builds + lays out + (debounced) writes vault.graph.
+        //
+        // WAIT for the count rather than reading it once. `openGraphPane`
+        // resolves on the pane's own presence, and the model is built behind
+        // the app's only `React.lazy` boundary a few hundred ms later — so a
+        // bare read here samples `data-node-count="0"` on a pane that is
+        // rendering its Suspense fallback. That is the whole of this
+        // scenario's residual flake.
         const pane = await openGraphPane(s);
-        const nodeCount = await pane.attribute("data-node-count");
+        const nodeCount = await s.waitUntil(
+          async () => {
+            const raw = await pane.attribute("data-node-count");
+            return Number(raw) >= TITLES.length ? { v: raw } : null;
+          },
+          { label: `graph built at least ${TITLES.length} nodes`, timeoutMs: 15_000 },
+        ).then((box) => box.v);
         expect(Number(nodeCount)).toBeGreaterThanOrEqual(TITLES.length);
 
         // At-rest proof: the encrypted MYG1 blob lands on disk.
@@ -94,17 +127,31 @@ describeE2E.flaky("gp1 graph layout persists across a lock/re-unlock remount", (
         await lockAndReunlock(s, password);
 
         // Reopen the graph → the layout is RESTORED from the encrypted blob:
-        // the hydrate path ran, and the graph built the same node-set.
+        // the hydrate path ran, and the graph built the same node-set. Same
+        // rule as above — wait for the attribute being asserted on, so a
+        // pre-hydrate sample cannot report "not hydrated" as a failure.
         const pane2 = await openGraphPane(s);
-        expect(await pane2.attribute("data-layout-hydrated")).toBe("true");
-        expect(await pane2.attribute("data-node-count")).toBe(nodeCount);
+        await s.waitUntil(
+          async () =>
+            (await pane2.attribute("data-layout-hydrated")) === "true" ? true : null,
+          { label: "graph layout hydrated from the MYG1 blob", timeoutMs: 15_000 },
+        );
+        await s.waitUntil(
+          async () =>
+            (await pane2.attribute("data-node-count")) === nodeCount ? true : null,
+          { label: `graph rebuilt the same ${nodeCount} nodes`, timeoutMs: 15_000 },
+        );
       },
     );
   });
 });
 
-// QUARANTINE (contention): same tail-of-suite mount-timeout as gp1.
-describeE2E.flaky("gp2 graph layout is flashbang-free (builds once, does not re-run)", () => {
+// DE-QUARANTINED (myne-md/myne#555) — same cause 1 as gp1 (the fixture-gen
+// build inside the first seeding test's budget), and it never had cause 2: this
+// scenario already waits for `data-layout-nonce` to reach "1" before asserting
+// anything, so it never read an unbuilt pane. That contrast is what identified
+// the defect in gp1.
+describeE2E("gp2 graph layout is flashbang-free (builds once, does not re-run)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("data-layout-nonce settles at 1 and never climbs while the graph sits open", async () => {
     let password = "";

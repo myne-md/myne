@@ -44,13 +44,23 @@ async function expectNavDisabled(
   );
 }
 
-// QUARANTINED (flaky-test epic): on a contended CI runner this scenario's
-// `unlockToEditor` has been observed timing out even at 45s — the app process
-// couldn't boot the unlock screen under host resource starvation (a mount-boot
-// timeout, not a nav logic bug; recurs across unrelated branches). Runs in the
-// non-blocking `e2e-quarantine` step until the contention fix lands. See
-// scenario.ts's gate note.
-describeE2E.flaky("nav1 back/forward steps through opened notes (MYND-260)", () => {
+// DE-QUARANTINED (myne-md/myne#555). It was quarantined as a
+// contended-runner victim, then re-diagnosed twice — the `clickNewMenuItem`
+// re-click, then the driver port — and neither closed it: on an idle machine, in
+// a warm container, `--retry=0`, it still failed about one run in five, always
+// as `Test timed out in 180000ms`.
+//
+// None of those was the cause. Instrumenting the whole scenario showed the
+// back/forward walk this file is about taking **6.4 seconds** and `seedVault`
+// taking **171**, because the first seed in a process builds `e2e-fixture-gen`
+// with `cargo build --release` INSIDE the test's own budget. Against a 180 s
+// `testTimeout` that is a coin flip, and it lands on whichever spec seeds first
+// in a worker — a different victim every run, which is exactly why it read as
+// contention. `e2e/support/global-setup.ts` now pays that build once per vitest
+// invocation, before any worker starts; this scenario went from 167–178 s to
+// 6.9 s in the same container, and cleared the 15×-at-`--retry=0` bar
+// `e2e/CLAUDE.md` sets for releasing a quarantined spec.
+describeE2E("nav1 back/forward steps through opened notes (MYND-260)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("steps back to earlier notes and forward again; ends greyed-out at edges", async () => {
     const M_ONE = "navigation marker bir";

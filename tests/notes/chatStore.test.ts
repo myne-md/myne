@@ -25,6 +25,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "hello",
+      insertable: false,
     });
     expect(out.streaming).toBe(true);
     expect(out.turns).toHaveLength(2);
@@ -38,6 +39,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "hi",
+      insertable: false,
     });
     const t1 = chatReducer(sent, { type: "TOKEN", text: "he" });
     const t2 = chatReducer(t1, { type: "TOKEN", text: "llo" });
@@ -48,7 +50,17 @@ describe("chatReducer", () => {
   it("TOKEN is a no-op when the last turn is not a streaming assistant turn", () => {
     // Only a user turn present (no assistant) → ignored.
     const state: ChatState = {
-      turns: [{ id: "u1", role: "user", text: "x", streaming: false, error: false }],
+      turns: [
+        {
+          id: "u1",
+          kind: "text",
+          role: "user",
+          text: "x",
+          streaming: false,
+          error: false,
+          insertable: false,
+        },
+      ],
       streaming: false,
     };
     expect(chatReducer(state, { type: "TOKEN", text: "z" })).toBe(state);
@@ -60,6 +72,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "q",
+      insertable: false,
     });
     const streamed = chatReducer(sent, { type: "TOKEN", text: "answer" });
     const done = chatReducer(streamed, {
@@ -75,6 +88,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "q",
+      insertable: false,
     });
     const failed = chatReducer(sent, { type: "FAIL" });
     expect(failed.streaming).toBe(false);
@@ -87,6 +101,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "q",
+      insertable: false,
     });
     const partial = chatReducer(sent, { type: "TOKEN", text: "half an answ" });
     const stopped = chatReducer(partial, { type: "STOP" });
@@ -101,6 +116,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "q",
+      insertable: false,
     });
     expect(chatReducer(sent, { type: "CLEARED" })).toEqual(CHAT_INITIAL);
   });
@@ -111,7 +127,7 @@ describe("chat store helpers + run epoch", () => {
     const token = sendChatMessage("what color is the sky?");
     appendChatToken(token, "It is ");
     appendChatToken(token, "blue.");
-    finalizeChatTurn(token, [{ noteId: "n1", byteStart: 0, byteEnd: 3, score: 1 }]);
+    finalizeChatTurn(token, { kind: "in-process" });
 
     const state = getChat();
     expect(state.streaming).toBe(false);
@@ -126,7 +142,7 @@ describe("chat store helpers + run epoch", () => {
     clearChat(); // lock teardown — bumps the epoch, wipes the transcript
     // A late token from the now-stale stream must NOT resurrect anything.
     appendChatToken(token, " more");
-    finalizeChatTurn(token, [{ noteId: "n1", byteStart: 0, byteEnd: 1, score: 1 }]);
+    finalizeChatTurn(token, { kind: "in-process" });
     expect(getChat()).toEqual(CHAT_INITIAL);
   });
 

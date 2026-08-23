@@ -8,11 +8,20 @@
 // what the user last chose. The effective collapse the editor renders is
 // `manualCollapsed || forced` (Editor.tsx).
 //
-// E2E note: the trigger is a window resize, which the tauri-driver harness
-// has no primitive to drive — so the load-bearing decision is covered by
-// `tests/screens/responsiveCollapse.test.ts` (Vitest) per the e2e/CLAUDE.md
-// "states unreachable through real UI" downgrade rule (recorded on
-// MYND-192). This hook is thin ResizeObserver glue over that tested fn.
+// E2E note: the load-bearing DECISION is covered by
+// `tests/screens/responsiveCollapse.test.ts` (Vitest), and the wiring — this
+// hook plus the two panes it collapses — by `e2e/window-resize-collapse.e2e.ts`.
+//
+// This paragraph used to say the trigger "is a window resize, which the
+// tauri-driver harness has no primitive to drive", citing the e2e/CLAUDE.md
+// "states unreachable through real UI" downgrade (MYND-192). That was wrong,
+// and wrong in a way that costs features rather than coverage: W3C WebDriver
+// has had `POST /window/rect` all along, nothing in this suite had happened to
+// need it, and the sentence was then read as a fact about the harness. The
+// identical belief in `src/components/settings/settingsCompact.ts` is why the
+// Settings responsive restack shipped with its `ResizeObserver` never attached
+// and nobody noticed (myne-md/myne#555). A hook is "thin glue" only for as long
+// as something checks that the glue is stuck.
 
 import { useEffect, useState, type RefObject } from "react";
 import { computeResponsiveCollapse, type ResponsiveCollapse } from "./layoutClamp";

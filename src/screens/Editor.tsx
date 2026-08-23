@@ -2244,7 +2244,7 @@ function EditorChrome({
         onCreateFromTemplate={(templateId, name) => {
           // Location-agnostic: lands at the root, where the header new-note
           // button's blank note would land (folder = null).
-          void createNoteFromTemplate(templateId, name, null)
+          void createNoteFromTemplate(templateId, name, null, new Date())
             .then((id) => ctx.open(id as NoteId))
             .catch(() => {
               /* creation failure surfaces via sidebar UX */
@@ -2887,8 +2887,13 @@ function CommandPaletteHost({
       const prefs = await prefsRead();
       const ids = await noteList();
       const notes = await loadNoteBatch(ids);
+      // ONE instant for both the title and the template render. Two
+      // `new Date()` calls a few statements apart can straddle midnight, which
+      // would title the note with yesterday's date and render `{{date}}` as
+      // today's — a note that disagrees with itself.
+      const now = new Date();
       const res = resolveTodayNote(
-        new Date(),
+        now,
         prefs.daily_date_format,
         prefs.daily_folder,
         notes,
@@ -2902,6 +2907,7 @@ function CommandPaletteHost({
           prefs.daily_template,
           res.dateTitle,
           res.folder,
+          now,
         )) as NoteId;
       } else {
         // No daily template → a blank note titled with the date.
@@ -4267,6 +4273,11 @@ function SidebarPane({
       // than the inner wrapper so the ornament spans the pane's full height
       // even while the collapse animation is running.
       {...ornamentRole("surface")}
+      // Observability only (myne-md/myne#555). The responsive auto-collapse is
+      // a WIDTH, so the E2E assertion is this element's measured box — the
+      // scenario deliberately does not read a `collapsed` flag the app would be
+      // reporting about itself.
+      data-testid={`editor.sidebar-${side}`}
       style={{
         position: "relative",
         width: collapsed ? 0 : width,

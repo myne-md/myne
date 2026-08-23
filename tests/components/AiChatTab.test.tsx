@@ -669,7 +669,7 @@ describe("AiChatTab: the live run's controls", () => {
     // `design-notes/ai/0515` makes this dialog the entire bound on
     // model-originated scope growth, so its reachability is the feature.
     parkOnScopeQuestion();
-    render(<AiChatTab onSend={() => {}} />);
+    render(<AiChatTab />);
     await screen.findByTestId("agentScope.dialog");
     expect(screen.getByTestId("agentScope.approve")).toBeTruthy();
     expect(screen.getByTestId("agentScope.decline")).toBeTruthy();
@@ -685,7 +685,7 @@ describe("AiChatTab: the live run's controls", () => {
 
   it("New chat stops the run host-side before forgetting it", async () => {
     parkOnScopeQuestion();
-    render(<AiChatTab onSend={() => {}} />);
+    render(<AiChatTab />);
     await screen.findByTestId("agentScope.dialog");
     fireEvent.click(screen.getByTestId("ai.new-chat"));
     // Forgetting a run is not stopping one: the host keeps its run table, keeps
@@ -701,7 +701,7 @@ describe("AiChatTab: the shape of a chat", () => {
   it("puts the composer last, under one scrolling transcript", () => {
     const token = sendChatMessage("hello");
     finalizeChatTurn(token);
-    render(<AiChatTab onSend={() => {}} />);
+    render(<AiChatTab />);
 
     const tab = screen.getByTestId("ai.chat-tab");
     const composer = screen.getByTestId("ai.composer");
@@ -729,7 +729,7 @@ describe("AiChatTab: the shape of a chat", () => {
   it("keeps the honesty note and the status out of the scrolling region", () => {
     const token = sendChatMessage("hello");
     finalizeChatTurn(token);
-    render(<AiChatTab onSend={() => {}} />);
+    render(<AiChatTab />);
     const scroller = screen.getByTestId("ai.transcript").parentElement!;
     // Both are standing statements about what this surface is, so neither may
     // scroll away: the note is the fallibility warning the answers are read

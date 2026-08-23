@@ -60,7 +60,13 @@ RUN_FLAGS=(
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
   -v myne-e2e-target:/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  # Mounted where cargo actually LOOKS, which is `$CARGO_HOME/registry` — and
+  # `E2E_ENV` below sets `CARGO_HOME=/home/e2e/.cargo`. At
+  # `/usr/local/cargo/registry` nothing in this container reads it, so every
+  # `--rm` run re-downloaded the whole crate set (measured live: 528 MB written
+  # to the container-local path while the persisted volume held 59 MB
+  # untouched). `e2e-ai-buildrun.sh` already had it right.
+  -v myne-e2e-cargo-registry:/home/e2e/.cargo/registry
   -w /work
   --user root
 )
@@ -91,7 +97,7 @@ for arch in arm64 amd64; do
     break
   fi
 done
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/target /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/target /home/e2e/.cargo'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
   $FIX_PERMS && su e2e -s /bin/bash -c '

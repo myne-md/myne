@@ -81,7 +81,16 @@ async function importTxt(s: Session): Promise<string> {
 // across 6 unrelated branches (none touching attachments), i.e. host
 // resource starvation, not a preview bug. Runs in the non-blocking
 // `e2e-quarantine` step until the contention fix lands. See scenario.ts's gate note.
-describeE2E.flaky("tp1 inline txt attachment preview decrypts read-only (MYND-268)", () => {
+// DE-QUARANTINED (myne-md/myne#555). The quarantine reason was
+// runner contention, and it was wrong for the same reason it was wrong for
+// `nav1`: the first seeding test in a vitest process builds `e2e-fixture-gen`
+// with `cargo build --release` INSIDE its own budget, ~171 s against a 180 s
+// `testTimeout`. Which spec paid it depended only on which one seeded first,
+// which is why the victim moved between runs and read as a loaded host.
+// `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
+// before any worker starts. Measured after the fix, `--retry=0`, warm
+// container: 16 consecutive clean runs, which is the bar `e2e/CLAUDE.md` sets.
+describeE2E("tp1 inline txt attachment preview decrypts read-only (MYND-268)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("a form-C .txt embed renders the decrypted text inline, non-editable", async () => {
     let password = "";

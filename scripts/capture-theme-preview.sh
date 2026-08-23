@@ -47,7 +47,13 @@ RUN_FLAGS=(
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
   -v myne-e2e-target:/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  # Mounted where cargo actually LOOKS, which is `$CARGO_HOME/registry` — and
+  # `E2E_ENV` below sets `CARGO_HOME=/home/e2e/.cargo`. At
+  # `/usr/local/cargo/registry` nothing in this container reads it, so every
+  # `--rm` run re-downloaded the whole crate set (measured live: 528 MB written
+  # to the container-local path while the persisted volume held 59 MB
+  # untouched). `e2e-ai-buildrun.sh` already had it right.
+  -v myne-e2e-cargo-registry:/home/e2e/.cargo/registry
   # Per-member node_modules volumes: the container's `pnpm install` rewrites a
   # bind-mounted workspace member's symlinks and breaks the host install
   # otherwise. One per member, and `ornaments` + `preview` are members too.
@@ -61,7 +67,7 @@ RUN_FLAGS=(
 )
 
 E2E_ENV="export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store MYNE_PREVIEW_COMMIT=$PREVIEW_COMMIT"
-FIX_PERMS='chown -R e2e:e2e /work /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work /home/e2e/.cargo'
 
 BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
 if [[ "$SKIP_BUILD" == 1 ]]; then

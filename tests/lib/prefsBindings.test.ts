@@ -22,6 +22,12 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("../../src/notes/prefsNonce", () => ({
   bumpPrefsNonce: () => bumpPrefsNonceMock(),
+  // `prefsRead` reads the nonce to key its in-flight coalescing
+  // (myne-md/myne#556). A mock missing this export makes every `prefsRead`
+  // REJECT, which silently drops the read-then-write bindings out of the roster
+  // below — the floor caught it at 67 against a pinned 68, which is what that
+  // number is for.
+  getPrefsNonce: () => 0,
 }));
 
 import {

@@ -18,7 +18,7 @@
 // lowercase-alnum token chosen to be a guaranteed non-word in en-US so the
 // engine flags it deterministically.
 
-import { it } from "vitest";
+import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
@@ -238,6 +238,107 @@ describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => 
         await s.byTestId("editor.root", { timeoutMs: 30_000 });
         await reopenNoteAfterReload(s); // reopen post-reload (load-robust)
         await squiggleFor(s, WORD);
+      },
+    );
+  });
+});
+
+// SP-5 — myne-md/myne#557's `editor.spell-check` bullet.
+//
+// # The distinction this exists to make, which spell.e2e.ts could not make
+//
+// SP-2 proves Myne's own correction menu opens on a right-click. It does NOT
+// prove the platform's menu was suppressed, and those are different claims with
+// the same observable on WebKitGTK: the engine offers no native context menu
+// there in the first place, so "no native menu appeared" is true whether or not
+// the app asked for it. A reviewer on that seat cannot tell them apart either —
+// which is exactly why the roster row existed and exactly why it could never
+// have answered the question.
+//
+// `preventDefault()` on the `contextmenu` event IS the suppression, and
+// `dispatchEvent` returns `false` precisely when a cancelable event was
+// prevented. So the app's own decision is readable from inside the page,
+// independent of what the host would have drawn:
+//
+//   * over a squiggle  → prevented, because Myne is drawing its own menu;
+//   * over plain prose → NOT prevented, because there is nothing to replace it
+//     with, and swallowing the event there would remove the platform's menu and
+//     put nothing in its place.
+//
+// The second half is the load-bearing one. A blanket `preventDefault` on the
+// editor passes any "the app's menu opened" assertion and silently deletes
+// copy/paste/lookup everywhere else in the document — on a seat where the native
+// menu does exist, which is every seat except this one.
+describeE2E("SP-5 the native context menu is suppressed only where Myne replaces it (myne-md/myne#557)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("contextmenu is prevented over a squiggle and left alone over plain prose", async () => {
+    const TYPO = "recieve";
+    let password = "";
+    await scenario(
+      "sp5-contextmenu-suppression",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Contextmenu Defteri");
+        await typeIntoEditor(s, `please ${TYPO} the parcel `);
+
+        // Wait for the squiggle so the "over a squiggle" case really is one.
+        await squiggleFor(s, TYPO);
+
+        // Dispatch a REAL cancelable contextmenu at each target and report
+        // whether the app prevented it. `dispatchEvent` returns false exactly
+        // when a cancelable event had `preventDefault()` called on it, so this
+        // reads the app's DECISION rather than the engine's rendering — which
+        // is the whole point, since WebKitGTK renders no native menu either way.
+        //
+        // The COORDINATES are load-bearing and were the first draft's bug. The
+        // handler is `view.posAtCoords({x: event.clientX, y: event.clientY})`
+        // (`editor/src/spell/correction-menu.ts`), so an event dispatched with
+        // the default 0,0 asks "is there a squiggle at the top-left of the
+        // viewport" — answers no, and the assertion reads as a missing
+        // suppression. Dispatching at the target's own centre is what makes the
+        // probe about the target.
+        const probe = (selector: string): Promise<boolean | null> =>
+          s.execute<boolean | null>(
+            "var el = document.querySelector(arguments[0]);" +
+              "if (!el) return null;" +
+              "var r = el.getBoundingClientRect();" +
+              "if (r.width === 0 || r.height === 0) return null;" +
+              "var ev = new MouseEvent('contextmenu', {" +
+              "  bubbles: true, cancelable: true," +
+              "  clientX: Math.round(r.left + r.width / 2)," +
+              "  clientY: Math.round(r.top + r.height / 2)" +
+              "});" +
+              "return el.dispatchEvent(ev) === false;",
+            [selector],
+          );
+
+        const overSquiggle = await probe('[data-testid="editor.spell-error"]');
+        expect(overSquiggle, "no squiggle element to dispatch on").not.toBeNull();
+        expect(
+          overSquiggle,
+          "the contextmenu was NOT prevented over a squiggle, so on a seat with " +
+            "a native menu the platform's would open on top of (or instead of) " +
+            "Myne's suggestion menu",
+        ).toBe(true);
+
+        // Plain prose: the app must leave the event alone. A blanket
+        // preventDefault on the editor would pass every SP-2-shaped assertion
+        // and delete the platform's copy/paste/lookup menu everywhere else.
+        // A line with no squiggle on it. `.cm-content`'s own centre could land
+        // on the misspelled word, which would make this case a second copy of
+        // the first — so the payload above ends with plain words and this
+        // targets the line element rather than the whole editor.
+        const overProse = await probe(".cm-line:last-child");
+        expect(overProse, "no editor content to dispatch on").not.toBeNull();
+        expect(
+          overProse,
+          "the contextmenu was prevented over ordinary prose. Myne offers no " +
+            "menu there, so this removes the platform's and puts nothing in " +
+            "its place — invisible on WebKitGTK, which draws none anyway.",
+        ).toBe(false);
       },
     );
   });

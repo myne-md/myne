@@ -22,6 +22,12 @@ export default defineConfig({
     // 4444/4445 default. session.ts + multi-device.ts read those env vars, so
     // this parallelises the harness with no change to either.
     setupFiles: ["./e2e/support/worker-ports.ts"],
+    // ONE-TIME setup, before any worker starts and outside every test budget.
+    // It builds `e2e-fixture-gen`, which `seedVault` otherwise builds LAZILY
+    // inside whichever test seeds first — a ~171 s `cargo build --release`
+    // against a 180 s `testTimeout`, which is the whole of the "nav1 is flaky"
+    // story and of several others. The file's header carries the measurement.
+    globalSetup: ["./e2e/support/global-setup.ts"],
     // Parallelise across worker PROCESSES: N = MYNE_E2E_SHARDS (default 2) file
     // workers run concurrently, each driving its own tauri-driver + app on its
     // own port pair. `forks` (not threads) so each worker has its own

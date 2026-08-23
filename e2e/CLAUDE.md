@@ -141,8 +141,56 @@
   `failure: ignore`) runs only them and reports without gating. Reserve it for a
   scenario verified as a runner-contention victim, keep the set short, and
   record the debt on the tracking issue — a real failure marked `.flaky` is a
-  real failure nobody will see. Currently quarantined: `nav1`, `tp1`, `ci1`, `gp1`,
-  `gp2`, `svc1`, `tor1`.
+  real failure nobody will see. **Currently quarantined: nothing.** The list was
+  `nav1`, `tp1`, `ci1`, `gp1`, `gp2`, `svc1`, `tor1` and all seven were released
+  by myne-md/myne#555 — see the next two entries for what the recorded reason
+  had been hiding.
+- **The cause was a `cargo build` inside a test's own budget, and it was none of
+  the three things diagnosed before it** (myne-md/myne#555). `nav1` survived both
+  fixes below and still failed about one run in five on an idle machine, in a
+  warm container, at `--retry=0`, always as `Test timed out in 180000ms`.
+  Instrumenting the whole scenario rather than the wait that reported the
+  timeout put the time somewhere nobody had looked:
+
+  ```
+  OUTER before-scenario   @      0 ms
+  OUTER seed-start        @      1 ms
+  OUTER seed-done         @ 171311 ms   <-- here
+  OUTER body-entered      @ 171724 ms
+  …the entire back/forward walk…
+  OUTER scenario-returned @ 178399 ms
+  ```
+
+  The navigation logic the scenario is about takes **6.4 seconds**. The other 171
+  are `seedVault` → `ensureGeneratorBuilt()` → `cargo build --release -p
+  e2e-fixture-gen`, which is memoized per PROCESS and therefore paid, lazily, by
+  whichever test seeds first in that process. Against a 180 s `testTimeout` that
+  is a coin flip. Every property the earlier diagnoses could not explain falls
+  out of it at once: the durations are bimodal because the binary is either in
+  the shared target volume or it is not; the victim moves between runs because
+  the first-seeding spec does; raising `DEFAULT_TIMEOUT_MS` changed nothing
+  because no inner wait is involved; and `e2e-one.sh` hits it nearly every time
+  because each invocation is a fresh `--rm` container. `ensureGeneratorBuilt`'s
+  own comment says the memoization exists so seeds pay no cargo cost "inside test
+  budgets" — it does that for the second seed onward, and the first one pays all
+  of it. `e2e/support/global-setup.ts` now runs that build once per vitest
+  invocation, before any worker starts: `nav1` went from 167–178 s to **6.9 s** in
+  the same container, and the whole quarantine list cleared the 15×-at-`--retry=0`
+  bar. **When a wait times out, instrument the SCENARIO, not the wait** — three
+  rounds of diagnosis all looked at the reported wait, and the answer was in the
+  seed.
+- **A second, independent defect was hiding underneath it in `gp1`**, and it is
+  worth knowing because it is invisible until the timeout above stops masking it.
+  After the fix, `gp1` still failed occasionally — in 2.6 s, with `expected 0 to
+  be greater than or equal to 3`, which is not a timeout at all. `openGraphPane`
+  resolves as soon as the pane ELEMENT exists, while the model is built behind
+  the app's only `React.lazy` boundary a few hundred ms later, so reading
+  `data-node-count` straight afterwards samples a pane rendering its Suspense
+  fallback. `openSettledGraphPane` already existed for exactly this and `gp2`
+  already used it, which is what made the contrast legible. Every read there now
+  waits for the attribute it is about to assert on. Same family as the
+  verifies-nothing helper below: **one flake can hide another, and fixing the
+  loud one is when the quiet one becomes findable.**
 - **"Runner contention" was the wrong diagnosis, and the quarantine list is
   built on it.** The flake reproduces on an IDLE machine — same spec, one warm
   container, nothing else running: 4 failures in 21 runs (~19 %), every one of
@@ -269,6 +317,46 @@
   after it (the `RUSTUP_HOME` re-provision above), and an A/B that does not
   absorb it will measure that instead of whatever it meant to measure — badly
   enough to invert the sign when the arms are swapped.
+- **`POST /window/rect` is accepted and silently ignored by WebKitWebDriver, so
+  the TOPLEVEL window is driven with `xdotool`.** Not an error and not a refusal:
+  HTTP 200 carrying the window's UNCHANGED rect. Measured — asked 800, granted
+  1100, `window.innerWidth` 1100, on a 1280x1024 screen, so neither stale
+  geometry nor a ceiling. A driver that accepts a command it does not implement
+  is the worst shape a capability gap takes, because every caller reads success.
+  `Session.setWindowRect` stays on the Session (it is correct W3C and a driver
+  that grows the capability starts working through it) but nothing here may
+  depend on it. `support/xwindow.ts` is the X route, and the absence of a window
+  manager under xvfb is what makes it the RIGHT layer rather than a workaround:
+  nothing arbitrates a geometry request, so `windowsize` is a plain
+  XConfigureWindow and `windowclose` is the WM_DELETE_WINDOW ClientMessage that
+  GTK turns into `delete-event` and tao into `CloseRequested`. Two things follow.
+  GTK re-asserts its own `minWidth` against the FIRST configure that crosses it
+  — a jump from 900 to 640 lands at 880 — so a resize is re-issued until the
+  page agrees, and the page is what is asked, never the resize call. And the app
+  window can therefore be driven BELOW its `minWidth` here, which a real desktop
+  cannot: a layout state this seat can reach is not automatically one a user can.
+- **`xdotool windowclose` does NOT send WM_DELETE_WINDOW, and the wrong version
+  of a close scenario PASSES.** It calls XDestroyWindow: the server tears the
+  window down, GTK sees a window that is already gone, no `delete-event` is
+  raised, tao raises no `CloseRequested`, and `Editor.tsx`'s close handler never
+  runs. The app still exits, so every outward sign of a graceful close is there
+  and none of the graceful behaviour happened. Measured twice rather than
+  reasoned: `strings` over the image's `libxdo.so.3` contains neither
+  `WM_DELETE_WINDOW` nor `WM_PROTOCOLS`, and a probe write injected into the
+  handler did not land after an `xdotool windowclose` — then landed once the
+  close became a real ClientMessage. `wmctrl -c` is also wrong here (it asks the
+  window MANAGER, and xvfb has none). The graceful close is
+  `support/wm-delete-window.py`, ~20 lines of Xlib through ctypes, which needs no
+  WM and no package the image lacks. `xdotool windowsize` is unaffected and stays
+  the resize primitive.
+- **The CI E2E seat is NOT `e2e/Dockerfile`.** The `e2e` and `e2e-quarantine`
+  steps start from a bare `rust:<version>-slim` and apt-install their own list,
+  so the two seats are two hand-maintained package sets. A scenario reaching for
+  a binary present on only one is green locally and red in CI with a bare
+  `spawn ENOENT`. `scripts/check-e2e-toolchain.mjs` now compares them, scoped to
+  the E2E RUNTIME additions (it subtracts whatever `tauri-compile` installs,
+  derived from the tree rather than rostered, because CI's E2E steps consume a
+  binary that step already built and have no reason to carry `libgtk-3-dev`).
 - States unreachable through real UI are NOT forced into E2E: downgrade to a
   Vitest component test (mocked `invoke`) and record the downgrade on the
   tracking issue.
