@@ -18,7 +18,7 @@ import { SyncPanel } from "../../src/components/settings/SyncPanel";
 import { SidebarStateProvider } from "../../src/notes/sidebarState";
 
 /** `usePrefs` consumers crash on a bare `undefined`; answer prefs-shaped. */
-export const PREFS_STUB = { device_names: {} };
+const PREFS_STUB = { device_names: {} };
 
 export interface SyncPanelRoute {
   /** What `sync_status` reports. */
@@ -30,8 +30,6 @@ export interface SyncPanelRoute {
     readonly pending: boolean;
     readonly can_abort?: boolean;
   };
-  /** Consulted BEFORE the defaults, for a command a single spec cares about. */
-  readonly overrides?: Readonly<Record<string, () => unknown>>;
 }
 
 /**
@@ -47,11 +45,8 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     syncState = "not_enrolled",
     betaTermsAccepted = true,
     migration = { offerable: false, pending: false },
-    overrides = {},
   } = route;
   return async (cmd: string): Promise<unknown> => {
-    const override = overrides[cmd];
-    if (override !== undefined) return override();
     if (cmd === "plugin:vault-migrate|vault_migrate_settle_status") {
       return { can_abort: false, ...migration };
     }

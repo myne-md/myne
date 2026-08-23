@@ -22,6 +22,12 @@
 // cleanly on both sides and simply target the wrong note. One declaration, next
 // to the seam members it mirrors, is the only thing that makes the two halves
 // checkable at all.
+//
+// The four consumers import from here directly. A per-client re-export shim was
+// tried first, on the precedent of `src/editor/`, and it was the wrong precedent:
+// that shim fronts a large surface with many importers, while these had two each
+// and a grep for the event name went from two files per client to three. The
+// four import lines are the whole cost of not having them.
 
 /** The signal behind `EditorHost.cover.openPicker`. */
 export const OPEN_COVER_PICKER_EVENT = "myne-open-cover-picker";

@@ -65,7 +65,7 @@ import { CLOSE_ACTIVE_TAB_EVENT } from "./notes/closeActiveTabSignal";
 import {
   OPEN_COVER_PICKER_EVENT,
   REMOVE_COVER_EVENT,
-} from "./notes/openCoverPickerSignal";
+} from "@myne/editor/cover-signal";
 import { infer,
   inferAmbient, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-assistant";
 import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/spell";
