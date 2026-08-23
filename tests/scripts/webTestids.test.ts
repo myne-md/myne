@@ -16,7 +16,11 @@
 // thinks to try.
 
 import { describe, expect, it } from "vitest";
-import { dynamicDataAttrs, preUnlockScope } from "../../scripts/check-web-testids.mjs";
+import {
+  dynamicDataAttrs,
+  interpolatedTestIdObjectForm,
+  preUnlockScope,
+} from "../../scripts/check-web-testids.mjs";
 
 describe("dynamicDataAttrs: the JSX form (what it always caught)", () => {
   it("names an attribute fed an expression", () => {
@@ -113,5 +117,43 @@ describe("preUnlockScope: the screens plus what they compose", () => {
   it("terminates on a file it cannot read", () => {
     expect(() => preUnlockScope(["src/screens/does-not-exist.tsx"])).not.toThrow();
     expect(preUnlockScope(["src/screens/does-not-exist.tsx"])).toEqual([]);
+  });
+});
+
+// `data-testid` is scanned by its own pair of rules (banned outright everywhere,
+// and named per file inside the pre-unlock budget), and both of them ask the
+// same question `dynamicDataAttrs` asks: is this value a constant? It was
+// spelled three times and the three disagreed. The backtick clause is where:
+// the testid copies read a leading backtick as disqualifying, so a constant
+// template was reported as a runtime value while `dynamicDataAttrs`, one
+// function away, had already learned that a template is constant exactly when
+// it interpolates nothing.
+describe("interpolatedTestIdObjectForm: the props-object testid spelling", () => {
+  it("names a value assembled at runtime", () => {
+    const src = 'const p = { "data-testid": `${prefix}-${account}` };';
+    expect(interpolatedTestIdObjectForm(src)).toHaveLength(1);
+  });
+
+  it("names a bare identifier", () => {
+    expect(interpolatedTestIdObjectForm('const p = { "data-testid": name };')).toEqual(["name"]);
+  });
+
+  it("passes a constant string, in either quote", () => {
+    expect(interpolatedTestIdObjectForm('const p = { "data-testid": "unlock.form" };')).toEqual([]);
+    expect(interpolatedTestIdObjectForm("const p = { 'data-testid': 'unlock.form' };")).toEqual([]);
+  });
+
+  it("passes a template that interpolates nothing, which the old copy reported", () => {
+    // The false positive the unified predicate removes. It is a false positive
+    // rather than a leak, so it cost an argument rather than a secret, but a
+    // guard that fires on a correct file is a guard people learn to route
+    // around.
+    expect(interpolatedTestIdObjectForm("const p = { 'data-testid': `unlock.form` };")).toEqual([]);
+  });
+
+  it("still names an INTERPOLATING template, which is the leak shape", () => {
+    // The direction that must not regress while the one above is fixed.
+    const src = "const p = { 'data-testid': `row-${accountNumber}` };";
+    expect(interpolatedTestIdObjectForm(src)).toHaveLength(1);
   });
 });
