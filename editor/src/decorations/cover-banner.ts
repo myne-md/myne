@@ -44,7 +44,7 @@ import {
 import { readCoverFromFmBody } from "@myne/dialect/surgery";
 import i18n from "@myne/editor/i18n";
 import { attachmentUrl } from "@myne/editor/host/notes/attachmentRef";
-import { getHost } from "../host";
+import { writableHost } from "../host";
 import { readNoteId } from "../note-identity";
 import { cachedLocateFrontmatter } from "../frontmatter-cache";
 import {
@@ -187,7 +187,11 @@ class CoverBannerWidget extends WidgetType {
     // companion as a strict read-only mirror of the same buffer, so without
     // this, hovering that mirror's banner and pressing Remove clears the note's
     // cover from a surface documented as never writing.
-    const cover = view.state.readOnly ? undefined : getHost().cover;
+    //
+    // `writableHost` rather than a `view.state.readOnly` clause here: the rule
+    // belongs to the seam, which is where the write-capable members are
+    // declared, so the third such control inherits it instead of re-deciding.
+    const cover = writableHost(view.state).cover;
     if (cover !== undefined) {
       // Read the note LIVE at activation, never captured here (myne-md/myne#520).
       // `eq()` compares the resolved URL alone, so CM6 legitimately keeps this

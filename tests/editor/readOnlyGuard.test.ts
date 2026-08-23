@@ -22,6 +22,7 @@ import { deleteToLineBoundary } from "@myne/editor/line-boundary";
 import { viewModeExtension } from "@myne/editor/view-mode";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { taskListDecorations } from "@myne/editor/decorations/task-list";
+import { type EditorHost, setEditorHost, writableHost } from "@myne/editor/host";
 
 function stateFor(mode: "live" | "reading" | "source", readOnly: boolean): EditorState {
   return EditorState.create({
@@ -124,5 +125,56 @@ describe("the task checkbox honours it too", () => {
     expect(box.getAttribute("tabindex")).toBe("0");
     box.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(view!.state.doc.toString()).toBe("- [x] milk\n");
+  });
+});
+
+// The seam half of the same rule (myne-md/myne#520's review, generalised).
+//
+// A widget's DOM handler that calls the HOST is invisible to every mechanism
+// that makes an editor read-only: `EditorState.readOnly` is consulted by
+// commands, and the reading mirror's `NOOP_ON_CHANGE` intercepts document
+// changes. The host re-encrypts the note on disk, so neither is in the path.
+// Two cover controls each grew their own `view.state.readOnly` clause; this
+// pins the accessor that now holds the rule for both and for the next one.
+describe("writableHost gates the host's write-capable members", () => {
+  const HOST = {
+    cover: { openPicker: () => {}, remove: () => {} },
+  } as unknown as EditorHost;
+
+  afterEach(() => {
+    setEditorHost(null as unknown as EditorHost);
+  });
+
+  const stateWith = (readOnly: boolean) =>
+    EditorState.create({ doc: "x", extensions: [EditorState.readOnly.of(readOnly)] });
+
+  it("hides a write member from a read-only state", () => {
+    setEditorHost(HOST);
+    expect(writableHost(stateWith(true)).cover).toBeUndefined();
+  });
+
+  it("passes it through on a writable one, which is the direction nobody tries", () => {
+    // A gate that refuses everything is also wrong, and green: the cover
+    // controls would simply stop rendering in the live editor.
+    setEditorHost(HOST);
+    expect(writableHost(stateWith(false)).cover).toBe(HOST.cover);
+  });
+
+  it("leaves READ members alone in both states", () => {
+    // The gate is not "no host in reading view". A reading surface still
+    // resolves attachments, opens links and reads prefs; only the members that
+    // write are withheld.
+    const withRead = { ...HOST, attachmentUrl: (id: string) => id } as unknown as EditorHost;
+    setEditorHost(withRead);
+    expect(writableHost(stateWith(true)).attachmentUrl).toBe(withRead.attachmentUrl);
+    expect(writableHost(stateWith(false)).attachmentUrl).toBe(withRead.attachmentUrl);
+  });
+
+  it("does not mutate the registered host", () => {
+    // It returns a copy; a gate that deleted the member from the singleton
+    // would turn one read-only render into a permanent loss of the affordance.
+    setEditorHost(HOST);
+    writableHost(stateWith(true));
+    expect(HOST.cover).toBeDefined();
   });
 });
