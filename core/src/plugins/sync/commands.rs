@@ -164,11 +164,36 @@ pub async fn sync_set_endpoint<R: Runtime>(
             if scheme == "https" {
                 // Reach the server once, accept-and-record its cert, pin it —
                 // subject to the out-of-band compare in Tor mode.
-                Some(
+                let captured =
                     super::pin_confirm::capture_pin(host, port, confirmed_fingerprint.as_deref())
                         .await
-                        .map_err(SyncConfigError::from)?,
-                )
+                        .map_err(SyncConfigError::from)?;
+                // A re-connect to an endpoint this device ALREADY trusts must
+                // not silently adopt a different certificate (myne#581). This
+                // command used to overwrite the stored pin with whatever the
+                // handshake produced, never reading the old one, so "re-enter
+                // the server URL" — the remedy the device panel recommends for
+                // a transport failure — was also the way to hand a pin to
+                // whoever answered. The user confirming a fingerprint out of
+                // band is the one path that may replace it, and `capture_pin`
+                // above has already enforced that compare when they did.
+                if confirmed_fingerprint.is_none() {
+                    let host_ctx = crate::host::tauri_host::TauriHost::new(app.clone());
+                    if let Ok(path) = super::config::config_path_for_read(&host_ctx) {
+                        let cfg = super::config::read_config(&crate::vault_io::StdVaultIo, &path)
+                            .await
+                            .unwrap_or_default();
+                        let replaces_a_trusted_pin = cfg.endpoint_url.as_deref() == Some(url)
+                            && cfg
+                                .cert_pin_hex
+                                .as_deref()
+                                .is_some_and(|prev| prev != captured);
+                        if replaces_a_trusted_pin {
+                            return Err(SyncConfigError::CertificateChanged);
+                        }
+                    }
+                }
+                Some(captured)
             } else {
                 None // loopback http: no TLS, nothing to pin
             }

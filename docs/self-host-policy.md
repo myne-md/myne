@@ -137,7 +137,13 @@ and if you self-host the web client too, that origin is yours.
   certificate it was served, and verifies every later connection against that pin; you **eye-compare the
   fingerprint** the client shows you across your devices (the same out-of-band channel the device-approval
   gate already uses). It is *assumed* trust rather than verified cryptography — the first connection is
-  taken on faith, and the eye-compare is what turns it into something you checked. A loopback `http`
+  taken on faith, and the eye-compare is what turns it into something you checked. **When you renew
+  that certificate, connected clients stop syncing until they trust the new one** — the pin is the
+  whole certificate's hash, so any renewal invalidates it, and the client says so specifically rather
+  than reporting a network error. Re-entering the server URL asks you for the new fingerprint (get it
+  with `openssl x509 -noout -fingerprint -sha256 -in <your certificate file>`) and will not adopt a
+  different certificate without it; that refusal is deliberate, because a renewal and an impostor look
+  identical from the client's side. A loopback `http`
   endpoint has no certificate, so nothing is pinned and the client reports that rather than implying a
   pin. A **browser cannot pin at all** (above): it reports that the platform's trust store is doing the
   verifying, which is a third answer rather than a missing one.

@@ -105,7 +105,18 @@ export function readFingerprintInput(raw: string): FingerprintReading {
  * was written** — no endpoint, no pin, no vault container — so the screen stays
  * where it is with the field revealed, and declining costs nothing to undo.
  */
-export type FingerprintGateRefusal = "PinConfirmationRequired" | "FingerprintMismatch";
+export type FingerprintGateRefusal =
+  | "PinConfirmationRequired"
+  | "FingerprintMismatch"
+  /**
+   * The endpoint is already trusted and the server presented a different
+   * certificate (myne#581). Reaches the gate for the same reason the other two
+   * do — nothing was written, and the way forward is a fingerprint the user
+   * obtained out of band — but it arises at RE-connect rather than at
+   * enrollment, which is why it exists at all: before it, re-entering the URL
+   * silently replaced the pin with whatever answered.
+   */
+  | "CertificateChanged";
 
 /**
  * Does this rejection mean "the gate wants a fingerprint", and which one?
@@ -118,7 +129,11 @@ export type FingerprintGateRefusal = "PinConfirmationRequired" | "FingerprintMis
  */
 export function fingerprintGateRefusal(e: unknown): FingerprintGateRefusal | null {
   const kind = (e as { kind?: unknown } | null)?.kind;
-  return kind === "PinConfirmationRequired" || kind === "FingerprintMismatch" ? kind : null;
+  return kind === "PinConfirmationRequired" ||
+    kind === "FingerprintMismatch" ||
+    kind === "CertificateChanged"
+    ? kind
+    : null;
 }
 
 /** Split hex into fixed-width groups for the eye-compare. */
