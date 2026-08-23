@@ -328,6 +328,15 @@ export function deleteToLineBoundary(view: EditorView, forward: boolean): boolea
  * `deleteLineBoundaryBackward` and friends. Mac-only chords, matching the
  * bindings they replace. The Home/End-based bindings on other platforms are
  * text operations already and were never affected.
+ *
+ * **`mac:`-only is also why there is no E2E scenario for them, and the absence
+ * is stated rather than left to be noticed.** The tauri-driver lane is a Linux
+ * container, so these bindings are not installed in it and no scenario there can
+ * press one. jsdom cannot cover the interesting half either: `probeLineBoundary`
+ * branches on real `coordsAtPos` geometry, so every unit test drives it through
+ * a stub. What is left is unit tests over stubbed geometry plus the manual pass,
+ * and closing the gap needs a macOS E2E seat this project does not have.
+ * `scripts/e2e-scenario-floor.json` carries the same note beside the floor.
  */
 export const lineBoundaryKeymap: readonly KeyBinding[] = [
   {

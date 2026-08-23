@@ -61,6 +61,7 @@ RUN_FLAGS=(
   --rm
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
   -v "$E2E_TARGET_VOLUME":/work/target
   -v myne-e2e-cargo-registry:/usr/local/cargo/registry
   -w /work
