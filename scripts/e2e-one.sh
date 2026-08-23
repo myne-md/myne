@@ -62,7 +62,9 @@ esac
 if [[ -f "myne-server/myne-server-linux-$SRVARCH" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/myne-server/myne-server-linux-$SRVARCH"
 fi
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target'
+# The member `node_modules` paths come from the include, derived from the very
+# array that mounts them, so a volume cannot be mounted without being chowned.
+FIX_PERMS="chown -R e2e:e2e /work/node_modules /work/target$E2E_MEMBER_NM_PATHS"
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
   $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '

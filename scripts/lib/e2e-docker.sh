@@ -72,8 +72,35 @@ E2E_MEMBER_NM_VOLUMES=(
 # either on the run after it, same tree, same volume.
 E2E_REGISTRY_MOUNT=(-v myne-e2e-cargo-registry:/home/e2e/.cargo/registry)
 
-# Docker creates the mount's PARENT root-owned, and cargo needs to write its lock
-# files (`.package-cache`, `.global-cache`) at the `CARGO_HOME` root as user
-# `e2e`. One directory, NOT `-R`: the volume's contents are already e2e-owned and
-# recursing over 574 MB of registry files costs more than the download it saves.
-E2E_CARGO_HOME_CHOWN='chown e2e:e2e /home/e2e/.cargo'
+# Ownership, DERIVED from the mounts above rather than hand-listed beside them.
+#
+# Docker creates a named volume's root and its mountpoint's parent `root:root`,
+# and everything in the container runs as `e2e`, so a volume that is mounted and
+# not chowned is a directory the build cannot write. The mounts moved into this
+# file and the chown half stayed hand-copied in seven runners, which reproduced
+# the drift the include exists to end: the seven disagreed three ways, with
+# `e2e-batch.sh` mounting five member `node_modules` volumes and chowning none of
+# them. Deriving the paths from the same array is what makes "mounted implies
+# chowned" true by construction instead of by seven people remembering.
+E2E_MEMBER_NM_PATHS=""
+for _e2e_v in "${E2E_MEMBER_NM_VOLUMES[@]}"; do
+  [ "$_e2e_v" = "-v" ] && continue
+  E2E_MEMBER_NM_PATHS="$E2E_MEMBER_NM_PATHS ${_e2e_v#*:}"
+done
+unset _e2e_v
+
+# The registry mountpoint AND its parent. The parent is where cargo writes its
+# lock files (`.package-cache`, `.global-cache`) at the `CARGO_HOME` root; the
+# mountpoint is the volume root, which is `root:root 0755` the first time the
+# volume is created and which cargo has to write `index/` into.
+#
+# Both non-recursively, and that is the whole point of naming two paths rather
+# than one `-R`. A warm volume holds 574 MB of already-correct files, and walking
+# them costs more than the download the cache saves. An earlier version chowned
+# only the parent, which worked on this machine and only because the volume had
+# already been recursively chowned by the code being removed. That is the "green
+# afterwards is not evidence" case. Measured on a fresh volume: the mountpoint
+# comes up `root:root 0755`, `chown` of the parent alone leaves
+# `mkdir /home/e2e/.cargo/registry/index` refused as `e2e`, and naming both paths
+# makes it succeed.
+E2E_CARGO_HOME_CHOWN='chown e2e:e2e /home/e2e/.cargo /home/e2e/.cargo/registry'
