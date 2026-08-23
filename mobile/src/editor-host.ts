@@ -32,7 +32,7 @@ import { requestVoiceRecording } from "./lib/voice-record-bridge";
 import {
   OPEN_COVER_PICKER_EVENT,
   REMOVE_COVER_EVENT,
-} from "./lib/openCoverPickerSignal";
+} from "@myne/editor/cover-signal";
 
 const host: EditorHost = {
   // Delegate to the shared react-i18next runtime (MYND-485) — replaces the

@@ -99,35 +99,32 @@ export function stripComments(source) {
 }
 
 /**
- * `data-*` attributes fed an EXPRESSION rather than a string literal, in BOTH
- * forms a React tree can produce one.
+ * A backtick template is constant exactly when it interpolates nothing.
  *
- * The JSX form (`data-x={expr}`) is the obvious one. The object form
- * (`"data-x": expr`, inside a props object a component later spreads) is the one
- * that shipped past this guard: `useScrollEdges` builds
- * `{ "data-fade-top": edges.top ? "true" : undefined }` and `CenteredCard`
- * spreads it onto the card every pre-unlock screen composes. Nothing in the
- * scanned files ever reads `data-x={`, so the attribute reached the DOM of the
- * screen where the account number is typed without this check seeing it.
- *
- * A string-literal value in either form is fine, which is what the negative
- * lookahead on the object form is for: `"data-mode": "compact"` is a constant.
+ * This one sentence is the rule that drifted, and it is the reason the file has
+ * three value scanners rather than one. Two of them read a value the regex
+ * CAPTURED and one walks to the closing backtick by index, because a template
+ * may contain the `,` and `}` that bound the captures; those three shapes are
+ * genuinely different and are not worth collapsing. What must not differ is what
+ * they conclude, and it did: the two `data-testid` scanners treated a leading
+ * backtick as disqualifying outright, so `` `plain` `` was reported as a runtime
+ * value while `dynamicDataAttrs` had already learned otherwise, and the fix that
+ * taught it reached one copy of three.
  */
+function templateInterpolates(body) {
+  return body.includes("${");
+}
+
 /**
  * Is this `data-testid` value a constant, rather than something computed at
  * runtime?
  *
- * One predicate, because there were three and they disagreed. The two testid
- * scanners each spelled it `/^(["'])[^"'`]*\1$/`, which treats a BACKTICK as
- * disqualifying and so reports `` `plain` `` as a runtime value while reporting
- * nothing about the shapes that matter more; `dynamicDataAttrs` below had
- * already learned the real rule, that a template is constant exactly when it
- * interpolates nothing, and the fix reached one copy of three. A predicate a
- * guard applies in two places is a predicate that must exist once.
+ * One predicate for both `data-testid` scanners, over an expression the regex
+ * captured whole.
  */
 function isConstantTestIdExpr(expr) {
   if (/^(["'])[^"'`]*\1$/.test(expr)) return true;
-  return expr.startsWith("`") && expr.endsWith("`") && !expr.includes("${");
+  return expr.startsWith("`") && expr.endsWith("`") && !templateInterpolates(expr);
 }
 
 /**
@@ -146,6 +143,21 @@ export function interpolatedTestIdObjectForm(cleanSource) {
     .filter((expr) => !isConstantTestIdExpr(expr));
 }
 
+/**
+ * `data-*` attributes fed an EXPRESSION rather than a string literal, in BOTH
+ * forms a React tree can produce one.
+ *
+ * The JSX form (`data-x={expr}`) is the obvious one. The object form
+ * (`"data-x": expr`, inside a props object a component later spreads) is the one
+ * that shipped past this guard: `useScrollEdges` builds
+ * `{ "data-fade-top": edges.top ? "true" : undefined }` and `CenteredCard`
+ * spreads it onto the card every pre-unlock screen composes. Nothing in the
+ * scanned files ever reads `data-x={`, so the attribute reached the DOM of the
+ * screen where the account number is typed without this check seeing it.
+ *
+ * A string-literal value in either form is fine, which is what the negative
+ * lookahead on the object form is for: `"data-mode": "compact"` is a constant.
+ */
 export function dynamicDataAttrs(source) {
   const clean = stripComments(source);
   const jsx = [...clean.matchAll(/(data-[a-z0-9-]+)=\{/g)].map((m) => m[1]);
@@ -155,13 +167,14 @@ export function dynamicDataAttrs(source) {
   // quote, and every constant string matches. Capturing cannot backtrack past
   // itself.
   //
-  // A BACKTICK is constant only when the template interpolates nothing.
-  // Excluding it outright, which is what shipped, made `` `${account}` `` read
-  // as a literal, and that is the one value shape most likely to carry the
-  // account number into a props-object `data-*`: the whole reason this arm
-  // exists. Scanning to the closing backtick can over-report if a template
-  // contains an escaped one, and that direction is the safe one: a false report
-  // costs an argument, a false silence costs the leak.
+  // A BACKTICK is constant only when the template interpolates nothing, which is
+  // `templateInterpolates` above and is deliberately NOT re-spelled here.
+  // Excluding the backtick outright, which is what shipped, made
+  // `` `${account}` `` read as a literal, and that is the one value shape most
+  // likely to carry the account number into a props-object `data-*`: the whole
+  // reason this arm exists. Scanning to the closing backtick can over-report if
+  // a template contains an escaped one, and that direction is the safe one: a
+  // false report costs an argument, a false silence costs the leak.
   const obj = [];
   for (const m of clean.matchAll(/["'](data-[a-z0-9-]+)["']\s*:\s*(\S)/g)) {
     const first = m[2];
@@ -170,7 +183,7 @@ export function dynamicDataAttrs(source) {
       const start = m.index + m[0].length;
       const close = clean.indexOf("`", start);
       const body = close === -1 ? clean.slice(start) : clean.slice(start, close);
-      if (!body.includes("${")) continue;
+      if (!templateInterpolates(body)) continue;
     }
     obj.push(m[1]);
   }
@@ -328,9 +341,10 @@ function main() {
     // three are composed by a pre-unlock screen. A value that comes from a prop
     // the caller chose is not a value the user typed; `data-testid={account}` is,
     // and that is what this catches.
-    // Read once and strip once. `dynamicDataAttrs` below used to open the same
-    // file a second time and strip it a third, on a list this loop already
-    // holds.
+    // Read once. `dynamicDataAttrs` below used to open the same file a second
+    // time, in a second loop over a list this one already holds. It still does
+    // its own strip, because it takes a source rather than a stripped one and
+    // that is its contract with every other caller.
     const raw = readFileSync(f, "utf8");
     const preUnlockSrc = stripComments(raw);
     const interpolated = [

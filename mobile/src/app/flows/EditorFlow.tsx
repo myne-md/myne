@@ -141,7 +141,7 @@ import {
   REMOVE_COVER_EVENT,
   type OpenCoverPickerDetail,
   type RemoveCoverDetail,
-} from "../../lib/openCoverPickerSignal";
+} from "@myne/editor/cover-signal";
 import { NoteRowActionsSheet } from "./editor/sheets/NoteRowActionsSheet";
 import { FolderActionsSheet } from "./editor/sheets/FolderActionsSheet";
 import { DecorationSheet } from "./editor/sheets/DecorationSheet";
@@ -1674,7 +1674,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // CodeMirror DOM in the shared editor package and has no route into this
   // component, which owns both the sheet mounts and the open note. Same shape
   // the desktop shell uses, and the event names are spelled identically on
-  // purpose (`mobile/src/lib/openCoverPickerSignal.ts` says so).
+  // purpose (`@myne/editor/cover-signal` says so).
   useEffect(() => {
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<OpenCoverPickerDetail>).detail;

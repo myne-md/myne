@@ -7,9 +7,8 @@
 // phrase-specific copy rather than a generic error.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { clickAndFlush } from "./_clickAndFlush";
-
 
 const migrateVault = vi.fn();
 vi.mock("../../src/lib/vault-migrate", () => ({

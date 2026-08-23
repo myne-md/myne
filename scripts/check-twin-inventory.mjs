@@ -284,16 +284,6 @@ const CURATED_TWINS = [
       "re-indexes and takes a property key; mobile does neither.",
   },
   {
-    a: "src/notes/openCoverPickerSignal.ts",
-    b: "mobile/src/lib/openCoverPickerSignal.ts",
-    what: "declares the cover-picker window event names the two shells listen for",
-    why:
-      "Two string constants that MUST agree, kept in step by a comment in each file saying they " +
-      "must agree. Cross-path, so the sweep cannot see it. This is the twin-drift shape stated at " +
-      "its purest: no logic, no seam, just a name that breaks silently on both ends if one side " +
-      "edits it.",
-  },
-  {
     a: "src/notes/localDateTime.ts",
     b: "mobile/src/lib/localDateTime.ts",
     what: "is a shim on one side and a hand copy on the other",
@@ -947,14 +937,6 @@ const ROSTER = [
     destination: "@myne/dialect",
     reason:
       "One question with one answer: what bytes a cover write produces. myne-md/myne#410's decision entry rests the case for a second implementation on 'a cover set on a phone is byte-identical to one set on a desktop', and what is actually shared is the primitives rather than the ORDER (patch `cover:`, then stamp `updated:`), which is the byte-deciding part. A pure `applyCoverToPlaintext(current, choice, nowIso)` in `@myne/dialect` would make the claimed property hold by construction instead of by comment; both clients already source-consume that package. Desktop additionally re-indexes and takes a property key, and those are legitimately per-client. One further asymmetry is DELIBERATE and recorded here rather than left to be noticed (myne-md/myne#520): desktop flushes every dirty pane INSIDE this writer (`flushBeforeFrontmatterWrite`), on the argument that a caller-side guard is opt-in and caller three inherits the gap, which is exactly what happened to the saved-view card's Set cover. Mobile flushes at its single caller in `EditorFlow.applyNoteCover` instead, because this client has no flush registry to put it inside: one note is open at a time and the buffer lives in the flow. Nothing is reachable today, since mobile's one caller passes the open note's id; the day it grows a second caller or a second open note, this sentence is what says what it owes.",
-  },
-  {
-    a: "src/notes/openCoverPickerSignal.ts",
-    b: "mobile/src/lib/openCoverPickerSignal.ts",
-    verdict: "decision",
-    destination: "@myne/editor",
-    reason:
-      "Two string constants that MUST agree, kept in step by a comment in each file saying they must agree. Twin drift at its purest: no logic, no seam, just a name that breaks silently on both ends if one side edits it. They belong beside the `cover?` seam definition in `editor/src/host.ts`, which both hosts already import to implement it.",
   },
   {
     a: "src-tauri/src/navigation.rs",

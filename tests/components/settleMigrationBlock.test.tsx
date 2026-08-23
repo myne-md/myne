@@ -22,9 +22,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { clickAndFlush } from "./_clickAndFlush";
 
-/** Click and flush the async handler's microtasks inside act, so a rejection is
- *  caught by the component rather than surfacing as an unhandled rejection. */
-
 const abortMigration = vi.fn(async () => {});
 const confirmMigration = vi.fn(async () => {});
 const migrationSettleStatus = vi.fn(async () => ({ pending: true, can_abort: true }));
