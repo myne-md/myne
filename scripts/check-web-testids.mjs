@@ -114,19 +114,36 @@ export function stripComments(source) {
  * lookahead on the object form is for: `"data-mode": "compact"` is a constant.
  */
 /**
- * Is `data-testid` given a runtime value through the props-object spelling?
+ * Is this `data-testid` value a constant, rather than something computed at
+ * runtime?
+ *
+ * One predicate, because there were three and they disagreed. The two testid
+ * scanners each spelled it `/^(["'])[^"'`]*\1$/`, which treats a BACKTICK as
+ * disqualifying and so reports `` `plain` `` as a runtime value while reporting
+ * nothing about the shapes that matter more; `dynamicDataAttrs` below had
+ * already learned the real rule, that a template is constant exactly when it
+ * interpolates nothing, and the fix reached one copy of three. A predicate a
+ * guard applies in two places is a predicate that must exist once.
+ */
+function isConstantTestIdExpr(expr) {
+  if (/^(["'])[^"'`]*\1$/.test(expr)) return true;
+  return expr.startsWith("`") && expr.endsWith("`") && !expr.includes("${");
+}
+
+/**
+ * Every `data-testid` given a runtime value through the props-object spelling.
  *
  * Separate from `dynamicDataAttrs`, which deliberately drops the name so the
  * curated-prop shape is not reported as a leak. Both callers below need the
  * object form as well as the JSX one, and this is the one place that knows it.
+ * It returns the offending EXPRESSIONS rather than a boolean, because the
+ * pre-unlock caller has to name them and applies one exemption of its own; the
+ * ban-everywhere caller reads the length.
  */
-function interpolatedTestIdObjectForm(cleanSource) {
-  for (const m of cleanSource.matchAll(/["']data-testid["']\s*:\s*([^,}\n]*)/g)) {
-    const expr = m[1].trim();
-    if (/^(["'])[^"'`]*\1$/.test(expr)) continue; // a constant name is fine
-    return true;
-  }
-  return false;
+export function interpolatedTestIdObjectForm(cleanSource) {
+  return [...cleanSource.matchAll(/["']data-testid["']\s*:\s*([^,}\n]*)/g)]
+    .map((m) => m[1].trim())
+    .filter((expr) => !isConstantTestIdExpr(expr));
 }
 
 export function dynamicDataAttrs(source) {
@@ -269,7 +286,7 @@ function main() {
     // exactly what this feature was written for, since `useScrollEdges` returns
     // a `data-*` object that `CenteredCard` spreads onto every pre-unlock screen.
     const cleanSrc = stripComments(src);
-    if (/data-testid=\{/.test(cleanSrc) || interpolatedTestIdObjectForm(cleanSrc)) {
+    if (/data-testid=\{/.test(cleanSrc) || interpolatedTestIdObjectForm(cleanSrc).length > 0) {
       problems.push(
         `${f}: data-testid is interpolated. Use a stable name plus a discriminator ` +
           `attribute (src/CLAUDE.md, "Test observability").`,
@@ -311,16 +328,21 @@ function main() {
     // three are composed by a pre-unlock screen. A value that comes from a prop
     // the caller chose is not a value the user typed; `data-testid={account}` is,
     // and that is what this catches.
-    const preUnlockSrc = stripComments(readFileSync(f, "utf8"));
+    // Read once and strip once. `dynamicDataAttrs` below used to open the same
+    // file a second time and strip it a third, on a list this loop already
+    // holds.
+    const raw = readFileSync(f, "utf8");
+    const preUnlockSrc = stripComments(raw);
     const interpolated = [
-      ...[...preUnlockSrc.matchAll(/data-testid=\{([^}]*)\}/g)].map((m) => m[1]),
+      // A constant string in either spelling is not a runtime value, and
+      // `isConstantTestIdExpr` is the one place that decides which is which.
+      ...[...preUnlockSrc.matchAll(/data-testid=\{([^}]*)\}/g)]
+        .map((m) => m[1].trim())
+        .filter((expr) => !isConstantTestIdExpr(expr)),
       // The props-object spelling, which the JSX pattern above never matched.
-      ...[...preUnlockSrc.matchAll(/["']data-testid["']\s*:\s*([^,}\n]*)/g)].map((m) => m[1]),
+      ...interpolatedTestIdObjectForm(preUnlockSrc),
     ];
-    for (const raw of interpolated) {
-      const expr = raw.trim();
-      // A constant string in either spelling is not a runtime value.
-      if (/^(["'])[^"'`]*\1$/.test(expr)) continue;
+    for (const expr of interpolated) {
       // BOTH alternatives anchored. `/testIdPrefix/` was a bare substring test,
       // so any expression merely CONTAINING the prop name was exempt, including
       // `` `${testIdPrefix}-${accountNumber}` ``. The exemption is for a value
@@ -333,11 +355,11 @@ function main() {
           `budget). A caller-supplied \`testId\` prop is the sanctioned shape.`,
       );
     }
-  }
-  for (const f of preUnlock) {
-    const dynamic = dynamicDataAttrs(readFileSync(f, "utf8")).filter(
-      (a) => !ALLOWED_DYNAMIC.has(a),
-    );
+
+    // The leak budget itself, over the SAME file and the same strip. Two
+    // consecutive loops over one list is two reads of every file for no reason;
+    // the rules stay distinct because their messages and exemption sets are.
+    const dynamic = dynamicDataAttrs(raw).filter((a) => !ALLOWED_DYNAMIC.has(a));
     if (dynamic.length > 0) {
       problems.push(
         `${f}: ${[...new Set(dynamic)].join(", ")} takes a runtime value on (or under) a ` +
