@@ -58,7 +58,11 @@ describe("markdown attachment token", () => {
     const para = blocks.find((b) => b.kind === "paragraph");
     expect(para?.kind).toBe("paragraph");
     const inline = para && para.kind === "paragraph" ? para.content : [];
-    expect(inline).toEqual([{ kind: "attachment", id: ID, label: "cat.png" }]);
+    // `toMatchObject`, not `toEqual`: the token also carries `alt` and `layout`
+    // (myne-md/myne#518) and those have their own assertions below. An exact
+    // match here would make every future field an edit to a test about labels.
+    expect(inline).toHaveLength(1);
+    expect(inline[0]).toMatchObject({ kind: "attachment", id: ID, label: "cat.png" });
   });
 
   // A note laid out on desktop syncs here. Reading the whole alias as the label
@@ -76,7 +80,50 @@ describe("markdown attachment token", () => {
     const blocks = parseBlocks(`![[att:${ID}|${alias}]]`);
     const para = blocks.find((b) => b.kind === "paragraph");
     const inline = para && para.kind === "paragraph" ? para.content : [];
-    expect(inline).toEqual([{ kind: "attachment", id: ID, label: want }]);
+    expect(inline).toHaveLength(1);
+    expect(inline[0]).toMatchObject({ kind: "attachment", id: ID, label: want });
+  });
+
+  // myne-md/myne#518. The alias was parsed and then thrown away: the token kept
+  // only `label`, so `AttachmentInline` passed `alt={label}` and an authored alt
+  // was not the accessible name on a phone. `docs/spec/wikilink.md` §5.1 is
+  // normative on both halves of this.
+  it.each([
+    ["an authored alt", "cat.png|alt=A cat asleep", "A cat asleep"],
+    ["an authored alt containing a pipe", "cat.png|alt=A cat | 2026", "A cat | 2026"],
+    ["an authored EMPTY alt, the decorative marker", "cat.png|alt=", ""],
+    ["no alt at all", "cat.png", null],
+  ])("carries %s through to the token", (_l, alias, want) => {
+    const blocks = parseBlocks(`![[att:${ID}|${alias}]]`);
+    const para = blocks.find((b) => b.kind === "paragraph");
+    const inline = para && para.kind === "paragraph" ? para.content : [];
+    const token = inline[0];
+    expect(token.kind).toBe("attachment");
+    expect(token.kind === "attachment" ? token.alt : undefined).toBe(want);
+  });
+
+  it("keeps `` distinct from no alt at all, which is the decorative signal", () => {
+    // The two cases above stated as the one comparison that matters: a fix that
+    // collapsed them (`?? ""`, or a trim) would satisfy each case read alone.
+    const decorative = parseBlocks(`![[att:${ID}|cat.png|alt=]]`);
+    const none = parseBlocks(`![[att:${ID}|cat.png]]`);
+    const altOf = (bs: ReturnType<typeof parseBlocks>) => {
+      const para = bs.find((b) => b.kind === "paragraph");
+      const t = para && para.kind === "paragraph" ? para.content[0] : undefined;
+      return t !== undefined && t.kind === "attachment" ? t.alt : undefined;
+    };
+    expect(altOf(decorative)).toBe("");
+    expect(altOf(none)).toBeNull();
+    expect(altOf(decorative)).not.toBe(altOf(none));
+  });
+
+  it("carries the layout through, so a note laid out on desktop is not flattened", () => {
+    const blocks = parseBlocks(`![[att:${ID}|cat.png|w=300|align=right]]`);
+    const para = blocks.find((b) => b.kind === "paragraph");
+    const token = para && para.kind === "paragraph" ? para.content[0] : undefined;
+    expect(token !== undefined && token.kind === "attachment" ? token.layout : null).toMatchObject(
+      { widthPx: 300, align: "right" },
+    );
   });
 
   it("keeps an audio embed recognisable once its alias carries segments", () => {

@@ -480,6 +480,24 @@ kbd {
   page-break-inside: avoid;
 }
 
+/* An authored alignment (issue 518, wikilink.md section 5.1). The rule
+   above is already margin: 12px auto, so CENTRE is the default and needs no
+   class; the two other cases override one margin each. Classes rather than an
+   inline margin string, mirroring the editor, so the emitter writes no
+   author-derived text into a style attribute it does not have to. */
+.att-image.att-align-left {
+  margin-left: 0;
+  margin-right: auto;
+}
+.att-image.att-align-right {
+  margin-left: auto;
+  margin-right: 0;
+}
+.att-image.att-align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* Excluded PDF / non-embeddable attachment: muted italic 11.5px line. */
 .att-excluded,
 .att-placeholder {

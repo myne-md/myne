@@ -1,4 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
+import type { EmbedLayout } from "@myne/dialect/embedLayout";
 import { useTranslation } from "react-i18next";
 import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
 import { parseBlocks, type Block, type Inline } from "../lib/markdown";
@@ -16,7 +17,31 @@ export const isAudioLabel = (label: string): boolean => {
  *  an `<audio controls>` player for a voice note / audio file, an `<img>` for an
  *  image, falling back to a file chip when the bytes aren't renderable (e.g. a
  *  PDF) or fail to load. */
-function AttachmentInline({ id, label }: { id: string; label: string }) {
+/**
+ * The accessible name for an embed, per `docs/spec/wikilink.md` §5.1
+ * (myne-md/myne#518).
+ *
+ * `alt === null` is "the author wrote none", so the filename stands in.
+ * `alt === ""` is "the author marked this decorative", which must survive as an
+ * empty `alt` so a screen reader skips the image rather than reading a filename
+ * out loud. `??` and not `||`, because `||` collapses the second case into the
+ * first, which is the whole defect.
+ */
+function accessibleName(label: string, alt: string | null): string {
+  return alt ?? label;
+}
+
+function AttachmentInline({
+  id,
+  label,
+  alt,
+  layout,
+}: {
+  id: string;
+  label: string;
+  alt: string | null;
+  layout: EmbedLayout;
+}) {
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
   if (failed) {
@@ -43,14 +68,41 @@ function AttachmentInline({ id, label }: { id: string; label: string }) {
   // Tap opens the shared @myne/editor lightbox (zoom/pan, MYND-594). Before this
   // there was no handler at all — an image could not be inspected on a phone.
   const src = attachmentSrc(id);
+  const name = accessibleName(label, alt);
+  // The author's width and alignment, applied the way `applyEmbedLayout` does in
+  // the editor (myne-md/myne#518): a length or a percentage with `max-width` at
+  // its side, and alignment as auto margins on a block image. A note laid out on
+  // desktop rendered at default size here, which `dialect/src/index.ts` says is
+  // exactly what the shared module exists to prevent.
+  const width =
+    layout.widthPx !== null
+      ? `${layout.widthPx}px`
+      : layout.widthPercent !== null
+        ? `${layout.widthPercent}%`
+        : undefined;
   return (
     <img
       src={src}
-      alt={label}
+      alt={name}
       data-testid="markdown.image"
       onError={() => setFailed(true)}
-      onClick={() => showAttachmentLightbox({ url: src, alt: label, id })}
-      style={{ display: "block", maxWidth: "100%", borderRadius: 8, margin: "8px 0", cursor: "zoom-in" }}
+      onClick={() => showAttachmentLightbox({ url: src, alt: name, id })}
+      style={{
+        display: "block",
+        maxWidth: "100%",
+        borderRadius: 8,
+        margin: "8px 0",
+        cursor: "zoom-in",
+        ...(width === undefined ? {} : { width }),
+        ...(layout.heightPx === null ? {} : { height: `${layout.heightPx}px` }),
+        ...(layout.align === "left"
+          ? { marginLeft: 0, marginRight: "auto" }
+          : layout.align === "right"
+            ? { marginLeft: "auto", marginRight: 0 }
+            : layout.align === "center"
+              ? { marginLeft: "auto", marginRight: "auto" }
+              : {}),
+      }}
     />
   );
 }
@@ -95,7 +147,9 @@ function renderInline(tokens: Inline[], onOpenWikilink: (target: string) => void
           </span>
         );
       case "attachment":
-        return <AttachmentInline key={i} id={t.id} label={t.label} />;
+        return (
+          <AttachmentInline key={i} id={t.id} label={t.label} alt={t.alt} layout={t.layout} />
+        );
       default:
         return <span key={i}>{t.text}</span>;
     }
