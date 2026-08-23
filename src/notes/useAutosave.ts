@@ -499,7 +499,7 @@ export function useAutosave(
 
     // A change happened.
     if (savedBodyRef.current !== null && body === savedBodyRef.current) {
-      // User reverted to last-saved state — back to clean. `savedBodyRef` is
+      // User reverted to last-saved state, so back to clean. `savedBodyRef` is
       // only ever set by a save that SUCCEEDED, so matching it means the buffer
       // equals the disk and the last attempt's failure has been undone by the
       // user rather than by a write.

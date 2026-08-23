@@ -121,6 +121,17 @@
   suspecting the mount (`docker run --rm -v "$(pwd):/work" -w /work myne-e2e
   grep -n '<symbol>' <path>`); if the container sees the right source and cargo
   still disagrees, the artifact is what is wrong, not the tree.
+- **A captured element handle cannot be re-found, so a click on one can only time
+  out.** `Element.click` retries while WebKit reports the node is in the DOM but
+  not hit-testable, which is the case it exists for. It cannot answer a node that
+  has been REPLACED: the handle is stale on every poll, and the failure reads
+  `waitUntil(element interactable + clicked) timed out … [stale element
+  reference]`, which looks like a slow app and is not. The sidebar list
+  re-renders on a save settling, on a sync tick and on the row's own selection,
+  so the window between `await noteRow(...)` and `.click()` is real. Measured on
+  `nco3`: one failure in eight runs after two retries, then three consecutive
+  passes with no change. Drive a row with `clickNoteRow`, which re-finds inside
+  the poll, the shape `clickByTestId` already uses for a bare testid.
 - **`e2e-one.sh` can report a red that `e2e-buildrun.sh` does not, on the same
   tree and the same volume.** Measured on myne-md/myne#461's branch: `ws1` in
   `workspace-state.e2e.ts` passed in 3.6 s under `e2e-buildrun.sh` and then hung

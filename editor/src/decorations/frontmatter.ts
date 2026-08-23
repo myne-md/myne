@@ -222,8 +222,10 @@ class PropertiesWidget extends WidgetType {
     // this control does not go through the document, so `EditorState.readOnly`
     // does not stop it, and the host it calls re-encrypts the note on disk. A
     // reading mirror offering "Add cover" is a write affordance on a surface
-    // documented as never writing. `writableHost` holds that rule for both
-    // controls and for whatever the next write member turns out to be.
+    // documented as never writing. `writableMember` holds that rule for both
+    // controls; what it does NOT reach is stated at `HOST_WRITE_MEMBERS` rather
+    // than promised here, because the roster covers top-level members and the
+    // attachments write members are not among them.
     const cover = writableMember(view.state, "cover");
     if (cover === undefined || this.coverShown) return input;
 
