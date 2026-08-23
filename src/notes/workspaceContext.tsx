@@ -603,26 +603,34 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
    *
    * A pane's own error UI is still its own: this reports only WHETHER it
    * settled, so the caller can decline to write on top of it. Each flusher
-   * answers with `!hasPendingWork()` after its flush, which reads refs rather
-   * than React state and so answers for the buffer as it is now.
+   * answers with `!lastSaveFailed()` after its flush, which reads refs rather
+   * than React state and so answers for the buffer as it is now. NOT
+   * `!hasPendingWork()`: that is true after any save whose buffer moved on, so
+   * it reported an ordinary success as "did not settle" and made this reject
+   * after every normal save. The comment at the call site in `PaneView.tsx`
+   * carries the measurement.
    */
   const flushAll = useCallback(async () => {
-    const entries = [...flushers.current.entries()];
     const settled = await Promise.all(
-      entries.map(([paneId, f]) =>
+      [...flushers.current.entries()].map(([paneId, f]) =>
         f().then(
           (ok) => (ok ? null : paneId),
           // A flusher that REJECTS outright did not settle either. Caught here
           // rather than left to `Promise.all` so one pane's failure does not
-          // hide the others: the caller gets the full list.
+          // hide the others: every pane is awaited and every failing id reaches
+          // the message below.
           () => paneId,
         ),
       ),
     );
     const unsettled = settled.filter((id): id is PaneId => id !== null);
     if (unsettled.length > 0) {
+      // The ids, not just the count. This message is what a caller logs when it
+      // declines to write, and "2 panes did not settle" cannot be acted on:
+      // which two decides whether the user is looking at a full disk, one bad
+      // note, or a pane they thought they had closed.
       throw new Error(
-        `flushOpenPanes: ${unsettled.length} pane(s) did not settle; refusing to report the disk as current`,
+        `flushOpenPanes: ${unsettled.length} pane(s) did not settle (${unsettled.join(", ")}); refusing to report the disk as current`,
       );
     }
   }, []);
