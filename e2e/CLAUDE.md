@@ -61,6 +61,30 @@
   params from `vault.meta`; creation stays pinned — no code branch). The VR-1
   recovery drill + creation scenarios run PRODUCTION params every pipeline.
 
+- **A new `*.e2e.ts` file owes a line in the manual test roster.**
+  `scripts/check-manual-test-roster.mjs` fails the commit until some entry in
+  `scripts/manual-test-roster.mjs` names the file in its `automatedBy`. The rule
+  is not bookkeeping: this suite runs only in a Linux container against
+  WebKitGTK, so a scenario proves one of the eight client surfaces the roster
+  counts, and the roster is
+  where what it does NOT prove is written down. Naming it is also what stops a
+  human from re-walking, every release, what you just automated. **Naming the
+  file is enough**: a new scenario needs a mention in an existing entry's
+  `automatedBy`, not an entry of its own, and a new SURFACE can be discharged
+  either by a roster entry or by a `NOT_A_SURFACE` record carrying its reason.
+
+  When a scenario you add covers an observation a roster item currently carries,
+  delete that item in the same change and run
+  `node scripts/check-manual-test-roster.mjs --record`. That lowers
+  `totalMinutesCeiling` and nothing else: the gate POLICY (`gatedTiers`,
+  `gatedClients`) is untouched by an item deletion, so there is nothing to
+  narrow and nothing to argue for. Deleting the item is the ratchet moving, and
+  it is the point of writing the scenario. Say in the ratchet's `$comment` which
+  scenario took the work, the same way a ceiling RAISE has to argue for itself.
+  One thing the guard will stop you on: if the item you delete was its entry's
+  LAST manual item, that entry now needs an `exemptionReason` of at least 40
+  characters. `decisions.md` 2026-08-21 (myne-md/myne#548).
+
 ## Authoring conventions
 
 - One scenario = one story; every scenario declares its **vault-count
