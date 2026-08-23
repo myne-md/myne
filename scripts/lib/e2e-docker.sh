@@ -66,6 +66,10 @@ E2E_MEMBER_NM_VOLUMES=(
 # siblings were still wrong and that fixing them was a change with its own claim
 # to verify. This is that change, and it lives here so the seventh runner cannot
 # get it wrong again.
+#
+# Measured on `e2e-buildrun.sh`, before and after: 789 `Downloaded <crate>` lines
+# and a full `Updating crates.io index` on the run before this fix, zero of
+# either on the run after it, same tree, same volume.
 E2E_REGISTRY_MOUNT=(-v myne-e2e-cargo-registry:/home/e2e/.cargo/registry)
 
 # Docker creates the mount's PARENT root-owned, and cargo needs to write its lock
