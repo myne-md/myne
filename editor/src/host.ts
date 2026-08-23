@@ -453,41 +453,53 @@ export function getHost(): EditorHost {
 }
 
 /**
- * The host members a widget may reach only while the document is WRITABLE.
+ * The TOP-LEVEL host members a widget may reach only while the document is
+ * WRITABLE, and the two words carry a limit worth reading before trusting the
+ * roster.
  *
- * The list is here, beside the members themselves, and not at the widgets that
- * consume them. That placement is the point: a widget's write is invisible to
- * every mechanism that makes an editor read-only, so gating it was a clause each
- * widget had to remember.
+ * The list is here, beside the members themselves, rather than at the widgets
+ * that consume them. That placement is the point: a widget's write is invisible
+ * to every mechanism that makes an editor read-only, so gating it was a clause
+ * each widget had to remember. `EditorState.readOnly` stops COMMANDS and the
+ * reading mirror's `NOOP_ON_CHANGE` stops document changes; neither stops a DOM
+ * handler that calls the host, and the host re-encrypts the note on disk. Two
+ * such controls were found by hand in myne-md/myne#520's review (the cover
+ * banner's Remove and the frontmatter panel's Add cover) and each grew its own
+ * `view.state.readOnly ? undefined : getHost().cover` line.
  *
- * `EditorState.readOnly` stops COMMANDS, and the reading mirror's
- * `NOOP_ON_CHANGE` stops document changes. Neither stops a DOM handler that
- * calls the host, and the host re-encrypts the note on disk, so a control
- * rendered on a surface documented as never writing does write. Two such
- * controls were found by hand in myne-md/myne#520's review (the cover banner's
- * Remove and the frontmatter panel's Add cover) and each grew its own
- * `view.state.readOnly ? undefined : getHost().cover` line. Nothing catches the
- * third.
- *
- * Adding a write-capable member to `EditorHost` therefore means adding its key
- * here, which is one declaration next to the member rather than a remembered
- * clause at each call site. It is still something to remember; it is one thing,
- * in the file the member is declared in, rather than one per consumer.
+ * **What this roster cannot cover, so that "covered" is not read into it.**
+ * `attachments.attachmentRename`, `attachments.attachmentExport` and
+ * `attachments.import` all re-encrypt on disk and are NOT here, because naming
+ * `attachments` would also withhold `resolveRef` and `catalogList`, which a
+ * reading mirror legitimately needs. They are also reached through
+ * `editor/src/host/lib/attachments.ts`, thin `getHost()` bridges that take no
+ * `EditorState` at all, so this gate could not be applied at those call sites
+ * even with a path-shaped roster. Extending the mechanism means moving it into
+ * that bridge layer, which every write consumer already goes through, and that
+ * is a larger change than the two controls this closed. Until then the roster
+ * covers one member, and it says which.
  */
 const HOST_WRITE_MEMBERS = ["cover"] as const satisfies readonly (keyof EditorHost)[];
 
 /**
- * `getHost()`, with every write-capable member absent when `state` is read-only.
+ * One write-capable host member, or `undefined` when `state` is read-only.
  *
- * Absent rather than throwing, because the seam's contract is already that a
+ * `undefined` rather than a throw, because the seam's contract is already that a
  * host omitting an optional member renders no affordance for it: a widget that
  * checks `cover !== undefined` before drawing its controls needs no second
  * branch for the read-only case, and gets the right one for free.
+ *
+ * Returning the MEMBER rather than a gated host also means nothing is cloned. An
+ * earlier shape did `{...host}` and deleted the key, which allocated a copy of a
+ * fifteen-member object with nested namespaces on every widget mount, and both
+ * call sites then read exactly one member off it.
+ *
+ * The `key` parameter is typed to the roster, so reaching for a member that is
+ * not write-gated is a compile error rather than a silent pass-through.
  */
-export function writableHost(state: EditorState): EditorHost {
-  const host = getHost();
-  if (!state.readOnly) return host;
-  const gated: EditorHost = { ...host };
-  for (const key of HOST_WRITE_MEMBERS) delete gated[key];
-  return gated;
+export function writableMember<K extends (typeof HOST_WRITE_MEMBERS)[number]>(
+  state: EditorState,
+  key: K,
+): EditorHost[K] | undefined {
+  return state.readOnly ? undefined : getHost()[key];
 }
