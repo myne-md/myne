@@ -1001,7 +1001,7 @@ mod tests {
             SyncRuntimeStatus::Pending,
         ] {
             assert_eq!(
-                overlay_status(base.clone(), Some(LiveStatus::Syncing), 5),
+                overlay_status(base.clone(), Some(LiveStatus::Syncing), 5, None),
                 base
             );
         }
@@ -1012,20 +1012,29 @@ mod tests {
         use SyncRuntimeStatus as S;
         // In-flight Syncing wins even with conflicts present.
         assert_eq!(
-            overlay_status(S::Idle, Some(LiveStatus::Syncing), 3),
+            overlay_status(S::Idle, Some(LiveStatus::Syncing), 3, None),
             S::Syncing
         );
         // A failed cycle surfaces Error (with its detail) over conflicts.
         assert_eq!(
-            overlay_status(S::Idle, Some(LiveStatus::Error("sync_failed".into())), 3),
+            overlay_status(
+                S::Idle,
+                Some(LiveStatus::Error("sync_failed".into())),
+                3,
+                None
+            ),
             S::Error {
-                detail: "sync_failed".into()
+                detail: "sync_failed".into(),
+                last_success_at: None
             }
         );
         // No live overlay + unresolved conflicts → Conflicts{count}.
-        assert_eq!(overlay_status(S::Idle, None, 2), S::Conflicts { count: 2 });
+        assert_eq!(
+            overlay_status(S::Idle, None, 2, None),
+            S::Conflicts { count: 2 }
+        );
         // Enrolled, nothing in flight, no conflicts → a bare Idle.
-        assert_eq!(overlay_status(S::Idle, None, 0), S::Idle);
+        assert_eq!(overlay_status(S::Idle, None, 0, None), S::Idle);
     }
 
     #[test]
