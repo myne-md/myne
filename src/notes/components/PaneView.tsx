@@ -74,6 +74,8 @@ import { setNoteCover } from "../setNoteCover";
 import { upsertSavedView } from "../../lib/prefs";
 import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
+import { Toast } from "../../components/Toast";
+import { isPanesNotSettled } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -1579,6 +1581,7 @@ function PaneLoading() {
  * is stale) the wrapper holds a calm, quiet body — no spinner churn.
  */
 function ViewHost({ viewId }: { viewId: string }) {
+  const { t } = useTranslation();
   const { def, result } = useViewResult(viewId);
   const ws = useWorkspace();
   const sidebar = useSelectedNote();
@@ -1608,6 +1611,10 @@ function ViewHost({ viewId }: { viewId: string }) {
   // defaulting to `cover` on first use (and recorded onto the view so the cards
   // render reads it back).
   const [coverNoteId, setCoverNoteId] = useState<string | null>(null);
+  // A refused or failed cover write, shown as a toast. Before this the catch
+  // below was bare, so the two rejection classes the fix introduced were
+  // reported nowhere and a refused write looked exactly like a successful one.
+  const [coverError, setCoverError] = useState<string | null>(null);
   const onSetCover = useCallback((noteId: string) => setCoverNoteId(noteId), []);
   const coverPropertyKey = def?.image ?? "cover";
   // Whether the picker's target note already has a resolvable cover (enables the
@@ -1650,8 +1657,22 @@ function ViewHost({ viewId }: { viewId: string }) {
           // than copied: it used to be a closure in `Editor.tsx` and this site
           // hand-copied its two lines.
           await settleFrontmatterWrite(sidebar, noteId as NoteId);
-        } catch {
-          /* surfaced via backend tracing */
+        } catch (err) {
+          // The two NEW rejection classes are constructed in the WebView and
+          // never reach backend tracing, so the old bare catch reported them
+          // nowhere: `setNoteCover` now opens with `flushBeforeFrontmatterWrite`
+          // (which throws `PanesNotSettledError`) and `settleFrontmatterWrite`
+          // deliberately propagates a failed record refresh. This is the call
+          // site `flushBeforeFrontmatterWrite`'s own header names as most at
+          // risk, and it was the only cover caller with no outcome at all while
+          // the editor screen shows `editor.cover.writeFailed` for the same
+          // failure. A refused cover write was byte-identical to a successful
+          // one here.
+          setCoverError(
+            isPanesNotSettled(err)
+              ? t("notes.folderManagement.unsettledSave")
+              : t("editor.cover.writeFailed"),
+          );
         }
       })();
     },
@@ -1725,6 +1746,7 @@ function ViewHost({ viewId }: { viewId: string }) {
         onPick={(choice) => applyCover(choice)}
         onRemove={() => applyCover(null)}
       />
+      <Toast message={coverError} onDone={() => setCoverError(null)} variant="error" />
     </div>
   );
 }

@@ -1144,6 +1144,7 @@
       }
     },
     "noteActions": {
+        "convertFailed": "Couldn't change what this note is, so it is unchanged.",
       "buttonLabel": "Note actions",
       "rename": "Rename",
       "move": "Move to folder…",
@@ -1986,6 +1987,7 @@
       }
     },
     "list": {
+        "renameFailed": "Couldn't save that name, so the note kept its old one.",
       "addToFavorites": "Add to favorites",
       "archive": "Archive",
       "archiveBulkError": "Couldn't archive the notes.",
@@ -4237,6 +4239,7 @@
     "phraseCopyFailed": "Couldn't copy. Use \"Save to file\" instead.",
     "savedToFile": "Saved to {{label}}",
     "savedToShareSheet": "Saved inside Myne, where the system file browser cannot reach it. Use the share sheet to put a copy somewhere you can reach, and tap Save again if you closed it.",
+    "savedFileWritten": "Saved inside Myne. This device did not report where the file can be reached from, so treat it as reachable only from inside the app until you have checked.",
     "saveFileError": "Couldn't save the file.",
     "stepLabel": "Create a vault · {{current}} of {{total}}",
     "briefingTitle": "Before we begin",

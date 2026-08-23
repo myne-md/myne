@@ -72,7 +72,7 @@ import {
 } from "../folderNote";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
-import { useWorkspace } from "../workspaceContext";
+import { isPanesNotSettled, useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
 import type { IconName } from "../../lib/icons";
 import { ViewsSection } from "./ViewsSection";
@@ -1773,7 +1773,32 @@ function PopulatedList({
           onStartRename={ctx.startRename}
           onContextMenu={handleContextMenu}
           onCommitRename={async (noteId, newTitle) => {
-            await executeRenameCommit(noteId, newTitle, ctx);
+            // The inline title rename inherits the same refusal the folder
+            // rename does: `commitRename` awaits `flushOpenPanes()` whenever an
+            // inbound note is open, rolls the optimistic rename back and
+            // rethrows. Without this the user watches the title flip to the new
+            // value and silently flip back, with the only other trace an
+            // unhandled rejection in the console. Same message as the folder
+            // path's, because it is the same fact about the same pane.
+            //
+            // Anything else gets the generic sentence rather than a rethrow:
+            // the prop is typed `=> void` and the caller discards the promise,
+            // so a rethrow here is an unhandled rejection and a title that
+            // reverted for no stated reason. The rollback has already run in
+            // `commitRename`, so both arms are true.
+            try {
+              await executeRenameCommit(noteId, newTitle, ctx);
+            } catch (err) {
+              setTrashError(
+                isPanesNotSettled(err)
+                  ? t("notes.folderManagement.unsettledSave")
+                  : t("notes.list.renameFailed"),
+              );
+              if (import.meta.env.DEV && !isPanesNotSettled(err)) {
+                // eslint-disable-next-line no-console
+                console.warn("[NoteList] rename failed:", err);
+              }
+            }
           }}
           onCancelRename={ctx.cancelRename}
           favorited={favorited}
