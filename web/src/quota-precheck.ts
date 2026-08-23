@@ -1,6 +1,26 @@
 // Storage-quota precheck before the first sync materialises a vault
 // (phase3-web-client task 24).
 //
+// NOT WIRED YET. Nothing in the client calls `precheckQuota` — only this
+// module's unit test imports it, and `scripts/check-unwired.mjs` records that
+// as a violation in so many words: "the precheck the web client is documented
+// to run does not run". Everything below describes the DESIGN and is written in
+// the present tense; until a boot-path caller exists, none of it happens.
+//
+// This notice is load-bearing rather than a courtesy. The paragraph after it
+// states "the check happens before any write, and a refusal leaves nothing
+// behind" as fact, and a reader deciding whether this area needs work would
+// conclude it is done. `tests/web/quotaPrecheckWiring.test.ts` holds the two
+// together in BOTH directions: it fails while the module is unwired and this
+// notice is absent, and it fails again the day a production importer lands and
+// the notice is still here (myne-md/myne#556).
+//
+// It also blocks a test. The `web.storage.quota-exhaustion` bullet asks for a
+// browser scenario driving CDP's `Storage.overrideQuotaForOrigin` to force a
+// refusal; that scenario cannot be written against a module on no code path,
+// and writing it anyway would produce a failure saying the app ignored the
+// quota — true, and useless.
+//
 // The failure this exists to prevent is a *partial* vault. Materialising a
 // large vault into OPFS is thousands of writes; running out of quota halfway
 // leaves a container that is neither empty nor complete, and the client cannot

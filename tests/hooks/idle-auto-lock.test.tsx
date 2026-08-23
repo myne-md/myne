@@ -35,6 +35,41 @@ afterEach(() => {
 });
 
 describe("idle auto-lock", () => {
+  // The case the WEB scenario found and no test here covered: the timeout
+  // arriving AFTER mount. In production `Editor.tsx` mounts with
+  // `auto_lock_seconds` still `null` (`timeoutSecs` 0, so the hook is inert) and
+  // the value lands moments later, once `usePrefs` has read the blob — or later
+  // still, when the user changes it in Settings. Every other case in this file
+  // renders with the timeout already set, which is the one shape the app never
+  // has on a cold start.
+  //
+  // myne-md/myne#556: a web vault never auto-locks in a session where the pref
+  // was set, and does lock after a reload — i.e. exactly when the value IS
+  // present at mount.
+  it("arms when the timeout arrives after mount, not only when it is set at mount", () => {
+    const onIdle = vi.fn();
+    const { rerender } = render(<Harness timeoutSecs={0} onIdle={onIdle} />);
+
+    // Inert while the pref is unknown. Not a nicety: 0 means "no timeout", and
+    // a hook that locked here would lock a vault the user never asked to lock.
+    vi.advanceTimersByTime(120_000);
+    expect(
+      onIdle,
+      "the hook fired with timeoutSecs 0, which means no auto-lock at all",
+    ).not.toHaveBeenCalled();
+
+    // …and now the value arrives.
+    rerender(<Harness timeoutSecs={60} onIdle={onIdle} />);
+    vi.advanceTimersByTime(61_000);
+    expect(
+      onIdle,
+      "the timeout arrived after mount and the hook never armed. That is the " +
+        "production shape on every cold start — Editor.tsx mounts before " +
+        "usePrefs has read vault.prefs — and it is what leaves a web vault " +
+        "unlocked forever (myne-md/myne#556).",
+    ).toHaveBeenCalledTimes(1);
+  });
+
   it("locks once the idle deadline passes", () => {
     const onIdle = vi.fn();
     render(<Harness timeoutSecs={60} onIdle={onIdle} />);

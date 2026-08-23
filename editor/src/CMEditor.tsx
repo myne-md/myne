@@ -29,6 +29,18 @@ import { reconfigureVaultBlockAnchors } from "./wikilink/vault-block-anchors";
 import type { VaultBlockAnchor } from "./wikilink/vault-block-anchors";
 import { reconfigureLineNumbers } from "./line-numbers";
 import { reconfigureVim } from "./vim";
+
+/**
+ * The vim engine failed to load, and that is not the note's problem.
+ *
+ * Named rather than an inline `() => {}` so both call sites visibly share one
+ * decision, and so the reason lives somewhere a reader lands. What is NOT
+ * handled here is telling the user: the Settings toggle stays on and only the
+ * absence of the bottom-bar mode indicator says the layer did not mount. That
+ * gap is a product decision (copy, whether to revert the pref) and is recorded
+ * on myne-md/myne#556 rather than invented here.
+ */
+function ignoreVimLoadFailure(): void {}
 import { reconfigureViewMode, type ViewMode } from "./view-mode";
 import { reconfigureDrawingEmbedIo, type DrawingEmbedIo } from "./drawing/embed-io";
 import { resolveAnchorRange, type WikilinkAnchor } from "./wikilink/anchor";
@@ -400,7 +412,10 @@ export function CMEditor(props: CMEditorProps) {
       // switching notes leaves the user back in plain insert mode. Async by
       // nature (the engine is dynamically imported); `reconfigureVim` carries its
       // own last-call-wins generation guard, so firing it here is safe.
-      void reconfigureVim(v, vimModeRef.current);
+      //
+      // `.catch()`, not `void` — see the effect below for why the distinction is
+      // load-bearing rather than stylistic.
+      reconfigureVim(v, vimModeRef.current).catch(ignoreVimLoadFailure);
     };
 
     const view = new EditorView({ state: makeState(value), parent: host });
@@ -604,13 +619,23 @@ export function CMEditor(props: CMEditorProps) {
   // vim compartment whenever it changes. Unlike the compartments above this is
   // ASYNC — the engine is dynamically imported on first enable — so the helper
   // owns its own last-call-wins guard rather than this effect trying to cancel.
-  // Errors are swallowed deliberately: a failed chunk load must leave the plain
-  // editor working, not break the note.
+  // A failed chunk load must leave the plain editor working, not break the note.
+  //
+  // `.catch()`, not `void` (myne-md/myne#556). `void` silences the floating-
+  // promise lint and swallows NOTHING: `reconfigureVim` has a bare
+  // `await import("@replit/codemirror-vim")`, so an offline user, a 503 on the
+  // chunk, or a blocking extension produces a rejected promise with no handler.
+  // On this client that is not merely a console line — `src/lib/global-failure.ts`
+  // listens for `unhandledrejection` and records `unhandled-rejection` as a
+  // bounded global failure code, which `FailClosedError`'s diagnostic block can
+  // then show. So a chunk that simply did not download read as the app having
+  // broken. The comment above already claimed these errors were swallowed; now
+  // they are.
   useEffect(() => {
     vimModeRef.current = vimMode;
     const view = viewRef.current;
     if (view === null) return;
-    void reconfigureVim(view, vimMode);
+    reconfigureVim(view, vimMode).catch(ignoreVimLoadFailure);
   }, [vimMode]);
 
   // local-ai (SYNC-14): push the live `ai_enabled` (ANDed with the not-excluded

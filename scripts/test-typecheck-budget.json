@@ -48,7 +48,6 @@
     "tests/lib/themeDeepLink.test.ts": 1,
     "tests/notes/archiveFiltering.test.ts": 2,
     "tests/notes/archiveOptimistic.test.ts": 1,
-    "tests/notes/chatStore.test.ts": 7,
     "tests/notes/conflictsView.test.tsx": 1,
     "tests/notes/dailyNote.test.ts": 1,
     "tests/notes/folderActions.test.ts": 2,
@@ -88,5 +87,5 @@
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 220
+  "total": 213
 }

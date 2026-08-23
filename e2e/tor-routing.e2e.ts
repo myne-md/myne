@@ -112,7 +112,16 @@ async function bannerPosture(session: Session): Promise<string | null> {
 // most likely the 20s slack is the victim of suite-length contention. Pending
 // an ISOLATED container run to decide: raise the timeout / keep quarantined
 // (contention) vs. fix a real control-file handshake bug if it fails solo too.
-describeE2E.flaky("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)", () => {
+// DE-QUARANTINED (myne-md/myne#555). The quarantine reason was
+// runner contention, and it was wrong for the same reason it was wrong for
+// `nav1`: the first seeding test in a vitest process builds `e2e-fixture-gen`
+// with `cargo build --release` INSIDE its own budget, ~171 s against a 180 s
+// `testTimeout`. Which spec paid it depended only on which one seeded first,
+// which is why the victim moved between runs and read as a loaded host.
+// `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
+// before any worker starts. Measured after the fix, `--retry=0`, warm
+// container: 16 consecutive clean runs, which is the bar `e2e/CLAUDE.md` sets.
+describeE2E("tor1 Tor routing: toggle, connecting, fail-closed (MYND-650)", () => {
   it("drives inactive → connecting → active → fail-closed → inactive from the real toggle", async () => {
     let password = "";
     const uninstallSidecar = installFakeTorSidecar();

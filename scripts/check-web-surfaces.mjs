@@ -175,10 +175,8 @@ const V = {
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
-  "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused. Same shape as `ai-chat.ts` directly below."],
-  "src/lib/ai-chat.ts": ["adapted", "Unreachable where `localAi` is absent; the editor host omits the `ai` member entirely."],
-  "src/lib/ai-model-store.ts": ["adapted", "Same as ai-chat: no AI surface mounts on web."],
-  "src/lib/ai-qa.ts": ["adapted", "Same as ai-chat."],
+  "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused. Same shape as the other AI-path wrappers below: reachable code, refused command."],
+  "src/lib/ai-model-store.ts": ["adapted", "No AI surface mounts on web (`localAi` is absent), so nothing reaches this."],
   "src/lib/ai-capability.ts": [
     "adapted",
     "Runs as written and gives the right answer for the wrong-looking reason: the `local-inference` plugin is `Unsupported` in the dispatcher, so the invoke is refused and the module returns UNCOMPILED_REPORT — which is exactly true on web, where no AI is compiled. Nothing renders it there (`localAi` is absent), so it is unreachable in practice; it is `adapted` rather than `excluded` because it is correct if it ever is reached.",

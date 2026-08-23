@@ -29,7 +29,9 @@ import {
   dismissImporterOffer,
   openSettings,
   runPaletteAction,
+  typeIntoEditor,
   unlockToEditor,
+  waitForSaved,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
@@ -121,6 +123,221 @@ describeE2E("fm2 focus-mode behaviour toggles persist (focus-mode, MYND-348)", (
         expect(
           await (await s.byTestId("settings.focus-typewriter")).attribute("aria-checked"),
         ).toBe("true");
+      },
+    );
+  });
+});
+
+// fm3 — the dimmed lines are dimmed and still READABLE, and the active line is
+// the most legible text on screen. myne-md/myne#555, the
+// `settings.block.focus-mode` bullet:
+//
+//   > assert the dimmed line's computed contrast sits below the active line's
+//   > and above a readability floor, and that the active line is the
+//   > highest-contrast text on screen — the same unit `ornament.e2e.ts` or4
+//   > already refuses palettes in.
+//
+// # Why "it looks dimmer" is not the assertion
+//
+// Focus mode's dim is `opacity: 0.4` on every `.cm-line` except the active one.
+// Two things can go wrong with that number and only one of them is visible to
+// someone glancing at the screen:
+//
+//  * too HIGH and the mode does nothing — the point of focus mode is that the
+//    eye is pulled to one line, and a barely-dimmed page does not do that;
+//  * too LOW and the surrounding text stops being readable. That is the failure
+//    that matters, because the surrounding text is not decoration: a user reads
+//    the paragraph above while writing the one below, and dimming it out of
+//    legibility turns a focus aid into a reading impairment. It is also the
+//    failure a sighted developer on a good monitor will not notice.
+//
+// So both bounds are asserted, in contrast ratios rather than in opacity —
+// opacity is the mechanism, contrast is what a reader actually experiences, and
+// the same opacity produces very different contrast on the light theme and on
+// AMOLED.
+//
+// # The measurement
+//
+// WCAG contrast ratio between the composited text colour and the page
+// background. `opacity` composites the whole line against what is behind it, so
+// the effective colour is `bg + (fg - bg) * alpha` — the standard alpha
+// composite, computed here rather than read, because `getComputedStyle` reports
+// the DECLARED colour and the opacity separately and no API hands back the
+// composite.
+//
+// The floor is 3:1: WCAG AA's large-text threshold, and deliberately not 4.5:1.
+// Dimmed body text is a supporting surface the user is not being asked to read
+// closely, so holding it to the normal-text bar would be asserting a stricter
+// rule than the design makes; below 3:1 it stops being text and becomes
+// texture. The active line is separately required to clear 4.5:1, which is the
+// real bar for the line being written.
+//
+// Vault-count precondition: 1 (weak KDF generator fixture).
+
+/** sRGB relative luminance, per WCAG 2.x. */
+function luminance(r: number, g: number, b: number): number {
+  const f = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+/** WCAG contrast ratio between two opaque colours. */
+function contrast(a: [number, number, number], b: [number, number, number]): number {
+  const la = luminance(...a);
+  const lb = luminance(...b);
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function parseRgb(value: string): [number, number, number] | null {
+  const m = value.match(/^rgba?\(([^)]+)\)$/);
+  if (!m) return null;
+  const p = m[1]!.split(",").map((x) => parseFloat(x));
+  if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
+  return [p[0]!, p[1]!, p[2]!];
+}
+
+/** What a line's text actually looks like on screen: its declared colour
+ *  composited over the page background at its own effective opacity. */
+type LineInk = { color: string; opacity: number; background: string };
+
+async function inkOf(s: Session, selector: string): Promise<LineInk | null> {
+  return await s.execute<LineInk | null>(
+    "var el = document.querySelector(arguments[0]);" +
+      "if (!el) return null;" +
+      "var cs = getComputedStyle(el);" +
+      // Opacity multiplies down the ancestor chain, so the effective value is
+      // the product — reading the line's own would miss a dim applied higher up.
+      "var alpha = 1; var n = el;" +
+      "while (n && n.nodeType === 1) {" +
+      "  var o = parseFloat(getComputedStyle(n).opacity);" +
+      "  if (!isNaN(o)) alpha *= o;" +
+      "  n = n.parentElement;" +
+      "}" +
+      // The nearest ancestor that actually paints a background is what the text
+      // composites against.
+      "var bg = 'rgb(255, 255, 255)'; var m = el;" +
+      "while (m && m.nodeType === 1) {" +
+      "  var c = getComputedStyle(m).backgroundColor;" +
+      "  if (c && c !== 'transparent' && !/, *0\\)$/.test(c)) { bg = c; break; }" +
+      "  m = m.parentElement;" +
+      "}" +
+      "return { color: cs.color, opacity: alpha, background: bg };",
+    [selector],
+  );
+}
+
+/** Composite `ink` over its background and return the contrast ratio. */
+function effectiveContrast(ink: LineInk): number | null {
+  const fg = parseRgb(ink.color);
+  const bg = parseRgb(ink.background);
+  if (!fg || !bg) return null;
+  const mixed: [number, number, number] = [
+    bg[0] + (fg[0] - bg[0]) * ink.opacity,
+    bg[1] + (fg[1] - bg[1]) * ink.opacity,
+    bg[2] + (fg[2] - bg[2]) * ink.opacity,
+  ];
+  return contrast(mixed, bg);
+}
+
+describeE2E("fm3 the focus dim stays readable (myne-md/myne#555)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("dims the inactive lines below the active one and above a readability floor", async () => {
+    let password = "";
+    await scenario(
+      "fm3-focus-dim-contrast",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Odak kontrasti");
+
+        // Several lines, so there is an inactive one to measure. The caret ends
+        // on the last, which becomes `.cm-activeLine`.
+        await typeIntoEditor(
+          s,
+          ["Ilk satir uzerinde calisilmiyor.", "Ikinci satir da oyle.", "Ucuncu satir aktif."].join(
+            "\n",
+          ),
+        );
+        await waitForSaved(s);
+
+        await runPaletteAction(s, "view.toggle-focus", "focus");
+        await s.waitUntil(async () => ((await focusActive(s)) ? true : null), {
+          label: "focus mode active",
+        });
+        // The dim is a SECOND condition on top of focus mode (the
+        // `editor_focus_dim_inactive` pref, default on), and fm2 covers the
+        // toggle. Waiting for the attribute rather than assuming it is what
+        // keeps this scenario measuring the dim rather than its absence.
+        await s.waitUntil(
+          async () =>
+            (await s.findElements('[data-focus-dim="true"]')).length > 0 ? true : null,
+          { label: "the inactive-line dim is applied" },
+        );
+
+        const active = await inkOf(s, '[data-testid="editor.content"] .cm-line.cm-activeLine');
+        const inactive = await inkOf(
+          s,
+          '[data-testid="editor.content"] .cm-line:not(.cm-activeLine)',
+        );
+        expect(active, "no active line to measure").not.toBeNull();
+        expect(inactive, "no inactive line to measure").not.toBeNull();
+
+        const activeRatio = effectiveContrast(active!);
+        const inactiveRatio = effectiveContrast(inactive!);
+        expect(activeRatio, `could not parse the active line's colours: ${JSON.stringify(active)}`)
+          .not.toBeNull();
+        expect(
+          inactiveRatio,
+          `could not parse the inactive line's colours: ${JSON.stringify(inactive)}`,
+        ).not.toBeNull();
+
+        // 1. The dim does something. Without this the whole scenario passes on a
+        //    focus mode that dims nothing at all.
+        expect(
+          inactiveRatio!,
+          `the inactive line's contrast is ${inactiveRatio!.toFixed(2)}:1 against the ` +
+            `active line's ${activeRatio!.toFixed(2)}:1 — the dim is not separating ` +
+            `them, so focus mode is not pulling the eye anywhere.`,
+        ).toBeLessThan(activeRatio! - 0.5);
+
+        // 2. …and it does not go so far that the surrounding text stops being
+        //    text. This is the half a sighted developer on a good monitor does
+        //    not notice, and the one that turns a focus aid into a reading
+        //    impairment.
+        expect(
+          inactiveRatio!,
+          `the dimmed lines sit at ${inactiveRatio!.toFixed(2)}:1, below the 3:1 ` +
+            `large-text floor. A user reads the paragraph above while writing the ` +
+            `one below; dimming it out of legibility is not a focus aid.`,
+        ).toBeGreaterThanOrEqual(3);
+
+        // 3. The line being written clears the real bar.
+        expect(
+          activeRatio!,
+          `the active line sits at ${activeRatio!.toFixed(2)}:1, below WCAG AA's 4.5:1 ` +
+            `for normal text — and it is the one line the user is definitely reading.`,
+        ).toBeGreaterThanOrEqual(4.5);
+
+        // 4. Leaving focus mode restores the inactive line. A dim that outlived
+        //    the mode would be a permanent contrast regression on every note.
+        await runPaletteAction(s, "view.toggle-focus", "focus");
+        await s.waitUntil(async () => (!(await focusActive(s)) ? true : null), {
+          label: "focus mode exited",
+        });
+        const restored = await inkOf(
+          s,
+          '[data-testid="editor.content"] .cm-line:not(.cm-activeLine)',
+        );
+        expect(
+          effectiveContrast(restored!)!,
+          "leaving focus mode did not restore the inactive lines' contrast — the dim " +
+            "outlived the mode that justified it",
+        ).toBeGreaterThan(inactiveRatio! + 0.5);
       },
     );
   });

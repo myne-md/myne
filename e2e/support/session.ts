@@ -100,6 +100,43 @@ export interface AppSession {
   appConfigDir: string;
   /** Stop the app session + driver, remove the temp dir. */
   teardown(): Promise<void>;
+  /**
+   * Kill the app the way a crash kills it — SIGKILL to the whole process
+   * group, no `deleteSession`, no `CloseRequested`, no chance to flush.
+   *
+   * `teardown` is a graceful stop and cannot stand in for this: it sends
+   * SIGTERM first, and the difference between the two is the entire subject of
+   * a crash-recovery scenario. Anything the app would only persist on the way
+   * out is, by construction, not persisted here.
+   *
+   * Pair with `keepDataDir: true` — a scenario that hard-kills and then lets
+   * the harness delete the tree has thrown away the only evidence. Resolves
+   * once the driver has stopped answering, so the next launch cannot attach to
+   * this one's corpse (see `waitForDriverGone` and the port note above).
+   *
+   * The session object is dead afterwards; every call on it will throw.
+   */
+  hardKill(): Promise<void>;
+  /**
+   * Wait for the app to finish exiting ON ITS OWN, after something outside the
+   * harness asked it to.
+   *
+   * The one caller is a scenario that closes the window the way a user does —
+   * `xdotool windowclose`, i.e. WM_DELETE_WINDOW, which GTK raises as
+   * `delete-event` and tao as `CloseRequested`, the event `Editor.tsx` listens
+   * on. That handler `preventDefault()`s the close, flushes every pane, persists
+   * the workspace, the vault indices and the graph layout, and only then calls
+   * `destroy()`. So the app's exit is the SIGNAL that the flush completed, and a
+   * scenario that returned before it would let `teardown` SIGTERM the app
+   * mid-flush and then measure a disk it had itself truncated.
+   *
+   * Neither `teardown` nor `hardKill` can stand in: both KILL the app, which is
+   * the opposite of asking it to leave. `teardown` afterwards is still correct
+   * and still cheap — it finds the session gone and reaps a dead group.
+   *
+   * The session object is dead once this resolves; every call on it will throw.
+   */
+  waitForExit(timeoutMs?: number): Promise<void>;
   /** Save a failure artifact (base64 PNG screenshot + page source). */
   saveArtifacts(label: string): Promise<void>;
 }
@@ -131,6 +168,24 @@ export interface LaunchOptions {
    * half is covered by the unit suite, not here.)
    */
   args?: readonly string[];
+  /**
+   * Extra environment for the app process, merged over the composed env below.
+   *
+   * The one thing this is for is a scenario whose SUBJECT is the machine's own
+   * configuration — `TZ` above all. A timezone bug is not reachable any other
+   * way: the app reads the host zone through ICU, there is no in-app setting
+   * that changes what "the machine's zone" is, and a scenario that could only
+   * run in the runner's own zone would be measuring the runner. Setting it here
+   * is the same lever a user's OS pulls, which is what makes it a real
+   * condition rather than a hook.
+   *
+   * It cannot reach the isolation the harness depends on: the `XDG_*` and
+   * `TMPDIR` values are applied AFTER this spread, so a scenario cannot point
+   * the app at a shared profile by accident (the plaintext-residue scan and the
+   * whole per-scenario data dir rest on those, and a scenario that could
+   * override them could silently disarm both).
+   */
+  env?: Readonly<Record<string, string>>;
   /** Override the tauri-driver port (multi-device: one pair per instance,
    *  off the `MYNE_E2E_DRIVER_PORT` base). Defaults to env/4444. */
   driverPort?: number;
@@ -337,6 +392,9 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
+        // Scenario-supplied env goes HERE, above the isolation values below, so
+        // it can set `TZ` and cannot set `XDG_DATA_HOME`. See `LaunchOptions.env`.
+        ...(opts.env ?? {}),
         XDG_DATA_HOME: dataHome,
         // Belt-and-suspenders isolation for config/cache too — keeps a
         // host machine's real profile out of reach even if a code path
@@ -389,6 +447,21 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       }
     };
 
+    // See the `hardKill` doc on `AppSession`. Deliberately does NOT call
+    // `deleteSession` and does NOT send SIGTERM first: a crash gives the app
+    // neither.
+    const hardKill = async () => {
+      killTree(proc, "SIGKILL");
+      await waitForDriverGone(baseUrl, DRIVER_FREE_TIMEOUT_MS);
+    };
+
+    // See the `waitForExit` doc on `AppSession`. Sends nothing: the app has
+    // already been asked to close by something outside this harness, and this
+    // waits for it to finish doing so.
+    const waitForExit = async (timeoutMs = DRIVER_FREE_TIMEOUT_MS) => {
+      await waitForDriverGone(baseUrl, timeoutMs);
+    };
+
     const saveArtifacts = async (label: string) => {
       const dir = join(REPO_ROOT, "e2e", "artifacts");
       mkdirSync(dir, { recursive: true });
@@ -408,7 +481,16 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       writeFileSync(join(dir, `${stamp}.driver.log`), driverLog);
     };
 
-    return { session, dataHome, appDataDir, appConfigDir, teardown, saveArtifacts };
+    return {
+      session,
+      dataHome,
+      appDataDir,
+      appConfigDir,
+      teardown,
+      hardKill,
+      waitForExit,
+      saveArtifacts,
+    };
   } catch (e) {
     killTree(proc, "SIGKILL");
     if (!opts.keepDataDir) rmSync(dataHome, { recursive: true, force: true });

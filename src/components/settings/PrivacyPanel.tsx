@@ -300,21 +300,41 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   } = usePrefs(onShowToast);
   return (
     <div style={PANEL_ROOT_STYLE}>
-      <SettingRow
-        label={t("settings.privacy.screenCaptureLabel")}
-        helper={screenCaptureHelperText(prefs.screen_capture_protection, t)}
-        anchorId="privacy.screen-capture"
-        control={(helperId) => (
-          <Switch
-            checked={prefs.screen_capture_protection}
-            onChange={(next) => {
-              void toggleScreenCapture(next);
-            }}
-            ariaLabel={t("settings.privacy.screenCaptureLabel")}
-            ariaDescribedBy={helperId}
-          />
-        )}
-      />
+      {/* Gated on the capability, because a page cannot stop a screenshot
+          (myne-md/myne#556). `web/src/platform/capabilities.ts` has listed
+          `screenCaptureProtection` in its ABSENT set all along; this row was
+          rendered ungated, so a web user saw a Privacy toggle, turned it on, and
+          was told their screen was protected by something with no way to
+          protect it.
+
+          OMITTED rather than disabled or re-worded, which is what
+          `decisions.md` 2026-07-26 makes normative for an absent capability: a
+          greyed control is an offer the platform cannot honour. The
+          attachment-compression row is the documented exception to that rule and
+          it argues for itself in its own file — the preference is shared vault
+          content that governs the user's OTHER devices, so removing the control
+          would take away something that works. No such argument exists here:
+          the pref reaches a desktop that already has its own copy of this row,
+          and the reading a user takes from a Privacy switch is about the screen
+          in front of them. */}
+      {has("screenCaptureProtection") && (
+        <SettingRow
+          testId="settings.screen-capture"
+          label={t("settings.privacy.screenCaptureLabel")}
+          helper={screenCaptureHelperText(prefs.screen_capture_protection, t)}
+          anchorId="privacy.screen-capture"
+          control={(helperId) => (
+            <Switch
+              checked={prefs.screen_capture_protection}
+              onChange={(next) => {
+                void toggleScreenCapture(next);
+              }}
+              ariaLabel={t("settings.privacy.screenCaptureLabel")}
+              ariaDescribedBy={helperId}
+            />
+          )}
+        />
+      )}
       {/* Beside screen-capture protection rather than beside the lock timers:
           both rows answer "what can somebody looking at this machine see",
           which is the question the user came to Privacy holding.

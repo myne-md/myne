@@ -126,7 +126,16 @@ async function selectedNoteId(s: Session): Promise<string> {
 // proves an OCR'd word reaches search. Un-quarantine it with the boot-cost
 // investigation the other five contention victims are also waiting on
 // (e2e/CLAUDE.md), not by nudging timeouts.
-describeE2E.flaky("io1 image OCR makes an embedded image searchable (MYND-441)", () => {
+// DE-QUARANTINED (myne-md/myne#555). The quarantine reason was
+// runner contention, and it was wrong for the same reason it was wrong for
+// `nav1`: the first seeding test in a vitest process builds `e2e-fixture-gen`
+// with `cargo build --release` INSIDE its own budget, ~171 s against a 180 s
+// `testTimeout`. Which spec paid it depended only on which one seeded first,
+// which is why the victim moved between runs and read as a loaded host.
+// `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
+// before any worker starts. Measured after the fix, `--retry=0`, warm
+// container: 16 consecutive clean runs, which is the bar `e2e/CLAUDE.md` sets.
+describeE2E("io1 image OCR makes an embedded image searchable (MYND-441)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("finds a note by words that exist only inside an embedded image", async () => {
     let password = "";

@@ -13,11 +13,51 @@
 
 use std::collections::HashMap;
 
+use unicode_normalization::UnicodeNormalization;
+
 use crate::plugins::attachments::reconcile::AttEmbedSpan;
 
 /// Suffix-dedup retry cap shared by both export dedup loops — a
 /// pathological collision flood bails closed instead of spinning.
 pub const DEDUP_RETRY_CAP: u32 = 9_999;
+
+/// The collision oracle two export names are compared under — NFC, then ASCII
+/// case-folded.
+///
+/// # Why folding at all
+///
+/// A destination volume decides whether two names are the same file, and the
+/// two volumes Myne exports onto most do not decide it byte-wise. NTFS and a
+/// default APFS volume are case-insensitive, and APFS (10.13+) compares
+/// normalization-insensitively as well while preserving the bytes it was given.
+/// So `Cafe\u{0301}.md` (NFD) and `Caf\u{e9}.md` (NFC) are ONE file there, and an
+/// exporter whose in-run oracle compares bytes writes the second over the first.
+/// That is silent data loss inside an export: the run reports success, the tree
+/// has one file where the vault had two notes, and the note that lost is
+/// whichever came second in an ordering nobody chose.
+///
+/// # Why NFC and not full case folding
+///
+/// `to_ascii_lowercase`, not `to_lowercase`: it matches what the platforms
+/// actually do closely enough for a collision oracle and cannot change a
+/// string's length, so the suffix arithmetic is unaffected. A pair differing
+/// only in NON-ASCII case still collides on the volume and is a narrower
+/// residue than the one this closes — and full Unicode case folding is not what
+/// either filesystem implements either.
+///
+/// NFC is a different axis and does not share that caveat: it is exactly what
+/// APFS compares under, so folding it here matches the volume rather than
+/// approximating it.
+///
+/// # Direction
+///
+/// Folding can only make the oracle see MORE collisions, never fewer, so the
+/// worst case of an over-eager fold is a `" (1)"` suffix on a name that would
+/// have been fine. The worst case of an under-eager one is a lost note. Prefer
+/// the suffix.
+pub fn export_dedup_key(name: &str) -> String {
+    name.nfc().collect::<String>().to_ascii_lowercase()
+}
 
 /// Make one export name component (catalog display filename, FM
 /// `title:`, or tree folder segment) safe as a filesystem name and as

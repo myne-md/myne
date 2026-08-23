@@ -29,7 +29,17 @@ RUN_FLAGS=(
   -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
   -v myne-e2e-nm-preview:/work/preview/node_modules
   -v myne-e2e-target:/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  # Mounted where cargo actually LOOKS, which is `$CARGO_HOME/registry` — and
+  # `E2E_ENV` below sets `CARGO_HOME=/home/e2e/.cargo`. It used to be mounted at
+  # `/usr/local/cargo/registry`, which nothing in this container reads: measured
+  # inside a live run, cargo had written 528 MB to `/home/e2e/.cargo/registry`
+  # (container-local, discarded by `--rm`) while the persisted volume held 59 MB
+  # and was untouched. So every invocation re-downloaded the whole crate set —
+  # minutes of wall clock per run, on a script whose entire purpose is to be run
+  # repeatedly (the 3x-consecutive gate in e2e/CLAUDE.md asks for exactly that).
+  #
+  # The giveaway that it was believed live is `FIX_PERMS` below, which chowns it.
+  -v myne-e2e-cargo-registry:/home/e2e/.cargo/registry
   -w /work
   --user root
 )
@@ -45,7 +55,7 @@ esac
 if [[ -f "myne-server/myne-server-linux-$SRVARCH" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/myne-server/myne-server-linux-$SRVARCH"
 fi
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target /home/e2e/.cargo'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
   $FIX_PERMS && su e2e -s /bin/bash -c '

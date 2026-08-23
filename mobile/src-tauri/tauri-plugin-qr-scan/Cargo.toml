@@ -22,3 +22,11 @@ tauri-plugin = { version = "2", features = ["build"] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
+
+[dev-dependencies]
+# Test-only, and already in the shared workspace lock (myne-core, theme-validator
+# and the desktop crate all pull it) — no new crate enters the closure, and a
+# dev-dependency never reaches a shipped binary. `tests/unsupported_contract.rs`
+# needs it to assert the WIRE FORM the WebView matches on, which is the half of
+# the contract no compiler checks.
+serde_json = "1"

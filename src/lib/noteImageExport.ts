@@ -180,7 +180,13 @@ export async function exportSelectionAsImage(): Promise<ImageExportOutcome> {
       contentWidth: selection.width,
       contentHeight: selection.height,
       padding: SELECTION_CARD_PADDING,
-      background: cssVar("--paper-1", "#faf8f3"),
+      // `--paper`, not `--paper-1`: there is no `--paper-1` token in
+      // `src/styles/tokens.css` (the light end of the surface ramp is plain
+      // `--paper`, and `src/CLAUDE.md` says so), so the old name resolved to
+      // nothing and every exported card carried the hardcoded cream fallback
+      // whatever theme was active — contradicting this function's own
+      // "come from the ACTIVE theme" contract on dark and AMOLED.
+      background: cssVar("--paper", "#faf8f3"),
       fontFamily: cssVar("--font-sans", "sans-serif"),
     };
     const svg = buildSelectionCardSvg(selection.xhtml, opts);

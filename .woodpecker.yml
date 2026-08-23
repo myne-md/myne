@@ -715,7 +715,7 @@ steps:
       # GTK -dev header chains are unnecessary (webkit2gtk-driver drags
       # the runtime libs transitively); pkg-config/libssl-dev stay for
       # the tauri-driver cargo install.
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth mold
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth xdotool python3 mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
       - cargo install tauri-driver --locked --version 2.0.6
@@ -784,7 +784,7 @@ steps:
       CI: "true"
     failure: ignore
     commands:
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth mold
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth xdotool python3 mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
       - cargo install tauri-driver --locked --version 2.0.6

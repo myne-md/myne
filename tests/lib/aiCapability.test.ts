@@ -109,6 +109,10 @@ describe("surfaceStateOf", () => {
       embedding: { available: false, cause: "remote_barred" },
       transcription: { available: false, cause: "unreachable" },
       autoTag: { available: true, cause: null },
+      // myne-md/myne#545 added this: whether the embedding index is BUILT, as
+      // distinct from whether an embedding model exists at all. Required, and
+      // irrelevant to what this test asserts — the causes above.
+      indexReady: false,
     };
     // Three unavailable features, three DIFFERENT reasons. Before this task all
     // three arrived at the UI as `false` and every surface said "select a model".
