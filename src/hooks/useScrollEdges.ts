@@ -33,7 +33,7 @@ export interface ScrollEdges {
 }
 
 /**
- * What makes an element a scroll region, as one object rather than four
+ * What makes an element a scroll region, as one object rather than three
  * declarations each consumer remembers separately.
  *
  * `minHeight: 0` is the one that fails SILENTLY when it is forgotten: a flex
@@ -41,13 +41,38 @@ export interface ScrollEdges {
  * container never overflows, `overflowY` has nothing to do, this hook measures
  * `false / false` forever, and no fade appears. Nothing reports it. Exported
  * beside the hook so the contract and its measurement live in one place.
+ *
+ * **Axis-agnostic on purpose.** It carried `flex: "1 1 auto"` and that is a
+ * different statement: "fill my parent's MAIN axis". Three of its four adopters
+ * sit in a column, where filling means filling vertically and the two read as
+ * one thing. The fourth is a direct child of `stageRootStyle`, which is a ROW,
+ * so `flex-grow: 1` grew it sideways: every vault-creation step took the whole
+ * window width instead of the `width` prop that is `StepLayout`'s entire API,
+ * and `align: "stretch"` stretched their children with them. `maxWidth: 600` is
+ * the only reason the recovery-phrase card next door did not do the same.
+ * Nothing observes it: jsdom has no layout, and the overflow spec pins
+ * `overflowY` / `maxHeight` / `minHeight`, not width. Use
+ * {@link fillingScrollRegionStyle} when the parent's main axis is the one you
+ * mean to fill.
  */
 export const scrollRegionStyle: CSSProperties = {
-  flex: "1 1 auto",
   minHeight: 0,
   overflowY: "auto",
   // Stop a flick past the last row from scrolling whatever is behind it.
   overscrollBehavior: "contain",
+};
+
+/**
+ * {@link scrollRegionStyle} plus "take the remaining space on my parent's main
+ * axis".
+ *
+ * Correct only where that axis is the one being scrolled, which in practice
+ * means a child of a `flexDirection: "column"` container. On a row-axis child
+ * this is a full-bleed width, not a taller scroller.
+ */
+export const fillingScrollRegionStyle: CSSProperties = {
+  ...scrollRegionStyle,
+  flex: "1 1 auto",
 };
 
 /** Class + attributes for the edges currently reachable. Both attributes absent

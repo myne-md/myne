@@ -91,6 +91,11 @@ const CARD_STYLE: CSSProperties = {
   // with `alignItems: center` pushes a too-tall card out of BOTH ends, so on a
   // short window the heading and the submit button leave together, with no way
   // to reach either. `CenteredCard` and `VaultPicker` carry the same pair.
+  //
+  // `scrollRegionStyle` and NOT `fillingScrollRegionStyle`: this card is a
+  // direct child of `stageRootStyle`, which is a ROW, so growing on its main
+  // axis is a full-bleed width rather than a taller scroller. `maxWidth: 600`
+  // above was the only thing keeping that invisible here.
   ...scrollRegionStyle,
   maxHeight: "100%",
 };
