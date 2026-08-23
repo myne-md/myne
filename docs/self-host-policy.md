@@ -104,17 +104,27 @@ The mechanical commands are in the `myne-ops` reproducible-build runbook.
 
 ## 6. Certificate trust
 
-Your client must trust the server's TLS certificate. On a **native client** (desktop, mobile) the SCRAM
-channel binding additionally ties the authenticated session to that exact certificate, so a
-man-in-the-middle presenting a different certificate fails to authenticate.
+Your client must trust the server's TLS certificate. On a **native client** (desktop, mobile) that trust
+is a **certificate pin**, and the pin is the whole of it: the pinned verifier replaces CA-chain validation,
+so a certificate other than the pinned one fails the handshake outright.
 
-**This does not hold for the web client, and will not.** A browser exposes neither TLS-exporter keying
-material nor a certificate-pinning API to page JavaScript, so a browser session rests on the browser's own
-trust store and nothing more — permanently, not pending some later release (`decisions.md` 2026-07-26).
-What is unchanged either way: a man-in-the-middle on the sync connection sees only ciphertext. What a web
-client additionally depends on is the origin that serves it the client code, which is a separate boundary
-with a separate adversary (`threat-model.md` TB11 / A15) — and if you self-host the web client too, that
-origin is yours.
+**The SCRAM channel binding adds nothing to that in any deployment fronted by a terminating proxy**, which
+is every deployment described here, the bundle's own Caddy edge included. The `-PLUS` `tls-exporter`
+binding is wired end to end on both sides, and it engages **only when the server process itself terminates
+TLS 1.3** (`decisions.md` 2026-07-13); behind a proxy that terminates TLS, both ends bind to empty and the
+exchange degrades to plain SCRAM-SHA-256 riding pinned TLS. So the man-in-the-middle resistance in the
+paragraph above is the pin's, and the binding is latent rather than a second lock on the same door. Making
+it real is a topology change — the server terminates TLS 1.3 and the proxy moves to TCP passthrough — and
+either way it is gated behind the standing R3 primitive-level review, which is also why no surface in the
+client presents certificate trust as *verified* (`threat-model.md` §1 A4).
+
+**Neither the pin nor the binding is available to the web client, and neither ever will be.** A browser
+exposes neither TLS-exporter keying material nor a certificate-pinning API to page JavaScript, so a
+browser session rests on the browser's own trust store and nothing more — permanently, not pending some
+later release (`decisions.md` 2026-07-26). What is unchanged either way: a man-in-the-middle on the sync
+connection sees only ciphertext. What a web client additionally depends on is the origin that serves it
+the client code, which is a separate boundary with a separate adversary (`threat-model.md` TB11 / A15) —
+and if you self-host the web client too, that origin is yours.
 
 - **Hosted:** a build-time static pin for the hosted endpoint is the **settled design** (`decisions.md`
   2026-06-20) and is **not shipped**. The hosted certificate and domain do not exist yet, so the client's
