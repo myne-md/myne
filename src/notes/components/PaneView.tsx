@@ -39,6 +39,7 @@ import { createNote } from "../createNote";
 import { createDrawing } from "../createDrawing";
 import { nextDrawingTitle } from "../drawingEmbedTitle";
 import { useSelectedNote, type NoteId } from "../sidebarState";
+import { settleFrontmatterWrite } from "../settleFrontmatterWrite";
 import { useLiveResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
 import { useVaultHeadings } from "../useVaultHeadings";
@@ -1637,18 +1638,18 @@ function ViewHost({ viewId }: { viewId: string }) {
           if (choice !== null && def !== null && def.image === undefined) {
             await upsertSavedView({ ...def, image: coverPropertyKey });
           }
-          // Settle, the same pair `Editor.tsx`'s `settleFrontmatterWrite` runs
-          // (`src/CLAUDE.md`, "A backend write made OUTSIDE a pane's autosave
-          // loop leaves that pane holding a stale buffer"). This call site is
-          // the one that needs it most and had none: the target is a note in a
-          // VIEW RESULT, so by definition it is not the note this pane is
-          // showing and it is the likeliest of all cover writers to be open,
-          // and dirty, somewhere else. Without the re-read that pane's buffer
-          // still has no `cover:` line and its next keystroke autosaves the
-          // cover away. `setNoteCover`'s flush closed the race; this closes the
-          // staleness, which is the other half.
-          sidebar.reloadOpenNote();
-          await sidebar.refreshOne(noteId as NoteId);
+          // Settle (`src/CLAUDE.md`, "A backend write made OUTSIDE a pane's
+          // autosave loop leaves that pane holding a stale buffer"). This call
+          // site is the one that needs it most and had none: the target is a
+          // note in a VIEW RESULT, so by definition it is not the note this
+          // pane is showing and it is the likeliest of all cover writers to be
+          // open, and dirty, somewhere else. Without the re-read that pane's
+          // buffer still has no `cover:` line and its next keystroke autosaves
+          // the cover away. `setNoteCover`'s flush closed the race; this closes
+          // the staleness, which is the other half. The recipe is called rather
+          // than copied: it used to be a closure in `Editor.tsx` and this site
+          // hand-copied its two lines.
+          await settleFrontmatterWrite(sidebar, noteId as NoteId);
         } catch {
           /* surfaced via backend tracing */
         }
