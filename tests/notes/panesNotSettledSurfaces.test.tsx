@@ -20,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PanesNotSettledError,
   isPanesNotSettled,
+  panesNotSettledMessage,
 } from "../../src/notes/workspaceContext";
 import { toggleTaskSwallowingRefusal } from "../../src/notes/toggleTask";
 import type { VaultTask } from "../../src/notes/taskIndex";
@@ -47,6 +48,25 @@ describe("PanesNotSettledError", () => {
     expect(isPanesNotSettled(new PanesNotSettledError([] as never))).toBe(true);
     expect(isPanesNotSettled(new Error("note_update failed"))).toBe(false);
     expect(isPanesNotSettled("not even an error")).toBe(false);
+  });
+});
+
+describe("panesNotSettledMessage, the sentence four surfaces were spelling", () => {
+  const SENTENCES = { unsettled: "not settled", failed: "it failed" };
+
+  it("picks the refusal sentence for the refusal", () => {
+    expect(panesNotSettledMessage(new PanesNotSettledError([] as never), SENTENCES)).toBe(
+      "not settled",
+    );
+  });
+
+  it("picks the failure sentence for anything else, which is the other half", () => {
+    // A helper that answered "not settled" to everything would say the app
+    // declined about a backend that failed, which is the exact claim the named
+    // class exists to stop being made.
+    expect(panesNotSettledMessage(new Error("note_update failed"), SENTENCES)).toBe(
+      "it failed",
+    );
   });
 });
 

@@ -75,7 +75,7 @@ import { upsertSavedView } from "../../lib/prefs";
 import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
 import { Toast } from "../../components/Toast";
-import { isPanesNotSettled } from "../workspaceContext";
+import { panesNotSettledMessage } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -1669,9 +1669,10 @@ function ViewHost({ viewId }: { viewId: string }) {
           // failure. A refused cover write was byte-identical to a successful
           // one here.
           setCoverError(
-            isPanesNotSettled(err)
-              ? t("notes.folderManagement.unsettledSave")
-              : t("editor.cover.writeFailed"),
+            panesNotSettledMessage(err, {
+              unsettled: t("notes.unsettledSave"),
+              failed: t("editor.cover.writeFailed"),
+            }),
           );
         }
       })();

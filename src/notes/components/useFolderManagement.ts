@@ -459,6 +459,9 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         result = await renameFolder(node.path, newPath, notesForOps(), deliberate);
       } catch (err) {
         if (!isPanesNotSettled(err)) throw err;
+        // The folder-specific sentence rather than the neutral shared one: the
+        // helper takes resolved strings precisely so a surface that can say
+        // something more useful does.
         setBlockNotice(i18n.t("notes.folderManagement.unsettledSave"));
         return;
       }
