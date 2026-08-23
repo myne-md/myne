@@ -75,6 +75,37 @@
   loaded before you believe it: `[...document.querySelectorAll('script[src]')]`
   from the page seat gives the hashed filename, and `find . -name '<that>'`
   says which tree it came from.
+- **The cargo target volume is PER TREE, and it has to be.** Every tree is
+  bind-mounted at the same in-container path, `/work`, so two checkouts of this
+  repo are indistinguishable to cargo: same package, same version, same absolute
+  source path. One shared volume therefore lets a build here reuse an rlib
+  compiled from ANOTHER tree, and worktrees live under `.claude/worktrees/` by
+  convention, so they sit inside the mount and this is the normal case rather
+  than an exotic one. The four `e2e-*.sh` scripts key the volume on `pwd`. The
+  cost is one full rebuild per tree, once, which is exactly what the sharing was
+  buying at the price of results that describe a different tree.
+- **The symptom is a compile error in code you did not touch.** A build refused
+  with `run_probe` taking 2 arguments while
+  `core/src/plugins/agent/probe.rs` plainly declared 3, and `ProbeProgress`
+  unresolved while the struct was right there. Neither file was in the diff. The
+  discriminator is two commands: `cargo check -p myne-desktop` on the host, and
+  the same inside `docker run -v "$(pwd):/work" -v myne-e2e-target:/work/target`.
+  Host green plus container red is the volume, and the container run itself
+  clears it by recompiling the crate. Read the file through the container before
+  suspecting the mount (`docker run --rm -v "$(pwd):/work" -w /work myne-e2e
+  grep -n '<symbol>' <path>`); if the container sees the right source and cargo
+  still disagrees, the artifact is what is wrong, not the tree.
+- **`e2e-one.sh` can report a red that `e2e-buildrun.sh` does not, on the same
+  tree and the same volume.** Measured on myne-md/myne#461's branch: `ws1` in
+  `workspace-state.e2e.ts` passed in 3.6 s under `e2e-buildrun.sh` and then hung
+  to the 180 s test timeout under `e2e-one.sh`, twice, with no source change
+  between them and with `e2e/fixture-gen` already compiled (measured at 4.3 s, so
+  the cold-cargo explanation in the toolchain guard is not this one). The
+  mechanism is NOT established, so this says only what was observed. The rule
+  that follows is: **a red from `e2e-one.sh` is a reason to re-run under
+  `e2e-buildrun.sh`, never a result on its own.** `e2e-one.sh` is for iterating
+  while you already believe the code is wrong; the build-and-run script is what
+  produces an answer worth writing into a PR.
 - **KDF policy:** weak-KDF generator fixtures by default (legal: unlock reads
   params from `vault.meta`; creation stays pinned — no code branch). The VR-1
   recovery drill + creation scenarios run PRODUCTION params every pipeline.
