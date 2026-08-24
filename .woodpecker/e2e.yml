@@ -201,7 +201,17 @@ steps:
   # path and PANICS on a missing one, so dropping the arti half fails the build
   # outright.
   e2e-compile:
-    image: rust:1.96.0-slim
+    # The prebuilt CI base image (myne-md/myne#585), pinned by DIGEST. Workflows
+    # share no anchors, so the reference is spelled out here rather than aliased
+    # from `main.yml`; `scripts/check-ci-image.mjs` reads every workflow file and
+    # holds them all to the one digest recorded in `ci/image.json`.
+    #
+    # The suite steps below deliberately do NOT use it: `scripts/ci-e2e-lane.sh`
+    # installs a RUNTIME-only set (`webkit2gtk-driver`, `xvfb`, `xauth`, no -dev
+    # header chains) because it consumes the binary this step just built. Baking
+    # those into the shared image would make every push pull an X server and a
+    # webkit driver that no push step uses.
+    image: ghcr.io/myne-md/myne-ci@sha256:99fbe08624fd824de91a9615202439fceb4d696e2bb911e175f4624096131b67
     when: *always
     depends_on:
       - name: e2e-web
@@ -226,9 +236,6 @@ steps:
       # cargo codegen open enough fds to hit the runner's low default, which
       # surfaces as a `tauri build` panic (EMFILE → core dump, exit 134).
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
-      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
-      - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
       # Cache hit-rate visibility. Never fails the step.

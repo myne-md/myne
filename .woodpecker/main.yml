@@ -59,6 +59,29 @@ when:
   - event: manual
     evaluate: 'RUN_E2E != "true"'
 
+variables:
+  # The prebuilt CI base image (myne-md/myne#585). It bakes the eleven Tauri
+  # sysdeps, mold, git, the pinned Rust components and wasm32 target, Node, pnpm
+  # and Go, so the five steps that used to apt-install that set on every run do
+  # not. `tauri-compile`'s own comment measures that install at 68 s, and four of
+  # the five are on the push path.
+  #
+  # PINNED BY DIGEST, never by tag: a tag is mutable, so republishing one would
+  # change what a gate ran on without changing a tracked byte. The digest is
+  # recorded in `ci/image.json` and `scripts/check-ci-image.mjs` holds the two
+  # together, along with the three versions the Dockerfile bakes against
+  # `rust-toolchain.toml`, `.nvmrc` and `package.json`'s `packageManager`.
+  #
+  # BUILT AND PUBLISHED BY HAND, never by CI. These pipelines verify and do not
+  # publish (myne-md/myne#584), and an image-publishing step would additionally
+  # be the one case where CI rewrites its own input. Procedure:
+  # `myne-ops/runbooks/ci-base-image.md`.
+  #
+  # Written ONCE as an anchor. Five hand-copies of a digest is five places to
+  # drift, and a stale one fails in a way that reads as an infrastructure
+  # outage rather than as an edit somebody made.
+  ci_image: &ci_image ghcr.io/myne-md/myne-ci@sha256:99fbe08624fd824de91a9615202439fceb4d696e2bb911e175f4624096131b67
+
 steps:
   # ─── Rust formatting ─────────────────────────────────────────
   cargo-fmt:
@@ -460,6 +483,11 @@ steps:
       # consumes them runs only before a release, and that protection is real
       # only while both lists agree. Compared in both directions.
       - node scripts/check-woodpecker-split.mjs
+      # The prebuilt CI base image against the versions the repo pins, and the
+      # workflow digest against `ci/image.json` (myne-md/myne#585). Both drifts
+      # are silent: a stale image makes rustup re-provision the pinned toolchain
+      # at runtime rather than failing, and a stale digest fails in a way that
+      # reads as an infrastructure outage rather than as an edit.
       # Twin-module drift (#261): a fix that lands on one client and never
       # reaches its counterpart. WARNING ONLY and exits 0 by design — most
       # one-sided changes are legitimate, so a gate here would be wrong and
@@ -537,7 +565,7 @@ steps:
   # Verifies the Tauri Rust+TS compile path on Linux.
   # Does NOT produce a signed bundle — release pipeline (Plan 1 §C-launch) handles cross-platform signed builds.
   tauri-compile:
-    image: rust:1.96.0-slim
+    image: *ci_image
     when: *code-paths
     # depends_on vitest (not pnpm-build) to keep the pnpm-install steps serial —
     # see the vitest step comment.
@@ -583,15 +611,11 @@ steps:
       # these packages baked in, which is a registry plus a build pipeline plus
       # an image-freshness gate, and belongs to its own change rather than to a
       # line hidden in this step.
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
-      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
-      - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       # Lint the shared `myne-core` crate here (not in the slim cargo-clippy
       # step): myne-core depends on `tauri` (default features), so it needs the
-      # webkit/gtk -dev chains this step already installs. No frontend dist
-      # needed — myne-core has no `generate_context!`.
-      - rustup component add clippy
+      # webkit/gtk -dev chains the base image bakes. No frontend dist needed,
+      # since myne-core has no `generate_context!`.
       - cargo clippy -p myne-core --all-targets -- -D warnings
       # Default build now compiles the on-device AI (local-inference is in
       # `default` as of decisions.md 2026-07-02) — no `--features` flag needed.
@@ -658,7 +682,7 @@ steps:
   # (the shared vault/notes/prefs plugin cores) in the same sysdeps env —
   # the slim cargo-test step can't, since myne-core pulls Tauri default-features.
   cargo-test-tauri:
-    image: rust:1.96.0-slim
+    image: *ci_image
     when: *code-paths
     depends_on: [tauri-compile]
     environment:
@@ -668,9 +692,6 @@ steps:
       # the downloads between them does NOT work — see that step for the two
       # stacked causes and for why a prebuilt image rather than a cache is the
       # answer at this size.
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
-      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
-      - npm install -g pnpm@11.8.0
       # vault_delete / vault_unlock tests assert UNIX permission-denial and
       # undeletable-file paths; root bypasses both (CI containers default to
       # root), so run the build + tests as an unprivileged user — the tests
@@ -1029,7 +1050,7 @@ steps:
   # Android SDK+NDK and belong to the release matrix, exactly as the desktop
   # signed-bundle pipeline is separate from this verification CI).
   mobile-compile:
-    image: rust:1.96.0-slim
+    image: *ci_image
     # `status: [success, failure]` — see the lane header above (#458). It hangs
     # off `web-build` optionally, which survives that ONE step failing and not
     # the pipeline-wide condition; both are needed.
@@ -1047,10 +1068,6 @@ steps:
       CARGO_HOME: /cache/cargo
     commands:
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
-      - apt-get update && apt-get install -y --no-install-recommends
-        git ca-certificates pkg-config libssl-dev
-        libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-      - rustup component add clippy
       - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
       - cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard --no-fail-fast
 
@@ -1178,7 +1195,7 @@ steps:
       - bash scripts/web-smoke.sh https://app.myne.md https://sync.myne.md $CI_COMMIT_SHA
 
   sync-sim:
-    image: rust:1.96.0-slim
+    image: *ci_image
     # The comment below says this step runs REGARDLESS of its upstream's result,
     # and with a bare `when` that was not true: `optional: true` only removes the
     # wait, while the implicit `status: success` is pipeline-wide and skipped
@@ -1242,9 +1259,6 @@ steps:
       # Sysdeps to compile/link myne-desktop's test binary (same set as
       # cargo-test-tauri) + git for the clone. node/pnpm NOT needed: dist/ is
       # already in the shared workspace from the pnpm-build step.
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
-      # Go toolchain (matches myne-server go.mod 1.26.x) to build the server.
-      - curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -C /usr/local -xz
       # Clone the private companion via the Forgejo mirror (git.myne.md/Myne/
       # myne-server — the in-house source a Forgejo PAT authenticates against,
       # NOT github.com; it tracks develop on a 10-minute interval) + build a

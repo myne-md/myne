@@ -304,6 +304,24 @@ pre-commit:
         - ".woodpecker/*.yaml"
       run: node scripts/check-woodpecker-split.mjs
 
+    ci-image:
+      # `ci/Dockerfile` drifting from the versions the repo pins, or the digest
+      # in the workflows drifting from `ci/image.json`. Same family as
+      # `e2e-toolchain` below and `playwright-image` above, and the same silence:
+      # rustup honours `rust-toolchain.toml` at RUNTIME, so a stale image
+      # re-provisions the pinned toolchain inside whichever step makes the first
+      # cargo call rather than failing, and a stale digest reads as an
+      # infrastructure outage rather than as an edit somebody made.
+      glob:
+        - "ci/Dockerfile"
+        - "ci/image.json"
+        - ".woodpecker/*.yml"
+        - ".woodpecker/*.yaml"
+        - "rust-toolchain.toml"
+        - ".nvmrc"
+        - "package.json"
+      run: node scripts/check-ci-image.mjs
+
     e2e-toolchain:
       # e2e/Dockerfile drifting from rust-toolchain.toml. Nothing fails to build:
       # rustup just re-provisions the pinned toolchain at runtime, inside
