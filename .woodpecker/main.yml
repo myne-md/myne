@@ -13,15 +13,26 @@
 #   entry `design-notes/ops/0529`). So a green
 #   run of THIS file is not a claim that the E2E suites pass; the release
 #   runbook owns that claim.
-# - TWO lanes, one pipeline (MYND-574). The desktop lane is one serial chain
-#   (pnpm-build -> vitest -> tauri-compile -> cargo-test-tauri) because every one
-#   of those steps runs `pnpm install` into the shared workspace node_modules and
-#   concurrent installs corrupt it. The WEB lane hangs off the end of that chain
-#   (`web-build`, alongside `sync-sim`) so it adds nothing to the desktop lane's
-#   wall-clock, plus the two Rust wasm gates that run early and independently
-#   (`wasm-protocol`). Every web step carries the same `code-paths` filter as the
-#   compile steps, so a docs-only commit runs none of them, and every step that
-#   can go red is listed in `notify-failure`.
+# - THREE lanes, one pipeline (MYND-574; the third landed 2026-08-13). The
+#   desktop lane is one serial chain (pnpm-build -> vitest -> tauri-compile ->
+#   cargo-test-tauri) because every one of those steps runs `pnpm install` into
+#   the shared workspace node_modules and concurrent installs corrupt it. The
+#   WEB lane hangs off the end of that chain (`web-build`, alongside
+#   `sync-sim`) so it adds nothing to the desktop lane's wall-clock. The MOBILE
+#   lane (`mobile-build` -> `npm-licenses` -> `mobile-vitest` ->
+#   `mobile-flow-logic`, plus `mobile-compile`) hangs off `web-build` for the
+#   same reason and by the same rule. One Rust wasm gate runs early and
+#   independently of all three, `wasm-protocol`; its reproducibility half
+#   `wasm-repro` was split out and now depends on `cargo-test-tauri`, so it is
+#   deliberately NOT early (that step's own comment carries the measurement).
+#   Every web and mobile step carries the same `code-paths` globs as the compile
+#   steps, so a docs-only commit runs none of them, and every step that can go
+#   red is listed in `notify-failure`.
+#   This paragraph said "TWO lanes" and "the two Rust wasm gates that run early
+#   ... (`wasm-protocol`)" until myne-md/myne#584: two counts, one of them naming
+#   a single step, and the mobile lane sitting unmentioned in the same file. It
+#   is the first thing anyone opening this file reads, so it is the worst place
+#   in the repository for a number that has stopped describing anything.
 # - Future: cache cargo + pnpm artifacts; pre-build a custom image with rust + node + Tauri sysdeps.
 
 when:
@@ -112,36 +123,6 @@ steps:
       CARGO_HOME: /cache/cargo
     commands:
       - /cache/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
-
-  # ─── Mobile cross-compile gate (MYND-457) ────────────────────
-  # Proves the shared `myne-core` (which now carries the sync engine +
-  # rustls/ring transport, decisions.md 2026-07-07) still compiles for the
-  # mobile targets, so a change that breaks mobile-compilability fails here
-  # rather than only when someone builds the phone app.
-  #
-  # HONEST SPLIT (SYNC-46 iOS-only v1):
-  #  - The PROVEN hard gate is `cargo check -p myne-core --target
-  #    aarch64-apple-ios` run LOCALLY on the mac dev machine (ring's asm needs
-  #    the Apple clang; passes on macOS + Xcode). iOS-in-CI needs a mac runner
-  #    → deferred with the mac/iOS release matrix (not this Linux runner).
-  #  - Android (`aarch64-linux-android`) needs the NDK clang for ring; this step
-  #    self-skips when the NDK is absent (mirrors sync-sim's self-skip), so it is
-  #    non-blocking until a runner image provisions ANDROID_NDK_HOME. Android
-  #    enablement itself is MYND-465.
-  mobile-crosscheck:
-    image: rust:1.96.0-slim
-    when: *code-paths
-    commands:
-      - rustup target add aarch64-linux-android
-      - |
-        CLANG="$${ANDROID_NDK_HOME:+$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang}"
-        if [ -z "$$ANDROID_NDK_HOME" ] || ! command -v "$$CLANG" >/dev/null 2>&1; then
-          echo "Android NDK not provisioned (ANDROID_NDK_HOME unset / clang missing) -> skipping android cross-check. iOS cross-check is the mac-local hard gate (MYND-457); Android enablement is MYND-465.";
-          exit 0;
-        fi
-        export CC_aarch64_linux_android="$$CLANG"
-        export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$$CLANG"
-        cargo check -p myne-core --target aarch64-linux-android
 
   # ─── Rust supply-chain audit ─────────────────────────────────
   # `git` is required by cargo-deny to fetch the rustsec advisory-db.
@@ -1449,9 +1430,13 @@ steps:
       - name: web-build
         optional: true
       # The mobile lane. Every one of these five is a blocking gate with no
-      # failure:ignore, so each can go red on its own — the exact hole
-      # `mobile-crosscheck` left below, and the reason mobile CI failures used to
-      # notify a different pipeline in a different repo.
+      # failure:ignore, so each can go red on its own, which is the reason
+      # mobile CI failures used to notify a different pipeline in a different
+      # repo. This used to point at `mobile-crosscheck` as the worked example of
+      # a step left off this list; that step is gone (myne-md/myne#584), since
+      # `ANDROID_NDK_HOME` was provisioned nowhere in the tree, so it installed
+      # the Android target and exited 0 on every push while its entry here
+      # claimed it could go red.
       - name: mobile-build
         optional: true
       - name: npm-licenses
@@ -1473,10 +1458,6 @@ steps:
         optional: true
       - name: sync-sim
         optional: true
-      # MYND-574 task 116. `mobile-crosscheck` can go red on its own (it has no
-      # failure:ignore), so leaving it out meant a red pipeline with no push.
-      - name: mobile-crosscheck
-        optional: true
     environment:
       PUSHOVER_TOKEN:
         from_secret: pushover_token
@@ -1493,6 +1474,19 @@ steps:
           --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
           --data-urlencode "url=$CI_PIPELINE_URL" \
           https://api.pushover.net/1/messages.json
+    # ─── The org-wide notify rule, stated because it was not (myne-md/myne#584) ──
+    # A PULL-REQUEST failure sends nothing. It is not an oversight and it is not
+    # a gap: `myne-bot` runs a pipeline on every PR and reports the result on the
+    # PR itself, so a push notification per branch iteration would be noise on
+    # top of a signal the author is already looking at. A push or a manual run
+    # has no such surface, which is why those two do notify.
+    #
+    # Five repos carry a `notify-failure` step and they disagreed three ways:
+    # this one, `myne-server` and `myne-test-vectors` omitted `pull_request`
+    # while `myne-clipper` and `myne-themes` included it, and not one file said
+    # which was intended. All five now read the same and all five say why, so
+    # the next person to notice the asymmetry finds a decision rather than a
+    # difference to "fix".
     when:
       - event: [push, manual]
         status: failure
