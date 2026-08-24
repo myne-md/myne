@@ -46,10 +46,8 @@ when:
   # `RUN_E2E != "true"` makes the manual trigger carry ONE intent at a time.
   # `.woodpecker/e2e.yml` claims the manual event with `RUN_E2E == "true"`, so
   # without this negation an E2E trigger would ALSO run this whole pipeline,
-  # which costs two things rather than one. It would deploy app.example.com, since
-  # `web-docker-build` below is gated `event: manual` + `branch: develop`
-  # (`design-notes/ops/0484`) and would match; and with the agent's
-  # `WOODPECKER_MAX_WORKFLOWS=2` the two workflows would run CONCURRENTLY on the
+  # which would put two workflows CONCURRENTLY on the shared host, with the agent's
+  # `WOODPECKER_MAX_WORKFLOWS=2`, and that is the
   # shared host, which is the documented root cause of the E2E suite's mount
   # timeouts. A lane whose whole purpose is a clean pre-release signal must not
   # be racing a full pipeline for the same cores.
@@ -297,8 +295,8 @@ steps:
   # So they were 120 s of pure waiting for every other step in the pipeline.
   # `depends_on: [cargo-test-tauri]` lands them in the stage that holds
   # `web-build` and `sync-sim`. That is NOT the last stage: `web-build` still
-  # feeds the four-step mobile tail and the `web-docker-build` deploy chain, so
-  # an over-run here delays those too, not just the pipeline's end.
+  # feeds the four-step mobile tail and `web-container-check`, so an over-run
+  # here delays those too, not just the pipeline's end.
   #
   # The placement was chosen when the stage also held the 1118 s `e2e` step,
   # under which 120 s cost nothing at all. `e2e` has since moved to
@@ -909,8 +907,9 @@ steps:
   # a `when` entry carries an implicit `status: success`, and that condition is
   # PIPELINE-WIDE rather than scoped to `depends_on`. So any red step anywhere
   # skipped this whole lane, including steps it has no dependency path to.
-  # `web-docker-build` going red skipped `npm-licenses`, `mobile-vitest` and
-  # `mobile-flow-logic` even though `mobile-build` itself was green.
+  # The web deploy step going red skipped `npm-licenses`, `mobile-vitest` and
+  # `mobile-flow-logic` even though `mobile-build` itself was green. (That step
+  # is gone since myne-md/myne#584; the shape it demonstrated is not.)
   #
   # What that cost, measured during the v0.5.0 release rather than reasoned
   # about: the mobile Vitest suite had not executed in CI once since the client
@@ -920,10 +919,13 @@ steps:
   # the `e2e-floor` rationale (that step now lives in `.woodpecker/e2e.yml`): a
   # gate that did not run is indistinguishable from a gate that passed.
   #
-  # Where it bites is narrower and worse than "a step went red once".
-  # `web-docker-build` is `event: manual` + `branch: develop` (`&web-deploy`,
-  # decisions 0484), so it does not run on a push at all — which means these four
-  # gates vanished on exactly the runs that publish `app.example.com`.
+  # Where it bit was narrower and worse than "a step went red once". The deploy
+  # step was `event: manual` + `branch: develop` (decisions 0484), so it did not
+  # run on a push at all, which means these four gates vanished on exactly the
+  # runs that published `app.example.com`. The deploy has since left this pipeline
+  # entirely (myne-md/myne#584), so that particular pairing cannot recur; the
+  # keys below stay because the pipeline-wide `status` rule that caused it has
+  # not changed.
   #
   # `mobile-build` is in the list even though the symptom was downstream of it,
   # and that is the part worth not trimming: `npm-licenses` and `mobile-vitest`
@@ -1095,128 +1097,73 @@ steps:
       - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
       - cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard --no-fail-fast
 
-  # ─── Hosted web-client deploy (MYND-574 task 112) ────────────────────────────
-  # The repo's first deployable artefact. Same shape every sibling repo already
-  # uses (`myne-server`, `myne-website`): a `docker:28-cli` step that builds on
-  # the HOST daemon through the mounted socket, then a second step that brings
-  # up the committed stack in its deploy directory.
+  # ─── Web container check (the deploy half of this chain is gone) ────────────
+  # `web-docker-build`, `web-docker-deploy` and `web-smoke` lived here. The last
+  # two were pure publication and are gone: CI verifies and does not publish
+  # (myne-md/myne#584). The by-hand procedure is
+  # `operations/runbooks/web-client-deploy.md`.
   #
-  # `depends_on: [web-build]` and nothing else, deliberately. A web deploy must
-  # not wait on anything that does not decide whether a static bundle can ship.
-  # The original wording named the desktop `e2e` step, which was roughly half the
-  # pipeline's runtime; that step has moved to `.woodpecker/e2e.yml` and no
-  # longer runs on this pipeline at all, so the reasoning outlives its example.
+  # What is KEPT is the half that was never a deploy. `check-web-container-headers.sh`
+  # asks whether the running container SERVES its CSP, COOP, COEP, CORP, HSTS
+  # and the rest, which is a different question from whether the config is
+  # right, and it is the only thing that can ask it. A container serving no CSP
+  # and a `/healthz` answering with the whole SPA both shipped once, and neither
+  # is visible to any unit test: the only thing that can see them is a request
+  # to a running container.
   #
-  # `manual` stays in the `when` block because a Forgejo pull-mirror sync does
-  # not reliably fire the push webhook, and a deploy that only fires on an event
-  # the mirror sometimes swallows is a deploy nobody can trigger.
-  web-docker-build:
+  # WHAT WAS DROPPED FROM IT, and where it went. The image is no longer tagged
+  # `myne-web:prod`, since nothing here deploys it. And the
+  # `check-bundle-record.mjs --has` gate is not run here: that one is a DEPLOY
+  # precondition rather than a build check (a bundle may only reach the origin
+  # once its hash was published in a reviewed commit), so it moved into the
+  # runbook, beside the deploy it guards. It is the only compensating control
+  # A15/TB11 has, and running it on a build nobody is about to ship would only
+  # teach people to ignore it going red.
+  #
+  # ─── Why a `web/**` path filter and not `*code-paths` ───────────────────────
+  # This step costs real time: `web/container/Dockerfile` rebuilds the wasm in a
+  # Rust image and runs a second full `pnpm install` plus `web:build`, none of
+  # which the host layer cache can keep across a source change. What it checks
+  # is what the CONTAINER serves, and the only inputs to that are the container
+  # definition, the header source (`web/csp.ts`) and the bundle itself. A commit
+  # that touches none of them cannot move the answer, so it does not pay for it.
+  web-container-check:
     # CLI pinned to the docker library's current major to match the host daemon
     # (29.x). The old docker:28-cli only logged benign BuildKit session-
-    # healthcheck noise ("only one connection allowed") against the 29 daemon —
-    # a red herring, never the actual failure (see the network note below).
+    # healthcheck noise ("only one connection allowed") against the 29 daemon.
     image: docker:cli
-    # MANUAL ONLY (owner decision, 2026-08-13). `develop` pushes still BUILD the
-    # bundle and run every artefact gate in `web-build`; what they no longer do
-    # is publish it.
-    #
-    # Why the automatic half went. `app.example.com` was tracking unreviewed
-    # `develop` — including, on any given day, another contributor's half-landed
-    # work. And the hash record is a PRECONDITION rather than a log
-    # (`docs/web-bundle-hashes.md`): a bundle may only be deployed once its hash
-    # has been published in a reviewed commit. Those two together mean an
-    # auto-deploy on every push is asking for a human decision on every push,
-    # and getting a red step instead — a gate that is permanently red teaches
-    # people to ignore red, which costs more than the deploy it was guarding.
-    #
-    # What is NOT weakened: the hash record itself. It is the only compensating
-    # control A15/TB11 has — the web bundle is re-delivered from an origin on
-    # every page load, no signature is verified by the browser, and the user
-    # keeps no artefact to compare. Detection-after-the-fact is the whole
-    # mitigation, and it depends on every served bundle having been published
-    # first. Deploying less often does not change that; deploying without the
-    # record would.
-    #
-    # The standing risk of manual-only, stated because nothing else will state
-    # it: a deploy that nobody triggers is a deploy that does not happen, and
-    # `app.example.com` will quietly serve an older bundle until someone notices.
-    # `web-smoke` verifies WHICH commit is live against the deployed origin, so
-    # the staleness is observable — but only when someone looks.
-    when: &web-deploy
-      - event: manual
-        branch: develop
-    depends_on: [web-build]
+    when:
+      - path:
+          include: ['web/**', 'scripts/check-web-container-headers.sh']
+        status: [success, failure]
+    depends_on:
+      - name: web-build
+        optional: true
     environment:
-      # THE actual cause of every web-docker-build failure (#392–#396, hidden
-      # until the full step log was read past its truncation): the header-check
-      # gate below runs INSIDE this step container, and reaching a probe
-      # container via a published host port + curl 127.0.0.1 cannot cross the
-      # netns boundary — "the container never answered". Hand the script this
-      # step's own docker network so it attaches the probe to that network and
-      # reaches it BY NAME through docker's embedded DNS instead. Must equal the
-      # agent's WOODPECKER_BACKEND_DOCKER_NETWORK.
+      # THE actual cause of every failure this step had while it was
+      # `web-docker-build` (#392 to #396, hidden until the full step log was read
+      # past its truncation): the header-check gate runs INSIDE this step
+      # container, and reaching a probe container via a published host port and
+      # curl 127.0.0.1 cannot cross the netns boundary, so "the container never
+      # answered". Hand the script this step's own docker network so it attaches
+      # the probe to that network and reaches it BY NAME through docker's
+      # embedded DNS instead. Must equal the agent's
+      # WOODPECKER_BACKEND_DOCKER_NETWORK.
       MYNE_WEB_TEST_NETWORK: woodpecker-workflows
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
       # `.git` is excluded from the build context, so the commit identity is
-      # passed in — `version.json` is what makes the deploy observable, and it
-      # would otherwise read `unknown` and the smoke gate could not tell a fresh
-      # deploy from a stale one.
+      # passed in: `version.json` would otherwise read `unknown`, and the header
+      # check asserts that file is served no-store with a bundle hash in it.
+      # No `:prod` tag: this image is built to be asked questions, not shipped.
       - >
         docker build -f web/container/Dockerfile
         --build-arg MYNE_BUILD_COMMIT=$CI_COMMIT_SHA
         --build-arg MYNE_BUILD_TIMESTAMP=$CI_COMMIT_TIMESTAMP
-        -t myne-web:$CI_COMMIT_SHA -t myne-web:prod .
-      # Gate the image BEFORE it is deployed. This is the check that would have
-      # caught a container serving no CSP, no COOP and no COEP with a valid
-      # config, and a `/healthz` answering 200 with the whole SPA — both shipped
-      # once, both invisible to every unit test, because the only thing that can
-      # see them is a request to a running container.
+        -t myne-web:$CI_COMMIT_SHA .
       - apk add --no-cache bash curl nodejs
-      - MYNE_WEB_IMAGE=myne-web:prod bash scripts/check-web-container-headers.sh --no-build
-      # The published-hash gate (MYND-574 task 56). The record is a
-      # PRECONDITION, not a log: a record written after the deploy detects
-      # nothing, because whoever substituted the bundle also writes the record
-      # and the two agree. Gating on it inverts that — a bundle whose hash was
-      # not published first cannot reach the origin.
-      #
-      # Usable only because the build is reproducible (task 16): the hash for a
-      # commit is knowable before the deploy, by anyone, which is what lets it
-      # be written down first.
-      - >
-        docker run --rm --entrypoint cat myne-web:prod /srv/web/version.json > /tmp/version.json
-      - >
-        node scripts/check-bundle-record.mjs --has
-        "$(node -e 'console.log(JSON.parse(require("fs").readFileSync("/tmp/version.json","utf8")).bundle_hash)')"
-
-  web-docker-deploy:
-    image: docker:28-cli
-    when: *web-deploy
-    depends_on: [web-docker-build]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/myne-web:/opt/myne-web
-    commands:
-      # The committed stack (`operations/deploy/web/docker-compose.yml`, copied to
-      # this directory), never an ad-hoc `docker run`: the port binding, the
-      # restart policy and the sync-origin variable are deployment decisions
-      # that belong in a file someone reviewed.
-      - cd /opt/myne-web/prod
-      - docker compose up -d
-      - docker image prune -f
-
-  # Post-deploy smoke, from OUTSIDE the container over the public origin. Every
-  # failure it exists to catch lives between the container and the browser — a
-  # proxy that drops a header, a certificate that did not renew, a stack that
-  # came up on the previous image — and none of those are visible from inside.
-  web-smoke:
-    image: alpine:3.21
-    when: *web-deploy
-    depends_on: [web-docker-deploy]
-    commands:
-      - apk add --no-cache curl bash
-      - bash scripts/web-smoke.sh https://app.example.com https://sync.myne.md $CI_COMMIT_SHA
+      - MYNE_WEB_IMAGE=myne-web:$CI_COMMIT_SHA bash scripts/check-web-container-headers.sh --no-build
 
   sync-sim:
     image: *ci_image
@@ -1466,11 +1413,7 @@ steps:
       # The deploy chain (task 112). A deploy that fails silently is worse than
       # one that fails loudly: the previous container keeps serving and nobody
       # learns the new build never shipped.
-      - name: web-docker-build
-        optional: true
-      - name: web-docker-deploy
-        optional: true
-      - name: web-smoke
+      - name: web-container-check
         optional: true
       - name: sync-sim
         optional: true
