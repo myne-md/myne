@@ -1271,102 +1271,82 @@ steps:
       # unmarshal map into string").
       - "/cache/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim)' --no-fail-fast"
 
-  # ─── Cross-impl vector verification, both lanes (BLOCKED, not disabled) ─────
-  # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
+  # ─── Cross-impl vector verification, both lanes ─────────────────────────────
+  # `protocol/tests/vectors.rs` reads the companion fixtures and asserts
   # byte-equality of the public API across all 34 runners (argon2id, ctx-aead,
-  # hkdf-sha256, account-number, phrase_normalize, myn-blob, vault-meta(+rewrite)
-  # and every §10.3 blob family). Without the companion checked out they all just
-  # skip. See protocol/CLAUDE.md.
+  # hkdf-sha256, account-number, phrase_normalize, myn-blob, vault-meta and
+  # every §10.3 blob family). Since MYND-574 task 15 the SAME runners also
+  # execute inside a real browser (`scripts/browser-vectors.sh`, wasm32 plus
+  # headless Chrome), which is not a nicety: the web client's execution target
+  # is a browser's wasm engine, and a suite that only ever ran on aarch64 and
+  # x86_64 is evidence about a different machine.
   #
-  # Since MYND-574 task 15 the SAME runners also execute inside a real browser —
-  # `scripts/browser-vectors.sh`, wasm32 + headless Chrome. That is not a nicety:
-  # the web client's execution target is a browser's wasm engine, and a suite that
-  # only ever ran on aarch64/x86_64 is evidence about a different machine. Both
-  # lanes belong in this step; the browser one is what task 15 owes.
+  # ─── This step was commented out for months, and why that mattered ──────────
+  # `myne-test-vectors` is private, so the clone needs a token, and a
+  # `from_secret:` naming a secret the repo cannot see fails CONFIG-COMPILE:
+  # the whole pipeline errors before any step runs, on every branch. That is not
+  # hypothetical. This step was uncommented on 2026-07-28 on the assertion that
+  # the secret was provisioned; it was not, and every gate on this repo was dead
+  # on every branch and every PR until the re-comment the next day.
   #
-  # WHY THIS IS STILL A COMMENT, AND WHAT IT COSTS. `myne-test-vectors` is a
-  # PRIVATE repo, so the clone needs a token — and a `from_secret:` naming a
-  # secret this repo cannot see fails CONFIG-COMPILE: the WHOLE pipeline errors
-  # before any step runs. Not hypothetical. This step was uncommented on
-  # 2026-07-28 on the assertion that `vectors_token` was provisioned; it was
-  # not, and every gate on this repo was dead on every branch and every PR —
-  # fmt, clippy, cargo-test, vitest, e2e, the web lane — until the re-comment on
-  # 2026-07-29 (MYND-635). Same caution as sync-sim above, which learned it the
-  # hard way.
+  # The cost of leaving it closed was easy to misread as zero, and was not:
+  # `cargo-test` runs the `vectors` target (it is `-p protocol`), every runner
+  # prints `[skip]`, and the step reports green having asserted nothing. So the
+  # byte-level agreement `protocol/CLAUDE.md` and `docs/threat-model.md` §6 both
+  # lean on was enforced on no machine (myne-md/myne#586).
   #
-  # The cost of leaving it commented is NOT zero and is easy to misread as zero:
-  # cargo-test runs the `vectors` target (it is `-p protocol`), every runner
-  # prints `[skip]`, and the step reports green having asserted nothing. On THIS
-  # repo and on mobile, the gate enforces on no machine — it is a pre-push check
-  # on a developer's laptop, nothing more.
+  # ─── github.com, not the Forgejo mirror ─────────────────────────────────────
+  # The closed version cloned `git.myne.md/Myne/myne-test-vectors`, and that
+  # half had never run, so nothing had ever confirmed the mirror exists. The
+  # proven pattern in this project is `myne-server`'s `vector-gate`, which
+  # clones from github.com with a read-scoped GitHub PAT and runs green today.
+  # `vectors_token` on this repo is that shape.
   #
-  # It is NOT true that it enforces nowhere, and the earlier wording here said so
-  # in a way that quietly discouraged the fix. `myne-server` runs the gate in CI
-  # today: its `.woodpecker.yml` clones the companion with a `vectors_token`
-  # secret, pins an explicit SHA, and FAILS the step when the secret is absent
-  # instead of skipping. So the secret exists and the pattern is proven in this
-  # project — what part 1 below needs is provisioning it for this repo, not
-  # inventing anything. (Server-side coverage is only the three categories the Go
-  # code touches — scram-auth, tls-exporter, vault-head — so it is not a
-  # substitute for this step; it is evidence that this step can work.)
+  # ─── Tip, not a pinned SHA, deliberately unlike myne-server ─────────────────
+  # `myne-server` pins a commit because it is a SECOND implementation and a
+  # stable target is what lets it catch up. This repo is where the vectors are
+  # generated FROM, so it must agree with the published tip at all times: a
+  # vectors change that the Rust client no longer matches should redden this
+  # pipeline the day it lands. A pin here would go stale silently, which is the
+  # other half of what myne-md/myne#586 found (that server pin sat two months
+  # behind while passing).
   #
-  # TO RE-ENABLE — four parts, IN THIS ORDER. Parts 1 and 2 are not diffs, and
-  # nothing in a review can tell you they happened. That is the whole hazard.
-  #
-  #   1. Provision the token on THIS repo (Woodpecker → repo → Settings →
-  #      Secrets). Two ways: add `vectors_token`, a Forgejo PAT with
-  #      read:repository on Myne/myne-test-vectors; or point the env key below
-  #      at `myne_server_token`, which this repo already has and sync-sim above
-  #      already resolves. Forgejo PAT scopes are per-user rather than per-repo,
-  #      so that existing PAT plausibly already reads the vectors repo — VERIFY
-  #      by cloning with it, never assume, since assuming is precisely what
-  #      caused the 2026-07-28 outage. Whichever you pick, the `from_secret:`
-  #      below must name a secret that exists.
-  #   2. Push any commit with this step STILL COMMENTED and confirm the pipeline
-  #      config-compiles. A green run is the only evidence part 1 landed.
-  #   3. Uncomment the step below AND restore its `notify-failure` entry, whose
-  #      slot is reserved by a comment there. A gate nobody is told about is a
-  #      gate that goes red unnoticed.
-  #   4. Keep `MYNE_VECTORS_REQUIRED` set on the step. `cases_json` in
-  #      protocol/tests/vectors.rs skips a missing fixture — right for a fresh
-  #      clone, wrong for the one step whose entire job is to assert. If that
-  #      helper has no env-gated arm yet, add it in the same change (panic with
-  #      the missing path instead of `eprintln!` + `return None`, only when the
-  #      variable is set, so `pre-push` and fresh clones keep today's skip).
-  #      Without it, an expired token or a moved ref silently returns this step
-  #      to green-and-empty, which is the state it is commented out over.
-  #
-  # The step still self-skips on an absent token rather than failing, so a fork
-  # PR (which gets no secrets) is not blocked by a companion it cannot clone.
-  # vector-verification:
-  #   image: rust:1.96.0-slim
-  #   when: *code-paths
-  #   depends_on: [cargo-test]
-  #   environment:
-  #     # Assert rather than skip: this is the one place a missing fixture is a
-  #     # failure, not a fresh clone. See part 4 above.
-  #     MYNE_VECTORS_REQUIRED: "1"
-  #     VECTORS_TOKEN:
-  #       from_secret: vectors_token
-  #   commands:
-  #     - |
-  #       if [ -z "$VECTORS_TOKEN" ]; then
-  #         echo "vectors_token not provided -> skipping cross-impl vectors";
-  #         exit 0;
-  #       fi
-  #     # chromium + its driver are what make the browser lane possible; the
-  #     # driver's major version must match the browser's, which is why they are
-  #     # installed as a pair from the same distro archive rather than pinned
-  #     # separately. (Learned locally the same week: chromedriver 151 refuses a
-  #     # Chrome 150 session outright.)
-  #     - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl chromium chromium-driver
-  #     - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@git.myne.md/Myne/myne-test-vectors.git" myne-test-vectors
-  #     # Native lane: the desktop/mobile execution target.
-  #     - cargo test -p protocol --test vectors
-  #     # Browser lane: the web client's. Same runners, same fixtures, different
-  #     # wasm engine. The script fails rather than skips when either the
-  #     # fixtures or a driver are missing.
-  #     - CHROMEDRIVER=/usr/bin/chromedriver bash scripts/browser-vectors.sh
+  # The empty-token guard is load-bearing rather than defensive. The secret is
+  # scoped to `push` and `manual` events only, so a `pull_request` run resolves
+  # it empty and this step skips cleanly instead of failing; the same holds for
+  # a fork PR, which gets no secrets at all.
+  vector-verification:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    depends_on: [cargo-test]
+    environment:
+      # Assert rather than skip: this is the one place a missing fixture is a
+      # failure rather than a fresh clone. `cases_json` in
+      # `protocol/tests/vectors.rs` reads this and panics with the missing path
+      # instead of `eprintln!` + `return None`. Without it an expired token or a
+      # moved ref returns this step to green-and-empty, which is the state it
+      # spent months in.
+      MYNE_VECTORS_REQUIRED: "1"
+      VECTORS_TOKEN:
+        from_secret: vectors_token
+    commands:
+      - |
+        if [ -z "$VECTORS_TOKEN" ]; then
+          echo "vectors_token not provided (pull_request or fork) -> skipping cross-impl vectors";
+          exit 0;
+        fi
+      # chromium and its driver are what make the browser lane possible, and the
+      # driver's major version must match the browser's, which is why they are
+      # installed as a PAIR from the same distro archive rather than pinned
+      # separately (chromedriver 151 refuses a Chrome 150 session outright).
+      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl chromium chromium-driver
+      - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@github.com/myne-md/myne-test-vectors.git" myne-test-vectors
+      # Native lane: the desktop and mobile execution target.
+      - cargo test -p protocol --test vectors
+      # Browser lane: the web client's. Same runners, same fixtures, a different
+      # wasm engine. The script fails rather than skips when either the fixtures
+      # or a driver are missing.
+      - CHROMEDRIVER=/usr/bin/chromedriver bash scripts/browser-vectors.sh
 
   # Failure notification via Pushover. The token + group come ONLY from CI
   # secrets, never committed (public repo). A missing secret (e.g. a fork PR)
@@ -1400,13 +1380,11 @@ steps:
       # step split off without one is a gate that goes quiet.
       - name: wasm-repro
         optional: true
-      # RESERVED SLOT — vector-verification is commented out (see the step
-      # above, part 3 of its re-enable procedure). Uncomment the two lines
-      # below in the SAME change that uncomments the step: this is the only
-      # thing that pushes a failure to the maintainer, and a gate nobody is
-      # told about is a gate that goes red unnoticed.
-      # - name: vector-verification
-      #   optional: true
+      # The slot this reserved is now filled (myne-md/myne#586). It is the only
+      # thing that pushes a failure to the maintainer, and a gate nobody is told
+      # about is a gate that goes red unnoticed.
+      - name: vector-verification
+        optional: true
       - name: pnpm-build
         optional: true
       - name: vitest
