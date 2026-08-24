@@ -759,8 +759,32 @@ steps:
     when:
       - path: *code-path-globs
         status: [success, failure]
+    # ─── Depends on `wasm-repro`, and that is a CORRECTNESS edge ────────────────
+    # `pnpm web:build` bundles `web/src/worker/worker.ts`, which imports
+    # `../../wasm/pkg/myne_web_wasm.js`. That path is GITIGNORED, so it is never
+    # in a CI checkout, and `web:build` does not generate it: the script is
+    # `tsc && vite build && emit-web-version`, with no `build-wasm.sh` in it.
+    #
+    # The only step that populates `web/wasm/pkg/` is `wasm-repro`, through
+    # `scripts/wasm-repro-check.sh` calling `build-wasm.sh --verify`. Until now
+    # this step and that one were SIBLINGS, both hanging off `cargo-test-tauri`,
+    # so which of them reached the artefact first was a race with no edge
+    # deciding it. Measured on two consecutive pipelines, and this step lost
+    # both: #765 started alongside `wasm-repro` and died 29 s in while that step
+    # needed 142 s; #766 died 58 s in against 188 s. The error is
+    # `[UNRESOLVED_IMPORT] Could not resolve '../../wasm/pkg/myne_web_wasm.js'`,
+    # which reads as a missing dependency rather than as a missing edge.
+    #
+    # `optional: true` is still right and still does the job: an optional edge
+    # ORDERS, it only stops requiring that the parent SUCCEEDED. That is exactly
+    # what is wanted here, because a reproducibility mismatch in `wasm-repro` is
+    # not a reason to stop asking whether the web bundle ships the recovery
+    # phrase. The ordering is what this step needs; the verdict is not.
+    #
+    # `wasm-repro` itself depends on `cargo-test-tauri`, so the serial chain the
+    # old edge existed to preserve is unchanged.
     depends_on:
-      - name: cargo-test-tauri
+      - name: wasm-repro
         optional: true
     commands:
       - npm install -g pnpm@11.8.0
