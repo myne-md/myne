@@ -267,7 +267,7 @@ Used in: `vision.md`; `threat-model.md` §7; `decisions.md` 2026-07-01, 2026-07-
 
 An observation that was proposed as a manual item and ruled out because an existing or plausible `e2e/`, `e2e-web/`, Vitest or cargo test could honestly assert it. Paying it is the only thing that lowers `totalMinutesCeiling`, so it is the mechanism by which the roster shrinks and the gate widens rather than a backlog of nice-to-haves. Tracked as issues rather than as a file, because a second list beside the roster is the drift the roster exists to stop: myne-md/myne#554 and its four lane sub-issues carry the 265 observations the first derivation ruled out.
 
-Used in: `decisions.md` 2026-08-21 (manual test roster, myne-md/myne#548), myne-md/myne#554
+Used in: `decisions.md` 2026-08-25 (manual test roster, myne-md/myne#548), myne-md/myne#554
 
 ### **backup schedule** &nbsp; 📦 *Product*
 

@@ -24,9 +24,14 @@
 // issue, per `operations/runbooks/release-checklist.md`.
 //
 // THAT RUNBOOK IS THE ONLY CALLER, and it is in another repository. Nothing in
-// this repo invokes this script: not lefthook, not `.woodpecker.yml`, not a
-// release script. So until the companion `operations` PR merges, this file is
-// inert here, and that is stated rather than left for somebody to discover.
+// this repo invokes this script: not lefthook, not `.woodpecker/`, not a release
+// script, and `check-unwired.mjs`-shaped reasoning would therefore read it as
+// dead. It is not: the runbook landed first (example-org/operations#27, merged
+// 2026-08-25), so the release half of this system is in force from the day this
+// branch lands rather than from some later one. The ordering came out the
+// reverse of what was planned, which is worth naming: for the window between
+// that merge and this one, the runbook instructed a maintainer to run a script
+// that was not on `develop` yet.
 // `scripts/check-manual-test-roster.mjs` beside it is the half that gates a
 // commit and needs no caller of its own.
 //

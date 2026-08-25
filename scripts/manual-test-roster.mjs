@@ -33,9 +33,13 @@
 // SECURITY OR PRIVACY BOUNDARY broke (plaintext leaving the device, a locked vault
 // still readable, a phrase or key on screen or in a log, an egress with no user
 // consent), or the item verifies the UPGRADE over a real vault from the previous
-// release. Everything else is `standard`. Both tiers gate the ship; the tier
-// decides ordering and what a short day drops first, not whether an item may be
-// skipped.
+// release. Everything else is `standard`. Both tiers are MEANT to gate the ship, and
+// `gatedTiers` in `scripts/manual-test-ratchet.json` records which ones do
+// today: `core` alone, on seven of the eight clients. A `standard` item is
+// walked and recorded and does not block a tag yet, so do not read this tier
+// choice as "may be skipped" either way. The tier decides ordering and what a
+// short day drops first; the ratchet decides what stops the tag, it may only
+// widen, and the end state is the whole file blocking.
 //
 // `estimateMin` IS PER CLIENT, for one execution. An item naming macOS, Linux and
 // Windows is three sittings, and every consumer multiplies by `clients.length`
