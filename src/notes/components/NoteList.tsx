@@ -23,6 +23,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { viewsEnabled, VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
+import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import { noteRead } from "../readNote";
 import {
   archivedRecords,
@@ -295,7 +296,24 @@ export async function executeRenameCommit(
   newTitle: string,
   ctx: Pick<UseSelectedNoteReturn, "commitRename">,
   read: (id: NoteId) => Promise<string> = noteRead,
+  flush: () => Promise<void> = flushBeforeFrontmatterWrite,
 ): Promise<void> {
+  // BEFORE the read, and the order is the defect rather than a preference.
+  // This is a read-patch-write against disk on a note that may be open and
+  // dirty in a pane, so it owes the same step every other writer of that class
+  // owes (`flushBeforeFrontmatterWrite`'s header). `commitRename` does flush,
+  // but only for INBOUND notes, over a `sources` list that explicitly filters
+  // out `args.renamedNoteId` (`renameInbound.ts`), so the renamed note's OWN
+  // dirty pane was never covered and the bytes read here were the pre-typing
+  // ones. What that cost: the stale body written under the new title, the
+  // dirty pane skipping its reload because `hasPendingWork()` is true, and its
+  // next autosave putting the pre-rename title back. The rename silently
+  // reverts, or, with the section 11.3 hash on, mints a keep-both conflict
+  // copy and drops the user's typing out of the open note.
+  //
+  // Injectable for the same reason `read` is: the test asserts the ORDER, and
+  // an order is not observable from a return value.
+  await flush();
   const currentBytes = await read(noteId);
   await ctx.commitRename(noteId, currentBytes, newTitle);
 }
