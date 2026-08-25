@@ -11,26 +11,172 @@
     "noApprovers": "In questo momento nessun altro dispositivo di questo account può approvarlo. Apri Myne su un dispositivo che ha già accesso, poi torna qui.",
     "pendingStartOver": "Ricomincia con un altro account",
     "pendingTitle": "In attesa di approvazione",
-    "sasMatch": "Corrispondono — continua",
+    "sasMatch": "Corrispondono, continua",
     "sasMismatch": "Non corrispondono",
-    "verifyBody": "Verifica che questo codice sia lo stesso su entrambi i dispositivi prima di continuare. Se non lo è, fermati — c'è qualcosa che non va nella connessione, non nella tua password.",
+    "verifyBody": "Verifica che questo codice sia lo stesso su entrambi i dispositivi prima di continuare. Se non lo è, fermati: c'è qualcosa che non va nella connessione, non nella tua password.",
+    "verifyChanged": "Il codice è cambiato mentre lo guardavi. Confronta di nuovo entrambe le schermate. Se continua a cambiare, fermati e non proseguire.",
     "verifyTitle": "Confronta questo codice",
     "title": "Accedi alla tua cassaforte",
     "working": "Configurazione…"
   },
   "accountEntry": {
+    "createAccount": "Non ho ancora un account. Creane uno.",
     "checkFailed": "Impossibile verificare quel numero di account. Riprova.",
     "checking": "Verifica in corso…",
     "continue": "Continua",
-    "hint": "Ha questo aspetto: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Viene verificato qui sul tuo dispositivo — non viene ancora inviato nulla.",
+    "hint": "Ha questo aspetto: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Viene verificato qui sul tuo dispositivo. Non viene ancora inviato nulla.",
     "invalid": "Quel numero di account non è valido. Controllalo e riprova.",
     "title": "Inserisci il tuo numero di account"
+  },
+  "agent": {
+    "composer": {
+      "placeholder": "Chiedi all'AI di modificare queste note",
+      "scopeLabel": "Lavora su",
+      "scopeChange": "Cambia",
+      "scopeOpenNote": "Questa nota",
+      "scopeCount_one": "{{count}} nota",
+      "scopeCount_many": "{{count}} note",
+      "scopeCount_other": "{{count}} note",
+      "scopeCountUnavailable": "Non è stato possibile verificare ora quante note contiene quella cartella.",
+      "startFailed": "Impossibile avviare l'agente.",
+      "autoApplyFailed": "Non è stato possibile applicare automaticamente le modifiche. Non è stato scritto nulla; apri la revisione per applicarle tu stesso.",
+      "permissionLabel": "Al termine dell'esecuzione",
+      "permissionAsk": "Esamina prima",
+      "permissionAuto": "Applica automaticamente",
+      "providerRejected": "Il provider non ha accettato questa richiesta, quindi l'esecuzione si è interrotta. Non è stato scritto nulla. È un difetto in ciò che Myne ha inviato, non nelle tue note né nella tua configurazione.",
+      "unchecked": "Non è stato possibile completare la verifica delle modifiche, quindi l'agente non è disponibile per ora. Controlla che il tuo modello o provider sia raggiungibile, poi riprova.",
+      "unsupported": "Questo modello non riesce a fare modifiche precise in modo affidabile, quindi l'agente non è disponibile. Scegli un modello più grande o un provider.",
+      "unsupportedDetail": "Ha superato {{passes}} verifiche su {{attempts}}; ne servono {{required}}.",
+      "checking": "Verifica del modello…",
+      "checkingAt": "Verifica del modello… ({{attempt}}/{{of}})",
+      "unsupportedProvisional": "Quella soglia di superamento non è ancora stata misurata su più modelli, quindi potrebbe essere più severa o più permissiva del dovuto."
+    },
+    "progress": {
+      "working": "In esecuzione",
+      "awaitingScope": "In attesa di te",
+      "cancelled": "Interrotta",
+      "exhausted": "Interrotta dopo troppi passaggi",
+      "stalled": "Interrotta: questo modello non è riuscito a procedere sulla nota",
+      "done": "Completata",
+      "scopeTotal_one": "può modificare {{count}} nota",
+      "scopeTotal_many": "può modificare {{count}} note",
+      "scopeTotal_other": "può modificare {{count}} note",
+      "cancel": "Interrompi",
+      "expandFailed": "Non è stato possibile ampliare l'ambito.",
+      "grantsUser_one": "{{count}} ambito impostato da te",
+      "grantsUser_many": "{{count}} ambiti impostati da te",
+      "grantsUser_other": "{{count}} ambiti impostati da te",
+      "grantsModel_one": "{{count}} richiesto dall'agente",
+      "grantsModel_many": "{{count}} richiesti dall'agente",
+      "grantsModel_other": "{{count}} richiesti dall'agente"
+    },
+    "scope": {
+      "title": "Includere {{folder}}?",
+      "grant_one": "L'AI potrebbe leggere e modificare {{count}} nota in {{folder}}.",
+      "grant_many": "L'AI potrebbe leggere e modificare {{count}} note in {{folder}}.",
+      "grant_other": "L'AI potrebbe leggere e modificare {{count}} note in {{folder}}.",
+      "newTotal_one": "Questa esecuzione coprirebbe quindi {{count}} nota in totale.",
+      "newTotal_many": "Questa esecuzione coprirebbe quindi {{count}} note in totale.",
+      "newTotal_other": "Questa esecuzione coprirebbe quindi {{count}} note in totale.",
+      "excluded_one": "{{count}} nota è esclusa dall'AI e resta fuori.",
+      "excluded_many": "{{count}} note sono escluse dall'AI e restano fuori.",
+      "excluded_other": "{{count}} note sono escluse dall'AI e restano fuori.",
+      "egressRemote": "Queste note vengono inviate a {{provider}}, che non è gestito da Myne. Escono da questo dispositivo.",
+      "egressLocal": "Queste note vanno a un programma in esecuzione su questo computer. Non escono dal dispositivo.",
+      "reasonLabel": "Dice:",
+      "approve": "Consenti",
+      "decline": "Non questa volta",
+      "countsUnavailable": "L'AI ha chiesto di leggere anche {{folder}}. Non è stato possibile verificare ora quante note aggiunge."
+    },
+    "review": {
+      "title": "Esamina le modifiche",
+      "close": "Chiudi",
+      "scopeTotal_one": "{{count}} nota nell'ambito",
+      "scopeTotal_many": "{{count}} note nell'ambito",
+      "scopeTotal_other": "{{count}} note nell'ambito",
+      "noChanges": "L'agente non ha proposto modifiche.",
+      "noteHeading_one": "{{count}} modifica",
+      "noteHeading_many": "{{count}} modifiche",
+      "noteHeading_other": "{{count}} modifiche",
+      "changedLines_one": "{{count}} riga",
+      "changedLines_many": "{{count}} righe",
+      "changedLines_other": "{{count}} righe",
+      "removalFlag": {
+        "trashed": "Sposta questa nota nel cestino",
+        "deleted": "Elimina questa nota su tutti i dispositivi",
+        "archived": "Sposta questa nota nell'archivio",
+        "template": "Trasforma questa nota in un modello",
+        "conflict": "Segna questa nota come copia in conflitto"
+      },
+      "largeDeletion": "Rimuove molto testo",
+      "rejectEdit": "Rifiuta",
+      "restoreEdit": "Mantieni",
+      "applyRemoval": "Applica separatamente",
+      "rejectAll": "Rifiuta tutto",
+      "approveAll_one": "Approva {{count}} modifica",
+      "approveAll_many": "Approva {{count}} modifiche",
+      "approveAll_other": "Approva {{count}} modifiche",
+      "appliedCount_one": "{{count}} modifica applicata.",
+      "appliedCount_many": "{{count}} modifiche applicate.",
+      "appliedCount_other": "{{count}} modifiche applicate.",
+      "refused": {
+        "anchorNotFound": "Impossibile applicare: quel testo non è più nella nota.",
+        "anchorAmbiguous": "Impossibile applicare: quel testo compare più di una volta.",
+        "anchorEmpty": "Impossibile applicare: nessun testo da abbinare.",
+        "outOfScope": "Impossibile applicare: quella nota è fuori dall'ambito di questa esecuzione.",
+        "removalNeedsOwnAct": "Non applicato qui: togliere una nota dalle tue note richiede una conferma a parte.",
+        "readFailed": "Impossibile applicare: non è stato possibile leggere quella nota.",
+        "unsafeFrontmatter": "Non creata: il titolo o la cartella proposti contengono un'interruzione di riga.",
+        "excludedFolder": "Non creata: quella cartella è esclusa dall'AI.",
+        "createFailed": "Non creata: la scrittura della nuova nota non è riuscita. Le altre modifiche sono state comunque applicate.",
+        "excludedNow": "Impossibile applicare: la cartella di quella nota è ora esclusa dall'AI.",
+        "notProposed": "Impossibile applicare: quella modifica non fa parte della proposta di questa esecuzione."
+      },
+      "applyFailed": "Non è stato possibile applicare le modifiche.",
+      "undo": "Annulla questa esecuzione",
+      "undoFailed": "Non è stato possibile annullare l'esecuzione.",
+      "undoReport": "{{reverted}} note ripristinate. {{kept}} note create dall'esecuzione sono state lasciate al loro posto.",
+      "alreadyApplied": "Applicata",
+      "untitledNote": "Nota senza titolo",
+      "vaultRoot": "Radice della cassaforte",
+      "newNotesHeading_one": "{{count}} nuova nota",
+      "newNotesHeading_many": "{{count}} nuove note",
+      "newNotesHeading_other": "{{count}} nuove note",
+      "createdCount_one": "{{count}} nota creata.",
+      "createdCount_many": "{{count}} note create.",
+      "createdCount_other": "{{count}} note create.",
+      "runSummaryRequests_one": "{{count}} richiesta",
+      "runSummaryRequests_many": "{{count}} richieste",
+      "runSummaryRequests_other": "{{count}} richieste",
+      "runSummaryNotes_one": "{{count}} nota letta",
+      "runSummaryNotes_many": "{{count}} note lette",
+      "runSummaryNotes_other": "{{count}} note lette",
+      "runSummaryOffDevice_one": "circa {{count}} carattere delle tue note è stato inviato al provider",
+      "runSummaryOffDevice_many": "circa {{count}} caratteri delle tue note sono stati inviati al provider",
+      "runSummaryOffDevice_other": "circa {{count}} caratteri delle tue note sono stati inviati al provider",
+      "runSummaryOnDevice": "nulla ha lasciato questo dispositivo"
+    },
+    "undo": {
+      "offer_one": "L'ultima esecuzione ha modificato {{count}} nota.",
+      "offer_many": "L'ultima esecuzione ha modificato {{count}} note.",
+      "offer_other": "L'ultima esecuzione ha modificato {{count}} note.",
+      "action": "Annulla l'esecuzione",
+      "reverted_one": "{{count}} nota ripristinata.",
+      "reverted_many": "{{count}} note ripristinate.",
+      "reverted_other": "{{count}} note ripristinate.",
+      "failed_one": "Impossibile ripristinare {{count}} nota.",
+      "failed_many": "Impossibile ripristinare {{count}} note.",
+      "failed_other": "Impossibile ripristinare {{count}} note.",
+      "createdNotReverted_one": "{{count}} nota creata dall'esecuzione è stata lasciata al suo posto.",
+      "createdNotReverted_many": "{{count}} note create dall'esecuzione sono state lasciate al loro posto.",
+      "createdNotReverted_other": "{{count}} note create dall'esecuzione sono state lasciate al loro posto."
+    }
   },
   "ai": {
     "answeredBy": {
       "inProcess": "Risposta generata su questo dispositivo",
       "localRuntime": "Risposta generata da {{name}}, su questo computer",
-      "remote": "Risposta generata da {{provider}} — le tue note sono state inviate lì"
+      "remote": "Risposta generata da {{provider}}. Le tue note sono state inviate lì."
     }
   },
   "attachments": {
@@ -43,8 +189,8 @@
       "deleteCta_one": "Elimina {{count}} inutilizzato",
       "deleteCta_many": "Elimina {{count}} inutilizzati",
       "deleteCta_other": "Elimina {{count}} inutilizzati",
-      "corpusIncomplete": "Completa prima la sincronizzazione — questo dispositivo non ha ancora tutte le tue note. Non è stato eliminato nulla.",
-      "error": "Impossibile completare la pulizia. Alcune note potrebbero essere illeggibili: non è stato eliminato nulla.",
+      "corpusIncomplete": "Completa prima la sincronizzazione. Questo dispositivo non ha ancora tutte le tue note. Non è stato eliminato nulla.",
+      "error": "Impossibile completare la pulizia. Alcune note potrebbero essere illeggibili. Non è stato eliminato nulla.",
       "intro_one": "Questo allegato non è usato in nessuna nota. L'eliminazione è permanente e non può essere annullata.",
       "intro_many": "Questi {{count}} allegati non sono usati in nessuna nota. L'eliminazione è permanente e non può essere annullata.",
       "intro_other": "Questi {{count}} allegati non sono usati in nessuna nota. L'eliminazione è permanente e non può essere annullata.",
@@ -87,7 +233,7 @@
       "actionsTitle": "Azioni",
       "checking": "Verifica in corso…",
       "checkUnusedFailedNotice": "Impossibile verificare gli allegati inutilizzati. Riprova.",
-      "corpusIncompleteNotice": "Completa prima la sincronizzazione — questo dispositivo non ha ancora tutte le tue note, quindi non può sapere quali allegati sono inutilizzati.",
+      "corpusIncompleteNotice": "Completa prima la sincronizzazione. Questo dispositivo non ha ancora tutte le tue note, quindi non può sapere quali allegati sono inutilizzati.",
       "cleanUnused": "Pulisci inutilizzati",
       "cleanUnusedTitle": "Elimina gli allegati non usati in nessuna nota",
       "colCreated": "Creato",
@@ -132,6 +278,7 @@
       "title": "Allegati",
       "transcribeDone": "Trascrizione completata.",
       "transcribeFailed": "Trascrizione non riuscita. Riprova.",
+      "transcribeTooLong": "Questa registrazione è troppo lunga per essere trascritta.",
       "transcribeFeatureOff": "La conversione da voce a testo è disattivata. Attivala in Impostazioni → Trascrizione.",
       "transcribeModelLoadFailed": "Impossibile caricare il modello da voce a testo. Reinstalla Myne, oppure controlla il tuo modello personalizzato in Impostazioni → Developer → AI.",
       "transcribeNoModelHint": "Il modello da voce a testo è mancante. Reinstallando Myne viene ripristinato.",
@@ -165,7 +312,7 @@
       "untitled": "Senza titolo"
     },
     "needsApp": "La pulizia degli allegati richiede l'app.",
-    "noUnused": "Nessun allegato inutilizzato — ogni file è referenziato.",
+    "noUnused": "Nessun allegato inutilizzato: ogni file è referenziato.",
     "scanError": "Impossibile cercare gli allegati inutilizzati.",
     "erasedToast_one": "Cancellato {{count}} file inutilizzato.",
     "erasedToast_many": "Cancellati {{count}} file inutilizzati.",
@@ -178,9 +325,9 @@
     "addError": "Impossibile aggiungere il file.",
     "deleteError": "Impossibile eliminare l'allegato.",
     "renameError": "Impossibile rinominare l'allegato.",
-    "unusedSummary_one": "{{count}} allegato non è referenziato da alcuna nota ({{size}}). La cancellazione è un'eliminazione crittografica permanente — non c'è cestino.",
-    "unusedSummary_many": "{{count}} allegati non sono referenziati da alcuna nota ({{size}}). La cancellazione è un'eliminazione crittografica permanente — non c'è cestino.",
-    "unusedSummary_other": "{{count}} allegati non sono referenziati da alcuna nota ({{size}}). La cancellazione è un'eliminazione crittografica permanente — non c'è cestino.",
+    "unusedSummary_one": "{{count}} allegato non è referenziato da alcuna nota ({{size}}). La cancellazione è un'eliminazione crittografica permanente. Non c'è cestino.",
+    "unusedSummary_many": "{{count}} allegati non sono referenziati da alcuna nota ({{size}}). La cancellazione è un'eliminazione crittografica permanente. Non c'è cestino.",
+    "unusedSummary_other": "{{count}} allegati non sono referenziati da alcuna nota ({{size}}). La cancellazione è un'eliminazione crittografica permanente. Non c'è cestino.",
     "eraseCta_one": "Cancella {{count}} file inutilizzato",
     "eraseCta_many": "Cancella {{count}} file inutilizzati",
     "eraseCta_other": "Cancella {{count}} file inutilizzati",
@@ -256,7 +403,7 @@
       "task": "Note con un'attività",
       "content": "Testo completo nel corpo"
     },
-    "searchPlaceholder": "Cerca note o esegui un comando — prova tag: · path: · task:",
+    "searchPlaceholder": "Cerca note o esegui un comando. Prova tag: · path: · task:",
     "sectionCommands": "Comandi",
     "sectionNotes": "Note",
     "untitledNote": "Senza titolo"
@@ -503,6 +650,12 @@
       "saveWorkspaceAs": {
         "label": "Salva spazio di lavoro come…"
       },
+      "removeNoteCover": {
+        "label": "Rimuovi copertina della nota"
+      },
+      "setNoteCover": {
+        "label": "Imposta copertina della nota…"
+      },
       "showGraph": {
         "label": "Mostra vista grafico…"
       },
@@ -582,7 +735,7 @@
       }
     },
     "rebind": {
-      "invalidChordReason": "Aggiungi un modificatore (⌘, Ctrl o Alt) — un tasto da solo non può essere una scorciatoia."
+      "invalidChordReason": "Aggiungi un modificatore (⌘, Ctrl o Alt). Un tasto da solo non può essere una scorciatoia."
     },
     "picker": {
       "vaultRoot": "Radice della cassaforte",
@@ -596,6 +749,7 @@
   },
   "common": {
     "cancel": "Annulla",
+    "close": "Chiudi",
     "dismiss": "Ignora",
     "prompt": {
       "cancel": "Annulla",
@@ -630,11 +784,11 @@
       "convert": {
         "cancel": "Annulla",
         "confirm": "Converti",
-        "skipped": "ignorato — {{note}}",
+        "skipped": "ignorato: {{note}}",
         "subtitle_one": "Verrà riscritto 1 riferimento. Controlla prima di confermare.",
         "subtitle_many": "Verranno riscritti {{count}} riferimenti. Controlla prima di confermare.",
         "subtitle_other": "Verranno riscritti {{count}} riferimenti. Controlla prima di confermare.",
-        "subtitleEmpty": "Niente da convertire — nessun file sorgente risolto.",
+        "subtitleEmpty": "Niente da convertire: nessun file sorgente risolto.",
         "title": "Converti gli allegati importati"
       },
       "convertCommand": {
@@ -656,7 +810,11 @@
         "skippedSuffix": " · {{count}} ignorati",
         "skippedSuffix_one": " · {{count}} ignorato",
         "skippedSuffix_many": " · {{count}} ignorati",
-        "skippedSuffix_other": " · {{count}} ignorati"
+        "skippedSuffix_other": " · {{count}} ignorati",
+        "layoutPreserved": "{{count}} ha mantenuto le dimensioni o il testo alternativo",
+        "layoutPreserved_one": "{{count}} ha mantenuto dimensioni o testo alternativo",
+        "layoutPreserved_many": "{{count}} hanno mantenuto dimensioni o testo alternativo",
+        "layoutPreserved_other": "{{count}} hanno mantenuto dimensioni o testo alternativo"
       },
       "fileKind": {
         "generic": "File",
@@ -728,7 +886,7 @@
       "recording": {
         "barAria": "Registrazione nota vocale",
         "cancel": "Annulla",
-        "noAudio": "Nessun audio rilevato — controlla il microfono.",
+        "noAudio": "Nessun audio rilevato. Controlla il microfono.",
         "saving": "Salvataggio…",
         "stop": "Interrompi"
       },
@@ -756,16 +914,16 @@
       "voice": {
         "startError": {
           "alreadyRecording": "Una registrazione è già in corso.",
-          "captureFailed": "Impossibile avviare la registrazione — controlla l'accesso al microfono nelle Impostazioni di sistema.",
+          "captureFailed": "Impossibile avviare la registrazione. Controlla l'accesso al microfono nelle Impostazioni di sistema.",
           "generic": "Impossibile avviare la registrazione.",
           "locked": "Sblocca la cassaforte per registrare una nota vocale.",
           "noInputDevice": "Nessun microfono trovato. Collegane uno e riprova."
         },
         "stopError": {
-          "captureFailed": "Registrazione non riuscita — controlla il microfono.",
+          "captureFailed": "Registrazione non riuscita. Controlla il microfono.",
           "emptyRecording": "Non è stato registrato nulla.",
           "generic": "Impossibile salvare la registrazione.",
-          "silentRecording": "La registrazione era silenziosa ed è stata scartata — controlla il microfono."
+          "silentRecording": "La registrazione era silenziosa ed è stata scartata. Controlla il microfono."
         }
       },
       "widget": {
@@ -779,11 +937,26 @@
           "remove": "Rimuovi",
           "rename": "Rinomina",
           "reveal": "Mostra nella libreria",
-          "transcribe": "Trascrivi"
+          "transcribe": "Trascrivi",
+          "customSize": "Dimensione personalizzata…",
+          "customSizeInvalid": "Inserisci una larghezza in pixel (1-8192) o una percentuale (1-100%).",
+          "editAlt": "Modifica testo alternativo…",
+          "size": {
+            "small": "Piccola",
+            "medium": "Media",
+            "large": "Grande",
+            "full": "Larghezza piena"
+          },
+          "align": {
+            "left": "Allinea a sinistra",
+            "center": "Allinea al centro",
+            "right": "Allinea a destra"
+          },
+          "altInvalid": "Il testo alternativo non può contenere \"]\", che romperebbe l'incorporamento."
         },
         "pdfFallback": "PDF",
         "textPreview": {
-          "truncated": "Anteprima troncata — Esporta per il file completo."
+          "truncated": "Anteprima troncata. Esporta per il file completo."
         },
         "tombstone": {
           "brokenAria": "Riferimento allegato non valido: {{filename}}",
@@ -806,7 +979,16 @@
           "progress": "Trascrizione in corso…",
           "stop": "Interrompi"
         },
-        "urlImageFallback": "immagine"
+        "urlImageFallback": "immagine",
+        "unreadableSegment": "Impossibile leggere: {{segments}}"
+      },
+      "customSizePrompt": {
+        "title": "Dimensione personalizzata",
+        "confirm": "Imposta dimensione"
+      },
+      "altPrompt": {
+        "title": "Testo alternativo",
+        "confirm": "Salva"
       }
     },
     "callout": {
@@ -903,7 +1085,7 @@
           "insert": "Inserimento",
           "normal": "Normale",
           "replace": "Sostituzione",
-          "title": "Modalità vim — premi Esc per la modalità normale",
+          "title": "Modalità vim: premi Esc per la modalità normale",
           "visual": "Visuale"
         },
         "graphTitle": "Grafico (⌘⇧G)",
@@ -935,23 +1117,35 @@
       "resizeNotesSidebar": "Ridimensiona barra laterale delle note",
       "rightPanel": {
         "aiChat": {
+          "agentTurn": {
+            "noAnswer": "L'agente si è fermato senza una risposta. Prova a chiedere di nuovo o riformula la domanda.",
+            "newNotes_one": "{{count}} nuova nota.",
+            "newNotes_many": "{{count}} nuove note.",
+            "newNotes_other": "{{count}} nuove note.",
+            "proposed_one": "Proposta {{count}} modifica.",
+            "proposed_many": "Proposte {{count}} modifiche.",
+            "proposed_other": "Proposte {{count}} modifiche."
+          },
           "askPlaceholder": "Fai una domanda sulle tue note…",
           "askSubmit": "Chiedi",
           "assistant": "Assistente",
           "citations": "Fonti",
           "composerPlaceholder": "Scrivi alle tue note…",
-          "empty": "L'output dell'AI — riassunti, risposte e suggerimenti — appare qui.",
+          "empty": "L'output dell'AI (riassunti, risposte e suggerimenti) appare qui.",
           "error": "Impossibile completare la richiesta AI.",
           "errorTurn": "L'assistente non è riuscito a rispondere.",
-          "gettingReadyHint": "Preparazione delle tue note per l'AI — un momento.",
+          "gettingReadyHint": "Preparazione delle tue note per l'AI. Un momento.",
+          "noSearchModelHint": "Le domande cercano tra le tue note su questo dispositivo, e per farlo serve un modello di ricerca qui. Un provider non può farlo. Scegline uno in Impostazioni → Developer → AI. La modifica delle tue note con l'AI continua a funzionare.",
           "insert": "Inserisci nella nota",
-          "noAnswer": "Nessuna risposta — prova a riformulare.",
+          "noAnswer": "Nessuna risposta. Prova a riformulare.",
+          "newChat": "Nuova chat",
           "noModelHint": "Non è configurato alcun provider AI, quindi chat, riassunti, riscrittura e ricerca semantica non hanno nulla su cui funzionare. Configurane uno in Impostazioni → Developer → AI.",
           "unreachableHint": "Il provider che hai configurato non risponde. Verifica che sia in esecuzione, poi invia di nuovo.",
           "unavailableHint": "Questa build di Myne è stata compilata senza l'AI locale, quindi qui non può essere eseguito nulla.",
           "offHint": "L'AI locale è disattivata. Attivala da Impostazioni → Developer → AI.",
           "send": "Invia",
           "statusGettingReady": "Preparazione…",
+          "statusNoSearchModel": "Nessun modello di ricerca",
           "statusNoModel": "Nessun provider",
           "statusUnreachable": "Non risponde",
           "statusUnavailable": "Non disponibile",
@@ -963,7 +1157,7 @@
           "truncated": "Riassunti i primi {{count}} caratteri.",
           "you": "Tu"
         },
-        "allHidden": "Tutte le schede sono nascoste — fai clic destro per ripristinarle.",
+        "allHidden": "Tutte le schede sono nascoste. Fai clic destro per ripristinarle.",
         "outline": {
           "collapse": "Comprimi sezione",
           "empty": "Nessuna intestazione",
@@ -1032,7 +1226,7 @@
       "done": "Fatto",
       "edit": "Modifica il disegno {{name}}",
       "editAction": "Modifica",
-      "empty": "Disegno vuoto — fai clic per disegnare",
+      "empty": "Disegno vuoto: fai clic per disegnare",
       "open": "Apri",
       "rename": "Rinomina il disegno"
     },
@@ -1054,6 +1248,12 @@
       "replaceOne": "Sostituisci",
       "replacePlaceholder": "Sostituisci con",
       "toggleReplace": "Attiva/disattiva sostituzione"
+    },
+    "cover": {
+      "add": "Aggiungi copertina",
+      "change": "Cambia copertina",
+      "emptyLibraryMobile": "Ancora nessuna immagine in questa cassaforte. Caricane una da usare come copertina.",
+      "writeFailed": "Impossibile aggiornare la copertina della nota"
     },
     "folding": {
       "clickToUnfold": "Clicca per espandere",
@@ -1220,9 +1420,9 @@
     "vim": {
       "ex": {
         "refused": {
-          "edit": "`:e` non è supportato — Myne apre note, non file. Usa la tavolozza dei comandi o la barra laterale.",
+          "edit": "`:e` non è supportato. Myne apre note, non file. Usa la tavolozza dei comandi o la barra laterale.",
           "map": "Le mappature di tasti personalizzate non sono supportate in Myne. Le scorciatoie si configurano in Impostazioni → Scorciatoie.",
-          "set": "`:set` non è supportato — Myne non ha opzioni vim. Le preferenze dell'editor si trovano in Impostazioni → Editor.",
+          "set": "`:set` non è supportato. Myne non ha opzioni vim. Le preferenze dell'editor si trovano in Impostazioni → Editor.",
           "source": "`:source` non è supportato. Myne non espone deliberatamente alcuno script di configurazione.",
           "unsupported": "Quel comando non è supportato in Myne."
         },
@@ -1249,11 +1449,11 @@
         "convertedToast_many": "{{count}} wikilink convertiti",
         "convertedToast_other": "{{count}} wikilink convertiti",
         "noneToConvert": "Nessun wikilink importato da convertire in questa nota.",
-        "nothingToConvert": "Niente da convertire — nessun wikilink importato risolto.",
+        "nothingToConvert": "Niente da convertire: nessun wikilink importato risolto.",
         "rewriteCount_one": "Verrà riscritto {{count}} collegamento",
         "rewriteCount_many": "Verranno riscritti {{count}} collegamenti",
         "rewriteCount_other": "Verranno riscritti {{count}} collegamenti",
-        "skipped": "ignorato — {{reason}}",
+        "skipped": "ignorato: {{reason}}",
         "title": "Converti i wikilink importati in questa nota",
         "staleDocument": "Questa nota è cambiata mentre l'anteprima era aperta, quindi non è stato convertito nulla. Esegui di nuovo l'operazione per vedere i collegamenti attuali."
       },
@@ -1274,6 +1474,9 @@
       "attachFailed": "Impossibile allegare il file.",
       "archiveFailed": "Impossibile archiviare questa nota.",
       "aiRewriteFailed": "Impossibile completare la riscrittura, quindi la tua selezione è rimasta invariata.",
+      "aiRewriteNoSelection": "Seleziona prima il testo da riscrivere, poi esegui di nuovo Riscrivi selezione.",
+      "aiRewriteUnavailable": "Non è stato possibile riscrivere la selezione in questo momento. Nella tua nota non è stato modificato nulla.",
+      "aiRewriteExcluded": "Questa nota è in una cartella che hai escluso dall'AI, quindi non è stato riscritto nulla.",
       "aiRewriteNoProvider": "Non è configurato alcun provider AI, quindi non è stato riscritto nulla. Configurane uno in Impostazioni → Developer → AI.",
       "trashFailed": "Impossibile spostare questa nota nel Cestino."
     },
@@ -1406,10 +1609,10 @@
         "ioNoSpace": "Spazio insufficiente nella destinazione.",
         "ioPermissionDenied": "Permessi insufficienti per scrivere nella destinazione.",
         "ioWriteDefault": "Impossibile scrivere il file esportato.",
-        "noteNotFound": "Questa nota non esiste più — potrebbe essere stata eliminata.",
+        "noteNotFound": "Questa nota non esiste più. Potrebbe essere stata eliminata.",
         "pdfCaptureFailed": "Impossibile generare il PDF, quindi non è stato esportato nulla.",
         "pdfExportInProgress": "Un'esportazione PDF è già in corso. Attendi che termini, poi riprova.",
-        "pdfPayloadMissing": "L'esportazione è stata interrotta — se la cassaforte si è bloccata, sbloccala e riprova.",
+        "pdfPayloadMissing": "L'esportazione è stata interrotta. Se la cassaforte si è bloccata, sbloccala e riprova.",
         "pdfRenderTimeout": "Il rendering della nota ha richiesto troppo tempo, quindi non è stato esportato nulla.",
         "pdfWindowCreateFailed": "Impossibile aprire la finestra di esportazione, quindi non è stato esportato nulla.",
         "targetExists": "Un file con quel nome esiste già nella destinazione.",
@@ -1523,7 +1726,7 @@
       "reload": "Ricarica"
     },
     "corrupted": {
-      "body": "Se hai un backup, puoi ripristinarlo — i tuoi file attuali non vengono toccati; il backup viene prima ripristinato come cassaforte separata.",
+      "body": "Se hai un backup, puoi ripristinarlo. I tuoi file attuali non vengono toccati; il backup viene prima ripristinato come cassaforte separata.",
       "cta": "Chiudi app",
       "title": "Il file della cassaforte è danneggiato."
     },
@@ -1568,7 +1771,7 @@
       "folderDeleteConfirmCta": "Sposta nel Cestino",
       "folderDeleteError": "Impossibile spostare le note di quella cartella nel Cestino. Riprova.",
       "folderDeleteTitle": "Spostare questa cartella nel Cestino?",
-      "folderDeleteWarning": "Vengono spostate nel Cestino — puoi ripristinarle in qualsiasi momento. L'eliminazione definitiva è un passaggio a parte.",
+      "folderDeleteWarning": "Vengono spostate nel Cestino. Puoi ripristinarle in qualsiasi momento. L'eliminazione definitiva è un passaggio a parte.",
       "restore": "Ripristina",
       "restoreError": "Impossibile ripristinare quella nota. Riprova.",
       "title": "Archivio",
@@ -1640,7 +1843,7 @@
         "is": "è",
         "isNot": "non è"
       },
-      "noConditions": "Ancora nessuna condizione — questa vista mostra tutte le pagine.",
+      "noConditions": "Ancora nessuna condizione. Questa vista mostra tutte le pagine.",
       "noteCount_one": "{{count}} nota",
       "noteCount_many": "{{count}} note",
       "noteCount_other": "{{count}} note",
@@ -1682,7 +1885,7 @@
       "openFolderNote": "Apri nota cartella"
     },
     "graph": {
-      "allConnected": "Tutto è collegato — nessuna nota isolata.",
+      "allConnected": "Tutto è collegato: nessuna nota isolata.",
       "building": "Creazione del grafico…",
       "colorGroups": {
         "addRule": "Aggiungi regola",
@@ -1691,7 +1894,7 @@
         "dragHandleTitle": "Trascina per riordinare",
         "editFilterButton": "Modifica filtro…",
         "editFilterTitle": "Modifica il filtro del gruppo di colore",
-        "emptyBody": "I gruppi di colore ti permettono di colorare i nodi del grafico per tag o per cartella — le note di lavoro di un colore, quelle personali di un altro. Aggiungi la tua prima regola.",
+        "emptyBody": "I gruppi di colore ti permettono di colorare i nodi del grafico per tag o per cartella: le note di lavoro di un colore, quelle personali di un altro. Aggiungi la tua prima regola.",
         "emptyTitle": "Ancora nessun gruppo di colore",
         "enableToggleAriaLabel": "Attiva la regola",
         "filterAllNotes": "Corrisponde a tutte le note",
@@ -1713,7 +1916,7 @@
       "noNotes": "Ancora nessuna nota da rappresentare nel grafico.",
       "overCap": "Questa cassaforte è grande — il grafico dell'intera cassaforte è limitato. Filtra per un tag o mostra le note isolate per esplorare.",
       "refresh": "Aggiorna",
-      "refreshTitle": "La cassaforte è cambiata — ricostruisci il grafico",
+      "refreshTitle": "La cassaforte è cambiata: ricostruisci il grafico",
       "settings": {
         "appearanceHeading": "Aspetto",
         "closeTitle": "Chiudi",
@@ -1774,16 +1977,16 @@
         "mediaOmittedSuffix_many": " · {{count}} omessi",
         "mediaOmittedSuffix_other": " · {{count}} omessi",
         "needsAttention": "Richiede attenzione",
-        "needsAttentionHelp": "Queste note sono state importate senza modifiche. Le correzioni suggerite sono punti di partenza — copiane una, poi rinomina la nota quando la apri.",
+        "needsAttentionHelp": "Queste note sono state importate senza modifiche. Le correzioni suggerite sono punti di partenza. Copiane una, poi rinomina la nota quando la apri.",
         "noFolderChosen": "Nessuna cartella scelta",
         "notesImported_one": "nota importata",
         "notesImported_many": "note importate",
         "notesImported_other": "note importate",
         "policyCopyHint": "Importala accanto alla nota esistente.",
         "policyCopyLabel": "Importa come copia",
-        "policySkipHint": "Consigliato — rieseguire un'importazione non crea mai duplicati né sovrascrive.",
+        "policySkipHint": "Consigliato: rieseguire un'importazione non crea mai duplicati né sovrascrive.",
         "policySkipLabel": "Ignorala",
-        "preexistingDetail": "Questa nota aveva già la propria cartella: “{{existing}}”, che Myne ha mantenuto — può differire da dove si trovava sul disco.",
+        "preexistingDetail": "Questa nota aveva già la propria cartella: “{{existing}}”, che Myne ha mantenuto. La sua cartella può differire da dove si trovava sul disco.",
         "preparing": "Preparazione…",
         "progressNotes": " note",
         "progressOf": " di ",
@@ -1791,7 +1994,7 @@
         "reasonPathTooLong": "il percorso cartella + titolo è troppo lungo",
         "reasonSegmentTooLong": "il nome è più lungo di quanto Myne consenta",
         "scanning": "Scansione della tua cassaforte…",
-        "setupIntro": "Myne importa e crittografa le tue note sul posto — nulla lascia questo dispositivo e i tuoi file originali non vengono mai modificati.",
+        "setupIntro": "Myne importa e crittografa le tue note sul posto. Nulla lascia questo dispositivo e i tuoi file originali non vengono mai modificati.",
         "statCancelled": "Annullate",
         "statCanvasSkipped": "file .canvas ignorati",
         "statCompressed": "Immagini compresse",
@@ -1812,8 +2015,8 @@
         "statExcalidrawSkipped": "Disegni Excalidraw ignorati",
         "unfollowedLinkOutside": "Questo è un collegamento a una cartella esterna a quella che hai scelto, quindi Myne non l'ha seguito. Sposta o copia quella cartella dentro la tua cassaforte e importa di nuovo.",
         "unfollowedLinkLoop": "Questo collegamento riporta a una cartella in cui Myne era già entrato, quindi seguirlo significherebbe girare all'infinito. Nulla al suo interno è stato tralasciato.",
-        "unfollowedLinkBroken": "Questo collegamento non porta da nessuna parte — ciò a cui puntava è stato spostato o eliminato.",
-        "unreadableDetail": "Ignorata — {{reason}} Il resto dell'importazione è proseguito.",
+        "unfollowedLinkBroken": "Questo collegamento non porta da nessuna parte. Ciò a cui puntava è stato spostato o eliminato.",
+        "unreadableDetail": "Ignorata: {{reason}} Il resto dell'importazione è proseguito.",
         "stoppedAt": "{{imported}} note su {{total}} sono state importate prima che l'operazione si interrompesse. Sono nella tua cassaforte e puoi tranquillamente conservarle.",
         "reasonNotUtf8": "Myne non è riuscito a leggere questo file come testo. Probabilmente è salvato in una codifica più vecchia, oppure non è affatto un file di testo.",
         "reasonPathRejected": "Myne non è riuscito a raggiungere questo file all'interno della cartella che hai scelto.",
@@ -1823,7 +2026,7 @@
         "reasonUnknown": "Myne non è riuscito a dire perché."
       },
       "offer": {
-        "body": "Porta le tue note esistenti in Myne. Ognuna viene crittografata durante l'importazione — nulla lascia questo dispositivo e i tuoi file originali restano esattamente dove sono.",
+        "body": "Porta le tue note esistenti in Myne. Ognuna viene crittografata durante l'importazione. Nulla lascia questo dispositivo e i tuoi file originali restano esattamente dove sono.",
         "chooseFolder": "Scegli cartella…",
         "laterHint": "Puoi sempre importare in seguito da Impostazioni → Archiviazione.",
         "notNow": "Non ora",
@@ -1844,14 +2047,14 @@
           "label": "Notion",
           "pickerTitle": "Scegli la cartella dell'esportazione Notion già decompressa",
           "survives": "Conserva: le pagine, la struttura delle cartelle, le proprietà di pagina come campi e i collegamenti interni come wikilink. Ogni database arriva anche come nota-tabella che rimanda alle sue righe.",
-          "loses": "Decomprimi prima l'esportazione — Myne legge la cartella, non il .zip. Toggle, riquadri evidenziati e testo colorato non hanno un equivalente e vengono elencati in un rapporto di importazione.",
+          "loses": "Decomprimi prima l'esportazione: Myne legge la cartella, non il .zip. Toggle, riquadri evidenziati e testo colorato non hanno un equivalente e vengono elencati in un rapporto di importazione.",
           "short": "Una cartella di esportazione decompressa"
         },
         "evernote": {
           "label": "Evernote",
           "pickerTitle": "Scegli il tuo file .enex di Evernote",
           "survives": "Conserva: ogni nota contenuta nel file, la formattazione e gli allegati. I blocchi crittografati vengono mantenuti come testo che puoi ancora decifrare in Evernote.",
-          "loses": "Lascia indietro: i promemoria e la cronologia delle note. Le esportazioni molto grandi vengono rifiutate invece di correre rischi — se succede, dividi l'esportazione.",
+          "loses": "Lascia indietro: i promemoria e la cronologia delle note. Le esportazioni molto grandi vengono rifiutate invece di correre rischi. Se succede, dividi l'esportazione.",
           "short": "Un singolo file di esportazione .enex"
         },
         "html": {
@@ -1865,7 +2068,7 @@
           "label": "CSV",
           "pickerTitle": "Scegli il tuo file .csv",
           "survives": "Diventa una singola nota che contiene la tabella.",
-          "loses": "È una sola nota, non una nota per riga — Myne non è un database. I file molto larghi o molto lunghi vengono ridotti, e il rapporto di importazione indica di quanto.",
+          "loses": "È una sola nota, non una nota per riga: Myne non è un database. I file molto larghi o molto lunghi vengono ridotti, e il rapporto di importazione indica di quanto.",
           "short": "Un singolo file di foglio di calcolo"
         }
       }
@@ -1891,7 +2094,7 @@
       "bulkMove_one": "Sposta {{count}} nota in…",
       "bulkMove_many": "Sposta {{count}} note in…",
       "bulkMove_other": "Sposta {{count}} note in…",
-      "caseMergeBody": "Esiste già una cartella di nome “{{name}}”. Queste verranno unite — vuoi rinominarne una per tenerle separate?",
+      "caseMergeBody": "Esiste già una cartella di nome “{{name}}”. Queste verranno unite. Vuoi rinominarne una per tenerle separate?",
       "color": "Colore…",
       "createFirstNote": "+ Crea la tua prima nota",
       "createFolderNote": "Crea nota cartella",
@@ -1902,7 +2105,7 @@
       "deleteFolderBody_other": "“{{name}}” e le sue {{count}} note",
       "deleteFolderConfirm": "Elimina cartella",
       "deleteFolderTitle": "Eliminare questa cartella?",
-      "deleteFolderWarning": "Le note vengono spostate nel Cestino — potrai ripristinarle in seguito.",
+      "deleteFolderWarning": "Le note vengono spostate nel Cestino. Potrai ripristinarle in seguito.",
       "duplicate": "Duplica",
       "editFilterTitle": "Modifica filtro",
       "emptyState": "Ancora nessuna nota.",
@@ -1957,10 +2160,10 @@
       "imported_one": "Importata 1 nota in questa cartella",
       "imported_many": "Importate {{count}} note in questa cartella",
       "imported_other": "Importate {{count}} note in questa cartella",
-      "importedWithSkips": "Importate {{count}} — {{skipped}} ignorate",
-      "importedWithSkips_one": "Importata {{count}} nota — ignorate: {{skipped}}",
-      "importedWithSkips_many": "Importate {{count}} note — ignorate: {{skipped}}",
-      "importedWithSkips_other": "Importate {{count}} note — ignorate: {{skipped}}",
+      "importedWithSkips": "Importate {{count}} · {{skipped}} ignorate",
+      "importedWithSkips_one": "Importata {{count}} · ignorate {{skipped}}",
+      "importedWithSkips_many": "Importate {{count}} · ignorate {{skipped}}",
+      "importedWithSkips_other": "Importate {{count}} · ignorate {{skipped}}",
       "importNoMarkdown": "Nessun file markdown in quel trascinamento",
       "moveFolderTo": "Sposta cartella in…"
     },
@@ -2007,7 +2210,7 @@
     "row": {
       "addToFavorites": "Aggiungi ai preferiti",
       "folderIndexBadgeLabel": "Nota cartella",
-      "folderIndexBadgeTitle": "Nota cartella — l'indice di questa cartella",
+      "folderIndexBadgeTitle": "Nota cartella: l'indice di questa cartella",
       "folderIndexConflictLabel": "La cartella ha già una nota indice",
       "folderIndexConflictTitle": "Questa cartella ha già una nota indice",
       "loadError": "Impossibile caricare questa nota",
@@ -2024,24 +2227,24 @@
     },
     "saveStatus": {
       "conflict": "Risoluzione del conflitto di modifica…",
-      "conflictTitle": "Questa nota è cambiata su un altro dispositivo — vengono mantenute entrambe le versioni",
+      "conflictTitle": "Questa nota è cambiata su un altro dispositivo: vengono mantenute entrambe le versioni",
       "editing": "Modifica",
       "editingEllipsis": "Modifica…",
-      "editingTitle": "Modifica — salvataggio automatico attivo",
+      "editingTitle": "Modifica: salvataggio automatico attivo",
       "justNow": "proprio ora",
       "retry": "Riprova",
       "saved": "Salvata",
       "savedRelative": "Salvata {{rel}}",
       "saveFailed": "Salvataggio non riuscito",
-      "saveFailedTitle": "Salvataggio non riuscito — clicca su Riprova",
+      "saveFailedTitle": "Salvataggio non riuscito: clicca su Riprova",
       "storageFull": "Archiviazione piena",
-      "storageFullTitle": "Non c'è più spazio per salvare questa nota. Libera spazio (o rimuovi qualche allegato), poi riprova. Finché non viene salvata, questa modifica esiste solo in questa finestra — e non è nemmeno sul server.",
+      "storageFullTitle": "Non c'è più spazio per salvare questa nota. Libera spazio (o rimuovi qualche allegato), poi riprova. Finché non viene salvata, questa modifica esiste solo in questa finestra. Non è nemmeno sul server.",
       "saving": "Salvataggio",
       "savingEllipsis": "Salvataggio…"
     },
     "snapshotFailed": {
       "dismiss": "Ignora",
-      "message": "Impossibile salvare un'istantanea — la tua nota è salvata, ma la cronologia delle versioni potrebbe essere incompleta (il disco potrebbe essere pieno)."
+      "message": "Impossibile salvare un'istantanea. La tua nota è salvata, ma la cronologia delle versioni potrebbe essere incompleta (il disco potrebbe essere pieno)."
     },
     "snapshots": {
       "cancel": "Annulla",
@@ -2062,14 +2265,14 @@
       "encryptedSize": "Crittografata · {{size}}",
       "errorCannotDecrypt": "Impossibile decifrare questa istantanea.",
       "errorGeneric": "Qualcosa è andato storto. Riprova.",
-      "errorIo": "Si è verificato un errore del disco — potrebbe essere pieno o non scrivibile.",
+      "errorIo": "Si è verificato un errore del disco. Il disco potrebbe essere pieno o non scrivibile.",
       "errorNotFound": "Quell'istantanea non è più disponibile.",
       "errorStorageAccess": "Impossibile accedere all'archivio delle istantanee della cassaforte.",
       "errorVaultLocked": "La cassaforte è bloccata. Sbloccala per visualizzare le istantanee.",
       "justNow": "proprio ora",
       "listLabel": "Elenco delle istantanee",
       "loading": "Caricamento…",
-      "noPrevious": "Questa è l'istantanea più vecchia — non c'è nulla prima con cui confrontarla.",
+      "noPrevious": "Questa è l'istantanea più vecchia. Non c'è nulla prima con cui confrontarla.",
       "restore": "Ripristina",
       "restoreCta": "Ripristina questa istantanea",
       "restoredStatus": "Ripristinata. La versione che avevi è stata salvata come istantanea.",
@@ -2084,7 +2287,7 @@
       "openNotes": "Apri note",
       "pin": "Fissa",
       "pinned": "Fissata",
-      "pinnedTitle": "Fissata — rimuovi il fissaggio per chiudere",
+      "pinnedTitle": "Fissata: rimuovi il fissaggio per chiudere",
       "unpin": "Rimuovi fissaggio",
       "untitled": "Senza titolo"
     },
@@ -2127,7 +2330,7 @@
       "emptyPartialFailure_one": "Impossibile eliminare {{count}} nota, che resta nel cestino.",
       "emptyPartialFailure_many": "Impossibile eliminare {{count}} note, che restano nel cestino.",
       "emptyPartialFailure_other": "Impossibile eliminare {{count}} note, che restano nel cestino.",
-      "emptyBody": "Le note che elimini finiscono qui. Restano finché non svuoti il cestino — puoi ripristinarne una qualsiasi in qualsiasi momento.",
+      "emptyBody": "Le note che elimini finiscono qui. Restano finché non svuoti il cestino. Puoi ripristinarne una qualsiasi in qualsiasi momento.",
       "emptyTitle": "Il cestino è vuoto",
       "emptyState": "Il cestino è vuoto.",
       "purgeConfirmCta": "Elimina definitivamente",
@@ -2142,7 +2345,7 @@
       "heading": "Menzioni non collegate",
       "link": "Collega",
       "linkTooltip": "Collega questa menzione a {{title}}",
-      "refresh": "Le menzioni potrebbero essere cambiate — aggiorna",
+      "refresh": "Le menzioni potrebbero essere cambiate: aggiorna",
       "searching": "Ricerca in corso…",
       "thisNote": "questa nota",
       "untitled": "Senza titolo"
@@ -2201,7 +2404,7 @@
       "columnsEmpty": "Nessuna proprietà trovata",
       "columnsHint": "Le proprietà del frontmatter mostrate come colonne (tabella) o come riga di dettaglio (elenco / schede).",
       "columnsPlaceholder": "Aggiungi colonne…",
-      "coverImageHint": "La proprietà del frontmatter il cui valore è un'immagine — mostrata come copertina di ogni scheda. Lascia vuoto per nessuna copertina.",
+      "coverImageHint": "La proprietà del frontmatter il cui valore è un'immagine, mostrata come copertina di ogni scheda. Lascia vuoto per nessuna copertina.",
       "coverImagePlaceholder": "es. cover",
       "coverImageProperty": "Proprietà immagine di copertina",
       "groupBy": "Raggruppa per",
@@ -2252,12 +2455,15 @@
     "intro": "Aggiorna questa cassaforte al nuovo formato. Le tue note acquisiscono l'unione automatica fra dispositivi. L'operazione rigenera le chiavi dell'intera cassaforte; la vecchia copia resta su questo dispositivo finché non confermi.",
     "passwordLabel": "Password principale",
     "phraseLabel": "Frase di recupero",
-    "phraseHelp": "Obbligatoria — le tue nuove chiavi vengono cifrate con questa frase, così il recupero continua a funzionare. Inserisci tutte le tue parole di recupero.",
+    "phraseHelp": "Obbligatoria: le tue nuove chiavi vengono cifrate con questa frase, così il recupero continua a funzionare. Inserisci tutte le tue parole di recupero.",
     "submit": "Migra",
     "migrating": "Migrazione…",
     "done": "{{count}} note migrate al nuovo formato.",
+    "done_one": "Migrata {{count}} nota al nuovo formato.",
+    "done_many": "Migrate {{count}} di note al nuovo formato.",
+    "done_other": "Migrate {{count}} note al nuovo formato.",
     "settle": {
-      "intro": "La tua cassaforte è stata aggiornata. La vecchia copia resta su questo dispositivo finché non completi l'operazione — fino ad allora, cambiare la password non la renderà inaccessibile.",
+      "intro": "La tua cassaforte è stata aggiornata. La vecchia copia resta su questo dispositivo finché non completi l'operazione. Fino ad allora, cambiare la password non la renderà inaccessibile.",
       "confirm": "Va tutto bene, rimuovi la vecchia copia",
       "abort": "Qualcosa non va, ripristina la vecchia cassaforte",
       "errorAlreadySynced": "Questa cassaforte si è già sincronizzata nel nuovo formato, quindi non è possibile tornare indietro. Ripristina da un backup se ti serve quella vecchia.",
@@ -2266,7 +2472,7 @@
     },
     "progressCount": "{{done}} di {{total}} elementi ricrittografati…",
     "error": {
-      "recoveryPhraseRequired": "Quella frase di recupero non corrisponde a questa cassaforte. Inserisci la frase di recupero corretta per migrare — è obbligatoria affinché il recupero continui a funzionare.",
+      "recoveryPhraseRequired": "Quella frase di recupero non corrisponde a questa cassaforte. Inserisci la frase di recupero corretta per migrare. È obbligatoria affinché il recupero continui a funzionare.",
       "wrongPassword": "Quella password non corrisponde a questa cassaforte.",
       "alreadyMigrated": "Questa cassaforte è già nel nuovo formato.",
       "generic": "Impossibile completare la migrazione. La tua cassaforte è rimasta invariata; riprova."
@@ -2289,7 +2495,7 @@
     "accountTitle": "Inserisci il tuo numero di account",
     "accountLead": "Lo trovi dove hai salvato la tua frase di recupero. Identifica la cassaforte da ripristinare.",
     "accountInvalid": "Numero di account non valido — controlla e reinseriscilo.",
-    "accountOptionalHint": "Non ce l'hai? Lascia vuoto e continua — la tua frase di recupero di 24 parole è tutto ciò che serve.",
+    "accountOptionalHint": "Non ce l'hai? Lascia il campo vuoto e continua. La tua frase di recupero di 24 parole è tutto ciò che serve.",
     "paste": "Incolla",
     "phraseGridHint": "Digita ogni parola, oppure incolla tutte e 24 in una volta per riempire la griglia.",
     "submitProgress": "Invia · {{filled}} di {{total}}",
@@ -2380,12 +2586,12 @@
     "backLabel": "Indietro",
     "cancelLabel": "Annulla",
     "collision": {
-      "body": "Una cassaforte di questo backup esiste già su questo dispositivo. Puoi mantenerle entrambe — la copia ripristinata compare come cassaforte separata nell'elenco delle casseforti — oppure ripristinare ora e poi rimuovere tu stesso la cassaforte esistente dall'elenco (la rimozione ti chiede di digitare DELETE e ha senso solo dopo aver confermato che la cassaforte ripristinata si apre).",
+      "body": "Una cassaforte di questo backup esiste già su questo dispositivo. Puoi mantenerle entrambe: la copia ripristinata compare come cassaforte separata nell'elenco delle casseforti. Oppure puoi ripristinare ora e poi rimuovere tu stesso la cassaforte esistente dall'elenco. La rimozione ti chiede di digitare DELETE e ha senso solo dopo aver confermato che la cassaforte ripristinata si apre.",
       "keepBoth": "Mantieni entrambe",
       "replaceExisting": "Ripristina, poi sostituisci l'esistente…"
     },
     "damaged": {
-      "body": "Il file di backup è danneggiato, quindi non è stato ripristinato nulla. Se questa è l'unica copia che hai, il recupero può ripristinare le note intatte ed elencare esattamente ciò che non è stato possibile leggere — il risultato è sempre indicato come ripristino parziale.",
+      "body": "Il file di backup è danneggiato, quindi non è stato ripristinato nulla. Se questa è l'unica copia che hai, il recupero può ripristinare le note intatte ed elencare esattamente ciò che non è stato possibile leggere. Il risultato è sempre indicato come ripristino parziale.",
       "close": "Chiudi",
       "salvage": "Recupera le note intatte…"
     },
@@ -2393,7 +2599,7 @@
       "tryAnotherFile": "Prova un altro file"
     },
     "pick": {
-      "body": "Scegli un file <code>.myne-backup</code>. Il backup viene verificato prima di ripristinare qualsiasi cosa; la cassaforte ripristinata si sblocca con la password o la frase di recupero di quella cassaforte — esattamente come lo sblocco.",
+      "body": "Scegli un file <code>.myne-backup</code>. Il backup viene verificato prima di ripristinare qualsiasi cosa; la cassaforte ripristinata si sblocca con la password o la frase di recupero di quella cassaforte, esattamente come lo sblocco.",
       "chooseFile": "Scegli il file di backup…",
       "corruptedSuffix": "La tua cassaforte attuale non viene toccata: il backup viene prima ripristinato come cassaforte separata."
     },
@@ -2402,9 +2608,9 @@
       "collidedNote": "La copia precedentemente esistente di questa cassaforte è ancora nel tuo elenco delle casseforti. Una volta confermato che la cassaforte ripristinata si apre, puoi rimuovere quella vecchia dall'elenco (ti verrà chiesto di digitare DELETE).",
       "notes": "Note: {{n}}",
       "openVaultList": "Apri l'elenco delle casseforti",
-      "partialHeader_one": "Ripristino parziale — impossibile leggere {{count}} elemento.",
-      "partialHeader_many": "Ripristino parziale — impossibile leggere {{count}} elementi.",
-      "partialHeader_other": "Ripristino parziale — impossibile leggere {{count}} elementi.",
+      "partialHeader_one": "Ripristino parziale: impossibile leggere {{count}} elemento.",
+      "partialHeader_many": "Ripristino parziale: impossibile leggere {{count}} elementi.",
+      "partialHeader_other": "Ripristino parziale: impossibile leggere {{count}} elementi.",
       "restored": "Cassaforte ripristinata.",
       "versionHistory": "Voci della cronologia delle versioni: {{n}}"
     },
@@ -2425,8 +2631,14 @@
       "changelogButton": "Visualizza changelog…",
       "changelogHelper": "Note per versione. Saranno disponibili quando verrà rilasciato MYND-119.",
       "changelogLabel": "Changelog",
-      "developerModeHelper": "Mostra le impostazioni avanzate che Myne per impostazione predefinita tiene fuori dalla vista: quelle in cui esci dal percorso di cui Myne risponde, e gli strumenti per utenti esperti di cui quasi nessuno ha bisogno. Disattivarla le nasconde soltanto di nuovo — ciò che hai attivato resta attivo, e si disattiva dal suo stesso controllo.",
+      "developerModeHelper": "Mostra le impostazioni avanzate che Myne per impostazione predefinita tiene fuori dalla vista: quelle in cui esci dal percorso di cui Myne risponde, e gli strumenti per utenti esperti di cui quasi nessuno ha bisogno. Disattivarla le nasconde soltanto di nuovo. Ciò che hai attivato resta attivo, e si disattiva dal suo stesso controllo.",
       "developerModeLabel": "Modalità sviluppatore",
+      "legalLabel": "Note legali",
+      "legalHelper": "Si apre su myne.md nel tuo browser. In tedesco dove l'interfaccia è in tedesco.",
+      "legalPrivacy": "Informativa sulla privacy",
+      "legalTerms": "Termini della beta",
+      "legalNotice": "Segnala contenuti illegali",
+      "legalLawEnforcement": "Richieste delle autorità",
       "licenseBody": "Pre-alpha · documentazione CC-BY-4.0 · codice dell'app AGPL-3.0 al rilascio della Fase 1.",
       "licenseLabel": "Licenza",
       "tagline": "Pre-alpha · client desktop della Fase 1",
@@ -2443,7 +2655,7 @@
         "ioError": "Errore del disco, riprova.",
         "joinFailure": "Qualcosa è andato storto, riprova.",
         "samePasswordRejected": "La nuova password coincide con quella attuale.",
-        "serverAckPending": "La tua nuova password funziona su questo dispositivo, ma Myne non ha potuto raggiungere il server per salvarla. Finché non ci riesce, gli altri tuoi dispositivi si aspettano ancora la vecchia password — e se la copia di questo browser viene cancellata prima di allora, la modifica va persa. Il tentativo verrà ripetuto automaticamente.",
+        "serverAckPending": "La tua nuova password funziona su questo dispositivo, ma Myne non ha potuto raggiungere il server per salvarla. Finché non ci riesce, gli altri tuoi dispositivi si aspettano ancora la vecchia password, e se la copia di questo browser viene cancellata prima di allora, la modifica va persa. Il tentativo verrà ripetuto automaticamente.",
         "weakNewPassword": "La nuova password deve avere almeno 12 caratteri."
       },
       "changePasswordHeading": "Cambia password",
@@ -2458,8 +2670,9 @@
       "parallelism": "Parallelismo",
       "timeCost": "Costo di tempo",
       "vaultLabelEyebrow": "ETICHETTA CASSAFORTE",
-      "vaultLabelHelper": "Un nome per questa cassaforte mostrato nel selettore interno all'app. Memorizzato crittografato all'interno della cassaforte; non lascia mai il tuo dispositivo in chiaro.",
+      "vaultLabelHelper": "Un nome per questa cassaforte, mostrato nel selettore interno all'app e nella scelta della cassaforte all'avvio, prima dello sblocco. Memorizzato crittografato all'interno della cassaforte; non lascia mai il tuo dispositivo in chiaro.",
       "vaultLabelPlaceholder": "Aggiungi un'etichetta…",
+      "vaultLabelRenameNotice": "Finché non sblocchi questa cassaforte sui tuoi altri dispositivi, le loro schermate di blocco continuano a mostrare l'ultimo dato memorizzato: un nome precedente, o un segnaposto se non ne hanno mai memorizzato uno.",
       "vaultLabelSave": "Salva",
       "vaultIconLabel": "ICONA",
       "vaultIconDefault": "Predefinita (logotipo)",
@@ -2507,7 +2720,7 @@
       "editorFont": "Carattere dell'editor",
       "showEditTimesSubtitle": "Data e ora sotto ogni nota",
       "graphSettingsLabel": "Aspetto del grafico",
-      "graphSettingsHelper": "I colori dei nodi, le etichette, le dimensioni e le forze di disposizione si impostano dentro il grafico stesso — aprilo e usa l'ingranaggio nel suo angolo. Sono conservate per dispositivo, quindi una modifica fatta qui non ti segue sul telefono.",
+      "graphSettingsHelper": "I colori dei nodi, le etichette, le dimensioni e le forze di disposizione si impostano dentro il grafico stesso. Aprilo e usa l'ingranaggio nel suo angolo. Sono conservate per dispositivo, quindi una modifica fatta qui non ti segue sul telefono.",
       "openGraph": "Apri il grafico"
     },
     "archive": {
@@ -2519,9 +2732,9 @@
     },
     "attachmentCompression": {
       "label": "Comprimi le immagini all'importazione",
-      "helper": "Riduce le immagini incollate o trascinate prima che vengano crittografate e archiviate, così la tua cassaforte, i backup e la sincronizzazione restano più piccoli. È irreversibile — il file originale non viene conservato.",
+      "helper": "Riduce le immagini incollate o trascinate prima che vengano crittografate e archiviate, così la tua cassaforte, i backup e la sincronizzazione restano più piccoli. È irreversibile: il file originale non viene conservato.",
       "helperScopeEveryDevice": "Vale per l'intera cassaforte, su ogni dispositivo.",
-      "helperScopeNotHere": "Vale per l'intera cassaforte, ma non in questo browser — le immagini aggiunte qui vengono archiviate esattamente come sono.",
+      "helperScopeNotHere": "Vale per l'intera cassaforte, ma non in questo browser: le immagini aggiunte qui vengono archiviate esattamente come sono.",
       "errorSaveSetting": "Impossibile salvare questa impostazione."
     },
     "transcription": {
@@ -2552,7 +2765,7 @@
       "saveFailedToast": "Impossibile salvare le impostazioni di backup.",
       "searchEmpty": "Nessuna corrispondenza.",
       "searchPlaceholder": "Cerca…",
-      "statusFailed": "Backup automatico non riuscito — {{stamp}}",
+      "statusFailed": "Backup automatico non riuscito: {{stamp}}",
       "statusLastBackup": "Ultimo backup: {{stamp}}",
       "statusNever": "Ancora nessun backup automatico.",
       "title": "Backup automatici"
@@ -2595,7 +2808,7 @@
     "cliAccess": {
       "label": "Accesso da terminale",
       "helperOff": "Disattivato. Il comando `myne` non può leggere né modificare nulla in questa cassaforte.",
-      "helperOn": "Attivo mentre questa cassaforte è sbloccata. Qualsiasi programma in esecuzione con il tuo account può leggere, cercare e creare note attraverso di esso — Myne non sa distinguere il tuo terminale da uno script, e non controlla nient'altro oltre alla porta aperta. Non chiede mai la tua password, si chiude nel momento in cui la cassaforte si blocca e non può eliminare note.",
+      "helperOn": "Attivo mentre questa cassaforte è sbloccata. Qualsiasi programma in esecuzione con il tuo account può leggere, cercare e creare note attraverso di esso. Myne non sa distinguere il tuo terminale da uno script, e non controlla nient'altro oltre alla porta aperta. Non chiede mai la tua password, si chiude nel momento in cui la cassaforte si blocca e non può eliminare note.",
       "lastUsedNever": "Non usato da quando questa cassaforte è stata sbloccata.",
       "lastUsedJustNow": "Usato l'ultima volta proprio ora.",
       "lastUsedMinutesAgo": "Usato l'ultima volta {{count}} min fa.",
@@ -2613,10 +2826,10 @@
       "notOnPathHint": "La tua shell non trova ancora `myne`. Aggiungi questa riga al profilo della tua shell, poi apri un nuovo terminale:",
       "pathLine": "export PATH=\"{{dir}}:$PATH\"",
       "excludedLabel": "Cartelle che il terminale non vede mai",
-      "excludedHelper": "Un percorso di cartella per riga. Le note in queste cartelle restano fuori da ogni risultato del terminale e da lì non possono esservi scritte — restano pienamente disponibili nell'app. Puoi impostarlo prima di attivare l'accesso da terminale.",
+      "excludedHelper": "Un percorso di cartella per riga. Le note in queste cartelle restano fuori da ogni risultato del terminale, e dal terminale non è possibile scrivervi. Restano pienamente disponibili nell'app. Puoi impostarlo prima di attivare l'accesso da terminale.",
       "excludedPlaceholder": "Privato/\nDiario/",
       "rateLimitLabel": "Lascia che il terminale vada alla massima velocità",
-      "rateLimitHelper": "Per impostazione predefinita Myne risponde al massimo a 120 comandi da terminale al minuto. È un limite di ritmo su uno script impazzito, non un controllo dei permessi — nulla decide quale programma abbia il diritto di chiedere. Attivalo per lavori in blocco, come far passare ogni nota attraverso un altro strumento."
+      "rateLimitHelper": "Per impostazione predefinita Myne risponde al massimo a 120 comandi da terminale al minuto. È un limite di ritmo su uno script impazzito, non un controllo dei permessi: nulla decide quale programma abbia il diritto di chiedere. Attivalo per lavori in blocco, come far passare ogni nota attraverso un altro strumento."
     },
     "clipperInstall": {
       "error": "Impossibile aggiornare l'impostazione del clipper del browser.",
@@ -2648,7 +2861,7 @@
       "export": "Esporta",
       "exportError": "Impossibile esportare quel tema. Riprova.",
       "fileFilterName": "Tema Myne",
-      "helper": "Usa la tua tavolozza di colori. I temi vengono convalidati su questo dispositivo prima dell'uso — nulla viene caricato.",
+      "helper": "Usa la tua tavolozza di colori. I temi vengono convalidati su questo dispositivo prima dell'uso. Nulla viene caricato.",
       "importButton": "Importa tema…",
       "importError": "Quel file non è un tema valido. Apri il riferimento per vedere il formato.",
       "label": "Temi personalizzati",
@@ -2662,7 +2875,7 @@
       "dateFormatHelper": "Il titolo di ogni nota giornaliera. Supporta YYYY, MM, DD. Predefinito: {{default}}.",
       "dateFormatLabel": "Formato data della nota giornaliera",
       "dateFormatSaveError": "Impossibile salvare il formato data. Riprova.",
-      "folderHelper": "Dove vengono archiviate le nuove note giornaliere. Predefinito: {{default}} — la cartella viene mantenuta anche quando è vuota.",
+      "folderHelper": "Dove vengono archiviate le nuove note giornaliere. Predefinito: {{default}}. La cartella viene mantenuta anche quando è vuota.",
       "folderLabel": "Cartella delle note giornaliere",
       "folderSaveError": "Impossibile salvare la cartella giornaliera. Riprova.",
       "folderSearchEmpty": "Nessuna cartella corrisponde.",
@@ -2780,15 +2993,15 @@
       },
       "reservedBadge": "Non disponibile qui",
       "reservedBadgeTitle": "Il tuo browser {{action}} con {{chord}}, quindi quella combinazione non raggiunge mai Myne. La scorciatoia funziona comunque nell'app desktop.",
-      "reservedRefused": "{{chord}} appartiene al tuo browser — {{action}}. Scegli una scorciatoia diversa; le tue scorciatoie sul desktop restano invariate.",
-      "reservedUnreliable": "{{chord}} potrebbe non raggiungere Myne — in alcuni browser {{action}}. Aggiunta comunque.",
+      "reservedRefused": "{{chord}} appartiene al tuo browser: {{action}}. Scegli una scorciatoia diversa; le tue scorciatoie sul desktop restano invariate.",
+      "reservedUnreliable": "{{chord}} potrebbe non raggiungere Myne: in alcuni browser {{action}}. Aggiunta comunque.",
       "resetAll": "Reimposta tutte le scorciatoie…",
       "resetAllConfirm": "Reimpostare ogni scorciatoia personalizzata al valore predefinito?",
       "resetAllYes": "Reimposta tutte",
       "restoreDefaultAria": "Ripristina il valore predefinito per {{command}}",
       "searchAriaLabel": "Cerca scorciatoie",
       "searchPlaceholder": "Cerca scorciatoie…",
-      "warnAlreadyUsed": "Già usata da {{commands}} — aggiunta comunque."
+      "warnAlreadyUsed": "Già usata da {{commands}}. Aggiunta comunque."
     },
     "language": {
       "helper": "Scegli la lingua di visualizzazione dell'app.",
@@ -2824,7 +3037,7 @@
     "ai": {
       "autoTagHelper": "Quando smetti di digitare, un piccolo modello sul tuo dispositivo legge la nota e suggerisce dei tag in cima. Non viene aggiunto nulla finché non accetti un suggerimento.",
       "autoTagLabel": "Suggerisci i tag automaticamente",
-      "autoTagUnavailable": "Questa build non include il modello per i tag, quindi non se ne può suggerire nessuno. Myne non ne scarica mai uno — l'interruttore si attiva da sé in una build che lo include.",
+      "autoTagUnavailable": "Questa build non include il modello per i tag, quindi non se ne può suggerire nessuno. Myne non ne scarica mai uno. L'interruttore si attiva da sé in una build che lo include.",
       "consent": {
         "accept": "Invia le mie note a {{provider}}",
         "cancel": "Annulla",
@@ -2837,7 +3050,7 @@
         "whoLabel": "Chi lo riceve"
       },
       "disclosureToggle": "Come funziona?",
-      "enableHelper": "Esegue un modello fornito da te. Dove viene eseguito — e se le tue note escono da questo dispositivo — dipende dal provider che indichi qui sotto. Sperimentale, disattivato per impostazione predefinita.",
+      "enableHelper": "Esegue un modello fornito da te. Dove viene eseguito, e se le tue note escono da questo dispositivo, dipende dal provider che indichi qui sotto. Sperimentale, disattivato per impostazione predefinita.",
       "enableLabel": "Abilita l'AI locale",
       "excludedHelper": "Le note in queste cartelle non vengono mai lette o indicizzate dall'AI. Un percorso di cartella per riga.",
       "excludedLabel": "Cartelle escluse",
@@ -2848,49 +3061,61 @@
       "endpointModelLabel": "Modello da usare lì",
       "endpointModelPlaceholder": "il nome del modello così come lo elenca il runtime",
       "endpointRejected": {
-        "malformed": "Questo non è un indirizzo che Myne può usare. Servono uno schema e una porta esplicita — per esempio http://127.0.0.1:11434.",
-        "notLoopback": "Questo indirizzo deve trovarsi su questo computer — localhost, 127.0.0.1 o ::1. Per usare un provider che gira altrove, indicalo invece sotto Provider remoto.",
+        "malformed": "Questo non è un indirizzo che Myne può usare. Servono uno schema e una porta esplicita, per esempio http://127.0.0.1:11434.",
+        "notLoopback": "Questo indirizzo deve trovarsi su questo computer: localhost, 127.0.0.1 o ::1. Per usare un provider che gira altrove, indicalo invece sotto Provider.",
         "unsupportedScheme": "Sono accettati solo indirizzi http e https."
       },
       "endpointSaveFailed": "Impossibile salvare l'indirizzo. Verifica che Myne possa scrivere le proprie impostazioni.",
       "endpointThirdParty": "{{name}} è un programma a sé, con un proprio comportamento di rete, e Myne non lo controlla. Le tue note gli vengono inviate mentre è in esecuzione su questo computer.",
       "providerError": {
-        "barred": "Questo tipo di richiesta non viene mai inviato a un provider — o viene eseguito su questo dispositivo, o non viene eseguito affatto.",
+        "barred": "Questo tipo di richiesta non viene mai inviato a un provider: viene eseguito su questo dispositivo o non viene eseguito affatto.",
         "failed": "Non ha funzionato. Non è stato salvato nulla e non è stato inviato di nuovo nulla.",
+        "localModelMissing": "Il modello locale registrato nelle impostazioni non è più su questo dispositivo. Non è stato inviato nulla da nessuna parte. Scegli di nuovo un modello, o indica un provider, in Impostazioni → Developer → AI.",
         "noCredential": "Per questo provider non è impostata alcuna chiave API. Aggiungine una in Impostazioni → Developer → AI.",
-        "quotaExhausted": "Il provider ha rifiutato la richiesta — hai esaurito il credito o superato un limite di frequenza. Va risolto con il provider, non in Myne.",
+        "notReady": "Non c'è ancora nulla di pronto a rispondere. Non è stato inviato nulla da nessuna parte. Scegli un modello, o indica un provider, in Impostazioni → Developer → AI.",
+        "noEmbeddingModel": "Le domande cercano tra le tue note su questo dispositivo, e per farlo serve un modello di ricerca qui. Un provider non può farlo. Non è stato inviato nulla da nessuna parte. Scegli un modello di ricerca in Impostazioni → Developer → AI.",
+        "indexNotReady": "Le tue note sono ancora in fase di indicizzazione per la ricerca. Non è stato inviato nulla da nessuna parte. Riprova tra un momento.",
+        "requestRejected": "Il provider non ha accettato questa richiesta. Non è stato salvato nulla. È un difetto in ciò che Myne ha inviato, non nella tua configurazione o nelle tue note.",
+        "policyRefused": "Il provider ha rifiutato questa richiesta in base alle proprie regole: una protezione dell'account, una policy dell'area di lavoro o un modello che il tuo piano non include. Va risolto con il provider, non in Myne.",
+        "quotaExhausted": "Il provider ha rifiutato la richiesta: hai esaurito il credito o superato un limite di frequenza. Va risolto con il provider, non in Myne.",
         "refused": "Il provider ha rifiutato la connessione. Potrebbe non essere attivo o bloccare questa rete.",
         "timeout": "Il provider non ha risposto in tempo. Non è rimasto nulla in esecuzione.",
-        "unauthorized": "Il provider ha rifiutato la tua chiave API. Sostituiscila — potrebbe essere errata, revocata o di un altro account.",
+        "unauthorized": "Il provider ha rifiutato la tua chiave API. Sostituiscila: potrebbe essere errata, revocata o di un altro account.",
         "unreachable": "Impossibile raggiungere il provider. Controlla la tua connessione di rete."
       },
       "modelChoose": "Scegli file…",
-      "modelEmbeddingLabel": "Modello di ricerca — ricerca semantica e domande e risposte",
+      "modelEmbeddingLabel": "Modello di ricerca: ricerca semantica e domande e risposte",
       "modelFilter": {
         "gguf": "Modello GGUF",
         "safetensors": "Modello Safetensors"
       },
-      "modelGenerationLabel": "Modello di testo — chat, riassunti, scrittura",
+      "modelGenerationLabel": "Modello di testo: chat, riassunti, scrittura",
       "modelNone": "Nessun file selezionato",
       "modelSaveFailed": "Impossibile salvare il percorso del modello (deve trovarsi fuori dalla tua cassaforte).",
       "modelTranscriptionLabel": "Modello da voce a testo (trascrizione)",
-      "modelsHelper": "Myne non scarica mai modelli — significherebbe inviare dati sulla rete. Apri un link per ottenerne uno nel tuo browser, poi seleziona qui i file scaricati. Un modello selezionato qui viene eseguito sul tuo dispositivo; se invece hai indicato un provider, risponde quel provider.",
+      "modelsHelper": "Myne non scarica mai modelli. Significherebbe inviare dati sulla rete. Apri un link per ottenerne uno nel tuo browser, poi seleziona qui i file scaricati. Un modello selezionato qui viene eseguito sul tuo dispositivo; se invece hai indicato un provider, risponde quel provider.",
       "providerHelper": "Invece di eseguire un modello qui, Myne può inviare una richiesta a un servizio indicato da te. Quando lo fa, le tue note escono da questo dispositivo. “Nessuno” è l'impostazione predefinita e significa che non viene contattato alcun servizio.",
       "providerKeyAdd": "incolla la tua chiave API",
       "providerKeyLabel": "Chiave API",
       "providerKeyNone": "Non è memorizzata alcuna chiave, quindi per ora non può essere inviato nulla.",
       "providerKeyRevoke": "Rimuovi questa chiave",
       "providerKeyReplace": "incolla una nuova chiave per sostituire quella memorizzata",
-      "providerKeyStored": "È memorizzata una chiave. Myne non te la mostra mai — incollane una nuova per sostituirla.",
+      "providerKeyStored": "È memorizzata una chiave. Myne non te la mostra mai. Incollane una nuova per sostituirla.",
       "providerActive": "Ora risponde: {{name}}",
       "providerLabel": "Provider remoto",
       "providerModelCount_one": "{{count}} modello disponibile.",
       "providerModelCount_other": "{{count}} modelli disponibili.",
       "providerModelEmpty": "Questo provider non ha pubblicato alcun modello per il tuo account.",
-      "providerModelHelper": "Myne non include alcun modello predefinito. L'elenco arriva dal provider, così resta aggiornato e non ti viene mai addebitato un modello che non hai scelto.",
+      "providerModelHelper": "Myne non include alcun modello predefinito. L'elenco arriva dal provider, così resta aggiornato e non ti viene mai addebitato un modello che non hai scelto. Sono elencati solo i modelli che leggono e scrivono testo, perché è l'unico tipo che Myne chiede a un provider.",
+      "providerModelHidden_one": "{{count}} modello nascosto: non legge e non scrive testo.",
+      "providerModelHidden_many": "{{count}} modelli nascosti: non leggono e non scrivono testo.",
+      "providerModelHidden_other": "{{count}} modelli nascosti: non leggono e non scrivono testo.",
       "providerModelLabel": "Modello",
       "providerModelLoad": "Carica i modelli",
       "providerModelNone": "Nessun modello scelto",
+      "providerModelNoTextModels": "Questo provider ha pubblicato dei modelli, ma nessuno di essi legge e scrive testo. Myne richiede solo testo, quindi qui non se ne può usare nessuno.",
+      "providerModelShowAll": "Mostra tutti i modelli",
+      "providerModelShowTextOnly": "Mostra solo i modelli di testo",
       "providerModelUnfetched": "Carica l'elenco per scegliere un modello.",
       "providerNone": "Nessuno",
       "providerNothingAnswering": "Non è ancora configurato nulla che possa rispondere.",
@@ -2905,26 +3130,26 @@
       "disabledCue": "La sincronizzazione non passa più attraverso Tor. Le nuove connessioni vanno direttamente al server di sincronizzazione.",
       "errorRead": "Impossibile leggere l'impostazione attuale. Aziona l'interruttore per impostarla di nuovo.",
       "errorSave": "Impossibile salvare l'impostazione. Non è cambiato nulla.",
-      "errorSidecar": "L'instradamento tramite Tor è attivo, ma il client Tor non è riuscito ad avviarsi. La sincronizzazione è in pausa finché non ci riesce — non viene inviato nulla in modo diretto.",
+      "errorSidecar": "L'instradamento tramite Tor è attivo, ma il client Tor non è riuscito ad avviarsi. La sincronizzazione è in pausa finché non ci riesce. Non viene inviato nulla in modo diretto.",
       "postureActive": "La sincronizzazione passa attraverso Tor",
-      "postureConnecting": "Connessione a Tor — sincronizzazione in pausa",
+      "postureConnecting": "Connessione a Tor: sincronizzazione in pausa",
       "postureConnectingDetail": "Di solito bastano pochi secondi. Nel frattempo non viene inviato nulla in modo diretto.",
-      "postureExempt": "La sincronizzazione non usa Tor — questo indirizzo punta a questo dispositivo",
+      "postureExempt": "La sincronizzazione non usa Tor: questo indirizzo punta a questo dispositivo",
       "postureExemptDetail": "L'indirizzo del server di sincronizzazione che hai configurato indica questo computer, quindi la connessione di Myne non passa attraverso un circuito Tor. Se quell'indirizzo inoltra a un server altrove, Myne non può saperlo e non può instradarlo. La sincronizzazione non è in pausa.",
       "postureHeading": "In questo momento",
       "postureInactive": "La sincronizzazione va direttamente al server di sincronizzazione",
-      "postureUnavailable": "Tor non è disponibile — sincronizzazione in pausa",
+      "postureUnavailable": "Tor non è disponibile: sincronizzazione in pausa",
       "postureUnavailableDetail": "Non viene inviato nulla in modo diretto. Disattiva e riattiva questa impostazione per provare ad avviare il client Tor, oppure disattivala per sincronizzare senza Tor.",
-      "residualExit": "L'ultimo relay di un circuito Tor — il nodo di uscita — vede a quale server di sincronizzazione ti colleghi. Non può leggere ciò che sincronizzi; quello resta crittografato end-to-end.",
+      "residualExit": "L'ultimo relay di un circuito Tor, il nodo di uscita, vede a quale server di sincronizzazione ti colleghi. Non può leggere ciò che sincronizzi, che resta crittografato end-to-end.",
       "residualMetadata": "Il server di sincronizzazione continua a vedere quando sincronizzi, quanti blob invii e quanto sono grandi, e quanti dispositivi hai. Tor non cambia questo.",
       "residualPayment": "Se paghi per la sincronizzazione ospitata, il pagamento e il tuo account possono comunque essere ricondotti a te. Tor cambia da dove arriva la connessione, non la traccia della fatturazione.",
       "residualScope": "Attraverso Tor passa solo il traffico di sincronizzazione di Myne. Nient'altro su questo dispositivo lo fa.",
       "residualsToggle": "Cosa non nasconde",
-      "torHelper": "Nasconde il tuo indirizzo IP e la tua posizione al server di sincronizzazione, e nasconde alla tua rete e al tuo provider internet con quale server sincronizzi — possono comunque vedere questo dispositivo collegarsi a Tor. Non ti rende anonimo verso Myne, e non nasconde al server cosa sincronizzi né quando.",
+      "torHelper": "Nasconde il tuo indirizzo IP e la tua posizione al server di sincronizzazione, e nasconde alla tua rete e al tuo provider internet con quale server sincronizzi. Possono comunque vedere questo dispositivo collegarsi a Tor. Non ti rende anonimo verso Myne, e non nasconde al server cosa sincronizzi né quando.",
       "torLabel": "Instrada la sincronizzazione attraverso Tor"
     },
     "prefs": {
-      "saveError": "Impossibile salvare la preferenza — riprova"
+      "saveError": "Impossibile salvare la preferenza. Riprova."
     },
     "reminders": {
       "aria": "Mostra i promemoria delle attività su questo dispositivo",
@@ -2942,13 +3167,21 @@
       "autoLockLabel": "Blocco automatico",
       "autoLockSearchEmpty": "Nessuna durata corrisponde.",
       "autoLockSearchPlaceholder": "Cerca durate…",
+      "hideVaultNamesLabel": "Nascondi i nomi delle casseforti nella schermata di blocco",
+      "hideVaultNamesHelper": "Su un dispositivo con un portachiavi utilizzabile, il selettore mostra il nome di una cassaforte dopo che questo dispositivo l'ha sbloccata. Con questa opzione attiva ogni cassaforte mostra invece un segnaposto come Cassaforte 2, e quel numero resta legato alla cassaforte comunque si riordini l'elenco.",
+      "hideVaultNamesErases": "Attivandola si distruggono le chiavi che rendono leggibili i nomi memorizzati qui, quindi quei nomi non possono essere recuperati su questo dispositivo, e finché resta attiva non viene scritto alcun altro nome.",
+      "hideVaultNamesResidue": "Non può raggiungere una copia fatta in precedenza: un backup completo del sistema, un'immagine del disco o qualsiasi altra copia a livello di sistema di questo disco, creata mentre i nomi erano visibili, contiene sia i nomi memorizzati sia le loro chiavi.",
+      "hideVaultNamesUnavailable": "Questo dispositivo non ha un portachiavi utilizzabile, quindi Myne non memorizza qui alcun nome di cassaforte e questa opzione non può essere attivata. Il selettore mostra già un segnaposto per ogni cassaforte.",
+      "hideVaultNamesErrorRead": "Impossibile leggere l'impostazione attuale. Sposta l'interruttore per impostarla di nuovo.",
+      "hideVaultNamesErrorSave": "Impossibile salvare l'impostazione, che resta quindi invariata. Se la stavi attivando, alcuni nomi memorizzati potrebbero essere già stati distrutti; attivala di nuovo per completare.",
+      "hideVaultNamesErrorErase": "Non è stato possibile distruggere un nome memorizzato, quindi l'impostazione è stata lasciata disattivata invece di dichiarare una cancellazione che non è avvenuta. Riprova.",
       "realtimeSyncHelper": "Le modifiche da altri dispositivi arrivano in pochi secondi tramite un segnale privo di contenuto — il server trasmette solo “qualcosa è cambiato”, mai cosa. Mentre la tua cassaforte è sbloccata l'app controlla comunque il server con regolarità, quindi questo non aggiunge alcuna visibilità significativa; non c'è nulla da configurare.",
       "realtimeSyncLabel": "Sincronizzazione in tempo reale",
       "screenCaptureHelperOff": "La protezione si applica sempre prima dello sblocco. Dopo lo sblocco, segue questa preferenza.",
       "screenCaptureHelperOn": "Attiva su Windows 10 (aggiornamento di maggio 2020) e versioni successive. macOS e Linux non offrono un’API di sistema per questo, quindi lì non può bloccare la cattura.",
       "screenCaptureLabel": "Protezione dalla cattura schermo",
       "screenCaptureSubtitle": "Blocca screenshot e registrazione dello schermo",
-      "screenshotBlocked": "La protezione dello schermo è attiva — gli screenshot di Myne risultano vuoti.",
+      "screenshotBlocked": "La protezione dello schermo è attiva: gli screenshot di Myne risultano vuoti.",
       "autoLockAfter": "Blocco automatico dopo",
       "autoLock1m": "1m",
       "autoLock5m": "5m",
@@ -2970,7 +3203,7 @@
       "errorPinTooShort_many": "Il PIN deve avere almeno {{count}} cifre.",
       "errorPinTooShort_other": "Il PIN deve avere almeno {{count}} cifre.",
       "helperConfigured": "Configurato tramite {{method}}. Dopo il blocco automatico, il reinserimento salta la password principale. Con un PIN la password principale è richiesta di nuovo dopo un riavvio; una verifica dell'impronta digitale o del volto vale anche dopo un riavvio, finché le impronte digitali o i volti registrati su questo dispositivo non cambiano.",
-      "helperNotConfigured": "Dopo il blocco automatico, reinserisci un PIN o usa Touch ID invece della password principale completa. È una comodità rispetto alla cassaforte crittografata — con un PIN la password principale è richiesta di nuovo dopo un riavvio; Touch ID vale anche dopo un riavvio, finché le impronte digitali registrate su questo dispositivo non cambiano.",
+      "helperNotConfigured": "Dopo il blocco automatico, rientra con un PIN o con Touch ID invece della password principale completa. È uno strato di comodità sopra la cassaforte crittografata: con un PIN la password principale è richiesta di nuovo dopo un riavvio; Touch ID vale anche dopo un riavvio, finché le impronte digitali registrate su questo dispositivo non cambiano.",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "PIN di sblocco rapido",
@@ -2994,9 +3227,9 @@
       "biometricToggleSubtitle": "Sblocca con {{method}} dopo il blocco automatico",
       "pinOnLead": "Lo sblocco rapido con PIN è ",
       "pinOnEmphasis": "attivo",
-      "pinOnRest": ". Dopo che la cassaforte si blocca automaticamente puoi rientrare con il tuo PIN invece della password completa — solo per questa sessione dell'app. Un avvio a freddo richiede sempre la password completa.",
+      "pinOnRest": ". Dopo che la cassaforte si blocca automaticamente puoi rientrare con il tuo PIN invece della password completa (solo per questa sessione dell'app). Un avvio a freddo richiede sempre la password completa.",
       "turnOffPin": "Disattiva PIN",
-      "pinSetupHelper": "Imposta un PIN di 6+ cifre per sbloccare rapidamente dopo il blocco automatico. Il PIN incapsula una chiave locale del dispositivo — non lascia mai questo dispositivo e non tocca mai la tua frase di recupero.",
+      "pinSetupHelper": "Imposta un PIN di 6+ cifre per sbloccare rapidamente dopo il blocco automatico. Il PIN incapsula una chiave locale del dispositivo: non lascia mai questo dispositivo e non tocca mai la tua frase di recupero.",
       "pinReplacesBiometric": " Impostare un PIN sostituisce lo sblocco con {{method}}.",
       "pinPlaceholder6": "Almeno 6 cifre",
       "confirmPin": "Conferma il PIN",
@@ -3029,10 +3262,10 @@
     "spell": {
       "errorSaveLanguages": "Impossibile salvare le lingue del controllo ortografico.",
       "errorSaveSetting": "Impossibile salvare l'impostazione del controllo ortografico.",
-      "helper": "Sottolinea le parole con errori di ortografia mentre scrivi. Completamente offline — le tue note non lasciano mai il dispositivo.",
+      "helper": "Sottolinea le parole con errori di ortografia mentre scrivi. Completamente offline: le tue note non lasciano mai il dispositivo.",
       "label": "Controllo ortografico",
       "languagesAriaLabel": "Lingue del controllo ortografico",
-      "languagesHelper": "Una parola è corretta se è valida in una qualsiasi delle lingue selezionate — utile per inserire termini inglesi in note di altre lingue.",
+      "languagesHelper": "Una parola è corretta se è valida in una qualsiasi delle lingue selezionate. Utile per inserire termini inglesi in note di altre lingue.",
       "languagesLabel": "Lingue",
       "languagesPlaceholder": "Seleziona le lingue…",
       "languagesSearchEmpty": "Nessuna lingua corrisponde.",
@@ -3041,20 +3274,20 @@
       "on": "Attivato"
     },
     "storage": {
-      "backupHelper": "I backup restano crittografati esattamente come la tua cassaforte, in un unico file .myne-backup verificato. Il ripristino funziona con la password o la frase di recupero di quella cassaforte — esattamente come lo sblocco.",
+      "backupHelper": "I backup restano crittografati esattamente come la tua cassaforte, in un unico file .myne-backup verificato. Il ripristino funziona con la password o la frase di recupero di quella cassaforte, esattamente come lo sblocco.",
       "backupLabel": "Backup",
       "backUpVault": "Esegui il backup della cassaforte…",
       "exportAction": "Esporta…",
       "exportBody": "Esporta cassaforte come Markdown",
-      "exportHelper": "Albero Markdown semplice — non crittografato.",
+      "exportHelper": "Albero Markdown semplice. Non crittografato.",
       "exportLabel": "Esporta",
       "importHelper": "Porta in Myne le note da Obsidian, Notion, Evernote, file HTML o un CSV. Tutto viene importato e crittografato sul posto; i tuoi file originali restano intatti.",
       "importLabel": "Importa",
       "importObsidian": "Importa note…",
-      "locationHelper": "Ogni cassaforte è una cartella di file crittografati sotto questo percorso. Preferisci il pulsante Backup qui sotto alle copie manuali — verifica il file scritto.",
+      "locationHelper": "Ogni cassaforte è una cartella di file crittografati sotto questo percorso. Preferisci il pulsante Backup qui sotto alle copie manuali: verifica il file scritto.",
       "locationLabel": "Posizione della cassaforte",
       "openInFiles": "Apri nei file",
-      "webLocationHelper": "Le tue note risiedono nell'archivio che questo browser riserva a questo sito, gestito dal browser — non c'è alcuna cartella da aprire. Cancellare i dati di questo sito rimuove la copia locale; poiché questo client si sincronizza, al successivo accesso la copia viene riscaricata.",
+      "webLocationHelper": "Le tue note risiedono nell'archivio che questo browser riserva a questo sito, gestito dal browser. Non c'è alcuna cartella da aprire. Cancellare i dati di questo sito rimuove la copia locale; poiché questo client si sincronizza, al successivo accesso la copia viene riscaricata.",
       "webLocationLabel": "Dove sono archiviate le tue note",
       "pathUnavailable": "Percorso non disponibile",
       "restoreBackup": "Ripristina da backup…"
@@ -3169,9 +3402,11 @@
         "focusMode": "modalità concentrazione macchina da scrivere attenua righe inattive senza distrazioni focus typewriter",
         "font": "carattere font tipo famiglia sans serif mono monospace tipografia",
         "graphSettings": "grafico aspetto fisica forze nodi collegamenti disposizione gruppi di colore etichette tela graph layout",
+        "hideVaultNames": "nascondi nomi casseforti schermata di blocco selettore segnaposto etichetta privacy cancella portachiavi sguardi indiscreti hide vault names lock screen keychain",
         "hotkeys": "scorciatoie tastiera combinazioni tasti associazioni hotkeys shortcuts keybindings keymap",
         "import": "importa importazione note obsidian notion evernote enex html csv migrazione migra import",
         "language": "lingua localizzazione interfaccia traduzione ui language locale",
+        "legal": "note legali informativa sulla privacy termini impressum gdpr dsgvo autorità segnalazione abusi protezione dei dati legal privacy policy law enforcement",
         "lastActiveNote": "riprendi dove avevi interrotto ultima nota aperta sincronizza continua resume",
         "license": "licenza agpl open source codice aperto legale license",
         "lineNumbers": "numeri di riga righe editor visualizzazione gutter line numbers",
@@ -3219,38 +3454,49 @@
       "time24": "24 ore",
       "time12": "12 ore",
       "zoneLabel": "Fuso orario",
-      "zoneHelper": "Quale fuso stabilisce cosa conta come oggi. Lascia vuoto per seguire questo dispositivo. Gli orari che scrivi in una nota non vengono mai modificati — le 09:00 restano le 09:00 ovunque.",
+      "zoneHelper": "Quale fuso stabilisce cosa conta come oggi. Lascia vuoto per seguire questo dispositivo. Gli orari che scrivi in una nota non vengono mai modificati; le 09:00 restano le 09:00 ovunque.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne non conosce quel fuso orario. Usa un nome come Europe/Berlin.",
       "errorSave": "Impossibile salvare quell'impostazione."
     }
   },
   "storageLost": {
-    "allSynced": "Non è andato perso nulla — ogni nota presente qui aveva già raggiunto il server.",
+    "allSynced": "Non è andato perso nulla: ogni nota presente qui aveva già raggiunto il server.",
     "evicted": {
-      "body": "Il tuo browser ha cancellato l'archivio di questo sito per liberare spazio. Non c'è nulla di danneggiato e sul server non è stato eliminato nulla — tutto ciò che era stato sincronizzato è ancora lì.",
+      "body": "Il tuo browser ha cancellato l'archivio di questo sito per liberare spazio. Non c'è nulla di danneggiato e sul server non è stato eliminato nulla. Tutto ciò che era stato sincronizzato è ancora lì.",
       "title": "Il tuo browser ha cancellato la copia locale di questa cassaforte"
     },
     "lockCta": "Blocca e riprova",
     "reDownloadCta": "Configura di nuovo questo browser",
     "reEnrolNotice": "Configurandolo di nuovo, questo browser viene registrato come un nuovo dispositivo, quindi attenderà l'approvazione di uno dei tuoi altri dispositivi prima di poter sincronizzare.",
     "unopenable": {
-      "body": "La copia locale di questa cassaforte non è più leggibile. Nulla sul server ne risente — la copia che si trova qui è una cache e può essere sostituita.",
+      "body": "La copia locale di questa cassaforte non è più leggibile. Nulla sul server ne risente: la copia che si trova qui è una cache e può essere sostituita.",
       "title": "Impossibile leggere la copia locale di questa cassaforte"
     },
-    "unsyncedIntro": "{{count}} note non avevano ancora raggiunto il server. Sono perdute — questa era l'unica copia:",
-    "unsyncedIntro_one": "{{count}} nota non aveva ancora raggiunto il server. È perduta — questa era l'unica copia:",
-    "unsyncedIntro_many": "{{count}} note non avevano ancora raggiunto il server. Sono perdute — questa era l'unica copia:",
-    "unsyncedIntro_other": "{{count}} note non avevano ancora raggiunto il server. Sono perdute — questa era l'unica copia:",
+    "unsyncedIntro": "{{count}} nota non aveva ancora raggiunto il server. È perduta, e questa era l'unica copia:",
+    "unsyncedIntro_one": "{{count}} nota non aveva ancora raggiunto il server. È perduta, e questa era l'unica copia:",
+    "unsyncedIntro_many": "{{count}} note non avevano ancora raggiunto il server. Sono perdute, e questa era l'unica copia:",
+    "unsyncedIntro_other": "{{count}} note non avevano ancora raggiunto il server. Sono perdute, e questa era l'unica copia:",
     "unsyncedOverflow": "…e altre {{count}}.",
     "unsyncedOverflow_one": "…e {{count}} in più.",
     "unsyncedOverflow_many": "…e altre {{count}}.",
     "unsyncedOverflow_other": "…e altre {{count}}."
   },
   "sync": {
-    "materialising": "Download delle tue note — {{done}} di {{total}}. Puoi iniziare a lavorare; le altre appariranno man mano che arrivano.",
-    "credentialAmbiguous": "La tua password potrebbe essere cambiata sia su questo dispositivo sia su un altro, e Myne non è in grado di stabilire quale sia più recente — quindi non ha modificato nulla. Accedi da un dispositivo che ha già accesso per risolvere la situazione.",
-    "vaultRekeyed": "Questa cassaforte è stata aggiornata al nuovo formato su un altro dispositivo. Sbloccala di nuovo per continuare — non è andato perso nulla.",
+    "betaTerms": {
+      "title": "Prima di attivare la sincronizzazione",
+      "intro": "La sincronizzazione invia le tue note, crittografate, a un server. Prima vale la pena sapere quattro cose.",
+      "whatThisIsLabel": "Che cos'è",
+      "dataLossLabel": "Se perdi entrambi i segreti",
+      "whatHappensNextLabel": "Quando finisce la beta",
+      "whatWeCanSeeLabel": "Cosa possiamo vedere",
+      "readFull": "Leggi i termini completi",
+      "review": "Esamina i termini della beta",
+      "accept": "Ho capito, attiva la sincronizzazione"
+    },
+    "materialising": "Download delle tue note: {{done}} di {{total}}. Puoi iniziare a lavorare; le altre appariranno man mano che arrivano.",
+    "credentialAmbiguous": "La tua password potrebbe essere cambiata sia su questo dispositivo sia su un altro, e Myne non è in grado di stabilire quale sia più recente, quindi non ha modificato nulla. Accedi da un dispositivo che ha già accesso per risolvere la situazione.",
+    "vaultRekeyed": "Questa cassaforte è stata aggiornata al nuovo formato su un altro dispositivo. Sbloccala di nuovo per continuare. Non è andato perso nulla.",
     "attachments": {
       "aria": {
         "downloading": "Download di {{name}} in corso",
@@ -3260,7 +3506,7 @@
       "heading": "Sincronizzazione degli allegati",
       "status": {
         "done": "completato",
-        "failedWillRetry": "non riuscito — verrà ritentato",
+        "failedWillRetry": "non riuscito, verrà ritentato",
         "paused": "in pausa"
       }
     },
@@ -3279,7 +3525,7 @@
       "compareTheirs": "Copia in conflitto",
       "compareTitle": "Confronto di “{{title}}”",
       "discard": "Scarta",
-      "empty": "Nessun conflitto — i tuoi dispositivi sono sincronizzati.",
+      "empty": "Nessun conflitto. I tuoi dispositivi sono sincronizzati.",
       "groupTitle_one": "{{count}} copia in conflitto di {{original}}",
       "groupTitle_many": "{{count}} copie in conflitto di {{original}}",
       "groupTitle_other": "{{count}} copie in conflitto di {{original}}",
@@ -3294,7 +3540,7 @@
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "Impossibile creare il QR. Riprova.",
       "generate": "Crea QR",
-      "hint": "Incolla il tuo numero di account per creare un QR che il tuo telefono può scansionare — compila per te il server e il numero di account.",
+      "hint": "Incolla il tuo numero di account per creare un QR che il tuo telefono può scansionare. Compila per te il server e il numero di account.",
       "invalidAccount": "Non sembra un numero di account valido.",
       "notConfigured": "Configura prima un server di sincronizzazione, poi crea un QR.",
       "scanWithApp": "Scansiona con l'app iOS",
@@ -3329,12 +3575,23 @@
       "shortName": "Dispositivo {{hex}}",
       "syncedHere": "Sincronizzato qui",
       "thisDevice": "Questo dispositivo",
+      "reasonUnreachable": "il server non ha risposto",
+      "reasonCertChanged": "il suo certificato non è quello di cui questo dispositivo si fida",
+      "reasonUnexpected": "un errore imprevisto",
+      "reasonRejected": "il server ha rifiutato l'accesso di questo dispositivo",
+      "reasonFrozen": "l'account è congelato",
+      "reasonDeviceLimit": "l'account ha raggiunto il limite di dispositivi",
+      "reasonAwaitingApproval": "questo dispositivo è ancora in attesa di approvazione",
+      "reasonNotConfigured": "non è configurato alcun server di sincronizzazione",
+      "certChanged": "Il server di sincronizzazione ha risposto, ma con un certificato diverso da quello fissato da questo dispositivo.",
+      "certChangedHint": "Così appare un certificato rinnovato, e così appare anche un impostore. Myne non può distinguerli, quindi non tira a indovinare. Procurati l'impronta dal tuo server, poi reinserisci l'URL del server alla voce “Server di sincronizzazione” qui sopra e incollala quando ti viene chiesto.",
       "transportHint": "Se il server è stato spostato o il suo certificato è cambiato, reinserisci l'URL del server in “Server di sincronizzazione” qui sopra per considerarlo di nuovo attendibile.",
       "unreachable": "Impossibile raggiungere la sincronizzazione ({{error}}).",
       "verifyBody": "Verifica che lo stesso codice appaia sul dispositivo che hai appena approvato. Se corrisponde, è sul tuo account. In caso contrario, rimuovi il dispositivo.",
       "verifyMatch": "Corrispondono",
       "verifyMismatch": "Non corrispondono",
       "verifyPending": "Questo codice appare quando il nuovo dispositivo completa la sua prima sincronizzazione.",
+      "verifyChanged": "Il codice è cambiato mentre lo guardavi. Confronta di nuovo entrambe le schermate. Se continua a cambiare, fermati e non proseguire.",
       "verifySyncing": "Sincronizzazione…",
       "verifyTitle": "Verifica il nuovo dispositivo",
       "verifyAction": "Confronta il codice",
@@ -3349,15 +3606,16 @@
       "connecting": "Connessione…",
       "fingerprintLabel": "Impronta del certificato del server:",
       "confirmFingerprintRequired": "L'instradamento tramite Tor è attivo, quindi questo dispositivo non si fiderà di un certificato che non gli è stato detto di aspettarsi. Procurati l'impronta SHA-256 del certificato del tuo server dal server stesso o da un dispositivo già connesso, poi incollala qui.",
-      "confirmFingerprintMismatch": "Il certificato presentato da questo server non è quello che hai inserito. Non è stato salvato nulla. Controlla l'impronta che hai incollato — e se è corretta, non connetterti: c'è qualcosa tra questo dispositivo e il tuo server.",
-      "confirmFingerprintDeclined": "Non è stato salvato nulla — questo dispositivo non è connesso a quel server. Torna qui quando avrai l'impronta del suo certificato.",
+      "confirmFingerprintMismatch": "Il certificato presentato da questo server non è quello che hai inserito. Non è stato salvato nulla. Controlla l'impronta che hai incollato. Se è corretta, non connetterti: c'è qualcosa tra questo dispositivo e il tuo server.",
+      "certificateChanged": "Questo server ha presentato un certificato diverso da quello di cui questo dispositivo si fida. Non è stato modificato nulla. Se lo hai rinnovato, incolla qui sotto la nuova impronta; se non lo hai fatto, non connetterti.",
+      "confirmFingerprintDeclined": "Non è stato salvato nulla: questo dispositivo non è connesso a quel server. Torna qui quando avrai l'impronta del suo certificato.",
       "pinStatic": "Verificato con il certificato integrato di Myne.",
       "pinTofu": "Fissato alla prima connessione. Confronta questa impronta sui tuoi dispositivi.",
-      "fixedOrigin": "Questo client si sincronizza con un solo server, stabilito al momento dell'installazione. Non può essere cambiato da qui — alla pagina è consentito comunicare solo con questo indirizzo.",
+      "fixedOrigin": "Questo client si sincronizza con un solo server, stabilito al momento dell'installazione. Non può essere cambiato da qui: alla pagina è consentito comunicare solo con questo indirizzo.",
       "fixedOriginNone": "Per questa installazione non è configurato alcun server di sincronizzazione.",
       "pinPlatformTrust": "Verificato dall'archivio certificati del tuo browser. Questo client non può fissare da sé un certificato.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "Impossibile raggiungere quel server — controlla l'URL e che sia in esecuzione."
+      "unreachable": "Impossibile raggiungere quel server. Controlla l'URL e che sia in esecuzione."
     },
     "enroll": {
       "accountNumberLabel": "Numero di account",
@@ -3388,7 +3646,7 @@
     },
     "fingerprint": {
       "title": "Controlla il certificato di questo server prima di fidartene",
-      "why": "L'instradamento tramite Tor è attivo, quindi questa prima connessione raggiunge il server attraverso un relay gestito da uno sconosciuto. Finché un certificato non è fissato, questo dispositivo accetterebbe qualunque certificato gli venga passato — compreso uno inventato da quel relay. Inserisci l'impronta che il tuo server pubblica e Myne la confronta prima di fissare qualsiasi cosa. Se non corrisponde, non viene salvato nulla.",
+      "why": "L'instradamento tramite Tor è attivo, quindi questa prima connessione raggiunge il server attraverso un relay gestito da uno sconosciuto. Finché un certificato non è fissato, questo dispositivo accetterebbe qualunque certificato gli venga passato, compreso uno inventato da quel relay. Inserisci l'impronta che il tuo server pubblica e Myne la confronta prima di fissare qualsiasi cosa. Se non corrisponde, non viene salvato nulla.",
       "label": "Impronta del certificato attesa",
       "placeholder": "Impronta SHA-256 dal tuo server",
       "echoLabel": "Cosa hai inserito",
@@ -3397,36 +3655,38 @@
       "echoProgress_one": "{{count}} carattere su {{total}} finora.",
       "echoProgress_many": "{{count}} caratteri su {{total}} finora.",
       "echoProgress_other": "{{count}} caratteri su {{total}} finora.",
-      "echoInvalid": "Un'impronta SHA-256 è composta da 64 caratteri, ognuno da 0–9 o a–f. Due punti, spazi e un “sha256:” iniziale vanno bene — tutto il resto non ne fa parte.",
+      "echoInvalid": "Un'impronta SHA-256 è composta da 64 caratteri, ciascuno compreso tra 0–9 o a–f. Due punti, spazi e un “sha256:” iniziale vanno bene. Tutto il resto non ne fa parte.",
       "helpToggle": "Dove trovo questa impronta?",
-      "helpNotOverTor": "Non attraverso questa connessione. Un'impronta che scarichi sullo stesso circuito non prova nulla — ciò che potrebbe sostituire il certificato potrebbe sostituire anche quella pagina.",
+      "helpNotOverTor": "Non attraverso questa connessione. Un'impronta che scarichi sullo stesso circuito non prova nulla: ciò che potrebbe sostituire il certificato potrebbe sostituire anche quella pagina.",
       "helpFromServer": "Sulla macchina che esegue il tuo server: openssl x509 -noout -fingerprint -sha256 -in <il file del tuo certificato>",
       "helpFromDevice": "Su un dispositivo già connesso a questo account: Impostazioni → Sincronizzazione mostra la stessa impronta.",
-      "helpNoFingerprint": "Se non riesci a ottenerla in nessuno di questi modi, questo server non può essere aggiunto mentre l'instradamento tramite Tor è attivo. Puoi disattivare l'instradamento tramite Tor in Impostazioni → Rete e connetterti direttamente — questo mostra il tuo indirizzo IP al server e a chiunque possa osservare la tua rete.",
-      "decline": "Non ce l'ho — annulla"
+      "helpNoFingerprint": "Se non riesci a ottenerla in nessuno di questi modi, questo server non può essere aggiunto mentre l'instradamento tramite Tor è attivo. Puoi disattivare l'instradamento tramite Tor in Impostazioni → Rete e connetterti direttamente. Questo mostra il tuo indirizzo IP al server e a chiunque possa osservare la tua rete.",
+      "decline": "Non ce l'ho, annulla"
     },
     "join": {
       "accountLabel": "Numero di account",
       "cancel": "Annulla",
       "continue": "Continua",
-      "error": "Impossibile aggiungere questo dispositivo. Controlla l'URL del server, il numero di account e la password — e che il server sia raggiungibile.",
+      "error": "Impossibile aggiungere questo dispositivo. Controlla l'URL del server, il numero di account e la password, e che il server sia raggiungibile.",
       "help": "Accedi con il tuo numero di account e la password. Questo dispositivo sincronizzerà le tue note non appena un dispositivo esistente lo approva. Non serve la frase di recupero.",
       "passwordLabel": "Password",
       "pinnedCompare": "Questo dispositivo ha fissato il certificato del tuo server. Verifica che questa impronta corrisponda sui tuoi altri dispositivi.",
       "confirmFingerprintRequired": "L'instradamento tramite Tor è attivo, quindi questo dispositivo non si fiderà di un certificato che non gli è stato detto di aspettarsi. Procurati l'impronta SHA-256 del certificato del tuo server dal server stesso o da un dispositivo già connesso, poi incollala qui.",
-      "confirmFingerprintMismatch": "Il certificato presentato da questo server non è quello che hai inserito. Questo dispositivo non è stato aggiunto e non è stato salvato nulla. Controlla l'impronta che hai incollato — e se è corretta, non continuare: c'è qualcosa tra questo dispositivo e il tuo server.",
+      "confirmFingerprintMismatch": "Il certificato presentato da questo server non è quello che hai inserito. Questo dispositivo non è stato aggiunto e non è stato salvato nulla. Controlla l'impronta che hai incollato. Se è corretta, non continuare: c'è qualcosa tra questo dispositivo e il tuo server.",
       "pinnedTitle": "Certificato del server fissato",
       "serverLabel": "Server di sincronizzazione",
       "serverPlaceholder": "https://your-server.example",
-      "sasMatch": "Corrispondono — continua",
-      "sasMismatch": "Non corrispondono — rimuovi questo dispositivo",
+      "sasMatch": "Corrispondono, continua",
+      "sasMismatch": "Non corrispondono, rimuovi questo dispositivo",
       "submit": "Aggiungi dispositivo",
       "submitting": "Aggiunta in corso…",
       "title": "Aggiungi questo dispositivo a un account",
       "verifyBody": "Verifica che questo codice corrisponda a quello sul dispositivo da cui hai approvato.",
+      "verifyChanged": "Il codice è cambiato mentre lo guardavi. Confronta di nuovo entrambe le schermate. Se continua a cambiare, fermati e non proseguire.",
       "verifyTitle": "Verifica questo dispositivo",
-      "waitingHint": "Tieni aperta questa finestra — una volta approvato, qui apparirà un codice di verifica da confrontare con l'altro dispositivo.",
-      "waitingTitle": "In attesa di approvazione"
+      "waitingHint": "Tieni aperta questa finestra. Una volta approvato, qui apparirà un codice di verifica da confrontare con l'altro dispositivo.",
+      "waitingTitle": "In attesa di approvazione",
+      "sasAbortFailed": "Impossibile disconnettere questo dispositivo. È ancora registrato su quel server, quindi consideralo non attendibile: apri Impostazioni → Sincronizzazione e rimuovilo da lì. Le tue note non sono state eliminate."
     },
     "panel": {
       "addDevice": {
@@ -3471,10 +3731,14 @@
       }
     },
     "reconcile": {
-      "message": "Questo dispositivo è rimasto offline per un po' — sincronizzazione in corso. Le tue note sono al sicuro."
+      "message": "Questo dispositivo è rimasto offline per un po', quindi sta recuperando la sincronizzazione. Le tue note sono al sicuro."
     },
     "recovered": {
       "restoredToast": "Ripristinata come nuova nota."
+    },
+    "stale": {
+      "body": "Myne non raggiunge il server di sincronizzazione da diversi giorni. Le tue note vengono salvate su questo dispositivo, ma non ne è uscito nulla, quindi questa è l'unica copia. Apri Impostazioni → Sincronizzazione per scoprire il perché.",
+      "dismiss": "Ignora"
     },
     "status": {
       "awaitingApproval": "In attesa di approvazione",
@@ -3483,11 +3747,12 @@
       "conflicts_other": "{{count}} conflitti da esaminare",
       "error": "Errore di sincronizzazione",
       "errorAuth": "Accesso alla sincronizzazione scaduto",
-      "errorFrozen": "Account congelato — caricamenti in pausa",
+      "errorFrozen": "Account congelato: caricamenti in pausa",
       "errorDeviceRevoked": "Questo dispositivo è stato rimosso dal tuo account",
-      "errorStorageFull": "Archiviazione piena — sincronizzazione in pausa",
-      "errorQuota": "Archiviazione piena — caricamenti in pausa",
-      "errorRateLimited": "Sincronizzazione limitata — nuovo tentativo in corso",
+      "errorCertChanged": "Certificato del server cambiato: verificalo per riconnetterti",
+      "errorStorageFull": "Archiviazione piena: sincronizzazione in pausa",
+      "errorQuota": "Archiviazione piena: caricamenti in pausa",
+      "errorRateLimited": "Sincronizzazione limitata: nuovo tentativo in corso",
       "errorTooLarge": "Un file è troppo grande per essere caricato",
       "loading": "Stato della sincronizzazione…",
       "notEnrolled": "Non registrato",
@@ -3506,19 +3771,19 @@
       "serverSection": "Server",
       "serverNotSet": "Non impostato",
       "statusLabel": "Stato",
-      "hubHelp": "La sincronizzazione mantiene le tue note aggiornate su tutti i dispositivi. Tutto viene cifrato su questo dispositivo prima di essere inviato — il server non vede mai le tue note.",
+      "hubHelp": "La sincronizzazione mantiene le tue note aggiornate su tutti i dispositivi. Tutto viene cifrato su questo dispositivo prima di essere inviato. Il server non vede mai le tue note.",
       "connectedTls": "Connesso tramite TLS.",
       "connectedLocal": "Connesso alla tua rete locale.",
       "connectError": "Impossibile raggiungere quel server. Controlla l'indirizzo e riprova.",
       "serverAddressLabel": "Indirizzo del server",
       "serverAddressPlaceholder": "https://sync.example.com",
       "fingerprintLabel": "Impronta del certificato",
-      "fingerprintCompare": "Confronta questa con la stessa schermata su un dispositivo di cui ti fidi già — devono corrispondere.",
+      "fingerprintCompare": "Confronta questa con la stessa schermata su un dispositivo di cui ti fidi già. Devono corrispondere.",
       "pinStatic": "Verificato con il certificato noto di questo server.",
       "pinTofu": "Fissato alla prima connessione. Confrontalo sui tuoi dispositivi per confermare.",
       "enrollNotConfigured": "Configura prima un server di sincronizzazione, poi aggiungi questo dispositivo.",
       "enrollTransport": "Impossibile raggiungere il server di sincronizzazione. Controlla la connessione e riprova.",
-      "accountNumberHint": "Ricontrolla questo numero — non sembra corretto.",
+      "accountNumberHint": "Ricontrolla questo numero. Non sembra corretto.",
       "passwordPlaceholder": "La password della tua cassaforte",
       "recoveryPhraseHint": "Inserisci o incolla le tue 24 parole. Incollando si riempiono le celle in ordine.",
       "verifyBody": "Verifica che lo stesso codice appaia sul dispositivo che hai appena approvato. Se corrisponde, è sul tuo account. In caso contrario, rimuovi il dispositivo.",
@@ -3537,11 +3802,11 @@
       "conflictsNeedReview_one": "{{count}} conflitto richiede revisione",
       "conflictsNeedReview_many": "{{count}} conflitti richiedono revisione",
       "conflictsNeedReview_other": "{{count}} conflitti richiedono revisione",
-      "catchingUp": "Recupero della sincronizzazione — le tue note sono al sicuro.",
+      "catchingUp": "Recupero della sincronizzazione in corso. Le tue note sono al sicuro.",
       "verifyDevices": "Verifica i dispositivi"
     },
     "tor": {
-      "connecting": "Connessione a Tor. La sincronizzazione è in pausa finché la connessione non è pronta — non viene inviato nulla in modo diretto.",
+      "connecting": "Connessione a Tor. La sincronizzazione è in pausa finché la connessione non è pronta. Non viene inviato nulla in modo diretto.",
       "settingsHint": "Impostazioni → Rete",
       "unavailable": "Tor non è disponibile, quindi la sincronizzazione è in pausa. Non viene inviato nulla in modo diretto. Disattiva l'instradamento tramite Tor per sincronizzare senza."
     }
@@ -3607,7 +3872,7 @@
       "closeLabel": "Chiudi modelli",
       "deleteRowLabel": "Elimina il modello {{name}} (sposta nel Cestino)",
       "editTemplateLabel": "Modifica il modello {{name}}",
-      "emptyBody": "Crea un modello per riutilizzare lo scheletro di una nota — una nota di riunione, un registro giornaliero, una nota di lettura. Scegline uno quando crei una nuova nota.",
+      "emptyBody": "Crea un modello per riutilizzare lo scheletro di una nota: una nota di riunione, un registro giornaliero, una nota di lettura. Scegline uno quando crei una nuova nota.",
       "emptyTitle": "Ancora nessun modello",
       "listLabel": "Modelli",
       "loading": "Caricamento…",
@@ -3619,7 +3884,7 @@
     },
     "emptyBefore": "Ancora nessun modello. Tocca ",
     "newAction": "Nuovo",
-    "emptyAfter": " per creare un modello di nota riutilizzabile — poi crea note a partire da esso (e scegline uno come modello per la nota giornaliera in Impostazioni).",
+    "emptyAfter": " per creare un modello di nota riutilizzabile, poi crea note a partire da esso (e scegline uno come modello per la nota giornaliera in Impostazioni).",
     "use": "Usa",
     "edit": "Modifica",
     "deleteConfirm": "Eliminare questo modello?",
@@ -3632,7 +3897,7 @@
     "cancel": "Annulla",
     "close": "Chiudi",
     "collision": {
-      "keepBoth": "Mantieni entrambi — installa come “{{name}}”",
+      "keepBoth": "Mantieni entrambi e installa come “{{name}}”",
       "question": "Hai già un tema chiamato “{{name}}”.",
       "replace": "Sostituisci “{{name}}”"
     },
@@ -3647,7 +3912,7 @@
       "unsupportedVersion": "Quel link è stato creato per una versione più recente di Myne. Aggiorna Myne, poi riprova."
     },
     "errorTitle": "Impossibile leggere quel tema",
-    "helper": "I temi sono una tavolozza di colori, non codice. Myne lo convalida su questo dispositivo prima di usarlo — nulla viene caricato.",
+    "helper": "I temi sono una tavolozza di colori, non codice. Myne lo convalida su questo dispositivo prima di usarlo. Nulla viene caricato.",
     "question": "Vuoi usare questo tema?",
     "title": "Installa tema"
   },
@@ -3659,10 +3924,10 @@
     "errors": {
       "alreadyUnlocked": "La cassaforte è già sbloccata.",
       "inProgress": "Operazione in corso.",
-      "kdfMemoryExceedsHost": "Per aprire questa cassaforte servono {{required}} MiB di memoria — più di quanti questo browser possa concederne ({{available}} MiB). La cassaforte è integra; aprila nell'app desktop di Myne.",
+      "kdfMemoryExceedsHost": "Per aprire questa cassaforte servono {{required}} MiB di memoria, più di quanti questo browser possa concederne ({{available}} MiB). La cassaforte è integra; aprila nell'app desktop di Myne.",
       "unexpected": "Errore imprevisto. Riprova.",
       "vaultNotFound": "File della cassaforte non trovato. Riavvia l'app.",
-      "vaultUpgraded": "Questa cassaforte è stata aggiornata a un formato più recente che questa versione di Myne non supporta ancora. I tuoi dati sono integri — aggiorna Myne all'ultima versione per aprirla."
+      "vaultUpgraded": "Questa cassaforte è stata aggiornata a un formato più recente che questa versione di Myne non supporta ancora. I tuoi dati sono integri. Aggiorna Myne all'ultima versione per aprirla."
     },
     "passwordLabel": "Password",
     "passwordPlaceholder": "Password",
@@ -3685,7 +3950,7 @@
     "subtitleBiometric": "Conferma con Touch ID per continuare.",
     "suspicion": {
       "lockedDuringChange": "Cambio password annullato: la cassaforte era bloccata.",
-      "metaChangedExternally": "La cassaforte è stata modificata in un'altra sessione — sbloccala di nuovo."
+      "metaChangedExternally": "La cassaforte è stata modificata in un'altra sessione. Sbloccala di nuovo."
     },
     "title": "Sblocca la tua cassaforte.",
     "vaultUnreadable": "Il file della cassaforte è illeggibile. Ripristina da un backup.",
@@ -3713,7 +3978,7 @@
     "unlockWithPinInstead": "Sblocca invece con il PIN",
     "useRecoveryPhrase": "Usa la tua frase di recupero",
     "deleteConfirmTitle": "Eliminare questa cassaforte?",
-    "deletePartialError": "Alcuni file non sono stati rimossi. La cassaforte non è più utilizzabile — continua per ricominciare.",
+    "deletePartialError": "Alcuni file non sono stati rimossi. La cassaforte non è più utilizzabile. Continua per ricominciare.",
     "failClosedEyebrow": "Impossibile aprire la cassaforte",
     "restoreHint": "Ripristina da un backup per continuare."
   },
@@ -3732,12 +3997,12 @@
       "committing": "Salvataggio…",
       "copied": "Copiato",
       "copy": "Copia",
-      "copyFailed": "Impossibile copiare — usa invece “Salva come file”.",
-      "eyebrow": "Passaggio 4 di 4 — numero di account",
+      "copyFailed": "Impossibile copiare. Usa invece “Salva come file”.",
+      "eyebrow": "Passaggio 4 di 4: numero di account",
       "heading": "Salva il tuo numero di account.",
-      "intro": "Questo è il tuo token al portatore — trattalo come contanti.",
+      "intro": "Questo è il tuo token al portatore. Trattalo come contanti.",
       "saveAsFile": "Salva come file",
-      "shownOnceBody": "Salvalo ora — Myne non può recuperarlo per te. È necessario per registrarti alla sincronizzazione più avanti.",
+      "shownOnceBody": "Salvalo ora. Myne non può recuperarlo per te. È necessario per registrarti alla sincronizzazione più avanti.",
       "shownOnceEmphasis": "Viene mostrato una sola volta."
     },
     "briefing": {
@@ -3745,17 +4010,17 @@
       "continue": "Continua alla creazione della cassaforte",
       "eyebrow": "Prima di creare la tua cassaforte",
       "heading": "Prima di creare la tua cassaforte",
-      "intro": "Myne crittografa le tue note in modo che solo tu possa aprirle. Da questo derivano tre cose — leggile, poi continua.",
+      "intro": "Myne crittografa le tue note in modo che solo tu possa aprirle. Da questo derivano tre cose. Leggile, poi continua.",
       "statements": {
         "no-email": {
           "ackLabel": "Ho capito che non esiste il recupero tramite email.",
           "statement": "Non esiste il recupero tramite email. Non esisterà mai.",
-          "why": "Non ti chiediamo mai la tua email, quindi non c'è alcun link di reimpostazione né alcun account che il supporto possa sbloccare. Non è una funzione mancante — è la garanzia. Il recupero tramite email significherebbe che potremmo leggere le tue note, e Myne è costruito in modo che non possiamo."
+          "why": "Non ti chiediamo mai la tua email, quindi non c'è alcun link di reimpostazione né alcun account che il supporto possa sbloccare. Non è una funzione mancante. È la garanzia. Il recupero tramite email significherebbe che potremmo leggere le tue note, e Myne è costruito in modo che non possiamo."
         },
         "no-store": {
           "ackLabel": "Ho capito che Myne non può recuperare la mia password.",
           "statement": "La tua password sblocca la tua cassaforte. Noi non la memorizziamo.",
-          "why": "La tua password è l'input della chiave che decifra le tue note. Non lascia mai questo dispositivo e nulla sui nostri server può riprodurla. È ciò che mantiene private le tue note — ed è il motivo per cui non possiamo reimpostarla per te."
+          "why": "La tua password è l'input della chiave che decifra le tue note. Non lascia mai questo dispositivo e nulla sui nostri server può riprodurla. È ciò che mantiene private le tue note, ed è il motivo per cui non possiamo reimpostarla per te."
         },
         "phrase-backup": {
           "ackLabel": "Ho capito che la mia frase di recupero è l'unico backup.",
@@ -3768,7 +4033,7 @@
     "confirm": {
       "back": "Indietro",
       "continue": "Continua",
-      "eyebrow": "Passaggio 3 di 4 — conferma la frase",
+      "eyebrow": "Passaggio 3 di 4: conferma la frase",
       "heading": "Ridigita quattro parole della tua frase.",
       "intro": "Ti chiederemo posizioni specifiche per verificare che tu l'abbia salvata.",
       "mismatch": "Non corrisponde alla parola n. {{pos}}.",
@@ -3778,6 +4043,11 @@
       "caption": "Richiede un momento.",
       "footerHint": "Se richiede più di 30 secondi, chiudi la finestra e riprova.",
       "heading": "Crittografia della tua cassaforte"
+    },
+    "provisioning": {
+      "heading": "Creazione del tuo account",
+      "caption": "Registrazione di questa cassaforte presso il server di sincronizzazione. Poi arriva la tua frase di recupero.",
+      "footerHint": "Richiede un momento. Lascia aperta questa scheda finché non finisce, così può ripulire dopo di sé se qualcosa va storto."
     },
     "errors": {
       "accountNumberInvalid": {
@@ -3841,7 +4111,7 @@
         "title": "Troppe creazioni di casseforti contemporanee"
       },
       "vaultArtifactsPresent": {
-        "body": "Impossibile creare una nuova cassaforte perché su questo dispositivo esistono già dati di una cassaforte. Chiudi l'app e riavviala — la schermata iniziale ti indirizzerà al flusso di sblocco.",
+        "body": "Impossibile creare una nuova cassaforte perché su questo dispositivo esistono già dati di una cassaforte. Chiudi l'app e riavviala. La schermata iniziale ti indirizzerà al flusso di sblocco.",
         "title": "La cassaforte esiste già"
       },
       "vaultBusyAuth": {
@@ -3863,22 +4133,31 @@
       "genericError": {
         "body": "Riprova.",
         "title": "Qualcosa è andato storto"
+      },
+      "provisionFailed": {
+        "body": "Non siamo riusciti a raggiungere il server di sincronizzazione, quindi questo browser è rimasto senza nulla da aprire. La tua frase di recupero non ti è mai stata mostrata, quindi non c'è nulla da trascrivere e nulla da perdere. Ricomincia quando sarai di nuovo online.",
+        "title": "Il tuo account non è stato creato"
       }
     },
     "password": {
       "back": "Indietro",
-      "eyebrow": "Passaggio 1 di 4 — password principale",
+      "eyebrow": "Passaggio 1 di 4: password principale",
       "heading": "Crea cassaforte",
       "helperLead": "Myne non memorizza la tua password né la tua frase di recupero.",
       "submit": "Genera frase di recupero"
     },
     "phrase": {
       "back": "Indietro",
-      "continue": "L'ho salvata — conferma la frase",
+      "clipboardNotCleared": "Il tuo browser non permette a Myne di svuotare gli appunti in seguito, quindi quelle 24 parole vi restano finché non copi qualcos'altro. Incollale nel tuo gestore di password, poi copia qualsiasi cosa.",
+      "continue": "L'ho salvata, conferma la frase",
+      "copied": "Copiata. Myne la rimuove dagli appunti dopo 30 secondi, anche se prosegui, purché l'app resti in esecuzione.",
+      "copiedNoAutoClear": "Copiata. Qui Myne non può svuotare gli appunti, quindi le parole vi restano finché non copi qualcos'altro.",
       "copy": "Copia",
-      "eyebrow": "Passaggio 2 di 4 — frase di recupero",
+      "extensionNotice": "Le estensioni del browser che hanno accesso a questo sito possono leggere ciò che si trova in questa pagina. Se non hai la certezza su tutte le estensioni presenti in questo profilo, usa l'app desktop o un profilo browser pulito per questo passaggio.",
+      "copyFailed": "Impossibile copiare. Usa invece \"Salva come file\".",
+      "eyebrow": "Passaggio 2 di 4: frase di recupero",
       "heading": "Trascrivi queste 24 parole.",
-      "intro": "Questa frase, insieme alla tua password, è l'unico modo per recuperare la tua cassaforte. Conservala offline — su carta, in un gestore di password, in un hardware wallet. Trattala come contanti.",
+      "intro": "Questa frase, insieme alla tua password, è l'unico modo per recuperare la tua cassaforte. Conservala offline: su carta, in un gestore di password, in un hardware wallet. Trattala come contanti.",
       "reveal": "Mostra la frase",
       "saveAsFile": "Salva come file"
     },
@@ -3886,10 +4165,10 @@
       "backedUp": "Backup eseguito ✓",
       "backingUp": "Backup in corso…",
       "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "Il backup non è stato completato — non è stato lasciato alcun file. Puoi eseguire il backup in qualsiasi momento da Impostazioni → Archiviazione.",
+      "backupError": "Il backup non è stato completato. Non è stato lasciato alcun file. Puoi eseguire il backup in qualsiasi momento da Impostazioni → Archiviazione.",
       "backupFilterName": "Backup Myne",
       "backUpNow": "Esegui ora il backup di questa cassaforte",
-      "body": "Myne ha scritto la tua cassaforte nella cartella dei dati dell'applicazione. La tua password principale e la tua frase di recupero sono l'unico modo per rientrare — assicurati di averle salvate entrambe in un luogo sicuro.",
+      "body": "Myne ha scritto la tua cassaforte nella cartella dei dati dell'applicazione. La tua password principale e la tua frase di recupero sono l'unico modo per rientrare. Assicurati di averle salvate entrambe in un luogo sicuro.",
       "decrypting": "Decifratura…",
       "done": "Fatto",
       "heading": "La tua cassaforte è pronta.",
@@ -3926,7 +4205,7 @@
         "weakPassword": "La nuova password deve avere almeno 12 caratteri."
       },
       "eyebrow": "Recupero · Nuova password",
-      "helperBody": "Aperta con la tua frase di recupero. La tua vecchia password non funziona più — imposta ora una nuova password principale.",
+      "helperBody": "Aperta con la tua frase di recupero. La tua vecchia password non funziona più. Imposta ora una nuova password principale.",
       "helperEmphasis": "La tua frase di recupero resta invariata.",
       "submit": "Imposta nuova password",
       "title": "Imposta una nuova password principale"
@@ -3983,9 +4262,9 @@
       "doneTitle": "Pulizia completata",
       "errorBody": "Qualcosa è andato storto. Chiudi l'app e riprova.",
       "errorTitle": "Pulizia non riuscita",
-      "foundBody_one": "{{count}} file residuo di un'eliminazione precedente non andata a buon fine. È già illeggibile — non perderai nulla di recuperabile.",
-      "foundBody_many": "{{count}} file residui di un'eliminazione precedente non andata a buon fine. Sono già illeggibili — non perderai nulla di recuperabile.",
-      "foundBody_other": "{{count}} file residui di un'eliminazione precedente non andata a buon fine. Sono già illeggibili — non perderai nulla di recuperabile.",
+      "foundBody_one": "{{count}} file residuo di un'eliminazione precedente non andata a buon fine. È già illeggibile. Non perderai nulla di recuperabile.",
+      "foundBody_many": "{{count}} file residui di un'eliminazione precedente non andata a buon fine. Sono già illeggibili. Non perderai nulla di recuperabile.",
+      "foundBody_other": "{{count}} file residui di un'eliminazione precedente non andata a buon fine. Sono già illeggibili. Non perderai nulla di recuperabile.",
       "foundTitle": "File residui di un'eliminazione incompleta",
       "partialBody_one": "{{count}} file potrebbe essere bloccato da un'altra app (antivirus, sincronizzazione file o indicizzazione di ricerca). Chiudi l'app e riprova tra un momento, oppure rimuovi manualmente la cartella della cassaforte.",
       "partialBody_many": "{{count}} file potrebbero essere bloccati da un'altra app (antivirus, sincronizzazione file o indicizzazione di ricerca). Chiudi l'app e riprova tra un momento, oppure rimuovi manualmente la cartella della cassaforte.",
@@ -4017,7 +4296,7 @@
     "nothingToPreview": "Ancora nulla da visualizzare in anteprima."
   },
   "conflicts": {
-    "empty": "Nessun conflitto da rivedere — le tue note sono sincronizzate.",
+    "empty": "Nessun conflitto da esaminare. Le tue note sono sincronizzate.",
     "groupTitle_one": "{{count}} copia in conflitto",
     "groupTitle_many": "{{count}} copie in conflitto",
     "groupTitle_other": "{{count}} copie in conflitto",
@@ -4050,14 +4329,14 @@
   },
   "restoreBackup": {
     "title": "Non ancora disponibile su mobile",
-    "body": "Il ripristino da un file di backup non è ancora disponibile su mobile — crea una cassaforte o recupera con la tua frase."
+    "body": "Il ripristino da un file di backup non è ancora disponibile su mobile. Crea una cassaforte o recupera con la tua frase."
   },
   "recording": {
     "deniedTitle": "L'accesso al microfono è disattivato",
     "errorTitle": "Impossibile avviare la registrazione",
     "deniedBody": "Per registrare una nota vocale, consenti l'accesso al microfono per Myne in Impostazioni › Myne › Microfono.",
     "noDeviceBody": "Nessun microfono trovato su questo dispositivo.",
-    "emptyBody": "Quella registrazione era vuota — nulla è stato acquisito.",
+    "emptyBody": "Quella registrazione era vuota. Nulla è stato acquisito.",
     "genericBody": "Qualcosa è andato storto durante la registrazione. Riprova.",
     "stopAria": "Interrompi registrazione"
   },
@@ -4093,14 +4372,15 @@
   "join": {
     "transportError": "Impossibile raggiungere quel server di sincronizzazione. Controlla l'indirizzo e la tua connessione, poi riprova.",
     "passwordPlaceholder": "La password della tua cassaforte",
-    "waitingHint": "Tieni aperta questa schermata — una volta approvato, qui apparirà un codice di verifica da confrontare con l'altro dispositivo.",
+    "waitingHint": "Tieni aperta questa schermata. Una volta approvato, qui apparirà un codice di verifica da confrontare con l'altro dispositivo.",
     "verifyBody": "Verifica che questo codice sia lo stesso mostrato sul dispositivo da cui hai approvato.",
+    "verifyChanged": "Il codice è cambiato mentre lo guardavi. Confronta di nuovo entrambe le schermate. Se continua a cambiare, fermati e non proseguire.",
     "removing": "Rimozione…",
-    "sasMismatch": "Non corrispondono — rimuovi questo dispositivo",
+    "sasMismatch": "Non corrispondono, rimuovi questo dispositivo",
     "title": "Connettiti al tuo account",
     "lead": "Inserisci i dettagli del tuo account per portare le tue note su questo dispositivo. Tutto resta cifrato end-to-end.",
     "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Ricontrolla questo numero — non sembra corretto.",
+    "accountHint": "Ricontrolla questo numero. Non sembra corretto.",
     "approvalHint": "Le tue note appaiono una volta che approvi questo dispositivo da un dispositivo che ha già il tuo account.",
     "connectingSubtitle": "Recupero del tuo account e sblocco della tua cassaforte su questo dispositivo.",
     "qr": {
@@ -4109,15 +4389,15 @@
       "confirmServer": "Server",
       "confirmTitle": "Aggiungere questo dispositivo?",
       "continue": "Continua",
-      "expired": "Questo QR è scaduto — generane uno nuovo sull'altro dispositivo e scansionalo di nuovo.",
+      "expired": "Questo QR è scaduto. Generane uno nuovo sull'altro dispositivo e scansionalo di nuovo.",
       "invalid": "Questo non è un QR di dispositivo Myne.",
-      "newerVersion": "Questo QR proviene da una versione più recente di Myne — aggiorna l'app e riprova.",
+      "newerVersion": "Questo QR proviene da una versione più recente di Myne. Aggiorna l'app e riprova.",
       "pinHosted": "Server ospitato da Myne",
       "pinNone": "Server self-hosted",
       "pinSelfHost": "Certificato fissato dal tuo dispositivo attendibile",
       "scan": "Scansiona il QR",
       "scanFailed": "Scansione non riuscita. Riprova, oppure inserisci i tuoi dati manualmente.",
-      "scanUnavailable": "La scansione non è disponibile su questo dispositivo — inserisci i tuoi dati qui sotto."
+      "scanUnavailable": "La scansione non è disponibile su questo dispositivo. Inserisci i tuoi dati qui sotto."
     }
   },
   "createVault": {
@@ -4125,6 +4405,9 @@
     "beginGeneric": "Impossibile avviare la creazione della cassaforte. Riprova.",
     "wordNumber": "PAROLA #{{position}}",
     "commitError": "Impossibile salvare la tua cassaforte. Riprova.",
+    "copyPhrase": "Copia",
+    "phraseCopied": "Copiata. Resta su questo dispositivo e il sistema la elimina dopo 30 secondi.",
+    "phraseCopyFailed": "Impossibile copiare. Usa invece \"Salva su file\".",
     "savedToFile": "Salvato in {{label}}",
     "saveFileError": "Impossibile salvare il file.",
     "stepLabel": "Crea una cassaforte · {{current}} di {{total}}",
@@ -4159,31 +4442,31 @@
   },
   "web": {
     "openElsewhere": {
-      "body": "Solo una scheda per volta può tenere aperta una cassaforte — due scriverebbero sullo stesso spazio di archiviazione e lo danneggerebbero. Chiudi l'altra scheda per continuare qui.",
+      "body": "Solo una scheda per volta può tenere aperta una cassaforte. Due scriverebbero sullo stesso spazio di archiviazione e lo danneggerebbero. Chiudi l'altra scheda per continuare qui.",
       "freed": "L'altra scheda è stata chiusa. Ricarica per aprire qui la tua cassaforte.",
       "reload": "Ricarica",
       "title": "Questa cassaforte è aperta in un'altra scheda"
     },
     "reload": {
-      "body": "Ricaricare questa pagina richiede di nuovo la tua password — per scelta progettuale non esiste una via d'accesso più rapida. La tua cassaforte resta crittografata su questo dispositivo mentre la pagina è chiusa, e la chiave viene ricostruita ogni volta dalla tua password.",
+      "body": "Ricaricare questa pagina richiede di nuovo la tua password. Per scelta progettuale non esiste una via d'accesso più rapida. La tua cassaforte resta crittografata su questo dispositivo mentre la pagina è chiusa, e la chiave viene ricostruita ogni volta dalla tua password.",
       "title": "Un ricaricamento significa reinserire la password"
     },
     "wall": {
       "getNative": "Scarica Myne per desktop o mobile",
       "noAccount": {
         "body": "Gli account si creano nell'app desktop o mobile di Myne, non qui.",
-        "reason": "La creazione di un account genera la tua frase di recupero di 24 parole e te la mostra una sola volta. Una pagina web non deve mai essere ciò che ti mostra quella frase — se trapelasse lì, nulla in Myne potrebbe rimediare.",
+        "reason": "La creazione di un account genera la tua frase di recupero di 24 parole e te la mostra una sola volta. Una pagina web non deve mai essere ciò che ti mostra quella frase. Se trapelasse lì, nulla in Myne potrebbe rimediare.",
         "title": "Prima ti serve un account"
       },
       "noSync": {
         "body": "Questo browser non ha alcun server di sincronizzazione configurato, quindi non ha nulla da aprire.",
-        "reason": "A differenza dell'app desktop, il browser non conserva una cassaforte propria su cui ripiegare — le sue note arrivano dalla sincronizzazione. Configurala nell'app desktop o mobile, poi torna qui.",
+        "reason": "A differenza dell'app desktop, il browser non conserva una cassaforte propria su cui ripiegare. Le sue note arrivano dalla sincronizzazione. Configurala nell'app desktop o mobile, poi torna qui.",
         "title": "La sincronizzazione non è ancora configurata"
       }
     },
     "unavailableHere": {
       "backup": "I backup crittografati si creano e si ripristinano nell'app desktop di Myne, che può scrivere il file di backup dove preferisci. Qui le tue note arrivano dal server, quindi questo browser si ripristina sincronizzandosi.",
-      "creation": "I nuovi account si creano nell'app desktop di Myne. È lì che ti viene mostrata la tua frase di recupero — e una frase di recupero non dovrebbe mai essere mostrata da una pagina web.",
+      "creation": "Questo browser contiene già un account. Per crearne un altro, apri l'app desktop di Myne o usa un altro profilo del browser.",
       "multiVault": "Questo browser contiene un solo account. Per usarne un altro, aprilo nell'app desktop di Myne o in un profilo del browser diverso.",
       "phraseRecovery": "Il recupero tramite frase avviene nell'app desktop di Myne. La tua frase di recupero non dovrebbe mai essere digitata in una pagina web.",
       "title": "Non disponibile nel browser"
@@ -4191,9 +4474,9 @@
     "unsupported": {
       "title": "Myne non può essere eseguito in questo browser",
       "mobileTitle": "Apri l'app Myne su questo dispositivo",
-      "handoff": "L'app desktop di Myne (macOS, Windows, Linux) e l'app mobile (iOS, Android) non hanno questo limite — e verificano la propria firma prima di essere eseguite, cosa che una pagina web non può fare.",
+      "handoff": "L'app desktop di Myne (macOS, Linux) e l'app mobile (Android) non hanno questo limite, e un'app che installi resta installata: se hai conservato il file che hai scaricato, è ancora sul tuo disco e puoi confrontarlo con l'hash che Myne pubblica per la versione corrente. Nulla esegue quel confronto al posto tuo. Non è ancora pubblicata alcuna build per Windows né alcuna build iOS installabile. Una pagina web viene inviata di nuovo al tuo browser a ogni visita, e il tuo browser non ne verifica nulla.",
       "reason": {
-        "desktop-form-factor": "Myne nel browser è pensato per un computer desktop — richiede la memoria e i dispositivi di input che il browser di un telefono o di un tablet non può offrire. Su questo dispositivo l'app Myne è comunque il client migliore: è più veloce, funziona offline e conserva le tue note quando il browser cancella il proprio archivio.",
+        "desktop-form-factor": "Myne nel browser è pensato per un computer desktop. Richiede la memoria e i dispositivi di input che il browser di un telefono o di un tablet non può offrire. Su questo dispositivo l'app Myne è comunque il client migliore: è più veloce, funziona offline e conserva le tue note quando il browser cancella il proprio archivio.",
         "webassembly": "Questo browser non supporta WebAssembly, su cui gira il nucleo crittografico.",
         "wasm-memory-headroom": "Questo browser non riesce a riservare i ~336 MB di memoria richiesti dalla derivazione delle chiavi della cassaforte. I browser di telefoni e tablet in genere non ci riescono; quel limite è stabilito dalla cassaforte stessa e non può essere abbassato per un singolo dispositivo senza rendere la cassaforte illeggibile su tutti gli altri.",
         "worker": "Questo browser non supporta i Web Workers, all'interno dei quali girano l'archiviazione e la crittografia della cassaforte.",

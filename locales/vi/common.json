@@ -11,26 +11,151 @@
     "noApprovers": "Hiện không có thiết bị nào khác trong tài khoản này có thể phê duyệt nó. Hãy mở Myne trên một thiết bị đã có quyền truy cập, rồi quay lại đây.",
     "pendingStartOver": "Bắt đầu lại với một tài khoản khác",
     "pendingTitle": "Đang chờ phê duyệt",
-    "sasMatch": "Chúng khớp — tiếp tục",
+    "sasMatch": "Mã khớp nhau, tiếp tục",
     "sasMismatch": "Chúng không khớp",
-    "verifyBody": "Hãy kiểm tra xem mã này có giống nhau trên cả hai thiết bị không trước khi bạn tiếp tục. Nếu không giống, hãy dừng lại — có gì đó không ổn với kết nối, chứ không phải với mật khẩu của bạn.",
+    "verifyBody": "Hãy kiểm tra xem mã này có giống nhau trên cả hai thiết bị không trước khi bạn tiếp tục. Nếu không giống, hãy dừng lại: có gì đó không ổn với kết nối, chứ không phải với mật khẩu của bạn.",
+    "verifyChanged": "Mã đã thay đổi trong lúc bạn đang xem. Hãy so sánh lại cả hai màn hình. Nếu nó vẫn tiếp tục thay đổi, hãy dừng lại và không tiếp tục.",
     "verifyTitle": "So sánh mã này",
     "title": "Đăng nhập vào kho của bạn",
     "working": "Đang thiết lập…"
   },
   "accountEntry": {
+    "createAccount": "Tôi chưa có tài khoản. Tạo một tài khoản.",
     "checkFailed": "Không thể kiểm tra số tài khoản đó. Hãy thử lại.",
     "checking": "Đang kiểm tra…",
     "continue": "Tiếp tục",
-    "hint": "Nó có dạng MY-XXXX-XXXX-XXXX-XXXX-XXXX. Được kiểm tra ngay trên thiết bị của bạn — chưa có gì được gửi đi.",
+    "hint": "Nó có dạng MY-XXXX-XXXX-XXXX-XXXX-XXXX. Được kiểm tra ngay tại đây trên thiết bị của bạn. Chưa có gì được gửi đi.",
     "invalid": "Số tài khoản đó không hợp lệ. Hãy kiểm tra rồi thử lại.",
     "title": "Nhập số tài khoản của bạn"
+  },
+  "agent": {
+    "composer": {
+      "placeholder": "Nhờ AI thay đổi các ghi chú này",
+      "scopeLabel": "Đang làm việc trên",
+      "scopeChange": "Đổi",
+      "scopeOpenNote": "Ghi chú này",
+      "scopeCount_one": "{{count}} ghi chú",
+      "scopeCount_other": "{{count}} ghi chú",
+      "scopeCountUnavailable": "Hiện không thể kiểm tra thư mục đó chứa bao nhiêu ghi chú.",
+      "startFailed": "Không thể khởi động tác nhân AI.",
+      "autoApplyFailed": "Không thể tự động áp dụng các thay đổi. Không có gì được ghi; hãy mở phần xem lại để tự áp dụng.",
+      "permissionLabel": "Khi lượt chạy kết thúc",
+      "permissionAsk": "Xem lại trước",
+      "permissionAuto": "Tự động áp dụng",
+      "providerRejected": "Nhà cung cấp không chấp nhận yêu cầu này, nên lượt chạy đã dừng. Không có gì được ghi. Đây là lỗi trong những gì Myne gửi đi, không phải ở ghi chú hay thiết lập của bạn.",
+      "unchecked": "Không thể hoàn thành việc kiểm tra khả năng chỉnh sửa, nên hiện chưa dùng được tác nhân AI. Hãy kiểm tra xem mô hình hoặc nhà cung cấp của bạn có kết nối được không, rồi thử lại.",
+      "unsupported": "Mô hình này không thể chỉnh sửa chính xác một cách đáng tin cậy, nên không dùng được tác nhân AI. Hãy chọn một mô hình lớn hơn hoặc một nhà cung cấp.",
+      "unsupportedDetail": "Nó đạt {{passes}} trên {{attempts}} lần kiểm tra; cần {{required}}.",
+      "checking": "Đang kiểm tra mô hình…",
+      "checkingAt": "Đang kiểm tra mô hình… ({{attempt}}/{{of}})",
+      "unsupportedProvisional": "Ngưỡng đạt đó chưa được đo trên nhiều mô hình, nên nó có thể chặt hơn hoặc lỏng hơn mức đáng có."
+    },
+    "progress": {
+      "working": "Đang chạy",
+      "awaitingScope": "Đang chờ bạn",
+      "cancelled": "Đã hủy",
+      "exhausted": "Đã dừng sau quá nhiều bước",
+      "stalled": "Đã dừng: mô hình này không tiến triển được với ghi chú",
+      "done": "Đã xong",
+      "scopeTotal_one": "có thể thay đổi {{count}} ghi chú",
+      "scopeTotal_other": "có thể thay đổi {{count}} ghi chú",
+      "cancel": "Dừng",
+      "expandFailed": "Không thể mở rộng phạm vi.",
+      "grantsUser_one": "{{count}} phạm vi bạn đặt",
+      "grantsUser_other": "{{count}} phạm vi bạn đặt",
+      "grantsModel_one": "{{count}} do nó yêu cầu",
+      "grantsModel_other": "{{count}} do nó yêu cầu"
+    },
+    "scope": {
+      "title": "Bao gồm {{folder}}?",
+      "grant_one": "AI sẽ có thể đọc và thay đổi {{count}} ghi chú trong {{folder}}.",
+      "grant_other": "AI sẽ có thể đọc và thay đổi {{count}} ghi chú trong {{folder}}.",
+      "newTotal_one": "Lượt chạy này khi đó sẽ bao gồm tổng cộng {{count}} ghi chú.",
+      "newTotal_other": "Lượt chạy này khi đó sẽ bao gồm tổng cộng {{count}} ghi chú.",
+      "excluded_one": "{{count}} ghi chú bị loại trừ khỏi AI và vẫn nằm ngoài.",
+      "excluded_other": "{{count}} ghi chú bị loại trừ khỏi AI và vẫn nằm ngoài.",
+      "egressRemote": "Những ghi chú này được gửi tới {{provider}}, bên mà Myne không vận hành. Chúng rời khỏi thiết bị này.",
+      "egressLocal": "Những ghi chú này đi tới một chương trình đang chạy trên máy tính này. Chúng không rời khỏi thiết bị.",
+      "reasonLabel": "Nó nói:",
+      "approve": "Cho phép",
+      "decline": "Lần này thì không",
+      "countsUnavailable": "AI đã xin đọc thêm {{folder}}. Hiện không thể kiểm tra việc đó thêm vào bao nhiêu ghi chú."
+    },
+    "review": {
+      "title": "Xem lại thay đổi",
+      "close": "Đóng",
+      "scopeTotal_one": "{{count}} ghi chú trong phạm vi",
+      "scopeTotal_other": "{{count}} ghi chú trong phạm vi",
+      "noChanges": "Tác nhân AI không đề xuất thay đổi nào.",
+      "noteHeading_one": "{{count}} thay đổi",
+      "noteHeading_other": "{{count}} thay đổi",
+      "changedLines_one": "{{count}} dòng",
+      "changedLines_other": "{{count}} dòng",
+      "removalFlag": {
+        "trashed": "Chuyển ghi chú này vào Thùng rác",
+        "deleted": "Xóa ghi chú này trên mọi thiết bị",
+        "archived": "Chuyển ghi chú này vào Lưu trữ",
+        "template": "Biến ghi chú này thành mẫu",
+        "conflict": "Đánh dấu ghi chú này là bản sao xung đột"
+      },
+      "largeDeletion": "Xóa nhiều văn bản",
+      "rejectEdit": "Từ chối",
+      "restoreEdit": "Giữ lại",
+      "applyRemoval": "Áp dụng riêng",
+      "rejectAll": "Từ chối tất cả",
+      "approveAll_one": "Phê duyệt {{count}} thay đổi",
+      "approveAll_other": "Phê duyệt {{count}} thay đổi",
+      "appliedCount_one": "Đã áp dụng {{count}} thay đổi.",
+      "appliedCount_other": "Đã áp dụng {{count}} thay đổi.",
+      "refused": {
+        "anchorNotFound": "Không thể áp dụng: văn bản đó không còn trong ghi chú.",
+        "anchorAmbiguous": "Không thể áp dụng: văn bản đó xuất hiện nhiều hơn một lần.",
+        "anchorEmpty": "Không thể áp dụng: không có văn bản nào để đối chiếu.",
+        "outOfScope": "Không thể áp dụng: ghi chú đó nằm ngoài phạm vi của lượt chạy này.",
+        "removalNeedsOwnAct": "Chưa áp dụng ở đây: việc đưa một ghi chú ra khỏi kho ghi chú của bạn cần xác nhận riêng.",
+        "readFailed": "Không thể áp dụng: không đọc được ghi chú đó.",
+        "unsafeFrontmatter": "Chưa tạo: tiêu đề hoặc thư mục được đề xuất có chứa ký tự xuống dòng.",
+        "excludedFolder": "Chưa tạo: thư mục đó bị loại trừ khỏi AI.",
+        "createFailed": "Chưa tạo: không ghi được ghi chú mới. Các thay đổi khác vẫn được áp dụng.",
+        "excludedNow": "Không thể áp dụng: thư mục của ghi chú đó hiện bị loại trừ khỏi AI.",
+        "notProposed": "Không thể áp dụng: thay đổi đó không nằm trong đề xuất của lượt chạy này."
+      },
+      "applyFailed": "Không thể áp dụng các thay đổi.",
+      "undo": "Hoàn tác lượt chạy này",
+      "undoFailed": "Không thể hoàn tác lượt chạy.",
+      "undoReport": "Đã khôi phục {{reverted}} ghi chú. {{kept}} ghi chú do lượt chạy tạo ra được giữ nguyên.",
+      "alreadyApplied": "Đã áp dụng",
+      "untitledNote": "Ghi chú chưa đặt tên",
+      "vaultRoot": "Thư mục gốc kho lưu trữ",
+      "newNotesHeading_one": "{{count}} ghi chú mới",
+      "newNotesHeading_other": "{{count}} ghi chú mới",
+      "createdCount_one": "Đã tạo {{count}} ghi chú.",
+      "createdCount_other": "Đã tạo {{count}} ghi chú.",
+      "runSummaryRequests_one": "{{count}} yêu cầu",
+      "runSummaryRequests_other": "{{count}} yêu cầu",
+      "runSummaryNotes_one": "đã đọc {{count}} ghi chú",
+      "runSummaryNotes_other": "đã đọc {{count}} ghi chú",
+      "runSummaryOffDevice_one": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
+      "runSummaryOffDevice_other": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
+      "runSummaryOnDevice": "không có gì rời khỏi thiết bị này"
+    },
+    "undo": {
+      "offer_one": "Lượt chạy vừa rồi đã thay đổi {{count}} ghi chú.",
+      "offer_other": "Lượt chạy vừa rồi đã thay đổi {{count}} ghi chú.",
+      "action": "Hoàn tác lượt chạy",
+      "reverted_one": "Đã khôi phục {{count}} ghi chú.",
+      "reverted_other": "Đã khôi phục {{count}} ghi chú.",
+      "failed_one": "Không thể khôi phục {{count}} ghi chú.",
+      "failed_other": "Không thể khôi phục {{count}} ghi chú.",
+      "createdNotReverted_one": "{{count}} ghi chú do lượt chạy tạo ra vẫn được giữ nguyên.",
+      "createdNotReverted_other": "{{count}} ghi chú do lượt chạy tạo ra vẫn được giữ nguyên."
+    }
   },
   "ai": {
     "answeredBy": {
       "inProcess": "Được trả lời trên thiết bị này",
       "localRuntime": "Được trả lời bởi {{name}}, trên máy tính này",
-      "remote": "Được trả lời bởi {{provider}} — ghi chú của bạn đã được gửi tới đó"
+      "remote": "Được trả lời bởi {{provider}}. Ghi chú của bạn đã được gửi tới đó."
     }
   },
   "attachments": {
@@ -42,8 +167,8 @@
       "deleteCta": "Xóa {{count}} tệp không dùng",
       "deleteCta_one": "Xóa {{count}} tệp không dùng",
       "deleteCta_other": "Xóa {{count}} tệp không dùng",
-      "corpusIncomplete": "Hãy hoàn tất đồng bộ trước — thiết bị này chưa có đầy đủ ghi chú của bạn. Không có gì bị xóa.",
-      "error": "Không thể dọn dẹp. Một số ghi chú có thể không đọc được — không có gì bị xóa.",
+      "corpusIncomplete": "Hãy hoàn tất đồng bộ trước. Thiết bị này chưa có đầy đủ ghi chú của bạn. Không có gì bị xóa.",
+      "error": "Không thể dọn dẹp. Một số ghi chú có thể không đọc được. Không có gì bị xóa.",
       "intro_one": "Tệp đính kèm này không được dùng trong bất kỳ ghi chú nào. Việc xóa là vĩnh viễn và không thể hoàn tác.",
       "intro_other": "{{count}} tệp đính kèm này không được dùng trong bất kỳ ghi chú nào. Việc xóa là vĩnh viễn và không thể hoàn tác.",
       "summaryFreed": " · đã giải phóng {{size}}",
@@ -82,7 +207,7 @@
       "actionsTitle": "Thao tác",
       "checking": "Đang kiểm tra…",
       "checkUnusedFailedNotice": "Không thể kiểm tra tệp đính kèm không dùng. Hãy thử lại.",
-      "corpusIncompleteNotice": "Hãy hoàn tất đồng bộ trước — thiết bị này chưa có đầy đủ ghi chú của bạn, nên không thể biết tệp đính kèm nào không được dùng.",
+      "corpusIncompleteNotice": "Hãy hoàn tất đồng bộ trước. Thiết bị này chưa có đầy đủ ghi chú của bạn, nên không thể biết tệp đính kèm nào không được dùng.",
       "cleanUnused": "Dọn tệp không dùng",
       "cleanUnusedTitle": "Xóa các tệp đính kèm không được dùng trong bất kỳ ghi chú nào",
       "colCreated": "Ngày tạo",
@@ -127,6 +252,7 @@
       "title": "Tệp đính kèm",
       "transcribeDone": "Đã chép lời xong.",
       "transcribeFailed": "Chép lời thất bại. Vui lòng thử lại.",
+      "transcribeTooLong": "Bản ghi âm này quá dài để chép lời.",
       "transcribeFeatureOff": "Chuyển giọng nói thành văn bản đang tắt. Hãy bật nó trong Cài đặt → Chép lời.",
       "transcribeModelLoadFailed": "Không thể tải mô hình chuyển giọng nói thành văn bản. Hãy cài đặt lại Myne, hoặc kiểm tra mô hình tùy chỉnh của bạn trong Cài đặt → Nhà phát triển → AI.",
       "transcribeNoModelHint": "Thiếu mô hình chuyển giọng nói thành văn bản. Cài đặt lại Myne sẽ khôi phục nó.",
@@ -159,7 +285,7 @@
       "untitled": "Không có tiêu đề"
     },
     "needsApp": "Cần ứng dụng để dọn dẹp tệp đính kèm.",
-    "noUnused": "Không có tệp đính kèm nào chưa dùng — mọi tệp đều được tham chiếu.",
+    "noUnused": "Không có tệp đính kèm nào không được dùng: mọi tệp đều được tham chiếu.",
     "scanError": "Không thể quét các tệp đính kèm chưa dùng.",
     "erasedToast_one": "Đã xóa {{count}} tệp chưa dùng.",
     "erasedToast_other": "Đã xóa {{count}} tệp chưa dùng.",
@@ -171,8 +297,8 @@
     "addError": "Không thể thêm tệp đó.",
     "deleteError": "Không thể xóa tệp đính kèm đó.",
     "renameError": "Không thể đổi tên tệp đính kèm đó.",
-    "unusedSummary_one": "{{count}} tệp đính kèm không được ghi chú nào tham chiếu ({{size}}). Việc xóa là thao tác xóa mật mã vĩnh viễn — không có thùng rác.",
-    "unusedSummary_other": "{{count}} tệp đính kèm không được ghi chú nào tham chiếu ({{size}}). Việc xóa là thao tác xóa mật mã vĩnh viễn — không có thùng rác.",
+    "unusedSummary_one": "{{count}} tệp đính kèm không được ghi chú nào tham chiếu ({{size}}). Việc xóa là thao tác xóa vĩnh viễn ở tầng mã hóa. Không có thùng rác.",
+    "unusedSummary_other": "{{count}} tệp đính kèm không được ghi chú nào tham chiếu ({{size}}). Việc xóa là thao tác xóa vĩnh viễn ở tầng mã hóa. Không có thùng rác.",
     "eraseCta_one": "Xóa {{count}} tệp chưa dùng",
     "eraseCta_other": "Xóa {{count}} tệp chưa dùng",
     "emptyState": "Chưa có tệp đính kèm. Chạm Tải lên để thêm hình ảnh hoặc PDF.",
@@ -192,7 +318,7 @@
         "joinFailure": "Sao lưu thất bại bất ngờ. Không có tệp nào được tạo ra.",
         "memberTooLarge": "Một tệp trong kho này lớn hơn mức định dạng sao lưu cho phép.",
         "vaultNotFound": "Không tìm thấy kho nào để sao lưu.",
-        "verifyFailed": "Bản sao lưu đã ghi không xác minh được nên đã bị loại bỏ. Hãy thử lại — dùng phương tiện khác nếu vẫn lặp lại."
+        "verifyFailed": "Bản sao lưu đã ghi không xác minh được nên đã bị loại bỏ. Hãy thử lại, dùng phương tiện khác nếu vẫn lặp lại."
       },
       "restore": {
         "authOperationInProgress": "Một thao tác kho khác đang diễn ra. Hãy chờ nó hoàn tất rồi thử lại.",
@@ -247,7 +373,7 @@
       "task": "Ghi chú có công việc",
       "content": "Toàn văn trong nội dung"
     },
-    "searchPlaceholder": "Tìm ghi chú hoặc chạy lệnh — thử tag: · path: · task:",
+    "searchPlaceholder": "Tìm ghi chú hoặc chạy lệnh. Thử tag: · path: · task:",
     "sectionCommands": "Lệnh",
     "sectionNotes": "Ghi chú",
     "untitledNote": "Không có tiêu đề"
@@ -494,6 +620,12 @@
       "saveWorkspaceAs": {
         "label": "Lưu không gian làm việc thành…"
       },
+      "removeNoteCover": {
+        "label": "Bỏ ảnh bìa ghi chú"
+      },
+      "setNoteCover": {
+        "label": "Đặt ảnh bìa ghi chú…"
+      },
       "showGraph": {
         "label": "Hiện chế độ xem đồ thị…"
       },
@@ -573,7 +705,7 @@
       }
     },
     "rebind": {
-      "invalidChordReason": "Hãy thêm một phím bổ trợ (⌘, Ctrl hoặc Alt) — một phím đơn lẻ không thể làm phím tắt."
+      "invalidChordReason": "Hãy thêm một phím bổ trợ (⌘, Ctrl hoặc Alt). Một phím đơn lẻ không thể làm phím tắt."
     },
     "picker": {
       "vaultRoot": "Thư mục gốc kho lưu trữ",
@@ -587,6 +719,7 @@
   },
   "common": {
     "cancel": "Hủy",
+    "close": "Đóng",
     "dismiss": "Bỏ qua",
     "prompt": {
       "cancel": "Hủy",
@@ -620,10 +753,10 @@
       "convert": {
         "cancel": "Hủy",
         "confirm": "Chuyển đổi",
-        "skipped": "đã bỏ qua — {{note}}",
+        "skipped": "đã bỏ qua: {{note}}",
         "subtitle_one": "1 tham chiếu sẽ được viết lại. Hãy xem lại trước khi thực hiện.",
         "subtitle_other": "{{count}} tham chiếu sẽ được viết lại. Hãy xem lại trước khi thực hiện.",
-        "subtitleEmpty": "Không có gì để chuyển đổi — không phân giải được tệp nguồn nào.",
+        "subtitleEmpty": "Không có gì để chuyển đổi: không phân giải được tệp nguồn nào.",
         "title": "Chuyển đổi tệp đính kèm đã nhập"
       },
       "convertCommand": {
@@ -643,7 +776,10 @@
         },
         "skippedSuffix": " · bỏ qua {{count}}",
         "skippedSuffix_one": " · bỏ qua {{count}}",
-        "skippedSuffix_other": " · bỏ qua {{count}}"
+        "skippedSuffix_other": " · bỏ qua {{count}}",
+        "layoutPreserved": "{{count}} giữ nguyên kích thước hoặc văn bản thay thế",
+        "layoutPreserved_one": "{{count}} tệp giữ nguyên kích thước hoặc văn bản thay thế",
+        "layoutPreserved_other": "{{count}} tệp giữ nguyên kích thước hoặc văn bản thay thế"
       },
       "fileKind": {
         "generic": "Tệp",
@@ -715,7 +851,7 @@
       "recording": {
         "barAria": "Đang ghi âm ghi chú giọng nói",
         "cancel": "Hủy",
-        "noAudio": "Không phát hiện âm thanh — hãy kiểm tra micrô.",
+        "noAudio": "Không phát hiện âm thanh. Hãy kiểm tra micrô.",
         "saving": "Đang lưu…",
         "stop": "Dừng"
       },
@@ -741,16 +877,16 @@
       "voice": {
         "startError": {
           "alreadyRecording": "Đang có một bản ghi âm tiến hành.",
-          "captureFailed": "Không thể bắt đầu ghi âm — hãy kiểm tra quyền truy cập micrô trong Cài đặt hệ thống.",
+          "captureFailed": "Không thể bắt đầu ghi âm. Hãy kiểm tra quyền truy cập micrô trong Cài đặt hệ thống.",
           "generic": "Không thể bắt đầu ghi âm.",
           "locked": "Hãy mở khóa kho để ghi âm ghi chú giọng nói.",
           "noInputDevice": "Không tìm thấy micrô. Hãy kết nối một micrô rồi thử lại."
         },
         "stopError": {
-          "captureFailed": "Ghi âm thất bại — hãy kiểm tra micrô của bạn.",
+          "captureFailed": "Ghi âm thất bại. Hãy kiểm tra micrô của bạn.",
           "emptyRecording": "Không có gì được ghi âm.",
           "generic": "Không thể lưu bản ghi âm.",
-          "silentRecording": "Bản ghi âm im lặng nên đã bị loại bỏ — hãy kiểm tra micrô của bạn."
+          "silentRecording": "Bản ghi âm im lặng nên đã bị loại bỏ. Hãy kiểm tra micrô của bạn."
         }
       },
       "widget": {
@@ -764,11 +900,26 @@
           "remove": "Gỡ bỏ",
           "rename": "Đổi tên",
           "reveal": "Hiện trong thư viện",
-          "transcribe": "Chép lời"
+          "transcribe": "Chép lời",
+          "customSize": "Kích thước tùy chỉnh…",
+          "customSizeInvalid": "Hãy nhập chiều rộng theo pixel (1-8192) hoặc theo phần trăm (1-100%).",
+          "editAlt": "Sửa văn bản thay thế…",
+          "size": {
+            "small": "Nhỏ",
+            "medium": "Vừa",
+            "large": "Lớn",
+            "full": "Toàn bộ chiều rộng"
+          },
+          "align": {
+            "left": "Căn trái",
+            "center": "Căn giữa",
+            "right": "Căn phải"
+          },
+          "altInvalid": "Văn bản thay thế không được chứa \"]\", vì sẽ làm hỏng phần nhúng."
         },
         "pdfFallback": "PDF",
         "textPreview": {
-          "truncated": "Bản xem trước bị cắt bớt — Xuất để lấy tệp đầy đủ."
+          "truncated": "Bản xem trước bị cắt bớt. Xuất để lấy tệp đầy đủ."
         },
         "tombstone": {
           "brokenAria": "Tham chiếu tệp đính kèm bị hỏng: {{filename}}",
@@ -791,7 +942,16 @@
           "progress": "Đang chép lời…",
           "stop": "Dừng"
         },
-        "urlImageFallback": "hình ảnh"
+        "urlImageFallback": "hình ảnh",
+        "unreadableSegment": "Không đọc được: {{segments}}"
+      },
+      "customSizePrompt": {
+        "title": "Kích thước tùy chỉnh",
+        "confirm": "Đặt kích thước"
+      },
+      "altPrompt": {
+        "title": "Văn bản thay thế",
+        "confirm": "Lưu"
       }
     },
     "callout": {
@@ -880,7 +1040,7 @@
           "insert": "Insert",
           "normal": "Normal",
           "replace": "Replace",
-          "title": "Chế độ vim — nhấn Esc để về chế độ normal",
+          "title": "Chế độ vim: nhấn Esc để về chế độ normal",
           "visual": "Visual"
         },
         "graphTitle": "Đồ thị (⌘⇧G)",
@@ -910,23 +1070,33 @@
       "resizeNotesSidebar": "Đổi cỡ thanh bên ghi chú",
       "rightPanel": {
         "aiChat": {
+          "agentTurn": {
+            "noAnswer": "Tác nhân AI đã dừng mà không có câu trả lời. Hãy hỏi lại hoặc diễn đạt lại.",
+            "newNotes_one": "{{count}} ghi chú mới.",
+            "newNotes_other": "{{count}} ghi chú mới.",
+            "proposed_one": "Đã đề xuất {{count}} thay đổi.",
+            "proposed_other": "Đã đề xuất {{count}} thay đổi."
+          },
           "askPlaceholder": "Đặt câu hỏi về ghi chú của bạn…",
           "askSubmit": "Hỏi",
           "assistant": "Trợ lý",
           "citations": "Nguồn",
           "composerPlaceholder": "Nhắn tin với ghi chú của bạn…",
-          "empty": "Kết quả AI — tóm tắt, câu trả lời và gợi ý — xuất hiện ở đây.",
+          "empty": "Kết quả AI (tóm tắt, câu trả lời và gợi ý) xuất hiện ở đây.",
           "error": "Không thể hoàn thành yêu cầu AI.",
           "errorTurn": "Trợ lý không thể trả lời.",
-          "gettingReadyHint": "Đang chuẩn bị ghi chú của bạn cho AI — chờ một chút.",
+          "gettingReadyHint": "Đang chuẩn bị ghi chú của bạn cho AI. Chờ một chút.",
+          "noSearchModelHint": "Việc hỏi sẽ tìm trong ghi chú của bạn ngay trên thiết bị này, và điều đó cần một mô hình tìm kiếm ở đây. Nhà cung cấp không làm được việc này. Hãy chọn một mô hình trong Cài đặt → Nhà phát triển → AI. Việc dùng AI để sửa ghi chú vẫn hoạt động.",
           "insert": "Chèn vào ghi chú",
-          "noAnswer": "Không có câu trả lời — thử diễn đạt lại.",
+          "noAnswer": "Không có câu trả lời. Hãy thử diễn đạt lại.",
+          "newChat": "Trò chuyện mới",
           "noModelHint": "Chưa thiết lập nhà cung cấp AI nào, nên các tính năng trò chuyện, tóm tắt, viết lại và tìm kiếm ngữ nghĩa không có gì để chạy. Hãy thiết lập một nhà cung cấp trong Cài đặt → Nhà phát triển → AI.",
           "unreachableHint": "Nhà cung cấp bạn đã thiết lập không phản hồi. Hãy kiểm tra xem nó có đang chạy không, rồi gửi lại.",
           "unavailableHint": "Bản dựng Myne này được biên dịch mà không kèm AI cục bộ, nên không có gì ở đây chạy được.",
           "offHint": "AI cục bộ đang tắt. Hãy bật nó trong Cài đặt → Nhà phát triển → AI.",
           "send": "Gửi",
           "statusGettingReady": "Đang chuẩn bị…",
+          "statusNoSearchModel": "Không có mô hình tìm kiếm",
           "statusNoModel": "Không có nhà cung cấp",
           "statusUnreachable": "Không phản hồi",
           "statusUnavailable": "Không khả dụng",
@@ -938,7 +1108,7 @@
           "truncated": "Đã tóm tắt {{count}} ký tự đầu tiên.",
           "you": "Bạn"
         },
-        "allHidden": "Tất cả tab đều bị ẩn — nhấp chuột phải để khôi phục.",
+        "allHidden": "Tất cả tab đều bị ẩn. Nhấp chuột phải để khôi phục.",
         "outline": {
           "collapse": "Thu gọn mục",
           "empty": "Không có tiêu đề",
@@ -1007,7 +1177,7 @@
       "done": "Xong",
       "edit": "Chỉnh sửa bản vẽ {{name}}",
       "editAction": "Chỉnh sửa",
-      "empty": "Bản vẽ trống — bấm để vẽ",
+      "empty": "Bản vẽ trống: bấm để vẽ",
       "open": "Mở",
       "rename": "Đổi tên bản vẽ"
     },
@@ -1029,6 +1199,12 @@
       "replaceOne": "Thay thế",
       "replacePlaceholder": "Thay bằng",
       "toggleReplace": "Bật/tắt thay thế"
+    },
+    "cover": {
+      "add": "Thêm ảnh bìa",
+      "change": "Đổi ảnh bìa",
+      "emptyLibraryMobile": "Chưa có hình ảnh nào trong kho này. Hãy tải lên một ảnh để dùng làm ảnh bìa.",
+      "writeFailed": "Không thể cập nhật ảnh bìa của ghi chú"
     },
     "folding": {
       "clickToUnfold": "Nhấn để mở rộng",
@@ -1195,9 +1371,9 @@
     "vim": {
       "ex": {
         "refused": {
-          "edit": "`:e` không được hỗ trợ — Myne mở ghi chú, không mở tệp. Hãy dùng bảng lệnh hoặc thanh bên.",
+          "edit": "`:e` không được hỗ trợ. Myne mở ghi chú, không mở tệp. Hãy dùng bảng lệnh hoặc thanh bên.",
           "map": "Myne không hỗ trợ ánh xạ phím tùy chỉnh. Phím tắt được cấu hình trong Cài đặt → Phím tắt.",
-          "set": "`:set` không được hỗ trợ — Myne không có tùy chọn vim. Các tùy chọn trình soạn thảo nằm trong Cài đặt → Trình soạn thảo.",
+          "set": "`:set` không được hỗ trợ. Myne không có tùy chọn vim. Các tùy chọn trình soạn thảo nằm trong Cài đặt → Trình soạn thảo.",
           "source": "`:source` không được hỗ trợ. Myne cố ý không có cơ chế tập lệnh cấu hình nào.",
           "unsupported": "Lệnh đó không được Myne hỗ trợ."
         },
@@ -1222,10 +1398,10 @@
         "convertedToast_one": "Đã chuyển đổi {{count}} liên kết wiki",
         "convertedToast_other": "Đã chuyển đổi {{count}} liên kết wiki",
         "noneToConvert": "Không có liên kết wiki đã nhập nào để chuyển đổi trong ghi chú này.",
-        "nothingToConvert": "Không có gì để chuyển đổi — không phân giải được liên kết wiki đã nhập nào.",
+        "nothingToConvert": "Không có gì để chuyển đổi: không phân giải được liên kết wiki đã nhập nào.",
         "rewriteCount_one": "{{count}} liên kết sẽ được viết lại",
         "rewriteCount_other": "{{count}} liên kết sẽ được viết lại",
-        "skipped": "đã bỏ qua — {{reason}}",
+        "skipped": "đã bỏ qua: {{reason}}",
         "title": "Chuyển đổi liên kết wiki đã nhập trong ghi chú này",
         "staleDocument": "Ghi chú này đã thay đổi trong khi bản xem trước đang mở, nên không có gì được chuyển đổi. Hãy chạy lại để xem các liên kết hiện tại."
       },
@@ -1246,6 +1422,9 @@
       "attachFailed": "Không thể đính kèm tệp đó.",
       "archiveFailed": "Không thể lưu trữ ghi chú này.",
       "aiRewriteFailed": "Không thể hoàn thành việc viết lại, nên vùng chọn của bạn không thay đổi.",
+      "aiRewriteNoSelection": "Hãy chọn văn bản bạn muốn viết lại trước, rồi chạy Viết lại vùng chọn một lần nữa.",
+      "aiRewriteUnavailable": "Không thể chạy Viết lại vùng chọn lúc này. Không có gì trong ghi chú của bạn bị thay đổi.",
+      "aiRewriteExcluded": "Ghi chú này nằm trong thư mục bạn đã loại trừ khỏi AI, nên không có gì được viết lại.",
       "aiRewriteNoProvider": "Chưa thiết lập nhà cung cấp AI nào, nên không có gì được viết lại. Hãy thiết lập một nhà cung cấp trong Cài đặt → Nhà phát triển → AI.",
       "trashFailed": "Không thể chuyển ghi chú này vào Thùng rác."
     },
@@ -1372,10 +1551,10 @@
         "ioNoSpace": "Không đủ dung lượng ở thư mục đích.",
         "ioPermissionDenied": "Không có quyền ghi tại thư mục đích.",
         "ioWriteDefault": "Không thể ghi tệp đã xuất.",
-        "noteNotFound": "Ghi chú này không còn tồn tại — có thể nó đã bị xóa.",
+        "noteNotFound": "Ghi chú này không còn tồn tại. Có thể nó đã bị xóa.",
         "pdfCaptureFailed": "Không thể tạo PDF, nên không có gì được xuất.",
         "pdfExportInProgress": "Một thao tác xuất PDF đang chạy. Hãy chờ nó hoàn tất rồi thử lại.",
-        "pdfPayloadMissing": "Quá trình xuất bị gián đoạn — nếu kho đã khóa, hãy mở khóa rồi thử lại.",
+        "pdfPayloadMissing": "Quá trình xuất bị gián đoạn. Nếu kho đã khóa, hãy mở khóa rồi thử lại.",
         "pdfRenderTimeout": "Ghi chú mất quá nhiều thời gian để dựng, nên không có gì được xuất.",
         "pdfWindowCreateFailed": "Không thể mở cửa sổ xuất, nên không có gì được xuất.",
         "targetExists": "Đã có một tệp trùng tên ở thư mục đích.",
@@ -1481,7 +1660,7 @@
       "reload": "Tải lại"
     },
     "corrupted": {
-      "body": "Nếu bạn có bản sao lưu, bạn có thể khôi phục nó — các tệp hiện tại của bạn không bị động đến; bản sao lưu được khôi phục thành một kho riêng biệt trước.",
+      "body": "Nếu bạn có bản sao lưu, bạn có thể khôi phục nó. Các tệp hiện tại của bạn không bị động đến; bản sao lưu được khôi phục thành một kho riêng biệt trước.",
       "cta": "Đóng ứng dụng",
       "title": "Tệp kho bị hỏng."
     },
@@ -1523,7 +1702,7 @@
       "folderDeleteConfirmCta": "Chuyển vào Thùng rác",
       "folderDeleteError": "Không thể chuyển ghi chú của thư mục đó vào Thùng rác. Thử lại.",
       "folderDeleteTitle": "Chuyển thư mục này vào Thùng rác?",
-      "folderDeleteWarning": "Chúng được chuyển vào Thùng rác — bạn có thể khôi phục bất cứ lúc nào. Xóa vĩnh viễn là một bước riêng.",
+      "folderDeleteWarning": "Chúng được chuyển vào Thùng rác. Bạn có thể khôi phục bất cứ lúc nào. Xóa vĩnh viễn là một bước riêng.",
       "restore": "Khôi phục",
       "restoreError": "Không thể khôi phục ghi chú đó. Hãy thử lại.",
       "title": "Lưu trữ",
@@ -1595,7 +1774,7 @@
         "is": "là",
         "isNot": "không phải là"
       },
-      "noConditions": "Chưa có điều kiện nào — chế độ xem này hiển thị tất cả các trang.",
+      "noConditions": "Chưa có điều kiện nào. Chế độ xem này hiển thị tất cả các trang.",
       "noteCount_one": "{{count}} ghi chú",
       "noteCount_other": "{{count}} ghi chú",
       "of": "của:",
@@ -1636,7 +1815,7 @@
       "openFolderNote": "Mở ghi chú thư mục"
     },
     "graph": {
-      "allConnected": "Mọi thứ đều được kết nối — không có ghi chú nào tách biệt.",
+      "allConnected": "Mọi thứ đều được kết nối: không có ghi chú nào tách biệt.",
       "building": "Đang dựng đồ thị…",
       "colorGroups": {
         "addRule": "Thêm quy tắc",
@@ -1645,7 +1824,7 @@
         "dragHandleTitle": "Kéo để sắp xếp lại",
         "editFilterButton": "Chỉnh sửa bộ lọc…",
         "editFilterTitle": "Chỉnh sửa bộ lọc nhóm màu",
-        "emptyBody": "Nhóm màu cho phép bạn tô màu các nút đồ thị theo thẻ hoặc thư mục — ghi chú công việc một màu, ghi chú cá nhân một màu khác. Hãy thêm quy tắc đầu tiên của bạn.",
+        "emptyBody": "Nhóm màu cho phép bạn tô màu các nút đồ thị theo thẻ hoặc thư mục: ghi chú công việc một màu, ghi chú cá nhân một màu khác. Hãy thêm quy tắc đầu tiên của bạn.",
         "emptyTitle": "Chưa có nhóm màu nào",
         "enableToggleAriaLabel": "Bật quy tắc",
         "filterAllNotes": "Khớp với mọi ghi chú",
@@ -1666,7 +1845,7 @@
       "noNotes": "Chưa có ghi chú nào để vẽ đồ thị.",
       "overCap": "Kho này lớn — đồ thị toàn kho bị giới hạn. Hãy lọc theo thẻ hoặc hiển thị các ghi chú tách biệt để khám phá.",
       "refresh": "Làm mới",
-      "refreshTitle": "Kho đã thay đổi — dựng lại đồ thị",
+      "refreshTitle": "Kho đã thay đổi: dựng lại đồ thị",
       "settings": {
         "appearanceHeading": "Giao diện",
         "closeTitle": "Đóng",
@@ -1723,15 +1902,15 @@
         "mediaOmittedSuffix_one": " · bỏ {{count}}",
         "mediaOmittedSuffix_other": " · bỏ {{count}}",
         "needsAttention": "Cần chú ý",
-        "needsAttentionHelp": "Những ghi chú này được nhập nguyên trạng. Các gợi ý sửa chỉ là điểm khởi đầu — sao chép một gợi ý, rồi đổi tên ghi chú khi bạn mở nó.",
+        "needsAttentionHelp": "Những ghi chú này được nhập nguyên trạng. Các gợi ý sửa chỉ là điểm khởi đầu. Sao chép một gợi ý, rồi đổi tên ghi chú khi bạn mở nó.",
         "noFolderChosen": "Chưa chọn thư mục",
         "notesImported_one": "ghi chú đã nhập",
         "notesImported_other": "ghi chú đã nhập",
         "policyCopyHint": "Đưa nó vào cùng với ghi chú hiện có.",
         "policyCopyLabel": "Nhập làm bản sao",
-        "policySkipHint": "Khuyến nghị — chạy lại việc nhập sẽ không bao giờ tạo bản sao hay ghi đè.",
+        "policySkipHint": "Khuyến nghị: chạy lại việc nhập sẽ không bao giờ tạo bản sao hay ghi đè.",
         "policySkipLabel": "Bỏ qua nó",
-        "preexistingDetail": "Ghi chú này vốn đã có thư mục riêng: “{{existing}}”, mà Myne giữ lại — thư mục của nó có thể khác với vị trí trên đĩa.",
+        "preexistingDetail": "Ghi chú này vốn đã có thư mục riêng: “{{existing}}”, mà Myne giữ lại. Thư mục của nó có thể khác với vị trí trên đĩa.",
         "preparing": "Đang chuẩn bị…",
         "progressNotes": " ghi chú",
         "progressOf": " trên ",
@@ -1739,7 +1918,7 @@
         "reasonPathTooLong": "đường dẫn thư mục + tiêu đề quá dài",
         "reasonSegmentTooLong": "tên dài hơn mức Myne cho phép",
         "scanning": "Đang quét kho của bạn…",
-        "setupIntro": "Myne nhập và mã hóa ghi chú của bạn ngay tại chỗ — không có gì rời khỏi thiết bị này, và các tệp gốc của bạn không bao giờ bị thay đổi.",
+        "setupIntro": "Myne nhập và mã hóa ghi chú của bạn ngay tại chỗ. Không có gì rời khỏi thiết bị này, và các tệp gốc của bạn không bao giờ bị thay đổi.",
         "statCancelled": "Đã hủy",
         "statCanvasSkipped": "tệp .canvas đã bỏ qua",
         "statCompressed": "Hình ảnh đã nén",
@@ -1760,8 +1939,8 @@
         "statExcalidrawSkipped": "Bản vẽ Excalidraw đã bỏ qua",
         "unfollowedLinkOutside": "Đây là lối tắt tới một thư mục nằm ngoài thư mục bạn đã chọn, nên Myne không đi theo nó. Hãy chuyển hoặc sao chép thư mục đó vào bên trong kho của bạn rồi nhập lại.",
         "unfollowedLinkLoop": "Lối tắt này trỏ ngược vào một thư mục mà Myne đã ở bên trong, nên đi theo nó sẽ lặp vòng mãi mãi. Không có gì bên dưới nó bị bỏ sót.",
-        "unfollowedLinkBroken": "Lối tắt này không dẫn đến đâu cả — thứ mà nó từng trỏ tới đã bị chuyển đi hoặc xóa.",
-        "unreadableDetail": "Đã bỏ qua — {{reason}} Phần còn lại của việc nhập vẫn tiếp tục.",
+        "unfollowedLinkBroken": "Lối tắt này không dẫn đến đâu cả. Thứ mà nó từng trỏ tới đã bị chuyển đi hoặc xóa.",
+        "unreadableDetail": "Đã bỏ qua: {{reason}} Phần còn lại của việc nhập vẫn tiếp tục.",
         "stoppedAt": "{{imported}} trên {{total}} ghi chú đã được nhập trước khi việc này dừng lại. Chúng nằm trong kho của bạn và an toàn để giữ.",
         "reasonNotUtf8": "Myne không đọc được tệp này dưới dạng văn bản. Có lẽ nó được lưu bằng một bảng mã cũ, hoặc nó không phải tệp văn bản.",
         "reasonPathRejected": "Myne không thể truy cập tệp này bên trong thư mục bạn đã chọn.",
@@ -1771,7 +1950,7 @@
         "reasonUnknown": "Myne không thể nói rõ lý do."
       },
       "offer": {
-        "body": "Đưa các ghi chú hiện có của bạn vào Myne. Từng ghi chú được mã hóa khi nhập — không có gì rời khỏi thiết bị này, và các tệp gốc của bạn vẫn ở nguyên vị trí.",
+        "body": "Đưa các ghi chú hiện có của bạn vào Myne. Từng ghi chú được mã hóa khi nhập. Không có gì rời khỏi thiết bị này, và các tệp gốc của bạn vẫn ở nguyên vị trí.",
         "chooseFolder": "Chọn thư mục…",
         "laterHint": "Bạn luôn có thể nhập sau từ Cài đặt → Lưu trữ.",
         "notNow": "Không phải bây giờ",
@@ -1792,14 +1971,14 @@
           "label": "Notion",
           "pickerTitle": "Chọn thư mục bản xuất Notion đã giải nén của bạn",
           "survives": "Giữ lại: các trang, cấu trúc thư mục, thuộc tính trang thành các trường, và liên kết nội bộ thành liên kết wiki. Mỗi cơ sở dữ liệu cũng được đưa vào thành một ghi chú dạng bảng liên kết tới các hàng của nó.",
-          "loses": "Hãy giải nén bản xuất trước — Myne đọc thư mục, không đọc tệp .zip. Toggle, khung chú thích và văn bản có màu không có thứ tương đương và được liệt kê trong một báo cáo nhập.",
+          "loses": "Hãy giải nén bản xuất trước: Myne đọc thư mục, không đọc tệp .zip. Toggle, khung chú thích và văn bản có màu không có thứ tương đương và được liệt kê trong một báo cáo nhập.",
           "short": "Một thư mục bản xuất đã giải nén"
         },
         "evernote": {
           "label": "Evernote",
           "pickerTitle": "Chọn tệp .enex Evernote của bạn",
           "survives": "Giữ lại: mọi ghi chú trong tệp, định dạng và tệp đính kèm. Các khối đã mã hóa được giữ nguyên dưới dạng văn bản mà bạn vẫn có thể giải mã trong Evernote.",
-          "loses": "Bỏ lại: lời nhắc và lịch sử ghi chú. Các bản xuất quá lớn bị từ chối thay vì mạo hiểm — hãy chia nhỏ bản xuất nếu gặp trường hợp đó.",
+          "loses": "Bỏ lại: nhắc nhở và lịch sử ghi chú. Các bản xuất quá lớn bị từ chối thay vì mạo hiểm. Hãy chia nhỏ bản xuất nếu gặp trường hợp đó.",
           "short": "Một tệp xuất .enex duy nhất"
         },
         "html": {
@@ -1813,7 +1992,7 @@
           "label": "CSV",
           "pickerTitle": "Chọn tệp .csv của bạn",
           "survives": "Trở thành một ghi chú duy nhất chứa bảng đó.",
-          "loses": "Đó là một ghi chú, không phải mỗi hàng một ghi chú — Myne không phải là cơ sở dữ liệu. Các tệp quá rộng hoặc quá dài sẽ bị cắt bớt, và báo cáo nhập cho biết đã cắt bao nhiêu.",
+          "loses": "Đó là một ghi chú, không phải mỗi hàng một ghi chú: Myne không phải là cơ sở dữ liệu. Các tệp quá rộng hoặc quá dài sẽ bị cắt bớt, và báo cáo nhập cho biết đã cắt bao nhiêu.",
           "short": "Một tệp bảng tính"
         }
       }
@@ -1836,7 +2015,7 @@
       "bulkMove": "Di chuyển {{count}} ghi chú đến…",
       "bulkMove_one": "Di chuyển {{count}} ghi chú đến…",
       "bulkMove_other": "Di chuyển {{count}} ghi chú đến…",
-      "caseMergeBody": "Đã có một thư mục tên “{{name}}”. Chúng sẽ được hợp nhất — đổi tên một thư mục để tách riêng?",
+      "caseMergeBody": "Đã có một thư mục tên “{{name}}”. Chúng sẽ được hợp nhất. Đổi tên một thư mục để tách riêng?",
       "color": "Màu sắc…",
       "createFirstNote": "+ Tạo ghi chú đầu tiên của bạn",
       "createFolderNote": "Tạo ghi chú thư mục",
@@ -1846,7 +2025,7 @@
       "deleteFolderBody_other": "“{{name}}” và {{count}} ghi chú của nó",
       "deleteFolderConfirm": "Xóa thư mục",
       "deleteFolderTitle": "Xóa thư mục này?",
-      "deleteFolderWarning": "Các ghi chú sẽ được chuyển vào Thùng rác — bạn có thể khôi phục chúng sau.",
+      "deleteFolderWarning": "Các ghi chú sẽ được chuyển vào Thùng rác. Bạn có thể khôi phục chúng sau.",
       "duplicate": "Nhân bản",
       "editFilterTitle": "Chỉnh sửa bộ lọc",
       "emptyState": "Chưa có ghi chú nào.",
@@ -1898,9 +2077,9 @@
       "viewSettingsTitle": "Cài đặt chế độ xem",
       "imported_one": "Đã nhập 1 ghi chú vào thư mục này",
       "imported_other": "Đã nhập {{count}} ghi chú vào thư mục này",
-      "importedWithSkips": "Đã nhập {{count}} — bỏ qua {{skipped}}",
-      "importedWithSkips_one": "Đã nhập {{count}} ghi chú — bỏ qua {{skipped}}",
-      "importedWithSkips_other": "Đã nhập {{count}} ghi chú — bỏ qua {{skipped}}",
+      "importedWithSkips": "Đã nhập {{count}} · bỏ qua {{skipped}}",
+      "importedWithSkips_one": "Đã nhập {{count}} · bỏ qua {{skipped}}",
+      "importedWithSkips_other": "Đã nhập {{count}} · bỏ qua {{skipped}}",
       "importNoMarkdown": "Không có tệp markdown nào trong phần vừa thả",
       "moveFolderTo": "Chuyển thư mục đến…"
     },
@@ -1947,7 +2126,7 @@
     "row": {
       "addToFavorites": "Thêm vào mục yêu thích",
       "folderIndexBadgeLabel": "Ghi chú thư mục",
-      "folderIndexBadgeTitle": "Ghi chú thư mục — mục lục của thư mục này",
+      "folderIndexBadgeTitle": "Ghi chú thư mục: mục lục của thư mục này",
       "folderIndexConflictLabel": "Thư mục đã có một ghi chú mục lục",
       "folderIndexConflictTitle": "Thư mục này đã có một ghi chú mục lục",
       "loadError": "Không thể tải ghi chú này",
@@ -1964,24 +2143,24 @@
     },
     "saveStatus": {
       "conflict": "Đang giải quyết xung đột chỉnh sửa…",
-      "conflictTitle": "Ghi chú này đã thay đổi trên một thiết bị khác — đang giữ cả hai phiên bản",
+      "conflictTitle": "Ghi chú này đã thay đổi trên một thiết bị khác: đang giữ cả hai phiên bản",
       "editing": "Đang chỉnh sửa",
       "editingEllipsis": "Đang chỉnh sửa…",
-      "editingTitle": "Đang chỉnh sửa — tự động lưu đã sẵn sàng",
+      "editingTitle": "Đang chỉnh sửa: tự động lưu đã sẵn sàng",
       "justNow": "vừa xong",
       "retry": "Thử lại",
       "saved": "Đã lưu",
       "savedRelative": "Đã lưu {{rel}}",
       "saveFailed": "Lưu thất bại",
-      "saveFailedTitle": "Lưu thất bại — nhấn Thử lại",
+      "saveFailedTitle": "Lưu thất bại: nhấn Thử lại",
       "storageFull": "Hết dung lượng lưu trữ",
-      "storageFullTitle": "Không còn chỗ trống để lưu ghi chú này. Hãy giải phóng dung lượng (hoặc gỡ bớt tệp đính kèm), rồi thử lại. Cho đến khi lưu được, thay đổi này chỉ nằm trong cửa sổ này — nó cũng không có trên máy chủ.",
+      "storageFullTitle": "Không còn chỗ trống để lưu ghi chú này. Hãy giải phóng dung lượng (hoặc gỡ bớt tệp đính kèm), rồi thử lại. Cho đến khi lưu được, thay đổi này chỉ nằm trong cửa sổ này. Nó cũng không có trên máy chủ.",
       "saving": "Đang lưu",
       "savingEllipsis": "Đang lưu…"
     },
     "snapshotFailed": {
       "dismiss": "Bỏ qua",
-      "message": "Không thể lưu một ảnh chụp — ghi chú của bạn đã được lưu, nhưng lịch sử phiên bản của nó có thể không đầy đủ (ổ đĩa có thể đã đầy)."
+      "message": "Không thể lưu một ảnh chụp. Ghi chú của bạn đã được lưu, nhưng lịch sử phiên bản của nó có thể không đầy đủ (ổ đĩa có thể đã đầy)."
     },
     "snapshots": {
       "cancel": "Hủy",
@@ -2000,14 +2179,14 @@
       "encryptedSize": "Đã mã hóa · {{size}}",
       "errorCannotDecrypt": "Không thể giải mã ảnh chụp này.",
       "errorGeneric": "Đã xảy ra lỗi. Hãy thử lại.",
-      "errorIo": "Đã xảy ra lỗi ổ đĩa — ổ đĩa có thể đã đầy hoặc không ghi được.",
+      "errorIo": "Đã xảy ra lỗi ổ đĩa. Ổ đĩa có thể đã đầy hoặc không ghi được.",
       "errorNotFound": "Ảnh chụp đó không còn nữa.",
       "errorStorageAccess": "Không thể truy cập vùng lưu trữ ảnh chụp của kho.",
       "errorVaultLocked": "Kho đang bị khóa. Hãy mở khóa để xem ảnh chụp.",
       "justNow": "vừa xong",
       "listLabel": "Danh sách ảnh chụp",
       "loading": "Đang tải…",
-      "noPrevious": "Đây là ảnh chụp sớm nhất — không có gì trước nó để so sánh.",
+      "noPrevious": "Đây là ảnh chụp sớm nhất. Không có gì trước nó để so sánh.",
       "restore": "Khôi phục",
       "restoreCta": "Khôi phục ảnh chụp này",
       "restoredStatus": "Đã khôi phục. Phiên bản bạn đang có được lưu thành một ảnh chụp.",
@@ -2022,7 +2201,7 @@
       "openNotes": "Mở ghi chú",
       "pin": "Ghim",
       "pinned": "Đã ghim",
-      "pinnedTitle": "Đã ghim — bỏ ghim để đóng",
+      "pinnedTitle": "Đã ghim: bỏ ghim để đóng",
       "unpin": "Bỏ ghim",
       "untitled": "Không có tiêu đề"
     },
@@ -2061,7 +2240,7 @@
       "emptyConfirmTitle": "Dọn sạch thùng rác?",
       "emptyPartialFailure_one": "Không thể xóa {{count}} ghi chú và chúng vẫn ở trong thùng rác.",
       "emptyPartialFailure_other": "Không thể xóa {{count}} ghi chú và chúng vẫn ở trong thùng rác.",
-      "emptyBody": "Ghi chú bạn xóa sẽ nằm ở đây. Chúng ở lại cho đến khi bạn dọn sạch thùng rác — bạn có thể khôi phục bất kỳ ghi chú nào bất cứ lúc nào.",
+      "emptyBody": "Ghi chú bạn xóa sẽ nằm ở đây. Chúng ở lại cho đến khi bạn dọn sạch thùng rác. Bạn có thể khôi phục bất kỳ ghi chú nào bất cứ lúc nào.",
       "emptyTitle": "Thùng rác trống",
       "emptyState": "Thùng rác trống.",
       "purgeConfirmCta": "Xóa vĩnh viễn",
@@ -2076,7 +2255,7 @@
       "heading": "Lượt nhắc chưa liên kết",
       "link": "Liên kết",
       "linkTooltip": "Liên kết lượt nhắc này tới {{title}}",
-      "refresh": "Các lượt nhắc có thể đã thay đổi — làm mới",
+      "refresh": "Các lượt nhắc có thể đã thay đổi: làm mới",
       "searching": "Đang tìm…",
       "thisNote": "ghi chú này",
       "untitled": "Không có tiêu đề"
@@ -2135,7 +2314,7 @@
       "columnsEmpty": "Không tìm thấy thuộc tính nào",
       "columnsHint": "Các thuộc tính frontmatter hiển thị dưới dạng cột (bảng) hoặc dòng chi tiết (danh sách / thẻ).",
       "columnsPlaceholder": "Thêm cột…",
-      "coverImageHint": "Thuộc tính frontmatter có giá trị là một hình ảnh — hiển thị làm ảnh bìa của mỗi thẻ. Để trống nếu không muốn ảnh bìa.",
+      "coverImageHint": "Thuộc tính frontmatter có giá trị là một hình ảnh, hiển thị làm ảnh bìa của mỗi thẻ. Để trống nếu không muốn ảnh bìa.",
       "coverImagePlaceholder": "vd. cover",
       "coverImageProperty": "Thuộc tính ảnh bìa",
       "groupBy": "Nhóm theo",
@@ -2186,12 +2365,14 @@
     "intro": "Nâng cấp kho này lên định dạng mới. Ghi chú của bạn sẽ được hợp nhất tự động giữa các thiết bị. Việc này tạo lại khóa cho toàn bộ kho; bản sao cũ vẫn được giữ trên thiết bị này cho tới khi bạn xác nhận.",
     "passwordLabel": "Mật khẩu chính",
     "phraseLabel": "Cụm từ khôi phục",
-    "phraseHelp": "Bắt buộc — các khóa mới của bạn được bọc dưới cụm từ này, nhờ đó việc khôi phục vẫn hoạt động. Hãy nhập đủ tất cả các từ khôi phục của bạn.",
+    "phraseHelp": "Bắt buộc: các khóa mới của bạn được bọc dưới cụm từ này, nhờ đó việc khôi phục vẫn hoạt động. Hãy nhập đủ tất cả các từ khôi phục của bạn.",
     "submit": "Nâng cấp",
     "migrating": "Đang nâng cấp…",
     "done": "Đã nâng cấp {{count}} ghi chú lên định dạng mới.",
+    "done_one": "Đã nâng cấp {{count}} ghi chú lên định dạng mới.",
+    "done_other": "Đã nâng cấp {{count}} ghi chú lên định dạng mới.",
     "settle": {
-      "intro": "Kho của bạn đã được nâng cấp. Bản sao cũ vẫn còn trên thiết bị này cho tới khi bạn hoàn tất — cho tới lúc đó, việc đổi mật khẩu sẽ không khóa được bản sao cũ.",
+      "intro": "Kho của bạn đã được nâng cấp. Bản sao cũ vẫn còn trên thiết bị này cho tới khi bạn hoàn tất. Cho tới lúc đó, việc đổi mật khẩu sẽ không khóa được bản sao cũ.",
       "confirm": "Mọi thứ đều ổn, hãy xóa bản sao cũ",
       "abort": "Có gì đó không ổn, hãy đưa kho cũ trở lại",
       "errorAlreadySynced": "Kho này đã đồng bộ ở định dạng mới, nên không thể đưa bản cũ trở lại. Hãy khôi phục từ một bản sao lưu nếu bạn cần bản cũ.",
@@ -2200,7 +2381,7 @@
     },
     "progressCount": "Đã mã hóa lại {{done}} trên {{total}} mục…",
     "error": {
-      "recoveryPhraseRequired": "Cụm từ khôi phục đó không khớp với kho này. Hãy nhập đúng cụm từ khôi phục của bạn để nâng cấp — nó là bắt buộc để việc khôi phục vẫn hoạt động.",
+      "recoveryPhraseRequired": "Cụm từ khôi phục đó không khớp với kho này. Hãy nhập đúng cụm từ khôi phục của bạn để nâng cấp. Nó là bắt buộc để việc khôi phục vẫn hoạt động.",
       "wrongPassword": "Mật khẩu đó không khớp với kho này.",
       "alreadyMigrated": "Kho này đã ở định dạng mới rồi.",
       "generic": "Không thể hoàn tất việc nâng cấp. Kho của bạn không thay đổi; hãy thử lại."
@@ -2223,7 +2404,7 @@
     "accountTitle": "Nhập số tài khoản của bạn",
     "accountLead": "Tìm số này ở nơi bạn đã lưu cụm từ khôi phục. Nó xác định kho lưu trữ cần khôi phục.",
     "accountInvalid": "Số tài khoản không hợp lệ — vui lòng kiểm tra và nhập lại.",
-    "accountOptionalHint": "Không có số này? Để trống và tiếp tục — cụm từ khôi phục 24 từ của bạn là tất cả những gì bạn cần.",
+    "accountOptionalHint": "Không có số này? Để trống và tiếp tục. Cụm từ khôi phục 24 từ của bạn là tất cả những gì bạn cần.",
     "paste": "Dán",
     "phraseGridHint": "Nhập từng từ, hoặc dán cả 24 từ cùng lúc để điền vào lưới.",
     "submitProgress": "Gửi · {{filled}}/{{total}}",
@@ -2310,12 +2491,12 @@
     "backLabel": "Quay lại",
     "cancelLabel": "Hủy",
     "collision": {
-      "body": "Một kho từ bản sao lưu này đã tồn tại trên thiết bị này. Bạn có thể giữ cả hai — bản sao đã khôi phục sẽ hiện ra như một kho riêng biệt trong danh sách kho của bạn — hoặc khôi phục ngay rồi tự gỡ kho hiện có khỏi danh sách (việc gỡ yêu cầu bạn gõ DELETE, và chỉ nên làm sau khi bạn xác nhận kho đã khôi phục mở được).",
+      "body": "Một kho từ bản sao lưu này đã tồn tại trên thiết bị này. Bạn có thể giữ cả hai: bản sao đã khôi phục sẽ hiện ra như một kho riêng biệt trong danh sách kho của bạn. Hoặc bạn có thể khôi phục ngay rồi tự gỡ kho hiện có khỏi danh sách kho. Việc gỡ yêu cầu bạn gõ DELETE, và chỉ hợp lý sau khi bạn xác nhận kho đã khôi phục mở được.",
       "keepBoth": "Giữ cả hai",
       "replaceExisting": "Khôi phục, rồi thay thế kho hiện có…"
     },
     "damaged": {
-      "body": "Tệp sao lưu bị hỏng nên không có gì được khôi phục. Nếu đây là bản sao duy nhất bạn có, chức năng cứu dữ liệu có thể khôi phục các ghi chú còn nguyên vẹn và liệt kê chính xác những gì không đọc được — kết quả luôn được ghi là khôi phục một phần.",
+      "body": "Tệp sao lưu bị hỏng nên không có gì được khôi phục. Nếu đây là bản sao duy nhất bạn có, chức năng cứu dữ liệu có thể khôi phục các ghi chú còn nguyên vẹn và liệt kê chính xác những gì không đọc được. Kết quả luôn được ghi là khôi phục một phần.",
       "close": "Đóng",
       "salvage": "Cứu các ghi chú nguyên vẹn…"
     },
@@ -2323,7 +2504,7 @@
       "tryAnotherFile": "Thử tệp khác"
     },
     "pick": {
-      "body": "Chọn một tệp <code>.myne-backup</code>. Bản sao lưu được xác minh trước khi khôi phục bất cứ thứ gì; kho đã khôi phục được mở khóa bằng mật khẩu hoặc cụm từ khôi phục của kho đó — y hệt như khi mở khóa.",
+      "body": "Chọn một tệp <code>.myne-backup</code>. Bản sao lưu được xác minh trước khi khôi phục bất cứ thứ gì; kho đã khôi phục được mở khóa bằng mật khẩu hoặc cụm từ khôi phục của kho đó, y hệt như khi mở khóa.",
       "chooseFile": "Chọn tệp sao lưu…",
       "corruptedSuffix": "Kho hiện tại của bạn không bị động đến: bản sao lưu được khôi phục thành một kho riêng biệt trước."
     },
@@ -2332,8 +2513,8 @@
       "collidedNote": "Bản sao trước đó của kho này vẫn còn trong danh sách kho của bạn. Sau khi bạn xác nhận kho đã khôi phục mở được, bạn có thể gỡ bản cũ khỏi danh sách kho (nó sẽ yêu cầu bạn gõ DELETE).",
       "notes": "Ghi chú: {{n}}",
       "openVaultList": "Mở danh sách kho",
-      "partialHeader_one": "Đã khôi phục một phần — không đọc được {{count}} mục.",
-      "partialHeader_other": "Đã khôi phục một phần — không đọc được {{count}} mục.",
+      "partialHeader_one": "Đã khôi phục một phần: không đọc được {{count}} mục.",
+      "partialHeader_other": "Đã khôi phục một phần: không đọc được {{count}} mục.",
       "restored": "Đã khôi phục kho.",
       "versionHistory": "Mục lịch sử phiên bản: {{n}}"
     },
@@ -2354,8 +2535,14 @@
       "changelogButton": "Xem nhật ký thay đổi…",
       "changelogHelper": "Ghi chú theo từng phiên bản. Sẽ xuất hiện khi MYND-119 hoàn thành.",
       "changelogLabel": "Nhật ký thay đổi",
-      "developerModeHelper": "Hiện các cài đặt nâng cao mà Myne mặc định giữ khuất: những cài đặt đưa bạn ra khỏi lối đi Myne bảo đảm, và các công cụ dành cho người dùng thành thạo mà hầu hết mọi người không bao giờ cần. Tắt nó chỉ ẩn chúng đi lần nữa — thứ gì bạn đã bật vẫn bật, và bạn tắt nó ở chính chỗ điều khiển của nó.",
+      "developerModeHelper": "Hiện các cài đặt nâng cao mà Myne mặc định giữ khuất: những cài đặt đưa bạn ra khỏi lối đi Myne bảo đảm, và các công cụ dành cho người dùng thành thạo mà hầu hết mọi người không bao giờ cần. Tắt nó chỉ ẩn chúng đi lần nữa. Thứ gì bạn đã bật vẫn bật, và bạn tắt nó ở chính chỗ điều khiển của nó.",
       "developerModeLabel": "Chế độ nhà phát triển",
+      "legalLabel": "Pháp lý",
+      "legalHelper": "Mở tại myne.md trong trình duyệt của bạn. Bằng tiếng Đức nếu giao diện là tiếng Đức.",
+      "legalPrivacy": "Chính sách quyền riêng tư",
+      "legalTerms": "Điều khoản bản beta",
+      "legalNotice": "Báo cáo nội dung bất hợp pháp",
+      "legalLawEnforcement": "Yêu cầu từ cơ quan thực thi pháp luật",
       "licenseBody": "Tiền alpha · Tài liệu CC-BY-4.0 · Mã ứng dụng AGPL-3.0 khi phát hành Giai đoạn 1.",
       "licenseLabel": "Giấy phép",
       "tagline": "Tiền alpha · Trình khách máy tính Giai đoạn 1",
@@ -2372,7 +2559,7 @@
         "ioError": "Lỗi ổ đĩa, vui lòng thử lại.",
         "joinFailure": "Đã xảy ra lỗi, vui lòng thử lại.",
         "samePasswordRejected": "Mật khẩu mới trùng với mật khẩu hiện tại.",
-        "serverAckPending": "Mật khẩu mới của bạn hoạt động trên thiết bị này, nhưng Myne không kết nối được tới máy chủ để lưu nó. Cho đến khi kết nối được, các thiết bị khác của bạn vẫn cần mật khẩu cũ — và nếu bản sao trong trình duyệt này bị xóa trước lúc đó, thay đổi đó sẽ bị mất. Myne sẽ tự động thử lại.",
+        "serverAckPending": "Mật khẩu mới của bạn hoạt động trên thiết bị này, nhưng Myne không kết nối được tới máy chủ để lưu nó. Cho đến khi kết nối được, các thiết bị khác của bạn vẫn cần mật khẩu cũ, và nếu bản sao trong trình duyệt này bị xóa trước lúc đó, thay đổi đó sẽ bị mất. Myne sẽ tự động thử lại.",
         "weakNewPassword": "Mật khẩu mới phải có ít nhất 12 ký tự."
       },
       "changePasswordHeading": "Đổi mật khẩu",
@@ -2387,8 +2574,9 @@
       "parallelism": "Mức song song",
       "timeCost": "Chi phí thời gian",
       "vaultLabelEyebrow": "NHÃN KHO",
-      "vaultLabelHelper": "Tên cho kho này, hiển thị trong bộ chuyển kho của ứng dụng. Được lưu mã hóa bên trong kho; không bao giờ rời thiết bị của bạn dưới dạng văn bản thuần.",
+      "vaultLabelHelper": "Tên cho kho này, hiển thị trong bộ chuyển kho của ứng dụng và trên màn hình chọn kho lúc khởi động trước khi bạn mở khóa. Được lưu mã hóa bên trong kho; không bao giờ rời thiết bị của bạn dưới dạng văn bản thuần.",
       "vaultLabelPlaceholder": "Thêm một nhãn…",
+      "vaultLabelRenameNotice": "Cho đến khi bạn mở khóa kho này trên các thiết bị khác của mình, màn hình khóa của chúng vẫn hiện những gì chúng đã lưu lần cuối: một tên cũ, hoặc một tên tạm nếu chúng chưa từng lưu tên nào.",
       "vaultLabelSave": "Lưu",
       "vaultIconLabel": "BIỂU TƯỢNG",
       "vaultIconDefault": "Mặc định (biểu trưng chữ)",
@@ -2436,7 +2624,7 @@
       "editorFont": "Phông chữ trình soạn thảo",
       "showEditTimesSubtitle": "Dấu thời gian dưới mỗi ghi chú",
       "graphSettingsLabel": "Giao diện đồ thị",
-      "graphSettingsHelper": "Màu nút, nhãn, kích thước và các lực bố cục được đặt ngay bên trong đồ thị — hãy mở nó và dùng bánh răng ở góc. Chúng được giữ riêng cho từng thiết bị, nên một thay đổi ở đó không theo bạn sang điện thoại.",
+      "graphSettingsHelper": "Màu nút, nhãn, kích thước và các lực bố cục được đặt ngay bên trong đồ thị. Hãy mở nó và dùng bánh răng ở góc. Chúng được giữ riêng cho từng thiết bị, nên một thay đổi ở đây không theo bạn sang điện thoại.",
       "openGraph": "Mở đồ thị"
     },
     "archive": {
@@ -2448,9 +2636,9 @@
     },
     "attachmentCompression": {
       "label": "Nén hình ảnh khi nhập",
-      "helper": "Thu nhỏ hình ảnh được dán hoặc thả vào trước khi chúng được mã hóa và lưu, để kho, bản sao lưu và đồng bộ của bạn nhẹ hơn. Việc này không thể đảo ngược — tệp gốc không được giữ lại.",
+      "helper": "Thu nhỏ hình ảnh được dán hoặc thả vào trước khi chúng được mã hóa và lưu, để kho, bản sao lưu và đồng bộ của bạn nhẹ hơn. Việc này không thể đảo ngược: tệp gốc không được giữ lại.",
       "helperScopeEveryDevice": "Áp dụng cho toàn bộ kho, trên mọi thiết bị.",
-      "helperScopeNotHere": "Áp dụng cho toàn bộ kho, nhưng không áp dụng trong trình duyệt này — hình ảnh thêm ở đây được lưu đúng như khi đưa vào.",
+      "helperScopeNotHere": "Áp dụng cho toàn bộ kho, nhưng không áp dụng trong trình duyệt này: hình ảnh thêm ở đây được lưu đúng như khi đưa vào.",
       "errorSaveSetting": "Không thể lưu cài đặt này."
     },
     "transcription": {
@@ -2480,7 +2668,7 @@
       "saveFailedToast": "Không thể lưu cài đặt sao lưu.",
       "searchEmpty": "Không có kết quả.",
       "searchPlaceholder": "Tìm kiếm…",
-      "statusFailed": "Sao lưu tự động thất bại — {{stamp}}",
+      "statusFailed": "Sao lưu tự động thất bại: {{stamp}}",
       "statusLastBackup": "Sao lưu gần nhất: {{stamp}}",
       "statusNever": "Chưa có bản sao lưu tự động nào.",
       "title": "Sao lưu tự động"
@@ -2520,7 +2708,7 @@
     "cliAccess": {
       "label": "Truy cập từ dòng lệnh",
       "helperOff": "Đang tắt. Lệnh `myne` không thể đọc hay thay đổi bất cứ thứ gì trong kho này.",
-      "helperOn": "Đang bật khi kho này được mở khóa. Bất kỳ chương trình nào chạy dưới tài khoản của bạn đều có thể đọc, tìm và tạo ghi chú qua nó — Myne không phân biệt được cửa sổ dòng lệnh của bạn với một script, và không kiểm tra gì ngoài việc cửa đang mở. Nó không bao giờ hỏi mật khẩu của bạn, đóng ngay khi kho bị khóa, và không thể xóa ghi chú.",
+      "helperOn": "Đang bật khi kho này được mở khóa. Bất kỳ chương trình nào chạy dưới tài khoản của bạn đều có thể đọc, tìm và tạo ghi chú qua nó. Myne không phân biệt được cửa sổ dòng lệnh của bạn với một script, và không kiểm tra gì ngoài việc cửa đang mở. Nó không bao giờ hỏi mật khẩu của bạn, đóng ngay khi kho bị khóa, và không thể xóa ghi chú.",
       "lastUsedNever": "Chưa dùng kể từ khi kho này được mở khóa.",
       "lastUsedJustNow": "Vừa dùng xong.",
       "lastUsedMinutesAgo": "Dùng lần cuối {{count}} phút trước.",
@@ -2535,10 +2723,10 @@
       "notOnPathHint": "Shell của bạn chưa tìm thấy `myne`. Hãy thêm dòng này vào hồ sơ shell của bạn, rồi mở một cửa sổ dòng lệnh mới:",
       "pathLine": "export PATH=\"{{dir}}:$PATH\"",
       "excludedLabel": "Thư mục mà dòng lệnh không bao giờ thấy",
-      "excludedHelper": "Mỗi dòng một đường dẫn thư mục. Ghi chú trong các thư mục này bị loại khỏi mọi kết quả từ dòng lệnh và không thể ghi vào đó từ dòng lệnh — chúng vẫn dùng được đầy đủ trong ứng dụng. Bạn có thể đặt việc này trước khi bật truy cập từ dòng lệnh.",
+      "excludedHelper": "Mỗi dòng một đường dẫn thư mục. Ghi chú trong các thư mục này bị loại khỏi mọi kết quả từ dòng lệnh và không thể ghi vào đó từ dòng lệnh. Chúng vẫn dùng được đầy đủ trong ứng dụng. Bạn có thể đặt việc này trước khi bật truy cập từ dòng lệnh.",
       "excludedPlaceholder": "Private/\nJournal/",
       "rateLimitLabel": "Cho dòng lệnh chạy hết tốc độ",
-      "rateLimitHelper": "Mặc định Myne trả lời tối đa 120 lệnh mỗi phút từ dòng lệnh. Đó là giới hạn nhịp độ dành cho một script chạy loạn, không phải một lớp kiểm tra quyền — không có gì quyết định chương trình nào được phép hỏi. Hãy bật tùy chọn này cho công việc hàng loạt, như đưa từng ghi chú qua một công cụ khác."
+      "rateLimitHelper": "Mặc định Myne trả lời tối đa 120 lệnh mỗi phút từ dòng lệnh. Đó là giới hạn nhịp độ dành cho một script chạy loạn, không phải một lớp kiểm tra quyền: không có gì quyết định chương trình nào được phép hỏi. Hãy bật tùy chọn này cho công việc hàng loạt, như đưa từng ghi chú qua một công cụ khác."
     },
     "clipperInstall": {
       "error": "Không thể cập nhật cài đặt trình cắt trình duyệt.",
@@ -2570,7 +2758,7 @@
       "export": "Xuất",
       "exportError": "Không thể xuất giao diện đó. Vui lòng thử lại.",
       "fileFilterName": "Giao diện Myne",
-      "helper": "Dùng bảng màu của riêng bạn. Giao diện được kiểm tra trên thiết bị này trước khi dùng — không có gì được tải lên.",
+      "helper": "Dùng bảng màu của riêng bạn. Giao diện được kiểm tra trên thiết bị này trước khi dùng. Không có gì được tải lên.",
       "importButton": "Nhập giao diện…",
       "importError": "Tệp đó không phải là một giao diện hợp lệ. Mở tài liệu tham khảo để xem định dạng.",
       "label": "Giao diện tùy chỉnh",
@@ -2584,7 +2772,7 @@
       "dateFormatHelper": "Tiêu đề của mỗi ghi chú hằng ngày. Hỗ trợ YYYY, MM, DD. Mặc định là {{default}}.",
       "dateFormatLabel": "Định dạng ngày của ghi chú hằng ngày",
       "dateFormatSaveError": "Không thể lưu định dạng ngày. Vui lòng thử lại.",
-      "folderHelper": "Nơi lưu các ghi chú hằng ngày mới. Mặc định là {{default}} — thư mục được giữ lại ngay cả khi trống.",
+      "folderHelper": "Nơi lưu các ghi chú hằng ngày mới. Mặc định là {{default}}. Thư mục được giữ lại ngay cả khi trống.",
       "folderLabel": "Thư mục ghi chú hằng ngày",
       "folderSaveError": "Không thể lưu thư mục hằng ngày. Vui lòng thử lại.",
       "folderSearchEmpty": "Không có thư mục nào khớp.",
@@ -2701,15 +2889,15 @@
       },
       "reservedBadge": "Không dùng được ở đây",
       "reservedBadgeTitle": "Trình duyệt của bạn {{action}} khi bạn nhấn {{chord}}, nên phím tắt này không bao giờ đến được Myne. Phím tắt vẫn hoạt động trong ứng dụng máy tính.",
-      "reservedRefused": "{{chord}} thuộc về trình duyệt của bạn — nó {{action}}. Hãy chọn một phím tắt khác; các phím tắt trên máy tính của bạn không thay đổi.",
-      "reservedUnreliable": "{{chord}} có thể không đến được Myne — ở một số trình duyệt, nó {{action}}. Vẫn được thêm.",
+      "reservedRefused": "{{chord}} thuộc về trình duyệt của bạn: nó {{action}}. Hãy chọn một phím tắt khác; các phím tắt trên máy tính của bạn không thay đổi.",
+      "reservedUnreliable": "{{chord}} có thể không đến được Myne: ở một số trình duyệt, nó {{action}}. Vẫn được thêm.",
       "resetAll": "Đặt lại tất cả phím tắt…",
       "resetAllConfirm": "Đặt lại mọi phím tắt tùy chỉnh về mặc định?",
       "resetAllYes": "Đặt lại tất cả",
       "restoreDefaultAria": "Khôi phục mặc định cho {{command}}",
       "searchAriaLabel": "Tìm phím tắt",
       "searchPlaceholder": "Tìm phím tắt…",
-      "warnAlreadyUsed": "Đã được dùng bởi {{commands}} — vẫn thêm."
+      "warnAlreadyUsed": "Đã được dùng bởi {{commands}}. Vẫn được thêm."
     },
     "language": {
       "helper": "Chọn ngôn ngữ hiển thị cho ứng dụng.",
@@ -2745,7 +2933,7 @@
     "ai": {
       "autoTagHelper": "Khi bạn ngừng gõ, một mô hình nhỏ trên thiết bị của bạn sẽ đọc ghi chú và gợi ý thẻ ở đầu ghi chú. Không có gì được thêm vào cho đến khi bạn chấp nhận một gợi ý.",
       "autoTagLabel": "Tự động gợi ý thẻ",
-      "autoTagUnavailable": "Bản dựng này không kèm mô hình gắn thẻ, nên không thể gợi ý thẻ nào. Myne không bao giờ tải mô hình về — công tắc sẽ tự bật trong một bản dựng có kèm mô hình.",
+      "autoTagUnavailable": "Bản dựng này không kèm mô hình gắn thẻ, nên không thể gợi ý thẻ nào. Myne không bao giờ tải mô hình về. Công tắc sẽ tự bật trong một bản dựng có kèm mô hình.",
       "consent": {
         "accept": "Gửi ghi chú của tôi tới {{provider}}",
         "cancel": "Hủy",
@@ -2758,7 +2946,7 @@
         "whoLabel": "Ai nhận được nó"
       },
       "disclosureToggle": "Cách này hoạt động thế nào?",
-      "enableHelper": "Chạy một mô hình do bạn cung cấp. Việc nó chạy ở đâu — và ghi chú của bạn có rời khỏi thiết bị này hay không — phụ thuộc vào nhà cung cấp mà bạn khai báo bên dưới. Thử nghiệm, tắt theo mặc định.",
+      "enableHelper": "Chạy một mô hình do bạn cung cấp. Việc nó chạy ở đâu, và ghi chú của bạn có rời khỏi thiết bị này hay không, đều phụ thuộc vào nhà cung cấp mà bạn khai báo bên dưới. Thử nghiệm, tắt theo mặc định.",
       "enableLabel": "Bật AI cục bộ",
       "excludedHelper": "Ghi chú trong các thư mục này không bao giờ được AI đọc hoặc lập chỉ mục. Mỗi dòng một đường dẫn thư mục.",
       "excludedLabel": "Thư mục bị loại trừ",
@@ -2769,49 +2957,60 @@
       "endpointModelLabel": "Mô hình sẽ dùng ở đó",
       "endpointModelPlaceholder": "tên mô hình đúng như trình chạy liệt kê",
       "endpointRejected": {
-        "malformed": "Đó không phải là địa chỉ Myne có thể dùng. Nó cần một giao thức và một cổng cụ thể — ví dụ http://127.0.0.1:11434.",
-        "notLoopback": "Địa chỉ này phải nằm trên chính máy tính này — localhost, 127.0.0.1 hoặc ::1. Để dùng một nhà cung cấp chạy ở nơi khác, hãy khai báo nó ở mục Nhà cung cấp từ xa.",
+        "malformed": "Đó không phải là địa chỉ Myne có thể dùng. Nó cần một giao thức và một cổng cụ thể, ví dụ http://127.0.0.1:11434.",
+        "notLoopback": "Địa chỉ này phải nằm trên chính máy tính này: localhost, 127.0.0.1 hoặc ::1. Để dùng một nhà cung cấp chạy ở nơi khác, hãy khai báo nó ở mục Nhà cung cấp từ xa.",
         "unsupportedScheme": "Chỉ chấp nhận địa chỉ http và https."
       },
       "endpointSaveFailed": "Không thể lưu địa chỉ. Hãy kiểm tra xem Myne có ghi được cài đặt của nó không.",
       "endpointThirdParty": "{{name}} là một chương trình riêng biệt với hành vi mạng của riêng nó, và Myne không kiểm soát nó. Ghi chú của bạn được gửi tới chương trình đó trong khi nó chạy trên máy tính này.",
       "providerError": {
-        "barred": "Loại yêu cầu này không bao giờ được gửi tới nhà cung cấp — nó chạy trên thiết bị này, hoặc không chạy ở đâu cả.",
+        "barred": "Loại yêu cầu này không bao giờ được gửi tới nhà cung cấp: nó chạy trên thiết bị này, hoặc không chạy ở đâu cả.",
         "failed": "Việc đó không thành công. Không có gì được lưu và không có gì được gửi lại.",
+        "localModelMissing": "Mô hình cục bộ được ghi trong cài đặt không còn trên thiết bị này nữa. Không có gì được gửi đi đâu cả. Hãy chọn lại một mô hình, hoặc chỉ định một nhà cung cấp, trong Cài đặt → Nhà phát triển → AI.",
         "noCredential": "Chưa đặt khóa API nào cho nhà cung cấp này. Hãy thêm một khóa trong Cài đặt → Nhà phát triển → AI.",
-        "quotaExhausted": "Nhà cung cấp đã từ chối yêu cầu — bạn đã hết số dư hoặc vượt quá giới hạn tần suất. Việc này phải được xử lý với nhà cung cấp, không phải trong Myne.",
+        "notReady": "Chưa có gì sẵn sàng để trả lời. Không có gì được gửi đi đâu cả. Hãy chọn một mô hình, hoặc chỉ định một nhà cung cấp, trong Cài đặt → Nhà phát triển → AI.",
+        "noEmbeddingModel": "Việc hỏi sẽ tìm trong ghi chú của bạn ngay trên thiết bị này, và điều đó cần một mô hình tìm kiếm tại đây. Nhà cung cấp không làm được việc đó. Không có gì được gửi đi đâu cả. Hãy chọn một mô hình tìm kiếm trong Cài đặt → Nhà phát triển → AI.",
+        "indexNotReady": "Ghi chú của bạn vẫn đang được lập chỉ mục để tìm kiếm. Không có gì được gửi đi đâu cả. Hãy thử lại sau giây lát.",
+        "requestRejected": "Nhà cung cấp không chấp nhận yêu cầu này. Không có gì được lưu. Đây là lỗi ở nội dung Myne đã gửi, không phải ở thiết lập hay ghi chú của bạn.",
+        "policyRefused": "Nhà cung cấp đã từ chối yêu cầu này theo quy định riêng của họ: một rào chắn tài khoản, một chính sách không gian làm việc, hoặc một mô hình không có trong gói của bạn. Việc này phải được xử lý với nhà cung cấp, không phải trong Myne.",
+        "quotaExhausted": "Nhà cung cấp đã từ chối yêu cầu: bạn đã hết số dư hoặc vượt quá giới hạn tần suất. Việc này phải được xử lý với nhà cung cấp, không phải trong Myne.",
         "refused": "Nhà cung cấp đã từ chối kết nối. Có thể dịch vụ đang ngừng hoạt động hoặc đang chặn mạng này.",
         "timeout": "Nhà cung cấp không trả lời kịp. Không còn gì đang chạy dở.",
-        "unauthorized": "Nhà cung cấp đã từ chối khóa API của bạn. Hãy thay bằng khóa khác — có thể khóa sai, đã bị thu hồi, hoặc thuộc về một tài khoản khác.",
+        "unauthorized": "Nhà cung cấp đã từ chối khóa API của bạn. Hãy thay khóa khác: có thể khóa sai, đã bị thu hồi, hoặc thuộc về một tài khoản khác.",
         "unreachable": "Không thể kết nối tới nhà cung cấp. Hãy kiểm tra kết nối mạng của bạn."
       },
       "modelChoose": "Chọn tệp…",
-      "modelEmbeddingLabel": "Mô hình tìm kiếm — tìm kiếm ngữ nghĩa & Hỏi đáp",
+      "modelEmbeddingLabel": "Mô hình tìm kiếm: tìm kiếm ngữ nghĩa & Hỏi đáp",
       "modelFilter": {
         "gguf": "Mô hình GGUF",
         "safetensors": "Mô hình Safetensors"
       },
-      "modelGenerationLabel": "Mô hình văn bản — trò chuyện, tóm tắt, viết",
+      "modelGenerationLabel": "Mô hình văn bản: trò chuyện, tóm tắt, viết",
       "modelNone": "Chưa chọn tệp",
       "modelSaveFailed": "Không thể lưu đường dẫn mô hình (nó phải nằm ngoài kho lưu trữ của bạn).",
       "modelTranscriptionLabel": "Mô hình chuyển giọng nói thành văn bản (chép lời)",
-      "modelsHelper": "Myne không bao giờ tải xuống mô hình — điều đó đồng nghĩa với việc gửi dữ liệu qua mạng. Mở một liên kết để lấy mô hình trong trình duyệt của bạn, rồi chọn các tệp đã tải xuống ở đây. Mô hình được chọn ở đây chạy trên thiết bị của bạn; nếu thay vào đó bạn đã khai báo một nhà cung cấp, thì nhà cung cấp đó sẽ trả lời.",
+      "modelsHelper": "Myne không bao giờ tải xuống mô hình. Điều đó đồng nghĩa với việc gửi dữ liệu qua mạng. Mở một liên kết để lấy mô hình trong trình duyệt của bạn, rồi chọn các tệp đã tải xuống ở đây. Mô hình được chọn ở đây chạy trên thiết bị của bạn; nếu thay vào đó bạn đã khai báo một nhà cung cấp, thì nhà cung cấp đó sẽ trả lời.",
       "providerHelper": "Thay vì chạy một mô hình tại đây, Myne có thể gửi yêu cầu tới một dịch vụ do bạn chỉ định. Khi đó ghi chú của bạn rời khỏi thiết bị này. “Không có” là mặc định và nghĩa là không có dịch vụ nào được liên hệ cả.",
       "providerKeyAdd": "dán khóa API của bạn",
       "providerKeyLabel": "Khóa API",
       "providerKeyNone": "Chưa có khóa nào được lưu, nên chưa thể gửi gì cả.",
       "providerKeyRevoke": "Gỡ khóa này",
       "providerKeyReplace": "dán khóa mới để thay cho khóa đã lưu",
-      "providerKeyStored": "Đã lưu một khóa. Myne không bao giờ hiển thị lại khóa đó cho bạn — hãy dán một khóa mới để thay thế.",
+      "providerKeyStored": "Đã lưu một khóa. Myne không bao giờ hiển thị lại khóa đó cho bạn. Hãy dán một khóa mới để thay thế.",
       "providerActive": "Đang trả lời: {{name}}",
       "providerLabel": "Nhà cung cấp từ xa",
       "providerModelCount_one": "Có {{count}} mô hình khả dụng.",
       "providerModelCount_other": "Có {{count}} mô hình khả dụng.",
       "providerModelEmpty": "Nhà cung cấp này không công bố mô hình nào cho tài khoản của bạn.",
-      "providerModelHelper": "Myne không kèm sẵn lựa chọn mặc định nào. Danh sách này lấy từ nhà cung cấp, nên nó luôn cập nhật và bạn không bao giờ bị tính phí cho một mô hình mà bạn không chọn.",
+      "providerModelHelper": "Myne không kèm sẵn lựa chọn mặc định nào. Danh sách này lấy từ nhà cung cấp, nên nó luôn cập nhật và bạn không bao giờ bị tính phí cho một mô hình mà bạn không chọn. Chỉ những mô hình đọc và viết văn bản mới được liệt kê, vì đó là loại duy nhất Myne yêu cầu ở nhà cung cấp.",
+      "providerModelHidden_one": "Đã ẩn {{count}} mô hình: mô hình đó không đọc và viết văn bản.",
+      "providerModelHidden_other": "Đã ẩn {{count}} mô hình: chúng không đọc và viết văn bản.",
       "providerModelLabel": "Mô hình",
       "providerModelLoad": "Tải danh sách mô hình",
       "providerModelNone": "Chưa chọn mô hình",
+      "providerModelNoTextModels": "Nhà cung cấp này có công bố mô hình, nhưng không mô hình nào đọc và viết văn bản. Myne chỉ yêu cầu văn bản, nên không mô hình nào dùng được ở đây.",
+      "providerModelShowAll": "Hiện tất cả mô hình",
+      "providerModelShowTextOnly": "Chỉ hiện mô hình văn bản",
       "providerModelUnfetched": "Hãy tải danh sách để chọn một mô hình.",
       "providerNone": "Không có",
       "providerNothingAnswering": "Chưa có gì được thiết lập để trả lời.",
@@ -2825,26 +3024,26 @@
       "disabledCue": "Đồng bộ không còn đi qua Tor. Các kết nối mới đi thẳng tới máy chủ đồng bộ.",
       "errorRead": "Không thể đọc cài đặt hiện tại. Hãy gạt công tắc để đặt lại.",
       "errorSave": "Không thể lưu cài đặt. Không có gì thay đổi.",
-      "errorSidecar": "Định tuyến qua Tor đang bật, nhưng không khởi động được trình khách Tor. Đồng bộ tạm dừng cho đến khi khởi động được — không có gì đang được gửi trực tiếp.",
+      "errorSidecar": "Định tuyến qua Tor đang bật, nhưng không khởi động được trình khách Tor. Đồng bộ tạm dừng cho đến khi khởi động được. Không có gì đang được gửi trực tiếp.",
       "postureActive": "Đồng bộ đang đi qua Tor",
-      "postureConnecting": "Đang kết nối tới Tor — đồng bộ tạm dừng",
+      "postureConnecting": "Đang kết nối tới Tor: đồng bộ tạm dừng",
       "postureConnectingDetail": "Việc này thường mất vài giây. Trong lúc đó không có gì được gửi trực tiếp.",
-      "postureExempt": "Đồng bộ không dùng Tor — địa chỉ này trỏ về chính thiết bị này",
+      "postureExempt": "Đồng bộ không dùng Tor: địa chỉ này trỏ về chính thiết bị này",
       "postureExemptDetail": "Địa chỉ máy chủ đồng bộ bạn đã cấu hình trỏ tới chính máy tính này, nên kết nối của Myne tới nó không đi qua một mạch Tor. Nếu địa chỉ đó chuyển tiếp tới một máy chủ ở nơi khác, Myne không thấy được điều đó và không thể định tuyến nó. Đồng bộ không bị tạm dừng.",
       "postureHeading": "Ngay lúc này",
       "postureInactive": "Đồng bộ đi thẳng tới máy chủ đồng bộ",
-      "postureUnavailable": "Không dùng được Tor — đồng bộ tạm dừng",
+      "postureUnavailable": "Không dùng được Tor: đồng bộ tạm dừng",
       "postureUnavailableDetail": "Không có gì đang được gửi trực tiếp. Hãy tắt rồi bật lại cài đặt này để thử khởi động trình khách Tor, hoặc tắt hẳn nó để đồng bộ mà không qua Tor.",
-      "residualExit": "Nút chuyển tiếp cuối cùng trong một mạch Tor — nút ra — thấy được bạn kết nối tới máy chủ đồng bộ nào. Nó không đọc được những gì bạn đồng bộ; phần đó vẫn được mã hóa đầu cuối.",
+      "residualExit": "Nút chuyển tiếp cuối cùng trong một mạch Tor, tức nút ra, thấy được bạn kết nối tới máy chủ đồng bộ nào. Nó không đọc được những gì bạn đồng bộ; phần đó vẫn được mã hóa đầu cuối.",
       "residualMetadata": "Máy chủ đồng bộ vẫn thấy bạn đồng bộ khi nào, bạn đẩy lên bao nhiêu khối dữ liệu và chúng lớn cỡ nào, cùng số thiết bị bạn có. Tor không thay đổi điều đó.",
       "residualPayment": "Nếu bạn trả tiền cho dịch vụ đồng bộ được lưu trữ sẵn, khoản thanh toán và tài khoản của bạn vẫn có thể liên kết tới bạn. Tor thay đổi nơi kết nối xuất phát, chứ không thay đổi dấu vết thanh toán.",
       "residualScope": "Chỉ lưu lượng đồng bộ của riêng Myne đi qua Tor. Không có gì khác trên thiết bị này đi qua đó.",
       "residualsToggle": "Điều này không che giấu những gì",
-      "torHelper": "Ẩn địa chỉ IP và vị trí của bạn khỏi máy chủ đồng bộ, và ẩn việc bạn đồng bộ với máy chủ nào khỏi mạng của bạn và nhà cung cấp Internet — họ vẫn thấy được thiết bị này kết nối tới Tor. Nó không làm bạn ẩn danh với Myne, và không giấu được khỏi máy chủ việc bạn đồng bộ cái gì hay khi nào.",
+      "torHelper": "Ẩn địa chỉ IP và vị trí của bạn khỏi máy chủ đồng bộ, và ẩn việc bạn đồng bộ với máy chủ nào khỏi mạng của bạn và nhà cung cấp Internet. Họ vẫn thấy được thiết bị này kết nối tới Tor. Nó không làm bạn ẩn danh với Myne, và không giấu được khỏi máy chủ việc bạn đồng bộ cái gì hay khi nào.",
       "torLabel": "Định tuyến đồng bộ qua Tor"
     },
     "prefs": {
-      "saveError": "Không thể lưu tùy chọn — hãy thử lại"
+      "saveError": "Không thể lưu tùy chọn. Hãy thử lại."
     },
     "reminders": {
       "aria": "Hiện nhắc nhở công việc trên thiết bị này",
@@ -2862,13 +3061,21 @@
       "autoLockLabel": "Tự động khóa",
       "autoLockSearchEmpty": "Không có khoảng thời gian nào khớp.",
       "autoLockSearchPlaceholder": "Tìm khoảng thời gian…",
+      "hideVaultNamesLabel": "Ẩn tên kho trên màn hình khóa",
+      "hideVaultNamesHelper": "Trên thiết bị có keychain dùng được, bộ chọn kho sẽ hiện tên của một kho sau khi thiết bị này đã mở khóa nó. Khi bật tùy chọn này, mọi kho sẽ hiện một tên tạm như Kho 2 thay vào đó, và con số đó gắn liền với kho dù danh sách có sắp xếp lại thế nào.",
+      "hideVaultNamesErases": "Bật tùy chọn này sẽ hủy các khóa giúp đọc được những tên đã lưu tại đây, nên không thể khôi phục những tên đó trên thiết bị này, và sẽ không có tên nào được ghi thêm khi tùy chọn còn bật.",
+      "hideVaultNamesResidue": "Nó không chạm tới được một bản sao đã tạo trước đó: một bản sao lưu toàn hệ thống, một ảnh đĩa, hoặc bất kỳ bản sao cấp hệ thống nào khác của đĩa này được tạo khi tên còn hiển thị đều mang theo cả những tên đã lưu lẫn khóa của chúng.",
+      "hideVaultNamesUnavailable": "Thiết bị này không có keychain dùng được, nên Myne không lưu tên kho nào tại đây và không thể bật tùy chọn này. Bộ chọn vốn đã hiện một tên tạm cho mọi kho.",
+      "hideVaultNamesErrorRead": "Không thể đọc cài đặt hiện tại. Hãy gạt công tắc để đặt lại.",
+      "hideVaultNamesErrorSave": "Không thể lưu cài đặt, nên nó không thay đổi. Nếu bạn đang bật nó, một số tên đã lưu có thể đã bị hủy; hãy bật lại để hoàn tất.",
+      "hideVaultNamesErrorErase": "Một tên đã lưu không thể bị hủy, nên tùy chọn này được giữ ở trạng thái tắt thay vì tuyên bố một việc xóa chưa hề xảy ra. Hãy thử lại.",
       "realtimeSyncHelper": "Thay đổi từ các thiết bị khác đến trong vài giây qua một tín hiệu không chứa nội dung — máy chủ chỉ chuyển tiếp “có gì đó đã thay đổi”, không bao giờ là nội dung gì. Khi kho lưu trữ của bạn được mở khóa, ứng dụng vẫn kiểm tra máy chủ thường xuyên, nên điều này không làm lộ thêm gì đáng kể; không có gì để cấu hình.",
       "realtimeSyncLabel": "Đồng bộ thời gian thực",
       "screenCaptureHelperOff": "Bảo vệ luôn được áp dụng trước khi mở khóa. Sau khi mở khóa, theo tùy chọn này.",
       "screenCaptureHelperOn": "Có hiệu lực trên Windows 10 (Bản cập nhật tháng 5 năm 2020) trở lên. macOS và Linux không có API hệ thống cho việc này, nên ở đó không thể chặn việc ghi màn hình.",
       "screenCaptureLabel": "Chống chụp màn hình",
       "screenCaptureSubtitle": "Chặn chụp màn hình và quay màn hình",
-      "screenshotBlocked": "Chống chụp màn hình đang bật — ảnh chụp màn hình của Myne sẽ bị trống.",
+      "screenshotBlocked": "Chống chụp màn hình đang bật: ảnh chụp màn hình của Myne sẽ bị trống.",
       "autoLockAfter": "Tự động khóa sau",
       "autoLock1m": "1 phút",
       "autoLock5m": "5 phút",
@@ -2889,7 +3096,7 @@
       "errorPinTooShort_one": "Mã PIN phải có ít nhất {{count}} chữ số.",
       "errorPinTooShort_other": "Mã PIN phải có ít nhất {{count}} chữ số.",
       "helperConfigured": "Đã thiết lập qua {{method}}. Khi nhập lại sau khi tự động khóa sẽ bỏ qua mật khẩu chính. Với mã PIN, vẫn cần mật khẩu chính sau khi khởi động lại; còn việc kiểm tra vân tay hoặc khuôn mặt thì vẫn dùng được cả sau khi khởi động lại, cho đến khi các vân tay hoặc khuôn mặt đã đăng ký trên thiết bị này thay đổi.",
-      "helperNotConfigured": "Nhập lại sau khi tự động khóa bằng mã PIN hoặc Touch ID thay vì mật khẩu chính đầy đủ. Đây là tiện ích bổ sung cho kho đã mã hóa — với mã PIN, vẫn cần mật khẩu chính sau khi khởi động lại; còn Touch ID thì vẫn dùng được cả sau khi khởi động lại, cho đến khi các vân tay đã đăng ký trên thiết bị này thay đổi.",
+      "helperNotConfigured": "Nhập lại sau khi tự động khóa bằng mã PIN hoặc Touch ID thay vì mật khẩu chính đầy đủ. Đây là tiện ích bổ sung cho kho đã mã hóa: với mã PIN, vẫn cần mật khẩu chính sau khi khởi động lại; còn Touch ID thì vẫn dùng được cả sau khi khởi động lại, cho đến khi các vân tay đã đăng ký trên thiết bị này thay đổi.",
       "methodPin": "Mã PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "Mã PIN mở khóa nhanh",
@@ -2912,9 +3119,9 @@
       "biometricToggleSubtitle": "Mở khóa bằng {{method}} sau khi tự động khóa",
       "pinOnLead": "Mở khóa nhanh bằng PIN đang ",
       "pinOnEmphasis": "bật",
-      "pinOnRest": ". Sau khi kho lưu trữ tự động khóa, bạn có thể nhập lại bằng mã PIN thay vì mật khẩu đầy đủ — chỉ trong phiên ứng dụng này. Khởi động nguội luôn yêu cầu mật khẩu đầy đủ.",
+      "pinOnRest": ". Sau khi kho tự động khóa, bạn có thể nhập lại bằng mã PIN thay vì mật khẩu đầy đủ (chỉ trong phiên ứng dụng này). Khởi động nguội luôn yêu cầu mật khẩu đầy đủ.",
       "turnOffPin": "Tắt PIN",
-      "pinSetupHelper": "Đặt mã PIN 6 chữ số trở lên để mở khóa nhanh sau khi tự động khóa. Mã PIN bọc một khóa cục bộ trên thiết bị — nó không bao giờ rời khỏi thiết bị này và không bao giờ chạm đến cụm từ khôi phục của bạn.",
+      "pinSetupHelper": "Đặt mã PIN 6 chữ số trở lên để mở khóa nhanh sau khi tự động khóa. Mã PIN bọc một khóa cục bộ trên thiết bị: nó không bao giờ rời khỏi thiết bị này và không bao giờ chạm đến cụm từ khôi phục của bạn.",
       "pinReplacesBiometric": " Việc đặt mã PIN thay thế cho mở khóa bằng {{method}}.",
       "pinPlaceholder6": "Ít nhất 6 chữ số",
       "confirmPin": "Xác nhận mã PIN",
@@ -2947,10 +3154,10 @@
     "spell": {
       "errorSaveLanguages": "Không thể lưu các ngôn ngữ kiểm tra chính tả.",
       "errorSaveSetting": "Không thể lưu cài đặt kiểm tra chính tả.",
-      "helper": "Gạch chân các từ sai chính tả khi bạn gõ. Hoàn toàn ngoại tuyến — ghi chú của bạn không bao giờ rời khỏi thiết bị.",
+      "helper": "Gạch chân các từ sai chính tả khi bạn gõ. Hoàn toàn ngoại tuyến: ghi chú của bạn không bao giờ rời khỏi thiết bị.",
       "label": "Kiểm tra chính tả",
       "languagesAriaLabel": "Ngôn ngữ kiểm tra chính tả",
-      "languagesHelper": "Một từ là đúng nếu nó hợp lệ trong bất kỳ ngôn ngữ nào được chọn — tiện lợi khi xen các thuật ngữ tiếng Anh vào ghi chú bằng ngôn ngữ khác.",
+      "languagesHelper": "Một từ là đúng nếu nó hợp lệ trong bất kỳ ngôn ngữ nào được chọn. Tiện lợi khi xen các thuật ngữ tiếng Anh vào ghi chú bằng ngôn ngữ khác.",
       "languagesLabel": "Ngôn ngữ",
       "languagesPlaceholder": "Chọn ngôn ngữ…",
       "languagesSearchEmpty": "Không có ngôn ngữ nào khớp.",
@@ -2959,20 +3166,20 @@
       "on": "Bật"
     },
     "storage": {
-      "backupHelper": "Các bản sao lưu được mã hóa đúng như kho của bạn, trong một tệp .myne-backup duy nhất đã được xác minh. Việc khôi phục dùng mật khẩu hoặc cụm từ khôi phục của kho đó — y hệt như khi mở khóa.",
+      "backupHelper": "Các bản sao lưu được mã hóa đúng như kho của bạn, trong một tệp .myne-backup duy nhất đã được xác minh. Việc khôi phục dùng mật khẩu hoặc cụm từ khôi phục của kho đó, y hệt như khi mở khóa.",
       "backupLabel": "Sao lưu",
       "backUpVault": "Sao lưu kho…",
       "exportAction": "Xuất…",
       "exportBody": "Xuất kho dạng Markdown",
-      "exportHelper": "Cây Markdown thuần — không được mã hóa.",
+      "exportHelper": "Cây Markdown thuần. Không được mã hóa.",
       "exportLabel": "Xuất",
       "importHelper": "Đưa ghi chú vào từ Obsidian, Notion, Evernote, tệp HTML hoặc một tệp CSV. Mọi thứ được nhập và mã hóa ngay tại chỗ; các tệp gốc của bạn không bị động đến.",
       "importLabel": "Nhập",
       "importObsidian": "Nhập ghi chú…",
-      "locationHelper": "Mỗi kho là một thư mục chứa các tệp đã mã hóa nằm dưới đường dẫn này. Hãy ưu tiên nút Sao lưu bên dưới thay vì sao chép thủ công — nó xác minh tệp đã ghi.",
+      "locationHelper": "Mỗi kho là một thư mục chứa các tệp đã mã hóa nằm dưới đường dẫn này. Hãy ưu tiên nút Sao lưu bên dưới thay vì sao chép thủ công: nó xác minh tệp đã ghi.",
       "locationLabel": "Vị trí kho",
       "openInFiles": "Mở trong trình quản lý tệp",
-      "webLocationHelper": "Ghi chú của bạn nằm trong vùng lưu trữ mà trình duyệt này dành cho trang này, do trình duyệt quản lý — không có thư mục nào để mở. Xóa dữ liệu của trang này sẽ gỡ bản sao cục bộ; vì trình khách này có đồng bộ, đăng nhập lại sẽ tải nó về.",
+      "webLocationHelper": "Ghi chú của bạn nằm trong vùng lưu trữ mà trình duyệt này dành cho trang này, do trình duyệt quản lý. Không có thư mục nào để mở. Xóa dữ liệu của trang này sẽ gỡ bản sao cục bộ; vì trình khách này có đồng bộ, đăng nhập lại sẽ tải nó về.",
       "webLocationLabel": "Nơi ghi chú của bạn được lưu",
       "pathUnavailable": "Không có đường dẫn",
       "restoreBackup": "Khôi phục từ bản sao lưu…"
@@ -3085,9 +3292,11 @@
         "focusMode": "chế độ tập trung máy đánh chữ làm mờ dòng không hoạt động focus typewriter",
         "font": "phông chữ kiểu chữ sans serif mono typography font",
         "graphSettings": "đồ thị giao diện vật lý lực nút liên kết bố cục nhóm màu nhãn khung vẽ graph",
+        "hideVaultNames": "ẩn tên kho màn hình khóa bộ chọn tên tạm nhãn quyền riêng tư xóa keychain nhìn trộm qua vai hide vault names privacy",
         "hotkeys": "phím tắt bàn phím tổ hợp gán phím hotkeys shortcuts keymap",
         "import": "nhập ghi chú obsidian notion evernote enex html csv di chuyển chuyển đổi import",
         "language": "ngôn ngữ giao diện bản dịch bản địa language ui",
+        "legal": "pháp lý chính sách quyền riêng tư điều khoản impressum gdpr dsgvo cơ quan thực thi pháp luật báo cáo lạm dụng bảo vệ dữ liệu legal privacy",
         "lastActiveNote": "tiếp tục chỗ dừng ghi chú cuối mở lại đồng bộ resume",
         "license": "giấy phép agpl mã nguồn mở pháp lý license",
         "lineNumbers": "số dòng trình soạn thảo hiển thị line numbers",
@@ -3135,36 +3344,47 @@
       "time24": "24 giờ",
       "time12": "12 giờ",
       "zoneLabel": "Múi giờ",
-      "zoneHelper": "Múi giờ nào quyết định thế nào là hôm nay. Để trống để theo thiết bị này. Giờ bạn viết trong ghi chú không bao giờ bị đổi — 09:00 vẫn là 09:00 ở mọi nơi.",
+      "zoneHelper": "Múi giờ nào quyết định thế nào là hôm nay. Để trống để theo thiết bị này. Giờ bạn viết trong ghi chú không bao giờ bị đổi; 09:00 vẫn là 09:00 ở mọi nơi.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne không biết múi giờ đó. Hãy dùng một tên như Europe/Berlin.",
       "errorSave": "Không thể lưu cài đặt đó."
     }
   },
   "storageLost": {
-    "allSynced": "Không có gì bị mất — mọi ghi chú ở đây đều đã lên máy chủ.",
+    "allSynced": "Không có gì bị mất: mọi ghi chú ở đây đều đã lên máy chủ.",
     "evicted": {
-      "body": "Trình duyệt của bạn đã xóa vùng lưu trữ của trang này để giải phóng dung lượng. Không có gì bị hỏng và không có gì bị xóa trên máy chủ — mọi thứ đã đồng bộ vẫn còn ở đó.",
+      "body": "Trình duyệt của bạn đã xóa vùng lưu trữ của trang này để giải phóng dung lượng. Không có gì bị hỏng và không có gì bị xóa trên máy chủ. Mọi thứ đã đồng bộ vẫn còn ở đó.",
       "title": "Trình duyệt của bạn đã xóa bản sao cục bộ của kho này"
     },
     "lockCta": "Khóa rồi thử lại",
     "reDownloadCta": "Thiết lập lại trình duyệt này",
     "reEnrolNotice": "Thiết lập lại sẽ đăng ký trình duyệt này thành một thiết bị mới, nên nó sẽ chờ một thiết bị khác của bạn phê duyệt trước khi có thể đồng bộ.",
     "unopenable": {
-      "body": "Không thể đọc được bản sao cục bộ của kho này nữa. Không có gì trên máy chủ bị ảnh hưởng — bản sao ở đây là bộ nhớ đệm, và nó có thể được thay thế.",
+      "body": "Không thể đọc được bản sao cục bộ của kho này nữa. Không có gì trên máy chủ bị ảnh hưởng: bản sao ở đây là bộ nhớ đệm, và nó có thể được thay thế.",
       "title": "Không thể đọc bản sao cục bộ của kho này"
     },
-    "unsyncedIntro": "{{count}} ghi chú chưa lên máy chủ. Chúng đã mất — đây là bản sao duy nhất:",
-    "unsyncedIntro_one": "{{count}} ghi chú chưa lên máy chủ. Nó đã mất — đây là bản sao duy nhất:",
-    "unsyncedIntro_other": "{{count}} ghi chú chưa lên máy chủ. Chúng đã mất — đây là bản sao duy nhất:",
+    "unsyncedIntro": "{{count}} ghi chú chưa lên máy chủ. Nó đã mất, và đây là bản sao duy nhất:",
+    "unsyncedIntro_one": "{{count}} ghi chú chưa lên máy chủ. Nó đã mất, và đây là bản sao duy nhất:",
+    "unsyncedIntro_other": "{{count}} ghi chú chưa lên máy chủ. Chúng đã mất, và đây là bản sao duy nhất:",
     "unsyncedOverflow": "…và {{count}} mục nữa.",
     "unsyncedOverflow_one": "…và {{count}} mục nữa.",
     "unsyncedOverflow_other": "…và {{count}} mục nữa."
   },
   "sync": {
-    "materialising": "Đang tải ghi chú của bạn về — {{done}} trên {{total}}. Bạn có thể bắt đầu làm việc; phần còn lại sẽ lần lượt xuất hiện.",
-    "credentialAmbiguous": "Mật khẩu của bạn có thể đã thay đổi trên thiết bị này và trên một thiết bị khác, và Myne không thể biết bản nào mới hơn — nên nó chưa thay đổi gì. Hãy đăng nhập trên một thiết bị đã có quyền truy cập để xử lý việc này.",
-    "vaultRekeyed": "Kho này đã được nâng cấp lên định dạng mới trên một thiết bị khác. Hãy mở khóa lại để tiếp tục — không có gì bị mất.",
+    "betaTerms": {
+      "title": "Trước khi bạn bật đồng bộ",
+      "intro": "Đồng bộ gửi ghi chú của bạn, đã mã hóa, tới một máy chủ. Có bốn điều bạn nên biết trước.",
+      "whatThisIsLabel": "Đây là gì",
+      "dataLossLabel": "Nếu bạn mất cả hai bí mật",
+      "whatHappensNextLabel": "Khi bản beta kết thúc",
+      "whatWeCanSeeLabel": "Những gì chúng tôi có thể thấy",
+      "readFull": "Đọc toàn bộ điều khoản",
+      "review": "Xem lại điều khoản bản beta",
+      "accept": "Tôi hiểu, bật đồng bộ"
+    },
+    "materialising": "Đang tải ghi chú của bạn về: {{done}} trên {{total}}. Bạn có thể bắt đầu làm việc; phần còn lại sẽ lần lượt xuất hiện.",
+    "credentialAmbiguous": "Mật khẩu của bạn có thể đã thay đổi trên thiết bị này và trên một thiết bị khác, và Myne không thể biết bản nào mới hơn, nên nó chưa thay đổi gì. Hãy đăng nhập trên một thiết bị đã có quyền truy cập để xử lý việc này.",
+    "vaultRekeyed": "Kho này đã được nâng cấp lên định dạng mới trên một thiết bị khác. Hãy mở khóa lại để tiếp tục. Không có gì bị mất.",
     "attachments": {
       "aria": {
         "downloading": "Đang tải xuống {{name}}",
@@ -3174,7 +3394,7 @@
       "heading": "Đồng bộ tệp đính kèm",
       "status": {
         "done": "xong",
-        "failedWillRetry": "thất bại — sẽ thử lại",
+        "failedWillRetry": "thất bại, sẽ thử lại",
         "paused": "tạm dừng"
       }
     },
@@ -3193,7 +3413,7 @@
       "compareTheirs": "Bản xung đột",
       "compareTitle": "Đang so sánh “{{title}}”",
       "discard": "Loại bỏ",
-      "empty": "Không có xung đột — các thiết bị của bạn đã đồng bộ.",
+      "empty": "Không có xung đột. Các thiết bị của bạn đã đồng bộ.",
       "groupTitle_one": "{{count}} bản xung đột của {{original}}",
       "groupTitle_other": "{{count}} bản xung đột của {{original}}",
       "keepAsSeparate": "Giữ thành bản riêng",
@@ -3207,7 +3427,7 @@
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "Không thể tạo mã QR. Vui lòng thử lại.",
       "generate": "Tạo mã QR",
-      "hint": "Dán số tài khoản của bạn để tạo một mã QR mà điện thoại có thể quét — nó sẽ tự điền máy chủ và số tài khoản cho bạn.",
+      "hint": "Dán số tài khoản của bạn để tạo một mã QR mà điện thoại có thể quét. Nó sẽ tự điền máy chủ và số tài khoản cho bạn.",
       "invalidAccount": "Đó có vẻ không phải là một số tài khoản hợp lệ.",
       "notConfigured": "Hãy cấu hình máy chủ đồng bộ trước, rồi tạo mã QR.",
       "scanWithApp": "Quét bằng ứng dụng iOS",
@@ -3241,12 +3461,23 @@
       "shortName": "Thiết bị {{hex}}",
       "syncedHere": "Đã đồng bộ tại đây",
       "thisDevice": "Thiết bị này",
+      "reasonUnreachable": "máy chủ không phản hồi",
+      "reasonCertChanged": "chứng chỉ của nó không phải chứng chỉ mà thiết bị này tin cậy",
+      "reasonUnexpected": "một lỗi không mong đợi",
+      "reasonRejected": "máy chủ đã từ chối đăng nhập của thiết bị này",
+      "reasonFrozen": "tài khoản đang bị đóng băng",
+      "reasonDeviceLimit": "tài khoản đã đạt giới hạn thiết bị",
+      "reasonAwaitingApproval": "thiết bị này vẫn đang chờ được phê duyệt",
+      "reasonNotConfigured": "chưa cấu hình máy chủ đồng bộ nào",
+      "certChanged": "Máy chủ đồng bộ đã phản hồi, nhưng với một chứng chỉ khác với chứng chỉ mà thiết bị này đã ghim.",
+      "certChangedHint": "Đây là dấu hiệu của một chứng chỉ vừa được gia hạn, và cũng là dấu hiệu của một kẻ mạo danh. Myne không thể phân biệt hai trường hợp đó, nên sẽ không đoán. Hãy lấy dấu vân tay chứng chỉ từ máy chủ của bạn, sau đó nhập lại URL máy chủ ở mục “Máy chủ đồng bộ” phía trên và dán dấu vân tay vào khi được hỏi.",
       "transportHint": "Nếu máy chủ đã chuyển đi hoặc chứng chỉ của nó thay đổi, hãy nhập lại URL máy chủ trong mục “Máy chủ đồng bộ” ở trên để tin cậy lại.",
       "unreachable": "Không thể kết nối tới đồng bộ ({{error}}).",
       "verifyBody": "Kiểm tra xem cùng một mã có xuất hiện trên thiết bị bạn vừa phê duyệt không. Nếu khớp, thiết bị đó thuộc tài khoản của bạn. Nếu không khớp, hãy gỡ thiết bị đó.",
       "verifyMatch": "Chúng khớp",
       "verifyMismatch": "Chúng không khớp",
       "verifyPending": "Mã này xuất hiện khi thiết bị mới hoàn tất lần đồng bộ đầu tiên.",
+      "verifyChanged": "Mã đã thay đổi trong lúc bạn đang xem. Hãy so sánh lại cả hai màn hình. Nếu nó vẫn tiếp tục thay đổi, hãy dừng lại và không tiếp tục.",
       "verifySyncing": "Đang đồng bộ…",
       "verifyTitle": "Xác minh thiết bị mới",
       "verifyAction": "So sánh mã",
@@ -3261,15 +3492,16 @@
       "connecting": "Đang kết nối…",
       "fingerprintLabel": "Dấu vân tay chứng chỉ máy chủ:",
       "confirmFingerprintRequired": "Định tuyến qua Tor đang bật, nên thiết bị này sẽ không tin một chứng chỉ mà nó chưa được báo trước. Hãy lấy dấu vân tay chứng chỉ SHA-256 của máy chủ từ chính máy chủ hoặc từ một thiết bị đã kết nối, rồi dán vào đây.",
-      "confirmFingerprintMismatch": "Chứng chỉ mà máy chủ này đưa ra không phải chứng chỉ bạn đã nhập. Không có gì được lưu. Hãy kiểm tra dấu vân tay bạn đã dán — và nếu nó đúng, đừng kết nối: có thứ gì đó đang nằm giữa thiết bị này và máy chủ của bạn.",
-      "confirmFingerprintDeclined": "Không có gì được lưu — thiết bị này chưa kết nối với máy chủ đó. Hãy quay lại khi bạn có dấu vân tay chứng chỉ của nó.",
+      "confirmFingerprintMismatch": "Chứng chỉ mà máy chủ này đưa ra không phải chứng chỉ bạn đã nhập. Không có gì được lưu. Hãy kiểm tra dấu vân tay bạn đã dán. Nếu nó đúng, đừng kết nối: có thứ gì đó đang nằm giữa thiết bị này và máy chủ của bạn.",
+      "certificateChanged": "Máy chủ này đã xuất trình một chứng chỉ khác với chứng chỉ mà thiết bị này tin cậy. Không có gì bị thay đổi. Nếu bạn đã gia hạn nó, hãy dán dấu vân tay mới bên dưới; nếu không, đừng kết nối.",
+      "confirmFingerprintDeclined": "Không có gì được lưu: thiết bị này chưa kết nối với máy chủ đó. Hãy quay lại khi bạn có dấu vân tay chứng chỉ của nó.",
       "pinStatic": "Đã xác minh với chứng chỉ tích hợp sẵn của Myne.",
       "pinTofu": "Đã ghim khi kết nối lần đầu. Hãy so sánh dấu vân tay này giữa các thiết bị của bạn.",
-      "fixedOrigin": "Trình khách này đồng bộ với một máy chủ duy nhất, được đặt khi triển khai. Không thể thay đổi từ đây — trang này chỉ được phép liên lạc với đúng một địa chỉ đó.",
+      "fixedOrigin": "Trình khách này đồng bộ với một máy chủ duy nhất, được đặt khi triển khai. Không thể thay đổi từ đây: trang này chỉ được phép liên lạc với đúng một địa chỉ đó.",
       "fixedOriginNone": "Bản triển khai này chưa được cấu hình máy chủ đồng bộ.",
       "pinPlatformTrust": "Được xác minh bằng kho chứng chỉ của trình duyệt. Trình khách này không thể tự ghim chứng chỉ.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "Không thể kết nối tới máy chủ đó — hãy kiểm tra URL và xem nó có đang chạy không."
+      "unreachable": "Không thể kết nối tới máy chủ đó. Hãy kiểm tra URL và xem nó có đang chạy không."
     },
     "enroll": {
       "accountNumberLabel": "Số tài khoản",
@@ -3300,7 +3532,7 @@
     },
     "fingerprint": {
       "title": "Hãy kiểm tra chứng chỉ của máy chủ này trước khi tin nó",
-      "why": "Định tuyến qua Tor đang bật, nên kết nối đầu tiên này đến được máy chủ qua một nút chuyển tiếp do người lạ vận hành. Cho đến khi một chứng chỉ được ghim, thiết bị này sẽ chấp nhận bất kỳ chứng chỉ nào được đưa cho nó — kể cả chứng chỉ do nút chuyển tiếp đó bịa ra. Hãy nhập dấu vân tay mà máy chủ của bạn công bố, và Myne sẽ so sánh trước khi ghim bất cứ thứ gì. Nếu không khớp, không có gì được lưu.",
+      "why": "Định tuyến qua Tor đang bật, nên kết nối đầu tiên này đến được máy chủ qua một nút chuyển tiếp do người lạ vận hành. Cho đến khi một chứng chỉ được ghim, thiết bị này sẽ chấp nhận bất kỳ chứng chỉ nào được đưa cho nó, kể cả chứng chỉ do nút chuyển tiếp đó bịa ra. Hãy nhập dấu vân tay mà máy chủ của bạn công bố, và Myne sẽ so sánh trước khi ghim bất cứ thứ gì. Nếu không khớp, không có gì được lưu.",
       "label": "Dấu vân tay chứng chỉ mong đợi",
       "placeholder": "Dấu vân tay SHA-256 từ máy chủ của bạn",
       "echoLabel": "Những gì bạn đã nhập",
@@ -3308,36 +3540,38 @@
       "echoProgress": "{{count}} trên {{total}} ký tự cho đến giờ.",
       "echoProgress_one": "{{count}} trên {{total}} ký tự cho đến giờ.",
       "echoProgress_other": "{{count}} trên {{total}} ký tự cho đến giờ.",
-      "echoInvalid": "Một dấu vân tay SHA-256 gồm 64 ký tự, mỗi ký tự là 0–9 hoặc a–f. Dấu hai chấm, dấu cách và tiền tố “sha256:” đều không sao — mọi thứ khác không thuộc về nó.",
+      "echoInvalid": "Một dấu vân tay SHA-256 gồm 64 ký tự, mỗi ký tự là 0–9 hoặc a–f. Dấu hai chấm, dấu cách và tiền tố “sha256:” đều không sao. Mọi ký tự khác đều không thuộc dấu vân tay.",
       "helpToggle": "Tôi tìm dấu vân tay này ở đâu?",
-      "helpNotOverTor": "Không phải qua kết nối này. Một dấu vân tay bạn lấy qua cùng mạch đó không chứng minh được gì — thứ có thể tráo chứng chỉ cũng có thể tráo cả trang đó.",
+      "helpNotOverTor": "Không phải qua kết nối này. Một dấu vân tay bạn lấy qua cùng mạch đó không chứng minh được gì: thứ có thể tráo chứng chỉ cũng có thể tráo cả trang đó.",
       "helpFromServer": "Trên máy đang chạy máy chủ của bạn: openssl x509 -noout -fingerprint -sha256 -in <tệp chứng chỉ của bạn>",
       "helpFromDevice": "Trên một thiết bị đã kết nối với tài khoản này: Cài đặt → Đồng bộ hiển thị cùng dấu vân tay đó.",
-      "helpNoFingerprint": "Nếu bạn không lấy được nó bằng cách nào trong số đó, không thể thêm máy chủ này khi định tuyến qua Tor đang bật. Bạn có thể tắt định tuyến qua Tor trong Cài đặt → Mạng và kết nối trực tiếp — điều đó để lộ địa chỉ IP của bạn cho máy chủ và cho bất kỳ ai xem được mạng của bạn.",
-      "decline": "Tôi không có nó — hủy"
+      "helpNoFingerprint": "Nếu bạn không lấy được nó bằng cách nào trong số đó, không thể thêm máy chủ này khi định tuyến qua Tor đang bật. Bạn có thể tắt định tuyến qua Tor trong Cài đặt → Mạng và kết nối trực tiếp. Điều đó để lộ địa chỉ IP của bạn cho máy chủ và cho bất kỳ ai xem được mạng của bạn.",
+      "decline": "Tôi không có nó, hủy"
     },
     "join": {
       "accountLabel": "Số tài khoản",
       "cancel": "Hủy",
       "continue": "Tiếp tục",
-      "error": "Không thể thêm thiết bị này. Hãy kiểm tra URL máy chủ, số tài khoản và mật khẩu — và xem máy chủ có kết nối được không.",
+      "error": "Không thể thêm thiết bị này. Hãy kiểm tra URL máy chủ, số tài khoản và mật khẩu, và xem máy chủ có kết nối được không.",
       "help": "Đăng nhập bằng số tài khoản và mật khẩu của bạn. Thiết bị này sẽ đồng bộ ghi chú của bạn sau khi một thiết bị hiện có phê duyệt nó. Không cần cụm từ khôi phục.",
       "passwordLabel": "Mật khẩu",
       "pinnedCompare": "Thiết bị này đã ghim chứng chỉ của máy chủ của bạn. Hãy kiểm tra dấu vân tay này có khớp trên các thiết bị khác của bạn không.",
       "confirmFingerprintRequired": "Định tuyến qua Tor đang bật, nên thiết bị này sẽ không tin một chứng chỉ mà nó chưa được báo trước. Hãy lấy dấu vân tay chứng chỉ SHA-256 của máy chủ từ chính máy chủ hoặc từ một thiết bị đã kết nối, rồi dán vào đây.",
-      "confirmFingerprintMismatch": "Chứng chỉ mà máy chủ này đưa ra không phải chứng chỉ bạn đã nhập. Thiết bị này chưa được thêm và không có gì được lưu. Hãy kiểm tra dấu vân tay bạn đã dán — và nếu nó đúng, đừng tiếp tục: có thứ gì đó đang nằm giữa thiết bị này và máy chủ của bạn.",
+      "confirmFingerprintMismatch": "Chứng chỉ mà máy chủ này đưa ra không phải chứng chỉ bạn đã nhập. Thiết bị này chưa được thêm và không có gì được lưu. Hãy kiểm tra dấu vân tay bạn đã dán. Nếu nó đúng, đừng tiếp tục: có thứ gì đó đang nằm giữa thiết bị này và máy chủ của bạn.",
       "pinnedTitle": "Đã ghim chứng chỉ máy chủ",
       "serverLabel": "Máy chủ đồng bộ",
       "serverPlaceholder": "https://your-server.example",
-      "sasMatch": "Chúng khớp — tiếp tục",
-      "sasMismatch": "Chúng không khớp — gỡ thiết bị này",
+      "sasMatch": "Chúng khớp, tiếp tục",
+      "sasMismatch": "Chúng không khớp, gỡ thiết bị này",
       "submit": "Thêm thiết bị",
       "submitting": "Đang thêm…",
       "title": "Thêm thiết bị này vào một tài khoản",
       "verifyBody": "Kiểm tra xem mã này có khớp với mã trên thiết bị bạn đã phê duyệt từ đó không.",
+      "verifyChanged": "Mã đã thay đổi trong lúc bạn đang xem. Hãy so sánh lại cả hai màn hình. Nếu nó vẫn tiếp tục thay đổi, hãy dừng lại và không tiếp tục.",
       "verifyTitle": "Xác minh thiết bị này",
-      "waitingHint": "Giữ cửa sổ này mở — sau khi được phê duyệt, một mã xác minh sẽ xuất hiện ở đây để so sánh với thiết bị kia của bạn.",
-      "waitingTitle": "Đang chờ phê duyệt"
+      "waitingHint": "Giữ cửa sổ này mở. Sau khi được phê duyệt, một mã xác minh sẽ xuất hiện ở đây để so sánh với thiết bị kia của bạn.",
+      "waitingTitle": "Đang chờ phê duyệt",
+      "sasAbortFailed": "Không thể ngắt kết nối thiết bị này. Nó vẫn đang đăng ký với máy chủ đó, nên hãy xem nó là không đáng tin cậy: mở Cài đặt → Đồng bộ và gỡ nó ở đó. Ghi chú của bạn không bị xóa."
     },
     "panel": {
       "addDevice": {
@@ -3382,10 +3616,14 @@
       }
     },
     "reconcile": {
-      "message": "Thiết bị này đã ngoại tuyến một lúc — đang bắt kịp đồng bộ. Ghi chú của bạn vẫn an toàn."
+      "message": "Thiết bị này đã ngoại tuyến một lúc, nên nó đang bắt kịp đồng bộ. Ghi chú của bạn vẫn an toàn."
     },
     "recovered": {
       "restoredToast": "Đã khôi phục thành một ghi chú mới."
+    },
+    "stale": {
+      "body": "Myne đã vài ngày không liên lạc được với máy chủ đồng bộ. Ghi chú của bạn vẫn đang được lưu trên thiết bị này, nhưng chưa có gì rời khỏi nó, nên đây là bản sao duy nhất. Hãy mở Cài đặt → Đồng bộ để xem lý do.",
+      "dismiss": "Bỏ qua"
     },
     "status": {
       "awaitingApproval": "Đang chờ phê duyệt",
@@ -3393,11 +3631,12 @@
       "conflicts_other": "{{count}} xung đột cần xem lại",
       "error": "Lỗi đồng bộ",
       "errorAuth": "Phiên đăng nhập đồng bộ đã hết hạn",
-      "errorFrozen": "Tài khoản bị đóng băng — đã tạm dừng tải lên",
+      "errorFrozen": "Tài khoản bị đóng băng: đã tạm dừng tải lên",
       "errorDeviceRevoked": "Thiết bị này đã bị gỡ khỏi tài khoản của bạn",
-      "errorStorageFull": "Hết dung lượng lưu trữ — đã tạm dừng đồng bộ",
-      "errorQuota": "Hết dung lượng lưu trữ — đã tạm dừng tải lên",
-      "errorRateLimited": "Đồng bộ bị hạn chế tốc độ — đang thử lại",
+      "errorCertChanged": "Chứng chỉ máy chủ đã thay đổi: hãy xác minh để kết nối lại",
+      "errorStorageFull": "Hết dung lượng lưu trữ: đã tạm dừng đồng bộ",
+      "errorQuota": "Hết dung lượng lưu trữ: đã tạm dừng tải lên",
+      "errorRateLimited": "Đồng bộ bị hạn chế tốc độ: đang thử lại",
       "errorTooLarge": "Một tệp quá lớn để tải lên",
       "loading": "Trạng thái đồng bộ…",
       "notEnrolled": "Chưa đăng ký",
@@ -3416,19 +3655,19 @@
       "serverSection": "Máy chủ",
       "serverNotSet": "Chưa đặt",
       "statusLabel": "Trạng thái",
-      "hubHelp": "Đồng bộ giữ cho ghi chú của bạn luôn cập nhật trên các thiết bị. Mọi thứ được mã hóa trên thiết bị này trước khi được gửi đi — máy chủ không bao giờ thấy được ghi chú của bạn.",
+      "hubHelp": "Đồng bộ giữ cho ghi chú của bạn luôn cập nhật trên các thiết bị. Mọi thứ được mã hóa trên thiết bị này trước khi được gửi đi. Máy chủ không bao giờ thấy được ghi chú của bạn.",
       "connectedTls": "Đã kết nối qua TLS.",
       "connectedLocal": "Đã kết nối trên mạng cục bộ của bạn.",
       "connectError": "Không thể kết nối tới máy chủ đó. Kiểm tra địa chỉ và thử lại.",
       "serverAddressLabel": "Địa chỉ máy chủ",
       "serverAddressPlaceholder": "https://sync.example.com",
       "fingerprintLabel": "Dấu vân tay chứng chỉ",
-      "fingerprintCompare": "So sánh nó với cùng màn hình này trên một thiết bị bạn đã tin cậy — chúng phải khớp.",
+      "fingerprintCompare": "So sánh nó với cùng màn hình này trên một thiết bị bạn đã tin cậy. Chúng phải khớp.",
       "pinStatic": "Đã xác minh với chứng chỉ đã biết của máy chủ này.",
       "pinTofu": "Đã ghim khi kết nối lần đầu. So sánh nó giữa các thiết bị của bạn để xác nhận.",
       "enrollNotConfigured": "Thiết lập máy chủ đồng bộ trước, rồi thêm thiết bị này.",
       "enrollTransport": "Không thể kết nối tới máy chủ đồng bộ. Kiểm tra kết nối của bạn và thử lại.",
-      "accountNumberHint": "Kiểm tra kỹ số này — nó có vẻ không đúng.",
+      "accountNumberHint": "Kiểm tra kỹ số này. Nó có vẻ không đúng.",
       "passwordPlaceholder": "Mật khẩu kho lưu trữ của bạn",
       "recoveryPhraseHint": "Nhập hoặc dán 24 từ của bạn. Việc dán sẽ điền vào các ô theo thứ tự.",
       "verifyBody": "Kiểm tra xem cùng một mã có xuất hiện trên thiết bị bạn vừa phê duyệt không. Nếu khớp, thiết bị đó thuộc tài khoản của bạn. Nếu không khớp, hãy gỡ thiết bị đó.",
@@ -3446,11 +3685,11 @@
     "banner": {
       "conflictsNeedReview_one": "{{count}} xung đột cần xem xét",
       "conflictsNeedReview_other": "{{count}} xung đột cần xem xét",
-      "catchingUp": "Đang bắt kịp đồng bộ — ghi chú của bạn vẫn an toàn.",
+      "catchingUp": "Đang bắt kịp đồng bộ. Ghi chú của bạn vẫn an toàn.",
       "verifyDevices": "Xác minh thiết bị"
     },
     "tor": {
-      "connecting": "Đang kết nối tới Tor. Đồng bộ tạm dừng cho đến khi kết nối sẵn sàng — không có gì đang được gửi trực tiếp.",
+      "connecting": "Đang kết nối tới Tor. Đồng bộ tạm dừng cho đến khi kết nối sẵn sàng. Không có gì đang được gửi trực tiếp.",
       "settingsHint": "Cài đặt → Mạng",
       "unavailable": "Không dùng được Tor, nên đồng bộ tạm dừng. Không có gì đang được gửi trực tiếp. Hãy tắt định tuyến qua Tor để đồng bộ mà không cần nó."
     }
@@ -3514,7 +3753,7 @@
       "closeLabel": "Đóng trình quản lý mẫu",
       "deleteRowLabel": "Xóa mẫu {{name}} (chuyển vào Thùng rác)",
       "editTemplateLabel": "Chỉnh sửa mẫu {{name}}",
-      "emptyBody": "Tạo một mẫu để tái sử dụng khung ghi chú — ghi chú cuộc họp, nhật ký hằng ngày, ghi chú đọc sách. Chọn một mẫu khi bạn tạo ghi chú mới.",
+      "emptyBody": "Tạo một mẫu để tái sử dụng khung ghi chú: ghi chú cuộc họp, nhật ký hằng ngày, ghi chú đọc sách. Chọn một mẫu khi bạn tạo ghi chú mới.",
       "emptyTitle": "Chưa có mẫu nào",
       "listLabel": "Mẫu",
       "loading": "Đang tải…",
@@ -3526,7 +3765,7 @@
     },
     "emptyBefore": "Chưa có mẫu nào. Chạm ",
     "newAction": "Mới",
-    "emptyAfter": " để tạo một mẫu ghi chú có thể tái sử dụng — rồi bắt đầu ghi chú từ nó (và chọn một mẫu làm mẫu ghi chú hằng ngày trong Cài đặt).",
+    "emptyAfter": " để tạo một mẫu ghi chú có thể tái sử dụng, rồi bắt đầu ghi chú từ nó (và chọn một mẫu làm mẫu ghi chú hằng ngày trong Cài đặt).",
     "use": "Dùng",
     "edit": "Sửa",
     "deleteConfirm": "Xóa mẫu này?",
@@ -3539,7 +3778,7 @@
     "cancel": "Hủy",
     "close": "Đóng",
     "collision": {
-      "keepBoth": "Giữ cả hai — cài đặt với tên “{{name}}”",
+      "keepBoth": "Giữ cả hai và cài đặt với tên “{{name}}”",
       "question": "Bạn đã có một giao diện tên “{{name}}”.",
       "replace": "Thay thế “{{name}}”"
     },
@@ -3554,7 +3793,7 @@
       "unsupportedVersion": "Liên kết đó được tạo cho một phiên bản Myne mới hơn. Hãy cập nhật Myne rồi thử lại."
     },
     "errorTitle": "Không thể đọc giao diện đó",
-    "helper": "Giao diện là một bảng màu, không phải mã. Myne kiểm tra nó trên thiết bị này trước khi dùng — không có gì được tải lên.",
+    "helper": "Giao diện là một bảng màu, không phải mã. Myne kiểm tra nó trên thiết bị này trước khi dùng. Không có gì được tải lên.",
     "question": "Bạn có muốn dùng giao diện này không?",
     "title": "Cài đặt giao diện"
   },
@@ -3566,10 +3805,10 @@
     "errors": {
       "alreadyUnlocked": "Kho đã được mở khóa.",
       "inProgress": "Một thao tác đang diễn ra.",
-      "kdfMemoryExceedsHost": "Kho này cần {{required}} MiB bộ nhớ để mở — nhiều hơn mức trình duyệt này có thể cấp ({{available}} MiB). Kho vẫn nguyên vẹn; hãy mở nó bằng ứng dụng Myne trên máy tính.",
+      "kdfMemoryExceedsHost": "Kho này cần {{required}} MiB bộ nhớ để mở, nhiều hơn mức trình duyệt này có thể cấp ({{available}} MiB). Kho vẫn nguyên vẹn; hãy mở nó bằng ứng dụng Myne trên máy tính.",
       "unexpected": "Lỗi bất ngờ. Vui lòng thử lại.",
       "vaultNotFound": "Không tìm thấy tệp kho. Vui lòng khởi động lại ứng dụng.",
-      "vaultUpgraded": "Kho này đã được nâng cấp lên một định dạng mới hơn mà phiên bản Myne này chưa hỗ trợ. Dữ liệu của bạn vẫn nguyên vẹn — hãy cập nhật Myne lên phiên bản mới nhất để mở nó."
+      "vaultUpgraded": "Kho này đã được nâng cấp lên một định dạng mới hơn mà phiên bản Myne này chưa hỗ trợ. Dữ liệu của bạn vẫn nguyên vẹn. Hãy cập nhật Myne lên phiên bản mới nhất để mở nó."
     },
     "passwordLabel": "Mật khẩu",
     "passwordPlaceholder": "Mật khẩu",
@@ -3592,7 +3831,7 @@
     "subtitleBiometric": "Xác nhận bằng Touch ID để tiếp tục.",
     "suspicion": {
       "lockedDuringChange": "Đã hủy đổi mật khẩu: kho đã bị khóa.",
-      "metaChangedExternally": "Kho đã bị sửa đổi ở một phiên khác — vui lòng mở khóa lại."
+      "metaChangedExternally": "Kho đã bị sửa đổi ở một phiên khác. Vui lòng mở khóa lại."
     },
     "title": "Mở khóa kho của bạn.",
     "vaultUnreadable": "Không thể đọc tệp kho lưu trữ. Khôi phục từ một bản sao lưu.",
@@ -3619,7 +3858,7 @@
     "unlockWithPinInstead": "Mở khóa bằng mã PIN thay thế",
     "useRecoveryPhrase": "Dùng cụm từ khôi phục của bạn",
     "deleteConfirmTitle": "Xóa kho lưu trữ này?",
-    "deletePartialError": "Không thể gỡ một số tệp. Kho lưu trữ không còn dùng được nữa — tiếp tục để bắt đầu lại.",
+    "deletePartialError": "Không thể gỡ một số tệp. Kho không còn dùng được nữa. Hãy tiếp tục để bắt đầu lại.",
     "failClosedEyebrow": "Không thể mở kho lưu trữ",
     "restoreHint": "Khôi phục từ một bản sao lưu để tiếp tục."
   },
@@ -3638,12 +3877,12 @@
       "committing": "Đang lưu…",
       "copied": "Đã sao chép",
       "copy": "Sao chép",
-      "copyFailed": "Không thể sao chép — hãy dùng “Lưu thành tệp” thay thế.",
-      "eyebrow": "Bước 4 trên 4 — số tài khoản",
+      "copyFailed": "Không thể sao chép. Hãy dùng “Lưu thành tệp” thay thế.",
+      "eyebrow": "Bước 4 trên 4: số tài khoản",
       "heading": "Lưu lại số tài khoản của bạn.",
-      "intro": "Đây là mã định danh bí mật của bạn — hãy coi nó như tiền mặt.",
+      "intro": "Đây là mã định danh bí mật của bạn. Hãy coi nó như tiền mặt.",
       "saveAsFile": "Lưu thành tệp",
-      "shownOnceBody": "Hãy lưu nó ngay — Myne không thể khôi phục nó cho bạn. Cần có nó để đăng ký đồng bộ sau này.",
+      "shownOnceBody": "Hãy lưu nó ngay. Myne không thể khôi phục nó cho bạn. Cần có nó để đăng ký đồng bộ sau này.",
       "shownOnceEmphasis": "Số này chỉ được hiển thị một lần."
     },
     "briefing": {
@@ -3651,17 +3890,17 @@
       "continue": "Tiếp tục tạo kho",
       "eyebrow": "Trước khi bạn tạo kho",
       "heading": "Trước khi bạn tạo kho",
-      "intro": "Myne mã hóa ghi chú của bạn để chỉ mình bạn có thể mở chúng. Từ đó có ba điều hệ quả — hãy đọc rồi tiếp tục.",
+      "intro": "Myne mã hóa ghi chú của bạn để chỉ mình bạn có thể mở chúng. Từ đó có ba điều hệ quả. Hãy đọc rồi tiếp tục.",
       "statements": {
         "no-email": {
           "ackLabel": "Tôi hiểu rằng không có khôi phục qua email.",
           "statement": "Không có khôi phục qua email. Sẽ không bao giờ có.",
-          "why": "Chúng tôi không bao giờ hỏi email của bạn, nên không có liên kết đặt lại và không có tài khoản nào để bộ phận hỗ trợ mở khóa. Đây không phải là một tính năng còn thiếu — đó là sự đảm bảo. Khôi phục qua email đồng nghĩa với việc chúng tôi có thể đọc ghi chú của bạn, và Myne được xây dựng để chúng tôi không thể làm điều đó."
+          "why": "Chúng tôi không bao giờ hỏi email của bạn, nên không có liên kết đặt lại và không có tài khoản nào để bộ phận hỗ trợ mở khóa. Đây không phải là một tính năng còn thiếu. Đó là sự đảm bảo. Khôi phục qua email đồng nghĩa với việc chúng tôi có thể đọc ghi chú của bạn, và Myne được xây dựng để chúng tôi không thể làm điều đó."
         },
         "no-store": {
           "ackLabel": "Tôi hiểu rằng Myne không thể khôi phục mật khẩu của tôi.",
           "statement": "Mật khẩu của bạn mở khóa kho của bạn. Chúng tôi không lưu nó.",
-          "why": "Mật khẩu của bạn là đầu vào cho khóa giải mã ghi chú của bạn. Nó không bao giờ rời khỏi thiết bị này, và không gì trên máy chủ của chúng tôi có thể tái tạo nó. Đó là điều giữ cho ghi chú của bạn riêng tư — và là lý do chúng tôi không thể đặt lại nó cho bạn."
+          "why": "Mật khẩu của bạn là đầu vào cho khóa giải mã ghi chú của bạn. Nó không bao giờ rời khỏi thiết bị này, và không gì trên máy chủ của chúng tôi có thể tái tạo nó. Đó là điều giữ cho ghi chú của bạn riêng tư, và là lý do chúng tôi không thể đặt lại nó cho bạn."
         },
         "phrase-backup": {
           "ackLabel": "Tôi hiểu rằng cụm từ khôi phục là bản sao lưu duy nhất của tôi.",
@@ -3674,7 +3913,7 @@
     "confirm": {
       "back": "Quay lại",
       "continue": "Tiếp tục",
-      "eyebrow": "Bước 3 trên 4 — xác nhận cụm từ",
+      "eyebrow": "Bước 3 trên 4: xác nhận cụm từ",
       "heading": "Gõ lại bốn từ trong cụm từ của bạn.",
       "intro": "Chúng tôi sẽ hỏi các vị trí cụ thể để xác minh bạn đã lưu nó.",
       "mismatch": "Không khớp với từ số {{pos}}.",
@@ -3684,6 +3923,11 @@
       "caption": "Việc này mất một chút thời gian.",
       "footerHint": "Nếu việc này lâu hơn 30 giây, hãy đóng cửa sổ rồi thử lại.",
       "heading": "Đang mã hóa kho của bạn"
+    },
+    "provisioning": {
+      "heading": "Đang tạo tài khoản của bạn",
+      "caption": "Đang đăng ký kho này với máy chủ đồng bộ. Cụm từ khôi phục của bạn sẽ đến ngay sau đó.",
+      "footerHint": "Việc này mất một chút thời gian. Hãy để tab này mở cho đến khi xong, để nó có thể tự dọn dẹp nếu có gì đó trục trặc."
     },
     "errors": {
       "accountNumberInvalid": {
@@ -3747,7 +3991,7 @@
         "title": "Quá nhiều phiên tạo kho cùng lúc"
       },
       "vaultArtifactsPresent": {
-        "body": "Không thể tạo kho mới vì dữ liệu kho đã tồn tại trên thiết bị này. Hãy đóng ứng dụng và khởi động lại — màn hình khởi động sẽ đưa bạn tới luồng mở khóa.",
+        "body": "Không thể tạo kho mới vì dữ liệu kho đã tồn tại trên thiết bị này. Hãy đóng ứng dụng và khởi động lại. Màn hình khởi động sẽ đưa bạn tới luồng mở khóa.",
         "title": "Kho đã tồn tại"
       },
       "vaultBusyAuth": {
@@ -3769,22 +4013,31 @@
       "genericError": {
         "body": "Hãy thử lại.",
         "title": "Đã xảy ra lỗi"
+      },
+      "provisionFailed": {
+        "body": "Chúng tôi không liên lạc được với máy chủ đồng bộ, nên trình duyệt này không còn gì để mở. Cụm từ khôi phục của bạn chưa từng được hiển thị, nên không có gì để ghi lại và không có gì để mất. Hãy bắt đầu lại khi bạn có mạng trở lại.",
+        "title": "Tài khoản của bạn chưa được tạo"
       }
     },
     "password": {
       "back": "Quay lại",
-      "eyebrow": "Bước 1 trên 4 — mật khẩu chính",
+      "eyebrow": "Bước 1 trên 4: mật khẩu chính",
       "heading": "Tạo kho",
       "helperLead": "Myne không lưu mật khẩu hay cụm từ khôi phục của bạn.",
       "submit": "Tạo cụm từ khôi phục"
     },
     "phrase": {
       "back": "Quay lại",
-      "continue": "Tôi đã lưu cụm từ này — xác nhận cụm từ",
+      "clipboardNotCleared": "Trình duyệt của bạn không cho phép Myne xóa bảng nhớ tạm sau đó, nên 24 từ ấy vẫn nằm ở đó cho đến khi bạn sao chép thứ khác. Hãy dán chúng vào trình quản lý mật khẩu của bạn, rồi sao chép bất kỳ thứ gì khác.",
+      "continue": "Tôi đã lưu cụm từ này, xác nhận cụm từ",
+      "copied": "Đã sao chép. Myne sẽ xóa nó sau 30 giây, kể cả khi bạn chuyển sang việc khác, miễn là ứng dụng vẫn đang chạy.",
+      "copiedNoAutoClear": "Đã sao chép. Myne không thể xóa bảng nhớ tạm ở đây, nên các từ vẫn nằm trên đó cho đến khi bạn sao chép thứ khác.",
       "copy": "Sao chép",
-      "eyebrow": "Bước 2 trên 4 — cụm từ khôi phục",
+      "extensionNotice": "Các tiện ích mở rộng trình duyệt có quyền truy cập trang này có thể đọc những gì hiển thị trên trang. Nếu bạn không chắc chắn về mọi tiện ích trong hồ sơ này, hãy dùng ứng dụng máy tính hoặc một hồ sơ trình duyệt sạch cho bước này.",
+      "copyFailed": "Không thể sao chép. Hãy dùng \"Lưu thành tệp\" thay thế.",
+      "eyebrow": "Bước 2 trên 4: cụm từ khôi phục",
       "heading": "Hãy viết ra 24 từ này.",
-      "intro": "Cụm từ này, cùng với mật khẩu của bạn, là cách duy nhất để khôi phục kho của bạn. Hãy lưu nó ngoại tuyến — trên giấy, trình quản lý mật khẩu, ví phần cứng. Hãy coi nó như tiền mặt.",
+      "intro": "Cụm từ này, cùng với mật khẩu của bạn, là cách duy nhất để khôi phục kho của bạn. Hãy lưu nó ngoại tuyến: trên giấy, trình quản lý mật khẩu, ví phần cứng. Hãy coi nó như tiền mặt.",
       "reveal": "Hiện cụm từ",
       "saveAsFile": "Lưu thành tệp"
     },
@@ -3792,10 +4045,10 @@
       "backedUp": "Đã sao lưu ✓",
       "backingUp": "Đang sao lưu…",
       "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "Sao lưu chưa hoàn tất — không có tệp nào được tạo ra. Bạn có thể sao lưu bất cứ lúc nào từ Cài đặt → Lưu trữ.",
+      "backupError": "Sao lưu chưa hoàn tất. Không có tệp nào được tạo ra. Bạn có thể sao lưu bất cứ lúc nào từ Cài đặt → Lưu trữ.",
       "backupFilterName": "Bản sao lưu Myne",
       "backUpNow": "Sao lưu kho này ngay",
-      "body": "Myne đã ghi kho của bạn vào thư mục dữ liệu ứng dụng. Mật khẩu chính và cụm từ khôi phục là cách duy nhất để truy cập lại — hãy đảm bảo cả hai được lưu ở nơi an toàn.",
+      "body": "Myne đã ghi kho của bạn vào thư mục dữ liệu ứng dụng. Mật khẩu chính và cụm từ khôi phục là cách duy nhất để truy cập lại. Hãy đảm bảo cả hai được lưu ở nơi an toàn.",
       "decrypting": "Đang giải mã…",
       "done": "Xong",
       "heading": "Kho của bạn đã sẵn sàng.",
@@ -3832,7 +4085,7 @@
         "weakPassword": "Mật khẩu mới phải có ít nhất 12 ký tự."
       },
       "eyebrow": "Khôi phục · Mật khẩu mới",
-      "helperBody": "Đã mở bằng cụm từ khôi phục của bạn. Mật khẩu cũ của bạn không còn dùng được — hãy đặt mật khẩu chính mới ngay.",
+      "helperBody": "Đã mở bằng cụm từ khôi phục của bạn. Mật khẩu cũ của bạn không còn dùng được. Hãy đặt mật khẩu chính mới ngay.",
       "helperEmphasis": "Cụm từ khôi phục của bạn vẫn giữ nguyên.",
       "submit": "Đặt mật khẩu mới",
       "title": "Đặt mật khẩu chính mới"
@@ -3887,8 +4140,8 @@
       "doneTitle": "Đã dọn dẹp xong",
       "errorBody": "Đã xảy ra lỗi. Hãy đóng ứng dụng rồi thử lại.",
       "errorTitle": "Dọn dẹp thất bại",
-      "foundBody_one": "{{count}} tệp còn sót lại từ một lần xóa trước đó chưa hoàn tất. Chúng vốn đã không đọc được — bạn sẽ không mất gì có thể khôi phục.",
-      "foundBody_other": "{{count}} tệp còn sót lại từ một lần xóa trước đó chưa hoàn tất. Chúng vốn đã không đọc được — bạn sẽ không mất gì có thể khôi phục.",
+      "foundBody_one": "{{count}} tệp còn sót lại từ một lần xóa trước đó chưa hoàn tất. Chúng vốn đã không đọc được. Bạn sẽ không mất gì có thể khôi phục.",
+      "foundBody_other": "{{count}} tệp còn sót lại từ một lần xóa trước đó chưa hoàn tất. Chúng vốn đã không đọc được. Bạn sẽ không mất gì có thể khôi phục.",
       "foundTitle": "Tệp còn sót lại từ một lần xóa chưa hoàn tất",
       "partialBody_one": "{{count}} tệp có thể đang bị một ứng dụng khác khóa (phần mềm diệt virus, đồng bộ tệp, hoặc lập chỉ mục tìm kiếm). Hãy đóng ứng dụng và thử lại sau giây lát, hoặc gỡ thư mục kho thủ công.",
       "partialBody_other": "{{count}} tệp có thể đang bị một ứng dụng khác khóa (phần mềm diệt virus, đồng bộ tệp, hoặc lập chỉ mục tìm kiếm). Hãy đóng ứng dụng và thử lại sau giây lát, hoặc gỡ thư mục kho thủ công.",
@@ -3918,7 +4171,7 @@
     "nothingToPreview": "Chưa có gì để xem trước."
   },
   "conflicts": {
-    "empty": "Không có xung đột nào cần xem xét — ghi chú của bạn đã đồng bộ.",
+    "empty": "Không có xung đột nào cần xem lại. Ghi chú của bạn đã đồng bộ.",
     "groupTitle_one": "{{count}} bản sao xung đột",
     "groupTitle_other": "{{count}} bản sao xung đột",
     "groupTitleOfNote": " của ghi chú {{hex}}"
@@ -3950,14 +4203,14 @@
   },
   "restoreBackup": {
     "title": "Chưa khả dụng trên di động",
-    "body": "Khôi phục từ tệp sao lưu chưa khả dụng trên di động — hãy tạo một kho lưu trữ hoặc khôi phục bằng cụm từ của bạn."
+    "body": "Khôi phục từ tệp sao lưu chưa khả dụng trên di động. Hãy tạo một kho hoặc khôi phục bằng cụm từ của bạn."
   },
   "recording": {
     "deniedTitle": "Quyền truy cập micrô đang tắt",
     "errorTitle": "Không thể bắt đầu ghi âm",
     "deniedBody": "Để ghi âm ghi chú thoại, hãy cho phép Myne truy cập micrô trong Cài đặt › Myne › Micrô.",
     "noDeviceBody": "Không tìm thấy micrô nào trên thiết bị này.",
-    "emptyBody": "Bản ghi đó trống — không có gì được ghi lại.",
+    "emptyBody": "Bản ghi đó trống. Không có gì được ghi lại.",
     "genericBody": "Đã xảy ra lỗi trong khi ghi âm. Vui lòng thử lại.",
     "stopAria": "Dừng ghi âm"
   },
@@ -3987,14 +4240,15 @@
   "join": {
     "transportError": "Không thể kết nối tới máy chủ đồng bộ đó. Kiểm tra địa chỉ và kết nối của bạn, rồi thử lại.",
     "passwordPlaceholder": "Mật khẩu kho lưu trữ của bạn",
-    "waitingHint": "Giữ màn hình này mở — sau khi được phê duyệt, một mã xác minh sẽ xuất hiện ở đây để so sánh với thiết bị kia của bạn.",
+    "waitingHint": "Giữ màn hình này mở. Sau khi được phê duyệt, một mã xác minh sẽ xuất hiện ở đây để so sánh với thiết bị kia của bạn.",
     "verifyBody": "Kiểm tra xem mã này có giống với mã hiển thị trên thiết bị bạn đã phê duyệt từ đó không.",
+    "verifyChanged": "Mã đã thay đổi trong lúc bạn đang xem. Hãy so sánh lại cả hai màn hình. Nếu nó vẫn tiếp tục thay đổi, hãy dừng lại và không tiếp tục.",
     "removing": "Đang gỡ…",
-    "sasMismatch": "Chúng không khớp — gỡ thiết bị này",
+    "sasMismatch": "Mã không khớp, gỡ thiết bị này",
     "title": "Kết nối tới tài khoản của bạn",
     "lead": "Nhập thông tin tài khoản của bạn để mang ghi chú đến thiết bị này. Mọi thứ vẫn được mã hóa đầu cuối.",
     "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Kiểm tra kỹ số này — nó có vẻ không đúng.",
+    "accountHint": "Kiểm tra kỹ số này. Nó có vẻ không đúng.",
     "approvalHint": "Ghi chú của bạn sẽ xuất hiện khi bạn phê duyệt thiết bị này từ một thiết bị đã có tài khoản của bạn.",
     "connectingSubtitle": "Đang lấy tài khoản của bạn và mở khóa kho lưu trữ trên thiết bị này.",
     "qr": {
@@ -4003,15 +4257,15 @@
       "confirmServer": "Máy chủ",
       "confirmTitle": "Thêm thiết bị này?",
       "continue": "Tiếp tục",
-      "expired": "Mã QR này đã hết hạn — hãy hiển thị một mã mới trên thiết bị kia của bạn rồi quét lại.",
+      "expired": "Mã QR này đã hết hạn. Hãy hiển thị một mã mới trên thiết bị kia của bạn rồi quét lại.",
       "invalid": "Đó không phải là mã QR thiết bị của Myne.",
-      "newerVersion": "Mã QR này đến từ một phiên bản Myne mới hơn — hãy cập nhật ứng dụng rồi thử lại.",
+      "newerVersion": "Mã QR này đến từ một phiên bản Myne mới hơn. Hãy cập nhật ứng dụng rồi thử lại.",
       "pinHosted": "Máy chủ do Myne vận hành",
       "pinNone": "Máy chủ tự lưu trữ",
       "pinSelfHost": "Chứng chỉ được ghim từ thiết bị bạn tin cậy",
       "scan": "Quét mã QR",
       "scanFailed": "Không thể quét. Hãy thử lại, hoặc nhập thông tin của bạn thủ công.",
-      "scanUnavailable": "Thiết bị này không quét được — hãy nhập thông tin của bạn bên dưới."
+      "scanUnavailable": "Thiết bị này không quét được. Hãy nhập thông tin của bạn bên dưới."
     }
   },
   "createVault": {
@@ -4019,6 +4273,9 @@
     "beginGeneric": "Không thể bắt đầu tạo kho lưu trữ. Vui lòng thử lại.",
     "wordNumber": "TỪ #{{position}}",
     "commitError": "Không thể lưu kho lưu trữ của bạn. Vui lòng thử lại.",
+    "copyPhrase": "Sao chép",
+    "phraseCopied": "Đã sao chép. Nó ở lại trên thiết bị này, và hệ thống sẽ xóa nó sau 30 giây.",
+    "phraseCopyFailed": "Không thể sao chép. Hãy dùng \"Lưu vào tệp\" thay thế.",
     "savedToFile": "Đã lưu vào {{label}}",
     "saveFileError": "Không thể lưu tệp.",
     "stepLabel": "Tạo một kho lưu trữ · {{current}}/{{total}}",
@@ -4053,31 +4310,31 @@
   },
   "web": {
     "openElsewhere": {
-      "body": "Mỗi lần chỉ một tab có thể mở kho — hai tab sẽ cùng ghi vào một vùng lưu trữ và làm hỏng nó. Hãy đóng tab kia để tiếp tục ở đây.",
+      "body": "Mỗi lần chỉ một tab có thể mở kho. Hai tab sẽ cùng ghi vào một vùng lưu trữ và làm hỏng nó. Hãy đóng tab kia để tiếp tục ở đây.",
       "freed": "Tab kia đã đóng. Hãy tải lại để mở kho của bạn ở đây.",
       "reload": "Tải lại",
       "title": "Kho này đang mở ở một tab khác"
     },
     "reload": {
-      "body": "Tải lại trang này sẽ hỏi mật khẩu của bạn một lần nữa — theo thiết kế, không có cách nào vào nhanh hơn. Kho của bạn vẫn được mã hóa trên thiết bị này khi trang đóng, và khóa được dựng lại từ mật khẩu của bạn mỗi lần.",
+      "body": "Tải lại trang này sẽ hỏi mật khẩu của bạn một lần nữa. Theo thiết kế, không có cách nào vào nhanh hơn. Kho của bạn vẫn được mã hóa trên thiết bị này khi trang đóng, và khóa được dựng lại từ mật khẩu của bạn mỗi lần.",
       "title": "Tải lại trang nghĩa là nhập lại mật khẩu"
     },
     "wall": {
       "getNative": "Tải Myne cho máy tính hoặc di động",
       "noAccount": {
         "body": "Tài khoản được tạo trong ứng dụng Myne trên máy tính hoặc di động, không phải ở đây.",
-        "reason": "Việc tạo tài khoản sinh ra cụm từ khôi phục 24 từ của bạn và chỉ hiển thị nó một lần. Một trang web không bao giờ nên là nơi hiển thị cụm từ đó — nếu nó rò rỉ ở đó, không gì trong Myne có thể thu hồi lại.",
+        "reason": "Việc tạo tài khoản sinh ra cụm từ khôi phục 24 từ của bạn và chỉ hiển thị nó một lần. Một trang web không bao giờ nên là nơi hiển thị cụm từ đó. Nếu nó rò rỉ ở đó, không gì trong Myne có thể thu hồi lại.",
         "title": "Bạn cần có tài khoản trước"
       },
       "noSync": {
         "body": "Trình duyệt này chưa được cấu hình máy chủ đồng bộ, nên không có gì để nó mở.",
-        "reason": "Khác với ứng dụng trên máy tính, trình duyệt không giữ kho riêng nào để dự phòng — ghi chú của nó đến từ đồng bộ. Hãy thiết lập trong ứng dụng máy tính hoặc di động, rồi quay lại đây.",
+        "reason": "Khác với ứng dụng trên máy tính, trình duyệt không giữ kho riêng nào để dự phòng. Ghi chú của nó đến từ đồng bộ. Hãy thiết lập trong ứng dụng máy tính hoặc di động, rồi quay lại đây.",
         "title": "Đồng bộ chưa được thiết lập"
       }
     },
     "unavailableHere": {
       "backup": "Bản sao lưu đã mã hóa được tạo và khôi phục trong ứng dụng Myne trên máy tính, nơi có thể ghi tệp sao lưu vào chỗ bạn chọn. Ghi chú ở đây đến từ máy chủ, nên trình duyệt này tự khôi phục bằng cách đồng bộ.",
-      "creation": "Tài khoản mới được tạo trong ứng dụng Myne trên máy tính. Ứng dụng đó hiển thị cụm từ khôi phục của bạn — và một trang web không bao giờ nên hiển thị cụm từ khôi phục.",
+      "creation": "Trình duyệt này đã có một tài khoản. Để tạo tài khoản khác, hãy mở ứng dụng Myne trên máy tính hoặc dùng một hồ sơ trình duyệt khác.",
       "multiVault": "Trình duyệt này giữ một tài khoản. Để dùng tài khoản khác, hãy mở nó trong ứng dụng Myne trên máy tính hoặc trong một hồ sơ trình duyệt khác.",
       "phraseRecovery": "Việc khôi phục bằng cụm từ diễn ra trong ứng dụng Myne trên máy tính. Không bao giờ nên gõ cụm từ khôi phục của bạn vào một trang web.",
       "title": "Không khả dụng trong trình duyệt"
@@ -4085,9 +4342,9 @@
     "unsupported": {
       "title": "Myne không thể chạy trong trình duyệt này",
       "mobileTitle": "Mở ứng dụng Myne trên thiết bị này",
-      "handoff": "Ứng dụng Myne trên máy tính (macOS, Windows, Linux) và ứng dụng di động (iOS, Android) không có giới hạn như vậy — và chúng tự xác minh chữ ký của mình trước khi chạy, điều mà một trang web không làm được.",
+      "handoff": "Ứng dụng Myne trên máy tính (macOS, Linux) và ứng dụng di động (Android) không có giới hạn như vậy, và ứng dụng bạn cài đặt thì vẫn ở lại trên máy: nếu bạn còn giữ tệp đã tải xuống, nó vẫn nằm trên đĩa của bạn để bạn đối chiếu với mã băm mà Myne công bố cho bản phát hành hiện tại. Không có gì thực hiện việc đối chiếu đó thay bạn. Hiện chưa có bản dựng nào cho Windows và cũng chưa có bản dựng iOS cài đặt được nào được công bố. Một trang web thì được gửi lại tới trình duyệt của bạn mỗi lần truy cập, và trình duyệt của bạn không kiểm tra gì trên đó.",
       "reason": {
-        "desktop-form-factor": "Myne trên trình duyệt được xây dựng cho máy tính để bàn — nó cần lượng bộ nhớ và cách nhập liệu mà trình duyệt trên điện thoại hay máy tính bảng không thể cung cấp. Trên thiết bị này, ứng dụng Myne dù sao cũng là trình khách tốt hơn: nó nhanh hơn, hoạt động ngoại tuyến, và giữ lại ghi chú của bạn khi trình duyệt xóa vùng lưu trữ.",
+        "desktop-form-factor": "Myne trên trình duyệt được xây dựng cho máy tính để bàn. Nó cần lượng bộ nhớ và cách nhập liệu mà trình duyệt trên điện thoại hay máy tính bảng không thể cung cấp. Trên thiết bị này, ứng dụng Myne dù sao cũng là trình khách tốt hơn: nó nhanh hơn, hoạt động ngoại tuyến, và giữ lại ghi chú của bạn khi trình duyệt xóa vùng lưu trữ.",
         "webassembly": "Trình duyệt này không hỗ trợ WebAssembly, nền tảng mà lõi mã hóa chạy trên đó.",
         "wasm-memory-headroom": "Trình duyệt này không thể dành riêng khoảng 336 MB bộ nhớ mà quá trình dẫn xuất khóa của kho cần. Trình duyệt trên điện thoại và máy tính bảng thường không làm được; giới hạn đó do chính kho đặt ra và không thể hạ xuống cho riêng một thiết bị mà không khiến kho trở nên không đọc được ở mọi nơi khác.",
         "worker": "Trình duyệt này không hỗ trợ Web Workers, nơi việc lưu trữ và mã hóa của kho chạy.",

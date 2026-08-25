@@ -136,7 +136,7 @@ export function AboutPanel() {
   const { prefs, setDeveloperMode } = usePrefs();
   // The SERVED bundle's identity, where there is one (phase3-web-client task
   // 114). `null` on desktop by construction — a desktop user's build identity is
-  // the signed installer they ran, which the version string above already names.
+  // the installer they ran, which the version string above already names.
   //
   // On web this is the readout that makes the rest of the integrity chain
   // usable: the bundle is re-delivered on every load, meant to be pinned by a
