@@ -52,6 +52,8 @@ import {
   type Action,
   type VaultRecoverState,
 } from "./reducer";
+import { stageRootStyle } from "../../components/primitives/stageRoot";
+import { scrollRegionStyle } from "../../hooks/useScrollEdges";
 
 interface PhraseEntryStepProps {
   state: VaultRecoverState;
@@ -65,10 +67,7 @@ interface PhraseEntryStepProps {
 }
 
 const ROOT_STYLE: CSSProperties = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  ...stageRootStyle,
   background: "var(--bg-1)",
   fontFamily: "var(--font-sans)",
   padding: "var(--space-6)",
@@ -86,6 +85,19 @@ const CARD_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-4)",
+  // Bounded and scrollable, because `stageRootStyle` bounds the root. This is
+  // the tallest surface in the tree (24 cells plus chrome) and it is the screen
+  // a user with nothing but their recovery phrase has to complete. A capped root
+  // with `alignItems: center` pushes a too-tall card out of BOTH ends, so on a
+  // short window the heading and the submit button leave together, with no way
+  // to reach either. `CenteredCard` and `VaultPicker` carry the same pair.
+  //
+  // `scrollRegionStyle` and NOT `fillingScrollRegionStyle`: this card is a
+  // direct child of `stageRootStyle`, which is a ROW, so growing on its main
+  // axis is a full-bleed width rather than a taller scroller. `maxWidth: 600`
+  // above was the only thing keeping that invisible here.
+  ...scrollRegionStyle,
+  maxHeight: "100%",
 };
 
 const EYEBROW_STYLE: CSSProperties = {

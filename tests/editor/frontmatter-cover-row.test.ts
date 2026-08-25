@@ -18,6 +18,7 @@
 
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import { noteIdExtension } from "@myne/editor/note-identity";
 import { describe, expect, it, vi } from "vitest";
 import { setEditorHost, getHost } from "@myne/editor/host";
 import { catalogField, type CatalogRow } from "../../src/editor/attachments/catalog";
@@ -128,9 +129,12 @@ describe("the cover row in the Properties widget", () => {
 });
 
 /** Render a document and return the "Add cover" control, if the widget drew one. */
-function addCoverControl(source: string): HTMLElement | null {
+function addCoverControl(source: string, readOnly = false): HTMLElement | null {
   const view = new EditorView({
-    state: EditorState.create({ doc: source, extensions: [frontmatterDecorations()] }),
+    state: EditorState.create({
+      doc: source,
+      extensions: [EditorState.readOnly.of(readOnly), frontmatterDecorations()],
+    }),
   });
   try {
     return view.dom.querySelector(`[data-testid="${ADD_COVER_TESTID}"]`);
@@ -159,7 +163,7 @@ describe("the Add cover control on the promoted title row", () => {
     ).toBeNull();
   });
 
-  it("asks the host for a picker that knows the note has no cover yet", () => {
+  it("asks the host for a picker that knows the note has no cover yet, and which note", () => {
     const openPicker = vi.fn();
     const host = getHost();
     setEditorHost({ ...host, cover: { openPicker, remove: vi.fn() } });
@@ -167,7 +171,7 @@ describe("the Add cover control on the promoted title row", () => {
       const view = new EditorView({
         state: EditorState.create({
           doc: fm("title: Roadmap"),
-          extensions: [frontmatterDecorations()],
+          extensions: [noteIdExtension("note-a"), frontmatterDecorations()],
         }),
       });
       view.dom
@@ -178,7 +182,20 @@ describe("the Add cover control on the promoted title row", () => {
       setEditorHost(host);
     }
     // `false`, so the picker does not offer Remove for a cover that is not there.
-    expect(openPicker).toHaveBeenCalledWith(false);
+    // The id is myne-md/myne#520: this control `preventDefault`s on `mousedown`
+    // for the same reason the banner's do, so the host cannot infer a target
+    // from focus here either.
+    expect(openPicker).toHaveBeenCalledWith(false, "note-a");
+  });
+
+  it("is absent on a read-only surface", () => {
+    // Same contract as the banner's controls one file away (myne-md/myne#564,
+    // applied in myne-md/myne#520's review): this control does not go through
+    // the document, so `EditorState.readOnly` does not stop it by itself, and
+    // the host it calls re-encrypts the note on disk. A reading mirror offering
+    // "Add cover" is a write affordance on a surface documented as never
+    // writing.
+    expect(addCoverControl(fm("title: Roadmap"), true)).toBeNull();
   });
 
   it("is absent entirely when the host has no cover seam", () => {

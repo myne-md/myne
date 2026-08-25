@@ -29,9 +29,25 @@ import {
 
 type Busy = "none" | "aborting" | "confirming";
 
+/** Which of the two settle actions landed. */
+export type SettleOutcome = "aborted" | "confirmed";
+
 export interface SettleMigrationBlockProps {
-  /** Called after an abort or confirm lands, so the panel can re-probe. */
-  onSettled?: () => void;
+  /**
+   * Called after a settle lands, told WHICH one.
+   *
+   * The argument is the whole of myne-md/myne#461. Both actions used to report
+   * through one bare callback, and the panel treated the pair as
+   * interchangeable, so confirming routed the user to the Unlock screen. Only
+   * ABORT is a re-key: it restores the pre-migration root and the backend locks
+   * the slot (`vault_migrate_abort` calls `lock_from_host`). CONFIRM only
+   * crypto-erases the staged `legacy/` snapshot and leaves the running slot
+   * exactly as it was, so a force-relock on top of it puts React on a lock
+   * screen while the Rust slot is still `Slot::Unlocked`, and every unlock
+   * attempt then returns `VaultAlreadyUnlocked` with no way forward short of
+   * restarting the app.
+   */
+  onSettled?: (which: SettleOutcome) => void;
 }
 
 export function SettleMigrationBlock({
@@ -60,7 +76,7 @@ export function SettleMigrationBlock({
     try {
       await (which === "aborting" ? abortMigration() : confirmMigration());
       setStatus(null);
-      onSettled?.();
+      onSettled?.(which === "aborting" ? "aborted" : "confirmed");
     } catch (e) {
       const kind = (e as { kind?: string } | null)?.kind;
       setErrorKey(

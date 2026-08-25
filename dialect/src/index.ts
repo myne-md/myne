@@ -86,6 +86,8 @@ export type { NormalizedConflictPair } from "./diffNormalize";
 // clients so a note laid out on one is read identically on the others.
 export {
   MAX_EMBED_DIMENSION_PX,
+  embedAccessibleName,
+  embedWidthCss,
   emitEmbedAlias,
   emptyEmbedLayout,
   isEmptyEmbedLayout,

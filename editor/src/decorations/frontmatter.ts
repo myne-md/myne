@@ -34,7 +34,8 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { formatYamlScalar } from "@myne/dialect";
-import { getHost } from "../host";
+import { writableMember } from "../host";
+import { readNoteId } from "../note-identity";
 import { catalogChanged, catalogField } from "../attachments/catalog";
 import { coverIsOnScreen } from "./cover-banner";
 import { foldSegment } from "@myne/dialect/folderPath";
@@ -216,7 +217,16 @@ class PropertiesWidget extends WidgetType {
     // Withdrawn only when a cover is actually ON SCREEN, matching the row skip.
     // A dangling cover keeps this control, because the user has no usable cover
     // and must still be able to set one.
-    const cover = getHost().cover;
+    // Read-only refuses, the same as the banner's controls one file away and for
+    // the same reason (myne-md/myne#564 applied in myne-md/myne#520's review):
+    // this control does not go through the document, so `EditorState.readOnly`
+    // does not stop it, and the host it calls re-encrypts the note on disk. A
+    // reading mirror offering "Add cover" is a write affordance on a surface
+    // documented as never writing. `writableMember` holds that rule for both
+    // controls; what it does NOT reach is stated at `HOST_WRITE_MEMBERS` rather
+    // than promised here, because the roster covers top-level members and the
+    // attachments write members are not among them.
+    const cover = writableMember(view.state, "cover");
     if (cover === undefined || this.coverShown) return input;
 
     const row = document.createElement("div");
@@ -232,7 +242,11 @@ class PropertiesWidget extends WidgetType {
     // input would otherwise take focus before the handler runs.
     add.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      cover.openPicker(false);
+      // Read live from the view, never captured (myne-md/myne#520): this widget
+      // outlives a note swap whenever its properties compare equal, and the
+      // `preventDefault` above is exactly what stops the host from working the
+      // target out from focus.
+      cover.openPicker(false, readNoteId(view.state));
     });
     row.appendChild(add);
     return row;

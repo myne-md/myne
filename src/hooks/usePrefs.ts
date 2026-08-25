@@ -415,11 +415,19 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   /**
    * Shared optimistic-then-reread-on-error core: patch the cache immediately
    * (so an open surface re-renders live), persist, and on failure re-read disk
-   * truth — the same convergence discipline the setters above spell out by
-   * hand. Every setter written from here on composes this instead of copying
-   * the block again.
+   * truth, the same convergence discipline the setters above spell out by hand.
+   * Every setter written from here on composes this instead of copying the block
+   * again.
+   *
+   * **Named `writeOptimisticPref`, not `writePref`** (myne-md/myne#507). That
+   * name belongs to `src/lib/prefs.ts`'s module-private chokepoint, the one that
+   * bumps the prefs nonce and that `scripts/check-prefs-nonce.mjs` enforces. This
+   * one touches no IPC and bumps nothing: it patches a cache and delegates. Two
+   * functions with the same name and different semantics, one layer apart, is
+   * how myne#251 happened, and myne#496 renamed the mobile twin out of the same
+   * collision.
    */
-  const writePref = useCallback(
+  const writeOptimisticPref = useCallback(
     async (patch: Partial<PrefsView>, persist: () => Promise<void>) => {
       setPrefs((p) => ({ ...p, ...patch }));
       try {
@@ -443,22 +451,22 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   // every tick, so a failed write that converges back to disk truth also
   // converges the socket.
   const setCliEnabledPref = useCallback(
-    (enabled: boolean) => writePref({ cli_enabled: enabled }, () => persistCliEnabled(enabled)),
-    [writePref],
+    (enabled: boolean) => writeOptimisticPref({ cli_enabled: enabled }, () => persistCliEnabled(enabled)),
+    [writeOptimisticPref],
   );
 
   const setCliExcludedFoldersPref = useCallback(
     (folders: string[]) =>
-      writePref({ cli_excluded_folders: folders }, () => persistCliExcludedFolders(folders)),
-    [writePref],
+      writeOptimisticPref({ cli_excluded_folders: folders }, () => persistCliExcludedFolders(folders)),
+    [writeOptimisticPref],
   );
 
   const setCliRateLimitDisabledPref = useCallback(
     (disabled: boolean) =>
-      writePref({ cli_rate_limit_disabled: disabled }, () =>
+      writeOptimisticPref({ cli_rate_limit_disabled: disabled }, () =>
         persistCliRateLimitDisabled(disabled),
       ),
-    [writePref],
+    [writeOptimisticPref],
   );
 
   const setAutoLock = useCallback(
@@ -587,37 +595,37 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
-  // The four editor-typography setters, over the shared `writePref` core.
+  // The four editor-typography setters, over the shared `writeOptimisticPref` core.
   const setEditorTextSizePref = useCallback(
-    (value: string | null) => writePref({ editor_text_size: value }, () => setEditorTextSize(value)),
-    [writePref],
+    (value: string | null) => writeOptimisticPref({ editor_text_size: value }, () => setEditorTextSize(value)),
+    [writeOptimisticPref],
   );
   const setEditorLineSpacingPref = useCallback(
     (value: string | null) =>
-      writePref({ editor_line_spacing: value }, () => setEditorLineSpacing(value)),
-    [writePref],
+      writeOptimisticPref({ editor_line_spacing: value }, () => setEditorLineSpacing(value)),
+    [writeOptimisticPref],
   );
   const setDateFormatPref = useCallback(
-    (value: string | null) => writePref({ date_format: value }, () => setDateFormat(value)),
-    [writePref],
+    (value: string | null) => writeOptimisticPref({ date_format: value }, () => setDateFormat(value)),
+    [writeOptimisticPref],
   );
   const setTimeFormatPref = useCallback(
-    (value: string | null) => writePref({ time_format: value }, () => setTimeFormat(value)),
-    [writePref],
+    (value: string | null) => writeOptimisticPref({ time_format: value }, () => setTimeFormat(value)),
+    [writeOptimisticPref],
   );
   const setTimezonePref = useCallback(
-    (value: string | null) => writePref({ timezone: value }, () => setTimezone(value)),
-    [writePref],
+    (value: string | null) => writeOptimisticPref({ timezone: value }, () => setTimezone(value)),
+    [writeOptimisticPref],
   );
   const setEditorContentWidthPref = useCallback(
     (value: string | null) =>
-      writePref({ editor_content_width: value }, () => setEditorContentWidth(value)),
-    [writePref],
+      writeOptimisticPref({ editor_content_width: value }, () => setEditorContentWidth(value)),
+    [writeOptimisticPref],
   );
   const setEditorFontFamilyPref = useCallback(
     (value: string | null) =>
-      writePref({ editor_font_family: value }, () => setEditorFontFamily(value)),
-    [writePref],
+      writeOptimisticPref({ editor_font_family: value }, () => setEditorFontFamily(value)),
+    [writeOptimisticPref],
   );
 
   const setKeymapBindingPref = useCallback(

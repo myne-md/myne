@@ -832,6 +832,47 @@ textarea,
   animation: myne-spinner-rotate 800ms linear infinite;
 }
 
+/* -- Scrolling-region soft edges (myne-md/myne#565) --------------------------
+   A fade at the edge of a scroll container that says "there is more this way",
+   instead of the hairline crop a bounded container otherwise gives.
+
+   Here rather than in an inline style for two reasons. The mask stops are
+   `#000`, which in a mask is not a colour at all: it is full opacity, and it
+   must stay full opacity, so it is exactly the kind of value that must NOT be
+   reachable to a theme. And the whole rule is static; only WHICH edges are
+   faded changes, which is what the two data attributes carry.
+
+   The fade appears only on an edge you can actually scroll toward: a fixed mask
+   on both ends leaves the first row of an unscrolled list half-faded for no
+   reason, which reads as a rendering fault rather than as an affordance.
+   `src/hooks/useScrollEdges.ts` owns the measurement. */
+
+.myne-scroll-fade {
+  --myne-fade: var(--space-5);
+  --myne-fade-top: 0px;
+  --myne-fade-bottom: 0px;
+}
+
+/* One gradient, two variables. Written out per-edge it was six copies of the
+   same stop list (three combinations x the -webkit- alias), which is six edits
+   to change the depth and six chances to change five of them. */
+.myne-scroll-fade[data-fade-top="true"],
+.myne-scroll-fade[data-fade-bottom="true"] {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0, #000 var(--myne-fade-top),
+    #000 calc(100% - var(--myne-fade-bottom)), transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0, #000 var(--myne-fade-top),
+    #000 calc(100% - var(--myne-fade-bottom)), transparent 100%
+  );
+}
+
+.myne-scroll-fade[data-fade-top="true"] { --myne-fade-top: var(--myne-fade); }
+.myne-scroll-fade[data-fade-bottom="true"] { --myne-fade-bottom: var(--myne-fade); }
+
 /* -- Sidebar tree disclosure ------------------------------------------------
    Enter/exit motion for folder-tree rows revealed/hidden by expand/collapse
    lives in `NoteList`'s `DisclosureWrapper` as an inline `grid-template-rows`

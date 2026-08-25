@@ -29,6 +29,8 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_EMBED_DIMENSION_PX,
+  embedAccessibleName,
+  embedWidthCss,
   emitEmbedAlias,
   emptyEmbedLayout,
   isAliasSafeText,
@@ -371,5 +373,69 @@ describe("unknown keyed segments survive a round trip", () => {
     expect(extractor.test(src)).toBe(false);
     // The tree scan stops at the first `]]` PAIR, which is the real one.
     expect(src.indexOf("]]")).toBe(src.length - 2);
+  });
+});
+
+// The two presentation resolvers the three renderers share (the editor widget,
+// the HTML/PDF emitter, the mobile renderer). They live in this module rather
+// than in each renderer because the rules below are the ones that were already
+// diverging: the `max-width` pairing was argued three times, and `alt` was
+// implemented at two different levels of completeness.
+describe("embedWidthCss", () => {
+  const layout = (over: Partial<EmbedLayout>): EmbedLayout => ({
+    ...emptyEmbedLayout(),
+    ...over,
+  });
+
+  it.each([
+    ["an absolute width", { widthPx: 300 }, "300px"],
+    ["a percentage width", { widthPercent: 50 }, "50%"],
+    ["no width at all", {}, null],
+    // Cannot both be set through the grammar (one `w=` wins), but the resolver
+    // has to answer deterministically if a caller hand-builds a layout.
+    ["both, absolute first", { widthPx: 300, widthPercent: 50 }, "300px"],
+  ])("resolves %s", (_l, over, want) => {
+    expect(embedWidthCss(layout(over))).toBe(want);
+  });
+
+  it("ignores the height, which is applied separately by each surface", () => {
+    expect(embedWidthCss(layout({ heightPx: 200 }))).toBeNull();
+  });
+});
+
+describe("embedAccessibleName", () => {
+  const layout = (alt: string | null): EmbedLayout => ({ ...emptyEmbedLayout(), alt });
+
+  it("uses the authored alt as the accessible name, over the filename", () => {
+    expect(embedAccessibleName(layout("A cat asleep"), "cat.png")).toEqual({
+      name: "A cat asleep",
+      decorative: false,
+    });
+  });
+
+  it("falls back to the filename when no alt was authored", () => {
+    expect(embedAccessibleName(layout(null), "cat.png")).toEqual({
+      name: "cat.png",
+      decorative: false,
+    });
+  });
+
+  it("reports an authored EMPTY alt as decorative, and names nothing", () => {
+    // `docs/spec/wikilink.md` §5.1's second clause. The name is `""` rather
+    // than the filename precisely so a caller that cannot hide the media from
+    // the accessibility tree still does not read the filename out loud.
+    expect(embedAccessibleName(layout(""), "cat.png")).toEqual({
+      name: "",
+      decorative: true,
+    });
+  });
+
+  it("keeps decorative distinct from absent, which is the whole rule", () => {
+    // Stated as the one comparison a `||` would fail: both cases pass when read
+    // alone, since `""` and `"cat.png"` are each individually plausible.
+    const decorative = embedAccessibleName(layout(""), "cat.png");
+    const absent = embedAccessibleName(layout(null), "cat.png");
+    expect(decorative.decorative).not.toBe(absent.decorative);
+    expect(decorative.name).not.toBe(absent.name);
   });
 });

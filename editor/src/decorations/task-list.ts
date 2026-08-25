@@ -7,6 +7,13 @@
 // Click handler dispatches a CM6 transaction toggling the source `[ ]` ↔ `[x]`
 // so undo/redo treats it as a single step.
 //
+// The checkbox is cursor-aware (myne-md/myne#563): the `- [ ]` run lifts back to
+// source when a selection sits inside it, like every other live-preview
+// construct, and re-renders when the caret leaves. It used to mount through
+// `makeDocOnlyDecorationPlugin`, whose gate does not watch the selection at all,
+// so the marker was the one piece of markdown in the editor with no way to see
+// what it stood for.
+//
 // A **recurring** task takes a different path first (myne#198): ticking one
 // materializes its next occurrence and un-ticking one removes the occurrence it
 // materialized, each as a single transaction carrying both changes. The
@@ -22,7 +29,8 @@ import {
   EditorView,
   WidgetType,
 } from "@codemirror/view";
-import { makeDocOnlyDecorationPlugin } from "./plugin-factory";
+import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
+import { revealsRange } from "./cursor-aware";
 import { completeRecurringTask, uncompleteRecurringTask } from "./task-recurrence";
 
 class TaskCheckboxWidget extends WidgetType {
@@ -57,14 +65,28 @@ class TaskCheckboxWidget extends WidgetType {
     // focus stop, which made it mouse-only. Shipping fully accessible chips
     // beside a mouse-only checkbox would have been an inconsistency the user
     // feels immediately: same line, two affordances, one reachable.
-    span.setAttribute("tabindex", "0");
+    // Not a focus stop and not a pointer on a surface that will refuse the
+    // toggle: an affordance that looks live and does nothing is worse than none.
+    const editable = !view.state.readOnly;
+    if (editable) span.setAttribute("tabindex", "0");
     span.setAttribute(
       "aria-label",
       this.checked ? "Task, completed" : "Task, not completed",
     );
-    span.style.cursor = "pointer";
+    span.setAttribute("aria-disabled", String(!editable));
+    span.style.cursor = editable ? "pointer" : "default";
 
     const toggle = (): void => {
+      // Read-only surfaces refuse (myne-md/myne#564). `EditorState.readOnly` is
+      // consulted by COMMANDS; this widget dispatches straight into the document
+      // from a DOM handler, so it inherits nothing from that flag and has to
+      // check it. Two things went wrong without this, and the second is worse
+      // than the first: a reading-mode tab wrote the note on a surface documented
+      // as strict read-only, and the reading COMPANION mirror (`PaneView`, whose
+      // `onChange` is a no-op) flipped the box on screen and threw the write
+      // away, so the tick looked like it landed and vanished at the next value
+      // adoption.
+      if (view.state.readOnly) return;
       // Resolve the marker position live from the DOM rather than trusting the
       // closure: if CM6 reused this widget's DOM, the captured `markerFrom`
       // could be stale and the toggle would rewrite the wrong range. Read the
@@ -127,17 +149,31 @@ function buildTaskListDecorations(view: EditorView): DecorationSet {
         const line = view.state.doc.lineAt(node.from);
         const before = view.state.doc.sliceString(line.from, node.from);
         const bullet = before.match(/^(\s*)[-*+]\s+$/);
-        if (bullet !== null) {
-          const bulletStart = line.from + (bullet[1] ?? "").length;
+        const bulletStart =
+          bullet === null ? node.from : line.from + (bullet[1] ?? "").length;
+        // Cursor-aware reveal (myne-md/myne#563, myne-md/myne#560). Three
+        // choices in one line:
+        //
+        //  - the hidden run is `- [ ]` TOGETHER, not the marker alone. Lifting
+        //    `[ ]` while the bullet stayed hidden renders a line that is neither
+        //    the rendered form nor the source.
+        //  - per-RANGE, not per-line (`isCursorLine` would do the latter),
+        //    because the label is ordinary prose: typing in it must not make the
+        //    checkbox disappear out from under the caret.
+        //  - a caret inside the run, OR a selection that overlaps it. The second
+        //    clause is what keeps a translucent selection band off the OPAQUE
+        //    checkbox fill: if the markup is in the selection, show the markup.
+        //    See `revealsRange`.
+        if (!revealsRange(view, bulletStart, node.to)) {
           if (node.from > bulletStart) {
             decorations.push(Decoration.replace({}).range(bulletStart, node.from));
           }
+          decorations.push(
+            Decoration.replace({
+              widget: new TaskCheckboxWidget(checked, node.from),
+            }).range(node.from, node.to),
+          );
         }
-        decorations.push(
-          Decoration.replace({
-            widget: new TaskCheckboxWidget(checked, node.from),
-          }).range(node.from, node.to),
-        );
         // Strike + mute the label text of a completed item so done items
         // visibly recede (MYND-142). Starts at the first non-space AFTER the
         // marker — so the strike line doesn't run through the gap into the
@@ -167,5 +203,5 @@ function buildTaskListDecorations(view: EditorView): DecorationSet {
 }
 
 export function taskListDecorations(): Extension {
-  return makeDocOnlyDecorationPlugin(buildTaskListDecorations);
+  return makeCursorAwareDecorationPlugin(buildTaskListDecorations);
 }

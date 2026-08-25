@@ -350,3 +350,54 @@ export function isEmptyEmbedLayout(layout: EmbedLayout): boolean {
     layout.alt === null
   );
 }
+
+/**
+ * The CSS length an explicit width segment resolves to, or `null` when the
+ * author named none.
+ *
+ * One implementation because the pairing with `max-width: 100%` is an invariant
+ * no compiler checks: an author who writes `w=4000` on a phone must still get a
+ * picture that fits the column, and every renderer that applies the width owes
+ * that cap. `MAX_EMBED_DIMENSION_PX` bounds the stored value, not the viewport,
+ * so it does not discharge the obligation. The three surfaces that consume this
+ * (the editor widget, the HTML/PDF emitter, the mobile renderer) each wrote the
+ * same six-line ternary and each argued the cap separately, which is three
+ * places for a fourth surface to get it wrong in.
+ *
+ * The width alone is returned rather than a whole style object, because the way
+ * a surface APPLIES it legitimately differs: a typed CSSOM setter in the editor
+ * (never a style string, see `applyEmbedLayout`), an escaped attribute in the
+ * emitter, a React style object on mobile. Only the value is shared.
+ */
+export function embedWidthCss(layout: EmbedLayout): string | null {
+  if (layout.widthPx !== null) return `${layout.widthPx}px`;
+  if (layout.widthPercent !== null) return `${layout.widthPercent}%`;
+  return null;
+}
+
+/**
+ * The accessible name for an embed, and whether the author marked it
+ * decorative. `docs/spec/wikilink.md` §5.1 is normative and has two clauses:
+ *
+ *  - an authored alt is THE accessible name, so it wins over the filename;
+ *  - an authored EMPTY alt (`alt=`) means decorative, which is a different
+ *    answer from "no alt segment" and must not fall back to the filename.
+ *
+ * Hence `??` rather than `||`: `alt=` parses to `""`, and `||` would treat that
+ * as absent and read the filename out loud, which is the opposite of what the
+ * author asked for. The distinction is invisible in every renderer's output
+ * until a screen reader meets it, which is why it lives here instead of being
+ * re-derived per surface. It had already diverged: two surfaces implemented
+ * both clauses and the third implemented only the first.
+ *
+ * `name` is `""` when `decorative` is true. A caller that hides the media from
+ * the accessibility tree ignores it; a caller that cannot must still not
+ * announce the filename.
+ */
+export function embedAccessibleName(
+  layout: EmbedLayout,
+  filename: string,
+): { name: string; decorative: boolean } {
+  if (layout.alt === "") return { name: "", decorative: true };
+  return { name: layout.alt ?? filename, decorative: false };
+}

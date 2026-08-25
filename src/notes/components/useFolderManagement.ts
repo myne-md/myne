@@ -49,6 +49,7 @@ import {
 import { moveNote } from "../moveNote";
 import { writeTabDrag } from "../tabDrag";
 import { itemKey, noteItem } from "../workspaceState";
+import { panesNotSettledMessage } from "../workspaceContext";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
 import {
@@ -438,12 +439,38 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
    */
   const applyFolderPathChange = useCallback(
     async (node: FolderNode, newPath: string) => {
-      const result = await renameFolder(
-        node.path,
-        newPath,
-        notesForOps(),
-        deliberate,
-      );
+      // `renameFolder` opens with `flushOpenPanes()`, which REJECTS when a pane
+      // did not settle (myne-md/myne#520). Declining the rename is the right
+      // answer, since the batch reads every note from disk and would write over
+      // whatever that pane still holds, but a silent decline is
+      // indistinguishable from a rename that did nothing. Say so.
+      //
+      // Two different sentences rather than one, and neither rethrows. A bare
+      // `catch` attributed every rejection to an unsettled pane; a rethrow
+      // reported nothing at all, because every route in is a `void fm.…` with no
+      // `.catch`. The third failure mode, a rejection with the rename already
+      // committed, is not here any more: `renameFolder` reports that one as
+      // `deliberateWriteFailed` precisely so this catch cannot swallow the
+      // re-rooting the landed rename still owes. See the tail of this callback.
+      let result;
+      try {
+        result = await renameFolder(node.path, newPath, notesForOps(), deliberate);
+      } catch (err) {
+        // Both arms REPORT, and neither rethrows. Every caller of this reaches it
+        // through a `void fm.moveFolderTo(...)` or `void fm.commitRenameFolder(...)`
+        // with no `.catch`, so a rethrow is an unhandled rejection and nothing on
+        // screen, which is worse than the wrong notice it replaced. The folder
+        // sentence is the folder-specific one rather than the neutral shared
+        // string, which is what `panesNotSettledMessage` taking resolved
+        // sentences is for.
+        setBlockNotice(
+          panesNotSettledMessage(err, {
+            unsettled: i18n.t("notes.folderManagement.unsettledSave"),
+            failed: i18n.t("notes.folderManagement.renameFailed"),
+          }),
+        );
+        return;
+      }
       setDeliberate(result.nextDeliberate);
       // Re-root the folder's color + icon onto the new path (and any descendant
       // folder's, since the rename re-roots the whole subtree) so a rename
@@ -469,6 +496,24 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         }
       }
       await Promise.all(result.moved.map((id) => ctx.refreshOne(id)));
+      // Last, and deliberately AFTER the re-rooting above. The rename committed
+      // and only the `deliberate_folders` write failed, so the notes are right
+      // and one setting is not; running the re-rooting first is what keeps the
+      // decoration map and `archived_folders` from ALSO drifting off a rename
+      // that landed. Nothing reconciles `vault.prefs` against note frontmatter
+      // later, so the user is the reconciliation.
+      if (result.deliberateWriteFailed === true) {
+        // The in-memory set KEEPS the new path, deliberately, and this is the one
+        // place in this file that does not revert an optimistic prefs write. The
+        // #259 shape reverts because there the write was the whole action; here
+        // the rename landed on disk, so the old path is the value that disagrees
+        // with the notes. Neither choice is right, and the message is what makes
+        // the surviving disagreement legible instead of silent: it names the
+        // residue (an empty folder back under the old name at the next unlock)
+        // and says removing it is safe, rather than promising a retry that a
+        // second rename cannot perform.
+        setBlockNotice(i18n.t("notes.folderManagement.deliberateWriteFailed"));
+      }
     },
     [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap],
   );
