@@ -265,10 +265,12 @@ pub async fn hide_vault_names<R: tauri::Runtime>(
     hide_vault_names_from_host(&host, &crate::vault_io::StdVaultIo).await
 }
 
-/// Report whether this device has a usable keychain, so the Privacy row can say
-/// that the option cannot work here instead of appearing to do nothing. Reads
-/// one keychain item that does not exist; stores nothing, mints nothing, and
-/// touches no vault.
+/// Report whether this BUILD on this device can store a vault name, so the
+/// Privacy row can say the option cannot work here instead of appearing to do
+/// nothing. Writes one non-secret byte under a non-`VaultId` probe account and
+/// best-effort deletes it; mints no wrap key and touches no vault. It said
+/// "reads one keychain item that does not exist; stores nothing" until
+/// 2026-08-25, which was the read probe this command stopped being.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn vault_label_keychain_status() -> Result<KeychainStatusView, HideVaultNamesError> {
