@@ -77,6 +77,18 @@ export type UseAutosaveReturn = {
    *  settled-check a caller about to read-patch-write the same note needs, and
    *  `hasPendingWork` is not it. */
   lastSaveFailed: () => boolean;
+  /** Is a `note_update` in flight RIGHT NOW?
+   *
+   *  The in-flight disjunct of `hasPendingWork`, on its own, because the other
+   *  two are what make `hasPendingWork` the wrong question for a settled-check:
+   *  a clean pane whose buffer merely moved on is ordinary, and reporting it as
+   *  unsettled refused writes after perfectly normal saves. This one is not
+   *  ordinary. A caller that read-patch-writes this note while a save is in
+   *  flight has its patch landed on and reverted, or, with the section 11.3
+   *  hash on, mints a keep-both conflict copy for a note no remote writer
+   *  touched, because the in-flight save declares a base the caller's write has
+   *  already replaced. */
+  saveInFlight: () => boolean;
 };
 
 /**
@@ -602,6 +614,9 @@ export function useAutosave(
     [],
   );
 
+  /** See the type docstring: the in-flight disjunct alone. */
+  const saveInFlight = useCallback(() => inFlightRef.current !== null, []);
+
   /**
    * Did the most recent save ATTEMPT fail?
    *
@@ -656,6 +671,7 @@ export function useAutosave(
       acceptReloadedBody,
       hasPendingWork,
       lastSaveFailed,
+      saveInFlight,
     }),
     [
       status,
@@ -665,6 +681,7 @@ export function useAutosave(
       acceptReloadedBody,
       hasPendingWork,
       lastSaveFailed,
+      saveInFlight,
     ],
   );
 }

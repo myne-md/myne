@@ -818,6 +818,61 @@ describe("lastSaveFailed, the settled-check a frontmatter writer needs", () => {
     expect(result.current.lastSaveFailed()).toBe(false);
   });
 
+  // The hole `lastSaveFailed` alone leaves, and the reason `PaneView`'s
+  // `flushAndReport` asks a second question. On a HAND-OFF (the user typed
+  // during the save) `fireSave` resolves early: it nulls `inFlightRef`, marks
+  // `handedOff`, fires the follow-up and returns. The follow-up's first
+  // statement is `saveFailedRef.current = false`, so the failure flag reads
+  // clean for a save that has not landed, and a caller told SETTLED then
+  // read-patch-writes the note while that save is still in flight.
+  it("saveInFlight is TRUE while a hand-off follow-up is still running, where lastSaveFailed reads clean", async () => {
+    let release: (() => void) | null = null;
+    const saveImpl = vi.fn(
+      (_id: string, body: string) =>
+        new Promise<string>((resolve) => {
+          release = () => resolve(body);
+        }),
+    );
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    // Start a save and hold it open.
+    let flushed: Promise<void> | null = null;
+    await act(async () => {
+      flushed = result.current.flushIfDirty();
+      await Promise.resolve();
+    });
+    // Type during the save: this is what makes the resolution a hand-off.
+    rerender({ body: "three" });
+    await act(async () => {
+      release?.();
+      await flushed;
+    });
+    // The follow-up is running. `lastSaveFailed` cannot see it; this can.
+    expect(result.current.lastSaveFailed()).toBe(false);
+    expect(result.current.saveInFlight()).toBe(true);
+    await act(async () => {
+      release?.();
+      await Promise.resolve();
+    });
+  });
+
+  it("saveInFlight is false on a hook that has never saved, and after one settles", async () => {
+    const saveImpl = vi.fn(async (_id: string, body: string) => body);
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    expect(result.current.saveInFlight()).toBe(false);
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.saveInFlight()).toBe(false);
+  });
+
   it("is false after a save that landed, even while the buffer has moved on", async () => {
     // The case that broke three E2E scenarios. `hasPendingWork` is TRUE here and
     // correctly so, because there is unsaved work; but nothing FAILED, so a

@@ -946,10 +946,25 @@ export function PaneView({
   // normal save, so the cover write behind it was refused and the user got a
   // write-failed toast. What a caller about to read-patch-write this note needs
   // to know is only whether the flush it just awaited actually persisted.
+  // `saveInFlight` is the THIRD thing this has to ask, and leaving it out was a
+  // silent hole rather than a simplification. `flushIfDirty` awaits two levels
+  // on its in-flight branch because a hand-off re-registers `inFlightRef`; its
+  // `await fireSave()` branch does not re-check at all, and on a hand-off
+  // `fireSave` resolves EARLY (it nulls `inFlightRef`, marks `handedOff`, fires
+  // the follow-up and returns). The follow-up's first statement clears the
+  // failure flag, so `lastSaveFailed()` reads clean for a save that has not
+  // landed, and this reported SETTLED. What that costs is the whole reason the
+  // flush exists: the caller reads the pre-typing disk bytes, patches its
+  // field, writes, and the in-flight follow-up lands on top and reverts it.
+  // With the section 11.3 hash on it is worse, because the follow-up declares
+  // the first save's body as its expected base while disk now holds the
+  // caller's, so it is refused `BaseMismatch` and mints a keep-both conflict
+  // copy for a note no remote writer ever touched.
+  const saveInFlight = autosave.saveInFlight;
   const flushAndReport = useCallback(async () => {
     await flushIfDirty();
-    return !lastSaveFailed();
-  }, [flushIfDirty, lastSaveFailed]);
+    return !lastSaveFailed() && !saveInFlight();
+  }, [flushIfDirty, lastSaveFailed, saveInFlight]);
   useEffect(() => {
     registerFlush(leaf.id, flushAndReport);
     return () => unregisterFlush(leaf.id);

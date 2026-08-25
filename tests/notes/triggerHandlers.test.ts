@@ -2,6 +2,7 @@
 // `src/notes/components/NoteList.tsx`. Covers the keyboard guard
 // invariants + the read-then-commit composition.
 
+import { PanesNotSettledError } from "../../src/notes/workspaceContext";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -80,6 +81,44 @@ describe("makeF2KeydownHandler", () => {
 });
 
 describe("executeRenameCommit", () => {
+  // The ORDER is the assertion, and a return value cannot carry it. This is a
+  // read-patch-write against disk on a note that may be open and dirty, so the
+  // flush has to happen BEFORE the read or the bytes are the pre-typing ones.
+  // `commitRename`'s own flush covers INBOUND notes only, over a list that
+  // filters out the renamed note itself, so the renamed note's own pane was
+  // never covered.
+  it("flushes BEFORE reading, not after and not never", async () => {
+    const calls: string[] = [];
+    const flush = vi.fn(async () => {
+      calls.push("flush");
+    });
+    const read = vi.fn(async () => {
+      calls.push("read");
+      return "---\ntitle: Old\n---\n\nbody";
+    });
+    const commitRename = vi.fn(async () => {
+      calls.push("commit");
+    });
+    await executeRenameCommit("id-1", "New Title", { commitRename }, read, flush);
+    expect(calls).toEqual(["flush", "read", "commit"]);
+  });
+
+  it("does not read or rename when the flush refuses", async () => {
+    // A refused flush means a pane holds unsaved typing. Reading disk anyway
+    // would rename over bytes the user has not saved, which is the failure the
+    // flush exists to prevent, so the whole thing has to stop here.
+    const flush = vi.fn(async () => {
+      throw new PanesNotSettledError(["pane-1" as never]);
+    });
+    const read = vi.fn();
+    const commitRename = vi.fn();
+    await expect(
+      executeRenameCommit("id-1", "X", { commitRename }, read, flush),
+    ).rejects.toBeInstanceOf(PanesNotSettledError);
+    expect(read).not.toHaveBeenCalled();
+    expect(commitRename).not.toHaveBeenCalled();
+  });
+
   it("reads current bytes and calls commitRename in order", async () => {
     const read = vi.fn().mockResolvedValueOnce("---\ntitle: Old\n---\n\nbody");
     const commitRename = vi.fn().mockResolvedValueOnce(undefined);
