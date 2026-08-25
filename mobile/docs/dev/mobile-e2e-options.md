@@ -23,7 +23,9 @@
   `e2e/fixture-gen/` (a Rust crate).
 - **Platform**: **Linux-only** — `tauri-driver` relies on
   `WebKitWebDriver`, which has no macOS/Windows equivalent. Mac devs run it in
-  Docker (`scripts/e2e-local.sh`). It is the merge gate in Woodpecker.
+  Docker (`scripts/e2e-local.sh`). It was the merge gate in Woodpecker until
+  myne-md/myne#579; it now runs in `.woodpecker/e2e.yml` on a manual trigger,
+  before a release, and gates no merge.
 
 ## 2. The core blocker for mobile
 

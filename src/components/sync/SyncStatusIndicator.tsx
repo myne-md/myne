@@ -105,6 +105,14 @@ function present(status: SyncStatus | null): Presentation {
       if (status.detail === "device_revoked") {
         return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorDeviceRevoked") };
       }
+      // myne#581. The one transport failure with a remedy, and the only failure
+      // class here that is GUARANTEED to occur: a certificate has a lifetime,
+      // so a pinned one is replaced on a schedule. Folded into the generic arm
+      // below it read as "Sync error" for four days while sync was completely
+      // dead and the fix was thirty seconds of work.
+      if (status.detail === "cert_pin_mismatch") {
+        return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorCertChanged") };
+      }
       return { dotColor: "var(--danger)", label: i18n.t("sync.status.error") };
     case "conflicts":
       return {

@@ -1,4 +1,4 @@
-# cargo-nextest configuration — used by the CI Rust-test steps (.woodpecker.yml
+# cargo-nextest configuration, used by the CI Rust-test steps (.woodpecker/main.yml
 # cargo-test / cargo-test-tauri / sync-sim run `cargo-nextest nextest run
 # --profile ci`).
 #

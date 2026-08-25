@@ -553,7 +553,7 @@ describe("import-report note", () => {
 
   it("uses a unique, path-legal title so a re-import cannot collide with it", () => {
     const t = reportTitle("csv", formatStamp(new Date(2026, 6, 25, 9, 5)));
-    expect(t).toBe("Import report — CSV 2026-07-25 09.05");
+    expect(t).toBe("Import report (CSV) 2026-07-25 09.05");
     expect(t).not.toContain(":");
   });
 });

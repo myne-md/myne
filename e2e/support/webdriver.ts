@@ -460,7 +460,7 @@ export interface FindOptions {
 // margin — it only tripled their fail time, bloating the suite to ~46 min and
 // tripping the 60-min Woodpecker pipeline timeout, which Canceled the whole run
 // mid-e2e. The real fixes are elsewhere: the e2e step is now non-blocking
-// (.woodpecker.yml) so a tail flake no longer gates, the repo timeout is raised
+// (.woodpecker/e2e.yml) so a tail flake no longer gates, the repo timeout is raised
 // to 120 min for headroom, and the durable cure is the boot-cost work. With
 // e2e non-blocking a FAST fail is preferable, so 45 s stays.) 45 s already
 // closed most of the tail (nav1 unlock, tp1 attachment-text); the rest is the

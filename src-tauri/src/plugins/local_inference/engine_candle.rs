@@ -11,7 +11,7 @@
 //!
 //! Two roles are **bundled** first-party task-models instead: transcription
 //! (MYND-270) and auto-tag (`infer_tags`, MYND-651). Bundling is not
-//! downloading — the weights ship inside the signed, reproducible build, so
+//! downloading — the weights ship inside the build itself, so
 //! SYNC-2 is intact (`decisions.md` 2026-07-19, 2026-07-31). Auto-tag also has
 //! no picker override at all, so it never re-enters the untrusted-model case.
 //!

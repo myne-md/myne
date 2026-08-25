@@ -443,6 +443,13 @@ pub enum SyncDeviceError {
     DeviceNotFound,
     /// Transport / server / internal failure.
     Transport,
+    /// The server's certificate is not the pinned one (A4, myne#581). Split out
+    /// of [`SyncDeviceError::Transport`] for the same reason
+    /// [`super::transport::TransportError::CertPinMismatch`] is split out of its
+    /// `Tls`: it is the one failure here with a remedy, and the device panel is
+    /// where a user lands when sync stops, so it is where the remedy has to be
+    /// offered rather than a shrug.
+    CertPinMismatch,
     /// Bad input (e.g. malformed device id).
     BadRequest,
     /// A first-run bootstrap found a vault container already holding a
@@ -520,6 +527,12 @@ impl From<super::enroll::EnrollError> for SyncDeviceError {
             E::PendingApproval => SyncDeviceError::AwaitingApproval,
             E::ServerSignatureMismatch => SyncDeviceError::FingerprintMismatch,
             E::Unauthenticated => SyncDeviceError::Unauthenticated,
+            // Ahead of the catch-all: this is the arm the payload is matched
+            // for. A revoked pin reaching the panel as a bare "Transport" is
+            // what the panel's own hint was written to guess at.
+            E::Transport(super::transport::TransportError::CertPinMismatch) => {
+                SyncDeviceError::CertPinMismatch
+            }
             E::BadResponse | E::Transport(_) => SyncDeviceError::Transport,
         }
     }
@@ -537,6 +550,9 @@ impl From<super::pin_confirm::PinConfirmError> for SyncDeviceError {
             P::ConfirmationRequired => SyncDeviceError::PinConfirmationRequired,
             P::FingerprintMismatch => SyncDeviceError::FingerprintMismatch,
             P::Transport => SyncDeviceError::Transport,
+            // `PinConfirmError` carries no pin-mismatch arm of its own: the
+            // gate runs BEFORE a pin exists to mismatch against. Listed here so
+            // adding one is a compile error rather than a silent fall-through.
         }
     }
 }

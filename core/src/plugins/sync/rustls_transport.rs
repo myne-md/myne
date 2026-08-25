@@ -37,7 +37,10 @@ use crate::http::codec::{
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
-use rustls::{ClientConfig, ClientConnection, DigitallySignedStruct, SignatureScheme, StreamOwned};
+use rustls::{
+    CertificateError, ClientConfig, ClientConnection, DigitallySignedStruct, SignatureScheme,
+    StreamOwned,
+};
 use sha2::{Digest, Sha256};
 use std::io::{BufReader, Write};
 use std::net::TcpStream;
@@ -68,8 +71,17 @@ impl ServerCertVerifier for PinnedVerifier {
         if self.pins.iter().any(|p| p.as_slice() == got.as_slice()) {
             Ok(ServerCertVerified::assertion())
         } else {
-            Err(rustls::Error::General(
-                "server certificate pin mismatch (A4)".into(),
+            // A MATCHABLE variant, not a prose string. This refusal has to
+            // survive the trip up through `io::Error` so `handshake_error`
+            // below can tell a pin mismatch from every other TLS failure and
+            // the caller can offer the one remedy that fixes it. Matching on
+            // the text of `Error::General` would compile and would then break
+            // silently on a rustls version bump. `ApplicationVerificationFailure`
+            // is unambiguous here: this is the only custom verifier in the
+            // client, and its other two methods delegate signature checking to
+            // the provider, which reports its own distinct variants.
+            Err(rustls::Error::InvalidCertificate(
+                CertificateError::ApplicationVerificationFailure,
             ))
         }
     }
@@ -102,6 +114,33 @@ pub fn cert_pin(cert_der: &[u8]) -> [u8; 32] {
     let mut out = [0u8; 32];
     out.copy_from_slice(&Sha256::digest(cert_der));
     out
+}
+
+/// Classify a handshake `io::Error` into the transport error it actually is.
+///
+/// rustls wraps its own error inside the `io::Error` it hands back, so the
+/// distinction is available and was being discarded: `map_err(|_| …)` threw
+/// away a diagnosis the verifier had already made. Three outcomes, and the
+/// split matters because only one of them has a remedy the user can act on:
+///
+/// * the pin refusal from [`PinnedVerifier`] → [`TransportError::CertPinMismatch`],
+///   which does not clear on its own and needs the new certificate confirmed
+///   out of band;
+/// * any other rustls error → [`TransportError::Tls`] (protocol, version,
+///   expiry, a malformed certificate);
+/// * no rustls error inside at all → [`TransportError::Network`], because then
+///   the socket died under the handshake rather than the handshake failing.
+fn handshake_error(e: std::io::Error) -> TransportError {
+    match e
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<rustls::Error>())
+    {
+        Some(rustls::Error::InvalidCertificate(
+            CertificateError::ApplicationVerificationFailure,
+        )) => TransportError::CertPinMismatch,
+        Some(_) => TransportError::Tls,
+        None => TransportError::Network,
+    }
 }
 
 /// A **trust-on-first-use** verifier: it accepts ANY server certificate and
@@ -355,7 +394,26 @@ impl RustlsTransport {
         let sock = self.open_socket()?;
         let _ = sock.set_read_timeout(Some(SOCKET_TIMEOUT));
         let _ = sock.set_write_timeout(Some(SOCKET_TIMEOUT));
-        Ok(StreamOwned::new(conn, sock))
+        let mut stream = StreamOwned::new(conn, sock);
+        // Drive the handshake HERE rather than leaving it to the first read or
+        // write. `StreamOwned` handshakes lazily, so the pin decision used to
+        // surface wherever the caller happened to touch the stream first, and
+        // each of those sites had already decided what a failure there meant:
+        // `request` reached it through the codec's write and called it
+        // `Network`, `open_sse` called it `Network`, `export_keying_material`
+        // called it `Tls`. One refusal, three different names, none of them the
+        // right one. Completing the handshake at the single place that opens a
+        // connection means the classification below is the only one there is.
+        while stream.conn.is_handshaking() {
+            let (rd, wr) = stream
+                .conn
+                .complete_io(&mut stream.sock)
+                .map_err(handshake_error)?;
+            if rd == 0 && wr == 0 {
+                break; // no progress (peer closed mid-handshake)
+            }
+        }
+        Ok(stream)
     }
 
     /// Export keying material from a fresh pinned connection (the tls-exporter
@@ -425,14 +483,11 @@ impl SyncTransport for RustlsTransport {
         // A dedicated pinned connection (like open_sse), so the tls-exporter is
         // computed over the EXACT connection this request is sent on — independent
         // of the shared keep-alive slot. Same PinnedVerifier config → identical A4
-        // pin. Drive the handshake to completion first so the exporter secret exists.
+        // pin. The exporter secret needs a completed handshake, which `connect`
+        // now guarantees for every caller (it used to be driven here, and only
+        // here, which is why the same refusal was named differently on the other
+        // two connection paths).
         let mut stream = self.connect()?;
-        while stream.conn.is_handshaking() {
-            stream
-                .conn
-                .complete_io(&mut stream.sock)
-                .map_err(|_| TransportError::Tls)?;
-        }
         // `None` context matches the Go server's `nil` (proven byte-identical under
         // TLS 1.3, F5). The body embeds the exporter as the SCRAM client-final cbind.
         let out = vec![0u8; out_len];
@@ -559,10 +614,20 @@ pub(crate) mod tests {
             pins: vec![[0u8; 32], cert_pin(b"a different cert")],
             algs: rustls::crypto::ring::default_provider().signature_verification_algorithms,
         };
-        match rejecting.verify_server_cert(&end_entity, &[], &name, &[], now) {
-            Err(rustls::Error::General(msg)) => assert!(msg.contains("pin mismatch")),
-            other => panic!("unpinned cert must be rejected (A4), got {other:?}"),
-        }
+        // Asserted on the VARIANT, not on the text. It used to read the prose
+        // out of `Error::General`, which is the same fragility the production
+        // side had: `handshake_error` has to recognise this refusal after it
+        // has been wrapped in an `io::Error`, and a message it could only match
+        // by substring would compile, pass, and break on a rustls bump.
+        assert!(
+            matches!(
+                rejecting.verify_server_cert(&end_entity, &[], &name, &[], now),
+                Err(rustls::Error::InvalidCertificate(
+                    CertificateError::ApplicationVerificationFailure
+                ))
+            ),
+            "unpinned cert must be rejected (A4) as a matchable variant"
+        );
     }
 
     // --- real TLS round-trip: TOFU-fetch the pin, then prove pinning ----------
@@ -648,6 +713,100 @@ pub(crate) mod tests {
         } else {
             Ok(())
         }
+    }
+
+    /// Accept `n` connections and answer with bytes that are not TLS at all — a
+    /// peer that is listening and talking, just not this protocol. This is the
+    /// shape that proves the classification is reading the rustls error rather
+    /// than assuming every handshake failure is the interesting one.
+    fn spawn_not_tls_server(n: usize) -> u16 {
+        use std::io::Write as _;
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for _ in 0..n {
+                let Ok((mut sock, _)) = listener.accept() else {
+                    return;
+                };
+                let _ = sock.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n");
+                let _ = sock.flush();
+            }
+        });
+        port
+    }
+
+    /// `handshake_error`'s three arms, driven directly. The live-server test
+    /// below proves the wrapping is real; this proves the reading is right,
+    /// including the arm that must NOT fire — an expired certificate is a TLS
+    /// failure and not a pin mismatch, and sweeping it into the new variant
+    /// would offer the user a remedy that cannot work.
+    #[test]
+    fn handshake_error_names_a_pin_refusal_and_nothing_else() {
+        let pin_refusal = std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            rustls::Error::InvalidCertificate(CertificateError::ApplicationVerificationFailure),
+        );
+        assert_eq!(
+            handshake_error(pin_refusal),
+            TransportError::CertPinMismatch
+        );
+
+        let expired = std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            rustls::Error::InvalidCertificate(CertificateError::Expired),
+        );
+        assert_eq!(
+            handshake_error(expired),
+            TransportError::Tls,
+            "an expired certificate is not a pin mismatch: re-trusting it fixes nothing"
+        );
+
+        let protocol =
+            std::io::Error::new(std::io::ErrorKind::InvalidData, rustls::Error::DecryptError);
+        assert_eq!(handshake_error(protocol), TransportError::Tls);
+
+        let socket_died = std::io::Error::from(std::io::ErrorKind::ConnectionReset);
+        assert_eq!(
+            handshake_error(socket_died),
+            TransportError::Network,
+            "no rustls error inside means the socket died under the handshake"
+        );
+    }
+
+    /// The same three outcomes over real sockets, which is the half that proves
+    /// rustls really does hand its own error back inside the `io::Error` — the
+    /// assumption the classification rests on, and one no type checks.
+    ///
+    /// Both directions on purpose. A version that only asserted the mismatch
+    /// arm would pass just as well if the classifier answered `CertPinMismatch`
+    /// to everything, which is the failure this repo has shipped before.
+    #[test]
+    fn a_live_pin_mismatch_is_named_and_a_live_non_pin_failure_is_not() {
+        let tls_port = spawn_tls_server(2);
+        let plain_port = spawn_not_tls_server(1);
+        std::thread::sleep(std::time::Duration::from_millis(100)); // let them bind
+
+        let wrong_pin = RustlsTransport::new("localhost", tls_port, vec![[0u8; 32]]);
+        assert_eq!(
+            wrong_pin.connect().err(),
+            Some(TransportError::CertPinMismatch),
+            "the verifier's refusal must survive the trip up through io::Error"
+        );
+
+        let not_tls = RustlsTransport::new("localhost", plain_port, vec![cert_pin(TEST_CERT_DER)]);
+        assert_eq!(
+            not_tls.connect().err(),
+            Some(TransportError::Tls),
+            "a peer that is not speaking TLS is not a pin problem"
+        );
+
+        let right_pin = RustlsTransport::new("localhost", tls_port, vec![cert_pin(TEST_CERT_DER)]);
+        assert!(
+            right_pin.connect().is_ok(),
+            "the pinned handshake still completes, and `connect` now completes it"
+        );
     }
 
     #[test]

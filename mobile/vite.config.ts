@@ -27,6 +27,13 @@ export default defineConfig(async () => ({
       { find: /^@myne\/editor\/(.*)$/, replacement: sib("../editor/src/$1") },
       { find: /^@myne\/dialect$/, replacement: sib("../dialect/src/index.ts") },
       { find: /^@myne\/dialect\/(.*)$/, replacement: sib("../dialect/src/$1") },
+      // The shared sync-staleness RULE (myne#583). Aliased rather than copied
+      // for the reason the load-bearing copy is shared: the threshold that
+      // decides when a failed sync is old enough to interrupt the user must be
+      // one number, or the two clients disagree about when their own vault is
+      // at risk. Like `@myne/i18n` below, this reaches into the desktop `src/`
+      // tree rather than a top-level workspace package.
+      { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       // The shared English catalog (repo-root `locales/en`) — now consumed only
       // by `src/lib/welcomeNote.ts` for its seed-time welcome-note copy. (The
       // editor host resolved its labels through this too until MYND-485 moved it

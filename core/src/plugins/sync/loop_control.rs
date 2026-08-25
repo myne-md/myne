@@ -84,6 +84,20 @@ pub enum FailureClass {
     DeviceRevoked,
     /// Socket/TLS-level failure — offline or the server is unreachable.
     Transport,
+    /// The server's certificate is not the pinned one (A4). Split out of
+    /// [`FailureClass::Transport`] on two axes, and it needs both.
+    ///
+    /// **It parks rather than backing off**, because unlike every other
+    /// transport failure it cannot resolve itself: the pinned certificate is
+    /// gone and no amount of retrying brings it back. Only a user action does,
+    /// so it belongs with the 401 family in the ladder even though it is a
+    /// socket-level error.
+    ///
+    /// **And it reaches the UI as itself**, because it is the one transport
+    /// failure with a specific remedy the user can carry out. Folded into
+    /// `Transport` it renders as "Sync error", which is what four days of dead
+    /// sync looked like after a routine certificate renewal.
+    CertPinMismatch,
     /// 507 — the account is over its storage ceiling. Retrying cannot help until
     /// the user frees space or the ceiling changes, so it parks like a 401.
     QuotaExceeded,
@@ -123,6 +137,10 @@ impl FailureClass {
             FailureClass::StorageFull => "storage_full",
             FailureClass::PayloadTooLarge => "payload_too_large",
             FailureClass::Frozen => "frozen",
+            // Not "sync_failed": this is the one transport failure the user can
+            // act on, and the action is specific (re-trust the server's new
+            // certificate out of band).
+            FailureClass::CertPinMismatch => "cert_pin_mismatch",
             FailureClass::Transport | FailureClass::Other => "sync_failed",
         }
     }
@@ -152,7 +170,12 @@ fn retry_delay_ms(class: FailureClass, consecutive_failures: u32) -> u64 {
         | FailureClass::DeviceRevoked
         | FailureClass::QuotaExceeded
         | FailureClass::StorageFull
-        | FailureClass::Frozen => return AUTH_PARK_MS,
+        | FailureClass::Frozen
+        // The pinned certificate is gone; retrying reaches the same replacement
+        // certificate and fails identically. Parking here is not a nicety: on
+        // the failure ladder this would otherwise re-probe every few seconds
+        // for as long as the renewal stands, which is days.
+        | FailureClass::CertPinMismatch => return AUTH_PARK_MS,
         FailureClass::RateLimited => (RATE_LIMIT_RETRY_START_MS, RATE_LIMIT_RETRY_CAP_MS),
         FailureClass::Transport | FailureClass::Other | FailureClass::PayloadTooLarge => {
             (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS)
@@ -896,6 +919,44 @@ mod tests {
         // Counter reset: a NEW failure starts the ladder at 1s again, and no
         // gate is pending now (interval poll at 30s fires normally).
         assert_eq!(s.tick(30_000), SyncAction::Pull);
+    }
+
+    /// A pin mismatch parks and says so, unlike every other transport failure.
+    ///
+    /// Two properties, and the pair is the point. It PARKS, because the pinned
+    /// certificate is gone and the ladder would otherwise re-probe a server
+    /// that will keep answering with the same replacement for as long as the
+    /// renewal stands — days, at a delay that starts at one second. And it
+    /// SAYS which failure it is, because it is the only transport error with a
+    /// remedy the user can carry out; folded into `Transport` it renders as
+    /// "Sync error", which is what a four-day outage after a routine Let's
+    /// Encrypt renewal actually looked like.
+    #[test]
+    fn a_pin_mismatch_parks_and_keeps_its_own_name() {
+        assert_eq!(
+            retry_delay_ms(FailureClass::CertPinMismatch, 1),
+            AUTH_PARK_MS,
+            "a pin mismatch cannot be retried out of — it parks like a 401"
+        );
+        assert_eq!(
+            retry_delay_ms(FailureClass::CertPinMismatch, 9),
+            retry_delay_ms(FailureClass::CertPinMismatch, 1),
+            "parking is flat: there is nothing to back off from"
+        );
+        assert_ne!(
+            retry_delay_ms(FailureClass::CertPinMismatch, 1),
+            retry_delay_ms(FailureClass::Transport, 1),
+            "it must NOT share the transport ladder it used to be folded into"
+        );
+        assert_eq!(
+            FailureClass::CertPinMismatch.status_detail(),
+            "cert_pin_mismatch"
+        );
+        assert_ne!(
+            FailureClass::CertPinMismatch.status_detail(),
+            FailureClass::Transport.status_detail(),
+            "the whole defect was these two sharing the string \"sync_failed\""
+        );
     }
 
     /// A full LOCAL store parks, and it parks distinctly from a full ACCOUNT
