@@ -1807,7 +1807,7 @@
       "moveCollision": "Orada bu adda bir klasör zaten var.",
       "unsettledSave": "Açık bir notun kaydedilmesi henüz bitmedi, bu yüzden klasöre dokunulmadı. Bittiğinde tekrar deneyin.",
       "renameFailed": "Klasör yeniden adlandırılamadı, bu yüzden değişmeden kaldı.",
-      "deliberateWriteFailed": "Klasör yeniden adlandırıldı ancak ayarlarından biri kaydedilemedi. Yeniden adlandırmak bunu tekrar dener."
+      "deliberateWriteFailed": "Klasör yeniden adlandırıldı ancak ayarlarından biri kaydedilemedi. Kasanın kilidini her açışınızda eski adla boş bir klasör yeniden belirecek; onu silmek güvenlidir ve başka hiçbir şeyi değiştirmez. Klasörü yeniden adlandırmak bunu temizlemez."
     },
     "folderNote": {
       "defaultTitle": "Dizin"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Kopyalandı. Bu cihazda kalır ve sistem onu 30 saniye sonra panodan siler.",
     "phraseCopyFailed": "Kopyalanamadı. Bunun yerine “Dosyaya kaydet”i kullanın.",
     "savedToFile": "{{label}} konumuna kaydedildi",
-    "savedToShareSheet": "Myne’in içine kaydedildi; sistem dosya tarayıcısı buraya erişemez. Erişebileceğiniz bir yere kopyasını koymak için paylaşım sayfasını kullanın; kapattıysanız Kaydet’e yeniden dokunun.",
-    "savedFileWritten": "Myne’in içine kaydedildi. Bu cihaz dosyaya nereden erişilebileceğini bildirmedi; siz kontrol edene kadar dosyaya yalnızca uygulama içinden erişilebildiğini varsayın.",
+    "savedToShareSheet": "Myne’in içine kaydedildi; sistem dosya tarayıcısı buraya erişemez. Bu bir düz metin dosyasıdır; erişebileceğiniz bir yere kopyasını koymak için paylaşım sayfasını kullanırsanız, bulut sürücüsü yerine yalnızca sizin okuyabileceğiniz bir yer seçin. Sayfayı kapattıysanız Kaydet’e yeniden dokunun.",
+    "savedFileWritten": "Myne’in içine kaydedildi. Bu bir düz metin dosyasıdır, bu yüzden aldığınız her kopyayı yalnızca sizin okuyabileceğiniz bir yerde saklayın. Bu cihaz dosyaya nereden erişilebileceğini bildirmedi; siz kontrol edene kadar dosyaya yalnızca uygulama içinden erişilebildiğini varsayın.",
     "saveFileError": "Dosya kaydedilemedi.",
     "stepLabel": "Kasa oluştur · {{total}} adımdan {{current}}",
     "briefingTitle": "Başlamadan önce",

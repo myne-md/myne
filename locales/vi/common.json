@@ -1807,7 +1807,7 @@
       "moveCollision": "Ở đó đã có một thư mục trùng tên.",
       "unsettledSave": "Một ghi chú đang mở vẫn chưa lưu xong, nên thư mục được giữ nguyên. Hãy thử lại khi ghi chú đã lưu xong.",
       "renameFailed": "Không thể đổi tên thư mục, nên nó không thay đổi.",
-      "deliberateWriteFailed": "Thư mục đã được đổi tên, nhưng một cài đặt của nó không lưu được. Đổi tên lại sẽ thử lại."
+      "deliberateWriteFailed": "Thư mục đã được đổi tên, nhưng một cài đặt của nó không lưu được. Mỗi lần bạn mở khóa, một thư mục trống sẽ lại xuất hiện với tên cũ; xóa nó là an toàn và không thay đổi gì khác. Đổi tên thư mục lần nữa sẽ không làm nó biến mất."
     },
     "folderNote": {
       "defaultTitle": "Mục lục"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Đã sao chép. Nó ở lại trên thiết bị này, và hệ thống sẽ xóa nó sau 30 giây.",
     "phraseCopyFailed": "Không thể sao chép. Hãy dùng \"Lưu vào tệp\" thay thế.",
     "savedToFile": "Đã lưu vào {{label}}",
-    "savedToShareSheet": "Đã lưu bên trong Myne, nơi trình quản lý tệp của hệ thống không thể chạm tới. Hãy dùng bảng chia sẻ để đặt một bản sao ở nơi bạn có thể mở được, và nhấn Lưu lần nữa nếu bạn đã đóng bảng đó.",
-    "savedFileWritten": "Đã lưu bên trong Myne. Thiết bị này không cho biết có thể mở tệp từ đâu, nên hãy xem như chỉ có thể mở nó từ trong ứng dụng cho tới khi bạn tự kiểm tra.",
+    "savedToShareSheet": "Đã lưu bên trong Myne, nơi trình quản lý tệp của hệ thống không thể chạm tới. Đây là tệp văn bản thuần, nên nếu bạn dùng bảng chia sẻ để đặt một bản sao ở nơi bạn có thể mở được, hãy chọn nơi chỉ mình bạn đọc được thay vì một ổ đĩa đám mây. Nhấn Lưu lần nữa nếu bạn đã đóng bảng đó.",
+    "savedFileWritten": "Đã lưu bên trong Myne. Đây là tệp văn bản thuần, nên hãy cất mọi bản sao bạn tạo ở nơi chỉ mình bạn đọc được. Thiết bị này không cho biết có thể mở tệp từ đâu, nên hãy xem như chỉ có thể mở nó từ trong ứng dụng cho tới khi bạn tự kiểm tra.",
     "saveFileError": "Không thể lưu tệp.",
     "stepLabel": "Tạo một kho lưu trữ · {{current}}/{{total}}",
     "briefingTitle": "Trước khi bắt đầu",

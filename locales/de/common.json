@@ -1807,7 +1807,7 @@
       "moveCollision": "Dort gibt es bereits einen Ordner mit diesem Namen.",
       "unsettledSave": "Eine geöffnete Notiz ist noch nicht fertig gespeichert, daher wurde der Ordner nicht verändert. Versuchen Sie es erneut, sobald sie gespeichert ist.",
       "renameFailed": "Der Ordner konnte nicht umbenannt werden, daher ist er unverändert.",
-      "deliberateWriteFailed": "Der Ordner wurde umbenannt, aber eine seiner Einstellungen konnte nicht gespeichert werden. Ein erneutes Umbenennen versucht es noch einmal."
+      "deliberateWriteFailed": "Der Ordner wurde umbenannt, aber eine seiner Einstellungen konnte nicht gespeichert werden. Bei jedem Entsperren erscheint erneut ein leerer Ordner mit dem alten Namen; Sie können ihn sicher löschen, ohne dass sich sonst etwas ändert. Ein erneutes Umbenennen des Ordners entfernt ihn nicht."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Kopiert. Sie bleibt auf diesem Gerät, und das System verwirft sie nach 30 Sekunden.",
     "phraseCopyFailed": "Kopieren nicht möglich. Verwenden Sie stattdessen „In Datei speichern“.",
     "savedToFile": "Gespeichert in {{label}}",
-    "savedToShareSheet": "In Myne gespeichert, wo der Dateibrowser des Systems nicht herankommt. Lege über das Teilen-Menü eine Kopie an einem Ort ab, den du erreichst, und tippe erneut auf „In Datei speichern“, wenn du es geschlossen hast.",
-    "savedFileWritten": "In Myne gespeichert. Dieses Gerät hat nicht gemeldet, von wo aus die Datei erreichbar ist; geh also davon aus, dass sie nur in der App erreichbar ist, bis du es geprüft hast.",
+    "savedToShareSheet": "In Myne gespeichert, wo der Dateibrowser des Systems nicht herankommt. Es ist eine reine Textdatei: Wenn du über das Teilen-Menü eine Kopie an einem Ort ablegst, den du erreichst, dann wähle einen Ort, den nur du lesen kannst, und keinen Cloud-Speicher. Tippe erneut auf „In Datei speichern“, wenn du das Menü geschlossen hast.",
+    "savedFileWritten": "In Myne gespeichert. Es ist eine reine Textdatei, bewahre also jede Kopie, die du anlegst, an einem Ort auf, den nur du lesen kannst. Dieses Gerät hat nicht gemeldet, von wo aus die Datei erreichbar ist; geh davon aus, dass sie nur in der App erreichbar ist, bis du es geprüft hast.",
     "saveFileError": "Die Datei konnte nicht gespeichert werden.",
     "stepLabel": "Tresor erstellen · {{current}} von {{total}}",
     "briefingTitle": "Bevor wir beginnen",

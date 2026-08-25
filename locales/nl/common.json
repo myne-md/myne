@@ -1807,7 +1807,7 @@
       "moveCollision": "Daar bestaat al een map met die naam.",
       "unsettledSave": "Een geopende notitie is nog niet klaar met opslaan, dus de map is ongemoeid gelaten. Probeer het opnieuw zodra dat klaar is.",
       "renameFailed": "Kon de map niet hernoemen, dus die is ongewijzigd gebleven.",
-      "deliberateWriteFailed": "De map is hernoemd, maar een van de instellingen kon niet worden opgeslagen. Als je de map opnieuw hernoemt, wordt het opnieuw geprobeerd."
+      "deliberateWriteFailed": "De map is hernoemd, maar een van de instellingen kon niet worden opgeslagen. Elke keer dat je ontgrendelt, verschijnt er weer een lege map onder de oude naam; die verwijderen is veilig en verandert verder niets. De map opnieuw hernoemen ruimt hem niet op."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Gekopieerd. Het blijft op dit apparaat en het systeem verwijdert het na 30 seconden.",
     "phraseCopyFailed": "Kon niet kopiëren. Gebruik in plaats daarvan “Opslaan in bestand”.",
     "savedToFile": "Opgeslagen in {{label}}",
-    "savedToShareSheet": "Opgeslagen in Myne, waar bestandsbeheer van het systeem er niet bij kan. Gebruik het deelmenu om een kopie op een plek te zetten waar je wel bij kunt, en tik opnieuw op Opslaan als je het hebt gesloten.",
-    "savedFileWritten": "Opgeslagen in Myne. Dit apparaat heeft niet gemeld waar het bestand te bereiken is, dus ga ervan uit dat het alleen vanuit de app bereikbaar is totdat je dat hebt gecontroleerd.",
+    "savedToShareSheet": "Opgeslagen in Myne, waar bestandsbeheer van het systeem er niet bij kan. Het is een bestand met platte tekst, dus als je het deelmenu gebruikt om een kopie op een plek te zetten waar je wel bij kunt, kies dan een plek waar alleen jij het kunt lezen en geen cloudopslag. Tik opnieuw op Opslaan als je het menu hebt gesloten.",
+    "savedFileWritten": "Opgeslagen in Myne. Het is een bestand met platte tekst, dus bewaar elke kopie die je maakt op een plek waar alleen jij het kunt lezen. Dit apparaat heeft niet gemeld waar het bestand te bereiken is, dus ga ervan uit dat het alleen vanuit de app bereikbaar is totdat je dat hebt gecontroleerd.",
     "saveFileError": "Kon het bestand niet opslaan.",
     "stepLabel": "Een kluis aanmaken · {{current}} van {{total}}",
     "briefingTitle": "Voordat we beginnen",

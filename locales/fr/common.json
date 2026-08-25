@@ -1877,7 +1877,7 @@
       "moveCollision": "Un dossier portant ce nom existe déjà à cet endroit.",
       "unsettledSave": "Une note ouverte n'a pas fini d'être enregistrée, le dossier n'a donc pas été modifié. Réessayez une fois que ce sera fait.",
       "renameFailed": "Impossible de renommer le dossier, il est donc inchangé.",
-      "deliberateWriteFailed": "Le dossier a été renommé, mais l'un de ses réglages n'a pas pu être enregistré. Le renommer à nouveau relancera la tentative."
+      "deliberateWriteFailed": "Le dossier a été renommé, mais l'un de ses réglages n'a pas pu être enregistré. Un dossier vide réapparaîtra sous l'ancien nom à chaque déverrouillage ; vous pouvez le supprimer sans risque, cela ne change rien d'autre. Renommer le dossier à nouveau ne le fera pas disparaître."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -4421,8 +4421,8 @@
     "phraseCopied": "Copié. Cela reste sur cet appareil, et le système l'efface au bout de 30 secondes.",
     "phraseCopyFailed": "Impossible de copier. Utilisez plutôt « Enregistrer dans un fichier ».",
     "savedToFile": "Enregistré dans {{label}}",
-    "savedToShareSheet": "Enregistré dans Myne, là où le gestionnaire de fichiers du système ne peut pas y accéder. Utilisez le menu de partage pour en placer une copie à un endroit qui vous est accessible, et appuyez à nouveau sur Enregistrer si vous l'avez fermé.",
-    "savedFileWritten": "Enregistré dans Myne. Cet appareil n'a pas indiqué d'où le fichier est accessible : considérez donc qu'il n'est accessible que depuis l'application, tant que vous ne l'avez pas vérifié.",
+    "savedToShareSheet": "Enregistré dans Myne, là où le gestionnaire de fichiers du système ne peut pas y accéder. C'est un fichier en texte brut, donc si vous utilisez le menu de partage pour en placer une copie à un endroit qui vous est accessible, choisissez un endroit que vous seul pouvez lire, plutôt qu'un service de stockage en ligne. Appuyez à nouveau sur Enregistrer si vous l'avez fermé.",
+    "savedFileWritten": "Enregistré dans Myne. C'est un fichier en texte brut, conservez donc toute copie que vous en faites à un endroit que vous seul pouvez lire. Cet appareil n'a pas indiqué d'où le fichier est accessible : considérez qu'il n'est accessible que depuis l'application, tant que vous ne l'avez pas vérifié.",
     "saveFileError": "Impossible d'enregistrer le fichier.",
     "stepLabel": "Créer un coffre-fort · {{current}} sur {{total}}",
     "briefingTitle": "Avant de commencer",

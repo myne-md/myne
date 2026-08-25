@@ -1794,7 +1794,7 @@
       "moveCollision": "There's already a folder with that name there.",
       "unsettledSave": "An open note hasn't finished saving, so the folder was left alone. Try again once it has.",
       "renameFailed": "Couldn't rename the folder, so it is unchanged.",
-      "deliberateWriteFailed": "The folder was renamed, but one of its settings could not be saved. Renaming it again will retry."
+      "deliberateWriteFailed": "The folder was renamed, but one of its settings could not be saved. An empty folder will reappear under the old name each time you unlock; deleting it is safe and changes nothing else. Renaming the folder again will not clear it."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -4258,8 +4258,8 @@
     "phraseCopied": "Copied. It stays on this device, and the system drops it after 30 seconds.",
     "phraseCopyFailed": "Couldn't copy. Use \"Save to file\" instead.",
     "savedToFile": "Saved to {{label}}",
-    "savedToShareSheet": "Saved inside Myne, where the system file browser cannot reach it. Use the share sheet to put a copy somewhere you can reach, and tap Save again if you closed it.",
-    "savedFileWritten": "Saved inside Myne. This device did not report where the file can be reached from, so treat it as reachable only from inside the app until you have checked.",
+    "savedToShareSheet": "Saved inside Myne, where the system file browser cannot reach it. It is a plain text file, so if you use the share sheet to put a copy somewhere you can reach, choose somewhere only you can read rather than a cloud drive. Tap Save again if you closed the sheet.",
+    "savedFileWritten": "Saved inside Myne. It is a plain text file, so keep any copy you make somewhere only you can read. This device did not report where the file can be reached from, so treat it as reachable only from inside the app until you have checked.",
     "saveFileError": "Couldn't save the file.",
     "stepLabel": "Create a vault · {{current}} of {{total}}",
     "briefingTitle": "Before we begin",

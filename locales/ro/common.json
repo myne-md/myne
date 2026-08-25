@@ -1877,7 +1877,7 @@
       "moveCollision": "Acolo există deja un folder cu acel nume.",
       "unsettledSave": "O notă deschisă nu a terminat de salvat, așa că folderul a rămas neatins. Încearcă din nou după ce termină.",
       "renameFailed": "Nu s-a putut redenumi folderul, așa că a rămas neschimbat.",
-      "deliberateWriteFailed": "Folderul a fost redenumit, dar una dintre setările lui nu a putut fi salvată. O nouă redenumire va reîncerca."
+      "deliberateWriteFailed": "Folderul a fost redenumit, dar una dintre setările lui nu a putut fi salvată. De fiecare dată când deblochezi, un folder gol va reapărea sub numele vechi; îl poți șterge în siguranță și nu se schimbă nimic altceva. O nouă redenumire a folderului nu îl va elimina."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -4421,8 +4421,8 @@
     "phraseCopied": "Copiat. Rămâne pe acest dispozitiv, iar sistemul îl elimină după 30 de secunde.",
     "phraseCopyFailed": "Copierea nu a reușit. Folosește în schimb „Salvează în fișier”.",
     "savedToFile": "Salvat în {{label}}",
-    "savedToShareSheet": "Salvat în interiorul Myne, unde managerul de fișiere al sistemului nu poate ajunge. Folosește meniul de partajare pentru a pune o copie undeva unde poți ajunge și apasă din nou pe Salvează dacă l-ai închis.",
-    "savedFileWritten": "Salvat în interiorul Myne. Acest dispozitiv nu a raportat de unde poate fi accesat fișierul, așa că tratează-l ca fiind accesibil doar din aplicație până când verifici.",
+    "savedToShareSheet": "Salvat în interiorul Myne, unde managerul de fișiere al sistemului nu poate ajunge. Este un fișier text simplu, așa că, dacă folosești meniul de partajare pentru a pune o copie undeva unde poți ajunge, alege un loc unde numai tu o poți citi, nu un serviciu de stocare în cloud. Apasă din nou pe Salvează dacă ai închis meniul.",
+    "savedFileWritten": "Salvat în interiorul Myne. Este un fișier text simplu, așa că păstrează orice copie faci într-un loc unde numai tu o poți citi. Acest dispozitiv nu a raportat de unde poate fi accesat fișierul, așa că tratează-l ca fiind accesibil doar din aplicație până când verifici.",
     "saveFileError": "Fișierul nu a putut fi salvat.",
     "stepLabel": "Creează un seif · {{current}} din {{total}}",
     "briefingTitle": "Înainte de a începe",

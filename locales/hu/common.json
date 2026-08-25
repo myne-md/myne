@@ -1807,7 +1807,7 @@
       "moveCollision": "Ott már van ilyen nevű mappa.",
       "unsettledSave": "Egy nyitott jegyzet mentése még nem fejeződött be, ezért a mappa érintetlen maradt. Próbáld újra, amint befejeződött.",
       "renameFailed": "Nem sikerült átnevezni a mappát, ezért változatlan maradt.",
-      "deliberateWriteFailed": "A mappa átnevezése sikerült, de az egyik beállítását nem sikerült menteni. Az ismételt átnevezés újra megkísérli a mentést."
+      "deliberateWriteFailed": "A mappa átnevezése sikerült, de az egyik beállítását nem sikerült menteni. Minden feloldáskor újra megjelenik egy üres mappa a régi néven; nyugodtan törölheted, ez semmi mást nem változtat meg. Az ismételt átnevezés nem tünteti el."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Másolva. Ezen az eszközön marad, és a rendszer 30 másodperc múlva eldobja.",
     "phraseCopyFailed": "Nem sikerült a másolás. Használd helyette a „Mentés fájlba” lehetőséget.",
     "savedToFile": "Mentve ide: {{label}}",
-    "savedToShareSheet": "Mentve a Myne-ban, ahol a rendszer fájlkezelője nem fér hozzá. A megosztási ablakkal tegyen egy másolatot olyan helyre, ahol hozzáfér, és koppintson újra a Mentés gombra, ha bezárta.",
-    "savedFileWritten": "Mentve a Myne-ban. Ez az eszköz nem jelezte, honnan érhető el a fájl, ezért tekintse úgy, hogy csak az alkalmazáson belülről érhető el, amíg ezt nem ellenőrizte.",
+    "savedToShareSheet": "Mentve a Myne-ban, ahol a rendszer fájlkezelője nem fér hozzá. Ez egyszerű szövegfájl, ezért ha a megosztási ablakkal olyan helyre tesz egy másolatot, ahol hozzáfér, válasszon olyan helyet, amelyet csak Ön olvashat, ne felhőtárhelyet. Koppintson újra a Mentés gombra, ha bezárta az ablakot.",
+    "savedFileWritten": "Mentve a Myne-ban. Ez egyszerű szövegfájl, ezért minden másolatát olyan helyen tartsa, ahol csak Ön olvashatja. Ez az eszköz nem jelezte, honnan érhető el a fájl, így tekintse úgy, hogy csak az alkalmazáson belülről érhető el, amíg ezt nem ellenőrizte.",
     "saveFileError": "Nem sikerült menteni a fájlt.",
     "stepLabel": "Széf létrehozása · {{current}} / {{total}}",
     "briefingTitle": "Mielőtt elkezdenénk",

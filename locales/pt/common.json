@@ -1877,7 +1877,7 @@
       "moveCollision": "Já existe aí uma pasta com esse nome.",
       "unsettledSave": "Uma nota aberta ainda não terminou de guardar, por isso a pasta ficou como estava. Tente novamente quando terminar.",
       "renameFailed": "Não foi possível mudar o nome da pasta, por isso mantém-se inalterada.",
-      "deliberateWriteFailed": "A pasta mudou de nome, mas não foi possível guardar uma das suas definições. Mudar o nome outra vez volta a tentar."
+      "deliberateWriteFailed": "A pasta mudou de nome, mas não foi possível guardar uma das suas definições. Sempre que desbloquear, uma pasta vazia volta a aparecer com o nome antigo; pode apagá-la em segurança, sem que mais nada mude. Mudar o nome da pasta outra vez não a apaga."
     },
     "folderNote": {
       "defaultTitle": "Índice"
@@ -4421,8 +4421,8 @@
     "phraseCopied": "Copiado. Fica neste dispositivo e o sistema descarta-a ao fim de 30 segundos.",
     "phraseCopyFailed": "Não foi possível copiar. Use antes “Guardar num ficheiro”.",
     "savedToFile": "Guardado em {{label}}",
-    "savedToShareSheet": "Guardado dentro do Myne, onde o gestor de ficheiros do sistema não lhe consegue chegar. Use o menu de partilha para colocar uma cópia num local a que consiga aceder e toque novamente em Guardar se o tiver fechado.",
-    "savedFileWritten": "Guardado dentro do Myne. Este dispositivo não indicou a partir de onde o ficheiro pode ser acedido, por isso trate-o como acessível apenas a partir da aplicação até ter verificado.",
+    "savedToShareSheet": "Guardado dentro do Myne, onde o gestor de ficheiros do sistema não lhe consegue chegar. É um ficheiro de texto simples, por isso, se usar o menu de partilha para colocar uma cópia num local a que consiga aceder, escolha um local que só você consiga ler, e não um serviço na nuvem. Toque novamente em Guardar se tiver fechado o menu.",
+    "savedFileWritten": "Guardado dentro do Myne. É um ficheiro de texto simples, por isso mantenha qualquer cópia que faça num local que só você consiga ler. Este dispositivo não indicou a partir de onde o ficheiro pode ser acedido, por isso trate-o como acessível apenas a partir da aplicação até ter verificado.",
     "saveFileError": "Não foi possível guardar o ficheiro.",
     "stepLabel": "Criar um cofre · {{current}} de {{total}}",
     "briefingTitle": "Antes de começar",

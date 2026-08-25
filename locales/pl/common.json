@@ -1947,7 +1947,7 @@
       "moveCollision": "W tym miejscu jest już folder o takiej nazwie.",
       "unsettledSave": "Otwarta notatka nie zakończyła jeszcze zapisywania, więc folder pozostał nietknięty. Spróbuj ponownie, gdy zapis się zakończy.",
       "renameFailed": "Nie udało się zmienić nazwy folderu, więc pozostał on bez zmian.",
-      "deliberateWriteFailed": "Nazwa folderu została zmieniona, ale jednego z jego ustawień nie udało się zapisać. Ponowna zmiana nazwy spowoduje kolejną próbę."
+      "deliberateWriteFailed": "Nazwa folderu została zmieniona, ale jednego z jego ustawień nie udało się zapisać. Przy każdym odblokowaniu pod starą nazwą będzie pojawiać się pusty folder; można go bezpiecznie usunąć, co nie zmieni niczego innego. Ponowna zmiana nazwy folderu go nie usunie."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -4553,8 +4553,8 @@
     "phraseCopied": "Skopiowano. Fraza zostaje na tym urządzeniu, a system usuwa ją po 30 sekundach.",
     "phraseCopyFailed": "Nie udało się skopiować. Użyj zamiast tego opcji „Zapisz do pliku”.",
     "savedToFile": "Zapisano do {{label}}",
-    "savedToShareSheet": "Zapisano wewnątrz Myne, gdzie systemowy menedżer plików nie ma do tego pliku dostępu. Użyj menu udostępniania, aby umieścić kopię w miejscu, do którego masz dostęp, i naciśnij ponownie Zapisz, jeśli menu zostało zamknięte.",
-    "savedFileWritten": "Zapisano wewnątrz Myne. To urządzenie nie podało, skąd można dotrzeć do pliku, więc traktuj go jako dostępny wyłącznie z wnętrza aplikacji, dopóki tego nie sprawdzisz.",
+    "savedToShareSheet": "Zapisano wewnątrz Myne, gdzie systemowy menedżer plików nie ma do tego pliku dostępu. To plik ze zwykłym tekstem, więc jeśli użyjesz menu udostępniania, aby umieścić kopię w miejscu, do którego masz dostęp, wybierz miejsce, w którym tylko Ty możesz ją odczytać, a nie dysk w chmurze. Naciśnij ponownie Zapisz, jeśli menu zostało zamknięte.",
+    "savedFileWritten": "Zapisano wewnątrz Myne. To plik ze zwykłym tekstem, więc każdą wykonaną kopię przechowuj w miejscu, w którym tylko Ty możesz ją odczytać. To urządzenie nie podało, skąd można dotrzeć do pliku, więc traktuj go jako dostępny wyłącznie z wnętrza aplikacji, dopóki tego nie sprawdzisz.",
     "saveFileError": "Nie udało się zapisać pliku.",
     "stepLabel": "Utwórz sejf · {{current}} z {{total}}",
     "briefingTitle": "Zanim zaczniemy",

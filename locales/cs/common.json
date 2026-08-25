@@ -1947,7 +1947,7 @@
       "moveCollision": "Složka s tímto názvem tam už je.",
       "unsettledSave": "Ukládání otevřené poznámky ještě neskončilo, takže složka zůstala nedotčená. Až skončí, zkuste to znovu.",
       "renameFailed": "Složku se nepodařilo přejmenovat, takže zůstala beze změny.",
-      "deliberateWriteFailed": "Složka byla přejmenována, ale jedno z jejích nastavení se nepodařilo uložit. Dalším přejmenováním se pokus zopakuje."
+      "deliberateWriteFailed": "Složka byla přejmenována, ale jedno z jejích nastavení se nepodařilo uložit. Při každém odemčení se pod původním názvem znovu objeví prázdná složka; je bezpečné ji smazat a nic jiného se tím nezmění. Dalším přejmenováním složky ji neodstraníte."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -4553,8 +4553,8 @@
     "phraseCopied": "Zkopírováno. Zůstává na tomto zařízení a systém ji po 30 sekundách vymaže.",
     "phraseCopyFailed": "Nepodařilo se zkopírovat. Použijte místo toho „Uložit do souboru“.",
     "savedToFile": "Uloženo do {{label}}",
-    "savedToShareSheet": "Uloženo uvnitř Myne, kam systémový prohlížeč souborů nedosáhne. Pomocí nabídky sdílení uložte kopii někam, kam se dostanete, a pokud jste ji zavřeli, klepněte znovu na Uložit.",
-    "savedFileWritten": "Uloženo uvnitř Myne. Toto zařízení neoznámilo, odkud je soubor dostupný, proto s ním zacházejte jako s dostupným jen zevnitř aplikace, dokud si to neověříte.",
+    "savedToShareSheet": "Uloženo uvnitř Myne, kam systémový prohlížeč souborů nedosáhne. Je to soubor v prostém textu, takže pokud pomocí nabídky sdílení uložíte kopii někam, kam se dostanete, zvolte místo, kde si ji přečtete jen vy, ne cloudové úložiště. Pokud jste nabídku zavřeli, klepněte znovu na Uložit.",
+    "savedFileWritten": "Uloženo uvnitř Myne. Je to soubor v prostém textu, takže každou kopii, kterou si vytvoříte, uchovejte tam, kde si ji přečtete jen vy. Toto zařízení neoznámilo, odkud je soubor dostupný, proto s ním zacházejte jako s dostupným jen zevnitř aplikace, dokud si to neověříte.",
     "saveFileError": "Soubor se nepodařilo uložit.",
     "stepLabel": "Vytvořit trezor · {{current}} z {{total}}",
     "briefingTitle": "Než začneme",

@@ -1807,7 +1807,7 @@
       "moveCollision": "Siellä on jo samanniminen kansio.",
       "unsettledSave": "Avoinna oleva muistiinpano ei ole vielä tallentunut loppuun, joten kansio jätettiin ennalleen. Yritä uudelleen, kun tallennus on valmis.",
       "renameFailed": "Kansion uudelleennimeäminen ei onnistunut, joten se pysyi ennallaan.",
-      "deliberateWriteFailed": "Kansio nimettiin uudelleen, mutta yhtä sen asetuksista ei voitu tallentaa. Jos nimeät sen uudelleen, tallennusta yritetään uudestaan."
+      "deliberateWriteFailed": "Kansio nimettiin uudelleen, mutta yhtä sen asetuksista ei voitu tallentaa. Tyhjä kansio ilmestyy vanhalla nimellä uudelleen aina, kun avaat holvin; sen voi poistaa turvallisesti, eikä poistaminen muuta mitään muuta. Kansion uudelleennimeäminen ei poista sitä."
     },
     "folderNote": {
       "defaultTitle": "Hakemisto"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Kopioitu. Se pysyy tällä laitteella, ja järjestelmä poistaa sen 30 sekunnin kuluttua.",
     "phraseCopyFailed": "Kopiointi ei onnistunut. Käytä sen sijaan ”Tallenna tiedostoon”.",
     "savedToFile": "Tallennettu kohteeseen {{label}}",
-    "savedToShareSheet": "Tallennettu Mynen sisään, jonne järjestelmän tiedostoselain ei ylety. Vie kopio jakovalikon kautta paikkaan, johon pääset itse käsiksi, ja napauta Tallenna uudelleen, jos suljit valikon.",
-    "savedFileWritten": "Tallennettu Mynen sisään. Tämä laite ei kertonut, mistä tiedostoon pääsee käsiksi, joten oleta, että siihen pääsee vain sovelluksen sisältä, kunnes olet tarkistanut asian.",
+    "savedToShareSheet": "Tallennettu Mynen sisään, jonne järjestelmän tiedostoselain ei ylety. Se on pelkkä tekstitiedosto, joten jos viet kopion jakovalikon kautta paikkaan, johon itse pääset käsiksi, valitse paikka, jonka vain sinä voit lukea, pilvipalvelun sijaan. Napauta Tallenna uudelleen, jos suljit valikon.",
+    "savedFileWritten": "Tallennettu Mynen sisään. Se on pelkkä tekstitiedosto, joten säilytä jokainen tekemäsi kopio paikassa, jonka vain sinä voit lukea. Tämä laite ei kertonut, mistä tiedostoon pääsee käsiksi, joten oleta, että siihen pääsee vain sovelluksen sisältä, kunnes olet tarkistanut asian.",
     "saveFileError": "Tiedoston tallentaminen epäonnistui.",
     "stepLabel": "Luo holvi · {{current}}/{{total}}",
     "briefingTitle": "Ennen kuin aloitamme",
