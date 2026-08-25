@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Tindakan catatan",
+      "convertFailed": "Tidak dapat mengubah jenis catatan ini, jadi catatan ini tidak berubah.",
       "rename": "Ganti nama",
       "move": "Pindahkan ke folder…",
       "duplicate": "Gandakan",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Nama folder tidak boleh memuat / \\ | # ^ [ ] atau diawali/diakhiri dengan spasi.",
       "tooLong": "Jalur folder itu terlalu panjang.",
       "moveIntoSelf": "Folder tidak dapat dipindahkan ke dalam dirinya sendiri.",
-      "moveCollision": "Sudah ada folder dengan nama itu di sana."
+      "moveCollision": "Sudah ada folder dengan nama itu di sana.",
+      "unsettledSave": "Sebuah catatan yang terbuka belum selesai disimpan, jadi folder itu tidak diubah. Coba lagi setelah selesai.",
+      "renameFailed": "Tidak dapat mengganti nama folder, jadi folder itu tidak berubah.",
+      "deliberateWriteFailed": "Nama folder sudah diganti, tetapi salah satu pengaturannya tidak dapat disimpan. Mengganti namanya lagi akan mencoba ulang."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Tambahkan ke favorit",
       "archive": "Arsipkan",
       "archiveBulkError": "Tidak dapat mengarsipkan catatan.",
+      "renameFailed": "Tidak dapat menyimpan nama itu, jadi catatan tetap memakai nama lamanya.",
       "archiveFolder": "Arsipkan folder",
       "archiveNote": "Arsipkan",
       "archiveSingleError": "Tidak dapat mengarsipkan catatan.",
@@ -2260,6 +2265,7 @@
       "thisNote": "catatan ini",
       "untitled": "Tanpa judul"
     },
+    "unsettledSave": "Sebuah catatan yang terbuka belum selesai disimpan, jadi tidak ada yang diubah. Coba lagi setelah selesai.",
     "views": {
       "cards": {
         "changeCover": "Ubah sampul",
@@ -3878,10 +3884,13 @@
       "copied": "Disalin",
       "copy": "Salin",
       "copyFailed": "Tidak dapat menyalin. Gunakan “Simpan sebagai berkas” saja.",
+      "downloadStarted": "Dikirim ke unduhan peramban Anda. Pastikan berkas itu sampai: peramban Anda yang menentukan ke mana berkas itu pergi, dan Myne tidak dapat melihat apakah berkas itu sampai.",
       "eyebrow": "Langkah 4 dari 4: nomor akun",
       "heading": "Simpan nomor akun Anda.",
       "intro": "Ini adalah token pembawa Anda. Perlakukan seperti uang tunai.",
       "saveAsFile": "Simpan sebagai berkas",
+      "saveFailed": "Tidak dapat menyimpan berkas. Sebagai gantinya, salin nomornya atau tuliskan.",
+      "savedToFile": "Disimpan. Ini berkas teks biasa, jadi simpan di tempat yang hanya Anda yang dapat membacanya.",
       "shownOnceBody": "Simpan sekarang. Myne tidak dapat memulihkannya untuk Anda. Diperlukan untuk mendaftar sinkronisasi nanti.",
       "shownOnceEmphasis": "Ini hanya ditampilkan sekali."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Salin",
       "extensionNotice": "Ekstensi peramban yang punya akses ke situs ini dapat membaca isi halaman ini. Jika Anda tidak yakin dengan setiap ekstensi di profil ini, gunakan aplikasi desktop atau profil peramban yang bersih untuk langkah ini.",
       "copyFailed": "Tidak dapat menyalin. Gunakan “Simpan sebagai berkas” sebagai gantinya.",
+      "downloadStarted": "Dikirim ke unduhan peramban Anda. Pastikan berkas itu sampai: peramban Anda yang menentukan ke mana berkas itu pergi, dan Myne tidak dapat melihat apakah berkas itu sampai.",
       "eyebrow": "Langkah 2 dari 4: frasa pemulihan",
       "heading": "Tuliskan 24 kata ini.",
       "intro": "Frasa ini, bersama kata sandi Anda, adalah satu-satunya cara untuk memulihkan brankas Anda. Simpan secara luring: kertas, pengelola kata sandi, dompet perangkat keras. Perlakukan seperti uang tunai.",
       "reveal": "Tampilkan frasa",
-      "saveAsFile": "Simpan sebagai berkas"
+      "saveAsFile": "Simpan sebagai berkas",
+      "saveFailed": "Tidak dapat menyimpan berkas. Sebagai gantinya, salin kata-katanya atau tuliskan.",
+      "savedToFile": "Disimpan. Ini berkas teks biasa, jadi simpan di tempat yang hanya Anda yang dapat membacanya."
     },
     "ready": {
       "backedUp": "Tercadangkan ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Disalin. Frasa tetap berada di perangkat ini, dan sistem menghapusnya setelah 30 detik.",
     "phraseCopyFailed": "Tidak dapat menyalin. Gunakan “Simpan ke berkas” sebagai gantinya.",
     "savedToFile": "Disimpan ke {{label}}",
+    "savedToShareSheet": "Disimpan di dalam Myne, di tempat yang tidak dapat dijangkau pengelola berkas sistem. Gunakan lembar berbagi untuk menaruh salinannya di tempat yang dapat Anda jangkau, dan ketuk Simpan lagi jika Anda sudah menutupnya.",
+    "savedFileWritten": "Disimpan di dalam Myne. Perangkat ini tidak melaporkan dari mana berkas itu dapat dijangkau, jadi anggap berkas itu hanya dapat dijangkau dari dalam aplikasi sampai Anda memeriksanya.",
     "saveFileError": "Tidak dapat menyimpan berkas.",
     "stepLabel": "Buat brankas · {{current}} dari {{total}}",
     "briefingTitle": "Sebelum kita mulai",

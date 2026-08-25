@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Thao tác với ghi chú",
+      "convertFailed": "Không thể đổi loại của ghi chú này, nên nó không thay đổi.",
       "rename": "Đổi tên",
       "move": "Chuyển đến thư mục…",
       "duplicate": "Nhân bản",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Tên thư mục không được chứa / \\ | # ^ [ ] hoặc bắt đầu/kết thúc bằng dấu cách.",
       "tooLong": "Đường dẫn thư mục đó quá dài.",
       "moveIntoSelf": "Không thể chuyển một thư mục vào chính nó.",
-      "moveCollision": "Ở đó đã có một thư mục trùng tên."
+      "moveCollision": "Ở đó đã có một thư mục trùng tên.",
+      "unsettledSave": "Một ghi chú đang mở vẫn chưa lưu xong, nên thư mục được giữ nguyên. Hãy thử lại khi ghi chú đã lưu xong.",
+      "renameFailed": "Không thể đổi tên thư mục, nên nó không thay đổi.",
+      "deliberateWriteFailed": "Thư mục đã được đổi tên, nhưng một cài đặt của nó không lưu được. Đổi tên lại sẽ thử lại."
     },
     "folderNote": {
       "defaultTitle": "Mục lục"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Thêm vào mục yêu thích",
       "archive": "Lưu trữ",
       "archiveBulkError": "Không thể lưu trữ các ghi chú.",
+      "renameFailed": "Không thể lưu tên đó, nên ghi chú vẫn giữ tên cũ.",
       "archiveFolder": "Lưu trữ thư mục",
       "archiveNote": "Lưu trữ",
       "archiveSingleError": "Không thể lưu trữ ghi chú.",
@@ -2260,6 +2265,7 @@
       "thisNote": "ghi chú này",
       "untitled": "Không có tiêu đề"
     },
+    "unsettledSave": "Một ghi chú đang mở vẫn chưa lưu xong, nên không có gì thay đổi. Hãy thử lại khi ghi chú đã lưu xong.",
     "views": {
       "cards": {
         "changeCover": "Đổi ảnh bìa",
@@ -3878,10 +3884,13 @@
       "copied": "Đã sao chép",
       "copy": "Sao chép",
       "copyFailed": "Không thể sao chép. Hãy dùng “Lưu thành tệp” thay thế.",
+      "downloadStarted": "Đã gửi tới mục tải xuống của trình duyệt. Hãy kiểm tra xem tệp đã tới chưa: trình duyệt của bạn quyết định tệp được lưu ở đâu, và Myne không thể thấy tệp có tới nơi hay không.",
       "eyebrow": "Bước 4 trên 4: số tài khoản",
       "heading": "Lưu lại số tài khoản của bạn.",
       "intro": "Đây là mã định danh bí mật của bạn. Hãy coi nó như tiền mặt.",
       "saveAsFile": "Lưu thành tệp",
+      "saveFailed": "Không thể lưu tệp. Thay vào đó, hãy sao chép số này, hoặc viết nó ra giấy.",
+      "savedToFile": "Đã lưu. Đây là tệp văn bản thuần, nên hãy cất nó ở nơi chỉ mình bạn đọc được.",
       "shownOnceBody": "Hãy lưu nó ngay. Myne không thể khôi phục nó cho bạn. Cần có nó để đăng ký đồng bộ sau này.",
       "shownOnceEmphasis": "Số này chỉ được hiển thị một lần."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Sao chép",
       "extensionNotice": "Các tiện ích mở rộng trình duyệt có quyền truy cập trang này có thể đọc những gì hiển thị trên trang. Nếu bạn không chắc chắn về mọi tiện ích trong hồ sơ này, hãy dùng ứng dụng máy tính hoặc một hồ sơ trình duyệt sạch cho bước này.",
       "copyFailed": "Không thể sao chép. Hãy dùng \"Lưu thành tệp\" thay thế.",
+      "downloadStarted": "Đã gửi tới mục tải xuống của trình duyệt. Hãy kiểm tra xem tệp đã tới chưa: trình duyệt của bạn quyết định tệp được lưu ở đâu, và Myne không thể thấy tệp có tới nơi hay không.",
       "eyebrow": "Bước 2 trên 4: cụm từ khôi phục",
       "heading": "Hãy viết ra 24 từ này.",
       "intro": "Cụm từ này, cùng với mật khẩu của bạn, là cách duy nhất để khôi phục kho của bạn. Hãy lưu nó ngoại tuyến: trên giấy, trình quản lý mật khẩu, ví phần cứng. Hãy coi nó như tiền mặt.",
       "reveal": "Hiện cụm từ",
-      "saveAsFile": "Lưu thành tệp"
+      "saveAsFile": "Lưu thành tệp",
+      "saveFailed": "Không thể lưu tệp. Thay vào đó, hãy sao chép các từ này, hoặc viết chúng ra giấy.",
+      "savedToFile": "Đã lưu. Đây là tệp văn bản thuần, nên hãy cất nó ở nơi chỉ mình bạn đọc được."
     },
     "ready": {
       "backedUp": "Đã sao lưu ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Đã sao chép. Nó ở lại trên thiết bị này, và hệ thống sẽ xóa nó sau 30 giây.",
     "phraseCopyFailed": "Không thể sao chép. Hãy dùng \"Lưu vào tệp\" thay thế.",
     "savedToFile": "Đã lưu vào {{label}}",
+    "savedToShareSheet": "Đã lưu bên trong Myne, nơi trình quản lý tệp của hệ thống không thể chạm tới. Hãy dùng bảng chia sẻ để đặt một bản sao ở nơi bạn có thể mở được, và nhấn Lưu lần nữa nếu bạn đã đóng bảng đó.",
+    "savedFileWritten": "Đã lưu bên trong Myne. Thiết bị này không cho biết có thể mở tệp từ đâu, nên hãy xem như chỉ có thể mở nó từ trong ứng dụng cho tới khi bạn tự kiểm tra.",
     "saveFileError": "Không thể lưu tệp.",
     "stepLabel": "Tạo một kho lưu trữ · {{current}}/{{total}}",
     "briefingTitle": "Trước khi bắt đầu",

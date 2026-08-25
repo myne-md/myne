@@ -1253,6 +1253,7 @@
     },
     "noteActions": {
       "buttonLabel": "Akce poznámky",
+      "convertFailed": "Tuto poznámku se nepodařilo převést, takže zůstala beze změny.",
       "rename": "Přejmenovat",
       "move": "Přesunout do složky…",
       "duplicate": "Duplikovat",
@@ -1943,7 +1944,10 @@
       "illegalSegment": "Název složky nemůže obsahovat / \\ | # ^ [ ] ani začínat či končit mezerou.",
       "tooLong": "Tato cesta ke složce je příliš dlouhá.",
       "moveIntoSelf": "Složku nelze přesunout do sebe samé.",
-      "moveCollision": "Složka s tímto názvem tam už je."
+      "moveCollision": "Složka s tímto názvem tam už je.",
+      "unsettledSave": "Ukládání otevřené poznámky ještě neskončilo, takže složka zůstala nedotčená. Až skončí, zkuste to znovu.",
+      "renameFailed": "Složku se nepodařilo přejmenovat, takže zůstala beze změny.",
+      "deliberateWriteFailed": "Složka byla přejmenována, ale jedno z jejích nastavení se nepodařilo uložit. Dalším přejmenováním se pokus zopakuje."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2153,6 +2157,7 @@
       "addToFavorites": "Přidat do oblíbených",
       "archive": "Archiv",
       "archiveBulkError": "Poznámky se nepodařilo archivovat.",
+      "renameFailed": "Tento název se nepodařilo uložit, takže poznámce zůstal ten původní.",
       "archiveFolder": "Archivovat složku",
       "archiveNote": "Archivovat",
       "archiveSingleError": "Poznámku se nepodařilo archivovat.",
@@ -2440,6 +2445,7 @@
       "thisNote": "tato poznámka",
       "untitled": "Bez názvu"
     },
+    "unsettledSave": "Ukládání otevřené poznámky ještě neskončilo, takže se nic nezměnilo. Až skončí, zkuste to znovu.",
     "views": {
       "cards": {
         "changeCover": "Změnit obálku",
@@ -4118,10 +4124,13 @@
       "copied": "Zkopírováno",
       "copy": "Kopírovat",
       "copyFailed": "Nepodařilo se zkopírovat. Použijte místo toho „Uložit jako soubor“.",
+      "downloadStarted": "Odesláno do stažených souborů vašeho prohlížeče. Ověřte, že soubor dorazil: kam půjde, rozhoduje váš prohlížeč, a Myne nevidí, zda dorazil.",
       "eyebrow": "Krok 4 ze 4: číslo účtu",
       "heading": "Uložte si své číslo účtu.",
       "intro": "Toto je váš přístupový token. Zacházejte s ním jako s hotovostí.",
       "saveAsFile": "Uložit jako soubor",
+      "saveFailed": "Soubor se nepodařilo uložit. Zkopírujte místo toho číslo, nebo si ho zapište.",
+      "savedToFile": "Uloženo. Je to soubor v prostém textu, uchovejte ho proto tam, kde si ho přečtete jen vy.",
       "shownOnceBody": "Uložte si ho teď. Myne ho za vás nemůže obnovit. Je nutný pro pozdější registraci k synchronizaci.",
       "shownOnceEmphasis": "Toto se zobrazí pouze jednou."
     },
@@ -4275,11 +4284,14 @@
       "copy": "Kopírovat",
       "extensionNotice": "Rozšíření prohlížeče, která mají přístup k tomuto webu, si mohou přečíst, co je na této stránce. Pokud si nejste jistí každým rozšířením v tomto profilu, použijte pro tento krok desktopovou aplikaci nebo čistý profil prohlížeče.",
       "copyFailed": "Nepodařilo se zkopírovat. Použijte místo toho „Uložit jako soubor“.",
+      "downloadStarted": "Odesláno do stažených souborů vašeho prohlížeče. Ověřte, že soubor dorazil: kam půjde, rozhoduje váš prohlížeč, a Myne nevidí, zda dorazil.",
       "eyebrow": "Krok 2 ze 4: fráze pro obnovení",
       "heading": "Zapište si těchto 24 slov.",
       "intro": "Tato fráze je spolu s vaším heslem jediný způsob, jak obnovit váš trezor. Uchovejte ji offline: papír, správce hesel, hardwarová peněženka. Zacházejte s ní jako s hotovostí.",
       "reveal": "Odhalit frázi",
-      "saveAsFile": "Uložit jako soubor"
+      "saveAsFile": "Uložit jako soubor",
+      "saveFailed": "Soubor se nepodařilo uložit. Zkopírujte místo toho slova, nebo si je zapište.",
+      "savedToFile": "Uloženo. Je to soubor v prostém textu, uchovejte ho proto tam, kde si ho přečtete jen vy."
     },
     "ready": {
       "backedUp": "Zálohováno ✓",
@@ -4541,6 +4553,8 @@
     "phraseCopied": "Zkopírováno. Zůstává na tomto zařízení a systém ji po 30 sekundách vymaže.",
     "phraseCopyFailed": "Nepodařilo se zkopírovat. Použijte místo toho „Uložit do souboru“.",
     "savedToFile": "Uloženo do {{label}}",
+    "savedToShareSheet": "Uloženo uvnitř Myne, kam systémový prohlížeč souborů nedosáhne. Pomocí nabídky sdílení uložte kopii někam, kam se dostanete, a pokud jste ji zavřeli, klepněte znovu na Uložit.",
+    "savedFileWritten": "Uloženo uvnitř Myne. Toto zařízení neoznámilo, odkud je soubor dostupný, proto s ním zacházejte jako s dostupným jen zevnitř aplikace, dokud si to neověříte.",
     "saveFileError": "Soubor se nepodařilo uložit.",
     "stepLabel": "Vytvořit trezor · {{current}} z {{total}}",
     "briefingTitle": "Než začneme",

@@ -1204,6 +1204,7 @@
     },
     "noteActions": {
       "buttonLabel": "Actions de la note",
+      "convertFailed": "Impossible de changer la nature de cette note, elle est donc inchangée.",
       "rename": "Renommer",
       "move": "Déplacer vers un dossier…",
       "duplicate": "Dupliquer",
@@ -1873,7 +1874,10 @@
       "illegalSegment": "Un nom de dossier ne peut pas contenir / \\ | # ^ [ ] ni commencer ou finir par un espace.",
       "tooLong": "Ce chemin de dossier est trop long.",
       "moveIntoSelf": "Un dossier ne peut pas être déplacé dans lui-même.",
-      "moveCollision": "Un dossier portant ce nom existe déjà à cet endroit."
+      "moveCollision": "Un dossier portant ce nom existe déjà à cet endroit.",
+      "unsettledSave": "Une note ouverte n'a pas fini d'être enregistrée, le dossier n'a donc pas été modifié. Réessayez une fois que ce sera fait.",
+      "renameFailed": "Impossible de renommer le dossier, il est donc inchangé.",
+      "deliberateWriteFailed": "Le dossier a été renommé, mais l'un de ses réglages n'a pas pu être enregistré. Le renommer à nouveau relancera la tentative."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2077,6 +2081,7 @@
       "addToFavorites": "Ajouter aux favoris",
       "archive": "Archiver",
       "archiveBulkError": "Impossible d'archiver les notes.",
+      "renameFailed": "Impossible d'enregistrer ce nom, la note a donc conservé l'ancien.",
       "archiveFolder": "Archiver le dossier",
       "archiveNote": "Archiver",
       "archiveSingleError": "Impossible d'archiver la note.",
@@ -2350,6 +2355,7 @@
       "thisNote": "cette note",
       "untitled": "Sans titre"
     },
+    "unsettledSave": "Une note ouverte n'a pas fini d'être enregistrée, rien n'a donc été modifié. Réessayez une fois que ce sera fait.",
     "views": {
       "cards": {
         "changeCover": "Changer la couverture",
@@ -3998,10 +4004,13 @@
       "copied": "Copié",
       "copy": "Copier",
       "copyFailed": "Impossible de copier. Utilisez plutôt « Enregistrer dans un fichier ».",
+      "downloadStarted": "Envoyé dans les téléchargements de votre navigateur. Vérifiez qu'il est bien arrivé : c'est votre navigateur qui décide où va le fichier, et Myne ne peut pas voir s'il est arrivé.",
       "eyebrow": "Étape 4 sur 4 : numéro de compte",
       "heading": "Enregistrez votre numéro de compte.",
       "intro": "C'est votre jeton au porteur. Traitez-le comme de l'argent liquide.",
       "saveAsFile": "Enregistrer dans un fichier",
+      "saveFailed": "Impossible d'enregistrer le fichier. Copiez plutôt le numéro, ou notez-le.",
+      "savedToFile": "Enregistré. C'est un fichier en texte brut, conservez-le donc à un endroit que vous seul pouvez lire.",
       "shownOnceBody": "Enregistrez-le maintenant. Myne ne peut pas le récupérer pour vous. Requis pour vous inscrire à la synchronisation plus tard.",
       "shownOnceEmphasis": "Il n'est affiché qu'une seule fois."
     },
@@ -4155,11 +4164,14 @@
       "copy": "Copier",
       "extensionNotice": "Les extensions de navigateur ayant accès à ce site peuvent lire ce qui se trouve sur cette page. Si vous n'êtes pas certain de chacune des extensions de ce profil, utilisez l'application de bureau ou un profil de navigateur sans extension pour cette étape.",
       "copyFailed": "Impossible de copier. Utilisez plutôt « Enregistrer dans un fichier ».",
+      "downloadStarted": "Envoyé dans les téléchargements de votre navigateur. Vérifiez qu'il est bien arrivé : c'est votre navigateur qui décide où va le fichier, et Myne ne peut pas voir s'il est arrivé.",
       "eyebrow": "Étape 2 sur 4 : phrase de récupération",
       "heading": "Notez ces 24 mots.",
       "intro": "Cette phrase, associée à votre mot de passe, est le seul moyen de récupérer votre coffre-fort. Conservez-la hors ligne : papier, gestionnaire de mots de passe, portefeuille matériel. Traitez-la comme de l'argent liquide.",
       "reveal": "Révéler la phrase",
-      "saveAsFile": "Enregistrer dans un fichier"
+      "saveAsFile": "Enregistrer dans un fichier",
+      "saveFailed": "Impossible d'enregistrer le fichier. Copiez plutôt les mots, ou notez-les.",
+      "savedToFile": "Enregistré. C'est un fichier en texte brut, conservez-le donc à un endroit que vous seul pouvez lire."
     },
     "ready": {
       "backedUp": "Sauvegardé ✓",
@@ -4409,6 +4421,8 @@
     "phraseCopied": "Copié. Cela reste sur cet appareil, et le système l'efface au bout de 30 secondes.",
     "phraseCopyFailed": "Impossible de copier. Utilisez plutôt « Enregistrer dans un fichier ».",
     "savedToFile": "Enregistré dans {{label}}",
+    "savedToShareSheet": "Enregistré dans Myne, là où le gestionnaire de fichiers du système ne peut pas y accéder. Utilisez le menu de partage pour en placer une copie à un endroit qui vous est accessible, et appuyez à nouveau sur Enregistrer si vous l'avez fermé.",
+    "savedFileWritten": "Enregistré dans Myne. Cet appareil n'a pas indiqué d'où le fichier est accessible : considérez donc qu'il n'est accessible que depuis l'application, tant que vous ne l'avez pas vérifié.",
     "saveFileError": "Impossible d'enregistrer le fichier.",
     "stepLabel": "Créer un coffre-fort · {{current}} sur {{total}}",
     "briefingTitle": "Avant de commencer",

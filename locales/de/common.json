@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Notizaktionen",
+      "convertFailed": "Diese Notiz konnte nicht umgewandelt werden, daher ist sie unverändert.",
       "rename": "Umbenennen",
       "move": "In Ordner verschieben…",
       "duplicate": "Duplizieren",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Ein Ordnername darf keine Zeichen / \\ | # ^ [ ] enthalten und nicht mit einem Leerzeichen beginnen oder enden.",
       "tooLong": "Dieser Ordnerpfad ist zu lang.",
       "moveIntoSelf": "Ein Ordner kann nicht in sich selbst verschoben werden.",
-      "moveCollision": "Dort gibt es bereits einen Ordner mit diesem Namen."
+      "moveCollision": "Dort gibt es bereits einen Ordner mit diesem Namen.",
+      "unsettledSave": "Eine geöffnete Notiz ist noch nicht fertig gespeichert, daher wurde der Ordner nicht verändert. Versuchen Sie es erneut, sobald sie gespeichert ist.",
+      "renameFailed": "Der Ordner konnte nicht umbenannt werden, daher ist er unverändert.",
+      "deliberateWriteFailed": "Der Ordner wurde umbenannt, aber eine seiner Einstellungen konnte nicht gespeichert werden. Ein erneutes Umbenennen versucht es noch einmal."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Zu Favoriten hinzufügen",
       "archive": "Archivieren",
       "archiveBulkError": "Die Notizen konnten nicht archiviert werden.",
+      "renameFailed": "Dieser Name konnte nicht gespeichert werden, daher behält die Notiz ihren alten.",
       "archiveFolder": "Ordner archivieren",
       "archiveNote": "Archivieren",
       "archiveSingleError": "Die Notiz konnte nicht archiviert werden.",
@@ -2260,6 +2265,7 @@
       "thisNote": "diese Notiz",
       "untitled": "Ohne Titel"
     },
+    "unsettledSave": "Eine geöffnete Notiz ist noch nicht fertig gespeichert, daher wurde nichts geändert. Versuchen Sie es erneut, sobald sie gespeichert ist.",
     "views": {
       "cards": {
         "changeCover": "Titelbild ändern",
@@ -3878,10 +3884,13 @@
       "copied": "Kopiert",
       "copy": "Kopieren",
       "copyFailed": "Kopieren nicht möglich. Verwenden Sie stattdessen „Als Datei speichern“.",
+      "downloadStarted": "Die Datei wurde an die Downloads Ihres Browsers übergeben. Prüfen Sie, ob sie angekommen ist: Ihr Browser entscheidet, wohin sie geht, und Myne kann nicht sehen, ob das geschehen ist.",
       "eyebrow": "Schritt 4 von 4: Kontonummer",
       "heading": "Speichern Sie Ihre Kontonummer.",
       "intro": "Dies ist Ihr Inhaber-Token. Behandeln Sie es wie Bargeld.",
       "saveAsFile": "Als Datei speichern",
+      "saveFailed": "Die Datei konnte nicht gespeichert werden. Kopieren Sie stattdessen die Nummer oder schreiben Sie sie auf.",
+      "savedToFile": "Gespeichert. Es ist eine reine Textdatei, bewahren Sie sie also an einem Ort auf, den nur Sie lesen können.",
       "shownOnceBody": "Speichern Sie sie jetzt. Myne kann sie nicht für Sie wiederherstellen. Erforderlich, um sich später für Sync zu registrieren.",
       "shownOnceEmphasis": "Dies wird nur einmal angezeigt."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Kopieren",
       "extensionNotice": "Browser-Erweiterungen mit Zugriff auf diese Website können lesen, was auf dieser Seite steht. Wenn Sie sich nicht bei jeder Erweiterung in diesem Profil sicher sind, nutzen Sie für diesen Schritt die Desktop-App oder ein sauberes Browserprofil.",
       "copyFailed": "Kopieren nicht möglich. Verwenden Sie stattdessen „Als Datei speichern“.",
+      "downloadStarted": "Die Datei wurde an die Downloads Ihres Browsers übergeben. Prüfen Sie, ob sie angekommen ist: Ihr Browser entscheidet, wohin sie geht, und Myne kann nicht sehen, ob das geschehen ist.",
       "eyebrow": "Schritt 2 von 4: Wiederherstellungsphrase",
       "heading": "Schreiben Sie diese 24 Wörter auf.",
       "intro": "Diese Phrase ist zusammen mit Ihrem Passwort die einzige Möglichkeit, Ihren Tresor wiederherzustellen. Bewahren Sie sie offline auf: Papier, Passwort-Manager, Hardware-Wallet. Behandeln Sie sie wie Bargeld.",
       "reveal": "Phrase anzeigen",
-      "saveAsFile": "Als Datei speichern"
+      "saveAsFile": "Als Datei speichern",
+      "saveFailed": "Die Datei konnte nicht gespeichert werden. Kopieren Sie stattdessen die Wörter oder schreiben Sie sie auf.",
+      "savedToFile": "Gespeichert. Es ist eine reine Textdatei, bewahren Sie sie also an einem Ort auf, den nur Sie lesen können."
     },
     "ready": {
       "backedUp": "Gesichert ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Kopiert. Sie bleibt auf diesem Gerät, und das System verwirft sie nach 30 Sekunden.",
     "phraseCopyFailed": "Kopieren nicht möglich. Verwenden Sie stattdessen „In Datei speichern“.",
     "savedToFile": "Gespeichert in {{label}}",
+    "savedToShareSheet": "In Myne gespeichert, wo der Dateibrowser des Systems nicht herankommt. Lege über das Teilen-Menü eine Kopie an einem Ort ab, den du erreichst, und tippe erneut auf „In Datei speichern“, wenn du es geschlossen hast.",
+    "savedFileWritten": "In Myne gespeichert. Dieses Gerät hat nicht gemeldet, von wo aus die Datei erreichbar ist; geh also davon aus, dass sie nur in der App erreichbar ist, bis du es geprüft hast.",
     "saveFileError": "Die Datei konnte nicht gespeichert werden.",
     "stepLabel": "Tresor erstellen · {{current}} von {{total}}",
     "briefingTitle": "Bevor wir beginnen",
