@@ -358,6 +358,38 @@ export function analyse(io) {
   };
 }
 
+/**
+ * A BCP-47 language tag as this repository writes them: a primary subtag plus
+ * any number of region or script subtags. `[a-z-]+` was the first draft and it
+ * was blind by construction to `pt-BR`, `zh-Hant` and `sr-Latn`, which are the
+ * three shapes a 32-locale roster is most likely to grow next. A code the
+ * pattern could not see was silently dropped from BOTH rosters at once, so the
+ * parity check compared two equally-truncated lists, agreed with itself, and
+ * reported ok on a language nothing in this script had ever looked at.
+ */
+const LANGUAGE_TAG = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+
+/**
+ * Every quoted string in a roster block, with anything that is not a language
+ * tag reported BY NAME rather than skipped. Widening the pattern alone would
+ * have traded one silent blindness for another: a quoted string the widened
+ * pattern still cannot classify would go on being dropped without a word. This
+ * is the `scanned-assets.mjs` discipline, which fails on an extension nobody
+ * classified instead of walking past it.
+ */
+function rosterCodes(block, where) {
+  const quoted = [...block.matchAll(/"([^"]*)"/g)].map((m) => m[1]);
+  const bad = quoted.filter((q) => !LANGUAGE_TAG.test(q));
+  if (bad.length > 0) {
+    return (
+      `${where} contains ${bad.length} quoted value(s) that are not language tags: ` +
+      `${bad.map((b) => JSON.stringify(b)).join(", ")}. ` +
+      `This check reads that block as a roster, so it will not silently ignore an entry it cannot classify.`
+    );
+  }
+  return quoted;
+}
+
 /** `SUPPORTED_LANGUAGES` codes, or a failure message naming what could not be read. */
 function declaredLanguages(source) {
   if (source === null) {
@@ -370,7 +402,9 @@ function declaredLanguages(source) {
       `reporting ok on an input this script never read is the one outcome that makes it worthless.`
     );
   }
-  const codes = [...block[1].matchAll(/code:\s*"([a-z-]+)"/g)].map((m) => m[1]);
+  const entries = [...block[1].matchAll(/code:\s*("[^"]*")/g)].map((m) => m[1]).join(" ");
+  const codes = rosterCodes(entries, `SUPPORTED_LANGUAGES in ${CONFIG_PATH}`);
+  if (typeof codes === "string") return codes;
   if (codes.length < 2) {
     return `SUPPORTED_LANGUAGES parsed to ${codes.length} language(s). That is a parse failure, not a roster.`;
   }
@@ -386,7 +420,8 @@ function extractorLanguages(source) {
   if (!block) {
     return `No \`locales:\` array found in ${EXTRACTOR_PATH}. If the extractor config changed shape, teach this check the new one.`;
   }
-  const codes = [...block[1].matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
+  const codes = rosterCodes(block[1], `The \`locales:\` array in ${EXTRACTOR_PATH}`);
+  if (typeof codes === "string") return codes;
   if (codes.length < 2) {
     return `${EXTRACTOR_PATH} parsed to ${codes.length} locale(s). That is a parse failure, not a roster.`;
   }

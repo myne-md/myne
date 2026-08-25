@@ -140,8 +140,13 @@ export function AboutPanel() {
   //
   // On web this is the readout that makes the rest of the integrity chain
   // usable: the bundle is re-delivered on every load, meant to be pinned by a
-  // service worker and checkable against a published hash record, and none of
-  // that helps if the running client will not say which bundle it is.
+  // service worker and checkable against a record of released hashes, and none
+  // of that helps if the running client will not say which bundle it is. (That
+  // record is not public today, and the service worker is not implemented, so
+  // both halves of the chain are intent rather than state: docs/threat-model.md
+  // §5 and docs/decisions/security/0534. The readout is still what makes either
+  // of them usable later, and what lets a user quote a hash to someone who can
+  // check it now.)
   //
   // Presented exactly as the version string is, with no security claim attached
   // — the disclosure of the weakened trust posture is a separate, deliberate

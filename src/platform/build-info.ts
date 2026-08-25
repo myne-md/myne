@@ -12,7 +12,11 @@
 // So the version and the commit are compile-time (they are inputs, not outputs)
 // and the hash is FETCHED, same-origin, from the document the deploy already
 // publishes — the same one the post-deploy smoke gate reads and the same one
-// anyone can `curl` to compare a running instance against the published record.
+// anyone can `curl`. Comparing it against the record of released hashes is a
+// different matter: that record is in a private repository today, so a user
+// cannot look their hash up in it (docs/threat-model.md §5, entry 0534). The
+// value is still worth serving, because quoting it lets someone with access
+// settle the question.
 //
 // # Why desktop answers `null` rather than something
 //

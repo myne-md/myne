@@ -522,4 +522,53 @@ describe("check-i18n-coverage: roster parse backstops", () => {
     expect(r.halted).toBe(true);
     expect(r.failures.join("\n")).toMatch(/i18next\.config\.js parsed to 1 locale\(s\)/);
   });
+
+  // The blindness both readers shipped with. `[a-z-]+` matches `pt` and stops
+  // at the hyphen-uppercase boundary, so `pt-BR` was captured as neither
+  // `pt-BR` nor `pt`: the whole quoted string failed to match and the code
+  // vanished from the roster. It vanished from BOTH rosters identically, which
+  // is what made it silent, because the parity check then compared two lists
+  // that were wrong in the same way and agreed.
+  it.each(["pt-BR", "zh-Hant", "sr-Latn"])(
+    "sees %s in both rosters rather than dropping it from both alike",
+    (code) => {
+      const files: Files = { ...healthy() };
+      files[CONFIG_PATH] = config(["en", "tr", "ru", code]);
+      files[EXTRACTOR_PATH] = extractor(["en", "tr", "ru", code]);
+      // No catalog on disk for it, so a reader that SEES the code must say so.
+      const r = run(files);
+      expect(r.halted).toBe(true);
+      expect(r.failures.join("\n")).toContain(code);
+    },
+  );
+
+  it("carries a region-subtag locale all the way to a coverage row", () => {
+    const files = withLocale("pt-BR", {
+      common: { save: "Salvar", moved: "{{count}} nota movida para {{folder}}" },
+      notes: {
+        count_one: "{{count}} nota",
+        count_many: "{{count}} de notas",
+        count_other: "{{count}} notas",
+        tag_one: "{{count}} etiqueta",
+        tag_many: "{{count}} de etiquetas",
+        tag_other: "{{count}} etiquetas",
+      },
+    });
+    const r = run(files);
+    expect(r.halted).toBe(false);
+    expect(r.record).toContain("pt-BR");
+  });
+
+  // The other half of the fix, and the reason widening the pattern alone was
+  // not enough: a quoted value that is not a language tag is now named rather
+  // than skipped, so the next shape nobody anticipated fails loudly.
+  it("names a quoted roster entry it cannot classify instead of walking past it", () => {
+    const files: Files = { ...healthy() };
+    files[EXTRACTOR_PATH] =
+      `export default defineConfig({\n  locales: ["en","tr","ru","en_US_POSIX_and_then_some"],\n});\n`;
+    const r = run(files);
+    expect(r.halted).toBe(true);
+    expect(r.failures.join("\n")).toMatch(/not language tags/);
+    expect(r.failures.join("\n")).toContain("en_US_POSIX_and_then_some");
+  });
 });

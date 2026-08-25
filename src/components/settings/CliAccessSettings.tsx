@@ -10,8 +10,11 @@
 // the same shape as screen-capture protection and auto-lock sitting beside it.
 // It is deliberately NOT Account, where "Connected extensions" lives — that
 // block pairs a separately-distributed application across a trust boundary
-// (TB10), whereas the `myne` sidecar ships inside this bundle, under this
-// bundle's own signature, and is never paired with anything.
+// (TB10), whereas the `myne` sidecar ships inside this bundle, built from the
+// same workspace and the same Cargo.lock, and is never paired with anything.
+// (Not "under this bundle's own signature", which this comment said until
+// 2026-08-25: the desktop bundle carries no signature any OS checks. See
+// docs/threat-model.md TB12 and docs/decisions/security/0534.)
 //
 // # The copy is the load-bearing part
 //
