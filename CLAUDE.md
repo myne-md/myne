@@ -363,7 +363,7 @@ Full primitive details, audit anchors, and subkey derivation discipline rule (wh
 - **No persistent server-side IP logging.** Abuse via per-account counters, not per-IP.
 - **User-meaningful timestamps live inside the encrypted blob.** Server uses opaque per-note version counter for conflict detection; resolution is client-side after decryption.
 - **Self-hosted and hosted servers share the exact same trust boundary (TB5).** Same protocol, same security model.
-- **Reproducible signed builds, hash-pinned lockfiles, minimal direct-dependency surface.** Credible substitute for the missing third-party audit (`threat-model.md` §6). **Adding a dependency is a security decision** — including the choice of Vite + React over Next.js.
+- **Reproducible builds where they ship (web bundle and server image, not desktop), minisign-signed release hashes, hash-pinned lockfiles, minimal direct-dependency surface.** Credible substitute for the missing third-party audit (`threat-model.md` §6, which is the authority on which half of this is shipped; this line read "reproducible signed builds" until 2026-08-25 and desktop has neither). **Adding a dependency is a security decision** — including the choice of Vite + React over Next.js.
 
 ## Gotchas
 

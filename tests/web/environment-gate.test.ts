@@ -1,6 +1,8 @@
 // Unsupported-environment gate (phase3-web-client task 29).
 
 import { describe, expect, it, vi } from "vitest";
+
+import enCommon from "../../locales/en/common.json";
 import {
   explainMissing,
   gateEnvironment,
@@ -301,10 +303,38 @@ describe("environment gate — the refusal it produces", () => {
   // pushed the next author back to the false wording. It pins persistence and
   // the published hash instead, which is what actually distinguishes an
   // installed app from a re-delivered page (design-notes/security/0534).
-  it("names the difference that holds rather than a signature check nothing performs", () => {
-    expect(NATIVE_HANDOFF).not.toMatch(/signature|signed|verif/i);
-    expect(NATIVE_HANDOFF).toMatch(/stays installed/i);
-    expect(NATIVE_HANDOFF).toMatch(/hash/i);
-    expect(NATIVE_HANDOFF).toMatch(/re-sent/i);
+  //
+  // It asserts over BOTH copies of the sentence, and the second one is the
+  // reason this loop exists at all. `UnsupportedEnvironment.tsx` renders
+  // `t("web.unsupported.handoff", { defaultValue: NATIVE_HANDOFF })`, and the
+  // English catalog carries that key, so the catalog value is what a reader
+  // actually sees and the constant is the fallback for a page whose i18n has
+  // not initialised. A version of this test that watched only the constant
+  // left the shipped sentence unguarded: restoring the retired wording in
+  // `locales/en/common.json` alone passed it, and every other gate in the
+  // tree, while the false claim was back on the screen.
+  const SHIPPED_HANDOFF = (
+    enCommon as unknown as { web: { unsupported: { handoff: string } } }
+  ).web.unsupported.handoff;
+
+  const HANDOFF_COPIES: [string, string][] = [
+    ["the NATIVE_HANDOFF constant, which is the pre-i18n fallback", NATIVE_HANDOFF],
+    ["locales/en/common.json web.unsupported.handoff, which is what renders", SHIPPED_HANDOFF],
+  ];
+
+  it.each(HANDOFF_COPIES)(
+    "names the difference that holds rather than a signature check nothing performs: %s",
+    (_where, copy) => {
+      expect(copy).not.toMatch(/signature|signed|verif/i);
+      expect(copy).toMatch(/stays installed/i);
+      expect(copy).toMatch(/hash/i);
+      expect(copy).toMatch(/re-sent/i);
+    },
+  );
+
+  // The two must not drift apart either, because a reader gets one of them
+  // depending on whether i18n has initialised and neither is more official.
+  it("keeps the constant and the shipped English string the same sentence", () => {
+    expect(SHIPPED_HANDOFF).toBe(NATIVE_HANDOFF);
   });
 });
