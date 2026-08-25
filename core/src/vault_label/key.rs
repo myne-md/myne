@@ -76,13 +76,15 @@ pub trait LabelKeychain: Send + Sync {
     fn delete(&self, account: &str) -> Result<(), VaultLabelError>;
 }
 
-/// The account the availability probe reads, and the only account this module
+/// The account the availability probe writes, and the only account this module
 /// ever addresses that is not a vault's.
 ///
-/// It is never stored under: [`keychain_available`] performs a `get` and
-/// nothing else, so no item by this name is ever created. It cannot collide
-/// with a real key either, because every real account is a canonical 36-char
-/// `VaultId` rendering and this parses as none.
+/// An item by this name **can** exist: [`keychain_available`] stores one byte
+/// under it and deletes it best-effort, so a probe interrupted between the two
+/// calls leaves one behind. One fact makes that leftover harmless and rules out
+/// a collision with a real key at the same time: every real account is a
+/// canonical 36-char `VaultId` rendering and this string parses as none, so no
+/// reader in this module ever loads it as a wrap key.
 pub const KEYCHAIN_PROBE_ACCOUNT: &str = "availability-probe";
 
 /// Is there a usable keychain on this device at all?
@@ -93,21 +95,58 @@ pub const KEYCHAIN_PROBE_ACCOUNT: &str = "availability-probe";
 /// say so. Without it the row toggles, nothing happens, and it looks broken
 /// forever with no explanation.
 ///
-/// Answered by reading an account that does not exist, so the ordinary answer is
-/// "no such item", which is [`LabelKeychain::get`]'s `Ok(None)`. Only
-/// [`VaultLabelError::KeychainUnavailable`] reports unavailable: a transient
-/// backend error means the facility answered and failed, and telling the user
-/// their device cannot store vault names on the strength of one bad call would
-/// be a claim about the machine rather than about the call.
+/// **Answered by attempting a WRITE, not a read, and that is the whole point.**
+/// This probe used to `get` an account that does not exist and treat "no such
+/// item" as proof the facility works. On macOS it is not: an ad-hoc-signed build
+/// (every `tauri dev` run) can READ the data-protection keychain and gets a
+/// clean `errSecItemNotFound`, while every `SecItemAdd` fails with
+/// `errSecMissingEntitlement` (-34018). So the read probe answered "available",
+/// the row promised the picker would show names, and each unlock silently wrote
+/// nothing. That is precisely the looks-fine-does-nothing state this function
+/// exists to prevent, reached through the one door nobody checked.
+///
+/// So it stores a one-byte value under the probe account and deletes it again.
+/// Two keychain calls on a Settings-panel mount is nothing, and it asks the
+/// question the caller actually has: can this device STORE a name. The delete is
+/// best-effort; a leftover probe item is inert (it is not a `VaultId`, so
+/// nothing reads it as a wrap key) and the next probe overwrites it.
+///
+/// **A permanent refusal reports unavailable whatever its code, and the retry is
+/// how that is decided without enumerating codes.** An earlier version keyed the
+/// verdict on `errSecMissingEntitlement` alone and mapped every other refusal to
+/// `Backend`, which `!matches!` then read as available: `errSecParam`,
+/// `errSecInteractionNotAllowed` and `errSecAuthFailed` all landed in exactly the
+/// looks-fine-does-nothing state this function exists to prevent, one code away
+/// from the one it caught. Enumerating the rest would be a denylist, and a
+/// denylist is wrong here by construction, because the next OSStatus nobody
+/// anticipated defaults to "available".
+///
+/// So the probe tries twice. `KeychainUnavailable` answers immediately, since
+/// the facility named itself. A `Backend` error is retried once, and a second
+/// failure of any kind reports unavailable. The asymmetry is deliberate and it
+/// runs the safe way: reporting available when it is not costs the user a
+/// feature that silently stores nothing forever, while reporting unavailable on
+/// a genuinely transient blip costs one Settings mount, because this probe runs
+/// on every one and the next answer corrects it. Telling someone their device
+/// cannot store vault names on the strength of ONE bad call would be a claim
+/// about the machine rather than about the call; saying it after two is a claim
+/// about the call, twice.
 ///
 /// **This is a probe, not a fallback.** Nothing anywhere reacts to a `false` by
 /// writing the name in the clear; the store simply holds nothing on such a
 /// device (`decisions.md` 2026-08-15).
 pub fn keychain_available(ops: &dyn LabelKeychain) -> bool {
-    !matches!(
-        ops.get(KEYCHAIN_PROBE_ACCOUNT),
-        Err(VaultLabelError::KeychainUnavailable)
-    )
+    let available = match ops.store(KEYCHAIN_PROBE_ACCOUNT, &[0u8]) {
+        Ok(()) => true,
+        // The facility named itself. No retry can change that answer.
+        Err(VaultLabelError::KeychainUnavailable) => false,
+        // Anything else is one bad call OR a permanent refusal wearing another
+        // OSStatus, and a single attempt cannot tell them apart. A second one
+        // can: a transient failure passes, a permanent refusal repeats.
+        Err(_) => ops.store(KEYCHAIN_PROBE_ACCOUNT, &[0u8]).is_ok(),
+    };
+    let _ = ops.delete(KEYCHAIN_PROBE_ACCOUNT);
+    available
 }
 
 /// The keychain account component for one vault: the canonical 36-char
@@ -462,23 +501,65 @@ mod tests {
     }
 
     #[test]
-    fn the_probe_neither_mints_nor_stores_anything() {
-        // It answers with one read. A probe that created an item would leave a
-        // keychain entry behind on every launch of the Settings panel.
+    fn the_probe_writes_and_then_cleans_up_after_itself() {
+        // It has to WRITE, because writing is the thing the caller wants to know
+        // about. It must also leave nothing behind: a probe that kept its item
+        // would add a keychain entry on every Settings-panel mount.
         let fake = FakeKeychain::empty();
         assert!(keychain_available(&fake));
-        assert!(fake.accounts().is_empty(), "the probe minted a key");
-        assert_eq!(fake.calls(), vec![format!("get {KEYCHAIN_PROBE_ACCOUNT}")]);
+        assert!(fake.accounts().is_empty(), "the probe left its item behind");
+        assert_eq!(
+            fake.calls(),
+            vec![
+                format!("store {KEYCHAIN_PROBE_ACCOUNT}"),
+                format!("delete {KEYCHAIN_PROBE_ACCOUNT}"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_keychain_that_reads_but_cannot_write_is_reported_unavailable() {
+        // The macOS ad-hoc-signed shape, and the reason this probe stopped being
+        // a read. Every `tauri dev` build is in it: `get` returns a clean
+        // errSecItemNotFound and `SecItemAdd` fails with errSecMissingEntitlement
+        // (-34018). The read probe called such a device healthy, so the Privacy
+        // row promised the picker would show names while each unlock silently
+        // wrote nothing. Reported by furkan against the running app, and it is
+        // exactly the looks-fine-does-nothing state this option exists to avoid.
+        let fake = FakeKeychain::readable_but_unwritable();
+        assert!(
+            fake.get(KEYCHAIN_PROBE_ACCOUNT).is_ok(),
+            "precondition: reads must work, or this proves nothing"
+        );
+        assert!(!keychain_available(&fake));
     }
 
     #[test]
     fn a_transient_backend_failure_is_not_reported_as_an_absent_keychain() {
-        // `store_fails` leaves `get` working, which is the probe's whole input.
-        // Only `KeychainUnavailable` means the facility is not there, and the
-        // row's sentence ("this device cannot store vault names") would be a
-        // lie about a keychain that answered.
-        let fake = FakeKeychain::failing_store();
+        // One bad call against a facility that is there. The row's sentence
+        // ("this device cannot store vault names") would be a lie about a
+        // keychain that answered, so the probe retries and the second attempt
+        // decides.
+        //
+        // This asserted over `failing_store()` until 2026-08-25, and that
+        // fixture fails EVERY store, permanently. So a test named for a
+        // transient failure was pinning the opposite: that a keychain which can
+        // never write is reported available. It was green, and it held the
+        // one-OSStatus gap below open.
+        let fake = FakeKeychain::store_fails_once();
         assert!(keychain_available(&fake));
+    }
+
+    #[test]
+    fn a_permanent_backend_refusal_is_reported_as_unavailable_whatever_its_code() {
+        // The gap the retry closes. `AppleKeychain::store` maps only
+        // `errSecMissingEntitlement` to `KeychainUnavailable` and sends every
+        // other refusal to `Backend`; `errSecParam`, `errSecInteractionNotAllowed`
+        // and `errSecAuthFailed` are all permanent and all arrive that way. A
+        // probe that read `Backend` as available left each of them in exactly the
+        // looks-fine-does-nothing state this whole function exists to prevent.
+        let fake = FakeKeychain::failing_store();
+        assert!(!keychain_available(&fake));
     }
 
     #[test]
