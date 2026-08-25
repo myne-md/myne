@@ -1204,6 +1204,7 @@
     },
     "noteActions": {
       "buttonLabel": "Acciones de la nota",
+      "convertFailed": "No se pudo convertir esta nota, así que sigue igual.",
       "rename": "Cambiar nombre",
       "move": "Mover a una carpeta…",
       "duplicate": "Duplicar",
@@ -1873,7 +1874,10 @@
       "illegalSegment": "Un nombre de carpeta no puede contener / \\ | # ^ [ ] ni empezar o terminar con un espacio.",
       "tooLong": "Esa ruta de carpeta es demasiado larga.",
       "moveIntoSelf": "Una carpeta no se puede mover dentro de sí misma.",
-      "moveCollision": "Ahí ya hay una carpeta con ese nombre."
+      "moveCollision": "Ahí ya hay una carpeta con ese nombre.",
+      "unsettledSave": "Una nota abierta aún no ha terminado de guardarse, así que la carpeta no se ha tocado. Inténtalo de nuevo cuando termine.",
+      "renameFailed": "No se pudo cambiar el nombre de la carpeta, así que sigue igual.",
+      "deliberateWriteFailed": "Se cambió el nombre de la carpeta, pero no se pudo guardar uno de sus ajustes. Si vuelves a cambiarle el nombre, se intentará de nuevo."
     },
     "folderNote": {
       "defaultTitle": "Índice"
@@ -2077,6 +2081,7 @@
       "addToFavorites": "Añadir a favoritos",
       "archive": "Archivo",
       "archiveBulkError": "No se pudieron archivar las notas.",
+      "renameFailed": "No se pudo guardar ese nombre, así que la nota conserva el anterior.",
       "archiveFolder": "Archivar carpeta",
       "archiveNote": "Archivar",
       "archiveSingleError": "No se pudo archivar la nota.",
@@ -2350,6 +2355,7 @@
       "thisNote": "esta nota",
       "untitled": "Sin título"
     },
+    "unsettledSave": "Una nota abierta aún no ha terminado de guardarse, así que no se ha cambiado nada. Inténtalo de nuevo cuando termine.",
     "views": {
       "cards": {
         "changeCover": "Cambiar portada",
@@ -3998,10 +4004,13 @@
       "copied": "Copiado",
       "copy": "Copiar",
       "copyFailed": "No se pudo copiar. Usa «Guardar como archivo».",
+      "downloadStarted": "El archivo se ha enviado a las descargas de tu navegador. Comprueba que ha llegado: tu navegador decide dónde va el archivo y Myne no puede ver si ha llegado.",
       "eyebrow": "Paso 4 de 4: número de cuenta",
       "heading": "Guarda tu número de cuenta.",
       "intro": "Este es tu token al portador. Trátalo como dinero en efectivo.",
       "saveAsFile": "Guardar como archivo",
+      "saveFailed": "No se pudo guardar el archivo. Copia el número en su lugar o anótalo.",
+      "savedToFile": "Guardado. Es un archivo de texto sin formato, así que consérvalo en un sitio que solo tú puedas leer.",
       "shownOnceBody": "Guárdalo ahora. Myne no puede recuperarlo por ti. Es necesario para registrarte y sincronizar más adelante.",
       "shownOnceEmphasis": "Esto se muestra solo una vez."
     },
@@ -4155,11 +4164,14 @@
       "copy": "Copiar",
       "extensionNotice": "Las extensiones del navegador con acceso a este sitio pueden leer lo que hay en esta página. Si no estás seguro de todas las extensiones de este perfil, usa la aplicación de escritorio o un perfil de navegador limpio para este paso.",
       "copyFailed": "No se pudo copiar. Usa «Guardar como archivo» en su lugar.",
+      "downloadStarted": "El archivo se ha enviado a las descargas de tu navegador. Comprueba que ha llegado: tu navegador decide dónde va el archivo y Myne no puede ver si ha llegado.",
       "eyebrow": "Paso 2 de 4: frase de recuperación",
       "heading": "Anota estas 24 palabras.",
       "intro": "Esta frase, junto con tu contraseña, es la única forma de recuperar tu bóveda. Guárdala sin conexión: en papel, en un gestor de contraseñas o en una cartera de hardware. Trátala como dinero en efectivo.",
       "reveal": "Mostrar frase",
-      "saveAsFile": "Guardar como archivo"
+      "saveAsFile": "Guardar como archivo",
+      "saveFailed": "No se pudo guardar el archivo. Copia las palabras en su lugar o anótalas.",
+      "savedToFile": "Guardado. Es un archivo de texto sin formato, así que consérvalo en un sitio que solo tú puedas leer."
     },
     "ready": {
       "backedUp": "Respaldada ✓",
@@ -4409,6 +4421,8 @@
     "phraseCopied": "Copiado. Se queda en este dispositivo y el sistema lo descarta a los 30 segundos.",
     "phraseCopyFailed": "No se pudo copiar. Usa «Guardar en un archivo» en su lugar.",
     "savedToFile": "Guardado en {{label}}",
+    "savedToShareSheet": "Guardado dentro de Myne, donde el gestor de archivos del sistema no puede llegar. Usa el menú de compartir para poner una copia en un sitio al que puedas llegar, y vuelve a tocar «Guardar en un archivo» si lo has cerrado.",
+    "savedFileWritten": "Guardado dentro de Myne. Este dispositivo no ha indicado desde dónde se puede acceder al archivo, así que considéralo accesible solo desde dentro de la app hasta que lo compruebes.",
     "saveFileError": "No se pudo guardar el archivo.",
     "stepLabel": "Crear una bóveda · {{current}} de {{total}}",
     "briefingTitle": "Antes de empezar",

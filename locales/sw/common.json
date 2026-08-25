@@ -1146,6 +1146,7 @@
     },
     "noteActions": {
       "buttonLabel": "Vitendo vya dokezo",
+      "convertFailed": "Imeshindwa kubadilisha aina ya dokezo hili, hivyo halijabadilika.",
       "rename": "Badilisha jina",
       "move": "Hamishia kwenye folda…",
       "duplicate": "Nakili",
@@ -1792,7 +1793,10 @@
       "illegalSegment": "Jina la folda haliwezi kuwa na / \\ | # ^ [ ] wala kuanza au kuishia na nafasi.",
       "tooLong": "Njia hiyo ya folda ni ndefu mno.",
       "moveIntoSelf": "Folda haiwezi kuhamishwa ndani yake yenyewe.",
-      "moveCollision": "Tayari kuna folda yenye jina hilo pale."
+      "moveCollision": "Tayari kuna folda yenye jina hilo pale.",
+      "unsettledSave": "Dokezo lililofunguliwa bado halijamaliza kuhifadhiwa, hivyo folda imeachwa kama ilivyo. Jaribu tena litakapomaliza.",
+      "renameFailed": "Imeshindwa kubadilisha jina la folda, hivyo haijabadilika.",
+      "deliberateWriteFailed": "Jina la folda limebadilishwa, lakini mojawapo ya mipangilio yake haikuweza kuhifadhiwa. Ukibadilisha jina tena, itajaribiwa upya."
     },
     "folderNote": {
       "defaultTitle": "Faharasa"
@@ -1989,6 +1993,7 @@
       "addToFavorites": "Ongeza kwenye vipendwa",
       "archive": "Kumbukumbu",
       "archiveBulkError": "Imeshindwa kuweka madokezo kwenye kumbukumbu.",
+      "renameFailed": "Imeshindwa kuhifadhi jina hilo, hivyo dokezo limebaki na jina lake la zamani.",
       "archiveFolder": "Weka folda kwenye kumbukumbu",
       "archiveNote": "Weka kwenye kumbukumbu",
       "archiveSingleError": "Imeshindwa kuweka dokezo kwenye kumbukumbu.",
@@ -2246,6 +2251,7 @@
       "thisNote": "dokezo hili",
       "untitled": "Bila kichwa"
     },
+    "unsettledSave": "Dokezo lililofunguliwa bado halijamaliza kuhifadhiwa, hivyo hakuna kilichobadilishwa. Jaribu tena litakapomaliza.",
     "views": {
       "cards": {
         "changeCover": "Badilisha jalada",
@@ -3849,10 +3855,13 @@
       "copied": "Imenakiliwa",
       "copy": "Nakili",
       "copyFailed": "Imeshindwa kunakili. Tumia “Hifadhi kama faili” badala yake.",
+      "downloadStarted": "Limetumwa kwenye vipakuliwa vya kivinjari chako. Hakikisha limefika: kivinjari chako ndicho huamua faili linakwenda wapi, na Myne haiwezi kuona kama limefika.",
       "eyebrow": "Hatua ya 4 kati ya 4: nambari ya akaunti",
       "heading": "Hifadhi nambari yako ya akaunti.",
       "intro": "Hii ni tokeni ya mmiliki. Ichukulie kama pesa taslimu.",
       "saveAsFile": "Hifadhi kama faili",
+      "saveFailed": "Imeshindwa kuhifadhi faili. Nakili nambari badala yake, au iandike.",
+      "savedToFile": "Imehifadhiwa. Ni faili la maandishi wazi, hivyo lihifadhi mahali ambapo wewe pekee unaweza kulisoma.",
       "shownOnceBody": "Ihifadhi sasa. Myne haiwezi kukurudishia. Inahitajika ili kujisajili kwa usawazishaji baadaye.",
       "shownOnceEmphasis": "Hii inaonyeshwa mara moja tu."
     },
@@ -4006,11 +4015,14 @@
       "copy": "Nakili",
       "extensionNotice": "Viendelezi vya kivinjari vyenye ufikiaji wa tovuti hii vinaweza kusoma kilicho kwenye ukurasa huu. Kama huna uhakika kuhusu kila kiendelezi kilicho kwenye wasifu huu, tumia programu ya kompyuta au wasifu safi wa kivinjari kwa hatua hii.",
       "copyFailed": "Imeshindwa kunakili. Tumia “Hifadhi kama faili” badala yake.",
+      "downloadStarted": "Limetumwa kwenye vipakuliwa vya kivinjari chako. Hakikisha limefika: kivinjari chako ndicho huamua faili linakwenda wapi, na Myne haiwezi kuona kama limefika.",
       "eyebrow": "Hatua ya 2 kati ya 4: kifungu cha urejeshaji",
       "heading": "Andika maneno haya 24.",
       "intro": "Kifungu hiki, pamoja na nenosiri lako, ndiyo njia pekee ya kurejesha kasha lako. Kihifadhi nje ya mtandao: karatasi, kidhibiti cha manenosiri, pochi ya kifaa. Kichukulie kama pesa taslimu.",
       "reveal": "Onyesha kifungu",
-      "saveAsFile": "Hifadhi kama faili"
+      "saveAsFile": "Hifadhi kama faili",
+      "saveFailed": "Imeshindwa kuhifadhi faili. Nakili maneno badala yake, au uyaandike.",
+      "savedToFile": "Imehifadhiwa. Ni faili la maandishi wazi, hivyo lihifadhi mahali ambapo wewe pekee unaweza kulisoma."
     },
     "ready": {
       "backedUp": "Imehifadhiwa ✓",
@@ -4248,6 +4260,8 @@
     "phraseCopied": "Imenakiliwa. Inabaki kwenye kifaa hiki, na mfumo huiondoa baada ya sekunde 30.",
     "phraseCopyFailed": "Imeshindwa kunakili. Tumia “Hifadhi kwenye faili” badala yake.",
     "savedToFile": "Imehifadhiwa kwenye {{label}}",
+    "savedToShareSheet": "Limehifadhiwa ndani ya Myne, mahali ambapo kidhibiti cha mafaili cha mfumo hakiwezi kulifikia. Tumia kidirisha cha kushiriki ili kuweka nakala mahali unapoweza kufikia, na ugusa Hifadhi tena kama ulikifunga.",
+    "savedFileWritten": "Limehifadhiwa ndani ya Myne. Kifaa hiki hakikuripoti mahali ambapo faili linaweza kufikiwa, hivyo lichukulie kama linalofikika kutoka ndani ya programu pekee hadi utakapokagua.",
     "saveFileError": "Imeshindwa kuhifadhi faili.",
     "stepLabel": "Unda kasha · {{current}} kati ya {{total}}",
     "briefingTitle": "Kabla hatujaanza",
