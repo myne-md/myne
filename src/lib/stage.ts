@@ -100,7 +100,7 @@ export type RecoverSubStep =
  * - `"vault-meta-changed-externally"` — backend returned `VaultMetaChangedExternally`
  *   (CAS mismatch — another instance committed a competing rewrite).
  *   Banner copy LITERAL (`decisions.md` 2026-05-06):
- *   `"Vault was modified in another session — please unlock again."` Red severity.
+ *   `"Vault was modified in another session. Please unlock again."` Red severity.
  * - `"vault-locked-during-change"` — backend returned `VaultLockedDuringChange`
  *   (user fired vault_lock during the Argon2id window; informational).
  *   Banner copy LITERAL: `"Password change cancelled: vault was locked."`

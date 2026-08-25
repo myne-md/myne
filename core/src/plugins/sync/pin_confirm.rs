@@ -88,6 +88,15 @@ pub fn normalize_fingerprint(input: &str) -> Option<String> {
         .strip_prefix("sha256:")
         .or_else(|| trimmed.strip_prefix("SHA256:"))
         .unwrap_or(trimmed);
+    // Take everything after the last `=`, so the output of the exact command
+    // the help text hands the operator can be pasted whole. `openssl x509
+    // -noout -fingerprint -sha256` prints `sha256 Fingerprint=6F:60:…` — a
+    // space, not the colon the two prefixes above strip — so the walk below hit
+    // the `s` of `sha256`, returned `None`, and the screen answered "a SHA-256
+    // fingerprint is 64 characters, each one 0-9 or a-f" to someone who had
+    // pasted exactly that. The value is public either way, so there is nothing
+    // to leak by being lenient here; the length and alphabet checks still stand.
+    let body = body.rsplit_once('=').map_or(body, |(_, after)| after);
     let mut out = String::with_capacity(64);
     for ch in body.chars() {
         match ch {
@@ -257,6 +266,34 @@ mod tests {
     /// No test in this crate installs a gate, so the read-back is the default
     /// (Tor mode off) — which is what keeps every existing enrollment test
     /// passing unchanged.
+    /// The literal output of the command the help text gives the operator.
+    ///
+    /// Not a hypothetical format: this is what `openssl x509 -noout
+    /// -fingerprint -sha256` printed for `sync.myne.md` on 2026-08-23, and
+    /// before this it was rejected with a message telling the user their
+    /// 64-character fingerprint was not 64 characters. The mismatch is
+    /// invisible from either side alone — the help text is a translation
+    /// string and the normalizer is Rust — which is why it survived until a
+    /// certificate renewal made somebody actually use the flow.
+    #[test]
+    fn the_help_texts_own_openssl_output_pastes_whole() {
+        let openssl = "sha256 Fingerprint=6F:60:CF:85:E7:6B:D9:F5:35:AF:CA:E7:96:2A:B3:34:AA:B3:61:86:E0:08:CC:B0:9A:75:71:F8:81:07:7B:38";
+        assert_eq!(
+            normalize_fingerprint(openssl).as_deref(),
+            Some("6f60cf85e76bd9f535afcae7962ab334aab36186e008ccb09a7571f881077b38")
+        );
+        // Uppercase label too — the spelling varies across openssl versions.
+        assert_eq!(
+            normalize_fingerprint("SHA256 Fingerprint=6F:60:CF:85:E7:6B:D9:F5:35:AF:CA:E7:96:2A:B3:34:AA:B3:61:86:E0:08:CC:B0:9A:75:71:F8:81:07:7B:38")
+                .as_deref(),
+            Some("6f60cf85e76bd9f535afcae7962ab334aab36186e008ccb09a7571f881077b38")
+        );
+        // Leniency stops at the alphabet and the length: a label with no
+        // fingerprint behind it is still a rejection, not an empty pass.
+        assert_eq!(normalize_fingerprint("sha256 Fingerprint="), None);
+        assert_eq!(normalize_fingerprint("sha256 Fingerprint=zz"), None);
+    }
+
     #[test]
     fn confirmation_is_not_required_with_tor_mode_off() {
         assert!(!confirmation_required("sync.myne.md"));

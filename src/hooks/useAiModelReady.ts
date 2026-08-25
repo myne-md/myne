@@ -15,6 +15,8 @@
 
 import { useEffect, useState } from "react";
 
+import { listen } from "../platform/event";
+
 import {
   aiCapabilityReport,
   surfaceStateOf,
@@ -23,6 +25,12 @@ import {
 } from "../lib/ai-capability";
 
 const CHECKING: AiSurfaceState = { kind: "checking" };
+
+/** Backend event name, mirroring `AI_VECTORS_HYDRATED_EVENT` (Rust,
+ *  `src-tauri/src/plugins/local_inference/hydrate.rs`). Spelled here rather
+ *  than imported from `AiHydrationProbe`, which is a test-observability
+ *  component this hook must not depend on. */
+const AI_VECTORS_HYDRATED_EVENT = "ai://vectors-hydrated";
 
 /**
  * The state of one AI `feature`, or `checking` while the single host read is in
@@ -70,15 +78,27 @@ export function useAiRetrievalState(enabled: boolean): AiRetrievalState {
       return;
     }
     let cancelled = false;
-    void aiCapabilityReport().then((report) => {
-      if (cancelled) return;
-      setState({
-        embedding: surfaceStateOf(report, "embedding"),
-        indexReady: report.indexReady,
+    const read = () => {
+      void aiCapabilityReport().then((report) => {
+        if (cancelled) return;
+        setState({
+          embedding: surfaceStateOf(report, "embedding"),
+          indexReady: report.indexReady,
+        });
       });
-    });
+    };
+    read();
+    // **Read again when the walk finishes.** A mount-only read leaves the chip
+    // on "Preparing…" for the rest of the session: the embed-on-unlock walk is
+    // detached and can take minutes, and nothing remounts this tab when it
+    // lands, so the surface said "not yet" about a question it had stopped
+    // asking. The host already announces it for exactly this — the same event
+    // `AiHydrationProbe` subscribes to — so this is a subscription that was
+    // missing rather than a mechanism that had to be built.
+    const pending = listen(AI_VECTORS_HYDRATED_EVENT, () => read());
     return () => {
       cancelled = true;
+      void pending.then((unlisten) => unlisten());
     };
   }, [enabled]);
 

@@ -16,7 +16,7 @@
 //
 // Both files said, and the decision entry said, that the two halves are "held
 // together by the published `embed-layout` vectors". They are not, on any
-// machine. `.woodpecker.yml`'s `vector-verification` step is commented out in
+// machine. `.woodpecker/main.yml`'s `vector-verification` step is commented out in
 // full pending a `vectors_token` secret, `MYNE_VECTORS_REQUIRED` is set nowhere
 // outside that commented block, and both runners skip silently when the
 // companion repository is absent, which is the default in CI and in a fresh

@@ -219,9 +219,13 @@ export function EndpointConfig() {
         if (refusal !== null) {
           setConfirmNeeded(true);
           setMsg(
-            refusal === "PinConfirmationRequired"
-              ? t("sync.endpoint.confirmFingerprintRequired")
-              : t("sync.endpoint.confirmFingerprintMismatch"),
+            t(
+              refusal === "PinConfirmationRequired"
+                ? "sync.endpoint.confirmFingerprintRequired"
+                : refusal === "CertificateChanged"
+                  ? "sync.endpoint.certificateChanged"
+                  : "sync.endpoint.confirmFingerprintMismatch",
+            ),
           );
           return;
         }

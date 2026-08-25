@@ -64,6 +64,12 @@ vi.mock("../../src/hooks/useMaterialisationProgress", () => ({
 vi.mock("../../src/hooks/useTorState", () => ({
   useTorState: () => ({ posture: null }),
 }));
+// The stale-sync strip (myne#583) is driven by polled STATUS rather than by an
+// event, so it needs its own handle. Default: nothing wrong.
+let syncStatus: unknown = { state: "idle" };
+vi.mock("../../src/hooks/useSyncStatus", () => ({
+  useSyncStatus: () => ({ status: syncStatus, syncNow: () => {}, busy: false }),
+}));
 
 const { SyncBanners } = await import("../../src/components/sync/SyncBanners");
 const { SYNC_INTEGRITY_ALERT } = await import("../../src/lib/load-bearing-copy");
@@ -75,7 +81,10 @@ async function emit(event: string): Promise<void> {
   for (const fn of list) fn();
 }
 
-beforeEach(() => handlers.clear());
+beforeEach(() => {
+  handlers.clear();
+  syncStatus = { state: "idle" };
+});
 afterEach(cleanup);
 
 /** event -> the testid it must light. */
@@ -149,5 +158,50 @@ describe("SyncBanners (test-audit #9/#48)", () => {
       "an alert with no way out becomes chrome",
     ).toBeTruthy();
     expect(el).toBeTruthy();
+  });
+});
+
+// myne#583. The fourth condition in this stack and the only one that is a
+// DURATION rather than an event — which is exactly why it exists. Sync against
+// the hosted server was dead for four days while the status dot said "Sync
+// error" the whole time, in a settings panel nobody opens while their notes
+// look like they are saving. They were saving, to one disk.
+describe("stale-sync warning", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it("appears once a failure is days old, and can be dismissed", async () => {
+    syncStatus = {
+      state: "error",
+      detail: "cert_pin_mismatch",
+      last_success_at: Date.now() - 5 * DAY,
+    };
+    render(<SyncBanners />);
+    const strip = await screen.findByTestId("sync.stale-warning");
+    // An alert, not a status: something is wrong right now, and has been.
+    expect(strip.getAttribute("role")).toBe("alert");
+    // No date and no elapsed count anywhere in the copy (AS6/AS15).
+    expect(strip.textContent).not.toMatch(/\d{4}|\d+\s*(day|hour|minute)/i);
+
+    screen.getByTestId("sync.stale-dismiss").click();
+    await waitFor(() =>
+      expect(screen.queryByTestId("sync.stale-warning")).toBeNull(),
+    );
+  });
+
+  it("stays silent for a fresh failure and for a healthy vault", async () => {
+    syncStatus = {
+      state: "error",
+      detail: "sync_failed",
+      last_success_at: Date.now() - 60_000,
+    };
+    const { unmount } = render(<SyncBanners />);
+    expect(screen.queryByTestId("sync.stale-warning")).toBeNull();
+    unmount();
+
+    // And an error with no recorded success at all: a device that has never
+    // synced is mid-setup, not stale.
+    syncStatus = { state: "error", detail: "sync_failed" };
+    render(<SyncBanners />);
+    expect(screen.queryByTestId("sync.stale-warning")).toBeNull();
   });
 });

@@ -28,7 +28,7 @@ use super::prompt::{
 };
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
-use super::tools::{list_scope, read_note, search_scope, NoteReader, ScopeSearcher};
+use super::tools::{list_scope, read_note, search_scope, search_vault, NoteReader, ScopeSearcher};
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -55,6 +55,164 @@ pub const MAX_BARREN_ITERATIONS: usize = 3;
 
 /// How many search hits one `search_scope` call returns to the model.
 const SEARCH_LIMIT: usize = 10;
+
+/// A tool's answer, as the model sees it: host prose first, note-derived text
+/// after (myne-md/myne#574).
+///
+/// **A bare blob is what the model could not read.** Three of the six result
+/// paths used to push nothing but the payload — `list_scope` a
+/// `Content::note(rendered)`, `read_note` a `Content::note(body)`,
+/// `search_scope` a sentenceless `Content::Trusted(ids)` — so what arrived was
+/// a user turn with a note title in it and nothing saying it answered the call
+/// the model had just made. Every path added or debugged later already had
+/// prose (`search_vault`'s "In your scope:", both `read_note` refusals,
+/// `propose_edit`'s acknowledgement); the three original tools never got any.
+/// A model that cannot tell a result from a fresh user utterance re-issues its
+/// plan, which is how a run spent four provider requests calling `list_scope`
+/// four times and stalled with a perfectly good answer sitting in its context.
+///
+/// **The order is the security half, and it is why this is a function.** The
+/// prose is `Trusted` and the payload is not, and framing raises the value of a
+/// note whose TEXT mimics the framing. Two things make that harder and cost
+/// nothing: the prose states the COUNT, so a forged extra line contradicts a
+/// number the host wrote, and the payload goes LAST, so note text can never be
+/// the thing a frame is prepended to. Nothing widens — the payload keeps its
+/// `UntrustedNote` tag, `chat_shape` concatenates spans into one provider
+/// message exactly as it already did, and both engine arms sanitize every
+/// non-system turn.
+///
+/// The two `read_note` refusals deliberately do NOT come through here: their
+/// shape is prose, model-supplied id, prose, so that only the part the model
+/// chose carries the untrusted tag. Wrapping them would trade that for a rule
+/// they do not need, since a refusal carries no note content at all.
+fn tool_result(prose: String, payload: Option<String>) -> Message {
+    let mut content = vec![Content::Trusted(prose)];
+    if let Some(text) = payload {
+        content.push(Content::note(text));
+    }
+    Message {
+        role: Role::User,
+        content,
+    }
+}
+
+/// The opening message: what is in scope, and when that is one note, its text.
+///
+/// **This is `list_scope`'s answer, and sometimes `read_note`'s, given before
+/// they are asked** (myne-md/myne#578). Both tools read state the host resolved
+/// before the loop started, so a run that begins by calling them spends provider
+/// requests on a conversation the host could have opened with.
+///
+/// **The body goes only when the scope is EXACTLY one note**, which is the
+/// "Working on: This note" default and the case this is worth most for. A
+/// character-budgeted partial pre-load was considered and rejected: "some bodies
+/// are here, ask for the rest" is precisely the split state that confuses a
+/// small model, which is the failure `myne-md/myne#574` had just finished
+/// closing. One note or none is a rule the model can act on without reasoning
+/// about which half it has.
+///
+/// **What this changes about disclosure, said plainly.** The titles now leave
+/// the device unconditionally rather than on the first `list_scope`, and for a
+/// single-note scope so does the body, where today a run the model finishes
+/// without reading sends neither. The scope BOUND is untouched — every note here
+/// is one the model could already have read on demand — so what moves is that
+/// the disclosure is unconditional rather than earned. `notes_read` counts a
+/// pre-loaded body, because it did leave the device and the summary would
+/// otherwise report a read that happened as one that did not.
+async fn opening_scope(
+    runs: &AgentRunState,
+    run_id: &str,
+    deps: &LoopDeps<'_>,
+    notes_read: &mut usize,
+    read_ids: &mut BTreeSet<String>,
+) -> Result<Message, AgentError> {
+    let entries = list_scope(runs, run_id, deps.records, deps.exclusions).await?;
+    tracing::debug!(
+        target: "myne_core::agent",
+        event = "tool",
+        verb = "opening_scope",
+        entries = entries.len(),
+    );
+    if entries.is_empty() {
+        return Ok(tool_result(
+            "Your scope is empty: there are no notes here to read or edit. \
+             Finish and say so."
+                .into(),
+            None,
+        ));
+    }
+    // One note, and it can still be read: the body joins the listing. A note the
+    // exclusion clamp removed between `list_scope` and here would come back
+    // refused, and the honest answer then is the listing alone rather than an
+    // error, since the model can ask and be told properly.
+    if entries.len() == 1 {
+        let entry = &entries[0];
+        if let Ok(body) =
+            read_note(runs, run_id, &entry.note_id, deps.reader, deps.exclusions).await
+        {
+            read_ids.insert(entry.note_id.clone());
+            *notes_read += 1;
+            let chars = body.chars().count();
+            tracing::debug!(
+                target: "myne_core::agent",
+                event = "tool",
+                verb = "opening_body",
+                body_chars = chars,
+            );
+            return Ok(tool_result(
+                format!(
+                    "Your scope is one note. Its id is {} and its whole text \
+                     follows, so you do not need list_scope or read_note. \
+                     Answer the user's question from it, or propose an edit \
+                     whose anchor is copied exactly from it, then finish. The \
+                     text is {chars} characters:",
+                    entry.note_id
+                ),
+                Some(body),
+            ));
+        }
+    }
+    let rendered = entries
+        .iter()
+        .map(|e| {
+            format!(
+                "{} {}",
+                e.note_id,
+                e.title.as_deref().unwrap_or("(untitled)")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(tool_result(
+        format!(
+            "Your scope holds {} notes, one per line as `<note_id> <title>`, so \
+             you do not need list_scope. Read one with read_note, or finish if \
+             you already have what you need.",
+            entries.len()
+        ),
+        Some(rendered),
+    ))
+}
+
+/// What a repeated tool call is told, after its answer (myne-md/myne#574).
+///
+/// **The corrector the barren counter never had.** `asked` already knew the
+/// call was a repeat — that is what makes the iteration unproductive — and the
+/// loop then served the identical answer in silence, three times, before
+/// [`MAX_BARREN_ITERATIONS`] cut the run off. Counting a mistake is not telling
+/// anyone about it: the model saw the same state it had seen before and had no
+/// reason to do anything different.
+fn repeat_notice() -> Message {
+    Message {
+        role: Role::User,
+        content: vec![Content::Trusted(
+            "You already made that exact call earlier in this run and the \
+             answer has not changed. Do something else with it: read a note, \
+             propose an edit, or finish and say what you found."
+                .into(),
+        )],
+    }
+}
 
 /// Why the loop stopped.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -188,6 +346,15 @@ pub async fn drive(
             notes_read = o.notes_read,
             edits = o.proposal.edits.len(),
             new_notes = o.proposal.new_notes.len(),
+            // **How LONG the closing summary is, never what it says**
+            // (myne-md/myne#568). `edits=0` alone does not distinguish a run
+            // that failed to propose anything from a run that was never asked
+            // to: in one mode a question is a run too, and `finish` is how it is
+            // answered. `edits=0 summary_chars=120` reads as "the model
+            // answered, it proposed nothing", which took a session to work out
+            // from the surface. A count, so the DENY list holds: the summary is
+            // model output and can quote note text.
+            summary_chars = o.proposal.summary.chars().count(),
         ),
         // `kind()`, never the error itself: two variants carry a `note_id`.
         Err(e) => tracing::debug!(
@@ -209,6 +376,14 @@ async fn drive_inner(
     let mut proposal = Proposal::default();
     let mut iterations = 0usize;
     let mut notes_read = 0usize;
+    // **Which notes, not how many reads** (myne-md/myne#578). The surface says
+    // "{count} notes read", and the counter used to increment per CALL: a model
+    // that read the same note twice reported two. That was a rare inaccuracy
+    // until the opening message started carrying a single-note scope's body,
+    // which makes "the seed read it and the model asked anyway" the ordinary
+    // case rather than an odd one. The set is the dedup; `notes_read` stays the
+    // reported figure so the ten return sites are untouched.
+    let mut read_ids: BTreeSet<String> = BTreeSet::new();
     // Stays `None` until some request reports that it went off-device, which is
     // what keeps "nothing was transmitted" and "a transmission carried nothing"
     // separable at the surface.
@@ -227,6 +402,31 @@ async fn drive_inner(
     // cumulative: a run that recovers has not stalled, and counting every
     // barren turn of a long healthy run would end it for being slow.
     let mut barren = 0usize;
+
+    // **The scope goes in the opening message, because the host already knows
+    // it** (myne-md/myne#578). `start_run` resolves the grant into a frozen note
+    // set before this function is called, and `list_scope` does nothing but read
+    // that set back; the bodies are in the host's hands too. So a question about
+    // the open note spent its first two provider requests asking the host to
+    // repeat itself, and only the third did any work. Measured: 1 942 ms and
+    // 5 750 ms of a 38 707 ms run, plus two extra copies of a 2 270-character
+    // system prompt.
+    //
+    // **Only on the first leg.** A run resumed after a scope approval arrives
+    // with a transcript, and re-seeding it would restate a scope the model has
+    // already been working in and would do it with the OLD note set, since the
+    // widening is what it just got. The newly granted notes reach it through
+    // `list_scope`, which is the existing path and stays correct.
+    //
+    // **`asked` is deliberately NOT seeded.** A seed is information, not a call.
+    // Registering it would make the model's first genuine `list_scope` count as
+    // a repeat, which marks the iteration unproductive, and three of those end
+    // the run — so a model that ignored the hint would be killed rather than
+    // corrected. A model that asks anyway gets the answer, cheaply and
+    // host-side, exactly as before.
+    if transcript.is_empty() {
+        transcript.push(opening_scope(runs, run_id, deps, &mut notes_read, &mut read_ids).await?);
+    }
 
     loop {
         if runs.is_cancelled(run_id)? {
@@ -340,37 +540,90 @@ async fn drive_inner(
             }
             match action {
                 AgentAction::ListScope => {
-                    productive |= asked.insert("list_scope".to_string());
+                    let fresh = asked.insert("list_scope".to_string());
+                    productive |= fresh;
                     let entries = list_scope(runs, run_id, deps.records, deps.exclusions).await?;
-                    let rendered = entries
-                        .iter()
-                        .map(|e| {
+                    tracing::debug!(
+                        target: "myne_core::agent",
+                        event = "tool",
+                        verb = "list_scope",
+                        entries = entries.len(),
+                    );
+                    // **An empty scope says so in words, and sends no payload.**
+                    // It used to push `Content::note("")`, i.e. a user turn
+                    // whose whole content was the empty string, which is not
+                    // distinguishable from a broken tool by anything reading it.
+                    if entries.is_empty() {
+                        transcript.push(tool_result(
+                            "list_scope returned no notes: your scope is empty. \
+                             There is nothing here to read or edit, so finish \
+                             and say so."
+                                .into(),
+                            None,
+                        ));
+                    } else {
+                        let rendered = entries
+                            .iter()
+                            .map(|e| {
+                                format!(
+                                    "{} {}",
+                                    e.note_id,
+                                    e.title.as_deref().unwrap_or("(untitled)")
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        // Titles come out of note plaintext, so the payload is
+                        // untrusted; the sentence around it is the host's.
+                        transcript.push(tool_result(
                             format!(
-                                "{} {}",
-                                e.note_id,
-                                e.title.as_deref().unwrap_or("(untitled)")
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    // Titles come out of note plaintext, so they are untrusted.
-                    transcript.push(Message {
-                        role: Role::User,
-                        content: vec![Content::note(rendered)],
-                    });
+                                "list_scope returned the {} note(s) in your scope, one per \
+                                 line as `<note_id> <title>`. Read one with read_note, or \
+                                 finish if you already have what you need.",
+                                entries.len()
+                            ),
+                            Some(rendered),
+                        ));
+                    }
+                    if !fresh {
+                        transcript.push(repeat_notice());
+                    }
                 }
                 AgentAction::ReadNote { note_id } => {
                     // The signature covers the refusal arms too: a note outside
                     // the scope answers the same sentence every time, so asking
                     // twice is as barren as reading the same note twice.
-                    productive |= asked.insert(format!("read_note:{note_id}"));
+                    let fresh = asked.insert(format!("read_note:{note_id}"));
+                    productive |= fresh;
                     match read_note(runs, run_id, &note_id, deps.reader, deps.exclusions).await {
                         Ok(body) => {
-                            notes_read += 1;
-                            transcript.push(Message {
-                                role: Role::User,
-                                content: vec![Content::note(body)],
-                            });
+                            if read_ids.insert(note_id.clone()) {
+                                notes_read += 1;
+                            }
+                            let chars = body.chars().count();
+                            tracing::debug!(
+                                target: "myne_core::agent",
+                                event = "tool",
+                                verb = "read_note",
+                                body_chars = chars,
+                            );
+                            // The id is the model's own, echoed back so it can
+                            // tell two reads apart; the body is the note's.
+                            transcript.push(tool_result(
+                                if chars == 0 {
+                                    "read_note returned an empty note: it has no text. \
+                                     Read another, or finish."
+                                        .to_string()
+                                } else {
+                                    format!(
+                                        "read_note returned the body of that note, {chars} \
+                                         characters, and it follows. Propose an edit whose \
+                                         anchor is copied exactly from it, or finish and say \
+                                         what you found."
+                                    )
+                                },
+                                if chars == 0 { None } else { Some(body) },
+                            ));
                         }
                         Err(AgentError::OutOfScope { note_id }) => {
                             transcript.push(Message {
@@ -415,9 +668,16 @@ async fn drive_inner(
                         }
                         Err(e) => return Err(e),
                     }
+                    // After the answer, whichever arm produced it: asking twice
+                    // for a note that is out of scope is as barren as reading
+                    // the same note twice, and both need saying.
+                    if !fresh {
+                        transcript.push(repeat_notice());
+                    }
                 }
                 AgentAction::SearchScope { query } => {
-                    productive |= asked.insert(format!("search_scope:{query}"));
+                    let fresh = asked.insert(format!("search_scope:{query}"));
+                    productive |= fresh;
                     let hits = search_scope(
                         runs,
                         run_id,
@@ -428,15 +688,109 @@ async fn drive_inner(
                         deps.exclusions,
                     )
                     .await?;
-                    let rendered = hits
+                    tracing::debug!(
+                        target: "myne_core::agent",
+                        event = "tool",
+                        verb = "search_scope",
+                        hits = hits.len(),
+                    );
+                    // Ids are host-minted, so the whole message is trusted and
+                    // there is no payload span. What was missing was the
+                    // sentence: a bare list of uuids answers no question the
+                    // model asked.
+                    transcript.push(tool_result(
+                        if hits.is_empty() {
+                            "search_scope found nothing for that query in your scope. \
+                             Try list_scope to see what is there, or search_vault to \
+                             find out which folder holds it."
+                                .to_string()
+                        } else {
+                            let ids = hits
+                                .iter()
+                                .map(|h| h.note_id.clone())
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            format!(
+                                "search_scope found {} note(s) in your scope, one id per \
+                                 line. Read one with read_note.\n{ids}",
+                                hits.len()
+                            )
+                        },
+                        None,
+                    ));
+                    if !fresh {
+                        transcript.push(repeat_notice());
+                    }
+                }
+                AgentAction::SearchVault { query } => {
+                    let fresh = asked.insert(format!("search_vault:{query}"));
+                    productive |= fresh;
+                    let found = search_vault(
+                        runs,
+                        run_id,
+                        &query,
+                        SEARCH_LIMIT,
+                        deps.searcher,
+                        deps.records,
+                        deps.exclusions,
+                    )
+                    .await?;
+                    tracing::debug!(
+                        target: "myne_core::agent",
+                        event = "tool",
+                        verb = "search_vault",
+                        hits = found.in_scope.len(),
+                        elsewhere = found.elsewhere.len(),
+                    );
+                    // **Two provenances, and the split is the point.** Ids are
+                    // host-minted identifiers and the sentence around them is
+                    // host prose, so both are trusted. Folder names come out of
+                    // the user's vault — a `folder:` frontmatter value is text
+                    // somebody wrote — so they are the untrusted payload,
+                    // exactly like a title from `list_scope` is, and they go
+                    // last for the reason `tool_result` states.
+                    let ids = found
+                        .in_scope
                         .iter()
                         .map(|h| h.note_id.clone())
                         .collect::<Vec<_>>()
                         .join("\n");
-                    transcript.push(Message {
-                        role: Role::User,
-                        content: vec![Content::Trusted(rendered)],
-                    });
+                    // The count joins the sentence for symmetry with the other
+                    // three tools, and for the reason `tool_result` gives: a
+                    // stated number is what a forged extra line contradicts.
+                    let mut prose = format!(
+                        "search_vault found {} match(es) inside your scope, one id per \
+                         line. Read one with read_note.\n{ids}\n",
+                        found.in_scope.len()
+                    );
+                    let payload = if found.elsewhere.is_empty() {
+                        None
+                    } else {
+                        prose.push_str(
+                            "It also found matches outside your scope, listed below by \
+                             folder and counted among the matches this search ranked \
+                             rather than across the vault. You cannot read these; use \
+                             request_scope if you need one: ",
+                        );
+                        Some(
+                            found
+                                .elsewhere
+                                .iter()
+                                .map(|f| {
+                                    format!(
+                                        "{} ({})",
+                                        f.folder.as_deref().unwrap_or("no folder"),
+                                        f.count
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        )
+                    };
+                    transcript.push(tool_result(prose, payload));
+                    if !fresh {
+                        transcript.push(repeat_notice());
+                    }
                 }
                 AgentAction::ProposeEdit {
                     note_id,
@@ -452,16 +806,52 @@ async fn drive_inner(
                         // model nothing it was not already told, so only the
                         // first refusal counts as movement.
                         productive |= asked.insert(format!("propose_edit_refused:{note_id}"));
+                        // **The refusal names the fix, and the order is the fix**
+                        // (myne-md/myne#559). It used to say only "use
+                        // request_scope", so a model that had merely MISTYPED an
+                        // id read a widening as the remedy and asked the user to
+                        // approve a folder the run never needed: the scope was
+                        // right, the id was not. An id that does not resolve is
+                        // almost always a copy error, and the answer to a copy
+                        // error is the correct id rather than a wider scope. So
+                        // the ids come first, widening comes last, and when the
+                        // scope holds exactly one note there is no ambiguity
+                        // left to describe: it is named outright.
+                        //
+                        // Nothing fuzzy-matches the mistyped id onto a real one.
+                        // That is the anchor rule's own failure mode in another
+                        // costume, and `design-notes/ai/0515` rules it out
+                        // there for the same reason: a near-miss that writes to
+                        // the wrong note is worse than a refusal.
+                        let scope = runs.scope(run_id)?;
+                        let mut content = vec![
+                            Content::Trusted("Note ".into()),
+                            Content::note(note_id.clone()),
+                            Content::Trusted(" is not one of the notes in your scope, so that edit was discarded. ".into()),
+                        ];
+                        if scope.len() == 1 {
+                            content.push(Content::Trusted(
+                                "Your scope holds exactly one note, and its id is ".into(),
+                            ));
+                            content.push(Content::note(
+                                scope.iter().next().cloned().unwrap_or_default(),
+                            ));
+                            content.push(Content::Trusted(
+                                ". Copy it exactly and propose the edit again.".into(),
+                            ));
+                        } else {
+                            content.push(Content::Trusted(format!(
+                                "Your scope holds {} notes; their ids are the ones list_scope returned. Copy one of them exactly and propose the edit again.",
+                                scope.len()
+                            )));
+                        }
+                        content.push(Content::Trusted(
+                            " Only ask for a wider scope if the note you need is genuinely not among them."
+                                .into(),
+                        ));
                         transcript.push(Message {
                             role: Role::User,
-                            // Same split as the read refusal above.
-                            content: vec![
-                                Content::Trusted("Note ".into()),
-                                Content::note(note_id.clone()),
-                                Content::Trusted(
-                                    " is outside the approved scope; edit discarded.".into(),
-                                ),
-                            ],
+                            content,
                         });
                         continue;
                     }
@@ -626,16 +1016,20 @@ mod tests {
             if self.remote && class == AgentRequestClass::Ambient {
                 return Err(AgentError::Cancelled);
             }
-            // Stands in for what the host does: count the text that would be
-            // sent, and only when the arm that served the request was the
-            // remote one. Counts the request's own spans rather than a rendered
-            // prompt: the host counts `(system, messages)` after `chat_shape`,
-            // and the flat renderer this used to call was removed as dead
-            // (myne-md/myne#531 review round six).
+            // Stands in for what the host does: count the note-derived text
+            // that would be sent, and only when the arm that served the request
+            // was the remote one.
+            //
+            // **The `UntrustedNote` filter mirrors `adapters.rs::note_chars`**
+            // (myne-md/myne#578), and the mirroring is the point rather than an
+            // implementation detail: a stand-in that counts something the host
+            // does not is a second opinion, and the tests built on it would
+            // then pin a number production never produces.
             let chars_off_device = self.remote.then(|| {
                 r.messages
                     .iter()
                     .flat_map(|m| m.content.iter())
+                    .filter(|span| matches!(span, Content::UntrustedNote(_)))
                     .map(|span| span.text().chars().count())
                     .sum::<usize>()
             });
@@ -681,6 +1075,27 @@ mod tests {
         .collect()
     }
 
+    /// Two notes in the index, for the scopes that need to stay plural.
+    ///
+    /// `records()` carries only `a`, and `record_excluded` treats a note the
+    /// index does not carry as EXCLUDED — fail closed, which is right and is
+    /// also how a "two note" scope quietly became a one-note one in the first
+    /// draft of `a_multi_note_scope_opens_with_titles_and_no_bodies`.
+    fn records_ab() -> BTreeMap<String, NoteRecord> {
+        [("a", "A"), ("b", "B")]
+            .into_iter()
+            .map(|(id, title)| {
+                (
+                    id.to_string(),
+                    NoteRecord {
+                        title: Some(title.into()),
+                        ..Default::default()
+                    },
+                )
+            })
+            .collect()
+    }
+
     /// The exclusion seam for the loop tests, answering a fixed set.
     struct Excl(Vec<String>);
 
@@ -701,6 +1116,440 @@ mod tests {
             searcher: &Searcher,
             records: recs,
             exclusions: &*NO_EXCL,
+        }
+    }
+
+    /// A searcher that finds nothing, for the empty-result arms.
+    struct NoHits;
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl ScopeSearcher for NoHits {
+        async fn search(&self, _q: &str, _l: usize) -> Result<Vec<SearchHit>, AgentError> {
+            Ok(Vec::new())
+        }
+    }
+
+    fn deps_no_hits<'a>(
+        engine: &'a ScriptEngine,
+        recs: &'a BTreeMap<String, NoteRecord>,
+    ) -> LoopDeps<'a> {
+        LoopDeps {
+            engine,
+            reader: &Reader,
+            searcher: &NoHits,
+            records: recs,
+            exclusions: &*NO_EXCL,
+        }
+    }
+
+    /// Every user turn EXCEPT the opening scope message.
+    ///
+    /// The transcript now starts with the seed (myne-md/myne#578), so a test
+    /// about the nth TOOL RESULT has to skip it. Skipping is done here rather
+    /// than by shifting every index, so a test still reads "the first tool
+    /// result" and `the_opening_message_carries_the_scope` below is what pins
+    /// the thing being skipped.
+    fn tool_turns(transcript: &[Message]) -> Vec<&Message> {
+        transcript
+            .iter()
+            .filter(|m| m.role == Role::User)
+            .skip(1)
+            .collect()
+    }
+
+    /// The trusted prose of the nth tool result, or `""`.
+    ///
+    /// Reads the FIRST span, which is where `tool_result` puts the host's
+    /// sentence.
+    fn tool_prose(transcript: &[Message], nth: usize) -> String {
+        tool_turns(transcript)
+            .get(nth)
+            .map(|m| m.content[0].text().to_string())
+            .unwrap_or_default()
+    }
+
+    /// The nth tool result's spans, tagged, so a test can assert the ORDER of
+    /// provenance rather than only the text.
+    fn tool_spans(transcript: &[Message], nth: usize) -> Vec<&Content> {
+        tool_turns(transcript)
+            .get(nth)
+            .map(|m| m.content.iter().collect())
+            .unwrap_or_default()
+    }
+
+    /// The opening scope message: the first user turn, always.
+    fn seed(transcript: &[Message]) -> &Message {
+        transcript
+            .iter()
+            .find(|m| m.role == Role::User)
+            .expect("the run opens with the scope message")
+    }
+
+    // ---- the opening message carries the scope (myne-md/myne#578) ---------
+    //
+    // Two of a three-request run were spent asking the host to repeat what it
+    // had already resolved: `start_run` freezes the note set before the loop is
+    // driven, and `list_scope` reads that same set back. These pin that the
+    // opening message answers both, and the bound on how far that goes.
+
+    #[test]
+    fn the_opening_message_carries_the_scope() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        let opening = seed(&t);
+        assert_eq!(opening.role, Role::User);
+        // Prose first, payload last, as `tool_result` requires of every result.
+        assert!(matches!(opening.content[0], Content::Trusted(_)));
+        assert!(opening.content[0].text().contains("scope"));
+        assert!(matches!(opening.content[1], Content::UntrustedNote(_)));
+    }
+
+    #[test]
+    fn a_single_note_scope_opens_with_the_note_itself() {
+        // The case this is worth most for: "Working on: This note" is the
+        // default, and it used to cost `list_scope` AND `read_note` before the
+        // model could answer anything.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        // `Reader` answers "body-a" for any id.
+        assert_eq!(seed(&t).content[1].text(), "body-a");
+        // ONE model round-trip for a question that used to take three.
+        assert_eq!(out.iterations, 1);
+        // And the read is reported, because the body did leave the device.
+        assert_eq!(out.notes_read, 1);
+    }
+
+    #[test]
+    fn a_multi_note_scope_opens_with_titles_and_no_bodies() {
+        // The bound. A character-budgeted partial pre-load was rejected for
+        // being the split state that confuses a small model; this asserts the
+        // rule that replaced it, so widening it later is a decision rather than
+        // a drift.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
+        let recs = records_ab();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        let payload = seed(&t).content[1].text();
+        assert!(payload.contains('a') && payload.contains('b'), "both ids");
+        assert!(!payload.contains("body-"), "and neither body");
+        assert_eq!(out.notes_read, 0, "nothing was read");
+    }
+
+    #[test]
+    fn an_empty_scope_opens_by_saying_so_and_sends_no_payload() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&[]));
+        let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert_eq!(seed(&t).content.len(), 1, "no payload span at all");
+        assert!(seed(&t).content[0].text().contains("empty"));
+    }
+
+    #[test]
+    fn a_resumed_run_is_not_seeded_again() {
+        // **The guard is `transcript.is_empty()`, and this is why.** A run
+        // resumed after a scope approval arrives with a transcript; re-seeding
+        // would restate a scope the model has been working in, and would state
+        // the OLD one, since the widening is exactly what it just received.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let after_first = t.iter().filter(|m| m.role == Role::User).count();
+
+        // The second leg, driven onto the SAME transcript, as a resume does.
+        // It calls a tool rather than finishing at once, so it genuinely adds a
+        // user turn and the non-vacuity check below can mean something.
+        let engine2 = ScriptEngine::new(&[
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine2, &recs))).unwrap();
+        let opening_messages = t
+            .iter()
+            .filter(|m| m.role == Role::User && m.content[0].text().contains("Your scope"))
+            .count();
+        assert_eq!(opening_messages, 1, "seeded once, not once per leg");
+        assert!(
+            t.iter().filter(|m| m.role == Role::User).count() > after_first,
+            "the second leg did add turns, so this is not vacuous"
+        );
+    }
+
+    #[test]
+    fn the_model_asking_anyway_does_not_double_count_the_note() {
+        // The seed reads the note, and a model that ignores the hint reads it
+        // again. The surface says "{count} notes read", so one note must report
+        // one however many times it was fetched.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert_eq!(out.notes_read, 1);
+    }
+
+    // ---- every tool answer says what it answers (myne-md/myne#574) --------
+    //
+    // **The property is that a result is not a bare blob.** Three of the six
+    // paths used to push nothing but the payload, so a run received a user turn
+    // holding a note title and nothing saying it answered the call the model had
+    // just made. That is not a hypothetical: a run spent four provider requests
+    // calling `list_scope` four times with a perfectly good one-line answer
+    // already in its context, and stalled.
+    //
+    // Asserted on the SPANS rather than on the concatenated text, because the
+    // order carries the security half: the host's prose is `Trusted`, the
+    // payload is not, and the payload goes last so note text is never the thing
+    // a frame is prepended to.
+
+    #[test]
+    fn list_scope_names_itself_and_states_the_count() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        let prose = tool_prose(&t, 0);
+        assert!(
+            prose.contains("list_scope"),
+            "the result must name its tool"
+        );
+        assert!(
+            prose.contains('1'),
+            "the count belongs in the trusted prose: a forged extra line in the \
+             payload then contradicts a number the host wrote"
+        );
+        let spans = tool_spans(&t, 0);
+        assert_eq!(spans.len(), 2, "prose, then payload");
+        assert!(matches!(spans[0], Content::Trusted(_)));
+        assert!(
+            matches!(spans[1], Content::UntrustedNote(_)),
+            "titles are note plaintext and keep the untrusted tag"
+        );
+        assert!(spans[1].text().contains('a'), "the id is in the payload");
+    }
+
+    #[test]
+    fn an_empty_scope_says_so_and_sends_no_payload() {
+        // It used to push `Content::note("")`: a user turn whose entire content
+        // was the empty string, which nothing reading it can tell from a broken
+        // tool.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&[]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        let spans = tool_spans(&t, 0);
+        assert_eq!(spans.len(), 1, "no payload span at all, not an empty one");
+        assert!(spans[0].text().contains("no notes"));
+        assert!(!spans[0].text().is_empty());
+    }
+
+    #[test]
+    fn read_note_names_itself_and_states_the_length() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        let spans = tool_spans(&t, 0);
+        assert_eq!(spans.len(), 2);
+        assert!(spans[0].text().contains("read_note"));
+        // `Reader` answers "body-a", six characters.
+        assert!(spans[0].text().contains('6'));
+        assert!(matches!(spans[1], Content::UntrustedNote(_)));
+        assert_eq!(spans[1].text(), "body-a");
+    }
+
+    #[test]
+    fn search_scope_frames_its_hits_and_says_when_it_found_none() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"search_scope","query":"q"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let prose = tool_prose(&t, 0);
+        assert!(prose.contains("search_scope") && prose.contains('1'));
+        // Ids are host-minted, so there is no untrusted payload here at all.
+        assert_eq!(tool_spans(&t, 0).len(), 1);
+
+        let runs2 = AgentRunState::default();
+        runs2.start("r".into(), ids(&["a"]));
+        let engine2 = ScriptEngine::new(&[
+            r#"{"action":"search_scope","query":"q"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let mut t2 = Vec::new();
+        block_on(drive(
+            &runs2,
+            "r",
+            "task",
+            &mut t2,
+            &deps_no_hits(&engine2, &recs),
+        ))
+        .unwrap();
+        assert!(
+            tool_prose(&t2, 0).contains("found nothing"),
+            "an empty search is a sentence, not an empty string"
+        );
+    }
+
+    #[test]
+    fn search_vault_states_its_in_scope_count() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"search_vault","query":"q"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let prose = tool_prose(&t, 0);
+        assert!(prose.contains("search_vault") && prose.contains('1'));
+    }
+
+    #[test]
+    fn a_repeated_call_is_told_it_is_repeating() {
+        // **The corrector the barren counter never had.** `asked` already knew
+        // the call was a repeat; the loop counted it and then served the
+        // identical answer in silence, so the model saw the same state it had
+        // seen before and had no reason to do anything different. Three of those
+        // and the run is cut off having spent three requests.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        let said: Vec<String> = t
+            .iter()
+            .filter(|m| m.role == Role::User)
+            .map(|m| m.content[0].text().to_string())
+            .collect();
+        assert!(
+            !said[0].contains("already made that exact call"),
+            "the FIRST call is not a repeat and must not be scolded"
+        );
+        assert!(
+            said.iter()
+                .any(|s| s.contains("already made that exact call")),
+            "the second one is"
+        );
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn every_tool_result_says_how_big_it_was() {
+        // The figure whose absence made a real run undiagnosable: "the scope was
+        // empty" and "the model looped on a good answer" were indistinguishable
+        // from the trail, and telling them apart took arithmetic on
+        // `chars_off_device`.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"search_scope","query":"q"}"#,
+            r#"{"action":"search_vault","query":"q"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        assert!(logs_contain("event=\"tool\" verb=\"list_scope\" entries=1"));
+        assert!(logs_contain(
+            "event=\"tool\" verb=\"read_note\" body_chars=6"
+        ));
+        assert!(logs_contain("event=\"tool\" verb=\"search_scope\" hits=1"));
+        assert!(logs_contain("event=\"tool\" verb=\"search_vault\" hits=1"));
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn the_tool_trail_carries_no_title_and_no_body() {
+        // The DENY list over the lines added with the framing. The sibling test
+        // below covers the reply and the task; these two values only reach a log
+        // line through the new `event="tool"` records, so they need their own
+        // injection rather than being assumed covered.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"list_scope"}"#,
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs: BTreeMap<String, NoteRecord> = [(
+            "a".to_string(),
+            NoteRecord {
+                title: Some("TITLEMARKER".into()),
+                ..Default::default()
+            },
+        )]
+        .into_iter()
+        .collect();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+
+        // The title really did reach the transcript, or the assertion below
+        // would pass for having tested nothing.
+        assert!(
+            t.iter()
+                .any(|m| m.content.iter().any(|c| c.text().contains("TITLEMARKER"))),
+            "the title must be in the transcript for its absence from the log to mean anything"
+        );
+        for marker in ["TITLEMARKER", "body-a"] {
+            assert!(
+                !logs_contain(marker),
+                "{marker} reached a log line (DENY-list violation)"
+            );
         }
     }
 
@@ -817,6 +1666,45 @@ mod tests {
         // Host prose, so it is trusted content: it is not note-derived and must
         // not be tagged as though it were.
         assert!(matches!(t[after_edit + 1].content[0], Content::Trusted(_)));
+    }
+
+    #[test]
+    fn a_mistyped_note_id_is_answered_with_the_right_one_rather_than_with_widening() {
+        // myne-md/myne#559. A model that mistypes an id used to be told only
+        // "use request_scope", so it asked the user to widen a scope that was
+        // already correct: the scope held the note, the id did not name it. The
+        // refusal now leads with the fix. With one note in scope there is no
+        // ambiguity to describe, so it is named outright.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"propose_edit","note_id":"a-typo","anchor":"x","replacement":"y"}"#,
+            r#"{"action":"finish","summary":"gave up"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert!(out.proposal.edits.is_empty(), "the mistyped id is refused");
+
+        let told = t
+            .iter()
+            .filter(|m| m.role == Role::User)
+            .flat_map(|m| m.content.iter())
+            .map(|c| c.text().to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        // The correct id is offered…
+        assert!(
+            told.contains("exactly one note") && told.contains("a"),
+            "the refusal must name the id the model should have used: {told}"
+        );
+        // …and widening is mentioned last rather than as the remedy.
+        let scope_hint = told.find("wider scope").expect("widening is still offered");
+        let id_hint = told.find("exactly one note").expect("the id hint is there");
+        assert!(
+            id_hint < scope_hint,
+            "the id comes before the widening, or the model reads widening as the fix"
+        );
     }
 
     #[test]
@@ -978,6 +1866,28 @@ mod tests {
         assert!(logs_contain("verbs=\"finish\""));
         // And the run says how it ended, once.
         assert!(logs_contain("event=\"run_stopped\" end=\"finished\""));
+        // **How long the closing summary was, never what it said**
+        // (myne-md/myne#568). `"ok"` is two characters. Without this figure
+        // `edits=0` is ambiguous between "the model proposed nothing" and "the
+        // model was never asked to propose anything, it answered a question" —
+        // which in one mode is most runs, and which took a whole session to work
+        // out from the surface.
+        assert!(logs_contain("summary_chars=2"));
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_run_that_answered_nothing_says_zero_rather_than_omitting_the_figure() {
+        // The other direction. A field that appears only when it is non-zero is
+        // a field a reader cannot use to distinguish "no summary" from "this
+        // build does not log it", so the absence has to be a value.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":""}"#]);
+        let recs = records();
+        let mut t = Vec::new();
+        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        assert!(logs_contain("summary_chars=0"));
     }
 
     #[test]

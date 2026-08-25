@@ -42,12 +42,10 @@ import {
 } from "../../hooks/useAiModelReady";
 import {
   clearChat,
-  stopChatTurn,
   useChat,
-  type ChatCitation,
+  type AgentTurnEnd,
   type ChatTurn,
 } from "../ai/chatStore";
-import { stopChat } from "../../lib/ai-chat";
 import { agentCancel } from "../../lib/agent-run";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
@@ -123,22 +121,14 @@ export interface AiChatTabProps {
   /** Explicit "Insert into note" action for a ready summary (task 5, SYNC-17).
    *  When absent, the insert affordance is not shown. */
   onInsert?: (text: string) => void;
-  /** Send a message to the conversational chat (conversational-ai-chat task 5).
-   *  When wired, the transcript composer replaces the single-shot ask input.
-   *  The real streaming invoke is wired by task 7. */
-  onSend?: (message: string) => void;
-  /** Stop an in-flight streaming generation (task 9). Shown as a "Stop" control
-   *  in the composer while `chat.streaming`. */
-  onStop?: () => void;
-  /** Navigate to a source note from a citation chip (task 8). */
-  onOpenNote?: (noteId: string, byteStart: number, byteEnd: number) => void;
-  /** Resolve a note id to its title for the citation chip label (task 8). When
-   *  absent, chips fall back to a short id prefix. */
-  titleOf?: (noteId: string) => string | null;
   /** The open note: the agent's default scope in the composer's Edit mode. */
   openNoteId?: string | null;
   /** Folders the user can attach as an agent scope. */
   folders?: readonly string[];
+  /** Called with the ids of notes an automatic apply wrote, so the open pane
+   *  re-reads them (myne-md/myne#551). The manual path reaches the same
+   *  callback through `AgentReviewTakeover`; this is the automatic one. */
+  onNotesWritten?: (noteIds: readonly string[]) => void;
   /** Called after an agent-run undo reverted notes on disk, with their ids. */
   onRunUndone?: (noteIds: readonly string[]) => void;
 }
@@ -149,47 +139,6 @@ const TURN_TEXT_STYLE: CSSProperties = { fontSize: "var(--text-sm)", lineHeight:
  *  composer a fresh array identity on every render. */
 const NO_FOLDERS: readonly string[] = [];
 
-/** One source-note citation chip under a grounded assistant turn. Clicking opens
- *  the source note (`onOpenNote`, task 8; disabled when absent). The label is the
- *  note title when resolvable (`titleOf`), else a short id prefix. */
-function CitationChip({
-  citation,
-  onOpenNote,
-  titleOf,
-}: {
-  citation: ChatCitation;
-  onOpenNote?: (noteId: string, byteStart: number, byteEnd: number) => void;
-  titleOf?: (noteId: string) => string | null;
-}) {
-  const title = titleOf?.(citation.noteId) ?? null;
-  const label = title !== null && title.length > 0 ? title : citation.noteId.slice(0, 8);
-  return (
-    <button
-      type="button"
-      data-testid="ai.citation"
-      data-note-id={citation.noteId}
-      title={label}
-      onClick={() => onOpenNote?.(citation.noteId, citation.byteStart, citation.byteEnd)}
-      disabled={onOpenNote === undefined}
-      style={{
-        fontSize: "var(--text-xs)",
-        color: "var(--fg-2)",
-        background: "var(--bg-1)",
-        border: "1px solid var(--line-1)",
-        borderRadius: "var(--radius-1)",
-        padding: "1px var(--space-1)",
-        cursor: onOpenNote ? "pointer" : "default",
-        maxWidth: 160,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-        fontFamily: title !== null ? "var(--font-sans)" : "var(--font-mono)",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
 
 /** The shared bubble every turn sits in. */
 const bubbleStyle = (isUser: boolean): CSSProperties => ({
@@ -200,6 +149,30 @@ const bubbleStyle = (isUser: boolean): CSSProperties => ({
   borderRadius: "var(--radius-1)",
   padding: "var(--space-1) var(--space-2)",
 });
+
+/** What a run that proposed nothing AND answered nothing says (myne-md/myne#574).
+ *
+ *  A total switch rather than a lookup table, for the reason the file's own note
+ *  above gives: `scripts/check-i18n.mjs` verifies **static** `t("…")` call
+ *  sites, so a key assembled from a variable is a key it cannot see.
+ *
+ *  Two of the five ends mean the run never did its work — it went round in
+ *  circles, or it ran out of steps — and those get a sentence that says so and
+ *  suggests the retry. The rest kept the old line: a `finished` run with an
+ *  empty proposal really did look and decide there was nothing to change, and a
+ *  `cancelled` one stopped because the user said so. `awaitingScope` never
+ *  reaches here, because `settleRunIntoChat` does not settle a turn on it. */
+function emptyRunLabel(end: AgentTurnEnd, t: TFn): string {
+  switch (end) {
+    case "stalled":
+    case "exhaustedIterations":
+      return t("editor.chrome.rightPanel.aiChat.agentTurn.noAnswer");
+    case "finished":
+    case "cancelled":
+    case "awaitingScope":
+      return t("agent.review.noChanges");
+  }
+}
 
 /** The speaker caption above a turn's body. */
 function TurnSpeaker({ isUser, t }: { isUser: boolean; t: TFn }) {
@@ -278,6 +251,20 @@ function AgentTurnView({
           {turn.text}
         </p>
       ) : null}
+      {/* **The model's own answer, above the counts** (myne-md/myne#568). In one
+          mode a question is a run like any other and `finish` is how it is
+          answered, so this is the reply the user asked for. It used to render
+          only inside the review dialog, which is how a question about a note
+          got answered inside a "Review changes" screen. Not `t()`-wrapped: it
+          is model output, not copy. */}
+      {s !== undefined && s.summary.trim().length > 0 ? (
+        <p
+          data-testid="ai.agent-answer"
+          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", margin: "var(--space-1) 0 0" }}
+        >
+          {s.summary}
+        </p>
+      ) : null}
       {s !== undefined ? (
         <div
           data-testid="ai.agent-summary"
@@ -285,7 +272,22 @@ function AgentTurnView({
         >
           <div>
             {s.edits === 0 && s.newNotes === 0
-              ? t("agent.review.noChanges")
+              ? // **Suppressed when the model answered.** "The agent proposed no
+                // changes" is the right line for an edit request that produced
+                // nothing, and exactly the wrong one under an answer the user
+                // asked for: it reads as a failure report on a reply that
+                // succeeded.
+                s.summary.trim().length > 0
+                ? null
+                : // **And the wrong one again when the run never got anywhere**
+                  // (myne-md/myne#574). A run that stalls or runs out of steps
+                  // proposed nothing AND answered nothing, so "the agent
+                  // proposed no changes" reports the less useful of the two
+                  // facts: it reads as a considered verdict on the note, when
+                  // what happened is that the run ended without doing its work.
+                  // The end line underneath says WHY; this says what the user
+                  // got, which is nothing, and what to do about it.
+                  emptyRunLabel(s.end, t)
               : [
                   s.edits > 0
                     ? t("editor.chrome.rightPanel.aiChat.agentTurn.proposed", {
@@ -333,14 +335,10 @@ function AgentTurnView({
  *  grows with the length of the conversation. */
 const ChatTurnView = memo(function ChatTurnView({
   turn,
-  onOpenNote,
-  titleOf,
   onInsert,
   t,
 }: {
   turn: ChatTurn;
-  onOpenNote?: (noteId: string, byteStart: number, byteEnd: number) => void;
-  titleOf?: (noteId: string) => string | null;
   onInsert?: (text: string) => void;
   t: TFn;
 }) {
@@ -423,30 +421,6 @@ const ChatTurnView = memo(function ChatTurnView({
           <AnsweredByIndicator answeredBy={turn.answeredBy} testId="ai.turn-answered-by" />
         </div>
       )}
-      {turn.citations.length > 0 && (
-        <div
-          data-testid="ai.citations"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "var(--space-1)",
-            marginTop: "var(--space-1)",
-          }}
-        >
-          <span style={CAPTION_STYLE}>
-            {t("editor.chrome.rightPanel.aiChat.citations")}
-          </span>
-          {turn.citations.map((c, i) => (
-            <CitationChip
-              key={`${c.noteId}-${c.byteStart}-${i}`}
-              citation={c}
-              onOpenNote={onOpenNote}
-              titleOf={titleOf}
-            />
-          ))}
-        </div>
-      )}
       {/* Per-turn "Insert into note" for a summary answer (task 10, SYNC-17). */}
       {turn.insertable && onInsert && !turn.streaming && turn.text.length > 0 && (
         <div style={{ marginTop: "var(--space-2)" }}>
@@ -466,12 +440,9 @@ const ChatTurnView = memo(function ChatTurnView({
 
 export function AiChatTab({
   onInsert,
-  onSend,
-  onStop,
-  onOpenNote,
-  titleOf,
   openNoteId = null,
   folders = NO_FOLDERS,
+  onNotesWritten,
   onRunUndone,
 }: AiChatTabProps = {}) {
   const { t } = useTranslation();
@@ -603,17 +574,12 @@ export function AiChatTab({
               data-testid="ai.new-chat"
               onClick={() => {
                 // **Stop what it is clearing, host side, before clearing it.**
-                // Forgetting a generation is not stopping one: the host keeps
-                // producing, on a remote provider it keeps spending the user's
-                // requests, and `clearChat()` resets `streaming` so the Stop
-                // control that would have ended it disappears. Same for a run:
-                // an abandoned one still settles later through
-                // `settleRunIntoChat`, which repopulates the store and pops the
-                // full-screen review of a conversation the user just deleted.
-                if (chat.streaming) {
-                  stopChatTurn();
-                  void stopChat();
-                }
+                // Forgetting a run is not stopping one: an abandoned one still
+                // settles later through `settleRunIntoChat`, which repopulates
+                // the store and pops the review of a conversation the user just
+                // deleted. The streaming half of this used to stop an Ask
+                // generation too; Ask is gone (myne-md/myne#552) and the only
+                // thing left to stop is the run.
                 // A run's first leg USED to have no id to cancel with:
                 // `beginRun()` nulls `view` and only a settled step set it, so
                 // for the whole of `agentStart` the run was working and
@@ -711,8 +677,6 @@ export function AiChatTab({
                 <ChatTurnView
                   key={turn.id}
                   turn={turn}
-                  onOpenNote={onOpenNote}
-                  titleOf={titleOf}
                   onInsert={onInsert}
                   t={t}
                 />
@@ -759,13 +723,11 @@ export function AiChatTab({
       {/* Shown whenever AI is on, and NOT gated on a side-loaded model, so it is
           reachable in the stub E2E build and in a no-model state (where a send
           surfaces the honest error turn). */}
-      {aiEnabled && onSend && (
+      {aiEnabled && (
         <ChatComposer
-          onSend={onSend}
-          onStop={onStop}
-          streaming={chat.streaming}
           openNoteId={openNoteId}
           folders={folders}
+          onNotesWritten={onNotesWritten}
         />
       )}
     </div>

@@ -12,7 +12,7 @@ struct NewNoteControl: ControlWidget {
                 Label("New note", systemImage: "plus")
             }
         }
-        .displayName("Myne — New note")
+        .displayName("Myne: New note")
         .description("Capture a quick note. It is encrypted the moment you save.")
     }
 }

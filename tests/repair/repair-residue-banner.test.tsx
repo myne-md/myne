@@ -92,7 +92,7 @@ describe("mount probe", () => {
     ).toBeDefined();
     expect(
       screen.getByText(
-        "3 leftover files from a previous deletion that didn't finish. They're already unreadable — you won't lose anything recoverable.",
+        "3 leftover files from a previous deletion that didn't finish. They're already unreadable. You won't lose anything recoverable.",
       ),
     ).toBeDefined();
   });
@@ -102,7 +102,7 @@ describe("mount probe", () => {
     render(<RepairResidueBanner />);
     expect(
       await screen.findByText(
-        "1 leftover file from a previous deletion that didn't finish. They're already unreadable — you won't lose anything recoverable.",
+        "1 leftover file from a previous deletion that didn't finish. They're already unreadable. You won't lose anything recoverable.",
       ),
     ).toBeDefined();
   });

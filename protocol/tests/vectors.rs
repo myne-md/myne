@@ -71,7 +71,7 @@ fn companion_vectors_root() -> PathBuf {
 /// is right for a contributor with no companion checked out and wrong for the
 /// one CI step whose entire job is to assert: there, `[skip]` on every runner
 /// reports green having verified nothing, which is the state the
-/// `vector-verification` step in `.woodpecker.yml` is commented out over.
+/// `vector-verification` step in `.woodpecker/main.yml` is commented out over.
 ///
 /// `MYNE_VECTORS_REQUIRED` inverts the default for that step alone. Unset —
 /// `pre-push`, a fresh clone, a contributor's laptop — keeps today's skip. Set

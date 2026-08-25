@@ -54,7 +54,7 @@ struct LockScreenWidget: Widget {
         StaticConfiguration(kind: "md.myne.widget.lock", provider: MyneProvider()) { _ in
             LockScreenView().widgetURL(URL(string: "myne://open"))
         }
-        .configurationDisplayName("Myne — locked")
+        .configurationDisplayName("Myne: locked")
         .description("A door on the Lock Screen. Tap to open and unlock.")
         .supportedFamilies([.accessoryInline, .accessoryCircular, .accessoryRectangular])
     }
@@ -83,7 +83,7 @@ struct StandByLockedWidget: Widget {
         StaticConfiguration(kind: "md.myne.widget.standby", provider: MyneProvider()) { _ in
             StandByLockedView().widgetURL(URL(string: "myne://open"))
         }
-        .configurationDisplayName("Myne — StandBy")
+        .configurationDisplayName("Myne: StandBy")
         .description("A locked glance for StandBy and the bedside table.")
         .supportedFamilies([.systemSmall])
     }

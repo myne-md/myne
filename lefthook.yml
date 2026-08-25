@@ -32,7 +32,7 @@ pre-commit:
       # phase3-web-client task 2: `src/platform/` is the only place under
       # `src/` allowed to import `@tauri-apps/*`. Without this the seam erodes
       # on the next feature and the web build silently regains a hard Tauri
-      # dependency. `.woodpecker.yml` runs the same script as the backstop so
+      # dependency. `.woodpecker/main.yml` runs the same script as the backstop so
       # `--no-verify` does not slip a violation past.
       #
       # Task 76 extended it to `editor/`, `dialect/` and `copy/` — the shared
@@ -247,7 +247,7 @@ pre-commit:
       # rewrite alone, mirrored narrowly in Rust. Both files and the decision
       # entry said the two halves were "held together by the published
       # embed-layout vectors" — and that vector step is commented out in
-      # .woodpecker.yml pending a vectors_token secret, MYNE_VECTORS_REQUIRED
+      # .woodpecker/main.yml pending a vectors_token secret, MYNE_VECTORS_REQUIRED
       # is set nowhere outside that comment, and both runners skip silently
       # when the companion repo is absent. So the stated lock ran on no
       # machine. This compares the one shared numeric bound, the same way
@@ -300,13 +300,57 @@ pre-commit:
       run: node scripts/check-e2e-menu-testids.mjs
 
     woodpecker-substitution:
-      # A single-dollar brace token anywhere in .woodpecker.yml — INCLUDING a
-      # comment — fails Woodpecker's envsubst pass and kills the whole pipeline
-      # on every branch before any step runs. This guard is here and not in CI
-      # because CI is what breaks: a check for "the CI config does not compile"
-      # can never fire from inside CI.
-      glob: ".woodpecker.yml"
+      # A single-dollar brace token anywhere in a Woodpecker workflow file,
+      # INCLUDING inside a comment, fails Woodpecker's envsubst pass and kills
+      # the whole pipeline on every branch before any step runs. This guard is here
+      # and not in CI because CI is what breaks: a check for "the CI config does
+      # not compile" can never fire from inside CI.
+      #
+      # The glob is the DIRECTORY since myne-md/myne#579 split the config into
+      # `main.yml` (per-push) and `e2e.yml` (manual, pre-release). `.woodpecker.yml`
+      # is listed too, and it earns its place: Woodpecker's lookup takes the
+      # DIRECTORY and ignores a root file, so resurrecting one produces dead
+      # config that changes nothing and reports nothing. Touching it fires this
+      # hook, and `scripts/lib/woodpecker-configs.mjs` then refuses outright
+      # rather than scanning around it. That roster is also what makes the guard
+      # fail BY NAME when a workflow file it expects has gone missing, instead of
+      # reporting ok on a smaller walk.
+      glob:
+        - ".woodpecker/*.yml"
+        - ".woodpecker/*.yaml"
+        - ".woodpecker.yml"
       run: node scripts/check-woodpecker-substitution.mjs
+
+    woodpecker-split:
+      # The two workflow files duplicate ONE thing by design: the desktop
+      # build's `--features` list. `main.yml`'s `tauri-compile` carries the stub
+      # features purely so those compile arms cannot bit-rot while the suite that
+      # consumes them runs only before a release, and that protection is real
+      # only while both lists agree. Four prose blocks asserted it and nothing
+      # checked it; this compares them in both directions and fails by name when
+      # either build line has been renamed away.
+      glob:
+        - ".woodpecker/*.yml"
+        - ".woodpecker/*.yaml"
+      run: node scripts/check-woodpecker-split.mjs
+
+    ci-image:
+      # `ci/Dockerfile` drifting from the versions the repo pins, or the digest
+      # in the workflows drifting from `ci/image.json`. Same family as
+      # `e2e-toolchain` below and `playwright-image` above, and the same silence:
+      # rustup honours `rust-toolchain.toml` at RUNTIME, so a stale image
+      # re-provisions the pinned toolchain inside whichever step makes the first
+      # cargo call rather than failing, and a stale digest reads as an
+      # infrastructure outage rather than as an edit somebody made.
+      glob:
+        - "ci/Dockerfile"
+        - "ci/image.json"
+        - ".woodpecker/*.yml"
+        - ".woodpecker/*.yaml"
+        - "rust-toolchain.toml"
+        - ".nvmrc"
+        - "package.json"
+      run: node scripts/check-ci-image.mjs
 
     e2e-toolchain:
       # e2e/Dockerfile drifting from rust-toolchain.toml. Nothing fails to build:
@@ -381,6 +425,18 @@ pre-commit:
       # Load-bearing copy renders from constants and is intentionally out of scope.
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n.mjs
+
+    i18n-coverage:
+      # The companion to i18n-catalog above, covering what that guard leaves out
+      # by design: it gates the ENGLISH source only, so translation coverage can
+      # fall for weeks with every gate green (myne-md/myne#589: the same 215
+      # keys missing from all 31 catalogs). Three hard checks (roster parity both
+      # ways, no partial plural group, placeholder parity) plus a generated
+      # record, docs/dev/i18n-coverage.md, that --check compares.
+      # Deliberately NOT globbed: the record is a docs/** file, so a hand edit to
+      # it is a docs-only commit any code glob would skip. Regenerate with
+      # `node scripts/check-i18n-coverage.mjs --emit`.
+      run: node scripts/check-i18n-coverage.mjs --check
 
     decisions-index:
       # design-notes.md is generated over design-notes/**. Without this, the first person to
@@ -554,7 +610,7 @@ pre-commit:
 
 pre-push:
   # Heavier checks — matches CLAUDE.md's "Common commands" baseline.
-  # Local pre-push net; Woodpecker CI (.woodpecker.yml) is the remote gate.
+  # Local pre-push net; Woodpecker CI (.woodpecker/) is the remote gate.
   parallel: false
   # A target directory of the hook's OWN, and the reason is a real failure that
   # cost four pushes: `cargo-test` went red twice in a row while the identical

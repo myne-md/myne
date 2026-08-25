@@ -25,6 +25,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "hello",
+      insertable: false,
     });
     expect(out.streaming).toBe(true);
     expect(out.turns).toHaveLength(2);
@@ -38,6 +39,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "hi",
+      insertable: false,
     });
     const t1 = chatReducer(sent, { type: "TOKEN", text: "he" });
     const t2 = chatReducer(t1, { type: "TOKEN", text: "llo" });
@@ -48,27 +50,36 @@ describe("chatReducer", () => {
   it("TOKEN is a no-op when the last turn is not a streaming assistant turn", () => {
     // Only a user turn present (no assistant) → ignored.
     const state: ChatState = {
-      turns: [{ id: "u1", role: "user", text: "x", streaming: false, error: false, citations: [] }],
+      turns: [
+        {
+          id: "u1",
+          kind: "text",
+          role: "user",
+          text: "x",
+          streaming: false,
+          error: false,
+          insertable: false,
+        },
+      ],
       streaming: false,
     };
     expect(chatReducer(state, { type: "TOKEN", text: "z" })).toBe(state);
   });
 
-  it("FINALIZE closes the assistant turn with citations and stops streaming", () => {
+  it("FINALIZE closes the assistant turn and stops streaming", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
       assistantId: "a1",
       text: "q",
+      insertable: false,
     });
     const streamed = chatReducer(sent, { type: "TOKEN", text: "answer" });
     const done = chatReducer(streamed, {
       type: "FINALIZE",
-      citations: [{ noteId: "n1", byteStart: 0, byteEnd: 5, score: 0.9 }],
     });
     expect(done.streaming).toBe(false);
     expect(done.turns[1]).toMatchObject({ text: "answer", streaming: false });
-    expect(done.turns[1].citations).toHaveLength(1);
   });
 
   it("FAIL marks the assistant turn errored and stops streaming", () => {
@@ -77,6 +88,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "q",
+      insertable: false,
     });
     const failed = chatReducer(sent, { type: "FAIL" });
     expect(failed.streaming).toBe(false);
@@ -89,6 +101,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "q",
+      insertable: false,
     });
     const partial = chatReducer(sent, { type: "TOKEN", text: "half an answ" });
     const stopped = chatReducer(partial, { type: "STOP" });
@@ -103,6 +116,7 @@ describe("chatReducer", () => {
       userId: "u1",
       assistantId: "a1",
       text: "q",
+      insertable: false,
     });
     expect(chatReducer(sent, { type: "CLEARED" })).toEqual(CHAT_INITIAL);
   });
@@ -113,14 +127,16 @@ describe("chat store helpers + run epoch", () => {
     const token = sendChatMessage("what color is the sky?");
     appendChatToken(token, "It is ");
     appendChatToken(token, "blue.");
-    finalizeChatTurn(token, [{ noteId: "n1", byteStart: 0, byteEnd: 3, score: 1 }]);
+    // Provenance, not citations: this parameter took the Ask flow's retrieval
+    // hits, and Ask is gone (myne-md/myne#552). Passed rather than dropped: an
+    // optional parameter no test ever supplies is one nothing exercises.
+    finalizeChatTurn(token, { kind: "in-process" });
 
     const state = getChat();
     expect(state.streaming).toBe(false);
     expect(state.turns).toHaveLength(2);
     expect(state.turns[0].text).toBe("what color is the sky?");
     expect(state.turns[1].text).toBe("It is blue.");
-    expect(state.turns[1].citations).toHaveLength(1);
   });
 
   it("a token from a stale (cleared) run is ignored — the lock-teardown guard", () => {
@@ -129,7 +145,7 @@ describe("chat store helpers + run epoch", () => {
     clearChat(); // lock teardown — bumps the epoch, wipes the transcript
     // A late token from the now-stale stream must NOT resurrect anything.
     appendChatToken(token, " more");
-    finalizeChatTurn(token, [{ noteId: "n1", byteStart: 0, byteEnd: 1, score: 1 }]);
+    finalizeChatTurn(token, { kind: "in-process" });
     expect(getChat()).toEqual(CHAT_INITIAL);
   });
 
@@ -174,14 +190,14 @@ describe("chat store helpers + run epoch", () => {
     failChatTurn(stale);
     expect(getChat().turns[1].error).toBe(false);
     // The fresh run can still finalize.
-    finalizeChatTurn(fresh, []);
+    finalizeChatTurn(fresh);
     expect(getChat().streaming).toBe(false);
   });
 
   it("sendChatMessage with insertable marks the assistant turn insertable (task 10)", () => {
     const token = sendChatMessage("Summarize this note", { insertable: true });
     appendChatToken(token, "the summary");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     const turns = getChat().turns;
     expect(turns[0].insertable).toBe(false); // user turn never insertable
     expect(turns[1].insertable).toBe(true);
@@ -220,11 +236,10 @@ describe("an ask terminal may not close an agent run's turn", () => {
     expect(chatReducer(before, { type: "TOKEN", text: "hello" })).toBe(before);
   });
 
-  it("FINALIZE does not hang the stream's citations on the run's turn", () => {
+  it("FINALIZE does not close the run's turn as though it were the stream's", () => {
     const before = stateWithRunLast();
     const after = chatReducer(before, {
       type: "FINALIZE",
-      citations: [{ noteId: "n1", byteStart: 0, byteEnd: 4, score: 1 }],
     });
     expect(after.turns).toEqual(before.turns);
     // It still closes the stream flag, because the stream really did end.
@@ -264,9 +279,10 @@ describe("an ask terminal may not close an agent run's turn", () => {
       text: "meanwhile, what is this note about",
       insertable: false,
     });
-    s = chatReducer(s, { type: "FINALIZE", citations: [] });
+    s = chatReducer(s, { type: "FINALIZE" });
     const summary = {
       runId: "r1",
+      summary: "",
       edits: 2,
       newNotes: 0,
       notesRead: 3,

@@ -31,6 +31,13 @@ pub enum AgentAction {
     ReadNote { note_id: String },
     /// Tool 3.
     SearchScope { query: String },
+    /// Tool 4: search the WHOLE vault, and be told where the matches are.
+    ///
+    /// In-scope matches come back as ids to read; everything else comes back as
+    /// a folder name and a count, never an id and never a title. See
+    /// [`super::tools::search_vault`] for why that split is the security
+    /// boundary rather than a rendering choice.
+    SearchVault { query: String },
     /// Verb 1: propose an anchored edit to a note in scope.
     ProposeEdit {
         note_id: String,
@@ -63,6 +70,7 @@ impl AgentAction {
             Self::ListScope => "list_scope",
             Self::ReadNote { .. } => "read_note",
             Self::SearchScope { .. } => "search_scope",
+            Self::SearchVault { .. } => "search_vault",
             Self::ProposeEdit { .. } => "propose_edit",
             Self::ProposeNote { .. } => "propose_note",
             Self::RequestScope { .. } => "request_scope",
@@ -107,10 +115,45 @@ pub fn system_instructions() -> String {
         "{\"action\":\"list_scope\"}\n",
         "{\"action\":\"read_note\",\"note_id\":\"...\"}\n",
         "{\"action\":\"search_scope\",\"query\":\"...\"}\n",
+        "{\"action\":\"search_vault\",\"query\":\"...\"}\n",
         "{\"action\":\"propose_edit\",\"note_id\":\"...\",\"anchor\":\"...\",\"replacement\":\"...\"}\n",
         "{\"action\":\"propose_note\",\"title\":\"...\",\"body\":\"...\"}\n",
         "{\"action\":\"request_scope\",\"folder\":\"...\",\"reason\":\"...\"}\n",
         "{\"action\":\"finish\",\"summary\":\"...\"}\n\n",
+        // **The shape of the exchange, which the instructions never described**
+        // (myne-md/myne#574). They listed the actions and stopped, so nothing
+        // told the model that the next message it receives IS its own tool's
+        // answer. A run spent four requests calling `list_scope` four times
+        // with the answer already in its context. The per-result framing in
+        // `run_loop.rs` is the other half of this; both were needed.
+        // **The seed, named so it gets used** (myne-md/myne#578). The opening
+        // message already carries the scope, and its bodies when the scope is
+        // one note, because the host resolved both before the loop began. A
+        // model that calls `list_scope` anyway gets the same answer at the cost
+        // of a whole provider request, so the saving depends on it knowing the
+        // answer is already there.
+        "Your scope is listed in the first message you receive, and when it is ",
+        "a single note that message carries the note's whole text as well. Use ",
+        "what is there: do not call list_scope or read_note for anything you ",
+        "have already been given.\n\n",
+        "After each action you take, the next message you receive is the ",
+        "result of that action. Read it and move on: do not repeat a call you ",
+        "have already made, because the answer will not have changed. When you ",
+        "have what you need, finish, and put the answer to the user's question ",
+        "in the summary — finish is how you reply to a question, not only how ",
+        "you end an edit.\n\n",
+        "search_scope looks inside the notes you were given. search_vault looks ",
+        "at the whole vault: matches inside your scope come back as ids you can ",
+        "read, and matches outside it come back only as a folder name and a ",
+        "count. You cannot read those notes. Those counts describe the matches ",
+        "this search ranked, not the vault, so do not report them as totals. If ",
+        "the material you need is in one of those folders, use request_scope ",
+        "and say which.\n\n",
+        "A note_id must be copied EXACTLY from what list_scope or search_vault ",
+        "returned, character for character. An id you retyped or shortened names ",
+        "no note, and the edit is discarded rather than guessed at: nothing here ",
+        "matches a near-miss onto a real note. If an id is refused, take the ",
+        "right one from list_scope rather than asking for a wider scope.\n\n",
         "The anchor of an edit must be text you have READ from that note, ",
         "copied exactly, and it must occur exactly once in the note. If it does ",
         "not match exactly the edit is discarded, so read the note first and ",
@@ -341,6 +384,8 @@ mod tests {
             "\n",
             r#"{"action":"search_scope","query":"q"}"#,
             "\n",
+            r#"{"action":"search_vault","query":"q"}"#,
+            "\n",
             r#"{"action":"propose_edit","note_id":"n1","anchor":"a","replacement":"b"}"#,
             "\n",
             r#"{"action":"propose_note","title":"T","body":"B"}"#,
@@ -349,7 +394,7 @@ mod tests {
             "\n",
             r#"{"action":"finish","summary":"done"}"#,
         );
-        assert_eq!(parse_actions(lines).len(), 7);
+        assert_eq!(parse_actions(lines).len(), 8);
     }
 
     #[test]
@@ -452,5 +497,17 @@ mod tests {
         let s = system_instructions();
         assert!(s.contains("exactly once"));
         assert!(s.contains("request_scope"));
+    }
+
+    #[test]
+    fn the_instructions_say_what_a_vault_search_may_not_do() {
+        // myne-md/myne#552. The tool's whole boundary is that an out-of-scope
+        // match yields a folder and a count rather than something readable, and
+        // a model that is not told will report those counts as vault totals and
+        // try to read what it cannot.
+        let s = system_instructions();
+        assert!(s.contains("search_vault"));
+        assert!(s.contains("cannot read those notes"));
+        assert!(s.contains("not the vault"));
     }
 }

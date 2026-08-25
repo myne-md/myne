@@ -188,7 +188,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
 
     case "error": {
       // Storage exhaustion gets its own words (phase3-web-client task 91).
-      // "Save failed — click Retry" is advice that cannot work while the disk or
+      // "Save failed: click Retry" is advice that cannot work while the disk or
       // the origin's quota is full: the user would retry forever. And the
       // sentence that matters most is the one a generic failure never says —
       // an edit that could not be written locally is **also not on the server**,

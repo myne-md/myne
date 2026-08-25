@@ -29,12 +29,6 @@ import type { AnsweredBy } from "../../components/AnsweredByIndicator";
 
 /** A source-note citation backing a grounded assistant answer (mirrors the Rust
  *  `SearchHit`; snake_case → camelCase at the IPC boundary). */
-export interface ChatCitation {
-  noteId: string;
-  byteStart: number;
-  byteEnd: number;
-  score: number;
-}
 
 export type ChatRole = "user" | "assistant";
 
@@ -53,13 +47,28 @@ export type AgentTurnEnd =
 
 /** What an agent turn keeps once its run is no longer the open one.
  *
- *  **Counts only, by construction.** `agentStore` holds exactly one run, so a
- *  turn that is not the newest has no live state to read; this is what it says
- *  instead. Every field is a number or a closed tag, with no note id, no title,
- *  no anchor and no replacement, so a transcript that outlives a run outlives it
- *  holding nothing the vault would miss. */
+ *  **Counts, plus the model's own closing sentence.** `agentStore` holds exactly
+ *  one run, so a turn that is not the newest has no live state to read; this is
+ *  what it says instead. Every field but `summary` is a number or a closed tag.
+ *
+ *  `summary` is the run's `finish` text, and it is here because in one mode it
+ *  is the ANSWER (myne-md/myne#568, superseding the counts-only clause of
+ *  `design-notes/ai/0518`). It is model output, so it can quote note text —
+ *  and that is the same class this store already holds, since a `text` turn is
+ *  the model's words about the open note. What is still excluded is the
+ *  PROPOSAL: anchors and replacements are text copied verbatim out of note
+ *  bodies, they stay in `agentStore`, and they are dropped by
+ *  `clearAgentForLock`. This store's own teardown is `clearChat`, on the same
+ *  roster and on the same paths, so nothing here outlives the unlocked
+ *  session. */
 export interface AgentTurnSummary {
   runId: string;
+  /** The model's closing summary, or "" when it finished without one.
+   *
+   *  In one mode this is what a question gets answered with, so an empty string
+   *  and a sentence are genuinely different renderings rather than a presence
+   *  check on decoration. */
+  summary: string;
   /** Proposed edits to existing notes. */
   edits: number;
   /** Proposed new notes. */
@@ -100,8 +109,6 @@ export interface ChatTurn {
    * Optional because a turn can fail before any cause is known.
    */
   errorCause?: ProviderErrorCause;
-  /** Source notes the grounded answer drew from (assistant turns; may be empty). */
-  citations: ChatCitation[];
   /** Whether this assistant turn can be inserted into the open note (summaries +
    *  any answer the user chooses to keep — SYNC-17 explicit action). (task 10) */
   insertable: boolean;
@@ -142,7 +149,7 @@ export type ChatAction =
       insertable: boolean;
     }
   | { type: "TOKEN"; text: string }
-  | { type: "FINALIZE"; citations: ChatCitation[]; answeredBy?: AnsweredBy }
+  | { type: "FINALIZE"; answeredBy?: AnsweredBy }
   | { type: "FAIL"; cause?: ProviderErrorCause }
   | { type: "STOP" }
   | {
@@ -217,7 +224,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         text: action.text,
         streaming: false,
         error: false,
-        citations: [],
         insertable: false,
       };
       const assistantTurn: ChatTurn = {
@@ -227,7 +233,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         text: "",
         streaming: true,
         error: false,
-        citations: [],
         insertable: action.insertable,
       };
       return { turns: [...state.turns, userTurn, assistantTurn], streaming: true };
@@ -250,7 +255,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         turns: replaceLast(state.turns, {
           ...last,
           streaming: false,
-          citations: action.citations,
           answeredBy: action.answeredBy,
         }),
         streaming: false,
@@ -294,7 +298,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         text: action.task,
         streaming: false,
         error: false,
-        citations: [],
         insertable: false,
         scopeLabel: action.scopeLabel,
       };
@@ -308,7 +311,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         text: "",
         streaming: false,
         error: false,
-        citations: [],
         insertable: false,
       };
       return { ...state, turns: [...state.turns, userTurn, agentTurn] };
@@ -393,14 +395,15 @@ export function appendChatToken(token: number, text: string): void {
   dispatchChat({ type: "TOKEN", text });
 }
 
-/** Close the active assistant turn with its citations, iff `token` is current. */
-export function finalizeChatTurn(
-  token: number,
-  citations: ChatCitation[],
-  answeredBy?: AnsweredBy,
-): void {
+/** Close the active assistant turn, iff `token` is current.
+ *
+ *  It used to take the citation set the Ask flow retrieved. Ask is gone
+ *  (myne-md/myne#552) and the one remaining producer of a text turn is the
+ *  summarize flow, which grounds on the open note rather than on a retrieval,
+ *  so there was nothing left to cite. */
+export function finalizeChatTurn(token: number, answeredBy?: AnsweredBy): void {
   if (!isChatRunCurrent(token)) return;
-  dispatchChat({ type: "FINALIZE", citations, answeredBy });
+  dispatchChat({ type: "FINALIZE", answeredBy });
 }
 
 /** Mark the active assistant turn as errored, iff `token` is current. */

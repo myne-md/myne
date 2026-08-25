@@ -8,13 +8,14 @@
 // the composer sat outside it. Two inputs is not a smaller decision than one; it
 // is the same decision, unmade, in front of every user who opens the tab.
 //
-// **Why the mode is a control rather than an inference.** Reading the message to
-// decide whether the user wants an answer or an edit puts that routing on the
-// model, and the model is the thing the edit-format probe below exists to
-// distrust. The failure is also asymmetric: mistaking a question for an edit
-// starts a scope-holding run and spends provider requests, while the reverse
-// only costs a re-send. So the user says which, in two words, and the
-// consequence is visible before they press anything.
+// **There is no Ask/Edit control any more** (myne-md/myne#552,
+// `design-notes/ai/0524`). Every message starts an agent run: the agent
+// answers a question with its `finish` summary and proposes edits when that is
+// what was asked for. The segment that used to choose the flow now chooses the
+// permission mode. The asymmetry the old control was justified by has not
+// changed and is not being denied — it is that in one mode every message
+// deliberately pays the expensive side, because the expensive side can now
+// answer questions too (`search_vault`, `0523`).
 //
 // **Two things here are load-bearing rather than layout.**
 //
@@ -23,12 +24,14 @@
 //      "Removing that control does not make the feature smaller; it routes every
 //      folder-scale run through the riskier of the two mechanisms." It shows the
 //      host's note count before sending, because "Projects" is not a size.
-//   2. The probe stays on the first Edit-mode Send. Not on mount, and **not on
-//      the mode switch** either: with a remote provider configured the probe
-//      issues `threshold.attempts` requests to that provider, and TB13 bars a
-//      surface that fires without the user asking. Flipping a segmented control
-//      is not asking. Opening the tab and choosing Edit both cost nothing; the
-//      Send pays for the check.
+//   2. The probe stays on the first Send. Not on mount, and not on a control
+//      change either: with a remote provider configured the probe issues
+//      `threshold.attempts` requests to that provider, and TB13 bars a surface
+//      that fires without the user asking. Opening the tab costs nothing; the
+//      Send pays for the check. What myne-md/myne#568 changed is only how long
+//      one answer LIVES — the verdict is session state in `agentStore` rather
+//      than this component's, so a tab switch no longer re-buys it — never when
+//      it is bought.
 
 import {
   useEffect,
@@ -46,28 +49,28 @@ import {
   agentCapability,
   agentPreviewGrant,
   type GrantPreview,
+  type ProbeProgress,
   type ProbeVerdict,
   type ScopeGrant,
 } from "../../lib/agent-run";
+import {
+  getAgent,
+  setAutoApply,
+  setProbeVerdict,
+  useAgent,
+} from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
 import { CAPTION_STYLE } from "./sharedStyles";
 
-/** What the composer does with the message. */
-type ChatMode = "ask" | "edit";
-
 export interface ChatComposerProps {
-  /** Send an Ask-mode message. Required: the parent renders nothing without it,
-   *  and an optional one turns a missing wire into a Send that silently does
-   *  nothing rather than into a compile error. */
-  onSend: (message: string) => void;
-  /** Stop an in-flight Ask generation. Shown while `streaming`. */
-  onStop?: () => void;
-  /** Whether an Ask generation is streaming right now. */
-  streaming: boolean;
-  /** The open note: the default Edit scope when nothing is attached. */
+  /** The open note: the default scope when no folder is attached. */
   openNoteId: string | null;
-  /** Folders the user can attach as an Edit scope. */
+  /** Folders the user can attach as a scope. */
   folders: readonly string[];
+  /** Called with the ids of notes an automatic apply wrote, so the open pane
+   *  re-reads them. Without it the editor keeps showing the pre-apply text and
+   *  the pane's next autosave writes that stale buffer back over the edit. */
+  onNotesWritten?: (noteIds: readonly string[]) => void;
 }
 
 const INPUT_STYLE: CSSProperties = {
@@ -97,14 +100,18 @@ const ROW_STYLE: CSSProperties = {
 };
 
 export function ChatComposer({
-  onSend,
-  onStop,
-  streaming,
   openNoteId,
   folders,
+  onNotesWritten,
 }: ChatComposerProps) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<ChatMode>("ask");
+  // Whether the scope picker is expanded. Collapsed by default: the scope shows
+  // as text with a control to change it, so the ordinary run reads as one line.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // The permission mode lives in the run store rather than here: it is
+  // session-scoped and has to be dropped by the same lock teardown that drops
+  // the run, which a component's own state cannot be.
+  const agent = useAgent();
   const [message, setMessage] = useState("");
   const [attached, setAttached] = useState<string | null>(null);
   const [preview, setPreview] = useState<GrantPreview | "failed" | null>(null);
@@ -117,30 +124,51 @@ export function ChatComposer({
    *  reset path was unreachable, because once the probe has failed the composer
    *  is blocked, so `ensureCapability` can never run again to clear it.
    *
-   *  Offering Send during the window between asking and hearing back would be
-   *  the same defect the gate exists to close, so `probing` covers that window. */
-  const [probe, setProbe] = useState<ProbeVerdict | "failed" | null>(null);
+   *  **In the run store rather than here** (myne-md/myne#568). It used to be
+   *  this component's own `useState`, so every remount asked again: with a
+   *  remote provider that is `threshold.attempts` requests, 8 seconds in the
+   *  session that found it, and `AiChatTab` remounts on an ordinary tab switch
+   *  in the right panel. The store keeps it for the session and
+   *  `clearAgentForLock` drops it, which is the teardown a component cannot
+   *  have. WHEN the probe fires has not changed: still the first Send. */
+  const probe = agent.probeVerdict;
+  /** Offering Send during the window between asking and hearing back would be
+   *  the same defect the gate exists to close, so this covers that window.
+   *  Component state on purpose, unlike the verdict: it describes a call this
+   *  composer has in flight, and a composer that unmounts takes it with it. */
   const [probing, setProbing] = useState(false);
+  /** Which attempt the probe is on, while it is on one (myne-md/myne#575).
+   *
+   *  Component state beside `probing`, and for the same reason: it describes a
+   *  call THIS composer has in flight, so a composer that unmounts takes it
+   *  with it. The VERDICT is the thing that has to outlive the component, and
+   *  it lives in the store. */
+  const [probeAt, setProbeAt] = useState<ProbeProgress | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const verdict = typeof probe === "object" ? probe : null;
 
-  /** Run the probe, at most once per mounted composer. See the module note for
-   *  why it is not fired on mount or on the mode switch. */
+  /** Run the probe, at most once per session. See the module note for why it is
+   *  not fired on mount or on a control change. */
   async function ensureCapability(): Promise<ProbeVerdict | null> {
-    if (verdict !== null) return verdict;
+    // Read through the store rather than trusting this render's snapshot: a
+    // sibling composer, or this one after a remount, may have paid for the
+    // answer already.
+    const known = getAgent().probeVerdict;
+    if (typeof known === "object" && known !== null) return known;
     setProbing(true);
     try {
-      const v = await agentCapability();
-      setProbe(v);
+      const v = await agentCapability(setProbeAt);
+      setProbeVerdict(v);
       return v;
     } catch {
       // Fail CLOSED. An unanswerable probe is not evidence that the backend can
       // hold the format, and offering the run anyway is what this gate exists
       // to prevent.
-      setProbe("failed");
+      setProbeVerdict("failed");
       return null;
     } finally {
       setProbing(false);
+      setProbeAt(null);
     }
   }
 
@@ -193,10 +221,10 @@ export function ChatComposer({
   // literal forces a synchronous layout read AND a second commit on every
   // render. During streaming that is once per token, to move a thumb that has
   // not moved.
-  const modeOptions = useMemo(
+  const permissionOptions = useMemo(
     () => [
-      { value: "ask", label: t("editor.chrome.rightPanel.aiChat.modeAsk") },
-      { value: "edit", label: t("editor.chrome.rightPanel.aiChat.modeEdit") },
+      { value: "ask", label: t("agent.composer.permissionAsk") },
+      { value: "auto", label: t("agent.composer.permissionAuto") },
     ],
     [t],
   );
@@ -211,21 +239,11 @@ export function ChatComposer({
   // check happens on Send. After one, it gates.
   const refused = probe === "failed" || verdict?.passed === false;
   const empty = message.trim().length === 0;
-  const blocked =
-    empty ||
-    busy ||
-    probing ||
-    streaming ||
-    (mode === "edit" && (refused || grant === null));
+  const blocked = empty || busy || probing || refused || grant === null;
 
   async function submit(): Promise<void> {
     if (blocked) return;
     const text = message.trim();
-    if (mode === "ask") {
-      setMessage("");
-      onSend(text);
-      return;
-    }
     if (grant === null) return;
     const verdict = await ensureCapability();
     // The refusal is rendered by the notice below; keep what the user typed so
@@ -234,11 +252,17 @@ export function ChatComposer({
     setMessage("");
     setBusy(true);
     try {
-      await startAgentRun(text, grant, {
-        scopeLabel: attached ?? t("agent.composer.scopeOpenNote"),
-        startFailed: t("agent.composer.startFailed"),
-        providerRejected: t("agent.composer.providerRejected"),
-      });
+      await startAgentRun(
+        text,
+        grant,
+        {
+          scopeLabel: attached ?? t("agent.composer.scopeOpenNote"),
+          startFailed: t("agent.composer.startFailed"),
+          autoApplyFailed: t("agent.composer.autoApplyFailed"),
+          providerRejected: t("agent.composer.providerRejected"),
+        },
+        onNotesWritten,
+      );
     } finally {
       setBusy(false);
     }
@@ -247,7 +271,6 @@ export function ChatComposer({
   return (
     <div
       data-testid="ai.composer"
-      data-mode={mode}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -259,7 +282,7 @@ export function ChatComposer({
       {/* The capability verdict, stated rather than implied by a dead button.
           This is the one place a user finds out that agent mode is unavailable
           on the model they chose. */}
-      {mode === "edit" && refused ? (
+      {refused ? (
         <div
           data-testid="ai.composer-unsupported"
           style={{
@@ -295,27 +318,48 @@ export function ChatComposer({
         </div>
       ) : null}
 
-      <Segmented
-        testId="ai.composer-mode"
-        ariaLabel={t("editor.chrome.rightPanel.aiChat.modeLabel")}
-        value={mode}
-        onChange={(v) => setMode(v as ChatMode)}
-        options={modeOptions}
-      />
-
       {/* The user-originated scope control, and the size it resolves to. Only in
           Edit mode: in Ask mode the grounding is the whole vault's index and
           there is nothing here for the user to grant. */}
-      {mode === "edit" ? (
+      {
         <div style={ROW_STYLE}>
           <span style={CAPTION_STYLE}>{t("agent.composer.scopeLabel")}</span>
-          <SearchableSelect
-            testId="ai.composer-scope"
-            aria-label={t("agent.composer.scopeLabel")}
-            options={scopeOptions}
-            selected={scopeSelected}
-            onChange={(next) => setAttached(next[0] ? next[0] : null)}
-          />
+          {/* **The picker is one step back, and the scope is not** (issue A).
+              The common run is the open note, and reading a dropdown before
+              typing is friction for a choice almost nobody changes. What may
+              NOT move is the control itself or the count beside it:
+              `design-notes/ai/0518` point 1 requires a user-originated scope
+              control on the composer, because removing it routes every
+              folder-scale run through the model-originated expansion instead,
+              which is the injection-reachable path. So this changes prominence
+              and nothing else, and the count below still renders whenever a
+              folder is attached. */}
+          {pickerOpen ? (
+            <SearchableSelect
+              testId="ai.composer-scope"
+              aria-label={t("agent.composer.scopeLabel")}
+              options={scopeOptions}
+              selected={scopeSelected}
+              onChange={(next) => {
+                setAttached(next[0] ? next[0] : null);
+                setPickerOpen(false);
+              }}
+            />
+          ) : (
+            <>
+              <span data-testid="ai.composer-scope-current" style={CAPTION_STYLE}>
+                {attached ?? t("agent.composer.scopeOpenNote")}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                data-testid="ai.composer-scope-change"
+                onClick={() => setPickerOpen(true)}
+              >
+                {t("agent.composer.scopeChange")}
+              </Button>
+            </>
+          )}
           {/* **A failed preview says so rather than showing nothing.** An
               absent count reads as "no folder attached", and the count before
               sending is part of the mitigation `design-notes/ai/0515` names,
@@ -339,7 +383,24 @@ export function ChatComposer({
             </>
           ) : null}
         </div>
-      ) : null}
+      }
+
+      {/* **The permission control** (myne-md/myne#551). Edit mode only: Ask
+          proposes nothing, so there is nothing for it to decide. What the
+          automatic side is bounded by is stated where it is enforced
+          (`autoApplyRun`), not here — the summary is that it stays inside the
+          scope the user approved and that a removal still needs its own act,
+          because the host refuses one inside a bulk approval whatever the
+          caller sends. */}
+      {
+        <Segmented
+          testId="ai.composer-permission"
+          ariaLabel={t("agent.composer.permissionLabel")}
+          value={agent.autoApply ? "auto" : "ask"}
+          onChange={(v) => setAutoApply(v === "auto")}
+          options={permissionOptions}
+        />
+      }
 
       <form
         onSubmit={(e) => {
@@ -364,40 +425,30 @@ export function ChatComposer({
               void submit();
             }
           }}
-          placeholder={
-            mode === "edit"
-              ? t("agent.composer.placeholder")
-              : t("editor.chrome.rightPanel.aiChat.composerPlaceholder")
-          }
-          aria-label={
-            mode === "edit"
-              ? t("agent.composer.placeholder")
-              : t("editor.chrome.rightPanel.aiChat.composerPlaceholder")
-          }
-          disabled={streaming || busy}
+          placeholder={t("agent.composer.placeholder")}
+          aria-label={t("agent.composer.placeholder")}
+          disabled={busy}
           style={INPUT_STYLE}
         />
-        {streaming && onStop ? (
-          <Button
-            type="button"
-            variant="secondary"
-            data-testid="ai.composer-stop"
-            onClick={() => onStop()}
-          >
-            {t("editor.chrome.rightPanel.aiChat.stop")}
-          </Button>
-        ) : (
-          <Button
-            type="submit"
-            variant="primary"
-            data-testid="ai.composer-send"
-            disabled={blocked}
-          >
-            {probing
+        <Button
+          type="submit"
+          variant="primary"
+          data-testid="ai.composer-send"
+          disabled={blocked}
+        >
+          {probing
+            ? // **The count, once the host has reported one.** The plain label
+              // is still what the first frames show, because the first attempt
+              // has not been announced yet at the moment Send is pressed, and a
+              // "0 of 3" would be a number describing nothing.
+              probeAt === null
               ? t("agent.composer.checking")
-              : t("editor.chrome.rightPanel.aiChat.send")}
-          </Button>
-        )}
+              : t("agent.composer.checkingAt", {
+                  attempt: probeAt.attempt,
+                  of: probeAt.of,
+                })
+            : t("editor.chrome.rightPanel.aiChat.send")}
+        </Button>
       </form>
     </div>
   );

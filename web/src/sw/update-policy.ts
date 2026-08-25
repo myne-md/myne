@@ -21,8 +21,11 @@
 // An update is accepted only when BOTH hold:
 //
 //   1. its hash is **signed** by a release key this client carries; and
-//   2. its hash is **present in the public append-only record** of released
-//      bundles.
+//   2. its hash is **present in the append-only record** of released bundles.
+//      "Public" is the intent and not the state: that record is in a private
+//      repository today (docs/threat-model.md §5, design-notes/security/0534),
+//      which matters for the property below, since a record only a first party
+//      can read gives a third party nothing to compare against.
 //
 // Neither implies the other, and dropping either one loses a distinct property.
 // Signature alone would let whoever holds the key ship a build that was never
@@ -39,7 +42,12 @@
 // replacement worker that omits all of this. That limit is recorded in
 // `threat-model.md` (A15/TB11) and in the decision entry; any copy describing
 // this as "the web client verifies its own code" is wrong. What it buys is
-// precise: **every load after the first is as strong as desktop's TB7.**
+// precise: **every load after the first is pinned, which is a property desktop
+// gets for free by being an installed file.** This comment said "as strong as
+// desktop's TB7" until 2026-08-25, which reads as a signature comparison and is
+// not one in either direction: no desktop artifact carries a signature any OS
+// checks (docs/threat-model.md TB7, A9), so the two channels are alike in
+// persistence rather than in verification.
 
 /** A release public key this client trusts, as it appears in the bundle. */
 export interface ReleaseKey {
@@ -56,7 +64,7 @@ export interface ReleaseKey {
   readonly revoked?: boolean;
 }
 
-/** One entry in the public append-only record of released bundle hashes. */
+/** One entry in the append-only record of released bundle hashes. */
 export interface RecordEntry {
   /** `sha256:<hex>` of the released bundle. */
   readonly bundleHash: string;
@@ -101,7 +109,7 @@ export interface UpdateInputs {
   readonly installedHash: string;
   /** Keys this bundle carries. More than one during a rotation window. */
   readonly keys: readonly ReleaseKey[];
-  /** The published record, as fetched. */
+  /** The record of released hashes, as fetched. */
   readonly record: readonly RecordEntry[];
   readonly verify: VerifySignature;
 }

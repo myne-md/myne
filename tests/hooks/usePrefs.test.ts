@@ -214,7 +214,7 @@ describe("optimistic write failure → re-read disk truth + onError", () => {
     });
 
     expect(result.current.prefs.screen_capture_protection).toBe(true);
-    expect(onError).toHaveBeenCalledWith("Couldn't save preference — try again");
+    expect(onError).toHaveBeenCalledWith("Couldn't save preference. Try again.");
   });
 
   it("keeps the optimistic value when BOTH persist and the re-read fail", async () => {
@@ -250,7 +250,7 @@ describe("optimistic write failure → re-read disk truth + onError", () => {
     });
 
     expect("graph.show" in result.current.prefs.keymap).toBe(false);
-    expect(onError).toHaveBeenCalledWith("Couldn't save preference — try again");
+    expect(onError).toHaveBeenCalledWith("Couldn't save preference. Try again.");
   });
 
   it("does NOT call onError on the happy path", async () => {

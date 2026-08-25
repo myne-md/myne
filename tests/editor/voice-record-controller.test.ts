@@ -186,7 +186,7 @@ describe("startVoiceRecording", () => {
       [{ kind: "alreadyRecording" }, "A recording is already in progress."],
       [
         { kind: "captureFailed" },
-        "Couldn't start recording — check microphone access in System Settings.",
+        "Couldn't start recording. Check microphone access in System Settings.",
       ],
       [{ kind: "weird" }, "Couldn't start recording."],
     ];
@@ -254,7 +254,7 @@ describe("finishRecording (Stop)", () => {
     voiceStop.mockRejectedValueOnce({ kind: "silentRecording" }); // stop fails
     await lastBarOpts!.onStop();
     expect(showAttachmentToast).toHaveBeenCalledWith(
-      "Recording was silent and discarded — check your microphone.",
+      "Recording was silent and discarded. Check your microphone.",
       "error",
     );
     expect(barHandle.teardown).toHaveBeenCalled();
