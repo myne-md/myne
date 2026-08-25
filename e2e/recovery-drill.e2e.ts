@@ -2,11 +2,14 @@
 // project's definition of done, vision.md: "lose the password, recover
 // from the phrase, plaintext never on disk").
 //
-// Vault-count precondition: 1 (SYNC-6). Runs at m=256 MiB, t=3, p=2 on
-// every pipeline by ratified decision (SYNC-9 / harness grill Q4) —
-// fixture generation pays Argon2id ×2 and the in-app phrase unlock +
-// password reset pay it again; budget accordingly (vitest.e2e.config
-// allows 180 s per test).
+// Vault-count precondition: 1 (SYNC-6). Runs at m=256 MiB, t=3, p=2 by
+// ratified decision (SYNC-9 / harness grill Q4). That decision also said
+// "on every pipeline", and `design-notes/ops/0529` retired that half:
+// since myne-md/myne#579 the suite runs only on the manual pre-release
+// workflow, so this drill is a release gate rather than a push one. The
+// parameters are untouched. Fixture generation pays Argon2id twice and
+// the in-app phrase unlock plus password reset pay it again, so budget
+// accordingly (vitest.e2e.config allows 180 s per test).
 //
 // SYNC-13: this spec NEVER logs the phrase/passwords; the plaintext
 // scan reports needle indices, not contents.

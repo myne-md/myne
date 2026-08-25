@@ -126,7 +126,7 @@ describe("AttachmentImageWidget", () => {
     const w = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []);
     expect(w.eq(new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []))).toBe(true);
     expect(w.eq(new AttachmentImageWidget(ID, "other.png", emptyEmbedLayout(), []))).toBe(false);
-    expect(w.eq(new AttachmentImageWidget("b".repeat(64), "p.png"))).toBe(false);
+    expect(w.eq(new AttachmentImageWidget("b".repeat(64), "p.png", emptyEmbedLayout(), []))).toBe(false);
     expect(w.ignoreEvent()).toBe(false);
   });
 });

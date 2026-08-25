@@ -5,7 +5,7 @@
 # BOTH or neither: the binary must be built `--features local-inference-stub`
 # (so `StubEngine` answers instead of a missing model), and the suite must run
 # with `MYNE_E2E_AI=1` (so `aiDescribe` is not `describe.skip`). CI pairs them in
-# `.woodpecker.yml`; locally there was no way to get them at all, which is how a
+# `.woodpecker/e2e.yml`; locally there was no way to get them at all, which is how a
 # whole family of specs came to be written without ever being run once.
 #
 #   ./scripts/e2e-ai-buildrun.sh agent-run

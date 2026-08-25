@@ -47,7 +47,7 @@
     "",
     "Same arithmetic as the +5 above and on the same CI-measured base: ag6 sits",
     "inside `aiDescribe`, and CI's e2e step sets MYNE_E2E_AI=1 and builds with",
-    "`local-inference-stub` (.woodpecker.yml), so it executes there.",
+    "`local-inference-stub` (.woodpecker/e2e.yml), so it executes there.",
     "",
     "MEASURED, not reasoned. `scripts/e2e-ai-buildrun.sh agent-run agent-run",
     "agent-run` ran green three consecutive times in one warm container on",

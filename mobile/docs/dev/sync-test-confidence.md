@@ -64,4 +64,4 @@ consumes this contract against the mock-IPC dev server.
 
 ## Cross-check
 
-Each "where-tested" cell should be re-verified against the actual `.woodpecker.yml` (main + mobile) at each release — if a CI step is renamed, disabled, or moved, update the matching row here rather than letting the doc drift.
+Each "where-tested" cell should be re-verified against the actual `.woodpecker/main.yml` (the mobile lane lives there too since the client moved in-repo; the manual E2E lane is `.woodpecker/e2e.yml`) at each release. If a CI step is renamed, disabled, or moved, update the matching row here rather than letting the doc drift.

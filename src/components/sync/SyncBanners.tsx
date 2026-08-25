@@ -22,6 +22,15 @@
 //    user did not ask for. NOT dismissable, for the same reason as the one
 //    below: the session is already locked and the only way forward is to unlock
 //    again, so hiding the sentence would leave an unexplained lock screen.
+//  - StaleSyncBanner: sync has been failing continuously for longer than
+//    `SYNC_STALE_DAYS` (myne-md/myne#583). Every other strip here is a
+//    single EVENT; this one is a DURATION, and it exists because a duration is
+//    what nobody noticed. Sync against the hosted server was dead for four days
+//    in August 2026 while the status dot said "Sync error" the whole time — in
+//    Settings → Sync, which nobody opens while their notes look like they are
+//    saving. They were saving, locally, to one disk. Dismissable but re-armed
+//    on the next stale read, because the condition is real until sync works
+//    again and a permanent dismiss would restore the silence.
 //  - CredentialAmbiguousBanner: the meta phase refused to adopt the server's
 //    `vault.meta` because the password-side wraps differ and no baseline says
 //    which side moved (phase3-web-client task 88). NOT dismissable, unlike the
@@ -37,6 +46,8 @@ import { IntegrityAlertBanner } from "./IntegrityAlertBanner";
 import { TorStatusBanner } from "./TorStatusBanner";
 import { useMaterialisationProgress } from "../../hooks/useMaterialisationProgress";
 import { useTorState } from "../../hooks/useTorState";
+import { useSyncStatus } from "../../hooks/useSyncStatus";
+import { isSyncStale } from "../../lib/sync-staleness";
 
 const STACK_STYLE: CSSProperties = {
   display: "flex",
@@ -60,6 +71,22 @@ export function SyncBanners() {
   // desktop install until the first read resolves; only `connecting` and
   // `unavailable` render anything.
   const { posture: torPosture } = useTorState();
+
+  // The one strip driven by a DURATION rather than an event. `useSyncStatus`
+  // already polls, and the clock rides on the error status itself, so this adds
+  // no IPC of its own. `Date.now()` is read at render rather than held in state
+  // deliberately: the poll re-renders this component every few seconds, and a
+  // stored "now" is a clock that has to be invalidated by something.
+  const { status: liveStatus } = useSyncStatus();
+  const [staleDismissed, setStaleDismissed] = useState(false);
+  const syncStale =
+    liveStatus?.state === "error" &&
+    isSyncStale(liveStatus.last_success_at, Date.now());
+  // Re-arm once sync recovers, so a dismiss covers this outage and not the next.
+  useEffect(() => {
+    if (!syncStale) setStaleDismissed(false);
+  }, [syncStale]);
+  const showStale = syncStale && !staleDismissed;
 
   // Event-driven producers (MYND-461). A reconcile occurred → show the reassuring
   // banner, re-armed, until the user dismisses it. A head-verify rejection → the
@@ -102,7 +129,8 @@ export function SyncBanners() {
     !credentialAmbiguous &&
     !rekeyedElsewhere &&
     !showMaterialising &&
-    !showTor
+    !showTor &&
+    !showStale
   ) {
     return null;
   }
@@ -120,6 +148,47 @@ export function SyncBanners() {
         present={integrity}
         onDismiss={() => setIntegrity(false)}
       />
+      {showStale && (
+        // `role="alert"`: unlike the progress strips above, this one is telling
+        // the user something is wrong right now and has been for days.
+        <div
+          role="alert"
+          data-testid="sync.stale-warning"
+          style={{
+            display: "flex",
+            gap: "var(--space-2)",
+            alignItems: "baseline",
+            padding: "var(--space-3) var(--space-4)",
+            borderRadius: "var(--radius-2)",
+            border: "1px solid var(--warning)",
+            background: "var(--bg-2)",
+            color: "var(--fg-1)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          {/* No date, no elapsed count — AS15 keeps per-device sync clocks off
+              screen, and the stored timestamp exists to answer the threshold
+              rather than to be rendered. */}
+          <span style={{ flex: 1 }}>{t("sync.stale.body")}</span>
+          <button
+            type="button"
+            onClick={() => setStaleDismissed(true)}
+            data-testid="sync.stale-dismiss"
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              padding: 0,
+            }}
+          >
+            {t("sync.stale.dismiss")}
+          </button>
+        </div>
+      )}
       {showMaterialising && materialising !== null && (
         // `role="status"`, not `alert`: this is progress, not a problem, and an
         // assertive live region would interrupt a screen reader every 250 ms.

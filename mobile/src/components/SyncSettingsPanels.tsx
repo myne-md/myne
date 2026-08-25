@@ -186,7 +186,17 @@ function statusView(status: SyncStatus | null, t: TFunction): { color: string; l
     case "syncing":
       return { color: "var(--accent)", label: t("sync.status.syncing") };
     case "error":
-      return { color: "var(--warning)", label: t("settings.sync.summary.offline") };
+      // One arm, deliberately, for every detail the desktop indicator splits
+      // into eight — with ONE exception (myne#581). "Offline" is a tolerable
+      // summary for a failure that clears itself; it is a false one for a
+      // pinned certificate that was replaced, because that never clears and
+      // the phone would say "offline" for as long as the renewal stands while
+      // the network was fine the whole time. Mobile has no fingerprint-confirm
+      // gate of its own yet, so this says what happened and the fix is on the
+      // desktop; the gate is separate follow-up work.
+      return status.detail === "cert_pin_mismatch"
+        ? { color: "var(--danger)", label: t("sync.status.errorCertChanged") }
+        : { color: "var(--warning)", label: t("settings.sync.summary.offline") };
     case "conflicts":
       return {
         color: "var(--danger)",

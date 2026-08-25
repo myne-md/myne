@@ -89,7 +89,7 @@ RUN_FLAGS=(
 
 # `su` resets the environment, and login shells re-source /etc/profile
 # (clobbering the rust image's PATH) — export explicitly, same idiom as
-# .woodpecker.yml's cargo-test-tauri step.
+# .woodpecker/main.yml's cargo-test-tauri step.
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
 
 # Forwarded HOST-side, because the container inherits neither and a spec gated on

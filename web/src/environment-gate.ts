@@ -342,7 +342,7 @@ export async function gateEnvironment(
 export function explainMissing(cap: RequiredCapability): string {
   switch (cap) {
     case "desktop-form-factor":
-      return "Myne in the browser is built for a desktop computer — it needs the memory and the input a phone or tablet browser cannot give it. On this device the Myne app is the better client anyway: it is faster, it works offline, and it keeps your notes when the browser clears its storage.";
+      return "Myne in the browser is built for a desktop computer. It needs the memory and the input a phone or tablet browser cannot give it. On this device the Myne app is the better client anyway: it is faster, it works offline, and it keeps your notes when the browser clears its storage.";
     case "wasm-memory-headroom":
       return "This browser cannot reserve the ~336 MB of memory the vault's key derivation needs. Phone and tablet browsers generally cannot; that limit is set by the vault itself and cannot be lowered for one device without making the vault unreadable everywhere else.";
     case "webassembly":
@@ -377,4 +377,4 @@ export const MOBILE_REFUSAL_TITLE = "Open Myne's app on this device";
 
 /** Where to go instead. Named clients, not a vague suggestion. */
 export const NATIVE_HANDOFF =
-  "Myne's desktop app (macOS, Windows, Linux) and mobile app (iOS, Android) have no such limit — and they verify their own signature before running, which a web page cannot.";
+  "Myne's desktop app (macOS, Linux) and mobile app (Android) have no such limit, and an app you install stays installed: if you kept the file you downloaded, it is still on your disk to compare against the hash Myne publishes for the current release. Nothing does that comparison for you. No Windows build and no installable iOS build are published yet. A web page is re-sent to your browser every visit, and your browser checks nothing on it.";

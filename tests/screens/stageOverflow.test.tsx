@@ -79,7 +79,7 @@ describe("PhraseEntryStep, the 24-cell recovery grid", () => {
   it("bounds its card and lets it scroll", () => {
     render(
       <PhraseEntryStep
-        state={initialState("phrase")}
+        state={initialState("phrase-entry")}
         dispatch={vi.fn()}
         onCancel={() => {}}
         onSubmitNormalizedPhrase={vi.fn()}

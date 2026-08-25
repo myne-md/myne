@@ -153,7 +153,7 @@ cargo clippy -p myne-core --all-targets -- -D warnings
 cargo test -p myne-core                       # the crate's own battery
 cargo test -p myne-core <name>                # filter by name
 
-# The wasm arm — CI runs both (`wasm-protocol` step, .woodpecker.yml)
+# The wasm arm. CI runs both (`wasm-protocol` step, .woodpecker/main.yml)
 cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
 bash scripts/wasm-core-graph-check.sh         # the dependency graph must resolve
 

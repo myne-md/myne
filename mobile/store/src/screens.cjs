@@ -199,7 +199,7 @@ const account = () => `${sb()}
   <div class="wm">${mark(24, 6)}<span class="w">myne</span></div>
   <div class="flow-eyebrow">Create a vault · 4 of 5</div>
   <div class="vtitle">Your account number</div>
-  <p class="lead">This is who you are to the sync server. There is no email and no phone number — save it alongside your recovery phrase.</p>
+  <p class="lead">This is who you are to the sync server. There is no email and no phone number. Save it alongside your recovery phrase.</p>
   <div class="acct">${mark(24, 5)}<span class="num">MY&#8209;7K2P&#8209;9C4H&#8209;8E3D&#8209;1B5F&#8209;Q6RN</span></div>
   <div class="acct-btns">
     <button class="sbtn">${ic(P.copy, 16, 1.8)}Copy</button>

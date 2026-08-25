@@ -175,15 +175,15 @@ const V = {
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
-  "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused. Same shape as `ai-chat.ts` directly below."],
-  "src/lib/ai-model-store.ts": ["adapted", "No AI surface mounts on web; the editor host omits the `ai` member entirely."],
+  "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused."],
+  "src/lib/ai-model-store.ts": ["adapted", "Unreachable where `localAi` is absent: no AI surface mounts on web, so nothing reads the store."],
   "src/lib/ai-capability.ts": [
     "adapted",
     "Runs as written and gives the right answer for the wrong-looking reason: the `local-inference` plugin is `Unsupported` in the dispatcher, so the invoke is refused and the module returns UNCOMPILED_REPORT — which is exactly true on web, where no AI is compiled. Nothing renders it there (`localAi` is absent), so it is unreachable in practice; it is `adapted` rather than `excluded` because it is correct if it ever is reached.",
   ],
   "src/lib/ai-tags.ts": [
     "adapted",
-    "Same as ai-chat: the auto-tag seam is unreachable where `localAi` is absent, and its command is `Unsupported` in the dispatcher.",
+    "The auto-tag seam is unreachable where `localAi` is absent, and its command is `Unsupported` in the dispatcher.",
   ],
   "src/lib/aiExcludedFolders.ts": ["ported", "Pure path predicate; also read by non-AI callers."],
   "src/lib/app-window.ts": [
@@ -310,6 +310,10 @@ const V = {
 
   "src/lib/spell.ts": ["adapted", "Unreachable where `spellCheck` is absent; the editor host omits the `spell` member."],
   "src/lib/stage.ts": ["adapted", "Boot routing branches on capabilities: an empty web client goes to account-entry, a corrupt one to re-sync (task 85)."],
+  "src/lib/sync-staleness.ts": [
+    "ported",
+    "Pure arithmetic over the last-successful-sync timestamp, plus the copy that says so after three days. It belongs on web MORE than on desktop, not less: a desktop vault works offline indefinitely, while the web client is sync-required (`decisions.md` 2026-07-26), so a sync that stopped working is the difference between a vault that is merely idle and one the user cannot reach from anywhere else.",
+  ],
   "src/lib/syntaxTheme.ts": ["ported", "CodeMirror theme."],
   "src/lib/theme-errors.ts": ["ported", "Error copy."],
   "src/lib/theme.ts": ["ported", "CSSOM only."],
@@ -387,10 +391,6 @@ const V = {
   "src/hooks/useRevealAfterIdleLock.ts": [
     "adapted",
     "Mounts on web and reaches a seam that REFUSES it (MYND-628). Desktop idle auto-lock hides the OS window with `orderOut:` and nothing on the Rust side shows it again, so a locked boot surface has to ask; a page has no hidden window, because web auto-lock re-renders the locked surface in the same tab. `window.show` is a typed refusal rather than a no-op, and the hook's `catch` is the correct handler — so this is adapted, not excluded: it still runs, it just correctly does nothing.",
-  ],
-  "src/hooks/useScrollEdges.ts": [
-    "ported",
-    "Pure DOM measurement of a scroll container's edges, feeding the `.myne-scroll-fade` mask. No host call, and both consumers (`CenteredCard`, the vault picker's list) render on web.",
   ],
   "src/hooks/useSyncStatus.ts": ["ported", "Sync status; more load-bearing on web, where sync is required."],
   "src/hooks/useTorState.ts": [

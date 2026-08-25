@@ -204,6 +204,38 @@ interface SasState {
   deviceId: string;
 }
 
+/**
+ * A readable reason for the "couldn't reach sync" line, keyed by the backend's
+ * serde `kind`.
+ *
+ * That line used to interpolate the `kind` itself, so a bare English enum name
+ * — `Transport` — appeared inside translated user copy, in all 32 locales. It
+ * told the reader nothing and it was the string a four-day sync outage was
+ * reported under. Unknown kinds fall through to a neutral phrase rather than
+ * leaking the identifier, so a variant added on the Rust side degrades to vague
+ * instead of to jargon.
+ */
+function deviceErrorReason(kind: string): string {
+  switch (kind) {
+    case "Transport":
+      return "sync.devices.reasonUnreachable";
+    case "CertPinMismatch":
+      return "sync.devices.reasonCertChanged";
+    case "Unauthenticated":
+      return "sync.devices.reasonRejected";
+    case "AccountFrozen":
+      return "sync.devices.reasonFrozen";
+    case "DeviceLimitReached":
+      return "sync.devices.reasonDeviceLimit";
+    case "AwaitingApproval":
+      return "sync.devices.reasonAwaitingApproval";
+    case "NotConfigured":
+      return "sync.devices.reasonNotConfigured";
+    default:
+      return "sync.devices.reasonUnexpected";
+  }
+}
+
 export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = hook;
@@ -376,7 +408,11 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
           data-testid="sync.device-error"
           style={{ display: "flex", flexDirection: "column", gap: 6, color: "var(--danger)", fontSize: "var(--text-sm)" }}
         >
-          <span>{t("sync.devices.unreachable", { error })}</span>
+          <span>
+            {error === "CertPinMismatch"
+              ? t("sync.devices.certChanged")
+              : t("sync.devices.unreachable", { error: t(deviceErrorReason(error)) })}
+          </span>
           {error === "Unauthenticated" ||
           error === "AccountFrozen" ||
           error === "DeviceLimitReached" ||
@@ -403,8 +439,23 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
           ) : (
             // A transport failure — NOT a reason to wipe the baseline. The likely cause
             // (server moved / certificate changed) is fixed by re-pinning the endpoint.
-            <span style={{ color: "var(--fg-3)" }} data-testid="sync.transport-hint">
-              {t("sync.devices.transportHint")}
+            //
+            // Two hints, because one of them no longer has to guess: when the
+            // backend says `CertPinMismatch` the cause is KNOWN, and the copy
+            // says so and says what to do. The older hint stays for every other
+            // transport failure, where "the server moved or its certificate
+            // changed" really is a guess.
+            <span
+              style={{ color: "var(--fg-3)" }}
+              data-testid={
+                error === "CertPinMismatch" ? "sync.cert-changed-hint" : "sync.transport-hint"
+              }
+            >
+              {t(
+                error === "CertPinMismatch"
+                  ? "sync.devices.certChangedHint"
+                  : "sync.devices.transportHint",
+              )}
             </span>
           )}
         </div>

@@ -20,7 +20,18 @@ export type SyncStatus =
   | { state: "pending" }
   | { state: "idle" }
   | { state: "syncing" }
-  | { state: "error"; detail: string }
+  | {
+      state: "error";
+      detail: string;
+      /**
+       * Epoch ms of the last cycle that completed on this device (myne#583),
+       * absent when none ever has. Carried only on `error`, matching the Rust
+       * side: how long sync has been broken is a question that only exists
+       * while it is broken. Feed it to `isSyncStale`, never to a date format —
+       * see `src/lib/sync-staleness.ts` for why.
+       */
+      last_success_at?: number;
+    }
   | { state: "conflicts"; count: number };
 
 /** Status-poll cadence for the indicator (ms). Cheap read-only command. */
@@ -102,7 +113,15 @@ function sameStatus(a: SyncStatus | null, b: SyncStatus): boolean {
   // compile error at that arm.
   switch (a.state) {
     case "error":
-      return b.state === "error" && sameFields(a, b, { detail: true });
+      // `last_success_at` arrived on this variant from develop while this ratchet
+      // was being written on the branch, and the merge is where the two met: the
+      // key literal has to name it, which is the compile error this design exists
+      // to produce. Comparing it is also the right answer rather than the quiet
+      // one. `SyncBanners.tsx` derives the days-failing banner from this field, so
+      // an `error` poll whose only change is a newer `last_success_at` must reach
+      // React; without it the banner freezes on its first value, which is the exact
+      // failure the comment above describes.
+      return b.state === "error" && sameFields(a, b, { detail: true, last_success_at: true });
     case "conflicts":
       return b.state === "conflicts" && sameFields(a, b, { count: true });
     // Payload-free today, and listed one per line rather than collapsed into a

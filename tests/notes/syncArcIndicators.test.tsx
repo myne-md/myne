@@ -46,7 +46,18 @@ function rowProps(over: Partial<NoteRowProps> = {}): NoteRowProps {
       folder: null,
       updatedAt: new Date("2026-06-16T12:00:00.000Z"),
       trashed: null,
+      // develop grew TitleRecord while this branch was open, and a fixture that
+      // casts past the gap is a fixture that stops describing the type. Listed
+      // in full instead, in the order the type declares them.
+      deleted: null,
+      archived: null,
       template: false,
+      folderIndex: false,
+      conflict: false,
+      conflictOf: null,
+      hasSource: false,
+      kind: null,
+      done: null,
     },
     selected: false,
     renaming: false,
@@ -75,7 +86,7 @@ describe("save readout", () => {
     // this component's grammar it is also the wrong shape: outstanding, not in
     // flight.
     const el = readout({ status: "editing" });
-    const arc = el.querySelector('[role="img"]');
+    const arc = el.querySelector<HTMLElement>('[role="img"]');
     expect(arc).not.toBeNull();
     expect(arc!.style.borderTopColor).toBe("transparent");
     expect(spins(arc!)).toBe(false);
