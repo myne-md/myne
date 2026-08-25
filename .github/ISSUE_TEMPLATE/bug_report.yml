@@ -78,7 +78,7 @@ body:
     attributes:
       label: How did you install it?
       options:
-        - Official signed bundle
+        - Official download from downloads.myne.md
         - Arch PKGBUILD / AUR
         - Built from source
         - Web client (no install)

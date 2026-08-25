@@ -94,8 +94,11 @@ then cannot reach its sync server is a worse outcome than one that does not
 boot.
 
 **Why it is runtime configuration and not a build-time constant.** A bundle whose
-hash you intend to compare against the published record must be
-**byte-identical to the published one** (below). Baking your server's address
+hash you intend to compare against the record of released hashes must be
+**byte-identical to the released one** (below). That record is in a private
+repository today, so the comparison is one you can prepare for and not one you
+can complete on your own (`threat-model.md` §5, `decisions.md` entry 0534); the
+reproducibility below is what makes it worth preparing for. Baking your server's address
 into it would make every self-hoster's bundle unique and that comparison
 impossible, so instead the address is read at container start, and the
 `connect-src` directive of the Content-Security-Policy is **generated from it**.
@@ -134,9 +137,11 @@ to produce a number to compare against a row.**
    build actually being served), so the identical comparison works against a
    running deployment as well as against a fresh build.
 4. Compare it against the row for that commit in
-   [`web-bundle-hashes.md`](web-bundle-hashes.md), the public append-only
-   record, which also carries the container recipe for reproducing a row from
-   scratch.
+   [`web-bundle-hashes.md`](web-bundle-hashes.md), the append-only record,
+   which also carries the container recipe for reproducing a row from scratch.
+   **That record is in a repository that is not public today**, so this step is
+   available to you only if you can already read this file where it lives; this
+   page called the record public until 2026-08-25 (`decisions.md` entry 0534).
 
    The serve-versus-compare split is stated in full under "Read this first"
    above and in step 2, so it is not restated here.
@@ -150,9 +155,11 @@ matters because the alternative teaches honest verifiers to ignore the check.
 **If other people use your instance, this is not optional in the way it is for
 you.** A bundle you built yourself needs no comparison, because you read the
 source. Your users did not: to them you are the code-delivery operator, and the
-one cross-check available to them is your served `/version.json` against a
-published row. An instance built natively on a non-amd64 host serves a hash that
-matches no row, so that check is unavailable to them. Build in the reference
+one cross-check that would be available to them is your served `/version.json`
+against a published row. **It is not available to them today**, because the
+record is not public (step 4 above); publishing it is a change Myne owes them.
+And an instance built natively on a non-amd64 host serves a hash that would
+match no row even once it is. Build in the reference
 environment, or tell them plainly that no published row will match what you
 serve.
 
