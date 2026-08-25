@@ -3043,7 +3043,7 @@
       "hideVaultNamesHelper": "On a device with a usable keychain the vault picker shows a vault's name once this device has unlocked it. With this on every vault shows a placeholder such as Vault 2 instead, and that number stays with the vault however the list reorders.",
       "hideVaultNamesErases": "Turning it on destroys the keys that make the names stored here readable, so those names cannot be recovered on this device, and no further name is written while it stays on.",
       "hideVaultNamesResidue": "It cannot reach a copy taken earlier: a full-system backup, a disk image, or any other system-level copy of this disk made while names were showing carries both the stored names and their keys.",
-      "hideVaultNamesUnavailable": "This device has no usable keychain, so Myne stores no vault name here and this option cannot be turned on. The picker already shows a placeholder for every vault.",
+      "hideVaultNamesUnavailable": "Myne can't store vault names in this copy of the app, so it stores none here and this option cannot be turned on. The picker already shows a placeholder for every vault.",
       "hideVaultNamesErrorRead": "Couldn't read the current setting. Flip the switch to set it again.",
       "hideVaultNamesErrorSave": "Couldn't save the setting, so it is unchanged. If you were turning it on, some stored names may already have been destroyed; turn it on again to finish.",
       "hideVaultNamesErrorErase": "One stored name couldn't be destroyed, so the setting was left off rather than claiming an erase that did not happen. Try again.",

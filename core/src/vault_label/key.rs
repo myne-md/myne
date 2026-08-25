@@ -111,18 +111,42 @@ pub const KEYCHAIN_PROBE_ACCOUNT: &str = "availability-probe";
 /// best-effort; a leftover probe item is inert (it is not a `VaultId`, so
 /// nothing reads it as a wrap key) and the next probe overwrites it.
 ///
-/// Only [`VaultLabelError::KeychainUnavailable`] reports unavailable. A
-/// transient backend error means the facility answered and failed, and telling
-/// someone their device cannot store vault names on the strength of one bad call
-/// would be a claim about the machine rather than about the call.
+/// **A permanent refusal reports unavailable whatever its code, and the retry is
+/// how that is decided without enumerating codes.** An earlier version keyed the
+/// verdict on `errSecMissingEntitlement` alone and mapped every other refusal to
+/// `Backend`, which `!matches!` then read as available: `errSecParam`,
+/// `errSecInteractionNotAllowed` and `errSecAuthFailed` all landed in exactly the
+/// looks-fine-does-nothing state this function exists to prevent, one code away
+/// from the one it caught. Enumerating the rest would be a denylist, and a
+/// denylist is wrong here by construction, because the next OSStatus nobody
+/// anticipated defaults to "available".
+///
+/// So the probe tries twice. `KeychainUnavailable` answers immediately, since
+/// the facility named itself. A `Backend` error is retried once, and a second
+/// failure of any kind reports unavailable. The asymmetry is deliberate and it
+/// runs the safe way: reporting available when it is not costs the user a
+/// feature that silently stores nothing forever, while reporting unavailable on
+/// a genuinely transient blip costs one Settings mount, because this probe runs
+/// on every one and the next answer corrects it. Telling someone their device
+/// cannot store vault names on the strength of ONE bad call would be a claim
+/// about the machine rather than about the call; saying it after two is a claim
+/// about the call, twice.
 ///
 /// **This is a probe, not a fallback.** Nothing anywhere reacts to a `false` by
 /// writing the name in the clear; the store simply holds nothing on such a
 /// device (`decisions.md` 2026-08-15).
 pub fn keychain_available(ops: &dyn LabelKeychain) -> bool {
-    let stored = ops.store(KEYCHAIN_PROBE_ACCOUNT, &[0u8]);
+    let available = match ops.store(KEYCHAIN_PROBE_ACCOUNT, &[0u8]) {
+        Ok(()) => true,
+        // The facility named itself. No retry can change that answer.
+        Err(VaultLabelError::KeychainUnavailable) => false,
+        // Anything else is one bad call OR a permanent refusal wearing another
+        // OSStatus, and a single attempt cannot tell them apart. A second one
+        // can: a transient failure passes, a permanent refusal repeats.
+        Err(_) => ops.store(KEYCHAIN_PROBE_ACCOUNT, &[0u8]).is_ok(),
+    };
     let _ = ops.delete(KEYCHAIN_PROBE_ACCOUNT);
-    !matches!(stored, Err(VaultLabelError::KeychainUnavailable))
+    available
 }
 
 /// The keychain account component for one vault: the canonical 36-char
@@ -512,12 +536,30 @@ mod tests {
 
     #[test]
     fn a_transient_backend_failure_is_not_reported_as_an_absent_keychain() {
-        // `store_fails` leaves `get` working, which is the probe's whole input.
-        // Only `KeychainUnavailable` means the facility is not there, and the
-        // row's sentence ("this device cannot store vault names") would be a
-        // lie about a keychain that answered.
-        let fake = FakeKeychain::failing_store();
+        // One bad call against a facility that is there. The row's sentence
+        // ("this device cannot store vault names") would be a lie about a
+        // keychain that answered, so the probe retries and the second attempt
+        // decides.
+        //
+        // This asserted over `failing_store()` until 2026-08-25, and that
+        // fixture fails EVERY store, permanently. So a test named for a
+        // transient failure was pinning the opposite: that a keychain which can
+        // never write is reported available. It was green, and it held the
+        // one-OSStatus gap below open.
+        let fake = FakeKeychain::store_fails_once();
         assert!(keychain_available(&fake));
+    }
+
+    #[test]
+    fn a_permanent_backend_refusal_is_reported_as_unavailable_whatever_its_code() {
+        // The gap the retry closes. `AppleKeychain::store` maps only
+        // `errSecMissingEntitlement` to `KeychainUnavailable` and sends every
+        // other refusal to `Backend`; `errSecParam`, `errSecInteractionNotAllowed`
+        // and `errSecAuthFailed` are all permanent and all arrive that way. A
+        // probe that read `Backend` as available left each of them in exactly the
+        // looks-fine-does-nothing state this whole function exists to prevent.
+        let fake = FakeKeychain::failing_store();
+        assert!(!keychain_available(&fake));
     }
 
     #[test]
