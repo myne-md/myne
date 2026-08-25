@@ -62,7 +62,7 @@ const SOURCE_LABEL: Readonly<Record<ImportSourceId, string>> = {
  * than read here so the function stays pure and testable.
  */
 export function reportTitle(source: ImportSourceId, stamp: string): string {
-  return `Import report — ${SOURCE_LABEL[source]} ${stamp}`;
+  return `Import report (${SOURCE_LABEL[source]}) ${stamp}`;
 }
 
 /** `YYYY-MM-DD HH.MM` — colon-free so the title is legal on every platform. */
@@ -78,7 +78,7 @@ function rows(lossy: readonly LossyNote[]): string[] {
   return lossy.map((n) => {
     const where = n.folder === null || n.folder.length === 0 ? "vault root" : n.folder;
     const what = n.dropped.map(label).join("; ");
-    return `- [[${n.title}]] — in \`${where}\` — ${what}`;
+    return `- [[${n.title}]] in \`${where}\`: ${what}`;
   });
 }
 

@@ -163,6 +163,39 @@ pub enum EngineError {
     /// guessed: `Backend::serializes_compute`.
     #[error("local-inference pass deferred to user-initiated work")]
     Deferred,
+    /// Asking cannot run because **no on-device embedding model is selected**
+    /// (myne-md/myne#545).
+    ///
+    /// Distinct from [`EngineError::NotReady`], and the distinction is the
+    /// whole reason it exists. Ask is retrieval-grounded, retrieval is refused
+    /// a remote provider unconditionally (SYNC-16), and the embedding model is
+    /// not bundled — so "a provider is named and working" and "asking can run"
+    /// are independent facts. Reporting `NotReady` here told a user who had
+    /// already named a provider to name one, which is advice they cannot act
+    /// on: the missing piece is a local search model, and no amount of provider
+    /// configuration supplies it.
+    ///
+    /// Nothing left the device on this path, and the refusal fires before the
+    /// question is embedded so that stays true.
+    #[error("no on-device embedding model is selected")]
+    NoEmbeddingModel,
+    /// An embedding model IS selected and the vault's index is **not built
+    /// yet** — the embed-on-unlock walk has not finished, or has not run.
+    ///
+    /// A state, not a failure, and separate from
+    /// [`EngineError::NoEmbeddingModel`] because the user's next move is
+    /// different: wait, rather than choose a model.
+    #[error("the search index is not ready yet")]
+    IndexNotReady,
+    /// The provider rejected the request itself (**HTTP 400**), as distinct
+    /// from rejecting the credential or the cost (myne-md/myne#547).
+    ///
+    /// Its own variant because the fix is on Myne's side rather than the
+    /// user's: a 400 says the request Myne built is one this provider will not
+    /// take. Collapsed into the generic failure it arrived as "the note could
+    /// not be read", which blames the vault for something the request did.
+    #[error("the provider rejected the request")]
+    RequestRejected,
 }
 
 impl EngineError {
@@ -190,6 +223,9 @@ impl EngineError {
             EngineError::EmptyCompletion => "empty_completion",
             EngineError::LocalModelMissing => "local_model_missing",
             EngineError::Deferred => "deferred",
+            EngineError::NoEmbeddingModel => "no_embedding_model",
+            EngineError::IndexNotReady => "index_not_ready",
+            EngineError::RequestRejected => "request_rejected",
         }
     }
 }

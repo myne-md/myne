@@ -209,7 +209,7 @@ pub trait Engine: Send + Sync {
     ///
     /// It is a separate method, not an `infer` parameter, because *which model*
     /// is the whole point: the tag role loads a first-party GGUF that ships
-    /// inside the signed build and has no picker override, so a user who never
+    /// inside the build itself and has no picker override, so a user who never
     /// side-loaded a generation model still gets suggestions, and a user who did
     /// does not get tag quality that varies with their pick.
     ///
@@ -1230,7 +1230,7 @@ mod agent_script_tests {
             AgentCompletion, AgentEngine, AgentRequest, AgentRequestClass,
         };
         use myne_core::plugins::agent::error::AgentError;
-        use myne_core::plugins::agent::probe::{run_probe, ProbeThreshold};
+        use myne_core::plugins::agent::probe::{run_probe, AttemptVerdict, ProbeThreshold};
 
         /// The stub behind the agent seam, mapped by the REAL `chat_shape` the
         /// desktop adapter uses. A second mapping written here would let this
@@ -1264,13 +1264,27 @@ mod agent_script_tests {
                 required: 2,
                 provisional: false,
             },
+            // This test is about the stub clearing the bar, not about progress.
+            &|_| {},
         ))
         .expect("the probe runs");
         assert!(
             verdict.passed,
             "the stub must be a backend Myne would offer agent mode on: {verdict:?}"
         );
-        assert_eq!(verdict.passes, 3, "and every attempt should be clean");
+        // **Every attempt that RAN was clean**, which is what this was always
+        // about; it used to say `passes == 3` and the number was a coincidence
+        // of the probe running every attempt regardless. Since the early exit
+        // (myne-md/myne#575) the bar of 2 settles it at 2, so asserting 3 would
+        // be asserting that the saving does not happen.
+        assert!(
+            verdict
+                .attempts
+                .iter()
+                .all(|a| *a == AttemptVerdict::Passed),
+            "the stub must not miss a single attempt it was asked: {verdict:?}"
+        );
+        assert_eq!(verdict.passes as usize, verdict.attempts.len());
     }
 
     #[test]

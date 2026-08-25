@@ -7,7 +7,9 @@
 // on the production binary without a forbidden hook, so they are
 // pinned at component level with a mocked `invoke` reject.
 //
-// - VaultAlreadyUnlocked / UnlockInProgress → banner literals.
+// - VaultAlreadyUnlocked / UnlockInProgress → banner literals. The first also
+//   asserts that nothing routes ON: see the case for why that is a security
+//   property (myne-md/myne#535).
 // - VaultRecoveryInProgress → the recovery-in-progress MODE (form
 //   suppressed, info banner, "Continue" → resume-recovery callback).
 // - JoinFailure → generic banner (the previously-untested trigger
@@ -35,11 +37,11 @@ import { Unlock } from "../../src/screens/Unlock";
 
 const PASSWORD = "component-test-password";
 
-function renderUnlock(overrides?: { onResumeRecovery?: () => void }) {
+function renderUnlock(overrides?: { onResumeRecovery?: () => void; onUnlocked?: () => void }) {
   return render(
     <Unlock
       initialStatus={{ kind: "Exists" }}
-      onUnlocked={() => {}}
+      onUnlocked={overrides?.onUnlocked ?? (() => {})}
       onStartRecovery={() => {}}
       onResumeRecovery={overrides?.onResumeRecovery ?? (() => {})}
       onDeleteVaultSuccess={() => {}}
@@ -96,12 +98,25 @@ describe("unreachable unlock error variants (component-level, mocked reject)", (
     ).toBe(false);
   });
 
-  it("VaultAlreadyUnlocked → its dedicated banner literal", async () => {
+  it("VaultAlreadyUnlocked → its dedicated banner literal, and no route on", async () => {
+    // The second assertion is the one myne-md/myne#535 added, and it is a
+    // security property rather than a rendering detail. That branch briefly
+    // routed this variant ON, on the argument that the vault is already open so
+    // no credential is owed. The variant comes from the slot-peek guard BEFORE
+    // any derivation, so routing on means entering the editor on a password
+    // nothing examined, and the state is reachable, because a `vault_lock`
+    // rejection still routes to this screen. Fail-closed is the answer; the web
+    // dead end it was written for is closed by porting `vault_slot_kind`.
+    const onUnlocked = vi.fn();
     rejectUnlockWith({ kind: "VaultAlreadyUnlocked" });
-    renderUnlock();
+    renderUnlock({ onUnlocked });
     await submitPassword();
     const banner = await screen.findByTestId("unlock.error-banner");
     expect(banner.textContent).toBe("Vault is already unlocked.");
+    expect(
+      onUnlocked,
+      "an unchecked credential must never open the editor",
+    ).not.toHaveBeenCalled();
   });
 
   it("UnlockInProgress → its dedicated banner literal", async () => {

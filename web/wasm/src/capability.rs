@@ -170,6 +170,14 @@ pub const DISPATCHED: &[&str] = &[
     // the guard that calls it fail-closes on an IPC REJECTION, so leaving it
     // unported turned a fully working session into "Unexpected state."
     "plugin:vault-unlock|vault_is_unlocked",
+    // The BOOT probe's runtime half (myne-md/myne#535). Read-only, like the two
+    // rows around it, and load-bearing for the same hidden reason: its caller
+    // swallows an IPC rejection into `"Empty"`, so leaving it unported did not
+    // fail. It made boot routing unable to see an unlocked slot at all, which
+    // sent a completed sign-in to the unlock form and then to a dead-end
+    // `VaultAlreadyUnlocked` banner. See `BOOT_PATH` below: this row is now
+    // required rather than optional.
+    "plugin:vault-unlock|vault_slot_kind",
     // #250: the authoritative active-vault id, straight off the slot map. The
     // TS side used to derive it from a best-effort disk cache; the delete it
     // targets is irreversible on this client too.
@@ -365,10 +373,21 @@ pub const DISPATCHED: &[&str] = &[
 /// Whole plugins with one classification. An entry applies to every command
 /// under that plugin unless [`PER_COMMAND`] overrides the specific name.
 ///
-/// Patterns rather than 185 literal strings on purpose: the classification is
-/// per **capability**, and a capability is a plugin far more often than it is a
-/// single command. Listing every name would bury the four genuinely
-/// per-command decisions in a wall of repetition.
+/// Patterns rather than one literal string per command on purpose: the
+/// classification is per **capability**, and a capability is a plugin far more
+/// often than it is a single command. Listing every name would bury the
+/// genuinely per-command decisions in a wall of repetition.
+///
+/// The count that used to stand in this sentence was stale by roughly a third
+/// when it was removed, which is the same failure the note under [`PER_COMMAND`]
+/// describes. Deleting it rather than correcting it is deliberate: a fresh
+/// number restarts the clock, and `scripts/check-web-command-coverage.mjs`
+/// prints the live one on every run.
+///
+/// A plugin default is a **quiet** answer, which is the property [`BOOT_PATH`]
+/// exists to withhold from a handful of names: `Pending` here means "a port is
+/// owed" and reads as a decision, so a command nobody ever considered inherits
+/// one and looks considered.
 const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // ── decided absent on web ────────────────────────────────────────────────
     //
@@ -550,8 +569,12 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     ("cli-bridge", Class::Unsupported),
 ];
 
-/// Per-command overrides of [`PLUGIN_DEFAULT`]. Four entries, each one a place
-/// where a plugin's capability genuinely splits per command.
+/// Per-command overrides of [`PLUGIN_DEFAULT`]. Each one is a place where a
+/// plugin's capability genuinely splits per command.
+///
+/// The count is deliberately not stated here. It said "four" while the list held
+/// ten (myne-md/myne#535), which is the failure mode of every hand-maintained
+/// tally sitting next to the thing it counts.
 const PER_COMMAND: &[(&str, Class)] = &[
     // The two phrase-typing entry points were `Unsupported` under `decisions.md`
     // 2026-07-26 and are **DISPATCHED** under 2026-08-15, which reverses that
@@ -685,6 +708,76 @@ pub fn classify(cmd: &str) -> Class {
 fn plugin_of(cmd: &str) -> Option<&str> {
     cmd.strip_prefix("plugin:")?.split('|').next()
 }
+
+/// The probes that decide which screen the user lands on, which may not be
+/// answered by a **plugin default** (myne-md/myne#535).
+///
+/// # Why these names get a rule of their own
+///
+/// A command whose port was missed normally announces itself: the call rejects
+/// and something on screen says so. These do not announce it the same way,
+/// because each is consumed by a caller that must produce an answer either way
+/// (a probe cannot leave the user on a loading shim), so an unported one is
+/// absorbed into a routing decision instead of surfacing as an error. Two shapes
+/// of absorption, and the first is the dangerous one:
+///
+/// * **Laundered into a plausible answer.** `probeSlotKind()` catches and
+///   returns `"Empty"`; `awaitingApprovalVerdict()` catches and returns `false`;
+///   `useStorageHealth`'s catch leaves the health `null`, i.e. "nothing wrong
+///   found". Each is a legitimate fallback and each is indistinguishable from a
+///   real answer.
+/// * **Fail-closed, loudly enough to see but not to diagnose.** `listVaults()`
+///   preserves the failure as `{err}` and routes to `unlock(IoError)`;
+///   `isVaultUnlocked()` rethrows and the Editor's mount guard renders
+///   "Unexpected state. Please restart." Neither is silent, and neither names
+///   the missing port either.
+///
+/// It has now happened twice. `vault_is_unlocked` shipped unported and replaced
+/// a fully working session with that error screen (`dispatch.rs` says so at its
+/// arm). `vault_slot_kind` shipped unported and made boot structurally unable to
+/// see an unlocked slot, so a completed sign-in landed on the unlock form and
+/// then on a dead-end `VaultAlreadyUnlocked` banner. Both times
+/// `check-web-command-coverage.mjs` was green, because `classify` answered from
+/// the plugin default and "classified" is all that guard asks for.
+///
+/// So the rule is narrow and mechanical: a name here must be argued for
+/// **by name**, in [`DISPATCHED`] or in [`PER_COMMAND`]. Inheriting
+/// `("vault-unlock", Pending)` is exactly the quiet outcome this list forbids.
+/// It does NOT assert what the answer is, since a future probe could legitimately
+/// be `Unsupported`. It asserts that somebody wrote one down, and that it is not still
+/// `Pending`, which for a probe means the client cannot honestly boot.
+///
+/// Enforced by [`tests::boot_path_commands_are_classified_by_name`]. Verified by
+/// breaking it: removing `vault_slot_kind` from [`DISPATCHED`] makes that test
+/// fail and name it.
+pub const BOOT_PATH: &[&str] = &[
+    // `App.tsx`'s boot `Promise.all`: the disk list and the runtime slot.
+    "plugin:vault-unlock|vault_list",
+    "plugin:vault-unlock|vault_slot_kind",
+    // The Editor's mount-time reality check, and the storage-health probe the
+    // same screen polls.
+    "plugin:vault-unlock|vault_is_unlocked",
+    "plugin:vault-unlock|vault_storage_health",
+    // The awaiting-approval verdict's two reads. Not boot any more, since #535
+    // moved that verdict to the first screen AFTER unlock, and they are here
+    // anyway because the membership rule is about the CALLER, not the moment:
+    // both reads are made by a caller that converts a rejection into a plausible
+    // answer, which is the whole property this roster exists to withhold from a
+    // plugin default.
+    //
+    // They fail in OPPOSITE directions, and each direction is bad in its own
+    // way, so neither may be inherited:
+    //
+    // * `sync_head_fingerprint` is caught into `null`, which means "this device
+    //   has adopted no head" and routes TOWARD the compare. Unported, it would
+    //   send every approved browser to the wait screen on every reload, forever.
+    //   That is the reported #535 symptom wearing a different mask.
+    // * `sync_status` is caught into `false`, which reads as "this device is not
+    //   waiting for anything" on the one client where waiting is the normal
+    //   first state.
+    "plugin:sync|sync_head_fingerprint",
+    "plugin:sync|sync_status",
+];
 
 #[cfg(test)]
 mod tests {
@@ -822,6 +915,47 @@ mod tests {
                     .iter()
                     .any(|(other, _)| other == plugin),
                 "duplicate PLUGIN_DEFAULT entry: {plugin}"
+            );
+        }
+    }
+
+    #[test]
+    fn boot_path_commands_are_classified_by_name() {
+        // myne-md/myne#535. The rule is about WHERE the answer comes from, not
+        // what it is: a boot probe whose caller converts a rejection into a
+        // plausible answer must be argued for by name, because a plugin default
+        // makes "nobody considered this" and "we decided" look identical from
+        // every other check in the tree.
+        //
+        // The floor first, because everything below it is a loop over the
+        // roster: emptying `BOOT_PATH` would leave the body unrun and this test
+        // green, which is the shape of a guard that has stopped checking. Pinned
+        // at the measured count, so a probe cannot silently drop off the list.
+        assert!(
+            BOOT_PATH.len() >= 6,
+            "BOOT_PATH lost entries: {} left, and this test is a loop over it",
+            BOOT_PATH.len()
+        );
+        for cmd in BOOT_PATH {
+            let named = DISPATCHED.contains(cmd) || PER_COMMAND.iter().any(|(name, _)| name == cmd);
+            assert!(
+                named,
+                "{cmd} is a boot-path probe, so it must appear in DISPATCHED or PER_COMMAND \
+                 by name. It currently inherits {:?} from its plugin default, which is the \
+                 silent answer this list exists to forbid.",
+                classify(cmd)
+            );
+            // The second assertion is not implied by the first: `PER_COMMAND`
+            // may legitimately carry any `Class`, so a name could be argued for
+            // BY NAME and still resolve to `Pending`. For a probe that is the
+            // one answer the client cannot boot honestly on, whichever table it
+            // came from. It also catches a renamed entry, which drops out of
+            // both tables and lands back on the plugin default.
+            assert_ne!(
+                classify(cmd),
+                Class::Pending,
+                "{cmd} is a boot-path probe and classifies as Pending: either the name was \
+                 changed and this roster is stale, or the port is genuinely owed"
             );
         }
     }

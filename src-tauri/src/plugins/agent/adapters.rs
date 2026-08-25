@@ -92,7 +92,15 @@ pub(super) fn agent_error_of(e: EngineError) -> AgentError {
         EngineError::RemoteBarred | EngineError::NoModel | EngineError::LocalModelMissing => {
             AgentError::EditFormatUnsupported
         }
-        _ => AgentError::ReadFailed,
+        // A 400 is the provider declining the REQUEST, which is Myne's to fix
+        // rather than the user's (myne-md/myne#547).
+        EngineError::RequestRejected => AgentError::ProviderRejected,
+        // **`ProviderFailed`, not `ReadFailed`.** The catch-all used to answer
+        // `ReadFailed`, which the loop ALSO produces for a note that could not
+        // be decrypted, so every backend failure reached the user wearing the
+        // vault's name. The two are different faults with different fixes and
+        // they no longer share a tag.
+        _ => AgentError::ProviderFailed,
     }
 }
 
@@ -148,6 +156,27 @@ pub(crate) fn chat_shape(
         }
     }
     (system, messages)
+}
+
+/// How much of the USER'S WRITING this request carries.
+///
+/// Split out of [`EngineAdapter::complete`] so it can be tested: the count is
+/// the compensating control `docs/decisions/ai/0515` clause 2 and
+/// `docs/threat-model.md` both rest on for the remote arm having no per-run
+/// volume bound, and a control nothing exercises is a claim.
+///
+/// Reads `AgentRequest` rather than the shaped `(system, messages)` pair
+/// because `chat_shape` flattens the provenance tags into strings, and the tag
+/// is the whole question: `Content::UntrustedNote` is what came out of a note,
+/// `Content::Trusted` is what Myne wrote.
+pub(crate) fn note_chars(request: &AgentRequest) -> usize {
+    request
+        .messages
+        .iter()
+        .flat_map(|m| m.content.iter())
+        .filter(|span| matches!(span, Content::UntrustedNote(_)))
+        .map(|span| span.text().chars().count())
+        .sum()
 }
 
 #[async_trait::async_trait]
@@ -209,17 +238,36 @@ impl AgentEngine for EngineAdapter<'_> {
         // posts `/api/chat` with a real `messages` array and its own system
         // role. Neither is invented here; both already existed for chat, and
         // the agent was the surface not using them.
+        // **Counted BEFORE the shaping, and only over the note-derived spans**
+        // (myne-md/myne#578). It used to sum `system` plus every shaped message,
+        // i.e. everything handed to the engine — and `docs/decisions/ai/0515`
+        // clause 2 says what this figure is for in as many words: "the question
+        // the user is asking is how much of their writing left the machine".
+        // Myne's own instruction is not their writing, and it dominated the
+        // answer: on a measured run the total was 8 105 characters of which
+        // 6 810 were the system prompt sent three times and 579 were note text.
+        // A number that is roughly 84% constant barely responds to the thing it
+        // exists to measure, and `threat-model.md` names it as the compensating
+        // control for the remote arm having no per-run volume bound, so it has
+        // to be responsive to be worth anything.
+        //
+        // `chat_shape` flattens the provenance tags into strings, which is why
+        // this reads `request.messages` instead: `Content` distinguishes what
+        // the host wrote from what came out of a note, and that distinction is
+        // exactly the question being asked.
+        //
+        // **It over-counts, in the safe direction, and the reason is worth
+        // knowing.** The model's own reply is tagged `Content::note(reply)`
+        // wholesale, so a bare `{"action":"list_scope"}` counts too. That is
+        // right for the case that matters — an anchor in a reply IS text copied
+        // verbatim out of a note, going back off-device — and the residual is a
+        // few tens of characters of JSON per turn. Under-counting would be the
+        // dangerous direction and this cannot do it.
+        //
+        // Characters rather than bytes, unchanged: a byte count overstates the
+        // answer for every non-ASCII vault.
+        let chars_off_device = offdevice.then(|| note_chars(request));
         let (system, messages) = chat_shape(request, &|s| chatml::sanitize_chatml(s));
-        // Counted over exactly what is handed to the engine. Characters rather
-        // than bytes: the summary answers "how much of my writing left the
-        // machine", and a byte count overstates that for every non-ASCII vault.
-        let chars_off_device = offdevice.then(|| {
-            system.chars().count()
-                + messages
-                    .iter()
-                    .map(|m| m.content.chars().count())
-                    .sum::<usize>()
-        });
         let cancel = Arc::clone(&self.cancel);
         let request_cancel = Arc::clone(&self.cancel);
         let reply = tokio::task::spawn_blocking(move || {
@@ -414,6 +462,71 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use myne_core::plugins::agent::engine::Message as AgentMessage;
+
+    /// The disclosure figure answers the question `0515` says it answers.
+    ///
+    /// It used to sum the SHAPED request — Myne's own system instruction plus
+    /// every message — so on a measured run it reported 8 105 characters "of
+    /// your notes" for a note of 457, with 6 810 of that being the system prompt
+    /// sent three times. A figure that is ~84% constant barely responds to the
+    /// thing it exists to measure, and `threat-model.md` names it as the
+    /// compensating control for the remote arm having no per-run volume bound.
+    #[test]
+    fn the_off_device_figure_counts_note_text_and_not_mynes_own_prompt() {
+        let request = AgentRequest {
+            messages: vec![
+                AgentMessage {
+                    role: Role::System,
+                    // The dominant term in the old count, and the one thing here
+                    // that is definitionally not the user's writing.
+                    content: vec![Content::Trusted("x".repeat(2000))],
+                },
+                AgentMessage {
+                    role: Role::User,
+                    content: vec![
+                        // Host prose framing a tool result: also not their
+                        // writing.
+                        Content::Trusted("y".repeat(100)),
+                        Content::note("note body"),
+                    ],
+                },
+            ],
+        };
+        assert_eq!(note_chars(&request), "note body".chars().count());
+    }
+
+    #[test]
+    fn the_off_device_figure_counts_characters_rather_than_bytes() {
+        // `0515` is explicit: a byte count overstates the answer for every
+        // non-ASCII vault, and the question is how much of their WRITING left.
+        let request = AgentRequest {
+            messages: vec![AgentMessage {
+                role: Role::User,
+                content: vec![Content::note("işaretlenmemiş")],
+            }],
+        };
+        assert_eq!(note_chars(&request), 14);
+    }
+
+    #[test]
+    fn a_request_carrying_no_note_text_reports_zero_rather_than_its_scaffold() {
+        // The probe's shape: system instruction plus a synthetic task, no note
+        // anywhere. It used to count over two thousand characters.
+        let request = AgentRequest {
+            messages: vec![
+                AgentMessage {
+                    role: Role::System,
+                    content: vec![Content::Trusted("x".repeat(2000))],
+                },
+                AgentMessage {
+                    role: Role::User,
+                    content: vec![Content::Trusted("a synthetic shopping list".into())],
+                },
+            ],
+        };
+        assert_eq!(note_chars(&request), 0);
+    }
 
     /// **The agent's generation must go through the ROLE-STRUCTURED surface**,
     /// and nothing pinned that (myne-md/myne#531 review round six).

@@ -7,10 +7,15 @@
 //! something nobody designed, and guessing what it meant is how a fourth
 //! capability arrives without a decision.
 //!
-//! Actions are one JSON object per line. Line-delimited rather than one JSON
-//! document because a truncated or trailing-prose reply then costs the actions
-//! after the break rather than all of them, which is the common failure on a
-//! small local model.
+//! The model is ASKED for one JSON object per line, and a stream of objects
+//! rather than one JSON document, because a truncated or trailing-prose reply
+//! then costs the actions after the break rather than all of them, which is the
+//! common failure on a small local model.
+//!
+//! What is READ is a shade wider than what is asked for: an object may span
+//! lines, since a backend that pretty-prints its JSON is answering the question
+//! correctly in a shape the first parser could not see at all. See
+//! [`parse_actions`] for where the tolerance stops.
 
 use super::edit::ProposedEdit;
 use super::engine::{AgentRequest, Content, Message, Role};
@@ -26,6 +31,13 @@ pub enum AgentAction {
     ReadNote { note_id: String },
     /// Tool 3.
     SearchScope { query: String },
+    /// Tool 4: search the WHOLE vault, and be told where the matches are.
+    ///
+    /// In-scope matches come back as ids to read; everything else comes back as
+    /// a folder name and a count, never an id and never a title. See
+    /// [`super::tools::search_vault`] for why that split is the security
+    /// boundary rather than a rendering choice.
+    SearchVault { query: String },
     /// Verb 1: propose an anchored edit to a note in scope.
     ProposeEdit {
         note_id: String,
@@ -44,6 +56,27 @@ pub enum AgentAction {
     RequestScope { folder: String, reason: String },
     /// Done. Everything proposed so far goes to review.
     Finish { summary: String },
+}
+
+impl AgentAction {
+    /// The action's name, as a `&'static str` from this file's own vocabulary.
+    ///
+    /// Safe to log by construction: it is one of seven compile-time strings and
+    /// cannot carry anything the model wrote. That is the whole reason it
+    /// exists rather than a `Debug` format of the value, which would print the
+    /// note id, the anchor and the replacement with it.
+    pub fn verb(&self) -> &'static str {
+        match self {
+            Self::ListScope => "list_scope",
+            Self::ReadNote { .. } => "read_note",
+            Self::SearchScope { .. } => "search_scope",
+            Self::SearchVault { .. } => "search_vault",
+            Self::ProposeEdit { .. } => "propose_edit",
+            Self::ProposeNote { .. } => "propose_note",
+            Self::RequestScope { .. } => "request_scope",
+            Self::Finish { .. } => "finish",
+        }
+    }
 }
 
 /// A proposed new note, before the user has approved it.
@@ -82,10 +115,45 @@ pub fn system_instructions() -> String {
         "{\"action\":\"list_scope\"}\n",
         "{\"action\":\"read_note\",\"note_id\":\"...\"}\n",
         "{\"action\":\"search_scope\",\"query\":\"...\"}\n",
+        "{\"action\":\"search_vault\",\"query\":\"...\"}\n",
         "{\"action\":\"propose_edit\",\"note_id\":\"...\",\"anchor\":\"...\",\"replacement\":\"...\"}\n",
         "{\"action\":\"propose_note\",\"title\":\"...\",\"body\":\"...\"}\n",
         "{\"action\":\"request_scope\",\"folder\":\"...\",\"reason\":\"...\"}\n",
         "{\"action\":\"finish\",\"summary\":\"...\"}\n\n",
+        // **The shape of the exchange, which the instructions never described**
+        // (myne-md/myne#574). They listed the actions and stopped, so nothing
+        // told the model that the next message it receives IS its own tool's
+        // answer. A run spent four requests calling `list_scope` four times
+        // with the answer already in its context. The per-result framing in
+        // `run_loop.rs` is the other half of this; both were needed.
+        // **The seed, named so it gets used** (myne-md/myne#578). The opening
+        // message already carries the scope, and its bodies when the scope is
+        // one note, because the host resolved both before the loop began. A
+        // model that calls `list_scope` anyway gets the same answer at the cost
+        // of a whole provider request, so the saving depends on it knowing the
+        // answer is already there.
+        "Your scope is listed in the first message you receive, and when it is ",
+        "a single note that message carries the note's whole text as well. Use ",
+        "what is there: do not call list_scope or read_note for anything you ",
+        "have already been given.\n\n",
+        "After each action you take, the next message you receive is the ",
+        "result of that action. Read it and move on: do not repeat a call you ",
+        "have already made, because the answer will not have changed. When you ",
+        "have what you need, finish, and put the answer to the user's question ",
+        "in the summary — finish is how you reply to a question, not only how ",
+        "you end an edit.\n\n",
+        "search_scope looks inside the notes you were given. search_vault looks ",
+        "at the whole vault: matches inside your scope come back as ids you can ",
+        "read, and matches outside it come back only as a folder name and a ",
+        "count. You cannot read those notes. Those counts describe the matches ",
+        "this search ranked, not the vault, so do not report them as totals. If ",
+        "the material you need is in one of those folders, use request_scope ",
+        "and say which.\n\n",
+        "A note_id must be copied EXACTLY from what list_scope or search_vault ",
+        "returned, character for character. An id you retyped or shortened names ",
+        "no note, and the edit is discarded rather than guessed at: nothing here ",
+        "matches a near-miss onto a real note. If an id is refused, take the ",
+        "right one from list_scope rather than asking for a wider scope.\n\n",
         "The anchor of an edit must be text you have READ from that note, ",
         "copied exactly, and it must occur exactly once in the note. If it does ",
         "not match exactly the edit is discarded, so read the note first and ",
@@ -122,18 +190,157 @@ pub fn build_request(task: &str, transcript: &[Message]) -> AgentRequest {
 
 /// Parse the model's reply into actions.
 ///
-/// Unparseable lines are skipped rather than failing the whole reply, because a
+/// Unparseable input is skipped rather than failing the whole reply, because a
 /// small model routinely emits a sentence of prose alongside its JSON and
 /// discarding the valid actions with it would make the feature unusable. An
 /// object that parses but names an unknown action is skipped by the same rule:
 /// serde rejects it, and nothing here invents a meaning for it.
+///
+/// **An object may span lines.** This used to require a line that, trimmed, was
+/// itself a whole JSON object, which is what the instructions ask for and is
+/// not what every backend does: a model that pretty-prints its JSON produced
+/// ZERO actions from a perfectly good reply, every turn, and the loop's only
+/// stop was the 24-iteration ceiling (myne-md/myne#543). So the scan is
+/// brace-balanced instead, and the tolerance is deliberately narrow in two
+/// ways. An object may only START where a line starts, so an unbalanced `{` in
+/// the middle of a sentence cannot swallow the real action after it. And the
+/// vocabulary is untouched: this accepts a different SHAPE, never a verb
+/// `AgentAction` does not name.
+///
+/// The truncation property the line scan had is kept, and for the same reason:
+/// an object that never closes costs the actions after the break rather than
+/// all of them, because everything before it has already been collected.
 pub fn parse_actions(reply: &str) -> Vec<AgentAction> {
-    reply
-        .lines()
-        .map(str::trim)
-        .filter(|l| l.starts_with('{'))
-        .filter_map(|l| serde_json::from_str::<AgentAction>(l).ok())
+    scan_objects(reply)
+        .into_iter()
+        .filter_map(|o| serde_json::from_str::<AgentAction>(o).ok())
         .collect()
+}
+
+/// Every balanced object the scan finds, as slices of `reply`.
+///
+/// Split out of [`parse_actions`] so [`reply_shape`] counts the SAME objects
+/// the parse saw. A second scanner would be a second opinion about where an
+/// object starts, and the diagnostic would then describe a reply the parser
+/// never read.
+fn scan_objects(reply: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut rest = reply;
+    while let Some(start) = next_object_start(rest) {
+        let candidate = &rest[start..];
+        let Some(end) = object_end(candidate) else {
+            // Unbalanced from here on: a truncated reply, or prose that opened
+            // a brace and never closed it. Nothing after it can be read.
+            break;
+        };
+        out.push(&candidate[..end]);
+        rest = &candidate[end..];
+    }
+    out
+}
+
+/// What a reply LOOKED LIKE, in counts.
+///
+/// The diagnostic for "the model answered and the loop got nothing out of it",
+/// which is myne-md/myne#543's failure and cost a code read to identify. Every
+/// field is a count.
+///
+/// **No part of the reply is carried, and the omission that matters most is the
+/// unknown verb's NAME.** A count of them is here; the string is not. The model
+/// chooses that string, note text can steer what it writes, and an `"action"`
+/// value is exactly where steered text would land. So it is treated as
+/// note-derived and stays out of the log, which is the same rule
+/// `src-tauri/CLAUDE.md` states for every other model output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ReplyShape {
+    /// Lines in the reply.
+    pub lines: usize,
+    /// Lines whose first non-whitespace character is `{`, i.e. how many places
+    /// the scan could have started.
+    pub brace_lines: usize,
+    /// Balanced objects the scan found.
+    pub objects: usize,
+    /// Objects that parsed into an action.
+    pub actions: usize,
+    /// Objects that were valid JSON and named something `AgentAction` does not.
+    /// A model using a verb nobody designed is worth seeing; WHICH verb is not
+    /// safe to print. See the type note.
+    pub unknown_verbs: usize,
+}
+
+/// Describe a reply without quoting it.
+pub fn reply_shape(reply: &str) -> ReplyShape {
+    let objects = scan_objects(reply);
+    let mut shape = ReplyShape {
+        lines: reply.lines().count(),
+        brace_lines: reply
+            .lines()
+            .filter(|l| l.trim_start().starts_with('{'))
+            .count(),
+        objects: objects.len(),
+        ..ReplyShape::default()
+    };
+    for object in objects {
+        if serde_json::from_str::<AgentAction>(object).is_ok() {
+            shape.actions += 1;
+        } else if serde_json::from_str::<serde_json::Value>(object).is_ok() {
+            shape.unknown_verbs += 1;
+        }
+    }
+    shape
+}
+
+/// Byte offset of the next `{` that begins a line (leading whitespace aside).
+///
+/// The line anchor is the whole safety of the brace scan: prose is full of
+/// braces, and one of them opening a scan that then eats the next real action
+/// is a worse failure than not reading the pretty-printed object at all.
+fn next_object_start(s: &str) -> Option<usize> {
+    let mut offset = 0usize;
+    for line in s.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('{') {
+            return Some(offset + (line.len() - trimmed.len()));
+        }
+        offset += line.len();
+    }
+    None
+}
+
+/// Byte offset one past the `}` that closes the object `s` starts with, or
+/// `None` when it never closes.
+///
+/// String-aware, because a JSON value legitimately contains braces: an anchor
+/// copied out of a note can be `if (x) {`, and counting that brace would leave
+/// the scan looking for a close that is not coming.
+fn object_end(s: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (i, c) in s.char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match c {
+            '"' => in_string = true,
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(i + c.len_utf8());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -177,6 +384,8 @@ mod tests {
             "\n",
             r#"{"action":"search_scope","query":"q"}"#,
             "\n",
+            r#"{"action":"search_vault","query":"q"}"#,
+            "\n",
             r#"{"action":"propose_edit","note_id":"n1","anchor":"a","replacement":"b"}"#,
             "\n",
             r#"{"action":"propose_note","title":"T","body":"B"}"#,
@@ -185,7 +394,7 @@ mod tests {
             "\n",
             r#"{"action":"finish","summary":"done"}"#,
         );
-        assert_eq!(parse_actions(lines).len(), 7);
+        assert_eq!(parse_actions(lines).len(), 8);
     }
 
     #[test]
@@ -207,9 +416,98 @@ mod tests {
     }
 
     #[test]
+    fn a_pretty_printed_object_is_read_rather_than_ignored() {
+        // The shape that produced zero actions every turn and left the loop
+        // spinning to its ceiling (myne-md/myne#543).
+        let reply = "{\n  \"action\": \"read_note\",\n  \"note_id\": \"n1\"\n}";
+        assert_eq!(
+            parse_actions(reply),
+            vec![AgentAction::ReadNote {
+                note_id: "n1".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn a_fenced_pretty_printed_object_is_read_too() {
+        let reply = "```json\n{\n  \"action\": \"list_scope\"\n}\n```";
+        assert_eq!(parse_actions(reply), vec![AgentAction::ListScope]);
+    }
+
+    #[test]
+    fn several_pretty_printed_objects_all_come_back() {
+        let reply = concat!(
+            "{\n  \"action\": \"list_scope\"\n}\n",
+            "{\n  \"action\": \"read_note\",\n  \"note_id\": \"n1\"\n}\n",
+        );
+        assert_eq!(
+            parse_actions(reply),
+            vec![
+                AgentAction::ListScope,
+                AgentAction::ReadNote {
+                    note_id: "n1".into()
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn a_truncated_pretty_printed_object_keeps_the_ones_before_it() {
+        let reply = concat!(
+            "{\n  \"action\": \"list_scope\"\n}\n",
+            "{\n  \"action\": \"read_note\",\n  \"note_id\": \"n",
+        );
+        assert_eq!(parse_actions(reply), vec![AgentAction::ListScope]);
+    }
+
+    #[test]
+    fn a_brace_inside_a_value_does_not_end_the_object() {
+        // An anchor is text copied verbatim out of a note, so it can contain
+        // anything, braces included. Counting one would leave the scan hunting
+        // for a close that never comes and drop a valid edit.
+        let reply = concat!(
+            "{\n",
+            "  \"action\": \"propose_edit\",\n",
+            "  \"note_id\": \"n1\",\n",
+            "  \"anchor\": \"if (x) {\",\n",
+            "  \"replacement\": \"if (y) {\"\n",
+            "}\n"
+        );
+        assert_eq!(
+            parse_actions(reply),
+            vec![AgentAction::ProposeEdit {
+                note_id: "n1".into(),
+                anchor: "if (x) {".into(),
+                replacement: "if (y) {".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_unbalanced_brace_mid_sentence_does_not_swallow_the_action_after_it() {
+        // The reason the scan may only START at a line start. Without that
+        // anchor the prose brace opens an object that closes on the action's
+        // own `}`, and the whole reply parses to nothing.
+        let reply = "Here is my plan { and then\n{\"action\":\"list_scope\"}";
+        assert_eq!(parse_actions(reply), vec![AgentAction::ListScope]);
+    }
+
+    #[test]
     fn the_instructions_name_the_anchor_rule_the_host_enforces() {
         let s = system_instructions();
         assert!(s.contains("exactly once"));
         assert!(s.contains("request_scope"));
+    }
+
+    #[test]
+    fn the_instructions_say_what_a_vault_search_may_not_do() {
+        // myne-md/myne#552. The tool's whole boundary is that an out-of-scope
+        // match yields a folder and a count rather than something readable, and
+        // a model that is not told will report those counts as vault totals and
+        // try to read what it cannot.
+        let s = system_instructions();
+        assert!(s.contains("search_vault"));
+        assert!(s.contains("cannot read those notes"));
+        assert!(s.contains("not the vault"));
     }
 }

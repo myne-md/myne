@@ -9,10 +9,13 @@
 // Direct-to-code per the owner directive; mobile has no i18n → plain strings,
 // EXCEPT the load-bearing literal, which is never i18n'd or paraphrased anyway.
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useSyncStatus } from "../lib/use-sync-status";
 import { SYNC_INTEGRITY_ALERT } from "../lib/load-bearing-copy";
+// The desktop rule, imported rather than reimplemented: the two clients must
+// agree on when a failure is old enough to interrupt, or one of them is wrong.
+import { isSyncStale } from "@myne/sync-staleness";
 
 const DISMISS: CSSProperties = {
   marginInlineStart: "auto",
@@ -106,7 +109,18 @@ export function SyncBanners({ onVerifyDevices, onOpenConflicts }: SyncBannersPro
   const showReconcile = reconciling;
   const showIntegrity = integrityAlert && !integrityDismissed;
   const showConflicts = conflictCount > 0;
-  if (!showReconcile && !showIntegrity && !showConflicts) return null;
+  // myne#583, the desktop twin's fourth strip. A phone is the client most
+  // likely to sit for days on a network that half-works, and the sync panel is
+  // several taps deep, so a silent multi-day failure is if anything easier to
+  // miss here than on the desktop. Re-armed on recovery for the same reason.
+  const [staleDismissed, setStaleDismissed] = useState(false);
+  const syncStale =
+    status?.state === "error" && isSyncStale(status.last_success_at, Date.now());
+  useEffect(() => {
+    if (!syncStale) setStaleDismissed(false);
+  }, [syncStale]);
+  const showStale = syncStale && !staleDismissed;
+  if (!showReconcile && !showIntegrity && !showConflicts && !showStale) return null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
@@ -119,6 +133,23 @@ export function SyncBanners({ onVerifyDevices, onOpenConflicts }: SyncBannersPro
         >
           {t("sync.banner.conflictsNeedReview", { count: conflictCount })}
         </button>
+      )}
+      {showStale && (
+        <div role="alert" data-testid="sync.stale-warning" style={INTEGRITY}>
+          {/* No date and no elapsed count: AS6/AS15 keep per-device sync
+              wall-clocks off this screen, and this file's own header states
+              that rule. The stamp behind it answers the threshold only. */}
+          <span style={{ minWidth: 0 }}>{t("sync.stale.body")}</span>
+          <button
+            type="button"
+            aria-label={t("common.dismiss")}
+            onClick={() => setStaleDismissed(true)}
+            style={DISMISS}
+            data-testid="sync.stale-dismiss"
+          >
+            ×
+          </button>
+        </div>
       )}
       {showReconcile && (
         <div role="status" data-testid="sync.reconcile-banner" style={RECONCILE}>

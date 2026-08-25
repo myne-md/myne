@@ -15,7 +15,7 @@
 // table and the transcript on teardown, so a proposal the user never approved
 // simply ceases to exist.
 
-import { invoke } from "../platform/core";
+import { Channel, invoke } from "../platform/core";
 
 /** What the user approved as a scope. Mirrors the Rust `ScopeGrant`.
  *
@@ -70,7 +70,12 @@ export type LoopEnd =
   | { kind: "finished" }
   | { kind: "awaitingScope"; folder: string; reason: string }
   | { kind: "cancelled" }
-  | { kind: "exhaustedIterations" };
+  | { kind: "exhaustedIterations" }
+  /** The model stopped making progress: three replies in a row produced no
+   *  action, or only tool calls the run had already made. A different end from
+   *  `exhaustedIterations` because the user's next move is different — a model
+   *  that cannot hold the format, rather than a run that ran out of room. */
+  | { kind: "stalled"; barrenIterations: number };
 
 /** What a start or a resume produced. */
 export interface AgentStepResult {
@@ -185,10 +190,21 @@ export interface ProbeVerdict {
 export async function agentStart(
   task: string,
   grant: ScopeGrant,
+  /** Called with the run's view as soon as the host has created it, which is
+   *  long before this promise resolves.
+   *
+   *  A run's first leg used to be unaddressable: this call returns only when
+   *  the loop has stopped, and its reply was the only thing that ever carried a
+   *  run id, so for minutes the surface had a `running` run with no id, no
+   *  scope total and no Stop (myne-md/myne#544). */
+  onOpen?: (view: AgentRunView) => void,
 ): Promise<AgentStepResult> {
+  const channel = new Channel<AgentRunView>();
+  if (onOpen !== undefined) channel.onmessage = onOpen;
   return await invoke<AgentStepResult>("plugin:agent|agent_start", {
     task,
     grant,
+    onOpen: channel,
   });
 }
 
@@ -324,9 +340,28 @@ export async function agentLastRun(): Promise<AppliedRun | null> {
   return await invoke<AppliedRun | null>("plugin:agent|agent_last_run");
 }
 
-/** Whether the configured backend can hold the anchored edit format. */
-export async function agentCapability(): Promise<ProbeVerdict> {
-  return await invoke<ProbeVerdict>("plugin:agent|agent_capability");
+/** Which probe attempt is in flight (myne-md/myne#575). Counts only. */
+export interface ProbeProgress {
+  /** 1-based. */
+  attempt: number;
+  /** The most that will be asked; the probe stops earlier once the verdict is
+   *  settled, so this is an allowance rather than a promise. */
+  of: number;
+}
+
+/** Whether the configured backend can hold the anchored edit format.
+ *
+ *  `onAttempt` is called before each request goes out. This call was measured at
+ *  40 seconds on a remote provider, and until it reported progress the surface
+ *  showed one unchanging label for the whole of it, which reads as a hang. */
+export async function agentCapability(
+  onAttempt?: (progress: ProbeProgress) => void,
+): Promise<ProbeVerdict> {
+  const channel = new Channel<ProbeProgress>();
+  if (onAttempt !== undefined) channel.onmessage = onAttempt;
+  return await invoke<ProbeVerdict>("plugin:agent|agent_capability", {
+    onAttempt: channel,
+  });
 }
 
 /** Whether an edit would take a note OUT of the working set.

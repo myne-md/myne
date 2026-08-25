@@ -109,7 +109,10 @@ export function QuickUnlockEntry({
         // Folding away is honest AND non-destructive: the credential is never
         // wiped and no failed attempt is burned (the provider errors before the
         // counter — `quick_unlock_with_dir`), so it works again the moment the
-        // user runs a signed build.
+        // user runs a signed build. Which today is nobody on macOS: the released
+        // `.dmg` is unsigned too, not just `tauri dev` (docs/threat-model.md §1 A9,
+        // myne-md/myne#214), so this arm is the normal macOS outcome rather than a
+        // developer-only one.
         case "HardwareUnavailable":
           onUnavailable();
           return;

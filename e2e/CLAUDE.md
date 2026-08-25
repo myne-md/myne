@@ -58,8 +58,12 @@
   `src/lib/load-bearing-copy.ts` (or `ioBanner(...)` where production renders
   that mapping). A copy collapse must fail a test.
 - **KDF policy:** weak-KDF generator fixtures by default (legal: unlock reads
-  params from `vault.meta`; creation stays pinned — no code branch). The VR-1
-  recovery drill + creation scenarios run PRODUCTION params every pipeline.
+  params from `vault.meta`; creation stays pinned, with no code branch). The VR-1
+  recovery drill and the creation scenarios run PRODUCTION params on every run of
+  the manual E2E workflow. Until myne-md/myne#579 that read "every pipeline",
+  which is the half of `docs/decisions/ops/0181` this change retired alongside
+  the merge gate: the drill still runs at m=256 MiB, t=3, p=2, but no push runs
+  it.
 
 ## Authoring conventions
 
@@ -109,6 +113,18 @@
   fresh-container boot flake. (A no-rebuild `e2e-one.sh` loop is the wrong tool for the
   3× gate.) Persisting `RUSTUP_HOME` as a volume — or baking the pinned toolchain into
   `e2e/Dockerfile` — would remove the re-provision cost; tracked as a separate infra item.
+- **`rustc ... (signal: 9, SIGKILL)` on `myne_desktop_lib` is the OOM killer, not a compile
+  error, and the message says neither.** What the runner prints is `error: could not compile
+  myne-desktop (lib)` followed by the whole rustc invocation and `failed to build app`, which
+  reads exactly like a broken build and sends you looking at the diff. Nothing in it mentions
+  memory. The cause is the VM's ceiling against cargo's default parallelism: a colima or
+  Docker Desktop VM is commonly 8 to 10 GiB, an unrelated container stack can hold a couple of
+  those, and eight concurrent `opt-level=3` rustc jobs on the top crate do not fit in what is
+  left. The tell is that the SAME commit built minutes earlier, and that the failure moves
+  between runs rather than naming a line. Fix by capping jobs rather than by touching the
+  code: `CARGO_BUILD_JOBS=3` costs wall clock and changes nothing about the artifact, so the
+  run still proves what the 3× gate asks. `docker stats --no-stream` during the build is how
+  you confirm it, and it is worth doing before believing a red build on an unchanged tree.
 - Post-exit assertions (disk state AFTER the app quit): launch with
   `keepDataDir: true`, capture `dataHome` in the SEED callback (the
   launch-failure path leaks the dir otherwise), gate on
@@ -122,11 +138,17 @@
   is the gate, with `./scripts/e2e-batch.sh <spec>…` when several specs need
   it. `./scripts/e2e-local.sh` runs the whole suite and is the wrong tool for
   proving one scenario. Invocations: `docs/dev/e2e.md`.
-- **`describeE2E.flaky` takes a scenario OUT of the merge gate.** It is the
-  quarantine marker (`support/scenario.ts`): the blocking `e2e` CI step skips
-  the flaky set so an unrelated PR cannot go red on someone else's contention
-  flake, and the non-blocking `e2e-quarantine` step (`MYNE_E2E_QUARANTINE=1`,
-  `failure: ignore`) runs only them and reports without gating. Reserve it for a
+- **This suite is not a merge gate and has not been one since
+  myne-md/myne#579.** It lives in `.woodpecker/e2e.yml`, a workflow that runs
+  only on a manual trigger carrying `RUN_E2E=true`, and the release runbook owns
+  that trigger. A green push pipeline says nothing about any scenario in this
+  directory. `docs/dev/e2e.md` "When CI runs these suites" has the procedure.
+- **`describeE2E.flaky` takes a scenario out of the counted set.** It is the
+  quarantine marker (`support/scenario.ts`): the `e2e` step skips the flaky set,
+  and the `e2e-quarantine` step (`MYNE_E2E_QUARANTINE=1`, `failure: ignore`)
+  runs only them and reports without gating. What counts is `e2e-floor`'s pair
+  of numbers, a floor on scenarios EXECUTED and a ceiling on scenarios FAILED,
+  and a quarantined scenario leaves both. Reserve it for a
   scenario verified as a runner-contention victim, keep the set short, and
   record the debt on the tracking issue — a real failure marked `.flaky` is a
   real failure nobody will see. Currently quarantined: `nav1`, `tp1`, `ci1`, `gp1`,
@@ -272,7 +294,7 @@
 - **The AI lane needs BOTH halves, and until recently neither was reachable
   locally.** A scenario gated on `MYNE_E2E_AI=1` also needs the binary built
   `--features local-inference-stub`, or `StubEngine` is not the backend and the
-  gate is meaningless; `.woodpecker.yml` pairs them and `e2e-buildrun.sh`
+  gate is meaningless; `.woodpecker/e2e.yml` pairs them and `e2e-buildrun.sh`
   supplies neither. That is the mechanism by which a whole family of specs was
   written and never run once on a developer machine. `scripts/e2e-ai-buildrun.sh`
   pairs them; repeating a spec argument runs it that many times in the same warm

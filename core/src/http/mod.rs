@@ -94,8 +94,19 @@ pub enum TransportError {
     NotConfigured,
     /// Connection / DNS / socket failure.
     Network,
-    /// TLS handshake or certificate-pin failure (A4).
+    /// TLS handshake failure that is NOT a pin mismatch: a protocol error, an
+    /// expired or malformed certificate, a version or cipher disagreement.
     Tls,
+    /// The server presented a certificate whose hash is not in the pin set (A4).
+    ///
+    /// Split out from [`TransportError::Tls`] because it is the one transport
+    /// failure with a **specific user remedy** and the one that does not clear
+    /// on its own. A certificate renewal changes the leaf DER and therefore the
+    /// pin, so this fires on every connection until the user re-trusts the new
+    /// certificate out of band. Collapsing it into `Tls` cost four days of dead
+    /// sync reported as a generic "Sync error", with the diagnosis the pinned
+    /// verifier had already produced thrown away one stack frame above it.
+    CertPinMismatch,
     /// The request could not be built (bad path, etc.).
     BadRequest,
 }

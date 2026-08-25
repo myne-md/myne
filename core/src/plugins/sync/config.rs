@@ -154,6 +154,25 @@ pub enum SyncConfigError {
     /// attacker's value and retry (`pin_confirm`'s module doc).
     #[error("the server certificate does not match the confirmed fingerprint")]
     FingerprintMismatch,
+    /// The server could not be reached, or the TLS handshake failed. Its own
+    /// variant because it used to be reported as [`SyncConfigError::InvalidUrl`],
+    /// which sent a user whose server was merely down to go and check a URL
+    /// that was correct.
+    #[error("the sync server could not be reached")]
+    Unreachable,
+    /// This device already trusts a certificate for this endpoint and the
+    /// server presented a different one, with no out-of-band confirmation
+    /// supplied. **Nothing was written**, and the captured fingerprint is not
+    /// reported, for `FingerprintMismatch`'s reason: handing it back would let
+    /// the user paste it straight into the confirmation field and re-trust
+    /// whatever they were just served.
+    ///
+    /// This is the ordinary certificate-renewal case as well as the attack one,
+    /// and the client cannot tell them apart — which is exactly why it asks
+    /// rather than deciding. Before this variant existed, re-entering the URL
+    /// silently replaced the pin with whatever the connection produced.
+    #[error("the server presented a different certificate than the pinned one")]
+    CertificateChanged,
 }
 
 /// The storage seam's closed error, straight through (phase3-web-client task 86).
@@ -186,9 +205,12 @@ impl From<super::pin_confirm::PinConfirmError> for SyncConfigError {
         match e {
             P::ConfirmationRequired => SyncConfigError::PinConfirmationRequired,
             P::FingerprintMismatch => SyncConfigError::FingerprintMismatch,
-            // Couldn't reach / handshake — the pre-task-5 answer, kept so an
-            // unreachable server still reads as a URL problem to the existing UI.
-            P::Transport => SyncConfigError::InvalidUrl,
+            // Its own variant since myne#581. Reporting a handshake failure as
+            // `InvalidUrl` told a user whose server was down, or whose
+            // certificate had just been replaced, to go and check a URL that
+            // was right — and it is the same conflation, one layer up, that
+            // made a pin mismatch read as a generic network failure.
+            P::Transport => SyncConfigError::Unreachable,
         }
     }
 }

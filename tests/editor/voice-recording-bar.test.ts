@@ -64,7 +64,7 @@ describe("mountRecordingBar", () => {
     vi.advanceTimersByTime(3000);
     const warning = el("voice-record.warning") as HTMLElement;
     expect(warning.hidden).toBe(false);
-    expect(warning.textContent).toBe("No audio detected — check your microphone.");
+    expect(warning.textContent).toBe("No audio detected. Check your microphone.");
     handle.teardown();
   });
 

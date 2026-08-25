@@ -89,32 +89,52 @@ self-host, this document gives you the **mechanism**, and you choose the number 
 
 ## 5. Verifying the server image
 
-You should verify the image you run rather than trust a tag. The server image is **reproducibly built and
-signed** (extending the desktop reproducible-signed-build commitment to the container):
+You should verify the image you run rather than trust a tag. **One of the three checks below ships and
+two do not, and this section presented all three as current until 2026-08-25** (`decisions.md` entry
+0534). It also called them an extension of a desktop reproducible-signed-build commitment; desktop has
+neither reproducibility nor a signature (`threat-model.md` §1 A9), so there was nothing to extend.
 
-- **Signature (offline):** the image and its SBOM attestation are signed with our hardware-held key. Verify
-  with the **public key alone** — no transparency log or external CA is required, so you can verify
-  **air-gapped**.
-- **Reproducibility:** rebuild the image from the public source and compare the resulting digest to the
+- **Reproducibility (shipped).** Rebuild the image from source and compare the resulting digest to the
   published one (`rebuild → digest-compare`). Equal digests mean the published image is exactly that
-  source.
-- **SBOM:** a CycloneDX SBOM is attached as a digest-bound attestation listing what is in the image.
+  source. `myne-server`'s pipeline runs this gate on every push (`scripts/repro-gate.sh`), so it is
+  checked rather than merely offered. The source is not public today, which bounds who can perform it.
+- **Signature (designed, not shipped).** The plan is `cosign` over the image and its SBOM attestation
+  with an offline hardware-held key, verifiable with the public key alone and therefore air-gapped, with
+  no transparency log or external CA. **Nothing signs the image today**: there is no signing step in
+  `myne-server`'s pipeline and the key-custody procedure it depends on is unwritten. Do not go looking
+  for a signature to verify.
+- **SBOM (designed, not shipped).** A CycloneDX SBOM attached as a digest-bound attestation, scanned
+  advisory-only. Not attached today.
 
-The mechanical commands are in the `myne-ops` reproducible-build runbook.
+Both of the unshipped two are deferred beta work rather than dropped commitments: they are the
+signing half of the compensating-controls set in `threat-model.md` §6 and they are expected before v1.
+Until they land, verify the reproducibility and do not assume the other two.
+
+The mechanical commands for the part that works are in the `myne-ops` reproducible-build runbook.
 
 ## 6. Certificate trust
 
-Your client must trust the server's TLS certificate. On a **native client** (desktop, mobile) the SCRAM
-channel binding additionally ties the authenticated session to that exact certificate, so a
-man-in-the-middle presenting a different certificate fails to authenticate.
+Your client must trust the server's TLS certificate. On a **native client** (desktop, mobile) that trust
+is a **certificate pin**, and the pin is the whole of it: the pinned verifier replaces CA-chain validation,
+so a certificate other than the pinned one fails the handshake outright.
 
-**This does not hold for the web client, and will not.** A browser exposes neither TLS-exporter keying
-material nor a certificate-pinning API to page JavaScript, so a browser session rests on the browser's own
-trust store and nothing more — permanently, not pending some later release (`decisions.md` 2026-07-26).
-What is unchanged either way: a man-in-the-middle on the sync connection sees only ciphertext. What a web
-client additionally depends on is the origin that serves it the client code, which is a separate boundary
-with a separate adversary (`threat-model.md` TB11 / A15) — and if you self-host the web client too, that
-origin is yours.
+**The SCRAM channel binding adds nothing to that in any deployment fronted by a terminating proxy**, which
+is every deployment described here, the bundle's own Caddy edge included. The `-PLUS` `tls-exporter`
+binding is wired end to end on both sides, and it engages **only when the server process itself terminates
+TLS 1.3** (`decisions.md` 2026-07-13); behind a proxy that terminates TLS, both ends bind to empty and the
+exchange degrades to plain SCRAM-SHA-256 riding pinned TLS. So the man-in-the-middle resistance in the
+paragraph above is the pin's, and the binding is latent rather than a second lock on the same door. Making
+it real is a topology change — the server terminates TLS 1.3 and the proxy moves to TCP passthrough — and
+either way it is gated behind the standing R3 primitive-level review, which is also why no surface in the
+client presents certificate trust as *verified* (`threat-model.md` §1 A4).
+
+**Neither the pin nor the binding is available to the web client, and neither ever will be.** A browser
+exposes neither TLS-exporter keying material nor a certificate-pinning API to page JavaScript, so a
+browser session rests on the browser's own trust store and nothing more — permanently, not pending some
+later release (`decisions.md` 2026-07-26). What is unchanged either way: a man-in-the-middle on the sync
+connection sees only ciphertext. What a web client additionally depends on is the origin that serves it
+the client code, which is a separate boundary with a separate adversary (`threat-model.md` TB11 / A15) —
+and if you self-host the web client too, that origin is yours.
 
 - **Hosted:** a build-time static pin for the hosted endpoint is the **settled design** (`decisions.md`
   2026-06-20) and is **not shipped**. The hosted certificate and domain do not exist yet, so the client's
@@ -127,7 +147,13 @@ origin is yours.
   certificate it was served, and verifies every later connection against that pin; you **eye-compare the
   fingerprint** the client shows you across your devices (the same out-of-band channel the device-approval
   gate already uses). It is *assumed* trust rather than verified cryptography — the first connection is
-  taken on faith, and the eye-compare is what turns it into something you checked. A loopback `http`
+  taken on faith, and the eye-compare is what turns it into something you checked. **When you renew
+  that certificate, connected clients stop syncing until they trust the new one** — the pin is the
+  whole certificate's hash, so any renewal invalidates it, and the client says so specifically rather
+  than reporting a network error. Re-entering the server URL asks you for the new fingerprint (get it
+  with `openssl x509 -noout -fingerprint -sha256 -in <your certificate file>`) and will not adopt a
+  different certificate without it; that refusal is deliberate, because a renewal and an impostor look
+  identical from the client's side. A loopback `http`
   endpoint has no certificate, so nothing is pinned and the client reports that rather than implying a
   pin. A **browser cannot pin at all** (above): it reports that the platform's trust store is doing the
   verifying, which is a third answer rather than a missing one.

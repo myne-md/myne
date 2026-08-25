@@ -663,6 +663,7 @@ pub fn engine_error_of(e: super::provider_transport::ProviderTransportError) -> 
         T::Unauthorized => EngineError::Unauthorized,
         T::QuotaExhausted => EngineError::QuotaExhausted,
         T::Cancelled => EngineError::Deferred,
+        T::RequestRejected => EngineError::RequestRejected,
         T::Exchange => EngineError::InferenceFailed,
     }
 }

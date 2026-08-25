@@ -28,7 +28,9 @@ import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
 import { has } from "./platform/capabilities";
 import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
-import { isPendingApproval } from "./lib/pending-approval";
+import { lockVault } from "./lib/vault-unlock";
+import { useIdleAutoLock } from "./hooks/useIdleAutoLock";
+import { awaitingApprovalVerdict } from "./lib/pending-approval";
 import { leaveActiveVault, switchVault } from "./lib/vault-switch";
 import { prefsRead } from "./lib/prefs";
 import { applyTheme, applyCustomTheme } from "./lib/theme";
@@ -160,21 +162,65 @@ function App() {
       // slot is detected and routes to `recover`. Routing keys only on
       // the slot KIND, never the vault id (the runtime owns active-vault
       // identity), so the synthetic key below is purely structural.
-      // The third probe (MYND-635) rides in the same `Promise.all` rather than
-      // after it: it is another cheap read, independent of the other two, so
-      // boot still blocks on the slowest single probe instead of their sum.
-      // What it adds is the one fact the other two structurally cannot carry —
-      // that a `vault.meta` on disk can belong to a device which has not been
-      // approved yet and can therefore read nothing out of it.
-      const [vaultList, activeSlotKind, pendingApproval] = await Promise.all([
-        listVaults(),
-        probeSlotKind(),
-        isPendingApproval(),
-      ]);
+      // Two probes, not three. MYND-635 added an `isPendingApproval()` read
+      // here and myne-md/myne#535 removed it, because the question it asked
+      // cannot be answered before the vault is unlocked: on the web client an
+      // approved device whose session token died with the tab
+      // (`docs/decisions/clients/0363`) is on disk indistinguishable from one
+      // nobody has approved. Routing on it sent every reload to a screen that
+      // asks for no password, and the only exit from pending needs `root_key`.
+      // The verdict is taken after unlock instead, where the screen it routes to
+      // can actually make progress: `awaitingApprovalVerdict` below.
+      const [vaultList, activeSlotKind] = await Promise.all([listVaults(), probeSlotKind()]);
       const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
-      setStage(initialStageFromProbe(vaultList, slotMap, pendingApproval));
+      setStage(initialStageFromProbe(vaultList, slotMap));
     })();
   }, [stage]);
+
+  // The awaiting-approval verdict (myne-md/myne#535), the probe that used to
+  // ride in the `Promise.all` above, moved to where it can be answered.
+  //
+  // It runs on ENTERING the editor rather than at boot, and the reason is the
+  // SCREEN rather than the reads. Both reads the verdict makes are device-local
+  // and neither needs `root_key`, so the question itself is askable earlier; the
+  // wait it routes to is not reachable earlier. The only exit from pending is
+  // `try_claim_token`, which runs inside a sync cycle, and the cycle refuses on a
+  // locked vault before it reaches the claim. A pre-unlock wait screen therefore
+  // cannot make progress, which is exactly the deadlock MYND-635's boot arm
+  // shipped. What boot genuinely cannot do is tell the two devices apart:
+  // `docs/decisions/clients/0363` makes the web token session-scoped, so before
+  // unlock an approved device and an unapproved one present the identical
+  // identity-present + token-absent pair. See `src/lib/pending-approval.ts` for
+  // the two reads and why their order is load-bearing.
+  //
+  // The per-client difference lives INSIDE the verdict, not here. A desktop
+  // device can be pending too, and evicting it from a vault that opens perfectly
+  // well would be a regression there. That rule belongs with the module
+  // that owns what each answer means, where a capability-substitution test can
+  // reach it. It used to sit in `initialStageFromProbe`, covered per client by
+  // the stage harness; putting it in this effect instead would have moved the
+  // one behaviour that still differs between the clients into the one place
+  // nothing asserts.
+  //
+  // `setStage` functionally rather than through `dispatch`, which is defined
+  // below the loading-shim early return and so is not in scope here. The
+  // functional form is also what keeps this race-free: a lock or a switch that
+  // lands between the verdict being asked for and coming back leaves `prev` on
+  // some other stage, and `transition` rejects the action rather than dragging
+  // the user back out of it.
+  useEffect(() => {
+    if (stage?.name !== "editor") return;
+    let cancelled = false;
+    void awaitingApprovalVerdict().then((awaiting) => {
+      if (cancelled || !awaiting) return;
+      setStage((prev) =>
+        prev?.name === "editor" ? transition(prev, { type: "editor.awaiting-approval" }) : prev,
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [stage?.name]);
 
   // Out-of-band stage reset for fail-closed recovery (Q5β-1
   // belt+suspenders). Bypasses the transition fn intentionally — the
@@ -252,6 +298,88 @@ function App() {
   // In-session changes from Settings → Appearance call `applyTheme` directly
   // (disk-first), so this effect only handles the stage-transition path.
   const stageName = stage?.name;
+
+  // The idle auto-lock for the ONE post-unlock stage that is not the editor
+  // (myne-md/myne#535).
+  //
+  // `editor.awaiting-approval` deliberately leaves the vault unlocked, because
+  // the wait exists so the sync cycle can claim a token and the claim needs
+  // `root_key`. But the stage renders `AccountBootstrap`, not `Editor`, and on
+  // the web client the only idle auto-lock there is lives inside `Editor`
+  // (`useIdleAutoLock`, mounted at its bottom). So without this the transition
+  // routes a user to a screen holding live keys where no timer will ever fire,
+  // and the wait has no outbound transition of its own: `threat-model.md` §1 A6
+  // rates the stolen-unlocked-device case mitigated ON auto-lock zeroizing those
+  // keys, and its per-client clause qualifies the web timer as weaker, never as
+  // absent on a whole screen.
+  //
+  // It is also the reachable-by-the-server half of the same fact. The verdict
+  // asks the network nothing, but the state it reads is one a server controls: a
+  // device holds no adopted head for exactly as long as the server withholds
+  // approval, and TB5 assumes a server that may refuse service. So a server that
+  // simply never approves parks every browser on this screen with a live
+  // `root_key` in RAM. A timer that runs on the stage removes the value of doing
+  // that.
+  //
+  // `enabled` is left to the hook's own default, which is "wherever
+  // `osIdleAutoLock` is absent", so desktop is untouched and the two clocks
+  // never race. The timeout is the same `auto_lock_seconds` pref the editor
+  // uses; `0` disables, which is what a failed read falls back to.
+  const [pendingIdleSecs, setPendingIdleSecs] = useState(0);
+  useEffect(() => {
+    if (stageName !== "pending-approval") {
+      setPendingIdleSecs(0);
+      return;
+    }
+    let cancelled = false;
+    void prefsRead()
+      .then((prefs) => {
+        if (!cancelled) setPendingIdleSecs(prefs.auto_lock_seconds ?? 0);
+      })
+      .catch(() => {
+        /* leave it disabled rather than inventing a deadline */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stageName]);
+  useIdleAutoLock({
+    timeoutSecs: pendingIdleSecs,
+    onIdle: () => {
+      // Nothing to flush here: this screen edits nothing. Lock, then re-probe,
+      // which lands on the password form because the slot is empty again.
+      //
+      // **The `catch` is not a best-effort lock, and the earlier comment here
+      // said it was.** It read: "if the lock IPC rejects, the slot stays
+      // unlocked, the reprobe reads it, and the user lands in the EDITOR, which
+      // holds the same live keys." That failure is not reachable, and a comment
+      // understating a guarantee is the same defect as one overstating it: the
+      // next reader either adds a control for nothing or stops trusting a
+      // guarantee that holds (myne-md/myne#540).
+      //
+      // `lock_with_state` takes the slot and returns `Ok(())` with no fallible
+      // step after the take, and `lock_from_host`'s only `?` is on that call, so
+      // the command cannot report a failure while leaving the slot unlocked. On
+      // web the reachable rejections are: a FATAL Worker, which is the side
+      // holding the keys, so its death is what the lock was for; `unsupported`,
+      // which `scripts/check-web-command-coverage.mjs` holds closed; and a
+      // structured-clone throw while posting, which needs a payload this command
+      // does not take. On desktop the Tauri IPC can fail transport-side, but
+      // desktop's auto-lock is the Rust timer in `auto_lock.rs` and never comes
+      // through here at all.
+      //
+      // So the `catch` exists to keep the `finally` reachable, not to absorb a
+      // half-locked vault. `teardownStep` (`lib/vault-unlock.ts`) is the guard
+      // that matters on this path: it stops a throwing pre-lock reset from
+      // skipping the lock IPC entirely.
+      void lockVault()
+        .catch(() => {
+          /* see above: no reachable rejection leaves the slot unlocked */
+        })
+        .finally(() => reprobe());
+    },
+  });
+
   useEffect(() => {
     if (stageName !== "editor") {
       applyTheme(null);
