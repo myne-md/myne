@@ -27,6 +27,11 @@ pub(crate) struct FakeKeychain {
     items: Mutex<Vec<(String, Vec<u8>)>>,
     calls: Mutex<Vec<String>>,
     store_fails: bool,
+    /// Fails the FIRST `store` and accepts every one after it. The transient
+    /// shape the probe's retry exists for, and distinct from `store_fails`,
+    /// which never recovers: a fixture that fails forever cannot model
+    /// "transient" and a test named for it was asserting the opposite.
+    store_fails_once: Mutex<bool>,
     unavailable: bool,
     /// Accounts whose `delete` refuses. One account rather than a global flag,
     /// because the property the sweep has to prove is that a failure on ONE
@@ -40,6 +45,7 @@ impl FakeKeychain {
             items: Mutex::new(Vec::new()),
             calls: Mutex::new(Vec::new()),
             store_fails: false,
+            store_fails_once: Mutex::new(false),
             store_unavailable: false,
             unavailable: false,
             delete_fails_for: Mutex::new(Vec::new()),
@@ -51,6 +57,17 @@ impl FakeKeychain {
     pub(crate) fn failing_store() -> Self {
         Self {
             store_fails: true,
+            ..Self::empty()
+        }
+    }
+
+    /// A keychain whose FIRST store fails and whose second succeeds: one bad
+    /// call against a facility that is there. `failing_store` cannot model this,
+    /// because it never recovers, and the probe's retry is what separates the
+    /// two.
+    pub(crate) fn store_fails_once() -> Self {
+        Self {
+            store_fails_once: Mutex::new(true),
             ..Self::empty()
         }
     }
@@ -139,6 +156,13 @@ impl LabelKeychain for FakeKeychain {
         }
         if self.store_fails {
             return Err(VaultLabelError::Backend);
+        }
+        {
+            let mut once = self.store_fails_once.lock().unwrap();
+            if *once {
+                *once = false;
+                return Err(VaultLabelError::Backend);
+            }
         }
         self.put(account, secret.to_vec());
         Ok(())
