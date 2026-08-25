@@ -377,4 +377,4 @@ export const MOBILE_REFUSAL_TITLE = "Open Myne's app on this device";
 
 /** Where to go instead. Named clients, not a vague suggestion. */
 export const NATIVE_HANDOFF =
-  "Myne's desktop app (macOS, Windows, Linux) and mobile app (iOS, Android) have no such limit, and they verify their own signature before running, which a web page cannot.";
+  "Myne's desktop app (macOS, Linux) and mobile app (Android) have no such limit, and an app you install stays installed: if you kept the file you downloaded, it is still on your disk to compare against the hash Myne publishes for the current release. Nothing does that comparison for you. No Windows build and no installable iOS build are published yet. A web page is re-sent to your browser every visit, and your browser checks nothing on it.";

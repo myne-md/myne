@@ -89,18 +89,28 @@ self-host, this document gives you the **mechanism**, and you choose the number 
 
 ## 5. Verifying the server image
 
-You should verify the image you run rather than trust a tag. The server image is **reproducibly built and
-signed** (extending the desktop reproducible-signed-build commitment to the container):
+You should verify the image you run rather than trust a tag. **One of the three checks below ships and
+two do not, and this section presented all three as current until 2026-08-25** (`decisions.md` entry
+0534). It also called them an extension of a desktop reproducible-signed-build commitment; desktop has
+neither reproducibility nor a signature (`threat-model.md` §1 A9), so there was nothing to extend.
 
-- **Signature (offline):** the image and its SBOM attestation are signed with our hardware-held key. Verify
-  with the **public key alone** — no transparency log or external CA is required, so you can verify
-  **air-gapped**.
-- **Reproducibility:** rebuild the image from the public source and compare the resulting digest to the
+- **Reproducibility (shipped).** Rebuild the image from source and compare the resulting digest to the
   published one (`rebuild → digest-compare`). Equal digests mean the published image is exactly that
-  source.
-- **SBOM:** a CycloneDX SBOM is attached as a digest-bound attestation listing what is in the image.
+  source. `myne-server`'s pipeline runs this gate on every push (`scripts/repro-gate.sh`), so it is
+  checked rather than merely offered. The source is not public today, which bounds who can perform it.
+- **Signature (designed, not shipped).** The plan is `cosign` over the image and its SBOM attestation
+  with an offline hardware-held key, verifiable with the public key alone and therefore air-gapped, with
+  no transparency log or external CA. **Nothing signs the image today**: there is no signing step in
+  `myne-server`'s pipeline and the key-custody procedure it depends on is unwritten. Do not go looking
+  for a signature to verify.
+- **SBOM (designed, not shipped).** A CycloneDX SBOM attached as a digest-bound attestation, scanned
+  advisory-only. Not attached today.
 
-The mechanical commands are in the `myne-ops` reproducible-build runbook.
+Both of the unshipped two are deferred beta work rather than dropped commitments: they are the
+signing half of the compensating-controls set in `threat-model.md` §6 and they are expected before v1.
+Until they land, verify the reproducibility and do not assume the other two.
+
+The mechanical commands for the part that works are in the `myne-ops` reproducible-build runbook.
 
 ## 6. Certificate trust
 

@@ -396,6 +396,18 @@ pre-commit:
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n.mjs
 
+    i18n-coverage:
+      # The companion to i18n-catalog above, covering what that guard leaves out
+      # by design: it gates the ENGLISH source only, so translation coverage can
+      # fall for weeks with every gate green (myne-md/myne#589: the same 215
+      # keys missing from all 31 catalogs). Three hard checks (roster parity both
+      # ways, no partial plural group, placeholder parity) plus a generated
+      # record, docs/dev/i18n-coverage.md, that --check compares.
+      # Deliberately NOT globbed: the record is a docs/** file, so a hand edit to
+      # it is a docs-only commit any code glob would skip. Regenerate with
+      # `node scripts/check-i18n-coverage.mjs --emit`.
+      run: node scripts/check-i18n-coverage.mjs --check
+
     decisions-index:
       # docs/decisions.md is generated over docs/decisions/**. Without this, the first person to
       # add a decision hand-edits the index, and the next regeneration silently discards it.

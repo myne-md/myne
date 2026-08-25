@@ -209,7 +209,7 @@ pub trait Engine: Send + Sync {
     ///
     /// It is a separate method, not an `infer` parameter, because *which model*
     /// is the whole point: the tag role loads a first-party GGUF that ships
-    /// inside the signed build and has no picker override, so a user who never
+    /// inside the build itself and has no picker override, so a user who never
     /// side-loaded a generation model still gets suggestions, and a user who did
     /// does not get tag quality that varies with their pick.
     ///
