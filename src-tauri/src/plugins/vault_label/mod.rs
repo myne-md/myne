@@ -8,8 +8,9 @@
 //! It also owns `vault_label_keychain_status`, which answers a different
 //! question for the same row: whether this device has a usable keychain at all.
 //! On one that does not, the option cannot store a name however it is set, and
-//! the row says so instead of appearing inert. It reads one keychain item that
-//! does not exist and reports whether the facility answered.
+//! the row says so instead of appearing inert. It attempts one WRITE under a
+//! non-`VaultId` probe account and deletes it again, because a read succeeds on
+//! a build that cannot write and that is the whole defect it exists to catch.
 //!
 //! ## Why its own plugin rather than a pair added to `vault-unlock`
 //!
