@@ -87,7 +87,7 @@
   scenario took the work, the same way a ceiling RAISE has to argue for itself.
   One thing the guard will stop you on: if the item you delete was its entry's
   LAST manual item, that entry now needs an `exemptionReason` of at least 40
-  characters. `decisions.md` 2026-08-21 (myne-md/myne#548).
+  characters. `decisions.md` 2026-08-25 (myne-md/myne#548).
 
 ## Authoring conventions
 

@@ -151,9 +151,14 @@ Git hooks are managed by **lefthook** (`lefthook.yml`, which is the authoritativ
 one no compiler and no CI lane can supply. Every desktop E2E scenario runs in a Linux container
 against WebKitGTK, so a flow that works there is verified on exactly one of the eight client surfaces the roster
 counts (`CLIENTS` in `scripts/check-manual-test-roster.mjs`). One other lane exists, `e2e-web/`,
-which drives the web client in Chromium. Between them they still leave seven surfaces with no
-automated UI coverage at all: macOS desktop, Windows desktop, Safari (the web client's other
-engine), iOS, Android, the `myne` CLI and the browser clipper. So a
+which drives the web client in Chromium. Between them they reach two of those eight, and no
+count is given here on purpose, because this sentence has already been wrong three ways: what
+matters is which surface is in which state, and a number invites a reader to trust the arithmetic
+instead of the list. `desktop-linux` is covered. `web` is covered on Chromium alone, so its other
+engine is not. `cli` and `clipper` have scenarios that the roster leans on by name
+(`e2e/cli-thin-client.e2e.ts`, `e2e/clipper-install.e2e.ts`), but both execute only inside that same
+Linux container, so what they lack is a second platform rather than a scenario. `desktop-macos`,
+`desktop-windows`, `ios` and `android` have no automated UI coverage at all. So a
 new file in any of the guard's six denominators (`src/screens/`, `src/components/settings/`, `web/src/screens/`, `web/src/components/settings/`, `mobile/src/app/flows/`, `e2e/*.e2e.ts`) owes a verdict in the
 same change, and `scripts/check-manual-test-roster.mjs` fails the commit until it has one. Two
 things discharge it and the guard's own message offers both: a roster entry claiming the file, or a
