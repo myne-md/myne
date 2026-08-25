@@ -426,9 +426,9 @@ Used in: MYND-444
 
 ### **code-signed releases** &nbsp; 🛠️ *Tooling*
 
-Myne desktop installers and auto-update payloads are cryptographically signed with hardware-backed keys controlled by the team. Auto-update verification (`threat-model.md` §3 TB7) refuses any artifact that fails signature or hash check. The signing keys are themselves the largest unmitigated risk against A9 (compromised distribution).
+**Retired as a description of Myne, and kept as the term it is not.** This entry said Myne's desktop installers and auto-update payloads were signed with hardware-backed keys and that auto-update refused any artifact failing the check. Every clause is false: no Apple Developer ID and no Windows Authenticode certificate exists, so the `.dmg`, `.deb`, `.AppImage` and `.pkg.tar.zst` carry no signature any OS checks, and there is no in-app auto-update to verify anything (`threat-model.md` TB7 and A9, corrected by `decisions.md` 2026-08-15 entry 0496; this definition was missed by that sweep and corrected by entry 0534). What Myne actually has is **signed release hashes**: each release's `SHA256SUMS` is signed with an offline **minisign** key and cross-published on a second origin, and the user verifies it by hand. The signature authenticates the hash list, not the installer, and no operating system checks it. The Android `.apk` is the one artifact carrying an OS-checked signature, because Android refuses to install an unsigned package.
 
-Used in: `threat-model.md` §3 TB7, §6
+Used in: `threat-model.md` TB7, §4 A9, §6
 
 ### **CodeMirror 6** &nbsp; 🛠️ *Tooling*
 
@@ -1181,9 +1181,9 @@ Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **locale catalog** &nbsp; 🛠️ *Tooling*
 
-A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are **Weblate**-managed and must not be hand-edited in the repo (that races Weblate) — with one recorded exception, the 2026-08-03 in-repo backfill that brought all 31 to 100%, which `decisions.md` explains is not a precedent. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's.
+A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are owned by **Weblate**. The repo rule was "never hand-edit one", suspended twice for in-repo backfills (2026-08-03, 2026-08-25) and now suspended on a stated condition rather than by exception: while `translate.myne.md` has closed registration and no translators enrolled, the catalogs are filled in-repo. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's. How complete each one is, is not asserted anywhere in prose: `docs/dev/i18n-coverage.md` is generated from the catalogs and gated by `scripts/check-i18n-coverage.mjs --check`, because the four documents that did carry a figure kept asserting 100% for three weeks after 215 keys had stopped being translated in every language.
 
-Used in: `docs/dev/i18n.md`; `locales/`.
+Used in: `docs/dev/i18n.md`; `docs/dev/i18n-coverage.md`; `locales/`.
 
 ### **KDF (Key Derivation Function)** &nbsp; 🏗️ *Construction*
 

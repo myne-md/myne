@@ -2353,6 +2353,8 @@
     "submit": "Migrate",
     "migrating": "Migrating…",
     "done": "Migrated {{count}} notes to the new format.",
+    "done_one": "Migrated {{count}} note to the new format.",
+    "done_other": "Migrated {{count}} notes to the new format.",
     "settle": {
       "intro": "Your vault was upgraded. The old copy is still on this device until you finish up. Until then, changing your password won't lock it away.",
       "confirm": "Everything looks right, remove the old copy",
@@ -4308,7 +4310,7 @@
     "unsupported": {
       "title": "Myne can’t run in this browser",
       "mobileTitle": "Open Myne's app on this device",
-      "handoff": "Myne's desktop app (macOS, Windows, Linux) and mobile app (iOS, Android) have no such limit, and they verify their own signature before running, which a web page cannot.",
+      "handoff": "Myne's desktop app (macOS, Linux) and mobile app (Android) have no such limit, and an app you install stays installed: if you kept the file you downloaded, it is still on your disk to compare against the hash Myne publishes for the current release. Nothing does that comparison for you. No Windows build and no installable iOS build are published yet. A web page is re-sent to your browser every visit, and your browser checks nothing on it.",
       "reason": {
         "desktop-form-factor": "Myne in the browser is built for a desktop computer. It needs the memory and the input a phone or tablet browser cannot give it. On this device the Myne app is the better client anyway: it is faster, it works offline, and it keeps your notes when the browser clears its storage.",
         "webassembly": "This browser does not support WebAssembly, which the encryption core runs on.",

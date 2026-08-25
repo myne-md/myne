@@ -291,9 +291,20 @@ describe("environment gate — the refusal it produces", () => {
     expect(NATIVE_HANDOFF).toMatch(/iOS|Android/);
   });
 
-  // Consistency with threat-model.md A15 / TB11: a web page cannot verify its
-  // own delivery, and the handoff copy is where a user first meets that.
-  it("names the verification difference rather than implying the web client is merely slower", () => {
-    expect(NATIVE_HANDOFF).toMatch(/signature/i);
+  // Consistency with threat-model.md A15 / TB11: a web page cannot be checked
+  // after the fact, and the handoff copy is where a user first meets that.
+  //
+  // This asserted /signature/i until 2026-08-25, pinning a claim the threat
+  // model denies in TB7, in A9 and in its compensating-controls list: no
+  // desktop artifact carries a signature any OS checks, and nothing verifies
+  // one at launch. A test is a specification, so that assertion would have
+  // pushed the next author back to the false wording. It pins persistence and
+  // the published hash instead, which is what actually distinguishes an
+  // installed app from a re-delivered page (design-notes/security/0534).
+  it("names the difference that holds rather than a signature check nothing performs", () => {
+    expect(NATIVE_HANDOFF).not.toMatch(/signature|signed|verif/i);
+    expect(NATIVE_HANDOFF).toMatch(/stays installed/i);
+    expect(NATIVE_HANDOFF).toMatch(/hash/i);
+    expect(NATIVE_HANDOFF).toMatch(/re-sent/i);
   });
 });

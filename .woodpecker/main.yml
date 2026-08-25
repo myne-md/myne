@@ -375,6 +375,28 @@ steps:
     commands:
       - node scripts/check-twin-inventory.mjs --check
 
+  # ─── Translation coverage is measured rather than asserted (#589) ────────────
+  # No `code-paths` filter, for exactly the reason bundle-record and
+  # twin-inventory carry none: the `--check` half compares the GENERATED
+  # docs/dev/i18n-coverage.md against what `--emit` would write, so a docs/**
+  # file is one of its inputs and a hand edit to it is a docs-only commit the
+  # filter would skip.
+  #
+  # It does not overlap `check-i18n.mjs` inside pnpm-build. That guard gates the
+  # ENGLISH source only, on purpose: an absent translation is a legitimate state
+  # that Weblate fills and English falls back for, so gating it would block every
+  # copy edit. What the design left uncovered is #589 itself: the same 215 keys
+  # missing from all 31 catalogs for three weeks, every gate green, and two
+  # documents asserting the catalogs were at 100%. So coverage is PUBLISHED into
+  # a generated record and the record is gated, while the three defects that are
+  # not a matter of degree stay hard failures here: roster parity in both
+  # directions, no partial plural group (a missing category falls straight
+  # through to English mid-sentence), and interpolation-placeholder parity.
+  i18n-coverage:
+    image: node:25
+    commands:
+      - node scripts/check-i18n-coverage.mjs --check
+
   pnpm-build:
     image: node:25
     when: *code-paths
@@ -1389,6 +1411,11 @@ steps:
       # Unfiltered like bundle-record, so it can go red on a docs-only commit,
       # which is precisely the commit that hand-edits its generated projection.
       - name: twin-inventory
+        optional: true
+      # Unfiltered for the same reason, and listed for the same one: a stale
+      # docs/dev/i18n-coverage.md is a docs-only commit away, and a gate nobody
+      # is paged for is a gate that stays red.
+      - name: i18n-coverage
         optional: true
       - name: web-build
         optional: true

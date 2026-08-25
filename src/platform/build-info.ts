@@ -17,7 +17,7 @@
 // # Why desktop answers `null` rather than something
 //
 // There is no served bundle to identify. A desktop user's build identity is the
-// signed installer they ran, which the version string already names — and
+// installer they ran, which the version string already names. And
 // inventing a per-install hash here would be a number that means nothing and
 // looks like it means something.
 //
