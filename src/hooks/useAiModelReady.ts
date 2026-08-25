@@ -15,6 +15,8 @@
 
 import { useEffect, useState } from "react";
 
+import { listen } from "../platform/event";
+
 import {
   aiCapabilityReport,
   surfaceStateOf,
@@ -23,6 +25,12 @@ import {
 } from "../lib/ai-capability";
 
 const CHECKING: AiSurfaceState = { kind: "checking" };
+
+/** Backend event name, mirroring `AI_VECTORS_HYDRATED_EVENT` (Rust,
+ *  `src-tauri/src/plugins/local_inference/hydrate.rs`). Spelled here rather
+ *  than imported from `AiHydrationProbe`, which is a test-observability
+ *  component this hook must not depend on. */
+const AI_VECTORS_HYDRATED_EVENT = "ai://vectors-hydrated";
 
 /**
  * The state of one AI `feature`, or `checking` while the single host read is in
@@ -36,6 +44,99 @@ const CHECKING: AiSurfaceState = { kind: "checking" };
  * a `catch → unavailable` on top would re-introduce the conflation this hook
  * was rewritten to remove.
  */
+/** What asking needs, in one read: can retrieval run at all, and is this
+ *  vault's index built. */
+export interface AiRetrievalState {
+  /** The `embedding` feature's state — whether asking can run at all. */
+  embedding: AiSurfaceState;
+  /** Whether the index is BUILT. Meaningless while `embedding` is
+   *  `checking`; `false` until the host answers. */
+  indexReady: boolean;
+}
+
+const RETRIEVAL_CHECKING: AiRetrievalState = {
+  embedding: CHECKING,
+  indexReady: false,
+};
+
+/**
+ * Whether asking can answer right now (myne-md/myne#545).
+ *
+ * Both halves from ONE report, rather than a `useAiSurfaceState(…, "embedding")`
+ * beside a second hook for the index: they are two fields of one answer, and
+ * splitting them across two reads would let a surface render "ready" from one
+ * and "still indexing" from the other. The chat header needs both because
+ * "asking cannot run here" and "asking cannot run yet" are different sentences
+ * with different next steps.
+ */
+export function useAiRetrievalState(enabled: boolean): AiRetrievalState {
+  const [state, setState] = useState<AiRetrievalState>(RETRIEVAL_CHECKING);
+
+  useEffect(() => {
+    if (!enabled) {
+      setState(RETRIEVAL_CHECKING);
+      return;
+    }
+    let cancelled = false;
+    const read = () => {
+      void aiCapabilityReport().then((report) => {
+        if (cancelled) return;
+        setState({
+          embedding: surfaceStateOf(report, "embedding"),
+          indexReady: report.indexReady,
+        });
+      });
+    };
+    read();
+    // **Read again when the walk finishes.** A mount-only read leaves the chip
+    // on "Preparing…" for the rest of the session: the embed-on-unlock walk is
+    // detached and can take minutes, and nothing remounts this tab when it
+    // lands, so the surface said "not yet" about a question it had stopped
+    // asking. The host already announces it for exactly this — the same event
+    // `AiHydrationProbe` subscribes to — so this is a subscription that was
+    // missing rather than a mechanism that had to be built.
+    const pending = listen(AI_VECTORS_HYDRATED_EVENT, () => read());
+    return () => {
+      cancelled = true;
+      void pending.then((unlisten) => unlisten());
+    };
+  }, [enabled]);
+
+  return state;
+}
+
+/**
+ * Which backend class is actually serving, or `null` while unasked.
+ *
+ * **The host's verdict, never the preference**, which is the whole reason this
+ * exists as a hook rather than a `prefs.ai_provider` read at the call site.
+ * `LocalInferenceState::active()` checks seven things and falls back to the
+ * local arm the moment any one fails; naming a provider satisfies one of them.
+ * A surface that attributes an answer, or states where the model runs, has to
+ * name what happened rather than what was intended (myne-md/myne#466,
+ * `decisions.md` 2026-08-13). `AiPanel` already derives its caption this way;
+ * this is the same derivation for the surfaces outside Settings.
+ */
+export function useAiBackendClass(enabled: boolean): string | null {
+  const [backendClass, setBackendClass] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setBackendClass(null);
+      return;
+    }
+    let cancelled = false;
+    void aiCapabilityReport().then((report) => {
+      if (!cancelled) setBackendClass(report.backendClass);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  return backendClass;
+}
+
 export function useAiSurfaceState(
   enabled: boolean,
   feature: AiFeature = "generation",

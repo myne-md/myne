@@ -65,6 +65,17 @@ describe("reading a typed fingerprint", () => {
     expect(readFingerprintInput(colons).complete).toBe(true);
     expect(readFingerprintInput(`sha256:${EXPECTED}`).complete).toBe(true);
     expect(readFingerprintInput(`  ${EXPECTED}  `).complete).toBe(true);
+    // The literal output of the command this screen's own help disclosure
+    // gives the operator (myne#582). `openssl x509 -noout -fingerprint
+    // -sha256` prints a SPACE before the label, not the colon the prefix strip
+    // above handles, so a whole paste used to be reported as invalid — by the
+    // one screen that had just told the user to run that command. The Rust
+    // twin `pin_confirm::normalize_fingerprint` gets the same rule in the same
+    // change; the two disagreeing would mean the field says "invalid" about a
+    // value the backend would have accepted.
+    const openssl = `sha256 Fingerprint=${EXPECTED.toUpperCase().match(/../g)!.join(":")}`;
+    expect(readFingerprintInput(openssl).complete).toBe(true);
+    expect(readFingerprintInput(openssl).hex).toBe(EXPECTED);
   });
 
   it("counts progress and refuses anything that is not hex", () => {

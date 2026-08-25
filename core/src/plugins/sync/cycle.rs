@@ -62,6 +62,7 @@ pub(crate) fn classify_cycle_error(
     use super::engine::{PullError, PushError};
     use super::loop_control::FailureClass;
     use super::orchestrator::SyncCycleError;
+    use super::transport::TransportError;
     match e {
         SyncCycleError::Pull(PullError::RateLimited)
         | SyncCycleError::Push(PushError::RateLimited) => FailureClass::RateLimited,
@@ -78,6 +79,14 @@ pub(crate) fn classify_cycle_error(
         SyncCycleError::Push(PushError::QuotaExceeded) => FailureClass::QuotaExceeded,
         SyncCycleError::Push(PushError::PayloadTooLarge) => FailureClass::PayloadTooLarge,
         SyncCycleError::Push(PushError::Frozen) => FailureClass::Frozen,
+        // Before the catch-all below, because this arm is the reason the payload
+        // is matched at all rather than discarded with `_`. A pin mismatch is a
+        // transport error by mechanism and an auth-shaped park by behaviour, and
+        // it is the only one here the user can fix.
+        SyncCycleError::Pull(PullError::Transport(TransportError::CertPinMismatch))
+        | SyncCycleError::Push(PushError::Transport(TransportError::CertPinMismatch)) => {
+            FailureClass::CertPinMismatch
+        }
         SyncCycleError::Pull(PullError::Transport(_))
         | SyncCycleError::Push(PushError::Transport(_)) => FailureClass::Transport,
         // The LOCAL store, not the server's ceiling (task 91). Parks like a 507
@@ -426,6 +435,9 @@ pub async fn run_active_cycle_from_host(
     }
     let notes_dir = dir.join("notes");
     let notes_dir_for_reindex = notes_dir.clone();
+    // Cloned for the same reason `notes_dir` is: `dir` moves into the blocking
+    // closure below, and the success stamp is written after it returns.
+    let vault_root_for_stamp = dir.clone();
     let dir_for_prefs = dir.clone();
 
     let res = crate::task::run_blocking_future(move || async move {
@@ -548,6 +560,12 @@ pub async fn run_active_cycle_from_host(
                     EventPayload::Unit,
                 );
             }
+            // The cycle reached the server and finished (myne#583). Stamp it,
+            // coalesced, so the staleness banner has a clock to measure from —
+            // this is the only place that knows a cycle SUCCEEDED, and until it
+            // existed nothing on disk did.
+            super::state::record_sync_success(io, &vault_root_for_stamp, host.now_unix_millis())
+                .await;
             CycleOutcome::Ran(summary)
         }
         Ok(Err(e)) => {
@@ -615,9 +633,25 @@ pub async fn sync_now_from_host(
             }
             SyncRuntimeStatus::Idle
         }
-        CycleOutcome::Failed(class) => SyncRuntimeStatus::Error {
-            detail: class.status_detail().into(),
-        },
+        CycleOutcome::Failed(class) => {
+            // The manual button's answer carries the same clock the polled
+            // status does, so a "Sync now" that fails does not blank out a
+            // staleness warning the poll had already raised.
+            let last_success_at = match crate::paths::active_vault_root_io_from_host(
+                host,
+                state.active_vault_id().await,
+            ) {
+                Ok(dir) => super::state::read_sync_state(io, &dir)
+                    .await
+                    .ok()
+                    .and_then(|s| s.last_success_at_ms),
+                Err(_) => None,
+            };
+            SyncRuntimeStatus::Error {
+                detail: class.status_detail().into(),
+                last_success_at,
+            }
+        }
     }
 }
 
@@ -726,6 +760,49 @@ mod tests {
     /// The account hash `seed_real_vault_meta` writes for `seed_byte`.
     fn seeded(seed_byte: u8) -> [u8; 16] {
         [seed_byte; 16]
+    }
+
+    /// `classify_cycle_error` keeps the pin mismatch out of the transport
+    /// catch-all, in both directions.
+    ///
+    /// The arm it has to beat is `Transport(_)`, which discarded the payload
+    /// and was the second of three places the diagnosis died on its way to the
+    /// user. The negative half matters as much: every OTHER transport failure
+    /// must still classify as `Transport`, because they are the ones that do
+    /// clear on their own and must keep backing off rather than parking.
+    #[test]
+    fn a_pin_mismatch_is_classified_apart_from_every_other_transport_failure() {
+        use super::super::engine::{PullError, PushError};
+        use super::super::loop_control::FailureClass;
+        use super::super::orchestrator::SyncCycleError;
+        use super::super::transport::TransportError;
+
+        assert_eq!(
+            classify_cycle_error(&SyncCycleError::Pull(PullError::Transport(
+                TransportError::CertPinMismatch
+            ))),
+            FailureClass::CertPinMismatch
+        );
+        assert_eq!(
+            classify_cycle_error(&SyncCycleError::Push(PushError::Transport(
+                TransportError::CertPinMismatch
+            ))),
+            FailureClass::CertPinMismatch,
+            "push and pull reach the same server over the same pinned config"
+        );
+
+        for other in [
+            TransportError::Network,
+            TransportError::Tls,
+            TransportError::NotConfigured,
+            TransportError::BadRequest,
+        ] {
+            assert_eq!(
+                classify_cycle_error(&SyncCycleError::Pull(PullError::Transport(other.clone()))),
+                FailureClass::Transport,
+                "{other:?} is not a pin mismatch and must keep the backoff ladder"
+            );
+        }
     }
 
     #[test]

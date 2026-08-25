@@ -5,7 +5,7 @@
 # The file name is HISTORICAL and is now a misnomer, kept deliberately: "no
 # network" was never what checks 1–2 proved (`decisions.md` 2026-08-04), and
 # after `decisions.md` 2026-08-09 it is not the product's claim either. Renaming
-# it would touch `.woodpecker.yml`, the root CLAUDE.md guard table and every doc
+# it would touch `.woodpecker/main.yml`, the root CLAUDE.md guard table and every doc
 # that cites it, for no safety gain — so the name stays and the header carries
 # the truth.
 #
@@ -279,7 +279,7 @@ done
 #    has never run green is a known way to ship a gate that does not gate.
 #    Note the FILE NAME is now historical — "no-network" was never what checks
 #    1–2 proved (`decisions.md` 2026-08-04) and is not what check 4 asserts.
-#    It is kept because renaming it would touch `.woodpecker.yml`, the root
+#    It is kept because renaming it would touch `.woodpecker/main.yml`, the root
 #    CLAUDE.md guard table and every doc that cites it, for no safety gain.
 echo "== AI-path egress call sites (ratchet) =="
 

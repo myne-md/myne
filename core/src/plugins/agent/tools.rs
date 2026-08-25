@@ -219,6 +219,104 @@ pub async fn search_scope(
     Ok(out)
 }
 
+/// One folder's share of the out-of-scope matches.
+///
+/// **A count, and never an id or a title.** The run may not read a note outside
+/// its scope, and a search that answered with note ids would hand the model a
+/// handle on notes it cannot open; one that answered with titles would hand it
+/// their content, since a title is note text. A folder name plus a number says
+/// where the material is without saying what it is, which is what the model
+/// needs to ask for a scope expansion the user then approves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FolderMatches {
+    /// The folder, or `None` for notes carrying no `folder:`.
+    pub folder: Option<String>,
+    /// How many of the ranked matches fell in it. See
+    /// [`search_vault`] on what this number is and is not.
+    pub count: usize,
+}
+
+/// What a vault-wide search found, split by what the run is allowed to read.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VaultSearchResult {
+    /// Matches inside the run's scope, exactly as [`search_scope`] returns them.
+    pub in_scope: Vec<SearchHit>,
+    /// Matches outside it, reduced to counts. Sorted by folder for a stable
+    /// rendering; the ranking is not carried, because a rank per folder would
+    /// be a second signal about content the run cannot read.
+    pub elsewhere: Vec<FolderMatches>,
+}
+
+/// Tool 4: search the WHOLE vault, and say where the matches are.
+///
+/// The tool that lets a single composer answer a question about a note the run
+/// was not given (myne-md/myne#552). It exists because the alternative was
+/// deleting the vault-wide Ask path, and losing semantic search across the
+/// vault with it.
+///
+/// **The scope still bounds reading, and this is where that is enforced.**
+/// In-scope matches come back as ids the model may then `read_note`. Everything
+/// else is collapsed into [`FolderMatches`]: a folder name and a number, so the
+/// model can name where the material is and ask for the scope to be widened
+/// through the approval the user answers. Nothing here lets it read a note it
+/// could not read before.
+///
+/// **An `ai_excluded_folders` note is not counted either.** Not as an id, not
+/// as a title, and not as a number: SYNC-14 makes its EXISTENCE the thing being
+/// hidden, which this module's header states, so a count that included it would
+/// leak exactly what the exclusion is for. `record_excluded` fails closed on an
+/// id the index does not carry, so an unclassifiable note is treated as
+/// excluded rather than counted.
+///
+/// **What the counts are.** They describe the ranked matches this search
+/// looked at, not the vault. A folder showing 3 means three of the top matches
+/// fell there, not that the folder holds three matching notes. The prompt says
+/// so to the model, because a number that reads as a vault total is a number
+/// the model will report to the user as one.
+pub async fn search_vault(
+    runs: &AgentRunState,
+    run_id: &str,
+    query: &str,
+    limit: usize,
+    searcher: &dyn ScopeSearcher,
+    records: &BTreeMap<String, NoteRecord>,
+    exclusions: &dyn ExclusionSource,
+) -> Result<VaultSearchResult, AgentError> {
+    // Resolve the run first, for the reason `search_scope` states: an empty
+    // result set would otherwise let an unknown run answer successfully.
+    runs.view(run_id)?;
+    let over = limit.saturating_mul(4).max(limit);
+    let ranked = searcher.search(query, over).await?;
+    let ids: Vec<String> = ranked.iter().map(|h| h.note_id.clone()).collect();
+    let in_scope_flags = runs.contains_all(run_id, &ids)?;
+    let excluded = excluded_now(exclusions).await?;
+
+    let mut in_scope = Vec::new();
+    let mut by_folder: BTreeMap<Option<String>, usize> = BTreeMap::new();
+    for (hit, keep) in ranked.into_iter().zip(in_scope_flags) {
+        // The SYNC-14 clamp first, and before the in-scope test rather than
+        // after it: an excluded note must not reach either arm.
+        if record_excluded(records, &hit.note_id, &excluded) {
+            continue;
+        }
+        if keep {
+            if in_scope.len() < limit {
+                in_scope.push(hit);
+            }
+        } else {
+            let folder = records.get(&hit.note_id).and_then(|r| r.folder.clone());
+            *by_folder.entry(folder).or_insert(0) += 1;
+        }
+    }
+    Ok(VaultSearchResult {
+        in_scope,
+        elsewhere: by_folder
+            .into_iter()
+            .map(|(folder, count)| FolderMatches { folder, count })
+            .collect(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,6 +390,23 @@ mod tests {
         async fn search(&self, _q: &str, _limit: usize) -> Result<Vec<SearchHit>, AgentError> {
             Ok(self.0.clone())
         }
+    }
+
+    /// Records carrying a folder, which the out-of-scope arm groups by.
+    fn records_in(pairs: &[(&str, &str, Option<&str>)]) -> BTreeMap<String, NoteRecord> {
+        pairs
+            .iter()
+            .map(|(id, title, folder)| {
+                (
+                    id.to_string(),
+                    NoteRecord {
+                        title: Some((*title).to_string()),
+                        folder: folder.map(|f| f.to_string()),
+                        ..Default::default()
+                    },
+                )
+            })
+            .collect()
     }
 
     fn hit(id: &str, score: f32) -> SearchHit {
@@ -610,5 +725,151 @@ mod tests {
             )),
             Err(AgentError::NoSuchRun)
         ));
+    }
+
+    // ---- search_vault (myne-md/myne#552) ------------------------------------
+    //
+    // The tool that lets one composer answer a question about a note the run
+    // was not given. Its whole security surface is what it returns for a match
+    // the run may NOT read, so that is what these pin.
+
+    #[test]
+    fn in_scope_matches_come_back_as_ids_and_the_rest_as_folder_counts() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let searcher = StubSearcher(vec![
+            hit("a", 0.9),
+            hit("b", 0.8),
+            hit("c", 0.7),
+            hit("d", 0.6),
+        ]);
+        let recs = records_in(&[
+            ("a", "mine", Some("Work")),
+            ("b", "theirs", Some("Journal")),
+            ("c", "also theirs", Some("Journal")),
+            ("d", "loose", None),
+        ]);
+        let out = block(search_vault(
+            &runs,
+            "r",
+            "q",
+            10,
+            &searcher,
+            &recs,
+            &no_exclusions(),
+        ))
+        .unwrap();
+
+        // The one note the run may read, by id.
+        assert_eq!(
+            out.in_scope
+                .iter()
+                .map(|h| h.note_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a"]
+        );
+        // Everything else as counts. Two in one folder, one with no folder.
+        assert_eq!(
+            out.elsewhere,
+            vec![
+                FolderMatches {
+                    folder: None,
+                    count: 1
+                },
+                FolderMatches {
+                    folder: Some("Journal".into()),
+                    count: 2
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn an_out_of_scope_match_never_yields_an_id_or_a_title() {
+        // **The boundary the tool exists to hold.** A note outside the scope
+        // cannot be read, so returning its id would hand the model a handle on
+        // it and returning its title would hand over note text outright. The
+        // assertion is on the whole returned value rather than on one field,
+        // because a later shape that added either would pass a field check.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let searcher = StubSearcher(vec![hit("secret", 0.9)]);
+        let recs = records_in(&[("secret", "The private title", Some("Personal"))]);
+        let out = block(search_vault(
+            &runs,
+            "r",
+            "q",
+            10,
+            &searcher,
+            &recs,
+            &no_exclusions(),
+        ))
+        .unwrap();
+
+        assert!(out.in_scope.is_empty());
+        let rendered = format!("{out:?}");
+        assert!(!rendered.contains("secret"), "the note id leaked");
+        assert!(!rendered.contains("The private title"), "the title leaked");
+        // The folder and the count are what it MAY say.
+        assert_eq!(
+            out.elsewhere,
+            vec![FolderMatches {
+                folder: Some("Personal".into()),
+                count: 1
+            }]
+        );
+    }
+
+    #[test]
+    fn an_excluded_note_is_not_even_counted() {
+        // SYNC-14 hides the EXISTENCE of a note in an excluded folder, which
+        // this module's header states. A count including it would leak exactly
+        // that, in the one arm that looks harmless because it carries no id.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let searcher = StubSearcher(vec![hit("a", 0.9), hit("x", 0.8)]);
+        let recs = records_in(&[
+            ("a", "mine", Some("Work")),
+            ("x", "hidden", Some("Private")),
+        ]);
+        let out = block(search_vault(
+            &runs,
+            "r",
+            "q",
+            10,
+            &searcher,
+            &recs,
+            &StubExclusions(vec!["Private".into()]),
+        ))
+        .unwrap();
+
+        assert_eq!(out.in_scope.len(), 1);
+        assert!(
+            out.elsewhere.is_empty(),
+            "an excluded folder must not appear even as a number"
+        );
+    }
+
+    #[test]
+    fn a_note_the_index_does_not_carry_is_treated_as_excluded() {
+        // `record_excluded` fails closed, and this is the arm where that
+        // matters: an unclassifiable note has no known folder, so counting it
+        // would mean inventing one or grouping it with the folderless.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let searcher = StubSearcher(vec![hit("ghost", 0.9)]);
+        let recs = records_in(&[("a", "mine", Some("Work"))]);
+        let out = block(search_vault(
+            &runs,
+            "r",
+            "q",
+            10,
+            &searcher,
+            &recs,
+            &no_exclusions(),
+        ))
+        .unwrap();
+        assert!(out.in_scope.is_empty());
+        assert!(out.elsewhere.is_empty());
     }
 }

@@ -193,6 +193,49 @@ pub enum AgentError {
     /// (myne-md/myne#531 review round six).
     #[error("this run is already working")]
     StepAlreadyRunning,
+    /// The provider rejected the request itself (HTTP 400), rather than the
+    /// credential or the cost (myne-md/myne#547).
+    #[error("the provider rejected the request")]
+    ProviderRejected,
+    /// The backend failed for some other reason.
+    ///
+    /// Both of these exist because [`AgentError::ReadFailed`] was carrying two
+    /// unrelated meanings: a note that could not be decrypted, and ANY engine
+    /// failure, via `agent_error_of`'s catch-all. So a provider refusing a
+    /// request reached the user as "the note could not be read", which sends
+    /// them to look at their vault for a fault in the request Myne built.
+    #[error("the backend failed")]
+    ProviderFailed,
+}
+
+impl AgentError {
+    /// Bounded, content-free tag for structured logging.
+    ///
+    /// Mirrors `EngineError::kind` and exists for the same reason: several
+    /// variants carry a `note_id`, so a `Debug` format of this value in a log
+    /// line would put a note identifier on disk. The DENY list in
+    /// `src-tauri/CLAUDE.md` names `note_id` explicitly. A caller logs this;
+    /// there is nothing else here safe to print.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::SlotNotUnlocked => "slot_not_unlocked",
+            Self::NoSuchRun => "no_such_run",
+            Self::AiDisabled => "ai_disabled",
+            Self::Cancelled => "cancelled",
+            Self::OutOfScope { .. } => "out_of_scope",
+            Self::ExcludedNow => "excluded_now",
+            Self::EmptyGrant => "empty_grant",
+            Self::RootGrant => "root_grant",
+            Self::RestorePointFailed => "restore_point_failed",
+            Self::WriteFailed => "write_failed",
+            Self::ReadFailed => "read_failed",
+            Self::EditFormatUnsupported => "edit_format_unsupported",
+            Self::IndividualApprovalNotSingle => "individual_approval_not_single",
+            Self::StepAlreadyRunning => "step_already_running",
+            Self::ProviderRejected => "provider_rejected",
+            Self::ProviderFailed => "provider_failed",
+        }
+    }
 }
 
 #[cfg(test)]

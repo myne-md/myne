@@ -12,7 +12,7 @@
 // binds to `local_inference` for the engine, the ChatML surface and the
 // retrieval store, so with the feature off it does not compile at all. That is
 // how the AI-free auditable build broke and stayed broken for four pipelines
-// (`cargo check -p myne-desktop --no-default-features`, `.woodpecker.yml`
+// (`cargo check -p myne-desktop --no-default-features`, `.woodpecker/main.yml`
 // `tauri-compile`) while every local gate stayed green: `pre-push` builds the
 // DEFAULT features, so nothing a developer runs exercises the feature-off tree.
 //

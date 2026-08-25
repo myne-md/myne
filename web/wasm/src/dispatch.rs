@@ -690,6 +690,64 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // The BOOT probe's runtime half (myne-md/myne#535), and the same failure
+        // shape as `vault_is_unlocked` directly above, one layer earlier and
+        // one layer quieter.
+        //
+        // `probeSlotKind()` catches an IPC rejection and answers `"Empty"`
+        // (`src/lib/vault-slot-kind.ts`), so an unported arm here does not fail:
+        // it makes boot routing structurally unable to observe an unlocked slot.
+        // `sync_join_account` leaves the vault UNLOCKED, so the reprobe that
+        // follows a completed join fell through to the disk arm and offered the
+        // unlock form, where the correct password then returns
+        // `VaultAlreadyUnlocked`, which the screen renders as a banner with no
+        // way forward. Signing in on the web client could not reach the editor
+        // at all, and every automated check was green: `capability.rs` had no
+        // entry, so `classify` answered from the `("vault-unlock", Pending)`
+        // plugin default and `check-web-command-coverage.mjs` reported the
+        // command classified.
+        "plugin:vault-unlock|vault_slot_kind" => {
+            use myne_core::plugins::vault_unlock::commands::vault_slot_kind_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                // Optional TARGETING param, matching the desktop command: `None`
+                // probes the active/sole vault, which is the only shape this
+                // client sends (one container per origin).
+                #[serde(default)]
+                vault_id: Option<String>,
+            }
+            // A null payload is the SAME call as `{}` here, and saying so is not
+            // tidiness. Every argument of the desktop command is optional, so
+            // `invoke("plugin:vault-unlock|vault_slot_kind")` with no payload is
+            // a legal call there; it arrives as `Value::Null`, which
+            // `from_value::<Args>` rejects. That would make this router stricter
+            // than the thing it replaces, which the rule below
+            // `zero_argument_commands_accept_any_payload_shape` states outright,
+            // and it would do so on the one command whose caller LAUNDERS a
+            // rejection: `probeSlotKind()` catches and answers `"Empty"`. A
+            // future call site that dropped the argument object would therefore
+            // reproduce myne-md/myne#535 in full, silently, on the arm added to
+            // fix it.
+            let args: Args = if args.is_null() {
+                Args { vault_id: None }
+            } else {
+                match serde_json::from_value(args) {
+                    Ok(a) => a,
+                    Err(e) => {
+                        return Outcome::BadArgs {
+                            command: cmd.to_string(),
+                            detail: e.to_string(),
+                        }
+                    }
+                }
+            };
+            match vault_slot_kind_from_host(args.vault_id, crate::session::state()).await {
+                Ok(kind) => Outcome::ok(&kind),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         // #250: the authoritative "which vault is open" answer, read from the
         // runtime slot map. Ported rather than declared absent because the
         // shared tree asks this question on every client — the web container is
@@ -3968,6 +4026,42 @@ mod tests {
             serde_json::json!({ "unexpected": 1 }),
         ] {
             let json = block_on(dispatch("plugin:prefs|device_platform", args)).to_json();
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed["outcome"], "ok", "{json}");
+        }
+    }
+
+    #[test]
+    fn vault_slot_kind_accepts_an_absent_payload_like_desktop() {
+        // The same rule one step along, for a command that HAS arguments and no
+        // required ones (myne-md/myne#535). `vault_slot_kind`'s `vault_id` is
+        // optional on desktop, so a payload-less invoke is legal there and
+        // arrives here as `Value::Null`, which `serde_json::from_value` refuses
+        // for a struct unless the arm treats null as empty.
+        //
+        // Worth its own test rather than folding into the case above, because
+        // the test above would pass on a broken arm: it drives a command with no
+        // `Args` struct at all, so nothing there exercises deserialisation.
+        //
+        // **Named for the one command it drives, not for the class.** Four other
+        // arms take all-optional arguments and would reject a bare `null` the
+        // same way this one did: `sync_set_endpoint`, the
+        // `sync_take_conflict`/`sync_resolve_conflict`/`sync_mark_tombstone`
+        // trio, `set_active_workspace` and `set_editor_default_view_mode`. None
+        // is reachable in that shape today, because every one of their TS
+        // bindings passes an object (`{ value }` with a null INSIDE it, which
+        // deserialises fine) rather than omitting the payload; `probeSlotKind()`
+        // was the sole call site invoking with no second argument at all. A test
+        // name asserting the whole class while pinning one member would read as
+        // coverage that does not exist, so if a binding ever starts omitting a
+        // payload for one of those four, this arm's `args.is_null()` branch is
+        // the shape to copy and this test is the shape to widen.
+        for args in [
+            serde_json::Value::Null,
+            serde_json::json!({}),
+            serde_json::json!({ "vaultId": null }),
+        ] {
+            let json = block_on(dispatch("plugin:vault-unlock|vault_slot_kind", args)).to_json();
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
             assert_eq!(parsed["outcome"], "ok", "{json}");
         }

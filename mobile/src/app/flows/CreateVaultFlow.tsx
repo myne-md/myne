@@ -773,7 +773,7 @@ export function CreateVaultFlow({
             {t("createVault.phraseIntro")}
           </p>
           <Banner kind="danger" icon={false} style={{ marginTop: 16 }}>
-            This is the only key to your vault. We can't reset it — lose these words and the notes are
+            This is the only key to your vault. We can't reset it. Lose these words and the notes are
             gone for good.
           </Banner>
           <div style={{ marginTop: 20 }}>

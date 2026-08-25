@@ -38,11 +38,11 @@ const CAP = '#fbfbfa';
 const CAP_SUB = 'rgba(251,251,250,.66)';
 
 const FRAMES = [
-  { h: 'Notes that<br>stay yours.',     s: 'End-to-end encrypted markdown — plain files after decryption.',        screen: S.home,       dy: 0 },
+  { h: 'Notes that<br>stay yours.',     s: 'End-to-end encrypted markdown. Plain files after decryption.',         screen: S.home,       dy: 0 },
   { h: 'Write in plain<br>markdown.',   s: 'Wikilinks, backlinks, and live preview. No proprietary format.',       screen: S.editor,     dy: 40 },
   { h: 'See how it<br>connects.',       s: 'Backlinks and a graph, computed on your device.',                      screen: S.graph,      dy: 0 },
-  { h: 'No email.<br>No tracking.',     s: 'Your identity is a 20-character account number — nothing else.',       screen: S.account,    dy: 40 },
-  { h: 'Make it<br>yours.',             s: 'System, light, dark, or AMOLED — built to read for hours.',            screen: S.appearance, dy: 0 },
+  { h: 'No email.<br>No tracking.',     s: 'Your identity is a 20-character account number. Nothing else.',        screen: S.account,    dy: 40 },
+  { h: 'Make it<br>yours.',             s: 'System, light, dark, or AMOLED. Built to read for hours.',             screen: S.appearance, dy: 0 },
 ];
 
 const phone = (i, f) => {

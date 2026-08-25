@@ -264,6 +264,25 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
         text: i18n.t("unlock.errors.vaultNotFound"),
       };
     case "VaultAlreadyUnlocked":
+      // Stays a banner, and myne-md/myne#535 is the reason it is worth saying
+      // why rather than leaving it looking like an oversight.
+      //
+      // That change routed this variant ON instead, arguing that the vault is
+      // already open so there is no credential to retype. The argument was
+      // wrong in the one direction that matters: the variant comes from the
+      // slot-peek guard BEFORE any derivation, so nothing the user typed is
+      // examined, and the claim that made it safe ("auto-lock empties the slot,
+      // so a locked vault cannot reach this branch") does not hold.
+      // `handleLockFlushed` swallows a `vault_lock` rejection and routes to this
+      // screen regardless, on both clients and behind the web idle auto-lock. A
+      // failed lock would therefore have produced a lock screen that opens on
+      // any one-character password, turning a fail-closed surface into a
+      // fail-open one for exactly the adversary `threat-model.md` §1 A6
+      // describes and rates as mitigated.
+      //
+      // The web sign-in dead end this was written for is closed a layer up
+      // instead: `vault_slot_kind` is ported, so boot sees the open slot that
+      // `sync_join_account` produced and routes to the editor rather than here.
       return { kind: "banner", text: i18n.t("unlock.errors.alreadyUnlocked") };
     case "UnlockInProgress":
       return { kind: "banner", text: i18n.t("unlock.errors.inProgress") };

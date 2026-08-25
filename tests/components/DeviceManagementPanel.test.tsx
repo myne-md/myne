@@ -81,7 +81,10 @@ describe("DeviceManagementPanel — error-state branching", () => {
 
     await waitFor(() => expect(screen.queryByTestId("sync.device-error")).toBeTruthy());
     expect(screen.getByTestId("sync.device-error").textContent).toMatch(
-      /Couldn.t reach sync \(Unauthenticated\)/,
+      // A readable reason, not the backend's serde `kind`. The raw identifier
+      // used to be interpolated into translated copy in all 32 locales, which
+      // told the reader nothing and pinned that leak in this assertion.
+      /Couldn.t reach sync \(the server rejected this device.s sign-in\)/,
     );
     expect(screen.getByTestId("sync.reset-local")).toBeTruthy();
   });
