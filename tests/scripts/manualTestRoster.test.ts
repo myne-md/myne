@@ -80,6 +80,7 @@ function healthy(): Io {
       gatedTiers: ["core"],
       gatedClients: ["desktop-macos"],
       totalMinutesCeiling: 3,
+      gatedMinutes: 3,
     },
     // The synthetic world gets a synthetic baseline. Injecting it is the point:
     // the real `RATCHET_BASELINE` describes the shipped gate, and a fixture bound
@@ -405,8 +406,24 @@ describe("the ratchet: the gate policy may only grow, the roster may only shrink
     io.roster[0].manual = [];
     io.roster[0].exemptionReason =
       "Every observation this entry carried is now asserted by e2e/notes.e2e.ts, which runs on every commit.";
-    ratchetOf(io).totalMinutesCeiling = 0;
+    // The ratchet is NOT re-recorded here, and that is the scenario: the author
+    // automates, runs the guard, and the recorded pair still describes the world
+    // before the automation. Gating fell by 3 and the total fell by 3, so the
+    // rule's own table reads this as "ok" rather than as a narrowing. Setting
+    // `totalMinutesCeiling = 0` here instead would model a HALF re-recorded
+    // ratchet, where the ceiling moved and `gatedMinutes` did not, and the rule
+    // would fire for the right reason on the wrong scenario.
     expect(analyse(io).failures).toEqual([]);
+  });
+
+  // The other half of that rule, which had no test at all: gating falls FURTHER
+  // than the total, which is what an item retiered out of `core` looks like. The
+  // work stays in the roster and leaves the gate, and `gatedTiers`/`gatedClients`
+  // cannot see it because neither list changed.
+  it("FAILS when gating minutes fall further than total minutes, which is a retier out of the gate", () => {
+    const io = healthy();
+    io.roster[0].manual[0].tier = "standard";
+    expect(messages(io)).toMatch(/the gate narrowed WITHOUT the roster shrinking/);
   });
 
   it("FAILS when manual work grows, which is a manual item added instead of automation", () => {
