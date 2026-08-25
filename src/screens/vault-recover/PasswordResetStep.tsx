@@ -34,6 +34,7 @@ import { completeRecovery } from "../../lib/vault-recover";
 import { ioBanner } from "../../lib/io-banner";
 import type { VaultRecoveryError } from "../../types/vault-recovery-error";
 import type { Action, PasswordOutcome, VaultRecoverState } from "./reducer";
+import { stageRootStyle } from "../../components/primitives/stageRoot";
 
 interface PasswordResetStepProps {
   state: VaultRecoverState;
@@ -134,10 +135,7 @@ const INFO_BOX_STYLE: CSSProperties = {
 };
 
 const ROOT_STYLE: CSSProperties = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  ...stageRootStyle,
   background: "var(--bg-1)",
   fontFamily: "var(--font-sans)",
   padding: "var(--space-5)",

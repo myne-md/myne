@@ -65,9 +65,12 @@ const ROOT = new URL("..", import.meta.url).pathname;
 // DELIBERATELY a named list, not derived from SCANNED_TREES by searching for
 // whatever declares `async function writePref(`. Stated precisely, because the
 // first version of this comment claimed a concrete counterexample that does not
-// exist: `src/hooks/usePrefs.ts` does declare a `writePref`, but as
+// exist, and the version after it went stale the moment the tree was fixed:
+// `src/hooks/usePrefs.ts` USED to declare a `writePref`, as
 // `const writePref = useCallback(`, which that pattern never matches, and it
-// holds no prefs literal for an exemption to protect. Searching would work today.
+// held no prefs literal for an exemption to protect. myne-md/myne#507 renamed it
+// to `writeOptimisticPref`, so there is no such declaration anywhere today, and
+// rule 3 below is what keeps it that way. Searching would work today.
 //
 // It stays a named list because of the DIRECTION the failure runs. Being on this
 // list is an exemption from rule 2: a module here is licensed to hold prefs write
@@ -125,6 +128,25 @@ export const { present: SCANNED_TREES, missing: SCANNED_TREES_MISSING } = presen
 // literal NOT sitting as writePref's first argument is the violation.
 // Quote-agnostic and generic-agnostic, because both are the caller's free choice.
 const PREFS_WRITE_CALL = /(writePref\s*\(\s*)?["'`]plugin:prefs\|([a-z0-9_]+)["'`]/g;
+
+// Rule 3's matcher: any BINDING named `writePref`, in any of the spellings a
+// module can use, outside a prefs module.
+//
+// The rule exists because the collision has now happened three times, and been
+// fixed by hand each time: myne#251 is the defect the chokepoint was built to
+// close, myne#496 renamed a colliding local on the mobile side, and myne#507
+// renamed `src/hooks/usePrefs.ts`'s optimistic-cache core one layer from the
+// chokepoint. Two functions with the same name and different semantics, one
+// layer apart, is how the original went unnoticed; nothing stopped the fourth
+// until this.
+//
+// It is a LEGIBILITY rule, not a correctness one, and that is why it is separate
+// from rules 1 and 2 rather than folded into them: a colliding local breaks
+// nothing today (rule 1's matcher requires `async function`, and a hook holds no
+// prefs literal for rule 2 to catch). What it costs is a reader of either file
+// being unable to tell which `writePref` is the IPC chokepoint.
+export const WRITE_PREF_BINDING =
+  /\b(?:async\s+function|function|const|let|var)\s+writePref\b|\bwritePref\s*[:=]\s*(?:async\s*)?(?:\(|function\b)/g;
 
 // Outside prefs.ts the bare literal IS the rule — `writePref` is module-private,
 // so no shape of a prefs literal is legitimate there. Over-matching a name in a
@@ -243,6 +265,21 @@ export function analyse({ prefsSource, missingTrees } = {}) {
       const rel = relative(ROOT, file);
       if (PREFS_MODULES.includes(rel)) continue;
       const src = readFileSync(file, "utf8");
+
+      // ---- rule 3: the chokepoint's NAME is not reused elsewhere ----------
+      if (src.includes("writePref")) {
+        WRITE_PREF_BINDING.lastIndex = 0;
+        let named;
+        while ((named = WRITE_PREF_BINDING.exec(src)) !== null) {
+          failures.push({
+            file: rel,
+            line: lineOf(src, named.index),
+            command: "(name collision)",
+            why: `declares a binding named writePref outside a prefs module (${PREFS_MODULES.join(", ")}), where that name is the IPC chokepoint that bumps the prefs nonce. Give this one a name that says what it does (myne#496 used writeDraftPref, myne#507 used writeOptimisticPref). Two functions with that name and different semantics one layer apart is how myne#251 went unnoticed.`,
+          });
+        }
+      }
+
       if (!src.includes("plugin:prefs|")) continue;
       PREFS_LITERAL.lastIndex = 0;
       let hit;
@@ -280,6 +317,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
 
   console.log(
-    `prefs-nonce: ok (${writes} write(s) through the chokepoint; ${READ_COMMANDS.size} read command(s) exempt)`,
+    `prefs-nonce: ok (${writes} write(s) through the chokepoint; ${READ_COMMANDS.size} read command(s) exempt; the chokepoint's name is unique across ${SCANNED_TREES.length} shared tree(s))`,
   );
 }

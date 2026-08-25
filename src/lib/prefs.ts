@@ -1277,9 +1277,23 @@ export async function setDeviceName(deviceIdHex: string, name: string): Promise<
  * platform from `navigator` instead** — that would be a second default-name
  * heuristic diverging per client, which is exactly what keeping names in one
  * synced map is meant to prevent.
+ *
+ * Memoised, because the answer is a compile-time constant of the running binary
+ * and this is an IPC round trip. Desktop has one caller today and mobile's twin
+ * has four; the memo is here anyway so the two modules stay comparable, which is
+ * how a fix to one reaches the other.
+ *
+ * Only a SUCCESS is cached. A rejected promise held here would turn one
+ * transient IPC failure into a permanently wrong answer for the process.
  */
+let platformProbe: Promise<string> | null = null;
+
 export async function devicePlatform(): Promise<string> {
-  return await invoke<string>("plugin:prefs|device_platform");
+  platformProbe ??= invoke<string>("plugin:prefs|device_platform").catch((e: unknown) => {
+    platformProbe = null;
+    throw e;
+  });
+  return await platformProbe;
 }
 
 /**

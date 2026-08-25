@@ -1204,6 +1204,7 @@
     },
     "noteActions": {
       "buttonLabel": "Ações da nota",
+      "convertFailed": "Não foi possível alterar o que esta nota é, por isso mantém-se inalterada.",
       "rename": "Mudar o nome",
       "move": "Mover para pasta…",
       "duplicate": "Duplicar",
@@ -1873,7 +1874,10 @@
       "illegalSegment": "Um nome de pasta não pode conter / \\ | # ^ [ ] nem começar/terminar com um espaço.",
       "tooLong": "Esse caminho de pasta é demasiado longo.",
       "moveIntoSelf": "Uma pasta não pode ser movida para dentro de si própria.",
-      "moveCollision": "Já existe aí uma pasta com esse nome."
+      "moveCollision": "Já existe aí uma pasta com esse nome.",
+      "unsettledSave": "Uma nota aberta ainda não terminou de guardar, por isso a pasta ficou como estava. Tente novamente quando terminar.",
+      "renameFailed": "Não foi possível mudar o nome da pasta, por isso mantém-se inalterada.",
+      "deliberateWriteFailed": "A pasta mudou de nome, mas não foi possível guardar uma das suas definições. Sempre que desbloquear, uma pasta vazia volta a aparecer com o nome antigo; pode apagá-la em segurança, sem que mais nada mude. Mudar o nome da pasta outra vez não a apaga."
     },
     "folderNote": {
       "defaultTitle": "Índice"
@@ -2077,6 +2081,7 @@
       "addToFavorites": "Adicionar aos favoritos",
       "archive": "Arquivar",
       "archiveBulkError": "Não foi possível arquivar as notas.",
+      "renameFailed": "Não foi possível guardar esse nome, por isso a nota manteve o antigo.",
       "archiveFolder": "Arquivar pasta",
       "archiveNote": "Arquivar",
       "archiveSingleError": "Não foi possível arquivar a nota.",
@@ -2350,6 +2355,7 @@
       "thisNote": "esta nota",
       "untitled": "Sem título"
     },
+    "unsettledSave": "Uma nota aberta ainda não terminou de guardar, por isso nada foi alterado. Tente novamente quando terminar.",
     "views": {
       "cards": {
         "changeCover": "Mudar capa",
@@ -3998,10 +4004,13 @@
       "copied": "Copiado",
       "copy": "Copiar",
       "copyFailed": "Não foi possível copiar. Use antes “Guardar como ficheiro”.",
+      "downloadStarted": "Enviado para as transferências do seu navegador. Confirme que chegou: é o seu navegador que decide para onde vai o ficheiro, e o Myne não consegue ver se isso aconteceu.",
       "eyebrow": "Passo 4 de 4: número de conta",
       "heading": "Guarde o seu número de conta.",
       "intro": "Este é o seu token ao portador. Trate-o como dinheiro.",
       "saveAsFile": "Guardar como ficheiro",
+      "saveFailed": "Não foi possível guardar o ficheiro. Copie antes o número ou anote-o.",
+      "savedToFile": "Guardado. É um ficheiro de texto simples, por isso mantenha-o num local que só você consiga ler.",
       "shownOnceBody": "Guarde-o agora. O Myne não o pode recuperar por si. Necessário para mais tarde se registar na sincronização.",
       "shownOnceEmphasis": "Isto é mostrado apenas uma vez."
     },
@@ -4155,11 +4164,14 @@
       "copy": "Copiar",
       "extensionNotice": "As extensões do navegador com acesso a este site conseguem ler o que está nesta página. Se não tiver a certeza sobre todas as extensões deste perfil, use a aplicação de ambiente de trabalho ou um perfil de navegador limpo para este passo.",
       "copyFailed": "Não foi possível copiar. Use antes “Guardar como ficheiro”.",
+      "downloadStarted": "Enviado para as transferências do seu navegador. Confirme que chegou: é o seu navegador que decide para onde vai o ficheiro, e o Myne não consegue ver se isso aconteceu.",
       "eyebrow": "Passo 2 de 4: frase de recuperação",
       "heading": "Anote estas 24 palavras.",
       "intro": "Esta frase, juntamente com a sua palavra-passe, é a única forma de recuperar o seu cofre. Guarde-a offline: papel, gestor de palavras-passe, carteira de hardware. Trate-a como dinheiro.",
       "reveal": "Revelar frase",
-      "saveAsFile": "Guardar como ficheiro"
+      "saveAsFile": "Guardar como ficheiro",
+      "saveFailed": "Não foi possível guardar o ficheiro. Copie antes as palavras ou anote-as.",
+      "savedToFile": "Guardado. É um ficheiro de texto simples, por isso mantenha-o num local que só você consiga ler."
     },
     "ready": {
       "backedUp": "Cópia de segurança feita ✓",
@@ -4409,6 +4421,8 @@
     "phraseCopied": "Copiado. Fica neste dispositivo e o sistema descarta-a ao fim de 30 segundos.",
     "phraseCopyFailed": "Não foi possível copiar. Use antes “Guardar num ficheiro”.",
     "savedToFile": "Guardado em {{label}}",
+    "savedToShareSheet": "Guardado dentro do Myne, onde o gestor de ficheiros do sistema não lhe consegue chegar. É um ficheiro de texto simples, por isso, se usar o menu de partilha para colocar uma cópia num local a que consiga aceder, escolha um local que só você consiga ler, e não um serviço na nuvem. Toque novamente em Guardar se tiver fechado o menu.",
+    "savedFileWritten": "Guardado dentro do Myne. É um ficheiro de texto simples, por isso mantenha qualquer cópia que faça num local que só você consiga ler. Este dispositivo não indicou a partir de onde o ficheiro pode ser acedido, por isso trate-o como acessível apenas a partir da aplicação até ter verificado.",
     "saveFileError": "Não foi possível guardar o ficheiro.",
     "stepLabel": "Criar um cofre · {{current}} de {{total}}",
     "briefingTitle": "Antes de começar",

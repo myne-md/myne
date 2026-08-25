@@ -805,3 +805,210 @@ describe("a BaseMismatch that lands after a note switch (myne#335)", () => {
     });
   });
 });
+
+// myne-md/myne#520. `flushAll` refuses to report the disk current when a pane
+// did not settle, and `PaneView` answers that question with `lastSaveFailed`.
+// These pin WHY it is not `hasPendingWork`: the first version used that, and it
+// answers true for a buffer that merely moved on during a successful save, so
+// every out-of-band frontmatter write that followed a normal save was refused.
+// The E2E suite caught it; nothing here did.
+describe("lastSaveFailed, the settled-check a frontmatter writer needs", () => {
+  it("is false on a hook that has never saved", () => {
+    const { result } = renderHook(() => useAutosave("note-1", "body", vi.fn()));
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+
+  // The hole `lastSaveFailed` alone leaves, and the reason `PaneView`'s
+  // `flushAndReport` asks a second question. On a HAND-OFF (the user typed
+  // during the save) `fireSave` resolves early: it nulls `inFlightRef`, marks
+  // `handedOff`, fires the follow-up and returns. The follow-up's first
+  // statement is `saveFailedRef.current = false`, so the failure flag reads
+  // clean for a save that has not landed, and a caller told SETTLED then
+  // read-patch-writes the note while that save is still in flight.
+  it("saveInFlight is TRUE while a hand-off follow-up is still running, where lastSaveFailed reads clean", async () => {
+    let release: (() => void) | null = null;
+    const saveImpl = vi.fn(
+      (_id: string, body: string) =>
+        new Promise<string>((resolve) => {
+          release = () => resolve(body);
+        }),
+    );
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    // Start a save and hold it open.
+    let flushed: Promise<void> | null = null;
+    await act(async () => {
+      flushed = result.current.flushIfDirty();
+      await Promise.resolve();
+    });
+    // Type during the save: this is what makes the resolution a hand-off.
+    rerender({ body: "three" });
+    await act(async () => {
+      release?.();
+      await flushed;
+    });
+    // The follow-up is running. `lastSaveFailed` cannot see it; this can.
+    expect(result.current.lastSaveFailed()).toBe(false);
+    expect(result.current.saveInFlight()).toBe(true);
+    await act(async () => {
+      release?.();
+      await Promise.resolve();
+    });
+  });
+
+  it("saveInFlight is false on a hook that has never saved, and after one settles", async () => {
+    const saveImpl = vi.fn(async (_id: string, body: string) => body);
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    expect(result.current.saveInFlight()).toBe(false);
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.saveInFlight()).toBe(false);
+  });
+
+  it("is false after a save that landed, even while the buffer has moved on", async () => {
+    // The case that broke three E2E scenarios. `hasPendingWork` is TRUE here and
+    // correctly so, because there is unsaved work; but nothing FAILED, so a
+    // caller about to read-patch-write this note must not be refused.
+    const saveImpl = vi.fn(async (_id: string, body: string) => body);
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    rerender({ body: "three" });
+    expect(result.current.hasPendingWork()).toBe(true);
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+
+  it("is true after a save that rejected, which is the case the guard is for", async () => {
+    const saveImpl = vi.fn(async () => {
+      throw new Error("storage full");
+    });
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+  });
+
+  it("clears on the next attempt, so one old failure does not block forever", async () => {
+    // The other direction. A latch that never resets would refuse every later
+    // cover write for the rest of the session after one transient error.
+    let fail = true;
+    const saveImpl = vi.fn(async (_id: string, body: string) => {
+      if (fail) throw new Error("transient");
+      return body;
+    });
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+
+    fail = false;
+    rerender({ body: "three" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+
+  // The three ways the pane stops holding the note the failed attempt was for.
+  // Each one leaves the pane CLEAN, so `flushIfDirty` returns immediately and
+  // nothing re-fires: a flag left set there is a latch that refuses every
+  // out-of-band frontmatter write for the rest of the session, on a note that
+  // never failed. The cover toasts write-failed, both template converts no-op,
+  // a folder rename reports an unsettled save, and vim `:w` reports a failure
+  // for a write that had nothing to do.
+  it("clears on a note SWITCH, because the failed save was for another note", async () => {
+    const saveImpl = vi.fn(async (_id: string, _body: string) => {
+      throw new Error("disk full");
+    });
+    const { result, rerender } = renderHook(
+      ({ id, body }) => useAutosave(id, body, saveImpl),
+      { initialProps: { id: "note-1", body: "one" } },
+    );
+    rerender({ id: "note-1", body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+
+    await act(async () => {
+      rerender({ id: "note-2", body: "other note" });
+    });
+    expect(result.current.lastSaveFailed()).toBe(false);
+    // And the pane really is clean, which is what makes the stale flag
+    // unreachable by any later attempt.
+    expect(result.current.hasPendingWork()).toBe(false);
+  });
+
+  it("clears when the buffer is re-baselined against reloaded bytes", async () => {
+    const saveImpl = vi.fn(async (_id: string, _body: string) => {
+      throw new Error("disk full");
+    });
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "two" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+
+    act(() => result.current.acceptReloadedBody("from disk"));
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+
+  it("clears when the user reverts to the last body that actually landed", async () => {
+    // `savedBodyRef` is only ever set by a save that SUCCEEDED, so matching it
+    // means the buffer equals the disk: the failure has been undone by the user
+    // rather than by a write.
+    let fail = false;
+    const saveImpl = vi.fn(async (_id: string, body: string) => {
+      if (fail) throw new Error("transient");
+      return body;
+    });
+    const { result, rerender } = renderHook(
+      ({ body }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "one" } },
+    );
+    rerender({ body: "landed" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(false);
+
+    fail = true;
+    rerender({ body: "doomed" });
+    await act(async () => {
+      await result.current.flushIfDirty();
+    });
+    expect(result.current.lastSaveFailed()).toBe(true);
+
+    act(() => {
+      rerender({ body: "landed" });
+    });
+    expect(result.current.lastSaveFailed()).toBe(false);
+  });
+});

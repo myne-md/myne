@@ -1253,6 +1253,7 @@
     },
     "noteActions": {
       "buttonLabel": "Działania na notatce",
+      "convertFailed": "Nie udało się zmienić tego, czym jest ta notatka, więc pozostała bez zmian.",
       "rename": "Zmień nazwę",
       "move": "Przenieś do folderu…",
       "duplicate": "Duplikuj",
@@ -1943,7 +1944,10 @@
       "illegalSegment": "Nazwa folderu nie może zawierać / \\ | # ^ [ ] ani zaczynać się/kończyć spacją.",
       "tooLong": "Ta ścieżka folderu jest za długa.",
       "moveIntoSelf": "Nie można przenieść folderu do niego samego.",
-      "moveCollision": "W tym miejscu jest już folder o takiej nazwie."
+      "moveCollision": "W tym miejscu jest już folder o takiej nazwie.",
+      "unsettledSave": "Otwarta notatka nie zakończyła jeszcze zapisywania, więc folder pozostał nietknięty. Spróbuj ponownie, gdy zapis się zakończy.",
+      "renameFailed": "Nie udało się zmienić nazwy folderu, więc pozostał on bez zmian.",
+      "deliberateWriteFailed": "Nazwa folderu została zmieniona, ale jednego z jego ustawień nie udało się zapisać. Przy każdym odblokowaniu pod starą nazwą będzie pojawiać się pusty folder; można go bezpiecznie usunąć, co nie zmieni niczego innego. Ponowna zmiana nazwy folderu go nie usunie."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2153,6 +2157,7 @@
       "addToFavorites": "Dodaj do ulubionych",
       "archive": "Archiwizuj",
       "archiveBulkError": "Nie udało się zarchiwizować notatek.",
+      "renameFailed": "Nie udało się zapisać tej nazwy, więc notatka zachowała poprzednią.",
       "archiveFolder": "Archiwizuj folder",
       "archiveNote": "Archiwizuj",
       "archiveSingleError": "Nie udało się zarchiwizować notatki.",
@@ -2440,6 +2445,7 @@
       "thisNote": "ta notatka",
       "untitled": "Bez tytułu"
     },
+    "unsettledSave": "Otwarta notatka nie zakończyła jeszcze zapisywania, więc nic nie zostało zmienione. Spróbuj ponownie, gdy zapis się zakończy.",
     "views": {
       "cards": {
         "changeCover": "Zmień okładkę",
@@ -4118,10 +4124,13 @@
       "copied": "Skopiowano",
       "copy": "Kopiuj",
       "copyFailed": "Nie udało się skopiować. Użyj zamiast tego opcji „Zapisz jako plik”.",
+      "downloadStarted": "Wysłano do pobranych plików przeglądarki. Sprawdź, czy plik dotarł: to przeglądarka decyduje, gdzie go umieści, a Myne nie może zobaczyć, czy tak się stało.",
       "eyebrow": "Krok 4 z 4: numer konta",
       "heading": "Zapisz swój numer konta.",
       "intro": "To Twój token na okaziciela. Traktuj go jak gotówkę.",
       "saveAsFile": "Zapisz jako plik",
+      "saveFailed": "Nie udało się zapisać pliku. Skopiuj zamiast tego numer albo zapisz go na papierze.",
+      "savedToFile": "Zapisano. To plik ze zwykłym tekstem, więc przechowuj go w miejscu, w którym tylko Ty możesz go odczytać.",
       "shownOnceBody": "Zapisz go teraz. Myne nie może go dla Ciebie odzyskać. Wymagany do późniejszej rejestracji synchronizacji.",
       "shownOnceEmphasis": "Jest on pokazywany tylko raz."
     },
@@ -4275,11 +4284,14 @@
       "copy": "Kopiuj",
       "extensionNotice": "Rozszerzenia przeglądarki mające dostęp do tej strony mogą odczytać to, co się na niej znajduje. Jeśli nie masz pewności co do każdego rozszerzenia w tym profilu, wykonaj ten krok w aplikacji na komputer albo w czystym profilu przeglądarki.",
       "copyFailed": "Nie udało się skopiować. Użyj zamiast tego opcji „Zapisz jako plik”.",
+      "downloadStarted": "Wysłano do pobranych plików przeglądarki. Sprawdź, czy plik dotarł: to przeglądarka decyduje, gdzie go umieści, a Myne nie może zobaczyć, czy tak się stało.",
       "eyebrow": "Krok 2 z 4: fraza odzyskiwania",
       "heading": "Zapisz te 24 słowa.",
       "intro": "Ta fraza, wraz z Twoim hasłem, jest jedynym sposobem odzyskania skarbca. Przechowuj ją offline: na papierze, w menedżerze haseł, w portfelu sprzętowym. Traktuj ją jak gotówkę.",
       "reveal": "Pokaż frazę",
-      "saveAsFile": "Zapisz jako plik"
+      "saveAsFile": "Zapisz jako plik",
+      "saveFailed": "Nie udało się zapisać pliku. Skopiuj zamiast tego słowa albo zapisz je na papierze.",
+      "savedToFile": "Zapisano. To plik ze zwykłym tekstem, więc przechowuj go w miejscu, w którym tylko Ty możesz go odczytać."
     },
     "ready": {
       "backedUp": "Utworzono kopię zapasową ✓",
@@ -4541,6 +4553,8 @@
     "phraseCopied": "Skopiowano. Fraza zostaje na tym urządzeniu, a system usuwa ją po 30 sekundach.",
     "phraseCopyFailed": "Nie udało się skopiować. Użyj zamiast tego opcji „Zapisz do pliku”.",
     "savedToFile": "Zapisano do {{label}}",
+    "savedToShareSheet": "Zapisano wewnątrz Myne, gdzie systemowy menedżer plików nie ma do tego pliku dostępu. To plik ze zwykłym tekstem, więc jeśli użyjesz menu udostępniania, aby umieścić kopię w miejscu, do którego masz dostęp, wybierz miejsce, w którym tylko Ty możesz ją odczytać, a nie dysk w chmurze. Naciśnij ponownie Zapisz, jeśli menu zostało zamknięte.",
+    "savedFileWritten": "Zapisano wewnątrz Myne. To plik ze zwykłym tekstem, więc każdą wykonaną kopię przechowuj w miejscu, w którym tylko Ty możesz ją odczytać. To urządzenie nie podało, skąd można dotrzeć do pliku, więc traktuj go jako dostępny wyłącznie z wnętrza aplikacji, dopóki tego nie sprawdzisz.",
     "saveFileError": "Nie udało się zapisać pliku.",
     "stepLabel": "Utwórz sejf · {{current}} z {{total}}",
     "briefingTitle": "Zanim zaczniemy",

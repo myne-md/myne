@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Not işlemleri",
+      "convertFailed": "Bu notun türü değiştirilemedi, bu yüzden not değişmeden kaldı.",
       "rename": "Yeniden adlandır",
       "move": "Klasöre taşı…",
       "duplicate": "Çoğalt",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Bir klasör adı / \\ | # ^ [ ] içeremez ve boşlukla başlayıp bitemez.",
       "tooLong": "Bu klasör yolu çok uzun.",
       "moveIntoSelf": "Bir klasör kendi içine taşınamaz.",
-      "moveCollision": "Orada bu adda bir klasör zaten var."
+      "moveCollision": "Orada bu adda bir klasör zaten var.",
+      "unsettledSave": "Açık bir notun kaydedilmesi henüz bitmedi, bu yüzden klasöre dokunulmadı. Bittiğinde tekrar deneyin.",
+      "renameFailed": "Klasör yeniden adlandırılamadı, bu yüzden değişmeden kaldı.",
+      "deliberateWriteFailed": "Klasör yeniden adlandırıldı ancak ayarlarından biri kaydedilemedi. Kasanın kilidini her açışınızda eski adla boş bir klasör yeniden belirecek; onu silmek güvenlidir ve başka hiçbir şeyi değiştirmez. Klasörü yeniden adlandırmak bunu temizlemez."
     },
     "folderNote": {
       "defaultTitle": "Dizin"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Favorilere ekle",
       "archive": "Arşivle",
       "archiveBulkError": "Notlar arşivlenemedi.",
+      "renameFailed": "Bu ad kaydedilemedi, bu yüzden not eski adını korudu.",
       "archiveFolder": "Klasörü arşivle",
       "archiveNote": "Arşivle",
       "archiveSingleError": "Not arşivlenemedi.",
@@ -2260,6 +2265,7 @@
       "thisNote": "bu not",
       "untitled": "Başlıksız"
     },
+    "unsettledSave": "Açık bir notun kaydedilmesi henüz bitmedi, bu yüzden hiçbir şey değiştirilmedi. Bittiğinde tekrar deneyin.",
     "views": {
       "cards": {
         "changeCover": "Kapağı değiştir",
@@ -3878,10 +3884,13 @@
       "copied": "Kopyalandı",
       "copy": "Kopyala",
       "copyFailed": "Kopyalanamadı. Bunun yerine “Dosya olarak kaydet”i kullanın.",
+      "downloadStarted": "Tarayıcınızın indirilenlerine gönderildi. Ulaştığını kontrol edin: dosyanın nereye gideceğine tarayıcınız karar verir ve Myne ulaşıp ulaşmadığını göremez.",
       "eyebrow": "4 adımdan 4’ü: hesap numarası",
       "heading": "Hesap numaranızı kaydedin.",
       "intro": "Bu sizin hamiline yazılı belirtecinizdir. Nakit gibi davranın.",
       "saveAsFile": "Dosya olarak kaydet",
+      "saveFailed": "Dosya kaydedilemedi. Bunun yerine numarayı kopyalayın ya da bir yere yazın.",
+      "savedToFile": "Kaydedildi. Bu bir düz metin dosyasıdır, bu yüzden yalnızca sizin okuyabileceğiniz bir yerde saklayın.",
       "shownOnceBody": "Şimdi kaydedin. Myne bunu sizin için kurtaramaz. Daha sonra eşitleme için kayıt olurken gereklidir.",
       "shownOnceEmphasis": "Bu yalnızca bir kez gösterilir."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Kopyala",
       "extensionNotice": "Bu siteye erişimi olan tarayıcı uzantıları bu sayfadakileri okuyabilir. Bu profildeki her uzantıdan emin değilseniz bu adım için masaüstü uygulamasını ya da temiz bir tarayıcı profilini kullanın.",
       "copyFailed": "Kopyalanamadı. Bunun yerine “Dosya olarak kaydet”i kullanın.",
+      "downloadStarted": "Tarayıcınızın indirilenlerine gönderildi. Ulaştığını kontrol edin: dosyanın nereye gideceğine tarayıcınız karar verir ve Myne ulaşıp ulaşmadığını göremez.",
       "eyebrow": "4 adımdan 2’si: kurtarma ifadesi",
       "heading": "Bu 24 sözcüğü yazın.",
       "intro": "Bu ifade, parolanızla birlikte kasanızı kurtarmanın tek yoludur. Çevrimdışı saklayın: kâğıt, parola yöneticisi, donanım cüzdanı. Ona nakit gibi davranın.",
       "reveal": "İfadeyi göster",
-      "saveAsFile": "Dosya olarak kaydet"
+      "saveAsFile": "Dosya olarak kaydet",
+      "saveFailed": "Dosya kaydedilemedi. Bunun yerine sözcükleri kopyalayın ya da bir yere yazın.",
+      "savedToFile": "Kaydedildi. Bu bir düz metin dosyasıdır, bu yüzden yalnızca sizin okuyabileceğiniz bir yerde saklayın."
     },
     "ready": {
       "backedUp": "Yedeklendi ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Kopyalandı. Bu cihazda kalır ve sistem onu 30 saniye sonra panodan siler.",
     "phraseCopyFailed": "Kopyalanamadı. Bunun yerine “Dosyaya kaydet”i kullanın.",
     "savedToFile": "{{label}} konumuna kaydedildi",
+    "savedToShareSheet": "Myne’in içine kaydedildi; sistem dosya tarayıcısı buraya erişemez. Bu bir düz metin dosyasıdır; erişebileceğiniz bir yere kopyasını koymak için paylaşım sayfasını kullanırsanız, bulut sürücüsü yerine yalnızca sizin okuyabileceğiniz bir yer seçin. Sayfayı kapattıysanız Kaydet’e yeniden dokunun.",
+    "savedFileWritten": "Myne’in içine kaydedildi. Bu bir düz metin dosyasıdır, bu yüzden aldığınız her kopyayı yalnızca sizin okuyabileceğiniz bir yerde saklayın. Bu cihaz dosyaya nereden erişilebileceğini bildirmedi; siz kontrol edene kadar dosyaya yalnızca uygulama içinden erişilebildiğini varsayın.",
     "saveFileError": "Dosya kaydedilemedi.",
     "stepLabel": "Kasa oluştur · {{total}} adımdan {{current}}",
     "briefingTitle": "Başlamadan önce",

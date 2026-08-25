@@ -942,9 +942,25 @@ export async function setDeviceName(deviceIdHex: string, name: string): Promise<
  * straight from Rust's `std::env::consts::OS`. Seeds the enrollment forms'
  * suggested device name. **Do not sniff `navigator` instead** — one source keeps
  * the two clients from drifting into two default-name heuristics.
+ *
+ * Memoised, because the answer is a compile-time constant of the running binary
+ * and this is an IPC round trip. Four callers ask it now (the enrollment form,
+ * the clipboard-tier predicate, the device-name default, and the secret-save
+ * delivery), and two of those are on paths where the user is waiting.
+ *
+ * Only a SUCCESS is cached. A rejected promise held here would turn one
+ * transient IPC failure into a permanently wrong answer for the process, and
+ * two of the callers read this to decide what a secret-handling affordance may
+ * claim.
  */
+let platformProbe: Promise<string> | null = null;
+
 export async function devicePlatform(): Promise<string> {
-  return await invoke<string>("plugin:prefs|device_platform");
+  platformProbe ??= invoke<string>("plugin:prefs|device_platform").catch((e: unknown) => {
+    platformProbe = null;
+    throw e;
+  });
+  return await platformProbe;
 }
 
 /**

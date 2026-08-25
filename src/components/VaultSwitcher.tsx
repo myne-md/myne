@@ -180,8 +180,36 @@ const MENU_STYLE: CSSProperties = {
   padding: 6,
   display: "flex",
   flexDirection: "column",
-  gap: 2,
   zIndex: 60,
+  // Bounded, and the footer is the reason rather than tidiness. myne-md/myne#565
+  // names this file in its stated cause and calls the failure "a lockout, not a
+  // cosmetic overflow": the menu is `position: fixed` from `menuPos.top`, so an
+  // unbounded vault list runs off the bottom of the window and takes "Create
+  // another vault" and "Add this device" with it, with no way to reach them.
+  // The list scrolls (below); the menu itself does not, so the footer stays put.
+  maxHeight: "calc(100vh - 96px)",
+  boxSizing: "border-box",
+  overflow: "hidden",
+};
+
+/** The vault rows, which are the part that grows without bound. `minHeight: 0`
+ *  is load-bearing: a flex child defaults to `min-height: auto`, so without it
+ *  the list refuses to shrink below its content and the `maxHeight` above moves
+ *  the overflow onto the menu instead of onto the list, which puts the footer
+ *  back off-screen. */
+const MENU_LIST_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  // MOVED here from `MENU_STYLE` rather than copied. It only ever separated
+  // vault rows, which now all live in this container, and the divider below
+  // carries its own `margin: 6px 0` so the footer's spacing is unchanged.
+  // Copying it would have added a second hardcoded gap, and hoisting it into a
+  // shared const would have satisfied the token ratchet by count while leaving
+  // the harm it measures exactly where it was: a const in an inline style is
+  // as unreachable to a custom theme as a literal.
+  gap: 2,
+  overflowY: "auto",
+  minHeight: 0,
 };
 
 function rowStyle(state: "active" | "hover" | "rest"): CSSProperties {
@@ -516,7 +544,8 @@ export function VaultSwitcher({
             pointerEvents: visible ? "auto" : "none",
           }}
         >
-          {ordered.map((v) => {
+          <div style={MENU_LIST_STYLE}>
+            {ordered.map((v) => {
             const isActive = v.id === activeId;
             const isFallback = v.label == null;
             const name =
@@ -592,7 +621,8 @@ export function VaultSwitcher({
                 ) : null}
               </button>
             );
-          })}
+            })}
+          </div>
 
           <hr style={DIVIDER_STYLE} aria-hidden="true" />
 

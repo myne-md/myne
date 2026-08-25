@@ -560,7 +560,9 @@ Reference: Chan & Rogaway, "On Committing Authenticated Encryption", ESORICS 202
 
 The Phase 1 editor pattern where decorations on the line containing the cursor lift to expose the underlying markdown source for editing, then reapply when the cursor leaves the line. There is no separate "rendered view" / "source view" mode-switch — cursor location *is* the reveal. Headings show their leading `#`s on the active line and hide them off-line; bold and italic delimiters reveal on entry; inline link URLs become editable when the cursor enters their parent line. Wikilink chips are an exception per `spec/wikilink.md` §5.4 (chips stay atomic regardless of cursor position). **Task-field chips are a second exception** (MYND-614): they never open on caret entry — a date is a structured value, not prose, and a line carrying three chips would reflow every time the caret travelled it — but they *do* open while the find panel is open, because a search that lands on a match inside hidden text and highlights nothing is worse than not finding it. Reading mode never reveals, under either exception.
 
-Used in: `spec/markdown-dialect.md`, `myne-agents/features/editor-mvp/rfc.md`; `decisions.md` 2026-07-28
+**The task checkbox has a third trigger: a SELECTION that overlaps it** (myne-md/myne#560). It lifts when a selection merely overlaps the hidden `- [ ]` run, not only when a caret is inside it, and its trigger is per-range rather than per-line. Stated for that construct rather than as a class rule about widget-replacing decorations, because it is not one: `revealsRange` has a single caller in the tree, and the two exceptions above go the other way. Wikilink chips stay atomic under a selection as under a caret (`spec/wikilink.md` §5.4, and its form-12 embeds likewise), and task-field chips open only for the find panel. The reason is not editing but painting: the rendered checkbox has an opaque accent fill, and a translucent selection band across it, beside the same band over plain text, is two tones in one selection. Showing the source removes the opaque surface rather than working around it, and it is the honest answer: what is selected is the markup, so the markup is what belongs on screen and on the clipboard. Restyling decorations (emphasis, link, inline code) keep the older per-endpoint rule: a mark changing style under a selection is harmless where a widget vanishing is not.
+
+Used in: `spec/markdown-dialect.md`, `myne-agents/features/editor-mvp/rfc.md`; `decisions.md` 2026-07-28, 2026-08-25 (entry 0536)
 
 ### **custom folder icon** &nbsp; 📦 *Product*
 
@@ -1075,6 +1077,14 @@ Used in: `spec/protocol.md` §9.5.2, `spec/sync-protocol.md` §10.2, `decisions.
 The self-host bundle's TLS edge (a vetted Caddy reverse proxy) configured to **delete every client-IP-bearing field** from its access log (`remote_ip`, `client_ip`, `X-Forwarded-For`, `X-Real-Ip`, `Forwarded`). Caddy's *default* access log emits the client IP, so the scrub is explicit and load-bearing: it enforces the no-persistent-IP-logging commitment (C4/AS14) at the **edge**, complementing the app's in-process `noIP` middleware (defense in depth). An operator who fronts the bundle with their own load balancer inherits the obligation to scrub the IP there. Phase 2.
 
 Used in: `self-host-policy.md` §3, `decisions.md` 2026-06-20 (MYND-438)
+
+### **inline status mark** &nbsp; 📦 *Product*
+
+A glyph that sits **inside a text run** to say what a surface owes: the trailing slot of a sidebar note row, the bottom bar beside the save readout. It is a distinct class from an **icon**, which names a thing, and `docs/design/README.md` carves three of the icon rules out for it rather than bending them: it is 7 to 8px rather than 16 and up, it is coloured by MEANING (`--accent` while work is in flight, `--fg-3` while it is merely outstanding) rather than by `currentColor`, and it is drawn as a three-sided border ring rather than from the Lucide set, because at that size no Lucide pair distinguishes a filled dot from a hollow one and the GAP is what carries "incomplete" while the glyph stands still.
+
+The class exists so a second member argues for itself against the same rules rather than re-deciding them. Today it has exactly one: [sync arc](#sync-arc). A mark is never a live region. It has no text content, so `role="status"` on it announces nothing, and the surface renders a persistently-mounted visually-hidden region beside it instead.
+
+Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`
 
 ### **inline tag** &nbsp; 📦 *Product*
 
@@ -2113,6 +2123,16 @@ An opaque UUIDv4 identifying an in-flight vault-creation session held in the Tau
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow: backend session pattern", "Vault creation session TTL"
 
+### **scroll-fade edge** &nbsp; 📦 *Product*
+
+The soft top or bottom edge on a scrollable region that says "there is more this way" (myne-md/myne#565). Rendered as a `mask-image` on the SCROLLER, never as an overlay gradient: an overlay has to guess the surface colour behind it, and every theme and every custom palette makes that guess differently, so a mask that fades the content itself is the only form that survives a palette the author never saw.
+
+**Conditional, and that is the whole affordance.** Each edge appears only while there is content past it, so a region whose content fits carries no fade at all. A permanent fade is decoration, and worse, it is a lie about whether scrolling would do anything. The two edges are independent: `data-fade-top` and `data-fade-bottom` are set separately from the scroll position, and their absence is the correct rendering rather than a default.
+
+Masked on the scroller and not on its container, for the reason `CenteredCard` records: a `mask-image` clips the whole rendered box, so masking a card fades its own fill, its hairline and its corners, which is what a card IS.
+
+Used in: `src/hooks/useScrollEdges.ts`, `src/styles/tokens.css`
+
 ### **sealed label store** &nbsp; 📋 *Protocol*
 
 The device-local cache that lets the locked [vault picker](#vault-picker) show a vault's real name after a relaunch, when the name itself is AEAD-sealed inside that vault's [vault.prefs](#vaultprefs) and therefore unreadable until unlock. One `MYL1` file per vault at the vault root beside `vault.quickunlock`, sealed under a **per-vault** 32-byte `wrap_key` held in the OS keychain, never a `DeriveSubkey(root_key, …)` subkey: a derived subkey cannot be destroyed on its own while its root survives, so it could not deliver per-vault erase. The per-vault scoping is what preserves vault deletion's per-`VaultId` cryptographic-erase guarantee, since deleting a vault destroys that vault's key. Only a vault this device has unlocked at least once is ever named; there is no key with which to read the label of one it has not. Device-local, never synced, and structurally excluded from the backup container by the `§9.11.3` closed allowlist. See also [hide vault names](#hide-vault-names).
@@ -2200,6 +2220,14 @@ The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the 
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **smart-home** &nbsp; 📦 *Product*
+
+What `Cmd+←` and `Cmd+Shift+←` do on a [line-task](#line-task) or any other list row: the first press stops at the item's **content start**, past the marker, and a second press reaches the raw line start (myne-md/myne#561). On `- [x] buy milk` the line the user sees begins at `buy`, because `- [x] ` is decoration-hidden and drawn as a checkbox, so a boundary at the raw offset would select or delete markup that is not on screen.
+
+Progressive by design, which is why it is a keymap behaviour rather than a selection rewrite: the second press needs to know where the first one landed, and nothing further back in the chain does. `Cmd+Backspace` shares the same boundary, so a first press takes the label and a second takes the marker. Forward is untouched, because the end of a line is the end of a line on every kind of line.
+
+Used in: `editor/src/line-boundary.ts`
+
 ### **snapshot** &nbsp; 📦 *Product*
 
 An encrypted previous version of a note, captured automatically as the note is edited so an accidental overwrite or bad edit can be recovered (the MYND-96 file-recovery feature — Myne's answer to Obsidian File Recovery). A snapshot is a **frozen [`.myn`](#myn-file) revision**: the prior note plaintext re-sealed under the note's own `item_key` in the `MY01` envelope (`spec/protocol.md` §9.2) — **no new magic byte, no new subkey role**. Snapshots live in a flat `<vault-root>/snapshots/` directory (§9.1), captured **time-coalesced** (≈ one per note per 5 min of active editing, plus on editor-close / vault-lock), retained for a **bounded window** (default ~7 days) with a safety backstop, and pruned eagerly. On **permanent** delete a note's snapshots are purged, preserving cryptographic erase; soft-[Trash](#trash) (an ordinary update, the note still exists) keeps snapshotting. Distinct from the unrelated `vault.prefs` *replay* sense ("restore prior valid `vault.prefs` snapshots") in `threat-model.md` §7. See also [`.myn` file](#myn-file), [Trash](#trash).
@@ -2249,6 +2277,18 @@ Used in: `spec/protocol.md` §10.3.1
 Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships malicious code. Myne's mitigations are hash-pinned lockfiles, minimal direct-dependency surface, dependency-review at update time, and `cargo-vet`/`cargo-audit` in CI. Status: Best-effort — cannot fully defend against a determined attacker in the dependency graph, but the Tauri/Cargo dependency tree is materially smaller than Electron/npm would be.
 
 Used in: `threat-model.md` §1 (A8), §7
+
+### **sync arc** &nbsp; 📦 *Product*
+
+The three-state glyph that says whether Myne owes the note anything (myne-md/myne#566). One shape vocabulary in two places: beside the save readout in the bottom bar, and trailing an unsynced row in the sidebar.
+
+- **solid dot**: settled. Nothing is owed.
+- **static arc**: outstanding, and nothing is moving on it. An edit waiting on a device that is offline is this, and so is text waiting on the autosave debounce.
+- **rotating arc**: in flight, and bounded. A disk write, a push. Never a state a user can sit in, because `docs/design/README.md` bans looping animation and a calm product does not spin at someone while they write.
+
+The gap in the ring is what carries "incomplete" while the arc stands still, which is what a 6px filled dot and a 6px hollow one could not do: at that size they are the same glyph. Two independent facts drive it and are deliberately not merged. Whether the marker is SHOWN comes from the note's own sync debt, and whether it TURNS comes from whether the device is moving bytes this second. Rotating on the first alone would claim work is in flight whenever a laptop is shut.
+
+Used in: `src/components/Spinner.tsx`, `src/notes/components/SaveStatus.tsx`, `src/notes/components/NoteRow.tsx`
 
 ### **sync cursor** &nbsp; 📋 *Protocol*
 

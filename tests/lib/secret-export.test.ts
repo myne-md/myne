@@ -26,6 +26,7 @@ vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
 
 import { copySecretToClipboard, saveSecretAsTextFile } from "../../src/lib/secret-export";
 import type { Feedback } from "../../src/lib/clipboard";
+import { recordingFeedback } from "./_recordingFeedback";
 
 beforeEach(() => {
   invokeMock.mockReset();
@@ -35,11 +36,24 @@ beforeEach(() => {
 });
 
 describe("saveSecretAsTextFile", () => {
+  // myne-md/myne#522: the feedback pair is a REQUIRED argument here for the same
+  // reason it is on the copy half, and these tests are what hold it. The arms
+  // record rather than report, so an assertion can say WHICH outcome was
+  // announced and not merely that something was. `inline`, because that is the
+  // arm these two screens pass: a secret shown once gets a persistent line
+  // rather than a toast that can be missed.
+  const recorder = () => recordingFeedback("inline");
+
   it("routes the write through the Rust command with the dialog-chosen path", async () => {
     saveMock.mockResolvedValue("/Users/me/Documents/myne-recovery-phrase.txt");
     invokeMock.mockResolvedValue(undefined);
+    const { feedback } = recorder();
 
-    await saveSecretAsTextFile("myne-recovery-phrase.txt", "correct horse battery staple");
+    await saveSecretAsTextFile(
+      "myne-recovery-phrase.txt",
+      "correct horse battery staple",
+      feedback,
+    );
 
     expect(saveMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenCalledWith("plugin:secret-export|save_secret_text", {
@@ -48,22 +62,43 @@ describe("saveSecretAsTextFile", () => {
     });
   });
 
+  it("announces the success once the command resolves", async () => {
+    saveMock.mockResolvedValue("/tmp/kit.txt");
+    invokeMock.mockResolvedValue(undefined);
+    const { ran: said, feedback } = recorder();
+
+    await saveSecretAsTextFile("kit.txt", "secret", feedback);
+
+    expect(said).toEqual(["success"]);
+  });
+
   it("does nothing when the user cancels the save dialog (null path)", async () => {
     saveMock.mockResolvedValue(null);
-    await saveSecretAsTextFile("kit.txt", "secret");
+    const { ran: said, feedback } = recorder();
+    await saveSecretAsTextFile("kit.txt", "secret", feedback);
     expect(invokeMock).not.toHaveBeenCalled();
+    // Silent on purpose: the user closed the dialog, so they already know.
+    // Announcing here would be the app narrating their own action back at them.
+    expect(said).toEqual([]);
   });
 
-  it("swallows a dialog rejection without invoking the command", async () => {
+  it("announces a failure when the dialog will not open, which a cancel does not", async () => {
     saveMock.mockRejectedValue(new Error("dialog boom"));
-    await saveSecretAsTextFile("kit.txt", "secret");
+    const { ran: said, feedback } = recorder();
+    await saveSecretAsTextFile("kit.txt", "secret", feedback);
     expect(invokeMock).not.toHaveBeenCalled();
+    // The pair of assertions is the point. Nothing was written in EITHER case,
+    // so the transport cannot tell the two apart; only what the user is told
+    // separates "you closed it" from "it would not open".
+    expect(said).toEqual(["failure"]);
   });
 
-  it("swallows a command rejection (never throws to the caller)", async () => {
+  it("announces a failure when the command rejects, and still never throws", async () => {
     saveMock.mockResolvedValue("/tmp/kit.txt");
     invokeMock.mockRejectedValue(new Error("io boom"));
-    await expect(saveSecretAsTextFile("kit.txt", "secret")).resolves.toBeUndefined();
+    const { ran: said, feedback } = recorder();
+    await expect(saveSecretAsTextFile("kit.txt", "secret", feedback)).resolves.toBeUndefined();
+    expect(said).toEqual(["failure"]);
   });
 });
 

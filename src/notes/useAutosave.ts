@@ -73,6 +73,22 @@ export type UseAutosaveReturn = {
    *  render — so this answers for the buffer as it is NOW, not as it was one
    *  commit ago. */
   hasPendingWork: () => boolean;
+  /** Did the most recent save ATTEMPT fail? See the impl docstring: this is the
+   *  settled-check a caller about to read-patch-write the same note needs, and
+   *  `hasPendingWork` is not it. */
+  lastSaveFailed: () => boolean;
+  /** Is a `note_update` in flight RIGHT NOW?
+   *
+   *  The in-flight disjunct of `hasPendingWork`, on its own, because the other
+   *  two are what make `hasPendingWork` the wrong question for a settled-check:
+   *  a clean pane whose buffer merely moved on is ordinary, and reporting it as
+   *  unsettled refused writes after perfectly normal saves. This one is not
+   *  ordinary. A caller that read-patch-writes this note while a save is in
+   *  flight has its patch landed on and reverted, or, with the section 11.3
+   *  hash on, mints a keep-both conflict copy for a note no remote writer
+   *  touched, because the in-flight save declares a base the caller's write has
+   *  already replaced. */
+  saveInFlight: () => boolean;
 };
 
 /**
@@ -257,6 +273,11 @@ export function useAutosave(
       /* best-effort — a switch must never be blocked by a failed save */
     });
   }, []);
+  /** Set true by `fireSave`'s error arm, cleared at the top of every attempt and
+   *  at every point the pane stops holding the note that attempt was for.
+   *  Read through `lastSaveFailed` below. */
+  const saveFailedRef = useRef(false);
+
   const flushOutgoingRef = useRef(flushOutgoing);
   flushOutgoingRef.current = flushOutgoing;
 
@@ -298,6 +319,15 @@ export function useAutosave(
       dirtyRef.current = false;
       hasEditedRef.current = false;
       savedBodyRef.current = null;
+      // The flag answers "did the save that just ran fail", and after a switch
+      // there IS no such save: this pane now holds a different note. Leaving it
+      // set makes `flushIfDirty` return immediately (the pane is clean, nothing
+      // re-fires) while `lastSaveFailed` keeps reporting the OLD note's failure,
+      // so every out-of-band frontmatter write refuses indefinitely: the cover
+      // toasts write-failed, both template converts no-op, a folder rename
+      // reports an unsettled save and vim `:w` reports a failure for a write
+      // that had nothing to do.
+      saveFailedRef.current = false;
       setStatus({ status: "clean" });
     } else {
       noteIdRef.current = noteId;
@@ -309,6 +339,9 @@ export function useAutosave(
   // flushIfDirty / retry.
   const fireSave = useCallback(async (): Promise<void> => {
     clearTimers();
+    // Cleared at the top of every attempt: the question this answers is "did the
+    // save that just ran fail", not "has anything ever failed" (myne-md/myne#520).
+    saveFailedRef.current = false;
     const id = noteIdRef.current;
     if (id === null) {
       // No selected note → can't save. Stay in current state.
@@ -453,6 +486,7 @@ export function useAutosave(
           }
         }
         dirtyRef.current = true;
+        saveFailedRef.current = true;
         setStatus({ status: "error", error: err });
       } finally {
         // Only when this invocation still owns the slot — see `handedOff`.
@@ -477,8 +511,12 @@ export function useAutosave(
 
     // A change happened.
     if (savedBodyRef.current !== null && body === savedBodyRef.current) {
-      // User reverted to last-saved state — back to clean.
+      // User reverted to last-saved state, so back to clean. `savedBodyRef` is
+      // only ever set by a save that SUCCEEDED, so matching it means the buffer
+      // equals the disk and the last attempt's failure has been undone by the
+      // user rather than by a write.
       dirtyRef.current = false;
+      saveFailedRef.current = false;
       clearTimers();
       setStatus({ status: "saved", at: new Date() });
       return;
@@ -529,6 +567,10 @@ export function useAutosave(
       dirtyRef.current = false;
       hasEditedRef.current = true;
       savedBodyRef.current = reloadedBody;
+      // Same reason as the note-switch reset: the buffer has been re-baselined
+      // against bytes that ARE on disk, so whatever the last attempt did is no
+      // longer a fact about this pane.
+      saveFailedRef.current = false;
       // Bridge only: the next render's write to `latestBodyRef` is
       // authoritative. Every caller batches `setContent(reloadedBody)` with
       // this call, so that render carries the same body — this line just
@@ -572,6 +614,28 @@ export function useAutosave(
     [],
   );
 
+  /** See the type docstring: the in-flight disjunct alone. */
+  const saveInFlight = useCallback(() => inFlightRef.current !== null, []);
+
+  /**
+   * Did the most recent save ATTEMPT fail?
+   *
+   * A narrower question than `hasPendingWork`, and the difference is the whole
+   * reason this exists (myne-md/myne#520). `hasPendingWork` is a "do not clobber
+   * me" flag and answers true for a buffer that merely moved on while a
+   * perfectly successful save was in flight, which is the ordinary state right
+   * after a flush. Using it as a settled-check refused every out-of-band
+   * frontmatter write that followed a normal save: the cover never landed and
+   * the user got a write-failed toast, measured against the E2E suite before it
+   * shipped.
+   *
+   * What a caller about to read-patch-write the same note needs to know is only
+   * whether the flush it just awaited actually persisted, and `fireSave` is the
+   * one place that knows. A ref, not `status`, for the reason the whole file
+   * gives: `status` is React state written from a passive effect.
+   */
+  const lastSaveFailed = useCallback(() => saveFailedRef.current, []);
+
   // Hold the latest `saveImpl` in a ref so the unmount cleanup sees
   // the current impl, not the one captured at first render.
   const saveImplRef = useRef(saveImpl);
@@ -606,7 +670,18 @@ export function useAutosave(
       flushOutgoing,
       acceptReloadedBody,
       hasPendingWork,
+      lastSaveFailed,
+      saveInFlight,
     }),
-    [status, retry, flushIfDirty, flushOutgoing, acceptReloadedBody, hasPendingWork],
+    [
+      status,
+      retry,
+      flushIfDirty,
+      flushOutgoing,
+      acceptReloadedBody,
+      hasPendingWork,
+      lastSaveFailed,
+      saveInFlight,
+    ],
   );
 }

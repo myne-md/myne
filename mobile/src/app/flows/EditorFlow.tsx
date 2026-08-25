@@ -140,7 +140,8 @@ import {
   OPEN_COVER_PICKER_EVENT,
   REMOVE_COVER_EVENT,
   type OpenCoverPickerDetail,
-} from "../../lib/openCoverPickerSignal";
+  type RemoveCoverDetail,
+} from "@myne/editor/cover-signal";
 import { NoteRowActionsSheet } from "./editor/sheets/NoteRowActionsSheet";
 import { FolderActionsSheet } from "./editor/sheets/FolderActionsSheet";
 import { DecorationSheet } from "./editor/sheets/DecorationSheet";
@@ -460,7 +461,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // The note cover's picker (myne-md/myne#410). `| null` rather than an `open`
   // flag: `hasCover` only means anything while it is open, and it comes from the
   // editor, which has just resolved the field. The shell cannot see it.
-  const [coverPicker, setCoverPicker] = useState<{ hasCover: boolean } | null>(null);
+  // `noteId` is the note the sheet was opened FOR; `null` means the entry point
+  // did not name one and the open note is the target (myne-md/myne#520).
+  const [coverPicker, setCoverPicker] = useState<
+    { hasCover: boolean; noteId: string | null } | null
+  >(null);
   // MYND-620 task 4: the phone's answer to the desktop's note-scoped side panel.
   // There is no permanently-visible panel beside an editor on a phone, so the
   // same information arrives as a sheet on request — the established mechanism
@@ -1669,13 +1674,22 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // CodeMirror DOM in the shared editor package and has no route into this
   // component, which owns both the sheet mounts and the open note. Same shape
   // the desktop shell uses, and the event names are spelled identically on
-  // purpose (`mobile/src/lib/openCoverPickerSignal.ts` says so).
+  // purpose (`@myne/editor/cover-signal` says so).
   useEffect(() => {
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<OpenCoverPickerDetail>).detail;
-      setCoverPicker({ hasCover: detail?.hasCover === true });
+      setCoverPicker({
+        hasCover: detail?.hasCover === true,
+        noteId: detail?.noteId ?? null,
+      });
     };
-    const onRemove = () => void applyNoteCover(null);
+    // `?? null` on a possibly-absent detail rather than a destructure: a bare
+    // `new CustomEvent(REMOVE_COVER_EVENT)` still has to mean "the open note"
+    // rather than throw (myne-md/myne#520).
+    const onRemove = (e: Event) => {
+      const detail = (e as CustomEvent<RemoveCoverDetail>).detail;
+      void applyNoteCover(null, detail?.noteId ?? null);
+    };
     window.addEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
     window.addEventListener(REMOVE_COVER_EVENT, onRemove);
     return () => {
@@ -1698,19 +1712,35 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
    * the re-read the next autosave would write the pre-write text back and
    * silently revert the cover.
    */
-  async function applyNoteCover(choice: CoverChoice | null) {
-    const id = editing?.id;
+  async function applyNoteCover(choice: CoverChoice | null, target: string | null) {
+    // The control's stated target, falling back to the open note for the entry
+    // points that do not name one (myne-md/myne#520). One note is ever open
+    // here, so the fallback is almost always what runs; carrying the argument
+    // is what keeps this flow honest against the shared seam rather than
+    // relying on the coincidence.
+    const id = target ?? editing?.id;
     setCoverPicker(null);
     if (id == null) return;
+    // Whether `id` is the note this editor is showing. Everything below that
+    // touches `editorText` is gated on it, and that gate is the point of
+    // accepting a target at all: `editorUnchanged` answers false for ANY id that
+    // is not the loaded one, so an ungated flush would write THIS buffer into
+    // that other note, and the re-read would replace the open note's text with
+    // the other note's. Unreachable today, since the only caller passing a
+    // target passes this note's id, but relying on that coincidence is exactly
+    // what the seam change exists to stop.
+    const isOpenNote = id === editing?.id;
     try {
-      if (!editorUnchanged(id)) {
+      if (isOpenNote && !editorUnchanged(id)) {
         if (HAS_TAURI) await noteUpdate(id, editorText);
         loadedTextRef.current = { id, text: editorText };
       }
       await setNoteCover(id, choice);
-      const next = await noteRead(id);
-      setEditorText(next);
-      loadedTextRef.current = { id, text: next };
+      if (isOpenNote) {
+        const next = await noteRead(id);
+        setEditorText(next);
+        loadedTextRef.current = { id, text: next };
+      }
       await refreshOne(id);
     } catch {
       setEditorError(t("editor.cover.writeFailed"));
@@ -2710,6 +2740,20 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             onUnmark={(id) =>
               void (async () => {
                 try {
+                  // Persist the open buffer first when this IS the open note.
+                  // `unmarkTemplate` is read-patch-write against disk, so
+                  // without this it reads bytes the user has since typed past
+                  // and writes over them (the desktop half of this rule is
+                  // `src/notes/flushBeforeFrontmatterWrite.ts`, myne-md/myne#520;
+                  // this client has no flush registry to put it inside, so the
+                  // caller carries it, and `docs/dev/twin-inventory.md` records
+                  // the asymmetry). The Templates tab is a separate tab from the
+                  // editor, so an unsaved buffer while browsing it is the
+                  // ordinary state rather than an exotic one.
+                  if (id === editing?.id && !editorUnchanged(id)) {
+                    if (HAS_TAURI) await noteUpdate(id, editorText);
+                    loadedTextRef.current = { id, text: editorText };
+                  }
                   if (HAS_TAURI) await unmarkTemplate(id);
                   await refreshOne(id);
                 } catch {
@@ -3110,6 +3154,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             value={editorText}
             onChange={setEditorText}
             onReady={setEditorView}
+            // myne-md/myne#520: the note the cover banner's controls act on.
+            // Mobile shows one note at a time, so this client cannot hit the
+            // split defect that motivated the field, but the seam is shared
+            // and a host that left it unset would hand the editor `null` and
+            // put this flow back on the guess it is meant to replace.
+            noteId={editing?.id ?? null}
             // MYND-559: the FormatBar (driven by the `onReady` view above) is
             // mobile's single formatting surface — suppress the engine's floating
             // selection toolbar so a word-select doesn't raise a second one.
@@ -3196,12 +3246,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         />
       )}
 
-      {coverPicker !== null && editing?.id != null && (
+      {coverPicker !== null && (coverPicker.noteId ?? editing?.id) != null && (
         <CoverPickerSheet
           hasCover={coverPicker.hasCover}
           onClose={() => setCoverPicker(null)}
-          onPick={(choice) => void applyNoteCover(choice)}
-          onRemove={() => void applyNoteCover(null)}
+          onPick={(choice) => void applyNoteCover(choice, coverPicker.noteId)}
+          onRemove={() => void applyNoteCover(null, coverPicker.noteId)}
         />
       )}
 

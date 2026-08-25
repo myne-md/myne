@@ -1204,6 +1204,7 @@
     },
     "noteActions": {
       "buttonLabel": "Acțiuni pentru notă",
+      "convertFailed": "Nu s-a putut converti această notă, așa că a rămas neschimbată.",
       "rename": "Redenumește",
       "move": "Mută în dosar…",
       "duplicate": "Duplică",
@@ -1873,7 +1874,10 @@
       "illegalSegment": "Un nume de folder nu poate conține / \\ | # ^ [ ] și nu poate începe sau se termina cu un spațiu.",
       "tooLong": "Acea cale de folder este prea lungă.",
       "moveIntoSelf": "Un folder nu poate fi mutat în el însuși.",
-      "moveCollision": "Acolo există deja un folder cu acel nume."
+      "moveCollision": "Acolo există deja un folder cu acel nume.",
+      "unsettledSave": "O notă deschisă nu a terminat de salvat, așa că folderul a rămas neatins. Încearcă din nou după ce termină.",
+      "renameFailed": "Nu s-a putut redenumi folderul, așa că a rămas neschimbat.",
+      "deliberateWriteFailed": "Folderul a fost redenumit, dar una dintre setările lui nu a putut fi salvată. De fiecare dată când deblochezi, un folder gol va reapărea sub numele vechi; îl poți șterge în siguranță și nu se schimbă nimic altceva. O nouă redenumire a folderului nu îl va elimina."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2077,6 +2081,7 @@
       "addToFavorites": "Adaugă la favorite",
       "archive": "Arhivează",
       "archiveBulkError": "Notele nu au putut fi arhivate.",
+      "renameFailed": "Acel nume nu a putut fi salvat, așa că nota și-a păstrat numele vechi.",
       "archiveFolder": "Arhivează dosarul",
       "archiveNote": "Arhivează",
       "archiveSingleError": "Nota nu a putut fi arhivată.",
@@ -2350,6 +2355,7 @@
       "thisNote": "această notă",
       "untitled": "Fără titlu"
     },
+    "unsettledSave": "O notă deschisă nu a terminat de salvat, așa că nimic nu a fost schimbat. Încearcă din nou după ce termină.",
     "views": {
       "cards": {
         "changeCover": "Schimbă coperta",
@@ -3998,10 +4004,13 @@
       "copied": "Copiat",
       "copy": "Copiază",
       "copyFailed": "Copierea nu a reușit. Folosește „Salvează ca fișier”.",
+      "downloadStarted": "Trimis în descărcările browserului tău. Verifică dacă a ajuns: browserul tău decide unde merge fișierul, iar Myne nu poate vedea dacă a ajuns acolo.",
       "eyebrow": "Pasul 4 din 4: numărul de cont",
       "heading": "Salvează-ți numărul de cont.",
       "intro": "Acesta este jetonul tău la purtător. Tratează-l ca pe bani.",
       "saveAsFile": "Salvează ca fișier",
+      "saveFailed": "Fișierul nu a putut fi salvat. Copiază în schimb numărul sau notează-l.",
+      "savedToFile": "Salvat. Este un fișier text simplu, așa că păstrează-l într-un loc unde numai tu îl poți citi.",
       "shownOnceBody": "Salvează-l acum. Myne nu îl poate recupera pentru tine. Necesar pentru a te înregistra la sincronizare mai târziu.",
       "shownOnceEmphasis": "Acesta este afișat o singură dată."
     },
@@ -4155,11 +4164,14 @@
       "copy": "Copiază",
       "extensionNotice": "Extensiile de browser care au acces la acest site pot citi ce se află pe această pagină. Dacă nu ești sigur de fiecare extensie din acest profil, folosește aplicația desktop sau un profil de browser curat pentru acest pas.",
       "copyFailed": "Copierea nu a reușit. Folosește în schimb „Salvează ca fișier”.",
+      "downloadStarted": "Trimis în descărcările browserului tău. Verifică dacă a ajuns: browserul tău decide unde merge fișierul, iar Myne nu poate vedea dacă a ajuns acolo.",
       "eyebrow": "Pasul 2 din 4: fraza de recuperare",
       "heading": "Notează aceste 24 de cuvinte.",
       "intro": "Această frază, împreună cu parola ta, este singura cale de a-ți recupera seiful. Păstreaz-o offline: pe hârtie, într-un manager de parole sau un portofel hardware. Tratează-o ca pe bani.",
       "reveal": "Arată fraza",
-      "saveAsFile": "Salvează ca fișier"
+      "saveAsFile": "Salvează ca fișier",
+      "saveFailed": "Fișierul nu a putut fi salvat. Copiază în schimb cuvintele sau notează-le.",
+      "savedToFile": "Salvat. Este un fișier text simplu, așa că păstrează-l într-un loc unde numai tu îl poți citi."
     },
     "ready": {
       "backedUp": "Copie de rezervă creată ✓",
@@ -4409,6 +4421,8 @@
     "phraseCopied": "Copiat. Rămâne pe acest dispozitiv, iar sistemul îl elimină după 30 de secunde.",
     "phraseCopyFailed": "Copierea nu a reușit. Folosește în schimb „Salvează în fișier”.",
     "savedToFile": "Salvat în {{label}}",
+    "savedToShareSheet": "Salvat în interiorul Myne, unde managerul de fișiere al sistemului nu poate ajunge. Este un fișier text simplu, așa că, dacă folosești meniul de partajare pentru a pune o copie undeva unde poți ajunge, alege un loc unde numai tu o poți citi, nu un serviciu de stocare în cloud. Apasă din nou pe Salvează dacă ai închis meniul.",
+    "savedFileWritten": "Salvat în interiorul Myne. Este un fișier text simplu, așa că păstrează orice copie faci într-un loc unde numai tu o poți citi. Acest dispozitiv nu a raportat de unde poate fi accesat fișierul, așa că tratează-l ca fiind accesibil doar din aplicație până când verifici.",
     "saveFileError": "Fișierul nu a putut fi salvat.",
     "stepLabel": "Creează un seif · {{current}} din {{total}}",
     "briefingTitle": "Înainte de a începe",

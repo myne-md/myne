@@ -50,6 +50,100 @@ async function readStatus(): Promise<SyncStatus> {
   return invoke<SyncStatus>("plugin:sync|sync_status");
 }
 
+/**
+ * Whether two reads are the same answer.
+ *
+ * Every poll deserializes a fresh object, so `Object.is` never matches and each
+ * tick re-rendered every subscriber to paint an identical frame. On the editor
+ * screen that subtree is the sidebar: `NoteList` -> `VirtualList` -> ~30
+ * un-memoized `NoteRow`s, once per poller per five seconds, for nothing.
+ *
+ * `useUnsyncedEdits`, read at the same level on the same beat, has done this
+ * since it was written and says why in its own comment. This hook did not, so a
+ * caller adding one beside it silently gave back the property that one protects.
+ */
+/**
+ * Every key of `T`, as a literal the compiler REQUIRES to be complete.
+ *
+ * This is the mechanism behind `sameStatus`'s claim, and it exists because the
+ * two shapes that read as if they carried it do not. An exhaustive `switch` with
+ * a `never` default catches a new STATE. Comparing `a.state === b.state` per arm
+ * catches nothing about payloads. Neither notices a FIELD added to a variant
+ * that already exists, which is the failure this function's comment names: the
+ * indicator freezing on its first value with nothing reporting it.
+ *
+ * A mapped type with `-?` makes the key literal at each call site fail to
+ * compile the moment its variant grows a field, which is the compile error the
+ * comment promised. Verified by adding `lastSyncedAt` to the `idle` variant and
+ * watching `tsc` name the arm.
+ */
+type PayloadKeys<T> = { [K in Exclude<keyof T, "state">]-?: true };
+
+/**
+ * Field-by-field equality over every key of `T` EXCEPT the discriminant, listed
+ * at the call site.
+ *
+ * `state` is excluded because both sides were just proved equal to the same
+ * literal one line up, so listing it was a tautology repeated in seven arms and
+ * it left five of them saying nothing but `{ state: true }`. Excluding it keeps
+ * the ratchet exactly where it bites: the literal still has to name every
+ * PAYLOAD field, so a variant that grows one fails to compile at its own arm.
+ */
+function sameFields<T extends { state: string }>(a: T, b: T, keys: PayloadKeys<T>): boolean {
+  return (Object.keys(keys) as Array<keyof T>).every((k) => a[k] === b[k]);
+}
+
+function sameStatus(a: SyncStatus | null, b: SyncStatus): boolean {
+  if (a === null) return false;
+  // EXHAUSTIVE, with a `never` default, rather than two comparisons and an
+  // unconditional `return true`. This function decides whether a poll result
+  // reaches React at all, so the failure mode when a state gains a payload (a
+  // `lastSyncedAt` on `idle`, a progress count on `syncing`) is the indicator
+  // freezing on its first value with nothing reporting it, on the one readout a
+  // user consults to decide whether their notes are on the server.
+  //
+  // Each arm narrows BOTH sides in its own condition rather than narrowing `a`
+  // and casting `b`. The casts were the point: an earlier version of this
+  // comment claimed the compiler narrowed `b` off `a.state`, so a new field
+  // would fail to compile here. It does not, and an `as Extract<…>` is exactly
+  // what stops a missing field from being an error.
+  //
+  // `sameFields` is what makes the claim true now. Its key literal must list
+  // every field of the narrowed variant, so a payload added to one becomes a
+  // compile error at that arm.
+  switch (a.state) {
+    case "error":
+      // `last_success_at` arrived on this variant from develop while this ratchet
+      // was being written on the branch, and the merge is where the two met: the
+      // key literal has to name it, which is the compile error this design exists
+      // to produce. Comparing it is also the right answer rather than the quiet
+      // one. `SyncBanners.tsx` derives the days-failing banner from this field, so
+      // an `error` poll whose only change is a newer `last_success_at` must reach
+      // React; without it the banner freezes on its first value, which is the exact
+      // failure the comment above describes.
+      return b.state === "error" && sameFields(a, b, { detail: true, last_success_at: true });
+    case "conflicts":
+      return b.state === "conflicts" && sameFields(a, b, { count: true });
+    // Payload-free today, and listed one per line rather than collapsed into a
+    // default, so adding a STATE to the union fails to compile below while
+    // adding a FIELD to one of these fails to compile at its own arm.
+    case "disabled":
+      return b.state === "disabled" && sameFields(a, b, {});
+    case "not_enrolled":
+      return b.state === "not_enrolled" && sameFields(a, b, {});
+    case "pending":
+      return b.state === "pending" && sameFields(a, b, {});
+    case "idle":
+      return b.state === "idle" && sameFields(a, b, {});
+    case "syncing":
+      return b.state === "syncing" && sameFields(a, b, {});
+    default: {
+      const exhaustive: never = a;
+      return exhaustive;
+    }
+  }
+}
+
 export function useSyncStatus(): SyncStatusHook {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,7 +155,7 @@ export function useSyncStatus(): SyncStatusHook {
     const tick = () => {
       readStatus()
         .then((s) => {
-          if (mounted.current) setStatus(s);
+          if (mounted.current) setStatus((prev) => (sameStatus(prev, s) ? prev : s));
         })
         .catch(() => {
           /* leave the last-known status; a transient read failure is not an

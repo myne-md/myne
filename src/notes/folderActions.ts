@@ -237,6 +237,17 @@ export type FolderRenameResult = {
   nextDeliberate: string[];
   /** True when the rename was rejected before any work (root source/target). */
   invalid?: boolean;
+  /**
+   * The `deliberate_folders` write failed, AFTER the rename committed.
+   *
+   * Reported as a value for the same reason the post-commit batch case is: past
+   * the commit, throwing tells the caller a rename that is on disk did not
+   * happen, and it skips the decoration and `archived_folders` re-rooting that
+   * still have to run. Those live in `vault.prefs` and nothing reconciles them
+   * later, so the subtree silently un-archives at the next unlock. The caller
+   * finishes the re-rooting and reports THIS separately.
+   */
+  deliberateWriteFailed?: boolean;
 };
 
 /** A note with its decrypted body — the input the transactional rename planner
@@ -440,8 +451,32 @@ export async function renameFolder(
     }
   }
 
+  // Past the commit, so a failure here is REPORTED rather than thrown. The
+  // rename is on disk; the caller still owes the decoration and
+  // `archived_folders` re-rooting, and a throw would skip both while telling the
+  // user nothing happened.
+  let deliberateWriteFailed = false;
   if (plan.deliberateRewritten > 0) {
-    await setDeliberateFolders(plan.nextDeliberate);
+    // Retried ONCE before it is reported, and the retry is the difference
+    // between a recoverable state and a permanent one. A second rename cannot
+    // fix this later: `planFolderRenameBatch` keys its rewrite off the folder's
+    // CURRENT path, and after a relaunch the stale entry is under the OLD one,
+    // so `deliberateRewritten` comes back 0 and this block does not even run.
+    // The residue is an empty folder that reappears under the old name at every
+    // unlock and that no rename can clear.
+    try {
+      await setDeliberateFolders(plan.nextDeliberate);
+    } catch {
+      try {
+        await setDeliberateFolders(plan.nextDeliberate);
+      } catch {
+        // A flag, not the error. Nothing downstream reads it, the sentence the
+        // caller renders is fixed, and `unknown` invited a reader to think
+        // otherwise. It also made the discriminator `!== undefined`, which
+        // reports SUCCESS for a rejection carrying `undefined`.
+        deliberateWriteFailed = true;
+      }
+    }
   }
 
   // The folder changed on the moved notes → re-index (live, decrypt-free) so
@@ -458,5 +493,6 @@ export async function renameFolder(
     failed: [],
     deliberateRewritten: plan.deliberateRewritten,
     nextDeliberate: plan.nextDeliberate,
+    deliberateWriteFailed,
   };
 }

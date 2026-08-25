@@ -24,6 +24,8 @@
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 
 IMAGE=myne-e2e
 SKIP_BUILD=0
@@ -46,22 +48,18 @@ RUN_FLAGS=(
   --rm
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
-  -v myne-e2e-target:/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  -v "$E2E_TARGET_VOLUME":/work/target
+  "${E2E_REGISTRY_MOUNT[@]}"
   # Per-member node_modules volumes: the container's `pnpm install` rewrites a
   # bind-mounted workspace member's symlinks and breaks the host install
   # otherwise. One per member, and `ornaments` + `preview` are members too.
-  -v myne-e2e-nm-dialect:/work/dialect/node_modules
-  -v myne-e2e-nm-editor:/work/editor/node_modules
-  -v myne-e2e-nm-copy:/work/copy/node_modules
-  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
-  -v myne-e2e-nm-preview:/work/preview/node_modules
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
   -w /work
   --user root
 )
 
 E2E_ENV="export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store MYNE_PREVIEW_COMMIT=$PREVIEW_COMMIT"
-FIX_PERMS='chown -R e2e:e2e /work /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work'
 
 BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
 if [[ "$SKIP_BUILD" == 1 ]]; then
@@ -69,7 +67,7 @@ if [[ "$SKIP_BUILD" == 1 ]]; then
 fi
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&

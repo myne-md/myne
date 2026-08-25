@@ -1,5 +1,13 @@
 // The one place a copy decides what the user is told.
 //
+// And, since myne-md/myne#522, the one place any secret-bearing ACTION does:
+// `Feedback`, `FeedbackArm` and `announce` are transport-agnostic policy, and
+// `secret-export.ts`'s save-as-file arm reports through them rather than
+// inventing a fifth pattern beside the four this module was created to end.
+// The module keeps the clipboard name because `copySecret` below is the copy
+// POLICY and is the bulk of it; a reader looking for outcome reporting for a
+// non-clipboard action should stop here rather than start a new one.
+//
 // Before this module, eleven clipboard call sites across `src/`, `editor/` and
 // `mobile/src/` each answered that question on their own, and four patterns
 // emerged: a toast pair, a label swap that never reverted, an icon flip, and
@@ -146,7 +154,16 @@ export interface CopyOptions {
   onClearError?: (e: unknown) => void;
 }
 
-function announce(arm: FeedbackArm): void {
+/**
+ * Run a feedback arm.
+ *
+ * Exported since myne-md/myne#522: the SAVE affordance beside Copy on the same
+ * two credential screens takes the same `Feedback` pair, and duplicating three
+ * lines to interpret it would be a second place for `silent` to acquire a
+ * different meaning. This module owns what an arm means; who calls it does not
+ * have to be a clipboard.
+ */
+export function announce(arm: FeedbackArm): void {
   // `silent` carries a reason and no `run`; there is deliberately nothing to do.
   if (arm.kind === "silent") return;
   arm.run();

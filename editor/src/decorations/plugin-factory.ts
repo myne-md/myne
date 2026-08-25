@@ -42,11 +42,6 @@ const cursorAwareUpdate = (update: ViewUpdate): boolean =>
   update.focusChanged ||
   treeChanged(update);
 
-/** Update trigger for decorations that don't depend on cursor position —
- *  e.g. task-list (checkbox is always rendered). */
-const docOnlyUpdate = (update: ViewUpdate): boolean =>
-  update.docChanged || update.viewportChanged || treeChanged(update);
-
 export function makeCursorAwareDecorationPlugin(
   build: (view: EditorView) => DecorationSet,
 ): Extension {
@@ -69,12 +64,6 @@ export function makeGatedDecorationPlugin(
     build,
     (update) => cursorAwareUpdate(update) || shouldUpdate(update),
   );
-}
-
-export function makeDocOnlyDecorationPlugin(
-  build: (view: EditorView) => DecorationSet,
-): Extension {
-  return makeDecorationPlugin(build, docOnlyUpdate);
 }
 
 /**
