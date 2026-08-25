@@ -133,6 +133,24 @@ pub struct SyncState {
     /// local notes changed since the last sync. Server-visible metadata only.
     #[serde(default)]
     pub blobs: std::collections::BTreeMap<String, BlobSyncState>,
+    /// Epoch-ms of the last cycle that completed against the server on this
+    /// device, or `None` if none ever has (myne#583).
+    ///
+    /// The client had no way to answer "how long has sync been broken": the
+    /// scheduler holds monotonic logical time and dies with the process, and
+    /// nothing on disk carried a clock. So a four-day outage looked exactly
+    /// like a four-second one, and the four-day one went unnoticed.
+    ///
+    /// **Coalesced to [`SUCCESS_STAMP_COALESCE_MS`], deliberately.** Stamping
+    /// every cycle would turn this file's mtime into a 30-second-resolution
+    /// log of when the user's device was awake and online — the at-rest
+    /// activity-metadata signal `threat-model.md` already bounds for
+    /// `vault.workspace` and snapshots, and there is no reason to add a
+    /// sharper one for a value a staleness threshold reads in days. It is
+    /// written in the clear alongside the rest of this device-local file,
+    /// which is why the granularity is the control rather than encryption.
+    #[serde(default)]
+    pub last_success_at_ms: Option<u64>,
     /// This device's 16-byte VV-actor `device_id` (lowercase hex), captured at
     /// enrollment so a later `sync_now` can author heads under the right actor.
     #[serde(default)]
@@ -433,6 +451,38 @@ pub enum HeadBaselineError {
 const _: () = assert!(DEVICE_ID_LEN == 16);
 const _: () = assert!(HEAD_ID_LEN == 32);
 
+/// How coarse the last-success clock is allowed to be (myne#583).
+///
+/// One hour. The threshold that reads it is measured in days, so nothing is
+/// lost, and the mtime of `sync-state.json` stays a once-an-hour signal rather
+/// than a once-a-cycle one.
+pub const SUCCESS_STAMP_COALESCE_MS: u64 = 60 * 60 * 1000;
+
+/// Record that a cycle completed, if the recorded stamp is old enough to be
+/// worth replacing.
+///
+/// Returns whether it wrote. A no-op on the common path: with a 30-second poll
+/// interval this writes on roughly one cycle in 120, and reads the file it is
+/// about to skip writing, which is the cheap half of an operation that has
+/// just finished talking to a server.
+pub async fn record_sync_success(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &std::path::Path,
+    now_ms: u64,
+) -> bool {
+    let Ok(mut state) = read_sync_state(io, vault_root).await else {
+        return false;
+    };
+    let fresh_enough = state
+        .last_success_at_ms
+        .is_some_and(|prev| now_ms.saturating_sub(prev) < SUCCESS_STAMP_COALESCE_MS);
+    if fresh_enough {
+        return false;
+    }
+    state.last_success_at_ms = Some(now_ms);
+    write_sync_state(io, vault_root, &state).await.is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -445,6 +495,8 @@ mod tests {
     // `StdVaultIo`, so the ~120 call sites in this module read unchanged and the
     // behavioural diff is not buried in mechanical noise. They are shims, not
     // fakes: every one drives the production function against a real temp dir.
+
+    use crate::test_support::ScopedTempDir;
 
     const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
 
@@ -625,6 +677,56 @@ mod tests {
         let _ = std::fs::remove_file(dir.join(SYNC_STATE_FILE));
     }
 
+    /// The last-success stamp advances, but only once an hour.
+    ///
+    /// Both halves are the test. It has to ADVANCE, or the staleness banner
+    /// measures from a clock that never moves and fires on a healthy vault.
+    /// And it has to COALESCE, or a 30-second poll turns this file's mtime into
+    /// a high-resolution log of when the device was awake and online — the
+    /// at-rest activity signal `threat-model.md` bounds elsewhere and there is
+    /// no reason to add a sharper one for a threshold measured in days.
+    #[test]
+    fn the_success_stamp_advances_hourly_and_not_per_cycle() {
+        let tmp = ScopedTempDir::new("sync-success-stamp").unwrap();
+        let dir = tmp.path();
+        write_sync_state(dir, &SyncState::default()).unwrap();
+
+        // Never stamped: the first success writes.
+        assert!(rt(super::record_sync_success(&IO, dir, 1_000_000)));
+        assert_eq!(
+            read_sync_state(dir).unwrap().last_success_at_ms,
+            Some(1_000_000)
+        );
+
+        // A cycle a minute later does not: the recorded value is still fresh.
+        assert!(!rt(super::record_sync_success(&IO, dir, 1_060_000)));
+        assert_eq!(
+            read_sync_state(dir).unwrap().last_success_at_ms,
+            Some(1_000_000),
+            "a coalesced no-op must leave the recorded value alone, not blank it"
+        );
+
+        // An hour on, it advances.
+        let hour_later = 1_000_000 + super::SUCCESS_STAMP_COALESCE_MS;
+        assert!(rt(super::record_sync_success(&IO, dir, hour_later)));
+        assert_eq!(
+            read_sync_state(dir).unwrap().last_success_at_ms,
+            Some(hour_later)
+        );
+
+        // And it does not trample the rest of the file.
+        let enrolled = SyncState {
+            cursor: 42,
+            device_id_hex: Some("ab".repeat(16)),
+            ..Default::default()
+        };
+        write_sync_state(dir, &enrolled).unwrap();
+        assert!(rt(super::record_sync_success(&IO, dir, hour_later * 2)));
+        let after = read_sync_state(dir).unwrap();
+        assert_eq!(after.cursor, 42);
+        assert_eq!(after.device_id_hex, Some("ab".repeat(16)));
+    }
+
     #[test]
     fn defaulting_over_an_unreadable_state_would_lose_exactly_these_fields() {
         // The blast radius, written down as a test rather than as a comment, so
@@ -639,6 +741,7 @@ mod tests {
             meta_baseline_hex: Some("cc".repeat(32)),
             corpus_complete: true,
             rekey_rebase_pending: false,
+            last_success_at_ms: Some(1_700_000_000_000),
             pending_orphan_tombstones: vec![OrphanTombstone {
                 blob_id_hex: "dd".repeat(16),
                 base_version: 7,
@@ -662,6 +765,12 @@ mod tests {
         // field left out because it seemed unimportant is how the list rots.
         assert!(!enrolled.pending_orphan_tombstones.is_empty());
         assert!(defaulted.pending_orphan_tombstones.is_empty());
+        // …and forgets when sync last worked (myne#583), which resets the
+        // staleness warning to "never synced" — the one reading that suppresses
+        // it, since a device that has never synced has no elapsed time to warn
+        // about. So the loss is silent in the direction that matters.
+        assert!(enrolled.last_success_at_ms.is_some());
+        assert!(defaulted.last_success_at_ms.is_none());
     }
 
     fn sample_head(root_key: &[u8; 32], counter: u64) -> SealedHead {

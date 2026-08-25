@@ -25,6 +25,7 @@ import {
   currentRunEpoch,
   getAgent,
   openRun,
+  resumeRun,
   settleStep,
 } from "../../src/notes/agent/agentStore";
 import type { AgentRunView } from "../../src/lib/agent-run";
@@ -100,5 +101,37 @@ describe("openRun", () => {
     expect(getAgent().running).toBe(false);
     expect(getAgent().end).toEqual({ kind: "stalled", barrenIterations: 3 });
     expect(getAgent().view?.scopeTotal).toBe(9);
+  });
+});
+
+describe("resumeRun", () => {
+  it("clears the awaiting-scope end, so the dialog that asked unmounts", () => {
+    // myne-md/myne#559. The scope-expansion dialog derives its visibility from
+    // `end?.kind === "awaitingScope"`. Leaving `end` alone kept it on screen
+    // while the approval was in flight, so pressing Allow looked like it did
+    // nothing and the second press raced the first. A run that has been
+    // resumed is not awaiting anything, which is what `running: true` beside
+    // it already claimed.
+    beginRun();
+    const epoch = currentRunEpoch();
+    openRun(VIEW, epoch);
+    settleStep(
+      {
+        view: VIEW,
+        proposal: { edits: [], newNotes: [], summary: "" },
+        end: { kind: "awaitingScope", folder: "Personal", reason: "needs it" },
+        iterations: 2,
+        notesRead: 1,
+        charsOffDevice: null,
+        excludedCount: 0,
+      },
+      epoch,
+    );
+    expect(getAgent().end?.kind).toBe("awaitingScope");
+
+    resumeRun();
+
+    expect(getAgent().end).toBeNull();
+    expect(getAgent().running).toBe(true);
   });
 });

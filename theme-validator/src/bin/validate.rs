@@ -51,7 +51,7 @@ fn main() -> ExitCode {
             // instead of wondering why nothing renders (myne#394).
             let dropped = theme_validator::drop_unknown_ornament_values(&mut theme);
             for key in &dropped {
-                eprintln!("warning: unrecognized ornament value for {key} — renders plain");
+                eprintln!("warning: unrecognized ornament value for {key} (renders plain)");
             }
             // …and the sibling case, which had no signal at all: a key naming a
             // real role and a real primitive that this role does not accept.
@@ -62,7 +62,7 @@ fn main() -> ExitCode {
             for key in theme_validator::refused_ornament_keys(&theme) {
                 eprintln!(
                     "warning: {key} is not a role/primitive pair this vocabulary accepts \
-                     — stored and ignored, renders plain"
+                     (stored and ignored, renders plain)"
                 );
             }
             println!("ok: {} tokens", theme.vars.len());

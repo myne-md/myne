@@ -11,7 +11,7 @@
 //!
 //! Two roles are **bundled** first-party task-models instead: transcription
 //! (MYND-270) and auto-tag (`infer_tags`, MYND-651). Bundling is not
-//! downloading — the weights ship inside the signed, reproducible build, so
+//! downloading — the weights ship inside the build itself, so
 //! SYNC-2 is intact (`decisions.md` 2026-07-19, 2026-07-31). Auto-tag also has
 //! no picker override at all, so it never re-enters the untrusted-model case.
 //!
@@ -387,15 +387,34 @@ impl CandleEngine {
 
     fn load_embed(&self) -> Result<LoadedEmbed, EngineError> {
         let started = Instant::now();
-        let model_path = match selected_model(&self.base, ModelRole::Embedding) {
+        // **The VERIFIED reader** (myne-md/myne#545 follow-up). This used to take
+        // the recorded path on trust, so a marker pointing at a deleted file
+        // reached `File::open` and failed as a generic not-ready. The whole
+        // embed-on-unlock walk then exited silently on that, which is how a
+        // vault sat on "Preparing…" indefinitely with nothing running.
+        // `selected_model_verified`'s own note calls the loaders "knowingly left
+        // on the unverified reader"; this is the embedding half of that debt.
+        let model_path = match selected_model_verified(&self.base, ModelRole::Embedding) {
             Ok(Some(p)) => p,
             Ok(None) => {
+                // Recorded-and-gone is a different fault from never-chosen, and
+                // a different sentence: one says choose again, the other says
+                // choose.
+                let recorded = selected_model(&self.base, ModelRole::Embedding)
+                    .ok()
+                    .flatten()
+                    .is_some();
                 tracing::warn!(
                     target: "myne::ai",
                     stage = "load_embed",
-                    "no embedding (search) model selected — pick a .safetensors in Settings → AI"
+                    recorded,
+                    "no loadable embedding (search) model — pick a .safetensors in Settings → AI"
                 );
-                return Err(EngineError::NotReady);
+                return Err(if recorded {
+                    EngineError::LocalModelMissing
+                } else {
+                    EngineError::NotReady
+                });
             }
             Err(e) => {
                 tracing::error!(

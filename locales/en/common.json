@@ -11,9 +11,9 @@
     "noApprovers": "No other device on this account can approve it right now. Open Myne on a device that already has access, then come back here.",
     "pendingStartOver": "Start over with a different account",
     "pendingTitle": "Waiting for approval",
-    "sasMatch": "They match — continue",
+    "sasMatch": "They match, continue",
     "sasMismatch": "They don't match",
-    "verifyBody": "Check that this code is the same on both devices before you continue. If it isn't, stop — something is wrong with the connection, not with your password.",
+    "verifyBody": "Check that this code is the same on both devices before you continue. If it isn't, stop: something is wrong with the connection, not with your password.",
     "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
     "verifyTitle": "Compare this code",
     "title": "Sign in to your vault",
@@ -24,7 +24,7 @@
     "checkFailed": "Could not check that account number. Try again.",
     "checking": "Checking…",
     "continue": "Continue",
-    "hint": "It looks like MY-XXXX-XXXX-XXXX-XXXX-XXXX. Checked here on your device — nothing is sent yet.",
+    "hint": "It looks like MY-XXXX-XXXX-XXXX-XXXX-XXXX. Checked here on your device. Nothing is sent yet.",
     "invalid": "That account number is not valid. Check it and try again.",
     "title": "Enter your account number"
   },
@@ -32,16 +32,22 @@
     "composer": {
       "placeholder": "Ask the AI to change these notes",
       "scopeLabel": "Working on",
+      "scopeChange": "Change",
       "scopeOpenNote": "This note",
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
       "scopeCountUnavailable": "How many notes that folder holds could not be checked just now.",
       "startFailed": "The agent could not start.",
+      "autoApplyFailed": "The changes could not be applied automatically. Nothing was written; open the review to apply them yourself.",
+      "permissionLabel": "When the run finishes",
+      "permissionAsk": "Review first",
+      "permissionAuto": "Apply automatically",
       "providerRejected": "The provider would not accept this request, so the run stopped. Nothing was written. This is a fault in what Myne sent, not in your notes or your setup.",
       "unchecked": "The edit check could not be completed, so the agent is unavailable for now. Check that your model or provider is reachable, then try again.",
       "unsupported": "This model cannot make precise edits reliably, so the agent is unavailable. Choose a larger model or a provider.",
       "unsupportedDetail": "It passed {{passes}} of {{attempts}} checks; {{required}} are needed.",
       "checking": "Checking the model…",
+      "checkingAt": "Checking the model… ({{attempt}}/{{of}})",
       "unsupportedProvisional": "That pass mark has not been measured across models yet, so it may be stricter or looser than it should be."
     },
     "progress": {
@@ -149,7 +155,7 @@
     "answeredBy": {
       "inProcess": "Answered on this device",
       "localRuntime": "Answered by {{name}}, on this computer",
-      "remote": "Answered by {{provider}} — your notes were sent there"
+      "remote": "Answered by {{provider}}. Your notes were sent there."
     }
   },
   "attachments": {
@@ -161,8 +167,8 @@
       "deleteCta": "Delete {{count}} unused",
       "deleteCta_one": "Delete {{count}} unused",
       "deleteCta_other": "Delete {{count}} unused",
-      "corpusIncomplete": "Finish syncing first — this device doesn't have all your notes yet. Nothing was deleted.",
-      "error": "Couldn't clean up. Some notes may be unreadable — nothing was deleted.",
+      "corpusIncomplete": "Finish syncing first. This device doesn't have all your notes yet. Nothing was deleted.",
+      "error": "Couldn't clean up. Some notes may be unreadable. Nothing was deleted.",
       "intro_one": "These attachment is not used in any note. Deleting it is permanent and can't be undone.",
       "intro_other": "These {{count}} attachments are not used in any note. Deleting them is permanent and can't be undone.",
       "summaryFreed": " · freed {{size}}",
@@ -200,7 +206,7 @@
       "actionsAriaLabel": "Attachment actions",
       "actionsTitle": "Actions",
       "checkUnusedFailedNotice": "Couldn't check for unused attachments. Try again.",
-      "corpusIncompleteNotice": "Finish syncing first — this device doesn't have all your notes yet, so it can't tell which attachments are unused.",
+      "corpusIncompleteNotice": "Finish syncing first. This device doesn't have all your notes yet, so it can't tell which attachments are unused.",
       "checking": "Checking…",
       "cleanUnused": "Clean unused",
       "cleanUnusedTitle": "Delete attachments not used in any note",
@@ -279,7 +285,7 @@
       "untitled": "Untitled"
     },
     "needsApp": "Attachment cleanup needs the app.",
-    "noUnused": "No unused attachments — every file is referenced.",
+    "noUnused": "No unused attachments: every file is referenced.",
     "scanError": "Couldn't scan for unused attachments.",
     "erasedToast_one": "Erased {{count}} unused file.",
     "erasedToast_other": "Erased {{count}} unused files.",
@@ -291,8 +297,8 @@
     "addError": "Couldn't add that file.",
     "deleteError": "Couldn't delete that attachment.",
     "renameError": "Couldn't rename that attachment.",
-    "unusedSummary_one": "{{count}} attachment is referenced by no note ({{size}}). Erasing is a permanent cryptographic delete — there is no trash.",
-    "unusedSummary_other": "{{count}} attachments are referenced by no note ({{size}}). Erasing is a permanent cryptographic delete — there is no trash.",
+    "unusedSummary_one": "{{count}} attachment is referenced by no note ({{size}}). Erasing is a permanent cryptographic delete. There is no trash.",
+    "unusedSummary_other": "{{count}} attachments are referenced by no note ({{size}}). Erasing is a permanent cryptographic delete. There is no trash.",
     "eraseCta_one": "Erase {{count}} unused file",
     "eraseCta_other": "Erase {{count}} unused files",
     "emptyState": "No attachments yet. Tap Upload to add an image or PDF.",
@@ -312,7 +318,7 @@
         "joinFailure": "Backup failed unexpectedly. No file was left behind.",
         "memberTooLarge": "A file in this vault is larger than the backup format allows.",
         "vaultNotFound": "No vault found to back up.",
-        "verifyFailed": "The written backup did not verify, so it was discarded. Try again — on different media if it repeats."
+        "verifyFailed": "The written backup did not verify, so it was discarded. Try again, on different media if it repeats."
       },
       "restore": {
         "authOperationInProgress": "Another vault operation is in progress. Wait for it to finish, then try again.",
@@ -367,7 +373,7 @@
       "task": "Notes with a task",
       "content": "Full-text in the body"
     },
-    "searchPlaceholder": "Search notes or run a command — try tag: · path: · task:",
+    "searchPlaceholder": "Search notes or run a command. Try tag: · path: · task:",
     "sectionCommands": "Commands",
     "sectionNotes": "Notes",
     "untitledNote": "Untitled"
@@ -693,7 +699,7 @@
       }
     },
     "rebind": {
-      "invalidChordReason": "Add a modifier (⌘, Ctrl, or Alt) — a key on its own can't be a shortcut."
+      "invalidChordReason": "Add a modifier (⌘, Ctrl, or Alt). A key on its own can't be a shortcut."
     },
     "picker": {
       "vaultRoot": "Vault root",
@@ -741,10 +747,10 @@
       "convert": {
         "cancel": "Cancel",
         "confirm": "Convert",
-        "skipped": "skipped — {{note}}",
+        "skipped": "skipped: {{note}}",
         "subtitle_one": "1 reference will be rewritten. Review before committing.",
         "subtitle_other": "{{count}} references will be rewritten. Review before committing.",
-        "subtitleEmpty": "Nothing to convert — no source files resolved.",
+        "subtitleEmpty": "Nothing to convert: no source files resolved.",
         "title": "Convert imported attachments"
       },
       "convertCommand": {
@@ -839,7 +845,7 @@
       "recording": {
         "barAria": "Recording voice note",
         "cancel": "Cancel",
-        "noAudio": "No audio detected — check your microphone.",
+        "noAudio": "No audio detected. Check your microphone.",
         "saving": "Saving…",
         "stop": "Stop"
       },
@@ -865,16 +871,16 @@
       "voice": {
         "startError": {
           "alreadyRecording": "A recording is already in progress.",
-          "captureFailed": "Couldn't start recording — check microphone access in System Settings.",
+          "captureFailed": "Couldn't start recording. Check microphone access in System Settings.",
           "generic": "Couldn't start recording.",
           "locked": "Unlock your vault to record a voice note.",
           "noInputDevice": "No microphone found. Connect one and try again."
         },
         "stopError": {
-          "captureFailed": "Recording failed — check your microphone.",
+          "captureFailed": "Recording failed. Check your microphone.",
           "emptyRecording": "Nothing was recorded.",
           "generic": "Couldn't save the recording.",
-          "silentRecording": "Recording was silent and discarded — check your microphone."
+          "silentRecording": "Recording was silent and discarded. Check your microphone."
         }
       },
       "widget": {
@@ -907,7 +913,7 @@
         },
         "pdfFallback": "PDF",
         "textPreview": {
-          "truncated": "Preview truncated — Export for the full file."
+          "truncated": "Preview truncated. Export for the full file."
         },
         "tombstone": {
           "brokenAria": "Broken attachment reference: {{filename}}",
@@ -1025,7 +1031,7 @@
           "insert": "Insert",
           "normal": "Normal",
           "replace": "Replace",
-          "title": "Vim mode — press Esc for normal mode",
+          "title": "Vim mode: press Esc for normal mode",
           "visual": "Visual"
         },
         "graphTitle": "Graph (⌘⇧G)",
@@ -1034,7 +1040,6 @@
         "openSettings": "Open settings",
         "settingsTitle": "Settings (⌘,)",
         "showGraph": "Show graph view",
-        "syncStatus": "Local-only · not synced",
         "tagsTitle": "Tags",
         "togglePreview": "Toggle side-by-side preview",
         "viewModeTitle": "View mode: {{mode}} (click to cycle)",
@@ -1057,6 +1062,7 @@
       "rightPanel": {
         "aiChat": {
           "agentTurn": {
+            "noAnswer": "The agent stopped without an answer. Try asking again, or rephrase it.",
             "newNotes_one": "{{count}} new note.",
             "newNotes_other": "{{count}} new notes.",
             "proposed_one": "Proposed {{count}} change.",
@@ -1065,18 +1071,13 @@
           "askPlaceholder": "Ask a question about your notes…",
           "askSubmit": "Ask",
           "assistant": "Assistant",
-          "citations": "Sources",
-          "composerPlaceholder": "Message your notes…",
-          "empty": "AI output — summaries, answers, and suggestions — appears here.",
+          "empty": "AI output (summaries, answers, and suggestions) appears here.",
           "error": "The AI request could not be completed.",
           "errorTurn": "The assistant could not answer.",
-          "gettingReadyHint": "Preparing your notes for AI — one moment.",
-          "noSearchModelHint": "Asking searches your notes on this device, and that needs a search model here — a provider cannot do it. Choose one in Settings → Developer → AI. Editing your notes with the AI still works.",
+          "gettingReadyHint": "Preparing your notes for AI. One moment.",
+          "noSearchModelHint": "Asking searches your notes on this device, and that needs a search model here. A provider cannot do it. Choose one in Settings → Developer → AI. Editing your notes with the AI still works.",
           "insert": "Insert into note",
-          "noAnswer": "No answer — try rephrasing.",
-          "modeAsk": "Ask",
-          "modeEdit": "Edit",
-          "modeLabel": "What the AI should do with this message",
+          "noAnswer": "No answer. Try rephrasing.",
           "newChat": "New chat",
           "noModelHint": "No AI provider is set up, so chat, summaries, rewriting and semantic search have nothing to run on. Set one up in Settings → Developer → AI.",
           "unreachableHint": "The provider you set up is not answering. Check that it is running, then send again.",
@@ -1096,7 +1097,7 @@
           "truncated": "Summarized the first {{count}} characters.",
           "you": "You"
         },
-        "allHidden": "All tabs are hidden — right-click to restore.",
+        "allHidden": "All tabs are hidden. Right-click to restore.",
         "outline": {
           "collapse": "Collapse section",
           "empty": "No headings",
@@ -1165,7 +1166,7 @@
       "done": "Done",
       "edit": "Edit drawing {{name}}",
       "editAction": "Edit",
-      "empty": "Empty drawing — click to draw",
+      "empty": "Empty drawing: click to draw",
       "open": "Open",
       "rename": "Rename drawing"
     },
@@ -1359,9 +1360,9 @@
     "vim": {
       "ex": {
         "refused": {
-          "edit": "`:e` isn't supported — Myne opens notes, not files. Use the command palette or the sidebar.",
+          "edit": "`:e` isn't supported. Myne opens notes, not files. Use the command palette or the sidebar.",
           "map": "Custom key mappings aren't supported in Myne. Shortcuts are configured in Settings → Hotkeys.",
-          "set": "`:set` isn't supported — Myne has no vim options. Editor preferences live in Settings → Editor.",
+          "set": "`:set` isn't supported. Myne has no vim options. Editor preferences live in Settings → Editor.",
           "source": "`:source` isn't supported. Myne deliberately has no config-script surface.",
           "unsupported": "That command isn't supported in Myne."
         },
@@ -1386,10 +1387,10 @@
         "convertedToast_one": "{{count}} wikilink converted",
         "convertedToast_other": "{{count}} wikilinks converted",
         "noneToConvert": "No imported wikilinks to convert in this note.",
-        "nothingToConvert": "Nothing to convert — no imported wikilinks resolve.",
+        "nothingToConvert": "Nothing to convert: no imported wikilinks resolve.",
         "rewriteCount_one": "{{count}} link will be rewritten",
         "rewriteCount_other": "{{count}} links will be rewritten",
-        "skipped": "skipped — {{reason}}",
+        "skipped": "skipped: {{reason}}",
         "title": "Convert imported wikilinks in this note",
         "staleDocument": "This note changed while the preview was open, so nothing was converted. Run it again to see the current links."
       },
@@ -1539,10 +1540,10 @@
         "ioNoSpace": "Not enough space at the destination.",
         "ioPermissionDenied": "No permission to write at the destination.",
         "ioWriteDefault": "Could not write the exported file.",
-        "noteNotFound": "This note no longer exists — it may have been deleted.",
+        "noteNotFound": "This note no longer exists. It may have been deleted.",
         "pdfCaptureFailed": "The PDF could not be generated, so nothing was exported.",
         "pdfExportInProgress": "A PDF export is already running. Wait for it to finish, then try again.",
-        "pdfPayloadMissing": "The export was interrupted — if the vault locked, unlock it and try again.",
+        "pdfPayloadMissing": "The export was interrupted. If the vault locked, unlock it and try again.",
         "pdfRenderTimeout": "The note took too long to render, so nothing was exported.",
         "pdfWindowCreateFailed": "The export window could not be opened, so nothing was exported.",
         "targetExists": "A file with that name already exists at the destination.",
@@ -1648,7 +1649,7 @@
       "reload": "Reload"
     },
     "corrupted": {
-      "body": "If you have a backup, you can restore it — your current files are not touched; the backup is restored as a separate vault first.",
+      "body": "If you have a backup, you can restore it. Your current files are not touched; the backup is restored as a separate vault first.",
       "cta": "Close app",
       "title": "Vault file is corrupted."
     },
@@ -1688,7 +1689,7 @@
       "folderDeleteConfirmCta": "Move to Trash",
       "folderDeleteError": "Couldn't move that folder's notes to Trash. Try again.",
       "folderDeleteTitle": "Move this folder to Trash?",
-      "folderDeleteWarning": "They move to Trash — restore them anytime. Permanent deletion is a separate step.",
+      "folderDeleteWarning": "They move to Trash. Restore them anytime. Permanent deletion is a separate step.",
       "restore": "Restore",
       "restoreError": "Couldn't restore that note. Try again.",
       "title": "Archive",
@@ -1760,7 +1761,7 @@
         "is": "is",
         "isNot": "is not"
       },
-      "noConditions": "No conditions yet — this view shows all pages.",
+      "noConditions": "No conditions yet. This view shows all pages.",
       "noteCount_one": "{{count}} note",
       "noteCount_other": "{{count}} notes",
       "of": "of:",
@@ -1801,7 +1802,7 @@
       "openFolderNote": "Open folder note"
     },
     "graph": {
-      "allConnected": "Everything is connected — no isolated notes.",
+      "allConnected": "Everything is connected: no isolated notes.",
       "building": "Building graph…",
       "colorGroups": {
         "addRule": "Add rule",
@@ -1810,7 +1811,7 @@
         "dragHandleTitle": "Drag to reorder",
         "editFilterButton": "Edit filter…",
         "editFilterTitle": "Edit color-group filter",
-        "emptyBody": "Color groups let you color graph nodes by tag or folder — work notes in one color, personal notes in another. Add your first rule.",
+        "emptyBody": "Color groups let you color graph nodes by tag or folder: work notes in one color, personal notes in another. Add your first rule.",
         "emptyTitle": "No color groups yet",
         "enableToggleAriaLabel": "Enable rule",
         "filterAllNotes": "Matches every note",
@@ -1830,7 +1831,7 @@
       "loading": "Loading graph…",
       "noNotes": "No notes to graph yet.",
       "refresh": "Refresh",
-      "refreshTitle": "The vault changed — rebuild the graph",
+      "refreshTitle": "The vault changed: rebuild the graph",
       "settings": {
         "appearanceHeading": "Appearance",
         "closeTitle": "Close",
@@ -1887,15 +1888,15 @@
         "mediaOmittedSuffix_one": " · {{count}} omitted",
         "mediaOmittedSuffix_other": " · {{count}} omitted",
         "needsAttention": "Needs attention",
-        "needsAttentionHelp": "These notes were imported unchanged. Suggested fixes are starting points — copy one, then rename the note when you open it.",
+        "needsAttentionHelp": "These notes were imported unchanged. Suggested fixes are starting points. Copy one, then rename the note when you open it.",
         "noFolderChosen": "No folder chosen",
         "notesImported_one": "note imported",
         "notesImported_other": "notes imported",
         "policyCopyHint": "Bring it in alongside the existing note.",
         "policyCopyLabel": "Import as a copy",
-        "policySkipHint": "Recommended — re-running an import never duplicates or overwrites.",
+        "policySkipHint": "Recommended: re-running an import never duplicates or overwrites.",
         "policySkipLabel": "Skip it",
-        "preexistingDetail": "This note already had its own folder: “{{existing}}”, which Myne kept — its folder may differ from where it sat on disk.",
+        "preexistingDetail": "This note already had its own folder: “{{existing}}”, which Myne kept. Its folder may differ from where it sat on disk.",
         "preparing": "Preparing…",
         "progressNotes": " notes",
         "progressOf": " of ",
@@ -1903,7 +1904,7 @@
         "reasonPathTooLong": "the folder + title path is too long",
         "reasonSegmentTooLong": "name is longer than Myne allows",
         "scanning": "Scanning your vault…",
-        "setupIntro": "Myne imports and encrypts your notes on the spot — nothing leaves this device, and your original files are never changed.",
+        "setupIntro": "Myne imports and encrypts your notes on the spot. Nothing leaves this device, and your original files are never changed.",
         "statCancelled": "Cancelled",
         "statCanvasSkipped": ".canvas files skipped",
         "statCompressed": "Images compressed",
@@ -1924,8 +1925,8 @@
         "statExcalidrawSkipped": "Excalidraw drawings skipped",
         "unfollowedLinkOutside": "This is a shortcut to a folder outside the one you picked, so Myne didn't follow it. Move or copy that folder inside your vault and import again.",
         "unfollowedLinkLoop": "This shortcut points back into a folder Myne was already inside, so following it would go round forever. Nothing under it was missed.",
-        "unfollowedLinkBroken": "This shortcut doesn't lead anywhere — whatever it pointed at has been moved or deleted.",
-        "unreadableDetail": "Skipped — {{reason}} The rest of the import carried on.",
+        "unfollowedLinkBroken": "This shortcut doesn't lead anywhere. Whatever it pointed at has been moved or deleted.",
+        "unreadableDetail": "Skipped: {{reason}} The rest of the import carried on.",
         "stoppedAt": "{{imported}} of {{total}} notes were imported before this stopped. They're in your vault and safe to keep.",
         "reasonNotUtf8": "Myne couldn't read this file as text. It's probably saved in an older encoding, or it isn't a text file at all.",
         "reasonPathRejected": "Myne couldn't reach this file inside the folder you picked.",
@@ -1935,7 +1936,7 @@
         "reasonUnknown": "Myne couldn't say why."
       },
       "offer": {
-        "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported — nothing leaves this device, and your original files stay exactly where they are.",
+        "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported. Nothing leaves this device, and your original files stay exactly where they are.",
         "chooseFolder": "Choose folder…",
         "laterHint": "You can always import later from Settings → Storage.",
         "notNow": "Not now",
@@ -1956,14 +1957,14 @@
           "label": "Notion",
           "pickerTitle": "Choose your unzipped Notion export folder",
           "survives": "Keeps: pages, folder structure, page properties as fields, and internal links as wikilinks. Each database also arrives as a table note linking to its rows.",
-          "loses": "Unzip the export first — Myne reads the folder, not the .zip. Toggles, callouts and coloured text have no equivalent and are listed in an import report.",
+          "loses": "Unzip the export first: Myne reads the folder, not the .zip. Toggles, callouts and coloured text have no equivalent and are listed in an import report.",
           "short": "An unzipped export folder"
         },
         "evernote": {
           "label": "Evernote",
           "pickerTitle": "Choose your Evernote .enex file",
           "survives": "Keeps: every note in the file, formatting, and attachments. Encrypted blocks are preserved as text you can still decrypt in Evernote.",
-          "loses": "Leaves behind: reminders and note history. Very large exports are refused rather than risked — split the export if that happens.",
+          "loses": "Leaves behind: reminders and note history. Very large exports are refused rather than risked. Split the export if that happens.",
           "short": "A single .enex export file"
         },
         "html": {
@@ -1977,7 +1978,7 @@
           "label": "CSV",
           "pickerTitle": "Choose your .csv file",
           "survives": "Becomes a single note holding the table.",
-          "loses": "It is one note, not one note per row — Myne is not a database. Very wide or very long files are trimmed, and the import report says by how much.",
+          "loses": "It is one note, not one note per row: Myne is not a database. Very wide or very long files are trimmed, and the import report says by how much.",
           "short": "One spreadsheet file"
         }
       }
@@ -2000,7 +2001,7 @@
       "bulkMove": "Move {{count}} notes to…",
       "bulkMove_one": "Move {{count}} note to…",
       "bulkMove_other": "Move {{count}} notes to…",
-      "caseMergeBody": "A folder named “{{name}}” already exists. These will merge — rename one to keep them separate?",
+      "caseMergeBody": "A folder named “{{name}}” already exists. These will merge. Rename one to keep them separate?",
       "color": "Color…",
       "createFirstNote": "+ Create your first note",
       "createFolderNote": "Create folder note",
@@ -2010,7 +2011,7 @@
       "deleteFolderBody_other": "“{{name}}” and its {{count}} notes",
       "deleteFolderConfirm": "Delete folder",
       "deleteFolderTitle": "Delete this folder?",
-      "deleteFolderWarning": "The notes move to Trash — you can restore them later.",
+      "deleteFolderWarning": "The notes move to Trash. You can restore them later.",
       "duplicate": "Duplicate",
       "editFilterTitle": "Edit filter",
       "emptyState": "No notes yet.",
@@ -2062,9 +2063,9 @@
       "viewSettingsTitle": "View settings",
       "imported_one": "Imported 1 note into this folder",
       "imported_other": "Imported {{count}} notes into this folder",
-      "importedWithSkips": "Imported {{count}} — {{skipped}} skipped",
-      "importedWithSkips_one": "Imported {{count}} — {{skipped}} skipped",
-      "importedWithSkips_other": "Imported {{count}} — {{skipped}} skipped",
+      "importedWithSkips": "Imported {{count}} · {{skipped}} skipped",
+      "importedWithSkips_one": "Imported {{count}} · {{skipped}} skipped",
+      "importedWithSkips_other": "Imported {{count}} · {{skipped}} skipped",
       "importNoMarkdown": "No markdown files in that drop",
       "moveFolderTo": "Move folder to…"
     },
@@ -2111,7 +2112,7 @@
     "row": {
       "addToFavorites": "Add to favorites",
       "folderIndexBadgeLabel": "Folder note",
-      "folderIndexBadgeTitle": "Folder note — this folder's index",
+      "folderIndexBadgeTitle": "Folder note: this folder's index",
       "folderIndexConflictLabel": "Folder already has an index note",
       "folderIndexConflictTitle": "This folder already has an index note",
       "loadError": "Couldn't load this note",
@@ -2128,24 +2129,24 @@
     },
     "saveStatus": {
       "conflict": "Resolving edit conflict…",
-      "conflictTitle": "This note changed on another device — keeping both versions",
+      "conflictTitle": "This note changed on another device: keeping both versions",
       "editing": "Editing",
       "editingEllipsis": "Editing…",
-      "editingTitle": "Editing — autosave is armed",
+      "editingTitle": "Editing: autosave is armed",
       "justNow": "just now",
       "retry": "Retry",
       "saved": "Saved",
       "savedRelative": "Saved {{rel}}",
       "saveFailed": "Save failed",
-      "saveFailedTitle": "Save failed — click Retry",
+      "saveFailedTitle": "Save failed: click Retry",
       "storageFull": "Storage full",
-      "storageFullTitle": "There's no room left to save this note. Free up space (or remove some attachments), then retry. Until it saves, this edit is only in this window — it is not on the server either.",
+      "storageFullTitle": "There's no room left to save this note. Free up space (or remove some attachments), then retry. Until it saves, this edit is only in this window. It is not on the server either.",
       "saving": "Saving",
       "savingEllipsis": "Saving…"
     },
     "snapshotFailed": {
       "dismiss": "Dismiss",
-      "message": "Couldn’t save a snapshot — your note is saved, but its version history may be incomplete (the disk may be full)."
+      "message": "Couldn’t save a snapshot. Your note is saved, but its version history may be incomplete (the disk may be full)."
     },
     "snapshots": {
       "cancel": "Cancel",
@@ -2164,14 +2165,14 @@
       "encryptedSize": "Encrypted · {{size}}",
       "errorCannotDecrypt": "This snapshot couldn't be decrypted.",
       "errorGeneric": "Something went wrong. Try again.",
-      "errorIo": "A disk error occurred — the disk may be full or unwritable.",
+      "errorIo": "A disk error occurred. The disk may be full or unwritable.",
       "errorNotFound": "That snapshot is no longer available.",
       "errorStorageAccess": "Couldn't access the vault's snapshot storage.",
       "errorVaultLocked": "The vault is locked. Unlock it to view snapshots.",
       "justNow": "just now",
       "listLabel": "Snapshot list",
       "loading": "Loading…",
-      "noPrevious": "This is the earliest snapshot — there's nothing before it to compare against.",
+      "noPrevious": "This is the earliest snapshot. There's nothing before it to compare against.",
       "restore": "Restore",
       "restoreCta": "Restore this snapshot",
       "restoredStatus": "Restored. The version you had is saved as a snapshot.",
@@ -2186,7 +2187,7 @@
       "openNotes": "Open notes",
       "pin": "Pin",
       "pinned": "Pinned",
-      "pinnedTitle": "Pinned — unpin to close",
+      "pinnedTitle": "Pinned: unpin to close",
       "unpin": "Unpin",
       "untitled": "Untitled"
     },
@@ -2224,7 +2225,7 @@
       "emptyConfirmTitle": "Empty trash?",
       "emptyPartialFailure_one": "{{count}} note couldn't be deleted and remain in the trash.",
       "emptyPartialFailure_other": "{{count}} notes couldn't be deleted and remain in the trash.",
-      "emptyBody": "Notes you delete land here. They stay until you empty the trash — you can restore any of them anytime.",
+      "emptyBody": "Notes you delete land here. They stay until you empty the trash. You can restore any of them anytime.",
       "emptyTitle": "Trash is empty",
       "purgeConfirmCta": "Delete permanently",
       "purgeConfirmTitle": "Delete permanently?",
@@ -2238,7 +2239,7 @@
       "heading": "Unlinked mentions",
       "link": "Link",
       "linkTooltip": "Link this mention to {{title}}",
-      "refresh": "Mentions may have changed — refresh",
+      "refresh": "Mentions may have changed: refresh",
       "searching": "Searching…",
       "thisNote": "this note",
       "untitled": "Untitled"
@@ -2297,7 +2298,7 @@
       "columnsEmpty": "No properties found",
       "columnsHint": "Frontmatter properties shown as columns (table) or as a detail line (list / cards).",
       "columnsPlaceholder": "Add columns…",
-      "coverImageHint": "The frontmatter property whose value is an image — shown as each card's cover. Leave empty for no cover.",
+      "coverImageHint": "The frontmatter property whose value is an image, shown as each card's cover. Leave empty for no cover.",
       "coverImagePlaceholder": "e.g. cover",
       "coverImageProperty": "Cover image property",
       "groupBy": "Group by",
@@ -2348,12 +2349,14 @@
     "intro": "Upgrade this vault to the new format. Your notes gain automatic cross-device merging. This re-keys the whole vault; the old copy is kept on this device until you confirm.",
     "passwordLabel": "Master password",
     "phraseLabel": "Recovery phrase",
-    "phraseHelp": "Required — your new keys are wrapped under this phrase, so recovery keeps working. Enter all your recovery words.",
+    "phraseHelp": "Required: your new keys are wrapped under this phrase, so recovery keeps working. Enter all your recovery words.",
     "submit": "Migrate",
     "migrating": "Migrating…",
     "done": "Migrated {{count}} notes to the new format.",
+    "done_one": "Migrated {{count}} note to the new format.",
+    "done_other": "Migrated {{count}} notes to the new format.",
     "settle": {
-      "intro": "Your vault was upgraded. The old copy is still on this device until you finish up — until then, changing your password won't lock it away.",
+      "intro": "Your vault was upgraded. The old copy is still on this device until you finish up. Until then, changing your password won't lock it away.",
       "confirm": "Everything looks right, remove the old copy",
       "abort": "Something's wrong, put the old vault back",
       "errorAlreadySynced": "This vault has already synced in the new format, so it can't be put back. Restore from a backup if you need the old one.",
@@ -2362,7 +2365,7 @@
     },
     "progressCount": "{{done}} of {{total}} items re-encrypted…",
     "error": {
-      "recoveryPhraseRequired": "That recovery phrase didn’t match this vault. Enter your correct recovery phrase to migrate — it’s required so recovery keeps working.",
+      "recoveryPhraseRequired": "That recovery phrase didn’t match this vault. Enter your correct recovery phrase to migrate. It’s required so recovery keeps working.",
       "wrongPassword": "That password didn’t match this vault.",
       "alreadyMigrated": "This vault is already on the new format.",
       "generic": "The migration couldn’t complete. Your vault is unchanged; try again."
@@ -2385,7 +2388,7 @@
     "accountTitle": "Enter your account number",
     "accountLead": "Find this where you saved your recovery phrase. It identifies the vault to restore.",
     "accountInvalid": "Invalid account number — please check and re-enter.",
-    "accountOptionalHint": "Don't have it? Leave this blank and continue — your 24-word recovery phrase is all you need.",
+    "accountOptionalHint": "Don't have it? Leave this blank and continue. Your 24-word recovery phrase is all you need.",
     "paste": "Paste",
     "phraseGridHint": "Type each word, or paste all 24 at once to fill the grid.",
     "submitProgress": "Submit · {{filled}} of {{total}}",
@@ -2472,12 +2475,12 @@
     "backLabel": "Back",
     "cancelLabel": "Cancel",
     "collision": {
-      "body": "A vault from this backup already exists on this device. You can keep both — the restored copy appears as a separate vault in your vault list — or restore now and then remove the existing vault from the vault list yourself (removal asks you to type DELETE, and only makes sense after you confirm the restored vault opens).",
+      "body": "A vault from this backup already exists on this device. You can keep both: the restored copy appears as a separate vault in your vault list. Or you can restore now and then remove the existing vault from the vault list yourself. Removal asks you to type DELETE, and only makes sense after you confirm the restored vault opens.",
       "keepBoth": "Keep both",
       "replaceExisting": "Restore, then replace existing…"
     },
     "damaged": {
-      "body": "The backup file is damaged, so nothing was restored. If this is the only copy you have, salvage can restore the intact notes and list exactly what could not be read — the result is always labeled as a partial restore.",
+      "body": "The backup file is damaged, so nothing was restored. If this is the only copy you have, salvage can restore the intact notes and list exactly what could not be read. The result is always labeled as a partial restore.",
       "close": "Close",
       "salvage": "Salvage intact notes…"
     },
@@ -2485,7 +2488,7 @@
       "tryAnotherFile": "Try another file"
     },
     "pick": {
-      "body": "Pick a <code>.myne-backup</code> file. The backup is verified before anything is restored; the restored vault unlocks with that vault's password or recovery phrase — exactly like unlock.",
+      "body": "Pick a <code>.myne-backup</code> file. The backup is verified before anything is restored; the restored vault unlocks with that vault's password or recovery phrase, exactly like unlock.",
       "chooseFile": "Choose backup file…",
       "corruptedSuffix": "Your current vault is not touched: the backup is restored as a separate vault first."
     },
@@ -2494,8 +2497,8 @@
       "collidedNote": "The previously existing copy of this vault is still in your vault list. Once you confirm the restored vault opens, you can remove the old one from the vault list (it will ask you to type DELETE).",
       "notes": "Notes: {{n}}",
       "openVaultList": "Open vault list",
-      "partialHeader_one": "Restored partially — {{count}} item could not be read.",
-      "partialHeader_other": "Restored partially — {{count}} items could not be read.",
+      "partialHeader_one": "Restored partially: {{count}} item could not be read.",
+      "partialHeader_other": "Restored partially: {{count}} items could not be read.",
       "restored": "Vault restored.",
       "versionHistory": "Version history entries: {{n}}"
     },
@@ -2516,7 +2519,7 @@
       "changelogButton": "View changelog…",
       "changelogHelper": "Per-version notes. Will appear when MYND-119 lands.",
       "changelogLabel": "Changelog",
-      "developerModeHelper": "Shows the advanced settings Myne keeps out of the way by default: the ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again — whatever you switched on stays on, and its own control is where you switch it off.",
+      "developerModeHelper": "Shows the advanced settings Myne keeps out of the way by default: the ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again. Whatever you switched on stays on, and its own control is where you switch it off.",
       "developerModeLabel": "Developer mode",
       "legalLabel": "Legal",
       "legalHelper": "Opens on myne.md in your browser. German where the interface is German.",
@@ -2539,7 +2542,7 @@
         "ioError": "Disk error, please try again.",
         "joinFailure": "Something went wrong, please try again.",
         "samePasswordRejected": "New password matches the current one.",
-        "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password — and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
+        "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password, and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
         "weakNewPassword": "New password must be at least 12 characters."
       },
       "changePasswordHeading": "Change password",
@@ -2601,7 +2604,7 @@
       "editorFont": "Editor font",
       "showEditTimesSubtitle": "Timestamps under each note",
       "graphSettingsLabel": "Graph appearance",
-      "graphSettingsHelper": "Node colors, labels, sizing and layout forces are set inside the graph itself — open it and use the gear in its corner. They are kept per device, so a change here doesn't follow you to your phone.",
+      "graphSettingsHelper": "Node colors, labels, sizing and layout forces are set inside the graph itself. Open it and use the gear in its corner. They are kept per device, so a change here doesn't follow you to your phone.",
       "openGraph": "Open graph"
     },
     "archive": {
@@ -2613,9 +2616,9 @@
     },
     "attachmentCompression": {
       "label": "Compress images on import",
-      "helper": "Shrinks pasted or dropped images before they are encrypted and stored, so your vault, backups, and sync stay smaller. This is irreversible — the original file is not kept.",
+      "helper": "Shrinks pasted or dropped images before they are encrypted and stored, so your vault, backups, and sync stay smaller. This is irreversible: the original file is not kept.",
       "helperScopeEveryDevice": "Applies to the whole vault, on every device.",
-      "helperScopeNotHere": "Applies to the whole vault, but not in this browser — images added here are stored exactly as given.",
+      "helperScopeNotHere": "Applies to the whole vault, but not in this browser: images added here are stored exactly as given.",
       "errorSaveSetting": "Could not save this setting."
     },
     "transcription": {
@@ -2645,7 +2648,7 @@
       "saveFailedToast": "Could not save backup settings.",
       "searchEmpty": "No match.",
       "searchPlaceholder": "Search…",
-      "statusFailed": "Automatic backup failed — {{stamp}}",
+      "statusFailed": "Automatic backup failed: {{stamp}}",
       "statusLastBackup": "Last backup: {{stamp}}",
       "statusNever": "No automatic backup yet.",
       "title": "Automatic backups"
@@ -2685,7 +2688,7 @@
     "cliAccess": {
       "label": "Terminal access",
       "helperOff": "Off. The `myne` command can't read or change anything in this vault.",
-      "helperOn": "On while this vault is unlocked. Any program running under your account can read, search and create notes through it — Myne can't tell your terminal apart from a script, and checks nothing beyond the door being open. It never asks for your password, closes the moment the vault locks, and can't delete notes.",
+      "helperOn": "On while this vault is unlocked. Any program running under your account can read, search and create notes through it. Myne can't tell your terminal apart from a script, and checks nothing beyond the door being open. It never asks for your password, closes the moment the vault locks, and can't delete notes.",
       "lastUsedNever": "Not used since this vault was unlocked.",
       "lastUsedJustNow": "Last used just now.",
       "lastUsedMinutesAgo": "Last used {{count}} min ago.",
@@ -2700,10 +2703,10 @@
       "notOnPathHint": "Your shell can't find `myne` yet. Add this line to your shell profile, then open a new terminal:",
       "pathLine": "export PATH=\"{{dir}}:$PATH\"",
       "excludedLabel": "Folders the terminal never sees",
-      "excludedHelper": "One folder path per line. Notes in these folders are left out of every terminal result and can't be written there from the terminal — they stay fully available in the app. You can set this before turning terminal access on.",
+      "excludedHelper": "One folder path per line. Notes in these folders are left out of every terminal result and can't be written there from the terminal. They stay fully available in the app. You can set this before turning terminal access on.",
       "excludedPlaceholder": "Private/\nJournal/",
       "rateLimitLabel": "Let the terminal run at full speed",
-      "rateLimitHelper": "Myne answers at most 120 terminal commands a minute by default. That's a pace limit on a runaway script, not a permission check — nothing decides which program is allowed to ask. Turn this on for bulk work, like piping every note through another tool."
+      "rateLimitHelper": "Myne answers at most 120 terminal commands a minute by default. That's a pace limit on a runaway script, not a permission check: nothing decides which program is allowed to ask. Turn this on for bulk work, like piping every note through another tool."
     },
     "clipperInstall": {
       "error": "Could not update the browser clipper setting.",
@@ -2735,7 +2738,7 @@
       "export": "Export",
       "exportError": "Couldn't export that theme. Please try again.",
       "fileFilterName": "Myne theme",
-      "helper": "Use your own color palette. Themes are validated on this device before use — nothing is uploaded.",
+      "helper": "Use your own color palette. Themes are validated on this device before use. Nothing is uploaded.",
       "importButton": "Import theme…",
       "importError": "That file isn't a valid theme. Open the reference to see the format.",
       "label": "Custom themes",
@@ -2747,7 +2750,7 @@
       "dateFormatHelper": "The title of each daily note. Supports YYYY, MM, DD. Defaults to {{default}}.",
       "dateFormatLabel": "Daily note date format",
       "dateFormatSaveError": "Couldn't save the date format. Please try again.",
-      "folderHelper": "Where new daily notes are filed. Defaults to {{default}} — the folder is kept even when empty.",
+      "folderHelper": "Where new daily notes are filed. Defaults to {{default}}. The folder is kept even when empty.",
       "folderLabel": "Daily note folder",
       "folderSaveError": "Couldn't save the daily folder. Please try again.",
       "folderSearchEmpty": "No folders match.",
@@ -2864,15 +2867,15 @@
       },
       "reservedBadge": "Unavailable here",
       "reservedBadgeTitle": "Your browser {{action}} with {{chord}}, so it never reaches Myne. The shortcut still works on the desktop app.",
-      "reservedRefused": "{{chord}} belongs to your browser — it {{action}}. Pick a different shortcut; your desktop shortcuts are unchanged.",
-      "reservedUnreliable": "{{chord}} may not reach Myne — in some browsers it {{action}}. Added anyway.",
+      "reservedRefused": "{{chord}} belongs to your browser: it {{action}}. Pick a different shortcut; your desktop shortcuts are unchanged.",
+      "reservedUnreliable": "{{chord}} may not reach Myne: in some browsers it {{action}}. Added anyway.",
       "resetAll": "Reset all hotkeys…",
       "resetAllConfirm": "Reset every custom shortcut to its default?",
       "resetAllYes": "Reset all",
       "restoreDefaultAria": "Restore default for {{command}}",
       "searchAriaLabel": "Search shortcuts",
       "searchPlaceholder": "Search shortcuts…",
-      "warnAlreadyUsed": "Already used by {{commands}} — added anyway."
+      "warnAlreadyUsed": "Already used by {{commands}}. Added anyway."
     },
     "language": {
       "helper": "Choose the display language for the app.",
@@ -2908,7 +2911,7 @@
     "ai": {
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
       "autoTagLabel": "Suggest tags automatically",
-      "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one — the switch turns on by itself in a build that includes it.",
+      "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one. The switch turns on by itself in a build that includes it.",
       "consent": {
         "accept": "Send my notes to {{provider}}",
         "cancel": "Cancel",
@@ -2921,7 +2924,7 @@
         "whoLabel": "Who receives it"
       },
       "disclosureToggle": "How does this work?",
-      "enableHelper": "Runs a model you provide. Where it runs — and whether your notes leave this device — depends on the provider you name below. Experimental, off by default.",
+      "enableHelper": "Runs a model you provide. Where it runs, and whether your notes leave this device, both depend on the provider you name below. Experimental, off by default.",
       "enableLabel": "Enable local AI",
       "excludedHelper": "Notes in these folders are never read or indexed by AI. One folder path per line.",
       "excludedLabel": "Excluded folders",
@@ -2932,54 +2935,54 @@
       "endpointModelLabel": "Model to use there",
       "endpointModelPlaceholder": "the model name as the runtime lists it",
       "endpointRejected": {
-        "malformed": "That is not an address Myne can use. It needs a scheme and an explicit port — for example http://127.0.0.1:11434.",
-        "notLoopback": "This address must be on this computer — localhost, 127.0.0.1 or ::1. To use a provider that runs somewhere else, name it under Provider instead.",
+        "malformed": "That is not an address Myne can use. It needs a scheme and an explicit port, for example http://127.0.0.1:11434.",
+        "notLoopback": "This address must be on this computer: localhost, 127.0.0.1 or ::1. To use a provider that runs somewhere else, name it under Provider instead.",
         "unsupportedScheme": "Only http and https addresses are accepted."
       },
       "endpointSaveFailed": "Could not save the address. Check that Myne can write its settings.",
       "endpointThirdParty": "{{name}} is a separate program with its own network behaviour, and Myne does not control it. Your notes are sent to it while it runs on this computer.",
       "providerError": {
-        "barred": "This kind of request never goes to a provider — it runs on this device or not at all.",
+        "barred": "This kind of request never goes to a provider: it runs on this device or not at all.",
         "failed": "That did not work. Nothing was saved and nothing was sent again.",
         "localModelMissing": "The local model recorded in settings is not on this device any more. Nothing was sent anywhere. Pick a model again, or name a provider, in Settings → Developer → AI.",
         "noCredential": "No API key is set for this provider. Add one in Settings → Developer → AI.",
         "notReady": "Nothing is ready to answer yet. Nothing was sent anywhere. Pick a model, or name a provider, in Settings → Developer → AI.",
-        "noEmbeddingModel": "Asking searches your notes on this device, and that needs a search model here — a provider cannot do it. Nothing was sent anywhere. Choose a search model in Settings → Developer → AI.",
+        "noEmbeddingModel": "Asking searches your notes on this device, and that needs a search model here. A provider cannot do it. Nothing was sent anywhere. Choose a search model in Settings → Developer → AI.",
         "indexNotReady": "Your notes are still being indexed for search. Nothing was sent anywhere. Try again in a moment.",
         "requestRejected": "The provider would not accept this request. Nothing was saved. This is a fault in what Myne sent, not in your setup or your notes.",
         "policyRefused": "The provider refused this request under its own rules: an account guardrail, a workspace policy, or a model your plan does not carry. This has to be fixed with the provider, not in Myne.",
-        "quotaExhausted": "The provider declined the request — you are out of credit or over a rate limit. This has to be fixed with the provider, not in Myne.",
+        "quotaExhausted": "The provider declined the request: you are out of credit or over a rate limit. This has to be fixed with the provider, not in Myne.",
         "refused": "The provider refused the connection. It may be down or blocking this network.",
         "timeout": "The provider did not answer in time. Nothing was left running.",
-        "unauthorized": "The provider rejected your API key. Replace it — it may be wrong, revoked, or for a different account.",
+        "unauthorized": "The provider rejected your API key. Replace it: it may be wrong, revoked, or for a different account.",
         "unreachable": "Could not reach the provider. Check your network connection."
       },
       "modelChoose": "Choose file…",
-      "modelEmbeddingLabel": "Search model — semantic search & Q&A",
+      "modelEmbeddingLabel": "Search model: semantic search & Q&A",
       "modelFilter": {
         "gguf": "GGUF model",
         "safetensors": "Safetensors model"
       },
-      "modelGenerationLabel": "Text model — chat, summaries, writing",
+      "modelGenerationLabel": "Text model: chat, summaries, writing",
       "modelNone": "No file selected",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
       "modelTranscriptionLabel": "Speech-to-text model (transcription)",
-      "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. A model picked here runs on your device; if you have named a provider instead, that provider answers.",
+      "modelsHelper": "Myne never downloads models. That would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. A model picked here runs on your device; if you have named a provider instead, that provider answers.",
       "providerHelper": "Instead of running a model here, Myne can send a request to a service you name. Your notes leave this device when it does. \"None\" is the default and means no service is contacted at all.",
       "providerKeyAdd": "paste your API key",
       "providerKeyLabel": "API key",
       "providerKeyNone": "No key is stored, so nothing can be sent yet.",
       "providerKeyRevoke": "Remove this key",
       "providerKeyReplace": "paste a new key to replace the stored one",
-      "providerKeyStored": "A key is stored. Myne never shows it back to you — paste a new one to replace it.",
+      "providerKeyStored": "A key is stored. Myne never shows it back to you. Paste a new one to replace it.",
       "providerActive": "Answering now: {{name}}",
       "providerLabel": "Remote provider",
       "providerModelCount_one": "{{count}} model available.",
       "providerModelCount_other": "{{count}} models available.",
       "providerModelEmpty": "This provider published no models for your account.",
       "providerModelHelper": "Myne ships no default. The list comes from the provider, so it stays current and you are never billed for a model you did not choose. Only models that read and write text are listed, because this is the only kind Myne asks a provider for.",
-      "providerModelHidden_one": "{{count}} model hidden — it does not read and write text.",
-      "providerModelHidden_other": "{{count}} models hidden — they do not read and write text.",
+      "providerModelHidden_one": "{{count}} model hidden: it does not read and write text.",
+      "providerModelHidden_other": "{{count}} models hidden: they do not read and write text.",
       "providerModelLabel": "Model",
       "providerModelLoad": "Load models",
       "providerModelNone": "No model chosen",
@@ -2999,26 +3002,26 @@
       "disabledCue": "Sync is no longer routed through Tor. New connections go straight to the sync server.",
       "errorRead": "Couldn't read the current setting. Flip the switch to set it again.",
       "errorSave": "Couldn't save the setting. Nothing changed.",
-      "errorSidecar": "Tor routing is on, but the Tor client couldn't start. Sync is paused until it can — nothing is being sent directly.",
+      "errorSidecar": "Tor routing is on, but the Tor client couldn't start. Sync is paused until it can. Nothing is being sent directly.",
       "postureActive": "Sync is going through Tor",
-      "postureConnecting": "Connecting to Tor — sync is paused",
+      "postureConnecting": "Connecting to Tor: sync is paused",
       "postureConnectingDetail": "This usually takes a few seconds. Nothing is being sent directly in the meantime.",
-      "postureExempt": "Sync isn't using Tor — this address points at this device",
+      "postureExempt": "Sync isn't using Tor: this address points at this device",
       "postureExemptDetail": "The sync server address you've configured names this computer, so Myne's connection to it doesn't go through a Tor circuit. If that address forwards on to a server somewhere else, Myne can't see that and can't route it. Sync is not paused.",
       "postureHeading": "Right now",
       "postureInactive": "Sync goes straight to the sync server",
-      "postureUnavailable": "Tor is unavailable — sync is paused",
+      "postureUnavailable": "Tor is unavailable: sync is paused",
       "postureUnavailableDetail": "Nothing is being sent directly. Turn this setting off and on again to try starting the Tor client, or turn it off to sync without Tor.",
-      "residualExit": "The last relay in a Tor circuit — the exit node — sees which sync server you connect to. It can't read what you sync; that stays encrypted end to end.",
+      "residualExit": "The last relay in a Tor circuit, the exit node, sees which sync server you connect to. It can't read what you sync; that stays encrypted end to end.",
       "residualMetadata": "The sync server still sees when you sync, how many blobs you push and how large they are, and how many devices you have. Tor doesn't change that.",
       "residualPayment": "If you pay for hosted sync, the payment and your account can still be linked to you. Tor changes where the connection comes from, not the billing trail.",
       "residualScope": "Only Myne's own sync traffic goes through Tor. Nothing else on this device does.",
       "residualsToggle": "What this doesn't hide",
-      "torHelper": "Hides your IP address and location from the sync server, and hides which server you sync with from your network and your internet provider — they can still see this device connecting to Tor. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
+      "torHelper": "Hides your IP address and location from the sync server, and hides which server you sync with from your network and your internet provider. They can still see this device connecting to Tor. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
       "torLabel": "Route sync through Tor"
     },
     "prefs": {
-      "saveError": "Couldn't save preference — try again"
+      "saveError": "Couldn't save preference. Try again."
     },
     "reminders": {
       "aria": "Show task reminders on this device",
@@ -3048,7 +3051,7 @@
       "screenCaptureHelperOn": "Effective on Windows 10 (May 2020 Update) and later. macOS and Linux have no system API for this, so it cannot block capture there.",
       "screenCaptureLabel": "Screen-capture protection",
       "screenCaptureSubtitle": "Block screenshots and screen recording",
-      "screenshotBlocked": "Screen protection is on — screenshots of Myne come out blank.",
+      "screenshotBlocked": "Screen protection is on: screenshots of Myne come out blank.",
       "autoLockAfter": "Auto-lock after",
       "autoLock1m": "1m",
       "autoLock5m": "5m",
@@ -3069,7 +3072,7 @@
       "errorPinTooShort_one": "PIN must be at least {{count}} digit.",
       "errorPinTooShort_other": "PIN must be at least {{count}} digits.",
       "helperConfigured": "Configured via {{method}}. Re-entry after auto-lock skips the master password. With a PIN the master password is required again after a restart; a fingerprint or face check covers a restart too, until the fingerprints or faces enrolled on this device change.",
-      "helperNotConfigured": "Re-enter after auto-lock with a PIN or Touch ID instead of the full master password. A convenience over the encrypted vault — with a PIN the master password is required again after a restart; Touch ID covers a restart too, until the fingerprints enrolled on this device change.",
+      "helperNotConfigured": "Re-enter after auto-lock with a PIN or Touch ID instead of the full master password. A convenience over the encrypted vault: with a PIN the master password is required again after a restart; Touch ID covers a restart too, until the fingerprints enrolled on this device change.",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "Quick-unlock PIN",
@@ -3092,9 +3095,9 @@
       "biometricToggleSubtitle": "Unlock with {{method}} after auto-lock",
       "pinOnLead": "PIN quick unlock is ",
       "pinOnEmphasis": "on",
-      "pinOnRest": ". After the vault auto-locks you can re-enter with your PIN instead of the full password — this app session only. A cold start always requires the full password.",
+      "pinOnRest": ". After the vault auto-locks you can re-enter with your PIN instead of the full password (this app session only). A cold start always requires the full password.",
       "turnOffPin": "Turn off PIN",
-      "pinSetupHelper": "Set a 6+ digit PIN to re-unlock quickly after auto-lock. The PIN wraps a device-local key — it never leaves this device and never touches your recovery phrase.",
+      "pinSetupHelper": "Set a 6+ digit PIN to re-unlock quickly after auto-lock. The PIN wraps a device-local key: it never leaves this device and never touches your recovery phrase.",
       "pinReplacesBiometric": " Setting a PIN replaces {{method}} unlock.",
       "pinPlaceholder6": "At least 6 digits",
       "confirmPin": "Confirm PIN",
@@ -3127,10 +3130,10 @@
     "spell": {
       "errorSaveLanguages": "Could not save the spell-check languages.",
       "errorSaveSetting": "Could not save the spell-check setting.",
-      "helper": "Underline misspelled words as you type. Fully offline — your notes never leave the device.",
+      "helper": "Underline misspelled words as you type. Fully offline: your notes never leave the device.",
       "label": "Spell check",
       "languagesAriaLabel": "Spell-check languages",
-      "languagesHelper": "A word is correct if it’s valid in any selected language — handy for mixing English terms into other-language notes.",
+      "languagesHelper": "A word is correct if it’s valid in any selected language. Handy for mixing English terms into other-language notes.",
       "languagesLabel": "Languages",
       "languagesPlaceholder": "Select languages…",
       "languagesSearchEmpty": "No languages match.",
@@ -3139,20 +3142,20 @@
       "on": "On"
     },
     "storage": {
-      "backupHelper": "Backups stay exactly as encrypted as your vault, in a single verified .myne-backup file. Restoring works with that vault's password or recovery phrase — exactly like unlock.",
+      "backupHelper": "Backups stay exactly as encrypted as your vault, in a single verified .myne-backup file. Restoring works with that vault's password or recovery phrase, exactly like unlock.",
       "backupLabel": "Backup",
       "backUpVault": "Back up vault…",
       "exportAction": "Export…",
       "exportBody": "Export vault as Markdown",
-      "exportHelper": "Plain markdown tree — not encrypted.",
+      "exportHelper": "Plain markdown tree. Not encrypted.",
       "exportLabel": "Export",
       "importHelper": "Bring notes in from Obsidian, Notion, Evernote, HTML files or a CSV. Everything is imported and encrypted on the spot; your original files are left untouched.",
       "importLabel": "Import",
       "importObsidian": "Import notes…",
-      "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies — it verifies the written file.",
+      "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies: it verifies the written file.",
       "locationLabel": "Vault location",
       "openInFiles": "Open in Files",
-      "webLocationHelper": "Your notes live in this browser's storage for this site, managed by the browser — there is no folder to open. Clearing this site's data removes the local copy; because this client syncs, signing in again downloads it back.",
+      "webLocationHelper": "Your notes live in this browser's storage for this site, managed by the browser. There is no folder to open. Clearing this site's data removes the local copy; because this client syncs, signing in again downloads it back.",
       "webLocationLabel": "Where your notes are stored",
       "pathUnavailable": "Path unavailable",
       "restoreBackup": "Restore from backup…"
@@ -3311,28 +3314,28 @@
       "time24": "24-hour",
       "time12": "12-hour",
       "zoneLabel": "Time zone",
-      "zoneHelper": "Which zone decides what counts as today. Leave empty to follow this device. Times you write in a note are never changed — 09:00 stays 09:00 everywhere.",
+      "zoneHelper": "Which zone decides what counts as today. Leave empty to follow this device. Times you write in a note are never changed; 09:00 stays 09:00 everywhere.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne doesn't know that time zone. Use a name like Europe/Berlin.",
       "errorSave": "Couldn't save that setting."
     }
   },
   "storageLost": {
-    "allSynced": "Nothing was lost — every note here had already reached the server.",
+    "allSynced": "Nothing was lost: every note here had already reached the server.",
     "evicted": {
-      "body": "Your browser cleared this site's storage to free up space. Nothing is damaged and nothing was deleted on the server — everything that had synced is still there.",
+      "body": "Your browser cleared this site's storage to free up space. Nothing is damaged and nothing was deleted on the server. Everything that had synced is still there.",
       "title": "Your browser cleared this vault's local copy"
     },
     "lockCta": "Lock and try again",
     "reDownloadCta": "Set this browser up again",
     "reEnrolNotice": "Setting up again registers this browser as a new device, so it will wait for approval from one of your other devices before it can sync.",
     "unopenable": {
-      "body": "The local copy of this vault can no longer be read. Nothing on the server is affected — the copy here is a cache, and it can be replaced.",
+      "body": "The local copy of this vault can no longer be read. Nothing on the server is affected: the copy here is a cache, and it can be replaced.",
       "title": "This vault's local copy can't be read"
     },
-    "unsyncedIntro": "{{count}} note hadn't reached the server yet. It's gone — this was the only copy:",
-    "unsyncedIntro_one": "{{count}} note hadn't reached the server yet. It's gone — this was the only copy:",
-    "unsyncedIntro_other": "{{count}} notes hadn't reached the server yet. They're gone — this was the only copy:",
+    "unsyncedIntro": "{{count}} note hadn't reached the server yet. It's gone, and this was the only copy:",
+    "unsyncedIntro_one": "{{count}} note hadn't reached the server yet. It's gone, and this was the only copy:",
+    "unsyncedIntro_other": "{{count}} notes hadn't reached the server yet. They're gone, and this was the only copy:",
     "unsyncedOverflow": "…and {{count}} more.",
     "unsyncedOverflow_one": "…and {{count}} more.",
     "unsyncedOverflow_other": "…and {{count}} more."
@@ -3347,11 +3350,11 @@
       "whatWeCanSeeLabel": "What we can see",
       "readFull": "Read the full terms",
       "review": "Review the beta terms",
-      "accept": "I understand — turn on sync"
+      "accept": "I understand, turn on sync"
     },
-    "materialising": "Downloading your notes — {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",
-    "credentialAmbiguous": "Your password may have changed on this device and on another, and Myne can't tell which is newer — so it hasn't changed anything. Sign in on a device that already has access to sort it out.",
-    "vaultRekeyed": "This vault was upgraded to the new format on another device. Unlock again to continue — nothing was lost.",
+    "materialising": "Downloading your notes: {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",
+    "credentialAmbiguous": "Your password may have changed on this device and on another, and Myne can't tell which is newer, so it hasn't changed anything. Sign in on a device that already has access to sort it out.",
+    "vaultRekeyed": "This vault was upgraded to the new format on another device. Unlock again to continue. Nothing was lost.",
     "attachments": {
       "aria": {
         "downloading": "Downloading {{name}}",
@@ -3361,7 +3364,7 @@
       "heading": "Attachment sync",
       "status": {
         "done": "done",
-        "failedWillRetry": "failed — will retry",
+        "failedWillRetry": "failed, will retry",
         "paused": "paused"
       }
     },
@@ -3380,7 +3383,7 @@
       "compareTheirs": "Conflicting copy",
       "compareTitle": "Comparing “{{title}}”",
       "discard": "Discard",
-      "empty": "No conflicts — your devices are in sync.",
+      "empty": "No conflicts. Your devices are in sync.",
       "groupTitle_one": "{{count}} conflicting copy of {{original}}",
       "groupTitle_other": "{{count}} conflicting copies of {{original}}",
       "keepAsSeparate": "Keep as separate",
@@ -3394,7 +3397,7 @@
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "Couldn’t make the QR. Please try again.",
       "generate": "Make QR",
-      "hint": "Paste your account number to make a QR your phone can scan — it fills in the server and account number for you.",
+      "hint": "Paste your account number to make a QR your phone can scan. It fills in the server and account number for you.",
       "invalidAccount": "That doesn’t look like a valid account number.",
       "notConfigured": "Configure a sync server first, then make a QR.",
       "scanWithApp": "Scan with the iOS app",
@@ -3428,6 +3431,16 @@
       "shortName": "Device {{hex}}",
       "syncedHere": "Synced here",
       "thisDevice": "This device",
+      "reasonUnreachable": "the server didn’t answer",
+      "reasonCertChanged": "its certificate is not the one this device trusts",
+      "reasonUnexpected": "an unexpected error",
+      "reasonRejected": "the server rejected this device’s sign-in",
+      "reasonFrozen": "the account is frozen",
+      "reasonDeviceLimit": "the account is at its device limit",
+      "reasonAwaitingApproval": "this device is still waiting to be approved",
+      "reasonNotConfigured": "no sync server is configured",
+      "certChanged": "The sync server answered, but with a different certificate than the one this device pinned.",
+      "certChangedHint": "This is what a renewed certificate looks like, and also what an impostor looks like. Myne cannot tell them apart, so it will not guess. Get the fingerprint from your server, then re-enter the server URL under “Sync server” above and paste it in when asked.",
       "transportHint": "If the server moved or its certificate changed, re-enter the server URL under “Sync server” above to re-trust it.",
       "unreachable": "Couldn’t reach sync ({{error}}).",
       "verifyBody": "Check that the same code appears on the device you just approved. If it matches, they’re on your account. If it doesn’t, remove the device.",
@@ -3449,15 +3462,16 @@
       "connecting": "Connecting…",
       "fingerprintLabel": "Server certificate fingerprint:",
       "confirmFingerprintRequired": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server’s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
-      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. Nothing was saved. Check the fingerprint you pasted — and if it is right, do not connect: something is between this device and your server.",
-      "confirmFingerprintDeclined": "Nothing was saved — this device is not connected to that server. Come back once you have its certificate fingerprint.",
+      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. Nothing was saved. Check the fingerprint you pasted. If it is right, do not connect: something is between this device and your server.",
+      "certificateChanged": "This server presented a different certificate than the one this device trusts. Nothing was changed. If you renewed it, paste the new fingerprint below; if you did not, do not connect.",
+      "confirmFingerprintDeclined": "Nothing was saved: this device is not connected to that server. Come back once you have its certificate fingerprint.",
       "pinStatic": "Verified against Myne’s built-in certificate.",
       "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
-      "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here — the page is only allowed to talk to this one address.",
+      "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here: the page is only allowed to talk to this one address.",
       "fixedOriginNone": "No sync server is configured for this deployment.",
       "pinPlatformTrust": "Verified by your browser’s certificate store. This client cannot pin a certificate itself.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "Couldn’t reach that server — check the URL and that it’s running."
+      "unreachable": "Couldn’t reach that server. Check the URL and that it’s running."
     },
     "enroll": {
       "accountNumberLabel": "Account number",
@@ -3488,7 +3502,7 @@
     },
     "fingerprint": {
       "title": "Check this server’s certificate before trusting it",
-      "why": "Tor routing is on, so this first connection reaches the server through a relay run by a stranger. Until a certificate is pinned, this device would accept whatever certificate it is handed — including one that relay made up. Enter the fingerprint your server publishes and Myne compares it before pinning anything. If it does not match, nothing is saved.",
+      "why": "Tor routing is on, so this first connection reaches the server through a relay run by a stranger. Until a certificate is pinned, this device would accept whatever certificate it is handed, including one that relay made up. Enter the fingerprint your server publishes and Myne compares it before pinning anything. If it does not match, nothing is saved.",
       "label": "Expected certificate fingerprint",
       "placeholder": "SHA-256 fingerprint from your server",
       "echoLabel": "What you entered",
@@ -3496,36 +3510,36 @@
       "echoProgress": "{{count}} of {{total}} characters so far.",
       "echoProgress_one": "{{count}} of {{total}} characters so far.",
       "echoProgress_other": "{{count}} of {{total}} characters so far.",
-      "echoInvalid": "A SHA-256 fingerprint is 64 characters, each one 0–9 or a–f. Colons, spaces and a leading “sha256:” are fine — anything else is not part of it.",
+      "echoInvalid": "A SHA-256 fingerprint is 64 characters, each one 0–9 or a–f. Colons, spaces and a leading “sha256:” are fine. Anything else is not part of it.",
       "helpToggle": "Where do I find this fingerprint?",
-      "helpNotOverTor": "Not through this connection. A fingerprint you fetch over the same circuit proves nothing — whatever could swap the certificate could swap that page too.",
+      "helpNotOverTor": "Not through this connection. A fingerprint you fetch over the same circuit proves nothing: whatever could swap the certificate could swap that page too.",
       "helpFromServer": "On the machine running your server: openssl x509 -noout -fingerprint -sha256 -in <your certificate file>",
       "helpFromDevice": "On a device already connected to this account: Settings → Sync shows the same fingerprint.",
-      "helpNoFingerprint": "If you cannot get it any of those ways, this server cannot be added while Tor routing is on. You can turn Tor routing off in Settings → Network and connect directly — that shows your IP address to the server and to whoever can watch your network.",
-      "decline": "I don’t have it — cancel"
+      "helpNoFingerprint": "If you cannot get it any of those ways, this server cannot be added while Tor routing is on. You can turn Tor routing off in Settings → Network and connect directly. That shows your IP address to the server and to whoever can watch your network.",
+      "decline": "I don’t have it, cancel"
     },
     "join": {
       "accountLabel": "Account number",
       "cancel": "Cancel",
       "continue": "Continue",
-      "error": "Couldn’t add this device. Check the server URL, account number, and password — and that the server is reachable.",
+      "error": "Couldn’t add this device. Check the server URL, account number, and password, and that the server is reachable.",
       "help": "Sign in with your account number and password. This device will sync your notes once an existing device approves it. No recovery phrase needed.",
       "passwordLabel": "Password",
       "pinnedCompare": "This device pinned your server’s certificate. Check that this fingerprint matches on your other devices.",
       "confirmFingerprintRequired": "Tor routing is on, so this device will not trust a certificate it has not been told to expect. Get your server’s SHA-256 certificate fingerprint from the server itself or from a device that is already connected, then paste it here.",
-      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. This device was not added and nothing was saved. Check the fingerprint you pasted — and if it is right, do not continue: something is between this device and your server.",
+      "confirmFingerprintMismatch": "The certificate this server presented is not the one you entered. This device was not added and nothing was saved. Check the fingerprint you pasted. If it is right, do not continue: something is between this device and your server.",
       "pinnedTitle": "Server certificate pinned",
       "serverLabel": "Sync server",
       "serverPlaceholder": "https://your-server.example",
-      "sasMatch": "They match — continue",
-      "sasMismatch": "They don’t match — remove this device",
+      "sasMatch": "They match, continue",
+      "sasMismatch": "They don’t match, remove this device",
       "submit": "Add device",
       "submitting": "Adding…",
       "title": "Add this device to an account",
       "verifyBody": "Check that this code matches the one on the device you approved from.",
       "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
       "verifyTitle": "Verify this device",
-      "waitingHint": "Keep this window open — once approved, a verification code appears here to compare with your other device.",
+      "waitingHint": "Keep this window open. Once approved, a verification code appears here to compare with your other device.",
       "waitingTitle": "Waiting for approval",
       "sasAbortFailed": "Could not disconnect this device. It is still enrolled with that server, so treat it as untrusted: open Settings → Sync and remove it there. Your notes were not deleted."
     },
@@ -3572,10 +3586,14 @@
       }
     },
     "reconcile": {
-      "message": "This device was offline for a while — catching up on sync. Your notes are safe."
+      "message": "This device was offline for a while, so it is catching up on sync. Your notes are safe."
     },
     "recovered": {
       "restoredToast": "Restored as a new note."
+    },
+    "stale": {
+      "body": "Myne hasn’t reached the sync server in several days. Your notes are saving on this device, but nothing has left it, so this is the only copy. Open Settings → Sync to see why.",
+      "dismiss": "Dismiss"
     },
     "status": {
       "awaitingApproval": "Awaiting approval",
@@ -3583,11 +3601,12 @@
       "conflicts_other": "{{count}} conflicts to review",
       "error": "Sync error",
       "errorAuth": "Sync sign-in expired",
-      "errorFrozen": "Account frozen — uploads paused",
+      "errorFrozen": "Account frozen: uploads paused",
       "errorDeviceRevoked": "This device was removed from your account",
-      "errorStorageFull": "Storage full — syncing paused",
-      "errorQuota": "Storage full — uploads paused",
-      "errorRateLimited": "Sync throttled — retrying",
+      "errorCertChanged": "Server certificate changed: verify it to reconnect",
+      "errorStorageFull": "Storage full: syncing paused",
+      "errorQuota": "Storage full: uploads paused",
+      "errorRateLimited": "Sync throttled: retrying",
       "errorTooLarge": "A file is too large to upload",
       "loading": "Sync status…",
       "notEnrolled": "Not enrolled",
@@ -3606,19 +3625,19 @@
       "serverSection": "Server",
       "serverNotSet": "Not set",
       "statusLabel": "Status",
-      "hubHelp": "Sync keeps your notes up to date across devices. Everything is encrypted on this device before it is sent — the server never sees your notes.",
+      "hubHelp": "Sync keeps your notes up to date across devices. Everything is encrypted on this device before it is sent. The server never sees your notes.",
       "connectedTls": "Connected over TLS.",
       "connectedLocal": "Connected on your local network.",
       "connectError": "Couldn't reach that server. Check the address and try again.",
       "serverAddressLabel": "Server address",
       "serverAddressPlaceholder": "https://sync.example.com",
       "fingerprintLabel": "Certificate fingerprint",
-      "fingerprintCompare": "Compare this against the same screen on a device you already trust — they must match.",
+      "fingerprintCompare": "Compare this against the same screen on a device you already trust. They must match.",
       "pinStatic": "Verified against this server's known certificate.",
       "pinTofu": "Pinned on first connect. Compare it across your devices to confirm.",
       "enrollNotConfigured": "Set up a sync server first, then add this device.",
       "enrollTransport": "Couldn't reach the sync server. Check your connection and try again.",
-      "accountNumberHint": "Double-check this number — it doesn't look right.",
+      "accountNumberHint": "Double-check this number. It doesn't look right.",
       "passwordPlaceholder": "Your vault password",
       "recoveryPhraseHint": "Enter or paste your 24 words. Pasting fills the cells in order.",
       "verifyBody": "Check that the same code appears on the device you just approved. If it matches, they are on your account. If it doesn't, remove the device.",
@@ -3636,11 +3655,11 @@
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflict needs review",
       "conflictsNeedReview_other": "{{count}} conflicts need review",
-      "catchingUp": "Catching up on sync — your notes are safe.",
+      "catchingUp": "Catching up on sync. Your notes are safe.",
       "verifyDevices": "Verify devices"
     },
     "tor": {
-      "connecting": "Connecting to Tor. Sync is paused until the connection is ready — nothing is being sent directly.",
+      "connecting": "Connecting to Tor. Sync is paused until the connection is ready. Nothing is being sent directly.",
       "settingsHint": "Settings → Network",
       "unavailable": "Tor is unavailable, so sync is paused. Nothing is being sent directly. Turn off Tor routing to sync without it."
     }
@@ -3704,7 +3723,7 @@
       "closeLabel": "Close templates",
       "deleteRowLabel": "Delete template {{name}} (move to Trash)",
       "editTemplateLabel": "Edit template {{name}}",
-      "emptyBody": "Create a template to reuse a note skeleton — a meeting note, a daily log, a reading note. Pick one when you make a new note.",
+      "emptyBody": "Create a template to reuse a note skeleton: a meeting note, a daily log, a reading note. Pick one when you make a new note.",
       "emptyTitle": "No templates yet",
       "listLabel": "Templates",
       "loading": "Loading…",
@@ -3716,7 +3735,7 @@
     },
     "emptyBefore": "No templates yet. Tap ",
     "newAction": "New",
-    "emptyAfter": " to create a reusable note template — then start notes from it (and pick one as your daily-note template in Settings).",
+    "emptyAfter": " to create a reusable note template, then start notes from it (and pick one as your daily-note template in Settings).",
     "use": "Use",
     "edit": "Edit",
     "deleteConfirm": "Delete this template?",
@@ -3729,7 +3748,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "collision": {
-      "keepBoth": "Keep both — install as “{{name}}”",
+      "keepBoth": "Keep both and install as “{{name}}”",
       "question": "You already have a theme called “{{name}}”.",
       "replace": "Replace “{{name}}”"
     },
@@ -3744,7 +3763,7 @@
       "unsupportedVersion": "That link was made for a newer version of Myne. Update Myne, then try again."
     },
     "errorTitle": "Couldn't read that theme",
-    "helper": "Themes are a color palette, not code. Myne validates this one on this device before using it — nothing is uploaded.",
+    "helper": "Themes are a color palette, not code. Myne validates this one on this device before using it. Nothing is uploaded.",
     "question": "Do you want to use this theme?",
     "title": "Install theme"
   },
@@ -3756,10 +3775,10 @@
     "errors": {
       "alreadyUnlocked": "Vault is already unlocked.",
       "inProgress": "Operation in progress.",
-      "kdfMemoryExceedsHost": "This vault needs {{required}} MiB of memory to open — more than this browser can give it ({{available}} MiB). The vault is fine; open it in the Myne desktop app.",
+      "kdfMemoryExceedsHost": "This vault needs {{required}} MiB of memory to open, more than this browser can give it ({{available}} MiB). The vault is fine; open it in the Myne desktop app.",
       "unexpected": "Unexpected error. Please try again.",
       "vaultNotFound": "Vault file not found. Please restart the app.",
-      "vaultUpgraded": "This vault was upgraded to a newer format this version of Myne doesn’t support yet. Your data is fine — update Myne to the latest version to open it."
+      "vaultUpgraded": "This vault was upgraded to a newer format this version of Myne doesn’t support yet. Your data is fine. Update Myne to the latest version to open it."
     },
     "passwordLabel": "Password",
     "passwordPlaceholder": "Password",
@@ -3781,7 +3800,7 @@
     "subtitleBiometric": "Confirm with Touch ID to continue.",
     "suspicion": {
       "lockedDuringChange": "Password change cancelled: vault was locked.",
-      "metaChangedExternally": "Vault was modified in another session — please unlock again."
+      "metaChangedExternally": "Vault was modified in another session. Please unlock again."
     },
     "title": "Unlock your vault.",
     "vaultUnreadable": "Vault file is unreadable. Restore from a backup.",
@@ -3808,7 +3827,7 @@
     "unlockWithPinInstead": "Unlock with PIN instead",
     "useRecoveryPhrase": "Use your recovery phrase",
     "deleteConfirmTitle": "Delete this vault?",
-    "deletePartialError": "Some files couldn't be removed. The vault is no longer usable — continue to start over.",
+    "deletePartialError": "Some files couldn't be removed. The vault is no longer usable. Continue to start over.",
     "failClosedEyebrow": "Can't open vault",
     "restoreHint": "Restore from a backup to continue."
   },
@@ -3828,11 +3847,11 @@
       "copied": "Copied",
       "copy": "Copy",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
-      "eyebrow": "Step 4 of 4 — account number",
+      "eyebrow": "Step 4 of 4: account number",
       "heading": "Save your account number.",
-      "intro": "This is your bearer token — treat it like cash.",
+      "intro": "This is your bearer token. Treat it like cash.",
       "saveAsFile": "Save as file",
-      "shownOnceBody": "Save it now — Myne cannot recover it for you. Required to register for sync later.",
+      "shownOnceBody": "Save it now. Myne cannot recover it for you. Required to register for sync later.",
       "shownOnceEmphasis": "This is shown only once."
     },
     "briefing": {
@@ -3840,17 +3859,17 @@
       "continue": "Continue to vault creation",
       "eyebrow": "Before you create your vault",
       "heading": "Before you create your vault",
-      "intro": "Myne encrypts your notes so that only you can open them. Three things follow from that — read them, then continue.",
+      "intro": "Myne encrypts your notes so that only you can open them. Three things follow from that. Read them, then continue.",
       "statements": {
         "no-email": {
           "ackLabel": "I understand there is no email recovery.",
           "statement": "There is no email recovery. There never will be.",
-          "why": "We never ask for your email, so there's no reset link and no account for support to unlock. This isn't a missing feature — it's the guarantee. Email recovery would mean we could read your notes, and Myne is built so we can't."
+          "why": "We never ask for your email, so there's no reset link and no account for support to unlock. This isn't a missing feature. It's the guarantee. Email recovery would mean we could read your notes, and Myne is built so we can't."
         },
         "no-store": {
           "ackLabel": "I understand Myne can't recover my password.",
           "statement": "Your password unlocks your vault. We don't store it.",
-          "why": "Your password is the input to the key that decrypts your notes. It never leaves this device, and nothing on our servers can reproduce it. That's what keeps your notes private — and why we can't reset it for you."
+          "why": "Your password is the input to the key that decrypts your notes. It never leaves this device, and nothing on our servers can reproduce it. That's what keeps your notes private, and why we can't reset it for you."
         },
         "phrase-backup": {
           "ackLabel": "I understand my recovery phrase is the only backup.",
@@ -3863,7 +3882,7 @@
     "confirm": {
       "back": "Back",
       "continue": "Continue",
-      "eyebrow": "Step 3 of 4 — confirm phrase",
+      "eyebrow": "Step 3 of 4: confirm phrase",
       "heading": "Type back four words from your phrase.",
       "intro": "We'll ask for specific positions to verify you saved it.",
       "mismatch": "Doesn't match word #{{pos}}.",
@@ -3941,7 +3960,7 @@
         "title": "Too many vault creations at once"
       },
       "vaultArtifactsPresent": {
-        "body": "A new vault cannot be created because vault data already exists on this device. Close the app and restart — the startup screen will route you to the unlock flow.",
+        "body": "A new vault cannot be created because vault data already exists on this device. Close the app and restart. The startup screen will route you to the unlock flow.",
         "title": "Vault already exists"
       },
       "vaultBusyAuth": {
@@ -3971,7 +3990,7 @@
     },
     "password": {
       "back": "Back",
-      "eyebrow": "Step 1 of 4 — master password",
+      "eyebrow": "Step 1 of 4: master password",
       "heading": "Create vault",
       "helperLead": "Myne does not store your password or recovery phrase.",
       "submit": "Generate recovery phrase"
@@ -3979,15 +3998,15 @@
     "phrase": {
       "back": "Back",
       "clipboardNotCleared": "Your browser will not let Myne clear your clipboard afterwards, so those 24 words stay there until you copy something else. Paste them into your password manager, then copy anything.",
-      "continue": "I've saved this — confirm phrase",
+      "continue": "I've saved this, confirm phrase",
       "copied": "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
       "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the words stay on it until you copy something else.",
       "copy": "Copy",
       "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
-      "eyebrow": "Step 2 of 4 — recovery phrase",
+      "eyebrow": "Step 2 of 4: recovery phrase",
       "heading": "Write down these 24 words.",
-      "intro": "This phrase, together with your password, is the only way to recover your vault. Store it offline — paper, password manager, hardware wallet. Treat it like cash.",
+      "intro": "This phrase, together with your password, is the only way to recover your vault. Store it offline: paper, password manager, hardware wallet. Treat it like cash.",
       "reveal": "Reveal phrase",
       "saveAsFile": "Save as file"
     },
@@ -3995,10 +4014,10 @@
       "backedUp": "Backed up ✓",
       "backingUp": "Backing up…",
       "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "Backup didn't complete — no file was left behind. You can back up any time from Settings → Storage.",
+      "backupError": "Backup didn't complete. No file was left behind. You can back up any time from Settings → Storage.",
       "backupFilterName": "Myne backup",
       "backUpNow": "Back up this vault now",
-      "body": "Myne wrote your vault to your application data folder. Your master password and recovery phrase are the only way back in — make sure both are saved somewhere safe.",
+      "body": "Myne wrote your vault to your application data folder. Your master password and recovery phrase are the only way back in. Make sure both are saved somewhere safe.",
       "decrypting": "Decrypting…",
       "done": "Done",
       "heading": "Your vault is ready.",
@@ -4035,7 +4054,7 @@
         "weakPassword": "New password must be at least 12 characters."
       },
       "eyebrow": "Recovery · New password",
-      "helperBody": "Opened with your recovery phrase. Your old password no longer works — set a new master password now.",
+      "helperBody": "Opened with your recovery phrase. Your old password no longer works. Set a new master password now.",
       "helperEmphasis": "Your recovery phrase stays the same.",
       "submit": "Set new password",
       "title": "Set a new master password"
@@ -4090,8 +4109,8 @@
       "doneTitle": "Cleaned up",
       "errorBody": "Something went wrong. Close the app and try again.",
       "errorTitle": "Cleanup failed",
-      "foundBody_one": "{{count}} leftover file from a previous deletion that didn't finish. They're already unreadable — you won't lose anything recoverable.",
-      "foundBody_other": "{{count}} leftover files from a previous deletion that didn't finish. They're already unreadable — you won't lose anything recoverable.",
+      "foundBody_one": "{{count}} leftover file from a previous deletion that didn't finish. They're already unreadable. You won't lose anything recoverable.",
+      "foundBody_other": "{{count}} leftover files from a previous deletion that didn't finish. They're already unreadable. You won't lose anything recoverable.",
       "foundTitle": "Leftover files from an incomplete deletion",
       "partialBody_one": "{{count}} file may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.",
       "partialBody_other": "{{count}} files may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.",
@@ -4121,7 +4140,7 @@
     "nothingToPreview": "Nothing to preview yet."
   },
   "conflicts": {
-    "empty": "No conflicts to review — your notes are in sync.",
+    "empty": "No conflicts to review. Your notes are in sync.",
     "groupTitle_one": "{{count}} conflicting copy",
     "groupTitle_other": "{{count}} conflicting copies",
     "groupTitleOfNote": " of note {{hex}}"
@@ -4153,14 +4172,14 @@
   },
   "restoreBackup": {
     "title": "Not available on mobile yet",
-    "body": "Restoring from a backup file is not available on mobile yet — create a vault or recover with your phrase."
+    "body": "Restoring from a backup file is not available on mobile yet. Create a vault or recover with your phrase."
   },
   "recording": {
     "deniedTitle": "Microphone access is off",
     "errorTitle": "Couldn't start recording",
     "deniedBody": "To record a voice note, allow microphone access for Myne in Settings › Myne › Microphone.",
     "noDeviceBody": "No microphone was found on this device.",
-    "emptyBody": "That recording was empty — nothing was captured.",
+    "emptyBody": "That recording was empty. Nothing was captured.",
     "genericBody": "Something went wrong while recording. Please try again.",
     "stopAria": "Stop recording"
   },
@@ -4190,15 +4209,15 @@
   "join": {
     "transportError": "Couldn't reach that sync server. Check the address and your connection, then try again.",
     "passwordPlaceholder": "Your vault password",
-    "waitingHint": "Keep this screen open — once approved, a verification code appears here to compare with your other device.",
+    "waitingHint": "Keep this screen open. Once approved, a verification code appears here to compare with your other device.",
     "verifyBody": "Check that this code is the same one shown on the device you approved from.",
     "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
     "removing": "Removing…",
-    "sasMismatch": "They don't match — remove this device",
+    "sasMismatch": "They don't match, remove this device",
     "title": "Connect to your account",
     "lead": "Enter your account details to bring your notes to this device. Everything stays encrypted end to end.",
     "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Double-check this number — it doesn't look right.",
+    "accountHint": "Double-check this number. It doesn't look right.",
     "approvalHint": "Your notes appear once you approve this device from a device that already has your account.",
     "connectingSubtitle": "Fetching your account and unlocking your vault on this device.",
     "qr": {
@@ -4207,15 +4226,15 @@
       "confirmServer": "Server",
       "confirmTitle": "Add this device?",
       "continue": "Continue",
-      "expired": "This QR has expired — show a fresh one on your other device and scan again.",
+      "expired": "This QR has expired. Show a fresh one on your other device and scan again.",
       "invalid": "That's not a Myne device QR.",
-      "newerVersion": "This QR is from a newer version of Myne — update the app and try again.",
+      "newerVersion": "This QR is from a newer version of Myne. Update the app and try again.",
       "pinHosted": "Myne-hosted server",
       "pinNone": "Self-hosted server",
       "pinSelfHost": "Cert pinned from your trusted device",
       "scan": "Scan QR",
       "scanFailed": "Couldn’t scan. Try again, or enter your details manually.",
-      "scanUnavailable": "Scanning isn’t available on this device — enter your details below."
+      "scanUnavailable": "Scanning isn’t available on this device. Enter your details below."
     }
   },
   "createVault": {
@@ -4260,25 +4279,25 @@
   },
   "web": {
     "openElsewhere": {
-      "body": "Only one tab can hold a vault open at a time — two would write to the same storage and corrupt it. Close the other tab to continue here.",
+      "body": "Only one tab can hold a vault open at a time. Two would write to the same storage and corrupt it. Close the other tab to continue here.",
       "freed": "The other tab has closed. Reload to open your vault here.",
       "reload": "Reload",
       "title": "This vault is open in another tab"
     },
     "reload": {
-      "body": "Reloading this page asks for your password again — there is no quicker way in, by design. Your vault stays encrypted on this device while the page is closed, and the key is rebuilt from your password each time.",
+      "body": "Reloading this page asks for your password again. There is no quicker way in, by design. Your vault stays encrypted on this device while the page is closed, and the key is rebuilt from your password each time.",
       "title": "A reload means your password again"
     },
     "wall": {
       "getNative": "Get Myne for desktop or mobile",
       "noAccount": {
         "body": "Accounts are created in the Myne desktop or mobile app, not here.",
-        "reason": "Creating an account generates your 24-word recovery phrase and shows it to you once. A web page should never be the thing that shows you that phrase — if it leaked there, nothing in Myne could take it back.",
+        "reason": "Creating an account generates your 24-word recovery phrase and shows it to you once. A web page should never be the thing that shows you that phrase. If it leaked there, nothing in Myne could take it back.",
         "title": "You need an account first"
       },
       "noSync": {
         "body": "This browser has no sync server configured, so there is nothing for it to open.",
-        "reason": "Unlike the desktop app, the browser keeps no vault of its own to fall back on — sync is where its notes come from. Set it up in the desktop or mobile app, then come back here.",
+        "reason": "Unlike the desktop app, the browser keeps no vault of its own to fall back on. Sync is where its notes come from. Set it up in the desktop or mobile app, then come back here.",
         "title": "Sync is not set up yet"
       }
     },
@@ -4291,9 +4310,9 @@
     "unsupported": {
       "title": "Myne can’t run in this browser",
       "mobileTitle": "Open Myne's app on this device",
-      "handoff": "Myne's desktop app (macOS, Windows, Linux) and mobile app (iOS, Android) have no such limit — and they verify their own signature before running, which a web page cannot.",
+      "handoff": "Myne's desktop app (macOS, Linux) and mobile app (Android) have no such limit, and an app you install stays installed: if you kept the file you downloaded, it is still on your disk to compare against the hash Myne publishes for the current release. Nothing does that comparison for you. No Windows build and no installable iOS build are published yet. A web page is re-sent to your browser every visit, and your browser checks nothing on it.",
       "reason": {
-        "desktop-form-factor": "Myne in the browser is built for a desktop computer — it needs the memory and the input a phone or tablet browser cannot give it. On this device the Myne app is the better client anyway: it is faster, it works offline, and it keeps your notes when the browser clears its storage.",
+        "desktop-form-factor": "Myne in the browser is built for a desktop computer. It needs the memory and the input a phone or tablet browser cannot give it. On this device the Myne app is the better client anyway: it is faster, it works offline, and it keeps your notes when the browser clears its storage.",
         "webassembly": "This browser does not support WebAssembly, which the encryption core runs on.",
         "wasm-memory-headroom": "This browser cannot reserve the ~336 MB of memory the vault's key derivation needs. Phone and tablet browsers generally cannot; that limit is set by the vault itself and cannot be lowered for one device without making the vault unreadable everywhere else.",
         "worker": "This browser does not support Web Workers, which the vault's storage and encryption run inside.",

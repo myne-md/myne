@@ -407,6 +407,14 @@ aiDescribe("ag5 a model-requested scope expansion is approved by the user", () =
         // Approving resumes the SAME run rather than starting a second one.
         const before = await (await s.byTestId("agentScope.total")).textContent();
         await (await s.byTestId("agentScope.approve")).click();
+        // **And the dialog goes.** Asserting only that the run resumes is what
+        // let myne-md/myne#559 stay green over a surface that visibly did not
+        // work: `resumeRun()` left `end` on `awaitingScope`, so the dialog
+        // stayed mounted, the user pressed Allow again, and the second press
+        // raced the first. The run resuming was true the whole time.
+        await s.waitForGone(testIdSelector("agentScope.dialog"), {
+          timeoutMs: 10_000,
+        });
         await s.waitForElement(testIdSelector("agentReview.screen"), {
           timeoutMs: 30_000,
         });

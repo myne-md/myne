@@ -29,6 +29,7 @@ pub mod progress;
 
 use crate::host::HostCtx;
 use crate::vault_io::{VaultIo, WriteOpts};
+use protocol::aead::{ROLE_STR_CUSTOM_THEMES_BLOB, ROLE_STR_PERSONAL_DICT_BLOB};
 use protocol::{
     decode_attachments_catalog, decode_note, decode_prefs_blob, derive_subkey, derive_subkey_v0_2,
     encode_attachments_catalog_versioned, encode_prefs_blob_versioned, encode_vault_meta_v0_2_raw,
@@ -47,7 +48,9 @@ struct KekSingleton {
     new_magic: &'static [u8; 4],
     /// The family's `blob_envelope` format-version byte (carried through).
     format_version: u8,
-    /// The family's AAD role string (e.g. `custom-themes-blob`).
+    /// The family's AAD role string, imported from `protocol` rather than
+    /// spelled here. The registry is `docs/spec/protocol.md` §5.2 and a drift
+    /// between the two spellings is invisible to every compiler.
     aad_role: &'static [u8],
     /// The `root_key`-derived KEK role (`derive_subkey` v0.1 / `_v0_2` v0.2).
     kek_role: SubkeyRole,
@@ -64,7 +67,7 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         old_magic: &THEMES_BLOB_MAGIC,
         new_magic: &THEMES_BLOB_V0_2_MAGIC,
         format_version: 0x01,
-        aad_role: b"custom-themes-blob",
+        aad_role: ROLE_STR_CUSTOM_THEMES_BLOB,
         kek_role: SubkeyRole::CustomThemesKey,
         cap: 4 * 1024 * 1024,
     },
@@ -73,7 +76,7 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         old_magic: &DICTIONARY_BLOB_MAGIC,
         new_magic: &DICTIONARY_BLOB_V0_2_MAGIC,
         format_version: 0x01,
-        aad_role: b"personal-dictionary-blob",
+        aad_role: ROLE_STR_PERSONAL_DICT_BLOB,
         kek_role: SubkeyRole::PersonalDictKey,
         cap: 4 * 1024 * 1024,
     },

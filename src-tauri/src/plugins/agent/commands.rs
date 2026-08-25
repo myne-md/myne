@@ -27,7 +27,7 @@ use myne_core::host::tauri_host::TauriHost;
 use myne_core::plugins::agent::apply::{ApplyOutcome, Approval, RefusedEdit};
 use myne_core::plugins::agent::engine::{Content, Message};
 use myne_core::plugins::agent::error::{AgentError, EditRejection};
-use myne_core::plugins::agent::probe::{run_probe, ProbeThreshold, ProbeVerdict};
+use myne_core::plugins::agent::probe::{run_probe, ProbeProgress, ProbeThreshold, ProbeVerdict};
 use myne_core::plugins::agent::prompt::{Proposal, ProposedNote};
 use myne_core::plugins::agent::run::{AgentRunState, AgentRunView, AppliedRun, GrantOrigin};
 use myne_core::plugins::agent::run_loop::{drive, LoopDeps, LoopEnd, LoopOutcome};
@@ -783,7 +783,16 @@ pub async fn agent_start<R: Runtime>(
         let _ = on_open.send(view);
     }
 
-    step(
+    // **Wall-clock, measured HERE rather than inside the loop**
+    // (myne-md/myne#568). `core/` compiles for `wasm32-unknown-unknown`, where
+    // `Instant::now()` compiles and then panics (`core/src/host.rs`), so timing
+    // the loop itself would mean threading a clock through `LoopDeps`. This
+    // crate is desktop-only and this is the whole user-visible call, which is
+    // the figure that was missing: a session sat at "Working" for minutes with
+    // no way to tell whether the time was the provider's or ours. It was the
+    // provider's, and now that is readable rather than inferred.
+    let started = std::time::Instant::now();
+    let outcome = step(
         app,
         run_id,
         Arc::clone(&runs),
@@ -795,7 +804,17 @@ pub async fn agent_start<R: Runtime>(
         cancel,
         resolved.excluded_count,
     )
-    .await
+    .await;
+    tracing::debug!(
+        target: "myne::agent",
+        event = "agent_start_returned",
+        elapsed_ms = started.elapsed().as_millis() as u64,
+        // A boolean, not the error: `step_failed` one frame in already logs the
+        // `kind`, and repeating it here would be a second place to keep the DENY
+        // list true.
+        ok = outcome.is_ok(),
+    );
+    outcome
 }
 
 /// Approve a scope expansion and resume the run.
@@ -1086,6 +1105,13 @@ pub struct AgentUndoResult {
 #[tauri::command]
 pub async fn agent_capability<R: Runtime>(
     app: AppHandle<R>,
+    // **The wait, reported while it is a wait** (myne-md/myne#575). This command
+    // returns once, when everything is done, which was measured at 40 seconds;
+    // until then the surface showed one unchanging label and read as a hang. A
+    // `Channel` rather than an event, for the reason `agent_start`'s `on_open`
+    // gives: it is an ordinary parameter, so there is no new command and no ACL
+    // change.
+    on_attempt: Channel<ProbeProgress>,
     ai: State<'_, LocalInferenceState>,
     vault: State<'_, VaultRuntimeState>,
 ) -> Result<ProbeVerdict, AgentError> {
@@ -1095,7 +1121,38 @@ pub async fn agent_capability<R: Runtime>(
         state: ai.inner(),
         cancel: Arc::new(AtomicBool::new(false)),
     };
-    run_probe(&engine, probe_threshold()).await
+    // **What the probe COSTS, which nothing said** (myne-md/myne#568). It issues
+    // `threshold.attempts` requests to the configured provider; on a remote one
+    // that was measured at 8 seconds, spent before the user's first message is
+    // sent, and the surface shows only "Checking the model".
+    //
+    // There is deliberately no `cached` field to go with it. The verdict is now
+    // remembered for the session in `agentStore`, and when it is remembered this
+    // command is not called at all — so the ABSENCE of this line is the cache. A
+    // flag that could only ever read `false` would be a claim the code cannot
+    // make.
+    let started = std::time::Instant::now();
+    // A failed send is ignored, exactly as `agent_start`'s is: a closed channel
+    // means the surface let go, and the probe is unaffected either way.
+    let sink = move |p: ProbeProgress| {
+        let _ = on_attempt.send(p);
+    };
+    let verdict = run_probe(&engine, probe_threshold(), &sink).await;
+    tracing::debug!(
+        target: "myne::agent",
+        event = "probe_returned",
+        elapsed_ms = started.elapsed().as_millis() as u64,
+        // Counts and a boolean. `ProbeVerdict::attempts` carries a `detail`
+        // string per failed attempt, which is model output, so it is not logged
+        // here.
+        passed = verdict.as_ref().map(|v| v.passed).unwrap_or(false),
+        passes = verdict.as_ref().map(|v| v.passes).unwrap_or(0),
+        // What was actually ASKED. Since the early exit this is the number the
+        // elapsed time above is explained by, and it differs from the threshold
+        // whenever the verdict settled early.
+        asked = verdict.as_ref().map(|v| v.attempts.len()).unwrap_or(0),
+    );
+    verdict
 }
 
 #[cfg(test)]
@@ -1127,8 +1184,15 @@ mod tests {
         let send = body
             .find("on_open.send(view)")
             .expect("agent_start still sends the view through the open channel");
+        // `= step(`, not `    step(`: the call is bound to a local now, so that
+        // its wall-clock can be logged after it returns (myne-md/myne#568), and
+        // the indent-anchored needle stopped matching. Keyed on the binding
+        // rather than on the bare name because `AgentStepResult` and the doc
+        // comments above contain "step" too, and a needle that matches prose
+        // would let the call itself move above the send while this test still
+        // passed.
         let drive = body
-            .find("    step(")
+            .find("= step(")
             .expect("agent_start still drives a step");
         assert!(
             send < drive,

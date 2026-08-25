@@ -184,7 +184,7 @@ describe("AiChatTab", () => {
     it("renders transcript turns from the chat store", () => {
       const token = sendChatMessage("what did I note about rust?");
       appendChatToken(token, "You wrote about ownership.");
-      finalizeChatTurn(token, []);
+      finalizeChatTurn(token);
       render(<AiChatTab />);
       const turns = screen.getAllByTestId("ai.turn");
       expect(turns).toHaveLength(2);
@@ -200,62 +200,10 @@ describe("AiChatTab", () => {
       expect(screen.getByTestId("ai.turn-streaming")).toBeTruthy();
     });
 
-    it("renders the composer when onSend is wired and AI is on; hidden when AI off", () => {
-      render(<AiChatTab onSend={vi.fn()} />);
-      expect(screen.getByTestId("ai.composer-input")).toBeTruthy();
-      expect(screen.getByTestId("ai.composer-send")).toBeTruthy();
-      cleanup();
 
-      render(<AiChatTab />);
-      expect(screen.queryByTestId("ai.composer-input")).toBeNull();
-      cleanup();
 
-      aiEnabled = false;
-      render(<AiChatTab onSend={vi.fn()} />);
-      expect(screen.queryByTestId("ai.composer-input")).toBeNull();
-    });
 
-    it("fires onSend with the trimmed message and clears the composer", () => {
-      const onSend = vi.fn();
-      render(<AiChatTab onSend={onSend} />);
-      const input = screen.getByTestId("ai.composer-input") as HTMLInputElement;
-      fireEvent.change(input, { target: { value: "  hello there  " } });
-      fireEvent.click(screen.getByTestId("ai.composer-send"));
-      expect(onSend).toHaveBeenCalledWith("hello there");
-      expect(input.value).toBe("");
-    });
 
-    it("shows the Stop control (not Send) while streaming and fires onStop", () => {
-      const onStop = vi.fn();
-      const token = sendChatMessage("q");
-      appendChatToken(token, "streaming…");
-      render(<AiChatTab onSend={vi.fn()} onStop={onStop} />);
-      expect(screen.queryByTestId("ai.composer-send")).toBeNull();
-      fireEvent.click(screen.getByTestId("ai.composer-stop"));
-      expect(onStop).toHaveBeenCalledTimes(1);
-    });
-
-    it("renders citation chips and fires onOpenNote on click", () => {
-      const token = sendChatMessage("q");
-      appendChatToken(token, "answer");
-      finalizeChatTurn(token, [
-        { noteId: "01970e83aaaa", byteStart: 4, byteEnd: 20, score: 0.9 },
-      ]);
-      const onOpenNote = vi.fn();
-      render(<AiChatTab onOpenNote={onOpenNote} />);
-      fireEvent.click(screen.getByTestId("ai.citation"));
-      expect(onOpenNote).toHaveBeenCalledWith("01970e83aaaa", 4, 20);
-    });
-
-    it("labels a citation with the note title when titleOf resolves it", () => {
-      const token = sendChatMessage("q");
-      appendChatToken(token, "a");
-      finalizeChatTurn(token, [{ noteId: "01970e83aaaa", byteStart: 0, byteEnd: 3, score: 1 }]);
-      render(
-        <AiChatTab titleOf={(id) => (id === "01970e83aaaa" ? "My Rust Notes" : null)} />,
-      );
-      expect(screen.getByTestId("ai.citation").textContent).toBe("My Rust Notes");
-    });
 
     it("hides the empty hint once the transcript has turns", () => {
       sendChatMessage("q");
@@ -310,7 +258,7 @@ describe("AiChatTab", () => {
     it("shows an Insert action on an insertable summary turn and fires onInsert", () => {
       const token = sendChatMessage("Summarize this note", { insertable: true });
       appendChatToken(token, "This is the summary.");
-      finalizeChatTurn(token, []);
+      finalizeChatTurn(token);
       const onInsert = vi.fn();
       render(<AiChatTab onInsert={onInsert} />);
       fireEvent.click(screen.getByTestId("ai.insert-turn"));
@@ -320,14 +268,14 @@ describe("AiChatTab", () => {
     it("shows no Insert action on an ordinary (non-insertable) chat turn", () => {
       const token = sendChatMessage("hi");
       appendChatToken(token, "hello");
-      finalizeChatTurn(token, []);
+      finalizeChatTurn(token);
       render(<AiChatTab onInsert={vi.fn()} />);
       expect(screen.queryByTestId("ai.insert-turn")).toBeNull();
     });
 
     it("renders no tag chips — the chat tab is not a tag surface (MYND-651)", () => {
       const token = sendChatMessage("Suggest tags for this note");
-      finalizeChatTurn(token, []);
+      finalizeChatTurn(token);
       render(<AiChatTab />);
       expect(screen.queryByTestId("ai.tag-chip")).toBeNull();
       expect(screen.queryByTestId("ai.turn-tags")).toBeNull();
@@ -341,7 +289,7 @@ describe("AiChatTab", () => {
       // why the component tests one field rather than a boolean plus a sibling
       // string, and why the boundary owns the classification.
       const token = sendChatMessage("Hello");
-      finalizeChatTurn(token, []); // no tokens appended → empty answer
+      finalizeChatTurn(token); // no tokens appended → empty answer
       render(<AiChatTab />);
       expect(screen.getByTestId("ai.no-answer")).toBeTruthy();
       // The user turn is not treated as a no-answer placeholder.
@@ -480,7 +428,7 @@ describe("AiChatTab attribution", () => {
     // Streaming: nobody has answered yet, so nothing may claim to have.
     expect(screen.queryByTestId("ai.turn-answered-by")).toBeNull();
 
-    finalizeChatTurn(token, [], { kind: "remote", provider: "OpenRouter" });
+    finalizeChatTurn(token, { kind: "remote", provider: "OpenRouter" });
     rerender(<AiChatTab />);
     const line = screen.getByTestId("ai.turn-answered-by");
     expect(line.getAttribute("data-answered-by")).toBe("remote");
@@ -489,10 +437,10 @@ describe("AiChatTab attribution", () => {
   it("does not retroactively re-label an earlier turn when a later one comes from elsewhere", () => {
     const first = sendChatMessage("one");
     appendChatToken(first, "local answer");
-    finalizeChatTurn(first, [], { kind: "in-process" });
+    finalizeChatTurn(first, { kind: "in-process" });
     const second = sendChatMessage("two");
     appendChatToken(second, "remote answer");
-    finalizeChatTurn(second, [], { kind: "remote", provider: "OpenRouter" });
+    finalizeChatTurn(second, { kind: "remote", provider: "OpenRouter" });
 
     render(<AiChatTab />);
     const kinds = screen
@@ -507,7 +455,7 @@ describe("AiChatTab attribution", () => {
   it("renders no empty line for a turn finalized without provenance", () => {
     const token = sendChatMessage("no provenance");
     appendChatToken(token, "text");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     render(<AiChatTab />);
     expect(screen.queryByTestId("ai.turn-answered-by")).toBeNull();
   });
@@ -516,6 +464,7 @@ describe("AiChatTab attribution", () => {
 describe("AiChatTab: the agent run is a turn in the same transcript", () => {
   const SUMMARY = {
     runId: "r1",
+    summary: "",
     edits: 4,
     newNotes: 1,
     notesRead: 6,
@@ -527,7 +476,7 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
   it("renders one transcript holding both kinds of turn", () => {
     const token = sendChatMessage("what did I write about tea");
     appendChatToken(token, "you wrote…");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn(SUMMARY);
 
@@ -598,6 +547,139 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     );
   });
 
+  // myne-md/myne#568. In one mode a question is a run like any other and
+  // `finish` is how it is answered, so the summary IS the reply. It used to
+  // render only inside the review dialog, which is how a question about a note
+  // got answered inside a "Review changes" screen.
+  describe("the model's answer", () => {
+    it("renders in the transcript", () => {
+      sendAgentTurn("how many personal tasks are in this note", "This note");
+      settleAgentTurn({
+        ...SUMMARY,
+        edits: 0,
+        newNotes: 0,
+        summary: "You have 16 personal tasks in this note.",
+      });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-answer").textContent).toBe(
+        "You have 16 personal tasks in this note.",
+      );
+    });
+
+    it("suppresses the no-changes line when it answered", () => {
+      // "The agent proposed no changes" is the right sentence for an edit
+      // request that produced nothing, and exactly the wrong one under an
+      // answer the user asked for: it reads as a failure report on a reply that
+      // succeeded, which is what the user saw.
+      sendAgentTurn("how many personal tasks are in this note", "This note");
+      settleAgentTurn({
+        ...SUMMARY,
+        edits: 0,
+        newNotes: 0,
+        summary: "You have 16 personal tasks in this note.",
+      });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-summary").textContent).not.toContain(
+        "agent.review.noChanges",
+      );
+    });
+
+    it("keeps the counts when the run BOTH answered and proposed", () => {
+      // The two are not alternatives. A run can explain what it did and propose
+      // the edits in the same breath, and dropping either half would be a
+      // narrower surface than before the fix.
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, summary: "I tightened four headings." });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-answer").textContent).toBe(
+        "I tightened four headings.",
+      );
+      expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+        "agentTurn.proposed:4",
+      );
+    });
+
+    it("renders nothing at all when the run finished without one", () => {
+      // Absence is a state rather than an empty paragraph: a run that proposed
+      // edits and said nothing about them should not grow a blank line.
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn(SUMMARY);
+      render(<AiChatTab />);
+      expect(screen.queryByTestId("ai.agent-answer")).toBeNull();
+    });
+
+    // myne-md/myne#574. A run that stalls proposed nothing AND answered
+    // nothing, so the no-changes line comes back and reports the less useful of
+    // the two facts: it reads as a considered verdict on the note, when what
+    // happened is that the run never did its work.
+    it("says a stalled run gave no answer, rather than reporting no changes", () => {
+      sendAgentTurn("how many personal tasks are in this note", "This note");
+      settleAgentTurn({ ...SUMMARY, edits: 0, newNotes: 0, end: "stalled" });
+      render(<AiChatTab />);
+      const shown = screen.getByTestId("ai.agent-summary").textContent ?? "";
+      expect(shown).toContain("agentTurn.noAnswer");
+      expect(shown).not.toContain("agent.review.noChanges");
+    });
+
+    it("says the same for a run that ran out of steps", () => {
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({
+        ...SUMMARY,
+        edits: 0,
+        newNotes: 0,
+        end: "exhaustedIterations",
+      });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+        "agentTurn.noAnswer",
+      );
+    });
+
+    it("keeps the no-changes line for a run that finished having decided so", () => {
+      // The other direction, and the one that must not move: a `finished` run
+      // with an empty proposal really did look and conclude there was nothing
+      // to change. So did a `cancelled` one, by the user's own act.
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, edits: 0, newNotes: 0, end: "finished" });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+        "agent.review.noChanges",
+      );
+    });
+
+    it("shows the answer, not the no-answer line, when a stalled run still said something", () => {
+      // A run can stall AFTER answering: the model replies and then goes round
+      // in circles instead of finishing. The answer is still the answer.
+      sendAgentTurn("how many personal tasks are in this note", "This note");
+      settleAgentTurn({
+        ...SUMMARY,
+        edits: 0,
+        newNotes: 0,
+        end: "stalled",
+        summary: "You have 16 personal tasks in this note.",
+      });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-answer").textContent).toBe(
+        "You have 16 personal tasks in this note.",
+      );
+      const shown = screen.getByTestId("ai.agent-summary").textContent ?? "";
+      expect(shown).not.toContain("agentTurn.noAnswer");
+    });
+
+    it("treats a whitespace-only summary as none", () => {
+      // The model can close with a bare newline. Rendering that is an empty
+      // bubble line, and worse, it would suppress the no-changes sentence on a
+      // run that really did nothing.
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, edits: 0, newNotes: 0, summary: "  \n " });
+      render(<AiChatTab />);
+      expect(screen.queryByTestId("ai.agent-answer")).toBeNull();
+      expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+        "agent.review.noChanges",
+      );
+    });
+  });
+
   it("names a run that was cancelled or ran out of steps", () => {
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({ ...SUMMARY, end: "cancelled" });
@@ -645,7 +727,7 @@ describe("AiChatTab: the live run's controls", () => {
     // `docs/decisions/ai/0515` makes this dialog the entire bound on
     // model-originated scope growth, so its reachability is the feature.
     parkOnScopeQuestion();
-    render(<AiChatTab onSend={() => {}} />);
+    render(<AiChatTab />);
     await screen.findByTestId("agentScope.dialog");
     expect(screen.getByTestId("agentScope.approve")).toBeTruthy();
     expect(screen.getByTestId("agentScope.decline")).toBeTruthy();
@@ -661,7 +743,7 @@ describe("AiChatTab: the live run's controls", () => {
 
   it("New chat stops the run host-side before forgetting it", async () => {
     parkOnScopeQuestion();
-    render(<AiChatTab onSend={() => {}} />);
+    render(<AiChatTab />);
     await screen.findByTestId("agentScope.dialog");
     fireEvent.click(screen.getByTestId("ai.new-chat"));
     // Forgetting a run is not stopping one: the host keeps its run table, keeps
@@ -671,22 +753,13 @@ describe("AiChatTab: the live run's controls", () => {
     expect(screen.queryByTestId("agentProgress.root")).toBeNull();
   });
 
-  it("New chat stops an in-flight ask generation too", () => {
-    const token = sendChatMessage("what is this note about");
-    appendChatToken(token, "partial");
-    render(<AiChatTab onSend={() => {}} />);
-    fireEvent.click(screen.getByTestId("ai.new-chat"));
-    // `clearChat()` resets `streaming`, so the Stop control disappears with the
-    // transcript. Without this the generation runs on with nothing to end it.
-    expect(stopChat).toHaveBeenCalled();
-  });
 });
 
 describe("AiChatTab: the shape of a chat", () => {
   it("puts the composer last, under one scrolling transcript", () => {
     const token = sendChatMessage("hello");
-    finalizeChatTurn(token, []);
-    render(<AiChatTab onSend={() => {}} />);
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
 
     const tab = screen.getByTestId("ai.chat-tab");
     const composer = screen.getByTestId("ai.composer");
@@ -713,8 +786,8 @@ describe("AiChatTab: the shape of a chat", () => {
 
   it("keeps the honesty note and the status out of the scrolling region", () => {
     const token = sendChatMessage("hello");
-    finalizeChatTurn(token, []);
-    render(<AiChatTab onSend={() => {}} />);
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
     const scroller = screen.getByTestId("ai.transcript").parentElement!;
     // Both are standing statements about what this surface is, so neither may
     // scroll away: the note is the fallibility warning the answers are read
@@ -736,17 +809,18 @@ describe("AiChatTab: starting a new conversation", () => {
     expect(screen.queryByTestId("ai.new-chat")).toBeNull();
     cleanup();
     const token = sendChatMessage("hello");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     render(<AiChatTab />);
     expect(screen.getByTestId("ai.new-chat")).toBeTruthy();
   });
 
   it("drops the transcript and the open run, but not the undo offer", () => {
     const token = sendChatMessage("hello");
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({
       runId: "r1",
+      summary: "",
       edits: 1,
       newNotes: 0,
       notesRead: 1,

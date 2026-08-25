@@ -162,11 +162,10 @@ import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
-import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
+import { clearChat } from "../notes/ai/chatStore";
 import { runSummarizeToChat } from "../notes/ai/aiToChat";
 import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
 import { infer as aiInfer } from "../lib/writing-assistant";
-import { sendChat, stopChat } from "../lib/ai-chat";
 import { isNoteAiExcluded } from "../lib/aiExcludedFolders";
 import { getActiveEditorView } from "../editor/active-view";
 import { BacklinksTab } from "../notes/components/BacklinksTab";
@@ -4089,6 +4088,10 @@ function RightSidebar() {
           <NoteTasksPanel />
         ) : active === "ai-chat" ? (
           <AiChatTab
+            // The automatic-apply path writes out of band of any pane's own
+            // autosave loop, exactly as the manual one does, so it owes the
+            // same reload (myne-md/myne#551).
+            onNotesWritten={() => ctx.reloadOpenNote()}
             onInsert={(text) => {
               // "Insert into note" (note-summarization task 5, SYNC-17): append a
               // `## Summary` block to the focused note and let the normal autosave
@@ -4102,15 +4105,6 @@ function RightSidebar() {
                 userEvent: "ai.insert",
               });
             }}
-            onSend={(m) => void sendChat(m, undefined, prefs.ai_provider)}
-            onStop={() => {
-              // Instant UI: close the turn keeping the partial; then signal the
-              // backend to abort the in-flight generation (task 4/9).
-              stopChatTurn();
-              void stopChat();
-            }}
-            onOpenNote={(noteId) => void ctx.open(noteId as NoteId).catch(() => {})}
-            titleOf={(noteId) => notes.find((n) => n.noteUuid === noteId)?.title ?? null}
             openNoteId={selectedId}
             folders={agentFolders}
             // An undo rewrites notes out-of-band of any pane's autosave, the

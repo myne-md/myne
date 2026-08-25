@@ -126,6 +126,44 @@ describe("the endpoint screen's out-of-band fingerprint gate", () => {
     expect(screen.getByTestId("sync.endpoint-connect")).toBeTruthy();
   });
 
+  it("opens the gate when an already-trusted endpoint serves a new certificate", async () => {
+    // myne#581, and the reason this refusal exists at all. Re-entering the URL
+    // is what the device panel tells a user to do when sync breaks, and before
+    // this the command answered by overwriting the stored pin with whatever
+    // the handshake produced — so the recommended remedy was also the way to
+    // hand a pin to whoever happened to answer. Now it refuses and asks.
+    const calls: Array<Record<string, unknown>> = [];
+    invokeMock.mockImplementation(
+      async (cmd: string, args?: Record<string, unknown>) => {
+        if (cmd === "plugin:sync|sync_get_endpoint")
+          throw new Error("unconfigured");
+        if (cmd === "plugin:sync|sync_set_endpoint") {
+          calls.push(args ?? {});
+          if (!args?.confirmedFingerprint) throw { kind: "CertificateChanged" };
+          return { fingerprint: EXPECTED, pin_source: "tofu" };
+        }
+        return undefined;
+      },
+    );
+    render(<EndpointConfig />);
+    connect();
+
+    const field = await screen.findByTestId("sync.expected-fingerprint-input");
+    // Never the captured value: handing it back would let the user paste it
+    // into the field and re-trust whatever they were just served.
+    expect(screen.queryByTestId("sync.cert-fingerprint")).toBeNull();
+
+    fireEvent.change(field, { target: { value: EXPECTED } });
+    fireEvent.click(screen.getByTestId("sync.fingerprint-confirm"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sync.cert-fingerprint")).toBeTruthy(),
+    );
+    expect(calls).toHaveLength(2);
+    expect(calls[0].confirmedFingerprint).toBeNull();
+    expect(calls[1].confirmedFingerprint).toBe(EXPECTED);
+  });
+
   it("declining aborts: nothing is sent, nothing is configured", async () => {
     let setCalls = 0;
     invokeMock.mockImplementation(async (cmd: string) => {

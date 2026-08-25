@@ -42,7 +42,7 @@ export async function runSummarizeToChat(args: {
       infer: args.infer,
     });
     appendChatToken(token, outcome.summary);
-    finalizeChatTurn(token, []);
+    finalizeChatTurn(token);
   } catch {
     // Engine error is a closed kind on the Rust side (DENY-list); the turn shows
     // its bounded error state, never the raw failure.

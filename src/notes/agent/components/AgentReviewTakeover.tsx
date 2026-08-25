@@ -29,8 +29,63 @@
 // in the tree; making it re-render on every rejected-checkbox toggle would be a
 // real cost for a fact only this overlay uses.
 
+import { useRef, type CSSProperties } from "react";
+
+import { ornamentRole } from "@myne/ornaments";
+
+import { useFocusTrap } from "../../../hooks/useFocusTrap";
 import { AgentReview } from "../../../screens/AgentReview";
 import { clearAgent, useAgent } from "../agentStore";
+
+// **A dialog, not a full-window takeover** (myne-md/myne#549). It was the
+// second, and `docs/decisions/ai/0518` point 3 said so; that entry's reasoning
+// is kept and only its SIZE claim is superseded. Approving is still meant to be
+// a deliberate act, so this dialog deliberately does NOT dismiss on a backdrop
+// click and does NOT dismiss on Escape, which is where it parts company with
+// `ModalShell` and with Settings: closing discards a proposal the user has not
+// applied, and a stray Escape that throws the model's work away would be a
+// worse surface than the takeover rather than a smaller one. `ModalShell` also
+// renders its own header, and this screen's header carries the running scope
+// total, which may not move behind a disclosure.
+//
+// The 48px top inset is the same one `SettingsModal` uses and the reason the
+// takeover needed replacing at all: it clears the macOS overlay traffic lights,
+// which the full-window version ran its heading straight into.
+const BACKDROP_STYLE: CSSProperties = {
+  // `fixed`, not `absolute`: this mounts inside the right sidebar, where the
+  // composer that opens it lives, so an absolutely positioned overlay would
+  // cover only that sidebar.
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0, 0, 0, 0.4)",
+  display: "flex",
+  alignItems: "stretch",
+  justifyContent: "center",
+  padding: "48px 24px 24px",
+  animation: "settings-backdrop-in var(--duration-fast) var(--ease-standard)",
+  // The shared modal stacking level, not a bespoke one. The sidebar pane
+  // carries `ornamentRole("surface")`, and with an ornament theme active that
+  // sets `isolation: isolate`, which creates a stacking context a promoted
+  // descendant is trapped in. A bespoke 40 also sat below the editor's own
+  // overlays at 50 and 60.
+  zIndex: 1000,
+};
+
+const CARD_STYLE: CSSProperties = {
+  width: "100%",
+  // Wider than Settings' 1080: this card holds a unified diff of note text,
+  // and wrapping one costs more than a wide card does.
+  maxWidth: 1200,
+  height: "100%",
+  background: "var(--paper)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  boxShadow: "var(--shadow-3)",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  animation: "settings-modal-in var(--duration-base) var(--ease-standard)",
+};
 
 export function AgentReviewTakeover({
   titleOf,
@@ -40,44 +95,51 @@ export function AgentReviewTakeover({
   onNotesWritten: () => void;
 }) {
   const agent = useAgent();
-  // A run is reviewable once it has stopped and has NOT stopped to ask. Every
-  // other end kind (`finished`, `cancelled`, `exhaustedIterations`, `stalled`)
-  // leaves a proposal the user is entitled to see, including a partial one.
+  // A run is reviewable once it has stopped, has NOT stopped to ask, and has
+  // something to show. Every end kind other than `awaitingScope` (`finished`,
+  // `cancelled`, `exhaustedIterations`, `stalled`) leaves a proposal the user is
+  // entitled to see, including a partial one — that rule from
+  // `docs/decisions/ai/0518` is kept exactly.
   const reviewable =
     agent.view !== null &&
     !agent.running &&
     agent.end !== null &&
-    agent.end.kind !== "awaitingScope";
+    agent.end.kind !== "awaitingScope" &&
+    // **And the run proposed something** (myne-md/myne#568). In the two-mode
+    // world every run that reached this screen had set out to produce a
+    // proposal, so "it stopped" and "there is something to review" were the same
+    // fact. One mode broke that: a question is a run too, so every question
+    // opened a review dialog whose whole content was "the agent proposed no
+    // changes", over the transcript where the answer belonged. This is the only
+    // case that changes — one edit is still enough to open the screen, whatever
+    // the end kind.
+    (agent.proposal.edits.length > 0 || agent.proposal.newNotes.length > 0) &&
+    // **And the run is not applying itself** (myne-md/myne#551). Without this
+    // clause an automatic run opens the screen it exists to skip for the frames
+    // between the step settling and the apply returning. The flag is raised
+    // before the settle for exactly that reason.
+    !agent.autoApplying;
+  // Declared before the early return, because hooks must be. Enabled on the
+  // same condition the render is, so a trap is never armed for a dialog that
+  // is not on screen.
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef, { enabled: reviewable });
   if (!reviewable) return null;
 
   return (
-    <div
-      data-testid="editor.agent-review"
-      style={{
-        // `fixed`, not `absolute`: this mounts inside the right sidebar, where
-        // the composer that opens it lives, so an absolutely positioned overlay
-        // would cover only that sidebar.
-        position: "fixed",
-        inset: 0,
-        // The shared modal stacking level, not a bespoke one. The sidebar pane
-        // carries `ornamentRole("surface")`, and with an ornament theme active
-        // that sets `isolation: isolate`, which creates a stacking context a
-        // promoted descendant is trapped in. A bespoke 40 also sat below the
-        // editor's own overlays at 50 and 60.
-        zIndex: 1000,
-        background: "var(--paper)",
-      }}
-    >
-      <AgentReview
-        titleOf={titleOf}
-        onNotesWritten={onNotesWritten}
-        // Closing drops the frontend's copy of the run, mirroring the host,
-        // which drops its half on lock: the two going out of step is how a
-        // screen ends up rendering a proposal whose run no longer exists. It is
-        // also what makes `reviewable` false, so there is no second flag to keep
-        // in step with this one.
-        onClose={clearAgent}
-      />
+    <div data-testid="editor.agent-review" style={BACKDROP_STYLE}>
+      <div ref={cardRef} {...ornamentRole("surface")} style={CARD_STYLE}>
+        <AgentReview
+          titleOf={titleOf}
+          onNotesWritten={onNotesWritten}
+          // Closing drops the frontend's copy of the run, mirroring the host,
+          // which drops its half on lock: the two going out of step is how a
+          // screen ends up rendering a proposal whose run no longer exists. It
+          // is also what makes `reviewable` false, so there is no second flag
+          // to keep in step with this one.
+          onClose={clearAgent}
+        />
+      </div>
     </div>
   );
 }
