@@ -1807,7 +1807,7 @@
       "moveCollision": "Sudah ada folder dengan nama itu di sana.",
       "unsettledSave": "Sebuah catatan yang terbuka belum selesai disimpan, jadi folder itu tidak diubah. Coba lagi setelah selesai.",
       "renameFailed": "Tidak dapat mengganti nama folder, jadi folder itu tidak berubah.",
-      "deliberateWriteFailed": "Nama folder sudah diganti, tetapi salah satu pengaturannya tidak dapat disimpan. Mengganti namanya lagi akan mencoba ulang."
+      "deliberateWriteFailed": "Nama folder sudah diganti, tetapi salah satu pengaturannya tidak dapat disimpan. Sebuah folder kosong akan muncul lagi dengan nama lama setiap kali Anda membuka kunci; folder itu aman untuk dihapus dan menghapusnya tidak mengubah apa pun yang lain. Mengganti nama folder lagi tidak akan menghilangkannya."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Disalin. Frasa tetap berada di perangkat ini, dan sistem menghapusnya setelah 30 detik.",
     "phraseCopyFailed": "Tidak dapat menyalin. Gunakan “Simpan ke berkas” sebagai gantinya.",
     "savedToFile": "Disimpan ke {{label}}",
-    "savedToShareSheet": "Disimpan di dalam Myne, di tempat yang tidak dapat dijangkau pengelola berkas sistem. Gunakan lembar berbagi untuk menaruh salinannya di tempat yang dapat Anda jangkau, dan ketuk Simpan lagi jika Anda sudah menutupnya.",
-    "savedFileWritten": "Disimpan di dalam Myne. Perangkat ini tidak melaporkan dari mana berkas itu dapat dijangkau, jadi anggap berkas itu hanya dapat dijangkau dari dalam aplikasi sampai Anda memeriksanya.",
+    "savedToShareSheet": "Disimpan di dalam Myne, di tempat yang tidak dapat dijangkau pengelola berkas sistem. Ini berkas teks biasa, jadi jika Anda menggunakan lembar berbagi untuk menaruh salinannya di tempat yang dapat Anda jangkau, pilih tempat yang hanya Anda yang dapat membacanya, bukan penyimpanan awan. Ketuk Simpan lagi jika Anda sudah menutup lembar itu.",
+    "savedFileWritten": "Disimpan di dalam Myne. Ini berkas teks biasa, jadi simpan setiap salinan yang Anda buat di tempat yang hanya Anda yang dapat membacanya. Perangkat ini tidak melaporkan dari mana berkas itu dapat dijangkau, jadi anggap berkas itu hanya dapat dijangkau dari dalam aplikasi sampai Anda memeriksanya.",
     "saveFileError": "Tidak dapat menyimpan berkas.",
     "stepLabel": "Buat brankas · {{current}} dari {{total}}",
     "briefingTitle": "Sebelum kita mulai",

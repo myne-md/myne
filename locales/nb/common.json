@@ -1807,7 +1807,7 @@
       "moveCollision": "Det finnes allerede en mappe med det navnet der.",
       "unsettledSave": "Et åpent notat er ikke ferdig lagret, så mappen ble ikke rørt. Prøv igjen når det er ferdig.",
       "renameFailed": "Kunne ikke endre navn på mappen, så den er uendret.",
-      "deliberateWriteFailed": "Mappen fikk nytt navn, men en av innstillingene kunne ikke lagres. Endrer du navn på den igjen, prøves det på nytt."
+      "deliberateWriteFailed": "Mappen fikk nytt navn, men en av innstillingene kunne ikke lagres. En tom mappe dukker opp igjen under det gamle navnet hver gang du låser opp; det er trygt å slette den, og ingenting annet endres. Å gi mappen nytt navn igjen fjerner den ikke."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Kopiert. Den blir værende på denne enheten, og systemet forkaster den etter 30 sekunder.",
     "phraseCopyFailed": "Kunne ikke kopiere. Bruk «Lagre til fil» i stedet.",
     "savedToFile": "Lagret til {{label}}",
-    "savedToShareSheet": "Lagret inne i Myne, der systemets filbehandler ikke når den. Bruk delingsmenyen for å legge en kopi et sted du kommer til, og trykk Lagre igjen hvis du lukket den.",
-    "savedFileWritten": "Lagret inne i Myne. Denne enheten oppga ikke hvor filen kan nås fra, så regn den som tilgjengelig bare inne i appen til du har sjekket.",
+    "savedToShareSheet": "Lagret inne i Myne, der systemets filbehandler ikke når den. Det er en fil med ren tekst, så hvis du bruker delingsmenyen til å legge en kopi et sted du kommer til, velg et sted der bare du kan lese den, ikke en skytjeneste. Trykk Lagre igjen hvis du lukket menyen.",
+    "savedFileWritten": "Lagret inne i Myne. Det er en fil med ren tekst, så oppbevar enhver kopi du lager et sted der bare du kan lese den. Denne enheten oppga ikke hvor filen kan nås fra, så regn den som tilgjengelig bare inne i appen til du har sjekket.",
     "saveFileError": "Kunne ikke lagre filen.",
     "stepLabel": "Opprett et hvelv · {{current}} av {{total}}",
     "briefingTitle": "Før vi begynner",

@@ -1807,7 +1807,7 @@
       "moveCollision": "Det finns redan en mapp med det namnet där.",
       "unsettledSave": "En öppen anteckning har inte sparats färdigt, så mappen lämnades orörd. Försök igen när den har sparats.",
       "renameFailed": "Det gick inte att byta namn på mappen, så den är oförändrad.",
-      "deliberateWriteFailed": "Mappen fick ett nytt namn, men en av dess inställningar kunde inte sparas. Om du byter namn på den igen görs ett nytt försök."
+      "deliberateWriteFailed": "Mappen fick ett nytt namn, men en av dess inställningar kunde inte sparas. En tom mapp dyker upp igen under det gamla namnet varje gång du låser upp; det är säkert att ta bort den, och inget annat påverkas. Att byta namn på mappen igen tar inte bort den."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Kopierad. Den stannar på den här enheten, och systemet rensar den efter 30 sekunder.",
     "phraseCopyFailed": "Kunde inte kopiera. Använd ”Spara till fil” i stället.",
     "savedToFile": "Sparat till {{label}}",
-    "savedToShareSheet": "Sparat inuti Myne, där systemets filhanterare inte kommer åt den. Använd delningsmenyn för att lägga en kopia någonstans där du kommer åt den, och tryck på Spara igen om du stängde menyn.",
-    "savedFileWritten": "Sparat inuti Myne. Den här enheten rapporterade inte var filen går att nå, så behandla den som åtkomlig endast inifrån appen tills du har kontrollerat.",
+    "savedToShareSheet": "Sparat inuti Myne, där systemets filhanterare inte kommer åt den. Det är en oformaterad textfil, så om du använder delningsmenyn för att lägga en kopia någonstans där du kommer åt den, välj någonstans där bara du kan läsa den, inte en molntjänst. Tryck på Spara igen om du stängde menyn.",
+    "savedFileWritten": "Sparat inuti Myne. Det är en oformaterad textfil, så förvara varje kopia du gör någonstans där bara du kan läsa den. Den här enheten rapporterade inte var filen går att nå, så behandla den som åtkomlig endast inifrån appen tills du har kontrollerat.",
     "saveFileError": "Det gick inte att spara filen.",
     "stepLabel": "Skapa ett valv · {{current}} av {{total}}",
     "briefingTitle": "Innan vi börjar",

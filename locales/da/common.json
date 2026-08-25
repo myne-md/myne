@@ -1807,7 +1807,7 @@
       "moveCollision": "Der findes allerede en mappe med det navn dér.",
       "unsettledSave": "En åben note er ikke færdig med at blive gemt, så mappen blev ikke rørt. Prøv igen, når den er færdig.",
       "renameFailed": "Kunne ikke omdøbe mappen, så den er uændret.",
-      "deliberateWriteFailed": "Mappen blev omdøbt, men en af dens indstillinger kunne ikke gemmes. Omdøber du den igen, forsøges det på ny."
+      "deliberateWriteFailed": "Mappen blev omdøbt, men en af dens indstillinger kunne ikke gemmes. Der dukker en tom mappe op med det gamle navn, hver gang du låser op; den kan trygt slettes, og intet andet ændres. Omdøber du mappen igen, forsvinder den ikke."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -4289,8 +4289,8 @@
     "phraseCopied": "Kopieret. Den bliver på denne enhed, og systemet fjerner den efter 30 sekunder.",
     "phraseCopyFailed": "Kunne ikke kopiere. Brug “Gem til fil” i stedet.",
     "savedToFile": "Gemt til {{label}}",
-    "savedToShareSheet": "Gemt inde i Myne, hvor systemets filbrowser ikke kan nå den. Brug delearket til at lægge en kopi et sted, du kan nå, og tryk på Gem igen, hvis du lukkede det.",
-    "savedFileWritten": "Gemt inde i Myne. Denne enhed oplyste ikke, hvorfra filen kan nås, så behandl den som kun tilgængelig inde fra appen, indtil du har tjekket efter.",
+    "savedToShareSheet": "Gemt inde i Myne, hvor systemets filbrowser ikke kan nå den. Det er en almindelig tekstfil, så hvis du bruger delearket til at lægge en kopi et sted, du kan nå, så vælg et sted, kun du kan læse, og ikke et skydrev. Tryk på Gem igen, hvis du lukkede arket.",
+    "savedFileWritten": "Gemt inde i Myne. Det er en almindelig tekstfil, så opbevar enhver kopi, du laver, et sted, kun du kan læse. Denne enhed oplyste ikke, hvorfra filen kan nås, så behandl den som kun tilgængelig inde fra appen, indtil du har tjekket efter.",
     "saveFileError": "Kunne ikke gemme filen.",
     "stepLabel": "Opret en boks · {{current}} af {{total}}",
     "briefingTitle": "Før vi begynder",

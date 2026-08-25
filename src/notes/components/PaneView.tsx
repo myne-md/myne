@@ -1640,11 +1640,15 @@ function ViewHost({ viewId }: { viewId: string }) {
       void (async () => {
         try {
           await setNoteCover(noteId, coverPropertyKey, choice);
-          // First cover on a view with no image property → adopt `cover` as the
-          // view's cover property so the card render picks it up.
-          if (choice !== null && def !== null && def.image === undefined) {
-            await upsertSavedView({ ...def, image: coverPropertyKey });
-          }
+          // Settle FIRST, and the order is the whole point rather than a
+          // preference. It used to sit after `upsertSavedView`, which is a
+          // `vault.prefs` write that can reject, so a failed prefs write took
+          // the settle down with it and landed in the catch below as a cover
+          // failure. That reintroduces exactly what the paragraph beneath says
+          // this call exists to prevent, on the call site it names as the one
+          // most at risk, and it does so while telling the user the cover write
+          // failed when the note write had already succeeded.
+          //
           // Settle (`src/CLAUDE.md`, "A backend write made OUTSIDE a pane's
           // autosave loop leaves that pane holding a stale buffer"). This call
           // site is the one that needs it most and had none: the target is a
@@ -1657,6 +1661,11 @@ function ViewHost({ viewId }: { viewId: string }) {
           // than copied: it used to be a closure in `Editor.tsx` and this site
           // hand-copied its two lines.
           await settleFrontmatterWrite(sidebar, noteId as NoteId);
+          // First cover on a view with no image property → adopt `cover` as the
+          // view's cover property so the card render picks it up.
+          if (choice !== null && def !== null && def.image === undefined) {
+            await upsertSavedView({ ...def, image: coverPropertyKey });
+          }
         } catch (err) {
           // The two NEW rejection classes are constructed in the WebView and
           // never reach backend tracing, so the old bare catch reported them

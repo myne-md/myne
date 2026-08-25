@@ -1877,7 +1877,7 @@
       "moveCollision": "Lì esiste già una cartella con quel nome.",
       "unsettledSave": "Una nota aperta non ha ancora finito di salvarsi, quindi la cartella non è stata toccata. Riprova quando avrà finito.",
       "renameFailed": "Impossibile rinominare la cartella, che resta quindi invariata.",
-      "deliberateWriteFailed": "La cartella è stata rinominata, ma non è stato possibile salvare una delle sue impostazioni. Rinominarla di nuovo fa un nuovo tentativo."
+      "deliberateWriteFailed": "La cartella è stata rinominata, ma non è stato possibile salvare una delle sue impostazioni. A ogni sblocco ricomparirà una cartella vuota con il vecchio nome; puoi eliminarla tranquillamente e non cambia nient'altro. Rinominare di nuovo la cartella non la farà sparire."
     },
     "folderNote": {
       "defaultTitle": "Indice"
@@ -4421,8 +4421,8 @@
     "phraseCopied": "Copiata. Resta su questo dispositivo e il sistema la elimina dopo 30 secondi.",
     "phraseCopyFailed": "Impossibile copiare. Usa invece \"Salva su file\".",
     "savedToFile": "Salvato in {{label}}",
-    "savedToShareSheet": "Salvato dentro Myne, dove il file manager di sistema non può raggiungerlo. Usa il menu di condivisione per mettere una copia in un posto che puoi raggiungere, e tocca di nuovo Salva se lo hai chiuso.",
-    "savedFileWritten": "Salvato dentro Myne. Questo dispositivo non ha comunicato da dove si può raggiungere il file, quindi consideralo raggiungibile solo dall'interno dell'app finché non avrai verificato.",
+    "savedToShareSheet": "Salvato dentro Myne, dove il file manager di sistema non può raggiungerlo. È un file di testo semplice, quindi se usi il menu di condivisione per metterne una copia in un posto che puoi raggiungere, scegli un luogo che solo tu puoi leggere, anziché un servizio cloud. Tocca di nuovo Salva se hai chiuso il menu.",
+    "savedFileWritten": "Salvato dentro Myne. È un file di testo semplice, quindi conserva ogni copia che ne fai in un luogo che solo tu puoi leggere. Questo dispositivo non ha comunicato da dove si può raggiungere il file, perciò consideralo raggiungibile solo dall'interno dell'app finché non avrai verificato.",
     "saveFileError": "Impossibile salvare il file.",
     "stepLabel": "Crea una cassaforte · {{current}} di {{total}}",
     "briefingTitle": "Prima di iniziare",

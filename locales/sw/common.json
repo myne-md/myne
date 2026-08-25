@@ -1796,7 +1796,7 @@
       "moveCollision": "Tayari kuna folda yenye jina hilo pale.",
       "unsettledSave": "Dokezo lililofunguliwa bado halijamaliza kuhifadhiwa, hivyo folda imeachwa kama ilivyo. Jaribu tena litakapomaliza.",
       "renameFailed": "Imeshindwa kubadilisha jina la folda, hivyo haijabadilika.",
-      "deliberateWriteFailed": "Jina la folda limebadilishwa, lakini mojawapo ya mipangilio yake haikuweza kuhifadhiwa. Ukibadilisha jina tena, itajaribiwa upya."
+      "deliberateWriteFailed": "Jina la folda limebadilishwa, lakini mojawapo ya mipangilio yake haikuweza kuhifadhiwa. Folda tupu itaonekana tena kwa jina la zamani kila unapofungua kasha; kuifuta ni salama na hakubadilishi kitu kingine chochote. Kubadilisha jina la folda tena hakutaiondoa."
     },
     "folderNote": {
       "defaultTitle": "Faharasa"
@@ -4260,8 +4260,8 @@
     "phraseCopied": "Imenakiliwa. Inabaki kwenye kifaa hiki, na mfumo huiondoa baada ya sekunde 30.",
     "phraseCopyFailed": "Imeshindwa kunakili. Tumia “Hifadhi kwenye faili” badala yake.",
     "savedToFile": "Imehifadhiwa kwenye {{label}}",
-    "savedToShareSheet": "Limehifadhiwa ndani ya Myne, mahali ambapo kidhibiti cha mafaili cha mfumo hakiwezi kulifikia. Tumia kidirisha cha kushiriki ili kuweka nakala mahali unapoweza kufikia, na ugusa Hifadhi tena kama ulikifunga.",
-    "savedFileWritten": "Limehifadhiwa ndani ya Myne. Kifaa hiki hakikuripoti mahali ambapo faili linaweza kufikiwa, hivyo lichukulie kama linalofikika kutoka ndani ya programu pekee hadi utakapokagua.",
+    "savedToShareSheet": "Limehifadhiwa ndani ya Myne, mahali ambapo kidhibiti cha mafaili cha mfumo hakiwezi kulifikia. Ni faili la maandishi wazi, hivyo ukitumia kidirisha cha kushiriki kuweka nakala mahali unapoweza kufikia, chagua mahali ambapo wewe pekee unaweza kuisoma badala ya hifadhi ya wingu. Gusa Hifadhi tena kama ulikifunga kidirisha.",
+    "savedFileWritten": "Limehifadhiwa ndani ya Myne. Ni faili la maandishi wazi, hivyo hifadhi nakala yoyote unayotengeneza mahali ambapo wewe pekee unaweza kuisoma. Kifaa hiki hakikuripoti mahali ambapo faili linaweza kufikiwa, hivyo lichukulie kama linalofikika kutoka ndani ya programu pekee hadi utakapokagua.",
     "saveFileError": "Imeshindwa kuhifadhi faili.",
     "stepLabel": "Unda kasha · {{current}} kati ya {{total}}",
     "briefingTitle": "Kabla hatujaanza",

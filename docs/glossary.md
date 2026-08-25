@@ -562,7 +562,7 @@ The Phase 1 editor pattern where decorations on the line containing the cursor l
 
 **The task checkbox has a third trigger: a SELECTION that overlaps it** (myne-md/myne#560). It lifts when a selection merely overlaps the hidden `- [ ]` run, not only when a caret is inside it, and its trigger is per-range rather than per-line. Stated for that construct rather than as a class rule about widget-replacing decorations, because it is not one: `revealsRange` has a single caller in the tree, and the two exceptions above go the other way. Wikilink chips stay atomic under a selection as under a caret (`spec/wikilink.md` §5.4, and its form-12 embeds likewise), and task-field chips open only for the find panel. The reason is not editing but painting: the rendered checkbox has an opaque accent fill, and a translucent selection band across it, beside the same band over plain text, is two tones in one selection. Showing the source removes the opaque surface rather than working around it, and it is the honest answer: what is selected is the markup, so the markup is what belongs on screen and on the clipboard. Restyling decorations (emphasis, link, inline code) keep the older per-endpoint rule: a mark changing style under a selection is harmless where a widget vanishing is not.
 
-Used in: `spec/markdown-dialect.md`, `agent-tooling/features/editor-mvp/rfc.md`; `decisions.md` 2026-07-28, 2026-08-22
+Used in: `spec/markdown-dialect.md`, `agent-tooling/features/editor-mvp/rfc.md`; `decisions.md` 2026-07-28, 2026-08-25 (entry 0535)
 
 ### **custom folder icon** &nbsp; 📦 *Product*
 

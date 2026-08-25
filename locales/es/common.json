@@ -1877,7 +1877,7 @@
       "moveCollision": "Ahí ya hay una carpeta con ese nombre.",
       "unsettledSave": "Una nota abierta aún no ha terminado de guardarse, así que la carpeta no se ha tocado. Inténtalo de nuevo cuando termine.",
       "renameFailed": "No se pudo cambiar el nombre de la carpeta, así que sigue igual.",
-      "deliberateWriteFailed": "Se cambió el nombre de la carpeta, pero no se pudo guardar uno de sus ajustes. Si vuelves a cambiarle el nombre, se intentará de nuevo."
+      "deliberateWriteFailed": "Se cambió el nombre de la carpeta, pero no se pudo guardar uno de sus ajustes. Cada vez que desbloquees, volverá a aparecer una carpeta vacía con el nombre anterior; puedes eliminarla sin riesgo y no cambia nada más. Volver a cambiar el nombre de la carpeta no la quitará."
     },
     "folderNote": {
       "defaultTitle": "Índice"
@@ -4421,8 +4421,8 @@
     "phraseCopied": "Copiado. Se queda en este dispositivo y el sistema lo descarta a los 30 segundos.",
     "phraseCopyFailed": "No se pudo copiar. Usa «Guardar en un archivo» en su lugar.",
     "savedToFile": "Guardado en {{label}}",
-    "savedToShareSheet": "Guardado dentro de Myne, donde el gestor de archivos del sistema no puede llegar. Usa el menú de compartir para poner una copia en un sitio al que puedas llegar, y vuelve a tocar «Guardar en un archivo» si lo has cerrado.",
-    "savedFileWritten": "Guardado dentro de Myne. Este dispositivo no ha indicado desde dónde se puede acceder al archivo, así que considéralo accesible solo desde dentro de la app hasta que lo compruebes.",
+    "savedToShareSheet": "Guardado dentro de Myne, donde el gestor de archivos del sistema no puede llegar. Es un archivo de texto sin formato, así que, si usas el menú de compartir para poner una copia en un sitio al que puedas llegar, elige un sitio que solo tú puedas leer y no una unidad en la nube. Vuelve a tocar «Guardar en un archivo» si lo has cerrado.",
+    "savedFileWritten": "Guardado dentro de Myne. Es un archivo de texto sin formato, de modo que conserva cualquier copia que hagas en un sitio que solo tú puedas leer. Este dispositivo no ha indicado desde dónde se puede acceder al archivo, así que considéralo accesible solo desde dentro de la app hasta que lo compruebes.",
     "saveFileError": "No se pudo guardar el archivo.",
     "stepLabel": "Crear una bóveda · {{current}} de {{total}}",
     "briefingTitle": "Antes de empezar",
