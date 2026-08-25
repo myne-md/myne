@@ -356,7 +356,7 @@ export function coverageGaps(roots, dirExists, exempt = NOT_A_SURFACE_ROSTER) {
  * @param {Array}  [io.denominators] the denominator roster; defaults to {@link DENOMINATORS}
  * @param {{gatedTiers: string[], gatedClients: string[]}} [io.baseline] the gate floor; defaults to {@link RATCHET_BASELINE}
  * @param {string[]} [io.missingRoots] shared roots absent from the checkout
- * @param {{unwalked: string[], stale: string[]}} [io.coverage]  from {@link coverageGaps}
+ * @param {{unwalked: string[], stale: string[], unreasoned?: string[]}} [io.coverage]  from {@link coverageGaps}
  * @returns {{ failures: string[], notes: string[], warnings: string[], stats: object }}
  */
 export function analyse(io) {

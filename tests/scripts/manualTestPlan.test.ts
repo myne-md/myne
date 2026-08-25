@@ -233,7 +233,7 @@ describe("blockingRows decides whether the tag stops, so it is tested on its own
 
   it("returns a failed row on a GATED client", () => {
     const rows = [r("notes.editor#0@desktop-macos", 0, "desktop-macos", "fail")];
-    expect(blockingRows(rows, roster, RATCHET).map((x) => x.key)).toEqual(["notes.editor#0@desktop-macos"]);
+    expect(blockingRows(rows, roster, RATCHET).map((x: { key: string }) => x.key)).toEqual(["notes.editor#0@desktop-macos"]);
   });
 
   it("does NOT return a failed row on a client the policy does not gate", () => {
