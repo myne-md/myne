@@ -37,7 +37,7 @@
 
 pkgname=myne-bin
 _appname=myne
-pkgver=0.5.0
+pkgver=0.6.0
 pkgrel=1
 pkgdesc="A calm place for your notes: clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search (binary release)"
 arch=('x86_64')
@@ -49,7 +49,7 @@ conflicts=("$_appname")
 options=('!strip')
 
 source=("https://downloads.myne.md/releases/v${pkgver}/Myne_${pkgver}_amd64.deb")
-sha256sums=('e4ea227ba1df344cd52fccb82f1a2d562b7d2948b38d880b0252f9d87fa805a9')
+sha256sums=('d418dd78bbbf3d27ec1a6568d206a72220840fbfda063017b321dcfd813d3753')
 # makepkg would otherwise try to unpack the .deb into $srcdir as a source
 # archive. package() reads it directly instead, so the outer `ar` container and
 # the inner data tarball stay paired.
