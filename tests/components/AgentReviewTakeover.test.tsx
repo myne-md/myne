@@ -14,21 +14,36 @@
 // because the whole point of the fix is that no caller decides this any more.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 // The screen itself is not under test here and mounting it would pull in the
 // whole apply path. What matters is whether it is asked for at all.
+//
+// It COUNTS its renders, because one test needs a fact a post-hoc query cannot
+// give: "never mounted" and "mounted, painted, then unmounted" look identical
+// to `queryByTestId` afterwards, and that difference is the whole of what
+// myne-md/myne#551's automatic mode promises.
+const review = vi.hoisted(() => ({ renders: 0 }));
 vi.mock("../../src/screens/AgentReview", () => ({
-  AgentReview: () => <div data-testid="stub-review" />,
+  AgentReview: () => {
+    review.renders += 1;
+    return <div data-testid="stub-review" />;
+  },
 }));
 
 import type { LoopEnd, Proposal } from "../../src/lib/agent-run";
+import { applyOutcome } from "../notes/_agentApplyOutcome";
 import { AgentReviewTakeover } from "../../src/notes/agent/components/AgentReviewTakeover";
 import {
+  beginAutoApply,
   beginRun,
   clearAgentForLock,
   currentRunEpoch,
+  endAutoApply,
+  getAgent,
+  settleApply,
   settleStep,
+  toggleEdit,
 } from "../../src/notes/agent/agentStore";
 
 const VIEW = {
@@ -51,6 +66,16 @@ const ONE_EDIT: Proposal = {
 };
 
 const NOTHING: Proposal = { edits: [], newNotes: [], summary: "" };
+
+/** Two edits, so one can be applied and the other resolved separately. */
+const TWO_EDITS: Proposal = {
+  edits: [
+    { noteId: "n1", anchor: "before-1", replacement: "after-1" },
+    { noteId: "n2", anchor: "before-2", replacement: "after-2" },
+  ],
+  newNotes: [],
+  summary: "",
+};
 
 function settle(end: LoopEnd, proposal: Proposal = ONE_EDIT) {
   settleStep({
@@ -227,5 +252,110 @@ describe("dismissal stays deliberate", () => {
     expect(backdrop.style.position).toBe("fixed");
     expect(backdrop.style.padding).not.toBe("");
     expect(backdrop.style.padding).not.toBe("0px");
+  });
+});
+
+// myne-md/myne#596. Closing is derived from the run the same way opening is: an
+// apply that refused nothing and left no row to act on has nothing the user can
+// decide, so the dialog dismisses itself. The rule itself is
+// `applyWasCleanAndComplete`, unit-tested in
+// `tests/notes/agentReviewAutoClose.test.ts`; what is pinned here is that this
+// component acts on it, and that acting on it DROPS the run rather than merely
+// hiding the screen.
+describe("a clean apply closes the dialog", () => {
+  /** A clean outcome for the single edit `ONE_EDIT` carries. */
+  const CLEAN = applyOutcome();
+
+  it("closes once the apply is clean and complete", () => {
+    beginRun();
+    settle({ kind: "finished" });
+    mount();
+    expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
+
+    act(() => {
+      settleApply(CLEAN, [0], currentRunEpoch());
+    });
+
+    expect(screen.queryByTestId("editor.agent-review")).toBeNull();
+  });
+
+  it("drops the run rather than hiding the screen", () => {
+    // The half a visibility assertion cannot see, and the reason the close goes
+    // through `clearAgent` rather than through a flag. `proposal.edits` holds
+    // anchors and replacements copied verbatim out of note bodies; a hidden
+    // dialog over a live proposal would leave that plaintext resident with no
+    // surface accounting for it, which is what this store's header exists to
+    // prevent.
+    beginRun();
+    settle({ kind: "finished" });
+    mount();
+
+    act(() => {
+      settleApply(CLEAN, [0], currentRunEpoch());
+    });
+
+    expect(getAgent().view).toBeNull();
+    expect(getAgent().proposal.edits).toHaveLength(0);
+  });
+
+  it("stays open when the host refused an edit, even once that row is resolved", () => {
+    // **The refused row is REJECTED before asserting, and that is the whole
+    // point.** A refused edit is not in `appliedEdits`, so it stays in
+    // `keptEdits` and the completeness clause already answers: without the
+    // rejection this test stays green with `hasRefusals` deleted from the
+    // predicate, which was measured. Rejecting it resolves the row and leaves
+    // the accumulated refusal as the only thing holding the screen.
+    beginRun();
+    settle({ kind: "finished" }, TWO_EDITS);
+    mount();
+
+    act(() => {
+      settleApply(
+        applyOutcome({
+          applied: 1,
+          refused: [{ noteId: "n2", index: 1, reason: "anchorNotFound" }],
+        }),
+        [0],
+        currentRunEpoch(),
+      );
+      toggleEdit(1);
+      // A second apply is what re-asks the rule: only an apply may close the
+      // review, so the rejection above cannot be the trigger.
+      settleApply(applyOutcome({ applied: 0, notesWritten: [], restorePoints: [] }), [], currentRunEpoch());
+    });
+
+    expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
+  });
+
+  it("never renders at all on the automatic path", () => {
+    // **The sequence production actually produces, in ONE `act`.**
+    // `agentToChat.ts::autoApplyRun` calls `settleApply(...)` and then
+    // `endAutoApply()` in one synchronous continuation, so React commits them
+    // together. Splitting them across two `act()` calls, which this test used
+    // to do, hides the only commit that matters: with `applied` set and
+    // `autoApplying` already false, `reviewable` is true, and a rule that ran
+    // in a passive effect let this dialog mount, arm its focus trap and paint
+    // before tearing itself down. Measured at one render under the real
+    // ordering, zero under the split one, so the split test passed for an
+    // interleaving that never happens.
+    //
+    // Asserted on the RENDER COUNT rather than on a post-hoc query, because a
+    // query after the fact cannot tell "never mounted" from "mounted and
+    // unmounted", which is exactly the distinction myne-md/myne#551 is about.
+    review.renders = 0;
+    beginRun();
+    beginAutoApply();
+    settle({ kind: "finished" });
+    mount();
+    expect(review.renders).toBe(0);
+
+    act(() => {
+      settleApply(CLEAN, [0], currentRunEpoch());
+      endAutoApply();
+    });
+
+    expect(review.renders, "the skipped screen must never paint").toBe(0);
+    expect(screen.queryByTestId("editor.agent-review")).toBeNull();
+    expect(getAgent().view).toBeNull();
   });
 });

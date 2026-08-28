@@ -119,6 +119,29 @@ export function AgentReviewTakeover({
     // between the step settling and the apply returning. The flag is raised
     // before the settle for exactly that reason.
     !agent.autoApplying;
+  // **Closing needs nothing here, and the empty space is the fix**
+  // (myne-md/myne#596). A clean, complete apply ends the review, and the drop
+  // happens inside `settleApply`, the one writer both apply paths pass through.
+  // `reviewable` above then goes false on its own, exactly as it does for a
+  // manual close, because there is no run left to review.
+  //
+  // It was written here first, as a `useEffect` on
+  // `applyWasCleanAndComplete(agent)`, on the reasoning that OPEN is derived so
+  // CLOSE should be too. That is wrong, and the difference is that `reviewable`
+  // is a pure read consumed at render while closing is a destructive write.
+  // Deriving it reached a state an apply never produces: `keptEdits` counts a
+  // REJECTED edit as resolved, so one click on the last outstanding row's
+  // Reject button dropped the whole proposal, with no confirmation and no way
+  // back, from the control whose other direction is labelled Restore. This file
+  // bans backdrop and Escape dismissal 120 lines up to prevent exactly that,
+  // and the effect reintroduced it through a button.
+  //
+  // It also mounted the dialog that myne-md/myne#551 exists to skip:
+  // `autoApplyRun` writes `settleApply` and `endAutoApply` in one synchronous
+  // continuation, so React commits them together and this component renders,
+  // arms its focus trap and paints before any passive effect runs. Measured at
+  // one render. `settleApply` owns the argument in full.
+  //
   // Declared before the early return, because hooks must be. Enabled on the
   // same condition the render is, so a trap is never armed for a dialog that
   // is not on screen.

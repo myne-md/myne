@@ -22,6 +22,31 @@
 //         a regression re-adding the second composer: every other one drives
 //         whichever input its own testid happens to find.
 //
+// **All six were dead, and had been since the AI tab lost its modes**
+// (myne-md/myne#596). `openComposerInEditMode` clicked `ai.composer-mode-edit`
+// and then waited on `ai.composer-scope`; `docs/decisions/ai/0524` gave the tab
+// ONE mode and deleted the first control, and the second moved behind the
+// "change" disclosure so it never appears unprompted. Every scenario therefore
+// timed out at 45 s in the shared setup step, six for six, on every run, and
+// nothing reddened, because this suite has been manual and pre-release since
+// myne-md/myne#579. Two consequences worth carrying: a green push pipeline was
+// never evidence about any of this, and the repair had to re-decide what ag6
+// asserts, since its own name described a two-mode composer that no longer
+// exists. That is the whole class `e2e/CLAUDE.md` calls "a helper that waits for
+// a surface without opening it", one layer on: here the helper opened the
+// surface correctly and then drove a control the surface had stopped rendering.
+//
+// **Three of them also carry the review dialog's own dismissal rule**
+// (myne-md/myne#596), and they carry it from both sides, which is why no
+// seventh scenario duplicates their setup. ag1 and ag4 assert the dialog
+// DISMISSES ITSELF: every row resolved, nothing refused, so there is no
+// decision left in the screen. ag3 asserts the opposite for the same reason:
+// its removal row is neither applied nor rejected, so the apply is clean but
+// not complete and the screen must stay. ag1 and ag4 used to close it by hand;
+// those clicks would now race a dialog on its way out, so both wait for the
+// disappearance instead, and ag1 reads the applied count off the undo strip,
+// which is where that fact lives once the screen is gone.
+//
 // ag4 is the one that would have caught the shipped gap. Undo used to live only
 // on the review screen, which owned the `[noteId, snapshotId]` record; closing
 // that screen dropped it, so a published guarantee stopped being true the moment
@@ -65,7 +90,7 @@ import type { Session } from "./support/webdriver";
 /** Only run when the binary under test is the AI-feature build. */
 const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
 
-/** Open the AI Chat tab and put its one composer into Edit mode.
+/** Open the AI Chat tab and wait for its composer to be ready to send.
  *
  *  **The palette action is what opens it**, and this helper shipped without it:
  *  it waited on a tab nothing had opened, so all five scenarios timed out at the
@@ -73,16 +98,24 @@ const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip
  *  `ai-chat`, so this reuses the route `ai-chat.e2e.ts` already uses rather than
  *  clicking chrome.
  *
- *  There is now ONE composer serving both modes, so the tab opens in Ask mode
- *  and a run has to say it wants Edit. Driving the mode control here IS the
- *  coverage of that change, not a detour around it: the scope control appears
- *  with the mode, so waiting for it is the assertion that the switch took rather
- *  than that a segment repainted. */
-async function openComposerInEditMode(session: Session): Promise<void> {
+ *  **It used to switch the composer into Edit mode, and there is no longer a
+ *  mode to switch to.** `docs/decisions/ai/0524` gave the AI tab ONE mode: every
+ *  message goes to the agent, and `ai.composer-mode-edit` went with the change.
+ *  This helper kept clicking it, so it timed out at 45 s and took all six
+ *  scenarios in this file down with it, every run, invisibly. The suite is
+ *  manual and pre-release since myne-md/myne#579, so nothing reddened. Found by
+ *  running it (myne-md/myne#596).
+ *
+ *  The wait is now `ai.composer-scope-current`, the caption that states what the
+ *  run will be scoped to. It replaces a wait on `ai.composer-scope`, which still
+ *  exists but moved behind the "change" disclosure and so never appears
+ *  unprompted. The caption is the better target anyway: it renders whenever the
+ *  composer does and it carries the fact a scenario actually depends on, which
+ *  is that a scope is resolved before Send. */
+async function openComposer(session: Session): Promise<void> {
   await runPaletteAction(session, "ai.open-chat", "chat");
   await session.waitForElement(testIdSelector("ai.composer"), { timeoutMs: 15_000 });
-  await clickByTestId(session, "ai.composer-mode-edit");
-  await session.waitForElement(testIdSelector("ai.composer-scope"), {
+  await session.waitForElement(testIdSelector("ai.composer-scope-current"), {
     timeoutMs: 5_000,
   });
 }
@@ -117,7 +150,7 @@ aiDescribe("ag1 agent run → review → reject one → approve rest", () => {
         await typeIntoEditor(s, "alpha beta gamma delta\nepsilon zeta eta theta");
         await waitForSaved(s);
         await enableAi(s);
-        await openComposerInEditMode(s);
+        await openComposer(s);
 
         // Baseline from the editor, not from the typed string: `editorText`
         // reads `.cm-content`'s textContent, which concatenates CM6 lines with
@@ -148,16 +181,31 @@ aiDescribe("ag1 agent run → review → reject one → approve rest", () => {
 
         // Approve the rest.
         await (await s.byTestId("agentReview.approveAll")).click();
-        await s.waitForElement(testIdSelector("agentReview.applyReport"), {
+
+        // **The dialog closes itself** (myne-md/myne#596). Every row is now
+        // resolved (one rejected, the rest applied) and nothing was refused,
+        // so there is no decision left in the screen and it dismisses. This
+        // scenario used to wait on `agentReview.applyReport` and then click
+        // `agentReview.close`; both would now race a dialog that is on its way
+        // out, so the disappearance IS the assertion.
+        await s.waitForGone(testIdSelector("agentReview.screen"), {
           timeoutMs: 20_000,
         });
-        // The report states what landed. A run that applied nothing would show a
-        // report too, so the count is the assertion rather than the report's
-        // presence.
-        const applied = await (await s.byTestId("agentReview.appliedCount")).textContent();
-        expect(applied).not.toContain("0");
 
-        await (await s.byTestId("agentReview.close")).click();
+        // **A DIFFERENT fact from the `agentReview.appliedCount` this replaces,
+        // and the difference is worth stating rather than glossing.** That
+        // counted EDITS applied; `agent.undo.offer` counts `restorePoints`,
+        // i.e. NOTES written, so three edits to one note read as "changed 1
+        // note". Both are non-zero exactly when the apply wrote something,
+        // which is what this scenario needs, but the strip is not the same
+        // number on a different surface. The applied-edit count is now asserted
+        // only by ag3, which is the run whose dialog stays open.
+        await s.waitForElement(testIdSelector("agentUndoLast.root"), {
+          timeoutMs: 15_000,
+        });
+        const offer = await (await s.byTestId("agentUndoLast.summary")).textContent();
+        expect(offer).not.toContain("0");
+
         await waitForSaved(s);
         // The note changed. The specific text depends on the stub engine, so the
         // assertion is that the body is no longer what was typed.
@@ -182,7 +230,7 @@ aiDescribe("ag2 the running scope total is continuously visible", () => {
         await typeIntoEditor(s, "one two three");
         await waitForSaved(s);
         await enableAi(s);
-        await openComposerInEditMode(s);
+        await openComposer(s);
         await startRun(s, "tidy this note");
 
         // On the review screen. This is the number that bounds accumulation, and
@@ -234,7 +282,7 @@ aiDescribe("ag3 a removing edit is not carried by the bulk approve", () => {
         await typeIntoEditor(s, "delete this note please");
         await waitForSaved(s);
         await enableAi(s);
-        await openComposerInEditMode(s);
+        await openComposer(s);
         await startRun(s, "trash this note");
 
         // NOT a self-skip. This used to return early with a warning when the
@@ -257,7 +305,11 @@ aiDescribe("ag3 a removing edit is not carried by the bulk approve", () => {
         // that rendered the generic string, or the wrong field's string, would
         // be telling the user something false at the moment they decide. The
         // stub's edit writes `trashed:`, so this is the Trash sentence.
-        expect(await flags[0].text()).toBe("Moves this note to Trash");
+        // `textContent()`, not `text()`. The harness's own note on those two
+        // says W3C getText drops text inside child elements and is for direct
+        // text nodes only; here it returned the empty string and the assertion
+        // read as a missing label on a flag that was rendering correctly.
+        expect(await flags[0].textContent()).toBe("Moves this note to Trash");
 
         // The bulk approve must not carry it. Approve everything, then assert the
         // note did NOT gain the marker: the state, not the label.
@@ -265,7 +317,22 @@ aiDescribe("ag3 a removing edit is not carried by the bulk approve", () => {
         await s.waitForElement(testIdSelector("agentReview.applyReport"), {
           timeoutMs: 20_000,
         });
-        await (await s.byTestId("agentReview.close")).click();
+
+        // **And the dialog is STILL UP** (myne-md/myne#596), which is the other
+        // half of the rule that dismisses a finished review and the reason this
+        // scenario carries the assertion rather than a seventh one duplicating
+        // its whole setup. A clean, complete apply closes the screen; this apply
+        // is clean but NOT complete, because the removal row was neither applied
+        // (the bulk action refuses it) nor rejected, so it is unresolved and the
+        // user still has a decision in front of them. Asserted explicitly so an
+        // over-eager rule fails here by name, instead of failing two lines down
+        // on a close control that is no longer in the DOM.
+        expect(
+          (await s.byTestIdAll("agentReview.screen")).length,
+          "an unapplied removal row is unresolved, so the review must not dismiss itself",
+        ).toBe(1);
+
+        await clickByTestId(s, "agentReview.close");
         await waitForSaved(s);
         expect(await editorText(s)).not.toContain("trashed:");
       },
@@ -295,18 +362,24 @@ aiDescribe("ag4 undo after the review screen is closed", () => {
         // broken undo rather than a broken assumption.
         const original = await editorText(s);
         await enableAi(s);
-        await openComposerInEditMode(s);
+        await openComposer(s);
         await startRun(s, "tidy this note");
 
         await (await s.byTestId("agentReview.approveAll")).click();
-        await s.waitForElement(testIdSelector("agentReview.applyReport"), {
+
+        // The screen is gone FIRST, and that is the whole point of the
+        // scenario: an undo pressed while the review screen is up passes
+        // against a build where the record lives only in that screen.
+        //
+        // It used to be closed by hand here. Since myne-md/myne#596 a clean,
+        // complete apply dismisses the dialog itself, so the premise arrives
+        // for free and the click would race it. Waiting for the disappearance
+        // keeps the precondition explicit rather than assumed: if the dialog
+        // stayed up, the undo below would be pressed with it on screen and this
+        // scenario would silently stop testing what it is named for.
+        await s.waitForGone(testIdSelector("agentReview.screen"), {
           timeoutMs: 20_000,
         });
-
-        // Close FIRST. This is the whole point of the scenario: an undo pressed
-        // while the review screen is up passes against a build where the record
-        // lives only in that screen.
-        await (await s.byTestId("agentReview.close")).click();
         await waitForSaved(s);
         const afterApply = await editorText(s);
         expect(afterApply).not.toBe(original);
@@ -356,7 +429,7 @@ aiDescribe("ag5 a model-requested scope expansion is approved by the user", () =
         await typeIntoEditor(s, "one two three");
         await waitForSaved(s);
         await enableAi(s);
-        await openComposerInEditMode(s);
+        await openComposer(s);
 
         const input = await s.byTestId("ai.composer-input");
         await input.click();
@@ -426,7 +499,7 @@ aiDescribe("ag5 a model-requested scope expansion is approved by the user", () =
   });
 });
 
-aiDescribe("ag6 one composer serves both modes, into one transcript", () => {
+aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
   it("answers a question and runs an edit from the same input", async () => {
     let password = "";
@@ -451,8 +524,17 @@ aiDescribe("ag6 one composer serves both modes, into one transcript", () => {
         await s.waitForElement(testIdSelector("ai.composer"), { timeoutMs: 15_000 });
         expect((await s.byTestIdAll("ai.composer-input")).length).toBe(1);
         expect((await s.byTestIdAll("ai.composer-send")).length).toBe(1);
-        // Ask mode makes no grant, so it offers no scope control.
-        expect((await s.byTestIdAll("ai.composer-scope")).length).toBe(0);
+        // **The scope caption is present from the start, and that is the
+        // change.** This line used to assert the scope control was ABSENT,
+        // because the tab opened in Ask mode and Ask granted no scope. With one
+        // mode (`docs/decisions/ai/0524`) every message is a run, so a scope is
+        // always resolved and always stated. Asserting its presence keeps the
+        // line doing work rather than deleting it: `docs/decisions/ai/0518`
+        // point 1 requires a user-originated scope control on the composer,
+        // and losing it routes every folder-scale run through the
+        // model-originated expansion instead, which is the injection-reachable
+        // path.
+        expect((await s.byTestIdAll("ai.composer-scope-current")).length).toBe(1);
 
         // Ask, from that one input.
         const ask = await s.byTestId("ai.composer-input");
@@ -465,27 +547,43 @@ aiDescribe("ag6 one composer serves both modes, into one transcript", () => {
         // drive a textarea that is switched off and depend on the next lookup
         // happening to block long enough. `data-streaming` is the fact this
         // step actually needs.
-        await s.waitUntil(
-          async () => {
-            const turns = await s.byTestIdAll("ai.turn");
-            if (turns.length < 2) return null;
-            const last = turns[turns.length - 1]!;
-            return (await last.attribute("data-streaming")) === "false" ? true : null;
-          },
-          { label: "the question was answered and the stream closed", timeoutMs: 20_000 },
-        );
-
-        // Switch the SAME input to Edit and run against the open note.
-        await clickByTestId(s, "ai.composer-mode-edit");
-        await s.waitForElement(testIdSelector("ai.composer-scope"), {
-          timeoutMs: 5_000,
+        // **A question is a RUN now, so the first send opens the review screen
+        // too, and this scenario has to get past it.** It used to wait on the
+        // last turn's `data-streaming` going false, which was the right fact
+        // when Ask streamed a chat reply. `docs/decisions/ai/0524` made every
+        // message an agent run: the stub proposes for any task, an agent turn
+        // renders `data-streaming="false"` from its first frame, and the wait
+        // therefore passed instantly while a modal was opening over the
+        // composer, which is what left the second send's click timing out on
+        // an input it could not reach.
+        //
+        // Closing it is the honest step rather than a workaround: what ag6 is
+        // about is the composer and the transcript, and this proposal is
+        // neither. ag1 and ag3 are where a proposal gets reviewed.
+        await s.waitForElement(testIdSelector("agentReview.screen"), {
+          timeoutMs: 30_000,
         });
+        await clickByTestId(s, "agentReview.close");
+        await s.waitForGone(testIdSelector("agentReview.screen"), {
+          timeoutMs: 10_000,
+        });
+
+        // **Run an edit from the SAME input, with no mode to switch.** These
+        // three lines used to click `ai.composer-mode-edit` and wait for the
+        // scope control to appear with it, which was the coverage of
+        // myne-md/myne#533's one-composer change. `docs/decisions/ai/0524` then
+        // removed the modes outright, so what this scenario proves is narrower
+        // and still worth proving: one input, no remount between a question and
+        // an edit, and both landing in one transcript in order. The input count
+        // is asserted again HERE rather than only above, because a build that
+        // re-mounted the composer between the two sends would still have shown
+        // one input at the start.
         expect((await s.byTestIdAll("ai.composer-input")).length).toBe(1);
         // The same helper every other scenario starts with, on the same input:
-        // that it works unchanged after a mode switch IS half of what this
-        // scenario claims.
+        // that it works with no remount between the two sends IS half of what
+        // this scenario claims.
         await startRun(s, "tidy this note");
-        await (await s.byTestId("agentReview.close")).click();
+        await clickByTestId(s, "agentReview.close");
 
         // Both flows landed in ONE transcript, in order, and the run's turn
         // still states its outcome after the review screen has been closed, which
@@ -496,11 +594,15 @@ aiDescribe("ag6 one composer serves both modes, into one transcript", () => {
         );
         const turns = await s.byTestIdAll("ai.turn");
         const kinds = await Promise.all(turns.map((el) => el.attribute("data-kind")));
-        // The ask exchange, then BOTH halves of the run: the task the user sent
-        // belongs to the agent flow even though it renders as an ordinary
-        // bubble, and `data-kind` reports the flow.
-        expect(kinds.slice(0, 2)).toEqual(["text", "text"]);
-        expect(kinds.slice(2)).toEqual(["agent", "agent"]);
+        // **Four agent turns, not two text ones and two agent ones.** The old
+        // split described two modes: Ask produced a `text` exchange, Edit an
+        // `agent` one. With one mode (`docs/decisions/ai/0524`) both sends are
+        // runs, and `data-kind` reports the FLOW rather than the bubble style,
+        // so the task the user typed is an agent turn too, even though it
+        // renders as an ordinary bubble. Asserting all four is what keeps this
+        // a claim about the transcript rather than about the modes that went
+        // away.
+        expect(kinds).toEqual(["agent", "agent", "agent", "agent"]);
         expect((await s.byTestIdAll("ai.transcript")).length).toBe(1);
         await s.waitForElement(testIdSelector("ai.agent-summary"), { timeoutMs: 15_000 });
       },
