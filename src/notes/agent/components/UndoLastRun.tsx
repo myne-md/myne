@@ -53,7 +53,15 @@ export function UndoLastRun({ onReverted }: UndoLastRunProps) {
   // this asks rather than infers: an apply in another surface, or a lock that
   // cleared the record, both show up here on the next read without this
   // component modelling either event.
-  const appliedTick = agent.applied?.applied ?? 0;
+  // **Keyed on the apply COUNTER, not on `applied?.applied`** (myne-md/myne#596).
+  // Two reasons, and the first is a defect this had. A clean, complete apply now
+  // settles and drops the run inside one `settleApply` call, so React's store
+  // subscription only ever sees the final state: `applied` back to null, the old
+  // key reading 0 to 0, the effect never firing, and this strip never appearing
+  // after the very applies it exists for. And the old key could not tell "no
+  // apply yet" from "an apply that landed nothing because every edit was
+  // refused", since both read 0.
+  const appliedTick = agent.applySeq;
   useEffect(() => {
     let live = true;
     // Captured before the await: a reply landing after the vault was left must

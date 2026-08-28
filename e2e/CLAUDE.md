@@ -82,7 +82,9 @@
   compiled from ANOTHER tree, and worktrees live under `.claude/worktrees/` by
   convention, so they sit inside the mount and this is the normal case rather
   than an exotic one. `scripts/lib/e2e-docker.sh` keys the volume on `pwd` and is
-  sourced by all seven scripts that run this repo in the container. The cost is one
+  sourced by every script that runs this repo in the container (eight of them as
+  of myne-md/myne#596, which added `e2e-ai-cargotest.sh`; the count is deliberately
+  not written as a number a new runner would falsify). The cost is one
   full rebuild per tree, once, which is exactly what the sharing was buying at the
   price of results that describe a different tree.
 

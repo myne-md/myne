@@ -40,6 +40,7 @@ import {
 } from "../../src/notes/agent/agentStore";
 import { __resetChatForTest } from "../../src/notes/ai/chatStore";
 import type { ProposedEdit } from "../../src/lib/agent-run";
+import { applyOutcome } from "./_agentApplyOutcome";
 
 const COPY = {
   scopeLabel: "This note",
@@ -78,17 +79,6 @@ function stepResult(edits: ProposedEdit[]) {
     notesRead: 1,
     charsOffDevice: null,
     excludedCount: 0,
-  };
-}
-
-function applyOutcome() {
-  return {
-    applied: 1,
-    refused: [],
-    refusedNewNotes: [],
-    notesWritten: ["n1"],
-    notesCreated: [],
-    restorePoints: [["n1", "s1"]] as [string, string][],
   };
 }
 
