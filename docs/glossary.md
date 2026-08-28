@@ -1803,6 +1803,16 @@ Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `v
 
 Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 
+### **Protected-branch guard** &nbsp; 🛠️ *Tooling*
+
+*(Aliases: none. Myne-divergent: no.)*
+
+The `protected-branch` lefthook `pre-push` command carried by every `myne-md` repository. It refuses a push whose **remote** ref is `refs/heads/develop`, `refs/heads/main` or `refs/heads/release`, matching the remote ref rather than the current branch name so that `git push origin HEAD:develop` from a feature branch, and a branch deletion, are caught by the same line. `release` is on the list because it is the branch that deploys: `myne-website` maps `release` to production and `develop` to staging, so a `develop`-only guard protected the branch with no blast radius. It exists because the real control is unavailable: the org is on the GitHub free plan with private repositories, so both the branch-protection API and the rulesets API answer 403 on every repo.
+
+**Hygiene, not enforcement**, which is the hook's own wording rather than a hedge added here. `--no-verify`, `LEFTHOOK=0` and `LEFTHOOK_EXCLUDE=protected-branch` each bypass it, and it exists only in clones where `lefthook install` has been run, so a fresh clone, the jailed runner and `myne-bot` are uncovered. Two hatches are sanctioned instead: `MYNE_ALLOW_PROTECTED_PUSH=1` for a one-off, and `git config myne.allowProtectedPush true` for a repository whose normal workflow genuinely is a direct push ([myne-range](#myne-range), `homebrew-tap`, `myne-branding`). Both parse a VALUE (`1`, `true`, `yes`, `on`, case-insensitively) and refuse anything else, so they agree on what "allow" means and `=0` keeps the guard on rather than switching it off. The flag is read with `git config --local` deliberately, since a plain `--get` reads the merged cascade and one `--global` setting would switch the guard off in all eleven clones at once. A `min_version` at the top of each `lefthook.yml` is what stops an older binary from silently dropping `use_stdin` and leaving the guard green and inert.
+
+Used in: `lefthook.yml` (every `myne-md` repo); root `CLAUDE.md`; `scripts/hooks-parity-check.sh`; `decisions.md` 2026-08-27
+
 ### **per-account quota** &nbsp; 📦 *Product*
 
 The Phase 2 hosted-sync storage ceiling: per-account aggregate **deduplicated** ciphertext bytes (AS17 — one stored blob is counted once, not once per referencing note). Keyed on the account, never on identity beyond `account_number_hash`; a self-host operator sets their own ceiling (the protocol exposes the counter, the operator sets policy — TB5). Distinct from the [per-account rate-limit](#per-account-rate-limit) (bytes-at-rest vs request-frequency). Phase 2.

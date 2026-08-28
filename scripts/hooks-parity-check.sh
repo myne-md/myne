@@ -28,6 +28,22 @@
 #                      #[test]); only the hook's TEXTUAL sentinel-block sync is
 #                      hook-exclusive, and that low-stakes formatting check is
 #                      not worth porting the generator+diff into a CI image.
+#   - protected-branch -> a pre-PUSH hook, and the one entry on this list with no
+#                      remote gate available AT ALL, by construction. The gate
+#                      would be server-side branch protection, and the org's plan
+#                      does not offer it for private repos (403 from both the
+#                      branch-protection and the rulesets API on every repo); a CI
+#                      check cannot stand in, because CI runs after the push has
+#                      already landed. Recorded here rather than ported.
+#
+#                      It is also the only hook in this repo hand-copied into ten
+#                      OTHER repos, with nothing holding the copies identical.
+#                      That is deliberate and not a factoring waiting to happen:
+#                      they are separate git repos, `scripts/` ships only in this
+#                      one, and a comparison script here could inspect only the
+#                      clones that happen to be on the machine running it, which
+#                      is a check that skips on missing input, and that reads as a
+#                      pass. The copies are compared by hand at review. #592.
 #
 # Kept in lockstep with lefthook.yml: the exclusion lists below MUST match the
 # eof-newline / whitespace hooks there.
