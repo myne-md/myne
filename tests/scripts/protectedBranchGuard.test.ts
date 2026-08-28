@@ -45,7 +45,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MANIFEST = join(REPO_ROOT, "workspace", "manifest.txt");
 const manifestRepos = readFileSync(MANIFEST, "utf8")
   .split("\n")
-  .map((l) => l.replace(/#.*$/, "").trim())
+  .map((l: string) => l.replace(/#.*$/, "").trim())
   .filter(Boolean);
 const OFF_MANIFEST = ["internal-service", "homebrew-tap"];
 const COMPANIONS = [...manifestRepos, ...OFF_MANIFEST];
