@@ -252,7 +252,7 @@
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
       "transcribeFailed": "Transcription failed. Please try again.",
-      "transcribeTooLong": "This recording is too long to transcribe.",
+      "transcribeTooLong": "This recording is too long to transcribe. The audio stays attached, so you can still play it back.",
       "transcribeFeatureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
       "transcribeModelLoadFailed": "Couldn't load the speech-to-text model. Reinstall Myne, or check your custom model in Settings → Developer → AI.",
       "transcribeNoModel": "Select a speech-to-text model in Settings → Developer → AI.",
@@ -926,6 +926,7 @@
             "featureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
             "modelLoadFailed": "Couldn't load the speech-to-text model. If you set a custom model in Settings → Developer → AI, check its files; otherwise reinstalling Myne restores the built-in one.",
             "noModel": "The speech-to-text model is missing. Reinstalling Myne restores it.",
+            "tooLong": "This recording is too long to transcribe. The audio stays attached, so you can still play it back.",
             "vaultLocked": "Unlock your vault to transcribe."
           },
           "failed": "Transcription failed. Please try again.",

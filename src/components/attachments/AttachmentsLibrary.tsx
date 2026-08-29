@@ -42,7 +42,11 @@ import {
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
 import { useWarmAttachmentRefs } from "./useWarmAttachmentRefs";
-import { startTranscription, type TranscribeError } from "../../lib/transcribe";
+import {
+  startTranscription,
+  type TranscribeError,
+  type TranscribeErrorKind,
+} from "../../lib/transcribe";
 import { usePrefs } from "../../hooks/usePrefs";
 import { showAttachmentToast } from "../../editor/attachments/toast";
 import { AttachmentSyncProgress } from "./AttachmentSyncProgress";
@@ -95,11 +99,14 @@ const SORT_OPTION_KEYS: readonly { value: SortKey; labelKey: string }[] = [
 // Toast i18n KEY per transcription-failure cause (MYND-591) — resolved with
 // `t()` at usage time (never a frozen resolved string). `"failed"` and any
 // unrecognized kind fall back to the generic failure toast at the call site.
-const TRANSCRIBE_TOAST_KEY: Readonly<Record<string, string>> = {
+const TRANSCRIBE_TOAST_KEY: Readonly<
+  Record<Exclude<TranscribeErrorKind, "failed">, string>
+> = {
   feature_off: "attachments.library.transcribeFeatureOff",
   vault_locked: "attachments.library.transcribeVaultLocked",
   no_model: "attachments.library.transcribeNoModelHint",
   model_load_failed: "attachments.library.transcribeModelLoadFailed",
+  too_long: "attachments.library.transcribeTooLong",
 };
 
 interface AttachmentsLibraryProps {
@@ -511,7 +518,14 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
         })
         .catch((err: unknown) => {
           const kind = (err as TranscribeError | null)?.kind ?? "failed";
-          showAttachmentToast(t(TRANSCRIBE_TOAST_KEY[kind] ?? "attachments.library.transcribeFailed"), "error");
+          // `"failed"` is spelled out rather than reached through a `??`
+          // fallback, so `TRANSCRIBE_TOAST_KEY` can be typed over the rest of
+          // the union and a new cause fails to compile here. The fallback form
+          // typechecked with a missing row and rendered the generic copy for a
+          // cause the backend had named (myne#510).
+          const toastKey =
+            kind === "failed" ? "attachments.library.transcribeFailed" : TRANSCRIBE_TOAST_KEY[kind];
+          showAttachmentToast(t(toastKey), "error");
         });
     },
     [t],

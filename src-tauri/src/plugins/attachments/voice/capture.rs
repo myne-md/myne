@@ -31,6 +31,76 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 /// hard stop).
 pub const MAX_SAMPLES: usize = (protocol::MAX_ATTACHMENT_LEN - WAV_HEADER_LEN) / 2;
 
+/// Sample rate the transcription front end resamples to, and the ceiling on the
+/// samples it will materialize there.
+///
+/// Duplicated from `local_inference::audio` on purpose: that module is behind
+/// the `local-inference` feature and this one is not, so a direct reference
+/// would make the recorder's clip boundary depend on whether the AI build was
+/// selected. The two are held together by a compile-time assertion and a test in
+/// `audio.rs`, which is the half that can see both.
+const TRANSCRIPTION_SAMPLE_RATE_HZ: u32 = 16_000;
+const TRANSCRIPTION_CEILING_SAMPLES: usize = protocol::MAX_ATTACHMENT_LEN / 2;
+
+/// Accessors so `local_inference::audio` can assert, at compile time, that the
+/// two copies agree. `const fn` rather than `pub const` to keep the values
+/// themselves private to this module.
+///
+/// Gated on the FEATURE, not on `cfg(test)`. Their only caller is a pair of
+/// `const _: () = assert!(...)` in `local_inference::audio`, which compiles only
+/// with `local-inference` on, so exported unconditionally they are dead code in
+/// a `--no-default-features` build and `-D warnings` refuses it. That is not
+/// hypothetical: `cargo clippy -p myne-desktop --all-targets
+/// --no-default-features -- -D warnings` failed on exactly this, and the
+/// existing AI-free gate missed it because it runs `cargo check` without
+/// `--all-targets` and so never compiles test code. Gating on the feature also
+/// lets the assertions leave the test module, so the two copies are compared on
+/// every default build rather than only under `cargo test`.
+#[cfg(feature = "local-inference")]
+pub const fn transcription_sample_rate_hz() -> u32 {
+    TRANSCRIPTION_SAMPLE_RATE_HZ
+}
+#[cfg(feature = "local-inference")]
+pub const fn transcription_ceiling_samples() -> usize {
+    TRANSCRIPTION_CEILING_SAMPLES
+}
+
+/// The per-clip sample ceiling at `sample_rate`: the tighter of the § 9.9 blob
+/// cap and what transcription will accept.
+///
+/// [`MAX_SAMPLES`] is that blob cap expressed in samples, and a sample count is
+/// not a duration. At 48 kHz it is 11 min 39 s; at 8 kHz the same number of
+/// samples is 69 min 54 s. Transcription bounds the other axis: it refuses a
+/// clip whose projection to 16 kHz passes `TRANSCRIPTION_CEILING_SAMPLES`, which
+/// is a flat 34 min 57 s of audio at any declared rate.
+///
+/// The two agree at or above 16 kHz, where the resample contracts and the blob
+/// cap binds first. Below it the resample EXPANDS, so `MAX_SAMPLES` frames at
+/// 8 kHz project to twice the transcription ceiling and the recorder would emit
+/// a clip its own decoder then refuses, permanently, with a message the user
+/// cannot act on. That rate is reachable: `CpalSource::start` takes whatever
+/// `default_input_config()` reports, and Bluetooth HFP/SCO is 8 kHz on all three
+/// desktop platforms (myne-md/myne#510).
+///
+/// Taking the tighter bound costs nothing the user sees. The boundary is a
+/// seamless flush, not a stop, so a low-rate recording becomes more clips rather
+/// than a shorter one.
+pub fn max_samples_for_rate(sample_rate: u32) -> usize {
+    if sample_rate == 0 {
+        // Unreachable through `CpalSource` (cpal never reports zero) and the
+        // fixture source is fixed at 48 kHz, but a zero here would compute a
+        // boundary of zero and `drain_full_clips` would emit empty clips
+        // forever. Fall back to the cap that does not divide.
+        return MAX_SAMPLES;
+    }
+    // `ceil(f * 16000 / rate) <= CEILING` iff `f * 16000 <= CEILING * rate`, so
+    // the largest admissible frame count is the floor of that quotient. u64
+    // because the product exceeds u32 at every real rate.
+    let transcribable = ((TRANSCRIPTION_CEILING_SAMPLES as u64) * (sample_rate as u64)
+        / (TRANSCRIPTION_SAMPLE_RATE_HZ as u64)) as usize;
+    transcribable.min(MAX_SAMPLES)
+}
+
 /// How often the session loop drains the source and checks for a stop signal.
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 
@@ -301,6 +371,10 @@ pub fn run_session(
         Err(e) => return SessionResult::Error(e),
     };
     let sample_rate = source.sample_rate();
+    // The caller passes the § 9.9 blob cap; the rate is only knowable here,
+    // after the source is built, so the transcription half of the boundary is
+    // applied at this point. See `max_samples_for_rate`.
+    let max_samples = max_samples_for_rate(sample_rate).min(max_samples);
     let mut buffer: Zeroizing<Vec<i16>> = Zeroizing::new(Vec::new());
 
     loop {
@@ -385,6 +459,29 @@ fn drain_full_clips(buffer: &mut Vec<i16>, max: usize) -> Vec<Vec<i16>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The `sample_rate == 0` arm, which every other guard in this change got a
+    /// named test for and this one did not. Unreachable through `CpalSource`
+    /// (cpal never reports zero) and through the 48 kHz fixture source, so it is
+    /// documented defensive code: the point is that it returns the cap that does
+    /// not divide rather than a boundary of zero, which `drain_full_clips` would
+    /// turn into empty clips forever.
+    #[test]
+    fn a_zero_rate_falls_back_to_the_blob_cap_rather_than_a_zero_boundary() {
+        assert_eq!(max_samples_for_rate(0), MAX_SAMPLES);
+    }
+
+    /// Below the target rate the transcription bound is the tighter one; at or
+    /// above it the blob cap is. Both directions, so the clamp cannot pass by
+    /// always returning one of them.
+    #[test]
+    fn the_tighter_of_the_two_bounds_wins_at_each_rate() {
+        assert!(max_samples_for_rate(8_000) < MAX_SAMPLES);
+        assert_eq!(max_samples_for_rate(8_000), MAX_SAMPLES / 2 + 11);
+        assert_eq!(max_samples_for_rate(16_000), MAX_SAMPLES);
+        assert_eq!(max_samples_for_rate(48_000), MAX_SAMPLES);
+    }
+
     use std::sync::mpsc;
 
     #[test]
