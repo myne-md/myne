@@ -23,6 +23,7 @@
 
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Spinner } from "./Spinner";
+import { stageRootStyle } from "./primitives/stageRoot";
 
 interface BlockingProgressStepProps {
   /** Optional small uppercase eyebrow above the heading. Examples:
@@ -53,10 +54,7 @@ interface BlockingProgressStepProps {
 }
 
 const ROOT_STYLE: CSSProperties = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  ...stageRootStyle,
   background: "var(--bg-1)",
   padding: "var(--space-5)",
 };

@@ -247,21 +247,59 @@
 
 /* ── The `+` add-field affordance (inline, at the end of a task line) ───────── */
 
+/* Metrics are LINE-BOX NEUTRAL, and that is load-bearing rather than cosmetic
+   (myne-md/myne#560).
+
+   This widget is cursor-gated: it appears the moment the caret lands on a task
+   line and vanishes when it leaves. So anything it contributes to the line box
+   is contributed CONDITIONALLY, and the row changes height under the caret.
+
+   It used to be a 20px box on `vertical-align: baseline`, which puts all 20px
+   ABOVE the baseline against roughly 16px for 14px/1.7 text, so the row grew by
+   about 4px whenever the caret arrived. Two things follow, and the second is the
+   one that was reported:
+
+     - CM6's height map gets a line whose height depends on the selection, which
+       is the same defect `theme.ts` records for the wikilink chip ("a VERTICAL
+       margin here makes any line holding a chip taller than its neighbours").
+     - `drawSelection` probes a line's visual row twice per selection, once from
+       each end (`rectanglesForRange` -> `wrappedLine`). When the two probes
+       disagree it falls to the two-rect branch and paints `range.from`-to-RIGHT
+       EDGE plus LEFT EDGE-to-`range.to`. Over one row that is a full-width band
+       with a second, denser wash across the selected text, because
+       `--selection-bg` is translucent. That is the "double highlight".
+
+   This is the ROOT-CAUSE half of that pair; the symptom half is `isCaretLine` in
+   `editor/src/decorations/cursor-aware.ts`, which stops the widget entering the
+   DOM during a selection at all. Both shipped together, and neither closes the
+   class on its own: the box below still contributes inline WIDTH when the caret
+   arrives, so on a row near the wrap width it can still force a wrap. Taking it
+   out of flow would close that; it is a bigger change than either of these.
+
+   So: sized in `em` (it tracks `--editor-text-size` rather than assuming 14px),
+   middle-aligned, and its block margins cancel its own height so the margin box
+   is zero-height at EVERY `--editor-line-spacing`. A px box that merely happens
+   to fit at the default typography would grow the line again at the small text
+   size or the tight line spacing. */
 .cm-task-add {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 1.35em;
+  height: 1.35em;
   margin-left: 6px;
+  margin-block: -0.675em;
   padding: 0;
-  vertical-align: baseline;
+  vertical-align: middle;
   border: 1px solid var(--line-2, #c8c7c1);
   border-radius: var(--radius-2, 6px);
   background: transparent;
   color: var(--fg-3, #78766e);
   font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
-  font-size: 15px;
+  /* Relative, so the `em` box metrics above resolve against the editor's text
+     size rather than a hardcoded 15px. `em` on width/height/margin reads the
+     element's OWN font-size, so this declaration is what carries the tracking. */
+  font-size: 1.05em;
   font-weight: var(--weight-semibold);
   line-height: 1;
   cursor: pointer;
@@ -289,8 +327,9 @@
    inline glyph on desktop where it would push the line height around. */
 @media (pointer: coarse) {
   .cm-task-add {
-    width: 28px;
-    height: 28px;
+    width: 2em;
+    height: 2em;
+    margin-block: -1em;
     font-size: var(--text-lg);
   }
 }

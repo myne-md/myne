@@ -476,9 +476,19 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
               a migration the vault locks and the user re-unlocks, so this is the
               surface they come back to, not one they see on the way out. */}
           <SettleMigrationBlock
-            onSettled={() => {
+            onSettled={(which) => {
               probeMigration();
-              onMigrated?.();
+              // ABORT only (myne-md/myne#461). `onMigrated` is the force-relock:
+              // it routes the shell to the Unlock screen, which is right after
+              // an abort, because that command restores the pre-migration root
+              // and the backend drops the slot with it. Confirm is not a re-key.
+              // It erases the staged `legacy/` snapshot and leaves the running
+              // slot untouched, so relocking on top of it showed a lock screen
+              // the backend never locked: the correct password then came back
+              // `VaultAlreadyUnlocked` forever and the only way out was
+              // restarting the app. Confirm re-probes and leaves the user where
+              // they are, which is what settling a migration should feel like.
+              if (which === "aborted") onMigrated?.();
             }}
           />
         </div>

@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Jegyzet műveletei",
+      "convertFailed": "Nem sikerült átalakítani ezt a jegyzetet, ezért változatlan maradt.",
       "rename": "Átnevezés",
       "move": "Áthelyezés mappába…",
       "duplicate": "Másolat",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "A mappa neve nem tartalmazhat / \\ | # ^ [ ] karaktert, és nem kezdődhet vagy végződhet szóközzel.",
       "tooLong": "Ez a mappaútvonal túl hosszú.",
       "moveIntoSelf": "Egy mappa nem helyezhető át önmagába.",
-      "moveCollision": "Ott már van ilyen nevű mappa."
+      "moveCollision": "Ott már van ilyen nevű mappa.",
+      "unsettledSave": "Egy nyitott jegyzet mentése még nem fejeződött be, ezért a mappa érintetlen maradt. Próbáld újra, amint befejeződött.",
+      "renameFailed": "Nem sikerült átnevezni a mappát, ezért változatlan maradt.",
+      "deliberateWriteFailed": "A mappa átnevezése sikerült, de az egyik beállítását nem sikerült menteni. Minden feloldáskor újra megjelenik egy üres mappa a régi néven; nyugodtan törölheted, ez semmi mást nem változtat meg. Az ismételt átnevezés nem tünteti el."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Hozzáadás a kedvencekhez",
       "archive": "Archiválás",
       "archiveBulkError": "Nem sikerült archiválni a jegyzeteket.",
+      "renameFailed": "Nem sikerült menteni ezt a nevet, ezért a jegyzet megtartotta a régit.",
       "archiveFolder": "Mappa archiválása",
       "archiveNote": "Archiválás",
       "archiveSingleError": "Nem sikerült archiválni a jegyzetet.",
@@ -2260,6 +2265,7 @@
       "thisNote": "ez a jegyzet",
       "untitled": "Névtelen"
     },
+    "unsettledSave": "Egy nyitott jegyzet mentése még nem fejeződött be, ezért semmi nem változott. Próbáld újra, amint befejeződött.",
     "views": {
       "cards": {
         "changeCover": "Borító módosítása",
@@ -3878,10 +3884,13 @@
       "copied": "Másolva",
       "copy": "Másolás",
       "copyFailed": "Nem sikerült a másolás. Használd inkább a „Mentés fájlként” lehetőséget.",
+      "downloadStarted": "Elküldve a böngésződ letöltései közé. Ellenőrizd, hogy megérkezett-e: a böngésződ dönti el, hova kerül a fájl, és ebbe a Myne nem lát bele.",
       "eyebrow": "4. lépés a 4-ből: fiókszám",
       "heading": "Mentsd el a fiókszámodat.",
       "intro": "Ez a bemutatóra szóló tokened. Kezeld úgy, mint a készpénzt.",
       "saveAsFile": "Mentés fájlként",
+      "saveFailed": "Nem sikerült menteni a fájlt. Másold ki inkább a fiókszámot, vagy írd le.",
+      "savedToFile": "Mentve. Ez egyszerű szövegfájl, ezért tartsd olyan helyen, ahol csak te olvashatod.",
       "shownOnceBody": "Mentsd el most. A Myne nem tudja visszaszerezni neked. A későbbi szinkronizáláshoz való regisztrációhoz szükséges.",
       "shownOnceEmphasis": "Ez csak egyszer jelenik meg."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Másolás",
       "extensionNotice": "Az ehhez az oldalhoz hozzáférő böngészőbővítmények el tudják olvasni, ami ezen az oldalon van. Ha nem vagy biztos ebben a profilban lévő minden bővítményben, ehhez a lépéshez használd az asztali alkalmazást vagy egy tiszta böngészőprofilt.",
       "copyFailed": "Nem sikerült a másolás. Használd helyette a „Mentés fájlként” lehetőséget.",
+      "downloadStarted": "Elküldve a böngésződ letöltései közé. Ellenőrizd, hogy megérkezett-e: a böngésződ dönti el, hova kerül a fájl, és ebbe a Myne nem lát bele.",
       "eyebrow": "2. lépés a 4-ből: helyreállító mondat",
       "heading": "Írd le ezt a 24 szót.",
       "intro": "Ez a mondat a jelszavaddal együtt az egyetlen módja a széfed helyreállításának. Tárold offline: papíron, jelszókezelőben, hardveres pénztárcában. Kezeld úgy, mint a készpénzt.",
       "reveal": "Mondat felfedése",
-      "saveAsFile": "Mentés fájlként"
+      "saveAsFile": "Mentés fájlként",
+      "saveFailed": "Nem sikerült menteni a fájlt. Másold ki inkább a szavakat, vagy írd le őket.",
+      "savedToFile": "Mentve. Ez egyszerű szövegfájl, ezért tartsd olyan helyen, ahol csak te olvashatod."
     },
     "ready": {
       "backedUp": "Mentve ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Másolva. Ezen az eszközön marad, és a rendszer 30 másodperc múlva eldobja.",
     "phraseCopyFailed": "Nem sikerült a másolás. Használd helyette a „Mentés fájlba” lehetőséget.",
     "savedToFile": "Mentve ide: {{label}}",
+    "savedToShareSheet": "Mentve a Myne-ban, ahol a rendszer fájlkezelője nem fér hozzá. Ez egyszerű szövegfájl, ezért ha a megosztási ablakkal olyan helyre tesz egy másolatot, ahol hozzáfér, válasszon olyan helyet, amelyet csak Ön olvashat, ne felhőtárhelyet. Koppintson újra a Mentés gombra, ha bezárta az ablakot.",
+    "savedFileWritten": "Mentve a Myne-ban. Ez egyszerű szövegfájl, ezért minden másolatát olyan helyen tartsa, ahol csak Ön olvashatja. Ez az eszköz nem jelezte, honnan érhető el a fájl, így tekintse úgy, hogy csak az alkalmazáson belülről érhető el, amíg ezt nem ellenőrizte.",
     "saveFileError": "Nem sikerült menteni a fájlt.",
     "stepLabel": "Széf létrehozása · {{current}} / {{total}}",
     "briefingTitle": "Mielőtt elkezdenénk",

@@ -173,7 +173,13 @@ describe("check-twin-inventory", () => {
     // clipboardManager.ts`, a seam module re-exporting a package the same change
     // removed, and the STALE direction is what said so. A verdict that outlives
     // its files describes nothing and inflates every count published here.
-    expect(full.out).toContain("105 twin(s) discovered");
+    //
+    // Then 105 to 104: myne-md/myne#520's review moved the cover-signal event
+    // names and detail types into `@myne/editor/cover-signal` and deleted both
+    // clients' copies, which is the destination the entry itself named. A twin
+    // that stops being a twin because the duplication was resolved leaves the
+    // roster the same way a deleted file does.
+    expect(full.out).toContain("104 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -347,7 +353,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(105);
+    expect(ROSTER.length).toBe(104);
   });
 
   it("keeps `screen` narrow", () => {

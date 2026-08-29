@@ -4,7 +4,7 @@
 // renders a React token tree, never `dangerouslySetInnerHTML`). Covers the marks
 // a note commonly uses; anything unrecognized falls through as plain text.
 
-import { parseEmbedAlias } from "@myne/dialect/embedLayout";
+import { parseEmbedAlias, type EmbedLayout } from "@myne/dialect/embedLayout";
 
 export type Inline =
   | { kind: "text"; text: string }
@@ -13,7 +13,29 @@ export type Inline =
   | { kind: "code"; text: string }
   | { kind: "link"; text: string; href: string }
   | { kind: "wikilink"; target: string; label: string }
-  | { kind: "attachment"; id: string; label: string };
+  | {
+      kind: "attachment";
+      id: string;
+      /** The display filename, with the layout segments split off. */
+      label: string;
+      /**
+       * The author's layout choices, carried whole so a renderer can apply what
+       * it supports rather than re-parsing the alias. `layout.alt` is included,
+       * and a renderer reads it through `embedAccessibleName` rather than
+       * directly: `null` means the author wrote none, so the filename remains
+       * the accessible name, while `""` means they deliberately wrote an empty
+       * one, which marks the media decorative and is NOT the same thing
+       * (`docs/spec/wikilink.md` §5.1). Mobile parsed the alias and then kept
+       * only `label`, so an authored alt was not the accessible name on a phone
+       * and an authored empty alt announced the filename instead of being
+       * skipped.
+       *
+       * It is not ALSO copied to a sibling `alt` field. It was, briefly, and
+       * two fields holding one fact is how a later writer sets one and not the
+       * other.
+       */
+      layout: EmbedLayout;
+    };
 
 export type Block =
   | { kind: "heading"; level: number; content: Inline[] }
@@ -39,11 +61,18 @@ const INLINE = [
     // degrading the inline player. `@myne/dialect` owns the split, and mobile
     // source-consumes it, so there is one grammar rather than a second copy.
     re: /^!\[\[att:([0-9a-f]{64})(?:\|([^\]\n]*))?\]\]/,
-    make: (m: RegExpExecArray): Inline => ({
-      kind: "attachment",
-      id: m[1],
-      label: parseEmbedAlias(m[2] ?? "").filename.trim(),
-    }),
+    make: (m: RegExpExecArray): Inline => {
+      const { filename, layout } = parseEmbedAlias(m[2] ?? "");
+      return {
+        kind: "attachment",
+        id: m[1],
+        label: filename.trim(),
+        // `layout.alt` is NOT `?? ""`-defaulted and NOT trimmed anywhere on the
+        // way here. Both would erase the distinction §5.1 rests on: `null` is
+        // "no alt authored", `""` is "decorative".
+        layout,
+      };
+    },
   },
   {
     re: /^\[\[([^\]|\n]+?)(?:\|([^\]\n]*))?\]\]/,

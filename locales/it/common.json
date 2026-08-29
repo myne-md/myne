@@ -1204,6 +1204,7 @@
     },
     "noteActions": {
       "buttonLabel": "Azioni della nota",
+      "convertFailed": "Impossibile cambiare il tipo di questa nota, che resta quindi invariata.",
       "rename": "Rinomina",
       "move": "Sposta in una cartella…",
       "duplicate": "Duplica",
@@ -1873,7 +1874,10 @@
       "illegalSegment": "Il nome di una cartella non può contenere / \\ | # ^ [ ] né iniziare o terminare con uno spazio.",
       "tooLong": "Quel percorso di cartella è troppo lungo.",
       "moveIntoSelf": "Una cartella non può essere spostata dentro sé stessa.",
-      "moveCollision": "Lì esiste già una cartella con quel nome."
+      "moveCollision": "Lì esiste già una cartella con quel nome.",
+      "unsettledSave": "Una nota aperta non ha ancora finito di salvarsi, quindi la cartella non è stata toccata. Riprova quando avrà finito.",
+      "renameFailed": "Impossibile rinominare la cartella, che resta quindi invariata.",
+      "deliberateWriteFailed": "La cartella è stata rinominata, ma non è stato possibile salvare una delle sue impostazioni. A ogni sblocco ricomparirà una cartella vuota con il vecchio nome; puoi eliminarla tranquillamente e non cambia nient'altro. Rinominare di nuovo la cartella non la farà sparire."
     },
     "folderNote": {
       "defaultTitle": "Indice"
@@ -2077,6 +2081,7 @@
       "addToFavorites": "Aggiungi ai preferiti",
       "archive": "Archivia",
       "archiveBulkError": "Impossibile archiviare le note.",
+      "renameFailed": "Impossibile salvare quel nome, quindi la nota ha mantenuto quello precedente.",
       "archiveFolder": "Archivia cartella",
       "archiveNote": "Archivia",
       "archiveSingleError": "Impossibile archiviare la nota.",
@@ -2350,6 +2355,7 @@
       "thisNote": "questa nota",
       "untitled": "Senza titolo"
     },
+    "unsettledSave": "Una nota aperta non ha ancora finito di salvarsi, quindi non è stato cambiato nulla. Riprova quando avrà finito.",
     "views": {
       "cards": {
         "changeCover": "Cambia copertina",
@@ -3998,10 +4004,13 @@
       "copied": "Copiato",
       "copy": "Copia",
       "copyFailed": "Impossibile copiare. Usa invece “Salva come file”.",
+      "downloadStarted": "Inviato ai download del tuo browser. Controlla che sia arrivato: è il tuo browser a decidere dove finisce il file, e Myne non può vedere se è arrivato.",
       "eyebrow": "Passaggio 4 di 4: numero di account",
       "heading": "Salva il tuo numero di account.",
       "intro": "Questo è il tuo token al portatore. Trattalo come contanti.",
       "saveAsFile": "Salva come file",
+      "saveFailed": "Impossibile salvare il file. Copia invece il numero, oppure trascrivilo.",
+      "savedToFile": "Salvato. È un file di testo semplice, quindi conservalo in un luogo che solo tu puoi leggere.",
       "shownOnceBody": "Salvalo ora. Myne non può recuperarlo per te. È necessario per registrarti alla sincronizzazione più avanti.",
       "shownOnceEmphasis": "Viene mostrato una sola volta."
     },
@@ -4155,11 +4164,14 @@
       "copy": "Copia",
       "extensionNotice": "Le estensioni del browser che hanno accesso a questo sito possono leggere ciò che si trova in questa pagina. Se non hai la certezza su tutte le estensioni presenti in questo profilo, usa l'app desktop o un profilo browser pulito per questo passaggio.",
       "copyFailed": "Impossibile copiare. Usa invece \"Salva come file\".",
+      "downloadStarted": "Inviato ai download del tuo browser. Controlla che sia arrivato: è il tuo browser a decidere dove finisce il file, e Myne non può vedere se è arrivato.",
       "eyebrow": "Passaggio 2 di 4: frase di recupero",
       "heading": "Trascrivi queste 24 parole.",
       "intro": "Questa frase, insieme alla tua password, è l'unico modo per recuperare la tua cassaforte. Conservala offline: su carta, in un gestore di password, in un hardware wallet. Trattala come contanti.",
       "reveal": "Mostra la frase",
-      "saveAsFile": "Salva come file"
+      "saveAsFile": "Salva come file",
+      "saveFailed": "Impossibile salvare il file. Copia invece le parole, oppure trascrivile.",
+      "savedToFile": "Salvato. È un file di testo semplice, quindi conservalo in un luogo che solo tu puoi leggere."
     },
     "ready": {
       "backedUp": "Backup eseguito ✓",
@@ -4409,6 +4421,8 @@
     "phraseCopied": "Copiata. Resta su questo dispositivo e il sistema la elimina dopo 30 secondi.",
     "phraseCopyFailed": "Impossibile copiare. Usa invece \"Salva su file\".",
     "savedToFile": "Salvato in {{label}}",
+    "savedToShareSheet": "Salvato dentro Myne, dove il file manager di sistema non può raggiungerlo. È un file di testo semplice, quindi se usi il menu di condivisione per metterne una copia in un posto che puoi raggiungere, scegli un luogo che solo tu puoi leggere, anziché un servizio cloud. Tocca di nuovo Salva se hai chiuso il menu.",
+    "savedFileWritten": "Salvato dentro Myne. È un file di testo semplice, quindi conserva ogni copia che ne fai in un luogo che solo tu puoi leggere. Questo dispositivo non ha comunicato da dove si può raggiungere il file, perciò consideralo raggiungibile solo dall'interno dell'app finché non avrai verificato.",
     "saveFileError": "Impossibile salvare il file.",
     "stepLabel": "Crea una cassaforte · {{current}} di {{total}}",
     "briefingTitle": "Prima di iniziare",

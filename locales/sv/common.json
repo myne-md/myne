@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Anteckningsåtgärder",
+      "convertFailed": "Det gick inte att ändra vad den här anteckningen är, så den är oförändrad.",
       "rename": "Byt namn",
       "move": "Flytta till mapp…",
       "duplicate": "Duplicera",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Ett mappnamn får inte innehålla / \\ | # ^ [ ] eller börja/sluta med ett mellanslag.",
       "tooLong": "Den mappsökvägen är för lång.",
       "moveIntoSelf": "En mapp kan inte flyttas in i sig själv.",
-      "moveCollision": "Det finns redan en mapp med det namnet där."
+      "moveCollision": "Det finns redan en mapp med det namnet där.",
+      "unsettledSave": "En öppen anteckning har inte sparats färdigt, så mappen lämnades orörd. Försök igen när den har sparats.",
+      "renameFailed": "Det gick inte att byta namn på mappen, så den är oförändrad.",
+      "deliberateWriteFailed": "Mappen fick ett nytt namn, men en av dess inställningar kunde inte sparas. En tom mapp dyker upp igen under det gamla namnet varje gång du låser upp; det är säkert att ta bort den, och inget annat påverkas. Att byta namn på mappen igen tar inte bort den."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Lägg till i favoriter",
       "archive": "Arkivera",
       "archiveBulkError": "Kunde inte arkivera anteckningarna.",
+      "renameFailed": "Det gick inte att spara det namnet, så anteckningen behöll sitt gamla.",
       "archiveFolder": "Arkivera mapp",
       "archiveNote": "Arkivera",
       "archiveSingleError": "Kunde inte arkivera anteckningen.",
@@ -2260,6 +2265,7 @@
       "thisNote": "den här anteckningen",
       "untitled": "Namnlös"
     },
+    "unsettledSave": "En öppen anteckning har inte sparats färdigt, så ingenting ändrades. Försök igen när den har sparats.",
     "views": {
       "cards": {
         "changeCover": "Byt omslag",
@@ -3878,10 +3884,13 @@
       "copied": "Kopierad",
       "copy": "Kopiera",
       "copyFailed": "Det gick inte att kopiera. Använd ”Spara som fil” i stället.",
+      "downloadStarted": "Skickat till din webbläsares nedladdningar. Kontrollera att filen kom fram: din webbläsare bestämmer var den hamnar, och Myne kan inte se om den gjorde det.",
       "eyebrow": "Steg 4 av 4: kontonummer",
       "heading": "Spara ditt kontonummer.",
       "intro": "Det här är din innehavartoken. Behandla den som kontanter.",
       "saveAsFile": "Spara som fil",
+      "saveFailed": "Det gick inte att spara filen. Kopiera numret i stället, eller skriv ner det.",
+      "savedToFile": "Sparat. Det är en oformaterad textfil, så förvara den någonstans där bara du kan läsa den.",
       "shownOnceBody": "Spara det nu. Myne kan inte återskapa det åt dig. Krävs för att registrera dig för synkronisering senare.",
       "shownOnceEmphasis": "Detta visas bara en gång."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Kopiera",
       "extensionNotice": "Webbläsartillägg med åtkomst till den här webbplatsen kan läsa det som finns på den här sidan. Om du inte är säker på varje tillägg i den här profilen, använd skrivbordsappen eller en ren webbläsarprofil för det här steget.",
       "copyFailed": "Kunde inte kopiera. Använd ”Spara som fil” i stället.",
+      "downloadStarted": "Skickat till din webbläsares nedladdningar. Kontrollera att filen kom fram: din webbläsare bestämmer var den hamnar, och Myne kan inte se om den gjorde det.",
       "eyebrow": "Steg 2 av 4: återställningsfras",
       "heading": "Skriv ner de här 24 orden.",
       "intro": "Den här frasen, tillsammans med ditt lösenord, är det enda sättet att återställa ditt valv. Förvara den offline: papper, lösenordshanterare, hårdvaruplånbok. Behandla den som kontanter.",
       "reveal": "Visa fras",
-      "saveAsFile": "Spara som fil"
+      "saveAsFile": "Spara som fil",
+      "saveFailed": "Det gick inte att spara filen. Kopiera orden i stället, eller skriv ner dem.",
+      "savedToFile": "Sparat. Det är en oformaterad textfil, så förvara den någonstans där bara du kan läsa den."
     },
     "ready": {
       "backedUp": "Säkerhetskopierad ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Kopierad. Den stannar på den här enheten, och systemet rensar den efter 30 sekunder.",
     "phraseCopyFailed": "Kunde inte kopiera. Använd ”Spara till fil” i stället.",
     "savedToFile": "Sparat till {{label}}",
+    "savedToShareSheet": "Sparat inuti Myne, där systemets filhanterare inte kommer åt den. Det är en oformaterad textfil, så om du använder delningsmenyn för att lägga en kopia någonstans där du kommer åt den, välj någonstans där bara du kan läsa den, inte en molntjänst. Tryck på Spara igen om du stängde menyn.",
+    "savedFileWritten": "Sparat inuti Myne. Det är en oformaterad textfil, så förvara varje kopia du gör någonstans där bara du kan läsa den. Den här enheten rapporterade inte var filen går att nå, så behandla den som åtkomlig endast inifrån appen tills du har kontrollerat.",
     "saveFileError": "Det gick inte att spara filen.",
     "stepLabel": "Skapa ett valv · {{current}} av {{total}}",
     "briefingTitle": "Innan vi börjar",

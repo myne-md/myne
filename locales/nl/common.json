@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Notitieacties",
+      "convertFailed": "Kon niet wijzigen wat deze notitie is, dus ze is ongewijzigd gebleven.",
       "rename": "Hernoemen",
       "move": "Naar map verplaatsen…",
       "duplicate": "Dupliceren",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Een mapnaam mag geen / \\ | # ^ [ ] bevatten en niet met een spatie beginnen of eindigen.",
       "tooLong": "Dat mappad is te lang.",
       "moveIntoSelf": "Een map kan niet in zichzelf worden verplaatst.",
-      "moveCollision": "Daar bestaat al een map met die naam."
+      "moveCollision": "Daar bestaat al een map met die naam.",
+      "unsettledSave": "Een geopende notitie is nog niet klaar met opslaan, dus de map is ongemoeid gelaten. Probeer het opnieuw zodra dat klaar is.",
+      "renameFailed": "Kon de map niet hernoemen, dus die is ongewijzigd gebleven.",
+      "deliberateWriteFailed": "De map is hernoemd, maar een van de instellingen kon niet worden opgeslagen. Elke keer dat je ontgrendelt, verschijnt er weer een lege map onder de oude naam; die verwijderen is veilig en verandert verder niets. De map opnieuw hernoemen ruimt hem niet op."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Aan favorieten toevoegen",
       "archive": "Archief",
       "archiveBulkError": "De notities konden niet worden gearchiveerd.",
+      "renameFailed": "Kon die naam niet opslaan, dus de notitie behield de oude naam.",
       "archiveFolder": "Map archiveren",
       "archiveNote": "Archiveren",
       "archiveSingleError": "De notitie kon niet worden gearchiveerd.",
@@ -2260,6 +2265,7 @@
       "thisNote": "deze notitie",
       "untitled": "Naamloos"
     },
+    "unsettledSave": "Een geopende notitie is nog niet klaar met opslaan, dus er is niets gewijzigd. Probeer het opnieuw zodra dat klaar is.",
     "views": {
       "cards": {
         "changeCover": "Omslag wijzigen",
@@ -3878,10 +3884,13 @@
       "copied": "Gekopieerd",
       "copy": "Kopiëren",
       "copyFailed": "Kopiëren is niet gelukt. Gebruik in plaats daarvan “Opslaan als bestand”.",
+      "downloadStarted": "Naar de downloads van je browser gestuurd. Controleer of het bestand is aangekomen: je browser bepaalt waar het terechtkomt, en Myne kan niet zien of dat gebeurd is.",
       "eyebrow": "Stap 4 van 4: accountnummer",
       "heading": "Bewaar je accountnummer.",
       "intro": "Dit is je toonderwaarde. Behandel het als contant geld.",
       "saveAsFile": "Opslaan als bestand",
+      "saveFailed": "Kon het bestand niet opslaan. Kopieer in plaats daarvan het nummer, of schrijf het op.",
+      "savedToFile": "Opgeslagen. Het is een bestand met platte tekst, dus bewaar het op een plek waar alleen jij het kunt lezen.",
       "shownOnceBody": "Sla het nu op. Myne kan het niet voor je herstellen. Vereist om je later voor synchronisatie te registreren.",
       "shownOnceEmphasis": "Dit wordt maar één keer getoond."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Kopiëren",
       "extensionNotice": "Browserextensies met toegang tot deze site kunnen lezen wat er op deze pagina staat. Als je niet van elke extensie in dit profiel zeker bent, gebruik dan de desktop-app of een schoon browserprofiel voor deze stap.",
       "copyFailed": "Kon niet kopiëren. Gebruik in plaats daarvan “Opslaan als bestand”.",
+      "downloadStarted": "Naar de downloads van je browser gestuurd. Controleer of het bestand is aangekomen: je browser bepaalt waar het terechtkomt, en Myne kan niet zien of dat gebeurd is.",
       "eyebrow": "Stap 2 van 4: herstelzin",
       "heading": "Schrijf deze 24 woorden op.",
       "intro": "Deze zin is, samen met je wachtwoord, de enige manier om je kluis te herstellen. Bewaar hem offline: op papier, in een wachtwoordmanager of op een hardware wallet. Behandel hem als contant geld.",
       "reveal": "Zin tonen",
-      "saveAsFile": "Opslaan als bestand"
+      "saveAsFile": "Opslaan als bestand",
+      "saveFailed": "Kon het bestand niet opslaan. Kopieer in plaats daarvan de woorden, of schrijf ze op.",
+      "savedToFile": "Opgeslagen. Het is een bestand met platte tekst, dus bewaar het op een plek waar alleen jij het kunt lezen."
     },
     "ready": {
       "backedUp": "Back-up gemaakt ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Gekopieerd. Het blijft op dit apparaat en het systeem verwijdert het na 30 seconden.",
     "phraseCopyFailed": "Kon niet kopiëren. Gebruik in plaats daarvan “Opslaan in bestand”.",
     "savedToFile": "Opgeslagen in {{label}}",
+    "savedToShareSheet": "Opgeslagen in Myne, waar bestandsbeheer van het systeem er niet bij kan. Het is een bestand met platte tekst, dus als je het deelmenu gebruikt om een kopie op een plek te zetten waar je wel bij kunt, kies dan een plek waar alleen jij het kunt lezen en geen cloudopslag. Tik opnieuw op Opslaan als je het menu hebt gesloten.",
+    "savedFileWritten": "Opgeslagen in Myne. Het is een bestand met platte tekst, dus bewaar elke kopie die je maakt op een plek waar alleen jij het kunt lezen. Dit apparaat heeft niet gemeld waar het bestand te bereiken is, dus ga ervan uit dat het alleen vanuit de app bereikbaar is totdat je dat hebt gecontroleerd.",
     "saveFileError": "Kon het bestand niet opslaan.",
     "stepLabel": "Een kluis aanmaken · {{current}} van {{total}}",
     "briefingTitle": "Voordat we beginnen",

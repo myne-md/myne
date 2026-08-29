@@ -16,6 +16,8 @@
 #                         `local-inference-stub` build too: use e2e-ai-buildrun.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 IMAGE=myne-e2e
 SPEC="$1"; shift || true
 EXTRA="$*"
@@ -28,13 +30,9 @@ RUN_FLAGS=(
   # container's pnpm install otherwise rewrites the bind-mounted members'
   # symlinks to container-side .pnpm hashes, breaking the HOST install
   # (symptom: host tsc "Cannot find module '@excalidraw/excalidraw'").
-  -v myne-e2e-nm-dialect:/work/dialect/node_modules
-  -v myne-e2e-nm-editor:/work/editor/node_modules
-  -v myne-e2e-nm-copy:/work/copy/node_modules
-  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
-  -v myne-e2e-nm-preview:/work/preview/node_modules
-  -v myne-e2e-target:/work/target
-  -v myne-e2e-cargo-registry:/usr/local/cargo/registry
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
+  -v "$E2E_TARGET_VOLUME":/work/target
+  "${E2E_REGISTRY_MOUNT[@]}"
   -w /work
   --user root
 )
@@ -64,10 +62,9 @@ esac
 if [[ -f "myne-server/myne-server-linux-$SRVARCH" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/myne-server/myne-server-linux-$SRVARCH"
 fi
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target /usr/local/cargo/registry'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config vitest.e2e.config.ts e2e/${SPEC}.e2e.ts ${EXTRA}

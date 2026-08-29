@@ -38,11 +38,14 @@ import { seedVault, seedVaults } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
+  clickNoteRow,
+  noteRowIds,
+  rowMenuPick,
   selectPickerRow,
   switchToVault,
   unlockToEditor,
 } from "./support/flows";
-import { type Element, type Session, testIdSelector } from "./support/webdriver";
+import { type Session, testIdSelector } from "./support/webdriver";
 
 
 // Distinct note titles — single lowercase-alnum tokens (the residue
@@ -106,43 +109,8 @@ async function waitForLayout(
   );
 }
 
-// ── note-row driving ─────────────────────────────────────────────────────
-
-/** The sidebar rows' note-ids, in DOM order, once exactly `expected` exist. */
-async function noteRowIds(session: Session, expected: number): Promise<string[]> {
-  const rows = await session.waitUntil(
-    async () => {
-      const found = await session.byTestIdAll("notes.row");
-      return found.length === expected ? found : null;
-    },
-    { label: `${expected} note rows`, timeoutMs: 15_000 },
-  );
-  return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
-}
-
-async function row(session: Session, noteId: string): Promise<Element> {
-  return session.waitForElement(testIdSelector("notes.row", { "data-note-id": noteId }));
-}
-
-/** Right-click a note row and pick a context-menu item by `data-item-id`. The
- *  new-tab / open-to-side gestures are driven through the row's REAL context menu
- *  (`open-in-new-tab` / `open-to-side`) rather than middle-click / Alt-click: the
- *  WebDriver synthetic middle-click never fires `auxclick` under WebKit, and the
- *  Alt-modifier click doesn't establish the split — both production gestures, but
- *  not driver-addressable. The context-menu items invoke the SAME workspace
- *  actions (openNewTabInFocused / openToSide). */
-async function rowMenuPick(
-  session: Session,
-  noteId: string,
-  itemId: string,
-): Promise<void> {
-  await (await row(session, noteId)).rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
+// Note-row driving lives in `support/flows.ts` (noteRowIds / noteRow /
+// rowMenuPick), shared with the cover suite's split scenario.
 
 // ── at-rest ──────────────────────────────────────────────────────────────
 
@@ -195,7 +163,7 @@ describeE2E("ws1 layout restore + at-rest (MYND-257)", () => {
         for (const t of WS1_TITLES) await createNote(s, t);
         const [n0, n1, n2] = await noteRowIds(s, 3);
 
-        await (await row(s, n0)).click(); // openInFocused → pane-0 = [n0]
+        await clickNoteRow(s, n0); // openInFocused → pane-0 = [n0]
         await rowMenuPick(s, n1, "open-in-new-tab"); // new tab → [n0, n1]
         await rowMenuPick(s, n2, "open-to-side"); // open to side → split
 
@@ -255,7 +223,7 @@ describeE2E("ws2 per-vault layout isolation (MYND-257)", () => {
         await dismissImporterOffer(s);
         for (const t of WS2_A_TITLES) await createNote(s, t);
         const [a0, a1] = await noteRowIds(s, 2);
-        await (await row(s, a0)).click();
+        await clickNoteRow(s, a0);
         await rowMenuPick(s, a1, "open-to-side"); // open to side → split
         const layoutA: LayoutSig = {
           panes: [
@@ -276,7 +244,7 @@ describeE2E("ws2 per-vault layout isolation (MYND-257)", () => {
         await unlockToEditor(s, b.password);
         for (const t of WS2_B_TITLES) await createNote(s, t);
         const [b0, b1] = await noteRowIds(s, 2);
-        await (await row(s, b0)).click();
+        await clickNoteRow(s, b0);
         await rowMenuPick(s, b1, "open-in-new-tab"); // new tab
         const layoutB: LayoutSig = {
           panes: [{ tabs: [b0, b1], active: b1 }],

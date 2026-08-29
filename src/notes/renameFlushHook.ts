@@ -12,12 +12,17 @@
 export interface RenameFlushHooks {
   /** Note-ids open in any pane right now. */
   readonly openNoteIds: () => ReadonlySet<string>;
-  /** Flush every dirty pane editor to disk. */
+  /** Flush every dirty pane editor to disk, and REJECT when any pane did not
+   *  settle (myne-md/myne#520). A caller that reads-patch-writes on top of a
+   *  pane whose save just failed clobbers unsaved text, so "the flush ran" and
+   *  "the disk matches the buffer" have to be distinguishable. */
   readonly flushOpenPanes: () => Promise<void>;
 }
 
 const EMPTY: RenameFlushHooks = {
   openNoteIds: () => new Set<string>(),
+  // Resolves, and correctly: no panes are registered, so nothing failed to
+  // settle. The degraded case is "no open editors", not "an unknown state".
   flushOpenPanes: async () => {},
 };
 

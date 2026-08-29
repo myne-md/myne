@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Notehandlinger",
+      "convertFailed": "Kunne ikke ændre, hvad denne note er, så den er uændret.",
       "rename": "Omdøb",
       "move": "Flyt til mappe…",
       "duplicate": "Dublér",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Et mappenavn kan ikke indeholde / \\ | # ^ [ ] eller begynde/slutte med et mellemrum.",
       "tooLong": "Den mappesti er for lang.",
       "moveIntoSelf": "En mappe kan ikke flyttes ind i sig selv.",
-      "moveCollision": "Der findes allerede en mappe med det navn dér."
+      "moveCollision": "Der findes allerede en mappe med det navn dér.",
+      "unsettledSave": "En åben note er ikke færdig med at blive gemt, så mappen blev ikke rørt. Prøv igen, når den er færdig.",
+      "renameFailed": "Kunne ikke omdøbe mappen, så den er uændret.",
+      "deliberateWriteFailed": "Mappen blev omdøbt, men en af dens indstillinger kunne ikke gemmes. Der dukker en tom mappe op med det gamle navn, hver gang du låser op; den kan trygt slettes, og intet andet ændres. Omdøber du mappen igen, forsvinder den ikke."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Tilføj til favoritter",
       "archive": "Arkivér",
       "archiveBulkError": "Kunne ikke arkivere noterne.",
+      "renameFailed": "Kunne ikke gemme det navn, så noten beholdt sit gamle.",
       "archiveFolder": "Arkivér mappe",
       "archiveNote": "Arkivér",
       "archiveSingleError": "Kunne ikke arkivere noten.",
@@ -2260,6 +2265,7 @@
       "thisNote": "denne note",
       "untitled": "Uden titel"
     },
+    "unsettledSave": "En åben note er ikke færdig med at blive gemt, så intet blev ændret. Prøv igen, når den er færdig.",
     "views": {
       "cards": {
         "changeCover": "Skift forside",
@@ -3878,10 +3884,13 @@
       "copied": "Kopieret",
       "copy": "Kopiér",
       "copyFailed": "Kunne ikke kopiere. Brug “Gem som fil” i stedet.",
+      "downloadStarted": "Sendt til din browsers downloads. Tjek, at den er nået frem: det er din browser, der bestemmer, hvor filen havner, og Myne kan ikke se, om den gjorde det.",
       "eyebrow": "Trin 4 af 4: kontonummer",
       "heading": "Gem dit kontonummer.",
       "intro": "Dette er din ihændehaver-nøgle. Behandl den som kontanter.",
       "saveAsFile": "Gem som fil",
+      "saveFailed": "Kunne ikke gemme filen. Kopiér nummeret i stedet, eller skriv det ned.",
+      "savedToFile": "Gemt. Det er en almindelig tekstfil, så opbevar den et sted, kun du kan læse.",
       "shownOnceBody": "Gem det nu. Myne kan ikke gendanne det for dig. Det kræves for at registrere dig til synkronisering senere.",
       "shownOnceEmphasis": "Dette vises kun én gang."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Kopiér",
       "extensionNotice": "Browserudvidelser med adgang til dette websted kan læse, hvad der står på denne side. Er du ikke sikker på hver eneste udvidelse i denne profil, så brug desktop-appen eller en ren browserprofil til dette trin.",
       "copyFailed": "Kunne ikke kopiere. Brug “Gem som fil” i stedet.",
+      "downloadStarted": "Sendt til din browsers downloads. Tjek, at den er nået frem: det er din browser, der bestemmer, hvor filen havner, og Myne kan ikke se, om den gjorde det.",
       "eyebrow": "Trin 2 af 4: gendannelsessætning",
       "heading": "Skriv disse 24 ord ned.",
       "intro": "Denne sætning er sammen med din adgangskode den eneste måde at gendanne din boks på. Opbevar den offline: på papir, i en adgangskodemanager eller en hardware-wallet. Behandl den som kontanter.",
       "reveal": "Vis sætning",
-      "saveAsFile": "Gem som fil"
+      "saveAsFile": "Gem som fil",
+      "saveFailed": "Kunne ikke gemme filen. Kopiér ordene i stedet, eller skriv dem ned.",
+      "savedToFile": "Gemt. Det er en almindelig tekstfil, så opbevar den et sted, kun du kan læse."
     },
     "ready": {
       "backedUp": "Sikkerhedskopieret ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Kopieret. Den bliver på denne enhed, og systemet fjerner den efter 30 sekunder.",
     "phraseCopyFailed": "Kunne ikke kopiere. Brug “Gem til fil” i stedet.",
     "savedToFile": "Gemt til {{label}}",
+    "savedToShareSheet": "Gemt inde i Myne, hvor systemets filbrowser ikke kan nå den. Det er en almindelig tekstfil, så hvis du bruger delearket til at lægge en kopi et sted, du kan nå, så vælg et sted, kun du kan læse, og ikke et skydrev. Tryk på Gem igen, hvis du lukkede arket.",
+    "savedFileWritten": "Gemt inde i Myne. Det er en almindelig tekstfil, så opbevar enhver kopi, du laver, et sted, kun du kan læse. Denne enhed oplyste ikke, hvorfra filen kan nås, så behandl den som kun tilgængelig inde fra appen, indtil du har tjekket efter.",
     "saveFileError": "Kunne ikke gemme filen.",
     "stepLabel": "Opret en boks · {{current}} af {{total}}",
     "briefingTitle": "Før vi begynder",

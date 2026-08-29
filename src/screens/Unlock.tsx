@@ -283,6 +283,19 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
       // The web sign-in dead end this was written for is closed a layer up
       // instead: `vault_slot_kind` is ported, so boot sees the open slot that
       // `sync_join_account` produced and routes to the editor rather than here.
+      //
+      // myne-md/myne#461 asked for the same thing again, from the desktop
+      // migration-settle path, and the answer is the same and for the same
+      // reason. That issue proposed re-probing here so the open slot routes to
+      // the editor, which is #535's design under another name: a re-probe reads
+      // the slot, sees `Unlocked`, and routes on. The case that makes it unsafe
+      // is not the one either issue was written about. `lock_with_state` cannot
+      // half-fail (`decisions.md` 0520), but a lock IPC that never REACHES it
+      // can, and `handleLockFlushed` swallows that rejection and routes here
+      // regardless. Re-probing would then open the vault on any keystroke, on a
+      // screen the user reached by pressing Lock. #461's real defect is that the
+      // frontend routed here at all after a confirm, and that is fixed where it
+      // happened, in `SettleMigrationBlock` and `SyncPanel`.
       return { kind: "banner", text: i18n.t("unlock.errors.alreadyUnlocked") };
     case "UnlockInProgress":
       return { kind: "banner", text: i18n.t("unlock.errors.inProgress") };

@@ -27,9 +27,14 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Spinner } from "../../components/Spinner";
 import { ErrorBanner } from "../../components/ErrorBanner";
-import { CopyStatus, useCopyStatus } from "../../components/CopyStatus";
+import {
+  ActionStatus,
+  type SecretAction,
+  useActionStatus,
+} from "../../components/ActionStatus";
 import {
   copySecretToClipboard,
+  saveOutcomeMessage,
   saveSecretAsTextFile,
 } from "../../lib/secret-export";
 import { StepEyebrow, StepHeading, StepLayout } from "./step-shell";
@@ -56,10 +61,10 @@ export function AccountStep({
   // what the user did next, a stale confirmation the user reads as the result of
   // the tap they just made. The shared hook reverts on its own and carries the
   // live region, so a screen reader hears the outcome too.
-  const { outcome, flashing, markCopied, markFailed } = useCopyStatus();
+  const { outcome, flashing, feedbackFor } = useActionStatus<SecretAction>();
   // The button LABEL uses the momentary half, so it reverts; the status line
   // below uses the persistent half, so the outcome stays readable.
-  const copied = flashing && outcome === "copied";
+  const copied = flashing && outcome?.action === "copy" && outcome.ok;
 
   // NO unmount cancel, and the omission is the point, matching PhraseStep.
   //
@@ -86,15 +91,32 @@ export function AccountStep({
     // consumer, it has existed in all 32 catalogs since it was written, with its
     // only caller on the mobile client, because this branch was checked here and
     // then dropped.
-    const cancel = await copySecretToClipboard(accountNumber, {
-      onSuccess: { kind: "inline", run: markCopied },
-      onFailure: { kind: "inline", run: markFailed },
-    });
+    const cancel = await copySecretToClipboard(accountNumber, feedbackFor("copy"));
     cancelAutoClearRef.current = cancel;
   };
 
   const handleSave = () =>
-    saveSecretAsTextFile("myne-account-number.txt", accountNumber);
+    saveSecretAsTextFile("myne-account-number.txt", accountNumber, feedbackFor("save"));
+
+  // Exhaustive over `SecretAction` by construction, so a third affordance is a
+  // compile error here rather than a silent fall into the save sentence. The
+  // keys stay STATIC `t("…")` literals inside the arms: `check-i18n.mjs` reads
+  // them by scanning for exactly that shape, and a table of key strings would
+  // put four load-bearing keys outside everything that checks them.
+  const message: Record<SecretAction, (ok: boolean) => string> = {
+    copy: (ok) =>
+      ok ? t("vaultCreation.account.copied") : t("vaultCreation.account.copyFailed"),
+    // The success half branches on the capability for the same reason the phrase
+    // step's copy half does: a client may not claim a guarantee it cannot make.
+    // `saveOutcomeMessage` holds that decision for both screens; the `t("…")`
+    // literals stay here, where `check-i18n.mjs` can see them.
+    save: (ok) =>
+      saveOutcomeMessage(ok, {
+        saved: t("vaultCreation.account.savedToFile"),
+        started: t("vaultCreation.account.downloadStarted"),
+        failed: t("vaultCreation.account.saveFailed"),
+      }),
+  };
 
   return (
     <StepLayout width={480}>
@@ -138,7 +160,12 @@ export function AccountStep({
         <Button variant="ghost" icon="copy" onClick={handleCopy}>
           {copied ? t("vaultCreation.account.copied") : t("vaultCreation.account.copy")}
         </Button>
-        <Button variant="ghost" icon="download" onClick={handleSave}>
+        <Button
+          variant="ghost"
+          icon="download"
+          onClick={handleSave}
+          data-testid="create.account-save"
+        >
           {t("vaultCreation.account.saveAsFile")}
         </Button>
       </div>
@@ -147,16 +174,13 @@ export function AccountStep({
           case is already visible as the button's label swap, so it is announced
           without being drawn twice; the failure case has no other surface, so it
           renders. */}
-      <CopyStatus
-        testId="create.account-copy-status"
-        visuallyHidden={outcome === "copied"}
-        message={
-          outcome === "copied"
-            ? t("vaultCreation.account.copied")
-            : outcome === "failed"
-              ? t("vaultCreation.account.copyFailed")
-              : null
-        }
+      <ActionStatus
+        testId="create.account-action-status"
+        // Only the COPY success is drawn twice by the button's own label swap,
+        // so only that one is hidden. A save has no label to swap, so both of its
+        // outcomes render.
+        visuallyHidden={outcome?.action === "copy" && outcome.ok}
+        message={outcome === null ? null : message[outcome.action](outcome.ok)}
       />
 
       <label

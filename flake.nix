@@ -25,12 +25,12 @@
       srcFor = system: pkgs:
         {
           "x86_64-linux" = pkgs.fetchurl {
-            url = "https://downloads.myne.md/releases/v0.5.0/Myne_0.5.0_amd64.AppImage";
-            sha256 = "4503f31337319ee2d2675e63268024c84798cc171598dae36515d3cb6afbfbbd";
+            url = "https://downloads.myne.md/releases/v0.6.0/Myne_0.6.0_amd64.AppImage";
+            sha256 = "a8af41651734544710e1e6c7ba211086dad8be00d825a1701a2741d54e6bbe3a";
           };
           "aarch64-linux" = pkgs.fetchurl {
-            url = "https://downloads.myne.md/releases/v0.5.0/Myne_0.5.0_aarch64.AppImage";
-            sha256 = "41dc4727dbaa17ba86a742041ebf2fca7f93e5712636971f1519e2b40021c26e";
+            url = "https://downloads.myne.md/releases/v0.6.0/Myne_0.6.0_aarch64.AppImage";
+            sha256 = "c18010da272b5e874b3f3669ed2079ce3b217beb6d190d38a8b9a8f3ae23ac1c";
           };
         }.${system};
     in {
@@ -39,7 +39,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           myne = pkgs.appimageTools.wrapType2 {
             pname = "myne";
-            version = "0.5.0";
+            version = "0.6.0";
             src = srcFor system pkgs;
           };
         in { default = myne; myne = myne; });
