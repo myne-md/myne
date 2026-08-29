@@ -265,6 +265,12 @@ On-device tag suggestion ([local inference](#local-inference), MYND-651): a **de
 
 Used in: `vision.md`; `threat-model.md` §7; `decisions.md` 2026-07-01, 2026-07-31
 
+### **automation debt (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+An observation that was proposed as a manual item and ruled out because an existing or plausible `e2e/`, `e2e-web/`, Vitest or cargo test could honestly assert it. Paying it is the only thing that lowers `totalMinutesCeiling`, so it is the mechanism by which the roster shrinks and the gate widens rather than a backlog of nice-to-haves. Tracked as issues rather than as a file, because a second list beside the roster is the drift the roster exists to stop: myne-md/myne#554 and its four lane sub-issues carry the 265 observations the first derivation ruled out.
+
+Used in: `decisions.md` 2026-08-25 (manual test roster, myne-md/myne#548), myne-md/myne#554
+
 ### **backup schedule** &nbsp; 📦 *Product*
 
 The device-local configuration that drives a vault's [scheduled backup](#scheduled-backup) (MYND-351): per-`VaultId` it records `enabled`, the cadence (`every-unlock` / `daily` / `weekly`), the target folder, the retention count N, the written-backup ledger (the prune allowlist), and the per-device status/clock (`last_scheduled_success_at`, `last_backup_attempt_at`, `last_backup_status`). Persisted as best-effort plaintext JSON at `<app_data_dir>/vaults/backup-schedule.json` — a sibling of the `registry.json` cache, modelled on it, and Myne's first persistent device-local *user-setting* store. It deliberately stores plaintext filesystem paths (the target folder + ledger), a recorded departure from `registry.json`'s no-paths discipline — backups are ciphertext, so a known location is not a confidentiality break (`decisions.md` 2026-06-18). The schedule does **not** sync across devices (the target is per-device); its clock is intentionally separate from [last_backup_at](#last_backup_at) (the synced reminder clock).
@@ -497,6 +503,12 @@ Used in: `spec/protocol.md` §3.2, §3.4
 The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth`, `backup-key`, and `vault-head-mac` (all reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10; `vault-head-mac` is the Phase 2 [vault head](#vault-head) MAC key, MYND-416). The next major version defines its own HKDF context-string prefix (not pre-allocated).
 
 Used in: `spec/protocol.md` §3.4
+
+### **core tier / standard tier (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+The two severities a [manual test roster](#manual-test-roster) item may carry. **core** is exactly three things and nothing else: failing means **data loss**, failing means a **security or privacy boundary broke** (plaintext leaving the device, a locked vault still readable, a phrase or key on screen or in a log, an egress with no user consent), or the item verifies the **upgrade over a real vault** from the previous release. Everything else is **standard**. The tier is not a priority label: together with the client it decides whether a row blocks a release today, because `gatedTiers` in `scripts/manual-test-ratchet.json` names the tier or tiers that stop a tag. Widening the gate has exactly two moves, adding a client and adding the other tier, which is why that field is a list rather than a string.
+
+Used in: `scripts/manual-test-roster.mjs`, `scripts/manual-test-ratchet.json`, `docs/dev/manual-test-roster.md`, `decisions.md` 2026-08-21 (manual test roster, myne-md/myne#548)
 
 ### **cover (note)** &nbsp; 📦 *Product*
 
@@ -961,6 +973,12 @@ The canonical Myne autosave call-pattern locked in `decisions.md` 2026-05-07 "`n
 
 Used in: `decisions.md` 2026-05-07 (pattern), 2026-05-15 (concrete timings); MYND-81
 
+### **gating row (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+One observation on one client that stops the tag when it fails. A row is the `(item, client)` pair rather than the item, because an observation naming macOS, Linux and Windows is three sittings; counting once per item understates the roster by more than half. Which rows gate is recorded in `scripts/manual-test-ratchet.json` as a tier list plus a client list, not implied: at the first measurement the gate is the `core` tier on every client this release ships, seven of the eight, 58.9 of 163.7 hours. The rest is walked and recorded and does not block yet, and that share only shrinks. A failed gating row is passed anyway only by `verdict: override` with a written, length-checked reason that lands in git.
+
+Used in: `scripts/manual-test-plan.mjs`, `scripts/manual-test-ratchet.json`, `scripts/manual-test-verified.json`
+
 ### **ghost-text** &nbsp; 📦 *Product*
 
 The dimmed inline completion the writing-assistant ([local inference](#local-inference)) shows at the cursor: a `Decoration.widget` overlay (never in the document buffer) rendering the model's short continuation in `--fg-3` italic, accepted with **Tab** (inserts it as plain markdown, one undo step) and dismissed by **Esc** or any edit. Fired on a paused cursor by a debounced CM6 `ViewPlugin` that cancels any in-flight inference on a doc/viewport change so a stale suggestion never lands. Composed into the editor only when `ai_enabled` (and the note is not an [AI-excluded folder](#ai-excluded-folder)). Modeled on the `spell.ts` StateEffect→StateField loader pattern (MYND-410).
@@ -1399,6 +1417,12 @@ Used in: `spec/protocol.md` §10.4.1, `decisions.md` 2026-08-09 + 2026-08-11.
 Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. Reserved for the next major version: `NT05`, `NTV5`. **Allocated for v0.2:** `NC05`, the CRDT note-type (`spec/protocol.md` §10.7). Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
 
 Used in: `spec/protocol.md` §9.1, §9.2, §9.3, §10.3, §10.7
+
+### **manual test roster** &nbsp; 🛠️ *Tooling*
+
+The recorded answer to "what must a human verify before this release, and why can no machine verify it instead". One entry per feature surface, each carrying the paths that implement it, the clients it ships on, the `e2e/` scenarios that already automate it, and the observations a person must make. It lives in `scripts/manual-test-roster.mjs` and IS the gate, so the record and the check cannot disagree; `docs/dev/manual-test-roster.md` is a generated projection of it and never a second source. Coverage is compared both ways against six directories, `src/screens/`, `src/components/settings/`, `web/src/screens/`, `web/src/components/settings/`, `mobile/src/app/flows/` and `e2e/*.e2e.ts`, so a surface entering the tree fails by name and a verdict whose files are gone fails as stale. Which six is checked too: a shared tree that grows a surface directory outside that list fails by name rather than being skipped. The rule that decides membership is that **an item earns a place only if a machine cannot honestly judge it**: an observation an `e2e/` scenario could assert is [automation debt](#automation-debt-manual-test-roster), not a manual item.
+
+Used in: `scripts/manual-test-roster.mjs`, `scripts/check-manual-test-roster.mjs`, `docs/dev/manual-test-roster.md`, `operations/runbooks/release-checklist.md` phase 1, `decisions.md` 2026-08-21 (manual test roster, myne-md/myne#548)
 
 ### **master password** &nbsp; 🗝️ *Key/identifier*
 
