@@ -2389,7 +2389,7 @@ Used in: `spec/markdown-dialect.md` §3.9.4; `decisions.md` 2026-07-28; MYND-617
 
 ### **task reminder** &nbsp; 📦 *Product*
 
-A nudge at a chosen moment for a [line-task](#line-task) carrying a [`remind`](#remind) field (MYND-618). Delivered in **two layers**: an in-app layer while Myne is open, and — on platforms that hold such registrations — an OS **pre-registration** layer so one can fire while Myne is closed.
+A nudge at a chosen moment for a [line-task](#line-task) carrying a [`remind`](#remind) field (MYND-618). Delivered in **two layers**: an in-app layer while Myne is open and unlocked, and, on platforms that hold such registrations, an OS **pre-registration** layer so one can fire while Myne is closed. **The second layer ships on no client today** (myne-md/myne#508): the desktop has no OS adapter, and mobile's registration pass has no production caller. Everything below describes it because both are one wiring change away, not because either performs it now.
 
 **Locking does not cancel the registered set**, which is an explicit departure from the rule that every plaintext surface is torn down on every lock path, recorded in `decisions.md` 2026-07-28. The rule protects vault *content*; what the platform holds here is a timestamp and a content-free string. It is also barely a choice: the default auto-lock is five minutes with no off switch, so cancelling on lock would end reminders five minutes after the user stops typing.
 
@@ -2399,11 +2399,13 @@ Used in: `threat-model.md` §7; `decisions.md` 2026-07-28; MYND-618
 
 ### **registration horizon** &nbsp; 📦 *Product*
 
-How far ahead a device hands pending [task reminders](#task-reminder) to its operating system. Device-local and user-adjustable; Myne's default is seven days.
+How far ahead a device hands pending [task reminders](#task-reminder) to its operating system. Device-local and user-adjustable; Myne's default is seven days, and it is also the longest a client offers.
 
 ***A privacy bound before a resource one.*** Pending reminder **times** leave the AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7), so a shorter horizon exposes less. Its consequence is **stated rather than discovered**: reminders stop if Myne is not opened within the horizon, because registration can only happen inside an unlocked session — so the UI shows the date through which reminders are currently registered.
 
-Used in: `spec/protocol.md` §9.5.2; `threat-model.md` §7; `decisions.md` 2026-07-28
+**It bounds the in-app tier too, which is the only tier that ships today** (myne-md/myne#508). Where no operating system holds the registration, the horizon is the window the *running app* arms timers within: the same set, decided by the same `targetReminders` cutoff, delivered by the app rather than the platform. So it is a delivery bound on a client that holds no OS registration and a privacy bound on one that does, and only the second tier renders the "registered through \<date\>" line. That distinction is why the offered horizons are all **shorter** than the default rather than longer: the privacy reading is the one a user is entitled to act on, and widening the window is a `threat-model.md` §7 change rather than a preference.
+
+Used in: `spec/protocol.md` §9.5.2; `threat-model.md` §7; `decisions.md` 2026-07-28, 2026-08-29
 
 ### **reminder registration** &nbsp; 📦 *Product*
 
@@ -2411,7 +2413,7 @@ One [task reminder](#task-reminder) as the operating system holds it: an **opaqu
 
 ***The identifier is opaque on purpose, and that is a Myne-divergent choice.*** The client's own key for a reminder names where the task lives, which is the right key for reconciling a set and the wrong thing to hand a platform: a registration is written into the operating system's own persistence — and on Android into a pending intent — where a note identifier would be correlatable metadata outside the AEAD envelope. So what crosses is random bytes minted per registration, and the mapping back to a task is held **in memory only**. The cost is accepted rather than hidden: a new session cannot name the previous one's registrations, so it clears and re-registers them.
 
-**Who holds the set differs by platform.** iOS keeps it entirely in OS-owned storage. Android exposes no way to enumerate an app's alarms, so the client also keeps a device-local `{identifier → instant}` record — same content as the OS would hold, different holder, and it is what makes a registration survive the reboot that drops every alarm.
+**Who holds the set differs by platform**, on the client that will hold one: no shipping build registers with an operating system today (see [task reminder](#task-reminder), myne-md/myne#508), so the set is empty everywhere and what follows describes the shape it takes when a pass fills it. iOS keeps it entirely in OS-owned storage. Android exposes no way to enumerate an app's alarms, so the client also keeps a device-local `{identifier → instant}` record — same content as the OS would hold, different holder, and it is what makes a registration survive the reboot that drops every alarm.
 
 Used in: `threat-model.md` §7; `decisions.md` 2026-07-29; MYND-619
 

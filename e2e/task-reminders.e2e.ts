@@ -72,11 +72,44 @@ describeE2E("tr1 the reminder switch tells the truth and remembers (MYND-618)", 
         expect(await s.byTestIdAll("settings.reminders.disclosure")).toHaveLength(0);
         expect(await limitation.textContent()).not.toBe(REMINDER_OS_DISCLOSURE_SENTENCE);
 
-        // The horizon line and the task-text opt-in belong to the OS tier: one
-        // is unobservable without an OS registration, the other has no
+        // The horizon LINE and the task-text opt-in belong to the OS tier: the
+        // first is unobservable without an OS registration, the second has no
         // preference behind it.
         expect(await s.byTestIdAll("settings.reminders.horizon")).toHaveLength(0);
         expect(await s.byTestIdAll("settings.reminders-text-toggle")).toHaveLength(0);
+
+        // The horizon CONTROL is not tier-gated, and the split is the point
+        // (myne#508). `useReminderScheduler` threads this value into
+        // `runReminderPass` on every build, so shortening it really does shrink
+        // the set of instants the running app arms; only the sentence claiming
+        // an OS registration has to wait for one. Gating the control too would
+        // also have satisfied `check-ipc-binding-callers.mjs` with a branch
+        // nothing renders, which is the invisibility that let #508 ship.
+        //
+        // The helper carries what the line cannot say on this tier, so the
+        // control is never a knob whose meaning is stated nowhere.
+        await s.byTestId("settings.reminders-horizon-row");
+        await s.byTestId("settings.reminders-horizon-helper");
+        for (const days of [1, 3, 5, 7]) {
+          await s.byTestId(`settings.reminders-horizon-picker-${days}`);
+        }
+
+        // ── The horizon survives a real AEAD round-trip ──
+        // Presence alone cannot fail on the defect this issue IS: a control
+        // wired to nothing renders identically. So the scenario chooses the
+        // shortest horizon, and the lock / re-unlock below re-reads it from
+        // disk the same way it re-reads the switch.
+        expect(
+          await (await s.byTestId("settings.reminders-horizon-picker-7")).attribute("data-active"),
+        ).toBe("true");
+        await (await s.byTestId("settings.reminders-horizon-picker-1")).click();
+        await s.waitUntil(async () =>
+          (await (await s.byTestId("settings.reminders-horizon-picker-1")).attribute(
+            "data-active",
+          )) === "true"
+            ? true
+            : null,
+        );
 
         // ── Default ON, then flipped OFF ──
         expect(await toggleState(s)).toBe("true");
@@ -98,6 +131,17 @@ describeE2E("tr1 the reminder switch tells the truth and remembers (MYND-618)", 
 
         await openReminderSettings(s);
         expect(await toggleState(s)).toBe("false");
+
+        // The horizon rode the same round-trip. Turning reminders back on is
+        // what reveals its row, which is also the assertion that the row's gate
+        // is the switch and not something that happens to be true on a fresh
+        // vault. `1` is not the default, so a decode that lost the field would
+        // come back selecting `7` and this is what would catch it.
+        await (await s.byTestId("settings.reminders-toggle")).click();
+        await s.waitUntil(async () => ((await toggleState(s)) === "true" ? true : null));
+        expect(
+          await (await s.byTestId("settings.reminders-horizon-picker-1")).attribute("data-active"),
+        ).toBe("true");
       },
     );
   });

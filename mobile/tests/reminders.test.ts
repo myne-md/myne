@@ -839,3 +839,109 @@ describe("the production factory is opaque by construction (MYND-619 task 4)", (
     expect(createReminderNotifier).not.toBe(createRawReminderNotifier);
   });
 });
+
+// myne#508. `setReminderHorizonDays` existed here with its Rust core, its ACL
+// row and the three-site registration the describe above pins, and no caller
+// anywhere in `mobile/src`, so the horizon rendered and could never be set.
+//
+// Worth saying why the tests above did not catch it: the "introduces no
+// preference field of its own" case asserts the sheet READS both fields and
+// that both setters EXIST in `prefs.ts`, and its comment says the sheet "writes
+// them through exactly the two shared setters". No assertion in it made that
+// claim. These are that claim, checked.
+describe("the horizon can actually be set (myne#508)", () => {
+  const sheet = (): string => read("../src/app/flows/SettingsSheet.tsx");
+  const component = (): string => read("../src/components/ReminderSettings.tsx");
+
+  it("writes the horizon through the same draft path as the switch beside it", () => {
+    // An import is not a caller, which is the whole shape of this bug and a
+    // lesson `scripts/check-ipc-binding-callers.mjs` learned about itself. So
+    // the assertion is on the CALL, and specifically on the call sitting inside
+    // `writeDraftPref`, the chokepoint that keeps the sheet's optimistic value
+    // and the persisted one in step.
+    expect(sheet()).toMatch(
+      /writeDraftPref\(\s*"reminder_horizon_days"[\s\S]{0,120}?setReminderHorizonDays\(/,
+    );
+  });
+
+  it("offers the SHARED choices rather than a list of its own", async () => {
+    // The drift #52 recorded about the horizon's end date, one step earlier: a
+    // picker with its own option list makes the same preference mean different
+    // things on the two clients, and the horizon is device-local, so nothing
+    // ever reconciles the disagreement.
+    expect(component()).toContain("REMINDER_HORIZON_CHOICES");
+    const { REMINDER_HORIZON_CHOICES, REMINDER_HORIZON_DAYS } = await import(
+      "@myne/reminder-schedule"
+    );
+    expect([...REMINDER_HORIZON_CHOICES]).toContain(REMINDER_HORIZON_DAYS);
+    // No hand-written day list beside the shared one.
+    expect(component()).not.toMatch(/\[\s*1\s*,\s*7\s*,/);
+  });
+
+  it("labels the options through `Intl`, not through a catalog key per option", () => {
+    // Five keys saying "7 g" in each of 32 catalogs is what this replaced, and
+    // a key held in a constant is invisible to `scripts/check-i18n.mjs`, whose
+    // scan is for static `t("…")` literals. `Intl` also keeps the two clients
+    // identical by construction, since the implementation is the platform's.
+    expect(component()).toContain("Intl.NumberFormat");
+    expect(component()).not.toMatch(/settings\.reminders\.horizon\d/);
+  });
+
+  it("keeps `remindersReachTheOs` and the unwired-pass record in agreement", async () => {
+    // This is the machine half of a claim `docs/threat-model.md` §7 now makes:
+    // "None of the exposure below currently applies to any build." Nothing tied
+    // that sentence to reality except a hardcoded `return false` and a prose
+    // pointer, and the change that makes the exposure real is the sanctioned
+    // silent path: `check-unwired.mjs` is a ratchet, so REMOVING
+    // `reminderPass.ts` from its exemption list is what wiring the pass looks
+    // like, and every other assertion here would stay green through it.
+    //
+    // So the two are asserted to move together. Give the pass a caller without
+    // flipping the predicate and this fails by name, which is the moment the
+    // §7 scope clause and the gated settings sentence both need revisiting.
+    const unwired = read("../../scripts/check-unwired.mjs");
+    const passIsRecordedUnwired = unwired.includes('"mobile/src/lib/reminderPass.ts"');
+    const { remindersReachTheOs } = await import("../src/lib/reminders");
+    expect(remindersReachTheOs()).toBe(!passIsRecordedUnwired);
+  });
+
+  it("gates the horizon line on the predicate, in BOTH directions", () => {
+    // `remindersReachTheOs()` returns `false` today, so every rendered
+    // assertion elsewhere exercises the absent arm. A gate proven only in the
+    // direction it is currently stuck in says nothing about the gate, and the
+    // arm that is dormant is the one the decision entry promises will come
+    // back. This pins the shape rather than the value: the line is inside the
+    // predicate's arm and nothing else is.
+    const src = component();
+    const start = src.indexOf("{remindersReachTheOs() && (");
+    expect(start).toBeGreaterThan(-1);
+    const close = src.indexOf("\n          )}", start);
+    expect(close).toBeGreaterThan(start);
+    const arm = src.slice(start, close);
+    expect(arm).toContain("settings.reminders.horizon");
+    // The picker is NOT inside it: the preference is real and persisted
+    // whatever reads it, and a control the user can set is not the same claim
+    // as a sentence saying something already happened.
+    expect(arm).not.toContain("settings.reminders-horizon-picker");
+  });
+
+  it("keeps the horizon behind the switch, so an off feature shows no window", () => {
+    // A picker rendered while reminders are off would take a write for a
+    // mechanism the switch has turned off. The behavioural half is
+    // `mobile/tests/flow-logic/settings/reminders.flow.ts`, which turns the
+    // switch off and asserts the picker is gone; this only pins that the markup
+    // sits inside the arm rather than after it.
+    //
+    // Bounded at the arm's close, not at end of file. Slicing to EOF is what
+    // this said first, and it made the assertion pass for a picker moved OUT of
+    // the arm to any later position. It was a containment claim that only
+    // failed if the picker moved ABOVE it.
+    const src = component();
+    const start = src.indexOf("{enabled && (");
+    expect(start).toBeGreaterThan(-1);
+    const close = src.indexOf("\n      )}", start);
+    expect(close).toBeGreaterThan(start);
+    const arm = src.slice(start, close);
+    expect(arm).toContain("settings.reminders-horizon-picker");
+  });
+});
