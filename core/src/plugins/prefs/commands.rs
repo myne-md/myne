@@ -3782,6 +3782,142 @@ pub(crate) async fn set_daily_template_with_dir(
     Ok(())
 }
 
+/// The three settings a period carries, mirroring what `daily_folder` /
+/// `daily_date_format` / `daily_template` carry for the daily period. The key
+/// written into `periodic_notes` is `<period>.<setting>` (myne#177).
+const PERIOD_SETTINGS: [&str; 3] = ["folder", "format", "template"];
+
+/// Slot::Unlocked-gated setter for one `periodic_notes` entry (myne#177),
+/// keyed `<period>.<setting>`, e.g. `weekly` + `folder`. `Some(value)` sets it,
+/// `None` removes the key, which the Phase 2 merge represents as a stamped
+/// absence rather than as "this device never had it". Read-modify-write under
+/// the write mutex; disk-first; non-load-bearing.
+///
+/// Two host-side validations, because the codec deliberately performs none. The
+/// **setting** must be one of [`PERIOD_SETTINGS`], so a typo cannot write a key
+/// nothing will ever read. The **period** must be a non-empty run of ASCII
+/// lowercase letters, which keeps the `<period>.<setting>` grammar unambiguous:
+/// a period containing a dot would produce a key that parses two ways. The
+/// period is deliberately NOT checked against a closed list, because a build that
+/// ships a fourth period writes `quarterly.folder` with no codec, spec or
+/// vector change, and an older build decodes that entry and ignores it.
+///
+/// `daily` is accepted by the grammar but is not where the daily period lives:
+/// daily keeps its three top-level fields, and writing `daily.folder` here
+/// would create a second home for one setting. The caller owns that; the UI
+/// routes daily to `set_daily_folder` and friends.
+pub async fn set_periodic_note_setting_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    period: String,
+    setting: String,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_periodic_note_setting_with_dir(&dir, state, hooks, period, setting, value, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_periodic_note_setting<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    period: String,
+    setting: String,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_periodic_note_setting_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        period,
+        setting,
+        value,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_periodic_note_setting`].
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn set_periodic_note_setting_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    period: String,
+    setting: String,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    if !PERIOD_SETTINGS.contains(&setting.as_str()) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    if period.is_empty() || !period.chars().all(|c| c.is_ascii_lowercase()) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    // Daily is refused HERE, not merely avoided by the caller. Daily keeps its
+    // three flat top-level fields, and `daily_match::period_settings` returns
+    // early for it and never reads this map, so a `daily.folder` entry would
+    // write, sync and be read by nothing: a second home for one setting, which
+    // is the exact shape the no-migration decision exists to prevent. It was
+    // reachable, and only `PeriodicNotesSettings.tsx`'s `period === "daily"`
+    // branch kept it from happening.
+    if period == "daily" {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    let key = format!("{period}.{setting}");
+    let cleared = value.is_none();
+
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            match value {
+                Some(v) => {
+                    prefs.periodic_notes.insert(key.clone(), v.clone());
+                    // A period folder is registered as a deliberate folder for
+                    // the same reason the daily one is (MYND-144): the folder
+                    // has no notes in it until the first period note is
+                    // created, and without this it would not appear in the
+                    // sidebar, so the setting would look like it did nothing.
+                    if setting == "folder" && !prefs.deliberate_folders.contains(&v) {
+                        prefs.deliberate_folders.push(v);
+                    }
+                }
+                None => {
+                    prefs.periodic_notes.remove(&key);
+                }
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // Field + which entry + set/cleared. The SETTING is a closed vocabulary
+    // this function just validated against `PERIOD_SETTINGS`; the PERIOD is a
+    // bounded-charset grammar token (a non-empty run of ASCII lowercase, daily
+    // excluded) rather than a closed list, deliberately, so a build shipping a
+    // fourth period needs no change here. Neither is user text, and the VALUE
+    // (a folder path, AS3 Sensitive) is never logged. See
+    // src-tauri/CLAUDE.md "Secret-handling logging discipline".
+    tracing::info!(
+        event = "prefs_written",
+        field = "periodic_notes",
+        entry = %key,
+        cleared
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the new-note default-location pair (MYND-462,
 /// "Files" settings panel) — `new_note_location` (the mode: root/current/specific) +
 /// `new_note_location_folder` (the target folder when mode == "specific"). Set
@@ -5305,6 +5441,164 @@ mod tests {
         });
     }
 
+    // periodic_notes setter (myne#177).
+
+    #[test]
+    fn set_periodic_note_setting_writes_the_composed_key_and_registers_the_folder() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "weekly".into(),
+                "folder".into(),
+                Some("Weekly/".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set weekly folder");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("weekly.folder")
+                    .map(String::as_str),
+                Some("Weekly/")
+            );
+            // The daily folder's discipline (MYND-144): without this the folder
+            // is invisible in the sidebar until the first note lands in it, so
+            // the setting looks like it did nothing.
+            assert!(prefs.deliberate_folders.iter().any(|f| f == "Weekly/"));
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_clears_by_removing_the_key() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            for (setting, value) in [("folder", "Weekly/"), ("template", "0190a000-tmpl")] {
+                set_periodic_note_setting_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    "weekly".into(),
+                    setting.into(),
+                    Some(value.into()),
+                    &io,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect("set");
+            }
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "weekly".into(),
+                "template".into(),
+                None,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear template");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(!prefs.periodic_notes.contains_key("weekly.template"));
+            // Clearing one setting must not disturb the period's others.
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("weekly.folder")
+                    .map(String::as_str),
+                Some("Weekly/")
+            );
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_refuses_an_unknown_setting_or_a_dotted_period() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            for (period, setting) in [
+                ("weekly", "colour"),       // not one of the three
+                ("weekly.extra", "folder"), // a dot makes the key ambiguous
+                ("", "folder"),             // empty period
+                ("Weekly", "folder"),       // not a bare lowercase word
+                // Daily keeps its three flat fields; an entry here would write,
+                // sync and be read by nothing, which is a second home for one
+                // setting.
+                ("daily", "folder"),
+                ("daily", "format"),
+                ("daily", "template"),
+            ] {
+                let err = set_periodic_note_setting_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    period.into(),
+                    setting.into(),
+                    Some("x".into()),
+                    &io,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect_err("must refuse");
+                assert!(
+                    matches!(err, PrefsWriteError::InvalidValue),
+                    "{period}.{setting}"
+                );
+            }
+            // Refusing means writing nothing, not writing something odd.
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(prefs.periodic_notes.is_empty());
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_accepts_a_period_this_build_has_no_ui_for() {
+        // The period is validated as a GRAMMAR, not against a closed list. That
+        // is what makes a fourth period a client-side change with no codec,
+        // spec or vector edit behind it.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "quarterly".into(),
+                "folder".into(),
+                Some("Quarterly/".into()),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set quarterly folder");
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("quarterly.folder")
+                    .map(String::as_str),
+                Some("Quarterly/")
+            );
+        });
+    }
+
     #[test]
     fn set_union_pref_edit_bumps_the_sync_push_window() {
         // MYND-517: set-union fields are SHARED but clockless (never stamped
@@ -6030,6 +6324,7 @@ mod tests {
                     new_note_location: None,
                     new_note_location_folder: None,
                     paired_extensions: Vec::new(),
+                    periodic_notes: Default::default(),
                     right_panel_active_tab: None,
                     right_panel_hidden_tabs: Vec::new(),
                     right_panel_tab_order: Vec::new(),

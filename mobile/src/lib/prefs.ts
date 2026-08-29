@@ -294,6 +294,27 @@ export interface PrefsView {
    */
   daily_date_format: string | null;
   /**
+   * Display timezone override (myne#279): an IANA zone identifier, or `null` ≡
+   * follow this device's own zone.
+   *
+   * **Device-local is a MERGE class, not an exclusion from the blob.** The
+   * value rides inside the encrypted `vault.prefs` like every other field, and
+   * enrolment adopts that blob wholesale as this device's starting defaults,
+   * device-local fields included (`sync-protocol.md` §10.2.1). What
+   * device-local buys is that no peer ever overwrites it afterwards. So a phone
+   * enrolled after a computer set an override starts out HOLDING that zone.
+   *
+   * Mobile therefore does not apply it (myne#177). It ships no control for the
+   * setting and displays nothing derived from it, so applying an inherited zone
+   * would change which note a period command opens and change nothing the user
+   * could see, explain or alter. The rule is that a client honours the override
+   * where it can also show and change it: desktop applies it, mobile and the
+   * CLI read the device clock, and the CLI says so on stderr. Declared on this
+   * type anyway because the shared codec serializes it and the round trip has
+   * to carry it.
+   */
+  timezone: string | null;
+  /**
    * Daily-notes folder path (MYND-191), canonical trailing-slash form — e.g.
    * `Daily/`. `null` ≡ the canonical default `Daily/`, applied host-side.
    * Designating a folder also registers it in `deliberate_folders`.
@@ -304,6 +325,30 @@ export interface PrefsView {
    * instantiate today's note from. `null` ≡ the "blank daily note" state.
    */
   daily_template: string | null;
+  /**
+   * Periodic-notes settings (myne#177): one entry per `<period>.<setting>`
+   * pair, e.g. `weekly.folder` → `Weekly/`, `monthly.format` → `YYYY-MM`. The
+   * three settings mirror what the `daily_*` fields above carry for the daily
+   * period, which keeps its own three fields and is deliberately not migrated
+   * in here (prefs merge per field, so a device on an older build would keep
+   * writing the flat ones and the two would silently diverge).
+   *
+   * Flat rather than nested so the Phase 2 field clock is per SETTING: a folder
+   * edit on one device and a template edit on another, to the same period in
+   * the same round, both survive. An entry naming a period this build has no UI
+   * for decodes and is ignored, which is what makes a fourth period free.
+   * Absent in vaults that configured no period → the Rust decoder defaults it
+   * to `{}`. Serialized from Rust `BTreeMap<String, String>`.
+   *
+   * **Read-only on mobile**, deliberately: there is a `setPeriodicNoteSetting`
+   * binding, an IPC command and an ACL row on desktop and none of the three
+   * here, because mobile ships no periodic-notes settings panel. A grant for a
+   * command the WebView never sends would widen the reachable surface for
+   * nothing. The map arrives by sync, configured on a computer, and mobile
+   * resolves periods from it. Add the write half in the same change as the
+   * panel, not before it.
+   */
+  periodic_notes: Record<string, string>;
   /**
    * Favorited notes — an ordered list of note UUIDs surfaced in the sidebar's
    * Favorites section, in display order (MYND-183). A sequence: the backend

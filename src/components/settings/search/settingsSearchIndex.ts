@@ -344,23 +344,69 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "editor.daily-notes-folder",
     panelId: "editor",
-    titleKey: "settings.dailyNotes.folderLabel",
-    descriptionKey: "settings.dailyNotes.folderHelper",
+    titleKey: "settings.dailyNotes.sectionDaily",
+    descriptionKey: "settings.dailyNotes.periodFolderLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
   },
   {
     id: "editor.daily-notes-date-format",
     panelId: "editor",
-    titleKey: "settings.dailyNotes.dateFormatLabel",
-    descriptionKey: "settings.dailyNotes.dateFormatHelper",
+    titleKey: "settings.dailyNotes.sectionDaily",
+    descriptionKey: "settings.dailyNotes.periodFormatLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
   },
   {
     id: "editor.daily-notes-template",
     panelId: "editor",
-    titleKey: "settings.dailyNotes.templateLabel",
-    descriptionKey: "settings.dailyNotes.templateHelper",
+    titleKey: "settings.dailyNotes.sectionDaily",
+    descriptionKey: "settings.dailyNotes.periodTemplateLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
+  },
+  // myne#177. The weekly and monthly rows get their own entries rather than
+  // riding the daily ones: search scrolls to a setting's ANCHOR, and the three
+  // periods are three anchors. Each is titled by its section and described by
+  // its row, so three results are not all called "Folder".
+  {
+    id: "editor.weekly-notes-folder",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionWeekly",
+    descriptionKey: "settings.dailyNotes.periodFolderLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.weekly-notes-date-format",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionWeekly",
+    descriptionKey: "settings.dailyNotes.periodFormatLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.weekly-notes-template",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionWeekly",
+    descriptionKey: "settings.dailyNotes.periodTemplateLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.monthly-notes-folder",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionMonthly",
+    descriptionKey: "settings.dailyNotes.periodFolderLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.monthly-notes-date-format",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionMonthly",
+    descriptionKey: "settings.dailyNotes.periodFormatLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.monthly-notes-template",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionMonthly",
+    descriptionKey: "settings.dailyNotes.periodTemplateLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
   },
   {
     id: "editor.reminders",

@@ -432,6 +432,22 @@ export interface PrefsView {
    */
   daily_template: string | null;
   /**
+   * Periodic-notes settings (myne#177): one entry per `<period>.<setting>`
+   * pair, e.g. `weekly.folder` → `Weekly/`, `monthly.format` → `YYYY-MM`. The
+   * three settings mirror what the `daily_*` fields above carry for the daily
+   * period, which keeps its own three fields and is deliberately not migrated
+   * in here (prefs merge per field, so a device on an older build would keep
+   * writing the flat ones and the two would silently diverge).
+   *
+   * Flat rather than nested so the Phase 2 field clock is per SETTING: a folder
+   * edit on one device and a template edit on another, to the same period in
+   * the same round, both survive. An entry naming a period this build has no UI
+   * for decodes and is ignored, which is what makes a fourth period free.
+   * Absent in vaults that configured no period → the Rust decoder defaults it
+   * to `{}`. Serialized from Rust `BTreeMap<String, String>`.
+   */
+  periodic_notes: Record<string, string>;
+  /**
    * Favorited notes — an ordered list of note UUIDs surfaced in the sidebar's
    * Favorites section, in display order (MYND-183). A sequence: the backend
    * preserves element order verbatim. UUIDs only (folders are not favoritable).
@@ -1249,6 +1265,35 @@ export async function setItemColors(colors: Record<string, string>): Promise<voi
  */
 export async function setFolderIcons(icons: Record<string, string>): Promise<void> {
   await writePref("plugin:prefs|set_folder_icons", { icons });
+}
+
+/**
+ * The three settings a period carries (myne#177), mirroring what
+ * `daily_folder` / `daily_date_format` / `daily_template` carry for daily.
+ */
+export type PeriodSetting = "folder" | "format" | "template";
+
+
+/**
+ * Set ONE periodic-notes entry (myne#177): `periodic_notes["<period>.<setting>"]`.
+ * Unlike {@link setFolderIcons} this takes a single entry rather than the whole
+ * map, which is what gives the entry its own Phase 2 field clock: two devices
+ * editing two settings of the same period in one round both keep their edit.
+ * Pass `value = null` to clear the entry; the backend removes the key, which
+ * the merge represents as a stamped absence rather than as "never had it".
+ *
+ * A `folder` value is also registered as a deliberate folder backend-side, so
+ * the folder shows in the sidebar before its first note exists.
+ *
+ * The backend refuses a setting outside the three, and a period that is not a
+ * bare lowercase word, because a period carrying a dot would make the key ambiguous.
+ */
+export async function setPeriodicNoteSetting(
+  period: string,
+  setting: PeriodSetting,
+  value: string | null,
+): Promise<void> {
+  await writePref("plugin:prefs|set_periodic_note_setting", { period, setting, value });
 }
 
 /**

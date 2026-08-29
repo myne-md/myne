@@ -655,6 +655,12 @@
       },
       "unfoldAll": {
         "label": "ਸਭ ਫੈਲਾਓ"
+      },
+      "openThisWeekNote": {
+        "label": "ਇਸ ਹਫ਼ਤੇ ਦਾ ਨੋਟ ਖੋਲ੍ਹੋ"
+      },
+      "openThisMonthNote": {
+        "label": "ਇਸ ਮਹੀਨੇ ਦਾ ਨੋਟ ਖੋਲ੍ਹੋ"
       }
     },
     "hotkeys": {
@@ -1525,6 +1531,13 @@
     "commandPalette": {
       "searchPlaceholder": "ਨੋਟ ਖੋਜੋ ਜਾਂ ਕਮਾਂਡ ਚਲਾਓ…",
       "noMatches": "ਕੋਈ ਕਮਾਂਡ ਜਾਂ ਨੋਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।"
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "ਅੱਜ ਦਾ ਨੋਟ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ।",
+        "weekly": "ਇਸ ਹਫ਼ਤੇ ਦਾ ਨੋਟ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ।",
+        "monthly": "ਇਸ ਮਹੀਨੇ ਦਾ ਨੋਟ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ।"
+      }
     }
   },
   "export": {
@@ -2757,18 +2770,37 @@
       "blankTemplate": "ਖਾਲੀ (ਕੋਈ ਟੈਂਪਲੇਟ ਨਹੀਂ)",
       "dateFormatHelper": "ਹਰ ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਸਿਰਲੇਖ। YYYY, MM, DD ਸਮਰਥਿਤ ਹਨ। ਮੂਲ {{default}} ਹੈ।",
       "dateFormatLabel": "ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਮਿਤੀ ਫਾਰਮੈਟ",
-      "dateFormatSaveError": "ਮਿਤੀ ਫਾਰਮੈਟ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "folderHelper": "ਨਵੇਂ ਰੋਜ਼ਾਨਾ ਨੋਟ ਕਿੱਥੇ ਰੱਖੇ ਜਾਂਦੇ ਹਨ। ਮੂਲ {{default}} ਹੈ। ਫੋਲਡਰ ਖਾਲੀ ਹੋਣ ਉੱਤੇ ਵੀ ਰੱਖਿਆ ਜਾਂਦਾ ਹੈ।",
       "folderLabel": "ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਫੋਲਡਰ",
-      "folderSaveError": "ਰੋਜ਼ਾਨਾ ਫੋਲਡਰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "folderSearchEmpty": "ਕੋਈ ਫੋਲਡਰ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
       "folderSearchPlaceholder": "ਫੋਲਡਰ ਖੋਜੋ…",
       "searchEmpty": "ਕੋਈ ਟੈਂਪਲੇਟ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
       "searchPlaceholder": "ਟੈਂਪਲੇਟ ਖੋਜੋ…",
       "templateHelper": "ਹਰ ਰੋਜ਼ਾਨਾ ਨੋਟ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਕੋਈ ਟੈਂਪਲੇਟ ਚੁਣੋ, ਜਾਂ ਮਿਤੀ ਵਾਲੇ ਸਿਰਲੇਖ ਵਾਲੇ ਖਾਲੀ ਨੋਟ ਲਈ ਖਾਲੀ ਛੱਡੋ।",
       "templateLabel": "ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਟੈਂਪਲੇਟ",
-      "templateSaveError": "ਰੋਜ਼ਾਨਾ ਟੈਂਪਲੇਟ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "untitledTemplate": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਟੈਂਪਲੇਟ"
+      "untitledTemplate": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਟੈਂਪਲੇਟ",
+      "sectionDaily": "ਰੋਜ਼ਾਨਾ ਨੋਟ",
+      "sectionWeekly": "ਹਫ਼ਤਾਵਾਰ ਨੋਟ",
+      "sectionMonthly": "ਮਹੀਨਾਵਾਰ ਨੋਟ",
+      "periodFolderLabel": "ਫੋਲਡਰ",
+      "periodFolderHelper": "ਨਵੇਂ {{period}} ਨੋਟ ਕਿੱਥੇ ਰੱਖੇ ਜਾਂਦੇ ਹਨ। ਮੂਲ: {{default}}। ਫੋਲਡਰ ਖਾਲੀ ਹੋਣ 'ਤੇ ਵੀ ਰਹਿੰਦਾ ਹੈ।",
+      "periodFormatLabel": "ਸਿਰਲੇਖ ਦਾ ਰੂਪ",
+      "periodFormatHelperDaily": "ਹਰ ਰੋਜ਼ਾਨਾ ਨੋਟ ਦਾ ਸਿਰਲੇਖ। YYYY, MM, DD, gggg (ISO ਹਫ਼ਤਾ-ਸਾਲ), ww (ISO ਹਫ਼ਤਾ ਸੰਖਿਆ) ਅਤੇ ਅੱਖਰੀ ਲਿਖਤ ਲਈ [ਲਿਖਤ] ਸਮਰਥਿਤ ਹਨ। ਮੂਲ: {{default}}।",
+      "periodFormatHelperWeekly": "ਹਰ ਹਫ਼ਤਾਵਾਰ ਨੋਟ ਦਾ ਸਿਰਲੇਖ। gggg (ISO ਹਫ਼ਤਾ-ਸਾਲ), ww (ISO ਹਫ਼ਤਾ ਸੰਖਿਆ), YYYY, MM, DD ਅਤੇ ਅੱਖਰੀ ਲਿਖਤ ਲਈ [ਲਿਖਤ] ਸਮਰਥਿਤ ਹਨ। ਮੂਲ: {{default}}।",
+      "periodFormatHelperMonthly": "ਹਰ ਮਹੀਨਾਵਾਰ ਨੋਟ ਦਾ ਸਿਰਲੇਖ। YYYY, MM, gggg (ISO ਹਫ਼ਤਾ-ਸਾਲ), ww (ISO ਹਫ਼ਤਾ ਸੰਖਿਆ) ਅਤੇ ਅੱਖਰੀ ਲਿਖਤ ਲਈ [ਲਿਖਤ] ਸਮਰਥਿਤ ਹਨ। ਮੂਲ: {{default}}।",
+      "periodTemplateLabel": "ਟੈਂਪਲੇਟ",
+      "periodTemplateHelper": "ਹਰ {{period}} ਨੋਟ ਜਿਸ ਟੈਂਪਲੇਟ ਤੋਂ ਸ਼ੁਰੂ ਹੋਵੇ ਉਹ ਚੁਣੋ, ਜਾਂ ਤਾਰੀਖ਼ ਦੇ ਸਿਰਲੇਖ ਵਾਲੇ ਖਾਲੀ ਨੋਟ ਲਈ ਇਸਨੂੰ ਖਾਲੀ ਛੱਡ ਦਿਓ।",
+      "collisionWarning": "{{first}} ਅਤੇ {{second}} ਨੋਟ ਇੱਕੋ ਨੋਟ ਉੱਤੇ ਪਹੁੰਚਦੇ ਹਨ, ਕਿਉਂਕਿ ਉਹਨਾਂ ਦਾ ਫੋਲਡਰ ਇੱਕੋ ਹੈ ਅਤੇ ਸਿਰਲੇਖ ਵੀ ਇੱਕੋ ਬਣਦਾ ਹੈ। ਦੋਵੇਂ ਕਮਾਂਡਾਂ ਉਹੀ ਖੋਲ੍ਹਣਗੀਆਂ।",
+      "weekStartNote": "ਹਫ਼ਤੇ ਸੋਮਵਾਰ ਤੋਂ ਸ਼ੁਰੂ ਹੁੰਦੇ ਹਨ (ISO 8601), ਇਸ ਲਈ ਜਨਵਰੀ ਦੇ ਪਹਿਲੇ ਦਿਨ ਪਿਛਲੇ ਸਾਲ ਦੇ ਆਖ਼ਰੀ ਹਫ਼ਤੇ ਵਿੱਚ ਅਤੇ ਦਸੰਬਰ ਦੇ ਆਖ਼ਰੀ ਦਿਨ ਅਗਲੇ ਸਾਲ ਦੇ ਪਹਿਲੇ ਹਫ਼ਤੇ ਵਿੱਚ ਆ ਸਕਦੇ ਹਨ।",
+      "periodFolderSaveError": "{{period}} ਨੋਟ ਦਾ ਫੋਲਡਰ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "periodFormatSaveError": "{{period}} ਨੋਟ ਦਾ ਸਿਰਲੇਖ ਰੂਪ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "periodTemplateSaveError": "{{period}} ਨੋਟ ਦਾ ਟੈਂਪਲੇਟ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "periodNameDaily": "ਰੋਜ਼ਾਨਾ",
+      "periodNameWeekly": "ਹਫ਼ਤਾਵਾਰ",
+      "periodNameMonthly": "ਮਹੀਨਾਵਾਰ",
+      "periodFolderAriaLabel": "{{period}} ਨੋਟ ਦਾ ਫੋਲਡਰ",
+      "periodFormatAriaLabel": "{{period}} ਨੋਟ ਦਾ ਸਿਰਲੇਖ ਰੂਪ",
+      "periodTemplateAriaLabel": "{{period}} ਨੋਟ ਦਾ ਟੈਂਪਲੇਟ"
     },
     "deleteVault": {
       "cancel": "ਰੱਦ ਕਰੋ",
@@ -3309,7 +3341,8 @@
         "viewMode": "ਮੂਲ ਦ੍ਰਿਸ਼ ਮੋਡ ਲਾਈਵ ਪੜ੍ਹਨਾ ਸਰੋਤ ਝਲਕ",
         "dateFormat": "ਮਿਤੀ ਤਾਰੀਖ਼ ਫਾਰਮੈਟ ਦਿਨ ਮਹੀਨਾ ਸਾਲ iso dd/mm mm/dd ਕੈਲੰਡਰ",
         "timeFormat": "ਸਮਾਂ ਫਾਰਮੈਟ 24 ਘੰਟੇ 12 ਘੰਟੇ ਘੜੀ am pm",
-        "timezone": "ਸਮਾਂ ਖੇਤਰ ਸਮਾਂ-ਖੇਤਰ tz utc iana ਇਲਾਕਾ ਅੱਜ"
+        "timezone": "ਸਮਾਂ ਖੇਤਰ ਸਮਾਂ-ਖੇਤਰ tz utc iana ਇਲਾਕਾ ਅੱਜ",
+        "periodicNotes": "ਨਿਯਮਤ ਨੋਟ ਹਫ਼ਤਾਵਾਰ ਮਹੀਨਾਵਾਰ ਹਫ਼ਤਾ ਮਹੀਨਾ ਫੋਲਡਰ ਟੈਂਪਲੇਟ ਰੂਪ"
       }
     },
     "dateTime": {

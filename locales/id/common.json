@@ -661,6 +661,12 @@
       },
       "unfoldAll": {
         "label": "Buka semua lipatan"
+      },
+      "openThisWeekNote": {
+        "label": "Buka catatan minggu ini"
+      },
+      "openThisMonthNote": {
+        "label": "Buka catatan bulan ini"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "Cari catatan atau jalankan perintah…",
       "noMatches": "Tidak ada perintah atau catatan yang cocok."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Catatan hari ini tidak dapat dibuka.",
+        "weekly": "Catatan minggu ini tidak dapat dibuka.",
+        "monthly": "Catatan bulan ini tidak dapat dibuka."
+      }
     }
   },
   "export": {
@@ -2777,18 +2790,37 @@
       "blankTemplate": "Kosong (tanpa templat)",
       "dateFormatHelper": "Judul setiap catatan harian. Mendukung YYYY, MM, DD. Default ke {{default}}.",
       "dateFormatLabel": "Format tanggal catatan harian",
-      "dateFormatSaveError": "Tidak dapat menyimpan format tanggal. Silakan coba lagi.",
       "folderHelper": "Tempat catatan harian baru disimpan. Default ke {{default}}. Folder tetap dipertahankan meski kosong.",
       "folderLabel": "Folder catatan harian",
-      "folderSaveError": "Tidak dapat menyimpan folder harian. Silakan coba lagi.",
       "folderSearchEmpty": "Tidak ada folder yang cocok.",
       "folderSearchPlaceholder": "Cari folder…",
       "searchEmpty": "Tidak ada templat yang cocok.",
       "searchPlaceholder": "Cari templat…",
       "templateHelper": "Pilih templat sebagai awalan setiap catatan harian, atau biarkan kosong untuk catatan kosong berjudul tanggal.",
       "templateLabel": "Templat catatan harian",
-      "templateSaveError": "Tidak dapat menyimpan templat harian. Silakan coba lagi.",
-      "untitledTemplate": "Templat tanpa judul"
+      "untitledTemplate": "Templat tanpa judul",
+      "sectionDaily": "Catatan harian",
+      "sectionWeekly": "Catatan mingguan",
+      "sectionMonthly": "Catatan bulanan",
+      "periodFolderLabel": "Folder",
+      "periodFolderHelper": "Tempat catatan {{period}} baru disimpan. Bawaan: {{default}}. Folder tetap dipertahankan meski kosong.",
+      "periodFormatLabel": "Format judul",
+      "periodFormatHelperDaily": "Judul setiap catatan harian. Mendukung YYYY, MM, DD, gggg (tahun pekan ISO), ww (nomor pekan ISO), dan [teks] untuk teks harfiah. Bawaan: {{default}}.",
+      "periodFormatHelperWeekly": "Judul setiap catatan mingguan. Mendukung gggg (tahun pekan ISO), ww (nomor pekan ISO), YYYY, MM, DD, dan [teks] untuk teks harfiah. Bawaan: {{default}}.",
+      "periodFormatHelperMonthly": "Judul setiap catatan bulanan. Mendukung YYYY, MM, gggg (tahun pekan ISO), ww (nomor pekan ISO), dan [teks] untuk teks harfiah. Bawaan: {{default}}.",
+      "periodTemplateLabel": "Templat",
+      "periodTemplateHelper": "Pilih templat sebagai awal setiap catatan {{period}}, atau biarkan kosong untuk catatan kosong berjudul tanggal.",
+      "collisionWarning": "Catatan {{first}} dan {{second}} bermuara pada catatan yang sama, karena berbagi folder dan menghasilkan judul yang sama. Kedua perintah akan membukanya.",
+      "weekStartNote": "Pekan dimulai pada hari Senin (ISO 8601), sehingga hari-hari awal Januari bisa termasuk pekan terakhir tahun sebelumnya, dan hari-hari akhir Desember termasuk pekan pertama tahun berikutnya.",
+      "periodFolderSaveError": "Folder catatan {{period}} tidak dapat disimpan. Silakan coba lagi.",
+      "periodFormatSaveError": "Format judul catatan {{period}} tidak dapat disimpan. Silakan coba lagi.",
+      "periodTemplateSaveError": "Templat catatan {{period}} tidak dapat disimpan. Silakan coba lagi.",
+      "periodNameDaily": "harian",
+      "periodNameWeekly": "mingguan",
+      "periodNameMonthly": "bulanan",
+      "periodFolderAriaLabel": "Folder catatan {{period}}",
+      "periodFormatAriaLabel": "Format judul catatan {{period}}",
+      "periodTemplateAriaLabel": "Templat catatan {{period}}"
     },
     "deleteVault": {
       "cancel": "Batal",
@@ -3337,7 +3369,8 @@
         "viewMode": "mode tampilan bawaan langsung baca sumber pratinjau view mode",
         "dateFormat": "format tanggal hari bulan tahun iso dd/mm mm/dd kalender date format",
         "timeFormat": "format waktu 24 jam 12 jam am pm penunjuk waktu time format",
-        "timezone": "zona waktu tz utc iana wilayah hari ini timezone"
+        "timezone": "zona waktu tz utc iana wilayah hari ini timezone",
+        "periodicNotes": "catatan berkala mingguan bulanan pekan bulan folder templat format"
       }
     },
     "dateTime": {

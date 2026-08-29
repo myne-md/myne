@@ -43,13 +43,25 @@ const decoder = new TextDecoder();
  * `weekday` follows the host locale (the app-language proxy until an in-app
  * language setting lands).
  */
-export function buildRenderContext(now: Date, title: string): RenderContext {
+export function buildRenderContext(
+  now: Date,
+  title: string,
+  period?: { start: Date; end: Date },
+): RenderContext {
   return {
     title,
     date: formatLocalDate(now),
     time: formatLocalTime(now),
     datetime: formatLocalDateTime(now),
     weekday: formatLocalWeekday(now),
+    // myne#177. Absent `period`, the period is the single day `now` falls on,
+    // which is exactly right for a daily note and for a note made by hand, and
+    // is why the two tokens are never empty. `{{date}}` is deliberately NOT
+    // re-pointed at the period start: the same template file can be both a
+    // weekly template and something instantiated by hand, and a token whose
+    // meaning depended on the call site would make one file say two things.
+    periodStart: formatLocalDate(period?.start ?? now),
+    periodEnd: formatLocalDate(period?.end ?? now),
   };
 }
 
@@ -80,10 +92,15 @@ export async function createNoteFromTemplate(
   name: string,
   folder: string | null = null,
   now: Date = new Date(),
+  // LAST, and deliberately: this parameter was added after the function had
+  // positional callers, and inserting it before `now` re-bound every one of
+  // them silently (`tests/` is outside `tsc`'s `include`, so only Vitest reads
+  // those call sites).
+  period?: { start: Date; end: Date },
 ): Promise<string> {
   const template = await noteRead(templateId);
   const body = extractTemplateBody(template);
-  const rendered = renderTemplate(body, buildRenderContext(now, name));
+  const rendered = renderTemplate(body, buildRenderContext(now, name, period));
   return await createNoteFromBody(rendered, name, folder);
 }
 

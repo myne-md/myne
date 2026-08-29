@@ -661,6 +661,12 @@
       },
       "unfoldAll": {
         "label": "全部展开"
+      },
+      "openThisWeekNote": {
+        "label": "打开本周笔记"
+      },
+      "openThisMonthNote": {
+        "label": "打开本月笔记"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "搜索笔记或运行命令…",
       "noMatches": "没有匹配的命令或笔记。"
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "无法打开今天的笔记。",
+        "weekly": "无法打开本周的笔记。",
+        "monthly": "无法打开本月的笔记。"
+      }
     }
   },
   "export": {
@@ -2777,18 +2790,37 @@
       "blankTemplate": "空白（无模板）",
       "dateFormatHelper": "每篇日记的标题。支持 YYYY、MM、DD。默认为 {{default}}。",
       "dateFormatLabel": "日记日期格式",
-      "dateFormatSaveError": "无法保存日期格式。请重试。",
       "folderHelper": "新日记的存放位置。默认为 {{default}}。即使为空也会保留该文件夹。",
       "folderLabel": "日记文件夹",
-      "folderSaveError": "无法保存日记文件夹。请重试。",
       "folderSearchEmpty": "没有匹配的文件夹。",
       "folderSearchPlaceholder": "搜索文件夹…",
       "searchEmpty": "没有匹配的模板。",
       "searchPlaceholder": "搜索模板…",
       "templateHelper": "选择一个用于创建每篇日记的模板，或留空以创建一篇以日期为标题的空白笔记。",
       "templateLabel": "日记模板",
-      "templateSaveError": "无法保存日记模板。请重试。",
-      "untitledTemplate": "无标题模板"
+      "untitledTemplate": "无标题模板",
+      "sectionDaily": "每日笔记",
+      "sectionWeekly": "每周笔记",
+      "sectionMonthly": "每月笔记",
+      "periodFolderLabel": "文件夹",
+      "periodFolderHelper": "新建{{period}}笔记的存放位置。默认值：{{default}}。即使为空，文件夹也会保留。",
+      "periodFormatLabel": "标题格式",
+      "periodFormatHelperDaily": "每篇每日笔记的标题。支持 YYYY、MM、DD、gggg（ISO 周年）、ww（ISO 周数），以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodFormatHelperWeekly": "每篇每周笔记的标题。支持 gggg（ISO 周年）、ww（ISO 周数）、YYYY、MM、DD，以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodFormatHelperMonthly": "每篇每月笔记的标题。支持 YYYY、MM、gggg（ISO 周年）、ww（ISO 周数），以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodTemplateLabel": "模板",
+      "periodTemplateHelper": "选择每篇{{period}}笔记的起始模板，或留空以创建以日期为标题的空白笔记。",
+      "collisionWarning": "{{first}}笔记和{{second}}笔记会指向同一篇笔记，因为它们共用文件夹并生成相同的标题。两个命令都会打开它。",
+      "weekStartNote": "每周从星期一开始（ISO 8601），因此一月初的几天可能属于上一年的最后一周，十二月末的几天可能属于下一年的第一周。",
+      "periodFolderSaveError": "无法保存{{period}}笔记的文件夹。请重试。",
+      "periodFormatSaveError": "无法保存{{period}}笔记的标题格式。请重试。",
+      "periodTemplateSaveError": "无法保存{{period}}笔记的模板。请重试。",
+      "periodNameDaily": "每日",
+      "periodNameWeekly": "每周",
+      "periodNameMonthly": "每月",
+      "periodFolderAriaLabel": "{{period}}笔记文件夹",
+      "periodFormatAriaLabel": "{{period}}笔记标题格式",
+      "periodTemplateAriaLabel": "{{period}}笔记模板"
     },
     "deleteVault": {
       "cancel": "取消",
@@ -3337,7 +3369,8 @@
         "viewMode": "默认视图 查看模式 实时 阅读 源代码 预览 default view mode live reading source",
         "dateFormat": "日期格式 日期 日 月 年 日历 date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "时间格式 时间 时钟 24小时制 12小时制 上午 下午 time format 24 hour 12 hour clock am pm",
-        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today"
+        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today",
+        "periodicNotes": "周期笔记 每周 每月 周 月 文件夹 模板 格式"
       }
     },
     "dateTime": {

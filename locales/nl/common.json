@@ -661,6 +661,12 @@
       },
       "unfoldAll": {
         "label": "Alles uitklappen"
+      },
+      "openThisWeekNote": {
+        "label": "Notitie van deze week openen"
+      },
+      "openThisMonthNote": {
+        "label": "Notitie van deze maand openen"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "Notities zoeken of een opdracht uitvoeren…",
       "noMatches": "Geen overeenkomende opdrachten of notities."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "De notitie van vandaag kon niet worden geopend.",
+        "weekly": "De notitie van deze week kon niet worden geopend.",
+        "monthly": "De notitie van deze maand kon niet worden geopend."
+      }
     }
   },
   "export": {
@@ -2777,18 +2790,37 @@
       "blankTemplate": "Leeg (geen sjabloon)",
       "dateFormatHelper": "De titel van elke dagelijkse notitie. Ondersteunt YYYY, MM, DD. Standaard {{default}}.",
       "dateFormatLabel": "Datumindeling dagelijkse notitie",
-      "dateFormatSaveError": "De datumindeling kon niet worden opgeslagen. Probeer het opnieuw.",
       "folderHelper": "Waar nieuwe dagelijkse notities worden geplaatst. Standaard {{default}}. De map blijft behouden, ook als die leeg is.",
       "folderLabel": "Map voor dagelijkse notities",
-      "folderSaveError": "De dagelijkse map kon niet worden opgeslagen. Probeer het opnieuw.",
       "folderSearchEmpty": "Geen mappen komen overeen.",
       "folderSearchPlaceholder": "Mappen zoeken…",
       "searchEmpty": "Geen sjablonen komen overeen.",
       "searchPlaceholder": "Sjablonen zoeken…",
       "templateHelper": "Kies een sjabloon om elke dagelijkse notitie mee te beginnen, of laat leeg voor een lege notitie met de datum als titel.",
       "templateLabel": "Sjabloon voor dagelijkse notitie",
-      "templateSaveError": "Het dagelijkse sjabloon kon niet worden opgeslagen. Probeer het opnieuw.",
-      "untitledTemplate": "Naamloos sjabloon"
+      "untitledTemplate": "Naamloos sjabloon",
+      "sectionDaily": "Dagelijkse notities",
+      "sectionWeekly": "Wekelijkse notities",
+      "sectionMonthly": "Maandelijkse notities",
+      "periodFolderLabel": "Map",
+      "periodFolderHelper": "Waar nieuwe {{period}} notities worden opgeslagen. Standaard: {{default}}. De map blijft behouden, ook als hij leeg is.",
+      "periodFormatLabel": "Titelopmaak",
+      "periodFormatHelperDaily": "De titel van elke dagelijkse notitie. Ondersteunt YYYY, MM, DD, gggg (ISO-weekjaar), ww (ISO-weeknummer) en [tekst] voor letterlijke tekst. Standaard: {{default}}.",
+      "periodFormatHelperWeekly": "De titel van elke wekelijkse notitie. Ondersteunt gggg (ISO-weekjaar), ww (ISO-weeknummer), YYYY, MM, DD en [tekst] voor letterlijke tekst. Standaard: {{default}}.",
+      "periodFormatHelperMonthly": "De titel van elke maandelijkse notitie. Ondersteunt YYYY, MM, gggg (ISO-weekjaar), ww (ISO-weeknummer) en [tekst] voor letterlijke tekst. Standaard: {{default}}.",
+      "periodTemplateLabel": "Sjabloon",
+      "periodTemplateHelper": "Kies een sjabloon om elke {{period}} notitie mee te beginnen, of laat leeg voor een lege notitie met de datum als titel.",
+      "collisionWarning": "{{first}} en {{second}} notities komen op dezelfde notitie uit, omdat ze een map delen en dezelfde titel opleveren. Beide opdrachten openen die notitie.",
+      "weekStartNote": "Weken beginnen op maandag (ISO 8601), dus de eerste dagen van januari kunnen bij de laatste week van het vorige jaar horen, en de laatste dagen van december bij de eerste week van het volgende jaar.",
+      "periodFolderSaveError": "De map voor {{period}} notities kon niet worden opgeslagen. Probeer het opnieuw.",
+      "periodFormatSaveError": "De titelopmaak voor {{period}} notities kon niet worden opgeslagen. Probeer het opnieuw.",
+      "periodTemplateSaveError": "Het sjabloon voor {{period}} notities kon niet worden opgeslagen. Probeer het opnieuw.",
+      "periodNameDaily": "dagelijkse",
+      "periodNameWeekly": "wekelijkse",
+      "periodNameMonthly": "maandelijkse",
+      "periodFolderAriaLabel": "Map voor {{period}} notities",
+      "periodFormatAriaLabel": "Titelopmaak voor {{period}} notities",
+      "periodTemplateAriaLabel": "Sjabloon voor {{period}} notities"
     },
     "deleteVault": {
       "cancel": "Annuleren",
@@ -3337,7 +3369,8 @@
         "viewMode": "standaardweergavemodus weergave modus live lezen bron voorbeeld view mode source reading preview",
         "dateFormat": "datumnotatie datumindeling datum notatie dag maand jaar iso dd/mm mm/dd kalender date format",
         "timeFormat": "tijdnotatie tijd notatie 24-uurs 12-uurs klok am pm time format 24 hour 12 hour",
-        "timezone": "tijdzone zone tz utc iana regio vandaag timezone time zone"
+        "timezone": "tijdzone zone tz utc iana regio vandaag timezone time zone",
+        "periodicNotes": "periodieke notities wekelijks maandelijks week maand map sjabloon opmaak"
       }
     },
     "dateTime": {

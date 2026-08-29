@@ -661,6 +661,12 @@
       },
       "unfoldAll": {
         "label": "Alle ausklappen"
+      },
+      "openThisWeekNote": {
+        "label": "Notiz dieser Woche öffnen"
+      },
+      "openThisMonthNote": {
+        "label": "Notiz dieses Monats öffnen"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "Notizen durchsuchen oder Befehl ausführen…",
       "noMatches": "Keine passenden Befehle oder Notizen."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Die Notiz von heute konnte nicht geöffnet werden.",
+        "weekly": "Die Notiz dieser Woche konnte nicht geöffnet werden.",
+        "monthly": "Die Notiz dieses Monats konnte nicht geöffnet werden."
+      }
     }
   },
   "export": {
@@ -2777,18 +2790,37 @@
       "blankTemplate": "Leer (keine Vorlage)",
       "dateFormatHelper": "Der Titel jeder Tagesnotiz. Unterstützt YYYY, MM, DD. Standard ist {{default}}.",
       "dateFormatLabel": "Datumsformat der Tagesnotiz",
-      "dateFormatSaveError": "Das Datumsformat konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
       "folderHelper": "Wo neue Tagesnotizen abgelegt werden. Standard ist {{default}}. Der Ordner bleibt erhalten, auch wenn er leer ist.",
       "folderLabel": "Ordner für Tagesnotizen",
-      "folderSaveError": "Der Ordner für Tagesnotizen konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
       "folderSearchEmpty": "Keine Ordner passen.",
       "folderSearchPlaceholder": "Ordner durchsuchen…",
       "searchEmpty": "Keine Vorlagen passen.",
       "searchPlaceholder": "Vorlagen durchsuchen…",
       "templateHelper": "Wählen Sie eine Vorlage, mit der jede Tagesnotiz beginnt, oder lassen Sie das Feld leer für eine leere Notiz mit dem Datum als Titel.",
       "templateLabel": "Vorlage für Tagesnotizen",
-      "templateSaveError": "Die Vorlage für Tagesnotizen konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
-      "untitledTemplate": "Vorlage ohne Titel"
+      "untitledTemplate": "Vorlage ohne Titel",
+      "sectionDaily": "Tägliche Notizen",
+      "sectionWeekly": "Wöchentliche Notizen",
+      "sectionMonthly": "Monatliche Notizen",
+      "periodFolderLabel": "Ordner",
+      "periodFolderHelper": "Wo neue {{period}} Notizen abgelegt werden. Standard: {{default}}. Der Ordner bleibt erhalten, auch wenn er leer ist.",
+      "periodFormatLabel": "Titelformat",
+      "periodFormatHelperDaily": "Der Titel jeder täglichen Notiz. Unterstützt YYYY, MM, DD, gggg (ISO-Wochenjahr), ww (ISO-Kalenderwoche) und [Text] für wörtlichen Text. Standard: {{default}}.",
+      "periodFormatHelperWeekly": "Der Titel jeder wöchentlichen Notiz. Unterstützt gggg (ISO-Wochenjahr), ww (ISO-Kalenderwoche), YYYY, MM, DD und [Text] für wörtlichen Text. Standard: {{default}}.",
+      "periodFormatHelperMonthly": "Der Titel jeder monatlichen Notiz. Unterstützt YYYY, MM, gggg (ISO-Wochenjahr), ww (ISO-Kalenderwoche) und [Text] für wörtlichen Text. Standard: {{default}}.",
+      "periodTemplateLabel": "Vorlage",
+      "periodTemplateHelper": "Wählen Sie eine Vorlage, mit der jede {{period}} Notiz beginnt, oder lassen Sie das Feld leer für eine leere Notiz mit dem Datum als Titel.",
+      "collisionWarning": "{{first}} und {{second}} Notizen führen zur selben Notiz, weil sie denselben Ordner teilen und denselben Titel erzeugen. Beide Befehle öffnen sie.",
+      "weekStartNote": "Wochen beginnen am Montag (ISO 8601), deshalb können die ersten Januartage zur letzten Woche des Vorjahres gehören und die letzten Dezembertage zur ersten Woche des Folgejahres.",
+      "periodFolderSaveError": "Der {{period}} Ordner konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      "periodFormatSaveError": "Das {{period}} Titelformat konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      "periodTemplateSaveError": "Die {{period}} Vorlage konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      "periodNameDaily": "tägliche",
+      "periodNameWeekly": "wöchentliche",
+      "periodNameMonthly": "monatliche",
+      "periodFolderAriaLabel": "Ordner für {{period}} Notizen",
+      "periodFormatAriaLabel": "Titelformat für {{period}} Notizen",
+      "periodTemplateAriaLabel": "Vorlage für {{period}} Notizen"
     },
     "deleteVault": {
       "cancel": "Abbrechen",
@@ -3337,7 +3369,8 @@
         "viewMode": "standard ansichtsmodus ansicht live lesen quelltext vorschau",
         "dateFormat": "datumsformat datum format tag monat jahr iso dd/mm mm/dd kalender",
         "timeFormat": "zeitformat uhrzeit format 24 stunden 12 stunden uhr am pm",
-        "timezone": "zeitzone zeitzonen zone tz utc iana region heute"
+        "timezone": "zeitzone zeitzonen zone tz utc iana region heute",
+        "periodicNotes": "periodische Notizen wöchentlich monatlich Woche Monat Ordner Vorlage Format"
       }
     },
     "dateTime": {

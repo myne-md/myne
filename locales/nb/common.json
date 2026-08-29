@@ -661,6 +661,12 @@
       },
       "unfoldAll": {
         "label": "Fold ut alle"
+      },
+      "openThisWeekNote": {
+        "label": "Åpne denne ukens notat"
+      },
+      "openThisMonthNote": {
+        "label": "Åpne denne månedens notat"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "Søk i notater eller kjør en kommando…",
       "noMatches": "Ingen kommandoer eller notater samsvarer."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Dagens notat kunne ikke åpnes.",
+        "weekly": "Denne ukens notat kunne ikke åpnes.",
+        "monthly": "Denne månedens notat kunne ikke åpnes."
+      }
     }
   },
   "export": {
@@ -2777,18 +2790,37 @@
       "blankTemplate": "Tomt (ingen mal)",
       "dateFormatHelper": "Tittelen på hvert dagsnotat. Støtter YYYY, MM, DD. Standardverdi er {{default}}.",
       "dateFormatLabel": "Datoformat for dagsnotat",
-      "dateFormatSaveError": "Kunne ikke lagre datoformatet. Prøv igjen.",
       "folderHelper": "Hvor nye dagsnotater plasseres. Standard er {{default}}. Mappen beholdes selv når den er tom.",
       "folderLabel": "Mappe for dagsnotat",
-      "folderSaveError": "Kunne ikke lagre dagsnotatmappen. Prøv igjen.",
       "folderSearchEmpty": "Ingen mapper samsvarer.",
       "folderSearchPlaceholder": "Søk i mapper…",
       "searchEmpty": "Ingen maler samsvarer.",
       "searchPlaceholder": "Søk i maler…",
       "templateHelper": "Velg en mal å starte hvert dagsnotat fra, eller la stå tom for et tomt notat med datoen som tittel.",
       "templateLabel": "Mal for dagsnotat",
-      "templateSaveError": "Kunne ikke lagre dagsnotatmalen. Prøv igjen.",
-      "untitledTemplate": "Mal uten tittel"
+      "untitledTemplate": "Mal uten tittel",
+      "sectionDaily": "Daglige notater",
+      "sectionWeekly": "Ukentlige notater",
+      "sectionMonthly": "Månedlige notater",
+      "periodFolderLabel": "Mappe",
+      "periodFolderHelper": "Hvor nye {{period}} notater lagres. Standard: {{default}}. Mappen beholdes også når den er tom.",
+      "periodFormatLabel": "Tittelformat",
+      "periodFormatHelperDaily": "Tittelen på hvert daglig notat. Støtter YYYY, MM, DD, gggg (ISO-ukeår), ww (ISO-ukenummer) og [tekst] for bokstavelig tekst. Standard: {{default}}.",
+      "periodFormatHelperWeekly": "Tittelen på hvert ukentlig notat. Støtter gggg (ISO-ukeår), ww (ISO-ukenummer), YYYY, MM, DD og [tekst] for bokstavelig tekst. Standard: {{default}}.",
+      "periodFormatHelperMonthly": "Tittelen på hvert månedlig notat. Støtter YYYY, MM, gggg (ISO-ukeår), ww (ISO-ukenummer) og [tekst] for bokstavelig tekst. Standard: {{default}}.",
+      "periodTemplateLabel": "Mal",
+      "periodTemplateHelper": "Velg en mal som hvert {{period}} notat starter fra, eller la feltet stå tomt for et tomt notat med datoen som tittel.",
+      "collisionWarning": "{{first}} og {{second}} notater fører til det samme notatet, fordi de deler mappe og gir samme tittel. Begge kommandoene åpner det.",
+      "weekStartNote": "Uker begynner på mandag (ISO 8601), så de første dagene i januar kan høre til siste uke i året før, og de siste dagene i desember til første uke i året etter.",
+      "periodFolderSaveError": "Mappen for {{period}} notater kunne ikke lagres. Prøv igjen.",
+      "periodFormatSaveError": "Tittelformatet for {{period}} notater kunne ikke lagres. Prøv igjen.",
+      "periodTemplateSaveError": "Malen for {{period}} notater kunne ikke lagres. Prøv igjen.",
+      "periodNameDaily": "daglige",
+      "periodNameWeekly": "ukentlige",
+      "periodNameMonthly": "månedlige",
+      "periodFolderAriaLabel": "Mappe for {{period}} notater",
+      "periodFormatAriaLabel": "Tittelformat for {{period}} notater",
+      "periodTemplateAriaLabel": "Mal for {{period}} notater"
     },
     "deleteVault": {
       "cancel": "Avbryt",
@@ -3337,7 +3369,8 @@
         "viewMode": "standard visningsmodus live lesing kilde forhåndsvisning view mode",
         "dateFormat": "datoformat dato format dag måned år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat klokkeslett 24 timer 12 timer klokke am pm time format",
-        "timezone": "tidssone sone tz utc iana region i dag timezone time zone"
+        "timezone": "tidssone sone tz utc iana region i dag timezone time zone",
+        "periodicNotes": "periodiske notater ukentlig månedlig uke måned mappe mal format"
       }
     },
     "dateTime": {

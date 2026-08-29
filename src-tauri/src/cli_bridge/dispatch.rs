@@ -69,6 +69,15 @@ enum Request {
     DailyAppend {
         line: String,
     },
+    /// myne#177. `period` is the wire spelling (`daily` / `weekly` /
+    /// `monthly`); an unknown one is refused rather than defaulted.
+    Period {
+        period: String,
+    },
+    PeriodAppend {
+        period: String,
+        line: String,
+    },
 }
 
 /// One search hit on the wire: an id + its title, nothing else. No score,
@@ -149,21 +158,33 @@ pub enum NewOutcome {
 /// `cli_excluded_folders`, checked before any scan or write runs (task 9's
 /// own text: "never a silent no-op").
 pub enum DailyOutcome {
-    Ok(String),
+    /// The note's markdown, plus whether the device clock was used in place of
+    /// a display-timezone override (myne#177). A flag, never the sentence: the
+    /// CLI owns the wording so no host-supplied bytes reach its stderr.
+    Ok(String, bool),
     FolderExcluded,
     /// Same narrow race as `ListOutcome::VaultLocked`.
     VaultLocked,
+    /// A period spelling this host does not know (myne#177). Distinct from
+    /// `Io` on purpose: refusing rather than defaulting only helps if a newer
+    /// client can tell version skew from a failing disk, and "an internal
+    /// error occurred" says the opposite of what happened.
+    UnknownPeriod,
     Io,
 }
 
-/// Closed outcome of a `daily_append` request (task 9). `Ok` carries no
-/// payload — success is silent, matching the `>>` mental model this
-/// command restores.
+/// Closed outcome of a `daily_append` request (task 9). `Ok` carries only the
+/// optional device-clock flag (myne#177). Success is otherwise silent, matching
+/// the `>>` mental model this command restores.
 pub enum DailyAppendOutcome {
-    Ok,
+    /// Whether the device clock was used in place of a display-timezone
+    /// override (myne#177). A flag, never the sentence: see `DailyOutcome::Ok`.
+    Ok(bool),
     FolderExcluded,
     /// Same narrow race as `ListOutcome::VaultLocked`.
     VaultLocked,
+    /// See [`DailyOutcome::UnknownPeriod`].
+    UnknownPeriod,
     Io,
 }
 
@@ -175,8 +196,11 @@ pub trait NoteLister: Send + Sync {
     fn show_note(&self, id: &str) -> ShowOutcome;
     fn search_notes(&self, query: &str) -> SearchOutcome;
     fn create_note(&self, body: &str, folder: Option<&str>) -> NewOutcome;
-    fn daily(&self) -> DailyOutcome;
-    fn daily_append(&self, line: &str) -> DailyAppendOutcome;
+    /// `period` is the wire spelling; the implementation refuses one it does
+    /// not know (myne#177). `daily` and `daily_append` reach these with
+    /// `"daily"`, so the pre-#177 wire commands keep working unchanged.
+    fn period(&self, period: &str) -> DailyOutcome;
+    fn period_append(&self, period: &str, line: &str) -> DailyAppendOutcome;
 }
 
 /// WebView event fired after a CLI write lands (#258).
@@ -200,7 +224,7 @@ fn handle_request(lister: &dyn NoteLister, request_body: &[u8]) -> Vec<u8> {
             ListOutcome::Io => encode_err("io", "an internal error occurred"),
         },
         Request::Show { id } => match lister.show_note(&id) {
-            ShowOutcome::Ok(body) => encode_ok_body(&body),
+            ShowOutcome::Ok(body) => encode_ok_body(&body, false),
             ShowOutcome::NotFound => encode_err("not_found", "no matching note"),
             ShowOutcome::VaultLocked => {
                 encode_err("vault_locked", "the vault locked during this request")
@@ -228,26 +252,44 @@ fn handle_request(lister: &dyn NoteLister, request_body: &[u8]) -> Vec<u8> {
             }
             NewOutcome::Io => encode_err("io", "an internal error occurred"),
         },
-        Request::Daily => match lister.daily() {
-            DailyOutcome::Ok(body) => encode_ok_body(&body),
-            DailyOutcome::FolderExcluded => {
-                encode_err("folder_excluded", "that folder is excluded from CLI access")
-            }
-            DailyOutcome::VaultLocked => {
-                encode_err("vault_locked", "the vault locked during this request")
-            }
-            DailyOutcome::Io => encode_err("io", "an internal error occurred"),
-        },
-        Request::DailyAppend { line } => match lister.daily_append(&line) {
-            DailyAppendOutcome::Ok => encode_ok(),
-            DailyAppendOutcome::FolderExcluded => {
-                encode_err("folder_excluded", "that folder is excluded from CLI access")
-            }
-            DailyAppendOutcome::VaultLocked => {
-                encode_err("vault_locked", "the vault locked during this request")
-            }
-            DailyAppendOutcome::Io => encode_err("io", "an internal error occurred"),
-        },
+        Request::Daily => dispatch_period(lister, "daily"),
+        Request::Period { period } => dispatch_period(lister, &period),
+        Request::PeriodAppend { period, line } => dispatch_period_append(lister, &period, &line),
+        Request::DailyAppend { line } => dispatch_period_append(lister, "daily", &line),
+    }
+}
+
+/// The `daily` / `weekly` / `monthly` reply (myne#177).
+fn dispatch_period(lister: &dyn NoteLister, period: &str) -> Vec<u8> {
+    match lister.period(period) {
+        DailyOutcome::Ok(body, used_device_clock) => encode_ok_body(&body, used_device_clock),
+        DailyOutcome::FolderExcluded => {
+            encode_err("folder_excluded", "that folder is excluded from CLI access")
+        }
+        DailyOutcome::VaultLocked => {
+            encode_err("vault_locked", "the vault locked during this request")
+        }
+        DailyOutcome::UnknownPeriod => {
+            encode_err("invalid_request", "this app does not know that period")
+        }
+        DailyOutcome::Io => encode_err("io", "an internal error occurred"),
+    }
+}
+
+/// The `daily:append` / `weekly:append` / `monthly:append` reply (myne#177).
+fn dispatch_period_append(lister: &dyn NoteLister, period: &str, line: &str) -> Vec<u8> {
+    match lister.period_append(period, line) {
+        DailyAppendOutcome::Ok(used_device_clock) => encode_ok_note(used_device_clock),
+        DailyAppendOutcome::FolderExcluded => {
+            encode_err("folder_excluded", "that folder is excluded from CLI access")
+        }
+        DailyAppendOutcome::VaultLocked => {
+            encode_err("vault_locked", "the vault locked during this request")
+        }
+        DailyAppendOutcome::UnknownPeriod => {
+            encode_err("invalid_request", "this app does not know that period")
+        }
+        DailyAppendOutcome::Io => encode_err("io", "an internal error occurred"),
     }
 }
 
@@ -259,9 +301,29 @@ fn encode_ok_notes(notes: &[String]) -> Vec<u8> {
 /// `show`'s success reply. The note body is exactly what this exists to
 /// carry across the wire — not logged anywhere, per this module's own DENY
 /// discipline note above.
-fn encode_ok_body(body: &str) -> Vec<u8> {
-    serde_json::to_vec(&serde_json::json!({ "ok": true, "body": body }))
-        .unwrap_or_else(|_| encode_err("io", "response encode failure"))
+fn encode_ok_body(body: &str, used_device_clock: bool) -> Vec<u8> {
+    // A FLAG, not the sentence: the CLI owns the wording, so no host-supplied
+    // bytes can reach its stderr (see `daily.rs` for why that matters). OMITTED
+    // when false (myne#177), so a reply to a client that predates the field is
+    // byte-identical to what it was, and the field is additive rather than
+    // breaking.
+    let mut value = serde_json::json!({ "ok": true, "body": body });
+    if let (true, Some(obj)) = (used_device_clock, value.as_object_mut()) {
+        obj.insert("used_device_clock".into(), serde_json::json!(true));
+    }
+    serde_json::to_vec(&value).unwrap_or_else(|_| encode_err("io", "response encode failure"))
+}
+
+/// A bare `{"ok": true}`, plus the device-clock flag when it applies.
+fn encode_ok_note(used_device_clock: bool) -> Vec<u8> {
+    match used_device_clock {
+        false => encode_ok(),
+        true => serde_json::to_vec(&serde_json::json!({
+            "ok": true,
+            "used_device_clock": true,
+        }))
+        .unwrap_or_else(|_| encode_err("io", "response encode failure")),
+    }
 }
 
 /// `search`'s success reply. **No field beyond `results` may ever appear
@@ -565,9 +627,17 @@ mod app_seam {
             })
         }
 
-        fn daily(&self) -> DailyOutcome {
-            use crate::cli_bridge::daily::{daily_show, DailyError};
+        fn period(&self, period: &str) -> DailyOutcome {
+            use crate::cli_bridge::daily::{period_show, DailyError};
+            use myne_core::plugins::notes::daily_match::Period;
 
+            // An unknown period is REFUSED, never defaulted to daily: a client
+            // asking for a period this host does not know is a version skew,
+            // and answering it with a different note is the silent-wrong-answer
+            // shape the whole wire is written to avoid (myne#177).
+            let Some(period) = Period::from_wire(period) else {
+                return DailyOutcome::UnknownPeriod;
+            };
             let Some(state) = self
                 .app
                 .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
@@ -579,23 +649,28 @@ mod app_seam {
             };
             let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
             let io = myne_core::vault_io::StdVaultIo;
-            let result = tauri::async_runtime::block_on(daily_show(
+            let result = tauri::async_runtime::block_on(period_show(
                 &host,
                 state.inner(),
                 hooks.inner(),
                 &io,
+                period,
             ));
             match result {
-                Ok(body) => DailyOutcome::Ok(body),
+                Ok((body, used_device_clock)) => DailyOutcome::Ok(body, used_device_clock),
                 Err(DailyError::FolderExcluded) => DailyOutcome::FolderExcluded,
                 Err(DailyError::VaultLocked) => DailyOutcome::VaultLocked,
                 Err(DailyError::Io) => DailyOutcome::Io,
             }
         }
 
-        fn daily_append(&self, line: &str) -> DailyAppendOutcome {
-            use crate::cli_bridge::daily::{daily_append, DailyError};
+        fn period_append(&self, period: &str, line: &str) -> DailyAppendOutcome {
+            use crate::cli_bridge::daily::{period_append, DailyError};
+            use myne_core::plugins::notes::daily_match::Period;
 
+            let Some(period) = Period::from_wire(period) else {
+                return DailyAppendOutcome::UnknownPeriod;
+            };
             let Some(state) = self
                 .app
                 .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
@@ -607,17 +682,18 @@ mod app_seam {
             };
             let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
             let io = myne_core::vault_io::StdVaultIo;
-            let result = tauri::async_runtime::block_on(daily_append(
+            let result = tauri::async_runtime::block_on(period_append(
                 &host,
                 state.inner(),
                 hooks.inner(),
                 &io,
+                period,
                 line,
             ));
             match result {
-                Ok(()) => {
+                Ok(used_device_clock) => {
                     self.notify_notes_changed();
-                    DailyAppendOutcome::Ok
+                    DailyAppendOutcome::Ok(used_device_clock)
                 }
                 Err(DailyError::FolderExcluded) => DailyAppendOutcome::FolderExcluded,
                 Err(DailyError::VaultLocked) => DailyAppendOutcome::VaultLocked,
@@ -640,8 +716,11 @@ mod tests {
         show: fn(&str) -> ShowOutcome,
         search: fn(&str) -> SearchOutcome,
         new_note: fn(&str, Option<&str>) -> NewOutcome,
-        daily: fn() -> DailyOutcome,
-        daily_append: fn(&str) -> DailyAppendOutcome,
+        // myne#177: BOTH take the wire period spelling. Discarding it, as the
+        // first version of this double did, makes a dispatcher that routes
+        // every period to daily indistinguishable from a correct one.
+        daily: fn(&str) -> DailyOutcome,
+        daily_append: fn(&str, &str) -> DailyAppendOutcome,
     }
     impl FixedLister {
         fn list_only(list: fn() -> ListOutcome) -> Self {
@@ -650,8 +729,8 @@ mod tests {
                 show: |_| ShowOutcome::Io,
                 search: |_| SearchOutcome::Io,
                 new_note: |_, _| NewOutcome::Io,
-                daily: || DailyOutcome::Io,
-                daily_append: |_| DailyAppendOutcome::Io,
+                daily: |_| DailyOutcome::Io,
+                daily_append: |_, _| DailyAppendOutcome::Io,
             }
         }
         fn show_only(show: fn(&str) -> ShowOutcome) -> Self {
@@ -660,8 +739,8 @@ mod tests {
                 show,
                 search: |_| SearchOutcome::Io,
                 new_note: |_, _| NewOutcome::Io,
-                daily: || DailyOutcome::Io,
-                daily_append: |_| DailyAppendOutcome::Io,
+                daily: |_| DailyOutcome::Io,
+                daily_append: |_, _| DailyAppendOutcome::Io,
             }
         }
         fn search_only(search: fn(&str) -> SearchOutcome) -> Self {
@@ -670,8 +749,8 @@ mod tests {
                 show: |_| ShowOutcome::Io,
                 search,
                 new_note: |_, _| NewOutcome::Io,
-                daily: || DailyOutcome::Io,
-                daily_append: |_| DailyAppendOutcome::Io,
+                daily: |_| DailyOutcome::Io,
+                daily_append: |_, _| DailyAppendOutcome::Io,
             }
         }
         fn new_note_only(new_note: fn(&str, Option<&str>) -> NewOutcome) -> Self {
@@ -680,27 +759,27 @@ mod tests {
                 show: |_| ShowOutcome::Io,
                 search: |_| SearchOutcome::Io,
                 new_note,
-                daily: || DailyOutcome::Io,
-                daily_append: |_| DailyAppendOutcome::Io,
+                daily: |_| DailyOutcome::Io,
+                daily_append: |_, _| DailyAppendOutcome::Io,
             }
         }
-        fn daily_only(daily: fn() -> DailyOutcome) -> Self {
+        fn daily_only(daily: fn(&str) -> DailyOutcome) -> Self {
             Self {
                 list: || ListOutcome::Io,
                 show: |_| ShowOutcome::Io,
                 search: |_| SearchOutcome::Io,
                 new_note: |_, _| NewOutcome::Io,
                 daily,
-                daily_append: |_| DailyAppendOutcome::Io,
+                daily_append: |_, _| DailyAppendOutcome::Io,
             }
         }
-        fn daily_append_only(daily_append: fn(&str) -> DailyAppendOutcome) -> Self {
+        fn daily_append_only(daily_append: fn(&str, &str) -> DailyAppendOutcome) -> Self {
             Self {
                 list: || ListOutcome::Io,
                 show: |_| ShowOutcome::Io,
                 search: |_| SearchOutcome::Io,
                 new_note: |_, _| NewOutcome::Io,
-                daily: || DailyOutcome::Io,
+                daily: |_| DailyOutcome::Io,
                 daily_append,
             }
         }
@@ -718,11 +797,11 @@ mod tests {
         fn create_note(&self, body: &str, folder: Option<&str>) -> NewOutcome {
             (self.new_note)(body, folder)
         }
-        fn daily(&self) -> DailyOutcome {
-            (self.daily)()
+        fn period(&self, period: &str) -> DailyOutcome {
+            (self.daily)(period)
         }
-        fn daily_append(&self, line: &str) -> DailyAppendOutcome {
-            (self.daily_append)(line)
+        fn period_append(&self, period: &str, line: &str) -> DailyAppendOutcome {
+            (self.daily_append)(period, line)
         }
     }
 
@@ -840,10 +919,10 @@ mod tests {
             fn create_note(&self, _body: &str, _folder: Option<&str>) -> NewOutcome {
                 panic!("a throttled request must never reach the vault");
             }
-            fn daily(&self) -> DailyOutcome {
+            fn period(&self, _period: &str) -> DailyOutcome {
                 panic!("a throttled request must never reach the vault");
             }
-            fn daily_append(&self, _line: &str) -> DailyAppendOutcome {
+            fn period_append(&self, _period: &str, _line: &str) -> DailyAppendOutcome {
                 panic!("a throttled request must never reach the vault");
             }
         }
@@ -1126,7 +1205,8 @@ mod tests {
 
     #[test]
     fn daily_ok_returns_body() {
-        let lister = FixedLister::daily_only(|| DailyOutcome::Ok("today's body".to_string()));
+        let lister =
+            FixedLister::daily_only(|_| DailyOutcome::Ok("today's body".to_string(), false));
         let reply = roundtrip(br#"{"cmd":"daily"}"#, &lister);
         assert_eq!(reply["ok"], true);
         assert_eq!(reply["body"], "today's body");
@@ -1134,7 +1214,7 @@ mod tests {
 
     #[test]
     fn daily_folder_excluded_maps_to_folder_excluded_kind() {
-        let lister = FixedLister::daily_only(|| DailyOutcome::FolderExcluded);
+        let lister = FixedLister::daily_only(|_| DailyOutcome::FolderExcluded);
         let reply = roundtrip(br#"{"cmd":"daily"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "folder_excluded");
@@ -1142,7 +1222,7 @@ mod tests {
 
     #[test]
     fn daily_vault_locked_maps_to_vault_locked_kind() {
-        let lister = FixedLister::daily_only(|| DailyOutcome::VaultLocked);
+        let lister = FixedLister::daily_only(|_| DailyOutcome::VaultLocked);
         let reply = roundtrip(br#"{"cmd":"daily"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "vault_locked");
@@ -1150,7 +1230,7 @@ mod tests {
 
     #[test]
     fn daily_io_failure_maps_to_io_kind() {
-        let lister = FixedLister::daily_only(|| DailyOutcome::Io);
+        let lister = FixedLister::daily_only(|_| DailyOutcome::Io);
         let reply = roundtrip(br#"{"cmd":"daily"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "io");
@@ -1158,7 +1238,7 @@ mod tests {
 
     #[test]
     fn daily_append_ok_returns_bare_ok_with_no_extra_field() {
-        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::Ok);
+        let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::Ok(false));
         let reply = roundtrip(br#"{"cmd":"daily_append","line":"hello"}"#, &lister);
         assert_eq!(
             reply,
@@ -1169,9 +1249,9 @@ mod tests {
 
     #[test]
     fn daily_append_passes_the_line_through_to_the_lister() {
-        let lister = FixedLister::daily_append_only(|line| {
+        let lister = FixedLister::daily_append_only(|_, line| {
             if line == "wanted line" {
-                DailyAppendOutcome::Ok
+                DailyAppendOutcome::Ok(false)
             } else {
                 DailyAppendOutcome::Io
             }
@@ -1182,7 +1262,7 @@ mod tests {
 
     #[test]
     fn daily_append_folder_excluded_maps_to_folder_excluded_kind() {
-        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::FolderExcluded);
+        let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::FolderExcluded);
         let reply = roundtrip(br#"{"cmd":"daily_append","line":"x"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "folder_excluded");
@@ -1190,7 +1270,7 @@ mod tests {
 
     #[test]
     fn daily_append_vault_locked_maps_to_vault_locked_kind() {
-        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::VaultLocked);
+        let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::VaultLocked);
         let reply = roundtrip(br#"{"cmd":"daily_append","line":"x"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "vault_locked");
@@ -1198,7 +1278,7 @@ mod tests {
 
     #[test]
     fn daily_append_io_failure_maps_to_io_kind() {
-        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::Io);
+        let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::Io);
         let reply = roundtrip(br#"{"cmd":"daily_append","line":"x"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "io");
@@ -1206,8 +1286,175 @@ mod tests {
 
     #[test]
     fn daily_append_missing_line_field_maps_to_invalid_request() {
-        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::Io);
+        let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::Io);
         let reply = roundtrip(br#"{"cmd":"daily_append"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    // myne#177. The `period` / `period_append` wire shapes, and the two legacy
+    // spellings whose only remaining job is to arrive as the daily period. Each
+    // case reads what the SEAM was handed, not what the reply said, because a
+    // dispatcher that answered every request with the daily note would satisfy
+    // an assertion on the reply alone.
+
+    /// Reports back the period spelling it was handed, so a case can read it
+    /// out of the reply body without a shared mutable cell.
+    fn echoing_period() -> FixedLister {
+        FixedLister::daily_only(|period| DailyOutcome::Ok(period.to_string(), false))
+    }
+
+    #[test]
+    fn period_hands_the_wire_spelling_to_the_seam_verbatim() {
+        for wire in ["daily", "weekly", "monthly"] {
+            let frame = format!(r#"{{"cmd":"period","period":"{wire}"}}"#);
+            let reply = roundtrip(frame.as_bytes(), &echoing_period());
+            assert_eq!(reply["ok"], true);
+            assert_eq!(reply["body"], wire, "the seam saw a different period");
+        }
+    }
+
+    #[test]
+    fn an_unknown_period_reaches_the_seam_rather_than_the_dispatcher_guessing() {
+        // The refusal is the vault-side lister's, not this layer's: a period
+        // this host does not know is version skew, and answering it with the
+        // daily note would be the one wrong answer. So the dispatcher passes it
+        // through unchanged and lets the seam refuse.
+        let reply = roundtrip(
+            br#"{"cmd":"period","period":"quarterly"}"#,
+            &echoing_period(),
+        );
+        assert_eq!(reply["body"], "quarterly");
+    }
+
+    #[test]
+    fn the_legacy_daily_request_arrives_as_the_daily_period() {
+        let reply = roundtrip(br#"{"cmd":"daily"}"#, &echoing_period());
+        assert_eq!(reply["body"], "daily");
+    }
+
+    #[test]
+    fn period_missing_the_period_field_maps_to_invalid_request() {
+        let lister = FixedLister::daily_only(|_| DailyOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"period"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn period_carries_the_device_clock_flag_and_omits_it_otherwise() {
+        // A FLAG, not a sentence: the CLI owns the wording, so the reply cannot
+        // carry host-supplied bytes onto the CLI's stderr. Omitted when false,
+        // so a reply to a client predating the field is unchanged.
+        let on = FixedLister::daily_only(|_| DailyOutcome::Ok("b".to_string(), true));
+        let reply = roundtrip(br#"{"cmd":"period","period":"weekly"}"#, &on);
+        assert_eq!(reply["body"], "b");
+        assert_eq!(reply["used_device_clock"], true);
+
+        let off = FixedLister::daily_only(|_| DailyOutcome::Ok("b".to_string(), false));
+        let reply = roundtrip(br#"{"cmd":"period","period":"weekly"}"#, &off);
+        assert_eq!(
+            reply,
+            serde_json::json!({ "ok": true, "body": "b" }),
+            "the flag must be absent, not false"
+        );
+    }
+
+    #[test]
+    fn period_append_carries_the_device_clock_flag_and_omits_it_otherwise() {
+        let on = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::Ok(true));
+        let reply = roundtrip(
+            br#"{"cmd":"period_append","period":"weekly","line":"x"}"#,
+            &on,
+        );
+        assert_eq!(reply["used_device_clock"], true);
+
+        let off = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::Ok(false));
+        let reply = roundtrip(
+            br#"{"cmd":"period_append","period":"weekly","line":"x"}"#,
+            &off,
+        );
+        assert_eq!(
+            reply,
+            serde_json::json!({ "ok": true }),
+            "the flag must be absent, not false"
+        );
+    }
+
+    #[test]
+    fn period_error_kinds_are_the_same_map_the_daily_arm_uses() {
+        fn assert_kind(outcome: fn(&str) -> DailyOutcome, kind: &str) {
+            let lister = FixedLister::daily_only(outcome);
+            let reply = roundtrip(br#"{"cmd":"period","period":"monthly"}"#, &lister);
+            assert_eq!(reply["ok"], false);
+            assert_eq!(reply["error"]["kind"], kind);
+        }
+        assert_kind(|_| DailyOutcome::FolderExcluded, "folder_excluded");
+        assert_kind(|_| DailyOutcome::VaultLocked, "vault_locked");
+        assert_kind(|_| DailyOutcome::Io, "io");
+        // Version skew reads as version skew, not as a failing disk.
+        assert_kind(|_| DailyOutcome::UnknownPeriod, "invalid_request");
+    }
+
+    // An append reply carries no string, so the double reports the period it was
+    // handed by ACCEPTING one spelling and refusing every other. A `fn` pointer
+    // cannot capture the spelling it is looking for, so there is one item per
+    // period rather than a loop.
+    fn only_daily(period: &str, line: &str) -> DailyAppendOutcome {
+        accept_if(period == "daily", line)
+    }
+    fn only_weekly(period: &str, line: &str) -> DailyAppendOutcome {
+        accept_if(period == "weekly", line)
+    }
+    fn only_monthly(period: &str, line: &str) -> DailyAppendOutcome {
+        accept_if(period == "monthly", line)
+    }
+    fn accept_if(period_matched: bool, line: &str) -> DailyAppendOutcome {
+        if period_matched && line == "wanted line" {
+            DailyAppendOutcome::Ok(false)
+        } else {
+            DailyAppendOutcome::Io
+        }
+    }
+
+    #[test]
+    fn period_append_hands_both_the_period_and_the_line_to_the_seam() {
+        for (wire, only) in [
+            ("daily", only_daily as fn(&str, &str) -> DailyAppendOutcome),
+            ("weekly", only_weekly),
+            ("monthly", only_monthly),
+        ] {
+            let frame =
+                format!(r#"{{"cmd":"period_append","period":"{wire}","line":"wanted line"}}"#);
+            let reply = roundtrip(frame.as_bytes(), &FixedLister::daily_append_only(only));
+            assert_eq!(
+                reply["ok"], true,
+                "the seam saw a different period, or the line did not arrive intact"
+            );
+        }
+    }
+
+    #[test]
+    fn the_legacy_daily_append_request_arrives_as_the_daily_period() {
+        let reply = roundtrip(
+            br#"{"cmd":"daily_append","line":"wanted line"}"#,
+            &FixedLister::daily_append_only(only_daily),
+        );
+        assert_eq!(reply["ok"], true);
+    }
+
+    #[test]
+    fn period_append_missing_the_period_field_maps_to_invalid_request() {
+        let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"period_append","line":"x"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn period_append_missing_the_line_field_maps_to_invalid_request() {
+        let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"period_append","period":"weekly"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "invalid_request");
     }
