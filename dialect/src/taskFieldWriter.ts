@@ -171,6 +171,38 @@ export function taskDescription(line: string, tree?: Tree): string {
 }
 
 /**
+ * Put back the separator the parser requires after `[ ]`, when stripping left a
+ * line that is nothing but its marker.
+ *
+ * `stripFieldSpans` ends by right-trimming, so clearing the last field from a
+ * description-less task takes `- [ ] @due(2026-01-01)` to `- [ ]`. That line has
+ * no separator, so `@lezer/markdown`'s GFM `TaskList` leaf does not see a task
+ * at all and the checkbox disappears.
+ *
+ * Before the marker shapes were consolidated, both repair paths still accepted
+ * it: `isTaskLine` and `flipMarker` each ended in `\s*`, which matches nothing.
+ * They are now built on `TASK_LINE_RE` with its required-separator lookahead, so
+ * the line this writer produced was one that no other writer in the tree could
+ * flip or rewrite: a persisted task silently became prose the task machinery
+ * would not touch again. The bytes were intact, so it was never data loss, and
+ * that is exactly what made it quiet.
+ *
+ * The reachable path is one keystroke: `/due` on a blank line auto-converts to
+ * `- [ ] ` and writes the field, and clearing that field again is the trigger.
+ *
+ * Restoring the space rather than refusing the write is the right half to fix.
+ * The user asked for the field to go; the separator is the parser's requirement,
+ * not their content.
+ */
+function restoreTaskSeparator(rewritten: string): string {
+  const marker = TASK_LINE_MARKER_STRIP.exec(rewritten);
+  if (marker === null) return rewritten;
+  // Already carries the separator, or has a description after it.
+  if (rewritten.length > marker[0].length) return rewritten;
+  return `${rewritten} `;
+}
+
+/**
  * The change that rewrites `line`'s task fields as `next`.
  *
  * The whole line is converted, not just the field that changed: every task field
@@ -195,8 +227,9 @@ export function planTaskFieldWrite(
   // `taskDescription`, which differs only in also dropping the list marker.
   const description = stripFieldSpans(line, ranges);
 
-  const rewritten =
-    serialized === "" ? description : `${description}${description === "" ? "" : " "}${serialized}`;
+  const rewritten = restoreTaskSeparator(
+    serialized === "" ? description : `${description}${description === "" ? "" : " "}${serialized}`,
+  );
 
   if (rewritten === line) return null;
 

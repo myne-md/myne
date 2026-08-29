@@ -238,6 +238,38 @@ describe("ContextMenu submenu", () => {
     expect(document.activeElement?.getAttribute("data-item-id")).toBe("export");
   });
 
+  it("drives the SUBMENU's own arrow cycle once focus is inside it", () => {
+    // The parent's two `[data-submenu]` guards are inherited by the nested
+    // instance, because it is the same component. Unscoped, the child's bail
+    // fired on its own rows and its filter stripped them, so ArrowDown,
+    // ArrowUp, Home and End all did nothing inside an open submenu. Escape and
+    // Enter kept working (a document listener, and native button semantics),
+    // which is what made it easy to miss.
+    //
+    // The case above fires on the PARENT menu div, whose own wrapper lookup is
+    // null, so it exercises the parent cycle only and stayed green throughout.
+    render(
+      <ContextMenu
+        x={0}
+        y={0}
+        onClose={vi.fn()}
+        items={[
+          item({
+            id: "export",
+            children: [item({ id: "md" }), item({ id: "pdf" }), item({ id: "html" })],
+          }),
+        ]}
+      />,
+    );
+    fireEvent.click(rowById("export"));
+    expect(document.activeElement?.getAttribute("data-item-id")).toBe("md");
+    const submenu = rowById("md").closest('[role="menu"]')!;
+    fireEvent.keyDown(submenu, { key: "ArrowDown" });
+    expect(document.activeElement?.getAttribute("data-item-id")).toBe("pdf");
+    fireEvent.keyDown(submenu, { key: "End" });
+    expect(document.activeElement?.getAttribute("data-item-id")).toBe("html");
+  });
+
   it("keeps the parent menu's arrow cycle to its OWN rows while a submenu is open", () => {
     // The submenu is a nested ContextMenu with its own key handler. Without the
     // `[data-submenu]` bail, one ArrowDown would move focus twice (once per

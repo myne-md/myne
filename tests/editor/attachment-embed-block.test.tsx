@@ -227,4 +227,21 @@ describe("ownLineInsertion", () => {
     m.host.remove();
   });
 
+  it("promotes a plain wikilink to a block embed when `!` is typed in front of it", async () => {
+    // The skip's three conditions read as a proof that the set cannot have
+    // moved, and this is the way it can that they missed: the line already held
+    // a complete `[[att:...]]` alone on it, so the block set was empty, the
+    // change is insert-only, and `!` is none of the characters the class
+    // listed. The embed became valid and nothing rebuilt, so it rendered as raw
+    // source until an unrelated edit happened to force one.
+    const plain = EMBED.startsWith("!") ? EMBED.slice(1) : EMBED;
+    mounted = await mount(`${plain}\n`);
+    expect(placement(mounted.host), "a plain wikilink is no embed").toBe("absent");
+    mounted.view.dispatch({ changes: { from: 0, insert: "!" } });
+    await Promise.resolve();
+    await Promise.resolve();
+    mounted.view.requestMeasure();
+    expect(placement(mounted.host), "typing `!` should promote it").toBe("block");
+  });
+
 });

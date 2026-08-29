@@ -346,7 +346,18 @@ function unaffectedByPlainTyping(value: DecorationSet, tr: Transaction): boolean
       return;
     }
     const text = inserted.toString();
-    if (/[[\]\n]/.test(text)) safe = false;
+    // `!` and `\r` join the class, and the reason is a way the set can move that
+    // the enumeration above missed. Typing `!` in front of an existing
+    // `[[att:<id>|x.png]]` that already sits alone on its line satisfies every
+    // other condition: the plain wikilink was never in the block set, so
+    // `value.size` is 0; the change is insert-only; and `!` is none of `[`, `]`
+    // or `\n`. The field returned `value` unchanged while the inline builder
+    // declined it too, because `embedIsAlone` had just become true, so the
+    // newly valid embed rendered as raw source until an unrelated non-plain
+    // edit forced a rebuild. It self-heals and never touches the document, and
+    // it persists across arbitrary further typing, which is the shape that
+    // reads as broken.
+    if (/[[\]\n\r!]/.test(text)) safe = false;
   });
   return safe;
 }

@@ -735,6 +735,9 @@ export const ROSTER = Object.freeze([
       "e2e/attachments-library.e2e.ts",
       "e2e/attachment-cleanup.e2e.ts",
       "e2e/attachment-zoom.e2e.ts",
+      // myne-md/myne#604: an embed alone on its line draws as a block and
+      // carries drag-to-resize handles.
+      "e2e/embed-resize.e2e.ts",
       "e2e/attachment-text-preview.e2e.ts",
       "e2e/generic-file-attachment.e2e.ts",
       "e2e/video-attachment.e2e.ts",
@@ -1625,6 +1628,8 @@ export const ROSTER = Object.freeze([
       "e2e/heading-list-folding.e2e.ts",
       "e2e/right-panel-active-tab.e2e.ts",
       "e2e/wikilink-deep-links.e2e.ts",
+      // myne-md/myne#601: one press on a rendered chip opens its note.
+      "e2e/wikilink-chip-click.e2e.ts",
       "e2e/find-replace.e2e.ts",
       "e2e/links-tab.e2e.ts",
     ],
@@ -6746,6 +6751,9 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
       "e2e/workspace-state.e2e.ts",
+      // myne-md/myne#600: a note keeps its reading position across a note
+      // switch (sm1) and across a pane split (sm2).
+      "e2e/scroll-memory.e2e.ts",
       "e2e/tab-modes.e2e.ts",
       "e2e/tab-switch-flush.e2e.ts",
       "e2e/navigation.e2e.ts",

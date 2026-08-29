@@ -1,8 +1,3 @@
-import {
-  decodedAspectOf,
-  rememberAspect,
-} from "./decoded-aspect";
-import { previewCache, previewInFlight } from "./session-caches";
 // Atomic widgets for the editor attachment render path (epic MYND-164 + 147/149).
 //
 // Four widget families, all `Decoration.replace({ widget, atomic: true })`:
@@ -22,6 +17,11 @@ import { previewCache, previewInFlight } from "./session-caches";
 //
 // All visible text is set via `textContent` (never `innerHTML`) per TB2.
 
+import {
+  decodedAspectOf,
+  rememberAspect,
+} from "./decoded-aspect";
+import { previewCache, previewInFlight } from "./session-caches";
 import { type EditorView, WidgetType } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
 import { getHost } from "../host";
@@ -2018,6 +2018,19 @@ function appendResizeHandles(
     // Written once rather than on every move: it does not change during a drag,
     // and a pointer sending coalesced events writes style faster than the
     // browser paints.
+    //
+    // BOTH caps come off, not just the image's. The image is a flex child of
+    // `.cm-attachment-frame`, and the theme caps that frame at 320px, so
+    // lifting only the image left the frame holding the real ceiling. On an
+    // embed with no `w=` segment, which is every image at its default size and
+    // precisely what this gesture is for, the drag then showed no growth at
+    // all: the width climbed toward the content column while nothing on screen
+    // moved, the handle detached from the pointer, and the size jumped only
+    // once `pointerup` wrote the layout and the rebuilt widget took
+    // `applyEmbedLayout`'s path. That path lifts the frame too, but only when a
+    // width is already set, which by definition it is not here.
+    const framePreDragMaxWidth = frame.style.maxWidth;
+    frame.style.maxWidth = "100%";
     img.style.maxWidth = "100%";
     // Style writes are coalesced into one per frame. A fast pointer delivers
     // more `pointermove` events than there are frames, and each one used to be
@@ -2064,6 +2077,12 @@ function appendResizeHandles(
       if (frameRequest !== 0) cancelAnimationFrame(frameRequest);
       frameRequest = 0;
       frame.classList.remove("cm-attachment-resizing");
+      // Put the frame's own cap back. On the commit path the rebuilt widget
+      // sets it again from the layout; on an ABANDONED drag (pointercancel, or
+      // a release that moved nothing) nothing rebuilds, so without this the
+      // embed would silently keep an uncapped frame for the rest of the
+      // session.
+      frame.style.maxWidth = framePreDragMaxWidth;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", cleanup);
