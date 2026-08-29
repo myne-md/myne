@@ -308,6 +308,12 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     // clobbers another folder's order (whole-sequence LWW dropped one — the
     // exact loss MYND-562 fixed for the decoration maps above).
     let item_order = per_key!("item_order", item_order);
+    // periodic_notes (myne#177): keys are `<period>.<setting>`, so a folder edit
+    // on one device and a template edit on another, to the SAME period in the
+    // same round, race on separate clocks and both survive. That is the whole
+    // reason the field is a flat map rather than a map of nested objects: a
+    // per-period value would have put both edits on one clock and dropped one.
+    let periodic_notes = per_key!("periodic_notes", periodic_notes);
 
     // The struct literal lists EVERY PrefsView field with no `..` — the same
     // compile-time drift lock as the classification conformance test: a new
@@ -438,6 +444,8 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // item_order (MYND-596): per-container map merge, computed above so it
         // borrows `clocks` once — moved here from the sequence-LWW group.
         item_order,
+        // periodic_notes (myne#177): per-setting map merge, same reason.
+        periodic_notes,
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
         ai_enabled: local.ai_enabled,
@@ -977,6 +985,52 @@ mod tests {
             assert_eq!(merged.folder_icons.get("work/").unwrap(), "briefcase");
             assert_eq!(merged.folder_icons.get("personal/").unwrap(), "leaf");
             assert_eq!(merged.field_clocks.get("item_colors/work/"), Some(&300));
+        }
+    }
+
+    #[test]
+    fn periodic_notes_merges_per_setting_not_per_period() {
+        // myne#177. The flat `<period>.<setting>` key shape was chosen over a
+        // map of nested objects for exactly this: two edits to the SAME period
+        // in the same round, on different settings, must both survive. With a
+        // per-period value they would have shared one clock and one would have
+        // been dropped. Asserting the property rather than the shape, because
+        // the shape is what a later refactor would change.
+        let mut a = PrefsView::default();
+        a.periodic_notes
+            .insert("weekly.folder".into(), "Weekly/".into());
+        a.periodic_notes
+            .insert("monthly.format".into(), "YYYY-MM".into());
+        stamped(&mut a, "periodic_notes/weekly.folder", 100);
+        stamped(&mut a, "periodic_notes/monthly.format", 100);
+
+        let mut b = PrefsView::default();
+        // Same period, different setting: must not clobber a's folder.
+        b.periodic_notes
+            .insert("weekly.template".into(), "0190a000-tmpl".into());
+        // Same key, newer clock: must win.
+        b.periodic_notes
+            .insert("monthly.format".into(), "YYYY/MM".into());
+        stamped(&mut b, "periodic_notes/weekly.template", 200);
+        stamped(&mut b, "periodic_notes/monthly.format", 300);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(
+                merged.periodic_notes.get("weekly.folder").unwrap(),
+                "Weekly/"
+            );
+            assert_eq!(
+                merged.periodic_notes.get("weekly.template").unwrap(),
+                "0190a000-tmpl"
+            );
+            assert_eq!(
+                merged.periodic_notes.get("monthly.format").unwrap(),
+                "YYYY/MM"
+            );
+            assert_eq!(
+                merged.field_clocks.get("periodic_notes/monthly.format"),
+                Some(&300)
+            );
         }
     }
 

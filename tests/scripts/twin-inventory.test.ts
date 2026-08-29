@@ -179,7 +179,13 @@ describe("check-twin-inventory", () => {
     // clients' copies, which is the destination the entry itself named. A twin
     // that stops being a twin because the duplication was resolved leaves the
     // roster the same way a deleted file does.
-    expect(full.out).toContain("104 twin(s) discovered");
+    //
+    // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
+    // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
+    // two different paths. The curated half again, and again the half that was
+    // green and blind: six doc comments across the two files claimed they
+    // mirrored each other exactly and nothing measured it.
+    expect(full.out).toContain("105 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -353,7 +359,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(104);
+    expect(ROSTER.length).toBe(105);
   });
 
   it("keeps `screen` narrow", () => {

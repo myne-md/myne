@@ -78,7 +78,14 @@ import { deriveTree, subtreeCount, orderedChildren, childOrderIndex, reorderChil
 import type { Child, OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
 import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expand-store";
 import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
-import { resolveTodayNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
+import {
+  resolvePeriodNote,
+  periodSettings,
+  zonedNow,
+  createNoteFromTemplate,
+  createBlankNamedNote,
+  type Period,
+} from "../../lib/daily";
 import { normalizeFolderPath, ancestorPaths, foldSegment, folderKey } from "../../dialect/folderPath";
 import {
   archivedFolderKeys,
@@ -150,6 +157,16 @@ import { TagBrowserSheet } from "./editor/sheets/TagBrowserSheet";
 import { VaultSwitcher } from "./editor/sheets/VaultSwitcher";
 import { ViewsSheet } from "./editor/sheets/ViewsSheet";
 import type { NoteEntry, OutlineItem, PaletteCommand } from "./editor/types";
+
+// One period-note failure string per period (myne#177), the desktop twin of
+// `src/screens/Editor.tsx::PERIOD_OPEN_FAILED_KEY`. Spelled out as literals
+// rather than built from the period name, because a template-built key is
+// invisible to `check-i18n.mjs` and would go missing from the catalog silently.
+const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
+  daily: "editor.periodicNotes.openFailed.daily",
+  weekly: "editor.periodicNotes.openFailed.weekly",
+  monthly: "editor.periodicNotes.openFailed.monthly",
+};
 
 /**
  * Editor flow — the wired main surface after unlock. Mirrors the static
@@ -1986,26 +2003,55 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     else devStore().delete(id);
   }
 
-  /** Open (or create) today's daily note per the daily-notes prefs. */
-  async function openToday() {
+  /** Open (or create) a period's note per the periodic-notes prefs (myne#177).
+   *  One function for all three periods: daily reads its three legacy top-level
+   *  prefs fields and the other two read the `periodic_notes` map, which
+   *  `periodSettings` resolves, so this flow does not know the difference. */
+  async function openPeriod(period: Period) {
     try {
       const candidates = liveNotes.map((n) => ({ id: n.id, title: n.title, folder: folderOf.get(n.id) ?? null }));
-      const res = resolveTodayNote(new Date(), prefs.daily_date_format, prefs.daily_folder, candidates);
+      const settings = periodSettings(prefs, period);
+      // ONE instant, read once: it anchors the period AND renders the
+      // template's `{{date}}`/`{{time}}`. Two calls could title the note with
+      // one date and stamp its body with another.
+      //
+      // `null`, not `prefs.timezone`, and that is deliberate (myne#177). The
+      // pref is device-local as a MERGE class, which is not an exclusion from
+      // the blob: enrolment adopts the whole prefs blob as this device's
+      // starting defaults (`sync-protocol.md` §10.2.1), so a phone enrolled
+      // after a computer set an override starts out holding that zone. Mobile
+      // ships no control for it and displays nothing derived from it, so
+      // applying it here would move which note this opens while changing
+      // nothing the user can see or alter. A client honours the override where
+      // it can also show and change it. Pass `prefs.timezone` on the day mobile
+      // ships the setting, and not before.
+      const now = zonedNow(new Date(), null);
+      const res = resolvePeriodNote(now, period, settings, candidates);
       if (res.kind === "open") {
         void openFromList(res.id);
         return;
       }
       const id =
-        prefs.daily_template != null
-          ? await createNoteFromTemplate(prefs.daily_template, res.dateTitle, res.folder, new Date())
+        settings.template != null
+          ? await createNoteFromTemplate(settings.template, res.dateTitle, res.folder, now, {
+              start: res.range.start,
+              end: res.range.end,
+            })
           : await createBlankNamedNote(res.dateTitle, res.folder);
       await refreshOne(id);
       void openFromList(id);
     } catch (e) {
-      // Never let the daily-note path crash the app — surface a message instead.
-      console.error("[today] failed:", e);
-      if (HAS_TAURI) setListError(t("editor.flow.openTodayFailed"));
+      // Never let the period-note path crash the app: surface a message instead,
+      // naming the period that failed rather than always saying "today".
+      console.error(`[${period}] failed:`, e);
+      if (HAS_TAURI) setListError(t(PERIOD_OPEN_FAILED_KEY[period]));
     }
+  }
+
+  /** Open (or create) today's daily note. The name the pre-myne#177 call sites
+   *  use; a delegation, so daily cannot drift from the other two periods. */
+  async function openToday() {
+    await openPeriod("daily");
   }
 
   /** Copy the current note's Markdown to the clipboard (WebView clipboard API —
@@ -2142,10 +2188,19 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // the CommandPalette overlay, which renders at the layout level (reachable
   // from every size class), so it lives OUTSIDE the list-pane render helper.
   const gi = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  // One calendar glyph for all three periods (myne#177): three byte-identical
+  // copies of the same markup is three places to edit when it changes.
+  const calendarGlyph = (
+    <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>
+  );
   const paletteCommands: PaletteCommand[] = [
     { id: "new-note", label: t("notes.list.newNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
     { id: "new-drawing", label: t("notes.newTab.createDrawing"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" {...gi} /></svg>, run: () => newDrawing() },
-    { id: "daily", label: t("editor.nav.dailyNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>, run: () => void openToday() },
+    { id: "daily", label: t("commands.actions.openTodayNote.label"), icon: calendarGlyph, run: () => void openToday() },
+    // myne#177: the weekly and monthly siblings, palette-only like daily and
+    // reusing daily's calendar glyph rather than inventing two more icons.
+    { id: "weekly", label: t("commands.actions.openThisWeekNote.label"), icon: calendarGlyph, run: () => void openPeriod("weekly") },
+    { id: "monthly", label: t("commands.actions.openThisMonthNote.label"), icon: calendarGlyph, run: () => void openPeriod("monthly") },
     { id: "templates", label: t("templates.manager.listLabel"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
     { id: "files", label: t("attachments.library.title"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
     { id: "graph", label: t("editor.chrome.barItems.graph"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>, run: () => setTab("graph") },

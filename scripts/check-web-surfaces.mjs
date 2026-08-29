@@ -94,7 +94,7 @@ const V = {
     "adapted",
     "Ships; import goes through the file-picker seam (`pickFiles` + `readPickedSmallText`) and export through the download seam (task 45). The import half only became true with #262 — this entry described the fix while the code still called `dialog.open`, a typed refusal in the browser, so a valid theme file was reported as invalid.",
   ],
-  "src/components/settings/DailyNotesSettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/PeriodicNotesSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/DefaultViewModeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/EditorPanel.tsx": [
     "adapted",

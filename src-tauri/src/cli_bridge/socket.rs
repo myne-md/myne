@@ -558,10 +558,14 @@ mod tests {
         fn create_note(&self, _body: &str, _folder: Option<&str>) -> NewOutcome {
             NewOutcome::Io
         }
-        fn daily(&self) -> crate::cli_bridge::dispatch::DailyOutcome {
+        fn period(&self, _period: &str) -> crate::cli_bridge::dispatch::DailyOutcome {
             crate::cli_bridge::dispatch::DailyOutcome::Io
         }
-        fn daily_append(&self, _line: &str) -> crate::cli_bridge::dispatch::DailyAppendOutcome {
+        fn period_append(
+            &self,
+            _period: &str,
+            _line: &str,
+        ) -> crate::cli_bridge::dispatch::DailyAppendOutcome {
             crate::cli_bridge::dispatch::DailyAppendOutcome::Io
         }
     }
@@ -756,10 +760,14 @@ mod tests {
             fn create_note(&self, _body: &str, _folder: Option<&str>) -> NewOutcome {
                 NewOutcome::Io
             }
-            fn daily(&self) -> crate::cli_bridge::dispatch::DailyOutcome {
+            fn period(&self, _period: &str) -> crate::cli_bridge::dispatch::DailyOutcome {
                 crate::cli_bridge::dispatch::DailyOutcome::Io
             }
-            fn daily_append(&self, _line: &str) -> crate::cli_bridge::dispatch::DailyAppendOutcome {
+            fn period_append(
+                &self,
+                _period: &str,
+                _line: &str,
+            ) -> crate::cli_bridge::dispatch::DailyAppendOutcome {
                 crate::cli_bridge::dispatch::DailyAppendOutcome::Io
             }
         }

@@ -775,6 +775,12 @@
       },
       "unfoldAll": {
         "label": "إلغاء طي الكل"
+      },
+      "openThisWeekNote": {
+        "label": "فتح ملاحظة هذا الأسبوع"
+      },
+      "openThisMonthNote": {
+        "label": "فتح ملاحظة هذا الشهر"
       }
     },
     "hotkeys": {
@@ -1757,6 +1763,13 @@
     "commandPalette": {
       "searchPlaceholder": "ابحث في الملاحظات أو نفّذ أمرًا…",
       "noMatches": "لا تطابق أي أوامر أو ملاحظات."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "تعذّر فتح ملاحظة اليوم.",
+        "weekly": "تعذّر فتح ملاحظة هذا الأسبوع.",
+        "monthly": "تعذّر فتح ملاحظة هذا الشهر."
+      }
     }
   },
   "export": {
@@ -3169,18 +3182,37 @@
       "blankTemplate": "فارغة (بدون قالب)",
       "dateFormatHelper": "عنوان كل ملاحظة يومية. يدعم YYYY وMM وDD. الافتراضي {{default}}.",
       "dateFormatLabel": "تنسيق تاريخ الملاحظة اليومية",
-      "dateFormatSaveError": "تعذّر حفظ تنسيق التاريخ. أعد المحاولة.",
       "folderHelper": "المكان الذي تُحفظ فيه الملاحظات اليومية الجديدة. الافتراضي {{default}}. ويُبقى على المجلد حتى لو كان فارغًا.",
       "folderLabel": "مجلد الملاحظات اليومية",
-      "folderSaveError": "تعذّر حفظ المجلد اليومي. أعد المحاولة.",
       "folderSearchEmpty": "لا توجد مجلدات مطابقة.",
       "folderSearchPlaceholder": "ابحث في المجلدات…",
       "searchEmpty": "لا توجد قوالب مطابقة.",
       "searchPlaceholder": "ابحث في القوالب…",
       "templateHelper": "اختر قالبًا تبدأ منه كل ملاحظة يومية، أو اتركه فارغًا للحصول على ملاحظة فارغة عنوانها التاريخ.",
       "templateLabel": "قالب الملاحظة اليومية",
-      "templateSaveError": "تعذّر حفظ القالب اليومي. أعد المحاولة.",
-      "untitledTemplate": "قالب بدون عنوان"
+      "untitledTemplate": "قالب بدون عنوان",
+      "sectionDaily": "الملاحظات اليومية",
+      "sectionWeekly": "الملاحظات الأسبوعية",
+      "sectionMonthly": "الملاحظات الشهرية",
+      "periodFolderLabel": "المجلد",
+      "periodFolderHelper": "المكان الذي تُحفظ فيه الملاحظات {{period}} الجديدة. الافتراضي: {{default}}. يبقى المجلد حتى لو كان فارغًا.",
+      "periodFormatLabel": "تنسيق العنوان",
+      "periodFormatHelperDaily": "عنوان كل ملاحظة يومية. يدعم YYYY وMM وDD وgggg (سنة الأسبوع حسب ISO) وww (رقم الأسبوع حسب ISO)، و[نص] للنص الحرفي. الافتراضي: {{default}}.",
+      "periodFormatHelperWeekly": "عنوان كل ملاحظة أسبوعية. يدعم gggg (سنة الأسبوع حسب ISO) وww (رقم الأسبوع حسب ISO) وYYYY وMM وDD، و[نص] للنص الحرفي. الافتراضي: {{default}}.",
+      "periodFormatHelperMonthly": "عنوان كل ملاحظة شهرية. يدعم YYYY وMM وgggg (سنة الأسبوع حسب ISO) وww (رقم الأسبوع حسب ISO)، و[نص] للنص الحرفي. الافتراضي: {{default}}.",
+      "periodTemplateLabel": "القالب",
+      "periodTemplateHelper": "اختر قالبًا تبدأ منه كل ملاحظة {{period}}، أو اتركه فارغًا للحصول على ملاحظة فارغة عنوانها التاريخ.",
+      "collisionWarning": "الملاحظات {{first}} و{{second}} تؤدي إلى الملاحظة نفسها، لأنها تشترك في المجلد وتنتج العنوان نفسه. وكلا الأمرين سيفتحها.",
+      "weekStartNote": "تبدأ الأسابيع يوم الاثنين (ISO 8601)، لذلك قد تنتمي أيام يناير الأولى إلى الأسبوع الأخير من السنة السابقة، وأيام ديسمبر الأخيرة إلى الأسبوع الأول من السنة التالية.",
+      "periodFolderSaveError": "تعذّر حفظ مجلد الملاحظات {{period}}. حاول مرة أخرى.",
+      "periodFormatSaveError": "تعذّر حفظ تنسيق عنوان الملاحظات {{period}}. حاول مرة أخرى.",
+      "periodTemplateSaveError": "تعذّر حفظ قالب الملاحظات {{period}}. حاول مرة أخرى.",
+      "periodNameDaily": "اليومية",
+      "periodNameWeekly": "الأسبوعية",
+      "periodNameMonthly": "الشهرية",
+      "periodFolderAriaLabel": "مجلد الملاحظات {{period}}",
+      "periodFormatAriaLabel": "تنسيق عنوان الملاحظات {{period}}",
+      "periodTemplateAriaLabel": "قالب الملاحظات {{period}}"
     },
     "deleteVault": {
       "partialFailBody_zero": "تعذّر حذف {{count}} ملف من القرص. مفاتيح الخزنة مُصفّرة من الذاكرة سلفًا، لذا فأي نص مشفّر يتيم يبقى هو خردة مغلّفة بـ Argon2id لا يمكن استرجاعها.",
@@ -3749,7 +3781,8 @@
         "viewMode": "وضع العرض الافتراضي حيّة قراءة مصدر معاينة",
         "dateFormat": "تنسيق التاريخ يوم شهر سنة iso dd/mm mm/dd تقويم",
         "timeFormat": "تنسيق الوقت 24 ساعة 12 ساعة نظام am pm",
-        "timezone": "المنطقة الزمنية توقيت tz utc iana منطقة اليوم"
+        "timezone": "المنطقة الزمنية توقيت tz utc iana منطقة اليوم",
+        "periodicNotes": "ملاحظات دورية أسبوعية شهرية أسبوع شهر مجلد قالب تنسيق"
       }
     },
     "dateTime": {

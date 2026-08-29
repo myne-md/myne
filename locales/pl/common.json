@@ -721,6 +721,12 @@
       },
       "unfoldAll": {
         "label": "Rozwiń wszystko"
+      },
+      "openThisWeekNote": {
+        "label": "Otwórz notatkę z tego tygodnia"
+      },
+      "openThisMonthNote": {
+        "label": "Otwórz notatkę z tego miesiąca"
       }
     },
     "hotkeys": {
@@ -1650,6 +1656,13 @@
     "commandPalette": {
       "searchPlaceholder": "Szukaj notatek lub uruchom polecenie…",
       "noMatches": "Brak pasujących poleceń lub notatek."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Nie udało się otworzyć dzisiejszej notatki.",
+        "weekly": "Nie udało się otworzyć notatki z tego tygodnia.",
+        "monthly": "Nie udało się otworzyć notatki z tego miesiąca."
+      }
     }
   },
   "export": {
@@ -2983,18 +2996,37 @@
       "blankTemplate": "Pusty (bez szablonu)",
       "dateFormatHelper": "Tytuł każdej notatki dziennej. Obsługuje YYYY, MM, DD. Domyślnie {{default}}.",
       "dateFormatLabel": "Format daty notatki dziennej",
-      "dateFormatSaveError": "Nie udało się zapisać formatu daty. Spróbuj ponownie.",
       "folderHelper": "Gdzie są zapisywane nowe notatki dzienne. Domyślnie {{default}}. Folder jest zachowywany, nawet gdy jest pusty.",
       "folderLabel": "Folder notatek dziennych",
-      "folderSaveError": "Nie udało się zapisać folderu notatek dziennych. Spróbuj ponownie.",
       "folderSearchEmpty": "Brak pasujących folderów.",
       "folderSearchPlaceholder": "Szukaj folderów…",
       "searchEmpty": "Brak pasujących szablonów.",
       "searchPlaceholder": "Szukaj szablonów…",
       "templateHelper": "Wybierz szablon, od którego zacznie się każda notatka dzienna, lub pozostaw puste, aby utworzyć pustą notatkę z tytułem w postaci daty.",
       "templateLabel": "Szablon notatki dziennej",
-      "templateSaveError": "Nie udało się zapisać szablonu notatki dziennej. Spróbuj ponownie.",
-      "untitledTemplate": "Szablon bez tytułu"
+      "untitledTemplate": "Szablon bez tytułu",
+      "sectionDaily": "Notatki dzienne",
+      "sectionWeekly": "Notatki tygodniowe",
+      "sectionMonthly": "Notatki miesięczne",
+      "periodFolderLabel": "Folder",
+      "periodFolderHelper": "Gdzie trafiają nowe notatki {{period}}. Domyślnie: {{default}}. Folder zostaje zachowany, nawet gdy jest pusty.",
+      "periodFormatLabel": "Format tytułu",
+      "periodFormatHelperDaily": "Tytuł każdej notatki dziennej. Obsługuje YYYY, MM, DD, gggg (rok tygodniowy ISO), ww (numer tygodnia ISO) oraz [tekst] dla tekstu dosłownego. Domyślnie: {{default}}.",
+      "periodFormatHelperWeekly": "Tytuł każdej notatki tygodniowej. Obsługuje gggg (rok tygodniowy ISO), ww (numer tygodnia ISO), YYYY, MM, DD oraz [tekst] dla tekstu dosłownego. Domyślnie: {{default}}.",
+      "periodFormatHelperMonthly": "Tytuł każdej notatki miesięcznej. Obsługuje YYYY, MM, gggg (rok tygodniowy ISO), ww (numer tygodnia ISO) oraz [tekst] dla tekstu dosłownego. Domyślnie: {{default}}.",
+      "periodTemplateLabel": "Szablon",
+      "periodTemplateHelper": "Wybierz szablon, od którego zaczyna się każda notatka {{period}}, albo zostaw puste, by utworzyć pustą notatkę z datą w tytule.",
+      "collisionWarning": "Notatki {{first}} i {{second}} prowadzą do tej samej notatki, ponieważ dzielą folder i dają ten sam tytuł. Obie komendy ją otworzą.",
+      "weekStartNote": "Tygodnie zaczynają się w poniedziałek (ISO 8601), więc pierwsze dni stycznia mogą należeć do ostatniego tygodnia poprzedniego roku, a ostatnie dni grudnia do pierwszego tygodnia następnego.",
+      "periodFolderSaveError": "Nie udało się zapisać folderu {{period}}. Spróbuj ponownie.",
+      "periodFormatSaveError": "Nie udało się zapisać formatu tytułu {{period}}. Spróbuj ponownie.",
+      "periodTemplateSaveError": "Nie udało się zapisać szablonu {{period}}. Spróbuj ponownie.",
+      "periodNameDaily": "dzienne",
+      "periodNameWeekly": "tygodniowe",
+      "periodNameMonthly": "miesięczne",
+      "periodFolderAriaLabel": "Folder notatek {{period}}",
+      "periodFormatAriaLabel": "Format tytułu notatek {{period}}",
+      "periodTemplateAriaLabel": "Szablon notatek {{period}}"
     },
     "deleteVault": {
       "cancel": "Anuluj",
@@ -3557,7 +3589,8 @@
         "viewMode": "domyślny tryb widoku na żywo czytanie źródło podgląd view mode",
         "dateFormat": "format daty dzień miesiąc rok iso dd mm kalendarz date format",
         "timeFormat": "format godziny czas zegar 24 12 godzinny am pm time format clock",
-        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone"
+        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone",
+        "periodicNotes": "notatki okresowe tygodniowe miesięczne tydzień miesiąc folder szablon format"
       }
     },
     "dateTime": {

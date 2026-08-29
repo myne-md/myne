@@ -655,6 +655,12 @@
       },
       "unfoldAll": {
         "label": "باز کردن همه"
+      },
+      "openThisWeekNote": {
+        "label": "باز کردن یادداشت این هفته"
+      },
+      "openThisMonthNote": {
+        "label": "باز کردن یادداشت این ماه"
       }
     },
     "hotkeys": {
@@ -1525,6 +1531,13 @@
     "commandPalette": {
       "searchPlaceholder": "جستجوی یادداشت‌ها یا اجرای یک فرمان…",
       "noMatches": "هیچ فرمان یا یادداشتی مطابقت ندارد."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "یادداشت امروز باز نشد.",
+        "weekly": "یادداشت این هفته باز نشد.",
+        "monthly": "یادداشت این ماه باز نشد."
+      }
     }
   },
   "export": {
@@ -2757,18 +2770,37 @@
       "blankTemplate": "خالی (بدون الگو)",
       "dateFormatHelper": "عنوان هر یادداشت روزانه. از YYYY، MM و DD پشتیبانی می‌کند. پیش‌فرض {{default}} است.",
       "dateFormatLabel": "قالب تاریخ یادداشت روزانه",
-      "dateFormatSaveError": "ذخیرهٔ قالب تاریخ ممکن نشد. دوباره تلاش کنید.",
       "folderHelper": "جایی که یادداشت‌های روزانهٔ جدید بایگانی می‌شوند. پیش‌فرض {{default}} است. این پوشه حتی وقتی خالی باشد نگه داشته می‌شود.",
       "folderLabel": "پوشهٔ یادداشت روزانه",
-      "folderSaveError": "ذخیرهٔ پوشهٔ روزانه ممکن نشد. دوباره تلاش کنید.",
       "folderSearchEmpty": "هیچ پوشه‌ای مطابقت ندارد.",
       "folderSearchPlaceholder": "جستجوی پوشه‌ها…",
       "searchEmpty": "هیچ الگویی مطابقت ندارد.",
       "searchPlaceholder": "جستجوی الگوها…",
       "templateHelper": "الگویی انتخاب کنید که هر یادداشت روزانه از آن آغاز شود، یا خالی بگذارید تا یادداشتی خالی با عنوان تاریخ ساخته شود.",
       "templateLabel": "الگوی یادداشت روزانه",
-      "templateSaveError": "ذخیرهٔ الگوی روزانه ممکن نشد. دوباره تلاش کنید.",
-      "untitledTemplate": "الگوی بدون عنوان"
+      "untitledTemplate": "الگوی بدون عنوان",
+      "sectionDaily": "یادداشت‌های روزانه",
+      "sectionWeekly": "یادداشت‌های هفتگی",
+      "sectionMonthly": "یادداشت‌های ماهانه",
+      "periodFolderLabel": "پوشه",
+      "periodFolderHelper": "محل ذخیرهٔ یادداشت‌های {{period}} تازه. پیش‌فرض: {{default}}. پوشه حتی وقتی خالی است باقی می‌ماند.",
+      "periodFormatLabel": "قالب عنوان",
+      "periodFormatHelperDaily": "عنوان هر یادداشت روزانه. از YYYY، MM، DD، gggg (سال هفتهٔ ISO)، ww (شمارهٔ هفتهٔ ISO) و [متن] برای متن عینی پشتیبانی می‌کند. پیش‌فرض: {{default}}.",
+      "periodFormatHelperWeekly": "عنوان هر یادداشت هفتگی. از gggg (سال هفتهٔ ISO)، ww (شمارهٔ هفتهٔ ISO)، YYYY، MM، DD و [متن] برای متن عینی پشتیبانی می‌کند. پیش‌فرض: {{default}}.",
+      "periodFormatHelperMonthly": "عنوان هر یادداشت ماهانه. از YYYY، MM، gggg (سال هفتهٔ ISO)، ww (شمارهٔ هفتهٔ ISO) و [متن] برای متن عینی پشتیبانی می‌کند. پیش‌فرض: {{default}}.",
+      "periodTemplateLabel": "الگو",
+      "periodTemplateHelper": "الگویی را انتخاب کنید که هر یادداشت {{period}} با آن آغاز شود، یا برای یادداشتی خالی با عنوان تاریخ، این را خالی بگذارید.",
+      "collisionWarning": "یادداشت‌های {{first}} و {{second}} به یک یادداشت می‌رسند، چون پوشهٔ مشترک دارند و عنوان یکسانی می‌سازند. هر دو فرمان همان را باز می‌کنند.",
+      "weekStartNote": "هفته‌ها از دوشنبه آغاز می‌شوند (ISO 8601)، بنابراین روزهای نخست ژانویه ممکن است به آخرین هفتهٔ سال پیش تعلق داشته باشند و روزهای پایانی دسامبر به نخستین هفتهٔ سال بعد.",
+      "periodFolderSaveError": "پوشهٔ یادداشت‌های {{period}} ذخیره نشد. دوباره تلاش کنید.",
+      "periodFormatSaveError": "قالب عنوان یادداشت‌های {{period}} ذخیره نشد. دوباره تلاش کنید.",
+      "periodTemplateSaveError": "الگوی یادداشت‌های {{period}} ذخیره نشد. دوباره تلاش کنید.",
+      "periodNameDaily": "روزانه",
+      "periodNameWeekly": "هفتگی",
+      "periodNameMonthly": "ماهانه",
+      "periodFolderAriaLabel": "پوشهٔ یادداشت‌های {{period}}",
+      "periodFormatAriaLabel": "قالب عنوان یادداشت‌های {{period}}",
+      "periodTemplateAriaLabel": "الگوی یادداشت‌های {{period}}"
     },
     "deleteVault": {
       "cancel": "انصراف",
@@ -3309,7 +3341,8 @@
         "viewMode": "حالت نمایش پیش‌فرض زنده مطالعه منبع پیش‌نمایش",
         "dateFormat": "قالب تاریخ روز ماه سال iso dd/mm mm/dd تقویم",
         "timeFormat": "قالب زمان 24 ساعته 12 ساعته ساعت am pm",
-        "timezone": "منطقه زمانی ناحیه tz utc iana امروز زمان"
+        "timezone": "منطقه زمانی ناحیه tz utc iana امروز زمان",
+        "periodicNotes": "یادداشت‌های دوره‌ای هفتگی ماهانه هفته ماه پوشه الگو قالب"
       }
     },
     "dateTime": {

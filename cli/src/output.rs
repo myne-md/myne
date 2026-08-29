@@ -202,6 +202,36 @@ pub fn print_daily_append(json: bool) {
     }
 }
 
+/// The advisory a period command prints when the host resolved the period on
+/// the device clock while a display-timezone override was set (myne#177).
+///
+/// It lives HERE rather than arriving on the wire, and that is the point: the
+/// crate's `logging_discipline` allowlist rests on every value an `eprintln!`
+/// interpolates being produced inside this crate, and it reads names rather
+/// than values, so a host-supplied string would have carried a folder path or
+/// an `io::Error` past it unnoticed. The host sends a bool; the wording is
+/// ours.
+///
+/// It deliberately does not name the zone: an IANA identifier is a coarse
+/// geolocation datum, which is why `protocol.md` §9.5 classes `timezone`
+/// device-local so it never merges from a peer, and stderr is the channel that
+/// ends up in `2>` redirects, CI logs and pasted output. The user set the
+/// override, so naming it back adds nothing they do not know.
+const DEVICE_CLOCK_NOTE: &str =
+    "note: this command used the device clock; the display timezone override is not applied to periodic-notes commands";
+
+/// Print [`DEVICE_CLOCK_NOTE`] to STDERR when the host used the device clock.
+///
+/// stderr rather than stdout, in both human and `--json` mode, and that is the
+/// load-bearing half: `myne weekly > this-week.md` is the obvious use, and a
+/// warning written into that file would corrupt the thing it was warning
+/// about. Under `--json` it would also make the output stop being JSON.
+pub fn print_device_clock_note(used_device_clock: bool) {
+    if used_device_clock {
+        eprintln!("{DEVICE_CLOCK_NOTE}");
+    }
+}
+
 /// Render a failure. Human mode writes to stderr so a failed `--json`-less
 /// invocation never corrupts stdout a caller might still be piping.
 pub fn print_error(err: &BackendError, json: bool) {

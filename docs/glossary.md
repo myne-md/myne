@@ -620,6 +620,8 @@ Used in: `spec/account-number.md` §4
 
 An ordinary `.myn` note representing one calendar day, identified by **folder + date-title** (e.g. a note titled `2026-06-07` inside the `Daily/` folder) — **not** a calendar object, date-object model, or date-indexed database. The "Open today's note" command resolves today's note idempotently: it computes today's date-title from `now` via the `daily_date_format` pref and looks for a non-trashed, non-template note matching the daily folder + date-title under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2); found → open, not found → create (from the [note template](#note-template) the `daily_template` pref points at, or blank with the date as title) and open. Three `vault.prefs` fields configure it (`spec/protocol.md` §9.5.2): **daily folder** (`daily_folder`, default `Daily/`, also registered as a [deliberate folder](#deliberate-folder) so it survives empty), **daily date format** (`daily_date_format`, default `YYYY-MM-DD`), and **daily template** (`daily_template`, a template UUID or unset). Past days are reached via the ordinary sidebar folder — no date-picker, no jump-to-date. Bounded as a plain-markdown skeleton + date navigation by construction, respecting the anti-Notion / no-calendar commitment (`vision.md`). See [decisions.md](decisions.md) 2026-06-07 (MYND-191).
 
+Since myne-md/myne#177 the daily note is one [periodic note](#periodic-note) among three; its three `daily_*` fields are unchanged and are deliberately NOT migrated into the `periodic_notes` map.
+
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07 (MYND-182 / MYND-191)
 
 ### **default new-note location** &nbsp; 📦 *Product*
@@ -1843,6 +1845,20 @@ The Phase 2 server storage layout: each vault's ciphertext blobs live in a names
 
 Used in: `spec/server-protocol.md` §2
 
+### **period anchor** &nbsp; 📦 *Product*
+
+The single date a [periodic note](#periodic-note)'s title is formatted from: the FIRST day of the period the current instant falls in. Today for a daily note, that week's Monday for a weekly one, that month's first day for a monthly one. It is what makes "open this period" idempotent: every day inside one period yields the same anchor, so it yields the same title, so it resolves to the same note. Computed from the display timezone where the `timezone` pref sets one, and from the device clock otherwise, so the date the app shows and the date it files under are the same date. Distinct from the period's inclusive **bounds**, which the `{{period_start}}` / `{{period_end}}` [note-template](#note-template) tokens carry. (myne-md/myne#177)
+
+Used in: `spec/protocol.md` §9.5.2
+
+### **periodic note** &nbsp; 📦 *Product*
+
+An ordinary `.myn` note representing one calendar period (a day, a week or a month), identified by **folder + title** exactly as a [daily note](#daily-note) is, and **not** a calendar object or date-indexed database. Three periods ship (daily, weekly, monthly); quarterly and yearly were deliberately cut. Each period configures a folder, a title format and an optional [note template](#note-template), and each has an "open this period" command that resolves idempotently: found → open, not found → create and open. Past periods are reached through the ordinary sidebar folder: no previous/next command, no picker, no calendar, which is the same line the daily note already drew (`vision.md`).
+
+Daily keeps its three top-level `vault.prefs` fields; weekly and monthly live in the `periodic_notes` map, keyed `<period>.<setting>` (`spec/protocol.md` §9.5.2). The split is a sync property rather than a style: prefs merge per field, so a device on an older build would keep writing `daily_folder` while a newer one wrote the map, and nothing could say which is authoritative. A weekly title is an ISO 8601 week (`gggg-[W]ww`, Monday start, week-year rather than calendar year), frozen with no first-day-of-week setting because changing one would silently re-point every weekly note already on disk. (myne-md/myne#177)
+
+Used in: `spec/protocol.md` §9.5.2; `spec/sync-protocol.md` §10.2
+
 ### **property** &nbsp; 📦 *Product*
 
 A typed `key → value` pair derived from a note's YAML [frontmatter](#frontmatter) body by the Saved Views property-index (MYND-271). Every arbitrary frontmatter key is read and coerced to exactly one Myne type — `string` / `number` / `date` / `list` / `checkbox` — by the canonical value-typing ruleset (`spec/markdown-dialect.md` §3.6.4); the property-index is the **single type authority** for the Saved Views epic (sibling features consume its typing, never redefine it). Tags (`#tag` ∪ frontmatter `tags:`) and the `folder:` value are queryable alongside properties as pseudo-properties. The parse is read-only and non-mutating (the `.myn` file stays source of truth); the typed values live in the derived [vault.indices](#vaultindices) / `MYI1` cache. A [saved view](#saved-view) filters and sorts on properties.
@@ -2547,9 +2563,9 @@ Used in: `src/styles/tokens.css`, `docs/design/colors_and_type.css`, `src/editor
 
 ### **template variable** &nbsp; 📦 *Product*
 
-A `{{token}}` placeholder in a [note template](#note-template) body that the variable engine substitutes against a fixed built-in registry at note-creation time. The v1 registry is `{{date}}`, `{{time}}`, `{{title}}`, `{{datetime}}`, `{{weekday}}` (lowercase-only; unknown tokens are left literal, which doubles as the escape mechanism). Substitution is **deterministic, one-shot, eager** — parse → registry lookup → substitute, never an expression, formula, callback, or format-argument mini-language (the anti-plugin / no-scripting commitment, `vision.md`). The engine is inferred-not-declared: it scans the template body for tokens at fill time rather than reading a declared-variables field, and reads no clock or locale itself (the host injects the time-derived values). Output is plain markdown — a rendered token emits only literal text. See `spec/markdown-dialect.md` §3.6.1, the variable-engine module in `protocol/`, MYND-188.
+A `{{token}}` placeholder in a [note template](#note-template) body that the variable engine substitutes against a fixed built-in registry at note-creation time. The registry is `{{date}}`, `{{time}}`, `{{title}}`, `{{datetime}}`, `{{weekday}}`, `{{period_start}}` and `{{period_end}}` (lowercase-only; unknown tokens are left literal, which doubles as the escape mechanism). The last two are the bounds of the [periodic note](#periodic-note) being instantiated (myne-md/myne#177); they are defined for every period and for a note made by hand, where both equal the current day, so a token is never rendered empty. Substitution is **deterministic, one-shot, eager** — parse → registry lookup → substitute, never an expression, formula, callback, or format-argument mini-language (the anti-plugin / no-scripting commitment, `vision.md`). The engine is inferred-not-declared: it scans the template body for tokens at fill time rather than reading a declared-variables field, and reads no clock or locale itself (the host injects the time-derived values). Output is plain markdown — a rendered token emits only literal text. See `spec/markdown-dialect.md` §3.6.1, the variable-engine module in `protocol/`, MYND-188.
 
-Used in: `protocol/` variable engine (MYND-188); `spec/markdown-dialect.md` §3.6.1
+Used in: `protocol/` variable engine (MYND-188, myne-md/myne#177); `spec/markdown-dialect.md` §3.6.1
 
 ### **test vector** &nbsp; 📋 *Protocol*
 
