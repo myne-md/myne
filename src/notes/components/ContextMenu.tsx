@@ -298,15 +298,35 @@ export function ContextMenu({
         const node = ref.current;
         if (node === null) return;
         // A submenu is a nested `ContextMenu` rendered INSIDE this one, so that
-        // the outside-click check still counts it as part of this menu. That
-        // also means its keydown handler runs first and then bubbles here, so
-        // without this bail one arrow press would move focus twice, once per
-        // menu. The filter below is the same fact from the other side: the
-        // nested menu's rows are descendants and must not join this cycle.
-        if ((e.target as HTMLElement).closest("[data-submenu]") !== null) return;
+        // the outside-click check still counts it as part of this menu. Two
+        // consequences, and the guards below are one each.
+        //
+        // Its keydown handler runs first and then bubbles here, so without the
+        // bail one arrow press would move focus twice, once per menu. And its
+        // rows are descendants of this node, so without the filter they would
+        // join this menu's cycle.
+        //
+        // Both are scoped to a submenu OTHER than this instance's own subtree.
+        // They were not, and since this is the same component the child
+        // inherited them: every row it renders sits inside the `[data-submenu]`
+        // wrapper, so the child's own bail fired on its own rows and its filter
+        // stripped them, leaving `its.length === 0`. A click-opened submenu
+        // takes focus, so the user landed in a menu where ArrowDown, ArrowUp,
+        // Home and End all did nothing. Escape and Enter still worked, from a
+        // document listener and native button semantics, which is what made it
+        // easy to miss.
+        const ownWrapper = (el: Element | null): Element | null =>
+          el === null ? null : el.closest("[data-submenu]");
+        const isBelowANestedMenu = (el: Element | null): boolean => {
+          const wrapper = ownWrapper(el);
+          // A wrapper this node CONTAINS belongs to a submenu of ours. One that
+          // contains this node is our own, and its rows are ours to drive.
+          return wrapper !== null && node.contains(wrapper);
+        };
+        if (isBelowANestedMenu(e.target as HTMLElement)) return;
         const its = Array.from(
           node.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'),
-        ).filter((el) => el.closest("[data-submenu]") === null);
+        ).filter((el) => !isBelowANestedMenu(el));
         if (its.length === 0) return;
         const cur = its.findIndex((el) => el === document.activeElement);
         let next: number;
