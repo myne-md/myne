@@ -16,7 +16,9 @@
 // the prose is its projection.
 
 import { readdirSync, readFileSync, statSync, existsSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
+
+import { TS_FILES, walkFiles } from "./lib/surface-files.mjs";
 
 const DIRS = [
   join("src", "components", "settings"),
@@ -440,16 +442,7 @@ const V = {
 };
 
 export function surfaceFiles(dirs = DIRS) {
-  const out = [];
-  const walk = (dir) => {
-    for (const name of readdirSync(dir).sort()) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (/\.(ts|tsx)$/.test(name)) out.push(relative(".", full));
-    }
-  };
-  dirs.forEach(walk);
-  return out;
+  return walkFiles(dirs, { extensions: TS_FILES });
 }
 
 export function rosterGaps(files, verdicts = V) {

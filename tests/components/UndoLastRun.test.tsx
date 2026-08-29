@@ -22,6 +22,12 @@ const agentUndo = vi.fn();
 vi.mock("../../src/lib/agent-run", () => ({
   agentLastRun: (...a: unknown[]) => agentLastRun(...a),
   agentUndo: (...a: unknown[]) => agentUndo(...a),
+  // Not mocked behaviour, just present: `agentStore` imports it for its
+  // auto-close rule (myne-md/myne#596), and a partial mock that omits it makes
+  // every store write throw with a message about this file rather than about
+  // the store. The real one is a pure two-length check.
+  hasRefusals: (r: { refused: unknown[]; refusedNewNotes: unknown[] }) =>
+    r.refused.length > 0 || r.refusedNewNotes.length > 0,
 }));
 
 vi.mock("react-i18next", () => ({

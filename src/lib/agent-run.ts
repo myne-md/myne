@@ -485,6 +485,25 @@ export const HIDING_MARKERS: readonly HidingMarker[] = [
  *  `"bulk"` approval regardless of what was sent. So this mirror is allowed to
  *  over-flag (that costs a click) and a divergence in the other direction
  *  costs nothing, because the host does not consult it. */
+/** Whether an apply outcome carries a refusal of either kind
+ *  (myne-md/myne#596).
+ *
+ *  One fact, one function, because two places decide on it and they must not
+ *  disagree: `AgentReview`'s `ApplyReport` renders `agentReview.refusedList`
+ *  when it holds, and `applyWasCleanAndComplete` keeps the review dialog OPEN
+ *  when it holds. If those drifted apart the dialog would dismiss itself over
+ *  the refusal list it was about to draw, which is the one outcome that screen
+ *  exists to put in front of the user.
+ *
+ *  Both lists, not just `refused`: a refused NEW NOTE is indexed against a
+ *  different space and is easy to leave out of a condition written from the
+ *  edit side. */
+export function hasRefusals(
+  result: Pick<AgentApplyResult, "refused" | "refusedNewNotes">,
+): boolean {
+  return result.refused.length > 0 || result.refusedNewNotes.length > 0;
+}
+
 export function splitForBulkApproval(edits: ProposedEdit[]): {
   bulkApprovable: ProposedEdit[];
   needsOwnAct: ProposedEdit[];
