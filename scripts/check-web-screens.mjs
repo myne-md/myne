@@ -25,12 +25,14 @@
 // the artefact" is a fact about what we serve. Same reasoning, and same
 // mechanism, as `scripts/check-web-no-phrase.mjs`.
 
-import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import {
   partitionAssets,
   unknownExtensionMessage,
 } from "./lib/scanned-assets.mjs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
+
+import { walkFiles } from "./lib/surface-files.mjs";
 
 const SCREENS = join("src", "screens");
 const DIST = join("web", "dist");
@@ -175,16 +177,7 @@ const VERDICTS = {
 
 /** Every file under `src/screens/`, as roster keys. */
 export function screenFiles(root = SCREENS) {
-  const out = [];
-  const walk = (dir) => {
-    for (const name of readdirSync(dir).sort()) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else out.push(relative(root, full));
-    }
-  };
-  walk(root);
-  return out;
+  return walkFiles([root], { relativeTo: root });
 }
 
 /** `{ missing, stale }` — files with no verdict, and verdicts with no file. */
