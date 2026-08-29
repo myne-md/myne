@@ -488,6 +488,99 @@ fn probe_answer(user: &str) -> Option<String> {
     ))
 }
 
+/// The first note id anywhere in a tool result, past whatever prose frames it.
+///
+/// A tool result is `<host prose>` then the payload (myne-md/myne#574), and the
+/// payload's lines are `<note_id> <title>`. So the id is not at a known offset
+/// and this searches for it by parsing, which is what makes a reworded frame
+/// move nothing.
+///
+/// **Scanned by POSITION, not by line or by whitespace token, and the wire
+/// format is why.** `chat_shape` concatenates a message's spans with no
+/// separator at all (`src-tauri/src/plugins/agent/adapters.rs`), so the prose
+/// does not end in a newline and the payload's first id is GLUED to the end of
+/// the prose sentence: the whitespace token there is `need.01a047c1-...`, not
+/// the id, and no line begins with an id when the scope holds one note, which
+/// is the ordinary case. Two earlier versions of this function missed that in
+/// those two ways, and each had a test whose fixture supplied a separator the
+/// wire never carries.
+///
+/// `Uuid::try_parse` rather than a hand-rolled shape check: the note store
+/// issues canonical hyphenated UUIDs, `uuid` is already a direct dependency,
+/// and the hand-rolled version wrote the dash positions out twice and had no
+/// right boundary, so a longer hex run answered with a truncated 36-character
+/// prefix. The boundary check is the other half of that: a candidate whose next
+/// byte is still hex or a dash is part of something longer and is not an id.
+///
+/// Parsing is not resolving. The stub has no note store to ask, so an id that
+/// parses and names nothing is still possible; the loop refuses it with a
+/// sentence naming the right one. What must not happen is the opposite, an
+/// English word passing as an id, which is the defect this replaces. The
+/// prose's own `` `<note_id> <title>` `` placeholder does not parse, so the
+/// frame cannot answer for the payload.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn first_note_id(text: &str) -> Option<&str> {
+    text.char_indices()
+        .filter(|(_, c)| c.is_ascii_hexdigit())
+        .find_map(|(i, _)| {
+            let candidate = text.get(i..i + 36)?;
+            if uuid::Uuid::try_parse(candidate).is_err() {
+                return None;
+            }
+            // Not a prefix of something longer.
+            let next = text.as_bytes().get(i + 36);
+            match next {
+                Some(b) if b.is_ascii_hexdigit() || *b == b'-' => None,
+                _ => Some(candidate),
+            }
+        })
+}
+
+/// What a `read_note` answer turned out to be.
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+enum Framed<'a> {
+    /// Host prose was found and its stated length located the note.
+    Note(&'a str),
+    /// It carries the frame's opening words but the length could not be read,
+    /// so the note's start is unknown. Answering nothing is the loud failure;
+    /// answering the whole message is how the host's own sentence became an
+    /// anchor (myne-md/myne#596).
+    Unreadable,
+    /// No frame at all: a bare note body, which is what the unit tests pass.
+    Bare,
+}
+
+/// Split a `read_note` answer into the note, using the length the host states.
+///
+/// The frame is `read_note returned the body of that note, N characters, and it
+/// follows. …` and `chat_shape` concatenates spans with no separator, so the
+/// note is the final N CHARACTERS (not bytes: the count the host writes is
+/// `chars().count()`).
+#[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+fn note_after_frame(body: &str) -> Framed<'_> {
+    const OPENER: &str = "read_note returned the body of that note,";
+    if !body.starts_with(OPENER) {
+        return Framed::Bare;
+    }
+    let Some(chars) = body
+        .split_once(OPENER)
+        .and_then(|(_, rest)| rest.split_once(" characters"))
+        .and_then(|(count, _)| count.trim().parse::<usize>().ok())
+    else {
+        return Framed::Unreadable;
+    };
+    let total = body.chars().count();
+    let Some(skip) = total.checked_sub(chars) else {
+        return Framed::Unreadable;
+    };
+    match body.char_indices().nth(skip) {
+        Some((at, _)) => Framed::Note(&body[at..]),
+        // The stated length is the whole message, which cannot be true of a
+        // framed one.
+        None => Framed::Unreadable,
+    }
+}
+
 /// Body lines that occur EXACTLY ONCE in the whole note, frontmatter skipped.
 ///
 /// Both halves were learned from a failing test, and both are the rule `place`
@@ -499,16 +592,54 @@ fn probe_answer(user: &str) -> Option<String> {
 /// Shared by the trash branch and by step 3 below, because the two producing
 /// different anchors from the same note is a difference nothing would report.
 #[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
-fn unique_body_lines(body: &str) -> impl Iterator<Item = &str> {
-    let after_frontmatter = body
+fn unique_body_lines(body: &str) -> std::vec::IntoIter<&str> {
+    // **The note does not start at offset zero any more** (myne-md/myne#596).
+    // `read_note`'s answer is host prose then the body (myne-md/myne#574), and
+    // `chat_shape` concatenates a message's spans with NO separator, so the
+    // note's opening `---` is glued to the end of that sentence.
+    // `strip_prefix("---\n")` therefore matched nothing, the frontmatter was
+    // never skipped, and the first "unique line" this yielded was the host's
+    // own sentence with `---` stuck to it: an anchor that occurs nowhere in the
+    // note, so every proposed edit was refused at apply time.
+    //
+    // **The boundary is MEASURED, not guessed at.** Two guesses were tried and
+    // both were wrong in their own direction. Requiring the fence at offset
+    // zero missed it entirely. Locating the fence anywhere reads a note with no
+    // frontmatter as all frame (a supported state:
+    // `core/src/plugins/agent/tools.rs` takes the frontmatter slice as an
+    // `Option`), and it cuts at the wrong `---` in a note whose body has
+    // thematic breaks.
+    //
+    // The host publishes the answer. `read_note`'s sentence states the note's
+    // length in characters and says the text follows, so the note is exactly
+    // the last N characters of the message. Reading that is not a guess, and it
+    // is right for a note with no frontmatter, a note with thematic breaks, and
+    // a note whose body happens to contain the word the frame starts with.
+    //
+    // Framed but unreadable answers NOTHING rather than falling back, which is
+    // the discipline `first_note_id` above follows: a reworded frame fails at
+    // the gate instead of offering the host's own sentence as an anchor, which
+    // is the defect this whole hunk exists to close. A message with no frame at
+    // all is a unit-test fixture passing a bare body, and is used as-is.
+    let note = match note_after_frame(body) {
+        Framed::Note(note) => note,
+        Framed::Unreadable => return Vec::new().into_iter(),
+        Framed::Bare => body,
+    };
+    let after_frontmatter = note
         .strip_prefix("---\n")
         .and_then(|rest| rest.split_once("\n---\n"))
         .map(|(_, rest)| rest)
-        .unwrap_or(body);
+        .unwrap_or(note);
     after_frontmatter
         .lines()
         .map(str::trim_end)
-        .filter(|l| !l.is_empty() && body.matches(*l).count() == 1)
+        // Uniqueness is asked of the NOTE, not of the framed message: a line
+        // the host's prose happens to repeat is still unique in the note, and
+        // `place` grades the anchor against the note.
+        .filter(|l| !l.is_empty() && note.matches(*l).count() == 1)
+        .collect::<Vec<_>>()
+        .into_iter()
 }
 
 /// A deterministic action script for an agent-loop request, or `None` when the
@@ -665,12 +796,27 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
 
     // Step 2: the scope listing is in, so read its first entry. `list_scope`
     // renders one `"{note_id} {title}"` line per note.
+    //
+    // **The listing is no longer the whole message, and taking its first line
+    // silently produced a wrong id for months** (myne-md/myne#596).
+    // myne-md/myne#574 framed every tool result as host prose FIRST and payload
+    // after, so the first non-empty line became
+    // `list_scope returned the 1 note(s) in your scope, ...` and this read
+    // `list_scope` as a note id. Nothing refused loudly: the loop answered "that
+    // note is not in your scope", the stub produced the same wrong id on the
+    // next turn, three barren iterations ended the run `stalled` with an empty
+    // proposal, and an empty proposal opens no review screen (myne-md/myne#568)
+    // so all six scenarios in `agent-run.e2e.ts` timed out waiting for
+    // `agentReview.screen`, every run.
+    //
+    // So it looks for the first thing anywhere in the message that PARSES as a
+    // note id, rather than trusting a position, and returns `None` when it
+    // finds none. `None` is the loud failure this arm lacked: the stub then
+    // answers nothing for a shape it does not understand, instead of
+    // confidently naming a note that does not exist. `first_note_id` states why
+    // the scan is positional rather than per line or per whitespace token.
     if last_assistant.contains("\"action\":\"list_scope\"") {
-        let id = last_user
-            .lines()
-            .find(|l| !l.trim().is_empty())?
-            .split_whitespace()
-            .next()?;
+        let id = first_note_id(last_user)?;
         return Some(format!("{{\"action\":\"read_note\",\"note_id\":\"{id}\"}}"));
     }
 
@@ -1287,6 +1433,190 @@ mod agent_script_tests {
         assert_eq!(verdict.passes as usize, verdict.attempts.len());
     }
 
+    /// The host frames every tool result with prose BEFORE the payload
+    /// (myne-md/myne#574), so the listing does not start at line one.
+    ///
+    /// Both directions, because the defect this replaces was silent in exactly
+    /// one of them: the old code took the first line's first token, which after
+    /// that change is the word `list_scope`, and emitted it as a note id. The
+    /// loop refused it, the stub produced the same wrong id on the next turn,
+    /// and the run ended `stalled` with an empty proposal, which opens no
+    /// review screen, so all six `agent-run.e2e.ts` scenarios timed out on
+    /// `agentReview.screen` for months (myne-md/myne#596). Nothing was red: the
+    /// suite is manual and pre-release since myne-md/myne#579.
+    #[test]
+    fn the_note_id_is_found_past_the_hosts_framing() {
+        // **The real wire shape, and note the missing separator.** `chat_shape`
+        // concatenates a message's spans with nothing between them, so the
+        // payload's first id is GLUED to the end of the prose sentence. A
+        // fixture that puts a `\n` there is a fixture describing a wire that
+        // does not exist. The first version of this test did exactly that,
+        // passed, and left the suite failing on the single-note scope, which is
+        // the ordinary case.
+        let framed = "list_scope returned the 2 note(s) in your scope, one per line as \
+                      `<note_id> <title>`. Read one with read_note, or finish if you \
+                      already have what you need.\
+                      01a047c1-1acd-7ba1-bc49-1e168836411c Shopping list\n\
+                      01a047c1-b6ce-7c42-be02-e87e303cff2d Reading list";
+        assert_eq!(
+            first_note_id(framed),
+            Some("01a047c1-1acd-7ba1-bc49-1e168836411c"),
+        );
+        // **The rejection cases are what earn their place here**, and two
+        // `assert_ne!`s against `"list_scope"` and the prose's own
+        // `` `<note_id>`` placeholder used to sit above them. Both were already
+        // implied by the equality assertion three lines up, so they proved
+        // nothing the first assertion had not. A test may not claim more
+        // coverage than its inputs give it.
+        //
+        // A framed message whose payload holds no id answers `None` rather than
+        // something confident, which is what makes the stub fail loudly on a
+        // shape it does not understand.
+        assert_eq!(
+            first_note_id(
+                "list_scope returned the 0 note(s) in your scope, one per line as \
+                 `<note_id> <title>`."
+            ),
+            None,
+        );
+        assert_eq!(
+            first_note_id("no identifiers in this sentence at all"),
+            None
+        );
+        // A hex-only token of the wrong length is not an id, so a stray hash in
+        // a title cannot be mistaken for one.
+        assert_eq!(first_note_id("deadbeef a title"), None);
+        // Nor is a PREFIX of a longer hex run. The hand-rolled shape check this
+        // replaced had no right boundary and answered with a truncated
+        // 36-character slice of the run.
+        assert_eq!(
+            first_note_id("01a047c1-1acd-7ba1-bc49-1e168836411cffff a title"),
+            None,
+        );
+    }
+
+    /// The body arrives glued to `read_note`'s sentence too, so the anchor the
+    /// stub picks has to come from the NOTE and not from the frame.
+    ///
+    /// Without this, `unique_body_lines` failed its `strip_prefix("---\n")`,
+    /// never skipped the frontmatter, and offered the host's own sentence as an
+    /// anchor, which occurs nowhere in the note, so every edit it proposed was
+    /// refused at apply time and the scenarios' "the note changed" assertions
+    /// could not pass.
+    #[test]
+    fn the_anchor_comes_from_the_note_not_from_the_framing() {
+        // The stated length is COMPUTED, never written by hand. The host writes
+        // `chars().count()` of the note, and a hand-typed number puts the
+        // boundary mid-word: the first draft of this fixture said 42 and the
+        // first anchor came back as `"te"`, the tail of `title: My note`.
+        let note = "---\ntitle: My note\n---\nalpha beta gamma\ndelta epsilon zeta";
+        let framed = format!(
+            "read_note returned the body of that note, {} characters, and it follows. \
+             Propose an edit whose anchor is copied exactly from it, or finish and say \
+             what you found.{note}",
+            note.chars().count(),
+        );
+        let anchors: Vec<&str> = unique_body_lines(&framed).collect();
+        assert_eq!(anchors, vec!["alpha beta gamma", "delta epsilon zeta"]);
+        // The frame must not be offered as an anchor, and neither must the
+        // managed frontmatter field.
+        assert!(
+            !anchors.iter().any(|a| a.contains("read_note returned")),
+            "the host's sentence is not in the note: {anchors:?}",
+        );
+        assert!(
+            !anchors.iter().any(|a| a.starts_with("title:")),
+            "a managed frontmatter field is not an anchor: {anchors:?}",
+        );
+
+        // **A note with NO frontmatter still works**, because the boundary is
+        // the length the host states rather than a `---` somewhere in the text.
+        // A frontmatter-less note is a supported state, and an earlier fix that
+        // located the fence read one of them as all frame.
+        let note = "alpha beta gamma\ndelta epsilon zeta";
+        let no_frontmatter = format!(
+            "read_note returned the body of that note, {} characters, and it follows. \
+             Propose an edit whose anchor is copied exactly from it, or finish and say \
+             what you found.{note}",
+            note.chars().count(),
+        );
+        assert_eq!(
+            unique_body_lines(&no_frontmatter).collect::<Vec<_>>(),
+            vec!["alpha beta gamma", "delta epsilon zeta"],
+        );
+
+        // **A note whose BODY carries thematic breaks.** The fence-locating
+        // version cut at the first `---` it saw, which is a rule in the body,
+        // and silently dropped everything before and between them.
+        let ruled = "intro line\n---\nbody after rule\n---\ntail line";
+        let framed_ruled = format!(
+            "read_note returned the body of that note, {} characters, and it follows. \
+             Propose an edit whose anchor is copied exactly from it, or finish and say \
+             what you found.{ruled}",
+            ruled.chars().count(),
+        );
+        assert_eq!(
+            unique_body_lines(&framed_ruled).collect::<Vec<_>>(),
+            vec!["intro line", "body after rule", "tail line"],
+            "a thematic break is not frontmatter",
+        );
+
+        // **A frame whose length cannot be read yields nothing, loudly.** The
+        // alternative is falling back to the whole message, which is how the
+        // host's own sentence became an anchor in the first place.
+        assert_eq!(
+            unique_body_lines(
+                "read_note returned the body of that note, some characters, and it \
+                 follows.alpha beta gamma"
+            )
+            .collect::<Vec<_>>(),
+            Vec::<&str>::new(),
+        );
+    }
+
+    /// The same fact one layer up: the SCRIPT, given a framed listing, asks to
+    /// read the note the listing named.
+    ///
+    /// `first_note_id`'s own test could pass while step 2 called something else,
+    /// so this drives `agent_script` with the message shape the loop actually
+    /// produces and asserts on the id in the reply.
+    #[test]
+    fn the_script_reads_the_note_the_framed_listing_named() {
+        let id = "01a047c1-1acd-7ba1-bc49-1e168836411c";
+        let messages = vec![
+            ChatMessage {
+                role: ChatRole::User,
+                content: "tidy this note".to_string(),
+            },
+            ChatMessage {
+                role: ChatRole::Assistant,
+                content: "{\"action\":\"list_scope\"}".to_string(),
+            },
+            ChatMessage {
+                role: ChatRole::User,
+                // No separator before the id: `chat_shape` concatenates spans
+                // raw, and a single-note scope is the case a per-line scan
+                // could never answer.
+                content: format!(
+                    "list_scope returned the 1 note(s) in your scope, one per line as \
+                     `<note_id> <title>`. Read one with read_note, or finish if you \
+                     already have what you need.{id} Shopping list"
+                ),
+            },
+        ];
+        let reply = agent_script(AGENT_INSTRUCTIONS_OPENER, &messages)
+            .expect("the script answers a framed listing");
+        assert!(reply.contains("\"action\":\"read_note\""), "{reply}");
+        assert!(
+            reply.contains(id),
+            "the reply must name the listed note: {reply}"
+        );
+        assert!(
+            !reply.contains("\"note_id\":\"list_scope\""),
+            "the framing's first word must never be sent as a note id: {reply}",
+        );
+    }
+
     #[test]
     fn a_reworded_probe_is_not_answered_from_memory() {
         // The answer is READ out of the prompt. A probe this parse no longer
@@ -1412,17 +1742,36 @@ mod agent_script_tests {
         assert!(matches!(actions[0], AgentAction::ListScope));
     }
 
+    /// **The fixture is the framed listing the host really sends, and that is
+    /// the point of this edit** (myne-md/myne#596). It used to be
+    /// `"note-aaa My note\nnote-bbb Another"`, a bare payload with invented
+    /// ids, which is a shape `list_scope` stopped producing when
+    /// myne-md/myne#574 put host prose in front of every tool result. So the
+    /// test modelled a world two changes old, passed, and left step 2 sending
+    /// the word `list_scope` as a note id in the world that exists. Real ids are
+    /// the note store's hyphenated UUIDs; using one here is what makes the
+    /// assertion mean something.
     #[test]
     fn step_two_reads_the_first_note_the_listing_named() {
+        let first = "01a047c1-1acd-7ba1-bc49-1e168836411c";
         let reply = ask(&[
             turn(ChatRole::User, "tidy this"),
             turn(ChatRole::Assistant, r#"{"action":"list_scope"}"#),
-            turn(ChatRole::User, "note-aaa My note\nnote-bbb Another"),
+            turn(
+                ChatRole::User,
+                &format!(
+                    "list_scope returned the 2 note(s) in your scope, one per line as \
+                     `<note_id> <title>`. Read one with read_note, or finish if you \
+                     already have what you need.\
+                     {first} My note\n\
+                     01a047c1-b6ce-7c42-be02-e87e303cff2d Another"
+                ),
+            ),
         ]);
         let actions = parse_actions(&reply);
         assert_eq!(actions.len(), 1);
         match &actions[0] {
-            AgentAction::ReadNote { note_id } => assert_eq!(note_id, "note-aaa"),
+            AgentAction::ReadNote { note_id } => assert_eq!(note_id, first),
             other => panic!("expected a read, got {other:?}"),
         }
     }

@@ -37,6 +37,7 @@ import {
   agentApply,
   agentUndo,
   editHidesNoteAs,
+  hasRefusals,
   netDeletion,
   splitForBulkApproval,
   type AgentApplyResult,
@@ -714,8 +715,13 @@ function ApplyReport({ result }: { result: AgentApplyResult }) {
         </p>
       ) : null}
       {/* Refusals are shown with their cause. A change that could not be placed
-          must never look like a change that was not needed. */}
-      {result.refused.length > 0 || result.refusedNewNotes.length > 0 ? (
+          must never look like a change that was not needed.
+
+          `hasRefusals` rather than the condition spelled out here, because
+          `applyWasCleanAndComplete` asks the same question to decide whether to
+          keep this dialog OPEN (myne-md/myne#596). Two copies that drifted would
+          dismiss the screen over the list it was about to draw. */}
+      {hasRefusals(result) ? (
         <ul
           data-testid="agentReview.refusedList"
           style={{ margin: 0, paddingInlineStart: "var(--space-5)", color: "var(--fg-2)" }}
