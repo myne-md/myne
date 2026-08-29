@@ -57,7 +57,7 @@ unset _e2e_m
 #
 # Every runner sets `CARGO_HOME=/home/e2e/.cargo` in its `E2E_ENV`, so that is
 # the only registry path cargo reads or writes; a volume mounted anywhere else
-# is a cache nothing consults. Six of the seven runners mounted it at the image
+# is a cache nothing consults. Six of the seven runners then extant mounted it at the image
 # default, so each re-downloaded the crates.io index and every crate source on
 # EVERY invocation, threw the result away with `--rm`, and spent minutes doing it
 # before the first line of the build appeared. Nothing reports that: the run is
@@ -80,7 +80,7 @@ E2E_REGISTRY_MOUNT=(-v myne-e2e-cargo-registry:/home/e2e/.cargo/registry)
 # Docker creates a named volume's root and its mountpoint's parent `root:root`,
 # and everything in the container runs as `e2e`, so a volume that is mounted and
 # not chowned is a directory the build cannot write. The mounts moved into this
-# file and the chown half stayed hand-copied in seven runners, which reproduced
+# file and the chown half stayed hand-copied in every runner, which reproduced
 # the drift the include exists to end: the seven disagreed three ways, with
 # `e2e-batch.sh` mounting five member `node_modules` volumes and chowning none of
 # them. Both halves are built from `E2E_MEMBERS` above, and the whole chown STEP
@@ -114,7 +114,7 @@ E2E_CARGO_HOME_CHOWN='chown e2e:e2e /home/e2e/.cargo /home/e2e/.cargo/registry'
 # people remembering, only of a shorter string: nothing forces a runner to use
 # the variable, so "mounted implies chowned" was a claim rather than a property.
 #
-# The FIVE e2e runners run `$E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS` verbatim, so
+# The SIX runners that need it run `$E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS` verbatim, so
 # both live here and a runner that mounts the volumes gets the ownership with
 # them. The two capture runners deliberately do not: they `chown -R e2e:e2e
 # /work`, the whole bind mount, because they write generated artefacts back into

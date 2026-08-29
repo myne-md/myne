@@ -375,6 +375,21 @@ steps:
     commands:
       - node scripts/check-twin-inventory.mjs --check
 
+  # myne#548: the manual half of a release, gated the way the automated half is.
+  #
+  # UNFILTERED, and for the same two reasons `twin-inventory` above is. First, it
+  # `--check`s a GENERATED document (`docs/dev/manual-test-roster.md`), so a hand
+  # edit to it is a docs-only commit that the `code-paths` filter would skip.
+  # Second, the roster records what a human must verify before a tag, and a
+  # docs-only commit is exactly when a procedure document moves.
+  #
+  # It is its own step rather than a line inside `pnpm-build` so it needs no
+  # `pnpm install` and can go red on a commit that touches nothing else.
+  manual-test-roster:
+    image: node:25
+    commands:
+      - node scripts/check-manual-test-roster.mjs --check
+
   # ─── Translation coverage is measured rather than asserted (#589) ────────────
   # No `code-paths` filter, for exactly the reason bundle-record and
   # twin-inventory carry none: the `--check` half compares the GENERATED
@@ -1411,6 +1426,13 @@ steps:
       # Unfiltered like bundle-record, so it can go red on a docs-only commit,
       # which is precisely the commit that hand-edits its generated projection.
       - name: twin-inventory
+        optional: true
+      # myne#548. Unfiltered like `twin-inventory` above and red for the same two
+      # reasons: a stale generated projection, or a feature surface that entered
+      # the tree with no manual-test verdict. This file is the only thing that
+      # pushes a failure to the maintainer, so a step added without a slot here
+      # is a gate that goes quiet.
+      - name: manual-test-roster
         optional: true
       # Unfiltered for the same reason, and listed for the same one: a stale
       # docs/dev/i18n-coverage.md is a docs-only commit away, and a gate nobody

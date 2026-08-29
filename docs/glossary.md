@@ -122,9 +122,11 @@ Used in: `decisions.md` 2026-08-19
 
 ### **Ask mode / Edit mode** &nbsp; 📦 *Product*
 
-The two settings of the one composer in the AI Chat tab (myne-md/myne#533). Ask sends a grounded chat message; Edit starts an [agent run](#agent-run) and reveals the user-originated scope control. The mode is a control the user sets rather than an intent the model infers, because the two mistakes do not cost the same: a question misread as an edit starts a scope-holding run and spends provider requests, while the reverse costs a re-send. The tab opens in Ask, and the mode is not remembered across a remount, so a user returning later is never one keystroke from a run they did not set up in this session.
+**Retired, and kept as the term it is not.** This entry defined the two settings of the one composer in the AI Chat tab (myne-md/myne#533): Ask sent a grounded chat message, Edit started an [agent run](#agent-run) and revealed the user-originated scope control, and the tab opened in Ask. There are no modes now. `decisions.md` 2026-08-22 entry 0524 gave the tab ONE flow: every message starts an agent run, the agent answers a question with its `finish` summary and proposes edits when that is what was asked for, and the segmented control that used to choose the flow now chooses the **permission mode** (ask before applying, or apply inside the approved scope, `decisions.md` 2026-08-20 entry 0522). The scope control is unconditional, because every message now has a scope.
 
-Used in: `decisions.md` 2026-08-19
+Kept rather than deleted because the retired names outlived the controls in three places at once: `ai.composer-mode-edit` was driven by every scenario in `e2e/agent-run.e2e.ts` for months after it stopped rendering, which killed that whole suite invisibly, and two comments in `ChatComposer.tsx` still described Edit-mode-only blocks (`decisions.md` 2026-08-28 entry 0538, myne-md/myne#596).
+
+Used in: `decisions.md` 2026-08-19, 2026-08-22 entry 0524, 2026-08-28 entry 0538
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -262,6 +264,12 @@ Used in: `threat-model.md` §7; `decisions.md` 2026-05-30 "Auto-lock on idle"
 On-device tag suggestion ([local inference](#local-inference), MYND-651): a **dedicated bundled task-model** (a small quantized Qwen2 GGUF shipped as a Tauri resource, like the transcription model — not the side-loaded generation model) reads the open note a debounce interval after typing settles and proposes a few tags, surfaced in the [tag suggestion band](#tag-suggestion-band). Candidates are open-vocabulary, then folded and ranked against the vault's own [tag index](#tag-index) under the §3.7.8 tag-identity rule — existing tags preferred (solid chips), a genuinely new tag coined only when nothing fits (dashed `+` chip). Accepting writes the tag into the note's frontmatter `tags:` list (idempotent under the fold); suggestions themselves are **RAM-only**, never persisted. Off by default behind its own `auto_tag_enabled` pref (an additive `vault.prefs`/`MYP1` field) *under* the `ai_enabled` beta opt-in, enforced host-side; an [AI-excluded folder](#ai-excluded-folder) short-circuits before any model call. Desktop-only (no Candle on web; mobile deferred to MYND-653). Replaces the earlier command-palette + AI-Chat-tab tag surface (MYND-411). See `decisions.md` 2026-07-31; `threat-model.md` §7 "Local AI".
 
 Used in: `vision.md`; `threat-model.md` §7; `decisions.md` 2026-07-01, 2026-07-31
+
+### **automation debt (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+An observation that was proposed as a manual item and ruled out because an existing or plausible `e2e/`, `e2e-web/`, Vitest or cargo test could honestly assert it. Paying it is the only thing that lowers `totalMinutesCeiling`, so it is the mechanism by which the roster shrinks and the gate widens rather than a backlog of nice-to-haves. Tracked as issues rather than as a file, because a second list beside the roster is the drift the roster exists to stop: myne-md/myne#554 and its four lane sub-issues carry the 265 observations the first derivation ruled out.
+
+Used in: `decisions.md` 2026-08-25 (manual test roster, myne-md/myne#548), myne-md/myne#554
 
 ### **backup schedule** &nbsp; 📦 *Product*
 
@@ -495,6 +503,12 @@ Used in: `spec/protocol.md` §3.2, §3.4
 The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth`, `backup-key`, and `vault-head-mac` (all reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10; `vault-head-mac` is the Phase 2 [vault head](#vault-head) MAC key, MYND-416). The next major version defines its own HKDF context-string prefix (not pre-allocated).
 
 Used in: `spec/protocol.md` §3.4
+
+### **core tier / standard tier (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+The two severities a [manual test roster](#manual-test-roster) item may carry. **core** is exactly three things and nothing else: failing means **data loss**, failing means a **security or privacy boundary broke** (plaintext leaving the device, a locked vault still readable, a phrase or key on screen or in a log, an egress with no user consent), or the item verifies the **upgrade over a real vault** from the previous release. Everything else is **standard**. The tier is not a priority label: together with the client it decides whether a row blocks a release today, because `gatedTiers` in `scripts/manual-test-ratchet.json` names the tier or tiers that stop a tag. Widening the gate has exactly two moves, adding a client and adding the other tier, which is why that field is a list rather than a string.
+
+Used in: `scripts/manual-test-roster.mjs`, `scripts/manual-test-ratchet.json`, `docs/dev/manual-test-roster.md`, `decisions.md` 2026-08-21 (manual test roster, myne-md/myne#548)
 
 ### **cover (note)** &nbsp; 📦 *Product*
 
@@ -959,6 +973,12 @@ The canonical Myne autosave call-pattern locked in `decisions.md` 2026-05-07 "`n
 
 Used in: `decisions.md` 2026-05-07 (pattern), 2026-05-15 (concrete timings); MYND-81
 
+### **gating row (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+One observation on one client that stops the tag when it fails. A row is the `(item, client)` pair rather than the item, because an observation naming macOS, Linux and Windows is three sittings; counting once per item understates the roster by more than half. Which rows gate is recorded in `scripts/manual-test-ratchet.json` as a tier list plus a client list, not implied: at the first measurement the gate is the `core` tier on every client this release ships, seven of the eight, 58.9 of 163.7 hours. The rest is walked and recorded and does not block yet, and that share only shrinks. A failed gating row is passed anyway only by `verdict: override` with a written, length-checked reason that lands in git.
+
+Used in: `scripts/manual-test-plan.mjs`, `scripts/manual-test-ratchet.json`, `scripts/manual-test-verified.json`
+
 ### **ghost-text** &nbsp; 📦 *Product*
 
 The dimmed inline completion the writing-assistant ([local inference](#local-inference)) shows at the cursor: a `Decoration.widget` overlay (never in the document buffer) rendering the model's short continuation in `--fg-3` italic, accepted with **Tab** (inserts it as plain markdown, one undo step) and dismissed by **Esc** or any edit. Fired on a paused cursor by a debounced CM6 `ViewPlugin` that cancels any in-flight inference on a doc/viewport change so a stale suggestion never lands. Composed into the editor only when `ai_enabled` (and the note is not an [AI-excluded folder](#ai-excluded-folder)). Modeled on the `spell.ts` StateEffect→StateField loader pattern (MYND-410).
@@ -1397,6 +1417,12 @@ Used in: `spec/protocol.md` §10.4.1, `decisions.md` 2026-08-09 + 2026-08-11.
 Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. Reserved for the next major version: `NT05`, `NTV5`. **Allocated for v0.2:** `NC05`, the CRDT note-type (`spec/protocol.md` §10.7). Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
 
 Used in: `spec/protocol.md` §9.1, §9.2, §9.3, §10.3, §10.7
+
+### **manual test roster** &nbsp; 🛠️ *Tooling*
+
+The recorded answer to "what must a human verify before this release, and why can no machine verify it instead". One entry per feature surface, each carrying the paths that implement it, the clients it ships on, the `e2e/` scenarios that already automate it, and the observations a person must make. It lives in `scripts/manual-test-roster.mjs` and IS the gate, so the record and the check cannot disagree; `docs/dev/manual-test-roster.md` is a generated projection of it and never a second source. Coverage is compared both ways against six directories, `src/screens/`, `src/components/settings/`, `web/src/screens/`, `web/src/components/settings/`, `mobile/src/app/flows/` and `e2e/*.e2e.ts`, so a surface entering the tree fails by name and a verdict whose files are gone fails as stale. Which six is checked too: a shared tree that grows a surface directory outside that list fails by name rather than being skipped. The rule that decides membership is that **an item earns a place only if a machine cannot honestly judge it**: an observation an `e2e/` scenario could assert is [automation debt](#automation-debt-manual-test-roster), not a manual item.
+
+Used in: `scripts/manual-test-roster.mjs`, `scripts/check-manual-test-roster.mjs`, `docs/dev/manual-test-roster.md`, `myne-ops/runbooks/release-checklist.md` phase 1, `decisions.md` 2026-08-21 (manual test roster, myne-md/myne#548)
 
 ### **master password** &nbsp; 🗝️ *Key/identifier*
 
