@@ -318,11 +318,16 @@ export function ChatComposer({
         </div>
       ) : null}
 
-      {/* The user-originated scope control, and the size it resolves to. Only in
-          Edit mode: in Ask mode the grounding is the whole vault's index and
-          there is nothing here for the user to grant. */}
-      {
-        <div style={ROW_STYLE}>
+      {/* The user-originated scope control, and the size it resolves to.
+          Unconditional: this used to be Edit-mode only, because Ask grounded on
+          the whole vault index and had nothing for the user to grant, and
+          `docs/decisions/ai/0524` then gave the tab ONE mode. Every message is a
+          run now, so every message has a scope and the control belongs on screen
+          for all of them. The comment is corrected rather than deleted because
+          the Edit-mode wording outlived the modes by long enough for
+          `agent-run.e2e.ts` to keep driving a control that no longer existed
+          (myne-md/myne#596). */}
+      <div style={ROW_STYLE}>
           <span style={CAPTION_STYLE}>{t("agent.composer.scopeLabel")}</span>
           {/* **The picker is one step back, and the scope is not** (issue A).
               The common run is the open note, and reading a dropdown before
@@ -382,25 +387,24 @@ export function ChatComposer({
               ) : null}
             </>
           ) : null}
-        </div>
-      }
+      </div>
 
-      {/* **The permission control** (myne-md/myne#551). Edit mode only: Ask
-          proposes nothing, so there is nothing for it to decide. What the
+      {/* **The permission control** (myne-md/myne#551). Unconditional, for the
+          reason the scope row above states: this used to be Edit-mode only
+          because Ask proposed nothing and had nothing to decide, and
+          `docs/decisions/ai/0524` then gave the tab ONE mode. What the
           automatic side is bounded by is stated where it is enforced
-          (`autoApplyRun`), not here — the summary is that it stays inside the
+          (`autoApplyRun`), not here. The summary is that it stays inside the
           scope the user approved and that a removal still needs its own act,
           because the host refuses one inside a bulk approval whatever the
           caller sends. */}
-      {
-        <Segmented
-          testId="ai.composer-permission"
-          ariaLabel={t("agent.composer.permissionLabel")}
-          value={agent.autoApply ? "auto" : "ask"}
-          onChange={(v) => setAutoApply(v === "auto")}
-          options={permissionOptions}
-        />
-      }
+      <Segmented
+        testId="ai.composer-permission"
+        ariaLabel={t("agent.composer.permissionLabel")}
+        value={agent.autoApply ? "auto" : "ask"}
+        onChange={(v) => setAutoApply(v === "auto")}
+        options={permissionOptions}
+      />
 
       <form
         onSubmit={(e) => {

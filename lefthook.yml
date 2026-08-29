@@ -219,6 +219,36 @@ pre-commit:
       glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,docs/dev/twin-inventory.md}"
       run: node scripts/check-twin-inventory.mjs --check
 
+    manual-test-roster:
+      # myne#548: every feature surface carries a pre-release manual-test verdict,
+      # and no verdict outlives its files. The half of a release CI does not run
+      # is the half nothing could describe: the desktop E2E suite is 133 files, and
+      # the 301 scenarios `scripts/e2e-scenario-floor.json` requires to execute
+      # all run in a Linux container against WebKitGTK,
+      # so macOS desktop, Windows desktop, Safari, iOS and Android have no
+      # automated UI coverage at all, and until this roster nothing in the tree
+      # said so. Seven manual procedure documents existed and four were reachable
+      # from no release step.
+      #
+      # `--check` also gates the generated `docs/dev/manual-test-roster.md`, and
+      # CI runs the same invocation in its own UNFILTERED step for the reason
+      # `twin-inventory` above records: a hand edit to a generated projection is a
+      # docs-only commit, which the `code-paths` filter would skip, leaving this
+      # bypassable hook as the only gate.
+      #
+      # NO GLOB, deliberately, and the measurement is the argument. Rule 1 ("no
+      # verdict outlives its files") ranges over 952 distinct roster paths, and a
+      # glob describing the DENOMINATOR covers 145 of them. The other 807 sit
+      # outside it entirely, 579 of those under `src/notes`, `src/lib`,
+      # `mobile/src`, `editor/src`, `src-tauri/src`, `core/src` and `web/src` and
+      # the rest scattered wider still, so renaming any of them would break the
+      # guard's opening rule with the local hook blind to it. Widening the glob until it
+      # covered the rule would name most of the repository anyway, and `--check`
+      # gates a generated `docs/**` file, which a docs-only commit would skip.
+      # It costs 50 ms, measured, against `check-twin-inventory.mjs --check` at
+      # 128 ms and `check-token-adoption.mjs` at 196 ms in this same hook.
+      run: node scripts/check-manual-test-roster.mjs --check
+
     embed-layout-drift:
       # myne#409: the form-C embed-layout grammar is written in TypeScript
       # (canonical, source-consumed by all three clients) and, for the export
