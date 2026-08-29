@@ -122,9 +122,11 @@ Used in: `decisions.md` 2026-08-19
 
 ### **Ask mode / Edit mode** &nbsp; 📦 *Product*
 
-The two settings of the one composer in the AI Chat tab (myne-md/myne#533). Ask sends a grounded chat message; Edit starts an [agent run](#agent-run) and reveals the user-originated scope control. The mode is a control the user sets rather than an intent the model infers, because the two mistakes do not cost the same: a question misread as an edit starts a scope-holding run and spends provider requests, while the reverse costs a re-send. The tab opens in Ask, and the mode is not remembered across a remount, so a user returning later is never one keystroke from a run they did not set up in this session.
+**Retired, and kept as the term it is not.** This entry defined the two settings of the one composer in the AI Chat tab (myne-md/myne#533): Ask sent a grounded chat message, Edit started an [agent run](#agent-run) and revealed the user-originated scope control, and the tab opened in Ask. There are no modes now. `decisions.md` 2026-08-22 entry 0524 gave the tab ONE flow: every message starts an agent run, the agent answers a question with its `finish` summary and proposes edits when that is what was asked for, and the segmented control that used to choose the flow now chooses the **permission mode** (ask before applying, or apply inside the approved scope, `decisions.md` 2026-08-20 entry 0522). The scope control is unconditional, because every message now has a scope.
 
-Used in: `decisions.md` 2026-08-19
+Kept rather than deleted because the retired names outlived the controls in three places at once: `ai.composer-mode-edit` was driven by every scenario in `e2e/agent-run.e2e.ts` for months after it stopped rendering, which killed that whole suite invisibly, and two comments in `ChatComposer.tsx` still described Edit-mode-only blocks (`decisions.md` 2026-08-28 entry 0538, myne-md/myne#596).
+
+Used in: `decisions.md` 2026-08-19, 2026-08-22 entry 0524, 2026-08-28 entry 0538
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
