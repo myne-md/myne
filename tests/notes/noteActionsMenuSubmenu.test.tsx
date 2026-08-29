@@ -145,4 +145,94 @@ describe("NoteActionsMenu submenu", () => {
     fireEvent.click(button); // reopen
     expect(rowActions()).toEqual(["export"]);
   });
+  it("Escape closes ONE level, and focus follows it both times", () => {
+    // The menu used to close outright on the first press, which contradicted
+    // the contract `ContextMenu` states for the same gesture, and it restored
+    // focus on neither step. The restore is not cosmetic: the arrow-key handler
+    // is an `onKeyDown` on the menu's own div, so focus landing on `<body>`
+    // leaves the menu on screen and keyboard-dead.
+    openMenu([
+      {
+        kind: "action",
+        action: "export",
+        label: "Export…",
+        onSelect: vi.fn(),
+        children: [{ action: "export-html", label: "HTML", onSelect: vi.fn() }],
+      },
+    ]);
+    const trigger = screen.getByTestId("editor.note-actions-menu");
+    fireEvent.click(rowByAction("export"));
+    expect(rowActions()).toContain("export-html");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(rowActions()).toEqual(["export"]);
+    expect(document.activeElement).toBe(rowByAction("export"));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByTestId("editor.note-actions-menu-item")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("a horizontal arrow leaves the submenu without closing the menu", () => {
+    // Entering is ArrowDown, since the submenu renders inline and the cycle
+    // walks into it in reading order. Leaving had no key at all. Both
+    // directions are accepted because the submenu opens on the inline-start
+    // side, which swaps under RTL.
+    for (const key of ["ArrowLeft", "ArrowRight"]) {
+      openMenu([
+        {
+          kind: "action",
+          action: "export",
+          label: "Export…",
+          onSelect: vi.fn(),
+          children: [{ action: "export-html", label: "HTML", onSelect: vi.fn() }],
+        },
+      ]);
+      fireEvent.click(rowByAction("export"));
+      rowByAction("export-html").focus();
+      fireEvent.keyDown(screen.getAllByRole("menu")[0]!, { key, bubbles: true });
+      expect(rowActions(), key).toEqual(["export"]);
+      expect(document.activeElement, key).toBe(rowByAction("export"));
+      cleanup();
+    }
+  });
+
+  it("puts no unroled element between the menu and its items", () => {
+    // `aria-required-children`: every child of a `role="menu"` must carry a
+    // menu role. The positioning wrapper used to render around EVERY row, so
+    // one parent row's need for `position: relative` made the whole menu
+    // non-conforming.
+    openMenu([
+      {
+        kind: "action",
+        action: "export",
+        label: "Export…",
+        onSelect: vi.fn(),
+        children: [{ action: "export-html", label: "HTML", onSelect: vi.fn() }],
+      },
+      { kind: "action", action: "trash", label: "Trash", onSelect: vi.fn() },
+    ]);
+    const menu = screen.getAllByRole("menu")[0]!;
+    for (const child of Array.from(menu.children)) {
+      const role = child.getAttribute("role");
+      expect(["menuitem", "menu", "none", "separator"], child.outerHTML.slice(0, 80))
+        .toContain(role);
+    }
+    // A plain row is the button itself, with no wrapper at all.
+    expect(rowByAction("trash").parentElement).toBe(menu);
+  });
+
+  it("hides the decorative chevron from the accessibility tree", () => {
+    openMenu([
+      {
+        kind: "action",
+        action: "export",
+        label: "Export…",
+        onSelect: vi.fn(),
+        children: [{ action: "export-html", label: "HTML", onSelect: vi.fn() }],
+      },
+    ]);
+    const chevron = rowByAction("export").querySelector("svg")?.closest("span");
+    expect(chevron?.getAttribute("aria-hidden")).toBe("true");
+  });
 });

@@ -249,4 +249,26 @@ describe("the release navigates, using what the press recorded (myne-md/myne#601
     v.contentDOM.dispatchEvent(new MouseEvent("mouseup", at));
     expect(fired).toBe(false);
   });
+  it("stays inert under every modifier, so somebody else's gesture survives", () => {
+    // Shift-click is the only way to extend a selection across a chip, and
+    // ctrl/cmd click is the platform chord for opening somewhere else, which
+    // this editor does not implement: honouring it as a plain navigation
+    // answers a request for a new window by replacing the note in the current
+    // one. Alt is CodeMirror's rectangular-selection modifier. All four
+    // navigated. Asserted per modifier rather than on one combined press, so
+    // dropping any single clause from the guard fails by name.
+    for (const mod of ["shiftKey", "ctrlKey", "metaKey", "altKey"] as const) {
+      const v = mount("[[Spec]]");
+      let fired = false;
+      v.dom.addEventListener("myne-open-wikilink", () => {
+        fired = true;
+      });
+      const chip = host!.querySelector(".cm-wikilink-chip") as HTMLElement | null;
+      expect(chip, mod).not.toBeNull();
+      const at = { bubbles: true, button: 0, clientX: 20, clientY: 10, [mod]: true };
+      chip!.dispatchEvent(new MouseEvent("mousedown", at));
+      v.contentDOM.dispatchEvent(new MouseEvent("mouseup", at));
+      expect(fired, mod).toBe(false);
+    }
+  });
 });

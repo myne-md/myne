@@ -60,7 +60,12 @@ export function readScrollAnchor(
   try {
     top = view.lineBlockAt(pos).top;
   } catch {
-    return null; // position outside the measured height map
+    // Measured, not assumed: the real `lineBlockAt` throws `RangeError:
+    // Invalid position N in document of length M` for a position past the end,
+    // which is what a coordinate read during a re-layout can produce. The
+    // earlier wording here said "outside the measured height map", which was a
+    // guess at the cause and named a different one.
+    return null;
   }
   return { pos, offsetPx: contentRect.top + top - scrollerTop };
 }
@@ -84,6 +89,43 @@ export function recallScroll(noteId: string): ScrollAnchor | undefined {
 /** Forget `noteId`, for a closed tab whose reopen should start at the top. */
 export function forgetScroll(noteId: string): void {
   anchors.delete(noteId);
+}
+
+/**
+ * Evict the notes a pane just CLOSED: open on the previous pass, gone now.
+ *
+ * The pane's own tab set is the input, and it has to be, which is the whole
+ * reason this is a function rather than three lines at the call site. The first
+ * version walked the per-note `EditorState` cache instead and evicted the keys
+ * that were no longer open, which answers a different question: that cache holds
+ * only notes the pane switched AWAY from, since the active note's state lives in
+ * the editor itself, and it is emptied wholesale whenever an out-of-band change
+ * (a sync pull, an external edit) invalidates it. So a tab closed without ever
+ * having been left, and any tab closed after a sync pull, kept its reading
+ * position for the rest of the session, and a reopen landed halfway down a note
+ * nobody remembered scrolling.
+ *
+ * A SPLIT is deliberately not this case: it leaves the source pane's tab where
+ * it is, so the id stays in `open` and the anchor survives, which is what makes
+ * "reopen starts at the top" a statement about closing rather than about panes.
+ *
+ * `stateCache` is evicted alongside, so the two cannot disagree about which
+ * notes this pane still has open. Returns the ids it forgot, for the caller's
+ * tests and for nothing else.
+ */
+export function evictClosedTabs(
+  previouslyOpen: Iterable<string>,
+  open: ReadonlySet<string>,
+  stateCache: Pick<Map<string, unknown>, "delete">,
+): string[] {
+  const closed: string[] = [];
+  for (const id of previouslyOpen) {
+    if (open.has(id)) continue;
+    stateCache.delete(id);
+    forgetScroll(id);
+    closed.push(id);
+  }
+  return closed;
 }
 
 /**

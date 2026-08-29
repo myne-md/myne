@@ -16,6 +16,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import {
   applyScrollAnchor,
+  evictClosedTabs,
   forgetScroll,
   readScrollAnchor,
   recallScroll,
@@ -86,6 +87,30 @@ describe("readScrollAnchor", () => {
   it("gives up rather than guessing when the position cannot be measured", () => {
     expect(readScrollAnchor(stubbedView(null, 0), stubbedScroller())).toBeNull();
   });
+
+  it("gives up on a position CodeMirror itself refuses to measure", () => {
+    // The `catch` around `lineBlockAt`, driven by the real method rather than by
+    // a stub that throws. A stub proves the catch runs; it cannot prove the
+    // branch is reachable, and the comment there names a specific cause (a
+    // position outside the measured height map), which a thrown stub asserts
+    // nothing about. So `lineBlockAt` is left alone here and only `posAtCoords`
+    // is made to answer with a position past the end of the document, which is
+    // what a stale coordinate read during a re-layout looks like.
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({ doc: DOC }),
+      parent: host,
+    });
+    vi.spyOn(view, "posAtCoords").mockReturnValue(DOC.length + 5000);
+    vi.spyOn(view.contentDOM, "getBoundingClientRect").mockReturnValue({
+      top: 100,
+      left: 10,
+    } as DOMRect);
+    expect(readScrollAnchor(view, stubbedScroller())).toBeNull();
+    view.destroy();
+    host.remove();
+  });
 });
 
 describe("the memory", () => {
@@ -134,5 +159,35 @@ describe("applyScrollAnchor", () => {
     // Dispatching a position outside the document throws; the clamp is what
     // keeps a stale anchor from taking the editor down with it.
     expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("evictClosedTabs", () => {
+  it("forgets a closed tab whose note was never in the state cache", () => {
+    // The defect this function exists to end. The eviction used to walk the
+    // state cache's keys, which hold only notes the pane switched AWAY from, so
+    // a tab opened, scrolled and closed without ever being left kept its
+    // reading position for the rest of the session. The cache here is empty on
+    // purpose: that is the case, not a simplification.
+    rememberScroll("n1", stubbedView(120, 80), stubbedScroller());
+    expect(recallScroll("n1")).toBeDefined();
+    const cache = new Map<string, unknown>();
+    expect(evictClosedTabs(new Set(["n1"]), new Set(), cache)).toEqual(["n1"]);
+    expect(recallScroll("n1")).toBeUndefined();
+  });
+
+  it("keeps the anchor of a tab that is still open", () => {
+    // The split case: the source pane keeps its tab, so nothing was closed.
+    rememberScroll("n1", stubbedView(120, 80), stubbedScroller());
+    expect(
+      evictClosedTabs(new Set(["n1"]), new Set(["n1"]), new Map()),
+    ).toEqual([]);
+    expect(recallScroll("n1")).toBeDefined();
+  });
+
+  it("evicts the cached state alongside, so the two cannot disagree", () => {
+    const cache = new Map<string, unknown>([["n1", {}], ["n2", {}]]);
+    evictClosedTabs(new Set(["n1", "n2"]), new Set(["n2"]), cache);
+    expect([...cache.keys()]).toEqual(["n2"]);
   });
 });

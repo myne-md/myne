@@ -237,6 +237,13 @@ function buildListDecorations(view: EditorView): DecorationSet {
             : bulletRendered
               ? BULLET_WIDTH
               : `${labelStart - node.from}ch`;
+          // Whether the source indent below is about to be hidden. The padding
+          // stands IN for it, so the two have to agree: when the indent stays
+          // visible the spaces are painted as text AND the padding adds the same
+          // step again, and the row lands one level further in than its
+          // siblings. The gate below is the authority on when that happens, so
+          // it is read here rather than restated.
+          const indentHidden = indent > 0 && lineKeepsText;
           decorations.push(
             Decoration.line({
               class: "cm-list-item-line",
@@ -250,7 +257,8 @@ function buildListDecorations(view: EditorView): DecorationSet {
                 style:
                   `text-indent:calc(-1 * ${markerWidth});` +
                   `padding-left:calc(var(--cm-line-lead, 0px)` +
-                  ` + ${depth} * ${INDENT_PER_LEVEL} + ${markerWidth} + 6px)`,
+                  ` + ${indentHidden || indent === 0 ? depth : 0} * ${INDENT_PER_LEVEL}` +
+                  ` + ${markerWidth} + 6px)`,
               },
             }).range(line.from),
           );
@@ -260,7 +268,7 @@ function buildListDecorations(view: EditorView): DecorationSet {
           // (myne-md/myne#598). An EMPTY item still has its separator, so it is
           // hidden there too and sits in its siblings' column rather than one
           // step further in.
-          if (indent > 0 && lineKeepsText) {
+          if (indentHidden) {
             decorations.push(
               Decoration.replace({}).range(line.from, line.from + indent),
             );

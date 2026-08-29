@@ -102,7 +102,7 @@ describe("save readout", () => {
     // `loader-circle` rather than a bespoke ring, so a disk write here reads the
     // same as every other bounded operation in the product (`VaultSwitcher`,
     // `AttachmentsLibrary`).
-    const mark = readout({ status: "saving" }).querySelector<HTMLElement>('[role="img"]');
+    const mark = readout({ status: "saving" }).querySelector<HTMLElement>('[data-status-mark]');
     expect(mark).not.toBeNull();
     expect(iconOf(mark!)).toBe("loader-circle");
     expect(spins(mark!)).toBe(true);
@@ -119,7 +119,7 @@ describe("save readout", () => {
     // writing session is spent in, and a mark turning through all of it is the
     // looping animation `docs/design/README.md` bans by name. Under the class
     // grammar it is also the wrong sentence: outstanding, not in flight.
-    const mark = readout({ status: "editing" }).querySelector<HTMLElement>('[role="img"]');
+    const mark = readout({ status: "editing" }).querySelector<HTMLElement>('[data-status-mark]');
     expect(mark).not.toBeNull();
     expect(iconOf(mark!)).toBe("circle-dashed");
     expect(spins(mark!)).toBe(false);
@@ -129,16 +129,16 @@ describe("save readout", () => {
     // A state told apart by rotation alone is told apart only to someone
     // watching the screen. The two marks must differ with the animation off,
     // which is also what a reduced-motion reader gets.
-    const editing = iconOf(readout({ status: "editing" }).querySelector('[role="img"]')!);
+    const editing = iconOf(readout({ status: "editing" }).querySelector('[data-status-mark]')!);
     cleanup();
-    const saving = iconOf(readout({ status: "saving" }).querySelector('[role="img"]')!);
+    const saving = iconOf(readout({ status: "saving" }).querySelector('[data-status-mark]')!);
     expect(editing).not.toBeNull();
     expect(saving).not.toBeNull();
     expect(editing).not.toBe(saving);
   });
 
   it("moves while a conflict copy is being written", () => {
-    const mark = readout({ status: "conflict" }).querySelector<HTMLElement>('[role="img"]');
+    const mark = readout({ status: "conflict" }).querySelector<HTMLElement>('[data-status-mark]');
     expect(iconOf(mark!)).toBe("loader-circle");
     expect(spins(mark!)).toBe(true);
   });
@@ -178,7 +178,7 @@ describe("unsynced marker", () => {
     // used to be the same `<SyncArc spinning={false}>`, same size, same colour,
     // one saying "autosave is armed" and the other "not on the server".
     const el = readout({ status: "editing" }, true);
-    const own = el.querySelector<HTMLElement>('[role="img"]')!;
+    const own = el.querySelector<HTMLElement>('[data-status-mark]')!;
     const mark = screen.getByTestId("editor.unsynced-marker");
     expect(iconOf(own)).not.toBeNull();
     expect(iconOf(mark)).not.toBeNull();
@@ -257,12 +257,20 @@ describe("unsynced marker", () => {
 
 describe("the arcs do not each become a live region", () => {
   it("stays silent where the readout beside it already names the state", () => {
-    // `role="status"` is an `aria-live` region. Inside the readout the parent
-    // span already carries the same phrase, so a second announcement is a
-    // duplicate, and the arc is a glyph rather than a message.
+    // `role="status"` is an `aria-live` region, and a mark is never one: the
+    // announcement, where a surface needs one, is a separate always-mounted
+    // node. Inside the readout the mark is decorative outright, because the very
+    // next span renders the same phrase as text: an accessible name here made a
+    // screen reader say the state twice, once off the `role="img"` and once off
+    // the words. `aria-hidden` rather than an empty name, so the mark leaves the
+    // tree instead of sitting in it unnamed.
     const el = readout({ status: "saving" });
     expect(el.querySelector('[role="status"]')).toBeNull();
-    expect(el.querySelector('[role="img"]')).not.toBeNull();
+    const mark = el.querySelector('[data-status-mark]');
+    expect(mark).not.toBeNull();
+    expect(mark!.getAttribute("aria-hidden")).toBe("true");
+    expect(mark!.getAttribute("role")).toBeNull();
+    expect(mark!.getAttribute("aria-label")).toBeNull();
   });
 
   it("stays silent on a sidebar row, of which there can be a screenful", () => {
@@ -301,6 +309,6 @@ describe("the arcs do not each become a live region", () => {
     // Defaulting `title` to `label` meant the tooltip changed with whichever
     // pixel the pointer landed on.
     const el = readout({ status: "editing" });
-    expect(el.querySelector('[role="img"]')!.getAttribute("title")).toBeNull();
+    expect(el.querySelector('[data-status-mark]')!.getAttribute("title")).toBeNull();
   });
 });

@@ -292,4 +292,68 @@ describe("ContextMenu submenu", () => {
     // One step from "export" lands on the next PARENT row, not on a child.
     expect(document.activeElement?.getAttribute("data-item-id")).toBe("delete");
   });
+  it("hovering a sibling gives focus BACK to the parent row, not to `<body>`", () => {
+    // The case the sibling test one above cannot reach. That one opens the
+    // submenu by HOVER, which never held focus, so it passes whether or not any
+    // restore exists. Opening by CLICK is what puts focus inside the submenu,
+    // and hovering a sibling then unmounts the element focus is standing on.
+    //
+    // The hover path used to call `setSubmenu(null)` directly while the restore
+    // lived only in the child's `onClose`, so this exact gesture, open with the
+    // keyboard then move the mouse, dropped focus to `<body>` and killed the
+    // arrow keys for the rest of the menu's life. Injecting that back (dropping
+    // the `open.focus` branch in `closeSubmenu`) fails this and nothing else.
+    render(
+      <ContextMenu
+        x={0}
+        y={0}
+        onClose={vi.fn()}
+        items={[
+          item({ id: "export", children: [item({ id: "md" })] }),
+          item({ id: "delete" }),
+        ]}
+      />,
+    );
+    fireEvent.click(rowById("export"));
+    expect(rowIds()).toContain("md");
+    // The click-opened submenu autofocuses, so focus is inside it.
+    expect(rowById("export").contains(document.activeElement)).toBe(false);
+    expect(document.activeElement).not.toBe(document.body);
+
+    fireEvent.mouseEnter(rowById("delete"));
+    expect(rowIds()).not.toContain("md");
+    expect(document.activeElement).toBe(rowById("export"));
+  });
+
+  it("names the submenu after the row that opened it", () => {
+    // Without it the nested `role="menu"` is anonymous, so a screen reader
+    // announces that focus entered a menu and cannot say which one.
+    render(
+      <ContextMenu
+        x={0}
+        y={0}
+        onClose={vi.fn()}
+        items={[item({ id: "export", label: "Export…", children: [item({ id: "md" })] })]}
+      />,
+    );
+    fireEvent.mouseEnter(rowById("export"));
+    const menus = screen.getAllByRole("menu");
+    expect(menus.map((m) => m.getAttribute("aria-label"))).toContain("Export…");
+  });
+  it("hides the decorative chevron from the accessibility tree", () => {
+    // The row's own text is its name; the chevron only says which way the
+    // submenu opens. `NoteActionsMenu` already wrapped its chevron this way and
+    // this one did not, which is one of the three ways the two implementations
+    // had drifted.
+    render(
+      <ContextMenu
+        x={0}
+        y={0}
+        onClose={vi.fn()}
+        items={[item({ id: "export", label: "Export…", children: [item({ id: "md" })] })]}
+      />,
+    );
+    const chevron = rowById("export").querySelector("svg")?.closest("span");
+    expect(chevron?.getAttribute("aria-hidden")).toBe("true");
+  });
 });

@@ -116,8 +116,16 @@ export function StatusMark({
    * Accessible name. The shape alone is not a readout, and neither is the
    * MOTION: a state told only by rotation is told only to sighted users, so a
    * caller with two states passes two names.
+   *
+   * `null` says the mark is DECORATIVE because the same phrase is already
+   * rendered as visible text beside it, and it renders `aria-hidden` instead.
+   * Required rather than optional, so that stays a decision each caller makes:
+   * an omitted prop would default the whole class back to silent, which is the
+   * defect this component was written to end. `SaveStatus` draws the mark and
+   * the words together, so a name here made a screen reader say the state
+   * twice, once off the `role="img"` and once off the text.
    */
-  label: string;
+  label: string | null;
   /**
    * Hover text. NOT defaulted to `label`, deliberately: a mark usually sits
    * inside a span that already carries a longer sentence, and a default would
@@ -139,8 +147,14 @@ export function StatusMark({
   return (
     <span
       className={spinning ? "myne-spinner" : undefined}
-      role="img"
-      aria-label={label}
+      // A constant hook, present in both forms. The tests used to find a mark by
+      // its `role="img"`, which is the very thing a decorative mark drops, so
+      // asserting the decorative shape would have meant losing the selector for
+      // it. This separates finding the mark from what is being asserted about it.
+      data-status-mark=""
+      role={label === null ? undefined : "img"}
+      aria-hidden={label === null ? true : undefined}
+      aria-label={label ?? undefined}
       title={title}
       data-testid={testId}
       style={{
