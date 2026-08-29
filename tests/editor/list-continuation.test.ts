@@ -9,7 +9,7 @@
 // the user is looking at.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { EditorState, type Transaction } from "@codemirror/state";
+import { EditorSelection, EditorState, type Transaction } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { forceParsing } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -226,5 +226,70 @@ describe("everything the repairs do not name is upstream behaviour", () => {
     // Upstream's own rule: at the very start of a list line, Enter is a plain
     // newline. The repairs must not turn that into a continuation.
     expect(enter("- [ ] foo", 0).handled).toBe(false);
+  });
+});
+
+describe("a multi-cursor keeps every caret", () => {
+  /** Press Enter with TWO carets and report the resulting selection. */
+  function enterTwice(doc: string, a: number, b: number) {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        selection: EditorSelection.create(
+          [EditorSelection.cursor(a), EditorSelection.cursor(b)],
+          0,
+        ),
+        // CM6 defaults this facet to FALSE and silently collapses a
+        // multi-range selection to its main range when it is off, so without it
+        // this harness cannot express the case at all: the first version of
+        // this test failed on a one-range selection and read as a product bug.
+        // `editor/src/extensions.ts` turns it on for the real editor.
+        extensions: [
+          EditorState.allowMultipleSelections.of(true),
+          markdown({ base: markdownLanguage }),
+        ],
+      }),
+      parent: host,
+    });
+    forceParsing(view);
+    m = { view, host };
+    let applied: Transaction | null = null;
+    continueListMarkup({
+      state: view.state,
+      dispatch: (tr) => {
+        applied = tr;
+      },
+    });
+    const tr = applied as Transaction | null;
+    return tr === null ? view.state.selection : tr.state.selection;
+  }
+
+  it("does not drop the caret whose change is not a continuation insert", () => {
+    // The shape that produces the mismatch, which took two attempts to write.
+    // A caret in plain PROSE does not: upstream still inserts a plain newline
+    // there, that text starts with a line break, and it takes the same arm, so
+    // the counts match and the bug is invisible. What is needed is a caret
+    // whose change carries NO line break at all, and the empty-item arm is one:
+    // it deletes the markup instead. So the first caret ends `- a` and
+    // continues the list, the second sits on an empty `- ` and clears it, one
+    // caret is recorded for two ranges, and the selection used to be rebuilt
+    // from the short list with the second cursor simply gone.
+    const doc = "- a\n- \n";
+    const sel = enterTwice(doc, 3, 6);
+    expect(sel.ranges).toHaveLength(2);
+  });
+
+  it("still moves BOTH carets when both are on list items", () => {
+    // The counts match here, so this takes the per-caret path. It is the case
+    // the mismatch branch must not have broken.
+    const doc = "- a\n- b";
+    const sel = enterTwice(doc, 3, 7);
+    expect(sel.ranges).toHaveLength(2);
+    // Each caret sits after the marker its own continuation inserted, so
+    // neither is where it started.
+    expect(sel.ranges[0]!.head).toBeGreaterThan(3);
+    expect(sel.ranges[1]!.head).toBeGreaterThan(7);
   });
 });

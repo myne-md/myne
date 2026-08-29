@@ -169,12 +169,28 @@ export const continueListMarkup: StateCommand = ({ state, dispatch }) => {
   // Mapping the insert's own `from` forward lands after the inserted text, at the
   // same position upstream computes as `from + insert.length + 1`, but derived
   // from the REPAIRED change and through any earlier change in the same set.
-  const ranges = carets.map((pos) => EditorSelection.cursor(changeSet.mapPos(pos, 1)));
-  const mainIndex = Math.min(plan.selection?.mainIndex ?? 0, ranges.length - 1);
+  //
+  // Only when there is one caret per RANGE, which there is not in general: a
+  // caret is recorded per continuation insert, and a multi-cursor whose carets
+  // are not all on list items produces fewer of them than the selection has
+  // ranges. Building the selection from the short list then silently deleted the
+  // other cursors, since `EditorSelection.create` is given every range there is.
+  // In that case the mapping is handed back to CodeMirror with the same
+  // association, which carries every range through and moves the ones an insert
+  // sits on. The comparison is against the ranges in the state the plan was
+  // computed from, since that is what the carets were collected over.
+  const rangeCount = state.selection.ranges.length;
+  const selection =
+    carets.length === rangeCount
+      ? EditorSelection.create(
+          carets.map((pos) => EditorSelection.cursor(changeSet.mapPos(pos, 1))),
+          Math.min(plan.selection?.mainIndex ?? 0, carets.length - 1),
+        )
+      : state.selection.map(changeSet, 1);
   dispatch(
     state.update({
       changes: changeSet,
-      selection: EditorSelection.create(ranges, mainIndex),
+      selection,
       scrollIntoView: true,
       // Upstream's own annotation. History groups on it, so a continuation
       // undoes with the typing around it rather than as its own step.

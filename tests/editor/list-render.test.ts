@@ -242,3 +242,28 @@ describe("byte stability", () => {
     expect(roundTripBytes(doc)).toBe(doc);
   });
 });
+
+describe("the padding and the hidden indent agree", () => {
+  it("drops the indent step when the source indent stays visible", () => {
+    // The padding stands IN for the source indent, and hiding it is gated: a
+    // line whose marker is the last thing on it keeps its text, or the `.cm-line`
+    // would have no text node for a typed character to land in (myne#598). The
+    // padding was not gated with it, so on that line the spaces were painted AND
+    // the same step was added again, and the row sat one level further in than
+    // its siblings. A nested `-` alone on its line is that case.
+    m = mount("- a\n  -");
+    const box = lineBox(m);
+    expect(box).not.toBeNull();
+    // Depth 1, but the step is written as 0 because the indent is still there.
+    expect(box).toContain("0*var(--cm-list-indent-step,1.5em)");
+    // …and the indent really is still painted, which is the premise.
+    expect(lineText(m)).toContain("  ");
+  });
+
+  it("keeps the indent step when the indent IS hidden", () => {
+    // The other direction, so the fix cannot be "always 0".
+    m = mount("- a\n  - nested label\n");
+    expect(lineBox(m)).toContain("1*var(--cm-list-indent-step,1.5em)");
+    expect(lineText(m)?.startsWith("  ")).toBe(false);
+  });
+});

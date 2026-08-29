@@ -23,7 +23,7 @@ import { CMEditor, type ScrollAnchorRequest, type CMEditorProps, type EditorSwap
 import { noteBecameActive, recentNoteIds } from "../recentNotes";
 import {
   applyScrollAnchor,
-  forgetScroll,
+  evictClosedTabs,
   recallScroll,
   rememberScroll,
 } from "../scrollMemory";
@@ -198,19 +198,40 @@ const SCROLL_SETTLE_MS = 120;
 function trailingEdge(delayMs: number): {
   run: (fn: () => void) => void;
   cancel: () => void;
+  flush: () => void;
 } {
   let timer = 0;
+  let pending: (() => void) | null = null;
+  const clear = () => {
+    if (timer !== 0) clearTimeout(timer);
+    timer = 0;
+    pending = null;
+  };
   return {
     run: (fn) => {
       if (timer !== 0) clearTimeout(timer);
+      pending = fn;
       timer = window.setTimeout(() => {
         timer = 0;
+        pending = null;
         fn();
       }, delayMs);
     },
-    cancel: () => {
-      if (timer !== 0) clearTimeout(timer);
-      timer = 0;
+    cancel: clear,
+    /**
+     * Run the pending callback now instead of dropping it.
+     *
+     * The two teardowns want opposite things and used to call the same one. A
+     * pending RESTORE is worth dropping: it would scroll a pane that is going
+     * away. A pending REMEMBER is the opposite, and the effect that owns it says
+     * so in its own comment, that a pane can leave without any effect seeing it.
+     * Cancelling there threw away the last scroll the reader made inside the
+     * settle window, which is precisely the one they would expect back.
+     */
+    flush: () => {
+      const fn = pending;
+      clear();
+      fn?.();
     },
   };
 }
@@ -525,21 +546,18 @@ export function PaneView({
     .filter((t) => t.kind === "note")
     .map((t) => t.id)
     .join("\u0000");
+  // The pane's note-tab set as of the previous pass. This, and not the state
+  // cache, is what makes a CLOSED tab identifiable: `evictClosedTabs` carries
+  // the reasoning, including why the cache's keys answer a different question.
+  const openNoteIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const open = new Set(
       leaf.tabs.filter((t) => t.kind === "note").map((t) => t.id),
     );
-    for (const key of [...stateCacheRef.current.keys()]) {
-      if (!open.has(key)) {
-        stateCacheRef.current.delete(key);
-        // The reading position goes with the state (myne-md/myne#600): closing
-        // a tab is the reader saying they are done with it, and a reopen that
-        // landed halfway down a note nobody remembers scrolling would read as a
-        // bug rather than as a courtesy. A SPLIT is the opposite case and keeps
-        // the anchor, because nothing was closed.
-        forgetScroll(key);
-      }
-    }
+    // The reading position goes with the state (myne-md/myne#600): closing a tab
+    // is the reader saying they are done with it.
+    evictClosedTabs(openNoteIdsRef.current, open, stateCacheRef.current);
+    openNoteIdsRef.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNoteTabKey]);
 
@@ -705,7 +723,11 @@ export function PaneView({
     scroller.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       if (raf !== 0) cancelAnimationFrame(raf);
-      settle.cancel();
+      // Flush, not cancel: see `trailingEdge`. The callback null-checks the view
+      // and the note, so this is inert on the unmount paths where the editor
+      // child has already cleared the ref, and it is the effect re-running (a
+      // new `recomputeActiveHeading`) that it reliably saves a scroll from.
+      settle.flush();
       scroller.removeEventListener("scroll", onScroll);
     };
   }, [recomputeActiveHeading]);

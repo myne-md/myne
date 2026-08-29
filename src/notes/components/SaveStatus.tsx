@@ -189,7 +189,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
               and `conflict`, which are bounded and short, and both of those draw
               `loader-circle` rather than this, so the two are never told apart
               by rotation alone. */}
-          <StatusMark name="circle-dashed" label={t("notes.saveStatus.editing")} />
+          <StatusMark name="circle-dashed" label={null} />
           {t("notes.saveStatus.editingEllipsis")}
         </span>
       );
@@ -208,7 +208,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
               different icon from `editing`'s rather than the same one turning,
               because a state told apart by motion alone is told apart only to
               someone watching it (myne-md/myne#603). */}
-          <StatusMark spinning tone="accent" name="loader-circle" label={t("notes.saveStatus.saving")} />
+          <StatusMark spinning tone="accent" name="loader-circle" label={null} />
           <span style={{ color: "var(--fg-1)" }}>
             {t("notes.saveStatus.savingEllipsis")}
           </span>
@@ -259,7 +259,8 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
               whole readout here, not to the mark alone. */}
           <StatusMark
             name="circle-x"
-            label={t(full ? "notes.saveStatus.storageFull" : "notes.saveStatus.saveFailed")}
+            // Decorative: the very next span renders this same phrase as text.
+            label={null}
             style={{ color: "inherit" }}
           />
           <span style={{ color: "var(--fg-1)" }}>
@@ -285,7 +286,7 @@ function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRet
           aria-label={t("notes.saveStatus.conflict")}
           title={t("notes.saveStatus.conflictTitle")}
         >
-          <StatusMark spinning tone="accent" name="loader-circle" label={t("notes.saveStatus.conflict")} />
+          <StatusMark spinning tone="accent" name="loader-circle" label={null} />
           <span style={{ color: "var(--fg-1)" }}>
             {t("notes.saveStatus.conflict")}
           </span>

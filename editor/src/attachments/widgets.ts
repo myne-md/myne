@@ -260,10 +260,41 @@ export class AttachmentImageWidget extends WidgetType {
      *  indistinguishable from a text selection. Part of `eq()` because a source
      *  edit can move an embed between the two forms, and the handles have to
      *  follow it. */
-    private readonly block: boolean = false,
+    /*
+     * REQUIRED, deliberately. A default here is the shape the root CLAUDE.md
+     * records as an opt-in guard: a call site that forgets the argument gets
+     * `false`, which is a valid inline embed with no resize handles, and `eq()`
+     * then compares `false === false`, so nothing rebuilds to tell anyone.
+     * Making it required is what lets the compiler name every site instead.
+     */
+    private readonly block: boolean,
   ) {
     super();
     this.url = attachmentUrl(id);
+  }
+
+  /**
+   * Height before the first draw, so CM's height map does not discover the real
+   * one as a surprise mutation mid-scroll. Same job as the text preview's
+   * further down this file, which this widget had no counterpart to: a block
+   * embed scrolled out and back was estimated at a line's height and corrected
+   * on measure, which is the jump the aspect reservation removes for a REBUILD
+   * and did nothing for a re-entry.
+   *
+   * Answered only when it can be answered exactly. An explicit `h=` is the
+   * height. Otherwise a known decoded ratio plus a known width gives it, and
+   * `decodedAspectOf` is undefined until this vault has drawn this image once,
+   * which is the same condition the box reservation keys off. A percentage
+   * width depends on the content column, which is not readable from here, so
+   * that case returns -1 and lets CM guess rather than inventing a number: a
+   * wrong estimate is worse than none, since CM trusts it until it measures.
+   */
+  get estimatedHeight(): number {
+    if (this.layout.heightPx !== null) return this.layout.heightPx;
+    const aspect = decodedAspectOf(this.id);
+    if (aspect === undefined || aspect <= 0) return -1;
+    if (this.layout.widthPercent !== null) return -1;
+    return Math.round((this.layout.widthPx ?? FRAME_WIDTH) / aspect);
   }
 
   eq(other: AttachmentImageWidget): boolean {

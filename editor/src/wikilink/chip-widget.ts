@@ -401,6 +401,16 @@ export function wikilinkChipExtensions(): readonly Extension[] {
       mousedown(event, view) {
         pressed = null;
         if (event.button !== 0) return false;
+        // A modified press is somebody else's gesture, so it records nothing and
+        // navigates nowhere. Shift-click extends a selection, and on a chip that
+        // is the only way to select across one; ctrl or cmd click is the
+        // platform's open-elsewhere chord, which this editor does not implement,
+        // so honouring it as a plain navigation answers a request for a new
+        // window by replacing the note in the current one. Alt is CodeMirror's
+        // own rectangular-selection modifier. Each of these used to navigate.
+        if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+          return false;
+        }
         const target = event.target as HTMLElement | null;
         const chipEl = target?.closest?.(".cm-wikilink-chip") as HTMLElement | null;
         // ONLY a press that starts on a rendered chip is a navigation. A press

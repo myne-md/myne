@@ -4,7 +4,7 @@
 // Source: docs/design/ui_kits/desktop/primitives.jsx
 // Stroke-based, 24x24 viewBox, 1.5px stroke (applied by the Icon component).
 
-export const ICON_PATHS: Record<string, string> = {
+export const ICON_PATHS = {
   "file-text":
     '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
   play: '<polygon points="6 3 20 12 6 21"/>',
@@ -152,6 +152,14 @@ export const ICON_PATHS: Record<string, string> = {
   // `rotate-ccw` — a counter-clockwise circular arrow reads as "put it back".
   "rotate-ccw":
     '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
-};
+} satisfies Record<string, string>;
 
+/**
+ * Every name `ICON_PATHS` actually defines.
+ *
+ * This is a real union only because the table above is `satisfies
+ * Record<string, string>` rather than annotated as one. With the annotation,
+ * `keyof` collapsed to `string`, so this type checked nothing: a misspelled
+ * `name` compiled, and the component rendered an empty `<svg>` at runtime.
+ */
 export type IconName = keyof typeof ICON_PATHS;

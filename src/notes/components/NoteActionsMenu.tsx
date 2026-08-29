@@ -145,34 +145,64 @@ export function NoteActionsMenu({
   // the submenu in the first place.
   const [submenuFor, setSubmenuFor] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   // Esc + outside-click dismissal, and focus the first item on open so the
   // `role="menu"` is keyboard-operable from the start (ContextMenu discipline).
+  /**
+   * Focus the first row on open, so the `role="menu"` is keyboard-operable from
+   * the start, and drop any submenu on close so reopening the "…" does not
+   * paint one before the pointer went near the parent row.
+   *
+   * Its OWN effect, keyed on `open` alone. The dismissal effect below has to
+   * re-subscribe whenever `submenuFor` moves, or its Escape handler reads a
+   * stale value; folding this into it would then re-run this focus call on
+   * every submenu open and close, yanking focus back to the first row in the
+   * middle of the user's navigation.
+   */
   useEffect(() => {
     if (!open) {
-      // A submenu must not survive its menu: reopening the "…" would otherwise
-      // paint it before the pointer had gone anywhere near the parent row.
       setSubmenuFor(null);
       return;
     }
+    ref.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const onDown = (e: globalThis.MouseEvent) => {
       if (ref.current !== null && !ref.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      // One level per press, which is the contract `ContextMenu` states and
+      // this menu used to contradict: a submenu is the innermost thing open, so
+      // the first Escape leaves it and the second leaves the menu.
+      //
+      // Focus follows the dismissal in both directions, because the element it
+      // was on is the one being unmounted. Without the restore it lands on
+      // `<body>`, and the arrow-key handler is an `onKeyDown` on this menu's
+      // own div, so the whole menu goes keyboard-dead while still on screen.
+      if (submenuFor !== null) {
+        const parent = ref.current?.querySelector<HTMLButtonElement>(
+          `[data-action="${submenuFor}"]`,
+        );
+        setSubmenuFor(null);
+        parent?.focus();
+        return;
+      }
+      setOpen(false);
+      triggerRef.current?.focus();
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    ref.current
-      ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
-      ?.focus();
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, submenuFor]);
 
   return (
     <div
@@ -181,6 +211,7 @@ export function NoteActionsMenu({
       style={{ position: "relative", display: "flex", alignItems: "center" }}
     >
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
@@ -204,6 +235,28 @@ export function NoteActionsMenu({
               node.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
             );
             if (its.length === 0) return;
+            // Either horizontal arrow leaves an open submenu and puts focus
+            // back on its parent row. Both, rather than one: the submenu opens
+            // on the inline-start side, which swaps under RTL, so a single
+            // direction would be the wrong one for half the locales. Nothing
+            // inside a submenu row uses the horizontal axis, so neither key has
+            // another job here. Entering is ArrowDown, since the submenu is
+            // rendered inline and the cycle below walks into it in reading
+            // order.
+            if (
+              (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+              submenuFor !== null
+            ) {
+              const parent = node.querySelector<HTMLButtonElement>(
+                `[data-action="${submenuFor}"]`,
+              );
+              if (parent !== null && parent !== document.activeElement) {
+                e.preventDefault();
+                setSubmenuFor(null);
+                parent.focus();
+                return;
+              }
+            }
             const cur = its.findIndex((el) => el === document.activeElement);
             let next: number;
             if (e.key === "ArrowDown") next = cur < 0 ? 0 : (cur + 1) % its.length;
@@ -230,15 +283,7 @@ export function NoteActionsMenu({
             const hover = hoverSurface({
               hoverBg: item.destructive ? "var(--warning-soft)" : "var(--paper-3)",
             });
-            return (
-              <Fragment key={item.action}>
-                <div
-                  style={
-                    item.children === undefined
-                      ? undefined
-                      : { position: "relative" }
-                  }
-                >
+            const row = (
                 <button
                   type="button"
                   role="menuitem"
@@ -318,7 +363,21 @@ export function NoteActionsMenu({
                     </span>
                   )}
                 </button>
-                {item.children !== undefined && submenuFor === item.action && (
+            );
+            return (
+              <Fragment key={item.action}>
+                {item.children === undefined ? (
+                  row
+                ) : (
+                  // The positioning wrapper exists only for a parent row, and
+                  // carries `role="none"`. Both halves matter to the same rule:
+                  // an unroled generic element between a `role="menu"` and its
+                  // `role="menuitem"` children breaks `aria-required-children`,
+                  // and this div used to render around EVERY row, so the
+                  // violation covered the whole menu rather than one row of it.
+                  <div role="none" style={{ position: "relative" }}>
+                    {row}
+                    {submenuFor === item.action && (
                   // Rendered inline right after its parent row, so the menu's
                   // own arrow-key cycle walks into it in reading order and this
                   // needs no keyboard code of its own. (The sidebar's
@@ -350,9 +409,10 @@ export function NoteActionsMenu({
                         </span>
                       </button>
                     ))}
+                      </div>
+                    )}
                   </div>
                 )}
-                </div>
               </Fragment>
             );
           })}
