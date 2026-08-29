@@ -138,6 +138,46 @@ test.describe("mobile task-reminder settings", () => {
       .toEqual([3]);
   });
 
+  test("the horizon control is one tab stop, traversed with arrows", async ({ page }) => {
+    // Announcing `role="radiogroup"` is a promise about the keyboard model, and
+    // the first version of this control kept none of it: every segment carried
+    // `tabIndex={0}`, so a four-option control was four tab stops and arrows did
+    // nothing. A role whose contract is not honoured is worse than the
+    // unannounced divs it replaced, because assistive technology now tells the
+    // user something untrue about how to drive it.
+    await installMockIpc(page, { prefs: { reminder_horizon_days: 7 } });
+    await page.goto("/");
+    await openPrivacy(page);
+
+    const group = page.getByTestId("settings.reminders-horizon-picker");
+    // Roving tabindex: exactly one segment is reachable by Tab, and it is the
+    // selected one.
+    await expect(group.locator('[role="radio"][tabindex="0"]')).toHaveCount(1);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-7")).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+
+    // In a radiogroup an arrow SELECTS as it moves, so the write lands without
+    // a second keystroke. 7 is the last of [1, 3, 5, 7], so one step right
+    // wraps to the first.
+    await page.getByTestId("settings.reminders-horizon-picker-7").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __reminderHorizonWrites?: (number | null)[] })
+              .__reminderHorizonWrites,
+        ),
+      )
+      .toEqual([1]);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-1")).toHaveAttribute(
+      "data-active",
+      "true",
+    );
+  });
+
   test("the horizon control is a radiogroup, not four unannounced divs", async ({ page }) => {
     // It ships on a phone, where the segments were `div`s with an `onClick`: no
     // role, no focus, no key handler, and no way for a spec to address one

@@ -260,6 +260,17 @@ export function targetReminders(
   // (myne#508). `23:59` rather than the next midnight because the comparison is
   // on the `YYYY-MM-DDTHH:MM` string and a reminder is stored to the minute.
   const to = `${horizonEndDate(now, horizonDays)}T23:59`;
+  // At horizon 1, during the final minute of a local day, `from` and `to` are
+  // the same string and the set is empty. That is correct rather than
+  // degenerate: a one-day horizon covers today, and at 23:59 no instant today
+  // is still in the future. What it costs is one minute of churn at the day
+  // boundary, since the pass cancels what it holds and re-registers after
+  // midnight. Harmless on the in-app tier, where the notifier's own timers are
+  // already armed, and worth knowing on the OS tier both clients are one wiring
+  // change from. Pinned in `reminderSchedule.test.ts` so the shape is a
+  // recorded property rather than a surprise. The old rolling cutoff had no
+  // such minute, and it bought that by registering a day past the date the
+  // settings line stated.
 
   const out: PendingReminder[] = [];
   for (const task of tasks) {

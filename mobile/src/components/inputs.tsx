@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 
@@ -334,6 +334,10 @@ export function Segmented({
   optionValues,
 }: SegmentedProps) {
   const wired = onChange !== undefined;
+  // Held so an arrow key can move focus with the selection. Populated by the
+  // segments' own refs rather than by a query, so it cannot go stale against a
+  // re-render that changes the option set.
+  const segmentRefs = useRef<Record<number, HTMLDivElement>>({});
   return (
     <div
       role={wired ? "radiogroup" : undefined}
@@ -353,18 +357,45 @@ export function Segmented({
           key={o}
           role={wired ? "radio" : undefined}
           aria-checked={wired ? i === active : undefined}
-          tabIndex={wired ? 0 : undefined}
+          // Roving tabindex: the GROUP is one tab stop, and the selected
+          // segment is the one it lands on. Giving every segment `tabIndex={0}`
+          // is what this had first, and it makes a four-option control four tab
+          // stops, which is the shape `role="radiogroup"` promises it is not.
+          // Announcing a role and then not honouring its keyboard model is
+          // worse than the unannounced divs this replaced.
+          tabIndex={wired ? (i === active ? 0 : -1) : undefined}
+          ref={
+            wired
+              ? (el) => {
+                  if (el !== null && i === active) segmentRefs.current[i] = el;
+                }
+              : undefined
+          }
           onClick={onChange ? () => onChange(i) : undefined}
           onKeyDown={
             onChange
               ? (e) => {
-                  // Enter and Space are what a radio answers to. Without them
-                  // the control is unreachable to a keyboard and to every
-                  // assistive technology that drives one.
+                  // Enter and Space are what a radio answers to. Arrows are how
+                  // a radiogroup is traversed, and in a radiogroup they SELECT
+                  // as they move rather than only moving focus.
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     onChange(i);
+                    return;
                   }
+                  const delta =
+                    e.key === "ArrowRight" || e.key === "ArrowDown"
+                      ? 1
+                      : e.key === "ArrowLeft" || e.key === "ArrowUp"
+                        ? -1
+                        : 0;
+                  if (delta === 0) return;
+                  e.preventDefault();
+                  // Wraps, which is the radiogroup convention: the set is a
+                  // cycle rather than a list with ends to get stuck against.
+                  const next = (i + delta + options.length) % options.length;
+                  onChange(next);
+                  segmentRefs.current[next]?.focus();
                 }
               : undefined
           }

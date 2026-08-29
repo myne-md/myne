@@ -144,10 +144,12 @@ export type ReminderHorizonSettingsProps = {
  * myne#508 ship: the setter had a Rust core, an ACL row and its tests, and no
  * caller on either client.
  *
- * Deliberately absent from `settingsSearchIndex.ts`: its row only exists while
- * reminders are on, and a search result that scrolls to nothing is worse than
- * no result, so `settings.search.keywords.reminders` carries the horizon's
- * words and lands the user on the switch that reveals it.
+ * Deliberately absent from `settingsSearchIndex.ts`, which is a departure from
+ * `src/CLAUDE.md` and is recorded as one in `docs/decisions/clients/0539`
+ * rather than argued only here: its row exists only while reminders are on, so
+ * a search hit would scroll to something not rendered for anyone with the
+ * feature off. `settings.search.keywords.reminders` carries the horizon's words
+ * instead and lands the user on the switch that reveals the row.
  */
 export function ReminderHorizonSettings({
   enabled,
