@@ -1213,10 +1213,6 @@
       "turnedIntoTemplate": "Transformada em modelo",
       "convertedToNote": "Convertida em nota",
       "versionHistory": "Histórico de versões",
-      "exportMarkdown": "Exportar como Markdown…",
-      "exportPdf": "Exportar como PDF…",
-      "exportHtml": "Exportar como HTML…",
-      "exportTxt": "Exportar como Texto Simples…",
       "trash": "Mover para a Lixeira"
     },
     "codeBlock": {
@@ -2114,10 +2110,6 @@
       "duplicate": "Duplicar",
       "editFilterTitle": "Editar filtro",
       "emptyState": "Ainda não há notas.",
-      "exportHtml": "Exportar como HTML…",
-      "exportMarkdown": "Exportar como Markdown…",
-      "exportPdf": "Exportar como PDF…",
-      "exportTxt": "Exportar como Texto Simples…",
       "favoritesHeading": "Favoritos",
       "icon": "Ícone…",
       "mergeAnyway": "Fundir mesmo assim",

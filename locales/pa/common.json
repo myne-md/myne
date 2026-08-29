@@ -1155,10 +1155,6 @@
       "turnedIntoTemplate": "ਟੈਂਪਲੇਟ ਬਣਾ ਦਿੱਤਾ",
       "convertedToNote": "ਨੋਟ ਵਿੱਚ ਬਦਲ ਦਿੱਤਾ",
       "versionHistory": "ਵਰਜ਼ਨ ਇਤਿਹਾਸ",
-      "exportMarkdown": "Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
-      "exportPdf": "PDF ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
-      "exportHtml": "HTML ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
-      "exportTxt": "ਸਾਦੀ ਲਿਖਤ ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
       "trash": "ਰੱਦੀ ਵਿੱਚ ਭੇਜੋ"
     },
     "codeBlock": {
@@ -2022,10 +2018,6 @@
       "duplicate": "ਨਕਲ ਬਣਾਓ",
       "editFilterTitle": "ਫਿਲਟਰ ਸੰਪਾਦਿਤ ਕਰੋ",
       "emptyState": "ਹਾਲੇ ਕੋਈ ਨੋਟ ਨਹੀਂ ਹੈ।",
-      "exportHtml": "HTML ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
-      "exportMarkdown": "Markdown ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
-      "exportPdf": "PDF ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
-      "exportTxt": "ਸਾਦੀ ਲਿਖਤ ਵਜੋਂ ਐਕਸਪੋਰਟ ਕਰੋ…",
       "favoritesHeading": "ਮਨਪਸੰਦ",
       "icon": "ਆਈਕਨ…",
       "mergeAnyway": "ਫਿਰ ਵੀ ਰਲਾਓ",

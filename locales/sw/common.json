@@ -1155,10 +1155,6 @@
       "turnedIntoTemplate": "Limegeuzwa kuwa kiolezo",
       "convertedToNote": "Limegeuzwa kuwa dokezo",
       "versionHistory": "Historia ya matoleo",
-      "exportMarkdown": "Hamisha kama Markdown…",
-      "exportPdf": "Hamisha kama PDF…",
-      "exportHtml": "Hamisha kama HTML…",
-      "exportTxt": "Hamisha kama maandishi wazi…",
       "trash": "Peleka kwenye tupio"
     },
     "codeBlock": {
@@ -2022,10 +2018,6 @@
       "duplicate": "Nakili",
       "editFilterTitle": "Hariri kichujio",
       "emptyState": "Bado hakuna madokezo.",
-      "exportHtml": "Hamisha kama HTML…",
-      "exportMarkdown": "Hamisha kama Markdown…",
-      "exportPdf": "Hamisha kama PDF…",
-      "exportTxt": "Hamisha kama maandishi wazi…",
       "favoritesHeading": "Vipendwa",
       "icon": "Aikoni…",
       "mergeAnyway": "Unganisha hata hivyo",

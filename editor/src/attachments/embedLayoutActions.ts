@@ -93,12 +93,23 @@ export function hasWidth(layout: EmbedLayout, px: number | null, percent: number
   return layout.widthPx === px && layout.widthPercent === percent;
 }
 
+/** Set a pixel width, unconditionally.
+ *
+ * The non-toggling arm of [`toggleWidthPx`], named because a drag has one: a
+ * pointer released on the width the image already had is a click, not a request
+ * to clear the width, and the caller decides that from how far the pointer moved
+ * rather than from what the layout says (myne-md/myne#604). Returned as a
+ * partial so a caller writing several fields in one mutation can spread it. */
+export function setWidthPx(px: number): Pick<EmbedLayout, "widthPx" | "widthPercent"> {
+  return { widthPx: px, widthPercent: null };
+}
+
 /** Set a pixel width, or clear both width forms when it is already active. */
 export function toggleWidthPx(px: number) {
   return (current: EmbedLayout): EmbedLayout =>
     hasWidth(current, px, null)
       ? { ...current, widthPx: null, widthPercent: null }
-      : { ...current, widthPx: px, widthPercent: null };
+      : { ...current, ...setWidthPx(px) };
 }
 
 /** Set a percentage width, or clear it when it is already active. */

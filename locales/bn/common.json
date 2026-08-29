@@ -1155,10 +1155,6 @@
       "turnedIntoTemplate": "টেমপ্লেটে পরিণত করা হয়েছে",
       "convertedToNote": "নোটে রূপান্তর করা হয়েছে",
       "versionHistory": "সংস্করণের ইতিহাস",
-      "exportMarkdown": "Markdown হিসেবে এক্সপোর্ট করুন…",
-      "exportPdf": "PDF হিসেবে এক্সপোর্ট করুন…",
-      "exportHtml": "HTML হিসেবে এক্সপোর্ট করুন…",
-      "exportTxt": "প্লেইন টেক্সট হিসেবে এক্সপোর্ট করুন…",
       "trash": "ট্র্যাশে পাঠান"
     },
     "codeBlock": {
@@ -2022,10 +2018,6 @@
       "duplicate": "অনুলিপি করুন",
       "editFilterTitle": "ফিল্টার সম্পাদনা করুন",
       "emptyState": "এখনও কোনও নোট নেই।",
-      "exportHtml": "HTML হিসেবে এক্সপোর্ট করুন…",
-      "exportMarkdown": "Markdown হিসেবে এক্সপোর্ট করুন…",
-      "exportPdf": "PDF হিসেবে এক্সপোর্ট করুন…",
-      "exportTxt": "প্লেইন টেক্সট হিসেবে এক্সপোর্ট করুন…",
       "favoritesHeading": "প্রিয়",
       "icon": "আইকন…",
       "mergeAnyway": "তবুও মিশিয়ে দিন",

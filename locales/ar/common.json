@@ -1351,10 +1351,6 @@
       "turnedIntoTemplate": "تم التحويل إلى قالب",
       "convertedToNote": "تم التحويل إلى ملاحظة",
       "versionHistory": "سجل الإصدارات",
-      "exportMarkdown": "تصدير بصيغة Markdown…",
-      "exportPdf": "تصدير بصيغة PDF…",
-      "exportHtml": "تصدير بصيغة HTML…",
-      "exportTxt": "تصدير كنص عادي…",
       "trash": "نقل إلى المهملات"
     },
     "codeBlock": {
@@ -2353,10 +2349,6 @@
       "duplicate": "تكرار",
       "editFilterTitle": "تعديل التصفية",
       "emptyState": "لا توجد ملاحظات بعد.",
-      "exportHtml": "تصدير بصيغة HTML…",
-      "exportMarkdown": "تصدير بصيغة Markdown…",
-      "exportPdf": "تصدير بصيغة PDF…",
-      "exportTxt": "تصدير كنص عادي…",
       "favoritesHeading": "المفضّلة",
       "icon": "الأيقونة…",
       "mergeAnyway": "ادمج على أي حال",

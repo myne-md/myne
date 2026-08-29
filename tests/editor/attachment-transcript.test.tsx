@@ -24,7 +24,9 @@ vi.mock("../../src/editor/attachments/toast", () => ({
 }));
 
 import { AttachmentAudioWidget } from "../../src/editor/attachments/widgets";
-import { __clearTranscriptStore } from "../../src/editor/attachments/transcript";
+// The production reset, not a test-only twin: it is the function the vault
+// teardown paths call, so exercising it here is worth more than a private one.
+import { resetTranscripts } from "../../src/editor/attachments/session-caches";
 import { showAttachmentToast } from "../../src/editor/attachments/toast";
 import { type EditorHost, getHost, setEditorHost } from "../../src/editor/host";
 import type { TranscribeHandle, TranscribeOptions } from "../../src/editor/host";
@@ -116,7 +118,7 @@ function transcribeRow(): HTMLButtonElement | null {
 }
 
 beforeEach(() => {
-  __clearTranscriptStore();
+  resetTranscripts();
   vi.stubGlobal(
     "IntersectionObserver",
     class {
@@ -254,7 +256,7 @@ describe("per-cause hint + Stop", () => {
       // Reset between iterations (afterEach only runs once for the whole test).
       setEditorHost(baseHost);
       document.body.innerHTML = "";
-      __clearTranscriptStore();
+      resetTranscripts();
       vi.mocked(showAttachmentToast).mockClear();
     }
     // Each cause maps to its own message — a regression that collapses them back

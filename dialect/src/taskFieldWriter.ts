@@ -19,6 +19,7 @@ import type { ByteRange } from "./types";
 import { parser } from "./lezer/parser";
 import type { PreservedTaskField, TaskFields, TaskInstant } from "./taskFields";
 import type { LineTask } from "./visitors/lineTasks";
+import { TASK_LINE_RE } from "./taskMarker";
 
 /** A byte range to replace and the text to replace it with. */
 export type TaskLineEdit = { range: ByteRange; text: string };
@@ -105,12 +106,38 @@ function stripFieldSpans(line: string, ranges: readonly ByteRange[]): string {
 }
 
 /**
- * The list-marker + checkbox prefix of a task line. Shared by `taskDescription`
- * (which strips it) and `isTaskLine` (which only tests for it), so the two
- * cannot disagree about what counts as a task line — a second regex would drift
- * the first time the marker grammar moved.
+ * The list-marker + checkbox prefix of a task line, plus the run of whitespace
+ * `taskDescription` strips before the description starts. Shared by
+ * `taskDescription` and `isTaskLine`, so the two cannot disagree about what
+ * counts as a task line.
+ *
+ * Built FROM `TASK_LINE_RE` rather than restated. The restated version was lax:
+ * `\\s*` after the checkbox accepts zero whitespace, so `- [ ]foo` passed here
+ * while `@lezer/markdown`'s GFM `TaskList` leaf, which requires the separator,
+ * does not see a task at all. A field written to such a line lands on something
+ * no reader parses as a task (myne-md/myne#593).
  */
-const TASK_LINE_MARKER = /^\s*[-*+]\s*\[[ xX]\]\s*/;
+const TASK_LINE_MARKER = new RegExp(`${TASK_LINE_RE.source}[ \\t]*`);
+
+/**
+ * The same marker for STRIPPING it, where the separator is optional.
+ *
+ * Two different questions, and one shape cannot answer both. Deciding whether a
+ * line IS a task requires the separator, because the parser requires it.
+ * REMOVING the marker runs over text `stripFieldSpans` has already trimmed, so
+ * on a line whose description is empty or was nothing but fields the separator
+ * is gone by the time this runs, and a required one simply fails to match.
+ *
+ * That is not hypothetical: with the required form, `taskDescription("- [ ]
+ * @due(2026-01-01)")` returned the literal `"- [ ]"` instead of `""`, and every
+ * fields-only and every empty task rendered that string in the Tasks panel and
+ * in every `task-query` block, in place of the untitled placeholder. `/due` on a
+ * blank line auto-converts to `- [ ] ` and writes the field, so it is one
+ * documented keystroke away.
+ */
+const TASK_LINE_MARKER_STRIP = new RegExp(
+  `^(\\s*[-*+][ \\t]+)\\[([ xX])\\][ \\t]*`,
+);
 
 /**
  * Whether `line` is a line-task: a list marker followed by a `[ ]` / `[x]`
@@ -139,7 +166,7 @@ export function isTaskLine(line: string): boolean {
  */
 export function taskDescription(line: string, tree?: Tree): string {
   return stripFieldSpans(line, fieldRanges(line, tree))
-    .replace(TASK_LINE_MARKER, "")
+    .replace(TASK_LINE_MARKER_STRIP, "")
     .trim();
 }
 
