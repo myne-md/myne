@@ -107,6 +107,26 @@ describe("the target set", () => {
     expect(REMINDER_HORIZON_DAYS).toBe(7);
   });
 
+  it("empties at the last minute of the day on a one-day horizon, and refills after midnight", () => {
+    // `from` and `to` are the same string during that minute, so the set is
+    // empty. Correct rather than degenerate: a one-day horizon covers today,
+    // and at 23:59 no instant today is still in the future. What it costs is
+    // one minute of churn at the boundary, because the pass cancels what it
+    // holds and re-registers on the other side. Pinned so the shape is a
+    // recorded property, not something the OS tier discovers.
+    const lastMinute = new Date(2026, 6, 28, 23, 59);
+    const tomorrow = [task({ remind: "2026-07-29 09:00" })];
+    expect(targetReminders(tomorrow, lastMinute, 1)).toEqual([]);
+
+    // One minute later it is a new day, and tomorrow's reminder is today's.
+    const justAfter = new Date(2026, 6, 29, 0, 0);
+    expect(targetReminders(tomorrow, justAfter, 1)).toHaveLength(1);
+
+    // The wider horizons have no such minute: 3 days from 23:59 still reaches
+    // into the days after it.
+    expect(targetReminders(tomorrow, lastMinute, 3)).toHaveLength(1);
+  });
+
   it("covers today and only today at the shortest horizon", () => {
     // The choice the issue was actually asking for, and the one where a rolling
     // 24-hour cutoff was most obviously wrong: "registered through today" has

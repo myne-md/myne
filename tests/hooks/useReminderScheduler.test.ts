@@ -128,6 +128,23 @@ describe("the tick is computed, not a coarse interval", () => {
     expect(ms).toBe(MIN_SLEEP_MS);
   });
 
+  it("re-arms to the SOONEST instant, not the first id", () => {
+    // `targetReminders` sorts by id to keep the diff byte-stable, so its head is
+    // the lexicographically first reminder rather than the nearest one. Taking
+    // `[0]` as "the next instant" was a second reading that sort never
+    // promised, and every existing case here passes a single task, so it was
+    // unobservable. Two notes whose id order is the inverse of their instant
+    // order is what tells them apart.
+    const soon = new Date(2026, 6, 28, 10, 0, 0);
+    const tasks = [
+      task({ noteId: "zzz", remind: "2026-07-28 10:00" }),
+      task({ noteId: "aaa", remind: "2026-07-28 10:30" }),
+    ];
+    // `zzz` is due in 30 s, `aaa` in half an hour. Sorted by id, `aaa` is first.
+    expect(msUntilNextPass(tasks, new Date(2026, 6, 28, 9, 59, 30))).toBe(30_000);
+    expect(soon).toBeInstanceOf(Date);
+  });
+
   it("falls back to the ceiling when nothing is pending", () => {
     expect(msUntilNextPass([], NOW)).toBe(MAX_SLEEP_MS);
   });

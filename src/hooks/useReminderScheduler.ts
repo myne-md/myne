@@ -23,6 +23,7 @@ import {
   resolveHorizonDays,
   runReminderPass,
   targetReminders,
+  type PendingReminder,
   type ReminderNotifier,
   type ReminderPassResult,
 } from "../lib/reminderSchedule";
@@ -51,7 +52,17 @@ export function msUntilNextPass(
   now: Date,
   horizonDays?: number,
 ): number {
-  const next = targetReminders(tasks, now, horizonDays)[0];
+  // `targetReminders` sorts by ID, not by instant, so `[0]` is the
+  // lexicographically first reminder rather than the soonest. That sort exists
+  // to keep the diff byte-stable and is correct for its own purpose; taking its
+  // head as "the next instant" was a second reading it never promised. The
+  // mobile twin needed an explicit comparator for the same reason
+  // (`mobile/src/lib/reminderPass.ts`). Every existing test here passes a single
+  // task, so the difference was unobservable.
+  const next = targetReminders(tasks, now, horizonDays).reduce<PendingReminder | undefined>(
+    (soonest, r) => (soonest === undefined || r.at < soonest.at ? r : soonest),
+    undefined,
+  );
   if (next === undefined) return MAX_SLEEP_MS;
   // `at` is a local wall-clock stamp; the shared parser is what keeps this
   // agreeing with the notifier's timer to the minute.
