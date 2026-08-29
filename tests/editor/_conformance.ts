@@ -10,6 +10,7 @@
 //
 // Test files that import this MUST declare `// @vitest-environment jsdom`.
 
+import { forceParsing } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { myneExtensions } from "../../src/editor/extensions";
@@ -69,6 +70,26 @@ export function mount(doc: string, selectionPos?: number): Mounted {
     }),
     parent: host,
   });
+  // Parse the WHOLE document before handing the mount back.
+  //
+  // CodeMirror parses incrementally under a time budget, so `syntaxTree(state)`
+  // returns whatever was finished when the budget ran out. Every decoration
+  // here is built from that tree, which makes a partial parse look exactly like
+  // a missing decoration: the assertion fails on a node the parser simply had
+  // not reached yet.
+  //
+  // Under `vitest run` that budget is shared with every other worker on the
+  // machine, so the failure is load-dependent rather than deterministic. It was
+  // measured at roughly one full-suite run in three, moving between files
+  // (`list-render`'s nested ring, `taskLineEditing`'s second Enter), and always
+  // passing when the file is run alone. That is the shape that reads as a broken test
+  // rather than a missing parse.
+  //
+  // The sibling files that assert on tree-derived decorations each call
+  // `forceParsing` themselves for this reason. Doing it here is the same fix one
+  // layer down, so a new test written against this harness inherits it instead
+  // of having to know.
+  forceParsing(view, view.state.doc.length, 5_000);
   view.requestMeasure();
   return { view, host };
 }

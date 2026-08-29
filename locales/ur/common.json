@@ -1155,10 +1155,6 @@
       "turnedIntoTemplate": "ٹیمپلیٹ بنا دیا گیا",
       "convertedToNote": "نوٹ میں تبدیل ہو گیا",
       "versionHistory": "ورژن کی تاریخ",
-      "exportMarkdown": "Markdown کے طور پر برآمد کریں…",
-      "exportPdf": "PDF کے طور پر برآمد کریں…",
-      "exportHtml": "HTML کے طور پر برآمد کریں…",
-      "exportTxt": "سادہ متن کے طور پر برآمد کریں…",
       "trash": "ردی میں منتقل کریں"
     },
     "codeBlock": {
@@ -2022,10 +2018,6 @@
       "duplicate": "نقل بنائیں",
       "editFilterTitle": "فلٹر میں ترمیم",
       "emptyState": "ابھی کوئی نوٹ نہیں۔",
-      "exportHtml": "HTML کے طور پر برآمد کریں…",
-      "exportMarkdown": "Markdown کے طور پر برآمد کریں…",
-      "exportPdf": "PDF کے طور پر برآمد کریں…",
-      "exportTxt": "سادہ متن کے طور پر برآمد کریں…",
       "favoritesHeading": "پسندیدہ",
       "icon": "آئیکن…",
       "mergeAnyway": "پھر بھی ضم کریں",

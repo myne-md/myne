@@ -42,6 +42,17 @@ export const ICON_PATHS: Record<string, string> = {
     '<circle cx="12" cy="12" r="10" stroke-dasharray="3 3"/>',
   "circle-alert":
     '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+  // "This save failed" (myne-md/myne#603). The readout drew a literal `✕` in an
+  // 8px box, which `docs/design/README.md` bans by name under "No unicode
+  // symbols as icons (e.g. ✓ ✗ →). Use Lucide's `check`, `x`, `arrow-right`".
+  "circle-x":
+    '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  // "This note is not on the server" (myne-md/myne#603). A cloud with the
+  // corner-to-corner slash, which is the one silhouette that says "absent from
+  // the server" without a legend. The slash is drawn LAST so it crosses the
+  // cloud rather than being crossed by it.
+  "cloud-off":
+    '<path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/>',
   bold:
     '<path d="M14 12a4 4 0 0 0 0-8H6v8"/><path d="M15 20a4 4 0 0 0 0-8H6v8Z"/>',
   italic:

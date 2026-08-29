@@ -1164,10 +1164,6 @@
       "turnedIntoTemplate": "Muutettu malliksi",
       "convertedToNote": "Muunnettu muistiinpanoksi",
       "versionHistory": "Versiohistoria",
-      "exportMarkdown": "Vie Markdown-muodossa…",
-      "exportPdf": "Vie PDF-muodossa…",
-      "exportHtml": "Vie HTML-muodossa…",
-      "exportTxt": "Vie pelkkänä tekstinä…",
       "trash": "Siirrä roskakoriin"
     },
     "codeBlock": {
@@ -2034,10 +2030,6 @@
       "duplicate": "Kahdenna",
       "editFilterTitle": "Muokkaa suodatinta",
       "emptyState": "Ei vielä muistiinpanoja.",
-      "exportHtml": "Vie HTML-muodossa…",
-      "exportMarkdown": "Vie Markdown-muodossa…",
-      "exportPdf": "Vie PDF-muodossa…",
-      "exportTxt": "Vie pelkkänä tekstinä…",
       "favoritesHeading": "Suosikit",
       "icon": "Kuvake…",
       "mergeAnyway": "Yhdistä silti",

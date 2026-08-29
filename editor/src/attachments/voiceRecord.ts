@@ -12,7 +12,7 @@ import type { EditorView } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
 import { addCatalogRows } from "./catalog";
-import { fileNameTimestamp } from "./insert";
+import { fileNameTimestamp, ownLineInsertion } from "./insert";
 import { showAttachmentToast } from "./toast";
 import { mountRecordingBar, type RecordingBarHandle } from "./recordingBar";
 
@@ -51,9 +51,11 @@ function insertVoiceEmbed(view: EditorView, imported: ImportedAttachment): void 
   ]);
   const embed = emitAttachmentEmbed(imported.id, imported.filename);
   const at = view.state.selection.main.head;
+  // Its own line, like every other embed Myne writes (myne-md/myne#604).
+  const { insert, anchor } = ownLineInsertion(view.state.doc, at, embed);
   view.dispatch({
-    changes: { from: at, insert: embed },
-    selection: { anchor: at + embed.length },
+    changes: { from: at, insert },
+    selection: { anchor },
     userEvent: "input.voice-note",
   });
 }

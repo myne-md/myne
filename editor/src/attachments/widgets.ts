@@ -1,3 +1,8 @@
+import {
+  decodedAspectOf,
+  rememberAspect,
+} from "./decoded-aspect";
+import { previewCache, previewInFlight } from "./session-caches";
 // Atomic widgets for the editor attachment render path (epic MYND-164 + 147/149).
 //
 // Four widget families, all `Decoration.replace({ widget, atomic: true })`:
@@ -43,6 +48,7 @@ import {
   embedWidthCss,
   emptyEmbedLayout,
   isAliasSafeText,
+  MAX_EMBED_DIMENSION_PX,
   sameEmbedLayout,
 } from "@myne/dialect/embedLayout";
 import {
@@ -52,6 +58,7 @@ import {
   setAlt,
   toggleAlign,
   toggleWidthPercent,
+  setWidthPx,
   toggleWidthPx,
   updateEmbedLayout,
 } from "./embedLayoutActions";
@@ -209,6 +216,26 @@ export type TombstoneKind = "deleted" | "broken";
 
 // --- resolved raster / SVG -------------------------------------------------
 
+/**
+ * # The measurement the aspect cache exists for (myne-md/myne#604)
+ *
+ * Typing one character before a mid-line embed destroys and rebuilds the
+ * widget's DOM. Measured in Chromium against this exact widget: the frame's
+ * probe tag changes from one render to the next, while an embed alone on its
+ * own line keeps its tag and its DOM. `eq()` is correct and does not prevent it;
+ * CodeMirror rebuilds a line's content when that line's text changes.
+ *
+ * Each rebuild restarts `toDOM`, which used to hide the `<img>` until its `load`
+ * fired, so the frame collapsed from 240px to 31px and sprang back a frame
+ * later. That is the flash, and with the document scrolled it is also the jump:
+ * the content height moves under the scroll position.
+ *
+ * The store itself lives in `./decoded-aspect`, a leaf with no imports, because
+ * the vault-teardown paths have to clear it and importing THIS file to do that
+ * dragged the whole attachment-widget subtree into the app's eager graph. That
+ * file states the measurement.
+ */
+
 export class AttachmentImageWidget extends WidgetType {
   /** The object URL resolved at BUILD time. `eq()` is keyed on it so that when
    *  the host warms this id on web (pending placeholder → real blob URL, #211)
@@ -219,12 +246,21 @@ export class AttachmentImageWidget extends WidgetType {
   private readonly url: string;
   /** Tear-down for the body-mounted overflow menu: see the file card's. */
   private menuTeardown: (() => void) | null = null;
+  /** Tear-down for the drag-resize handles' window-level pointer listeners. */
+  private resizeTeardown: (() => void) | null = null;
 
   constructor(
     private readonly id: string,
     private readonly filename: string,
     private readonly layout: EmbedLayout,
     private readonly dropped: readonly DroppedEmbedSegment[],
+    /** Whether this embed is drawn as a whole-line block. Only the block form
+     *  carries resize handles: an inline embed has no stable edge to grab (the
+     *  line reflows around it as it grows) and dragging inside a line box is
+     *  indistinguishable from a text selection. Part of `eq()` because a source
+     *  edit can move an embed between the two forms, and the handles have to
+     *  follow it. */
+    private readonly block: boolean = false,
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -235,6 +271,7 @@ export class AttachmentImageWidget extends WidgetType {
       other.id === this.id &&
       other.filename === this.filename &&
       other.url === this.url &&
+      other.block === this.block &&
       // Without this the widget survives a layout edit unchanged: CM6 keeps the
       // old DOM whenever eq() says the rebuild matches.
       sameEmbedLayout(other.layout, this.layout) &&
@@ -253,8 +290,14 @@ export class AttachmentImageWidget extends WidgetType {
 
     // Clean progress chip ("Loading…") until the first decrypt+decode paints —
     // NOT the struck/tombstone style. Removed once the <img> fires `load`.
-    const loading = makeProgressChip("loading");
-    frame.appendChild(loading);
+    //
+    // Only on a FIRST paint (myne-md/myne#604). Once this id's shape is known
+    // the box is reserved below and the image arrives into it, so a chip would
+    // be a second thing flashing in a space that is no longer empty. The whole
+    // point of the reservation is that a rebuild looks like nothing happened.
+    const knownAspect = decodedAspectOf(this.id);
+    const loading = knownAspect === undefined ? makeProgressChip("loading") : null;
+    if (loading !== null) frame.appendChild(loading);
 
     const img = document.createElement("img");
     img.className = "cm-attachment-img";
@@ -278,16 +321,29 @@ export class AttachmentImageWidget extends WidgetType {
     if (this.layout.heightPx !== null) {
       img.style.height = `${this.layout.heightPx}px`;
     }
-    // Hidden until decoded so the progress chip is the only thing visible while
-    // the bytes decrypt; swap on load (or drop the chip on error so a genuine
-    // broken-image affordance still surfaces).
-    img.style.display = "none";
+    // The box is reserved from the remembered ratio, so the image occupies its
+    // final height from the first frame and a rebuild is invisible
+    // (myne-md/myne#604). `aspect-ratio` rather than a pixel height because the
+    // width is the layout's to decide: `w=`, the 320px default cap, or the
+    // aligned `fit-content` form. Only the height follows from the image.
+    //
+    // On a FIRST paint the ratio is unknown, so the old behaviour stands: hide
+    // the `<img>` and show the chip, because an unhidden zero-size image next to
+    // a chip is two placeholders for one thing. That first settle is the one
+    // jump left, and it is unavoidable while `CatalogRow` carries no dimensions
+    // (`editor/src/host.ts`).
+    if (knownAspect !== undefined && this.layout.heightPx === null) {
+      img.style.aspectRatio = String(knownAspect);
+    } else if (knownAspect === undefined) {
+      img.style.display = "none";
+    }
     img.addEventListener("load", () => {
+      rememberAspect(this.id, img);
       img.style.display = "";
-      loading.remove();
+      loading?.remove();
     });
     img.addEventListener("error", () => {
-      loading.remove();
+      loading?.remove();
     });
     // Click the rendered image → full-size lightbox preview (same decrypted
     // source). Cursor + title hint the affordance.
@@ -305,14 +361,22 @@ export class AttachmentImageWidget extends WidgetType {
     this.menuTeardown = menu.teardown;
     frame.appendChild(menu.wrap);
 
+    // Drag-to-resize, on the block form only (myne-md/myne#604). See
+    // `appendResizeHandles` for why the inline form gets none.
+    this.resizeTeardown = appendResizeHandles(view, frame, img, this.id, this.block);
+
     return frame;
   }
 
   // If CM6 discards the widget while its menu is open, tear the menu down so its
-  // document `mousedown` listener cannot outlive the DOM.
+  // document `mousedown` listener cannot outlive the DOM. Same for a resize
+  // drag: it holds window-level `pointermove`/`pointerup` listeners, and a
+  // keystroke elsewhere rebuilds this widget mid-drag (measured, myne#604).
   destroy(): void {
     this.menuTeardown?.();
     this.menuTeardown = null;
+    this.resizeTeardown?.();
+    this.resizeTeardown = null;
   }
 
   // Let the click reach the <img> handler (lightbox) rather than being
@@ -1445,12 +1509,12 @@ const PREVIEW_GRID_MAX_COLS = 256;
 /** One decrypt round trip's outcome. An error is an outcome too: a failing
  *  read degrades to the file-card once instead of re-issuing an IPC every time
  *  the embed scrolls back into view. */
-type PreviewOutcome =
+export type PreviewOutcome =
   | { kind: "text"; text: string; truncated: boolean }
   | { kind: "structured"; content: StructuredPreview }
   | { kind: "error" };
 
-interface PreviewCacheEntry {
+export interface PreviewCacheEntry {
   outcome: PreviewOutcome;
   /** Last measured card height (px) — feeds `estimatedHeight` so a widget
    *  re-entering the viewport is laid out at its real height immediately. */
@@ -1462,13 +1526,16 @@ interface PreviewCacheEntry {
  *  `ATTACHMENT_TEXT_PREVIEW_CAP`), so worst-case retention stays modest. */
 const PREVIEW_CACHE_MAX = 24;
 
-/** LRU-ish preview cache keyed by {@link previewCacheKey}: `Map` iterates in
- *  insertion order, a hit re-inserts, overflow evicts the oldest. */
-const previewCache = new Map<string, PreviewCacheEntry>();
-
-/** In-flight de-dup: concurrent `toDOM` for the same attachment (the same file
- *  embedded twice, or a rebuild racing a slow read) share ONE IPC round trip. */
-const previewInFlight = new Map<string, Promise<PreviewOutcome>>();
+// The two maps live in `./session-caches`, a leaf with no imports, because the
+// vault-leaving paths have to clear them and reaching into THIS file to do that
+// puts the whole attachment-widget subtree into the app's eager bundle graph.
+// The key derivation, the LRU eviction and the in-flight de-dup below are still
+// this file's; only the containers moved. `session-caches.ts` states why.
+//
+// LRU-ish: `Map` iterates in insertion order, a hit re-inserts, overflow evicts
+// the oldest. The in-flight map lets concurrent `toDOM` for the same attachment
+// (the same file embedded twice, or a rebuild racing a slow read) share ONE IPC
+// round trip.
 
 /** Cache key: attachment id + preview tier (the structured kinds parse
  *  differently from the raw-text tier, so they cache separately). */
@@ -1814,6 +1881,17 @@ export function makeResolvedWidget(
   row: CatalogRow,
   layout: EmbedLayout,
   dropped: readonly DroppedEmbedSegment[],
+  /** Whether the caller is drawing this embed as a whole-line block. Only the
+   *  image widget reads it today, to decide whether to carry drag-resize handles
+   *  (myne-md/myne#604); the other five ignore it. Threaded through here rather
+   *  than read from the DOM because the widget is constructed before it has any.
+   *
+   *  Required, not defaulted to the inline arm. A default here would answer for
+   *  every future caller in the direction that draws no handles, which is the
+   *  shape `CLAUDE.md` records under "a guard parameter with a default value is
+   *  an opt-in guard": the arm that never fires is the one a new call site
+   *  silently takes. Both builders state their form. */
+  block: boolean,
 ): WidgetType {
   // `layout` is media-only and `dropped` is NOT, and the two used to travel
   // together as if they were one thing (myne-md/myne#518). A file card, an audio
@@ -1829,7 +1907,7 @@ export function makeResolvedWidget(
     return new AttachmentPdfWidget(row.id, row.filename, layout, dropped);
   }
   if (isRenderableImageType(row.contentType)) {
-    return new AttachmentImageWidget(row.id, row.filename, layout, dropped);
+    return new AttachmentImageWidget(row.id, row.filename, layout, dropped, block);
   }
   if (isPlayableAudioType(row.contentType)) {
     return new AttachmentAudioWidget(row.id, row.filename, dropped);
@@ -1865,4 +1943,150 @@ function isPlayableAudioType(contentType: string): boolean {
  *  would still degrade gracefully via the widget's error→file-card fallback.) */
 function isPlayableVideoType(contentType: string): boolean {
   return contentType === "video/mp4" || contentType === "video/webm";
+}
+
+/** Narrowest a drag may leave an image. Below this the handles overlap each
+ *  other and there is nothing left to grab to undo the drag. */
+const MIN_RESIZE_PX = 80;
+
+/**
+ * Notion-style drag-to-resize: a bar on the right edge and a grip at the
+ * bottom-right corner (myne-md/myne#604).
+ *
+ * # Block only
+ *
+ * An inline embed gets none, and that is not a shortcut. Its box sits in a line
+ * box that reflows around it as it grows, so the edge you grabbed moves under
+ * the pointer mid-drag; and a press-and-drag inside a line is how a text
+ * selection starts, so the two gestures would compete on the same pixels. The
+ * block form has a stable right edge and nothing else claims a horizontal drag
+ * there.
+ *
+ * # What it writes
+ *
+ * `w=<px>`, through `updateEmbedLayout`, which `embedLayoutActions.ts` names as
+ * the only authoring path for the layout segments. The drag itself only moves
+ * CSS; the document is touched ONCE, on release, so a drag is one undo step
+ * rather than one per frame.
+ *
+ * # Why the listeners are on the window
+ *
+ * A pointer leaves the handle almost immediately once a drag starts. The
+ * teardown is handed back to the widget rather than left to a `pointerup` that
+ * may never arrive at this element: a keystroke elsewhere in the document
+ * rebuilds this widget's DOM mid-drag, which is measured behaviour, and a
+ * listener whose element is gone is a leak that keeps resizing a detached node.
+ */
+function appendResizeHandles(
+  view: EditorView,
+  frame: HTMLElement,
+  img: HTMLImageElement,
+  id: string,
+  block: boolean,
+): (() => void) | null {
+  if (!block) return null;
+  let disposeDrag: (() => void) | null = null;
+
+  const startDrag = (event: PointerEvent, axis: "x" | "both"): void => {
+    // Dispose any drag still live before starting another. A second
+    // `pointerdown` on the other handle used to overwrite `disposeDrag`
+    // outright, orphaning the first drag's window listeners: the widget's
+    // `destroy()` disposes only the last one, and this function's own
+    // docstring names that exact leak as the reason the teardown is handed
+    // back at all.
+    disposeDrag?.();
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const box = img.getBoundingClientRect();
+    const startWidth = box.width;
+    const startHeight = box.height;
+    // The content column is the ceiling: a width past it would be clipped by the
+    // editor rather than honoured, so the handle would keep moving while nothing
+    // changed on screen.
+    const maxWidth = Math.max(
+      MIN_RESIZE_PX,
+      Math.min(view.contentDOM.getBoundingClientRect().width, MAX_EMBED_DIMENSION_PX),
+    );
+    let width = startWidth;
+    // Only the corner grip writes a height. The edge bar leaves it alone, so a
+    // width-only drag keeps the image's own proportions, which is what an edge
+    // handle means everywhere else. `null` here is "unchanged", not "cleared".
+    let height: number | null = null;
+    frame.classList.add("cm-attachment-resizing");
+    // Written once rather than on every move: it does not change during a drag,
+    // and a pointer sending coalesced events writes style faster than the
+    // browser paints.
+    img.style.maxWidth = "100%";
+    // Style writes are coalesced into one per frame. A fast pointer delivers
+    // more `pointermove` events than there are frames, and each one used to be
+    // its own layout write.
+    let frameRequest = 0;
+    const paint = (): void => {
+      frameRequest = 0;
+      img.style.width = `${width}px`;
+      if (height !== null) img.style.height = `${height}px`;
+    };
+
+    const onMove = (e: PointerEvent): void => {
+      width = Math.round(
+        Math.min(maxWidth, Math.max(MIN_RESIZE_PX, startWidth + (e.clientX - startX))),
+      );
+      if (axis === "both") {
+        height = Math.round(
+          Math.min(
+            MAX_EMBED_DIMENSION_PX,
+            Math.max(MIN_RESIZE_PX, startHeight + (e.clientY - startY)),
+          ),
+        );
+      }
+      if (frameRequest === 0) frameRequest = requestAnimationFrame(paint);
+    };
+
+    const onUp = (): void => {
+      cleanup();
+      const movedWidth = Math.round(width) !== Math.round(startWidth);
+      const movedHeight = height !== null && Math.round(height) !== Math.round(startHeight);
+      if (!movedWidth && !movedHeight) return; // a click, not a drag
+      updateEmbedLayout(view, frame, id, (current) => ({
+        ...current,
+        ...setWidthPx(width),
+        // An explicit height is aspect distortion on purpose, which is what the
+        // widget's own comment says `h=` means and what dragging a corner asks
+        // for. The edge bar never reaches here, so a width-only drag leaves
+        // whatever height the author had (usually none).
+        ...(height !== null ? { heightPx: height } : {}),
+      }));
+    };
+
+    const cleanup = (): void => {
+      if (frameRequest !== 0) cancelAnimationFrame(frameRequest);
+      frameRequest = 0;
+      frame.classList.remove("cm-attachment-resizing");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", cleanup);
+      disposeDrag = null;
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", cleanup);
+    disposeDrag = cleanup;
+  };
+
+  for (const spec of [
+    { cls: "cm-attachment-resize-e", axis: "x" as const, testid: "attachment-image.resize-e" },
+    { cls: "cm-attachment-resize-se", axis: "both" as const, testid: "attachment-image.resize-se" },
+  ]) {
+    const handle = document.createElement("span");
+    handle.className = `cm-attachment-resize ${spec.cls}`;
+    handle.setAttribute("data-testid", spec.testid);
+    handle.setAttribute("aria-hidden", "true");
+    handle.addEventListener("pointerdown", (e) => startDrag(e, spec.axis));
+    frame.appendChild(handle);
+  }
+
+  return () => disposeDrag?.();
 }

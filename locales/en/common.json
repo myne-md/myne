@@ -1153,10 +1153,6 @@
       "turnedIntoTemplate": "Turned into template",
       "convertedToNote": "Converted to note",
       "versionHistory": "Version history",
-      "exportMarkdown": "Export as Markdown…",
-      "exportPdf": "Export as PDF…",
-      "exportHtml": "Export as HTML…",
-      "exportTxt": "Export as Plain Text…",
       "trash": "Move to trash"
     },
     "codeBlock": {
@@ -1855,6 +1851,13 @@
       },
       "tagPlaceholder": "Tag…"
     },
+    "export": {
+      "submenuLabel": "Export…",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "html": "HTML",
+      "txt": "Plain text"
+    },
     "import": {
       "base": {
         "untitledView": "Untitled view"
@@ -2020,10 +2023,6 @@
       "duplicate": "Duplicate",
       "editFilterTitle": "Edit filter",
       "emptyState": "No notes yet.",
-      "exportHtml": "Export as HTML…",
-      "exportMarkdown": "Export as Markdown…",
-      "exportPdf": "Export as PDF…",
-      "exportTxt": "Export as Plain Text…",
       "favoritesHeading": "Favorites",
       "icon": "Icon…",
       "mergeAnyway": "Merge anyway",

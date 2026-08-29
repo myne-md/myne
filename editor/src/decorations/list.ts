@@ -7,15 +7,19 @@
 // (like a heading's `#`) — NOT for the whole line — so editing the item's text
 // keeps the disc instead of flickering back to raw. ORDERED markers (`1.`) stay
 // editable text: muted OFF the cursor line, un-muted (revealed) ON it. Every
-// list line gets a hanging indent so wrapped lines align under the body, not the
-// marker. Render-only — the buffer is never mutated (§6 C1).
+// list line gets a hanging indent so a wrapped label hangs under the label
+// rather than running back under its own marker.
+// Render-only: the buffer is never mutated (§6 C1).
 //
-// Task-list items (`- [ ]` / `- [x]`) are owned by `task-list.ts` (it hides the
-// `-` and renders a checkbox); this decoration SKIPS them so the two don't both
-// claim the marker. Nesting indent itself comes from the source's leading
-// whitespace (which CM6 renders); this only swaps the glyph + adds the
-// hanging-indent line box.
+// Task-list items (`- [ ]` / `- [x]`) have their MARKER owned by `task-list.ts`
+// (it hides the `-` and renders a checkbox), so this decoration paints no glyph
+// for one, but their LINE BOX is still this file's, because the hanging indent
+// belongs to every list line and nothing else emits one (myne-md/myne#594).
+// The nesting indent is NOT the source's leading whitespace: that is hidden and
+// re-drawn as one fixed step per level, which is what makes the wrapped column
+// exact rather than measured against a space of unknown width.
 
+import { isTaskMarker } from "@myne/dialect/taskMarker";
 import { syntaxTree } from "@codemirror/language";
 import { type Extension, type Range, RangeSetBuilder } from "@codemirror/state";
 import {
@@ -49,13 +53,24 @@ class ListBulletWidget extends WidgetType {
 }
 
 /** True if the list item starting at this mark is a GFM task item (`- [ ]` /
- *  `- [x]`), which `task-list.ts` owns — `list.ts` leaves those alone. */
+ *  `- [x]`), whose MARKER `task-list.ts` owns: `list.ts` renders no glyph for
+ *  one (its line box is still this file's, see `buildListDecorations`).
+ *
+ *  The shape comes from `@myne/dialect/taskMarker` rather than being restated,
+ *  and the leading-whitespace tolerance is this caller's own: it is handed the
+ *  text after the mark, which can begin with the gap. Restating it here is what
+ *  made this predicate LAXER than the parser once, so `- [ ]foo`, an ordinary
+ *  bullet item whose text happens to start with `[ ]`, had its bullet
+ *  suppressed here while `task-list.ts`, finding no `TaskMarker` node, drew no
+ *  checkbox either, and the line rendered with no marker at all. */
 function isTaskItem(doc: string): boolean {
-  return /^\s*\[[ xX]\]/.test(doc);
+  return isTaskMarker(doc.slice(spaceRunLength(doc, 0)));
 }
 
 /** Number of ancestor list nodes above this one (0 = top level). */
-function listDepth(node: { parent: { name: string; parent: unknown } | null }): number {
+function listDepth(node: {
+  parent: { name: string; parent: unknown } | null;
+}): number {
   let depth = 0;
   let cur = node.parent;
   while (cur !== null) {
@@ -67,119 +82,193 @@ function listDepth(node: { parent: { name: string; parent: unknown } | null }): 
   return Math.max(0, depth - 1);
 }
 
-/** True if this list item is nested inside a blockquote. Such lines already get
- *  their left padding (to clear the quote bar) from `blockquote.ts`; adding the
- *  list's own negative-text-indent hanging indent ON TOP pulls the marker LEFT of
- *  the bar (the markers-collide-with-blockquote bug). So we skip the hanging
- *  indent there and let the quote padding position the marker after the bar. */
-function inBlockquote(node: { parent: { name: string; parent: unknown } | null }): boolean {
-  for (let cur = node.parent; cur !== null; ) {
-    if (cur.name === "Blockquote") return true;
-    cur = (cur as { parent: { name: string; parent: unknown } | null }).parent;
-  }
-  return false;
-}
-
-/** Rendered width of the bullet widget, in `ch` — `.cm-list-bullet`'s `width:
- *  1ch` plus its `margin-right: 0.4ch` (theme.ts). Keep in step with that rule:
- *  they are the same measurement expressed on two sides of the DOM. */
-const BULLET_WIDTH_CH = 1.4;
-
-/** A tab's column width, matching the editor's `tabSize`. */
-const TAB_COLS = 4;
-
-/** Leading indentation of `text`, in columns (tabs expanded). */
-function leadingCols(text: string): number {
-  let cols = 0;
-  for (const ch of text) {
-    if (ch === " ") cols += 1;
-    else if (ch === "\t") cols += TAB_COLS;
-    else break;
-  }
-  return cols;
-}
-
-/**
- * The hanging indent a list line needs so its WRAPPED lines sit under the body
- * text, in `ch`.
+/** The marker column each list shape occupies, as CSS the THEME declares.
  *
- * Measured against what is actually painted, which differs by state:
- * - off-cursor bullet — the raw marker is replaced by the widget, so the body
- *   starts at `indent + BULLET_WIDTH_CH`;
- * - off-cursor ordered — the number stays as text, so the body starts after the
- *   marker and its trailing space;
- * - on-cursor (either) — the raw source is revealed, so the body starts at the
- *   source column of the first content character.
+ *  These used to be JS numbers mirroring `theme.ts` under a "keep in step"
+ *  comment, which was a cosmetic coupling until myne-md/myne#594 made it
+ *  arithmetic: the hanging indent is computed FROM the marker width, so editing
+ *  `.cm-task-checkbox`'s `margin-right` in the theme silently misaligned every
+ *  wrapped task row. Reading the same custom property both sides draw from
+ *  leaves one value, and it leaves it where a custom theme can reach it.
  *
- * Computing all three keeps the wrap column stable when the caret enters and
- * leaves the line, instead of shifting by the widget-vs-source width difference.
- */
-function hangingIndentCh(
-  doc: EditorView["state"]["doc"],
-  line: { from: number; to: number; text: string },
-  markFrom: number,
+ *  The fallbacks are what the theme declares today, so a host that mounts the
+ *  decorations without the Myne theme still renders a sane column. */
+const BULLET_WIDTH = "var(--cm-list-marker-bullet, 1.4ch)";
+const CHECKBOX_WIDTH = "var(--cm-list-marker-task, 22px)";
+
+/** How far ONE level of nesting indents a list. A design value rather than a
+ *  measured one, which is the point: the source's own leading whitespace is
+ *  hidden and this is drawn in its place, so the column is exact and a list
+ *  indented with two spaces per level looks like one indented with four. */
+const INDENT_PER_LEVEL = "var(--cm-list-indent-step, 1.5em)";
+
+/** The offset the item's label starts at: the marker's own whitespace run,
+ *  skipped. The one statement of "where does the body of this item begin",
+ *  which `task-list.ts` asks too. The two must agree or the hanging indent
+ *  and the painted label part company (myne-md/myne#594). */
+export function listLabelStart(
+  line: { from: number; text: string },
   markTo: number,
-  /** True when the fixed-width bullet disc is what's painted (not the raw `- `). */
-  bulletRendered: boolean,
 ): number {
-  const indent = leadingCols(line.text);
-  const markerLen = markTo - markFrom;
-  const trailing = doc.sliceString(markTo, line.to).match(/^[ \t]*/);
-  const gap = trailing ? leadingCols(trailing[0]) : 0;
-  const rawOffset = indent + markerLen + gap;
+  return markTo + spaceRunLength(line.text, markTo - line.from);
+}
 
-  // A painted bullet is a fixed-width disc; anything else (a revealed raw marker,
-  // or an ordered number) has the body start after the source marker + gap.
-  return bulletRendered ? indent + BULLET_WIDTH_CH : rawOffset;
+/** How many spaces and tabs run from `from` in `text`.
+ *
+ * The one whitespace scanner in this file. It was three: the gap after a list
+ * marker, the leading indent of a line, and a per-character test in the Enter
+ * command next door, all the same primitive written three ways in one change.
+ *
+ * `listLabelStart` used to answer its question with `doc.sliceString(markTo,
+ * line.to)`, copying the whole remainder of the line to count one or two
+ * spaces, on every list line, on every decoration rebuild. This plugin is
+ * cursor-aware, so that is every keystroke, every viewport change and every
+ * cursor move. `line.text` is already materialised by the `doc.lineAt` the
+ * caller just did. */
+export function spaceRunLength(text: string, from: number): number {
+  let n = from;
+  while (n < text.length && (text[n] === " " || text[n] === "\t")) n += 1;
+  return n - from;
+}
+
+/** Leading whitespace of `text`, in characters. */
+function indentLength(text: string): number {
+  return spaceRunLength(text, 0);
 }
 
 function buildListDecorations(view: EditorView): DecorationSet {
   const decorations: Array<Range<Decoration>> = [];
   const doc = view.state.doc;
+  // Hoisted out of the range loop: it is the same tree for every visible range.
+  const tree = syntaxTree(view.state);
   const seenLines = new Set<number>();
 
   for (const { from, to } of view.visibleRanges) {
-    syntaxTree(view.state).iterate({
+    tree.iterate({
       from,
       to,
       enter: (node) => {
         if (node.name !== "ListMark") return undefined;
         const line = doc.lineAt(node.from);
-        const afterMark = doc.sliceString(node.to, Math.min(node.to + 4, line.to));
-        if (isTaskItem(afterMark)) return undefined; // task-list owns it
+        // Five characters, not four: the parser's task rule needs the separator
+        // AFTER `[ ]` to see a task at all, and so does `isTaskItem`.
+        const afterMark = doc.sliceString(node.to, Math.min(node.to + 5, line.to));
+        const isTask = isTaskItem(afterMark);
 
         const marker = doc.sliceString(node.from, node.to);
         const isBullet = /^[-*+]$/.test(marker);
         // A bullet reveals its raw `- ` ONLY when the caret sits ON the marker
         // itself (like a heading's `#`), not for the whole line — so editing the
         // item's text keeps the disc. Ordered markers reveal on the cursor LINE.
-        const bulletRevealed = isBullet && isInsideRange(view, node.from, node.to);
+        const bulletRevealed =
+          isBullet && isInsideRange(view, node.from, node.to);
         const bulletRendered = isBullet && !bulletRevealed;
+        const depth = listDepth(node.node);
+        // Where this item's label begins: the marker column's width for the
+        // hanging indent, and the end of what the bullet's own widget replaces.
+        const labelStart = listLabelStart(line, node.to);
+        // How much of the marker's run the bullet widget takes: its trailing
+        // whitespace too, UNLESS that is the rest of the line. A `.cm-line`
+        // whose DOM is nothing but widgets has no editable position in it, and a
+        // character typed there is attributed to the widget's start: the letter
+        // lands before the marker and the item stops being a list item
+        // (myne-md/myne#598).
+        const markerReplaceTo = labelStart < line.to ? labelStart : node.to;
+        // …which is also what decides whether hiding the source indent is safe:
+        // the two replacements are adjacent, so it is their SUM that can empty
+        // the line, and neither can answer that alone.
+        const lineKeepsText = markerReplaceTo < line.to;
 
-        // Hanging indent on every list-item line — EXCEPT inside a blockquote,
-        // where the quote bar + padding owns the line's left edge (see
-        // `inBlockquote`).
+        // Hanging indent, in units this file OWNS rather than in units it has to
+        // guess (myne-md/myne#594).
         //
-        // MYND-626: the indent is MEASURED per line, not a fixed 1.5em. A fixed
-        // value cannot be right for more than one shape at a time: the bullet
-        // widget is `1ch + 0.4ch` wide (theme `.cm-list-bullet`), an ordered
-        // marker is as wide as its own digits, and a nested item carries leading
-        // source whitespace that the first line renders but a wrapped line does
-        // not. At one nesting level the old constant was already ~2x the real
-        // offset, which is what pushed wrapped lines visibly right of the body
-        // column instead of hanging under it.
-        if (!seenLines.has(line.from) && !inBlockquote(node.node)) {
+        // A wrapped row has to start where the label starts, and that column is
+        // `leading indent + marker`. The marker half is known: the disc is
+        // `1.4ch` and the checkbox is 22px, both of them CSS the theme declares.
+        // The leading indent was the half that could not be: it is SOURCE
+        // WHITESPACE, painted at the font's space width, while the offset had to
+        // be written in `ch`, the width of a "0". Under the default monospace
+        // editor font those are the same number and the arithmetic was
+        // invisible. Under any proportional one a space is roughly half a `ch`,
+        // so every wrapped row sat about `indent columns x (ch - space)` too far
+        // right, growing with nesting depth.
+        //
+        // So the indent stops being source whitespace: it is REPLACED and
+        // re-drawn as `depth x INDENT_PER_LEVEL_EM` of padding. The column is
+        // then exact by construction under every font and every text size, and a
+        // list indented with two spaces per level renders like one indented with
+        // four, the same normalisation the bullet glyph already applies to
+        // `-` / `*` / `+`.
+        //
+        // (An inline-block around the label is the other way to hang a wrapped
+        // row without measuring anything, and it does not work here: an
+        // inline-block's shrink-to-fit width resolves against its CONTAINING
+        // BLOCK, not against the space left on the line, so a long label asks for
+        // the full line width, fails to fit beside its own marker, and drops to
+        // the next row at the line's left edge, further left than the bug it
+        // was fixing.)
+        if (!seenLines.has(line.from)) {
           seenLines.add(line.from);
-          const offset = hangingIndentCh(doc, line, node.from, node.to, bulletRendered);
+          const indent = indentLength(line.text);
+          // The marker column, in the unit the theme draws that marker in.
+          //
+          // The third arm is `ch` and that is a KNOWN approximation, not an
+          // oversight, so it is written down rather than left to look like one.
+          // It covers the two cases where the marker is REVEALED source text:
+          // an ordered marker (`1. `), and a bullet on the caret's own line.
+          // Source text is painted at the font's own metrics, which is exactly
+          // the argument above for why the leading indent could not stay in
+          // `ch`, so a wrapped row under `10. ` on a proportional font hangs
+          // slightly off, by the difference between `ch` and what the digits,
+          // period and space actually measure.
+          //
+          // The fix the indent got does not transfer: that column is a fixed
+          // step per nesting level, and this one is not. `1.` and `100.` are
+          // different widths, so no theme-declared constant expresses it, and
+          // the marker cannot be replaced and re-drawn the way the indent is
+          // because being the source is the point of revealing it. What would
+          // close it is measuring the rendered marker, which a decoration
+          // built from document positions has no way to do. Bounded and
+          // shrinking rather than open: it applies only while the caret is on
+          // the line, or to ordered lists, and never to the resting bullet or
+          // checkbox rendering above, which are theme-declared and exact.
+          const markerWidth = isTask
+            ? CHECKBOX_WIDTH
+            : bulletRendered
+              ? BULLET_WIDTH
+              : `${labelStart - node.from}ch`;
           decorations.push(
             Decoration.line({
               class: "cm-list-item-line",
               attributes: {
-                style: `text-indent:-${offset}ch;padding-left:calc(${offset}ch + 6px)`,
+                // `--cm-line-lead` is whatever an enclosing construct has already
+                // claimed of the line's left edge: a blockquote sets it to clear
+                // its own bars. Reading it here makes the two insets ADD rather
+                // than overwrite: both write `padding-left` on the same
+                // `.cm-line`, and the later declaration simply won, which is what
+                // the old `inBlockquote` carve-out dodged by emitting nothing.
+                style:
+                  `text-indent:calc(-1 * ${markerWidth});` +
+                  `padding-left:calc(var(--cm-line-lead, 0px)` +
+                  ` + ${depth} * ${INDENT_PER_LEVEL} + ${markerWidth} + 6px)`,
               },
             }).range(line.from),
           );
+          // Hide the source indent the padding now stands for, but never when
+          // the marker is the last thing on the line, which would leave the line
+          // with no text node at all and nowhere for a typed character to land
+          // (myne-md/myne#598). An EMPTY item still has its separator, so it is
+          // hidden there too and sits in its siblings' column rather than one
+          // step further in.
+          if (indent > 0 && lineKeepsText) {
+            decorations.push(
+              Decoration.replace({}).range(line.from, line.from + indent),
+            );
+          }
         }
+        // Everything below paints the MARKER, which on a task line belongs to
+        // `task-list.ts`.
+        if (isTask) return undefined;
 
         if (isBullet) {
           // Render the disc unless the caret is on the marker (then the raw `- `
@@ -187,13 +276,26 @@ function buildListDecorations(view: EditorView): DecorationSet {
           // with the bullet; the gap to the body is the bullet's `margin-right`
           // (theme), so a leftover source space doesn't widen it.
           if (bulletRendered) {
-            const rest = doc.sliceString(node.to, line.to);
-            const ws = rest.match(/^[ \t]+/);
-            const contentStart = node.to + (ws ? ws[0].length : 0);
+            // …but stop at the marker on an EMPTY item, leaving that whitespace
+            // as real text (myne-md/myne#598).
+            //
+            // An empty item is the one line where "marker plus its whitespace"
+            // is the WHOLE line, so replacing all of it leaves a `.cm-line`
+            // whose DOM is nothing but widget: no text node anywhere in it.
+            // Typing into a line like that has no editable position to land in,
+            // and the character is attributed to the widget's start: the letter
+            // appears BEFORE the marker (`f- `), the item stops parsing as a
+            // list item, and its disc turns back into a raw `-`. It is the
+            // state every "Enter, Enter to leave a list" gesture ends in.
+            //
+            // One space of real text is enough to fix it and shows nothing: the
+            // gap to a body that does not exist is invisible. A task item never
+            // had the hole: `task-list.ts` replaces the marker characters only
+            // and always leaves the separator behind.
             decorations.push(
               Decoration.replace({
-                widget: new ListBulletWidget(listDepth(node.node) > 0),
-              }).range(node.from, contentStart),
+                widget: new ListBulletWidget(depth > 0),
+              }).range(node.from, markerReplaceTo),
             );
           }
         } else if (/^\d+[.)]$/.test(marker)) {
@@ -211,7 +313,9 @@ function buildListDecorations(view: EditorView): DecorationSet {
   }
 
   const builder = new RangeSetBuilder<Decoration>();
-  decorations.sort((a, b) => a.from - b.from || a.value.startSide - b.value.startSide);
+  decorations.sort(
+    (a, b) => a.from - b.from || a.value.startSide - b.value.startSide,
+  );
   for (const d of decorations) builder.add(d.from, d.to, d.value);
   return builder.finish();
 }

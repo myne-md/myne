@@ -1262,10 +1262,6 @@
       "turnedIntoTemplate": "Перетворено на шаблон",
       "convertedToNote": "Перетворено на нотатку",
       "versionHistory": "Історія версій",
-      "exportMarkdown": "Експортувати як Markdown…",
-      "exportPdf": "Експортувати як PDF…",
-      "exportHtml": "Експортувати як HTML…",
-      "exportTxt": "Експортувати як простий текст…",
       "trash": "Перемістити в кошик"
     },
     "codeBlock": {
@@ -2194,10 +2190,6 @@
       "duplicate": "Дублювати",
       "editFilterTitle": "Редагувати фільтр",
       "emptyState": "Поки немає нотаток.",
-      "exportHtml": "Експортувати як HTML…",
-      "exportMarkdown": "Експортувати як Markdown…",
-      "exportPdf": "Експортувати як PDF…",
-      "exportTxt": "Експортувати як простий текст…",
       "favoritesHeading": "Обране",
       "icon": "Піктограма…",
       "mergeAnyway": "Усе одно об’єднати",
