@@ -57,6 +57,94 @@
 - **Load-bearing banner copy is asserted by FULL-LITERAL equality** via
   `src/lib/load-bearing-copy.ts` (or `ioBanner(...)` where production renders
   that mapping). A copy collapse must fail a test.
+- **A frontend-only change needs the crate to relink, or the binary keeps
+  ANOTHER TREE's bundle.** The frontend is embedded at compile time, so a diff
+  confined to `src/`, `editor/` or any other frontend tree touches no Rust source,
+  cargo relinks nothing, and `target/release/myne-desktop` keeps whatever
+  `dist/` it embedded when it was last compiled. It was found in its cross-tree
+  form, back when the cargo target volume was shared, so the stale bundle could be
+  a **different worktree's** frontend. It happened on myne-md/myne#520: `pnpm build` emitted a correct `dist/`, the
+  build reported success, and the app under test loaded
+  `main-CoKDUqv9.js` out of `.claude/worktrees/554-…/dist`, whose host still
+  dispatched the pre-fix event, so a correct fix's own scenario failed and read
+  as "the fix does not work". The three `e2e-*.sh` build scripts now
+  `touch src-tauri/src/lib.rs` before `pnpm tauri build`; **`e2e-one.sh` does
+  not build at all**, so after a frontend edit it is testing the previous
+  binary, which is the same trap wearing a different hat. When a scenario
+  contradicts a fix you have read in the source, check WHICH bundle the WebView
+  loaded before you believe it: `[...document.querySelectorAll('script[src]')]`
+  from the page seat gives the hashed filename, and `find . -name '<that>'`
+  says which tree it came from.
+- **The cargo target volume is PER TREE, and it has to be.** Every tree is
+  bind-mounted at the same in-container path, `/work`, so two checkouts of this
+  repo are indistinguishable to cargo: same package, same version, same absolute
+  source path. One shared volume therefore lets a build here reuse an rlib
+  compiled from ANOTHER tree, and worktrees live under `.claude/worktrees/` by
+  convention, so they sit inside the mount and this is the normal case rather
+  than an exotic one. `scripts/lib/e2e-docker.sh` keys the volume on `pwd` and is
+  sourced by every script that runs this repo in the container (eight of them as
+  of myne-md/myne#596, which added `e2e-ai-cargotest.sh`; the count is deliberately
+  not written as a number a new runner would falsify). The cost is one
+  full rebuild per tree, once, which is exactly what the sharing was buying at the
+  price of results that describe a different tree.
+
+  **The registry cache had the mirror-image defect, and it was six copies.** Every
+  runner sets `CARGO_HOME=/home/e2e/.cargo`, so that is the only registry path
+  cargo reads or writes, and six of the seven mounted the named volume at the
+  image's `/usr/local/cargo/registry` instead. That volume held 574 MB of crate
+  sources no run had consulted since the override was added, and
+  `/home/e2e/.cargo` does not exist in the image at all, so every containerised
+  run re-downloaded the crates.io index and every crate and then threw the result
+  away with `--rm`. Nothing reports it: the run is green, only slow, which is
+  exactly why it survived. `e2e-ai-buildrun.sh` found it, fixed itself, and wrote
+  down that its siblings were still wrong; the mount is now in the include with
+  the rest.
+
+  **The key lives in one file because four copies of it was already the bug twice.**
+  It has to be byte identical everywhere, since two scripts that hash the same tree
+  differently get two volumes and the second rebuilds from scratch while looking
+  like a cache. The copies also missed three call sites entirely
+  (`e2e-batch.sh`, `capture-theme-preview.sh`, `capture-userguide.sh` kept the
+  shared volume), and in a fourth (`e2e-local.sh`) the assignment landed INSIDE the
+  `RUN_FLAGS=( … )` array literal, where bash reads it as an element rather than an
+  assignment: the subshell ran, nothing was assigned, and `set -u` aborted the
+  script on the next line. Neither `bash -n` nor any guard sees either shape.
+- **The symptom is a compile error in code you did not touch.** A build refused
+  with `run_probe` taking 2 arguments while
+  `core/src/plugins/agent/probe.rs` plainly declared 3, and `ProbeProgress`
+  unresolved while the struct was right there. Neither file was in the diff. The
+  discriminator is two commands: `cargo check -p myne-desktop` on the host, and
+  the same inside
+  `docker run -v "$(pwd):/work" -v "$E2E_TARGET_VOLUME":/work/target` (source
+  `scripts/lib/e2e-docker.sh` first, or pass the shared name to reproduce the
+  original failure).
+  Host green plus container red is the volume, and the container run itself
+  clears it by recompiling the crate. Read the file through the container before
+  suspecting the mount (`docker run --rm -v "$(pwd):/work" -w /work myne-e2e
+  grep -n '<symbol>' <path>`); if the container sees the right source and cargo
+  still disagrees, the artifact is what is wrong, not the tree.
+- **A captured element handle cannot be re-found, so a click on one can only time
+  out.** `Element.click` retries while WebKit reports the node is in the DOM but
+  not hit-testable, which is the case it exists for. It cannot answer a node that
+  has been REPLACED: the handle is stale on every poll, and the failure reads
+  `waitUntil(element interactable + clicked) timed out … [stale element
+  reference]`, which looks like a slow app and is not. The sidebar list
+  re-renders on a save settling, on a sync tick and on the row's own selection,
+  so the window between `await noteRow(...)` and `.click()` is real. Measured on
+  `nco3`: one failure in eight runs after two retries, then three consecutive
+  passes with no change. Drive a row with `clickNoteRow`, which re-finds inside
+  the poll, the shape `clickByTestId` already uses for a bare testid.
+- **`e2e-one.sh` can report a red that `e2e-buildrun.sh` does not, on the same
+  tree and the same volume.** Measured on myne-md/myne#461's branch: `ws1` in
+  `workspace-state.e2e.ts` passed in 3.6 s under `e2e-buildrun.sh` and then hung
+  to the 180 s test timeout under `e2e-one.sh`, twice, with no source change
+  between them and with `e2e/fixture-gen` already compiled (measured at 4.3 s, so
+  the cold-cargo explanation in the toolchain guard is not this one). The
+  mechanism is NOT established, so this says only what was observed. The rule
+  that follows is: **a red from `e2e-one.sh` is a reason to re-run under
+  `e2e-buildrun.sh`, never a result on its own.** `e2e-one.sh` is for iterating
+  while you already believe the code is wrong; the build-and-run script is what
+  produces an answer worth writing into a PR.
 - **KDF policy:** weak-KDF generator fixtures by default (legal: unlock reads
   params from `vault.meta`; creation stays pinned, with no code branch). The VR-1
   recovery drill and the creation scenarios run PRODUCTION params on every run of
@@ -118,14 +206,17 @@
   keystroke, so asserting straight after `sendKeys` is both correct and
   instant. Follow it with a positive probe (send a key, assert it took effect)
   so the absence cannot pass merely because input stopped arriving.
-- **The `myne-e2e-target` Docker volume is shared across git worktrees.** A run
-  can fail to BUILD against a stale crate compiled from another branch — the
-  giveaway is a compile error naming a field that exists in neither your source
-  nor `develop` (observed: `PrefsView has no field named editor_vim_mode`, with
-  the note listing `attachment_ocr_enabled`, a field belonging to a different
-  feature branch). Fix: `docker volume rm myne-e2e-target`, then a full rebuild
-  (`--skip-build` is not enough). Same class as the shared-`CARGO_TARGET_DIR`
-  collision, one layer down.
+- **The `myne-e2e-target` Docker volume USED to be shared across git worktrees,
+  and the volume is still on disk.** A run could fail to BUILD against a stale
+  crate compiled from another branch, the giveaway being a compile error naming a
+  field that exists in neither your source nor `develop` (observed:
+  `PrefsView has no field named editor_vim_mode`, with the note listing
+  `attachment_ocr_enabled`, a field belonging to a different feature branch). The
+  per-tree keying above closed the class; this entry stays because a machine that
+  ran the suite before it still has the shared volume, and because the same
+  reasoning applies to any other volume shared across trees. Fix, then and now:
+  `docker volume rm myne-e2e-target`, then a full rebuild (`--skip-build` is not
+  enough). Same class as the shared-`CARGO_TARGET_DIR` collision, one layer down.
 - **`e2e-one.sh` re-provisions the pinned Rust toolchain per run, which flakes the boot.**
   Each `e2e-one.sh` invocation spawns a fresh `--rm` container whose `RUSTUP_HOME`
   is not a persisted volume, so `rust-toolchain.toml`'s pinned toolchain re-downloads

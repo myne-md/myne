@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Notathandlinger",
+      "convertFailed": "Kunne ikke endre hva dette notatet er, så det er uendret.",
       "rename": "Endre navn",
       "move": "Flytt til mappe…",
       "duplicate": "Dupliser",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Et mappenavn kan ikke inneholde / \\ | # ^ [ ] eller starte/slutte med et mellomrom.",
       "tooLong": "Den mappebanen er for lang.",
       "moveIntoSelf": "En mappe kan ikke flyttes inn i seg selv.",
-      "moveCollision": "Det finnes allerede en mappe med det navnet der."
+      "moveCollision": "Det finnes allerede en mappe med det navnet der.",
+      "unsettledSave": "Et åpent notat er ikke ferdig lagret, så mappen ble ikke rørt. Prøv igjen når det er ferdig.",
+      "renameFailed": "Kunne ikke endre navn på mappen, så den er uendret.",
+      "deliberateWriteFailed": "Mappen fikk nytt navn, men en av innstillingene kunne ikke lagres. En tom mappe dukker opp igjen under det gamle navnet hver gang du låser opp; det er trygt å slette den, og ingenting annet endres. Å gi mappen nytt navn igjen fjerner den ikke."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Legg til i favoritter",
       "archive": "Arkiver",
       "archiveBulkError": "Kunne ikke arkivere notatene.",
+      "renameFailed": "Kunne ikke lagre det navnet, så notatet beholdt det gamle.",
       "archiveFolder": "Arkiver mappe",
       "archiveNote": "Arkiver",
       "archiveSingleError": "Kunne ikke arkivere notatet.",
@@ -2260,6 +2265,7 @@
       "thisNote": "dette notatet",
       "untitled": "Uten tittel"
     },
+    "unsettledSave": "Et åpent notat er ikke ferdig lagret, så ingenting ble endret. Prøv igjen når det er ferdig.",
     "views": {
       "cards": {
         "changeCover": "Endre omslag",
@@ -3878,10 +3884,13 @@
       "copied": "Kopiert",
       "copy": "Kopier",
       "copyFailed": "Kunne ikke kopiere. Bruk «Lagre som fil» i stedet.",
+      "downloadStarted": "Sendt til nedlastingene i nettleseren din. Sjekk at den kom fram: nettleseren bestemmer hvor filen havner, og Myne kan ikke se om den kom fram.",
       "eyebrow": "Steg 4 av 4: kontonummer",
       "heading": "Lagre kontonummeret ditt.",
       "intro": "Dette er ihendehaver-tokenet ditt. Behandle det som kontanter.",
       "saveAsFile": "Lagre som fil",
+      "saveFailed": "Kunne ikke lagre filen. Kopier nummeret i stedet, eller skriv det ned.",
+      "savedToFile": "Lagret. Det er en fil med ren tekst, så oppbevar den et sted der bare du kan lese den.",
       "shownOnceBody": "Lagre det nå. Myne kan ikke gjenopprette det for deg. Kreves for å registrere deg for synkronisering senere.",
       "shownOnceEmphasis": "Dette vises bare én gang."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Kopier",
       "extensionNotice": "Nettleserutvidelser med tilgang til dette nettstedet kan lese det som står på denne siden. Hvis du ikke er sikker på hver eneste utvidelse i denne profilen, bruk skrivebordsappen eller en ren nettleserprofil til dette trinnet.",
       "copyFailed": "Kunne ikke kopiere. Bruk «Lagre som fil» i stedet.",
+      "downloadStarted": "Sendt til nedlastingene i nettleseren din. Sjekk at den kom fram: nettleseren bestemmer hvor filen havner, og Myne kan ikke se om den kom fram.",
       "eyebrow": "Steg 2 av 4: gjenopprettingsfrase",
       "heading": "Skriv ned disse 24 ordene.",
       "intro": "Denne frasen, sammen med passordet ditt, er den eneste måten å gjenopprette hvelvet ditt på. Oppbevar den utenfor nettet: papir, passordbehandler, maskinvarelommebok. Behandle den som kontanter.",
       "reveal": "Vis frase",
-      "saveAsFile": "Lagre som fil"
+      "saveAsFile": "Lagre som fil",
+      "saveFailed": "Kunne ikke lagre filen. Kopier ordene i stedet, eller skriv dem ned.",
+      "savedToFile": "Lagret. Det er en fil med ren tekst, så oppbevar den et sted der bare du kan lese den."
     },
     "ready": {
       "backedUp": "Sikkerhetskopiert ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Kopiert. Den blir værende på denne enheten, og systemet forkaster den etter 30 sekunder.",
     "phraseCopyFailed": "Kunne ikke kopiere. Bruk «Lagre til fil» i stedet.",
     "savedToFile": "Lagret til {{label}}",
+    "savedToShareSheet": "Lagret inne i Myne, der systemets filbehandler ikke når den. Det er en fil med ren tekst, så hvis du bruker delingsmenyen til å legge en kopi et sted du kommer til, velg et sted der bare du kan lese den, ikke en skytjeneste. Trykk Lagre igjen hvis du lukket menyen.",
+    "savedFileWritten": "Lagret inne i Myne. Det er en fil med ren tekst, så oppbevar enhver kopi du lager et sted der bare du kan lese den. Denne enheten oppga ikke hvor filen kan nås fra, så regn den som tilgjengelig bare inne i appen til du har sjekket.",
     "saveFileError": "Kunne ikke lagre filen.",
     "stepLabel": "Opprett et hvelv · {{current}} av {{total}}",
     "briefingTitle": "Før vi begynner",

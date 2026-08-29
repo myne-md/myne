@@ -45,6 +45,7 @@ coverage/
 /myne-themes/
 /myne-branding/
 /myne-range/
+/homebrew-tap/
 
 # Vite dep-optimization cache (regenerated each build).
 .vite/

@@ -28,6 +28,7 @@
 
 import { patchFrontmatterField, patchUpdatedField } from "../dialect";
 import { emitAttachmentEmbed } from "./attachmentRef";
+import { flushBeforeFrontmatterWrite } from "./flushBeforeFrontmatterWrite";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
 import { reindexNoteFromBody } from "./vaultIndices";
@@ -45,14 +46,20 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 /**
  * Set the note's cover-image property `propertyKey` to a form-C embed of the
  * given attachment, or delete it when `attachment === null` (remove cover).
- * Reads the note, rewrites the property, bumps `updated:`, re-encrypts, and
- * re-indexes. Rejects with whatever `noteRead` / `noteUpdate` propagate.
+ * Flushes every dirty pane first (see `flushBeforeFrontmatterWrite`), then
+ * reads the note, rewrites the property, bumps `updated:`, re-encrypts, and
+ * re-indexes. Rejects with whatever the flush / `noteRead` / `noteUpdate`
+ * propagate.
  */
 export async function setNoteCover(
   noteId: string,
   propertyKey: string,
   attachment: { id: string; filename: string } | null,
 ): Promise<void> {
+  // Before the read, not after it (myne-md/myne#520). This is read-patch-write
+  // against disk on a note that may be open and dirty in a pane, and the pane's
+  // autosave is a second writer of the same bytes.
+  await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const value =
     attachment === null

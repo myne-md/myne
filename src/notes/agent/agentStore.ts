@@ -20,6 +20,7 @@ import type {
   Proposal,
   ProposedEdit,
 } from "../../lib/agent-run";
+import { hasRefusals } from "../../lib/agent-run";
 
 /** The whole of what a screen needs to render a run. */
 export interface AgentState {
@@ -57,6 +58,23 @@ export interface AgentState {
   appliedEdits: ReadonlySet<number>;
   /** The result of the last apply, or null. */
   applied: AgentApplyResult | null;
+  /** How many applies this session has settled. Monotonic, and it SURVIVES
+   *  `clearAgent` (myne-md/myne#596).
+   *
+   *  **The one thing that still moves when a run is applied and dropped in the
+   *  same write.** `UndoLastRun` re-reads the host's undo record whenever an
+   *  apply lands, and it used to key that on `applied?.applied`. Since a clean,
+   *  complete apply now settles and calls `clearAgent` inside one
+   *  {@link settleApply} call, React's store subscription only ever sees the
+   *  final state: `applied` is back to null and the count reads 0 to 0, so the
+   *  effect never fired, `agentLastRun()` was never called, and the undo strip
+   *  did not appear at all. Caught by `agent-run.e2e.ts` ag1 and ag4, which is
+   *  what running that suite is for.
+   *
+   *  It is also strictly better than the count it replaces, which could not
+   *  tell "no apply yet" from "an apply that landed nothing because every edit
+   *  was refused": both read 0. */
+  applySeq: number;
   /** Whether a finished run applies itself (myne-md/myne#551).
    *
    *  **Session-scoped on purpose, and reset on lock and on vault switch.** A
@@ -121,6 +139,7 @@ const INITIAL: AgentState = {
   rejectedNewNotes: new Set(),
   appliedEdits: new Set(),
   applied: null,
+  applySeq: 0,
   autoApply: false,
   probeVerdict: null,
   autoApplying: false,
@@ -355,6 +374,87 @@ export function keptEdits(s: AgentState = state): ProposedEdit[] {
   );
 }
 
+/** Whether the applies so far left nothing to read and nothing to do
+ *  (myne-md/myne#596).
+ *
+ *  The predicate the review dialog closes itself on. Two halves, and both are
+ *  required, because each alone closes over something the user needed.
+ *
+ *  **Clean**: no refusal, of either kind. A refused edit is precisely what the
+ *  review screen exists to show. `anchorNotFound` and `anchorAmbiguous` mean a
+ *  change the user approved did NOT land, so a rule that closed over one would
+ *  be the inverse of the confusion this screen prevents.
+ *
+ *  **Nothing failed**: `error` is null. A whole-call apply failure is strictly
+ *  worse than a per-edit refusal, it is the only signal the user has that a
+ *  write they asked for did not happen, and both surfaces that render it
+ *  (`agentReview.error` and `agentProgress.error`) go with the run.
+ *
+ *  **Complete**: every proposal row is resolved. For edits that is
+ *  {@link keptEdits} being empty, which is the same filter the actionable list
+ *  uses: an edit is resolved when the user rejected it or an apply landed it.
+ *
+ *  A run with no apply yet is not complete, whatever else is true of it. That is
+ *  the `applied === null` arm, and it is what stops an empty proposal or a
+ *  freshly settled run from being read as finished.
+ *
+ *  **A new note holds the review while it still matters**: while one is
+ *  approved and not yet written, and while any note was created. A new note the
+ *  user rejected and nothing created leaves neither a pending write nor an
+ *  unreversible one, so it holds nothing. That is blunter than the edit half,
+ *  which answers per row.
+ *
+ *  Two reasons, and the second is the load-bearing one. The store tracks
+ *  `appliedEdits` but has no `appliedNewNotes`, so a per-row answer is not
+ *  available here: an earlier version compared the approved COUNT against
+ *  `notesCreated.length`, and counts can stay equal while membership diverges
+ *  (reject one, restore another), which closes over a note the user approved
+ *  and nothing wrote. And `agentReview.createdCount` is the only surface in the
+ *  whole client that says the agent created notes: the undo strip counts
+ *  `restorePoints`, which a create has none of. Closing over a create therefore
+ *  destroys the one report of the least reversible thing an agent run does.
+ *
+ *  The honest per-row fix is `created_new_note_indices`, which the host already
+ *  computes in `core/src/plugins/agent/apply.rs` and `#[serde(skip)]`s. Bringing
+ *  it across IPC is a change to a shared crate for a case this clause already
+ *  answers safely, so it is not done here and the narrowing is recorded on
+ *  myne-md/myne#596 rather than left to be inferred from this comment.
+ *
+ *  One more limit, stated because it is a decision: `applied.refused`
+ *  ACCUMULATES across applies, by {@link settleApply}'s own design, so a
+ *  refusal anywhere in a run's history holds the dialog even after the user
+ *  re-applies that row successfully. That is the safe direction, and also the
+ *  one that misses the users with the most rows to work through.
+ *
+ *  A selector, not a writer. Its one caller is {@link settleApply}; the reason
+ *  that is the caller, and not an effect in `AgentReviewTakeover`, is argued
+ *  there. It lives beside {@link landedEditIndices} for the reason that
+ *  function states about its own subtraction: a call site is not testable, and
+ *  each of the five checks below is worth failing by name.
+ *
+ *  All four were verified the way `CLAUDE.md` requires, by deletion rather than
+ *  by a green run, and the refusal check is why that matters. A refused edit is
+ *  not in `appliedEdits`, so it is still in `keptEdits`: the obvious test for a
+ *  refusal therefore answers on the completeness check instead, and the FIRST
+ *  draft of these specs stayed green with the refusal check deleted. They now
+ *  reject the refused row before asserting, which resolves it and leaves the
+ *  refusal as the only thing answering, so deleting that check reddens two of
+ *  them by name (`tests/notes/agentReviewAutoClose.test.ts`). */
+export function applyWasCleanAndComplete(s: AgentState = state): boolean {
+  const applied = s.applied;
+  if (applied === null) return false;
+  // Nothing to review means there is no review to close, so the rule does not
+  // fire and the run is not dropped. Mirrors `AgentReviewTakeover`'s own
+  // `reviewable`, which needs a proposal for the same reason (myne-md/myne#568).
+  if (s.proposal.edits.length === 0 && s.proposal.newNotes.length === 0) {
+    return false;
+  }
+  if (s.error !== null) return false;
+  if (hasRefusals(applied)) return false;
+  if (keptEdits(s).length > 0) return false;
+  return approvedNewNoteIndices(s).length === 0 && applied.notesCreated.length === 0;
+}
+
 /** Which of the SENT edit indices actually landed.
  *
  *  **The subtraction, as a function, because the bug was at the call site and a
@@ -382,7 +482,43 @@ export function landedEditIndices(
  *
  *  `applied` accumulates rather than replaces: a second apply that overwrote the
  *  first would erase the earlier refusals from the screen, which is the one
- *  outcome the user most needs to keep reading. */
+ *  outcome the user most needs to keep reading.
+ *
+ *  **And it DROPS THE RUN when the apply left nothing to decide**
+ *  (myne-md/myne#596). Surprising for a function called `settle`, so it is said
+ *  here rather than left to be discovered: a clean, complete apply ends the
+ *  review, and this write is where that happens.
+ *
+ *  **An APPLY is the only thing that may close the review, and that is the
+ *  whole reason this lives here.** The rule was written as a `useEffect` in
+ *  `AgentReviewTakeover` first, deriving from state the way that file derives
+ *  OPEN, and it reached one state too many. `keptEdits` counts a REJECTED edit
+ *  as resolved, so after any clean apply had left one row outstanding, a single
+ *  click on that row's Reject button satisfied the rule and the effect dropped
+ *  the whole proposal: no confirmation, no undo, and the control the user
+ *  pressed is the one whose other direction is labelled Restore. That is the
+ *  same "stray Escape that throws the model's work away" the takeover's own
+ *  header bans backdrop and Escape dismissal to prevent. Reaching a rejection
+ *  had looked like the derivation's advantage; it was the defect.
+ *
+ *  Three more things follow from being here rather than in a passive effect,
+ *  each of which was a real finding against the effect version:
+ *
+ *   1. **No frame of `ApplyReport`.** `autoApplyRun` calls `settleApply` and
+ *      `endAutoApply` in one synchronous continuation, so React commits them
+ *      together: `applied` set, `autoApplying` already false, and the dialog
+ *      myne-md/myne#551 exists to skip mounts, arms its focus trap and paints
+ *      before a passive effect can tear it down. Measured at one render. The
+ *      drop being part of this write means that commit never exists.
+ *   2. **No epoch bump from a stale read.** `clearAgent` bumps `runEpoch`, and
+ *      an effect acts on a value computed a commit earlier, so a `beginRun`
+ *      landing in that window was wiped by the previous run's teardown. Here
+ *      the guard above has already run.
+ *   3. **No StrictMode double-invoke**, which doubled that bump in dev.
+ *
+ *  Both apply paths pass through this one writer, `AgentReview.apply` and
+ *  `agentToChat.ts::autoApplyRun`, so the rule is still inherited by any future
+ *  path that applies, which is the property the derivation was reaching for. */
 export function settleApply(
   result: AgentApplyResult,
   appliedIndices: number[],
@@ -416,7 +552,12 @@ export function settleApply(
     : result;
   const nextApplied = new Set(state.appliedEdits);
   for (const i of appliedIndices) nextApplied.add(i);
-  set({ applied: merged, appliedEdits: nextApplied });
+  set({ applied: merged, appliedEdits: nextApplied, applySeq: state.applySeq + 1 });
+  // Asked of the state this write just produced, not of `merged` alone: the
+  // rule reads `rejected`, `appliedEdits` and `error` too. Every caller's
+  // remaining work reads locals rather than the store, so the epoch bump
+  // `clearAgent` makes here races nothing.
+  if (applyWasCleanAndComplete()) clearAgent();
   return true;
 }
 
@@ -478,6 +619,13 @@ export function clearAgent(): void {
     // strip papered over it by re-reading the host whenever `applied` changed
     // identity, which is a different event and not always this one.
     undoable: state.undoable,
+    // Kept because it is a SESSION counter, not run state, and because this is
+    // the call site that would break it: a clean, complete apply settles and
+    // clears in one write, so a counter reset here would be back to its old
+    // value by the time React looked, and `UndoLastRun` would never re-read the
+    // host. That is the defect this field was added to fix; resetting it here
+    // would reintroduce it at the one call site that matters.
+    applySeq: state.applySeq,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
     appliedEdits: new Set(),

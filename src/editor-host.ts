@@ -65,7 +65,7 @@ import { CLOSE_ACTIVE_TAB_EVENT } from "./notes/closeActiveTabSignal";
 import {
   OPEN_COVER_PICKER_EVENT,
   REMOVE_COVER_EVENT,
-} from "./notes/openCoverPickerSignal";
+} from "@myne/editor/cover-signal";
 import { infer,
   inferAmbient, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-assistant";
 import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/spell";
@@ -204,15 +204,18 @@ const host: EditorHost = {
   //     same one rename auto-update drives).
   //   - `:q` emits a window event the editor shell listens for; the shell owns
   //     the pane tree and is the only thing that can close a tab correctly.
-  // The cover picker is a React modal the shell mounts, and the shell is also
-  // the only thing that knows which note the focused pane holds — the same two
-  // reasons `closeActiveTab` below is an event rather than a call.
+  // The cover picker is a React modal the shell mounts, the same reason
+  // `closeActiveTab` below is an event rather than a call. The TARGET, though,
+  // now rides along instead of being inferred from focus on the far side
+  // (myne-md/myne#520): the banner knows which note it is drawing, and in a
+  // split that is the only thing that does at the moment the control is pressed.
   cover: {
-    openPicker: (hasCover) =>
+    openPicker: (hasCover, noteId) =>
       window.dispatchEvent(
-        new CustomEvent(OPEN_COVER_PICKER_EVENT, { detail: { hasCover } }),
+        new CustomEvent(OPEN_COVER_PICKER_EVENT, { detail: { hasCover, noteId } }),
       ),
-    remove: () => window.dispatchEvent(new CustomEvent(REMOVE_COVER_EVENT)),
+    remove: (noteId) =>
+      window.dispatchEvent(new CustomEvent(REMOVE_COVER_EVENT, { detail: { noteId } })),
   },
   workspace: {
     flushPendingSaves: () => renameFlushHooks().flushOpenPanes(),

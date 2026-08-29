@@ -480,6 +480,30 @@ kbd {
   page-break-inside: avoid;
 }
 
+/* An authored alignment (issue 518, wikilink.md section 5.1). The rule
+   above is already margin: 12px auto, so CENTRE is what an unaligned image
+   already does; the two other cases override one margin each. Classes rather
+   than an inline margin string, mirroring the editor, so the emitter writes no
+   author-derived text into a style attribute it does not have to.
+
+   The centre rule is written out even though it restates that default, and the
+   redundancy is the point: this file is handed to another program. A PDF
+   renderer or a user stylesheet that changes .att-image's margin would silently
+   un-centre every image the author explicitly centred, and an authored choice
+   is exactly the one that must not depend on a default holding. */
+.att-image.att-align-left {
+  margin-left: 0;
+  margin-right: auto;
+}
+.att-image.att-align-right {
+  margin-left: auto;
+  margin-right: 0;
+}
+.att-image.att-align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* Excluded PDF / non-embeddable attachment: muted italic 11.5px line. */
 .att-excluded,
 .att-placeholder {

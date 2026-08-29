@@ -32,7 +32,7 @@ import { requestVoiceRecording } from "./lib/voice-record-bridge";
 import {
   OPEN_COVER_PICKER_EVENT,
   REMOVE_COVER_EVENT,
-} from "./lib/openCoverPickerSignal";
+} from "@myne/editor/cover-signal";
 
 const host: EditorHost = {
   // Delegate to the shared react-i18next runtime (MYND-485) — replaces the
@@ -121,11 +121,12 @@ const host: EditorHost = {
   // than opening anything. Installing this member is what makes the banner's
   // hover controls and the Add-cover affordance exist at all here.
   cover: {
-    openPicker: (hasCover) =>
+    openPicker: (hasCover, noteId) =>
       window.dispatchEvent(
-        new CustomEvent(OPEN_COVER_PICKER_EVENT, { detail: { hasCover } }),
+        new CustomEvent(OPEN_COVER_PICKER_EVENT, { detail: { hasCover, noteId } }),
       ),
-    remove: () => window.dispatchEvent(new CustomEvent(REMOVE_COVER_EVENT)),
+    remove: (noteId) =>
+      window.dispatchEvent(new CustomEvent(REMOVE_COVER_EVENT, { detail: { noteId } })),
   },
   // PrefsView ⊇ EditorPrefs (identical field types), so this is structurally sound.
   prefsRead: async (): Promise<EditorPrefs> => prefsRead(),

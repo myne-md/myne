@@ -24,18 +24,7 @@ import {
   type ClearStrategy,
   type Feedback,
 } from "../../src/lib/clipboard";
-
-/** A feedback pair whose arms record that they ran. */
-function recordingFeedback(): { feedback: Feedback; ran: string[] } {
-  const ran: string[] = [];
-  return {
-    ran,
-    feedback: {
-      onSuccess: { kind: "toast", run: () => ran.push("success") },
-      onFailure: { kind: "toast", run: () => ran.push("failure") },
-    },
-  };
-}
+import { recordingFeedback } from "./_recordingFeedback";
 
 const SILENT_FAILURE: Feedback = {
   onSuccess: { kind: "inline", run: () => {} },

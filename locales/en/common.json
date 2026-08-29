@@ -1144,6 +1144,7 @@
     },
     "noteActions": {
       "buttonLabel": "Note actions",
+      "convertFailed": "Couldn't change what this note is, so it is unchanged.",
       "rename": "Rename",
       "move": "Move to folder…",
       "duplicate": "Duplicate",
@@ -1790,7 +1791,10 @@
       "illegalSegment": "A folder name can't contain / \\ | # ^ [ ] or start/end with a space.",
       "tooLong": "That folder path is too long.",
       "moveIntoSelf": "A folder can't be moved inside itself.",
-      "moveCollision": "There's already a folder with that name there."
+      "moveCollision": "There's already a folder with that name there.",
+      "unsettledSave": "An open note hasn't finished saving, so the folder was left alone. Try again once it has.",
+      "renameFailed": "Couldn't rename the folder, so it is unchanged.",
+      "deliberateWriteFailed": "The folder was renamed, but one of its settings could not be saved. An empty folder will reappear under the old name each time you unlock; deleting it is safe and changes nothing else. Renaming the folder again will not clear it."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1987,6 +1991,7 @@
       "addToFavorites": "Add to favorites",
       "archive": "Archive",
       "archiveBulkError": "Couldn't archive the notes.",
+      "renameFailed": "Couldn't save that name, so the note kept its old one.",
       "archiveFolder": "Archive folder",
       "archiveNote": "Archive",
       "archiveSingleError": "Couldn't archive the note.",
@@ -2244,6 +2249,7 @@
       "thisNote": "this note",
       "untitled": "Untitled"
     },
+    "unsettledSave": "An open note hasn't finished saving, so nothing was changed. Try again once it has.",
     "views": {
       "cards": {
         "changeCover": "Change cover",
@@ -3043,7 +3049,7 @@
       "hideVaultNamesHelper": "On a device with a usable keychain the vault picker shows a vault's name once this device has unlocked it. With this on every vault shows a placeholder such as Vault 2 instead, and that number stays with the vault however the list reorders.",
       "hideVaultNamesErases": "Turning it on destroys the keys that make the names stored here readable, so those names cannot be recovered on this device, and no further name is written while it stays on.",
       "hideVaultNamesResidue": "It cannot reach a copy taken earlier: a full-system backup, a disk image, or any other system-level copy of this disk made while names were showing carries both the stored names and their keys.",
-      "hideVaultNamesUnavailable": "This device has no usable keychain, so Myne stores no vault name here and this option cannot be turned on. The picker already shows a placeholder for every vault.",
+      "hideVaultNamesUnavailable": "Myne can't store vault names in this copy of the app, so it stores none here and this option cannot be turned on. The picker already shows a placeholder for every vault.",
       "hideVaultNamesErrorRead": "Couldn't read the current setting. Flip the switch to set it again.",
       "hideVaultNamesErrorSave": "Couldn't save the setting, so it is unchanged. If you were turning it on, some stored names may already have been destroyed; turn it on again to finish.",
       "hideVaultNamesErrorErase": "One stored name couldn't be destroyed, so the setting was left off rather than claiming an erase that did not happen. Try again.",
@@ -3847,10 +3853,13 @@
       "copied": "Copied",
       "copy": "Copy",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
+      "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
       "eyebrow": "Step 4 of 4: account number",
       "heading": "Save your account number.",
       "intro": "This is your bearer token. Treat it like cash.",
       "saveAsFile": "Save as file",
+      "saveFailed": "Couldn't save the file. Copy the number instead, or write it down.",
+      "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read.",
       "shownOnceBody": "Save it now. Myne cannot recover it for you. Required to register for sync later.",
       "shownOnceEmphasis": "This is shown only once."
     },
@@ -4004,11 +4013,14 @@
       "copy": "Copy",
       "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
+      "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
       "eyebrow": "Step 2 of 4: recovery phrase",
       "heading": "Write down these 24 words.",
       "intro": "This phrase, together with your password, is the only way to recover your vault. Store it offline: paper, password manager, hardware wallet. Treat it like cash.",
       "reveal": "Reveal phrase",
-      "saveAsFile": "Save as file"
+      "saveAsFile": "Save as file",
+      "saveFailed": "Couldn't save the file. Copy the words instead, or write them down.",
+      "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read."
     },
     "ready": {
       "backedUp": "Backed up ✓",
@@ -4246,6 +4258,8 @@
     "phraseCopied": "Copied. It stays on this device, and the system drops it after 30 seconds.",
     "phraseCopyFailed": "Couldn't copy. Use \"Save to file\" instead.",
     "savedToFile": "Saved to {{label}}",
+    "savedToShareSheet": "Saved inside Myne, where the system file browser cannot reach it. It is a plain text file, so if you use the share sheet to put a copy somewhere you can reach, choose somewhere only you can read rather than a cloud drive. Tap Save again if you closed the sheet.",
+    "savedFileWritten": "Saved inside Myne. It is a plain text file, so keep any copy you make somewhere only you can read. This device did not report where the file can be reached from, so treat it as reachable only from inside the app until you have checked.",
     "saveFileError": "Couldn't save the file.",
     "stepLabel": "Create a vault · {{current}} of {{total}}",
     "briefingTitle": "Before we begin",

@@ -1155,6 +1155,7 @@
     },
     "noteActions": {
       "buttonLabel": "Muistiinpanon toiminnot",
+      "convertFailed": "Tämän muistiinpanon tyypin muuttaminen ei onnistunut, joten se pysyi ennallaan.",
       "rename": "Nimeä uudelleen",
       "move": "Siirrä kansioon…",
       "duplicate": "Kahdenna",
@@ -1803,7 +1804,10 @@
       "illegalSegment": "Kansion nimi ei voi sisältää merkkejä / \\ | # ^ [ ] eikä alkaa tai päättyä välilyöntiin.",
       "tooLong": "Tuo kansiopolku on liian pitkä.",
       "moveIntoSelf": "Kansiota ei voi siirtää itsensä sisään.",
-      "moveCollision": "Siellä on jo samanniminen kansio."
+      "moveCollision": "Siellä on jo samanniminen kansio.",
+      "unsettledSave": "Avoinna oleva muistiinpano ei ole vielä tallentunut loppuun, joten kansio jätettiin ennalleen. Yritä uudelleen, kun tallennus on valmis.",
+      "renameFailed": "Kansion uudelleennimeäminen ei onnistunut, joten se pysyi ennallaan.",
+      "deliberateWriteFailed": "Kansio nimettiin uudelleen, mutta yhtä sen asetuksista ei voitu tallentaa. Tyhjä kansio ilmestyy vanhalla nimellä uudelleen aina, kun avaat holvin; sen voi poistaa turvallisesti, eikä poistaminen muuta mitään muuta. Kansion uudelleennimeäminen ei poista sitä."
     },
     "folderNote": {
       "defaultTitle": "Hakemisto"
@@ -2001,6 +2005,7 @@
       "addToFavorites": "Lisää suosikkeihin",
       "archive": "Arkistoi",
       "archiveBulkError": "Muistiinpanojen arkistointi ei onnistunut.",
+      "renameFailed": "Tuon nimen tallentaminen ei onnistunut, joten muistiinpano säilytti vanhan nimensä.",
       "archiveFolder": "Arkistoi kansio",
       "archiveNote": "Arkistoi",
       "archiveSingleError": "Muistiinpanon arkistointi ei onnistunut.",
@@ -2260,6 +2265,7 @@
       "thisNote": "tämä muistiinpano",
       "untitled": "Nimetön"
     },
+    "unsettledSave": "Avoinna oleva muistiinpano ei ole vielä tallentunut loppuun, joten mitään ei muutettu. Yritä uudelleen, kun tallennus on valmis.",
     "views": {
       "cards": {
         "changeCover": "Vaihda kansikuva",
@@ -3878,10 +3884,13 @@
       "copied": "Kopioitu",
       "copy": "Kopioi",
       "copyFailed": "Kopiointi ei onnistunut. Käytä sen sijaan ”Tallenna tiedostona”.",
+      "downloadStarted": "Lähetetty selaimesi latauksiin. Tarkista, että se saapui perille: selaimesi päättää, minne tiedosto menee, eikä Myne voi nähdä, saapuiko se.",
       "eyebrow": "Vaihe 4/4: tilinumero",
       "heading": "Tallenna tilinumerosi.",
       "intro": "Tämä on haltijatunnuksesi. Kohtele sitä kuin käteistä.",
       "saveAsFile": "Tallenna tiedostona",
+      "saveFailed": "Tiedoston tallentaminen ei onnistunut. Kopioi numero sen sijaan tai kirjoita se ylös.",
+      "savedToFile": "Tallennettu. Se on pelkkä tekstitiedosto, joten säilytä sitä paikassa, jonka vain sinä voit lukea.",
       "shownOnceBody": "Tallenna se nyt. Myne ei voi palauttaa sitä puolestasi. Vaaditaan myöhempää synkronoinnin rekisteröintiä varten.",
       "shownOnceEmphasis": "Tämä näytetään vain kerran."
     },
@@ -4035,11 +4044,14 @@
       "copy": "Kopioi",
       "extensionNotice": "Selainlaajennukset, joilla on pääsy tähän sivustoon, voivat lukea tämän sivun sisällön. Jos et ole varma jokaisesta tämän profiilin laajennuksesta, käytä tähän vaiheeseen työpöytäsovellusta tai puhdasta selainprofiilia.",
       "copyFailed": "Kopiointi ei onnistunut. Käytä sen sijaan ”Tallenna tiedostona”.",
+      "downloadStarted": "Lähetetty selaimesi latauksiin. Tarkista, että se saapui perille: selaimesi päättää, minne tiedosto menee, eikä Myne voi nähdä, saapuiko se.",
       "eyebrow": "Vaihe 2/4: palautuslause",
       "heading": "Kirjoita nämä 24 sanaa ylös.",
       "intro": "Tämä lause yhdessä salasanasi kanssa on ainoa tapa palauttaa holvisi. Säilytä se verkon ulkopuolella: paperilla, salasanojen hallintaohjelmassa, laitelompakossa. Kohtele sitä kuin käteistä.",
       "reveal": "Näytä lause",
-      "saveAsFile": "Tallenna tiedostona"
+      "saveAsFile": "Tallenna tiedostona",
+      "saveFailed": "Tiedoston tallentaminen ei onnistunut. Kopioi sanat sen sijaan tai kirjoita ne ylös.",
+      "savedToFile": "Tallennettu. Se on pelkkä tekstitiedosto, joten säilytä sitä paikassa, jonka vain sinä voit lukea."
     },
     "ready": {
       "backedUp": "Varmuuskopioitu ✓",
@@ -4277,6 +4289,8 @@
     "phraseCopied": "Kopioitu. Se pysyy tällä laitteella, ja järjestelmä poistaa sen 30 sekunnin kuluttua.",
     "phraseCopyFailed": "Kopiointi ei onnistunut. Käytä sen sijaan ”Tallenna tiedostoon”.",
     "savedToFile": "Tallennettu kohteeseen {{label}}",
+    "savedToShareSheet": "Tallennettu Mynen sisään, jonne järjestelmän tiedostoselain ei ylety. Se on pelkkä tekstitiedosto, joten jos viet kopion jakovalikon kautta paikkaan, johon itse pääset käsiksi, valitse paikka, jonka vain sinä voit lukea, pilvipalvelun sijaan. Napauta Tallenna uudelleen, jos suljit valikon.",
+    "savedFileWritten": "Tallennettu Mynen sisään. Se on pelkkä tekstitiedosto, joten säilytä jokainen tekemäsi kopio paikassa, jonka vain sinä voit lukea. Tämä laite ei kertonut, mistä tiedostoon pääsee käsiksi, joten oleta, että siihen pääsee vain sovelluksen sisältä, kunnes olet tarkistanut asian.",
     "saveFileError": "Tiedoston tallentaminen epäonnistui.",
     "stepLabel": "Luo holvi · {{current}}/{{total}}",
     "briefingTitle": "Ennen kuin aloitamme",

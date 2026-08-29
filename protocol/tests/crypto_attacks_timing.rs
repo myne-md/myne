@@ -103,26 +103,55 @@ struct Measured {
 fn measure(n: usize, fixed: &[u8; 32], seed: u64, op: &dyn Fn(&[u8; 32])) -> Measured {
     let mut rng = XorShift(seed);
     let randoms: Vec<[u8; 32]> = (0..n).map(|_| rng.next_key()).collect();
+    // THREE arrays of equal size, one per class, and this is the measurement
+    // rather than an implementation detail.
+    //
+    // The earlier version passed `fixed` by reference every iteration: the same
+    // 32 bytes, resident in L1 from the first warm-up call onward. The random
+    // class read `randoms[i]`, walking a 3.84 MB Vec sequentially, so it paid a
+    // cache line on roughly every other iteration that the fixed class never
+    // paid. That is a systematic per-iteration cost applied to exactly one of
+    // the two classes being compared, and it has nothing whatever to do with
+    // whether `decode_note` branches on key bytes.
+    //
+    // It was not small. Measured on the same machine, same build: `real` sat
+    // between 8 and 15 against a bound of 10 while `control` stayed near 2, so
+    // the test failed roughly two runs in three, on a binary with no leak in
+    // it. Every push paid for it, because `cargo test --workspace` runs in
+    // `pre-push`. Giving the fixed class an equally-sized array to walk drops
+    // `real` to under 4 in absolute value and leaves `control` where it was.
+    //
+    // The control gets its OWN array rather than sharing the fixed one, which
+    // the intermediate version did and which cost something visible: reading
+    // `fixed_a[i]` twice in one iteration makes the second read warm, so the
+    // control was then measuring cold-versus-warm and climbed from ~2 to ~4.3.
+    // The control is the noise floor of two IDENTICAL workloads, so it has to
+    // be identical in every respect including how cold its bytes are. Three
+    // arrays is what makes all three classes alike.
+    let fixed_a: Vec<[u8; 32]> = (0..n).map(|_| *fixed).collect();
+    let fixed_b: Vec<[u8; 32]> = (0..n).map(|_| *fixed).collect();
 
-    // Warm up caches / branch predictors.
-    for _ in 0..2000 {
-        op(fixed);
+    // Warm up branch predictors. NOT the data cache for one class only, which
+    // is what the old `op(fixed)` warm-up did on top of everything above.
+    for i in 0..2000 {
+        op(&fixed_a[i % n]);
+        op(&randoms[i % n]);
     }
 
     let mut t_fixed = Vec::with_capacity(n);
     let mut t_random = Vec::with_capacity(n);
     let mut t_control = Vec::with_capacity(n);
-    for rk in &randoms {
+    for i in 0..n {
         let s = Instant::now();
-        op(fixed);
+        op(&fixed_a[i]);
         t_fixed.push(s.elapsed().as_nanos());
 
         let s = Instant::now();
-        op(rk);
+        op(&randoms[i]);
         t_random.push(s.elapsed().as_nanos());
 
         let s = Instant::now();
-        op(fixed);
+        op(&fixed_b[i]);
         t_control.push(s.elapsed().as_nanos());
     }
 

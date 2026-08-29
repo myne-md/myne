@@ -102,7 +102,7 @@ interface EditorViewStub {
 
 /** Build the audio widget DOM against `view`, opening the ⋮ menu. */
 function build(view: EditorViewStub): HTMLElement {
-  const dom = new AttachmentAudioWidget(ID, "Voice note 1.wav").toDOM(view as never);
+  const dom = new AttachmentAudioWidget(ID, "Voice note 1.wav", []).toDOM(view as never);
   document.body.appendChild(dom);
   return dom;
 }

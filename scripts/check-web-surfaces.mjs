@@ -361,6 +361,14 @@ const V = {
 
   // ── src/hooks ───────────────────────────────────────────────────────────
   "src/hooks/useAccountStatus.ts": ["ported", "Sync account status; degrades to null on an older server."],
+  "src/hooks/useScrollEdges.ts": [
+    "ported",
+    "Pure DOM geometry (scrollTop/clientHeight/scrollHeight) behind a ResizeObserver and a "
+      + "MutationObserver, both feature-detected because a host may lack them. No host call, no "
+      + "seam import, no capability. Its four consumers all ship on web: CenteredCard, "
+      + "VaultPicker, step-shell and PhraseEntryStep, which is a pre-unlock screen, so the "
+      + "absence half of this guard covers it there.",
+  ],
   "src/hooks/useHeadFingerprintCompare.ts": [
     "ported",
     "The SYNC-40 eye-compare poll + its push hold (myne#462). More load-bearing here than on desktop: per `decisions.md` 2026-07-26 a web client re-runs this compare on EVERY re-bootstrap, because OPFS is evictable.",

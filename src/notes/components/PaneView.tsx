@@ -39,6 +39,7 @@ import { createNote } from "../createNote";
 import { createDrawing } from "../createDrawing";
 import { nextDrawingTitle } from "../drawingEmbedTitle";
 import { useSelectedNote, type NoteId } from "../sidebarState";
+import { settleFrontmatterWrite } from "../settleFrontmatterWrite";
 import { useLiveResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
 import { useVaultHeadings } from "../useVaultHeadings";
@@ -73,6 +74,8 @@ import { setNoteCover } from "../setNoteCover";
 import { upsertSavedView } from "../../lib/prefs";
 import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
+import { Toast } from "../../components/Toast";
+import { panesNotSettledMessage } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -929,10 +932,43 @@ export function PaneView({
   // lock / close / quit.
   const { registerFlush, unregisterFlush } = ws;
   const flushIfDirty = autosave.flushIfDirty;
+  const lastSaveFailed = autosave.lastSaveFailed;
+  // Answer whether the pane SETTLED, not merely whether the flush returned.
+  // `fireSave` swallows its own rejection into `saveStatus`, so a failed
+  // `note_update` resolves this flush exactly like a successful one.
+  //
+  // `lastSaveFailed`, NOT `hasPendingWork`, and the difference cost three E2E
+  // scenarios before it shipped. `hasPendingWork` is a "do not clobber me" flag:
+  // it answers true whenever the live body differs from what the hook believes
+  // is on disk, which is the ORDINARY state right after a save whose buffer
+  // moved on, and for a clean pane `flushIfDirty` returns without saving at all.
+  // Reporting that as "did not settle" made `flushAll` reject after a perfectly
+  // normal save, so the cover write behind it was refused and the user got a
+  // write-failed toast. What a caller about to read-patch-write this note needs
+  // to know is only whether the flush it just awaited actually persisted.
+  // `saveInFlight` is the THIRD thing this has to ask, and leaving it out was a
+  // silent hole rather than a simplification. `flushIfDirty` awaits two levels
+  // on its in-flight branch because a hand-off re-registers `inFlightRef`; its
+  // `await fireSave()` branch does not re-check at all, and on a hand-off
+  // `fireSave` resolves EARLY (it nulls `inFlightRef`, marks `handedOff`, fires
+  // the follow-up and returns). The follow-up's first statement clears the
+  // failure flag, so `lastSaveFailed()` reads clean for a save that has not
+  // landed, and this reported SETTLED. What that costs is the whole reason the
+  // flush exists: the caller reads the pre-typing disk bytes, patches its
+  // field, writes, and the in-flight follow-up lands on top and reverts it.
+  // With the section 11.3 hash on it is worse, because the follow-up declares
+  // the first save's body as its expected base while disk now holds the
+  // caller's, so it is refused `BaseMismatch` and mints a keep-both conflict
+  // copy for a note no remote writer ever touched.
+  const saveInFlight = autosave.saveInFlight;
+  const flushAndReport = useCallback(async () => {
+    await flushIfDirty();
+    return !lastSaveFailed() && !saveInFlight();
+  }, [flushIfDirty, lastSaveFailed, saveInFlight]);
   useEffect(() => {
-    registerFlush(leaf.id, flushIfDirty);
+    registerFlush(leaf.id, flushAndReport);
     return () => unregisterFlush(leaf.id);
-  }, [leaf.id, flushIfDirty, registerFlush, unregisterFlush]);
+  }, [leaf.id, flushAndReport, registerFlush, unregisterFlush]);
 
   // Surgical sidebar refresh after a successful save (title/H1 edits
   // propagate to the row label). Tracks the `saved.at` identity.
@@ -1218,6 +1254,13 @@ export function PaneView({
         <div style={{ minWidth: 0, flex: companionVisible ? 1 : undefined }}>
           <CMEditor
             value={content}
+            // myne-md/myne#520: which note this pane is holding. The cover
+            // banner's controls name their target with it instead of leaving
+            // the shell to infer one from focus, which was wrong the moment
+            // the banner pressed was in a pane that is not the focused one.
+            // Pushed live rather than keyed, because this view is long-lived
+            // and notes are swapped through it.
+            noteId={activeId}
             // Set only by the autosave `updated:` echo; undefined for every
             // authoritative writer, so those still apply unconditionally.
             valueBase={buffer.base}
@@ -1298,6 +1341,9 @@ export function PaneView({
           >
             <CMEditor
               value={content}
+              // Same note as the primary editor above: the reading mirror draws
+              // its own cover banner, so its controls need the same target.
+              noteId={activeId}
               // Deliberately NO `valueBase`: this mirror holds no local edits,
               // so it must adopt every value unconditionally. Handing it the
               // primary's baseline would make it silently skip `updated:`
@@ -1550,6 +1596,7 @@ function PaneLoading() {
  * is stale) the wrapper holds a calm, quiet body — no spinner churn.
  */
 function ViewHost({ viewId }: { viewId: string }) {
+  const { t } = useTranslation();
   const { def, result } = useViewResult(viewId);
   const ws = useWorkspace();
   const sidebar = useSelectedNote();
@@ -1579,6 +1626,10 @@ function ViewHost({ viewId }: { viewId: string }) {
   // defaulting to `cover` on first use (and recorded onto the view so the cards
   // render reads it back).
   const [coverNoteId, setCoverNoteId] = useState<string | null>(null);
+  // A refused or failed cover write, shown as a toast. Before this the catch
+  // below was bare, so the two rejection classes the fix introduced were
+  // reported nowhere and a refused write looked exactly like a successful one.
+  const [coverError, setCoverError] = useState<string | null>(null);
   const onSetCover = useCallback((noteId: string) => setCoverNoteId(noteId), []);
   const coverPropertyKey = def?.image ?? "cover";
   // Whether the picker's target note already has a resolvable cover (enables the
@@ -1604,17 +1655,53 @@ function ViewHost({ viewId }: { viewId: string }) {
       void (async () => {
         try {
           await setNoteCover(noteId, coverPropertyKey, choice);
+          // Settle FIRST, and the order is the whole point rather than a
+          // preference. It used to sit after `upsertSavedView`, which is a
+          // `vault.prefs` write that can reject, so a failed prefs write took
+          // the settle down with it and landed in the catch below as a cover
+          // failure. That reintroduces exactly what the paragraph beneath says
+          // this call exists to prevent, on the call site it names as the one
+          // most at risk, and it does so while telling the user the cover write
+          // failed when the note write had already succeeded.
+          //
+          // Settle (`src/CLAUDE.md`, "A backend write made OUTSIDE a pane's
+          // autosave loop leaves that pane holding a stale buffer"). This call
+          // site is the one that needs it most and had none: the target is a
+          // note in a VIEW RESULT, so by definition it is not the note this
+          // pane is showing and it is the likeliest of all cover writers to be
+          // open, and dirty, somewhere else. Without the re-read that pane's
+          // buffer still has no `cover:` line and its next keystroke autosaves
+          // the cover away. `setNoteCover`'s flush closed the race; this closes
+          // the staleness, which is the other half. The recipe is called rather
+          // than copied: it used to be a closure in `Editor.tsx` and this site
+          // hand-copied its two lines.
+          await settleFrontmatterWrite(sidebar, noteId as NoteId);
           // First cover on a view with no image property → adopt `cover` as the
           // view's cover property so the card render picks it up.
           if (choice !== null && def !== null && def.image === undefined) {
             await upsertSavedView({ ...def, image: coverPropertyKey });
           }
-        } catch {
-          /* surfaced via backend tracing */
+        } catch (err) {
+          // The two NEW rejection classes are constructed in the WebView and
+          // never reach backend tracing, so the old bare catch reported them
+          // nowhere: `setNoteCover` now opens with `flushBeforeFrontmatterWrite`
+          // (which throws `PanesNotSettledError`) and `settleFrontmatterWrite`
+          // deliberately propagates a failed record refresh. This is the call
+          // site `flushBeforeFrontmatterWrite`'s own header names as most at
+          // risk, and it was the only cover caller with no outcome at all while
+          // the editor screen shows `editor.cover.writeFailed` for the same
+          // failure. A refused cover write was byte-identical to a successful
+          // one here.
+          setCoverError(
+            panesNotSettledMessage(err, {
+              unsettled: t("notes.unsettledSave"),
+              failed: t("editor.cover.writeFailed"),
+            }),
+          );
         }
       })();
     },
-    [coverNoteId, coverPropertyKey, def],
+    [coverNoteId, coverPropertyKey, def, sidebar],
   );
   // The non-mutating card context menu (task 8) — the CLOSED four-item set
   // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy
@@ -1684,6 +1771,7 @@ function ViewHost({ viewId }: { viewId: string }) {
         onPick={(choice) => applyCover(choice)}
         onRemove={() => applyCover(null)}
       />
+      <Toast message={coverError} onDone={() => setCoverError(null)} variant="error" />
     </div>
   );
 }
