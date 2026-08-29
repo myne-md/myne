@@ -20,6 +20,7 @@
 import { useEffect, useRef } from "react";
 import {
   parseLocalInstant,
+  resolveHorizonDays,
   runReminderPass,
   targetReminders,
   type ReminderNotifier,
@@ -63,6 +64,23 @@ export type ReminderSchedulerOptions = {
   enabled: boolean;
   tasks: readonly VaultTask[];
   notifier: ReminderNotifier | null;
+  /**
+   * The user's registration horizon. `null` is the vault that never chose one.
+   *
+   * myne#508: absent until then, so `runReminderPass`'s fourth parameter always
+   * took its default and the pref could not reach the mechanism it names even
+   * once something wrote it.
+   *
+   * **Required, not optional, and that is the fix rather than a style choice.**
+   * An optional field is an opt-in wire: omitting it compiles, the pass silently
+   * falls back to the default, and the preference stops reaching the mechanism
+   * again with nothing reporting it. That is this issue's own defect one layer
+   * up, and it is the shape `CLAUDE.md` records under "A guard parameter with a
+   * default value is an opt-in guard". Required means deleting the line in
+   * `Editor.tsx` is a compile error naming the site, which no test can be
+   * deleted around.
+   */
+  horizonDays: number | null;
   /** Injected in tests; production reads the wall clock here and nowhere else. */
   clock?: () => Date;
   /** Observability hook. A failure is reported, never thrown. */
@@ -78,7 +96,12 @@ export type ReminderSchedulerOptions = {
  * nothing.
  */
 export function useReminderScheduler(options: ReminderSchedulerOptions): void {
-  const { enabled, tasks, notifier, clock: clockOption, onPass } = options;
+  const { enabled, tasks, notifier, horizonDays, clock: clockOption, onPass } = options;
+  // Resolved to a number rather than left as `number | undefined` leaning on a
+  // default parameter two modules away: both call sites below then read the
+  // same value, and the dep array compares a primitive that changes only when
+  // the user's horizon does.
+  const horizon = resolveHorizonDays(horizonDays ?? null);
   // Kept in a ref so the timer closure always sees the current list without
   // being torn down and rebuilt on every keystroke-driven index change.
   const tasksRef = useRef(tasks);
@@ -120,7 +143,7 @@ export function useReminderScheduler(options: ReminderSchedulerOptions): void {
       if (cancelled) return;
       let result: ReminderPassResult;
       try {
-        result = await runReminderPass(tasksRef.current, notifier, clock);
+        result = await runReminderPass(tasksRef.current, notifier, clock, horizon);
       } catch {
         // `runReminderPass` is already total; this is belt-and-braces so a
         // future change there cannot turn an unlock into a crash.
@@ -129,7 +152,15 @@ export function useReminderScheduler(options: ReminderSchedulerOptions): void {
       if (cancelled) return;
       onPassRef.current?.(result);
       // Re-arm to the NEXT instant rather than to a fixed coarse interval.
-      timer = setTimeout(() => void pass(), msUntilNextPass(tasksRef.current, clock()));
+      //
+      // The horizon is threaded for correctness rather than for effect, and no
+      // test can tell the two calls apart: `MAX_SLEEP_MS` is a minute, every
+      // horizon is at least a day, so an instant outside the horizon and an
+      // instant far inside it both clamp to the ceiling, and an instant close
+      // enough to change the answer is inside every horizon by construction.
+      // Passing it anyway is what keeps this call correct if that ceiling ever
+      // rises, and saying so here is better than a test that cannot fail.
+      timer = setTimeout(() => void pass(), msUntilNextPass(tasksRef.current, clock(), horizon));
     };
 
     // The catch-up pass, on mount — i.e. on unlock.
@@ -142,5 +173,12 @@ export function useReminderScheduler(options: ReminderSchedulerOptions): void {
     // `tasks` is intentionally in the dependency list: a newly typed reminder
     // must register immediately rather than at the next tick, and the pass is
     // idempotent so the extra run is free.
-  }, [enabled, notifier, tasks, clock]);
+    //
+    // `horizon` is there for the stronger version of the same reason. Widening
+    // it only delays a registration, but SHORTENING it is the user tightening a
+    // privacy bound over times already sitting in OS-owned plaintext, and those
+    // are cancelled by the pass recomputing its target set. Leaving the change
+    // to the next tick would let a horizon the user just cut to one day keep a
+    // month of instants registered for up to `MAX_SLEEP_MS`.
+  }, [enabled, notifier, tasks, horizon, clock]);
 }

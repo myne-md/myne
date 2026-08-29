@@ -37,8 +37,17 @@ vi.mock("../../src/components/settings/AccountPanel", () => ({
 vi.mock("../../src/components/settings/PrivacyPanel", () => ({
   PrivacyPanel: () => <div data-testid="panel.privacy">privacy</div>,
 }));
+// Records its props rather than ignoring them: the Editor panel is the only one
+// whose `usePrefs` writes have no error surface of their own, so the toast the
+// shell threads into it is the sole signal a failed optimistic write produces
+// (myne#508). Deleting `onShowToast={onShowToast}` at the shell left every
+// suite green before this captured it.
+let editorPanelProps: { onShowToast?: (message: string) => void } | undefined;
 vi.mock("../../src/components/settings/EditorPanel", () => ({
-  EditorPanel: () => <div data-testid="panel.editor">editor</div>,
+  EditorPanel: (props: { onShowToast?: (message: string) => void }) => {
+    editorPanelProps = props;
+    return <div data-testid="panel.editor">editor</div>;
+  },
 }));
 vi.mock("../../src/components/settings/AppearancePanel", () => ({
   AppearancePanel: () => <div data-testid="panel.appearance">appearance</div>,
@@ -79,6 +88,24 @@ function renderModal(over: Partial<Parameters<typeof SettingsModal>[0]> = {}) {
   const utils = render(<SettingsModal {...props} />);
   return { ...utils, props };
 }
+
+describe("SettingsModal panel wiring", () => {
+  it("threads its toast surface into the Editor panel", async () => {
+    // The Editor panel's `usePrefs` writes have no error surface of their own,
+    // so this prop is the only signal a failed optimistic write produces there.
+    // `writeOptimisticPref` keeps the optimistic value when its converging
+    // re-read also fails, which means an unthreaded toast leaves a horizon that
+    // was never persisted on screen as though it were in force (myne#508).
+    const onShowToast = vi.fn();
+    editorPanelProps = undefined;
+    renderModal({ onShowToast });
+    fireEvent.click(screen.getByTestId("settings.tab-editor"));
+    await screen.findByTestId("panel.editor");
+    expect(typeof editorPanelProps?.onShowToast).toBe("function");
+    editorPanelProps?.onShowToast?.("boom");
+    expect(onShowToast).toHaveBeenCalledWith("boom");
+  });
+});
 
 describe("SettingsModal — open gate", () => {
   it("renders nothing when open is false", () => {

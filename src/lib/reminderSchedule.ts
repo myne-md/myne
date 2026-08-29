@@ -32,6 +32,94 @@ export type { VaultTask };
 /** How far ahead reminders are registered with the OS. */
 export const REMINDER_HORIZON_DAYS = 7;
 
+/**
+ * The horizons a user may choose between, shortest first (myne#508).
+ *
+ * Lives here rather than in either settings panel for the reason myne#52
+ * recorded against this exact feature: the two clients derived the horizon's
+ * end date apart and drifted, so the same vault told two devices two different
+ * dates. An option SET is the same hazard one step earlier. A picker offering
+ * 1/7/14/30 on one client and 1/7/30 on the other is a preference whose meaning
+ * depends on which device last wrote it, and because the horizon is
+ * device-local (`prefs_classification.rs`, `PrefClass::DeviceLocal`) nothing
+ * ever reconciles the disagreement.
+ *
+ * **Days, not labels.** An earlier draft paired each day with an i18n key,
+ * which put presentation in a module whose header calls it a pure decision core
+ * and cost five catalog keys in each of 32 locales to say "7d". Both clients
+ * render these through `Intl.NumberFormat`'s `unit` style instead, which is one
+ * line each and cannot drift between them, because the shared implementation is
+ * the platform's rather than ours.
+ *
+ * **Four, not five.** `docs/design/README.md` ("Which picker") puts `Segmented`
+ * at 2-4 options and `Select` at 5-12, so a fifth entry would have forced the
+ * desktop into a dropdown while mobile kept a segmented control: two shapes for
+ * one setting, decided by an option nobody asked for.
+ *
+ * **The default is the CEILING, and every other choice is shorter.** The issue
+ * asked for a way to TIGHTEN this bound, and `threat-model.md` §7 accepts the
+ * reminder leak on four axes of which the first is "the horizon is short (only
+ * reminders within it are ever registered)". A draft of this offered 14 and 30,
+ * which would have quadrupled the window whose shortness is the mitigation, in
+ * a change whose whole purpose was the opposite direction, and would have made
+ * that sentence describe a bound the code no longer enforced. Offering only
+ * shorter horizons keeps §7 true as written. Whether Myne should ever offer a
+ * LONGER one is a threat-model amendment and a decision the owner makes, not
+ * something a bug fix decides on the way past.
+ *
+ * {@link REMINDER_HORIZON_DAYS} is a member, and `reminderSchedule.test.ts`
+ * holds it to that: a default absent from the picker leaves a never-set vault
+ * rendering no selected segment at all.
+ */
+export const REMINDER_HORIZON_CHOICES = [1, 3, 5, 7] as const;
+
+/**
+ * The horizon actually in force: the stored value clamped, or the default.
+ *
+ * **The clamp is the bound, and before myne#508 nothing needed one.**
+ * `runReminderPass`'s `horizonDays: number = REMINDER_HORIZON_DAYS` default
+ * pinned the horizon at seven whatever `vault.prefs` held, because no caller
+ * ever passed one. That default was the only thing enforcing §7's "short
+ * horizon" axis, and threading the preference through removes it. The offered
+ * SET bounds the picker; it does not bound the preference, which
+ * `core/src/plugins/prefs/commands.rs` stores verbatim and deliberately does
+ * not clamp (clamping there would disagree with whatever the settings UI had
+ * shown).
+ *
+ * So the bound lives here, and `horizonEndDate` applies it rather than trusting
+ * its caller to have done so. That matters because every horizon-taking
+ * function below still carries `horizonDays: number = REMINDER_HORIZON_DAYS`,
+ * which is an opt-in bound: a caller passing a raw stored value opts out by
+ * omission, and mobile's pass is documented as the next thing to pass one.
+ * Clamping at the derivation both the date line and the cutoff go through is
+ * what makes it a bound rather than a convention. Two values it has to survive, neither of them hypothetical: a
+ * stored `0`, which `??` passes through unchanged and which would render
+ * "registered through yesterday" while registering nothing at all, and a value
+ * from a future build or a hand-edited blob that is larger than anything this
+ * one offers.
+ *
+ * `null` is not one of them. It is a legitimate persisted state meaning "never
+ * chosen", and it resolves to the default.
+ *
+ * **It clamps into the RANGE, not onto the offered SET.** A stored `4` stays
+ * `4`: the scheduler has to honour the horizon actually in force, and snapping
+ * it onto a neighbouring choice would make the pass register a window the user
+ * never asked for. What that costs is a picker with no segment selected, which
+ * is what both clients show for a value they do not offer, and it is the honest
+ * readout rather than a rounded one. Only a hand-edited blob or a build with a
+ * different choice set can produce one, since the two pickers are the only
+ * writers.
+ */
+export function resolveHorizonDays(stored: number | null): number {
+  // `Number.isFinite` first, because the clamp cannot catch `NaN`:
+  // `Math.max(NaN, 1)` and `Math.min(NaN, 7)` are both `NaN`, and a `NaN`
+  // horizon builds the cutoff string `"NaN-NaN-NaNT23:59"`, which every real
+  // instant sorts BELOW. The bound would then disappear in the widest possible
+  // direction, on a function whose whole job is to survive a hand-edited blob.
+  if (stored === null || !Number.isFinite(stored)) return REMINDER_HORIZON_DAYS;
+  return Math.min(Math.max(Math.trunc(stored), 1), REMINDER_HORIZON_DAYS);
+}
+
 /** One reminder as the OS holds it. Content-free by design — see below. */
 export type PendingReminder = {
   /**
@@ -134,8 +222,13 @@ export function parseLocalInstant(at: string): Date {
  * later than any reminder the scheduler would actually register.
  *
  * `N - 1` because the horizon is INCLUSIVE of today: a 7-day horizon covers
- * today plus the next six days, which is what `targetReminders`' cutoff
- * (`now + N × 86_400_000`) admits.
+ * today plus the next six days. `targetReminders` cuts off at the END of this
+ * day, so the sentence this produces and the set the pass registers are the
+ * same claim. They were not until myne#508: the cutoff was a rolling
+ * `now + N × 86_400_000`, which admits instants up to N×24h out, so at N=1 the
+ * line said "today" while the pass registered into tomorrow. Nothing caught it
+ * because the parity tests pinned the two clients' DISPLAY derivations against
+ * each other and never the display against the registration set.
  *
  * Local calendar arithmetic on purpose — a UTC-based shift would name the wrong
  * day for anyone far enough east or west, on a line whose entire job is being
@@ -148,7 +241,7 @@ export function horizonEndDate(
   const end = new Date(
     today.getFullYear(),
     today.getMonth(),
-    today.getDate() + horizonDays - 1,
+    today.getDate() + resolveHorizonDays(horizonDays) - 1,
   );
   const p = (n: number): string => String(n).padStart(2, "0");
   return `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`;
@@ -160,8 +253,13 @@ export function targetReminders(
   horizonDays: number = REMINDER_HORIZON_DAYS,
 ): PendingReminder[] {
   const from = localStamp(now);
-  const horizon = new Date(now.getTime() + horizonDays * 86_400_000);
-  const to = localStamp(horizon);
+  // The END of the last day the horizon covers, which is the day
+  // `horizonEndDate` names, and which clamps through `resolveHorizonDays` on
+  // the way. A rolling `now + N × 86_400_000` cutoff is what this used to be,
+  // and it admitted instants a day past the date the settings line stated
+  // (myne#508). `23:59` rather than the next midnight because the comparison is
+  // on the `YYYY-MM-DDTHH:MM` string and a reminder is stored to the minute.
+  const to = `${horizonEndDate(now, horizonDays)}T23:59`;
 
   const out: PendingReminder[] = [];
   for (const task of tasks) {

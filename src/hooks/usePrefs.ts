@@ -42,6 +42,7 @@ import {
   setBarItemsOrder as persistBarItemsOrder,
   setHiddenBarItems as persistHiddenBarItems,
   setKeymapBinding as persistKeymapBinding,
+  setReminderHorizonDays as persistReminderHorizonDays,
   setRightPanelActiveTab as persistRightPanelActiveTab,
   setRightPanelHiddenTabs as persistRightPanelHiddenTabs,
   setRightPanelTabOrder as persistRightPanelTabOrder,
@@ -178,6 +179,16 @@ interface UsePrefsResult {
    * Same pattern as `toggleScreenCapture`.
    */
   setAutoLock: (seconds: number) => Promise<void>;
+  /**
+   * Set the reminder registration horizon (days). Same optimistic-then-converge
+   * discipline as {@link setAutoLock}, which it is the near-twin of: a numeric
+   * prefs field with a `null` never-set state and a fixed set of offered values.
+   *
+   * It lives here rather than as a component-local optimistic write (myne#508)
+   * so the settings row holds no state of its own and the panel holds no echo
+   * for it, the same reason the ~40 setters around it do.
+   */
+  setReminderHorizon: (days: number) => Promise<void>;
   /**
    * Persist the full hidden-bottom-bar-items set (bottom-bar customization).
    * Optimistic: the cache updates immediately so the BottomBar reflects the
@@ -491,6 +502,17 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  // myne#508. Through the shared `writeOptimisticPref` rather than a hand-rolled
+  // twin of `setAutoLock` above: the two differ only in the field and the
+  // persist call, which is exactly what that helper exists to absorb.
+  const setReminderHorizon = useCallback(
+    (days: number) =>
+      writeOptimisticPref({ reminder_horizon_days: days }, () =>
+        persistReminderHorizonDays(days),
+      ),
+    [writeOptimisticPref],
+  );
+
   const setHiddenBarItems = useCallback(
     async (items: string[]) => {
       // Optimistic via functional update (no captured-previous staleness) —
@@ -691,6 +713,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setCliRateLimitDisabled: setCliRateLimitDisabledPref,
     setDeveloperMode: setDeveloperModePref,
     setAutoLock,
+    setReminderHorizon,
     setHiddenBarItems,
     setBarItemsOrder,
     setRightPanelActiveTab,

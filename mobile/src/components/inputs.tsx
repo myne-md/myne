@@ -293,19 +293,51 @@ export function Switch({
 // ── Segmented control ────────────────────────────────────────────────────────
 // Presentational by default (gallery boards pass only `active`); pass `onChange`
 // to make each segment tappable (wired settings).
+//
+// **A wired one is a radiogroup, not four divs** (myne#508). The segments were
+// bare `div`s with an `onClick`: nothing announced them, nothing could focus
+// them, and no test could address one except by its localized text. That last
+// part is why the horizon picker's first tests were all source-text greps, and
+// a source-text grep cannot fail when the handler is deleted. The presentational
+// form keeps no roles, because a board that is not tappable should not tell a
+// screen reader it is.
+/** A presentational board, or a wired control. The two differ in more than one
+ *  field, so they are two shapes rather than one shape with optional halves.
+ *
+ *  **The name is required on the wired form** (myne#508). It was optional for
+ *  one review round, and because the wired form is the one that renders
+ *  `role="radiogroup"`, every existing caller gained a grouping role with
+ *  `aria-label={undefined}`: an announced group with no name, which is worse
+ *  than the unannounced divs it replaced. A union makes `tsc` name each site
+ *  instead of leaving it to whoever notices. */
+type SegmentedProps = {
+  options: string[];
+  active?: number;
+  style?: CSSProperties;
+  /** Segments derive `${testIdPrefix}-${optionValues[i] ?? i}`. */
+  testIdPrefix?: string;
+  /** Stable per-option ids for the testid tail, so a spec does not have to
+   *  address a segment by its translated label. Defaults to the index. */
+  optionValues?: string[];
+} & (
+  | { onChange: (index: number) => void; ariaLabel: string }
+  | { onChange?: undefined; ariaLabel?: undefined }
+);
+
 export function Segmented({
   options,
   active = 0,
   onChange,
   style,
-}: {
-  options: string[];
-  active?: number;
-  onChange?: (index: number) => void;
-  style?: CSSProperties;
-}) {
+  ariaLabel,
+  testIdPrefix,
+  optionValues,
+}: SegmentedProps) {
+  const wired = onChange !== undefined;
   return (
     <div
+      role={wired ? "radiogroup" : undefined}
+      aria-label={wired ? ariaLabel : undefined}
       style={{
         display: "flex",
         padding: 2,
@@ -319,11 +351,38 @@ export function Segmented({
       {options.map((o, i) => (
         <div
           key={o}
+          role={wired ? "radio" : undefined}
+          aria-checked={wired ? i === active : undefined}
+          tabIndex={wired ? 0 : undefined}
           onClick={onChange ? () => onChange(i) : undefined}
+          onKeyDown={
+            onChange
+              ? (e) => {
+                  // Enter and Space are what a radio answers to. Without them
+                  // the control is unreachable to a keyboard and to every
+                  // assistive technology that drives one.
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onChange(i);
+                  }
+                }
+              : undefined
+          }
+          data-testid={testIdPrefix ? `${testIdPrefix}-${optionValues?.[i] ?? i}` : undefined}
+          data-active={wired && i === active ? "true" : undefined}
           style={{
             flex: 1,
             textAlign: "center",
-            padding: "7px 12px",
+            // 44px is what both platforms publish as the minimum, and padding
+            // alone does not reach it: 11px either side of a 14px label at the
+            // inherited 1.5 line-height measures 43px. `minHeight` states the
+            // target instead of computing it, so it cannot drift with a
+            // typography token.
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 12px",
             borderRadius: 6,
             fontSize: 14,
             fontWeight: 600,

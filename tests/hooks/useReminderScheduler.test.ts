@@ -37,15 +37,25 @@ function task(over: Partial<VaultTask> & { noteId?: string }): VaultTask {
   } as VaultTask;
 }
 
-function notifier() {
+// `held` is optional because most cases only need the CALLS. Pass a map when the
+// test needs `listPending` to reflect what was scheduled: a cancel is only
+// observable against a non-empty current set, since `diffReminders` has nothing
+// to cancel otherwise.
+function notifier(held?: Map<string, string>) {
   const calls = { listed: 0, scheduled: [] as string[], cancelled: [] as string[] };
   const impl: ReminderNotifier = {
     listPending: async () => {
       calls.listed++;
-      return [];
+      return held === undefined ? [] : [...held].map(([id, at]) => ({ id, at }));
     },
-    schedule: async (p) => void calls.scheduled.push(p.id),
-    cancel: async (id) => void calls.cancelled.push(id),
+    schedule: async (p) => {
+      held?.set(p.id, p.at);
+      calls.scheduled.push(p.id);
+    },
+    cancel: async (id) => {
+      held?.delete(id);
+      calls.cancelled.push(id);
+    },
   };
   return { impl, calls };
 }
@@ -63,6 +73,29 @@ function mount(options: ReminderSchedulerOptions): () => void {
   return () => {
     act(() => root.unmount());
     host.remove();
+  };
+}
+
+/** `mount`, plus a re-render that re-reads the options factory.
+ *
+ * Module scope rather than inside one describe: myne#318's block and myne#508's
+ * both need it, and the second one hand-rolled a third copy of this mount
+ * boilerplate before it was hoisted. */
+function mountRerenderable(makeOptions: () => ReminderSchedulerOptions) {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const Probe = (): null => {
+    useReminderScheduler(makeOptions());
+    return null;
+  };
+  act(() => root.render(createElement(Probe)));
+  return {
+    rerender: () => act(() => root.render(createElement(Probe, { key: undefined }))),
+    unmount: () => {
+      act(() => root.unmount());
+      host.remove();
+    },
   };
 }
 
@@ -113,6 +146,7 @@ describe("the catch-up pass", () => {
       enabled: true,
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
+      horizonDays: null,
       clock: () => NOW,
     });
     await act(async () => {
@@ -129,6 +163,7 @@ describe("the catch-up pass", () => {
       enabled: false,
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
+      horizonDays: null,
       clock: () => NOW,
     });
     await act(async () => {
@@ -144,6 +179,7 @@ describe("the catch-up pass", () => {
       enabled: true,
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: null,
+      horizonDays: null,
       clock: () => NOW,
     });
     await act(async () => {
@@ -159,6 +195,7 @@ describe("the catch-up pass", () => {
       enabled: true,
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
+      horizonDays: null,
       clock: () => NOW,
       onPass,
     });
@@ -190,6 +227,7 @@ describe("it never throws", () => {
       enabled: true,
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
+      horizonDays: null,
       clock: () => NOW,
       onPass,
     });
@@ -241,24 +279,6 @@ describe("it never throws", () => {
 // timer and loses the race by ordering; a render-driven one is not.
 describe("the default clock is stable across renders (myne#318)", () => {
   /** Mount with a re-renderable options object, returning a re-render fn. */
-  function mountRerenderable(makeOptions: () => ReminderSchedulerOptions) {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const Probe = (): null => {
-      useReminderScheduler(makeOptions());
-      return null;
-    };
-    act(() => root.render(createElement(Probe)));
-    return {
-      rerender: () => act(() => root.render(createElement(Probe, { key: undefined }))),
-      unmount: () => {
-        act(() => root.unmount());
-        host.remove();
-      },
-    };
-  }
-
   it("does not re-run the pass when nothing but render identity changed", () => {
     const n = notifier();
     const tasks = [task({ remind: "2026-07-28 10:00" })];
@@ -293,6 +313,77 @@ describe("the default clock is stable across renders (myne#318)", () => {
     tasks = [task({ remind: "2026-07-28 11:00" })];
     rerender();
     expect(n.calls.listed).toBeGreaterThan(afterMount);
+    unmount();
+  });
+});
+
+// myne#508. The pref existed, the pass took a `horizonDays` fourth parameter,
+// and the hook had no field to carry one, so `runReminderPass` always took its
+// default and the setting could not reach the mechanism it names even once
+// something wrote it. These pin the WIRE, not the arithmetic: `targetReminders`
+// is where the horizon's effect is already covered.
+describe("the horizon reaches the pass (myne#508)", () => {
+  // A three-day-out reminder against three horizons. Under the pre-#508 hook
+  // every row registered, because the default seven applied regardless of what
+  // the caller passed. The `null` row is the state a vault that never chose a
+  // horizon actually persists, and reading it as a number would register
+  // nothing at all.
+  it.each([
+    [1, 0],
+    [7, 1],
+    [null, 1],
+  ])("registers %s-day-horizon reminders: %i", async (horizonDays, expected) => {
+    const { impl, calls } = notifier();
+    const unmount = mount({
+      enabled: true,
+      tasks: [task({ remind: "2026-07-30 09:00" })],
+      notifier: impl,
+      horizonDays,
+      clock: () => NOW,
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(calls.scheduled).toHaveLength(expected);
+    unmount();
+  });
+
+  it("re-runs the pass when the horizon is shortened, rather than at the next tick", async () => {
+    // The direction that matters. Shortening the horizon withdraws instants the
+    // pass has already registered, and it only withdraws them by recomputing
+    // its target set. Leaving that to the timer would keep a month of instants
+    // registered for up to MAX_SLEEP_MS after the user cut the horizon to a
+    // day. `notifier`'s backing map is what makes the cancel observable: with a
+    // `listPending` that always answers `[]`, `diffReminders` has nothing to
+    // cancel and the assertion would report zero either way.
+    const held = new Map<string, string>();
+    const { impl, calls } = notifier(held);
+    // Stable identity: the effect also keys on `tasks`, so a fresh array per
+    // render would re-run the pass for a reason unrelated to the horizon under
+    // test. Local to this test, closed over by the factory the same way `days`
+    // is, rather than a module-level binding that survives into every later
+    // test reusing `mountRerenderable`.
+    const tasks: readonly VaultTask[] = [task({ remind: "2026-07-30 09:00" })];
+    let days = 7;
+    const { rerender, unmount } = mountRerenderable(() => ({
+      enabled: true,
+      tasks,
+      notifier: impl,
+      horizonDays: days,
+      clock: () => NOW,
+    }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(calls.scheduled).toHaveLength(1);
+
+    // Same task list, same clock, same notifier: only the horizon moved.
+    days = 1;
+    rerender();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(calls.cancelled).toHaveLength(1);
     unmount();
   });
 });
