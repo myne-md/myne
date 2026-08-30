@@ -675,23 +675,6 @@ impl VaultRuntimeState {
         }
     }
 
-    /// The `VaultId` of the sole [`Slot::ImportSource`] entry, or `None`.
-    ///
-    /// Deliberately NOT folded into [`Self::active_vault_id`] or
-    /// `active_or_recovering_vault_id`: those two resolve "the vault this
-    /// process is working ON", which `vault_lock` and the idle timer act upon,
-    /// and a source vault opened for reading is not that. Keeping the resolvers
-    /// disjoint is what leaves every existing lock path unchanged.
-    pub async fn import_source_vault_id(&self) -> Option<VaultId> {
-        self.slots
-            .read()
-            .await
-            .iter()
-            .filter(|(_, slot)| matches!(slot, Slot::ImportSource { .. }))
-            .map(|(id, _)| *id)
-            .min()
-    }
-
     /// Populate [`Slot::ImportSource`] for `id`. Returns the prior `Slot` for
     /// diagnostics, exactly as [`Self::set_recovering`] does.
     pub async fn set_import_source(&self, id: VaultId, material: ImportSourceMaterial) -> Slot {
@@ -3131,9 +3114,15 @@ mod import_source_slot_tests {
 
             assert_eq!(state.active_vault_id().await, None);
             assert_eq!(state.active_vault_or_recovering_for_probe().await, None);
+            // And the slot IS there, so the two assertions above are about the
+            // resolvers refusing it rather than about an empty map. This used
+            // to read `import_source_vault_id()`, a resolver whose only caller
+            // was this line and which `.min()`-picked among multiple sources,
+            // answering a question that has no single answer. `slot_kind` asks
+            // the same thing of the id the test already knows.
             assert_eq!(
-                state.import_source_vault_id().await,
-                Some(test_vault_id_b())
+                state.slot_kind(test_vault_id_b()).await,
+                SlotKind::ImportSource
             );
         });
     }

@@ -100,11 +100,37 @@ pub async fn open(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
 ) -> Result<(), VaultUnlockError> {
+    // A target vault MUST be unlocked, and this runs before every other guard.
+    //
+    // The window this closes is the one A6's amendment does not describe. With
+    // no target, `is_vault_switch(None, target)` is false, so the `close_all`
+    // on the unlock path had nothing to fire against and the slot survived into
+    // the first unlock: a second vault's keys resident across a session
+    // boundary, bounded only by the 30-minute TTL, when the amendment says "no
+    // longer than the target vault's own session". `reseal_attachment` also
+    // resolves its destination from `active_vault_id()` at call time, so a
+    // source opened before any unlock has no destination and would acquire one
+    // the user never named. That call site's comment already says this is the
+    // hazard `close_all` exists to prevent; the precondition is the other half.
+    //
+    // Belt and braces with the unconditional `close_all` in `unlock_from_host`:
+    // this refuses the state and that one clears it. Either alone leaves a
+    // path, and the review that found this named both.
+    let active = state.active_vault_id().await;
+    if active.is_none() {
+        tracing::error!(
+            stage = "slot_check",
+            error_kind = "NoActiveVaultToImportInto",
+            "import source rejected: nothing is unlocked to import into"
+        );
+        return Err(VaultUnlockError::NoActiveVaultToImportInto);
+    }
+
     // The source may not be the vault we are importing INTO. Not a paranoid
     // check: the picker excludes it, so reaching here means the UI and the host
     // disagree, and importing a vault into itself would rename every note
     // against its own titles.
-    if state.active_vault_id().await == Some(source_id) {
+    if active == Some(source_id) {
         tracing::error!(
             stage = "slot_check",
             error_kind = "VaultAlreadyUnlocked",
@@ -691,6 +717,24 @@ mod import_source_read_tests {
         uuid.to_string()
     }
 
+    /// Unlock a TARGET vault, which `open()` now requires.
+    ///
+    /// `test_vault_id()` rather than the source's id, and they must differ: a
+    /// vault cannot be its own import source, and the guard that says so is one
+    /// of the four under test below.
+    fn unlock_target(state: &VaultRuntimeState) -> VaultId {
+        let target = crate::plugins::vault_unlock::state::test_vault_id();
+        block_on(async {
+            state
+                .set_unlocked(
+                    target,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+        });
+        target
+    }
+
     fn open_slot(state: &VaultRuntimeState, id: VaultId) {
         block_on(async {
             state
@@ -713,6 +757,40 @@ mod import_source_read_tests {
     // notes) is proved by `a_note_round_trips_through_the_import_slot` above,
     // through the same slot, and end to end by `e2e/import-myne-vault.e2e.ts`,
     // which drives a real password through the real UI.
+
+    /// A target vault MUST be unlocked, and this guard runs before every other
+    /// one.
+    ///
+    /// Without it a slot holding a SECOND vault's keys can exist with no
+    /// session: `is_vault_switch(None, target)` is false, so the `close_all` on
+    /// the unlock path had nothing to fire against and the slot survived into
+    /// the first unlock. `threat-model.md` A6's amendment bounds that residency
+    /// as "no longer than the target vault's own session", which a slot
+    /// predating the session is simply outside of.
+    #[test]
+    fn an_import_source_needs_a_vault_to_import_into() {
+        let tmp = ScopedTempDir::new("import-src-notarget").expect("temp");
+        let state = VaultRuntimeState::default();
+        let host = TempHost {
+            base: tmp.path().to_path_buf(),
+        };
+
+        let err = block_on(open(
+            test_vault_id_b(),
+            SourceCredential::Password(Zeroizing::new("pw".into())),
+            &state,
+            &host,
+            &crate::vault_io::StdVaultIo,
+        ))
+        .expect_err("nothing is unlocked");
+        assert!(matches!(err, VaultUnlockError::NoActiveVaultToImportInto));
+        // No slot was minted. The refusal that matters is the one that leaves
+        // no key material behind, not the one that returns the right enum.
+        assert_eq!(
+            block_on(state.slot_kind(test_vault_id_b())),
+            SlotKind::Empty
+        );
+    }
 
     /// A vault may not be its own import source. Reaching this means the UI and
     /// the host disagree, and the cost of not refusing is silent: the run
@@ -761,6 +839,7 @@ mod import_source_read_tests {
         let tmp = ScopedTempDir::new("import-src-twice").expect("temp");
         let id = test_vault_id_b();
         let state = VaultRuntimeState::default();
+        unlock_target(&state);
         open_slot(&state, id);
         let host = TempHost {
             base: tmp.path().to_path_buf(),
@@ -786,6 +865,7 @@ mod import_source_read_tests {
         let tmp = ScopedTempDir::new("import-src-recovering").expect("temp");
         let id = test_vault_id_b();
         let state = VaultRuntimeState::default();
+        unlock_target(&state);
         block_on(async {
             state
                 .set_recovering(
@@ -822,6 +902,7 @@ mod import_source_read_tests {
         let tmp = ScopedTempDir::new("import-src-permit").expect("temp");
         let id = test_vault_id_b();
         let state = VaultRuntimeState::default();
+        unlock_target(&state);
         let host = TempHost {
             base: tmp.path().to_path_buf(),
         };
@@ -901,6 +982,71 @@ mod import_source_read_tests {
             &crate::vault_io::StdVaultIo,
         ))
         .expect("the note decrypts");
+        assert_eq!(got, body);
+    }
+
+    /// A **v0.2** source note round-trips through the import slot.
+    ///
+    /// This is the version-routing half, and it is here rather than in the E2E
+    /// suite because this is where the encoders are. `e2e/fixture-gen` writes
+    /// through `protocol`'s public API alone, deliberately, and an `NC05` blob
+    /// is sealed by `crate::plugins::notes::crdt::encode_note_blob`, which is
+    /// `myne-core`'s. Pulling `myne-core` into that crate to reach it would
+    /// move a dependency boundary to buy a fixture.
+    ///
+    /// The gap it closes was the largest one the review of myne-md/myne#636
+    /// left open, and the reason it mattered is not hypothetical:
+    /// `protocol.md` §10.3.1 makes v0.2 the BIRTH format, so importing from a
+    /// vault created today is the common case, and every automated lane
+    /// exercised only v0.1. `write_import_source_suite` hard-asserts
+    /// `MetaVersion::V0_1` in its own signature.
+    ///
+    /// What it proves is narrow and stated as such: `read_note` reaches
+    /// `decode_note_any`, which dispatches on the `NC05` magic rather than
+    /// assuming the v0.1 codec. It does not exercise a v0.2 `vault.meta`, a
+    /// v0.2 KDF salt domain, or the `MYA5`/`MYC5` attachment pair, each of
+    /// which is routed by `MetaVersion` read from the source's own
+    /// `vault.meta` and covered by its own tests one layer down.
+    #[test]
+    fn a_v0_2_note_round_trips_through_the_import_slot() {
+        let tmp = ScopedTempDir::new("import-src-v02").expect("temp");
+        let id = test_vault_id_b();
+        let body = "---\ntitle: Project\n---\n\nBody with a [[Link]].\n";
+
+        // Sealed with the SAME `items_key` the fixture slot holds, so a failure
+        // here is about the format and not about the keys.
+        let notes = crate::paths::vault_root_for_id_from_base(tmp.path(), id).join("notes");
+        std::fs::create_dir_all(&notes).expect("notes dir");
+        let uuid = uuid::Uuid::now_v7();
+        let blob = crate::plugins::notes::crdt::encode_note_blob_at_millis(
+            body,
+            &ITEMS_KEY,
+            &ITEMS_KEY_ID,
+            uuid.as_bytes(),
+            b"import-source-test-actor",
+            1_700_000_000_000,
+        )
+        .expect("NC05 seal");
+        // The blob really is the v0.2 family, not a v0.1 one that happened to
+        // decode. Without this the test passes for an encoder that silently
+        // fell back, which is the exact wrong answer it exists to rule out.
+        assert_eq!(&blob[..4], b"NC05", "the fixture must be an NC05 blob");
+        std::fs::write(notes.join(format!("{uuid}.myn")), blob).expect("write blob");
+
+        let state = VaultRuntimeState::default();
+        open_slot(&state, id);
+        let host = TempHost {
+            base: tmp.path().to_path_buf(),
+        };
+
+        let got = block_on(read_note(
+            id,
+            uuid.to_string(),
+            &state,
+            &host,
+            &crate::vault_io::StdVaultIo,
+        ))
+        .expect("the v0.2 note decodes through the import slot");
         assert_eq!(got, body);
     }
 

@@ -159,11 +159,16 @@ export const IMPORT_SOURCE_ORDER: readonly ImportSourceId[] = [
 /**
  * The sources this platform can actually offer, in display order.
  *
- * The ONE place the capability filter is applied, so the picker, the palette
- * keywords and the settings-search index cannot disagree about which cards
- * exist. They did disagree in the first version: the filter was in the picker
- * alone, so searching "combine vaults" on a client without the capability
- * routed the user to a modal whose card had been filtered out.
+ * The ONE place the capability filter is applied, so every consumer of the
+ * source list sees the same set. Today that is the picker
+ * (`ImportSourcePicker.tsx`) and `allSourceKeywords()` below.
+ *
+ * The first version of this comment claimed the filter kept the picker, the
+ * command palette and the settings-search index in agreement. It does not, and
+ * saying so was worse than saying nothing: `allSourceKeywords()` has no
+ * production caller at all, so neither of those two surfaces consumes this list
+ * in the first place. The filter is still the right shape, and the claim it
+ * made about the system was not checkable.
  */
 export function availableSourceOrder(): readonly ImportSourceId[] {
   return IMPORT_SOURCE_ORDER.filter((id) => {
@@ -172,7 +177,17 @@ export function availableSourceOrder(): readonly ImportSourceId[] {
   });
 }
 
-/** Every source keyword, for the palette command + settings-search index. */
+/**
+ * Every keyword of every source this platform offers.
+ *
+ * **No production caller today.** It was written for the command palette and
+ * the settings-search index, and neither consumes it: the palette reaches the
+ * importer through one action with its own keywords, and the settings-search
+ * registry holds its own. Kept rather than deleted because it is the correct
+ * shape for both, and because it is the derived half of a list a future caller
+ * must not re-filter by hand; the honest version of that is this sentence
+ * rather than a comment naming callers that do not exist.
+ */
 export function allSourceKeywords(): string[] {
   return availableSourceOrder().flatMap((id) => [...IMPORT_SOURCES[id].keywords]);
 }

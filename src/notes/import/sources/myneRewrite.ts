@@ -147,14 +147,37 @@ export function rewriteMyneBody(
   }
   let out = splice(markdown, attachmentSplices);
 
-  // Pass two: the renamed titles, one planner run per rename. Re-extracted from
-  // the spliced text so the byte ranges are current.
+  // Pass two: the renamed titles. EVERY rename is planned against the same
+  // body, and the splices are applied together, once.
+  //
+  // Applying them one at a time over the already-spliced text compounds, and
+  // the case is not exotic. Suppose the source holds both `Beta` and
+  // `Beta (Eski laptop)`, both collide and both are linked. The map then
+  // carries `Beta -> Beta (Eski laptop)` and
+  // `Beta (Eski laptop) -> Beta (Eski laptop) (Eski laptop)`. A sequential
+  // application rewrites `[[Beta]]` on the first iteration and then MATCHES ITS
+  // OWN OUTPUT on the second, landing the link on the other note's renamed
+  // title. `decisions/editor/0543` states both transforms are idempotent and
+  // cannot compound; for the title half that held only against a single pass,
+  // which this now is.
+  //
+  // Planning against `out` (post-attachment-splice) rather than against
+  // `markdown` is deliberate and safe: the attachment pass only ever rewrites
+  // the 64-hex id inside an `att:` target, which is not a title and cannot
+  // appear in a rename map. So every range planned here is still valid when
+  // `splice` applies them back-to-front.
+  //
+  // Overlaps between two renames' ranges are impossible for the same reason
+  // they are impossible within one rename: a wikilink occupies one range, and
+  // its target folds to exactly one title, so at most one rename can claim it.
   let linksRetargeted = 0;
+  const titleSplices: InboundRewrite[] = [];
   for (const [oldTitle, newTitle] of plan.renamedTitles) {
     const rewrites = planInboundRewrites(out, { oldTitle, newTitle });
     linksRetargeted += rewrites.length;
-    out = splice(out, rewrites);
+    titleSplices.push(...rewrites);
   }
+  out = splice(out, titleSplices);
 
   return { markdown: out, attachmentsRewritten, linksRetargeted, tombstonedEmbeds };
 }

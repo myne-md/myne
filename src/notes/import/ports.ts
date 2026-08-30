@@ -138,26 +138,6 @@ export function titleRecordsToExistingNotes(
   }));
 }
 
-/**
- * The UNTITLED half of the target vault's identity set.
- *
- * `buildExistingIdentitySet` skips untitled notes, correctly: they have no
- * matchable `(folder, title)`, and no source whose notes come from outside Myne
- * can produce one. A Myne source can, in bulk, so this reads the bodies of the
- * target's untitled notes and keys them by content instead. Without it a second
- * import of the same vault duplicates every untitled note, because nothing in
- * the snapshot could recognise one.
- *
- * Proportional to the number of UNTITLED notes, not to the vault: the title
- * batch already says which ids those are, so a vault with none pays one listing
- * and no decrypts.
- */
-export async function loadUntitledIdentities(): Promise<
-  { folder: string | null; bodyHash: string }[]
-> {
-  return await untitledIdentitiesFrom(await loadNoteBatch(await noteList()));
-}
-
 /** The untitled half, given a batch somebody else already paid for. */
 async function untitledIdentitiesFrom(
   records: Awaited<ReturnType<typeof loadNoteBatch>>,

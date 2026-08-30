@@ -121,6 +121,19 @@ export type VaultUnlockError =
    */
   | { kind: "VaultOpenAsImportSource" }
   /**
+   * A vault import was asked for with NO vault unlocked to import into
+   * (myne-md/myne#464).
+   *
+   * **Not user-facing.** The import flow is reachable only from the editor,
+   * which exists only while a vault is unlocked, so seeing this means a router
+   * bug. It is mirrored here because a variant the frontend cannot name is a
+   * variant it silently falls through on, and because the host answers it as a
+   * hard precondition rather than as a UI assumption: without it a second
+   * vault's keys could be held with no session to bound them, which is outside
+   * what `threat-model.md` A6's amendment describes.
+   */
+  | { kind: "NoActiveVaultToImportInto" }
+  /**
    * The vault is already unlocked. Returned by the slot-peek guard
    * when an unlock attempt arrives with the slot occupied by
    * `Slot::Unlocked(_)`.

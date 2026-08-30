@@ -38,6 +38,10 @@ function ctx(
       : addUntitledIdentities(base, extra.untitled);
   return {
     existing,
+    // Same set for both by default: these tests describe a target that already
+    // holds the titles, which is a PRE-RUN state. The one case where the two
+    // differ has its own test below, and it overrides `existing` explicitly.
+    preRun: existing,
     inboundLinks: new Map(
       Object.entries(links).map(([k, v]) => [k, new Set(v)]),
     ),
@@ -45,7 +49,53 @@ function ctx(
   };
 }
 
+/** The identity key the engine's live `seen` set holds for a titled note. */
+function liveKey(folder: string | null, title: string): string {
+  return [...buildExistingIdentitySet([{ folder, title, trashed: null, template: false }])][0];
+}
+
 describe("Myne source conflict rules", () => {
+  it("creates the SECOND of two source notes that legally share a title", () => {
+    // Two source notes with the same (folder, title) are legal in Myne, and
+    // `conflict.ts` says so outright. The first crosses; the second used to
+    // collide with the sibling the same run had just created, take the skip
+    // arm, and be counted into `skippedExisting`, which the import report
+    // renders as "you already had one by that name". The target had none.
+    //
+    // The live set holds the sibling; the pre-run snapshot is empty.
+    const base = ctx([]);
+    const out = decideMyneImport(
+      { ...base, existing: new Set([liveKey(null, "Beta")]) },
+      { folder: null, title: "Beta", bodyHash: "b" },
+    );
+    expect(out).toEqual({ kind: "create", renamedTitle: null });
+  });
+
+  it("does not rename a run-local duplicate even when something links to it", () => {
+    // Deliberately unrenamed. The two notes were ambiguous in the SOURCE under
+    // exactly this name, and a link to that name was already ambiguous there.
+    // Renaming one of them would invent a distinction the author never made,
+    // with a suffix that belongs to the import rather than to the note.
+    const base = ctx([], { beta: ["note-a"] });
+    const out = decideMyneImport(
+      { ...base, existing: new Set([liveKey(null, "Beta")]) },
+      { folder: null, title: "Beta", bodyHash: "b" },
+    );
+    expect(out).toEqual({ kind: "create", renamedTitle: null });
+  });
+
+  it("still skips when the collision is with the target's OWN note", () => {
+    // The other direction, without which the two tests above pass for a
+    // decision that simply stopped skipping. Same live set, but the title is in
+    // the pre-run snapshot too, so this is a real collision.
+    const out = decideMyneImport(ctx([{ folder: null, title: "Beta" }]), {
+      folder: null,
+      title: "Beta",
+      bodyHash: "b",
+    });
+    expect(out).toEqual({ kind: "skip" });
+  });
+
   it("creates a source note whose title the target does not have", () => {
     const out = decideMyneImport(ctx([]), {
       folder: null,

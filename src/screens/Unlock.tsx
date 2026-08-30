@@ -338,6 +338,18 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
         kind: "banner",
         text: i18n.t("unlock.errors.openAsImportSource"),
       };
+    case "NoActiveVaultToImportInto":
+      // Not reachable from an UNLOCK: the host returns it only from
+      // `import_source_open`, and this screen never calls that. The arm exists
+      // because the switch is exhaustive over the shared error type, and
+      // falling through would render nothing at all while `tsc` stayed quiet
+      // about the reason. Answered with the generic banner rather than copy of
+      // its own, because copy for a state a user cannot reach is copy nobody
+      // will ever check.
+      return {
+        kind: "banner",
+        text: i18n.t("unlock.errors.unexpected"),
+      };
   }
 }
 
