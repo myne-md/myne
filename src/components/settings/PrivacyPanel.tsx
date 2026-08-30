@@ -116,7 +116,7 @@ function ScreenCaptureOverrideRow({
       // explanatory text. Twelve sibling panels use it.
       error={
         status === "failed"
-          ? t("settings.privacy.screenCaptureOverrideError")
+          ? t("screenCaptureEscape.saveFailed")
           : null
       }
       control={(helperId) => (
@@ -131,7 +131,7 @@ function ScreenCaptureOverrideRow({
     >
       {viaFlag && (
         <p style={HELPER_STYLE} data-testid="settings.screen-capture-override-flag">
-          {t("settings.privacy.screenCaptureOverrideFlag")}
+          {t("screenCaptureEscape.flagNotice")}
         </p>
       )}
     </SettingRow>
@@ -397,25 +397,38 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
     status: overrideStatus,
     save: saveOverride,
   } = useScreenCaptureOverride();
-  const superseded = override?.effective ?? false;
+  // `null` is UNKNOWN, not "no override", and the two must not collapse here.
+  // The hook deliberately leaves `view === null` on a failed read rather than
+  // asserting a position it could not read. Treating that as `false` rendered
+  // this switch LIVE on a device whose override may be on, and its `onChange`
+  // writes `vault.prefs`, which is AEAD-sealed and SYNCED, then reports success
+  // while the window stays capturable. That is the exact failure the block
+  // comment above says this row exists to prevent, and it is the same
+  // fail-towards-protection direction `protection_disabled_at_rest` takes on the
+  // Rust side, inverted. So an unread override supersedes too.
+  const overrideUnknown = override === null;
+  const superseded = override?.effective ?? true;
   // The switch goes inert on `effective`, which is the union, but the SENTENCE
   // cannot: the two ways to be superseded have different ways back. When only
   // the process flag holds, the row below reads OFF, so pointing the user at
   // "turn that off" names a control that is already off and offers no route at
   // all. When the file says so, the row below is the route, and the row's own
   // helper carries the flag caveat if both hold.
-  const supersededByFlagOnly = superseded && !(override?.disabled ?? false);
+  const supersededByFlagOnly =
+    !overrideUnknown && superseded && !(override?.disabled ?? false);
 
   return (
     <div style={PANEL_ROOT_STYLE}>
       <SettingRow
         label={t("settings.privacy.screenCaptureLabel")}
         helper={
-          supersededByFlagOnly
-            ? t("settings.privacy.screenCaptureSupersededByFlag")
-            : superseded
-              ? t("settings.privacy.screenCaptureSuperseded")
-              : screenCaptureHelperText(prefs.screen_capture_protection, t)
+          overrideUnknown
+            ? t("settings.privacy.screenCaptureOverrideUnknown")
+            : supersededByFlagOnly
+              ? t("settings.privacy.screenCaptureSupersededByFlag")
+              : superseded
+                ? t("settings.privacy.screenCaptureSuperseded")
+                : screenCaptureHelperText(prefs.screen_capture_protection, t)
         }
         anchorId="privacy.screen-capture"
         testId="settings.screen-capture"

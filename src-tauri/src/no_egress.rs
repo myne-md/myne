@@ -305,7 +305,7 @@ pub const GRANTED_CORE_NAMESPACES: &[(&str, &str)] = &[
          named `core:window:allow-*` entries beside the sub-default cover \
          `destroy` (app-exit + editor close-intercept) and `start_dragging`, \
          which Tauri's own injected `drag.js` invokes for \
-         `data-tauri-drag-region`. The one consumer that exists in no source \
+         `data-tauri-drag-region`, the one consumer that exists in no source \
          file in this repo. `show` was a third until myne-md/myne#483: its one \
          consumer, the reveal after idle lock, now asks the host for a fixed \
          protect/show/protect/focus sequence \

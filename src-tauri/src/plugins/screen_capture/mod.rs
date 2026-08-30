@@ -28,11 +28,14 @@
 //! `allow-screen-capture-override-set` and `allow-screen-capture-show-protected`,
 //! main-window-only. None touches vault content; the only values that cross in
 //! either direction are booleans, and `screen_capture_show_protected` takes and
-//! returns nothing at all. The bundle is a NET NARROWING of the WebView's
-//! authority: `core:window:allow-show` was dropped from
-//! `capabilities/default.json` in the same change, because its one consumer
-//! (`src/hooks/useRevealAfterIdleLock.ts`) now asks the host for a fixed
-//! protect/show/protect/focus sequence instead of driving the window itself.
+//! returns nothing at all.
+//!
+//! **What the bundle does to the WebView's window authority**, stated as the
+//! measurement rather than as a slogan: it is a TRADE rather than a narrowing, and an earlier revision of this text called it a net narrowing, which was wrong in the direction that stops a reviewer reading further. `core:window:default` grants 28 permissions and every one of them is a READ (`allow-is-*`, `allow-get-all-windows`, the size, position and monitor queries, `allow-title`), so `show`, `unminimize` and `set_focus` were none of them granted. Before this change page context could invoke exactly one window mutator, `show`, through `core:window:allow-show`. After it, one argument-less command drives `unminimize`, `show` and `set_focus` as well as two `set_content_protected` calls. What genuinely narrows is PARAMETERISATION: page context chooses none of the values and cannot aim the sequence. What widens is the surface, by `unminimize` and `set_focus`, which are nuisance-class (a forced un-minimise and a focus steal from an A8 page-context compromise) and are rated as such in `threat-model.md` § 6 beside the setter.
+//! `core:window:allow-show` was dropped from `capabilities/default.json` in the
+//! same change, because its one consumer
+//! (`src/hooks/useRevealAfterIdleLock.ts`) now asks the host for the fixed
+//! sequence instead of driving the window itself.
 //!
 //! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
 

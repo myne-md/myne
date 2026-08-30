@@ -115,8 +115,8 @@ pub async fn screen_capture_override_set<R: Runtime>(
 /// the window natively and re-applies protection *while it is hidden*, which is
 /// precisely the hide/show cycle the Windows affinity is reported not to survive
 /// (tauri-apps/tauri#14189). `useRevealAfterIdleLock` is what asks for the
-/// window back, so without a re-apply on this path the unlock screen. Which
-/// carries the account number. Comes back unprotected for the rest of the
+/// window back, so without a re-apply on this path the unlock screen, which
+/// carries the account number, comes back unprotected for the rest of the
 /// session.
 ///
 /// **It performs the whole sequence rather than only the re-apply**, which is
@@ -126,12 +126,15 @@ pub async fn screen_capture_override_set<R: Runtime>(
 /// held by a comment, at the exact site that shape had already failed at three
 /// times. Here `show_protected` owns both, so no caller can get the order wrong.
 ///
-/// **This narrows the ACL rather than widening it.** `core:window:allow-show`
-/// was granted for that one call and is now gone: the page trades a raw window
-/// operation for one fixed sequence it cannot parameterise. It takes nothing and
-/// returns nothing, and every value it applies is state the backend already
-/// holds, so the strongest thing page context can do with it is re-show a window
-/// in the state it was already meant to be in.
+/// **This is an ACL trade, not a narrowing, and the earlier wording here said
+/// narrowing.** `core:window:allow-show` was granted for that one call and is
+/// now gone, so the page loses the one window mutator it had; `core:window:default`
+/// is 28 read-only grants, so `unminimize` and `set_focus` were never among
+/// them and this command adds both. It takes nothing and returns nothing, and
+/// every value it applies is state the backend already holds, so what the page
+/// gains it cannot aim: the strongest thing it can do is re-show a window in the
+/// state it was already meant to be in, plus un-minimise it and take focus.
+/// `threat-model.md` § 6 rates that pair.
 #[tauri::command]
 pub async fn screen_capture_show_protected<R: Runtime>(app: AppHandle<R>) {
     crate::screen_capture::show_protected(&app, "webview_reveal");
@@ -144,6 +147,55 @@ mod tests {
         read_screen_capture_override, SCREEN_CAPTURE_FILE_NAME,
     };
     use myne_core::test_support::{block_on, ScopedTempDir};
+
+    /// The setter must re-assert, and nothing else could tell you.
+    ///
+    /// This is the one call that makes the escape work **in the session the
+    /// user took it in**. Delete it and every observable the rest of the suite
+    /// checks still reads correct: the disk says `disabled: true`, the getter
+    /// answers `effective: true`, the dialog closes reporting success, and on
+    /// Windows, the only platform where any of this matters, the window stays
+    /// black until the user quits and relaunches.
+    ///
+    /// Asserted at the SOURCE rather than through a double, and the limit is
+    /// stated rather than hidden: `reassert` reaches `resolve` and
+    /// `get_webview_window`, both of which need a running Tauri app, so a
+    /// behavioural test here would need a runtime this crate's unit suite does
+    /// not stand up. The same shape as
+    /// `screen_capture::tests::the_reshow_sequence_is_not_hand_rolled_anywhere_else`,
+    /// and it catches the failure that actually happens, which is the line
+    /// going away in a refactor rather than `reassert` itself misbehaving.
+    #[test]
+    fn the_setter_re_asserts_after_it_writes() {
+        let src = include_str!("commands.rs");
+        let body = src
+            .split_once("pub async fn screen_capture_override_set")
+            .expect("the setter must still be named that")
+            .1;
+        let body = body
+            .split_once("\n}\n")
+            .expect("the setter must have an end")
+            .0;
+
+        assert!(
+            body.contains("screen_capture::reassert("),
+            "screen_capture_override_set must re-assert after the write, or the \
+             window keeps the pre-write state for the rest of the session"
+        );
+        // Ordering, not just presence: re-asserting BEFORE the state is updated
+        // would replay the old value and leave the same black window.
+        let write_at = body
+            .find("state.set_file_disabled(")
+            .expect("the setter must still update the state");
+        let reassert_at = body
+            .find("screen_capture::reassert(")
+            .expect("checked above");
+        assert!(
+            write_at < reassert_at,
+            "the state update must precede the re-assert, or the re-assert \
+             replays the value the write just replaced"
+        );
+    }
 
     #[test]
     fn the_view_reports_the_file_and_the_flag_apart() {

@@ -62,7 +62,6 @@ import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useScreenCaptureOverride } from "../hooks/useScreenCaptureOverride";
 import { has } from "../platform/capabilities";
-import { HAS_NATIVE_TITLE_BAR } from "../screens/titlebar";
 import { ActionStatus } from "./ActionStatus";
 import { Button } from "./primitives/Button";
 import { ModalShell } from "./primitives/ModalShell";
@@ -84,22 +83,37 @@ const HIDDEN_TRIGGER_STYLE: CSSProperties = {
  *  position and the ground are overridden. The ramp, the hover and the press
  *  come from the primitive.
  *
- *  It sits BELOW the 38px window-drag strip where the platform has one, rather
- *  than at the very top. `tauri.conf.json` sets `titleBarStyle: "Overlay"` on
- *  macOS, so the webview extends under the traffic lights, and a control at
- *  `top: var(--space-2)` lands on top of them. */
+ *  It sits BELOW the 38px window-drag strip `App.tsx` reserves on every
+ *  non-editor stage, rather than at the very top, and unconditionally: this
+ *  component renders on the Tauri clients only, all of which have that strip.
+ *  The first revision made it a `HAS_NATIVE_TITLE_BAR` ternary reasoning about
+ *  the macOS traffic lights, which tests the wrong property twice over. That
+ *  constant is a hardcoded `true`, so the other arm was unreachable, and the
+ *  constant that names the traffic lights is `HAS_OVERLAY_WINDOW_CONTROLS`,
+ *  which `titlebar.ts` records as having been renamed out of `IS_MAC` for
+ *  exactly this reason. */
 const FOCUSED_TRIGGER_STYLE: CSSProperties = {
   position: "fixed",
-  top: HAS_NATIVE_TITLE_BAR ? 46 : "var(--space-2)",
+  top: 46,
   left: "var(--space-2)",
   zIndex: 2000,
   background: "var(--bg-2)",
 };
 
-const BODY_STYLE: CSSProperties = {
+/** The prose scrolls; the actions do not. `ModalShell`'s body wrapper is
+ *  `overflow: hidden` under a `100vh`-derived `maxHeight`, so a body that grows
+ *  past it clips whatever is at the bottom, which here is the pair of buttons.
+ *  A dialog whose buttons scroll out of view reads as unanswerable, and this
+ *  one is the only way out of a window the reader cannot see. Same split, and
+ *  the same reason, as the three consent-class siblings (`AiProviderConsent`,
+ *  `BetaTermsConsent`, `DeleteAttachmentDialog`). */
+const SCROLL_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
+  flex: 1,
+  minHeight: 0,
+  overflowY: "auto",
   padding: "var(--space-5)",
 };
 
@@ -114,7 +128,18 @@ const ACTIONS_STYLE: CSSProperties = {
   display: "flex",
   justifyContent: "flex-end",
   gap: "var(--space-2)",
-  paddingTop: "var(--space-2)",
+  flex: "0 0 auto",
+  padding: "var(--space-4) var(--space-5)",
+  borderTop: "1px solid var(--line-1)",
+};
+
+/** The failure arm, in `--danger` with the alert role the Privacy row's error
+ *  slot already uses. A helper-coloured status line reads as explanatory text,
+ *  which is the one reading this dialog cannot afford: its audience is the
+ *  person least able to notice an unmarked colour change. */
+const FAILED_STYLE: CSSProperties = {
+  ...TEXT_STYLE,
+  color: "var(--danger)",
 };
 
 export function ScreenCaptureEscape() {
@@ -211,11 +236,12 @@ export function ScreenCaptureEscape() {
         onClose={() => {
           if (!busy) setOpen(false);
         }}
+        closeLabel={t("common.close")}
         labelId="screen-capture-escape-title"
         testId="screen-capture-escape.dialog"
         width={520}
       >
-        <div style={BODY_STYLE}>
+        <div style={SCROLL_STYLE}>
           {!savedForNextLaunch &&
             (disabled ? (
               <p style={TEXT_STYLE}>{t("screenCaptureEscape.restoreBody")}</p>
@@ -243,7 +269,7 @@ export function ScreenCaptureEscape() {
               is the only report there is. */}
           <ActionStatus
             testId="screen-capture-escape.status"
-            style={TEXT_STYLE}
+            style={status === "failed" ? FAILED_STYLE : TEXT_STYLE}
             message={
               status === "failed"
                 ? t("screenCaptureEscape.saveFailed")

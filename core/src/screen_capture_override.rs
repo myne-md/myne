@@ -1,8 +1,8 @@
 //! The device-local **screen-capture protection override** (myne-md/myne#482).
 //!
 //! One boolean, persisted at `<app_config_dir>/screen-capture.json`. With it on,
-//! native screen-capture protection is off on this device. Before unlock and
-//! after it. And the per-vault `vault.prefs` toggle is superseded rather than
+//! native screen-capture protection is off on this device, before unlock and
+//! after it, and the per-vault `vault.prefs` toggle is superseded rather than
 //! merely ignored.
 //!
 //! ## The lockout it exists to open
@@ -31,28 +31,39 @@
 //! ## Why it is not a sealed device-local blob
 //!
 //! Because it would ship nothing on the platform that has the bug. The sealed
-//! stores in this crate (`MYL1`, `MYQ1`, `MYK1`, `MYF1`) all rest on a keychain.
+//! stores whose `wrap_key` is available with **no user input** (`MYL1`, `MYK1`,
+//! and `MYF1`'s working arm) all rest on a keychain, and that is the property
+//! this read needs: it happens before the user has done anything.
 //! [`crate::vault_label::key::platform_keychain`] is Apple-only, every other target
 //! gets `UnavailableKeychain`, and wiring the Windows credential store is a
-//! dependency decision in its own right (root `CLAUDE.md`). Meanwhile
+//! dependency decision in its own right (root `CLAUDE.md`). `MYQ1` is not a
+//! counter-example and is stated apart rather than listed above, because it is
+//! **provider-agnostic** (`protocol.md` § 9.14.2): its PIN provider derives a
+//! `wrap_key` through Argon2id with no keychain, so it does ship on Windows and
+//! Linux. It cannot serve this read for the other reason, which is that a
+//! PIN-derived key needs the user to type the PIN. Meanwhile
 //! `threat-model.md` § 6 claims screen-capture protection **only** on Windows 10
-//! build 19041+. A sealed override would therefore exist on the two platforms where
-//! there is nothing to escape from and be absent on the one that goes black.
+//! build 19041+. A sealed override would therefore exist on macOS alone, the
+//! platform where nothing is claimed, and be absent on BOTH Linux and Windows.
+//! Not "the two platforms where there is nothing to escape from", which an
+//! earlier revision of this paragraph said in three files: Linux has no
+//! keychain arm either, so it gets nothing, and the sentence contradicted its
+//! own premise two lines above.
 //!
 //! So it is a plaintext device-local file, one more of a family already under
 //! `<app_config_dir>`: `sync-config.json`, `tor-routing.json`,
 //! `legal-consent.json`, `vault-names.json`, `backup-schedule.json`,
 //! `clipper-install.json` and `ai-endpoint.json`. **Do not write a count here.**
 //! The first version of this paragraph said "the fourth of its kind" and named
-//! three, having missed `legal_consent.rs`. Which is the same module shape
-//! under the same directory. And the same wrong number reached the decision
+//! three, having missed `legal_consent.rs`, which is the same module shape
+//! under the same directory, and the same wrong number reached the decision
 //! entry and `threat-model.md`. Nobody can enumerate that family from memory
 //! because no seam holds the roster, which is the finding rather than the typo.
 //! `decisions.md` 0131 rejected a plaintext file for the
 //! *per-vault preference*, where `vault.prefs` was available and free; that
 //! reasoning does not reach a setting `vault.prefs` structurally cannot hold. The
-//! leak it does create is one bit to an at-rest observer. "this device's window is
-//! capturable". Which is a targeting signal they cannot act on without the local
+//! leak it does create is one bit to an at-rest observer: "this device's window is
+//! capturable", which is a targeting signal they cannot act on without the local
 //! code execution that § 6 already records as able to reset the affinity itself.
 //! Stated in `threat-model.md` § 7 rather than argued away.
 //!
@@ -70,7 +81,7 @@
 //! ([`protection_disabled_at_rest`]). A damaged file resolving to "disabled" would
 //! switch a security control off for a user who may never have asked for that, on
 //! the strength of bytes nobody can read. Resolving it the other way costs that user
-//! the black window again. Which is the exact lockout this module exists to open,
+//! the black window again, which is the exact lockout this module exists to open,
 //! so it is not a cost to wave past. The `--disable-screen-capture-protection`
 //! process flag is the recovery path for precisely that case, and it is why the flag
 //! ships alongside the file rather than instead of it.
@@ -288,8 +299,8 @@ mod tests {
     }
 
     // The rule this file inverts. If `hide_flag`'s reducer and this one ever agree
-    // on a damaged file, one of the two has silently adopted the other's direction
-    //. And each is the privacy-preserving answer for its own subject.
+    // on a damaged file, one of the two has silently adopted the other's direction,
+    // and each is the privacy-preserving answer for its own subject.
     #[test]
     fn a_damaged_file_fails_the_opposite_way_from_the_hide_names_flag() {
         let ours = protection_disabled_at_rest(Err(ScreenCaptureOverrideError::Parse));

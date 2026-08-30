@@ -18,8 +18,17 @@
 //    two-independent-calls shape the other three sites had. And the ordering
 //    lived in a comment. If a `window.show` ever reappears here, the invariant is
 //    back to being a convention.
-// 2. A refusal is swallowed. The web dispatcher answers the whole plugin
-//    `Unsupported`; a page has no hidden window and no affinity to lose.
+// 2. A refusal does not escape. Web never reaches the call at all: the hook
+//    returns early on the absent `screenCaptureProtection` capability, so the
+//    wasm dispatcher's `Unsupported` for the whole plugin is a second line of
+//    defence rather than the mechanism. A failure that does happen is logged
+//    rather than swallowed, because this call is the one that brings the window
+//    back and a silent loss leaves the user looking at nothing.
+//
+//    NEITHER of those is asserted below, and saying so is the point: the header
+//    used to describe a swallow and a dispatcher round trip, both of which the
+//    code stopped doing. The gate and the warn are covered by review and by
+//    `check-web-command-coverage.mjs`, not here.
 // 3. It fires once per mount, not per render.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
