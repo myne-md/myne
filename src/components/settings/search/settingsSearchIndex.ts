@@ -110,6 +110,23 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.screenCapture",
   },
   {
+    // myne-md/myne#482. The device-local escape hatch, mirrored here so a user
+    // who took it pre-unlock has an obvious way back. Same `capability` gate as
+    // the row above and for the same reason: PrivacyPanel omits it where there
+    // is no capture affinity to suppress, and an untagged entry would navigate
+    // to an anchor that was never rendered.
+    //
+    // No `developerGated`: the person this exists for is a low-vision or
+    // remote-desktop user on a black window, and a setting behind Developer
+    // mode cannot be found by them.
+    id: "privacy.screen-capture-override",
+    capability: "screenCaptureProtection",
+    panelId: "privacy",
+    titleKey: "settings.privacy.screenCaptureOverrideLabel",
+    descriptionKey: "settings.privacy.screenCaptureOverrideHelper",
+    keywordsKey: "settings.search.keywords.screenCaptureOverride",
+  },
+  {
     // myne-md/myne#411. One gate, and deliberately not the other.
     //
     // `capability`, because PrivacyPanel omits the row where

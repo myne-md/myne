@@ -58,6 +58,12 @@ pub mod note_txn;
 pub mod paths;
 pub mod plugins;
 pub mod protocol_error_kind;
+/// The device-local screen-capture override (myne-md/myne#482). One plaintext
+/// boolean under `<app_config_dir>` that the startup hook reads BEFORE any
+/// vault exists, which is what makes the pre-unlock lockout escapable.
+/// Top-level rather than under `plugins/` for the reason `vault_label` is:
+/// the plugin, the setup hook and the lock path all consume it and none owns it.
+pub mod screen_capture_override;
 pub mod task;
 // The full-text search engine (MYS1) + its encrypted persistence/reconcile core.
 // Top-level (not under `plugins/`) mirroring the desktop `mod search;` it

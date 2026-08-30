@@ -1,9 +1,9 @@
 //! Screen-capture protection — startup default-ON + runtime override.
 //!
-//! Two-function public API per `decisions.md` 2026-05-27 entries
-//! ("Tauri `set_content_protected` abstraction over direct FFI" +
-//! "Lock-on-default-ON" + "Vault preferences blob") and MYND-160 grill
-//! Q5.3:
+//! The original two-function public API, per `decisions.md` 2026-05-27
+//! entries ("Tauri `set_content_protected` abstraction over direct
+//! FFI" + "Lock-on-default-ON" + "Vault preferences blob") and
+//! MYND-160 grill Q5.3:
 //!
 //! - [`init`] — startup hook called from `tauri::Builder::setup`. Calls
 //!   `set_content_protected(true)` before the window's first paint
@@ -19,13 +19,39 @@
 //!   not-found degrades to a single tracing::warn so a stale call
 //!   after `tauri::AppHandle::cleanup_before_exit` does not blow up.
 //!
-//! Both call sites share the private [`apply_inner`] helper. The
-//! `site: &'static str` parameter distinguishes the three call sites
+//! Two more entry points landed with myne-md/myne#482 and #483:
+//!
+//! - [`reassert`]. Re-apply whatever was last requested, for a window
+//!   that has just come back from hidden. See [`ScreenCaptureState`].
+//! - [`show_protected`]. The one implementation of "bring the main
+//!   window back", replacing the `unminimize` / `show` / `set_focus`
+//!   block that was written out at three call sites and missing its
+//!   protection step at all three.
+//!
+//! All of them bottom out in [`apply_inner`], which is `pub(crate)`
+//! rather than private because the pdf-export plugin drives its own
+//! hidden render window through it. The
+//! `site: &'static str` parameter distinguishes the call sites
 //! in tracing output (`"startup_init"` / `"runtime_apply"` /
-//! `"lock_reset"`) without expanding the public API — semantic intent
-//! travels in tracing labels rather than additional functions. There
-//! is **no** `reset_to_default` function; lock-time callers use
+//! `"lock_reset"` / `"pdf_export_window"`, and now
+//! `"single_instance_show"` / `"macos_reopen"` / `"clipper_raise"` /
+//! `"webview_reveal"`) without expanding the public API. Semantic
+//! intent travels in tracing labels rather than additional functions.
+//! There is **no** `reset_to_default` function; lock-time callers use
 //! `apply(app, true)` with the appropriate site label.
+//!
+//! ## The device-local override
+//!
+//! Every state this module applies is `requested && !override`, where
+//! the override is the device-local escape hatch of myne-md/myne#482
+//! ([`myne_core::screen_capture_override`]) plus the
+//! `--disable-screen-capture-protection` process flag. It exists because
+//! the protection is always ON before unlock and the toggle that could
+//! clear it is sealed inside `vault.prefs`, so a user on remote-control
+//! software or a magnifier could see a black unlock screen with no path
+//! to the control. It is **device-wide, not pre-unlock-only**: an
+//! override that lapsed at unlock would put the black window straight
+//! back in front of the person it exists for.
 //!
 //! ## Failure-mode asymmetry
 //!
@@ -66,17 +92,245 @@
 //!
 //! ## Capability ACL
 //!
-//! No IPC command is exposed from this module — both `init` and `apply`
-//! are Rust-internal entry points called from the host's setup hook
-//! and other plugins respectively. The `set_screen_capture_protection`
-//! IPC lives in the prefs plugin (Task 9) and is gated by its own
-//! `prefs:allow-set-screen-capture-protection` permission entry.
+//! [`init`], [`apply`] and [`reassert`] are Rust-internal entry points,
+//! called from the host's setup hook, from other plugins, and from the
+//! override-set command respectively. **[`show_protected`] is not**: it
+//! is also reached from page context as
+//! `plugin:screen-capture|screen_capture_show_protected`, gated by
+//! `screen-capture:allow-screen-capture-show-protected`, because the
+//! fourth re-show site is the WebView asking for its window back after
+//! idle auto-lock (`src/hooks/useRevealAfterIdleLock.ts`). It takes no
+//! argument and every value it applies is state the backend already
+//! holds, so the strongest thing page context can do with it is re-show
+//! the window in the state it was already meant to be in. That grant
+//! REPLACED `core:window:allow-show`, whose only consumer this was.
 //!
-//! See: ../../CLAUDE.md "Secret-handling logging discipline" — the
+//! Two other IPCs govern this module's inputs and live elsewhere: the
+//! per-vault `set_screen_capture_protection` in the prefs plugin
+//! (`prefs:allow-set-screen-capture-protection`), and the device-local
+//! override pair in `plugins::screen_capture`
+//! (`screen-capture:allow-screen-capture-override-{get,set}`).
+//!
+//! See: ../../CLAUDE.md "Secret-handling logging discipline". The
 //! warn-on-failure path uses a closed-enum kind helper, never `?e`
 //! Debug-formats the underlying `tauri::Error`.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tauri::Manager;
+
+/// Everything every screen-capture decision on the main window is made from,
+/// `app.manage`d once in `Builder::setup` before [`init`] runs.
+///
+/// ## Why the requested value is recorded rather than re-derived
+///
+/// myne-md/myne#483 is that protection is applied at the lock site and at no
+/// re-show site, and the Windows affinity is reported to reset across a
+/// hide/show cycle (tauri-apps/tauri#14189; Electron fixed the same thing in
+/// electron/electron#45868). Closing it means re-applying after every `show()`,
+/// which needs an answer to "what state should this window be in right now".
+///
+/// The issue proposed deriving it. `true` while the vault is locked, the
+/// persisted preference once unlocked. That answer needs a `VaultRuntimeState`
+/// read at each site, which is async behind an `RwLock` and would put a
+/// `block_on` on the single-instance callback; and it is a *second* opinion
+/// about a value [`apply`] already knows, so the two can disagree. Recording
+/// what was last requested cannot disagree, because [`apply`] is the only
+/// writer and every caller already routes through it.
+///
+/// ## Why the override is here rather than read per call
+///
+/// The device-local escape hatch (myne-md/myne#482) lives in a file
+/// ([`myne_core::screen_capture_override`]) and reading a file is async. It is
+/// read once at startup, and re-read only when the command that writes it says
+/// so, so every `apply` on the hot path stays a synchronous atomic load.
+///
+/// ## Two override sources, and only one of them is writable
+///
+/// The persisted file and the `--disable-screen-capture-protection` process
+/// flag are kept apart rather than OR-ed once at startup, because the UI has to
+/// be able to say which one is in force. A flag-launched run whose Privacy row
+/// offered to "turn protection back on" would write `disabled: false` to disk,
+/// report success, and leave the window exactly as unprotected as before.
+#[derive(Debug)]
+pub struct ScreenCaptureState {
+    /// The persisted half of the override, as `screen-capture.json` had it at
+    /// startup and as the command rewrites it.
+    file_disabled: AtomicBool,
+    /// The process-flag half.
+    ///
+    /// Atomic and set-only, because argv reaches this process twice. Once at
+    /// launch, and once more whenever a SECOND launch is folded back in by
+    /// `tauri-plugin-single-instance`, which is the shape the recovery path
+    /// actually takes: the app is already running and showing a black window,
+    /// and the user reaches for the flag from a terminal. It only ever goes
+    /// from `false` to `true` for the same reason it used to be a plain
+    /// `bool`: an argv cannot be un-passed, and a later launch without the
+    /// flag is a request to run normally, not a request to override the
+    /// override.
+    via_flag: AtomicBool,
+    /// The last state a caller *asked* for, before the override is folded in.
+    /// Seeded `true` so a [`reassert`] that somehow precedes the first [`apply`]
+    /// asks for protection rather than for its absence.
+    last_requested: AtomicBool,
+}
+
+impl ScreenCaptureState {
+    /// Seed from the startup resolution: the device-local file, and separately
+    /// whether this run was launched with the flag.
+    pub fn new(file_disabled: bool, via_flag: bool) -> Self {
+        Self {
+            file_disabled: AtomicBool::new(file_disabled),
+            via_flag: AtomicBool::new(via_flag),
+            last_requested: AtomicBool::new(true),
+        }
+    }
+
+    /// Whether this device refuses protection, from either source.
+    pub fn override_disabled(&self) -> bool {
+        self.via_flag() || self.file_disabled.load(Ordering::Relaxed)
+    }
+
+    /// Whether the persisted file asks for the override, ignoring the flag.
+    /// This is what the Settings control reflects, so a flag-launched run does
+    /// not show a switch the user never set.
+    pub fn file_disabled(&self) -> bool {
+        self.file_disabled.load(Ordering::Relaxed)
+    }
+
+    /// Whether this process has been handed
+    /// `--disable-screen-capture-protection`, at launch or by a later one.
+    pub fn via_flag(&self) -> bool {
+        self.via_flag.load(Ordering::Relaxed)
+    }
+
+    /// Fold in a flag that arrived on a SECOND launch.
+    ///
+    /// Set-only: there is no clearing counterpart, because a later launch
+    /// WITHOUT the flag is a request to run normally rather than a request to
+    /// cancel an override the user asked for a moment ago. Quitting is how a
+    /// flag is un-passed, which is what a new process means.
+    pub fn note_flag_relaunch(&self) {
+        self.via_flag.store(true, Ordering::Relaxed);
+    }
+
+    /// Point the persisted half at a new value. The caller re-applies; this
+    /// only records, so the write to disk and the native call keep the ordering
+    /// the prefs IPC already establishes (disk first, then native).
+    pub fn set_file_disabled(&self, disabled: bool) {
+        self.file_disabled.store(disabled, Ordering::Relaxed);
+    }
+
+    /// The last requested state, as [`reassert`] replays it.
+    pub fn last_requested(&self) -> bool {
+        self.last_requested.load(Ordering::Relaxed)
+    }
+
+    /// Record what was asked for and answer what may actually be applied.
+    ///
+    /// The override only ever *removes* protection (`requested && !override`),
+    /// so a device that has opted out cannot be protected by a later `apply`,
+    /// and a device that has not opted out is unaffected by this line.
+    ///
+    /// What is recorded is the **requested** value, not the resolved one. If it
+    /// were the resolved one, an opted-out device would record `false` forever
+    /// and clearing the override would then re-assert that `false`.
+    fn record_and_resolve(&self, requested: bool) -> bool {
+        self.last_requested.store(requested, Ordering::Relaxed);
+        requested && !self.override_disabled()
+    }
+}
+
+/// The argv flag that turns protection off for one run.
+///
+/// Signal shipped `--disable-screen-security` one day after the first
+/// remote-desktop lockout report (7.56). This is the same escape hatch under a
+/// name that says what it disables, and it exists *alongside* the persisted
+/// override rather than instead of it: a person who cannot see the window at
+/// first run has no terminal in front of them, and a person whose
+/// `screen-capture.json` is unreadable has no working control (that file fails
+/// towards protection, deliberately
+/// ([`myne_core::screen_capture_override::protection_disabled_at_rest`]).
+pub const DISABLE_FLAG: &str = "--disable-screen-capture-protection";
+
+/// Whether `args` (the process argv, minus the program) carries [`DISABLE_FLAG`].
+///
+/// Takes the iterator rather than reading argv itself so the match can be
+/// tested, and compares `OsStr` rather than `String`: `std::env::args()` panics
+/// on non-UTF-8 argv, and `lib.rs` already carries a comment about not putting
+/// that on the boot path.
+pub fn flag_in<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    let flag = std::ffi::OsStr::new(DISABLE_FLAG);
+    args.into_iter().any(|a| a.as_ref() == flag)
+}
+
+/// Resolve the device-local override at startup: the file AND the flag.
+///
+/// **Both, always, with no short-circuit.** An earlier version returned as soon
+/// as the flag was found, leaving `file_disabled` reporting `false` over a file
+/// that said `true`. And that value is not cosmetic, it is what the setter
+/// writes back. The pre-unlock escape drove its action off the resolved state,
+/// so on a flag-launched run the only offered action was "restore", and
+/// confirming replaced the user's persisted `disabled: true` with `false`. The
+/// next launch without the flag then resolved to `false` and put the black
+/// window back in front of the account number and the recovery-phrase ceremony,
+/// which is the exact lockout this whole feature exists to open. Reading both
+/// makes the state describe the disk, and the defect unrepresentable rather than
+/// merely fixed.
+///
+/// A path that cannot be resolved at all answers `false`, meaning protection
+/// applied, which is the same posture `plugins::sync::tor::restore_at_startup` takes for
+/// its own device-local config when `app_config_dir` is unreachable, and the
+/// same direction a damaged file takes.
+pub fn override_at_startup(app: &tauri::App) -> ScreenCaptureState {
+    let via_flag = flag_in(std::env::args_os().skip(1));
+    let host = myne_core::host::tauri_host::TauriHost::new(app.handle().clone());
+    let file_disabled = tauri::async_runtime::block_on(async {
+        use myne_core::screen_capture_override as sco;
+        match sco::screen_capture_override_path_from_host(&host, &myne_core::vault_io::StdVaultIo)
+            .await
+        {
+            Ok(path) => sco::protection_disabled_at_rest(
+                sco::read_screen_capture_override(&myne_core::vault_io::StdVaultIo, &path).await,
+            ),
+            Err(_) => false,
+        }
+    });
+    tracing::info!(
+        event = "screen_capture_override_resolved",
+        file_disabled,
+        via_flag,
+    );
+    ScreenCaptureState::new(file_disabled, via_flag)
+}
+
+/// Fold the managed state into a requested value.
+///
+/// A missing state resolves to the requested value unchanged, which is the
+/// pre-#482 behaviour and the safe direction: protection stays on. It is still
+/// warned about, because in a shipped build it can only mean the `app.manage`
+/// in `Builder::setup` was moved after a call site.
+fn resolve<R: tauri::Runtime, M: Manager<R>>(
+    manager: &M,
+    requested: bool,
+    site: &'static str,
+) -> bool {
+    match manager.try_state::<ScreenCaptureState>() {
+        Some(state) => state.record_and_resolve(requested),
+        None => {
+            tracing::warn!(
+                event = "screen_capture_state_absent",
+                site,
+                "screen-capture state not managed; applying the requested value unresolved"
+            );
+            requested
+        }
+    }
+}
 
 /// Apply screen-capture protection to the main window, then show it.
 ///
@@ -106,7 +360,11 @@ pub fn init(app: &tauri::App) -> Result<(), tauri::Error> {
          screen_capture::init owns the only `show()` call"
     );
 
-    apply_inner(&window, true, "startup_init");
+    // `true` is what the app ASKS for at startup; the device-local override
+    // (myne-md/myne#482) is the only thing that can turn that into `false`, and
+    // it does so through the same resolver every other call site uses.
+    let effective = resolve(app, true, "startup_init");
+    apply_inner(&window, effective, "startup_init");
 
     // Both `set_content_protected` (inside `apply_inner`) and `show()`
     // dispatch via Tauri's event loop (winit/tao backend). FIFO
@@ -140,15 +398,163 @@ pub fn init(app: &tauri::App) -> Result<(), tauri::Error> {
 /// request; `vault_unlock` and `vault_lock` always pass the persisted
 /// preference and `true` respectively.
 pub fn apply<R: tauri::Runtime>(app: &tauri::AppHandle<R>, enabled: bool, site: &'static str) {
-    let Some(window) = app.get_webview_window("main") else {
+    let Some(window) = main_window(app, site) else {
+        return;
+    };
+    let effective = resolve(app, enabled, site);
+    apply_inner(&window, effective, site);
+}
+
+/// The main window, or a warn and `None`.
+///
+/// Shared by [`apply`] and [`show_protected`] so the degradation is stated
+/// once: a stale call after `tauri::AppHandle::cleanup_before_exit`, or the
+/// hypothetical multi-window edge, warns and returns rather than propagating.
+fn main_window<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    site: &'static str,
+) -> Option<tauri::WebviewWindow<R>> {
+    let window = app.get_webview_window("main");
+    if window.is_none() {
         tracing::warn!(
             event = "screen_capture_protection_failed",
             site,
             reason = "window_not_found",
         );
+    }
+    window
+}
+
+/// The state to replay, for the two callers that re-apply rather than set.
+///
+/// Shared by [`reassert`] and [`show_protected`] so the unmanaged-state case
+/// cannot answer differently in the two: they used to, one warning and one
+/// silently assuming `true`, which is how a missing `app.manage` would have
+/// been reported on one re-show path and not the other.
+fn replay_target<R: tauri::Runtime>(app: &tauri::AppHandle<R>, site: &'static str) -> bool {
+    match app.try_state::<ScreenCaptureState>() {
+        Some(state) => state.last_requested(),
+        None => {
+            tracing::warn!(
+                event = "screen_capture_state_absent",
+                site,
+                "screen-capture state not managed; re-asserting protection"
+            );
+            true
+        }
+    }
+}
+
+/// Re-apply whatever protection state the app last asked for.
+///
+/// The other half of myne-md/myne#483: [`apply`] answers "the state changed",
+/// this answers "the window came back and may have lost it". It replays
+/// [`ScreenCaptureState::last_requested`] rather than deriving a fresh answer,
+/// so it cannot disagree with what was actually applied. See that type's docs
+/// for why deriving was rejected.
+///
+/// Best-effort in the same three ways [`apply`] is: no window, no managed state
+/// and a failing native call each warn and return.
+pub fn reassert<R: tauri::Runtime>(app: &tauri::AppHandle<R>, site: &'static str) {
+    apply(app, replay_target(app, site), site);
+}
+
+/// Bring the main window back and keep it protected across the trip.
+///
+/// **The one implementation of "re-show the main window", for every client.**
+/// Before myne-md/myne#483 the three-line `unminimize` / `show` / `set_focus`
+/// block was written out at three call sites and the fourth thing. Re-applying
+/// protection. Was missing from all three. One function is what makes that
+/// omission impossible to repeat rather than merely fixed three times.
+///
+/// **The fourth site goes through it too**, from page context, as
+/// `plugin:screen-capture|screen_capture_show_protected`. An earlier revision
+/// left the WebView holding its own `getCurrentWindow().show()` with a separate
+/// re-assert after it, which is the same two-independent-calls shape the other
+/// three had. The ordering held by a comment rather than by construction, at
+/// the site the decision entry itself calls the worst of the four. Folding it
+/// in also let `core:window:allow-show` be dropped from the capability set: the
+/// page trades a raw window operation it could aim anywhere for one fixed
+/// sequence it cannot parameterise.
+///
+/// See [`raise_sequence`] for why protection is applied on BOTH sides of the
+/// `show()`.
+pub fn show_protected<R: tauri::Runtime>(app: &tauri::AppHandle<R>, site: &'static str) {
+    let Some(window) = main_window(app, site) else {
         return;
     };
-    apply_inner(&window, enabled, site);
+    let effective = resolve(app, replay_target(app, site), site);
+    raise_sequence(
+        &TauriRaise {
+            window: &window,
+            site,
+        },
+        effective,
+    );
+}
+
+/// The five steps of a re-show, in the order they have to happen.
+///
+/// **Protection is applied on both sides of the `show()`, deliberately.** The
+/// two calls cover different failures and neither covers both:
+///
+/// * The **pre-show** call is [`init`]'s `visible: false` then protect then
+///   `show()` discipline applied to a hidden window, and it is the one that
+///   holds wherever the affinity survives a hide/show cycle.
+/// * The **post-show** call is the one that holds where it does not.
+///   tauri-apps/tauri#14189 reports `WDA_EXCLUDEFROMCAPTURE` resetting to
+///   `WDA_NONE` across `hide()`/`show()` on Windows, and Electron shipped the
+///   same fix for the same reason (electron/electron#45868). Applying only
+///   before the show would be clobbered by the show itself.
+///
+/// `set_focus` goes last, as it did at all three original call sites: focus is
+/// what draws the user's eye, so nothing that could still change what is on
+/// screen may run after it.
+fn raise_sequence<W: RaisableWindow>(window: &W, effective: bool) {
+    window.protect(effective);
+    window.unminimize();
+    window.show();
+    window.protect(effective);
+    window.focus();
+}
+
+/// The four window operations [`raise_sequence`] performs, behind a trait so the
+/// ORDER can be asserted without a running Tauri runtime.
+///
+/// Same shape and same motive as `auto_lock::LockTeardown`: the sequence is the
+/// property worth testing, and a `WebviewWindow` cannot be constructed in a unit
+/// test.
+trait RaisableWindow {
+    fn protect(&self, enabled: bool);
+    fn unminimize(&self);
+    fn show(&self);
+    fn focus(&self);
+}
+
+/// The production [`RaisableWindow`], over a real Tauri window. Every call is
+/// best-effort. A re-show that half-works still beats a window that stays
+/// hidden, which is what `RunEvent::Reopen` exists to prevent.
+struct TauriRaise<'a, R: tauri::Runtime> {
+    window: &'a tauri::WebviewWindow<R>,
+    /// Carried on the struct rather than threaded through every trait method:
+    /// only `protect` uses it, and the recording double had to accept and
+    /// ignore it at each call.
+    site: &'static str,
+}
+
+impl<R: tauri::Runtime> RaisableWindow for TauriRaise<'_, R> {
+    fn protect(&self, enabled: bool) {
+        apply_inner(self.window, enabled, self.site);
+    }
+    fn unminimize(&self) {
+        let _ = self.window.unminimize();
+    }
+    fn show(&self) {
+        let _ = self.window.show();
+    }
+    fn focus(&self) {
+        let _ = self.window.set_focus();
+    }
 }
 
 /// Shared inner implementation called by [`init`] (with
@@ -238,6 +644,184 @@ mod tests {
             screen_capture_protection_error_kind(&e),
             "other_tauri_error"
         );
+    }
+
+    /// Recording [`RaisableWindow`], the same device `auto_lock`'s
+    /// `LockTeardown` double is: the ORDER is the property, and a real
+    /// `WebviewWindow` cannot be built in a unit test.
+    #[derive(Default)]
+    struct RecordingWindow {
+        log: std::cell::RefCell<Vec<String>>,
+    }
+
+    impl RaisableWindow for RecordingWindow {
+        fn protect(&self, enabled: bool) {
+            self.log.borrow_mut().push(format!("protect({enabled})"));
+        }
+        fn unminimize(&self) {
+            self.log.borrow_mut().push("unminimize".into());
+        }
+        fn show(&self) {
+            self.log.borrow_mut().push("show".into());
+        }
+        fn focus(&self) {
+            self.log.borrow_mut().push("focus".into());
+        }
+    }
+
+    #[test]
+    fn a_reshow_protects_on_both_sides_of_the_show_and_focuses_last() {
+        let w = RecordingWindow::default();
+        raise_sequence(&w, true);
+        assert_eq!(
+            w.log.into_inner(),
+            vec![
+                "protect(true)",
+                "unminimize",
+                "show",
+                "protect(true)",
+                "focus"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_reshow_on_an_opted_out_device_protects_nothing_and_still_shows() {
+        // The override reaches the sequence as a resolved `false`. The window
+        // must still come back. A device that opted out of protection did not
+        // opt out of being able to see the unlock screen.
+        let w = RecordingWindow::default();
+        raise_sequence(&w, false);
+        assert_eq!(
+            w.log.into_inner(),
+            vec![
+                "protect(false)",
+                "unminimize",
+                "show",
+                "protect(false)",
+                "focus"
+            ]
+        );
+    }
+
+    #[test]
+    fn the_override_can_only_remove_protection_never_add_it() {
+        let on = ScreenCaptureState::new(false, false);
+        assert!(on.record_and_resolve(true), "no override, asked on");
+        assert!(!on.record_and_resolve(false), "no override, asked off");
+
+        let off = ScreenCaptureState::new(true, false);
+        assert!(!off.record_and_resolve(true), "override beats an asked-on");
+        assert!(!off.record_and_resolve(false), "override, asked off");
+    }
+
+    #[test]
+    fn the_recorded_request_is_what_was_asked_for_not_what_was_applied() {
+        // The distinction is the whole point: on an opted-out device every
+        // `apply` resolves to `false`, and if the recorded value followed the
+        // RESOLVED one, turning the override back off would re-assert `false`
+        // forever.
+        let state = ScreenCaptureState::new(true, false);
+        assert!(!state.record_and_resolve(true));
+        assert!(state.last_requested());
+
+        state.set_file_disabled(false);
+        assert!(state.record_and_resolve(state.last_requested()));
+    }
+
+    #[test]
+    fn a_fresh_state_asks_for_protection_before_anything_has_applied() {
+        // `reassert` seeds from this. Seeding `false` would mean a re-show that
+        // somehow beat the first `apply` re-showed an unprotected window.
+        assert!(ScreenCaptureState::new(false, false).last_requested());
+        assert!(ScreenCaptureState::new(true, false).last_requested());
+    }
+
+    #[test]
+    fn the_flag_overrides_and_the_command_cannot_clear_it() {
+        // The failure this rules out: a flag-launched run whose Settings row
+        // writes `disabled: false`, reports success, and leaves the window
+        // exactly as unprotected as it was.
+        let flagged = ScreenCaptureState::new(false, true);
+        assert!(flagged.override_disabled());
+        assert!(flagged.via_flag());
+        assert!(!flagged.file_disabled(), "the file said nothing");
+
+        flagged.set_file_disabled(false);
+        assert!(
+            flagged.override_disabled(),
+            "clearing the file must not clear the flag"
+        );
+    }
+
+    #[test]
+    fn the_two_override_sources_are_reported_apart() {
+        let from_file = ScreenCaptureState::new(true, false);
+        assert!(from_file.override_disabled());
+        assert!(from_file.file_disabled());
+        assert!(!from_file.via_flag());
+    }
+
+    #[test]
+    fn the_flag_is_matched_whole_and_only_as_itself() {
+        assert!(flag_in([DISABLE_FLAG]));
+        assert!(flag_in(["--other", DISABLE_FLAG, "x"]));
+        assert!(!flag_in(["--disable-screen-capture"]), "prefix");
+        assert!(
+            !flag_in(["--disable-screen-capture-protection=1"]),
+            "suffix"
+        );
+        assert!(!flag_in(["-disable-screen-capture-protection"]), "one dash");
+        assert!(!flag_in(Vec::<&str>::new()));
+    }
+
+    #[test]
+    fn a_non_utf8_argv_does_not_stop_the_flag_being_found() {
+        // `std::env::args()` panics on non-UTF-8 argv, which is why this takes
+        // `OsStr`. A deep link arriving as a second launch is one way such an
+        // argument reaches the boot path.
+        let bad = non_utf8_os_string();
+        assert!(flag_in([bad.clone(), DISABLE_FLAG.into()]));
+        assert!(!flag_in([bad]));
+    }
+
+    #[cfg(unix)]
+    fn non_utf8_os_string() -> std::ffi::OsString {
+        use std::os::unix::ffi::OsStringExt;
+        std::ffi::OsString::from_vec(vec![0x66, 0x6f, 0x80, 0x6f])
+    }
+
+    #[cfg(windows)]
+    fn non_utf8_os_string() -> std::ffi::OsString {
+        use std::os::windows::ffi::OsStringExt;
+        std::ffi::OsString::from_wide(&[0x66, 0x6f, 0xD800, 0x6f])
+    }
+
+    /// No fifth re-show site may hand-roll the sequence.
+    ///
+    /// This is the regression [`show_protected`] exists to make impossible, and
+    /// nothing else can see it: the block compiles, the window comes back, and
+    /// only the protection is missing. Asserted over the source of the three
+    /// files that used to carry a copy, because there is no runtime moment at
+    /// which a hand-rolled block announces itself.
+    ///
+    /// Deleting the body of `show_protected` is the other half, and it surfaces
+    /// as a `dead_code` warning on `raise_sequence` and `TauriRaise` under
+    /// `-D warnings`, which `pre-push` and CI both run.
+    #[test]
+    fn the_reshow_sequence_is_not_hand_rolled_anywhere_else() {
+        for (name, src) in [
+            ("lib.rs", include_str!("lib.rs")),
+            ("clipper/relay_app.rs", include_str!("clipper/relay_app.rs")),
+            ("auto_lock.rs", include_str!("auto_lock.rs")),
+        ] {
+            assert!(
+                !src.contains(".unminimize()"),
+                "{name} raises a window by hand; every re-show goes through \
+                 `screen_capture::show_protected`, which is what keeps the \
+                 protect/show/protect ordering a property of the code"
+            );
+        }
     }
 
     // Note: `apply_inner` requires a `WebviewWindow<R>` instance which

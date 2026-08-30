@@ -435,6 +435,24 @@ fn main() {
             ]),
         )
         .plugin(
+            "screen-capture",
+            // myne-md/myne#482 + #483: the device-local escape hatch from
+            // screen-capture protection. `screen_capture_override_get` (read)
+            // + `screen_capture_override_set` (write, and the write turns a
+            // defence-in-depth control off device-wide). Plus
+            // `screen_capture_show_protected`, the WebView's door to the one
+            // host-side re-show sequence (which replaced its own `window.show()`). Same InlinedPlugin
+            // discipline as the plugins above; without a matching
+            // `commands.allow` entry in
+            // `permissions/screen-capture/default.toml` the ACL resolver never
+            // authorizes the `plugin:screen-capture|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "screen_capture_override_get",
+                "screen_capture_override_set",
+                "screen_capture_show_protected",
+            ]),
+        )
+        .plugin(
             "spell",
             // MYND-262/266: spell_check (read) + add_to_personal_dictionary /
             // ignore_word_in_vault (Slot::Unlocked-gated writers). InlinedPlugin

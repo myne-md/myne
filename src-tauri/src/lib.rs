@@ -248,7 +248,6 @@ pub fn run() {
     // layer. See `decisions.md` 2026-05-06 entry.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-        use tauri::Manager;
         // MYND-567: on Windows + Linux the OS delivers a `myne://` deep link by
         // spawning a SECOND process whose only argv is the URL — so the
         // single-instance callback is the deep link's arrival path there. Hand
@@ -267,16 +266,30 @@ pub fn run() {
             use tauri_plugin_deep_link::DeepLinkExt;
             app.deep_link().handle_cli_arguments(args.iter());
         }
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.unminimize();
-            // `show()` is load-bearing, not redundant with `unminimize()`:
-            // auto-lock on idle calls `window.hide()` (orderOut on macOS), which
-            // leaves the window HIDDEN rather than minimized. `unminimize()` is a
-            // no-op on a hidden window, so without `show()` the window stays
-            // invisible after a re-launch. See `auto_lock::hide_window`.
-            let _ = window.show();
-            let _ = window.set_focus();
+        // The `show()` inside is load-bearing, not redundant with
+        // `unminimize()`: auto-lock on idle calls `window.hide()` (orderOut on
+        // macOS), which leaves the window HIDDEN rather than minimized.
+        // `unminimize()` is a no-op on a hidden window, so without `show()` the
+        // window stays invisible after a re-launch. See `auto_lock::hide_window`.
+        //
+        // myne-md/myne#482: the second launch may be the ESCAPE. The recovery
+        // path the flag is documented for is "the app is already running,
+        // showing a black window, and the user reaches for a terminal". And a
+        // second launch exits into this callback, so without reading argv here
+        // the flag silently does nothing in the one situation it is advertised
+        // for. Folded in BEFORE the re-show, so the window that comes back is
+        // already resolved against it.
+        use tauri::Manager as _;
+        if let Some(state) = app.try_state::<screen_capture::ScreenCaptureState>() {
+            if screen_capture::flag_in(args.iter().skip(1)) {
+                state.note_flag_relaunch();
+                tracing::info!(event = "screen_capture_override_flag_relaunch");
+            }
         }
+        // myne-md/myne#483: that hide/show cycle is also where the Windows
+        // capture affinity is reported to be lost, so the re-show and the
+        // re-apply are one call rather than two things to remember.
+        screen_capture::show_protected(app, "single_instance_show");
     }));
 
     let builder = builder
@@ -330,6 +343,11 @@ pub fn run() {
         // unconditionally and reachable pre-unlock, because the picker it
         // governs is the screen that renders before any vault is open.
         .plugin(plugins::vault_label::init())
+        // myne#482 + #483: the device-local screen-capture escape hatch and
+        // the WebView-side re-assert. Registered unconditionally and
+        // reachable pre-unlock, because the pre-unlock set is exactly what a
+        // locked-out user cannot see.
+        .plugin(plugins::screen_capture::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
         // ext-foundation-handoff task 4: the browser-extension pairing
@@ -436,6 +454,13 @@ pub fn run() {
                     );
                 }
             }
+            // myne-md/myne#482: resolve the device-local escape hatch BEFORE
+            // the first frame, and manage it before anything can call
+            // `screen_capture::apply`. Both orderings are load-bearing:
+            // resolving late would paint one protected frame at a user who
+            // cannot see through it, and managing late would let an early
+            // `apply` run unresolved and warn about its own wiring.
+            app.manage(screen_capture::override_at_startup(app));
             // Apply screen-capture protection before `window.show()` so
             // the first frame is protected on macOS + Windows 10 build
             // 19041+. The main window is declared `"visible": false` in
@@ -612,17 +637,16 @@ pub fn run() {
             // callback (no new process is spawned). After auto-lock on idle hides
             // the window (`auto_lock::hide_window` → `orderOut`), this is the only
             // path that brings the (locked) unlock screen back. Without it the
-            // window stays hidden and the app looks frozen in the dock. Re-show +
-            // focus the existing main window; screen-capture protection is already
-            // re-applied at the lock site, so no plaintext is re-exposed.
+            // window stays hidden and the app looks frozen in the dock.
+            //
+            // myne-md/myne#483: this used to say protection was "already
+            // re-applied at the lock site, so no plaintext is re-exposed". The
+            // lock site re-applies while the window is HIDDEN, and a hide/show
+            // cycle is exactly where the Windows affinity is reported to be
+            // lost. So the lock-site call is not a substitute for one here.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
-                use tauri::Manager;
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    let _ = window.unminimize();
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+                screen_capture::show_protected(app_handle, "macos_reopen");
             }
             // MYND-650 task 2: terminate the arti sidecar before the process
             // goes away. A Tor client left holding circuits open after the app
