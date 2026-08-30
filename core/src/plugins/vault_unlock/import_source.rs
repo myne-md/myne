@@ -275,7 +275,6 @@ fn derive_from_phrase(
     use crate::plugins::vault_recover::commands::{derive_items_key, derive_root_key_from_phrase};
     use crate::plugins::vault_recover::error::VaultRecoveryError;
 
-
     let map = |e: VaultRecoveryError| match e {
         VaultRecoveryError::InvalidCredentialOrVault => VaultUnlockError::InvalidCredentialOrVault,
         _ => VaultUnlockError::InvalidVaultMeta,
@@ -725,7 +724,10 @@ mod import_source_read_tests {
         let state = VaultRuntimeState::default();
         block_on(async {
             state
-                .set_unlocked(id, crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1))
+                .set_unlocked(
+                    id,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
                 .await;
         });
         let host = TempHost {
@@ -788,7 +790,9 @@ mod import_source_read_tests {
             state
                 .set_recovering(
                     id,
-                    crate::plugins::vault_unlock::state::fixture_recovering_with_keys(0x11, 0x22, 0x33),
+                    crate::plugins::vault_unlock::state::fixture_recovering_with_keys(
+                        0x11, 0x22, 0x33,
+                    ),
                 )
                 .await;
         });
