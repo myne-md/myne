@@ -1,5 +1,5 @@
 // The pre-unlock escape hatch from screen-capture protection
-// (myne-md/myne#482), at the three places a locked-out user meets it.
+// (myne-md/myne#482), at the five places a locked-out user meets it.
 //
 //   sc1  a fresh install: the escape is reachable by KEYBOARD from a cold boot
 //        while being invisible, and taking it writes the device-local file.
@@ -7,6 +7,13 @@
 //        the same control offers the way back.
 //   sc3  a run launched with `--disable-screen-capture-protection`: the flag is
 //        reported apart from the file, and clearing the file does not clear it.
+//   sc4  the same flag run over a PERSISTED override: restoring protection
+//        records the intent for the next launch and does not overwrite the
+//        file's `true` with the flag's answer, which is the data-loss defect
+//        the short-circuited startup resolution shipped.
+//   sc5  the Unlock screen specifically: the password field is autofocused, so
+//        the route to the escape there is Shift+Tab rather than Tab, and it is
+//        the screen carrying the account number.
 //
 // ## READ THIS BEFORE CHANGING AN ASSERTION HERE
 //
@@ -35,9 +42,11 @@
 //     cannot be told "protection is back on" over a window that is still
 //     capturable.
 //
-// Vault-count precondition: 0 in sc1 and sc3 (a fresh install is the case the
-// issue is worst in. A first-run user reading a recovery phrase they cannot
-// see), 0 in sc2 as well; the override is device-wide and needs no vault.
+// Vault-count precondition: 0 in sc1 through sc4 (a fresh install is the case
+// the issue is worst in. A first-run user reading a recovery phrase they cannot
+// see), and the override is device-wide, so it needs no vault to exist. sc5 is
+// the exception and seeds one, because the Unlock screen is the thing it is
+// about: without a vault the app never routes there.
 // SYNC-13: nothing here touches a password, a phrase or an account number.
 
 import { expect, it } from "vitest";

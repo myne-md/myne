@@ -249,6 +249,43 @@ describe("pre-unlock escape: reachable without being visible", () => {
     expect(screen.getByTestId("screen-capture-escape.dialog")).toBeTruthy();
   });
 
+  it("does not re-offer the opposite action under its own success message", async () => {
+    // The write that produces `savedForNextLaunch` flips `view.disabled` to
+    // false, so every control keyed off it re-rendered INVERTED: the person who
+    // had just turned protection back on was looking at "Turn protection off"
+    // under "Saved", one Enter press from undoing it. Asserted as the ABSENCE
+    // of the confirm control rather than as its label, because a relabelled
+    // button that still fires `apply(true)` is the same defect.
+    stub({
+      [GET]: () =>
+        Promise.resolve({ disabled: true, via_flag: true, effective: true }),
+      [SET]: () =>
+        Promise.resolve({ disabled: false, via_flag: true, effective: true }),
+    });
+    render(<ScreenCaptureEscape />);
+    fireEvent.click(await screen.findByTestId("screen-capture-escape.trigger"));
+    fireEvent.click(await screen.findByTestId("screen-capture-escape.confirm"));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("screen-capture-escape.status").textContent,
+      ).toBe(t("screenCaptureEscape.savedForNextLaunch")),
+    );
+
+    expect(screen.queryByTestId("screen-capture-escape.confirm")).toBeNull();
+    // The title stays the one the user opened, not the inverted one.
+    expect(screen.getByText(t("screenCaptureEscape.restoreTitle"))).toBeTruthy();
+    expect(screen.queryByText(t("screenCaptureEscape.disableBody"))).toBeNull();
+    // The one control left dismisses, and it writes nothing on the way out.
+    const setCalls = invokeMock.mock.calls.filter(([cmd]) => cmd === SET).length;
+    fireEvent.click(screen.getByTestId("screen-capture-escape.cancel"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("screen-capture-escape.dialog")).toBeNull(),
+    );
+    expect(invokeMock.mock.calls.filter(([cmd]) => cmd === SET)).toHaveLength(
+      setCalls,
+    );
+  });
+
   it("still offers the escape when the override could not be read", async () => {
     // The person who needs this is the one who cannot see what went wrong, so a
     // failed read must not remove the control.
@@ -300,6 +337,64 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(false);
   });
 
+  it("names the process flag rather than the row below when only the flag holds", async () => {
+    // `{disabled: false, via_flag: true, effective: true}`: the switch is inert
+    // on `effective`, but the SENTENCE cannot key off it. The general helper
+    // sends the user to "Allow screen capture on this device" below, which in
+    // this state reads OFF, so it names a control that is already off and
+    // offers no route back at all. Both directions are asserted: the flag
+    // sentence present AND the file sentence absent.
+    stub({
+      [GET]: () =>
+        Promise.resolve({ disabled: false, via_flag: true, effective: true }),
+    });
+    render(<PrivacyPanel />);
+    const row = await screen.findByTestId("settings.screen-capture");
+    await waitFor(() =>
+      expect(row.getAttribute("data-superseded")).toBe("true"),
+    );
+    expect(
+      screen.getByText(t("settings.privacy.screenCaptureSupersededByFlag")),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(t("settings.privacy.screenCaptureSuperseded")),
+    ).toBeNull();
+    // Still inert: the flag governs the window whatever the vault preference says.
+    expect(
+      screen
+        .getByTestId("settings.screen-capture-toggle")
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+  });
+
+  it("retries the read on this surface after it failed on the other one", async () => {
+    // The shared cell used to mark the read STARTED before awaiting it, so one
+    // failure was permanent for the process: every later surface rendered
+    // `null` as "no override" and asserted protection was on because nobody
+    // could find out. Opening Settings after a failed boot read is the ordinary
+    // way out, so it has to ask again.
+    let reads = 0;
+    stub({
+      [GET]: () => {
+        reads += 1;
+        return reads === 1
+          ? Promise.reject({ kind: "Io" })
+          : Promise.resolve({ disabled: true, via_flag: false, effective: true });
+      },
+    });
+
+    const first = render(<ScreenCaptureEscape />);
+    await waitFor(() => expect(reads).toBe(1));
+    first.unmount();
+
+    render(<PrivacyPanel />);
+    const row = await screen.findByTestId("settings.screen-capture");
+    await waitFor(() =>
+      expect(row.getAttribute("data-superseded")).toBe("true"),
+    );
+    expect(reads).toBe(2);
+  });
+
   it("mirrors the override as its own row, and writes through it", async () => {
     stub();
     render(<PrivacyPanel />);
@@ -323,7 +418,11 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     // `process.cwd()` rather than `import.meta.url`: this spec runs under the
     // jsdom environment, where `import.meta.url` is not a file URL. Vitest runs
     // from the repo root.
-    const app = readFileSync(join(process.cwd(), "src/App.tsx"), "utf8");
+    // Annotated rather than inferred: `@types/node` is not a dependency, so
+    // `readFileSync` is untyped here and `app` would be `any`, which makes the
+    // `filter` callback below an implicit-any that `check-test-typecheck.mjs`
+    // counts. `pnpm build` never sees this file, so CI is the only reporter.
+    const app: string = readFileSync(join(process.cwd(), "src/App.tsx"), "utf8");
     // Asserted on the LINE rather than on one conditional shape. The first
     // version rejected only `{cond && <ScreenCaptureEscape />}`, which a
     // ternary, a predicate containing a `}`, or a wrapper component all walk

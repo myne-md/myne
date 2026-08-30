@@ -53,7 +53,15 @@ export type ScreenCaptureOverrideStatus = "idle" | "saving" | "failed";
 type Listener = (view: ScreenCaptureOverrideView | null) => void;
 
 let shared: ScreenCaptureOverrideView | null = null;
-let readStarted = false;
+// Two flags rather than one `readStarted`, and the split is the whole point.
+// A single flag set BEFORE the await made a failed read permanent: nothing ever
+// retried it, and both surfaces then rendered `null` as "no override" for the
+// rest of the process. On the surface that exists for somebody looking at a
+// black window, asserting "protection is on" because we could not find out is
+// the wrong direction to fail. `inFlight` still collapses concurrent mounts
+// into one call; `landed` is what makes the answer final.
+let readInFlight = false;
+let readLanded = false;
 const listeners = new Set<Listener>();
 
 function publish(next: ScreenCaptureOverrideView | null): void {
@@ -61,24 +69,33 @@ function publish(next: ScreenCaptureOverrideView | null): void {
   for (const listener of listeners) listener(next);
 }
 
-/** Read once per process, not once per mount. */
+/** Read once per process on success, and once per mount until one succeeds. */
 function readOnce(): void {
-  if (readStarted) return;
-  readStarted = true;
+  if (readInFlight || readLanded) return;
+  readInFlight = true;
   void getScreenCaptureOverride()
-    .then(publish)
+    .then((next) => {
+      readLanded = true;
+      publish(next);
+    })
     .catch(() => {
       // Do not assert a position we could not read. `null` renders as "no
       // override", which is what every install that never opted out is, while
       // both surfaces still offer the control: the person who needs it is the
-      // one who cannot see what went wrong.
+      // one who cannot see what went wrong. `readLanded` stays false, so the
+      // next mount of either surface asks again. Opening Settings after a
+      // failed boot read is the ordinary way out.
+    })
+    .finally(() => {
+      readInFlight = false;
     });
 }
 
 /** Test seam: drop the shared cell so each spec starts from a cold process. */
 export function resetScreenCaptureOverrideForTest(): void {
   shared = null;
-  readStarted = false;
+  readInFlight = false;
+  readLanded = false;
   listeners.clear();
 }
 
