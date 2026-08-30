@@ -16,6 +16,7 @@ import { visibleHistory } from "../../src/notes/ai/chatHistory";
 import {
   __resetChatForTest,
   blockSeedingOfExistingTurns,
+  observeEgressControls,
   getChat,
   isSeedable,
   sendAgentTurn,
@@ -159,5 +160,67 @@ describe("an exclusion change stops earlier turns being seeded", () => {
     const later = getChat().turns.find((t) => t.text === "second");
     expect(later).toBeDefined();
     expect(isSeedable(later!.id)).toBe(true);
+  });
+});
+
+// The gap the setter-side cut could not see (myne-md/myne#635 review, C3).
+//
+// `ai_excluded_folders` is classified `Shared(SetUnion)`
+// (`core/src/plugins/sync/prefs_classification.rs`), so a folder excluded on
+// another device arrives here by SYNC MERGE. No setter on this machine runs, so
+// a cut wired to the setter never fires, while `threat-model.md` TB13 says a
+// change to that set stops every turn then on screen from being seeded into any
+// later run. Ten reviewers and an adversarial pass missed it; the automated
+// review found it by reading the classification table.
+//
+// The trigger is therefore on the VALUE rather than on a code path, so the
+// arrival route stops mattering and a route invented later inherits it.
+describe("the seed cut fires on the observed value, not on the setter", () => {
+  beforeEach(() => {
+    __resetChatForTest();
+  });
+
+  it("cuts when the exclusion set arrives changed, with no setter called", () => {
+    // The first observation is the baseline: nothing has changed yet.
+    observeEgressControls([], null);
+    sendAgentTurn("an earlier question", "This note");
+    const id = getChat().turns[0]!.id;
+    expect(isSeedable(id)).toBe(true);
+
+    // A sync merge lands a folder somebody excluded on another device. This is
+    // the whole test: no setter runs, only a re-read.
+    observeEgressControls(["Private/"], null);
+    expect(isSeedable(id)).toBe(false);
+  });
+
+  it("cuts when the provider arrives changed the same way", () => {
+    observeEgressControls([], null);
+    sendAgentTurn("an earlier question", "This note");
+    const id = getChat().turns[0]!.id;
+
+    observeEgressControls([], "openrouter");
+    expect(isSeedable(id)).toBe(false);
+  });
+
+  it("does not cut when the value is unchanged, whatever the order", () => {
+    observeEgressControls(["Work/", "Private/"], "openrouter");
+    sendAgentTurn("an earlier question", "This note");
+    const id = getChat().turns[0]!.id;
+
+    // Set semantics: the merge may hand the same set back in another order, and
+    // a cut on every re-read would drop the conversation's memory on a timer.
+    observeEgressControls(["Private/", "Work/"], "openrouter");
+    expect(isSeedable(id)).toBe(true);
+  });
+
+  it("treats the FIRST observation as a baseline rather than a change", () => {
+    sendAgentTurn("an earlier question", "This note");
+    const id = getChat().turns[0]!.id;
+
+    // A fresh vault's first prefs read is not a change from anything, and
+    // cutting there would make the feature useless on the first message after
+    // every unlock.
+    observeEgressControls(["Private/"], "openrouter");
+    expect(isSeedable(id)).toBe(true);
   });
 });

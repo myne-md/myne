@@ -66,14 +66,20 @@ describe("the seed cut is wired to the setters, not only implemented", () => {
     expect(isSeedable(id)).toBe(false);
   });
 
-  it("does not fire on an unrelated prefs write", async () => {
+  it("fires when the exclusion set changes, at the same layer", async () => {
+    // The cut used to live a layer up, in `usePrefs`, while the provider's sat
+    // in the binding. Review (myne-md/myne#635, I9) called the split what it
+    // was: the two controls bound the same thing, so a reader had to find both
+    // to know the rule. Both are in the binding now.
     const id = existingTurnId();
-    await setAiExcludedFolders([]);
-    // `setAiExcludedFolders` is the raw binding; the cut for the exclusion set
-    // lives one layer up in `usePrefs.setAiExcludedFoldersPref`, which is where
-    // the optimistic state it converges also lives. This asserts the split is
-    // deliberate rather than an omission: if the cut ever moves down here, this
-    // test says so instead of a reviewer having to notice.
-    expect(isSeedable(id)).toBe(true);
+    await setAiExcludedFolders(["Private/"]);
+    expect(isSeedable(id)).toBe(false);
+  });
+
+  it("cuts on the exclusion set even when the write fails", async () => {
+    const id = existingTurnId();
+    writePref.mockRejectedValueOnce(new Error("disk"));
+    await expect(setAiExcludedFolders(["Private/"])).rejects.toThrow();
+    expect(isSeedable(id)).toBe(false);
   });
 });

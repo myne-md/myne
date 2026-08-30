@@ -988,8 +988,23 @@ export async function setChatHistoryBudget(budget: number | null): Promise<void>
  * encoding as `deliberate_folders` (the Rust codec NFC-sorts + exact-dedups).
  * The caller passes the entire desired set; a rejected promise means the disk
  * write failed and the caller's optimistic UI must revert.
+ *
+ * **The seed cut lives here, beside the one in [`setAiProvider`], rather than in
+ * `usePrefs`.** This binding is the single point every exclusion write passes
+ * through, and the two controls bound the same thing, so splitting them across
+ * two layers meant a reader had to find both to know the rule. It fires BEFORE
+ * the write and before any await: the user has stated an intent about what may
+ * reach a provider, and a failed disk write does not withdraw it.
+ *
+ * It is not the only trigger, and the other one is the reason this control needs
+ * two. `ai_excluded_folders` is classified `Shared(SetUnion)`, so it also
+ * arrives by SYNC MERGE, where no setter on this machine runs at all;
+ * `chatStore.observeEgressControls` catches that by watching the value on every
+ * prefs read. This one catches the stated intent, including when the write
+ * fails; that one catches the arrival, whatever route it took.
  */
 export async function setAiExcludedFolders(folders: string[]): Promise<void> {
+  blockSeedingOfExistingTurns();
   await writePref("plugin:prefs|set_ai_excluded_folders", { folders });
 }
 

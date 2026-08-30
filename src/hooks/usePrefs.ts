@@ -20,7 +20,7 @@
 // past ~5 fields, revisit (separate PRD).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { blockSeedingOfExistingTurns } from "../notes/ai/chatStore";
+import { observeEgressControls } from "../notes/ai/chatStore";
 import i18n from "../i18n";
 import {
   PrefsView,
@@ -289,6 +289,12 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
         // every consumer that reads a field off it.
         if (!cancelled && view && mine > applied.current) {
           applied.current = mine;
+          // Every applied view is observed, so a change to the egress controls
+          // cuts the chat-history seed whichever way it arrived. See
+          // `chatStore.observeEgressControls`: `ai_excluded_folders` is
+          // Shared(SetUnion), so it also arrives by sync merge, where no setter
+          // on this machine is called.
+          observeEgressControls(view.ai_excluded_folders, view.ai_provider);
           setPrefs(view);
         }
       } catch {
@@ -437,13 +443,12 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   const setAiExcludedFoldersPref = useCallback(
     async (folders: string[]) => {
       setPrefs((p) => ({ ...p, ai_excluded_folders: folders }));
-      // BEFORE the write, and before any await: the cut must hold even if the
-      // persist fails, because the user has stated an intent about what may
-      // reach a provider and a failed disk write does not withdraw it. The
-      // conservative order costs nothing (a retry re-applies it) and the other
-      // order has a window in which a run could seed the turns this is
-      // protecting.
-      blockSeedingOfExistingTurns();
+      // The seed cut used to be here. It moved down into
+      // `prefs.setAiExcludedFolders`, which is the single point every exclusion
+      // write passes through, so it now sits beside the identical one in
+      // `setAiProvider` instead of a layer above it. `persistAiExcludedFolders`
+      // below is that binding, so the ordering the cut depends on (before the
+      // write, before any await) is unchanged.
       try {
         await persistAiExcludedFolders(folders);
       } catch {
@@ -714,6 +719,11 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       const view = await prefsRead();
       if (mine <= applied.current) return;
       applied.current = mine;
+      // Same observation as the mount read, and this is the path a synced
+      // change actually takes: the sync apply bumps the prefs nonce, every
+      // `usePrefs` re-reads, and the change is visible here with no setter
+      // having run.
+      observeEgressControls(view.ai_excluded_folders, view.ai_provider);
       setPrefs(view);
     } catch {
       // Keep the current cache (safer-state per spec § 9.5.5).

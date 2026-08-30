@@ -460,9 +460,19 @@ export function aiTrustDisclosure(state: AiTrustState): string {
  *  says of that roster: "Naming it here because the sentence above says nothing
  *  else and a bulk enumeration of notes the model has not read is not covered by
  *  it." This is the sentence it meant, and it did not say so until
- *  myne-md/myne#531 review round six. */
+ *  myne-md/myne#531 review round six.
+ *
+ *  **And the conversation is named for the same reason, one boundary amendment
+ *  later.** myne-md/myne#617 seeds an agent run with the visible chat
+ *  transcript, so a follow-up can refer to the previous answer, and TB13 grew by
+ *  that item. This constant did not, which is the second time this screen has
+ *  been caught behind an amendment it is the user-facing half of: a user reading
+ *  it would take away that their notes leave and their conversation does not.
+ *  The bound is named with it, because "your recent conversation" without a
+ *  bound reads as the whole history and the bound is the thing the settings
+ *  screen lets them move. */
 export const CONSENT_WHAT_LEAVES =
-  "The text of the notes involved in each request leaves your device — the note you are working in, and any note used to answer you. An agent run also sends the titles and identifiers of every note in the scope you approved, before it has read any of them.";
+  "The text of the notes involved in each request leaves your device — the note you are working in, and any note used to answer you. An agent run also sends the titles and identifiers of every note in the scope you approved, before it has read any of them, and a bounded amount of your recent conversation in this panel so it can follow what you are referring to. You can change that amount, or turn it off, in AI settings.";
 
 /** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for.
  *
