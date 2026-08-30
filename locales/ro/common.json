@@ -1238,6 +1238,7 @@
     },
     "find": {
       "close": "Închide căutarea",
+      "dateFallback": "Se caută {{stored}}, forma în care este stocată această dată.",
       "matchCase": "Potrivire majuscule",
       "matchCount": "{{current}} din {{total}}",
       "nextMatch": "Următorul rezultat",
@@ -1246,6 +1247,7 @@
       "previousMatch": "Rezultatul anterior",
       "replaceAll": "Înlocuiește tot",
       "replaceAllCount": "Înlocuiește tot ({{total}})",
+      "replaceOffOnDateFallback": "Înlocuirea este dezactivată cât timp o dată este găsită prin forma ei stocată, ca o înlocuire să nu o facă imposibil de citit.",
       "replaceOne": "Înlocuiește",
       "replacePlaceholder": "Înlocuiește cu",
       "toggleReplace": "Comută înlocuirea"
@@ -3452,7 +3454,7 @@
     },
     "dateTime": {
       "dateLabel": "Formatul datei",
-      "dateHelper": "Cum sunt afișate datele în sarcini, vizualizări salvate și atașamente.",
+      "dateHelper": "Cum este scrisă o dată oriunde Myne afișează una.",
       "dateSystem": "În funcție de limbă",
       "timeLabel": "Formatul orei",
       "timeHelper": "Dacă orele sunt afișate pe un ceas de 24 de ore sau de 12 ore.",

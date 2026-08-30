@@ -1189,6 +1189,7 @@
     },
     "find": {
       "close": "Luk søgning",
+      "dateFallback": "Søger efter {{stored}}, den form denne dato er gemt i.",
       "matchCase": "Forskel på store/små bogstaver",
       "matchCount": "{{current}} af {{total}}",
       "nextMatch": "Næste resultat",
@@ -1197,6 +1198,7 @@
       "previousMatch": "Forrige resultat",
       "replaceAll": "Erstat alle",
       "replaceAllCount": "Erstat alle ({{total}})",
+      "replaceOffOnDateFallback": "Erstat er slået fra, mens en dato findes i sin gemte form, så en erstatning ikke kan gøre datoen ulæselig.",
       "replaceOne": "Erstat",
       "replacePlaceholder": "Erstat med",
       "toggleReplace": "Slå erstat til/fra"
@@ -3342,7 +3344,7 @@
     },
     "dateTime": {
       "dateLabel": "Datoformat",
-      "dateHelper": "Hvordan datoer vises i opgaver, gemte visninger og vedhæftede filer.",
+      "dateHelper": "Hvordan en dato skrives, overalt hvor Myne viser en.",
       "dateSystem": "Følg sproget",
       "timeLabel": "Tidsformat",
       "timeHelper": "Om klokkeslæt vises på et 24-timers eller 12-timers ur.",

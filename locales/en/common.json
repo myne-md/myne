@@ -1178,6 +1178,7 @@
     },
     "find": {
       "close": "Close find",
+      "dateFallback": "Searching for {{stored}}, the form this date is stored in.",
       "matchCase": "Match case",
       "matchCount": "{{current}} of {{total}}",
       "nextMatch": "Next match",
@@ -1186,6 +1187,7 @@
       "previousMatch": "Previous match",
       "replaceAll": "Replace all",
       "replaceAllCount": "Replace all ({{total}})",
+      "replaceOffOnDateFallback": "Replace is off while a date is matched by its stored form, so a replacement cannot make the date unreadable.",
       "replaceOne": "Replace",
       "replacePlaceholder": "Replace with",
       "toggleReplace": "Toggle replace"
@@ -3312,7 +3314,7 @@
     },
     "dateTime": {
       "dateLabel": "Date format",
-      "dateHelper": "How dates are shown across tasks, saved views and attachments.",
+      "dateHelper": "How a date is written wherever Myne shows one.",
       "dateSystem": "Match language",
       "timeLabel": "Time format",
       "timeHelper": "Whether times are shown on a 24-hour or 12-hour clock.",

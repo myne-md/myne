@@ -452,6 +452,13 @@ steps:
       # on. Backstop for the pre-commit hook — `--no-verify` must not land a
       # setter whose change the open editor never receives.
       - node scripts/check-prefs-nonce.mjs
+      # Date/time display publisher (myne-md/myne#609): a client tree that reads
+      # the shared display store must also write to it. One publisher served
+      # three readers, so mobile printed defaults while holding a synced value,
+      # and no compiler, lint or existing guard could express the gap: the
+      # consumer and the publisher are different files in different packages,
+      # linked by a module-scope variable rather than a call.
+      - node scripts/check-datetime-display-publisher.mjs
       - node scripts/check-clipboard-feedback.mjs
       # Unwired-module ratchet (#272): a module with no production importer does
       # not run, and nothing else in the toolchain says so — the single-tab vault

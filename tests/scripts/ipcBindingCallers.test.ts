@@ -14,7 +14,14 @@
 
 import { describe, expect, it } from "vitest";
 
-import { deadBindings, ratchet } from "../../scripts/check-ipc-binding-callers.mjs";
+import {
+  deadBindings,
+  deadBindingsAcrossTrees,
+  importAliases,
+  ratchet,
+  CALLER_ROOTS_FOR,
+  PLACEHOLDER_REASON,
+} from "../../scripts/check-ipc-binding-callers.mjs";
 import {
   LEAVING_PATHS,
   TEARDOWN_CALLS,
@@ -134,6 +141,17 @@ describe("check-ipc-binding-callers: the ratchet", () => {
     expect(v.news).toEqual([]);
   });
 
+  it("rejects the `--record` placeholder, which was long enough to pass", () => {
+    // The hole this closes (myne-md/myne#609): the placeholder `--record` writes
+    // is 15 characters and the length floor is 12, so seven entries carried it
+    // for months and the record claimed a reason nobody had written. Asserted
+    // against the exported constant rather than a copy of the string, because a
+    // copy is how the writer and the check drifted apart in the first place.
+    const v = ratchet(["a.ts:x"], { "a.ts:x": PLACEHOLDER_REASON });
+    expect(v.unreasoned).toEqual(["a.ts:x"]);
+    expect(PLACEHOLDER_REASON.length).toBeGreaterThan(12);
+  });
+
   it("names an exemption whose binding has since acquired a caller", () => {
     // The ratchet's other direction. Without it the record decays into licences
     // nobody re-argued, and the guard reports ok about a tree it no longer
@@ -170,9 +188,136 @@ function healthyFiles(): Record<string, string> {
   };
 }
 
+/** The two desktop leaving paths these cases drive.
+ *
+ *  A SUBSET of the real `LEAVING_PATHS`, taken by file+fn rather than inherited
+ *  whole, because myne-md/myne#609 added mobile's two paths to the roster and
+ *  keyed matching by `<file>::<fn>`. Inheriting the whole roster would make every
+ *  case here also assert the mobile and delete paths, which the synthetic file
+ *  set does not contain, so the cases would fail for a reason that has nothing to
+ *  do with the rule under test. */
+const CASE_PATHS = LEAVING_PATHS.filter(
+  (p: { file: string }) =>
+    p.file === "src/lib/vault-unlock.ts" || p.file === "src/lib/vault-switch.ts",
+);
+
+/** The four teardown calls the synthetic file set declares, with their skips
+ *  narrowed to the two paths above for the same reason. */
+const CASE_CALLS = TEARDOWN_CALLS.filter((t: { call: string }) =>
+  ["clearAgentForLock", "clearChat", "clearAiOutput", "resetSessionIgnored"].includes(t.call),
+).map((t: { appliesTo: string[]; skips?: Record<string, string> }) => ({
+  ...t,
+  appliesTo: t.appliesTo.filter(
+    (k) => k.startsWith("src/lib/vault-unlock.ts") || k.startsWith("src/lib/vault-switch.ts"),
+  ),
+  skips: Object.fromEntries(
+    Object.entries(t.skips ?? {}).filter(
+      ([k]) => k.startsWith("src/lib/vault-unlock.ts") || k.startsWith("src/lib/vault-switch.ts"),
+    ),
+  ),
+}));
+
 function run(files: Record<string, string>): string[] {
-  return analyse({ files, leavingPaths: LEAVING_PATHS, teardownCalls: TEARDOWN_CALLS });
+  return analyse({ files, leavingPaths: CASE_PATHS, teardownCalls: CASE_CALLS });
 }
+
+describe("check-ipc-binding-callers: the per-tree scoping", () => {
+  // The scoping used to be three lines inside `main()`, so nothing tested it
+  // and its written justification was wrong for months. Both halves are asserted
+  // here: that a same-named caller in the OTHER tree does not answer, and that a
+  // caller in the SAME tree does.
+  const binding = (name: string) =>
+    `export async function ${name}() {\n  return await invoke("plugin:prefs|set_x", {});\n}\n`;
+
+  it("does not let a desktop caller answer a mobile binding of the same name", () => {
+    const { dead } = deadBindingsAcrossTrees([
+      {
+        bindings: new Map([["src/lib/prefs.ts", binding("setThing")]]),
+        callers: new Map([["src/screens/Settings.tsx", "setThing();\n"]]),
+      },
+      {
+        bindings: new Map([["mobile/src/lib/prefs.ts", binding("setThing")]]),
+        callers: new Map([["mobile/src/app/Sheet.tsx", "const n = 1;\n"]]),
+      },
+    ]);
+    expect(dead).toEqual(["mobile/src/lib/prefs.ts:setThing"]);
+  });
+
+  it("reports both live once each tree has its own caller", () => {
+    const { dead, checked } = deadBindingsAcrossTrees([
+      {
+        bindings: new Map([["src/lib/prefs.ts", binding("setThing")]]),
+        callers: new Map([["src/screens/Settings.tsx", "setThing();\n"]]),
+      },
+      {
+        bindings: new Map([["mobile/src/lib/prefs.ts", binding("setThing")]]),
+        callers: new Map([["mobile/src/app/Sheet.tsx", "setThing();\n"]]),
+      },
+    ]);
+    expect(dead).toEqual([]);
+    expect(checked).toBe(2);
+  });
+
+  it("keeps each binding tree's caller roster disjoint on the client trees", () => {
+    // The shared packages are compiled into both clients, so they belong under
+    // both. The CLIENT trees must not cross, which is the property the roster
+    // exists for and the one a careless edit reverts.
+    expect(CALLER_ROOTS_FOR["src/lib"]).toContain("src");
+    expect(CALLER_ROOTS_FOR["src/lib"]).not.toContain("mobile/src");
+    expect(CALLER_ROOTS_FOR["mobile/src/lib"]).toContain("mobile/src");
+    expect(CALLER_ROOTS_FOR["mobile/src/lib"]).not.toContain("src");
+    for (const shared of ["editor/src", "dialect/src"]) {
+      expect(CALLER_ROOTS_FOR["src/lib"], shared).toContain(shared);
+      expect(CALLER_ROOTS_FOR["mobile/src/lib"], shared).toContain(shared);
+    }
+  });
+});
+
+describe("check-ipc-binding-callers: an aliased import is still a call", () => {
+  // The defect this closes made the record carry a false statement: mobile's
+  // `writeText` is imported as `writeText as clipboardWriteText`, the import
+  // line is stripped before the probe runs, and the binding was recorded as
+  // having no caller while two files called it.
+  const binding = 'export async function writeText(v) {\n  return await invoke("plugin:clipboard|write", { v });\n}\n';
+
+  it("finds the call under the local name the importer chose", () => {
+    const { dead } = deadBindings({
+      bindings: new Map([["mobile/src/lib/clipboardTransport.ts", binding]]),
+      callers: new Map([
+        [
+          "mobile/src/editor-host.ts",
+          'import { writeText as clipboardWriteText } from "./lib/clipboardTransport";\nclipboardWriteText(x);\n',
+        ],
+      ]),
+    });
+    expect(dead).toEqual([]);
+  });
+
+  it("still reports dead when the alias is imported and never called", () => {
+    // The other direction, which is the one nobody thinks to try: resolving the
+    // alias must not turn the IMPORT itself into evidence of a call.
+    const { dead } = deadBindings({
+      bindings: new Map([["mobile/src/lib/clipboardTransport.ts", binding]]),
+      callers: new Map([
+        [
+          "mobile/src/editor-host.ts",
+          'import { writeText as clipboardWriteText } from "./lib/clipboardTransport";\nconst n = 1;\n',
+        ],
+      ]),
+    });
+    expect(dead).toEqual(["mobile/src/lib/clipboardTransport.ts:writeText"]);
+  });
+
+  it("reads the alias map itself, and only for renamed imports", () => {
+    const m = importAliases(
+      'import { a as b, c, type d as e } from "./x";\nimport { f } from "./y";\n',
+    );
+    expect([...(m.get("a") ?? [])]).toEqual(["b"]);
+    expect([...(m.get("d") ?? [])]).toEqual(["e"]);
+    expect(m.has("c")).toBe(false);
+    expect(m.has("f")).toBe(false);
+  });
+});
 
 describe("check-frontend-lock-teardown: the cross product", () => {
   it("passes on a file set that satisfies both rosters", () => {
@@ -311,14 +456,14 @@ describe("check-frontend-lock-teardown: the cross product", () => {
   it("rejects a skip that gives no reason", () => {
     const errors = analyse({
       files: healthyFiles(),
-      leavingPaths: LEAVING_PATHS,
+      leavingPaths: CASE_PATHS,
       teardownCalls: [
         {
           call: "resetSessionIgnored",
           declaredIn: "editor/src/decorations/spell.ts",
           holds: "the session's ignored-word set",
-          appliesTo: ["leaveActiveVault"],
-          skips: { lockVault: "not needed" },
+          appliesTo: ["src/lib/vault-switch.ts::leaveActiveVault"],
+          skips: { "src/lib/vault-unlock.ts::lockVault": "not needed" },
         },
       ],
     });

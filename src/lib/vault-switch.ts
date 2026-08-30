@@ -32,6 +32,7 @@
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
+import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import { resetSessionIgnored } from "../editor/decorations/spell";
 import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
 import type { Action, VaultId } from "./stage";
@@ -121,6 +122,10 @@ export async function leaveActiveVault(deps: {
   // vault being left, and the Q and A answers over its content, are as
   // vault-specific as the conversation above.
   clearAiOutput();
+  // And the ambient date/time display store. Asserted on this path as well
+  // as on the lock, because a vault CHANGE is the case where the resident
+  // value is the PREVIOUS vault's zone and formats rather than this one's.
+  resetDateTimeDisplayForLock();
 }
 
 /**
