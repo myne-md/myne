@@ -684,15 +684,15 @@ impl<R: Runtime> PairingDispatcher for PairingDispatch<R> {
 
 #[cfg(desktop)]
 impl<R: Runtime> PairingDispatch<R> {
-    /// Bring the main window to the foreground (unminimize + show + focus).
+    /// Bring the main window to the foreground (unminimize + show + focus),
+    /// re-asserting screen-capture protection across the trip.
     /// Best-effort; the Tauri window calls are safe from the relay thread.
+    ///
+    /// myne-md/myne#483: the sequence lives in `screen_capture` rather than
+    /// here because this was one of three copies of it, and the copy that had
+    /// to re-apply protection after the `show()` was missing from all three.
     fn bring_to_front(&self) {
-        use tauri::Manager;
-        if let Some(window) = self.app.get_webview_window("main") {
-            let _ = window.unminimize();
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
+        crate::screen_capture::show_protected(&self.app, "clipper_raise");
     }
 }
 

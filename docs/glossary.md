@@ -2037,9 +2037,17 @@ A widening of an [agent scope](#agent-scope) during a run, approved by the user 
 
 Used in: `decisions.md` 2026-08-16
 
+### **screen-capture override** &nbsp; 📦 *Product*
+
+*(Aliases: screen-capture escape, pre-unlock escape hatch. `threat-model.md` §7, `decisions.md` 0541 and the manual-test roster all say *escape*; the component is `ScreenCaptureEscape.tsx`. One thing, listed here under the name the setting carries.)*
+
+The device-local escape hatch from [screen-capture protection](#screen-capture-protection) (myne-md/myne#482). One boolean at `<app_config_dir>/screen-capture.json`, plus a `--disable-screen-capture-protection` process flag that leaves no file at all, reachable from a keyboard-focusable control on every pre-unlock screen and set only through a consent step that states the cost. It exists because the three decisions that made protection always-on before unlock left the toggle sealed inside `vault.prefs` and its control post-unlock, so on Windows a user on remote-control software or a magnifier saw a black window with the account number, the recovery-phrase ceremony and the device-join QR behind it. **Device-wide, not pre-unlock-only** (an override that lapsed at unlock would put the black window straight back) so while it is set the per-vault preference is superseded rather than silently ignored. It is deliberately **not** a sealed store: every keychain-backed store in this codebase is Apple-only, which would have shipped the escape on the two platforms where nothing is claimed and omitted it on the one where the layer works. An unreadable file resolves to protection ON, the opposite direction from [hide vault names](#hide-vault-names) and for the opposite reason, and the process flag is the recovery path for that case. What it discloses at rest is bounded in `threat-model.md` §7.
+
+Used in: `decisions.md` 2026-08-30 (entry 0541); `threat-model.md` §6, §7
+
 ### **screen-capture protection** &nbsp; 📦 *Product*
 
-Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (Windows `WDA_EXCLUDEFROMCAPTURE`, macOS `NSWindowSharingNone`). **Effective on Windows 10 build 19041+ only.** The macOS call is still made but nothing is claimed for it — Apple documents `NSWindowSharingNone` as a legacy constant macOS no longer uses and states no public API exists for preventing screen capture. No Linux display server offers an application-requestable exclusion; on KDE Plasma 6.6+ and Hyprland 0.50+ the **user** can configure one as a window rule. `decisions.md` 2026-08-15 supersedes the macOS clause of 2026-05-27.
+Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (Windows `WDA_EXCLUDEFROMCAPTURE`, macOS `NSWindowSharingNone`). **Effective on Windows 10 build 19041+ only.** The macOS call is still made but nothing is claimed for it. Apple documents `NSWindowSharingNone` as a legacy constant macOS no longer uses and states no public API exists for preventing screen capture. No Linux display server offers an application-requestable exclusion; on KDE Plasma 6.6+ and Hyprland 0.50+ the **user** can configure one as a window rule. `decisions.md` 2026-08-15 supersedes the macOS clause of 2026-05-27. It is always applied before unlock regardless of any saved *vault* preference, with one consented device-local exception: see [screen-capture override](#screen-capture-override) (`decisions.md` 0541).
 
 Used in: `threat-model.md` §6, §7
 

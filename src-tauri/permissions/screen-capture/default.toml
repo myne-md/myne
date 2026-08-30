@@ -1,0 +1,39 @@
+# Permissions for the in-app `screen-capture` Tauri plugin (myne-md/myne#482,
+# #483). Picked up under the `screen-capture:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files reference
+# these as `screen-capture:default` (or the individual `allow-…` identifiers).
+#
+# All three commands are reachable PRE-UNLOCK, deliberately: the surfaces they
+# govern are the unlock screen, the vault picker, the recovery-phrase ceremony
+# and the device-join QR, every one of which renders before a vault is open and
+# every one of which is what a locked-out user cannot see. None reaches vault
+# content, none decrypts anything, and the only values crossing in either
+# direction are booleans. Adding a command here without a matching entry in
+# `src-tauri/src/plugins/screen_capture/mod.rs`'s `generate_handler!` ships it
+# dead (root CLAUDE.md: an ACL entry does not wire a command, and nothing checks
+# that it does).
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the screen-capture plugin: read and write of the device-local screen-capture override, plus the host-side re-show the WebView asks for when idle auto-lock has hidden the window."
+permissions = [
+  "allow-screen-capture-override-get",
+  "allow-screen-capture-override-set",
+  "allow-screen-capture-show-protected",
+]
+
+[[permission]]
+identifier = "allow-screen-capture-override-get"
+description = "Allow invoking screen-capture:screen_capture_override_get (report the device-local screen-capture override: what app_config_dir/screen-capture.json asks for, whether this run carries the --disable-screen-capture-protection flag, and whether protection is suppressed at all). Three booleans out, read from process state rather than from disk; no vault access, no write."
+commands.allow = ["screen_capture_override_get"]
+
+[[permission]]
+identifier = "allow-screen-capture-override-set"
+description = "Allow invoking screen-capture:screen_capture_override_set (persist the device-local screen-capture override to app_config_dir/screen-capture.json, then make the window match it). SECURITY-RELEVANT: setting it turns a defence-in-depth control off device-wide, before unlock and after it, which is why the UI gates it behind an explicit consent step that states the cost. It writes one boolean to one file and calls set_content_protected; it reads no vault content and cannot turn protection ON for a run launched with the process flag. Disk first, then the native call, so a failed write never leaves the window and the record of it disagreeing."
+commands.allow = ["screen_capture_override_set"]
+
+[[permission]]
+identifier = "allow-screen-capture-show-protected"
+description = "Allow invoking screen-capture:screen_capture_show_protected (bring the main window back after idle auto-lock hid it, applying screen-capture protection on both sides of the show). Takes nothing and returns nothing: every value in the sequence is state the backend already holds, so page context chooses none of it and the strongest possible effect is re-showing the window in the state it was already meant to be in. Exists because the lock teardown's own re-apply runs while the window is HIDDEN, and the Windows capture affinity is reported not to survive a hide/show cycle (tauri-apps/tauri#14189). This grant REPLACED core:window:allow-show, which was removed from capabilities/default.json in the same change: its one consumer drove the window itself, and a fixed unparameterised sequence is narrower than a raw window operation."
+commands.allow = ["screen_capture_show_protected"]

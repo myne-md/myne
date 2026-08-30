@@ -519,6 +519,20 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // `lockedVaultNames`, absent in the web descriptor, so `PrivacyPanel`
     // omits the row instead of rendering one whose three probes all reject.
     ("vault-label", Class::Unsupported),
+    // myne-md/myne#482 + #483: the device-local screen-capture escape hatch
+    // and the WebView-side re-assert. Absent on web because the thing they
+    // govern is absent: a page cannot ask a browser to exclude itself from the
+    // compositor's capture path, so there is no affinity to suppress and none
+    // to re-assert after a re-show. `threat-model.md` A15/TB11 already says the
+    // web client has no screen-capture protection to fall back on.
+    //
+    // `Unsupported` rather than `Pending`, for the reason `vault-label` above
+    // gives: `Pending` promises a port, and no port makes an escape hatch
+    // meaningful when there is nothing to escape from. The capability behind it
+    // is `screenCaptureProtection`, absent in the web descriptor, so
+    // `PrivacyPanel` and `ScreenCaptureEscape` both omit rather than render
+    // controls whose commands would reject.
+    ("screen-capture", Class::Unsupported),
     // Owner decision, 2026-07-27 (task 72): repair is ABSENT on web. It scans a
     // vault DIRECTORY for orphan artefacts, which exists because a desktop
     // directory is writable by other software; an OPFS container has one writer

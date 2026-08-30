@@ -290,6 +290,16 @@ export function hideVaultNamesFlagPath(appConfigDir: string): string {
   return join(appConfigDir, "vault-names.json");
 }
 
+/** Path to the device-local screen-capture override,
+ *  `<app_config_dir>/screen-capture.json`
+ *  (`core/src/screen_capture_override.rs`, myne-md/myne#482). Same directory
+ *  and same reason as `vault-names.json` above: a DEVICE setting, not vault
+ *  data, and it has to be readable before any vault is open because
+ *  "unreadable before unlock" is the lockout it exists to open. */
+export function screenCaptureOverridePath(appConfigDir: string): string {
+  return join(appConfigDir, "screen-capture.json");
+}
+
 /**
  * Assert a blob's leading 4 bytes equal `magic` (latin1). The generic shape
  * every at-rest format check reuses — MYA1 (per-attachment blob), MYC1

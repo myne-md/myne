@@ -337,6 +337,14 @@ const V = {
     "excluded",
     "Creation-flow logging; same reason as vault-creation-errors.",
   ],
+  "src/hooks/useScreenCaptureOverride.ts": [
+    "adapted",
+    "Ships, and short-circuits before its first IPC here. It owns the client state of the device-local screen-capture override for both surfaces that touch it (myne-md/myne#482), and its mount read is gated on the `screenCaptureProtection` capability \u2014 absent on web, so the hook holds `null` and both consumers render the override as off, which is what they would render anyway. The gate lives here rather than at each caller because it used to sit AFTER the escape's effect, which cost a Worker round trip per mount for an answer the capability set already had.",
+  ],
+  "src/lib/screen-capture-override.ts": [
+    "typed-unsupported",
+    "Ships, and on this client no call reaches IPC. All three wrappers name commands the wasm dispatcher classifies `Unsupported` for the whole `screen-capture` plugin, and every caller is gated on the `screenCaptureProtection` capability, which the web descriptor omits: `ScreenCaptureEscape` and the Privacy row omit their controls, and `useRevealAfterIdleLock` returns before calling `showWindowProtected` (a page has no hidden window to reveal and no capture affinity to lose). The gating is what makes this `typed-unsupported` rather than a live refusal path \u2014 the backend answer exists and is typed, and nothing on this client asks for it. `threat-model.md` A15/TB11 already records that the web client has no screen-capture protection, so an escape from it would be a control with no referent (myne-md/myne#482, #483).",
+  ],
   "src/lib/vault-delete.ts": ["adapted", "Task 72 owns what deletion MEANS on a sync-required client; the binding itself is portable."],
   "src/lib/vault-migrate.ts": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration (#420) is a desktop flow (Class::Unsupported in web/wasm/src/capability.rs, like vault-creation): a browser client joins an already-current account over sync and never migrates. The binding is present but its command answers the typed refusal on web."],
   "src/lib/vault-export-errors.ts": ["ported", "Error copy shared with the note-level export that does ship."],
