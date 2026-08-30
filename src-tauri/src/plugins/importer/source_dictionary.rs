@@ -84,11 +84,10 @@ pub async fn import_source_dictionary<R: Runtime>(
     // out: a bare array is `Copy`, so it would live to the end of this command
     // across two `.await` points and drop unwiped, which is the thing
     // `protocol/CLAUDE.md`'s memory-hygiene rule exists to stop.
-    let root_key = import_source::with_keys(state.inner(), source_id, |root, _items, _id| {
-        root.clone()
-    })
-    .await
-    .ok_or(ImportSourceDictionaryError::SessionClosed)?;
+    let root_key =
+        import_source::with_keys(state.inner(), source_id, |root, _items, _id| root.clone())
+            .await
+            .ok_or(ImportSourceDictionaryError::SessionClosed)?;
 
     let source_root = myne_core::paths::vault_root_for_id_from_host(&host, source_id)
         .map_err(|_| ImportSourceDictionaryError::SessionClosed)?;

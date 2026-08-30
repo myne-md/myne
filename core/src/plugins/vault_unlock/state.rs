@@ -3231,12 +3231,21 @@ mod import_source_slot_tests {
             let state = VaultRuntimeState::default();
             // `test_vault_id()` is the legacy all-zero id, which sorts below.
             state
-                .set_import_source(test_vault_id(), fixture_import_source(0x11, 0x22, 0x33, 900))
+                .set_import_source(
+                    test_vault_id(),
+                    fixture_import_source(0x11, 0x22, 0x33, 900),
+                )
                 .await;
             state
-                .set_import_source(test_vault_id_b(), fixture_import_source(0x44, 0x55, 0x66, 0))
+                .set_import_source(
+                    test_vault_id_b(),
+                    fixture_import_source(0x44, 0x55, 0x66, 0),
+                )
                 .await;
-            assert!(test_vault_id() < test_vault_id_b(), "fixture assumes this order");
+            assert!(
+                test_vault_id() < test_vault_id_b(),
+                "fixture assumes this order"
+            );
 
             // `opened_at` 0 is old, 900 is fresh.
             let dropped = state
