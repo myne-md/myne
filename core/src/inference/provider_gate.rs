@@ -6,19 +6,38 @@
 //! shipped discipline in `AiPanel.tsx` already treats the panel as *discovery*
 //! rather than enforcement, and this is the enforcement half.
 //!
-//! **Five independent preconditions**, and none implies another:
+//! **Four independent preconditions**, and none implies another:
 //!
 //! | missing | cause | what the user does |
 //! |---|---|---|
-//! | `developer_mode` | [`EngineError::FeatureOff`] | turn on Developer mode |
 //! | `ai_enabled` | [`EngineError::FeatureOff`] | turn on the AI beta |
 //! | a selected provider | [`EngineError::NotReady`] | pick one |
 //! | a stored key | [`EngineError::NoCredential`] | paste a key |
-//! | consent **for that provider** | [`EngineError::RemoteBarred`] | approve the screen |
+//! | consent **for that provider** | [`EngineError::ConsentMissing`] | approve the screen |
 //!
 //! Missing-key and missing-consent are deliberately different causes: one means
 //! "there is nothing to send", the other "you have not agreed to send it", and
 //! the fixes are in different places.
+//!
+//! **It was five until myne-md/myne#456, and `developer_mode` is the one that
+//! went.** SYNC-18 put the whole surface behind Developer mode, and that rule
+//! is superseded rather than relaxed by accident. Two things forced the
+//! question. Developer mode is defined as *where the user leaves the path Myne
+//! vouches for* (`docs/decisions/ai/0278`), and per-provider consent is a
+//! sharper instrument for exactly that: it names the recipient, it is compared
+//! for equality so a stale approval is unusable, and it cannot be satisfied by
+//! a switch the user flipped for an unrelated reason, the same flag also
+//! governs CLI access and the Vim keymap. And on mobile, where local inference
+//! is out of scope by decision, a Developer-mode precondition would have meant
+//! the AI surface was inert for anyone who had not found an unrelated toggle,
+//! while the tab's own gate said otherwise.
+//!
+//! **What that costs, stated rather than glossed.** `ai_enabled` is now the
+//! only device-local switch on this path. The compensating control is that
+//! `ai_provider_consent` became `DeviceLocal` in the same change: the key still
+//! syncs, so a phone can hold it, and it still sends nothing until somebody
+//! approves the screen on that phone. One switch alone would have been a
+//! narrowing; the pair is not.
 //!
 //! **Consent is per provider**, and that is a property of the DATA rather than
 //! of a setter's diligence: `ai_provider_consent` stores the provider name it
@@ -68,37 +87,41 @@ impl RemoteAuthorization {
 /// function of state — testable without a vault, and impossible to satisfy with
 /// a cached answer, because the caller must hand it freshly-read prefs.
 ///
-/// `developer_mode` is a separate argument rather than a `PrefsView` field read
-/// here only to make the call site state it: SYNC-18 puts the whole surface
-/// behind Developer mode, and a gate that reads it silently is one refactor
-/// away from not reading it at all.
-pub fn authorize_remote(
-    prefs: &PrefsView,
-    developer_mode: bool,
-) -> Result<RemoteAuthorization, EngineError> {
-    // 1. Developer mode. Checked first because it is the outermost gate: with
-    //    it off, none of the controls that set the rest are even reachable.
-    if !developer_mode {
-        return Err(EngineError::FeatureOff);
-    }
-    // 2. The AI beta itself.
+/// **It took a `developer_mode: bool` until myne-md/myne#456 and no longer
+/// does.** That argument existed to make the call site state SYNC-18's rule
+/// out loud, and the rule itself is what changed: per-provider consent, which
+/// names the recipient and is compared for equality, is a stronger marker of
+/// leaving the path Myne vouches for than a global switch that also governs
+/// CLI access and Vim mode. The argument is removed rather than ignored so no
+/// caller can pass a value that no longer decides anything.
+pub fn authorize_remote(prefs: &PrefsView) -> Result<RemoteAuthorization, EngineError> {
+    // 1. The AI beta itself. The only device-local switch left on this path,
+    //    which is why the consent below is device-local too (myne-md/myne#456):
+    //    one switch alone would mean a synced vault could turn a device into a
+    //    sending device without anyone at that device agreeing.
     if !prefs.ai_enabled {
         return Err(EngineError::FeatureOff);
     }
-    // 3. A provider this build can reach. An unrecognized stored name is
+    // 2. A provider this build can reach. An unrecognized stored name is
     //    treated as no provider — a newer client may have written one, and
     //    guessing at it is how a request goes somewhere nobody named.
     let selected = prefs.ai_provider.as_deref().unwrap_or_default();
     let Some(provider) = RemoteProvider::from_wire(selected) else {
         return Err(EngineError::NotReady);
     };
-    // 4. Consent, FOR THIS PROVIDER. An equality, not a flag: an approval
+    // 3. Consent, FOR THIS PROVIDER. An equality, not a flag: an approval
     //    recorded for a different provider names a different recipient than
     //    the one about to receive the text.
     if prefs.ai_provider_consent.as_deref() != Some(provider.wire_name()) {
-        return Err(EngineError::RemoteBarred);
+        // `ConsentMissing`, not `RemoteBarred` (myne-md/myne#456). The latter
+        // is a rule about a request CLASS that no user choice can lift; this is
+        // a permission nobody has given yet, and only one of the two has a fix
+        // the user can act on. They were the same variant, so the surface told
+        // someone who had never seen the consent screen that "this kind of
+        // request never goes to a provider".
+        return Err(EngineError::ConsentMissing);
     }
-    // 5. A credential. Last, because "you have not agreed to send this" is a
+    // 4. A credential. Last, because "you have not agreed to send this" is a
     //    more fundamental refusal than "you have not pasted a key" — and
     //    ordering it this way means a user who declines consent is never asked
     //    for a key first.
@@ -136,7 +159,7 @@ mod tests {
 
     #[test]
     fn the_happy_path_yields_the_provider_and_its_key() {
-        let auth = authorize_remote(&ready(), true).expect("all five hold");
+        let auth = authorize_remote(&ready()).expect("all four hold");
         assert_eq!(auth.provider(), RemoteProvider::OpenRouter);
         assert_eq!(auth.key(), "sk-test");
     }
@@ -146,20 +169,16 @@ mod tests {
     /// if two of them collapsed into the same message.
     #[test]
     fn each_missing_precondition_refuses_with_its_own_cause() {
-        let cases: Vec<(&str, PrefsView, bool, EngineError)> = vec![
-            (
-                "developer mode off",
-                ready(),
-                false,
-                EngineError::FeatureOff,
-            ),
+        // The "developer mode off" row was here until myne-md/myne#456 and is
+        // gone rather than converted: with the flag no longer read, it would
+        // have been `ready()` asserting a refusal that no longer happens.
+        let cases: Vec<(&str, PrefsView, EngineError)> = vec![
             (
                 "AI beta off",
                 PrefsView {
                     ai_enabled: false,
                     ..ready()
                 },
-                true,
                 EngineError::FeatureOff,
             ),
             (
@@ -168,7 +187,6 @@ mod tests {
                     ai_provider: None,
                     ..ready()
                 },
-                true,
                 EngineError::NotReady,
             ),
             (
@@ -177,8 +195,14 @@ mod tests {
                     ai_provider_consent: None,
                     ..ready()
                 },
-                true,
-                EngineError::RemoteBarred,
+                // `ConsentMissing`, not `RemoteBarred` (myne-md/myne#456). The
+                // two used to be one variant, and the surface therefore told a
+                // user who had never seen the consent screen that "this kind of
+                // request never goes to a provider", which is false about their
+                // request and names no fix. `RemoteBarred` keeps its own
+                // meaning: a rule about a request CLASS that no user choice can
+                // lift.
+                EngineError::ConsentMissing,
             ),
             (
                 "no key",
@@ -186,35 +210,28 @@ mod tests {
                     ai_provider_key: None,
                     ..ready()
                 },
-                true,
                 EngineError::NoCredential,
             ),
         ];
 
-        for (what, prefs, dev, expected) in &cases {
-            let got = authorize_remote(prefs, *dev).err();
+        for (what, prefs, expected) in &cases {
+            let got = authorize_remote(prefs).err();
             assert_eq!(got, Some(*expected), "{what}");
         }
 
         // The distinction the whole task turns on: a missing KEY and a missing
         // CONSENT are different problems with different fixes, and must not
         // arrive at the UI as one message.
-        let no_key = authorize_remote(
-            &PrefsView {
-                ai_provider_key: None,
-                ..ready()
-            },
-            true,
-        )
+        let no_key = authorize_remote(&PrefsView {
+            ai_provider_key: None,
+            ..ready()
+        })
         .err()
         .unwrap();
-        let no_consent = authorize_remote(
-            &PrefsView {
-                ai_provider_consent: None,
-                ..ready()
-            },
-            true,
-        )
+        let no_consent = authorize_remote(&PrefsView {
+            ai_provider_consent: None,
+            ..ready()
+        })
         .err()
         .unwrap();
         assert_ne!(no_key.kind(), no_consent.kind());
@@ -231,15 +248,15 @@ mod tests {
             ..ready()
         };
         assert_eq!(
-            authorize_remote(&switched, true).err(),
-            Some(EngineError::RemoteBarred)
+            authorize_remote(&switched).err(),
+            Some(EngineError::ConsentMissing)
         );
         // Re-consenting to the new one lets it through.
         let reconsented = PrefsView {
             ai_provider_consent: Some("ollama-cloud".into()),
             ..switched
         };
-        let auth = authorize_remote(&reconsented, true).expect("consented");
+        let auth = authorize_remote(&reconsented).expect("consented");
         assert_eq!(auth.provider(), RemoteProvider::OllamaCloud);
     }
 
@@ -251,7 +268,7 @@ mod tests {
             ai_provider_key: Some(Zeroizing::new("sk-rotated".into())),
             ..ready()
         };
-        let auth = authorize_remote(&rotated, true).expect("still consented");
+        let auth = authorize_remote(&rotated).expect("still consented");
         assert_eq!(auth.key(), "sk-rotated");
     }
 
@@ -288,7 +305,7 @@ mod tests {
             "after a revoke the blob must be byte-identical to a vault that never configured a provider"
         );
         assert_eq!(
-            authorize_remote(&revoked, true).err(),
+            authorize_remote(&revoked).err(),
             Some(EngineError::FeatureOff)
         );
     }
@@ -303,7 +320,7 @@ mod tests {
             ..ready()
         };
         assert_eq!(
-            authorize_remote(&blank, true).err(),
+            authorize_remote(&blank).err(),
             Some(EngineError::NoCredential)
         );
     }
@@ -317,10 +334,7 @@ mod tests {
             ai_provider_consent: Some("some-future-provider".into()),
             ..ready()
         };
-        assert_eq!(
-            authorize_remote(&future, true).err(),
-            Some(EngineError::NotReady)
-        );
+        assert_eq!(authorize_remote(&future).err(), Some(EngineError::NotReady));
     }
 
     /// The authorization cannot be `Debug`-printed, so the key cannot reach a
@@ -388,8 +402,8 @@ mod default_off_proof {
     /// What a request would do IF the gate let it through: open a socket. The
     /// probe measures whether that ever happens, which is a stronger question
     /// than "what did the gate return".
-    fn attempt_request(prefs: &PrefsView, developer_mode: bool, port: u16) {
-        if authorize_remote(prefs, developer_mode).is_ok() {
+    fn attempt_request(prefs: &PrefsView, port: u16) {
+        if authorize_remote(prefs).is_ok() {
             let _ = TcpStream::connect(("127.0.0.1", port));
         }
     }
@@ -411,16 +425,21 @@ mod default_off_proof {
         // Every state in which the user has NOT finished naming a provider.
         // The shipped state of every install that predates this feature is the
         // first row, and it is the one that matters most.
-        let states: Vec<(&str, PrefsView, bool)> = vec![
-            ("nothing configured at all", PrefsView::default(), true),
-            ("developer mode off", configured(), false),
+        //
+        // SIX rows since myne-md/myne#456, not seven: the "developer mode off"
+        // row went with the precondition. It is removed rather than converted
+        // because, with the flag unread, it would have been `configured()`
+        // asserting zero sockets, the exact opposite of what the control arm
+        // below proves, and a row that would have turned this proof into a
+        // contradiction rather than a weaker claim.
+        let states: Vec<(&str, PrefsView)> = vec![
+            ("nothing configured at all", PrefsView::default()),
             (
                 "AI beta off",
                 PrefsView {
                     ai_enabled: false,
                     ..configured()
                 },
-                true,
             ),
             (
                 "no provider selected",
@@ -428,7 +447,6 @@ mod default_off_proof {
                     ai_provider: None,
                     ..configured()
                 },
-                true,
             ),
             (
                 "provider selected, no key",
@@ -436,7 +454,6 @@ mod default_off_proof {
                     ai_provider_key: None,
                     ..configured()
                 },
-                true,
             ),
             (
                 "key present, no consent",
@@ -444,7 +461,6 @@ mod default_off_proof {
                     ai_provider_consent: None,
                     ..configured()
                 },
-                true,
             ),
             (
                 "consent for a DIFFERENT provider",
@@ -452,12 +468,11 @@ mod default_off_proof {
                     ai_provider: Some("ollama-cloud".into()),
                     ..configured()
                 },
-                true,
             ),
         ];
 
-        for (what, prefs, dev) in &states {
-            attempt_request(prefs, *dev, port);
+        for (what, prefs) in &states {
+            attempt_request(prefs, port);
             assert_eq!(
                 accepts.load(Ordering::SeqCst),
                 0,
@@ -466,10 +481,10 @@ mod default_off_proof {
         }
 
         // ── THE CONTROL ARM ──
-        // Fully configured, one request, one accept. Without this the seven
-        // zeros above are compatible with a probe that could never have seen
+        // Fully configured, one request, one accept. Without this the six zeros
+        // above are compatible with a probe that could never have seen
         // anything.
-        attempt_request(&configured(), true, port);
+        attempt_request(&configured(), port);
         assert!(
             wait_for_accept(&accepts),
             "the probe must be able to see a connection, or the zeros above prove nothing"
@@ -477,20 +492,48 @@ mod default_off_proof {
     }
 
     /// The absences that would each be a byte leaving on their own. Asserted
-    /// over the whole plugin tree's production source, because "we did not add
-    /// one" is not something a behavioural test can show — a startup probe
-    /// fires before any test's listener exists.
+    /// over the whole AI tree's production source, because "we did not add one"
+    /// is not something a behavioural test can show: a startup probe fires
+    /// before any test's listener exists.
+    ///
+    /// **The tree is two directories since myne-md/myne#456**, and scanning only
+    /// one would have been the quiet way to lose half this assertion. The
+    /// portable half moved here; the local half (the Candle engine, the Ollama
+    /// loopback arm, retrieval, the vector store, the model store, whisper, the
+    /// Tauri surface) stayed in the desktop crate. Both are scanned, and a
+    /// directory that is missing FAILS rather than shrinking the scan: the move
+    /// itself made this test panic on a `read_dir` of a path that no longer
+    /// existed, which is the behaviour to keep rather than paper over.
     #[test]
     fn there_is_no_startup_probe_reachability_check_or_telemetry() {
         use std::fs;
         // `file!()` is workspace-relative while the test's CWD is the crate
         // dir, so resolve from `CARGO_MANIFEST_DIR` instead — the one path
-        // that is stable regardless of where cargo was invoked.
-        let dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/plugins/local_inference");
+        // that is stable regardless of where cargo was invoked. The desktop
+        // half is a sibling crate, reached by the one hop out of `core/`; that
+        // is a path this test already deals in, and the alternative (a second
+        // copy of the banned-word list in the desktop crate) is a list that
+        // drifts.
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let dirs = [
+            manifest.join("src/inference"),
+            manifest.join("../src-tauri/src/plugins/local_inference"),
+        ];
         let mut scanned = 0usize;
-        for entry in fs::read_dir(&dir).expect("read the plugin dir") {
-            let path = entry.expect("entry").path();
+        let mut entries = Vec::new();
+        for dir in &dirs {
+            let read = fs::read_dir(dir).unwrap_or_else(|e| {
+                panic!(
+                    "{}: {e}. Both halves of the AI tree must be scanned; a half \
+                     that cannot be read is a coverage hole, not a smaller scan",
+                    dir.display()
+                )
+            });
+            for entry in read {
+                entries.push(entry.expect("entry").path());
+            }
+        }
+        for path in entries {
             if path.extension().and_then(|e| e.to_str()) != Some("rs") {
                 continue;
             }
@@ -528,10 +571,13 @@ mod default_off_proof {
             }
         }
         // Self-guard: a directory read that returned nothing would make the
-        // loop above vacuously true.
+        // loop above vacuously true. The floor is measured across BOTH halves
+        // (8 here, 18 desktop-side at the time of the split), and it stays a
+        // floor rather than an equality so ordinary additions do not trip it.
         assert!(
-            scanned >= 10,
-            "scanned only {scanned} files — too few to be real"
+            scanned >= 20,
+            "scanned only {scanned} files across both halves of the AI tree, \
+             too few to be real"
         );
     }
 }

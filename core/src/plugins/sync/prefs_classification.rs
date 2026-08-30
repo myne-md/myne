@@ -57,24 +57,55 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     // `ai_enabled` is DeviceLocal because "should THIS machine spend its CPU
     // on inference" is a property of the machine. Naming a REMOTE provider is
     // not — it is a statement about where this vault's notes may be sent, and
-    // a vault whose owner said "OpenRouter" has said it about the vault. The
-    // three rows below therefore travel together, and the cost of that is
-    // recorded rather than hidden: a newly enrolled device inherits the
-    // selection, the consent and the key, and begins sending without anyone at
-    // that device seeing the consent screen (ledger SYNC-22;
-    // `threat-model.md` §5 states the same in the normative text).
+    // a vault whose owner said "OpenRouter" has said it about the vault.
+    //
+    // **Three of the four rows below travel together; the consent does not,
+    // since myne-md/myne#456.** This comment used to say all three did, and
+    // record the cost as a residual: a newly enrolled device inherited the
+    // selection, the consent AND the key, and began sending without anyone at
+    // that device seeing the consent screen (ledger SYNC-22; `threat-model.md`
+    // §5 stated the same normatively). That residual is closed rather than
+    // still being carried, see the `ai_provider_consent` row. What a newly
+    // enrolled device inherits now is a selection, a model and a credential,
+    // and none of those is permission to use them.
     (
         "ai_provider",
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
-    // Shared with the selection it approves — splitting them would produce the
-    // worst state of the four: a device that inherited a provider and a key but
-    // not the consent would be configured and silently refused, with no screen
-    // anywhere to fix it.
-    (
-        "ai_provider_consent",
-        PrefClass::Shared(SharedDiscipline::ScalarLww),
-    ),
+    // DeviceLocal since myne-md/myne#456, and it was `Shared(ScalarLww)` until
+    // then. This is the one field in the AI cluster that does NOT travel, and
+    // the split is the whole point rather than an inconsistency.
+    //
+    // **What the old reasoning was, and why it expired.** It read: splitting
+    // consent from the selection it approves "would produce the worst state of
+    // the four: a device that inherited a provider and a key but not the
+    // consent would be configured and silently refused, with no screen anywhere
+    // to fix it." That was true and it is no longer, because the missing screen
+    // is what myne-md/myne#456 builds. Mobile ships a consent surface in the
+    // same change; desktop already had one. A device in that state is now one
+    // tap from resolving it, so the argument for carrying the approval across
+    // devices lost the thing it rested on.
+    //
+    // **What this closes.** SYNC-22, stated normatively in `threat-model.md`
+    // §5: a newly enrolled device inherited the selection, the consent AND the
+    // key, and began sending without anyone at that device seeing the consent
+    // screen. It was harmless only while no mobile code read those fields, and
+    // writing that code is what made it real. Approving on a laptop is now an
+    // approval by that laptop, not by every device the account will ever hold.
+    //
+    // **The key deliberately still syncs** (see the entry below), so a phone
+    // holds a credential it may not use. That is the intended shape: the
+    // credential is an account fact and rotating it must reach every device,
+    // while the approval is a decision a person makes at a device. The gate is
+    // an equality against the active provider, so a phone with the key and no
+    // local consent refuses with `ConsentMissing`: "you have not agreed to send
+    // this": rather than with a missing-credential error it cannot act on.
+    //
+    // It is also the ONLY device-local control left on the remote path besides
+    // `ai_enabled`, because myne-md/myne#456 removed `developer_mode` from the
+    // gate. Those two changes are a pair and neither is defensible alone: one
+    // switch by itself would be thinner than what was there before.
+    ("ai_provider_consent", PrefClass::DeviceLocal),
     // Shared (SYNC-15). Last-writer-wins is right for a credential in a way it
     // is not for a set: rotating the key on one device MUST replace it
     // everywhere, and a union or a merge of two key values is not a thing that
@@ -490,6 +521,31 @@ mod tests {
         // synced under the original posture, both are device-local now.
         assert_eq!(classify("hidden_bar_items"), Some(PrefClass::DeviceLocal));
         assert_eq!(classify("active_workspace"), Some(PrefClass::DeviceLocal));
+        // The third (myne-md/myne#456): `ai_provider_consent` was
+        // `Shared(ScalarLww)` and is device-local now. Asserted with its
+        // siblings held FIXED beside it, because the property is the SPLIT
+        // rather than the one field's class: a change that made the whole AI
+        // cluster device-local would satisfy the first assertion alone while
+        // breaking revocation, since a revoked key has to reach every device.
+        assert_eq!(
+            classify("ai_provider_consent"),
+            Some(PrefClass::DeviceLocal)
+        );
+        assert_eq!(
+            classify("ai_provider"),
+            Some(PrefClass::Shared(SharedDiscipline::ScalarLww))
+        );
+        assert_eq!(
+            classify("ai_provider_key"),
+            Some(PrefClass::Shared(SharedDiscipline::ScalarLww))
+        );
+        assert_eq!(
+            classify("ai_provider_model"),
+            Some(PrefClass::Shared(SharedDiscipline::ScalarLww))
+        );
+        // `ai_enabled` was already device-local and is the other half of the
+        // pair myne-md/myne#456 rests on, once `developer_mode` left the gate.
+        assert_eq!(classify("ai_enabled"), Some(PrefClass::DeviceLocal));
         // And the fields the feature exists for stay shared.
         assert_eq!(
             classify("label"),

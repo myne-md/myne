@@ -49,7 +49,8 @@
       "unsupportedDetail": "Superó {{passes}} de {{attempts}} comprobaciones; hacen falta {{required}}.",
       "checking": "Comprobando el modelo…",
       "checkingAt": "Comprobando el modelo… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Ese umbral de aprobado aún no se ha medido en varios modelos, así que puede ser más estricto o más laxo de lo debido."
+      "unsupportedProvisional": "Ese umbral de aprobado aún no se ha medido en varios modelos, así que puede ser más estricto o más laxo de lo debido.",
+      "scopeNone": "ninguna nota abierta, así que todavía no hay nada sobre lo que trabajar"
     },
     "progress": {
       "working": "Trabajando",
@@ -68,7 +69,8 @@
       "grantsUser_other": "{{count}} alcances que definiste",
       "grantsModel_one": "{{count}} que pidió",
       "grantsModel_many": "{{count}} que pidió",
-      "grantsModel_other": "{{count}} que pidió"
+      "grantsModel_other": "{{count}} que pidió",
+      "cancelledBackground": "La ejecución se canceló porque Myne pasó a segundo plano. No se escribió nada. Vuelve a preguntar cuando quieras."
     },
     "scope": {
       "title": "¿Incluir {{folder}}?",
@@ -169,7 +171,9 @@
       "failed_other": "No se pudieron restaurar {{count}} notas.",
       "createdNotReverted_one": "{{count}} nota creada por la ejecución se dejó tal cual.",
       "createdNotReverted_many": "{{count}} notas creadas por la ejecución se dejaron tal cual.",
-      "createdNotReverted_other": "{{count}} notas creadas por la ejecución se dejaron tal cual."
+      "createdNotReverted_other": "{{count}} notas creadas por la ejecución se dejaron tal cual.",
+      "sessionOnly": "Este deshacer de un toque dura hasta que bloquees la caja fuerte o cierres la aplicación. Después, restaura las notas de una en una desde el historial de versiones de cada nota.",
+      "sessionOnlyLink": "Abrir historial de versiones"
     }
   },
   "ai": {
@@ -3053,7 +3057,8 @@
         "title": "Antes de que Myne envíe nada a {{provider}}",
         "whatLabel": "Qué sale de tu dispositivo",
         "whenLabel": "Cuándo sale",
-        "whoLabel": "Quién lo recibe"
+        "whoLabel": "Quién lo recibe",
+        "connectionLabel": "Cómo viaja"
       },
       "disclosureToggle": "¿Cómo funciona esto?",
       "enableHelper": "Ejecuta un modelo que tú proporcionas. Dónde se ejecuta, y si tus notas salen de este dispositivo, depende del proveedor que indiques más abajo. Experimental, desactivado de forma predeterminada.",
@@ -3087,7 +3092,9 @@
         "refused": "El proveedor rechazó la conexión. Puede que esté caído o que esté bloqueando esta red.",
         "timeout": "El proveedor no respondió a tiempo. No ha quedado nada en marcha.",
         "unauthorized": "El proveedor rechazó tu clave de API. Sustitúyela: puede que sea incorrecta, que esté revocada o que sea de otra cuenta.",
-        "unreachable": "No se pudo conectar con el proveedor. Comprueba tu conexión de red."
+        "unreachable": "No se pudo conectar con el proveedor. Comprueba tu conexión de red.",
+        "featureOff": "La IA está desactivada en este dispositivo. No se envió nada. Actívala en Ajustes, en IA.",
+        "consentMissing": "No has aceptado enviar notas a este proveedor desde este dispositivo. No se envió nada. Vuelve a elegir el proveedor en Ajustes, en IA, y lee qué se enviará."
       },
       "modelChoose": "Elegir archivo…",
       "modelEmbeddingLabel": "Modelo de búsqueda: búsqueda semántica y preguntas y respuestas",
@@ -3130,7 +3137,14 @@
       "recommendedFilesGeneration": "Necesita el archivo .gguf + tokenizer.json en la misma carpeta.",
       "recommendedFilesTranscription": "Necesita el archivo .gguf de Whisper + config.json + tokenizer.json en la misma carpeta.",
       "title": "IA",
-      "providerModelCount_many": "{{count}} modelos disponibles."
+      "providerModelCount_many": "{{count}} modelos disponibles.",
+      "mobileEnableLabel": "Usar IA en este teléfono",
+      "mobileEnableHelper": "Desactivado por defecto. Myne no ejecuta ningún modelo en un teléfono, así que cada solicitud va a un servicio que indiques abajo, y tus notas salen de este dispositivo al hacerlo.",
+      "mobileKeyAdd": "Guardar clave",
+      "mobileKeyReplace": "Reemplazar clave",
+      "mobileRevokeHelper": "Elimina el proveedor, su clave y la aprobación de este teléfono a la vez, dejando exactamente el estado de no haberlo configurado nunca. Otros dispositivos siguen funcionando hasta que también lo elimines allí.",
+      "mobileApproveLabel": "Aprobar el envío en este teléfono",
+      "mobileApproveHelper": "El proveedor y su clave vinieron de otro dispositivo. No se envía nada desde este teléfono hasta que leas qué se enviará y lo apruebes aquí."
     },
     "network": {
       "disabledCue": "La sincronización ya no se enruta a través de Tor. Las conexiones nuevas van directamente al servidor de sincronización.",

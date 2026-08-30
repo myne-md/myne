@@ -48,7 +48,8 @@
       "unsupportedDetail": "Imepita ukaguzi {{passes}} kati ya {{attempts}}; {{required}} zinahitajika.",
       "checking": "Inakagua modeli…",
       "checkingAt": "Inakagua modeli… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Kiwango hicho cha kufaulu bado hakijapimwa katika modeli mbalimbali, kwa hivyo kinaweza kuwa kikali au chepesi kuliko inavyostahili."
+      "unsupportedProvisional": "Kiwango hicho cha kufaulu bado hakijapimwa katika modeli mbalimbali, kwa hivyo kinaweza kuwa kikali au chepesi kuliko inavyostahili.",
+      "scopeNone": "hakuna dokezo lililofunguliwa, hivyo bado hakuna cha kufanyia kazi"
     },
     "progress": {
       "working": "Inafanya kazi",
@@ -64,7 +65,8 @@
       "grantsUser_one": "wigo {{count}} uliouweka",
       "grantsUser_other": "wigo {{count}} uliouweka",
       "grantsModel_one": "{{count}} alioomba",
-      "grantsModel_other": "{{count}} alioomba"
+      "grantsModel_other": "{{count}} alioomba",
+      "cancelledBackground": "Uendeshaji ulighairiwa kwa sababu Myne ilihamia chinichini. Hakuna kilichoandikwa. Uliza tena ukiwa tayari."
     },
     "scope": {
       "title": "Ujumuishe {{folder}}?",
@@ -148,7 +150,9 @@
       "failed_one": "Dokezo {{count}} halikuweza kurejeshwa.",
       "failed_other": "Madokezo {{count}} hayakuweza kurejeshwa.",
       "createdNotReverted_one": "Dokezo {{count}} lililoundwa na uendeshaji huo limeachwa palepale.",
-      "createdNotReverted_other": "Madokezo {{count}} yaliyoundwa na uendeshaji huo yameachwa palepale."
+      "createdNotReverted_other": "Madokezo {{count}} yaliyoundwa na uendeshaji huo yameachwa palepale.",
+      "sessionOnly": "Kutendua huku kwa mguso mmoja hudumu hadi ufunge kasha au ufunge programu. Baada ya hapo, rejesha madokezo moja baada ya jingine kutoka historia ya matoleo ya dokezo.",
+      "sessionOnlyLink": "Fungua historia ya matoleo"
     }
   },
   "ai": {
@@ -2929,7 +2933,8 @@
         "title": "Kabla Myne haijatuma chochote kwa {{provider}}",
         "whatLabel": "Kinachotoka kwenye kifaa chako",
         "whenLabel": "Wakati kinapotoka",
-        "whoLabel": "Nani anayekipokea"
+        "whoLabel": "Nani anayekipokea",
+        "connectionLabel": "Jinsi inavyosafiri"
       },
       "disclosureToggle": "Hii inafanyaje kazi?",
       "enableHelper": "Huendesha modeli unayoitoa wewe. Mahali inapoendeshwa, na iwapo madokezo yako yanatoka kwenye kifaa hiki, hutegemea mtoa huduma unayemtaja hapa chini. Ya majaribio, imezimwa kwa chaguomsingi.",
@@ -2963,7 +2968,9 @@
         "refused": "Mtoa huduma amekataa muunganisho. Huenda hafanyi kazi au anazuia mtandao huu.",
         "timeout": "Mtoa huduma hakujibu kwa wakati. Hakuna kilichoachwa kikiendelea.",
         "unauthorized": "Mtoa huduma amekataa ufunguo wako wa API. Ubadilishe: huenda si sahihi, umebatilishwa, au ni wa akaunti nyingine.",
-        "unreachable": "Imeshindwa kumfikia mtoa huduma. Kagua muunganisho wako wa mtandao."
+        "unreachable": "Imeshindwa kumfikia mtoa huduma. Kagua muunganisho wako wa mtandao.",
+        "featureOff": "AI imezimwa kwenye kifaa hiki. Hakuna kilichotumwa. Iwashe katika Mipangilio, chini ya AI.",
+        "consentMissing": "Hujakubali kutuma madokezo kwa mtoa huduma huyu kutoka kifaa hiki. Hakuna kilichotumwa. Chagua tena mtoa huduma katika Mipangilio, chini ya AI, na usome kitakachotumwa."
       },
       "modelChoose": "Chagua faili…",
       "modelEmbeddingLabel": "Modeli ya utafutaji: utafutaji wa kimaana na maswali na majibu",
@@ -3004,7 +3011,14 @@
       "recommendedFilesEmbedding": "Inahitaji model.safetensors + config.json + tokenizer.json katika folda moja.",
       "recommendedFilesGeneration": "Inahitaji faili la .gguf + tokenizer.json katika folda ile ile.",
       "recommendedFilesTranscription": "Inahitaji faili la Whisper la .gguf + config.json + tokenizer.json katika folda ile ile.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Tumia AI kwenye simu hii",
+      "mobileEnableHelper": "Imezimwa kwa chaguo-msingi. Myne haiendeshi modeli yoyote kwenye simu, hivyo kila ombi huenda kwa huduma unayotaja hapa chini, na madokezo yako huondoka kwenye kifaa hiki wakati huo.",
+      "mobileKeyAdd": "Hifadhi ufunguo",
+      "mobileKeyReplace": "Badilisha ufunguo",
+      "mobileRevokeHelper": "Huondoa mtoa huduma, ufunguo wake na idhini ya simu hii kwa pamoja, ikiacha hali ile ile ya kutokuwahi kusanidiwa. Vifaa vingine huendelea kufanya kazi hadi uviondoe huko pia.",
+      "mobileApproveLabel": "Idhinisha kutuma kwenye simu hii",
+      "mobileApproveHelper": "Mtoa huduma na ufunguo wake vilitoka kwenye kifaa kingine. Hakuna kinachotumwa kutoka simu hii hadi usome kitakachotumwa na uidhinishe hapa."
     },
     "network": {
       "disabledCue": "Usawazishaji hausafirishwi tena kupitia Tor. Miunganisho mipya huenda moja kwa moja kwenye seva ya usawazishaji.",

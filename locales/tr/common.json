@@ -48,7 +48,8 @@
       "unsupportedDetail": "{{attempts}} denetimden {{passes}} tanesini geçti; {{required}} tanesi gerekiyor.",
       "checking": "Model denetleniyor…",
       "checkingAt": "Model denetleniyor… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Bu geçme eşiği henüz modeller genelinde ölçülmedi, bu yüzden olması gerekenden katı veya gevşek olabilir."
+      "unsupportedProvisional": "Bu geçme eşiği henüz modeller genelinde ölçülmedi, bu yüzden olması gerekenden katı veya gevşek olabilir.",
+      "scopeNone": "açık not yok, dolayısıyla henüz üzerinde çalışılacak bir şey yok"
     },
     "progress": {
       "working": "Çalışıyor",
@@ -64,7 +65,8 @@
       "grantsUser_one": "sizin belirlediğiniz {{count}} kapsam",
       "grantsUser_other": "sizin belirlediğiniz {{count}} kapsam",
       "grantsModel_one": "istediği {{count}} kapsam",
-      "grantsModel_other": "istediği {{count}} kapsam"
+      "grantsModel_other": "istediği {{count}} kapsam",
+      "cancelledBackground": "Myne arka plana geçtiği için çalışma iptal edildi. Hiçbir şey yazılmadı. Hazır olduğunuzda tekrar sorun."
     },
     "scope": {
       "title": "{{folder}} dahil edilsin mi?",
@@ -148,7 +150,9 @@
       "failed_one": "{{count}} not geri yüklenemedi.",
       "failed_other": "{{count}} not geri yüklenemedi.",
       "createdNotReverted_one": "Çalıştırmanın oluşturduğu {{count}} not yerinde bırakıldı.",
-      "createdNotReverted_other": "Çalıştırmanın oluşturduğu {{count}} not yerinde bırakıldı."
+      "createdNotReverted_other": "Çalıştırmanın oluşturduğu {{count}} not yerinde bırakıldı.",
+      "sessionOnly": "Bu tek dokunuşluk geri alma, kasayı kilitleyene ya da uygulamayı kapatana kadar geçerlidir. Sonrasında notları tek tek, bir notun sürüm geçmişinden geri yüklersiniz.",
+      "sessionOnlyLink": "Sürüm geçmişini aç"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Myne, {{provider}} sağlayıcısına bir şey göndermeden önce",
         "whatLabel": "Cihazınızdan ne çıkıyor",
         "whenLabel": "Ne zaman çıkıyor",
-        "whoLabel": "Kim alıyor"
+        "whoLabel": "Kim alıyor",
+        "connectionLabel": "Nasıl iletiliyor"
       },
       "disclosureToggle": "Bu nasıl çalışır?",
       "enableHelper": "Sağladığınız bir modeli çalıştırır. Nerede çalıştığı ve notlarınızın bu cihazdan çıkıp çıkmadığı, aşağıda belirttiğiniz sağlayıcıya bağlıdır. Deneyseldir, varsayılan olarak kapalıdır.",
@@ -2983,7 +2988,9 @@
         "refused": "Sağlayıcı bağlantıyı reddetti. Kapalı olabilir ya da bu ağı engelliyor olabilir.",
         "timeout": "Sağlayıcı zamanında yanıt vermedi. Arkada çalışan bir şey kalmadı.",
         "unauthorized": "Sağlayıcı API anahtarınızı reddetti. Anahtarı değiştirin: yanlış, iptal edilmiş ya da başka bir hesaba ait olabilir.",
-        "unreachable": "Sağlayıcıya ulaşılamadı. Ağ bağlantınızı kontrol edin."
+        "unreachable": "Sağlayıcıya ulaşılamadı. Ağ bağlantınızı kontrol edin.",
+        "featureOff": "Bu cihazda yapay zekâ kapalı. Hiçbir şey gönderilmedi. Ayarlar'da Yapay Zekâ bölümünden açın.",
+        "consentMissing": "Bu cihazdan bu sağlayıcıya not gönderilmesini kabul etmediniz. Hiçbir şey gönderilmedi. Ayarlar'da Yapay Zekâ bölümünden sağlayıcıyı yeniden seçin ve neyin gönderileceğini okuyun."
       },
       "modelChoose": "Dosya seç…",
       "modelEmbeddingLabel": "Arama modeli: anlamsal arama ve Soru-Cevap",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "Tek bir klasörde model.safetensors + config.json + tokenizer.json gerektirir.",
       "recommendedFilesGeneration": "Aynı klasörde .gguf dosyası + tokenizer.json gerektirir.",
       "recommendedFilesTranscription": "Aynı klasörde Whisper .gguf dosyası + config.json + tokenizer.json gerektirir.",
-      "title": "Yapay Zeka"
+      "title": "Yapay Zeka",
+      "mobileEnableLabel": "Bu telefonda yapay zekâyı kullan",
+      "mobileEnableHelper": "Varsayılan olarak kapalı. Myne telefonda hiçbir model çalıştırmaz; bu yüzden her istek aşağıda adını verdiğiniz bir hizmete gider ve notlarınız o sırada bu cihazdan çıkar.",
+      "mobileKeyAdd": "Anahtarı kaydet",
+      "mobileKeyReplace": "Anahtarı değiştir",
+      "mobileRevokeHelper": "Sağlayıcıyı, anahtarını ve bu telefonun onayını birlikte kaldırır; tam olarak hiç kurulmamış hâline döner. Diğer cihazlar, oradan da kaldırana kadar çalışmayı sürdürür.",
+      "mobileApproveLabel": "Bu telefondan göndermeyi onayla",
+      "mobileApproveHelper": "Sağlayıcı ve anahtarı başka bir cihazdan geldi. Neyin gönderileceğini okuyup burada onaylayana kadar bu telefondan hiçbir şey gönderilmez."
     },
     "network": {
       "disabledCue": "Eşitleme artık Tor üzerinden yönlendirilmiyor. Yeni bağlantılar doğrudan eşitleme sunucusuna gider.",

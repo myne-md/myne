@@ -18,6 +18,45 @@
 // `docs/decisions/ai/0515` rested its "nothing survives a lock" claim on the
 // opposite.
 //
+// BOTH TAURI CLIENTS, since myne-md/myne#456. The guard used to walk desktop's
+// two leaving paths alone, and that was a blind spot rather than a scope:
+// mobile holds the SAME note-derived plaintext in the SAME module-scope store
+// (`@myne/agent-store` is one module, aliased into both trees), reached through
+// its own lock path, and a roster naming only `src/lib/` reported ok over it
+// without ever opening the file. That is the shape `check-prefs-nonce.mjs`
+// shipped for months and the reason `scripts/lib/shared-roots.mjs` exists.
+//
+// Mobile contributes TWO paths and neither mirrors a desktop one. Its vault
+// switch calls `lockVault` (`AppShell.tsx` awaits it before dispatching
+// `editor.switch-vault`), so there is no `leaveActiveVault` to name and the
+// switch is covered by the lock. And it has BACKGROUNDING, which desktop has no
+// analogue of: the OS suspends a backgrounded WebView and may reclaim the
+// process, so an in-flight run's reply can never arrive and the store would
+// hold note text across a suspension with nothing left to settle it.
+//
+// PATHS ARE KEYED BY `id`, NOT BY FUNCTION NAME, and that changed with the same
+// issue. Both clients call their choke point `lockVault`, so a roster keyed on
+// the name cannot tell them apart: `appliesTo: ["lockVault"]` would silently
+// mean both, and a skip for one would excuse the other. The collision is exactly
+// the kind this guard exists to catch, so it is not left to a comment.
+//
+// A PATH MAY REACH A TEARDOWN THROUGH A NAMED WRAPPER, and the guard then
+// checks BOTH hops rather than one. Mobile's two paths call `endAgentRun`,
+// which cancels the host-side run and then clears the store: the cancel and the
+// clear belong together (a cleared store with a run still spending on a
+// provider is the worse half of the failure), and writing them at each call
+// site would be two places to get the pair wrong. A `via` entry names the
+// wrapper, and the guard asserts the path calls the wrapper AND that the
+// wrapper calls the real teardown. Accepting the wrapper without the second hop
+// would let an empty function satisfy this guard, which is the exact shape
+// `scripts/check-lock-teardown.mjs` exists to catch on the Rust side.
+//
+// **Hop two reads the wrapper's BODY, not its file**, and the first version did
+// the latter. A file-wide grep passes as soon as any sibling function in that
+// file calls the teardown, so an empty wrapper beside a live one satisfied it:
+// the defect the hop exists for, surviving the hop. It held only because the
+// real wrapper file contained one function.
+//
 // WHAT IT CHECKS, and why it is keyed this way. Two hand-maintained rosters,
 // because both halves are judgement calls a scan cannot make:
 //
@@ -63,14 +102,28 @@ const ROOT = resolve(new URL("..", import.meta.url).pathname);
  * cannot speak for. */
 export const LEAVING_PATHS = [
   {
+    id: "desktop:lockVault",
     file: "src/lib/vault-unlock.ts",
     fn: "lockVault",
-    why: "The frontend lock choke point. Every path that ends a vault session calls it: the Lock button, the vault switch, the StorageLost takeover and the invalid-state fail-closed CTA.",
+    why: "The desktop lock choke point. Every path that ends a vault session calls it: the Lock button, the vault switch, the StorageLost takeover and the invalid-state fail-closed CTA.",
   },
   {
+    id: "desktop:leaveActiveVault",
     file: "src/lib/vault-switch.ts",
     fn: "leaveActiveVault",
     why: "Vault CHANGE specifically, which is a superset of a lock: it is the only path where the next thing opened is a different vault.",
+  },
+  {
+    id: "mobile:lockVault",
+    file: "mobile/src/lib/vault-unlock.ts",
+    fn: "lockVault",
+    why: "Mobile's SINGLE choke point (myne-md/myne#456): the Lock button, the idle auto-lock and the vault switch all route through it, so a store whose reason is a vault CHANGE has to hang off this one.",
+  },
+  {
+    id: "mobile:background",
+    file: "mobile/src/app/flows/EditorFlow.tsx",
+    fn: "flushAll",
+    why: "Backgrounding, which desktop has no analogue of. This is the ONE listener pair for that moment (`visibilitychange` -> hidden, plus `pagehide`), named so a second registration cannot become a second way to get it wrong.",
   },
 ];
 
@@ -99,8 +152,23 @@ export const TEARDOWN_CALLS = [
     // ones. Also asserted on the switch, because that path is reached through
     // `leaveActiveVault` and a later refactor could stop routing it through
     // `lockVault` without anything noticing.
-    appliesTo: ["lockVault", "leaveActiveVault"],
+    // And BOTH mobile paths. It is the same module on both clients
+    // (`@myne/agent-store` aliases into mobile), so the plaintext at risk is not
+    // an analogue of desktop's, it IS desktop's. Mobile reaches it through
+    // `endAgentRun`, which calls this and cancels the host-side run.
+    appliesTo: [
+      "desktop:lockVault",
+      "desktop:leaveActiveVault",
+      "mobile:lockVault",
+      "mobile:background",
+    ],
     skips: {},
+    // Both mobile paths reach it through one wrapper, which also cancels the
+    // host-side run. Both hops are checked; see the header.
+    via: {
+      "mobile:lockVault": { fn: "endAgentRun", file: "mobile/src/lib/agent-lifetime.ts" },
+      "mobile:background": { fn: "endAgentRun", file: "mobile/src/lib/agent-lifetime.ts" },
+    },
   },
   {
     call: "clearChat",
@@ -114,8 +182,13 @@ export const TEARDOWN_CALLS = [
     // into the next session, and nothing would say so.
     // `docs/decisions/ai/0276` rests its "no new at-rest magic byte, KEK or
     // format" argument on this transcript being RAM-only and dropped on lock.
-    appliesTo: ["lockVault", "leaveActiveVault"],
-    skips: {},
+    appliesTo: ["desktop:lockVault", "desktop:leaveActiveVault"],
+    skips: {
+      "mobile:lockVault":
+        "Mobile ships no chat TRANSCRIPT at all. Its AI surface is one composer and one run (`docs/decisions/ai/0524`), so `chatStore` has no mobile importer and a call here would be a line the guard checks and nothing runs. The note-derived half of a mobile run is the PROPOSAL, and `clearAgentForLock` above covers it on both mobile paths.",
+      "mobile:background":
+        "Mobile ships no chat TRANSCRIPT at all. Its AI surface is one composer and one run (`docs/decisions/ai/0524`), so `chatStore` has no mobile importer and a call here would be a line the guard checks and nothing runs. The note-derived half of a mobile run is the PROPOSAL, and `clearAgentForLock` above covers it on both mobile paths.",
+    },
   },
   {
     call: "clearAiOutput",
@@ -132,17 +205,26 @@ export const TEARDOWN_CALLS = [
     // The note-SWITCH call in the Editor stays where it is. That one is about a
     // different event (note A's summary must not be insertable into note B) and
     // neither leaving path can speak for it.
-    appliesTo: ["lockVault", "leaveActiveVault"],
-    skips: {},
+    appliesTo: ["desktop:lockVault", "desktop:leaveActiveVault"],
+    skips: {
+      "mobile:lockVault":
+        "Same as `clearChat`: `aiOutputStore` backs desktop's summary pane and its Q-and-A answers, and mobile renders neither. Nothing on mobile writes to it, so there is nothing there to outlive a lock or a suspension.",
+      "mobile:background":
+        "Same as `clearChat`: `aiOutputStore` backs desktop's summary pane and its Q-and-A answers, and mobile renders neither. Nothing on mobile writes to it, so there is nothing there to outlive a lock or a suspension.",
+    },
   },
   {
     call: "resetSessionIgnored",
     declaredIn: "editor/src/decorations/spell.ts",
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",
-    appliesTo: ["leaveActiveVault"],
+    appliesTo: ["desktop:leaveActiveVault"],
     skips: {
-      lockVault:
+      "desktop:lockVault":
         "A plain lock does not change vault, and the ignore-this-session set is scoped to the session the user is still in. Clearing it at the lock choke point would discard a choice they made about the vault they are about to re-open. The store's own comment states the reason as a vault CHANGE, which is why this one is asserted on the switch path only.",
+      "mobile:lockVault":
+        "On mobile a vault CHANGE and a plain lock are the same call, so there is no path here that means change without also meaning lock. Clearing on either would discard a choice the user made about the vault they are about to re-open, which is exactly the reason the desktop entry skips its own lock path. Backgrounding is not a vault change either: the same session resumes.",
+      "mobile:background":
+        "On mobile a vault CHANGE and a plain lock are the same call, so there is no path here that means change without also meaning lock. Clearing on either would discard a choice the user made about the vault they are about to re-open, which is exactly the reason the desktop entry skips its own lock path. Backgrounding is not a vault change either: the same session resumes.",
     },
   },
 ];
@@ -172,22 +254,47 @@ export function bodyOf(src, at) {
   // wrong on the arrow shape: the first `(` after a `const x = useCallback(`
   // declaration is `useCallback`'s own, so its match is the END of the whole
   // call and the brace found after it belongs to a later function.
+  //
+  // **A THIRD shape was missing and failed SILENTLY**, which is the worst way
+  // for this function to be wrong: `f(...): void {`. The rule above wants the
+  // character before the brace to be `)` or `>`, and a `void` return annotation
+  // ends in a letter, so the scan walked past the real body and returned the
+  // first INNER block whose brace happened to follow a `)`, here an
+  // `if (...) {`. Every assertion then ran against a fragment of the function,
+  // and `mobile/src/lib/agent-lifetime.ts::endAgentRun` was reported as never
+  // calling a teardown it calls on its first line. Found by the /simplify pass
+  // on myne-md/myne#456, tightening hop two from file scope to body scope.
+  //
+  // So the test is now: the brace is the body's when the declaration's own
+  // parameter parens have CLOSED before it, or when it directly follows `)` or
+  // `>` (which is what keeps the `useCallback(async () => {` shape working,
+  // where the parens are still open at the arrow's brace).
   let bStart = -1;
-  for (let k = src.indexOf("{", at); k >= 0; k = src.indexOf("{", k + 1)) {
-    let b = k - 1;
-    while (b >= 0 && /\s/.test(src[b])) b -= 1;
-    if (b >= 0 && (src[b] === ")" || src[b] === ">")) {
-      bStart = k;
-      break;
+  let depth = 0;
+  let closed = false;
+  for (let k = at; k < src.length; k += 1) {
+    const c = src[k];
+    if (c === "(") depth += 1;
+    else if (c === ")") {
+      depth -= 1;
+      if (depth === 0) closed = true;
+    } else if (c === "{") {
+      let b = k - 1;
+      while (b >= 0 && /\s/.test(src[b])) b -= 1;
+      const afterParenOrArrow = b >= 0 && (src[b] === ")" || src[b] === ">");
+      if (afterParenOrArrow || (closed && depth === 0)) {
+        bStart = k;
+        break;
+      }
     }
   }
   if (bStart < 0) return null;
-  let depth = 0;
+  let braces = 0;
   for (let j = bStart; j < src.length; j += 1) {
-    if (src[j] === "{") depth += 1;
+    if (src[j] === "{") braces += 1;
     else if (src[j] === "}") {
-      depth -= 1;
-      if (depth === 0) return src.slice(bStart, j + 1);
+      braces -= 1;
+      if (braces === 0) return src.slice(bStart, j + 1);
     }
   }
   return null;
@@ -248,23 +355,65 @@ export function analyse({ files, leavingPaths, teardownCalls }) {
       continue;
     }
     for (const t of teardownCalls) {
-      if (!t.appliesTo.includes(path.fn)) {
+      if (!t.appliesTo.includes(path.id)) {
         // A skip needs a stated reason, on the same rule the exemption list in
         // the sibling guard follows: a silent absence is indistinguishable from
         // an oversight.
-        const why = t.skips?.[path.fn];
+        const why = t.skips?.[path.id];
         if (typeof why !== "string" || why.trim().length < 20) {
-          errors.push(`${t.call} does not apply to ${path.fn} and gives no reason`);
+          errors.push(`${t.call} does not apply to ${path.id} and gives no reason`);
         }
         continue;
       }
-      if (!new RegExp(`\\b${t.call}\\s*\\(`).test(body)) {
+      // Hop one: the path calls either the teardown itself or its declared
+      // wrapper for this path.
+      const hop = t.via?.[path.id];
+      const expected = hop?.fn ?? t.call;
+      if (!new RegExp(`\\b${expected}\\s*\\(`).test(body)) {
         errors.push(
-          `${path.file}::${path.fn} does not call ${t.call}()\n` +
+          `${path.file}::${path.fn} does not call ${expected}()\n` +
             `  That path ends a vault session (${path.why})\n` +
             `  and ${t.call} drops ${t.holds}.\n` +
             `  Module-scope state survives an unmount, and neither a lock nor a switch reloads the WebView.`,
         );
+        continue;
+      }
+      // Hop two, and it is the half that stops an EMPTY wrapper passing. A
+      // wrapper the path calls but that clears nothing satisfies hop one and is
+      // exactly the defect `check-lock-teardown.mjs` was written for.
+      if (hop !== undefined) {
+        const wrapperSrc = files[hop.file];
+        if (wrapperSrc === undefined) {
+          errors.push(`${hop.file} does not exist (via entry for ${path.id} is stale)`);
+          continue;
+        }
+        // **Scoped to the WRAPPER'S OWN BODY, not to its file**, and the
+        // difference is the whole of what hop two buys. A file-wide grep passes
+        // the moment any sibling in that file calls the teardown, so an EMPTY
+        // wrapper beside a live one satisfies it: exactly the defect this hop
+        // was added to catch, surviving the hop. The real
+        // `mobile/src/lib/agent-lifetime.ts` held one function, so the property
+        // held by accident of file size rather than by the check. Found by the
+        // /simplify altitude pass on myne-md/myne#456 and confirmed by
+        // injection.
+        const at = wrapperSrc.search(
+          new RegExp(
+            `(?:export\\s+)?(?:async\\s+)?(?:function\\s+${hop.fn}\\b|const\\s+${hop.fn}\\s*=)`,
+          ),
+        );
+        if (at < 0) {
+          errors.push(`${hop.file} no longer declares ${hop.fn} (via entry for ${path.id} is stale)`);
+          continue;
+        }
+        const wrapperBody = bodyOf(wrapperSrc, at);
+        if (wrapperBody === null) {
+          errors.push(`could not extract ${hop.fn}'s body in ${hop.file}`);
+        } else if (!new RegExp(`\\b${t.call}\\s*\\(`).test(wrapperBody)) {
+          errors.push(
+            `${hop.file} declares ${hop.fn}, which ${path.id} relies on, but never calls ${t.call}()\n` +
+              `  A wrapper that clears nothing satisfies the call site and drops none of ${t.holds}.`,
+          );
+        }
       }
     }
   }
@@ -276,6 +425,7 @@ function rosterFiles() {
   const files = {};
   for (const rel of [
     ...TEARDOWN_CALLS.map((t) => t.declaredIn),
+    ...TEARDOWN_CALLS.flatMap((t) => Object.values(t.via ?? {}).map((v) => v.file)),
     ...LEAVING_PATHS.map((p) => p.file),
   ]) {
     const p = join(ROOT, rel);

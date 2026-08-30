@@ -48,7 +48,8 @@
       "unsupportedDetail": "{{attempts}} ellenőrzésből {{passes}} sikerült; {{required}} szükséges.",
       "checking": "Modell ellenőrzése…",
       "checkingAt": "Modell ellenőrzése… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Ezt a ponthatárt még nem mérték több modellen, ezért lehet, hogy szigorúbb vagy megengedőbb a kelleténél."
+      "unsupportedProvisional": "Ezt a ponthatárt még nem mérték több modellen, ezért lehet, hogy szigorúbb vagy megengedőbb a kelleténél.",
+      "scopeNone": "nincs megnyitott jegyzet, így még nincs min dolgozni"
     },
     "progress": {
       "working": "Dolgozik",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} általad megadott hatókör",
       "grantsUser_other": "{{count}} általad megadott hatókör",
       "grantsModel_one": "{{count}} általa kért",
-      "grantsModel_other": "{{count}} általa kért"
+      "grantsModel_other": "{{count}} általa kért",
+      "cancelledBackground": "A futás megszakadt, mert a Myne a háttérbe került. Semmi nem íródott ki. Kérdezd meg újra, amikor szeretnéd."
     },
     "scope": {
       "title": "Bevonod a(z) {{folder}} mappát?",
@@ -148,7 +150,9 @@
       "failed_one": "{{count}} jegyzetet nem sikerült visszaállítani.",
       "failed_other": "{{count}} jegyzetet nem sikerült visszaállítani.",
       "createdNotReverted_one": "A futtatás által létrehozott {{count}} jegyzet a helyén maradt.",
-      "createdNotReverted_other": "A futtatás által létrehozott {{count}} jegyzet a helyén maradt."
+      "createdNotReverted_other": "A futtatás által létrehozott {{count}} jegyzet a helyén maradt.",
+      "sessionOnly": "Ez az egy koppintásos visszavonás addig él, amíg le nem zárod a széfet vagy be nem zárod az alkalmazást. Utána a jegyzeteket egyesével állítod vissza a jegyzet verziótörténetéből.",
+      "sessionOnlyLink": "Verziótörténet megnyitása"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Mielőtt a Myne bármit elküldene ide: {{provider}}",
         "whatLabel": "Mi hagyja el az eszközödet",
         "whenLabel": "Mikor hagyja el",
-        "whoLabel": "Ki kapja meg"
+        "whoLabel": "Ki kapja meg",
+        "connectionLabel": "Hogyan utazik"
       },
       "disclosureToggle": "Hogyan működik ez?",
       "enableHelper": "Egy általad biztosított modellt futtat. Hogy hol fut, és hogy a jegyzeteid elhagyják-e ezt az eszközt, az attól a szolgáltatótól függ, amelyet alább megnevezel. Kísérleti, alapértelmezés szerint kikapcsolva.",
@@ -2983,7 +2988,9 @@
         "refused": "A szolgáltató visszautasította a kapcsolatot. Lehet, hogy nem üzemel, vagy blokkolja ezt a hálózatot.",
         "timeout": "A szolgáltató nem válaszolt időben. Semmi nem maradt futásban.",
         "unauthorized": "A szolgáltató elutasította az API-kulcsodat. Cseréld le: lehet, hogy hibás, visszavonták, vagy egy másik fiókhoz tartozik.",
-        "unreachable": "Nem sikerült elérni a szolgáltatót. Ellenőrizd a hálózati kapcsolatodat."
+        "unreachable": "Nem sikerült elérni a szolgáltatót. Ellenőrizd a hálózati kapcsolatodat.",
+        "featureOff": "Az MI ki van kapcsolva ezen az eszközön. Semmi nem lett elküldve. Kapcsold be a Beállításokban, az MI résznél.",
+        "consentMissing": "Nem járultál hozzá, hogy erről az eszközről jegyzeteket küldj ennek a szolgáltatónak. Semmi nem lett elküldve. Válaszd ki újra a szolgáltatót a Beállításokban, az MI résznél, és olvasd el, mi kerül elküldésre."
       },
       "modelChoose": "Fájl kiválasztása…",
       "modelEmbeddingLabel": "Keresőmodell: szemantikus keresés és kérdés-válasz",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "Szükséges a model.safetensors + config.json + tokenizer.json egy mappában.",
       "recommendedFilesGeneration": "Szükséges a .gguf fájl + tokenizer.json ugyanabban a mappában.",
       "recommendedFilesTranscription": "Szükséges a Whisper .gguf fájl + config.json + tokenizer.json ugyanabban a mappában.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "MI használata ezen a telefonon",
+      "mobileEnableHelper": "Alapértelmezés szerint kikapcsolva. A Myne telefonon nem futtat modellt, így minden kérés az alább megnevezett szolgáltatáshoz megy, és a jegyzeteid ilyenkor elhagyják ezt az eszközt.",
+      "mobileKeyAdd": "Kulcs mentése",
+      "mobileKeyReplace": "Kulcs cseréje",
+      "mobileRevokeHelper": "Egyszerre távolítja el a szolgáltatót, a kulcsát és ennek a telefonnak a jóváhagyását, pontosan azt az állapotot hagyva, mintha soha nem lett volna beállítva. A többi eszköz addig működik tovább, amíg ott is el nem távolítod.",
+      "mobileApproveLabel": "Küldés jóváhagyása ezen a telefonon",
+      "mobileApproveHelper": "A szolgáltató és a kulcsa egy másik eszközről érkezett. Erről a telefonról semmi nem megy el, amíg el nem olvasod, mi kerül elküldésre, és itt jóvá nem hagyod."
     },
     "network": {
       "disabledCue": "A szinkronizálás már nem a Toron keresztül megy. Az új kapcsolatok közvetlenül a szinkronszerverhez csatlakoznak.",

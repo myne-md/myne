@@ -48,7 +48,8 @@
       "unsupportedDetail": "Se läpäisi {{passes}}/{{attempts}} tarkistusta; vaaditaan {{required}}.",
       "checking": "Tarkistetaan mallia…",
       "checkingAt": "Tarkistetaan mallia… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Tätä läpäisyrajaa ei ole vielä mitattu eri malleilla, joten se voi olla tiukempi tai löysempi kuin sen pitäisi olla."
+      "unsupportedProvisional": "Tätä läpäisyrajaa ei ole vielä mitattu eri malleilla, joten se voi olla tiukempi tai löysempi kuin sen pitäisi olla.",
+      "scopeNone": "ei avointa muistiinpanoa, joten työstettävää ei vielä ole"
     },
     "progress": {
       "working": "Käsitellään",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} asettamasi rajaus",
       "grantsUser_other": "{{count}} asettamaasi rajausta",
       "grantsModel_one": "{{count}} sen pyytämä",
-      "grantsModel_other": "{{count}} sen pyytämää"
+      "grantsModel_other": "{{count}} sen pyytämää",
+      "cancelledBackground": "Ajo peruutettiin, koska Myne siirtyi taustalle. Mitään ei kirjoitettu. Kysy uudelleen, kun olet valmis."
     },
     "scope": {
       "title": "Otetaanko {{folder}} mukaan?",
@@ -148,7 +150,9 @@
       "failed_one": "{{count}} muistiinpanoa ei voitu palauttaa.",
       "failed_other": "{{count}} muistiinpanoa ei voitu palauttaa.",
       "createdNotReverted_one": "{{count}} muistiinpano, jonka ajo loi, jätettiin paikalleen.",
-      "createdNotReverted_other": "{{count}} muistiinpanoa, jotka ajo loi, jätettiin paikalleen."
+      "createdNotReverted_other": "{{count}} muistiinpanoa, jotka ajo loi, jätettiin paikalleen.",
+      "sessionOnly": "Tämä yhden napautuksen kumoaminen on voimassa, kunnes lukitset holvin tai suljet sovelluksen. Sen jälkeen palautat muistiinpanot yksitellen muistiinpanon versiohistoriasta.",
+      "sessionOnlyLink": "Avaa versiohistoria"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Ennen kuin Myne lähettää mitään palveluun {{provider}}",
         "whatLabel": "Mitä laitteeltasi lähtee",
         "whenLabel": "Milloin se lähtee",
-        "whoLabel": "Kuka sen vastaanottaa"
+        "whoLabel": "Kuka sen vastaanottaa",
+        "connectionLabel": "Miten se kulkee"
       },
       "disclosureToggle": "Miten tämä toimii?",
       "enableHelper": "Suorittaa antamasi mallin. Se, missä se suoritetaan ja poistuvatko muistiinpanosi tältä laitteelta, riippuu alla nimeämästäsi palveluntarjoajasta. Kokeellinen, oletuksena pois päältä.",
@@ -2983,7 +2988,9 @@
         "refused": "Palveluntarjoaja torjui yhteyden. Se voi olla poissa käytöstä tai estää tämän verkon.",
         "timeout": "Palveluntarjoaja ei vastannut ajoissa. Mitään ei jäänyt käyntiin.",
         "unauthorized": "Palveluntarjoaja hylkäsi API-avaimesi. Vaihda se: se voi olla väärä, peruutettu tai kuulua toiselle tilille.",
-        "unreachable": "Palveluntarjoajaan ei saatu yhteyttä. Tarkista verkkoyhteytesi."
+        "unreachable": "Palveluntarjoajaan ei saatu yhteyttä. Tarkista verkkoyhteytesi.",
+        "featureOff": "Tekoäly on pois käytöstä tässä laitteessa. Mitään ei lähetetty. Ota se käyttöön Asetuksissa kohdassa Tekoäly.",
+        "consentMissing": "Et ole hyväksynyt muistiinpanojen lähettämistä tälle palveluntarjoajalle tästä laitteesta. Mitään ei lähetetty. Valitse palveluntarjoaja uudelleen Asetuksissa kohdassa Tekoäly ja lue, mitä lähetetään."
       },
       "modelChoose": "Valitse tiedosto…",
       "modelEmbeddingLabel": "Hakumalli: semanttinen haku sekä kysymykset ja vastaukset",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "Tarvitsee tiedostot model.safetensors + config.json + tokenizer.json samassa kansiossa.",
       "recommendedFilesGeneration": "Tarvitsee .gguf-tiedoston + tokenizer.json samassa kansiossa.",
       "recommendedFilesTranscription": "Tarvitsee Whisperin .gguf-tiedoston + config.json + tokenizer.json samassa kansiossa.",
-      "title": "Tekoäly"
+      "title": "Tekoäly",
+      "mobileEnableLabel": "Käytä tekoälyä tässä puhelimessa",
+      "mobileEnableHelper": "Oletuksena pois. Myne ei suorita puhelimessa mitään mallia, joten jokainen pyyntö menee alla nimeämääsi palveluun, ja muistiinpanosi poistuvat silloin tästä laitteesta.",
+      "mobileKeyAdd": "Tallenna avain",
+      "mobileKeyReplace": "Vaihda avain",
+      "mobileRevokeHelper": "Poistaa palveluntarjoajan, sen avaimen ja tämän puhelimen hyväksynnän yhdessä, jolloin tila on täsmälleen sama kuin ennen käyttöönottoa. Muut laitteet toimivat edelleen, kunnes poistat sen sielläkin.",
+      "mobileApproveLabel": "Hyväksy lähettäminen tässä puhelimessa",
+      "mobileApproveHelper": "Palveluntarjoaja ja sen avain tulivat toisesta laitteesta. Tästä puhelimesta ei lähetetä mitään, ennen kuin luet mitä lähetetään ja hyväksyt sen täällä."
     },
     "network": {
       "disabledCue": "Synkronointia ei enää reititetä Torin kautta. Uudet yhteydet menevät suoraan synkronointipalvelimelle.",

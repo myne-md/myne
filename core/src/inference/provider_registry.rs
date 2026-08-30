@@ -461,7 +461,11 @@ pub struct RemoteEngine {
     /// How the engine obtains the current preferences. A closure rather than a
     /// stored `PrefsView` so "re-read" is structural: there is no field here
     /// that could go stale.
-    read_prefs: Box<dyn Fn() -> Option<(protocol::PrefsView, bool)> + Send + Sync>,
+    ///
+    /// It returned `(PrefsView, bool)` until myne-md/myne#456, the `bool` being
+    /// `developer_mode` on its way to the gate. The gate stopped taking it, so
+    /// the tuple collapsed rather than keeping a slot that nothing reads.
+    read_prefs: Box<dyn Fn() -> Option<protocol::PrefsView> + Send + Sync>,
     cancelled: super::cancellable_io::CancelledFn,
 }
 
@@ -474,7 +478,7 @@ impl RemoteEngine {
     /// teardown. This constructor takes the source, so a caller has to supply
     /// one or say `|| false` deliberately.
     pub fn new(
-        read_prefs: Box<dyn Fn() -> Option<(protocol::PrefsView, bool)> + Send + Sync>,
+        read_prefs: Box<dyn Fn() -> Option<protocol::PrefsView> + Send + Sync>,
         cancelled: super::cancellable_io::CancelledFn,
     ) -> Self {
         Self {
@@ -502,8 +506,8 @@ impl RemoteEngine {
         ),
         EngineError,
     > {
-        let (prefs, developer_mode) = (self.read_prefs)().ok_or(EngineError::VaultLocked)?;
-        let auth = super::provider_gate::authorize_remote(&prefs, developer_mode)?;
+        let prefs = (self.read_prefs)().ok_or(EngineError::VaultLocked)?;
+        let auth = super::provider_gate::authorize_remote(&prefs)?;
         let provider = auth.provider();
         let transport = super::provider_transport::ProviderTransport::with_cancel(
             provider.host(),
@@ -551,7 +555,7 @@ impl RemoteEngine {
     /// value is `NotReady` — a refusal the panel can act on — rather than a
     /// guess at a model tag that would rot and might bill.
     fn model(&self) -> Result<String, EngineError> {
-        let (prefs, _) = (self.read_prefs)().ok_or(EngineError::VaultLocked)?;
+        let prefs = (self.read_prefs)().ok_or(EngineError::VaultLocked)?;
         prefs
             .ai_provider_model
             .as_deref()
@@ -668,6 +672,51 @@ pub fn engine_error_of(e: super::provider_transport::ProviderTransportError) -> 
     }
 }
 
+/// The gate, then the fetch, then the parse, with the fetch injected.
+///
+/// **Shared by both clients since myne-md/myne#456.** It was desktop's, and
+/// nothing in it is desktop-specific: the model chooser needs the same list on a
+/// phone, and the alternative was a second copy of the gate-before-socket
+/// ordering: which is the one thing about this function that matters.
+///
+/// The injection is the point. A test can then assert the thing no assertion
+/// about the RETURN VALUE can reach: when a precondition is missing, the fetch
+/// is **never called**. An implementation that connected first and checked
+/// afterwards would satisfy every error-equality assertion while having already
+/// sent a byte, which is the exact failure #414's invariant is written against.
+///
+/// It is an EGRESS, gated exactly like a completion, because asking a provider
+/// "what models do you have" over an authenticated connection tells that
+/// provider this account exists and is active. It fetches model NAMES and never
+/// weights, which is what keeps it on the permitted side of the pull-or-download
+/// line `decisions.md` 2026-08-09 draws.
+pub async fn list_models_gated<F>(
+    prefs: &protocol::PrefsView,
+    fetch: F,
+) -> Result<Vec<crate::inference::provider_registry::ProviderModel>, EngineError>
+where
+    F: FnOnce(
+            crate::inference::provider_registry::RemoteProvider,
+            &str,
+        )
+            -> Result<Vec<u8>, crate::inference::provider_transport::ProviderTransportError>
+        + Send
+        + 'static,
+{
+    let auth = crate::inference::provider_gate::authorize_remote(prefs)?;
+    let provider = auth.provider();
+    let key = auth.key().to_string();
+
+    let raw = crate::task::run_blocking(move || fetch(provider, &key))
+        .await
+        .map_err(|_| EngineError::InferenceFailed)?
+        .map_err(crate::inference::provider_registry::engine_error_of)?;
+
+    provider
+        .parse_models_reply(&raw)
+        .map_err(|_| EngineError::InferenceFailed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,18 +727,14 @@ mod tests {
     fn authorized_engine(construction: super::super::cancellable_io::CancelledFn) -> RemoteEngine {
         RemoteEngine::new(
             Box::new(|| {
-                Some((
-                    protocol::PrefsView {
-                        ai_enabled: true,
-                        developer_mode: true,
-                        ai_provider: Some("openrouter".into()),
-                        ai_provider_consent: Some("openrouter".into()),
-                        ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
-                        ai_provider_model: Some("some/model".into()),
-                        ..protocol::PrefsView::default()
-                    },
-                    true,
-                ))
+                Some(protocol::PrefsView {
+                    ai_enabled: true,
+                    ai_provider: Some("openrouter".into()),
+                    ai_provider_consent: Some("openrouter".into()),
+                    ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
+                    ai_provider_model: Some("some/model".into()),
+                    ..protocol::PrefsView::default()
+                })
             }),
             construction,
         )
@@ -1215,10 +1260,10 @@ mod remote_engine_tests {
     /// The model now lives in the SNAPSHOT, not in a constructor argument, so
     /// the helper writes it into the prefs it hands over — which is also how a
     /// caller sets it in production.
-    fn engine_with(prefs: Option<(PrefsView, bool)>, model: &str) -> RemoteEngine {
-        let prefs = prefs.map(|(mut p, dev)| {
+    fn engine_with(prefs: Option<PrefsView>, model: &str) -> RemoteEngine {
+        let prefs = prefs.map(|mut p| {
             p.ai_provider_model = (!model.is_empty()).then(|| model.to_string());
-            (p, dev)
+            p
         });
         RemoteEngine::new(
             Box::new(move || prefs.clone()),
@@ -1231,14 +1276,14 @@ mod remote_engine_tests {
     /// obtained this engine some other way still cannot embed through it.
     #[test]
     fn embedding_is_refused_by_the_engine_itself() {
-        let e = engine_with(Some((ready_prefs(), true)), "some/model");
+        let e = engine_with(Some(ready_prefs()), "some/model");
         assert_eq!(e.embed("x").err(), Some(EngineError::RemoteBarred));
     }
 
     /// No model named → `NotReady`, never a default (SYNC-24).
     #[test]
     fn an_unnamed_model_is_not_ready_rather_than_a_guess() {
-        let e = engine_with(Some((ready_prefs(), true)), "   ");
+        let e = engine_with(Some(ready_prefs()), "   ");
         assert_eq!(e.infer("hi").err(), Some(EngineError::NotReady));
     }
 
@@ -1252,15 +1297,15 @@ mod remote_engine_tests {
             ai_provider_consent: None,
             ..ready_prefs()
         };
-        let e = engine_with(Some((withdrawn, true)), "some/model");
-        assert_eq!(e.infer("hi").err(), Some(EngineError::RemoteBarred));
+        let e = engine_with(Some(withdrawn), "some/model");
+        assert_eq!(e.infer("hi").err(), Some(EngineError::ConsentMissing));
 
         // Key revoked: the distinguishable "paste a key" cause.
         let revoked = PrefsView {
             ai_provider_key: None,
             ..ready_prefs()
         };
-        let e2 = engine_with(Some((revoked, true)), "some/model");
+        let e2 = engine_with(Some(revoked), "some/model");
         assert_eq!(e2.infer("hi").err(), Some(EngineError::NoCredential));
     }
 
@@ -1310,5 +1355,147 @@ mod remote_engine_tests {
         // answered, but not who it claimed, and there is nothing the user can
         // do about it that differs from "could not reach it".
         assert_eq!(engine_error_of(T::TlsNotTrusted), EngineError::Unreachable);
+    }
+    // ---- the model listing: the gate runs BEFORE the socket ----------------
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
+    //
+    // Moved here with `list_models_gated` (myne-md/myne#456). The property is
+    // the ORDERING, and the ordering is the same on every client.
+
+    use std::sync::atomic::AtomicUsize;
+
+    /// A fully-configured, consented, keyed vault, the only state in which a
+    /// listing may reach the provider.
+    fn listing_ready() -> protocol::PrefsView {
+        protocol::PrefsView {
+            ai_enabled: true,
+            ai_provider: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
+            ..protocol::PrefsView::default()
+        }
+    }
+
+    fn block_on<F: std::future::Future>(f: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(f)
+    }
+
+    /// Every unconfigured state refuses **with the completion path's own
+    /// cause**, and (the part an error-equality assertion cannot reach) the
+    /// fetch is never invoked. The counter is the assertion; the error is a
+    /// bonus. Modelled on `provider_gate::default_off_proof`, in-process
+    /// because no socket needs to exist for the question to be meaningful.
+    #[test]
+    fn a_listing_reaches_nothing_until_all_four_preconditions_hold() {
+        let cases: Vec<(&str, protocol::PrefsView, EngineError)> = vec![
+            (
+                "AI beta off",
+                protocol::PrefsView {
+                    ai_enabled: false,
+                    ..listing_ready()
+                },
+                EngineError::FeatureOff,
+            ),
+            (
+                "no provider selected",
+                protocol::PrefsView {
+                    ai_provider: None,
+                    ..listing_ready()
+                },
+                EngineError::NotReady,
+            ),
+            (
+                "consent for a DIFFERENT provider",
+                protocol::PrefsView {
+                    ai_provider_consent: Some("ollama-cloud".into()),
+                    ..listing_ready()
+                },
+                // See `provider_gate`'s own table: consent has its own variant
+                // since myne-md/myne#456, because "you have not agreed to send
+                // this" and "this class of request never goes remote" are
+                // different facts with different fixes.
+                EngineError::ConsentMissing,
+            ),
+            (
+                "no key",
+                protocol::PrefsView {
+                    ai_provider_key: None,
+                    ..listing_ready()
+                },
+                EngineError::NoCredential,
+            ),
+        ];
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        for (what, prefs, expected) in &cases {
+            let seen = Arc::clone(&calls);
+            let got = block_on(list_models_gated(prefs, move |_, _| {
+                seen.fetch_add(1, Ordering::SeqCst);
+                Ok(Vec::new())
+            }))
+            .err();
+            assert_eq!(got, Some(*expected), "{what}");
+        }
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "an unconfigured listing must reach the provider ZERO times",
+        );
+
+        // The control arm. Without it the zero above is compatible with a
+        // closure that could never be called at all, the same reason
+        // `rustls_transport.rs`'s probe insists on one.
+        let seen = Arc::clone(&calls);
+        let models = block_on(list_models_gated(&listing_ready(), move |p, key| {
+            seen.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(key, "sk-test", "the gate hands the stored credential over");
+            assert_eq!(p.models_path(), "/api/v1/models");
+            Ok(br#"{"data":[{"id":"meta-llama/llama-3.1-8b"},{"id":"qwen/qwen3-30b"}]}"#.to_vec())
+        }))
+        .expect("a configured listing succeeds");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            ["meta-llama/llama-3.1-8b", "qwen/qwen3-30b"]
+        );
+        // Neither entry published an `architecture`, so both arrive usable:
+        // the fail-open direction, asserted here as well as in the codec's own
+        // tests because this is the path the panel actually reads.
+        assert!(models.iter().all(|m| m.text_capable));
+    }
+
+    /// A transport failure arrives as the taxonomy the panel already renders,
+    /// not as a generic error: the chooser distinguishes "your key is wrong"
+    /// from "the provider is down" using the same arms the chat surface does.
+    #[test]
+    fn a_listing_failure_maps_onto_the_shared_taxonomy() {
+        use crate::inference::provider_transport::ProviderTransportError as T;
+        for (transport_err, expected) in [
+            (T::Unauthorized, EngineError::Unauthorized),
+            (T::QuotaExhausted, EngineError::QuotaExhausted),
+            (T::Unreachable, EngineError::Unreachable),
+        ] {
+            let got = block_on(list_models_gated(&listing_ready(), move |_, _| {
+                Err(transport_err)
+            }))
+            .err();
+            assert_eq!(got, Some(expected));
+        }
+    }
+
+    /// A provider that answers with something unparseable is a failure, never
+    /// an empty list: an empty chooser reads as "this provider has no models",
+    /// which is a different and wrong thing to tell the user.
+    #[test]
+    fn an_unparseable_listing_is_a_failure_not_an_empty_list() {
+        let got = block_on(list_models_gated(&listing_ready(), |_, _| {
+            Ok(b"<html>not json</html>".to_vec())
+        }));
+        assert_eq!(got.err(), Some(EngineError::InferenceFailed));
     }
 }

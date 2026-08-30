@@ -152,9 +152,24 @@ describe("the per-provider consent screen", () => {
     expect(screen.getByTestId("ai-consent.revoke").textContent).toContain(
       "at the provider",
     );
-    // The account-scope residual (SYNC-22) is on the screen, not discovered.
-    expect(screen.getByTestId("ai-consent.scope").textContent).toContain(
-      "any device you add later",
+    // **Device scope, and this assertion is inverted from what it was.** The
+    // clause used to state the SYNC-22 residual, that a device added later
+    // inherits the choice and does not ask. myne-md/myne#456 made the consent
+    // device-local, so the screen must no longer say it, and asserting the
+    // ABSENCE of the old sentence is what stops it coming back in a copy edit.
+    const scope = screen.getByTestId("ai-consent.scope").textContent ?? "";
+    expect(scope).toContain("this device only");
+    expect(scope).not.toContain("any device you add later");
+    // The key DOES still travel, and the sentence says so: a phone can hold a
+    // credential it has not been permitted to use, which is the part a user
+    // could otherwise be surprised by.
+    expect(scope).toContain("key does travel");
+
+    // **How it travels** (myne-md/myne#456). Stated nowhere else, and a reader
+    // who has seen the Tor routing option elsewhere would reasonably assume it
+    // applies here.
+    expect(screen.getByTestId("ai-consent.connection").textContent).toContain(
+      "direct",
     );
   });
 

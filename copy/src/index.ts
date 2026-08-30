@@ -152,3 +152,118 @@ export const BETA_TERMS_WHAT_HAPPENS_NEXT =
 /** The moderation reality, which is also the DSA Art. 14 transparency line. */
 export const BETA_TERMS_WHAT_WE_CAN_SEE =
   "We cannot read what you store, so we cannot screen it and do not try. On a substantiated report we can act on an account — freeze it or delete it — but never on a single note, because we cannot tell them apart.";
+
+/* ---- AI provider names (myne-md/myne#456) ----------------------------------
+ *
+ * Proper nouns, so deliberately outside i18n: "OpenRouter" is "OpenRouter" in
+ * every locale, and a translated brand name is a wrong brand name.
+ *
+ * Here rather than in one client's tree because three surfaces now name a
+ * provider: the desktop AI panel, the desktop chat transcript, and the mobile
+ * settings panel. The mapping used to live privately in `AiPanel.tsx`, which is
+ * what made the transcript unable to name the provider without copying it.
+ */
+
+/**
+ * The proper noun a user reads for a stored provider wire name.
+ *
+ * The host stores `openrouter`; a person reads `OpenRouter`.
+ *
+ * An unknown wire name returns ITSELF rather than an empty string: a newer build
+ * may have written one, and rendering the raw value tells the user more than
+ * rendering nothing. A caller that wants to say "this build does not know that
+ * provider" has to decide that from the wire value, not from this.
+ */
+export function providerLabelOf(wire: string | null | undefined): string | undefined {
+  if (!wire) return undefined;
+  switch (wire) {
+    case "ollama-cloud":
+      return "Ollama Cloud";
+    case "openrouter":
+      return "OpenRouter";
+    default:
+      return wire;
+  }
+}
+
+/* ---- AI provider consent (myne-md/myne#456) --------------------------------
+ *
+ * Moved here from `src/lib/load-bearing-copy.ts` so the mobile consent screen
+ * shows the same sentences as the desktop one, by construction rather than by
+ * discipline. Deliberately outside i18n: the exact wording is what
+ * `docs/threat-model.md` bounds.
+ */
+
+/** WHAT leaves. Names the content, not a euphemism for it.
+ *
+ *  **The scope roster is named because nothing else names it.** An agent run
+ *  answers the model's first `list_scope` with the note ids and titles of the
+ *  whole approved scope, before a single body has been read, so a user who
+ *  grants a folder and then stops the run has still sent that folder's titles,
+ *  which are frequently the most disclosing line in a note. `threat-model.md`
+ *  says of that roster: "Naming it here because the sentence above says nothing
+ *  else and a bulk enumeration of notes the model has not read is not covered by
+ *  it." This is the sentence it meant, and it did not say so until
+ *  myne-md/myne#531 review round six. */
+export const CONSENT_WHAT_LEAVES =
+  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles and identifiers of every note in the scope you approved, before it has read any of them.";
+
+/** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for.
+ *
+ *  The agent run is the fifth trigger and was added late: this branch amends
+ *  TB12 and TB13 to widen what crosses, and this screen is the surface that
+ *  amendment is meant to reach (myne-md/myne#531 review round six). A consent
+ *  screen that enumerates four of five triggers is not one. */
+export const CONSENT_WHEN_IT_LEAVES =
+  "Only when you ask for something: chat, summarize, rewrite, edit selection, or an agent run. Nothing is sent as you type, and nothing is sent in the background.";
+
+/** TO WHOM. Interpolates the provider because a consent screen that cannot
+ *  name the recipient is not consent. */
+export function consentToWhom(provider: string): string {
+  return `Everything above goes to ${provider}, which Myne does not run.`;
+}
+
+/** WHAT MYNE CANNOT VERIFY (A17). Myne may state what it sends and to whom;
+ *  never what the far side retains. */
+export function consentCannotVerify(provider: string): string {
+  return `Myne cannot see or control what ${provider} keeps, how long it keeps it, or whether it passes your request to someone else.`;
+}
+
+/** How to undo it, stated on the screen rather than discovered later. The
+ *  distinction matters: deleting the key here stops THIS account's requests,
+ *  but the credential itself lives at the provider. */
+export const CONSENT_HOW_TO_REVOKE =
+  "You can remove the key at any time, which stops Myne sending anything. Revoking the key itself is done at the provider, and it applies to the key rather than to this device.";
+
+/** WHICH DEVICES this covers, and it says "this one".
+ *
+ *  **This sentence used to say the opposite, and it was true when written.** As
+ *  `CONSENT_ACCOUNT_SCOPE` it read: "This choice is part of your vault, so any
+ *  device you add later inherits it and will not ask again." That was the
+ *  SYNC-22 residual, stated on the screen rather than discovered later, which
+ *  was the right way to carry a cost that had no remedy.
+ *
+ *  myne-md/myne#456 built the remedy: `ai_provider_consent` is device-local now,
+ *  so the inheritance it described no longer happens. A screen still claiming it
+ *  would be telling the user something worse about their own privacy than what
+ *  the code does, which is a strange direction to be wrong in and still wrong.
+ *
+ *  The KEY still travels, and the sentence says so, because that is the part a
+ *  user could otherwise be surprised by: a phone can hold a credential it has
+ *  not been permitted to use. */
+export const CONSENT_DEVICE_SCOPE =
+  "This choice covers this device only. Your key does travel to your other devices, but each one asks before it sends anything.";
+
+/** HOW IT TRAVELS. Added by myne-md/myne#456, and it is stated nowhere else.
+ *
+ *  Myne can route its SYNC traffic through Tor on a desktop where the user has
+ *  turned that on. The AI provider arm is not routed: `provider_transport.rs`
+ *  opens a direct connection on every client, so the provider learns the
+ *  device's IP address and the local network learns which provider is in use.
+ *
+ *  Worth a clause of its own because the rest of this screen is about WHAT
+ *  leaves and TO WHOM, and a reader who has seen the Tor option elsewhere in the
+ *  product would reasonably assume it applies here. Routing it is
+ *  myne-md/myne#607; until then, this is the honest sentence. */
+export const CONSENT_DIRECT_CONNECTION =
+  "The connection is direct. The provider sees this device's IP address, and your network can see which provider you use.";

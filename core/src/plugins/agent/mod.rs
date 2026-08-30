@@ -37,6 +37,24 @@ pub mod edit;
 pub mod engine;
 pub mod error;
 pub mod hide;
+/// The host-generic half of the agent command surface: the session table, the
+/// guards, the scope source, and `step`. Both Tauri clients call into it and
+/// supply only their own engine and searcher; see the module doc for the split.
+/// The Tauri-host adapters an agent run needs: reading a note, taking its
+/// restore point, writing the approved batch.
+///
+/// **Here rather than in `crate::inference`, and that placement is
+/// load-bearing.** It shipped there for one review round and broke the audit
+/// build outright: `cargo check -p myne-desktop --no-default-features` failed
+/// with `cannot find inference in crate`, because this plugin compiles
+/// unconditionally while `crate::inference` is behind the default-off
+/// `remote-ai` feature. The file has no remote-provider content at all, its
+/// imports are this plugin, the notes command cores, `TauriHost`, the snapshot
+/// store and `StdVaultIo`: so the gate it sat behind was buying nothing and
+/// costing the one build that gate exists to protect.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+pub mod host_adapters;
+pub mod host_commands;
 pub mod probe;
 pub mod prompt;
 pub mod run;

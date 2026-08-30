@@ -48,7 +48,8 @@
       "unsupportedDetail": "Den klarade {{passes}} av {{attempts}} kontroller; {{required}} krävs.",
       "checking": "Kontrollerar modellen…",
       "checkingAt": "Kontrollerar modellen… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Den godkäntgränsen har ännu inte mätts över flera modeller, så den kan vara strängare eller mildare än den borde vara."
+      "unsupportedProvisional": "Den godkäntgränsen har ännu inte mätts över flera modeller, så den kan vara strängare eller mildare än den borde vara.",
+      "scopeNone": "ingen anteckning öppen, så det finns inget att arbeta med än"
     },
     "progress": {
       "working": "Arbetar",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} omfattning du angav",
       "grantsUser_other": "{{count}} omfattningar du angav",
       "grantsModel_one": "{{count}} som den bad om",
-      "grantsModel_other": "{{count}} som den bad om"
+      "grantsModel_other": "{{count}} som den bad om",
+      "cancelledBackground": "Körningen avbröts eftersom Myne gick till bakgrunden. Ingenting skrevs. Fråga igen när du vill."
     },
     "scope": {
       "title": "Inkludera {{folder}}?",
@@ -148,7 +150,9 @@
       "failed_one": "{{count}} anteckning kunde inte återställas.",
       "failed_other": "{{count}} anteckningar kunde inte återställas.",
       "createdNotReverted_one": "{{count}} anteckning som körningen skapade lämnades kvar.",
-      "createdNotReverted_other": "{{count}} anteckningar som körningen skapade lämnades kvar."
+      "createdNotReverted_other": "{{count}} anteckningar som körningen skapade lämnades kvar.",
+      "sessionOnly": "Den här ångra-med-en-tryckning gäller tills du låser valvet eller stänger appen. Därefter återställer du anteckningar en i taget från en anteckningss versionshistorik.",
+      "sessionOnlyLink": "Öppna versionshistorik"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Innan Myne skickar något till {{provider}}",
         "whatLabel": "Vad som lämnar din enhet",
         "whenLabel": "När det lämnar enheten",
-        "whoLabel": "Vem som tar emot det"
+        "whoLabel": "Vem som tar emot det",
+        "connectionLabel": "Hur det färdas"
       },
       "disclosureToggle": "Hur fungerar det här?",
       "enableHelper": "Kör en modell du tillhandahåller. Var den körs, och om dina anteckningar lämnar den här enheten, beror på leverantören du anger nedan. Experimentell, av som standard.",
@@ -2983,7 +2988,9 @@
         "refused": "Leverantören nekade anslutningen. Den kan ligga nere eller blockera det här nätverket.",
         "timeout": "Leverantören svarade inte i tid. Ingenting lämnades igång.",
         "unauthorized": "Leverantören avvisade din API-nyckel. Byt ut den: den kan vara felaktig, återkallad eller höra till ett annat konto.",
-        "unreachable": "Kunde inte nå leverantören. Kontrollera din nätverksanslutning."
+        "unreachable": "Kunde inte nå leverantören. Kontrollera din nätverksanslutning.",
+        "featureOff": "AI är avstängt på den här enheten. Ingenting skickades. Slå på det i Inställningar, under AI.",
+        "consentMissing": "Du har inte godkänt att skicka anteckningar till den här leverantören från den här enheten. Ingenting skickades. Välj leverantören igen i Inställningar, under AI, och läs vad som skickas."
       },
       "modelChoose": "Välj fil…",
       "modelEmbeddingLabel": "Sökmodell: semantisk sökning och frågor och svar",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "Behöver model.safetensors + config.json + tokenizer.json i en och samma mapp.",
       "recommendedFilesGeneration": "Behöver .gguf-filen + tokenizer.json i samma mapp.",
       "recommendedFilesTranscription": "Behöver .gguf-filen för Whisper + config.json + tokenizer.json i samma mapp.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Använd AI på den här telefonen",
+      "mobileEnableHelper": "Av som standard. Myne kör ingen modell på en telefon, så varje begäran går till en tjänst du anger nedan, och dina anteckningar lämnar då den här enheten.",
+      "mobileKeyAdd": "Spara nyckel",
+      "mobileKeyReplace": "Byt nyckel",
+      "mobileRevokeHelper": "Tar bort leverantören, dess nyckel och den här telefonens godkännande tillsammans, och lämnar exakt det tillstånd som rådde innan något ställdes in. Andra enheter fortsätter fungera tills du tar bort det där också.",
+      "mobileApproveLabel": "Godkänn sändning på den här telefonen",
+      "mobileApproveHelper": "Leverantören och dess nyckel kom från en annan enhet. Ingenting skickas från den här telefonen förrän du läser vad som skickas och godkänner det här."
     },
     "network": {
       "disabledCue": "Synkroniseringen går inte längre via Tor. Nya anslutningar går direkt till synkservern.",

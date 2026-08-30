@@ -48,7 +48,8 @@
       "unsupportedDetail": "Es hat {{passes}} von {{attempts}} Prüfungen bestanden; {{required}} sind erforderlich.",
       "checking": "Modell wird geprüft…",
       "checkingAt": "Modell wird geprüft… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Diese Bestehensgrenze wurde noch nicht über verschiedene Modelle hinweg gemessen, sie kann also strenger oder lockerer sein als nötig."
+      "unsupportedProvisional": "Diese Bestehensgrenze wurde noch nicht über verschiedene Modelle hinweg gemessen, sie kann also strenger oder lockerer sein als nötig.",
+      "scopeNone": "keine Notiz geöffnet, also gibt es noch nichts zu bearbeiten"
     },
     "progress": {
       "working": "Arbeitet",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} von Ihnen gesetzter Umfang",
       "grantsUser_other": "{{count}} von Ihnen gesetzte Umfänge",
       "grantsModel_one": "{{count}} vom Agenten angefragt",
-      "grantsModel_other": "{{count}} vom Agenten angefragt"
+      "grantsModel_other": "{{count}} vom Agenten angefragt",
+      "cancelledBackground": "Der Lauf wurde abgebrochen, weil Myne in den Hintergrund gewechselt ist. Es wurde nichts geschrieben. Fragen Sie erneut, wenn Sie bereit sind."
     },
     "scope": {
       "title": "{{folder}} einbeziehen?",
@@ -148,7 +150,9 @@
       "failed_one": "{{count}} Notiz konnte nicht wiederhergestellt werden.",
       "failed_other": "{{count}} Notizen konnten nicht wiederhergestellt werden.",
       "createdNotReverted_one": "{{count}} vom Durchlauf erstellte Notiz wurde beibehalten.",
-      "createdNotReverted_other": "{{count}} vom Durchlauf erstellte Notizen wurden beibehalten."
+      "createdNotReverted_other": "{{count}} vom Durchlauf erstellte Notizen wurden beibehalten.",
+      "sessionOnly": "Dieses Rückgängig mit einem Tippen gilt, bis Sie den Tresor sperren oder die App schließen. Danach stellen Sie Notizen einzeln über die Versionsgeschichte einer Notiz wieder her.",
+      "sessionOnlyLink": "Versionsgeschichte öffnen"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Bevor Myne etwas an {{provider}} sendet",
         "whatLabel": "Was Ihr Gerät verlässt",
         "whenLabel": "Wann es das Gerät verlässt",
-        "whoLabel": "Wer es empfängt"
+        "whoLabel": "Wer es empfängt",
+        "connectionLabel": "Wie es übertragen wird"
       },
       "disclosureToggle": "Wie funktioniert das?",
       "enableHelper": "Führt ein von Ihnen bereitgestelltes Modell aus. Wo es läuft und ob Ihre Notizen dieses Gerät verlassen, hängt davon ab, welchen Anbieter Sie unten benennen. Experimentell, standardmäßig aus.",
@@ -2983,7 +2988,9 @@
         "refused": "Der Anbieter hat die Verbindung abgelehnt. Möglicherweise ist er ausgefallen oder blockiert dieses Netzwerk.",
         "timeout": "Der Anbieter hat nicht rechtzeitig geantwortet. Es läuft nichts weiter.",
         "unauthorized": "Der Anbieter hat Ihren API-Schlüssel zurückgewiesen. Ersetzen Sie ihn: Er könnte falsch, widerrufen oder für ein anderes Konto sein.",
-        "unreachable": "Der Anbieter ist nicht erreichbar. Prüfen Sie Ihre Netzwerkverbindung."
+        "unreachable": "Der Anbieter ist nicht erreichbar. Prüfen Sie Ihre Netzwerkverbindung.",
+        "featureOff": "KI ist auf diesem Gerät ausgeschaltet. Es wurde nichts gesendet. Schalten Sie sie in den Einstellungen unter KI ein.",
+        "consentMissing": "Sie haben nicht zugestimmt, Notizen von diesem Gerät an diesen Anbieter zu senden. Es wurde nichts gesendet. Wählen Sie den Anbieter in den Einstellungen unter KI erneut aus und lesen Sie, was gesendet wird."
       },
       "modelChoose": "Datei auswählen…",
       "modelEmbeddingLabel": "Suchmodell: semantische Suche & Q&A",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "Benötigt model.safetensors + config.json + tokenizer.json in einem Ordner.",
       "recommendedFilesGeneration": "Benötigt die .gguf-Datei + tokenizer.json im selben Ordner.",
       "recommendedFilesTranscription": "Benötigt die Whisper-.gguf-Datei + config.json + tokenizer.json im selben Ordner.",
-      "title": "KI"
+      "title": "KI",
+      "mobileEnableLabel": "KI auf diesem Telefon nutzen",
+      "mobileEnableHelper": "Standardmäßig aus. Myne führt auf einem Telefon kein Modell aus, also geht jede Anfrage an einen Dienst, den Sie unten benennen, und Ihre Notizen verlassen dabei dieses Gerät.",
+      "mobileKeyAdd": "Schlüssel speichern",
+      "mobileKeyReplace": "Schlüssel ersetzen",
+      "mobileRevokeHelper": "Entfernt den Anbieter, seinen Schlüssel und die Zustimmung dieses Telefons zusammen und stellt genau den Zustand her, als wäre nie etwas eingerichtet worden. Andere Geräte funktionieren weiter, bis Sie es dort ebenfalls entfernen.",
+      "mobileApproveLabel": "Senden auf diesem Telefon freigeben",
+      "mobileApproveHelper": "Der Anbieter und sein Schlüssel stammen von einem anderen Gerät. Von diesem Telefon wird nichts gesendet, bis Sie lesen, was gesendet wird, und es hier freigeben."
     },
     "network": {
       "disabledCue": "Sync läuft nicht mehr über Tor. Neue Verbindungen gehen direkt zum Sync-Server.",

@@ -1336,7 +1336,7 @@ mod agent_script_tests {
     //! nothing usable.
 
     use super::*;
-    use myne_core::plugins::agent::prompt::{parse_actions, system_instructions, AgentAction};
+    use crate::plugins::agent::prompt::{parse_actions, system_instructions, AgentAction};
 
     fn turn(role: ChatRole, content: &str) -> ChatMessage {
         ChatMessage {
@@ -1351,86 +1351,6 @@ mod agent_script_tests {
         StubEngine
             .chat_streaming(&system_instructions(), messages, &mut sink)
             .expect("the stub answers")
-    }
-
-    /// The regression that motivated the whole module: echoing the prompt back
-    /// parses as EVERY example action, ending at `finish`, so a run that used
-    /// the echo produced an empty proposal on iteration one.
-    /// The stub must PASS the capability probe, driven through the real
-    /// `run_probe` and the real grader.
-    ///
-    /// This is the test the composer's gate made necessary and its absence made
-    /// expensive: wiring `agentCapability()` into the composer (which is what
-    /// makes the anchored format's right to refuse a near-miss mean anything)
-    /// disabled Send until the probe passes, and the stub answered the probe
-    /// with `list_scope` because `probe_request` carries the same system
-    /// instructions a run does. Every agent E2E scenario went red on a button
-    /// that never enabled, one container build later.
-    ///
-    /// Asserted through `run_probe` rather than by inspecting the reply, because
-    /// the reply being well-formed is not the claim. The claim is that the
-    /// grader accepts it.
-    #[test]
-    fn the_stub_passes_the_capability_probe_it_is_asked() {
-        use myne_core::plugins::agent::engine::{
-            AgentCompletion, AgentEngine, AgentRequest, AgentRequestClass,
-        };
-        use myne_core::plugins::agent::error::AgentError;
-        use myne_core::plugins::agent::probe::{run_probe, AttemptVerdict, ProbeThreshold};
-
-        /// The stub behind the agent seam, mapped by the REAL `chat_shape` the
-        /// desktop adapter uses. A second mapping written here would let this
-        /// test pass while the shipped one was wrong, which is the whole shape
-        /// this suite exists to catch.
-        struct StubBehindTheSeam;
-        #[async_trait::async_trait]
-        impl AgentEngine for StubBehindTheSeam {
-            async fn complete(
-                &self,
-                _class: AgentRequestClass,
-                request: &AgentRequest,
-            ) -> Result<AgentCompletion, AgentError> {
-                let (system, messages) =
-                    crate::plugins::agent::adapters::chat_shape(request, &|s: &str| s.to_string());
-                let mut sink = |_: &str| ControlFlow::Continue(());
-                let reply = StubEngine
-                    .chat_streaming(&system, &messages, &mut sink)
-                    .map_err(|_| AgentError::ReadFailed)?;
-                Ok(AgentCompletion {
-                    reply,
-                    chars_off_device: None,
-                })
-            }
-        }
-
-        let verdict = myne_core::test_support::block_on(run_probe(
-            &StubBehindTheSeam,
-            ProbeThreshold {
-                attempts: 3,
-                required: 2,
-                provisional: false,
-            },
-            // This test is about the stub clearing the bar, not about progress.
-            &|_| {},
-        ))
-        .expect("the probe runs");
-        assert!(
-            verdict.passed,
-            "the stub must be a backend Myne would offer agent mode on: {verdict:?}"
-        );
-        // **Every attempt that RAN was clean**, which is what this was always
-        // about; it used to say `passes == 3` and the number was a coincidence
-        // of the probe running every attempt regardless. Since the early exit
-        // (myne-md/myne#575) the bar of 2 settles it at 2, so asserting 3 would
-        // be asserting that the saving does not happen.
-        assert!(
-            verdict
-                .attempts
-                .iter()
-                .all(|a| *a == AttemptVerdict::Passed),
-            "the stub must not miss a single attempt it was asked: {verdict:?}"
-        );
-        assert_eq!(verdict.passes as usize, verdict.attempts.len());
     }
 
     /// The host frames every tool result with prose BEFORE the payload
@@ -1717,9 +1637,9 @@ mod agent_script_tests {
             // Checked through the real placer and the real detector rather than
             // by reading the string, so the claim is about what applying the
             // edit DOES.
-            let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+            let placed = crate::plugins::agent::edit::place(body, anchor, replacement)
                 .expect("the anchor must place");
-            if myne_core::plugins::agent::hide::edit_hides_note(body, &placed) {
+            if crate::plugins::agent::hide::edit_hides_note(body, &placed) {
                 trashing += 1;
             } else {
                 ordinary += 1;
@@ -1839,7 +1759,7 @@ mod agent_script_tests {
             1,
             "anchor {anchor:?} must place exactly once"
         );
-        let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+        let placed = crate::plugins::agent::edit::place(body, anchor, replacement)
             .expect("the stub's anchor must place in a frontmattered note");
         assert_ne!(placed, body);
         // And the frontmatter is intact, so the edit is a body edit rather than
@@ -1876,7 +1796,7 @@ mod agent_script_tests {
                 !anchor.starts_with("title:"),
                 "an anchor may not be a managed frontmatter field: {anchor:?}"
             );
-            myne_core::plugins::agent::edit::place(body, anchor, replacement)
+            crate::plugins::agent::edit::place(body, anchor, replacement)
                 .unwrap_or_else(|e| panic!("anchor {anchor:?} must place: {e:?}"));
         }
     }

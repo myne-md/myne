@@ -48,7 +48,8 @@
       "unsupportedDetail": "Nó đạt {{passes}} trên {{attempts}} lần kiểm tra; cần {{required}}.",
       "checking": "Đang kiểm tra mô hình…",
       "checkingAt": "Đang kiểm tra mô hình… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Ngưỡng đạt đó chưa được đo trên nhiều mô hình, nên nó có thể chặt hơn hoặc lỏng hơn mức đáng có."
+      "unsupportedProvisional": "Ngưỡng đạt đó chưa được đo trên nhiều mô hình, nên nó có thể chặt hơn hoặc lỏng hơn mức đáng có.",
+      "scopeNone": "không có ghi chú nào đang mở, nên chưa có gì để làm việc"
     },
     "progress": {
       "working": "Đang chạy",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} phạm vi bạn đặt",
       "grantsUser_other": "{{count}} phạm vi bạn đặt",
       "grantsModel_one": "{{count}} do nó yêu cầu",
-      "grantsModel_other": "{{count}} do nó yêu cầu"
+      "grantsModel_other": "{{count}} do nó yêu cầu",
+      "cancelledBackground": "Lượt chạy đã bị hủy vì Myne chuyển sang chạy nền. Không có gì được ghi. Hãy hỏi lại khi bạn sẵn sàng."
     },
     "scope": {
       "title": "Bao gồm {{folder}}?",
@@ -148,7 +150,9 @@
       "failed_one": "Không thể khôi phục {{count}} ghi chú.",
       "failed_other": "Không thể khôi phục {{count}} ghi chú.",
       "createdNotReverted_one": "{{count}} ghi chú do lượt chạy tạo ra vẫn được giữ nguyên.",
-      "createdNotReverted_other": "{{count}} ghi chú do lượt chạy tạo ra vẫn được giữ nguyên."
+      "createdNotReverted_other": "{{count}} ghi chú do lượt chạy tạo ra vẫn được giữ nguyên.",
+      "sessionOnly": "Thao tác hoàn tác một chạm này có hiệu lực đến khi bạn khóa két hoặc đóng ứng dụng. Sau đó, hãy khôi phục từng ghi chú một từ lịch sử phiên bản của ghi chú.",
+      "sessionOnlyLink": "Mở lịch sử phiên bản"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Trước khi Myne gửi bất cứ thứ gì tới {{provider}}",
         "whatLabel": "Những gì rời khỏi thiết bị của bạn",
         "whenLabel": "Khi nào nó rời đi",
-        "whoLabel": "Ai nhận được nó"
+        "whoLabel": "Ai nhận được nó",
+        "connectionLabel": "Cách nó được truyền đi"
       },
       "disclosureToggle": "Cách này hoạt động thế nào?",
       "enableHelper": "Chạy một mô hình do bạn cung cấp. Việc nó chạy ở đâu, và ghi chú của bạn có rời khỏi thiết bị này hay không, đều phụ thuộc vào nhà cung cấp mà bạn khai báo bên dưới. Thử nghiệm, tắt theo mặc định.",
@@ -2983,7 +2988,9 @@
         "refused": "Nhà cung cấp đã từ chối kết nối. Có thể dịch vụ đang ngừng hoạt động hoặc đang chặn mạng này.",
         "timeout": "Nhà cung cấp không trả lời kịp. Không còn gì đang chạy dở.",
         "unauthorized": "Nhà cung cấp đã từ chối khóa API của bạn. Hãy thay khóa khác: có thể khóa sai, đã bị thu hồi, hoặc thuộc về một tài khoản khác.",
-        "unreachable": "Không thể kết nối tới nhà cung cấp. Hãy kiểm tra kết nối mạng của bạn."
+        "unreachable": "Không thể kết nối tới nhà cung cấp. Hãy kiểm tra kết nối mạng của bạn.",
+        "featureOff": "AI đang tắt trên thiết bị này. Không có gì được gửi. Hãy bật trong Cài đặt, mục AI.",
+        "consentMissing": "Bạn chưa đồng ý gửi ghi chú tới nhà cung cấp này từ thiết bị này. Không có gì được gửi. Hãy chọn lại nhà cung cấp trong Cài đặt, mục AI, và đọc những gì sẽ được gửi."
       },
       "modelChoose": "Chọn tệp…",
       "modelEmbeddingLabel": "Mô hình tìm kiếm: tìm kiếm ngữ nghĩa & Hỏi đáp",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "Cần model.safetensors + config.json + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesGeneration": "Cần tệp .gguf + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesTranscription": "Cần tệp .gguf của Whisper + config.json + tokenizer.json trong cùng một thư mục.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Dùng AI trên điện thoại này",
+      "mobileEnableHelper": "Mặc định tắt. Myne không chạy mô hình nào trên điện thoại, nên mọi yêu cầu đều tới dịch vụ bạn nêu bên dưới, và ghi chú của bạn rời khỏi thiết bị này khi đó.",
+      "mobileKeyAdd": "Lưu khóa",
+      "mobileKeyReplace": "Thay khóa",
+      "mobileRevokeHelper": "Gỡ nhà cung cấp, khóa của nó và sự chấp thuận của điện thoại này cùng lúc, để lại đúng trạng thái như chưa từng thiết lập. Các thiết bị khác vẫn hoạt động cho đến khi bạn gỡ ở đó nữa.",
+      "mobileApproveLabel": "Cho phép gửi từ điện thoại này",
+      "mobileApproveHelper": "Nhà cung cấp và khóa của nó đến từ một thiết bị khác. Không có gì được gửi từ điện thoại này cho đến khi bạn đọc những gì sẽ được gửi và cho phép tại đây."
     },
     "network": {
       "disabledCue": "Đồng bộ không còn đi qua Tor. Các kết nối mới đi thẳng tới máy chủ đồng bộ.",

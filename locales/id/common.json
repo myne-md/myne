@@ -48,7 +48,8 @@
       "unsupportedDetail": "Model lulus {{passes}} dari {{attempts}} pemeriksaan; {{required}} yang dibutuhkan.",
       "checking": "Memeriksa model…",
       "checkingAt": "Memeriksa model… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Batas kelulusan itu belum diukur pada berbagai model, jadi bisa lebih ketat atau lebih longgar dari seharusnya."
+      "unsupportedProvisional": "Batas kelulusan itu belum diukur pada berbagai model, jadi bisa lebih ketat atau lebih longgar dari seharusnya.",
+      "scopeNone": "tidak ada catatan yang terbuka, jadi belum ada yang bisa dikerjakan"
     },
     "progress": {
       "working": "Memproses…",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} cakupan yang Anda tetapkan",
       "grantsUser_other": "{{count}} cakupan yang Anda tetapkan",
       "grantsModel_one": "{{count}} yang diminta agen",
-      "grantsModel_other": "{{count}} yang diminta agen"
+      "grantsModel_other": "{{count}} yang diminta agen",
+      "cancelledBackground": "Proses dibatalkan karena Myne berpindah ke latar belakang. Tidak ada yang ditulis. Tanyakan lagi saat Anda siap."
     },
     "scope": {
       "title": "Sertakan {{folder}}?",
@@ -148,7 +150,9 @@
       "failed_one": "{{count}} catatan tidak dapat dipulihkan.",
       "failed_other": "{{count}} catatan tidak dapat dipulihkan.",
       "createdNotReverted_one": "{{count}} catatan yang dibuat proses itu dibiarkan tetap ada.",
-      "createdNotReverted_other": "{{count}} catatan yang dibuat proses itu dibiarkan tetap ada."
+      "createdNotReverted_other": "{{count}} catatan yang dibuat proses itu dibiarkan tetap ada.",
+      "sessionOnly": "Pembatalan sekali ketuk ini berlaku sampai Anda mengunci brankas atau menutup aplikasi. Setelah itu, pulihkan catatan satu per satu dari riwayat versi sebuah catatan.",
+      "sessionOnlyLink": "Buka riwayat versi"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Sebelum Myne mengirim apa pun ke {{provider}}",
         "whatLabel": "Apa yang keluar dari perangkat Anda",
         "whenLabel": "Kapan itu keluar",
-        "whoLabel": "Siapa yang menerimanya"
+        "whoLabel": "Siapa yang menerimanya",
+        "connectionLabel": "Bagaimana ia dikirim"
       },
       "disclosureToggle": "Bagaimana ini bekerja?",
       "enableHelper": "Menjalankan model yang Anda sediakan. Di mana model itu berjalan, dan apakah catatan Anda keluar dari perangkat ini, bergantung pada penyedia yang Anda sebutkan di bawah. Eksperimental, mati secara bawaan.",
@@ -2983,7 +2988,9 @@
         "refused": "Penyedia menolak koneksi. Mungkin sedang mati atau memblokir jaringan ini.",
         "timeout": "Penyedia tidak menjawab tepat waktu. Tidak ada yang dibiarkan berjalan.",
         "unauthorized": "Penyedia menolak kunci API Anda. Gantilah: kunci itu mungkin salah, sudah dicabut, atau milik akun lain.",
-        "unreachable": "Tidak dapat menjangkau penyedia. Periksa koneksi jaringan Anda."
+        "unreachable": "Tidak dapat menjangkau penyedia. Periksa koneksi jaringan Anda.",
+        "featureOff": "AI dimatikan di perangkat ini. Tidak ada yang dikirim. Nyalakan di Pengaturan, bagian AI.",
+        "consentMissing": "Anda belum menyetujui pengiriman catatan ke penyedia ini dari perangkat ini. Tidak ada yang dikirim. Pilih kembali penyedia di Pengaturan, bagian AI, dan baca apa yang akan dikirim."
       },
       "modelChoose": "Pilih berkas…",
       "modelEmbeddingLabel": "Model pencarian: pencarian semantik & Tanya-Jawab",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "Membutuhkan model.safetensors + config.json + tokenizer.json dalam satu folder.",
       "recommendedFilesGeneration": "Membutuhkan berkas .gguf + tokenizer.json dalam folder yang sama.",
       "recommendedFilesTranscription": "Membutuhkan berkas Whisper .gguf + config.json + tokenizer.json dalam folder yang sama.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Gunakan AI di ponsel ini",
+      "mobileEnableHelper": "Mati secara bawaan. Myne tidak menjalankan model apa pun di ponsel, jadi setiap permintaan pergi ke layanan yang Anda sebutkan di bawah, dan catatan Anda meninggalkan perangkat ini saat itu.",
+      "mobileKeyAdd": "Simpan kunci",
+      "mobileKeyReplace": "Ganti kunci",
+      "mobileRevokeHelper": "Menghapus penyedia, kuncinya, dan persetujuan ponsel ini sekaligus, meninggalkan keadaan persis seperti belum pernah disiapkan. Perangkat lain tetap bekerja sampai Anda menghapusnya di sana juga.",
+      "mobileApproveLabel": "Setujui pengiriman di ponsel ini",
+      "mobileApproveHelper": "Penyedia dan kuncinya berasal dari perangkat lain. Tidak ada yang dikirim dari ponsel ini sampai Anda membaca apa yang akan dikirim dan menyetujuinya di sini."
     },
     "network": {
       "disabledCue": "Sinkronisasi tidak lagi dirutekan melalui Tor. Koneksi baru langsung menuju server sinkronisasi.",
