@@ -118,13 +118,17 @@
         "excludedFolder": "Chưa tạo: thư mục đó bị loại trừ khỏi AI.",
         "createFailed": "Chưa tạo: không ghi được ghi chú mới. Các thay đổi khác vẫn được áp dụng.",
         "excludedNow": "Không thể áp dụng: thư mục của ghi chú đó hiện bị loại trừ khỏi AI.",
-        "notProposed": "Không thể áp dụng: thay đổi đó không nằm trong đề xuất của lượt chạy này."
+        "notProposed": "Không thể áp dụng: thay đổi đó không nằm trong đề xuất của lượt chạy này.",
+        "noteMoved": "Không thể áp dụng: thay đổi đó sẽ chuyển ghi chú sang thư mục khác.",
+        "appendEmpty": "Không thể áp dụng: không có gì để thêm.",
+        "appendWouldWriteFrontmatter": "Không thể áp dụng: văn bản đó sẽ trở thành khối thuộc tính của ghi chú."
       },
       "applyFailed": "Không thể áp dụng các thay đổi.",
       "undo": "Hoàn tác lượt chạy này",
       "undoFailed": "Không thể hoàn tác lượt chạy.",
       "undoReport": "Đã khôi phục {{reverted}} ghi chú. {{kept}} ghi chú do lượt chạy tạo ra được giữ nguyên.",
       "alreadyApplied": "Đã áp dụng",
+      "appendFlag": "thêm vào cuối",
       "untitledNote": "Ghi chú chưa đặt tên",
       "vaultRoot": "Thư mục gốc kho lưu trữ",
       "newNotesHeading_one": "{{count}} ghi chú mới",
@@ -3024,7 +3028,9 @@
       "recommendedFilesEmbedding": "Cần model.safetensors + config.json + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesGeneration": "Cần tệp .gguf + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesTranscription": "Cần tệp .gguf của Whisper + config.json + tokenizer.json trong cùng một thư mục.",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "Mỗi yêu cầu mang theo bao nhiêu phần của cuộc trò chuyện gần đây, tính bằng ký tự. Để trống để dùng giá trị mặc định. Số lớn hơn cho phép AI theo dõi những cuộc trò chuyện dài hơn và gửi đi nhiều hơn: với nhà cung cấp không nằm trên thiết bị này, đó là nhiều văn bản của bạn rời khỏi thiết bị hơn, ở mỗi bước của một lần chạy.",
+      "historyBudgetLabel": "Cuộc trò chuyện gửi kèm mỗi yêu cầu"
     },
     "network": {
       "disabledCue": "Đồng bộ không còn đi qua Tor. Các kết nối mới đi thẳng tới máy chủ đồng bộ.",
@@ -3337,7 +3343,8 @@
         "viewMode": "chế độ xem mặc định trực tiếp đọc nguồn xem trước view mode",
         "dateFormat": "định dạng ngày ngày tháng năm lịch date format iso dd/mm mm/dd calendar",
         "timeFormat": "định dạng giờ 24 giờ 12 giờ đồng hồ sáng chiều time format clock am pm",
-        "timezone": "múi giờ vùng hôm nay timezone time zone tz utc iana region today"
+        "timezone": "múi giờ vùng hôm nay timezone time zone tz utc iana region today",
+        "aiHistoryBudget": "trò chuyện lịch sử ngữ cảnh bộ nhớ hạn mức ký tự tác nhân chat yêu cầu"
       }
     },
     "dateTime": {

@@ -118,13 +118,17 @@
         "excludedFolder": "Ikke oprettet: den mappe er udelukket fra AI.",
         "createFailed": "Ikke oprettet: den nye note kunne ikke skrives. De øvrige ændringer blev stadig anvendt.",
         "excludedNow": "Kunne ikke anvendes: notens mappe er nu udelukket fra AI.",
-        "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag."
+        "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag.",
+        "noteMoved": "Kunne ikke anvendes: den ændring ville flytte noten til en anden mappe.",
+        "appendEmpty": "Kunne ikke anvendes: der var intet at tilføje.",
+        "appendWouldWriteFrontmatter": "Kunne ikke anvendes: den tekst ville være blevet notens egenskabsblok."
       },
       "applyFailed": "Ændringerne kunne ikke anvendes.",
       "undo": "Fortryd denne kørsel",
       "undoFailed": "Kørslen kunne ikke fortrydes.",
       "undoReport": "{{reverted}} noter gendannet. {{kept}} noter, som kørslen oprettede, blev bevaret.",
       "alreadyApplied": "Anvendt",
+      "appendFlag": "tilføjes til slutningen",
       "untitledNote": "Note uden titel",
       "vaultRoot": "Boksens rod",
       "newNotesHeading_one": "{{count}} ny note",
@@ -3024,7 +3028,9 @@
       "recommendedFilesEmbedding": "Kræver model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Kræver .gguf-filen + tokenizer.json i samme mappe.",
       "recommendedFilesTranscription": "Kræver Whisper .gguf-filen + config.json + tokenizer.json i samme mappe.",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "Hvor meget af den seneste samtale hver forespørgsel bærer, i tegn. Lad feltet stå tomt for standardværdien. Et større tal lader AI'en følge længere samtaler og sender mere af dem: hos en udbyder, der ikke er på denne enhed, betyder det mere af din tekst, der forlader den, ved hvert trin i en kørsel.",
+      "historyBudgetLabel": "Samtale der sendes med hver forespørgsel"
     },
     "network": {
       "disabledCue": "Synkronisering sendes ikke længere gennem Tor. Nye forbindelser går direkte til synkroniseringsserveren.",
@@ -3337,7 +3343,8 @@
         "viewMode": "standardvisning visningstilstand live læsning kilde forhåndsvisning view mode",
         "dateFormat": "datoformat dato dag måned år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat klokkeslæt 24 timer 12 timer ur am pm time format",
-        "timezone": "tidszone zone tz utc iana region i dag timezone"
+        "timezone": "tidszone zone tz utc iana region i dag timezone",
+        "aiHistoryBudget": "samtale historik kontekst hukommelse budget tegn agent chat forespørgsel"
       }
     },
     "dateTime": {

@@ -130,13 +130,17 @@
         "excludedFolder": "Necreată: acel folder este exclus din AI.",
         "createFailed": "Necreată: scrierea notei noi a eșuat. Celelalte modificări au fost totuși aplicate.",
         "excludedNow": "Nu a putut fi aplicată: folderul acelei note este acum exclus din AI.",
-        "notProposed": "Nu a putut fi aplicată: acea modificare nu face parte din propunerea acestei rulări."
+        "notProposed": "Nu a putut fi aplicată: acea modificare nu face parte din propunerea acestei rulări.",
+        "noteMoved": "Nu a putut fi aplicată: acea modificare ar muta nota în alt folder.",
+        "appendEmpty": "Nu a putut fi aplicată: nu era nimic de adăugat.",
+        "appendWouldWriteFrontmatter": "Nu a putut fi aplicată: acel text ar fi devenit blocul de proprietăți al notei."
       },
       "applyFailed": "Modificările nu au putut fi aplicate.",
       "undo": "Anulează această rulare",
       "undoFailed": "Rularea nu a putut fi anulată.",
       "undoReport": "{{reverted}} note restaurate. {{kept}} note create de rulare au fost lăsate pe loc.",
       "alreadyApplied": "Aplicată",
+      "appendFlag": "adaugă la final",
       "untitledNote": "Notă fără titlu",
       "vaultRoot": "Rădăcina seifului",
       "newNotesHeading_one": "{{count}} notă nouă",
@@ -3130,7 +3134,9 @@
       "recommendedFilesGeneration": "Necesită fișierul .gguf + tokenizer.json în același dosar.",
       "recommendedFilesTranscription": "Necesită fișierul Whisper .gguf + config.json + tokenizer.json în același dosar.",
       "title": "AI",
-      "providerModelCount_few": "{{count}} modele disponibile."
+      "providerModelCount_few": "{{count}} modele disponibile.",
+      "historyBudgetHelper": "Cât din conversația recentă duce cu sine fiecare cerere, în caractere. Lasă gol pentru valoarea implicită. Un număr mai mare permite AI-ului să urmărească conversații mai lungi și trimite mai mult din ele: la un furnizor care nu se află pe acest dispozitiv, înseamnă mai mult din textul tău părăsindu-l, la fiecare pas al unei rulări.",
+      "historyBudgetLabel": "Conversația trimisă cu fiecare cerere"
     },
     "network": {
       "disabledCue": "Sincronizarea nu mai este rutată prin Tor. Conexiunile noi merg direct la serverul de sincronizare.",
@@ -3447,7 +3453,8 @@
         "viewMode": "mod de vizualizare implicit live citire sursă previzualizare",
         "dateFormat": "format dată zi lună an iso dd/mm mm/dd calendar date format",
         "timeFormat": "format oră 24 de ore 12 ore ceas am pm time format",
-        "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone"
+        "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone",
+        "aiHistoryBudget": "conversație istoric context memorie buget caractere agent chat cerere"
       }
     },
     "dateTime": {

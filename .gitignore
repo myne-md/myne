@@ -35,17 +35,21 @@ coverage/
 
 # Companion repos cloned by workspace/setup.sh as nested directories.
 # Each carries its own .git and is tracked by GitHub separately under myne-md.
-/myne-test-vectors/
-/myne-server/
-/myne-web/
-/myne-website/
-/operations/
-/agent-tooling/
-/myne-clipper/
-/myne-themes/
-/myne-branding/
-/internal-service/
-/homebrew-tap/
+# No trailing slash, deliberately. Inside a worktree a companion repo is a
+# SYMLINK to the shared checkout (root CLAUDE.md, "Worktrees"), and a trailing
+# slash matches a directory only, so every worktree left its companion symlinks
+# untracked and one `git add -A` away from being committed into the repo.
+/myne-test-vectors
+/myne-server
+/myne-web
+/myne-website
+/operations
+/agent-tooling
+/myne-clipper
+/myne-themes
+/myne-branding
+/internal-service
+/homebrew-tap
 
 # Vite dep-optimization cache (regenerated each build).
 .vite/

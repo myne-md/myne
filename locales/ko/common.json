@@ -118,13 +118,17 @@
         "excludedFolder": "생성되지 않았습니다: 해당 폴더는 AI에서 제외되어 있습니다.",
         "createFailed": "생성되지 않았습니다: 새 노트를 기록하지 못했습니다. 다른 변경 사항은 적용되었습니다.",
         "excludedNow": "적용할 수 없습니다: 해당 노트의 폴더가 이제 AI에서 제외되었습니다.",
-        "notProposed": "적용할 수 없습니다: 해당 변경은 이번 실행의 변경 제안에 포함되어 있지 않습니다."
+        "notProposed": "적용할 수 없습니다: 해당 변경은 이번 실행의 변경 제안에 포함되어 있지 않습니다.",
+        "noteMoved": "적용할 수 없습니다: 해당 변경은 노트를 다른 폴더로 옮기게 됩니다.",
+        "appendEmpty": "적용할 수 없습니다: 추가할 내용이 없었습니다.",
+        "appendWouldWriteFrontmatter": "적용할 수 없습니다: 해당 텍스트가 노트의 속성 블록이 되었을 것입니다."
       },
       "applyFailed": "변경 사항을 적용하지 못했습니다.",
       "undo": "이번 실행 되돌리기",
       "undoFailed": "실행을 되돌리지 못했습니다.",
       "undoReport": "노트 {{reverted}}개가 복원되었습니다. 실행이 만든 노트 {{kept}}개는 그대로 남았습니다.",
       "alreadyApplied": "적용됨",
+      "appendFlag": "끝에 추가",
       "untitledNote": "제목 없는 노트",
       "vaultRoot": "보관함 루트",
       "newNotesHeading_one": "새 노트 {{count}}개",
@@ -3024,7 +3028,9 @@
       "recommendedFilesEmbedding": "한 폴더에 model.safetensors + config.json + tokenizer.json이 필요합니다.",
       "recommendedFilesGeneration": "같은 폴더에 .gguf 파일 + tokenizer.json이 필요합니다.",
       "recommendedFilesTranscription": "같은 폴더에 Whisper .gguf 파일 + config.json + tokenizer.json이 필요합니다.",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "각 요청이 최근 대화를 얼마나 포함할지, 문자 수로 지정합니다. 비워 두면 기본값이 적용됩니다. 값이 클수록 AI가 더 긴 대화를 따라갈 수 있지만 그만큼 더 많이 전송됩니다. 이 기기에 없는 제공자를 쓰는 경우, 실행의 매 단계마다 더 많은 텍스트가 기기 밖으로 나갑니다.",
+      "historyBudgetLabel": "요청마다 함께 보내는 대화"
     },
     "network": {
       "disabledCue": "동기화가 더 이상 Tor를 거치지 않습니다. 새 연결은 동기화 서버로 곧바로 연결됩니다.",
@@ -3337,7 +3343,8 @@
         "viewMode": "기본 보기 모드 실시간 읽기 소스 미리보기 view mode",
         "dateFormat": "날짜 형식 일 월 년 달력 iso dd/mm mm/dd date format calendar",
         "timeFormat": "시간 형식 24시간 12시간 시계 오전 오후 time format clock am pm",
-        "timezone": "시간대 표준시 지역 오늘 timezone time zone tz utc iana region"
+        "timezone": "시간대 표준시 지역 오늘 timezone time zone tz utc iana region",
+        "aiHistoryBudget": "대화 기록 문맥 기억 예산 문자 에이전트 채팅 요청"
       }
     },
     "dateTime": {

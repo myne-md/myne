@@ -92,6 +92,13 @@ let aiProviderModel: string | null = null;
 /** What the HOST says is answering. `in_process_local` is the honest default:
  *  a fresh profile has no provider resolved, whatever the preferences say. */
 let backendClass = "in_process_local";
+/** The stored budget the panel re-syncs its draft from. `null` is "unset", which
+ *  is a third state rather than a zero: zero means seed nothing. */
+let chatHistoryBudget: number | null = null;
+const setChatHistoryBudget = vi.fn((v: number | null) => {
+  chatHistoryBudget = v;
+  return Promise.resolve();
+});
 vi.mock("../../src/hooks/usePrefs", () => ({
   usePrefs: () => ({
     prefs: {
@@ -101,10 +108,12 @@ vi.mock("../../src/hooks/usePrefs", () => ({
       ai_provider: aiProvider,
       ai_provider_consent: aiProvider,
       ai_provider_model: aiProviderModel,
+      chat_history_budget: chatHistoryBudget,
     },
     setAiEnabled: vi.fn(),
     setAiExcludedFolders: vi.fn(),
     setAutoTagEnabled,
+    setChatHistoryBudget,
   }),
 }));
 
@@ -702,5 +711,75 @@ describe("AiPanel — what is answering right now", () => {
     // change (src/CLAUDE.md); a caption does not, and this is what keeps that
     // claim true rather than remembered.
     expect(caption.closest("[data-setting-row]")).toBeNull();
+  });
+});
+
+/**
+ * The chat-history budget control (myne-md/myne#617).
+ *
+ * Four unasserted branches used to sit between a typed number and how much
+ * plaintext leaves the device, and one of them was a defect review found: for
+ * `type="number"` the value IDL attribute returns "" for anything the control
+ * cannot parse, so "abc" took the clear-the-override branch and silently reset
+ * the bound to the host default. A control whose whole purpose is a privacy
+ * bound owes coverage more than most.
+ */
+describe("the chat-history budget control", () => {
+  const input = () => screen.getByLabelText("settings.ai.historyBudgetLabel");
+
+  beforeEach(() => {
+    chatHistoryBudget = null;
+    setChatHistoryBudget.mockClear();
+  });
+
+  it("has an accessible name, since SettingRow renders its label as a span", () => {
+    render(<AiPanel onShowToast={() => {}} />);
+    expect(input()).toBeTruthy();
+  });
+
+  it("stores a number the user typed", async () => {
+    render(<AiPanel onShowToast={() => {}} />);
+    fireEvent.change(input(), { target: { value: "500" } });
+    fireEvent.blur(input());
+    await waitFor(() => expect(setChatHistoryBudget).toHaveBeenCalledWith(500));
+  });
+
+  it("clears the override when the field is genuinely empty", async () => {
+    chatHistoryBudget = 500;
+    render(<AiPanel onShowToast={() => {}} />);
+    fireEvent.change(input(), { target: { value: "" } });
+    fireEvent.blur(input());
+    await waitFor(() => expect(setChatHistoryBudget).toHaveBeenCalledWith(null));
+  });
+
+  it("does NOT clear the override when the field holds unparseable input", async () => {
+    // The defect: jsdom mirrors the browser here, so `value` is "" and
+    // `validity.badInput` is what tells the two apart. A user who select-alls,
+    // mistypes and tabs away must not have their bound silently reset.
+    chatHistoryBudget = 500;
+    render(<AiPanel onShowToast={() => {}} />);
+    const el = input() as HTMLInputElement;
+    Object.defineProperty(el, "validity", {
+      configurable: true,
+      value: { badInput: true },
+    });
+    fireEvent.change(el, { target: { value: "" } });
+    fireEvent.blur(el);
+    await waitFor(() => expect(el.value).toBe("500"));
+    expect(setChatHistoryBudget).not.toHaveBeenCalled();
+  });
+
+  it("rejects a negative number rather than coercing it", async () => {
+    render(<AiPanel onShowToast={() => {}} />);
+    fireEvent.change(input(), { target: { value: "-5" } });
+    fireEvent.blur(input());
+    await waitFor(() => expect(setChatHistoryBudget).not.toHaveBeenCalled());
+  });
+
+  it("is disabled when AI is off, like every other control in this panel", () => {
+    aiEnabled = false;
+    render(<AiPanel onShowToast={() => {}} />);
+    expect((input() as HTMLInputElement).disabled).toBe(true);
+    aiEnabled = true;
   });
 });

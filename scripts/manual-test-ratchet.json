@@ -130,6 +130,32 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 9822,
-  "gatedMinutes": 3533
+  "$raise-2026-08-30": [
+    "RAISED 9822 -> 9897 (+75) by myne-md/myne#622, and the argument the ratchet's",
+    "own rule asks for. Two new manual items on ai.agent-mode, both of which a",
+    "scenario genuinely cannot assert rather than merely has not yet:",
+    "",
+    "  +10  language behaviour. Every AI scenario runs StubEngine behind",
+    "       --features local-inference-stub, which returns a fixed script and",
+    "       produces no natural language at all, so a test asserting a language",
+    "       would be asserting the fixture. The host-side half IS automated and is",
+    "       not in this number: cargo pins that the tag reaches the system message",
+    "       and that eight hostile shapes are dropped. What is left is whether a",
+    "       real model honours the instruction, plus a WebKitGTK bidirectional",
+    "       layout question that only exists once the text is in the bubble's box.",
+    "",
+    "  +15  the remote request body. Needs a real provider, a real key and real",
+    "       money: routing, per-iteration billing and whether a model behind the",
+    "       broker honours a cache marker are all the far side's behaviour, and",
+    "       nothing in CI is allowed to make a third-party request at all. It also",
+    "       carries the one change no test here can exercise, that the system",
+    "       turn's content is now an array rather than a string.",
+    "",
+    "Neither displaces automation. myne#622 also ADDED an e2e scenario (ag7, the",
+    "empty-note append) rather than a manual item for it, which is the direction",
+    "this ratchet exists to encourage; that scenario's work simply was not on the",
+    "roster to remove."
+  ],
+  "totalMinutesCeiling": 9897,
+  "gatedMinutes": 3563
 }

@@ -289,6 +289,20 @@ spot opened another, one line away. Both directions have to be injected, and the
 one nobody thinks to try: prove the guard still catches what it caught BEFORE, not only what it
 missed.
 
+**A test whose NAME states the claim while its assertion checks a proxy is the
+hardest miss to see, because the name is what a reviewer reads.** Two shipped in
+one branch (myne-md/myne#622) and ten independent reviewers passed both. A test
+called "no user or assistant turn carries a cache marker" asserted turn ROLE,
+while the property that mattered was content class: the marker was also being
+attached to a system message built from decrypted note excerpts, which is a
+system turn, so the defect satisfied the test exactly. And every test for a
+"character budget" used an ASCII fixture, so all of them passed while the code
+counted bytes and a Turkish user got half the budget the settings screen showed.
+Neither is a missing test; both are tests measuring something adjacent to their
+own title. The check is one question at review time: **name the input for which
+this assertion and this title would disagree, and put it in the test.** If no
+such input exists the test earns its name.
+
 **And when a test can assert either a return value or a state, assert the state.** The same feature's
 first plaintext-fallback test checked `expect_err` before walking the disk, which is the weaker fact:
 a fallback could report either result while the name sat on the medium. A failure message may not

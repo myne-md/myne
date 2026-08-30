@@ -530,6 +530,12 @@ function EditRowView({
   return (
     <article
       data-testid="agentReview.edit"
+      /* Replace or append. The diff renders identically for both (an append
+         diffs an empty anchor against the new text, so every line reads as an
+         addition, which is exactly what it is), so this attribute is the only
+         thing that lets a scenario tell the two shapes apart. A literal, never
+         a runtime expression carrying content. */
+      data-kind={row.edit.kind ?? "replace"}
       data-rejected={rejected ? "true" : "false"}
       data-applied={applied ? "true" : "false"}
       style={{
@@ -561,6 +567,19 @@ function EditRowView({
             style={{ color: "var(--fg-1)", fontWeight: "var(--weight-semibold)" }}
           >
             {removalFlagLabel(row.removes, t)}
+          </span>
+        ) : null}
+        {/* Which VERB this row is, made visible. The diff renders an append
+            and a replacement identically (an append diffs an empty anchor
+            against the new text, so every line reads as an addition), and
+            "informed approval" is this screen's whole premise: an append is
+            unanchored and lands after the frontmatter block, which is a
+            different write from replacing text the reader can see in front of
+            them. `data-kind` above tells a SCENARIO the two apart; this tells
+            the person approving. */}
+        {row.edit.kind === "append" ? (
+          <span data-testid="agentReview.appendFlag" style={{ color: "var(--fg-2)" }}>
+            {t("agent.review.appendFlag")}
           </span>
         ) : null}
         {/* The visual-only flag. Deliberately weaker than the one above. */}
