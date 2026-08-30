@@ -3061,6 +3061,7 @@
       "screenCaptureOverrideHelper": "Turns screen-capture protection off on this device only, before you unlock a vault and after. Set it if a screen magnifier, remote-desktop software or someone helping you remotely sees a black window. It is not synced.",
       "screenCaptureOverrideLabel": "Allow screen capture on this device",
       "screenCaptureSuperseded": "Off on this device. See \"Allow screen capture on this device\" below. This preference is kept and applies again when you turn that off.",
+      "screenCaptureSupersededByFlag": "Off for this session, because Myne was started with --disable-screen-capture-protection. This preference is kept and applies again the next time you open Myne without it.",
       "screenCaptureSubtitle": "Block screenshots and screen recording",
       "screenshotBlocked": "Screen protection is on: screenshots of Myne come out blank.",
       "autoLockAfter": "Auto-lock after",

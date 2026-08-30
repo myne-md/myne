@@ -398,15 +398,24 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
     save: saveOverride,
   } = useScreenCaptureOverride();
   const superseded = override?.effective ?? false;
+  // The switch goes inert on `effective`, which is the union, but the SENTENCE
+  // cannot: the two ways to be superseded have different ways back. When only
+  // the process flag holds, the row below reads OFF, so pointing the user at
+  // "turn that off" names a control that is already off and offers no route at
+  // all. When the file says so, the row below is the route, and the row's own
+  // helper carries the flag caveat if both hold.
+  const supersededByFlagOnly = superseded && !(override?.disabled ?? false);
 
   return (
     <div style={PANEL_ROOT_STYLE}>
       <SettingRow
         label={t("settings.privacy.screenCaptureLabel")}
         helper={
-          superseded
-            ? t("settings.privacy.screenCaptureSuperseded")
-            : screenCaptureHelperText(prefs.screen_capture_protection, t)
+          supersededByFlagOnly
+            ? t("settings.privacy.screenCaptureSupersededByFlag")
+            : superseded
+              ? t("settings.privacy.screenCaptureSuperseded")
+              : screenCaptureHelperText(prefs.screen_capture_protection, t)
         }
         anchorId="privacy.screen-capture"
         testId="settings.screen-capture"

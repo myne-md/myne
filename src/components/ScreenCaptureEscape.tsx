@@ -196,8 +196,15 @@ export function ScreenCaptureEscape() {
 
       <ModalShell
         open={open}
+        // Frozen once the write has landed. `savedForNextLaunch` is reachable
+        // from ONE action, restoring protection on a flag-launched run, and
+        // that write flips `view.disabled` to false, so every control below
+        // re-rendered INVERTED under a success message, offering "Turn
+        // protection off" to the person who had just turned it on, one Enter
+        // press from undoing it. The confirmation state is terminal: it states
+        // what happened and offers a way out of the dialog, nothing else.
         title={
-          disabled
+          disabled || savedForNextLaunch
             ? t("screenCaptureEscape.restoreTitle")
             : t("screenCaptureEscape.disableTitle")
         }
@@ -209,16 +216,21 @@ export function ScreenCaptureEscape() {
         width={520}
       >
         <div style={BODY_STYLE}>
-          {disabled ? (
-            <p style={TEXT_STYLE}>{t("screenCaptureEscape.restoreBody")}</p>
-          ) : (
-            <>
-              <p style={TEXT_STYLE}>{t("screenCaptureEscape.disableBody")}</p>
-              <p style={TEXT_STYLE}>{t("screenCaptureEscape.disableCost")}</p>
-            </>
-          )}
+          {!savedForNextLaunch &&
+            (disabled ? (
+              <p style={TEXT_STYLE}>{t("screenCaptureEscape.restoreBody")}</p>
+            ) : (
+              <>
+                <p style={TEXT_STYLE}>{t("screenCaptureEscape.disableBody")}</p>
+                <p style={TEXT_STYLE}>{t("screenCaptureEscape.disableCost")}</p>
+              </>
+            ))}
 
-          {viaFlag && (
+          {/* Dropped in the confirmation state rather than kept: the
+              `savedForNextLaunch` line below already says the session was
+              started with the flag and when protection returns, so leaving this
+              here says it twice to the one reader who is hearing it read out. */}
+          {viaFlag && !savedForNextLaunch && (
             <p style={TEXT_STYLE} data-testid="screen-capture-escape.flag-notice">
               {t("screenCaptureEscape.flagNotice")}
             </p>
@@ -242,24 +254,39 @@ export function ScreenCaptureEscape() {
           />
 
           <div style={ACTIONS_STYLE}>
-            <Button
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={busy}
-              data-testid="screen-capture-escape.cancel"
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button
-              variant={disabled ? "primary" : "danger"}
-              onClick={() => void apply(!disabled)}
-              disabled={busy}
-              data-testid="screen-capture-escape.confirm"
-            >
-              {disabled
-                ? t("screenCaptureEscape.restoreConfirm")
-                : t("screenCaptureEscape.disableConfirm")}
-            </Button>
+            {savedForNextLaunch ? (
+              // One control, and it is the cancel testid rather than a third
+              // one: E2E and the component spec both close this dialog through
+              // that name, and the button does the same thing it always did.
+              <Button
+                variant="primary"
+                onClick={() => setOpen(false)}
+                data-testid="screen-capture-escape.cancel"
+              >
+                {t("common.close")}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => setOpen(false)}
+                  disabled={busy}
+                  data-testid="screen-capture-escape.cancel"
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  variant={disabled ? "primary" : "danger"}
+                  onClick={() => void apply(!disabled)}
+                  disabled={busy}
+                  data-testid="screen-capture-escape.confirm"
+                >
+                  {disabled
+                    ? t("screenCaptureEscape.restoreConfirm")
+                    : t("screenCaptureEscape.disableConfirm")}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </ModalShell>
