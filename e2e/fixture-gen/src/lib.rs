@@ -518,6 +518,192 @@ pub fn write_export_suite(base: &Path, fixture: &Fixture) -> std::io::Result<Exp
     })
 }
 
+// ── vault-import source suite (myne-md/myne#464) ────────────────────────────
+
+/// Names the import-source suite lays down, so a scenario asserts against the
+/// same strings the generator wrote rather than against re-typed copies.
+pub struct ImportSourceSuite {
+    /// Title of the note that links to `COLLIDING_LINKED_TITLE`. Imported.
+    pub linking_note_title: String,
+    /// Collides with a note in the TARGET vault AND is linked to. Must arrive
+    /// under a renamed title, and the link must move with it.
+    pub colliding_linked_title: String,
+    /// Collides with the target and nothing links to it. Must be skipped.
+    pub colliding_unlinked_title: String,
+    /// Has no frontmatter `title:`. Must arrive untitled, not titled `019…`.
+    pub untitled_body: String,
+    /// In the source's trash. Must NOT arrive.
+    pub trashed_title: String,
+    /// A template. Must NOT arrive.
+    pub template_title: String,
+    /// Referenced by an imported note. Must cross.
+    pub referenced_attachment_id: String,
+    /// In the source's catalog, referenced by nothing. Must NOT cross.
+    pub unreferenced_attachment_id: String,
+    /// Embedded by an imported note, absent from the source catalog. Must stay
+    /// pointing at this id, so it renders as a tombstone in the target too.
+    pub tombstoned_attachment_id: String,
+    /// A link that was ALREADY broken in the source. The accepted residual.
+    pub broken_link_target: String,
+    /// The word this suite WOULD have put in the source's added-dictionary set.
+    ///
+    /// Reported but NOT written: see the comment at the dictionary step for why
+    /// this crate cannot seal that blob without keeping a second copy of the
+    /// payload format. A scenario reads these two to state, in its own output,
+    /// which part of the feature it is not covering.
+    pub dictionary_word_not_written: String,
+    /// The ignore-set word, same caveat.
+    pub ignored_word_not_written: String,
+}
+
+/// Lay a SOURCE vault out for the vault-import scenario.
+///
+/// One vault holding one instance of every rule the feature decided, so a
+/// single import run can assert all of them. One run rather than one per rule
+/// because each run pays a full Argon2id derivation at the source's KDF cost
+/// inside the scenario's own budget.
+///
+/// The TARGET side (the colliding titles this suite is built to collide WITH)
+/// is created by the scenario through the real UI, not here: a collision the
+/// generator manufactured on both sides would prove the generator agrees with
+/// itself.
+pub fn write_import_source_suite(
+    base: &Path,
+    fixture: &Fixture,
+) -> std::io::Result<ImportSourceSuite> {
+    assert_eq!(
+        fixture.generation,
+        MetaVersion::V0_1,
+        "the import-source suite writes MY01/MYA1/MYC1 blobs — build its fixture \
+         with build_fixture_in(MetaVersion::V0_1, ..)"
+    );
+    let vault_dir = base.join("vaults").join(&fixture.vault_id);
+    let notes_dir = vault_dir.join("notes");
+    let attachments_dir = vault_dir.join("attachments");
+    fs::create_dir_all(&notes_dir)?;
+    fs::create_dir_all(&attachments_dir)?;
+
+    // Two real attachments, one referenced and one not. Distinct bytes, because
+    // the id is content-derived and identical bytes would be one attachment.
+    let referenced = b"import-source referenced attachment bytes";
+    let unreferenced = b"import-source UNreferenced attachment bytes";
+    let mut catalog = AttachmentsCatalog::empty();
+    let mut seal = |contents: &[u8], filename: &str| -> std::io::Result<String> {
+        let id = compute_attachment_id(&fixture.root_key, contents);
+        let id_hex = hex_lower(&id);
+        let blob = encode_attachment_blob(
+            &fixture.items_key,
+            &fixture.items_key_id,
+            &id,
+            ATTACHMENT_CONTENT_TYPE.as_bytes(),
+            contents,
+        )
+        .map_err(proto_io)?;
+        fs::write(attachments_dir.join(&id_hex), &blob)?;
+        catalog.entries.insert(
+            id_hex.clone(),
+            AttachmentMeta::live(
+                ATTACHMENT_CONTENT_TYPE.to_string(),
+                1_700_000_000,
+                filename.to_string(),
+                contents.len() as u64,
+            ),
+        );
+        Ok(id_hex)
+    };
+    let referenced_id = seal(referenced, "referenced.png")?;
+    let unreferenced_id = seal(unreferenced, "unreferenced.png")?;
+
+    // The tombstone bait: an id an imported note embeds and the catalog does
+    // NOT carry. No blob is written for it, which is exactly the state a
+    // deleted attachment leaves behind.
+    let tombstoned_id = "9".repeat(64);
+
+    let catalog_key = derive_subkey(&fixture.root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog_blob = encode_attachments_catalog(&catalog_key, &fixture.account_hash, &catalog)
+        .map_err(proto_io)?;
+    fs::write(vault_dir.join("vault.attachments"), &catalog_blob)?;
+
+    let write_note = |plaintext: &str| -> std::io::Result<()> {
+        let note_uuid = uuid::Uuid::now_v7();
+        let blob = encode_new_note(
+            &fixture.items_key,
+            &fixture.items_key_id,
+            note_uuid.as_bytes(),
+            plaintext.as_bytes(),
+        )
+        .map_err(proto_io)?;
+        let id = note_uuid.hyphenated().to_string().to_lowercase();
+        fs::write(notes_dir.join(format!("{}.myn", id)), &blob)?;
+        Ok(())
+    };
+
+    let linking = "Import Linking Note";
+    let colliding_linked = "Shared Title Linked";
+    let colliding_unlinked = "Shared Title Unlinked";
+    let trashed = "Import Trashed Note";
+    let template = "Import Template Note";
+    let broken_target = "Never Existed Here";
+    let untitled_body = "An untitled scratch note from the source vault.";
+    let dictionary_word = "Kubernetes";
+    let ignored_word = "definately";
+
+    // The note that carries every link and embed the rewrite has to handle.
+    write_note(&format!(
+        "---\ntitle: {linking}\n---\n\nLinks to [[{colliding_linked}]].\n\n\
+         A link that is already broken here: [[{broken_target}]].\n\n\
+         Referenced: ![[att:{referenced_id}|referenced.png]]\n\n\
+         Already deleted in this vault: ![[att:{tombstoned_id}|gone.png]]\n"
+    ))?;
+    write_note(&format!(
+        "---\ntitle: {colliding_linked}\n---\n\nThe linked one.\n"
+    ))?;
+    write_note(&format!(
+        "---\ntitle: {colliding_unlinked}\n---\n\nNothing here links to me.\n"
+    ))?;
+    // No `title:` at all — the case `conflict.ts` used to call unreachable.
+    write_note(&format!("---\nfolder: null\n---\n\n{untitled_body}\n"))?;
+    // `trashed:` is a value-strict RFC-3339 timestamp; its PRESENCE is the flag.
+    write_note(&format!(
+        "---\ntitle: {trashed}\ntrashed: 2026-01-01T00:00:00Z\n---\n\nDeleted here.\n"
+    ))?;
+    write_note(&format!(
+        "---\ntitle: {template}\ntemplate: true\n---\n\nA template.\n"
+    ))?;
+
+    // NO `vault.dictionary` is written here, deliberately.
+    //
+    // The `MYD1` framing is in `protocol`, but its INNER payload is a postcard
+    // encoding of `PersonalDictionaryData`, which lives in
+    // `src-tauri/src/spell/dictionary.rs` and is not reachable from this crate.
+    // Writing the bytes by hand from a tuple would encode a SECOND opinion about
+    // that payload's shape, and the moment the real one gained a field the
+    // fixture would keep producing something the app no longer writes — a
+    // divergence that shows up as a passing test.
+    //
+    // The dictionary carry is covered instead where it can be covered honestly:
+    // `tests/notes/import/myneDictionary.test.ts` for the union and the
+    // ignore-set exclusion, and `plugins::importer::source_dictionary::tests` in
+    // `myne-desktop` for the read, which seals a real blob through the real
+    // encoder. The two names are still reported below so a scenario can say what
+    // this suite does NOT cover rather than implying it does.
+
+    Ok(ImportSourceSuite {
+        linking_note_title: linking.to_string(),
+        colliding_linked_title: colliding_linked.to_string(),
+        colliding_unlinked_title: colliding_unlinked.to_string(),
+        untitled_body: untitled_body.to_string(),
+        trashed_title: trashed.to_string(),
+        template_title: template.to_string(),
+        referenced_attachment_id: referenced_id,
+        unreferenced_attachment_id: unreferenced_id,
+        tombstoned_attachment_id: tombstoned_id,
+        broken_link_target: broken_target.to_string(),
+        dictionary_word_not_written: dictionary_word.to_string(),
+        ignored_word_not_written: ignored_word.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

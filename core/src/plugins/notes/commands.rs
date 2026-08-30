@@ -191,7 +191,7 @@ pub async fn note_create_with_dir(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",
@@ -473,7 +473,7 @@ pub async fn note_read_with_dir(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",
@@ -971,7 +971,7 @@ pub async fn note_update_with_dir(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",
@@ -1513,7 +1513,7 @@ pub async fn note_write_batch_with_dir(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",
@@ -1869,7 +1869,7 @@ pub async fn note_delete_with_dir(
     let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",
@@ -2209,7 +2209,7 @@ pub async fn note_list_with_dir(
     let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",
@@ -2429,7 +2429,7 @@ pub async fn note_titles_batch_with_dir(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",

@@ -2636,6 +2636,53 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "import.myne-vault",
+    title: "Import notes from another Myne vault",
+    paths: [
+      "src/notes/import/sources/myne.ts",
+      "src/notes/import/sources/myneRewrite.ts",
+      "src/notes/import/sources/myneDictionary.ts",
+      "src/notes/import/myneRun.ts",
+      "src/notes/import/MyneVaultSetup.tsx",
+      "src/lib/import-source-vault.ts",
+      "core/src/plugins/vault_unlock/import_source.rs",
+      "src-tauri/src/plugins/importer/source_dictionary.rs",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/import-myne-vault.e2e.ts"],
+    manual: [
+      {
+        see: "Start an import from another vault, then walk away and leave the machine idle past the auto-lock timeout while the import is still running. Confirm the vault does not lock mid-import, and that once the import finishes the very next idle tick locks it. Then start another import and abandon it at the credential step for longer than the source-slot TTL; confirm the source vault's session has ended (the flow reports the session closed rather than continuing to read notes).",
+        whyNotAutomated: "The interaction under test is between two timers measured in real minutes: the idle auto-lock that import_set_hold defers, and the 30-minute source-slot TTL that is deliberately independent of it. A scenario lives for seconds and would have to fake both clocks, which is exactly the coupling the design was worried about and so exactly the thing a faked clock would stop proving.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 45,
+        tier: "core",
+      },
+      {
+        see: "Import from a vault whose password you have forgotten, using its 24-word recovery phrase instead. Confirm the notes arrive, and then confirm the SOURCE vault still opens with its original password afterwards: the phrase path must grant a read without committing a new password to that vault.",
+        whyNotAutomated: "The property is an absence in a vault the scenario has finished with: that vault.meta was not rewritten. Asserting it means unlocking the source afterwards with its original credential, which needs a second full Argon2id derivation and a vault the harness has already torn down.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 12,
+        tier: "core",
+      },
+      {
+        see: "Import a source vault holding several hundred notes and a few hundred megabytes of attachments while watching Activity Monitor or Task Manager. Confirm memory does not climb past roughly 2 GB (the design holds one note body and one attachment in RAM at a time), the window stays responsive, and the run finishes rather than being killed.",
+        whyNotAutomated: "Memory ceiling and sustained responsiveness are host measurements the harness makes no observation of, and the seeded fixture is six notes and two small attachments by design.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 25,
+        tier: "standard",
+      },
+      {
+        see: "Import a vault whose notes use words you had added to that vault's dictionary, and which also has words in its vault-wide ignore set. Confirm the added words no longer show as misspelled in the imported notes, and that a word which was only IGNORED in the source is still flagged here.",
+        whyNotAutomated: "The fixture generator cannot seal a vault.dictionary without keeping a second copy of the postcard payload that lives in src-tauri/src/spell/dictionary.rs, so the E2E fixture deliberately writes none; the unit tiers cover the union and the exclusion, but whether a squiggle appears under a word in the running editor is a rendering question neither answers.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "input.keybindings",
     title: "Keyboard shortcuts, rebinding and reserved chords",
     paths: [

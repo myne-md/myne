@@ -28,6 +28,9 @@ describe("import source catalog", () => {
       "csv",
       "evernote",
       "html",
+      // The sixth source (myne-md/myne#464): the only one whose format is
+      // Myne's own, and the only one that reads an ENCRYPTED source.
+      "myne",
       "notion",
       "obsidian",
     ]);
@@ -39,6 +42,9 @@ describe("import source catalog", () => {
     expect(IMPORT_SOURCES.obsidian.pick).toBe("directory");
     expect(IMPORT_SOURCES.notion.pick).toBe("directory");
     expect(IMPORT_SOURCES.html.pick).toBe("directory");
+    // Neither: the Myne source picks one of the user's other local vaults from
+    // the list the app already keeps, so there is no path to browse to.
+    expect(IMPORT_SOURCES.myne.pick).toBe("vault");
   });
 
   it("gives the single-file sources a native-dialog extension filter", () => {
