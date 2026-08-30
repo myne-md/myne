@@ -123,6 +123,44 @@ impl SpellState {
         Some(snapshot)
     }
 
+    /// Merge a whole word list into the personal set in ONE lock acquisition,
+    /// returning the snapshot to persist and how many words were genuinely NEW.
+    ///
+    /// Exists for the vault import (myne-md/myne#464), and both halves of the
+    /// signature are the reason.
+    ///
+    /// The COUNT: `add_personal` cannot report newness (it pushes and lets the
+    /// encoder dedup), so a caller looping over it could only count its own
+    /// calls. The import report then told the user it had brought 500 words
+    /// across when the two vaults shared 480 of them. Folded comparison, the
+    /// same `foldSegment`-shaped rule the lookup layer uses, because "Myne" and
+    /// "myne" are not two words to a user.
+    ///
+    /// The BATCH: the per-word command persists the whole `vault.dictionary`
+    /// blob, so carrying 500 words meant 500 AEAD seals and 500 fsyncs, in
+    /// sequence, each behind its own IPC round trip. One merge, one persist.
+    pub fn merge_personal(&self, words: &[String]) -> Option<(PersonalDictionaryData, usize)> {
+        let mut rt = self.inner.lock().ok()?;
+        let mut present: std::collections::HashSet<String> = rt
+            .data
+            .personal_words
+            .iter()
+            .map(|w| w.to_lowercase())
+            .collect();
+        let mut added = 0usize;
+        for word in words {
+            if !present.insert(word.to_lowercase()) {
+                continue;
+            }
+            rt.data.add_personal(word);
+            added += 1;
+        }
+        let snapshot = rt.data.clone();
+        rt.engine
+            .set_personal_words(snapshot.personal_words.iter().cloned());
+        Some((snapshot, added))
+    }
+
     /// Add an ignore word; returns the updated canonical data to persist.
     pub fn add_ignore(&self, word: &str) -> Option<PersonalDictionaryData> {
         let mut rt = self.inner.lock().ok()?;

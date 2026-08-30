@@ -109,6 +109,21 @@ pub enum VaultUnlockError {
     #[error("unlock in progress")]
     UnlockInProgress,
 
+    /// A vault-import run is holding THIS vault open as a read-only source
+    /// (myne-md/myne#464). The slot map is keyed by `VaultId`, so unlocking it
+    /// would have to evict a key context the import is actively reading
+    /// through.
+    ///
+    /// Kept distinct from [`Self::UnlockInProgress`] rather than folded into
+    /// it: that variant is documented as not user-facing, on the grounds that
+    /// the frontend disables Submit for its whole window, so a user who ever
+    /// sees it has hit a UI bug. This one has no such window. It is a state the
+    /// user can reach deliberately (start an import, then try to unlock its
+    /// source vault), and its resolution is theirs: finish or cancel the
+    /// import, or wait for the import slot's TTL.
+    #[error("vault is open as a vault-import source")]
+    VaultOpenAsImportSource,
+
     /// The vault is already unlocked. Returned by the slot-peek guard
     /// when an unlock attempt arrives with the slot occupied by
     /// `Slot::Unlocked(_)`.
@@ -270,6 +285,7 @@ mod tests {
                     available_mib: _,
                 } => {}
                 VaultUnlockError::VaultUpgradedUnsupported => {}
+                VaultUnlockError::VaultOpenAsImportSource => {}
             }
         }
         assert_closed(&VaultUnlockError::VaultNotFound);

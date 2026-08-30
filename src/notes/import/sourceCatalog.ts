@@ -15,10 +15,26 @@
 // never productized as Myne feature names, the same discipline the `.base` import
 // established.
 
-export type ImportSourceId = "obsidian" | "notion" | "evernote" | "html" | "csv";
+import { has, type Capability } from "../../platform/capabilities";
 
-/** Whether the source is a directory tree or a single picked file. */
-export type PickMode = "directory" | "file";
+export type ImportSourceId =
+  | "obsidian"
+  | "notion"
+  | "evernote"
+  | "html"
+  | "csv"
+  | "myne";
+
+/**
+ * How the user names the source.
+ *
+ * `"vault"` is not a file-dialog mode at all: the Myne source picks one of the
+ * user's OTHER local vaults from the list the app already keeps, so there is no
+ * path to browse to and no native dialog to open. Keeping it in this union
+ * rather than adding a parallel flag is what makes the picker exhaustive over
+ * the ways a source can be named.
+ */
+export type PickMode = "directory" | "file" | "vault";
 
 export interface ImportSourceSpec {
   readonly id: ImportSourceId;
@@ -39,6 +55,16 @@ export interface ImportSourceSpec {
    *  (typing "notion" still lands the user here) without five menu items that grow
    *  with every future adapter. */
   readonly keywords: readonly string[];
+  /**
+   * A platform capability this source needs. Absent means every client has it.
+   *
+   * A source whose capability is missing is OMITTED, not disabled: a greyed
+   * card is an offer the platform cannot honour, and `decisions.md` 2026-07-26
+   * makes omission the normative answer to that shape. It also keeps the
+   * keyword out of `allSourceKeywords()`, so the palette and the settings
+   * search do not route a user to a card that is not there.
+   */
+  readonly capability?: Capability;
 }
 
 export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> = {
@@ -87,6 +113,22 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
     losesKey: "notes.import.source.html.loses",
     keywords: ["html", "web", "page"],
   },
+  myne: {
+    id: "myne",
+    icon: "vault",
+    pick: "vault",
+    // Desktop only. A browser origin holds one container under a constant vault
+    // id, so the source list would be permanently empty, and the `importer:`
+    // plugin is `Class::Unsupported` there in any case. See the capability's own
+    // entry for the second reason, which the runtime flag alone cannot deliver.
+    capability: "vaultImport",
+    labelKey: "notes.import.source.myne.label",
+    shortKey: "notes.import.source.myne.short",
+    pickerTitleKey: "notes.import.source.myne.pickerTitle",
+    survivesKey: "notes.import.source.myne.survives",
+    losesKey: "notes.import.source.myne.loses",
+    keywords: ["myne", "vault", "merge", "combine", "consolidate"],
+  },
   csv: {
     id: "csv",
     icon: "list",
@@ -103,6 +145,10 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
 
 /** Display order in the picker: most-requested migrations first. */
 export const IMPORT_SOURCE_ORDER: readonly ImportSourceId[] = [
+  // First, and not by seniority: this is the only source whose format is
+  // Myne's own, and a user with two vaults looking for how to combine them has
+  // nowhere else in the product to look.
+  "myne",
   "obsidian",
   "notion",
   "evernote",
@@ -110,7 +156,23 @@ export const IMPORT_SOURCE_ORDER: readonly ImportSourceId[] = [
   "csv",
 ];
 
+/**
+ * The sources this platform can actually offer, in display order.
+ *
+ * The ONE place the capability filter is applied, so the picker, the palette
+ * keywords and the settings-search index cannot disagree about which cards
+ * exist. They did disagree in the first version: the filter was in the picker
+ * alone, so searching "combine vaults" on a client without the capability
+ * routed the user to a modal whose card had been filtered out.
+ */
+export function availableSourceOrder(): readonly ImportSourceId[] {
+  return IMPORT_SOURCE_ORDER.filter((id) => {
+    const cap = IMPORT_SOURCES[id].capability;
+    return cap === undefined || has(cap);
+  });
+}
+
 /** Every source keyword, for the palette command + settings-search index. */
 export function allSourceKeywords(): string[] {
-  return IMPORT_SOURCE_ORDER.flatMap((id) => [...IMPORT_SOURCES[id].keywords]);
+  return availableSourceOrder().flatMap((id) => [...IMPORT_SOURCES[id].keywords]);
 }

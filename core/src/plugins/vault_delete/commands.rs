@@ -25,6 +25,9 @@
 //!   accept (D2 revise per MYND-105 grill Q5 — terminal destroy ≠
 //!   navigate-away bail).
 //! - **Happy-path (Empty + meta-exists, MYND-108-bis):**
+//!   (a `Slot::ImportSource` for the targeted vault goes the same way, and
+//!   every OTHER vault's import source is closed too: whichever vault was
+//!   just erased, an import across it cannot continue)
 //!   `delete_vault_files_no_zeroize` skips the slot.take() step
 //!   (slot is already Empty; no keys to zeroize) and runs the same
 //!   `unlink_walk` / `emit_per_unlink_failure_trace` /
@@ -168,7 +171,7 @@ pub async fn vault_delete_from_host(
     hooks.preempt_inflight_backup(state).await;
 
     let result = vault_delete_with_dir(vault_dir.clone(), vault_id, state).await;
-    run_post_delete_teardown(hooks, io, &vault_dir, vault_id, keychain, &result).await;
+    run_post_delete_teardown(state, hooks, io, &vault_dir, vault_id, keychain, &result).await;
     result
 }
 
@@ -203,7 +206,7 @@ pub async fn vault_delete_via_io_from_host(
     hooks.preempt_inflight_backup(state).await;
 
     let result = vault_delete_via_io(io, vault_dir.clone(), vault_id, state).await;
-    run_post_delete_teardown(hooks, io, &vault_dir, vault_id, keychain, &result).await;
+    run_post_delete_teardown(state, hooks, io, &vault_dir, vault_id, keychain, &result).await;
     result
 }
 
@@ -221,6 +224,7 @@ pub async fn vault_delete_via_io_from_host(
 /// until its next unlock. Everything above the erase is RAM; the erase is the
 /// one durable member, and it goes last for that reason.
 async fn run_post_delete_teardown(
+    state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &std::path::Path,
@@ -229,6 +233,16 @@ async fn run_post_delete_teardown(
     result: &Result<(), VaultDeleteError>,
 ) {
     if matches!(result, Ok(()) | Err(VaultDeleteError::PartialDelete { .. })) {
+        // myne-md/myne#464: drop every `Slot::ImportSource` on the same path.
+        // A source vault's `root_key` and `items_key` are a SECOND vault's key
+        // material held in RAM, so they belong on every list that answers
+        // "what must not outlive this vault leaving". `threat-model.md` A6's
+        // amendment for this feature bounds the window as "the length of the
+        // import, and no longer than the target vault's own session", and a
+        // teardown site that skips this call is precisely where that sentence
+        // stops being true. `close_all` rather than a keyed drop: whichever
+        // vault just went away, an import across it cannot continue.
+        crate::plugins::vault_unlock::import_source::close_all(state).await;
         hooks.zeroize_search_index();
         // MYND-166: wipe the staged editor-workspace descriptor too.
         hooks.clear_staged_descriptor();
@@ -344,7 +358,7 @@ pub(crate) async fn vault_delete_with_dir(
     //     rejection.
     match state.slot_kind(vault_id).await {
         SlotKind::Empty => dispatch_empty_arm(vault_dir).await,
-        SlotKind::Recovering | SlotKind::Unlocked => {
+        SlotKind::Recovering | SlotKind::Unlocked | SlotKind::ImportSource => {
             // Happy path: take_and_run_blocking takes the slot
             // (zeroize via the moved-out variant's Drop fires BEFORE
             // any IO) then runs the unlink pipeline inside
@@ -603,7 +617,7 @@ pub async fn vault_delete_via_io(
 
     match state.slot_kind(vault_id).await {
         SlotKind::Empty => dispatch_empty_arm_via_io(io, vault_dir).await,
-        SlotKind::Recovering | SlotKind::Unlocked => {
+        SlotKind::Recovering | SlotKind::Unlocked | SlotKind::ImportSource => {
             let dir = vault_dir.clone();
             let taken = state
                 .take_and_run_async_for_id(vault_id, || async {

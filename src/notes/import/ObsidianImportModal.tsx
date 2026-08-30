@@ -27,6 +27,16 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { MyneVaultSetup } from "./MyneVaultSetup";
+import { BODY_STYLE, FOOTER_STYLE } from "./modalChrome";
+import { runMyneVaultImport, type MyneImportExtras } from "./myneRun";
+import { createVaultOnlyPorts } from "./ports";
+import {
+  asVaultUnlockError,
+  importSourceClose,
+  importSourceOpen,
+} from "../../lib/import-source-vault";
+import { activeVaultId } from "../../lib/vault-list";
 import type { TFunction } from "i18next";
 import {
   pickDirectory,
@@ -101,25 +111,6 @@ const TITLE_STYLE: CSSProperties = {
   margin: 0,
 };
 
-const BODY_STYLE: CSSProperties = {
-  flex: 1,
-  minHeight: 0,
-  overflow: "auto",
-  padding: "var(--space-5)",
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-4)",
-};
-
-const FOOTER_STYLE: CSSProperties = {
-  borderTop: "1px solid var(--line-1)",
-  padding: "var(--space-3) var(--space-5)",
-  display: "flex",
-  justifyContent: "flex-end",
-  gap: "var(--space-2)",
-  flex: "0 0 auto",
-};
-
 const MONO: CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontFeatureSettings: '"ss02","zero","calt"',
@@ -170,6 +161,11 @@ export function ObsidianImportModal({
     setPolicy(DEFAULT_DUPLICATE_POLICY);
     setProgress({ done: 0, total: 0 });
     setResult(null);
+    // Cleared alongside `result`, and for the same reason: these rows render
+    // on the summary, so a set left over from a previous run claims things
+    // about a run that did not happen. Reachable today: a Myne import, then an
+    // Obsidian one, rendered the Myne block with the earlier run's numbers.
+    setMyneExtras(null);
     setErrorMsg(null);
     cancelRef.current = false;
     setCancelling(false);
@@ -181,6 +177,23 @@ export function ObsidianImportModal({
   // report must be closed deliberately via ✕ / Done / Close, never lost to a
   // stray backdrop click or keypress.
   const dismissable = phase !== "running";
+  // The vault being imported INTO. Read once when the modal opens, so the
+  // source list can exclude it: a vault cannot be its own import source.
+  const [activeVault, setActiveVault] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void activeVaultId().then((id) => {
+      if (live) setActiveVault(id);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open]);
+
+  /** Myne-source-only report rows. Absent for every other source. */
+  const [myneExtras, setMyneExtras] = useState<MyneImportExtras | null>(null);
+
   const casualDismiss = phase === "setup" || phase === "pick";
 
   const handleClose = useCallback(() => {
@@ -228,6 +241,124 @@ export function ObsidianImportModal({
       // Picker failure (cancel / unavailable) → leave the prior selection.
     }
   }, [spec]);
+
+  /**
+   * Run a Myne vault import.
+   *
+   * This function OWNS the close, and that is deliberate: the setup step opened
+   * the slot, but every exit path from here (success, failure, cancel) is this
+   * function's, and a close split across two owners is a close that gets skipped
+   * on one of them. The `finally` is the whole mechanism.
+   */
+  // A retryable credential message shown ON the setup step. Cleared on every
+  // fresh submission, so a corrected password does not sit under the old error.
+  const [setupError, setSetupError] = useState<string | null>(null);
+
+  const startMyneImport = useCallback(
+    ({
+      sourceVaultId,
+      importLabel,
+      credential,
+    }: {
+      sourceVaultId: string;
+      importLabel: string;
+      credential: { password: string } | { recoveryPhrase: string };
+    }) => {
+      cancelRef.current = false;
+      setCancelling(false);
+      setSetupError(null);
+      setProgress({ done: 0, total: 0 });
+      setPhase("running");
+      void (async () => {
+        try {
+          // The OPEN happens HERE, inside the same try/finally as the close.
+          // It used to happen in the credential step, which left an
+          // Argon2id-long gap in which that subtree could be unmounted by Esc
+          // or a backdrop click: the derivation still landed, a second vault's
+          // root_key and items_key sat resident until the 30-minute TTL swept
+          // them, and the import then ran headless behind a closed modal. One
+          // owner for the whole slot lifetime makes that unrepresentable.
+          await importSourceOpen(sourceVaultId, credential);
+          const out = await runMyneVaultImport(
+            sourceVaultId,
+            policy,
+            createVaultOnlyPorts(),
+            {
+              importLabel,
+              onProgress: (done: number, total: number) =>
+                setProgress({ done, total }),
+              shouldCancel: () => cancelRef.current,
+            },
+          );
+          setMyneExtras(out.extras);
+          setResult(out.result);
+          setPhase("summary");
+          onImported?.(out.result);
+        } catch (err) {
+          // The credential errors are this function's now that it owns the
+          // open, and they are the ones a user can actually act on: a wrong
+          // password, a vault already open for another import, or the shared
+          // Argon2id permit being held.
+          //
+          // All three go BACK TO THE SETUP STEP with the message inline, not to
+          // the terminal error phase. Two reasons, and the second is the worse
+          // one. A mistyped password is the single likeliest outcome of this
+          // flow, and dropping the user out of it means re-choosing the vault,
+          // re-typing the label and re-opening the modal to fix one character.
+          // And the error phase's copy says "Any notes already imported were
+          // kept", which for a credential rejection is FALSE: the open failed,
+          // so the run never started and nothing was imported. A screen that
+          // tells a user their notes are half-imported when they are not is
+          // worse than a screen that is merely inconvenient.
+          //
+          // Everything else is a real import failure and keeps the terminal
+          // phase, where that sentence is true.
+          const kind = asVaultUnlockError(err)?.kind;
+          const retryable =
+            kind === "InvalidCredentialOrVault"
+              ? t("notes.import.myne.errors.credential")
+              : kind === "UnlockInProgress"
+                ? t("notes.import.myne.errors.busy")
+                : kind === "VaultOpenAsImportSource"
+                  ? t("notes.import.myne.errors.alreadyOpen")
+                  : null;
+          if (retryable !== null) {
+            setSetupError(retryable);
+            setPhase("setup");
+          } else {
+            setErrorMsg(t(importFailureReasonKey(importFailureReason(err))));
+            setPhase("error");
+            onImported?.(null);
+          }
+        } finally {
+          // Idempotent on the host side, so calling it on a path where the slot
+          // is already gone (a TTL expiry, a vault lock underneath the run) is a
+          // no-op rather than a second error to handle.
+          //
+          // Its OWN try/catch, and not because a failure here is unimportant.
+          // `finally` runs on the success path too, so an `await` that rejects
+          // here rejects the whole IIFE, which is `void`-ed: an unhandled
+          // promise rejection, after the user has already been shown a completed
+          // import, with a second vault's `root_key` and `items_key` still
+          // resident. Catching it is what keeps the failure inside this
+          // function; what actually bounds the exposure is the pair of
+          // reclaimers that do not depend on this call landing at all, the
+          // 30-minute TTL swept by the idle timer and `close_all` on every
+          // teardown path of the target vault. That is why there is no retry
+          // loop here: a second attempt would fail for the same reason and the
+          // real backstop is host-side.
+          try {
+            await importSourceClose(sourceVaultId);
+          } catch {
+            // Deliberately silent to the USER: they cannot act on it, and the
+            // window is already bounded above. Not silent to the developer.
+            console.warn("import source close failed; TTL and lock will reclaim");
+          }
+        }
+      })();
+    },
+    [policy, onImported, t],
+  );
 
   const startImport = useCallback(() => {
     if (folder === null) return;
@@ -337,7 +468,20 @@ export function ObsidianImportModal({
           />
         )}
 
-        {phase === "setup" && (
+        {phase === "setup" && spec.pick === "vault" && (
+          // The Myne source picks a VAULT, not a path, so it gets its own setup
+          // step: a list of the user's other local vaults, a credential for the
+          // chosen one, and the import label. `SetupBody` below is built around
+          // a picked folder and has nothing to show here.
+          <MyneVaultSetup
+            activeVaultId={activeVault}
+            onReady={startMyneImport}
+            onCancel={handleClose}
+            onBack={initialSource === undefined ? () => setPhase("pick") : undefined}
+            error={setupError}
+          />
+        )}
+        {phase === "setup" && spec.pick !== "vault" && (
           <SetupBody
             spec={spec}
             onBack={initialSource === undefined ? () => setPhase("pick") : undefined}
@@ -361,7 +505,11 @@ export function ObsidianImportModal({
           />
         )}
         {phase === "summary" && result !== null && (
-          <SummaryBody result={result} onDone={handleClose} />
+          <SummaryBody
+            result={result}
+            myneExtras={myneExtras}
+            onDone={handleClose}
+          />
         )}
         {phase === "error" && (
           <ErrorBody
@@ -684,7 +832,16 @@ function totalByType(t: MediaByType): number {
   return t.image + t.pdf + t.audio + t.video + t.other;
 }
 
-function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => void }) {
+function SummaryBody({
+  result,
+  myneExtras,
+  onDone,
+}: {
+  result: ImportResult;
+  /** Myne-source-only rows. `null` for every other source. */
+  myneExtras?: MyneImportExtras | null;
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
   const mediaIngested = totalByType(result.media.ingested);
   const mediaOmitted = totalByType(result.media.omitted);
@@ -758,6 +915,84 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
         {/* secondary counts */}
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
           <StatRow label={t("notes.import.modal.statSkipped")} value={result.skippedExisting} />
+          {myneExtras != null && (
+            <>
+              {/* Every class that did NOT cross gets a count, so the gap is
+                  stated here rather than discovered later in the vault. */}
+              <StatRow
+                label={t("notes.import.myne.report.linksRetargeted")}
+                value={myneExtras.linksRetargeted}
+              />
+              <StatRow
+                label={t("notes.import.myne.report.attachmentsCrossed")}
+                value={myneExtras.attachmentsCrossed}
+              />
+              <StatRow
+                label={t("notes.import.myne.report.attachmentsDeduped")}
+                value={myneExtras.attachmentsDeduped}
+                muted
+              />
+              <StatRow
+                label={t("notes.import.myne.report.attachmentsFailed")}
+                value={myneExtras.attachmentsFailed}
+                muted
+              />
+              <StatRow
+                label={t("notes.import.myne.report.tombstonedEmbeds")}
+                value={myneExtras.tombstonedEmbeds}
+                muted
+              />
+              <StatRow
+                label={t("notes.import.myne.report.untitledImported")}
+                value={myneExtras.untitledImported}
+                muted
+              />
+              <StatRow
+                label={t("notes.import.myne.report.trashedLeftBehind")}
+                value={myneExtras.trashedLeftBehind}
+                muted
+              />
+              <StatRow
+                label={t("notes.import.myne.report.templatesLeftBehind")}
+                value={myneExtras.templatesLeftBehind}
+                muted
+              />
+              <StatRow
+                label={t("notes.import.myne.report.dictionaryWordsAdded")}
+                value={myneExtras.dictionaryWordsAdded}
+                muted
+              />
+              {myneExtras.dictionaryUnreadable && (
+                // "There was nothing to bring" and "we could not look" are
+                // different facts, and only the second is worth saying out loud.
+                <p
+                  style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}
+                  data-testid="import-myne.dictionary-unreadable"
+                >
+                  {t("notes.import.myne.report.dictionaryUnreadable")}
+                </p>
+              )}
+              {/* The two sentences the completion step owes, and the reason it
+                  owes them: a user who has just "consolidated" two vaults has a
+                  model of what happened, and without these it does not match.
+                  Version history stayed behind, and the source vault is
+                  untouched and still syncing. No destructive action is offered
+                  here: this is exactly the moment a user should not be one
+                  click from deleting the original. */}
+              <p
+                style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}
+                data-testid="import-myne.history-stays"
+              >
+                {t("notes.import.myne.done.historyStays")}
+              </p>
+              <p
+                style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}
+                data-testid="import-myne.source-unchanged"
+              >
+                {t("notes.import.myne.done.sourceUnchanged")}
+              </p>
+            </>
+          )}
           {hasMedia && (
             <StatRow
               label={t("notes.import.modal.statMedia")}
@@ -825,7 +1060,7 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
         )}
       </div>
       <div style={FOOTER_STYLE}>
-        <Button variant="primary" onClick={onDone}>
+        <Button variant="primary" onClick={onDone} data-testid="import.done">
           {t("notes.import.modal.done")}
         </Button>
       </div>

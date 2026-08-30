@@ -329,6 +329,15 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
       // implement. NOT `corrupted` — the vault is fine, this app is too old, so
       // the CTA is "update this app", never "restore a backup".
       return { kind: "banner", text: i18n.t("unlock.errors.vaultUpgraded") };
+    case "VaultOpenAsImportSource":
+      // A vault-import run holds this vault open as its read-only source
+      // (myne-md/myne#464). Retryable by the user's own action, so the copy
+      // names the action rather than telling them to try again: the import has
+      // to finish, be cancelled, or time out first.
+      return {
+        kind: "banner",
+        text: i18n.t("unlock.errors.openAsImportSource"),
+      };
   }
 }
 

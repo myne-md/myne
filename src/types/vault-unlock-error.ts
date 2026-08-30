@@ -108,6 +108,19 @@ export type VaultUnlockError =
    */
   | { kind: "UnlockInProgress" }
   /**
+   * A vault-import run is holding THIS vault open as a read-only source
+   * (myne-md/myne#464). The slot map is keyed by `VaultId`, so unlocking it
+   * would have to evict a key context the import is actively reading through.
+   *
+   * **User-facing**, unlike `UnlockInProgress` one line above. That variant is
+   * documented as not user-facing because the frontend disables Submit for its
+   * whole window; this state has no such window. The user reaches it
+   * deliberately (start an import, then try to unlock its source vault) and
+   * resolves it themselves: finish or cancel the import, or wait for the import
+   * slot's TTL.
+   */
+  | { kind: "VaultOpenAsImportSource" }
+  /**
    * The vault is already unlocked. Returned by the slot-peek guard
    * when an unlock attempt arrives with the slot occupied by
    * `Slot::Unlocked(_)`.

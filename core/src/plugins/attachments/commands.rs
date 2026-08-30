@@ -361,7 +361,16 @@ pub async fn attachment_import_with_dir(
     state: &VaultRuntimeState,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
-    attachment_import_with_dir_ext(io, host, vault_dir, state, source, None, no_op_extract).await
+    attachment_import_with_dir_ext(
+        io,
+        host,
+        vault_dir,
+        state,
+        source,
+        IngestPolicy::fresh(),
+        no_op_extract,
+    )
+    .await
 }
 
 /// No-op text extractor: reports every input as `Unsupported`, so the eager
@@ -375,6 +384,64 @@ fn no_op_extract(_content_type: &str, _filename: &str, _bytes: &[u8]) -> Extract
     )
 }
 
+/// Whether the ingest path may re-encode an eligible image on the way in.
+///
+/// An enum rather than a `bool` because a bare `true`/`false` at a call site
+/// says nothing about WHY, and the two reasons are not symmetric. The ordinary
+/// paste / drop / file-pick path is [`Self::Apply`]: the bytes are arriving from
+/// outside the vault for the first time and the compression preference is the
+/// user's answer about them. [`Self::SkipAlreadyCanonical`] exists for exactly
+/// one caller, the vault-import re-seal (myne-md/myne#464), where the bytes are
+/// already a Myne vault's stored bytes and have been through this gate once
+/// under their own vault's preference. Re-encoding them there is generation
+/// loss on a copy the user did not ask to have re-processed.
+///
+/// It disables a lossy TRANSFORM and nothing else. The MIME allowlist re-sniff,
+/// the 64 MiB cap and every AEAD step are unaffected by it, which is the
+/// distinction that makes this parameter acceptable where a flag switching off
+/// the sniff would not be.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IngestCompression {
+    /// Honour `attachment_compression_enabled` and compress an eligible image.
+    Apply,
+    /// Store the bytes verbatim. The caller is copying bytes that are already
+    /// canonical inside some Myne vault.
+    SkipAlreadyCanonical,
+}
+
+/// The two ingest knobs that are not the bytes themselves, bundled.
+///
+/// Bundled rather than passed as two more parameters because they belong to one
+/// question: what this caller knows about where the bytes came from. The
+/// ordinary paste / drop / file-pick path knows nothing (they are new, stamp
+/// now, honour the compression preference); the vault-import re-seal knows both
+/// (they carry their own creation time, and they are already some Myne vault's
+/// canonical bytes). Keeping them together is what stops a future caller from
+/// answering one and forgetting the other.
+#[derive(Debug, Clone, Copy)]
+pub struct IngestPolicy {
+    /// Override for the fresh entry's `created_at` (UNIX seconds). `None` stamps
+    /// the current time, the ordinary path. A caller re-materializing a file
+    /// with its own original timestamp (a backup restore, a vault import)
+    /// passes `Some`, which also governs the unused-cleanup grace window
+    /// (`UNUSED_CLEANUP_GRACE_SECS`): a restored file whose original creation
+    /// predates the window is not withheld as "recently added". Ignored on a
+    /// dedup hit, where the existing entry's `created_at` wins.
+    pub created_at_override: Option<u64>,
+    pub compression: IngestCompression,
+}
+
+impl IngestPolicy {
+    /// Bytes arriving from outside any vault for the first time: stamp now,
+    /// honour the user's compression preference.
+    pub fn fresh() -> Self {
+        Self {
+            created_at_override: None,
+            compression: IngestCompression::Apply,
+        }
+    }
+}
+
 /// Testable core of [`attachment_import`], with the text-extraction *producer*
 /// injected as `extract` so this module (in `myne-core`) never depends on the
 /// desktop-only `lopdf`/`zip`/`quick-xml` extractor. Desktop passes its real
@@ -386,14 +453,7 @@ pub async fn attachment_import_with_dir_ext<F>(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     source: ImportSource,
-    // Optional override for the fresh entry's `created_at` (UNIX seconds). `None`
-    // stamps the current time — the ordinary paste/drop/import path. A caller
-    // that is re-materializing a file with its own original timestamp (a backup
-    // restore / migration import) passes `Some`, which also governs the
-    // unused-cleanup grace window (`UNUSED_CLEANUP_GRACE_SECS`): a restored file
-    // whose original creation predates the window is not withheld as "recently
-    // added". Ignored on a dedup hit (the existing entry's `created_at` wins).
-    created_at_override: Option<u64>,
+    policy: IngestPolicy,
     extract: F,
 ) -> Result<ImportedAttachment, AttachmentImportError>
 where
@@ -495,7 +555,8 @@ where
     // trusted; `Absent` genuinely means "never changed the default", which is
     // an answer, and is the normal state of every vault that has not opened
     // Settings.
-    let compress_this = compress::is_eligible(content_type)
+    let compress_this = policy.compression == IngestCompression::Apply
+        && compress::is_eligible(content_type)
         && matches!(
             crate::plugins::prefs::commands::prefs_read_with_dir_reporting_origin(
                 vault_dir, state, io,
@@ -634,7 +695,9 @@ where
         })
         .unwrap_or_else(|| auto_filename(content_type));
     let size = file_bytes.len() as u64;
-    let created_at = created_at_override.unwrap_or_else(|| host.now_unix_secs());
+    let created_at = policy
+        .created_at_override
+        .unwrap_or_else(|| host.now_unix_secs());
 
     // (10) Encode the MYA1 blob on a blocking thread (random key + nonces
     //      from getrandom; AEAD seal under items_key → attachment_key).
@@ -2594,7 +2657,10 @@ mod tests {
             vault_dir,
             state,
             source,
-            created_at_override,
+            super::IngestPolicy {
+                created_at_override,
+                compression: super::IngestCompression::Apply,
+            },
             extract,
         )
         .await

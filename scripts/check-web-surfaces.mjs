@@ -193,6 +193,14 @@ const V = {
     "`closeApp` was deleted in task 95; the fail-closed exit is the `app-exit` seam, whose web arm reloads the page.",
   ],
   "src/lib/attachments.ts": ["ported", "IPC bindings; the import path moved to the seam in task 67."],
+  "src/lib/import-source-vault.ts": [
+    "excluded",
+    "Vault import (myne-md/myne#464). Every binding here wraps an `importer:` " +
+      "command, and `web/wasm/src/capability.rs` classifies that whole plugin " +
+      "`Class::Unsupported`, so none of them can be dispatched in the browser. " +
+      "The placement is the reason: putting these under `vault-unlock:` or " +
+      "`attachments:` would have widened plugins the web client DOES dispatch.",
+  ],
   "src/lib/backup-errors.ts": [
     "excluded",
     "Backup error copy; leaves with the modules that produce those errors.",
