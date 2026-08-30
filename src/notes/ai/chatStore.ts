@@ -451,6 +451,7 @@ export function failAgentTurn(message: string): void {
 /** Drop the whole transcript — the lock / vault-teardown wipe (task 12). Bumps
  *  the run epoch so any in-flight stream can no longer mutate the transcript. */
 export function clearChat(): void {
+  lastEgressControls = null;
   runEpoch += 1;
   // Nothing left to block: the turns the cut was protecting are gone, and a
   // stale set would silently suppress seeding for turns that do not exist.
@@ -489,6 +490,56 @@ export function blockSeedingOfExistingTurns(): void {
   seedBlocked = new Set(current.turns.map((t) => t.id));
 }
 
+/** The egress controls as this module last OBSERVED them, or `null` before the
+ *  first observation. Module scope rather than per hook instance, because the
+ *  question is whether the value changed, not how many components noticed. */
+let lastEgressControls: { excluded: string; provider: string | null } | null = null;
+
+/** Cut the seed when the egress controls have changed since the last read.
+ *
+ *  **A trigger on the VALUE, not on a code path, and that is the whole point.**
+ *  `ai_excluded_folders` is classified `Shared(SetUnion)`, so a folder excluded
+ *  on another device arrives here by SYNC MERGE and no setter on this machine is
+ *  ever called. The setter-side cut therefore covered one of the two ways the
+ *  control changes, while `threat-model.md` TB13 says a change to it stops every
+ *  turn then on screen from being seeded into any later run. Observing the value
+ *  covers both arrival routes with one mechanism, and a route invented later
+ *  inherits it for free.
+ *
+ *  **The setter-side call stays as well, and is not redundant.** It fires BEFORE
+ *  the write, so a failed persist still cuts: the user stated an intent about
+ *  what may reach a provider, and a disk error does not withdraw it. This one
+ *  fires only when the value actually moved, which is the opposite property.
+ *  Both are idempotent, so a local change firing both costs one extra `Set`.
+ *
+ *  The FIRST observation is recorded rather than treated as a change, since
+ *  there is nothing to have changed from. `clearChat` and the test reset drop it
+ *  back to `null` so a vault switch starts a fresh baseline instead of comparing
+ *  the new vault's controls against the old vault's. */
+export function observeEgressControls(
+  excludedFolders: readonly string[] | undefined,
+  provider: string | null | undefined,
+): void {
+  // **A view that does not carry the fields teaches nothing, so it is not an
+  // observation.** The read paths already treat a malformed or partial response
+  // as "keep what we had", and the honest counterpart here is to leave the
+  // baseline alone: substituting an empty set would compare a real value
+  // against a fabricated one on the next read and cut on a difference nobody
+  // made.
+  if (!Array.isArray(excludedFolders)) return;
+  // Sorted and joined on a byte that cannot occur in a folder path, so set
+  // equality does not depend on the order the merge happened to produce.
+  const now = {
+    excluded: [...excludedFolders].sort().join("\u0000"),
+    provider: provider ?? null,
+  };
+  const before = lastEgressControls;
+  lastEgressControls = now;
+  if (before === null) return;
+  if (before.excluded === now.excluded && before.provider === now.provider) return;
+  blockSeedingOfExistingTurns();
+}
+
 /** Whether this turn may still be seeded into a new run. */
 export function isSeedable(turnId: string): boolean {
   return !seedBlocked.has(turnId);
@@ -496,6 +547,7 @@ export function isSeedable(turnId: string): boolean {
 
 /** Test-only reset so the module store doesn't leak across tests. */
 export function __resetChatForTest(): void {
+  lastEgressControls = null;
   seedBlocked = new Set();
   current = CHAT_INITIAL;
   listeners.clear();

@@ -82,7 +82,7 @@ fn flatten_chat_to_prompt(system: &str, messages: &[ChatMessage]) -> String {
 /// "No valid action found" tells the model to fix a format error it did not
 /// make while a barren strike is spent. Carrying the reason up is what lets the
 /// loop say the true thing instead.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AgentReply {
     /// What the model said, as far as it got.
     pub text: String,
@@ -91,6 +91,25 @@ pub struct AgentReply {
     /// short, and guessing would tell a model that answered correctly to answer
     /// more briefly.
     pub truncated: bool,
+}
+
+/// Prints a shape, for the reason [`AgentCompletion`]'s hand-written `Debug`
+/// does one crate over: `text` is the raw model reply, which carries the anchors
+/// and replacements the model copied verbatim out of decrypted note bodies, and
+/// a derived `Debug` puts that wherever a `{:?}` happens to be, including a
+/// panic message or an `assert_eq!` diff, without anyone deciding to put it
+/// there. Nothing formats one today, so this closes a trap rather than a leak,
+/// which is the cheapest moment to close one.
+impl std::fmt::Debug for AgentReply {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentReply")
+            .field(
+                "text",
+                &format_args!("<{} chars>", self.text.chars().count()),
+            )
+            .field("truncated", &self.truncated)
+            .finish()
+    }
 }
 
 /// On-device inference surface (SYNC-7): a blocking `infer(prompt) -> result`
