@@ -1225,7 +1225,8 @@
       "titlePlaceholder": "無題"
     },
     "mermaid": {
-      "rendering": "図を描画中…"
+      "rendering": "図を描画中…",
+      "renderFailed": "この図を描画できませんでした: {{reason}}"
     },
     "slash": {
       "aiContinue": "続きを書く（AI）",

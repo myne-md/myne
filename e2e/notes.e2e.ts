@@ -189,8 +189,8 @@ describeE2E("nc5 keyboard Delete confirms before soft-trash (MYND-487)", () => {
         await s.waitForGone(testIdSelector("delete-confirm.confirm"));
         await s.byTestId("notes.row");
 
-        // Delete again → confirm; the confirm button is default-focused
-        // (initialFocus="confirm"), so Enter soft-trashes it.
+        // Delete again → confirm; the confirm button holds initial focus (the
+        // component default since #628), so Enter soft-trashes it.
         await (await s.byTestId("notes.row")).click();
         await pressKey(s, KEY.DELETE);
         await s.byTestId("delete-confirm.confirm");
@@ -279,18 +279,23 @@ describeE2E("nc4 folder delete soft-trashes its notes (MYND-223 / MYND-144)", ()
   });
 });
 
-describeE2E("nc7 cancel-focused Delete swallows Enter (#397)", () => {
+describeE2E("nc7 Enter confirms the folder-delete gate (#628)", () => {
   // Vault-count precondition: 1 (weak KDF).
   //
-  // Twin of nc5, which covers Enter on the CONFIRM-focused gate. The folder
-  // delete uses the default CANCEL-focused modal, where a bare Enter used to
-  // activate the focused Cancel button and dismiss the dialog silently — a
-  // close indistinguishable from a successful delete. #397 makes Enter a no-op
-  // there: the dialog stays open and nothing is deleted.
-  it("Enter on the folder-delete confirm is a no-op — dialog stays open, nothing deleted", async () => {
+  // Twin of nc5, which covers the note soft-trash gate. This one is the FOLDER
+  // delete, which used to be the cancel-focused variant: the ring sat on Cancel
+  // while the accent-filled primary button was Delete, and #397 had made Enter a
+  // deliberate no-op there (before that it silently activated Cancel, a close
+  // indistinguishable from a successful delete).
+  //
+  // #628 makes Enter follow the focus RING: focus lands on the destructive
+  // button, so the reflex press confirms, and a user who Tabs to Cancel gets an
+  // Enter that cancels. `design-notes/ui/0541` records it. Escape is asserted
+  // first here, because a confirming Enter is only safe if the way out works.
+  it("Escape cancels; Enter deletes the folder and its notes move to Trash", async () => {
     let password = "";
     await scenario(
-      "nc7-folder-delete-enter-noop",
+      "nc7-folder-delete-enter-confirms",
       { seed: (dir) => void (password = seedVault(dir).password) },
       async (app) => {
         const s = app.session;
@@ -306,21 +311,26 @@ describeE2E("nc7 cancel-focused Delete swallows Enter (#397)", () => {
         await s.waitForGone(testIdSelector("notes.rename-input"));
         await s.byTestId("notes.row"); // the in-folder note settled (as in nc4)
 
-        // Open the (cancel-focused) confirm, then press Enter.
+        // Escape still cancels, and nothing is deleted.
+        await contextMenuPick(s, await s.byTestId("notes.folder-row"), "delete");
+        await s.byTestId("delete-confirm.confirm");
+        await pressKey(s, KEY.ESCAPE);
+        await s.waitForGone(testIdSelector("delete-confirm.confirm"));
+        await s.byTestId("notes.folder-row");
+
+        // Enter confirms. The discriminating assertion: under the #397
+        // behaviour the modal would still be open here and the folder present.
         await contextMenuPick(s, await s.byTestId("notes.folder-row"), "delete");
         await s.byTestId("delete-confirm.confirm");
         await pressKey(s, KEY.ENTER);
-
-        // The discriminating assertion: Enter did NOT close the dialog. Under
-        // the old silent-cancel bug the modal would be gone here.
-        await s.byTestId("delete-confirm.confirm");
-        await s.byTestId("notes.folder-row");
-
-        // Dismiss deliberately via Cancel; the folder is still in the live tree
-        // (nothing was deleted by the stray Enter).
-        await (await s.byTestId("delete-confirm.cancel")).click();
         await s.waitForGone(testIdSelector("delete-confirm.confirm"));
-        await s.byTestId("notes.folder-row");
+        await s.waitForGone(testIdSelector("notes.folder-row"));
+
+        // Soft-trash, not gone. The in-folder note is recoverable, which is
+        // what the dialog's own warning copy promises.
+        await (await s.byTestId("notes.trash-open")).click();
+        await s.byTestId("trash.panel");
+        expect((await s.byTestIdAll("trash.restore")).length).toBe(1);
       },
     );
   });

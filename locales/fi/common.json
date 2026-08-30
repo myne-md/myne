@@ -1225,7 +1225,8 @@
       "titlePlaceholder": "Nimetön"
     },
     "mermaid": {
-      "rendering": "Piirretään kaaviota…"
+      "rendering": "Piirretään kaaviota…",
+      "renderFailed": "Tätä kaaviota ei voitu piirtää: {{reason}}"
     },
     "slash": {
       "aiContinue": "Jatka kirjoittamista (tekoäly)",

@@ -74,7 +74,7 @@ export function FolderActionsSheet({
             />
           )}
           {sep}
-          {row(t("notes.list.deleteFolderConfirm"), onTrash, { danger: true, groupTop: true })}
+          {row(t("notes.list.deleteFolderConfirm"), onTrash, { danger: true, groupTop: true, testId: "notes.folder-delete-action" })}
         </>
       )}
     </Sheet>

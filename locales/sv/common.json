@@ -1225,7 +1225,8 @@
       "titlePlaceholder": "Namnlös"
     },
     "mermaid": {
-      "rendering": "Renderar diagram…"
+      "rendering": "Renderar diagram…",
+      "renderFailed": "Det här diagrammet kunde inte ritas: {{reason}}"
     },
     "slash": {
       "aiContinue": "Fortsätt skriva (AI)",

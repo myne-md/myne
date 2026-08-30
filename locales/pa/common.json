@@ -1216,7 +1216,8 @@
       "titlePlaceholder": "ਬਿਨਾਂ ਸਿਰਲੇਖ"
     },
     "mermaid": {
-      "rendering": "ਡਾਇਗਰਾਮ ਬਣ ਰਿਹਾ ਹੈ…"
+      "rendering": "ਡਾਇਗਰਾਮ ਬਣ ਰਿਹਾ ਹੈ…",
+      "renderFailed": "ਇਹ ਚਿੱਤਰ ਰੈਂਡਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ: {{reason}}"
     },
     "slash": {
       "aiContinue": "ਲਿਖਣਾ ਜਾਰੀ ਰੱਖੋ (AI)",

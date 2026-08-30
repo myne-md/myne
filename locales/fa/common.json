@@ -1216,7 +1216,8 @@
       "titlePlaceholder": "بدون عنوان"
     },
     "mermaid": {
-      "rendering": "در حال رسم نمودار…"
+      "rendering": "در حال رسم نمودار…",
+      "renderFailed": "این نمودار رندر نشد: {{reason}}"
     },
     "slash": {
       "aiContinue": "ادامهٔ نوشتن (AI)",

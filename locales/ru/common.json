@@ -1323,7 +1323,8 @@
       "titlePlaceholder": "Без названия"
     },
     "mermaid": {
-      "rendering": "Построение диаграммы…"
+      "rendering": "Построение диаграммы…",
+      "renderFailed": "Не удалось отрисовать эту диаграмму: {{reason}}"
     },
     "slash": {
       "aiContinue": "Продолжить писать (ИИ)",

@@ -1225,7 +1225,8 @@
       "titlePlaceholder": "Ohne Titel"
     },
     "mermaid": {
-      "rendering": "Diagramm wird gerendert…"
+      "rendering": "Diagramm wird gerendert…",
+      "renderFailed": "Dieses Diagramm konnte nicht dargestellt werden: {{reason}}"
     },
     "slash": {
       "aiContinue": "Weiterschreiben (KI)",

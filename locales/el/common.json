@@ -1225,7 +1225,8 @@
       "titlePlaceholder": "Χωρίς τίτλο"
     },
     "mermaid": {
-      "rendering": "Απόδοση διαγράμματος…"
+      "rendering": "Απόδοση διαγράμματος…",
+      "renderFailed": "Δεν ήταν δυνατή η απόδοση αυτού του διαγράμματος: {{reason}}"
     },
     "slash": {
       "aiContinue": "Συνέχεια γραφής (AI)",

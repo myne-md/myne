@@ -1698,6 +1698,7 @@ export const ROSTER = Object.freeze([
       "e2e/saved-views-table-list.e2e.ts",
       "e2e/saved-views-cards.e2e.ts",
       "e2e/tag-suggestion-band.e2e.ts",
+      "e2e/editor-no-hscroll.e2e.ts",
     ],
     manual: [
       {
@@ -1732,6 +1733,7 @@ export const ROSTER = Object.freeze([
       "e2e/reading-source-modes.e2e.ts",
       "e2e/rtl-layout.e2e.ts",
       "e2e/a11y-axe.e2e.ts",
+      "e2e/editor-vertical-caret.e2e.ts",
     ],
     manual: [
       {
@@ -1787,7 +1789,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Open a note with a ```mermaid flowchart of at least six nodes including one long node label, plus a sequence diagram. On each client confirm no node label overflows its box, no two edge labels overlap, the diagram fits the note width without clipping at the right edge, and the whole card is legible against the editor background in both light and dark themes. On a phone, confirm it is legible at the narrow width rather than shrunk to unreadable.",
+        see: "Open a note with a ```mermaid flowchart of at least six nodes including one long node label, plus a sequence diagram, and make one of them wider than the note column. On each client confirm no node label overflows its box, no two edge labels overlap, a diagram wider than the note scrolls inside its own card rather than shrinking or dragging the note sideways, and the whole card is legible against the editor background in light, dark and AMOLED. On a phone, confirm it is legible at the narrow width rather than shrunk to unreadable.",
         whyNotAutomated: "Mermaid lays out by measuring text with getBBox against the live engine's font metrics, which differ between WebKitGTK, WKWebView, Android WebView and WebView2; render-mermaid.ts states in its own header that jsdom cannot run the render, and there is no Mermaid scenario in any E2E lane.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
         estimateMin: 6,
