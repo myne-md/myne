@@ -39,6 +39,7 @@ import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
 import { Select } from "../../components/primitives/Select";
 import { PasswordInput } from "../../components/PasswordInput";
+import { isLegalImportLabel } from "./conflict";
 import { listVaults } from "../../lib/vault-list";
 import type { VaultSummary } from "../../types/vault-summary";
 import { BODY_STYLE, FOOTER_STYLE } from "./modalChrome";
@@ -344,13 +345,53 @@ export function MyneVaultSetup({
     [vaults, t],
   );
 
+  // The 24 cells are cleared on `pagehide`, matching
+  // `vault-recover/PhraseEntryStep.tsx`.
+  //
+  // The reason travels with the surface rather than with the screen, which is
+  // what `recovery-flow.md` §3.2 as amended by this change now says: a browser
+  // restores form state on back-navigation and session restore, from storage
+  // this client neither owns nor can reach, and `autoComplete="off"` on each
+  // cell is only the first half. `pagehide` is the event that fires on bfcache
+  // entry as well as unload, which is why it is the one used.
+  //
+  // Best-effort, and stated as such, exactly as §3.5 requires: nothing here can
+  // guarantee the browser has not already snapshotted the field. It is here on
+  // the desktop client too, and that is not redundancy for its own sake: the
+  // module is a WebView surface, the recovery screen's own copy carries the
+  // same clear for the same reason, and a per-client exemption is how one of
+  // the two surfaces silently loses it.
+  useEffect(() => {
+    const clear = () =>
+      setCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
+    window.addEventListener("pagehide", clear);
+    return () => window.removeEventListener("pagehide", clear);
+  }, []);
+
+  // The label is validated HERE, at the input, because this is the only place
+  // a person can still fix it.
+  //
+  // It is spliced into a note's `title:` AND into the target of every
+  // retargeted wikilink, so it inherits the dialect's title-segment rule. A `/`
+  // turns `[[Beta (2024/archive)]]` into a path-form link whose final segment
+  // is `archive)`, and a `]]` closes the wikilink early and leaves the rest as
+  // literal text in every linking note. `renamedTitleFor` refuses an illegal
+  // label too, but its refusal is a silent no-op rename that sends the
+  // collision down the skip path; refusing at the input is what turns that into
+  // a sentence the user can act on.
+  //
+  // Checked against a SAMPLE title rather than the label alone, because the
+  // rule bounds the whole segment: `isLegalSegment` rejects a trailing dot and
+  // a byte length, both properties of the result.
+  const labelIllegal = !isLegalImportLabel("x", label);
+
   // §3.2 normalisation happens inside the derivation (`protocol.md` §7.4), so
   // this only has to join the cells the way the user typed them.
   const phrase = cells.join(" ").trim();
   const secretReady = kind === "password" ? password.length > 0 : cells.every((c) => c.trim() !== "");
 
   const submit = useCallback(() => {
-    if (chosen === NO_VAULT || !secretReady) return;
+    if (chosen === NO_VAULT || !secretReady || labelIllegal) return;
     const credential =
       kind === "password" ? { password } : { recoveryPhrase: phrase };
     // The secret leaves THIS component's state as it is handed over. It still
@@ -360,7 +401,7 @@ export function MyneVaultSetup({
     setPassword("");
     setCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
     onReady({ sourceVaultId: chosen, importLabel: label, credential });
-  }, [chosen, kind, password, phrase, secretReady, label, onReady]);
+  }, [chosen, kind, password, phrase, secretReady, labelIllegal, label, onReady]);
 
   if (vaults === null) {
     return (
@@ -479,6 +520,11 @@ export function MyneVaultSetup({
             data-testid="import-myne.label"
           />
           <p style={HINT}>{t("notes.import.myne.importLabelHint")}</p>
+          {labelIllegal && (
+            <p style={HINT} role="alert" data-testid="import-myne.label-error">
+              {t("notes.import.myne.importLabelIllegal")}
+            </p>
+          )}
         </div>
       </div>
 
@@ -499,7 +545,7 @@ export function MyneVaultSetup({
           // which sends the collision back down the skip path: the silent
           // mis-link the whole rule exists to prevent.
           disabled={
-            chosen === NO_VAULT || !secretReady || label.trim().length === 0
+            chosen === NO_VAULT || !secretReady || labelIllegal
           }
           onClick={submit}
           data-testid="import-myne.continue"

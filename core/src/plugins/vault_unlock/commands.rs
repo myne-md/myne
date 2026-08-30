@@ -181,13 +181,30 @@ pub async fn unlock_from_host(
     // a same-id re-unlock from `Empty` carries no stale global index). Reuses
     // the EXACT existing teardown calls from the lock path — not a second wipe
     // path.
+    // The import sources go FIRST, and OUTSIDE the switch branch below.
+    //
+    // Ordering, first: `reseal_attachment` resolves its destination from the
+    // ACTIVE vault, so a slot that survived into the new session would re-seal
+    // the old source's attachment plaintext into a vault the user never named
+    // as an import target (myne-md/myne#464).
+    //
+    // Placement, and this is the correction. It used to sit inside
+    // `is_vault_switch(active_before, target_id)`, which is FALSE when
+    // `active_before` is `None`: nothing was unlocked, so nothing is being
+    // switched away from. But `open()` does not require an unlocked target, so
+    // an import slot can exist while no vault is open, and on that path the
+    // branch never ran. The slot then survived into the first unlock, which is
+    // precisely the state the ordering comment above says must not happen, with
+    // only the 30-minute TTL bounding it. `threat-model.md` A6 as amended by
+    // this feature bounds the second vault's residency as "no longer than the
+    // target vault's own session"; a slot that PREDATES the session is not
+    // bounded by that sentence at all.
+    //
+    // Unconditional is also simply cheaper to reason about: on every other path
+    // there is no import source and this is one read-lock probe that finds an
+    // empty map.
+    super::import_source::close_all(state).await;
     if is_vault_switch(active_before, target_id) {
-        // The source slot goes FIRST on a switch, and the ordering is the point:
-        // `reseal_attachment` resolves its destination from the ACTIVE vault, so
-        // a slot that survived into the new session would re-seal the old
-        // source's attachment plaintext into a vault the user never named as an
-        // import target (myne-md/myne#464).
-        super::import_source::close_all(state).await;
         hooks.zeroize_search_index();
         // MYND-262/266: drop the prior vault's spell engine + personal/ignore
         // sets before the new vault hydrates — no cross-vault dictionary bleed.

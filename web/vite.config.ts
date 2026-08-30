@@ -209,6 +209,7 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
   // browser origin holds ONE container under a constant vault id (task 85), so
   // there is no second vault to import from, and `importer:` is
   // `Class::Unsupported` wholesale.
+
   [path.join(repoRoot, "src", "notes", "import", "MyneVaultSetup")]: path.join(
     repoRoot,
     "web",

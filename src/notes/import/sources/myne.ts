@@ -19,7 +19,7 @@
 //    untitled note `019…` hex. They stay Untitled, as they are in the source.
 
 import { parse } from "../../../dialect/parse";
-import { foldSegment } from "../../../dialect/folderPath";
+import { foldSegment, isFolderTarget } from "../../../dialect/folderPath";
 import {
   readTemplateFromFmBody,
   readTrashedFromFmBody,
@@ -253,6 +253,11 @@ export function createMyneSource(
    */
   const conflict: MyneConflictContext = {
     existing: conflictInput.existing,
+    // The SAME set, and that is correct here: `conflictInput.existing` IS the
+    // pre-run snapshot, taken by `runMyneVaultImport` before the loop. The
+    // `existing` field is overridden per item below with the engine's live set;
+    // `preRun` is never overridden, which is what makes the two differ.
+    preRun: conflictInput.existing,
     inboundLinks,
     importLabel: conflictInput.importLabel,
   };
@@ -303,9 +308,20 @@ export function createMyneSource(
         if (outcome.kind === "create" && title === null) {
           seenUntitled.add(untitledIdentityKey(candidate.folder, bodyHash));
         }
-        // No rename is recorded here: `plan()` filled `renamedTitles` before the
-        // loop started, so `finalize` sees the complete map on the first item as
-        // well as the last.
+        // No rename is recorded here, and the map really is complete rather
+        // than merely filled early.
+        //
+        // `plan()` computes a rename for every note that collides with the
+        // PRE-RUN snapshot and is linked to, and `decideMyneImport` now emits
+        // `renamedTitle` from that same condition and no other: a collision
+        // with a note this run created is a legal source-side duplicate and
+        // takes the create arm unrenamed. So the two agree by construction.
+        //
+        // Before that change they did not. `decide` evaluated collisions
+        // against the engine's LIVE set, so a run-local collision produced a
+        // `renamedTitle` with no entry in `renamedTitles`, and no inbound link
+        // was ever retargeted to it. This comment asserted the property; the
+        // code now has it.
         return outcome;
       },
 
@@ -410,16 +426,38 @@ export function createMyneSource(
         const linkTargets = new Set<string>();
         const attachmentIds = new Set<string>();
         for (const link of parsed.wikilinks) {
+          // The ATTACHMENT branch stays first: an `![[att:<id>]]` is an
+          // attachment reference, not a note link, and folding its id as a
+          // title would put a 64-hex string in the link graph.
           const att = ATTACHMENT_TARGET.exec(link.target);
           if (att !== null) {
             attachmentIds.add(att[1]);
             continue;
           }
-          if (link.embed) continue;
+          // A NOTE embed is an inbound link, and skipping it was the defect.
+          //
+          // `if (link.embed) continue;` used to sit here, which excluded
+          // `![[Beta]]` from `inboundLinks` while `myneRewrite.ts` retargets it
+          // like any other link (its own test says why: a note embed resolves
+          // title-keyed exactly as a link does). So a source note whose ONLY
+          // reference to Beta was an embed did not make Beta "linked", the
+          // rename rule did not fire, Beta took the skip arm, and the embed
+          // silently rendered the TARGET's own Beta. That is verbatim the
+          // hazard `decisions/storage/0544` names, and `countUnresolved` reads
+          // the same set, so the report could not flag it either.
+          //
+          // A FOLDER target is skipped instead, and for a different reason:
+          // `[[Projects/]]` addresses a folder, has no title to resolve, and
+          // its final path segment is the empty string, which is in no set. It
+          // was inflating `linksLeftUnresolved`, the row 0544 calls the
+          // feature's highest-risk residual, with noise on any vault that uses
+          // folder links.
+          if (isFolderTarget(link.target)) continue;
           // Resolution is title-keyed (`wikilink.md` §5.3), so the FOLDER
           // segment of a path-form link is a disambiguator and the final
           // segment is the key. Fold it the way the resolver does.
           const finalSegment = link.target.split("/").pop() ?? link.target;
+          if (finalSegment === "") continue;
           linkTargets.add(foldSegment(finalSegment.replace(/\.md$/i, "")));
         }
 

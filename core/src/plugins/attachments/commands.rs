@@ -426,7 +426,11 @@ pub struct IngestPolicy {
     /// passes `Some`, which also governs the unused-cleanup grace window
     /// (`UNUSED_CLEANUP_GRACE_SECS`): a restored file whose original creation
     /// predates the window is not withheld as "recently added". Ignored on a
-    /// dedup hit, where the existing entry's `created_at` wins.
+    /// dedup hit, where the existing entry's `created_at` wins, and ignored
+    /// again when the import REVIVES a tombstone: the revival's whole
+    /// correctness rests on its timestamp postdating the tombstone's
+    /// `deleted_at`, so a historical one would lose the merge and the file
+    /// would be deleted again on the next sync.
     pub created_at_override: Option<u64>,
     pub compression: IngestCompression,
 }
@@ -662,6 +666,13 @@ where
     // treated as absent: re-importing the same file is the deliberate re-add
     // of `sync-protocol.md` §11.4 rule 4 — the fresh live entry's `created_at`
     // postdates the tombstone's `deleted_at`, so the revival wins the merge.
+    //
+    // That last clause is a PRECONDITION, not a description, and step (9) below
+    // is where it is kept.
+    let reviving_tombstone = catalog
+        .entries
+        .get(&id_hex)
+        .is_some_and(|e| e.is_tombstone());
     if let Some(existing) = catalog.entries.get(&id_hex).filter(|e| !e.is_tombstone()) {
         tracing::debug!(stage = "dedup", outcome = "hit");
         return Ok(ImportedAttachment {
@@ -695,9 +706,30 @@ where
         })
         .unwrap_or_else(|| auto_filename(content_type));
     let size = file_bytes.len() as u64;
-    let created_at = policy
-        .created_at_override
-        .unwrap_or_else(|| host.now_unix_secs());
+    // NOW when this is a revival, whatever the caller asked for, and the
+    // override otherwise.
+    //
+    // The dedup filter above treats a tombstone as absent, and the comment
+    // there rests that on the revival winning the merge because its
+    // `created_at` postdates the tombstone's `deleted_at`. A caller supplying a
+    // HISTORICAL timestamp breaks exactly that, and one does: the vault-import
+    // re-seal (myne-md/myne#464) passes the SOURCE catalog row's `created_at`,
+    // which can predate the target's deletion by any amount. The revival then
+    // loses the merge, the attachment is re-deleted on the next sync
+    // convergence, and the imported note's embed points at a tombstoned id.
+    //
+    // Overriding here rather than asking every caller to notice is deliberate:
+    // the caller cannot see the target's catalog, so "is this a revival" is not
+    // a question it is able to answer. The cost is one restored file showing
+    // today's date instead of its original, on a path where the alternative is
+    // the file disappearing again.
+    let created_at = if reviving_tombstone {
+        host.now_unix_secs()
+    } else {
+        policy
+            .created_at_override
+            .unwrap_or_else(|| host.now_unix_secs())
+    };
 
     // (10) Encode the MYA1 blob on a blocking thread (random key + nonces
     //      from getrandom; AEAD seal under items_key → attachment_key).

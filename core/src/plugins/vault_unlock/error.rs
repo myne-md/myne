@@ -124,6 +124,22 @@ pub enum VaultUnlockError {
     #[error("vault is open as a vault-import source")]
     VaultOpenAsImportSource,
 
+    /// A vault import was asked for with NO vault unlocked to import INTO
+    /// (myne-md/myne#464).
+    ///
+    /// **Not user-facing**: the flow is reachable only from the editor, which
+    /// exists only while a vault is unlocked, so a user who sees this has hit a
+    /// router bug. It is a hard precondition rather than a UI assumption
+    /// because of what the absence costs: `open()` would otherwise mint a slot
+    /// holding a second vault's `root_key` and `items_key` with no session to
+    /// bound it, and `threat-model.md` A6 as amended by this feature bounds
+    /// that residency as "no longer than the target vault's own session". A
+    /// slot that predates the session is outside that sentence, and
+    /// `reseal_attachment` resolves its destination from `active_vault_id()`
+    /// at call time, so it would also have no destination to resolve.
+    #[error("no vault is unlocked to import into")]
+    NoActiveVaultToImportInto,
+
     /// The vault is already unlocked. Returned by the slot-peek guard
     /// when an unlock attempt arrives with the slot occupied by
     /// `Slot::Unlocked(_)`.
@@ -286,6 +302,7 @@ mod tests {
                 } => {}
                 VaultUnlockError::VaultUpgradedUnsupported => {}
                 VaultUnlockError::VaultOpenAsImportSource => {}
+                VaultUnlockError::NoActiveVaultToImportInto => {}
             }
         }
         assert_closed(&VaultUnlockError::VaultNotFound);

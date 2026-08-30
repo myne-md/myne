@@ -96,6 +96,44 @@ export async function runMyneVaultImport(
     }),
   );
 
+  // A run that did not FINISH stops here, before the dictionary and before the
+  // report. Both halves of that matter and neither is cosmetic.
+  //
+  // The dictionary carry is a durable, SYNCED write into the target's
+  // `vault.dictionary`. It is the one non-additive effect of this whole flow,
+  // and running it after the user pressed Cancel means the cancel did not
+  // cancel: the words are in, they sync, and nothing on screen said so. A note
+  // that already landed is different, and stays, because SYNC-6 says a
+  // cancelled import keeps its partial result rather than rolling back.
+  //
+  // The report is skipped for a different reason: its counts come from `plan()`
+  // rather than from what the loop created, so on a cancelled run every row is
+  // about the whole source instead of the prefix that ran.
+  // `trashedLeftBehind` and `templatesLeftBehind` describe notes the run never
+  // reached, and `untitledImported` counts untitled notes in the SOURCE, under
+  // a row that says they were brought over. A durable note asserting numbers
+  // that describe a run that did not happen is worse than no note.
+  //
+  // `stopped` is included with `cancelled`: a write failure stops the loop the
+  // same way, and the same two arguments apply to it unchanged.
+  if (result.cancelled !== null || result.stopped !== null) {
+    return {
+      result,
+      extras: {
+        ...zeroExtras(),
+        // The one count that IS about what happened rather than about the
+        // source, so it survives: the rewrite tallies are incremented per note
+        // as the loop runs.
+        attachmentsCrossed: adapter.tally.attachmentsCrossed,
+        attachmentsDeduped: adapter.tally.attachmentsDeduped,
+        attachmentsFailed: adapter.tally.attachmentsFailed,
+        linksRetargeted: adapter.tally.linksRetargeted,
+        tombstonedEmbeds: adapter.tally.tombstonedEmbeds,
+        linksLeftUnresolved: adapter.tally.linksLeftUnresolved,
+      },
+    };
+  }
+
   // The dictionary is carried AFTER the notes, and its failure is never fatal:
   // the notes are already in, so refusing to finish because a dictionary would
   // not decrypt would report failure for an import that succeeded.
@@ -145,6 +183,32 @@ export async function runMyneVaultImport(
   }
 
   return { result, extras };
+}
+
+/**
+ * The extras a run that did not finish reports: everything the source-wide
+ * counts would have claimed, zeroed.
+ *
+ * Zeroed rather than omitted, because `MyneImportExtras` is what the summary
+ * renders and a missing field would render as a blank row rather than as an
+ * absent one. The caller then puts back the per-note tallies, which are the
+ * only counts that describe the prefix that actually ran.
+ */
+function zeroExtras(): MyneImportExtras {
+  return {
+    trashedLeftBehind: 0,
+    templatesLeftBehind: 0,
+    untitledImported: 0,
+    attachmentsCrossed: 0,
+    attachmentsDeduped: 0,
+    attachmentsFailed: 0,
+    linksRetargeted: 0,
+    tombstonedEmbeds: 0,
+    linksLeftUnresolved: 0,
+    unreadableNotes: 0,
+    dictionaryWordsAdded: 0,
+    dictionaryUnreadable: false,
+  };
 }
 
 /**
