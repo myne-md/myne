@@ -90,6 +90,24 @@ pub enum EngineError {
     /// routed nowhere because Myne's own code declines to route it there.
     #[error("this request may not use a remote backend")]
     RemoteBarred,
+    /// **No consent has been recorded on THIS DEVICE for the selected
+    /// provider.** Actionable: accept the consent screen, once, here.
+    ///
+    /// Split out of [`EngineError::RemoteBarred`] by myne-md/myne#456, and the
+    /// reason is that one variant was carrying two unrelated meanings. The
+    /// other is a rule Myne applies to a request CLASS: an ambient request or
+    /// any embedding may not use a remote backend, ever, whatever the user
+    /// says. This one is a permission the user has simply not given yet, and
+    /// the difference is the whole of what the user does next. Collapsed
+    /// together, someone who had never seen the consent screen was told "this
+    /// kind of request never goes to a provider", which is both false about
+    /// their request and silent about the one action that would fix it.
+    ///
+    /// Distinct from [`EngineError::NoCredential`] for the same class of
+    /// reason: one means there is nothing to send, the other that you have not
+    /// agreed to send it, and the two fixes are in different places.
+    #[error("no consent recorded on this device for the selected provider")]
+    ConsentMissing,
     // ---- provider-credential + quota causes (ai-remote-providers task 7) ---
     // The issue asks for "three distinct states, not one"; these are two of the
     // five, and the two the tree could not otherwise express. Unit and
@@ -216,6 +234,7 @@ impl EngineError {
             EngineError::Unreachable => "unreachable",
             EngineError::Refused => "refused",
             EngineError::RemoteBarred => "remote_barred",
+            EngineError::ConsentMissing => "consent_missing",
             EngineError::NoCredential => "no_credential",
             EngineError::Unauthorized => "unauthorized",
             EngineError::QuotaExhausted => "quota_exhausted",

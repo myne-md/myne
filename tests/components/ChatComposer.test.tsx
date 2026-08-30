@@ -240,11 +240,16 @@ describe("ChatComposer", () => {
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(agentStart).toHaveBeenCalled());
     expect(agentCapability).toHaveBeenCalledTimes(1);
-    // The third argument is the open-channel callback the run reports its id
-    // through (myne-md/myne#544); the scope is what this test is about.
+    // The third and fourth arguments are the two channel callbacks: the run
+    // reports its id through one (myne-md/myne#544) and its accruing cost
+    // through the other (myne-md/myne#456). The scope is what this test is
+    // about, and both callbacks are asserted as present rather than ignored,
+    // because a caller that stopped passing the cost channel would leave the
+    // disclosure control silent for a whole run.
     expect(agentStart).toHaveBeenCalledWith(
       "tidy the headings",
       { kind: "notes", value: ["n1"] },
+      expect.any(Function),
       expect.any(Function),
     );
     // A second send reuses the verdict rather than paying for it again.
@@ -273,6 +278,7 @@ describe("ChatComposer", () => {
     expect(agentStart).toHaveBeenCalledWith(
       "rename the concept",
       { kind: "folder", value: "Projects" },
+      expect.any(Function),
       expect.any(Function),
     );
   });

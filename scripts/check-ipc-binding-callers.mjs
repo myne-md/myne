@@ -85,6 +85,36 @@ const BINDING_ROOTS = ["src/lib", "mobile/src/lib"];
 /** Trees a caller may live in. A test does not count. */
 const CALLER_ROOTS = ["src", "web/src", "mobile/src", "editor/src", "dialect/src"];
 
+/** Which caller trees answer for which binding tree.
+ *
+ * **A binding is live when ITS OWN client calls it, not when the other one
+ * does.** Both Tauri clients name their bindings identically, so a flat search
+ * over every caller root let desktop's caller satisfy mobile's binding and the
+ * other way round: the same "each was the other's caller" defect that had been
+ * hiding `probeVaultStatus`, one level up. It survived two earlier fixes to this
+ * guard in the same change, which is the argument for writing it down as a map
+ * rather than as a comment.
+ *
+ * `editor/src` and `dialect/src` are genuinely shared source packages that both
+ * clients compile, so they answer for both. `web/src` answers only for `src`,
+ * which is the tree it substitutes a seam into. */
+const CALLERS_FOR = new Map([
+  ["src/lib", ["src", "web/src", "editor/src", "dialect/src"]],
+  ["mobile/src/lib", ["mobile/src", "editor/src", "dialect/src"]],
+]);
+
+/** The caller trees that answer for the binding file at `rel`. */
+export function callerRootsFor(rel) {
+  for (const [bindingRoot, callers] of CALLERS_FOR) {
+    if (rel.startsWith(`${bindingRoot}/`)) return callers;
+  }
+  // A binding root nobody mapped falls back to every tree, which is the old
+  // behaviour and is the SAFE direction: it can only make a dead binding look
+  // live, never the reverse, and `BINDING_ROOTS` is two entries so a third
+  // arriving unmapped is a visible edit rather than a silent one.
+  return CALLER_ROOTS;
+}
+
 const IS_TEST = /(^|\/)(tests?|__tests__)\//;
 const TEST_FILE = /\.(test|spec)\.[jt]sx?$/;
 
@@ -125,7 +155,51 @@ export function bindingsInSource(src) {
       found.push(marks[i].name);
     }
   }
-  return found;
+  return found.concat(reexportedBindings(src));
+}
+
+/**
+ * Bindings a module re-exports out of a FACTORY's return record.
+ *
+ * **The shape that made this guard blind, found by the /simplify review of
+ * myne-md/myne#456.** Sharing the agent's IPC bindings between two Tauri
+ * clients meant moving them inside `makeAgentRun({ invoke, Channel })`, so each
+ * client's `agent-run.ts` became:
+ *
+ * ```ts
+ * const bound = makeAgentRun({ invoke, Channel });
+ * export const { agentStart, agentApply, agentUndo, … } = bound;
+ * ```
+ *
+ * The scan above matches `export function NAME`, and after that refactor there
+ * were none: eight tracked bindings on desktop collapsed to ZERO, mobile's copy
+ * never entered the denominator at all, and the guard went on printing `ok`
+ * about the 189 it could still see. The binding whose deadness this guard was
+ * WRITTEN for, `agentCapability` (myne-md/myne#529), was among the seven it
+ * stopped watching.
+ *
+ * Matching the destructure alone would be the weak version: it would count
+ * names the file merely re-exports without checking any of them reaches a
+ * command. So the factory's own source has to be in `src` too, which it is
+ * whenever the file both calls the factory and destructures it, and the
+ * per-client injection files do not, which is why the FACTORY file is scanned
+ * for the `plugin:` literals and the CLIENT file contributes the names.
+ */
+export function reexportedBindings(src) {
+  const out = [];
+  // `export const { a, b, c } = <expr>;`, the whole record, names only.
+  const re = /export\s+const\s*\{([^}]*)\}\s*=/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    for (const raw of m[1].split(",")) {
+      // `a: renamed` re-exports under the new name, which is what a caller
+      // would use.
+      const name = raw.includes(":") ? raw.split(":")[1] : raw;
+      const clean = name.trim();
+      if (/^[A-Za-z0-9_$]+$/.test(clean)) out.push(clean);
+    }
+  }
+  return out;
 }
 
 /** A file's text with its import statements removed.
@@ -144,6 +218,54 @@ export function withoutImports(text) {
     .replace(/^\s*import\s+type\s[\s\S]*?from\s*["'][^"']+["'];?\s*$/gm, "")
     .replace(/^\s*import\s[\s\S]*?from\s*["'][^"']+["'];?\s*$/gm, "")
     .replace(/^\s*import\s*["'][^"']+["'];?\s*$/gm, "");
+}
+
+/** The local names a file gave the imports it renamed, as `original -> aliases`.
+ *
+ * **A renamed import makes a live binding invisible**, and it does so through
+ * this guard's own `withoutImports`: the import line is stripped precisely so a
+ * mention in it cannot count as a call, which also deletes the only place the
+ * two names appear together. What is left says `clipboardWriteText(...)` and
+ * never says `writeText`, so the guard reports a binding that four call sites
+ * reach.
+ *
+ * That is a FALSE POSITIVE, which is the dangerous direction for a ratchet: the
+ * fix a reader reaches for is an exemption, and an exemption on live code turns
+ * the record from a list of defects into a list of names somebody once argued
+ * about. `mobile/src/lib/clipboardTransport.ts:writeText` was reported dead
+ * while `mobile/src/editor-host.ts` installs it as the editor's clipboard port.
+ *
+ * Read from the ORIGINAL text, before stripping, because stripping is what
+ * removes the evidence. */
+export function importAliases(text) {
+  const out = new Map();
+  const line = /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*["'][^"']+["']/g;
+  for (const m of text.matchAll(line)) {
+    for (const clause of m[1].split(",")) {
+      const as = /^\s*([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)\s*$/.exec(clause);
+      if (!as) continue;
+      const [, original, alias] = as;
+      if (!out.has(original)) out.set(original, new Set());
+      out.get(original).add(alias);
+    }
+  }
+  return out;
+}
+
+/** Top-level exported function bodies in `src`, as `name -> body`.
+ *
+ * The unit the second hop needs. Split on a column-0 `export`, which is where a
+ * top-level declaration in this tree begins, so a nested `export` inside a
+ * string or a block cannot end a body early. */
+export function exportedBodies(src) {
+  const out = new Map();
+  const head = /^export\s+(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm;
+  const starts = [...src.matchAll(head)].map((m) => ({ name: m[1], at: m.index }));
+  for (let i = 0; i < starts.length; i += 1) {
+    const end = i + 1 < starts.length ? starts[i + 1].at : src.length;
+    out.set(starts[i].name, src.slice(starts[i].at, end));
+  }
+  return out;
 }
 
 /** The tree as `deadBindings` wants it.
@@ -182,23 +304,92 @@ export function deadBindings({ bindings, callers }) {
   // Stripped ONCE, not per binding. Re-stripping inside the inner loop is what
   // turns a 1 s guard into a 40 s one, for the same reason the read is hoisted.
   const stripped = [...callers].map(([k, v]) => [k, withoutImports(v)]);
+  // Harvested from the UNSTRIPPED text, which is the only place the renamed
+  // import still names both sides. Built once, for the same reason `stripped`
+  // is: per-binding re-parsing is what turns a 1 s guard into a 40 s one.
+  const aliases = new Map([...callers].map(([k, v]) => [k, importAliases(v)]));
   const dead = [];
   let checked = 0;
   for (const [rel, src] of bindings) {
     for (const name of bindingsInSource(src)) {
       checked += 1;
       const word = new RegExp(`\\b${name}\\b`);
-      let called = false;
-      for (const [other, text] of stripped) {
-        if (other === rel) continue;
-        // A re-export moves the problem rather than solving it.
-        if (new RegExp(`export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`).test(text)) continue;
-        if (word.test(text)) {
-          called = true;
-          break;
+      // **A file that DECLARES the binding is not a caller of it**, and the
+      // declaring FILE is not the only place a declaration can be. That was
+      // enough while every binding was `export function agentApply` in the file
+      // being checked; myne-md/myne#456 moved the agent's bindings inside a
+      // factory (`makeAgentRun({ invoke, Channel })`) so two clients could
+      // share them, and each client's module now re-exports them out of the
+      // factory's return record. The factory's own source sits in `src/lib`,
+      // which is a caller root, so it mentions every one of those names and
+      // every one of them looked called. Verified by injecting a binding with
+      // no caller anywhere: before this, the guard counted it and passed.
+      const declares = new RegExp(
+        `(?:function|const|let|var)\\s+${name}\\b|\\b${name}\\s*[:=]\\s*(?:async\\s*)?(?:function|\\()`,
+      );
+      // **A destructuring re-export is a declaration too**, and missing that
+      // left the third blind spot in a row. The first fix taught the scan to
+      // SEE `export const { agentStart, … } = bound`; without teaching the
+      // caller test the same shape, each client's copy of that line counted as
+      // the other client's caller, which is the identical "each was the other's
+      // caller" defect the first two fixes closed for `probeVaultStatus`. The
+      // symptom was `agentCapability` reported live while nothing on mobile
+      // calls it.
+      const reexports = new RegExp(`export\\s+const\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*=`);
+      const answering = callerRootsFor(rel);
+      if (!reaches(name)) dead.push(`${rel}:${name}`);
+
+      /** Is `wanted` mentioned by a production file that does not declare it?
+       *
+       * Hoisted into a closure because the SECOND HOP asks the same question of
+       * a different name, and asking it twice by copy would be a second place
+       * for the alias rule and the re-export rule to drift apart. */
+      function reachedFromAnotherFile(wanted) {
+        const w = new RegExp(`\\b${wanted}\\b`);
+        const dec = new RegExp(
+          `(?:function|const|let|var)\\s+${wanted}\\b|\\b${wanted}\\s*[:=]\\s*(?:async\\s*)?(?:function|\\()`,
+        );
+        const reex = new RegExp(`export\\s+const\\s*\\{[^}]*\\b${wanted}\\b[^}]*\\}\\s*=`);
+        for (const [other, text] of stripped) {
+          if (other === rel) continue;
+          // Only the trees that answer for this binding's client.
+          if (!answering.some((root) => other.startsWith(`${root}/`))) continue;
+          // A re-export moves the problem rather than solving it.
+          if (new RegExp(`export\\s*\\{[^}]*\\b${wanted}\\b[^}]*\\}`).test(text)) continue;
+          if (dec.test(text) || reex.test(text)) continue;
+          if (w.test(text)) return true;
+          // The name the importing file actually calls it by.
+          for (const alias of aliases.get(other)?.get(wanted) ?? []) {
+            if (new RegExp(`\\b${alias}\\b`).test(text)) return true;
+          }
         }
+        return false;
       }
-      if (!called) dead.push(`${rel}:${name}`);
+
+      /** Reached directly, or through one exported function in its own file.
+       *
+       * **The second hop is not a relaxation of the caller rule, it is the rule
+       * applied twice.** This guard's header argues that a wrapper referenced
+       * only from inside its own file is by definition unused, and records that
+       * as MEASURED over the binding layer. The measurement was taken before
+       * the caller search was scoped per client, so it only ever read the
+       * desktop tree: `mobile/src/lib/workspace-persist.ts` declares
+       * `workspaceRead`, calls it from `ensureWorkspaceHydrated` twenty lines
+       * down, and exports that instead. The binding is reached on every unlock.
+       *
+       * ONE hop, deliberately. A chain the guard follows arbitrarily far stops
+       * being able to say a binding is unreachable, because a cycle of dead
+       * functions inside one file would carry each other. One hop covers the
+       * shape that occurs and refuses the shape that hides. */
+      function reaches(wanted) {
+        if (reachedFromAnotherFile(wanted)) return true;
+        for (const [fn, body] of exportedBodies(src)) {
+          if (fn === wanted) continue;
+          if (!new RegExp(`\\b${wanted}\\s*\\(`).test(body)) continue;
+          if (reachedFromAnotherFile(fn)) return true;
+        }
+        return false;
+      }
     }
   }
   dead.sort();
@@ -212,11 +403,24 @@ export function deadBindings({ bindings, callers }) {
  * exemption whose binding has since acquired a caller. A guard that only
  * reported the first would let the record drift into a list of licences nobody
  * re-argued. */
+/** What `--record` writes into every fresh entry.
+ *
+ * **A sentinel, not a reason, and the guard has to know the difference.** The
+ * reason check was a length floor, and this string is 15 characters, so the
+ * tool's own placeholder passed the tool's own gate: `--record` produced a file
+ * that went green while every entry in it said, in words, that its reason was
+ * missing. Seven entries sat that way. Exported so the check and the writer
+ * cannot drift to two spellings of it. */
+export const PLACEHOLDER = "REASON REQUIRED";
+
 export function ratchet(dead, exempt) {
   return {
     news: dead.filter((d) => !(d in exempt)),
     unreasoned: Object.entries(exempt)
-      .filter(([, why]) => typeof why !== "string" || why.trim().length < 12)
+      .filter(
+        ([, why]) =>
+          typeof why !== "string" || why.trim().length < 12 || why.trim() === PLACEHOLDER,
+      )
       .map(([k]) => k),
     stale: Object.keys(exempt).filter((k) => !dead.includes(k)),
   };
@@ -245,8 +449,13 @@ function main() {
             "IPC bindings with no production caller. Each entry needs a REASON,",
             "because an entry without one is indistinguishable from a defect",
             "somebody recorded instead of fixing. Ratchet: may shrink, never grow.",
+            "",
+            "THIS FILE FAILS THE GUARD AS WRITTEN, deliberately: every entry",
+            "carries the placeholder and the guard rejects it by name. `--record`",
+            "gives you the LIST, never the licence. Replace each one with what",
+            "you found out, or the entry is not an exemption.",
           ],
-          exempt: Object.fromEntries(dead.map((d) => [d, "REASON REQUIRED"])),
+          exempt: Object.fromEntries(dead.map((d) => [d, PLACEHOLDER])),
         },
         null,
         2,

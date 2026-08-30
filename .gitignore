@@ -33,19 +33,27 @@ coverage/
 /tauri
 /myne@*
 
-# Companion repos cloned by workspace/setup.sh as nested directories.
-# Each carries its own .git and is tracked by GitHub separately under myne-md.
-/myne-test-vectors/
-/myne-server/
-/myne-web/
-/myne-website/
-/operations/
-/agent-tooling/
-/myne-clipper/
-/myne-themes/
-/myne-branding/
-/internal-service/
-/homebrew-tap/
+# Companion repos. Each carries its own .git and is tracked by GitHub separately
+# under myne-md.
+#
+# NO TRAILING SLASH, and that is the whole point of this comment. In the shared
+# checkout `workspace/setup.sh` clones each as a nested DIRECTORY, which a
+# `path/` pattern matches. In a worktree they are SYMLINKS to the shared
+# checkout's copy, which it does not: a directory-only pattern leaves three
+# untracked entries whose target is an absolute path on one machine, and the
+# next `git add -A` commits them. Since `CLAUDE.md` makes a worktree the normal
+# place to work, that is the common case rather than the exotic one.
+/myne-test-vectors
+/myne-server
+/myne-web
+/myne-website
+/operations
+/agent-tooling
+/myne-clipper
+/myne-themes
+/myne-branding
+/internal-service
+/homebrew-tap
 
 # Vite dep-optimization cache (regenerated each build).
 .vite/

@@ -48,7 +48,8 @@
       "unsupportedDetail": "{{attempts}}回のチェック中{{passes}}回合格しました。必要なのは{{required}}回です。",
       "checking": "モデルを確認しています…",
       "checkingAt": "モデルを確認しています…（{{attempt}}/{{of}}）",
-      "unsupportedProvisional": "この合格基準はまだ複数のモデルで測定されていないため、本来より厳しすぎたり緩すぎたりする可能性があります。"
+      "unsupportedProvisional": "この合格基準はまだ複数のモデルで測定されていないため、本来より厳しすぎたり緩すぎたりする可能性があります。",
+      "scopeNone": "開いているノートがないため、まだ作業する対象がありません"
     },
     "progress": {
       "working": "処理中",
@@ -64,7 +65,8 @@
       "grantsUser_one": "あなたが設定した範囲{{count}}件",
       "grantsUser_other": "あなたが設定した範囲{{count}}件",
       "grantsModel_one": "要求された{{count}}件",
-      "grantsModel_other": "要求された{{count}}件"
+      "grantsModel_other": "要求された{{count}}件",
+      "cancelledBackground": "Myne がバックグラウンドに移ったため、実行は取り消されました。何も書き込まれていません。準備ができたらもう一度お尋ねください。"
     },
     "scope": {
       "title": "{{folder}}を含めますか？",
@@ -148,7 +150,9 @@
       "failed_one": "{{count}}件のノートを復元できませんでした。",
       "failed_other": "{{count}}件のノートを復元できませんでした。",
       "createdNotReverted_one": "この実行が作成した{{count}}件のノートはそのまま残されています。",
-      "createdNotReverted_other": "この実行が作成した{{count}}件のノートはそのまま残されています。"
+      "createdNotReverted_other": "この実行が作成した{{count}}件のノートはそのまま残されています。",
+      "sessionOnly": "このワンタップの取り消しは、保管庫をロックするかアプリを閉じるまで有効です。その後はノートのバージョン履歴から一件ずつ復元してください。",
+      "sessionOnlyLink": "バージョン履歴を開く"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Myneが{{provider}}に何かを送信する前に",
         "whatLabel": "デバイスから出ていくもの",
         "whenLabel": "いつ出ていくか",
-        "whoLabel": "受け取る相手"
+        "whoLabel": "受け取る相手",
+        "connectionLabel": "どのように送られるか"
       },
       "disclosureToggle": "これはどのように機能しますか？",
       "enableHelper": "あなたが用意したモデルを実行します。どこで実行されるか、そしてノートがこのデバイスの外に出るかどうかは、下で指定するプロバイダーによって決まります。実験的機能で、デフォルトはオフです。",
@@ -2983,7 +2988,9 @@
         "refused": "プロバイダーが接続を拒否しました。停止しているか、このネットワークをブロックしている可能性があります。",
         "timeout": "プロバイダーから時間内に応答がありませんでした。実行されたまま残っているものはありません。",
         "unauthorized": "プロバイダーがAPIキーを拒否しました。キーを入れ替えてください：間違っているか、失効しているか、別のアカウントのものである可能性があります。",
-        "unreachable": "プロバイダーに接続できませんでした。ネットワーク接続を確認してください。"
+        "unreachable": "プロバイダーに接続できませんでした。ネットワーク接続を確認してください。",
+        "featureOff": "この端末では AI がオフです。何も送信されていません。設定の「AI」でオンにしてください。",
+        "consentMissing": "この端末からこの提供者にノートを送ることに同意していません。何も送信されていません。設定の「AI」で提供者をもう一度選び、何が送られるかをお読みください。"
       },
       "modelChoose": "ファイルを選択…",
       "modelEmbeddingLabel": "検索モデル：セマンティック検索とQ&A",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "model.safetensors + config.json + tokenizer.json が1つのフォルダに必要です。",
       "recommendedFilesGeneration": ".gguf ファイル + tokenizer.json が同じフォルダに必要です。",
       "recommendedFilesTranscription": "Whisperの .gguf ファイル + config.json + tokenizer.json が同じフォルダに必要です。",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "この端末で AI を使う",
+      "mobileEnableHelper": "既定でオフです。Myne は携帯端末でモデルを実行しないため、すべての要求は下で指定したサービスに送られ、そのときノートはこの端末を離れます。",
+      "mobileKeyAdd": "キーを保存",
+      "mobileKeyReplace": "キーを差し替え",
+      "mobileRevokeHelper": "提供者、そのキー、この端末の承認をまとめて削除し、設定前とまったく同じ状態に戻します。他の端末は、そちらでも削除するまで動作を続けます。",
+      "mobileApproveLabel": "この端末からの送信を許可",
+      "mobileApproveHelper": "提供者とそのキーは別の端末から届いたものです。何が送られるかをお読みになり、ここで許可されるまで、この端末からは何も送信されません。"
     },
     "network": {
       "disabledCue": "同期はTor経由ではなくなりました。新しい接続は同期サーバーに直接つながります。",

@@ -48,7 +48,8 @@
       "unsupportedDetail": "검사 {{attempts}}개 중 {{passes}}개를 통과했습니다. {{required}}개가 필요합니다.",
       "checking": "모델을 확인하는 중…",
       "checkingAt": "모델을 확인하는 중… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "이 합격 기준은 아직 여러 모델에서 측정되지 않아 실제보다 엄격하거나 느슨할 수 있습니다."
+      "unsupportedProvisional": "이 합격 기준은 아직 여러 모델에서 측정되지 않아 실제보다 엄격하거나 느슨할 수 있습니다.",
+      "scopeNone": "열린 노트가 없어 아직 작업할 대상이 없습니다"
     },
     "progress": {
       "working": "작업 중",
@@ -64,7 +65,8 @@
       "grantsUser_one": "직접 설정한 범위 {{count}}개",
       "grantsUser_other": "직접 설정한 범위 {{count}}개",
       "grantsModel_one": "에이전트가 요청한 범위 {{count}}개",
-      "grantsModel_other": "에이전트가 요청한 범위 {{count}}개"
+      "grantsModel_other": "에이전트가 요청한 범위 {{count}}개",
+      "cancelledBackground": "Myne이 백그라운드로 전환되어 실행이 취소되었습니다. 아무것도 기록되지 않았습니다. 준비되면 다시 물어보세요."
     },
     "scope": {
       "title": "{{folder}}을(를) 포함할까요?",
@@ -148,7 +150,9 @@
       "failed_one": "노트 {{count}}개를 복원하지 못했습니다.",
       "failed_other": "노트 {{count}}개를 복원하지 못했습니다.",
       "createdNotReverted_one": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다.",
-      "createdNotReverted_other": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다."
+      "createdNotReverted_other": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다.",
+      "sessionOnly": "이 한 번 탭 실행 취소는 보관함을 잠그거나 앱을 닫을 때까지 유효합니다. 그 이후에는 노트의 버전 기록에서 하나씩 복원하세요.",
+      "sessionOnlyLink": "버전 기록 열기"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Myne가 {{provider}}에 무언가를 보내기 전에",
         "whatLabel": "기기를 떠나는 것",
         "whenLabel": "언제 떠나는지",
-        "whoLabel": "누가 받는지"
+        "whoLabel": "누가 받는지",
+        "connectionLabel": "어떻게 전송되는지"
       },
       "disclosureToggle": "어떻게 작동하나요?",
       "enableHelper": "사용자가 제공한 모델을 실행합니다. 모델이 어디에서 실행되는지, 그리고 노트가 이 기기를 떠나는지는 아래에서 지정하는 제공업체에 따라 달라집니다. 실험적이며 기본적으로 꺼져 있습니다.",
@@ -2983,7 +2988,9 @@
         "refused": "제공업체가 연결을 거부했습니다. 서비스가 중단되었거나 이 네트워크를 차단하고 있을 수 있습니다.",
         "timeout": "제공업체가 제때 응답하지 않았습니다. 실행 중인 채로 남은 것은 없습니다.",
         "unauthorized": "제공업체가 API 키를 거부했습니다. 키를 교체하세요. 잘못되었거나, 취소되었거나, 다른 계정의 키일 수 있습니다.",
-        "unreachable": "제공업체에 연결하지 못했습니다. 네트워크 연결을 확인하세요."
+        "unreachable": "제공업체에 연결하지 못했습니다. 네트워크 연결을 확인하세요.",
+        "featureOff": "이 기기에서 AI가 꺼져 있습니다. 아무것도 전송되지 않았습니다. 설정의 AI에서 켜세요.",
+        "consentMissing": "이 기기에서 이 제공자에게 노트를 보내는 데 동의하지 않았습니다. 아무것도 전송되지 않았습니다. 설정의 AI에서 제공자를 다시 선택하고 무엇이 전송되는지 읽어보세요."
       },
       "modelChoose": "파일 선택…",
       "modelEmbeddingLabel": "검색 모델: 의미 기반 검색 및 Q&A",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "한 폴더에 model.safetensors + config.json + tokenizer.json이 필요합니다.",
       "recommendedFilesGeneration": "같은 폴더에 .gguf 파일 + tokenizer.json이 필요합니다.",
       "recommendedFilesTranscription": "같은 폴더에 Whisper .gguf 파일 + config.json + tokenizer.json이 필요합니다.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "이 휴대폰에서 AI 사용",
+      "mobileEnableHelper": "기본적으로 꺼져 있습니다. Myne은 휴대폰에서 어떤 모델도 실행하지 않으므로 모든 요청은 아래에서 지정한 서비스로 가고, 그때 노트가 이 기기를 떠납니다.",
+      "mobileKeyAdd": "키 저장",
+      "mobileKeyReplace": "키 교체",
+      "mobileRevokeHelper": "제공자, 그 키, 이 휴대폰의 승인을 함께 제거하여 설정한 적 없는 상태로 되돌립니다. 다른 기기는 거기서도 제거할 때까지 계속 작동합니다.",
+      "mobileApproveLabel": "이 휴대폰에서 전송 승인",
+      "mobileApproveHelper": "제공자와 그 키는 다른 기기에서 왔습니다. 무엇이 전송되는지 읽고 여기서 승인하기 전까지 이 휴대폰에서는 아무것도 전송되지 않습니다."
     },
     "network": {
       "disabledCue": "동기화가 더 이상 Tor를 거치지 않습니다. 새 연결은 동기화 서버로 곧바로 연결됩니다.",

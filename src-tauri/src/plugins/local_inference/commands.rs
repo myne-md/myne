@@ -432,12 +432,14 @@ pub(super) fn retrieval_refusal_from(
 /// rejected.
 ///
 /// **It is an egress, and it is gated exactly like a completion.** Same
-/// [`authorize_remote`](super::provider_gate::authorize_remote): developer
-/// mode, the AI beta, a selected provider, a stored key, and consent naming
-/// that provider. All five, re-read here rather than trusted from the panel —
-/// asking a provider "what models do you have" over an authenticated
-/// connection tells that provider this account exists and is active, which is
-/// exactly the kind of byte #414's invariant is about.
+/// [`authorize_remote`](super::provider_gate::authorize_remote): the AI beta, a
+/// selected provider, a stored key, and consent naming that provider. All four,
+/// re-read here rather than trusted from the panel, asking a provider "what
+/// models do you have" over an authenticated connection tells that provider
+/// this account exists and is active, which is exactly the kind of byte #414's
+/// invariant is about. It was five until myne-md/myne#456 dropped
+/// `developer_mode` from the gate; the count is stated here rather than left to
+/// the reader precisely so it cannot drift from the gate again.
 ///
 /// It fetches model **names**, never weights. `decisions.md` 2026-08-09 draws
 /// the forbidden line at a provider's *pull or download* endpoint; a listing
@@ -464,47 +466,11 @@ pub async fn list_provider_models<R: Runtime>(
     // The gate first, and the network only after it says yes. Written in this
     // order on purpose: an implementation that connected and then checked would
     // satisfy every assertion about the RESULT while still having sent a byte.
-    list_models_gated(&prefs, prefs.developer_mode, |provider, key| {
+    super::provider_registry::list_models_gated(&prefs, |provider, key| {
         let transport = super::provider_transport::ProviderTransport::new(provider.host());
         transport.get_json(provider.models_path(), key)
     })
     .await
-}
-
-/// Testable core of [`list_provider_models`]: the gate, then the fetch, then
-/// the parse — with the fetch injected.
-///
-/// The injection is the point. A test can then assert the thing that actually
-/// matters and that no assertion about the RETURN VALUE can reach: when a
-/// precondition is missing, the fetch is **never called**. An implementation
-/// that connected first and checked afterwards would satisfy every
-/// error-equality assertion while having already sent a byte, which is the
-/// exact failure #414's invariant is written against.
-pub(crate) async fn list_models_gated<F>(
-    prefs: &protocol::PrefsView,
-    developer_mode: bool,
-    fetch: F,
-) -> Result<Vec<super::provider_registry::ProviderModel>, EngineError>
-where
-    F: FnOnce(
-            super::provider_registry::RemoteProvider,
-            &str,
-        ) -> Result<Vec<u8>, super::provider_transport::ProviderTransportError>
-        + Send
-        + 'static,
-{
-    let auth = super::provider_gate::authorize_remote(prefs, developer_mode)?;
-    let provider = auth.provider();
-    let key = auth.key().to_string();
-
-    let raw = tokio::task::spawn_blocking(move || fetch(provider, &key))
-        .await
-        .map_err(|_| EngineError::InferenceFailed)?
-        .map_err(super::provider_registry::engine_error_of)?;
-
-    provider
-        .parse_models_reply(&raw)
-        .map_err(|_| EngineError::InferenceFailed)
 }
 
 /// Read the device-local AI endpoint, or `None` when none is configured.
@@ -2284,152 +2250,5 @@ mod tests {
         }
         .into_message();
         assert_eq!(s.role, ChatRole::User);
-    }
-
-    // ---- list_provider_models: the gate runs BEFORE the socket -------------
-
-    use std::sync::atomic::AtomicUsize;
-
-    /// A fully-configured, consented, keyed vault — the only state in which a
-    /// listing may reach the provider.
-    fn listing_ready() -> protocol::PrefsView {
-        protocol::PrefsView {
-            ai_enabled: true,
-            developer_mode: true,
-            ai_provider: Some("openrouter".into()),
-            ai_provider_consent: Some("openrouter".into()),
-            ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
-            ..protocol::PrefsView::default()
-        }
-    }
-
-    fn block_on<F: std::future::Future>(f: F) -> F::Output {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("runtime")
-            .block_on(f)
-    }
-
-    /// Every unconfigured state refuses **with the completion path's own
-    /// cause**, and — the part an error-equality assertion cannot reach — the
-    /// fetch is never invoked. The counter is the assertion; the error is a
-    /// bonus. Modelled on `provider_gate::default_off_proof`, in-process
-    /// because no socket needs to exist for the question to be meaningful.
-    #[test]
-    fn a_listing_reaches_nothing_until_all_five_preconditions_hold() {
-        let cases: Vec<(&str, protocol::PrefsView, EngineError)> = vec![
-            (
-                "developer mode off",
-                protocol::PrefsView {
-                    developer_mode: false,
-                    ..listing_ready()
-                },
-                EngineError::FeatureOff,
-            ),
-            (
-                "AI beta off",
-                protocol::PrefsView {
-                    ai_enabled: false,
-                    ..listing_ready()
-                },
-                EngineError::FeatureOff,
-            ),
-            (
-                "no provider selected",
-                protocol::PrefsView {
-                    ai_provider: None,
-                    ..listing_ready()
-                },
-                EngineError::NotReady,
-            ),
-            (
-                "consent for a DIFFERENT provider",
-                protocol::PrefsView {
-                    ai_provider_consent: Some("ollama-cloud".into()),
-                    ..listing_ready()
-                },
-                EngineError::RemoteBarred,
-            ),
-            (
-                "no key",
-                protocol::PrefsView {
-                    ai_provider_key: None,
-                    ..listing_ready()
-                },
-                EngineError::NoCredential,
-            ),
-        ];
-
-        let calls = Arc::new(AtomicUsize::new(0));
-        for (what, prefs, expected) in &cases {
-            let seen = Arc::clone(&calls);
-            let got = block_on(list_models_gated(
-                prefs,
-                prefs.developer_mode,
-                move |_, _| {
-                    seen.fetch_add(1, Ordering::SeqCst);
-                    Ok(Vec::new())
-                },
-            ))
-            .err();
-            assert_eq!(got, Some(*expected), "{what}");
-        }
-        assert_eq!(
-            calls.load(Ordering::SeqCst),
-            0,
-            "an unconfigured listing must reach the provider ZERO times",
-        );
-
-        // The control arm. Without it the zero above is compatible with a
-        // closure that could never be called at all — the same reason
-        // `rustls_transport.rs`'s probe insists on one.
-        let seen = Arc::clone(&calls);
-        let models = block_on(list_models_gated(&listing_ready(), true, move |p, key| {
-            seen.fetch_add(1, Ordering::SeqCst);
-            assert_eq!(key, "sk-test", "the gate hands the stored credential over");
-            assert_eq!(p.models_path(), "/api/v1/models");
-            Ok(br#"{"data":[{"id":"meta-llama/llama-3.1-8b"},{"id":"qwen/qwen3-30b"}]}"#.to_vec())
-        }))
-        .expect("a configured listing succeeds");
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
-        assert_eq!(
-            models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
-            ["meta-llama/llama-3.1-8b", "qwen/qwen3-30b"]
-        );
-        // Neither entry published an `architecture`, so both arrive usable —
-        // the fail-open direction, asserted here as well as in the codec's own
-        // tests because this is the path the panel actually reads.
-        assert!(models.iter().all(|m| m.text_capable));
-    }
-
-    /// A transport failure arrives as the taxonomy the panel already renders,
-    /// not as a generic error — the chooser distinguishes "your key is wrong"
-    /// from "the provider is down" using the same arms the chat surface does.
-    #[test]
-    fn a_listing_failure_maps_onto_the_shared_taxonomy() {
-        use super::super::provider_transport::ProviderTransportError as T;
-        for (transport_err, expected) in [
-            (T::Unauthorized, EngineError::Unauthorized),
-            (T::QuotaExhausted, EngineError::QuotaExhausted),
-            (T::Unreachable, EngineError::Unreachable),
-        ] {
-            let got = block_on(list_models_gated(&listing_ready(), true, move |_, _| {
-                Err(transport_err)
-            }))
-            .err();
-            assert_eq!(got, Some(expected));
-        }
-    }
-
-    /// A provider that answers with something unparseable is a failure, never
-    /// an empty list: an empty chooser reads as "this provider has no models",
-    /// which is a different and wrong thing to tell the user.
-    #[test]
-    fn an_unparseable_listing_is_a_failure_not_an_empty_list() {
-        let got = block_on(list_models_gated(&listing_ready(), true, |_, _| {
-            Ok(b"<html>not json</html>".to_vec())
-        }));
-        assert_eq!(got.err(), Some(EngineError::InferenceFailed));
     }
 }

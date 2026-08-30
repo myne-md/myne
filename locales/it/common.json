@@ -49,7 +49,8 @@
       "unsupportedDetail": "Ha superato {{passes}} verifiche su {{attempts}}; ne servono {{required}}.",
       "checking": "Verifica del modello…",
       "checkingAt": "Verifica del modello… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Quella soglia di superamento non è ancora stata misurata su più modelli, quindi potrebbe essere più severa o più permissiva del dovuto."
+      "unsupportedProvisional": "Quella soglia di superamento non è ancora stata misurata su più modelli, quindi potrebbe essere più severa o più permissiva del dovuto.",
+      "scopeNone": "nessuna nota aperta, quindi non c'è ancora nulla su cui lavorare"
     },
     "progress": {
       "working": "In esecuzione",
@@ -68,7 +69,8 @@
       "grantsUser_other": "{{count}} ambiti impostati da te",
       "grantsModel_one": "{{count}} richiesto dall'agente",
       "grantsModel_many": "{{count}} richiesti dall'agente",
-      "grantsModel_other": "{{count}} richiesti dall'agente"
+      "grantsModel_other": "{{count}} richiesti dall'agente",
+      "cancelledBackground": "L'esecuzione è stata annullata perché Myne è passata in secondo piano. Non è stato scritto nulla. Richiedi quando vuoi."
     },
     "scope": {
       "title": "Includere {{folder}}?",
@@ -169,7 +171,9 @@
       "failed_other": "Impossibile ripristinare {{count}} note.",
       "createdNotReverted_one": "{{count}} nota creata dall'esecuzione è stata lasciata al suo posto.",
       "createdNotReverted_many": "{{count}} note create dall'esecuzione sono state lasciate al loro posto.",
-      "createdNotReverted_other": "{{count}} note create dall'esecuzione sono state lasciate al loro posto."
+      "createdNotReverted_other": "{{count}} note create dall'esecuzione sono state lasciate al loro posto.",
+      "sessionOnly": "Questo annullamento con un tocco dura finché non blocchi la cassaforte o chiudi l'app. Dopo, ripristina le note una alla volta dalla cronologia delle versioni di una nota.",
+      "sessionOnlyLink": "Apri cronologia versioni"
     }
   },
   "ai": {
@@ -3053,7 +3057,8 @@
         "title": "Prima che Myne invii qualcosa a {{provider}}",
         "whatLabel": "Cosa esce dal tuo dispositivo",
         "whenLabel": "Quando esce",
-        "whoLabel": "Chi lo riceve"
+        "whoLabel": "Chi lo riceve",
+        "connectionLabel": "Come viaggia"
       },
       "disclosureToggle": "Come funziona?",
       "enableHelper": "Esegue un modello fornito da te. Dove viene eseguito, e se le tue note escono da questo dispositivo, dipende dal provider che indichi qui sotto. Sperimentale, disattivato per impostazione predefinita.",
@@ -3087,7 +3092,9 @@
         "refused": "Il provider ha rifiutato la connessione. Potrebbe non essere attivo o bloccare questa rete.",
         "timeout": "Il provider non ha risposto in tempo. Non è rimasto nulla in esecuzione.",
         "unauthorized": "Il provider ha rifiutato la tua chiave API. Sostituiscila: potrebbe essere errata, revocata o di un altro account.",
-        "unreachable": "Impossibile raggiungere il provider. Controlla la tua connessione di rete."
+        "unreachable": "Impossibile raggiungere il provider. Controlla la tua connessione di rete.",
+        "featureOff": "L'IA è disattivata su questo dispositivo. Non è stato inviato nulla. Attivala in Impostazioni, sezione IA.",
+        "consentMissing": "Non hai acconsentito a inviare note a questo fornitore da questo dispositivo. Non è stato inviato nulla. Scegli di nuovo il fornitore in Impostazioni, sezione IA, e leggi cosa verrà inviato."
       },
       "modelChoose": "Scegli file…",
       "modelEmbeddingLabel": "Modello di ricerca: ricerca semantica e domande e risposte",
@@ -3130,7 +3137,14 @@
       "recommendedFilesGeneration": "Richiede il file .gguf + tokenizer.json nella stessa cartella.",
       "recommendedFilesTranscription": "Richiede il file .gguf di Whisper + config.json + tokenizer.json nella stessa cartella.",
       "title": "AI",
-      "providerModelCount_many": "{{count}} modelli disponibili."
+      "providerModelCount_many": "{{count}} modelli disponibili.",
+      "mobileEnableLabel": "Usa l'IA su questo telefono",
+      "mobileEnableHelper": "Disattivato per impostazione predefinita. Myne non esegue alcun modello su un telefono, quindi ogni richiesta va a un servizio che indichi qui sotto, e le tue note lasciano questo dispositivo.",
+      "mobileKeyAdd": "Salva chiave",
+      "mobileKeyReplace": "Sostituisci chiave",
+      "mobileRevokeHelper": "Rimuove insieme il fornitore, la sua chiave e l'approvazione di questo telefono, lasciando esattamente lo stato di non averlo mai configurato. Gli altri dispositivi continuano a funzionare finché non lo rimuovi anche lì.",
+      "mobileApproveLabel": "Approva l'invio su questo telefono",
+      "mobileApproveHelper": "Il fornitore e la sua chiave provengono da un altro dispositivo. Da questo telefono non viene inviato nulla finché non leggi cosa verrà inviato e lo approvi qui."
     },
     "network": {
       "disabledCue": "La sincronizzazione non passa più attraverso Tor. Le nuove connessioni vanno direttamente al server di sincronizzazione.",

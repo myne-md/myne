@@ -52,7 +52,10 @@
 pub mod adapters;
 pub mod commands;
 
-pub use commands::AgentSessionState;
+// The session table moved to `myne-core` with the host-generic half of the
+// command surface (myne-md/myne#456). Re-exported from the path `lib.rs` and the
+// teardown already name, so the move stays invisible to them.
+pub use myne_core::plugins::agent::host_commands::AgentSessionState;
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{Manager, Runtime};

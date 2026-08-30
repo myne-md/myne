@@ -37,8 +37,6 @@
 
 pub mod audio;
 pub mod cancel;
-pub mod cancellable_io;
-pub mod chatml;
 pub mod chunker;
 pub mod commands;
 pub mod compute_priority;
@@ -49,21 +47,43 @@ pub mod compute_priority;
 mod compute_priority_integration;
 pub mod embeddings_persist;
 pub mod endpoint_config;
-pub mod engine;
 pub mod engine_candle;
 pub mod engine_ollama;
-pub mod error;
 pub mod hydrate;
 pub mod indexing;
 pub mod model_store;
-pub mod provider_gate;
-pub mod provider_registry;
-pub mod provider_transport;
 pub mod rag;
 pub mod retrieval;
-pub mod state;
 pub mod vector_store;
 pub mod whisper;
+
+// The inference seam moved to `myne-core` (myne-md/myne#456): the `Engine`
+// trait, the error type, the ChatML sanitizer, the cancellable-IO wrapper, the
+// backend registry with its ambient-versus-remote refusal, and the whole
+// remote-provider arm. What stays above is the LOCAL half, the Candle engine,
+// the Ollama loopback engine, retrieval, the vector store, the model store:
+// plus this plugin's Tauri surface.
+//
+// Re-exported as modules rather than as a flat list of items so every existing
+// `super::engine::…` / `super::state::…` path in this tree keeps resolving. The
+// alternative, rewriting several hundred call sites to `myne_core::inference::`,
+// would have buried the actual move in noise and made the diff unreviewable for
+// the one property this change has to demonstrate: that desktop behaviour is
+// unchanged.
+//
+// These are behind `myne-core/remote-ai`, which this crate's `local-inference`
+// feature turns on, so the whole set is absent from the auditable
+// `--no-default-features` build exactly as it was when the files lived here.
+// `provider_gate` is re-exported with no in-crate reader today: the gate is
+// called from `myne-core`'s own command half now, and this crate names only the
+// registry and the transport. Kept because callers in this tree have
+// historically reached for the whole set together, and a re-export list that
+// tracks today's call sites is a list that churns.
+#[allow(unused_imports)]
+pub use myne_core::inference::{
+    cancellable_io, chatml, engine, error, provider_gate, provider_registry, provider_transport,
+    state,
+};
 
 // Sibling-facing API (AI capability features, tasks 3–7): the stable
 // `local_inference::{Engine, StubEngine, EngineError}` path — siblings reach
@@ -412,52 +432,21 @@ fn prefs_reader<R: Runtime>(app: tauri::AppHandle<R>) -> state::PrefsReader {
             )
             .await
             .ok()?;
-            let developer_mode = prefs.developer_mode;
             // Stamp the vault this was read from (myne-md/myne#437) — the seam
             // refuses to route remote unless it still matches the unlocked one.
             Some(state::PrefsSnapshot {
                 prefs,
-                developer_mode,
                 vault_id: vault.active_vault_id().await,
             })
         })
     })
 }
 
-/// The remote arm, as a registered backend.
-///
-/// **Registration is not selection.** This is always in the registry — it costs
-/// nothing to carry, it opens no socket by existing, and it cannot be reached
-/// unless `LocalInferenceState::active` finds all five of task 9's
-/// preconditions plus a chosen model in the preferences. Building it lazily on
-/// the first authorized request would mean the registry did not describe what
-/// the app can do, which is the one thing a registry is for — and the
-/// capability report reads that registry.
-///
-/// It reads the SAME snapshot cell the selection consulted, so the engine and
-/// the seam cannot disagree about what the preferences say.
-///
-/// Not `.serializing_compute()`, for the loopback arm's reason and one of its
-/// own: the work happens on someone else's hardware, and holding Myne's Candle
-/// lock across an internet round trip would block local inference on a network
-/// wait (task 6's criterion).
-pub(crate) fn remote_backend(
-    cell: state::PrefsCell,
-    cancelled: cancellable_io::CancelledFn,
-) -> state::Backend {
-    state::Backend::new(
-        "remote",
-        state::BackendClass::Remote,
-        std::sync::Arc::new(provider_registry::RemoteEngine::new(
-            Box::new(move || {
-                cell.read()
-                    .ok()
-                    .and_then(|s| s.as_ref().map(|s| (s.prefs.clone(), s.developer_mode)))
-            }),
-            cancelled,
-        )),
-    )
-}
+// `remote_backend` moved to `myne-core` with the inference seam
+// (myne-md/myne#456): nothing in it was desktop-specific, and mobile registers
+// the same arm. Re-exported so the call site in `init` and any reader who comes
+// looking for it here still find it.
+pub use myne_core::inference::state::remote_backend;
 
 #[cfg(test)]
 mod resolve_engine_tests {
@@ -765,7 +754,6 @@ mod resolve_engine_tests {
 
         let mut prefs = protocol::PrefsView {
             ai_enabled: true,
-            developer_mode: true,
             ai_provider: Some("openrouter".into()),
             ai_provider_consent: Some("openrouter".into()),
             ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
@@ -775,7 +763,6 @@ mod resolve_engine_tests {
         prefs.ai_provider_model = Some("some/model".into());
         *state.snapshot_cell().write().expect("cell") = Some(PrefsSnapshot {
             prefs,
-            developer_mode: true,
             vault_id: Some(vault),
         });
         assert_eq!(
@@ -1071,14 +1058,12 @@ mod resolve_backends_tests {
                 std::sync::Arc::new(std::sync::RwLock::new(Some(state::PrefsSnapshot {
                     prefs: protocol::PrefsView {
                         ai_enabled: true,
-                        developer_mode: true,
                         ai_provider: Some("openrouter".into()),
                         ai_provider_consent: Some("openrouter".into()),
                         ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
                         ai_provider_model: Some("some/model".into()),
                         ..protocol::PrefsView::default()
                     },
-                    developer_mode: true,
                     vault_id: None,
                 })));
 

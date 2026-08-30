@@ -536,7 +536,10 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     prefs.ai_provider,
     prefs.ai_provider_consent,
     prefs.ai_provider_model,
-    prefs.developer_mode,
+    // `prefs.developer_mode` was in this list until myne-md/myne#456, when it
+    // stopped being a precondition in `provider_gate`. The capability report no
+    // longer moves when it changes, so re-running the effect on it would be a
+    // dependency on a value the answer does not depend on.
     hasKey,
     // `saveAiEndpoint` writes to the device-local model store, not `vault.prefs`,
     // so none of the fields above move when an endpoint is configured. Without

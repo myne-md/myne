@@ -1389,10 +1389,58 @@ async fn sync_prefs_phase(
             read_prefs_nonce,
             "prefs-seed",
         )? {
-            if let Ok(seeded) =
+            if let Ok(mut seeded) =
                 protocol::decode_prefs_blob(&prefs_key, account_number_hash, &remote_bytes)
             {
-                io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
+                // **The two AI fields are withheld from the seed, and they are
+                // the only device-local fields that are** (myne-md/myne#456).
+                //
+                // Adopting the rest verbatim is the recorded design and it is a
+                // good one: a new device inheriting your theme, your editor
+                // settings and your auto-lock timeout is a convenience nobody
+                // has to ask for. A CONSENT is not a convenience. Inheriting it
+                // means a device begins sending note plaintext to a third party
+                // with nobody at that device having seen the screen that says
+                // so, which is exactly what `docs/threat-model.md` TB13 names
+                // as the crossing condition.
+                //
+                // Reclassifying the field to `DeviceLocal` (entry 0542) was
+                // necessary and NOT sufficient: the classification is consumed
+                // by `merge_prefs`, and a just-joined device never merges. It
+                // has no local blob, so it takes this branch instead and the
+                // whole closure was inert on the one path it was built for. The
+                // `developer_mode` removal in entry 0541 rests on that closure,
+                // which makes this the compensating half of a pair.
+                //
+                // `ai_enabled` goes with it: it is the other half of the gate
+                // 0541's own module doc calls a pair, and a device that
+                // inherited "AI is on" plus an inherited consent plus the synced
+                // key is fully configured to send before anyone has touched it.
+                //
+                // Withheld, not defaulted from the classification table: this is
+                // a narrow, argued carve-out rather than a rule about
+                // device-local fields in general, and writing it as a loop over
+                // `CLASSIFICATION` would silently withhold the next field
+                // somebody classifies device-local for an unrelated reason.
+                seeded.ai_provider_consent = None;
+                seeded.ai_enabled = false;
+                // **The VERSIONED encoder, like every other write in this
+                // function.** The v0.1-only twin compiles, passes every test run
+                // against an unmigrated vault, and stamps the v0.1 magic
+                // unconditionally, so a v0.2 vault would quietly grow a v0.1
+                // prefs blob here. Every decoder is magic-detecting, so nothing
+                // downstream would ever report the hybrid, and enrollment is
+                // exactly the path a migrated vault reaches on a new device.
+                // Caught by scripts/check-version-routing.mjs, which exists for
+                // this failure and nothing else.
+                let seed_bytes = protocol::encode_prefs_blob_versioned(
+                    version,
+                    &prefs_key,
+                    account_number_hash,
+                    &seeded,
+                )
+                .map_err(|_| SyncCycleError::Io)?;
+                io.write(&path, &seed_bytes, crate::vault_io::WriteOpts::default())
                     .await
                     .map_err(|_| SyncCycleError::Io)?;
                 record_blob_baseline(state, &id_hex, &rec);

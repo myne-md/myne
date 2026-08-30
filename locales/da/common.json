@@ -48,7 +48,8 @@
       "unsupportedDetail": "Den bestod {{passes}} af {{attempts}} tjek; der kræves {{required}}.",
       "checking": "Tjekker modellen…",
       "checkingAt": "Tjekker modellen… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Den beståelsesgrænse er endnu ikke målt på tværs af modeller, så den kan være strengere eller mere lempelig, end den bør være."
+      "unsupportedProvisional": "Den beståelsesgrænse er endnu ikke målt på tværs af modeller, så den kan være strengere eller mere lempelig, end den bør være.",
+      "scopeNone": "ingen note åben, så der er endnu ikke noget at arbejde med"
     },
     "progress": {
       "working": "Arbejder",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} omfang, du har angivet",
       "grantsUser_other": "{{count}} omfang, du har angivet",
       "grantsModel_one": "{{count}} den bad om",
-      "grantsModel_other": "{{count}} omfang, den bad om"
+      "grantsModel_other": "{{count}} omfang, den bad om",
+      "cancelledBackground": "Kørslen blev annulleret, fordi Myne gik i baggrunden. Der blev ikke skrevet noget. Spørg igen, når du er klar."
     },
     "scope": {
       "title": "Inkludér {{folder}}?",
@@ -148,7 +150,9 @@
       "failed_one": "{{count}} note kunne ikke gendannes.",
       "failed_other": "{{count}} noter kunne ikke gendannes.",
       "createdNotReverted_one": "{{count}} note, som kørslen oprettede, blev efterladt.",
-      "createdNotReverted_other": "{{count}} noter, som kørslen oprettede, blev efterladt."
+      "createdNotReverted_other": "{{count}} noter, som kørslen oprettede, blev efterladt.",
+      "sessionOnly": "Denne fortryd-med-ét-tryk gælder, indtil du låser boksen eller lukker appen. Derefter gendanner du noter én ad gangen fra en notes versionshistorik.",
+      "sessionOnlyLink": "Åbn versionshistorik"
     }
   },
   "ai": {
@@ -2949,7 +2953,8 @@
         "title": "Før Myne sender noget til {{provider}}",
         "whatLabel": "Hvad der forlader din enhed",
         "whenLabel": "Hvornår det sendes",
-        "whoLabel": "Hvem der modtager det"
+        "whoLabel": "Hvem der modtager det",
+        "connectionLabel": "Hvordan det rejser"
       },
       "disclosureToggle": "Hvordan fungerer det?",
       "enableHelper": "Kører en model, du selv leverer. Hvor den kører, og om dine noter forlader denne enhed, afhænger begge dele af den udbyder, du angiver nedenfor. Eksperimentel, slået fra som standard.",
@@ -2983,7 +2988,9 @@
         "refused": "Udbyderen afviste forbindelsen. Den er måske nede eller blokerer dette netværk.",
         "timeout": "Udbyderen svarede ikke i tide. Intet blev efterladt kørende.",
         "unauthorized": "Udbyderen afviste din API-nøgle. Udskift den: den kan være forkert, tilbagekaldt eller høre til en anden konto.",
-        "unreachable": "Kunne ikke nå udbyderen. Tjek din netværksforbindelse."
+        "unreachable": "Kunne ikke nå udbyderen. Tjek din netværksforbindelse.",
+        "featureOff": "AI er slået fra på denne enhed. Der blev ikke sendt noget. Slå det til under Indstillinger, i AI.",
+        "consentMissing": "Du har ikke accepteret at sende noter til denne udbyder fra denne enhed. Der blev ikke sendt noget. Vælg udbyderen igen under Indstillinger, i AI, og læs, hvad der sendes."
       },
       "modelChoose": "Vælg fil…",
       "modelEmbeddingLabel": "Søgemodel: semantisk søgning og spørgsmål/svar",
@@ -3024,7 +3031,14 @@
       "recommendedFilesEmbedding": "Kræver model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Kræver .gguf-filen + tokenizer.json i samme mappe.",
       "recommendedFilesTranscription": "Kræver Whisper .gguf-filen + config.json + tokenizer.json i samme mappe.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Brug AI på denne telefon",
+      "mobileEnableHelper": "Slået fra som standard. Myne kører ingen model på en telefon, så hver forespørgsel går til en tjeneste, du angiver nedenfor, og dine noter forlader dermed denne enhed.",
+      "mobileKeyAdd": "Gem nøgle",
+      "mobileKeyReplace": "Udskift nøgle",
+      "mobileRevokeHelper": "Fjerner udbyderen, dens nøgle og denne telefons godkendelse på én gang og efterlader præcis den tilstand, hvor der aldrig var sat noget op. Andre enheder fungerer videre, indtil du også fjerner det der.",
+      "mobileApproveLabel": "Godkend afsendelse på denne telefon",
+      "mobileApproveHelper": "Udbyderen og dens nøgle kom fra en anden enhed. Der sendes intet fra denne telefon, før du læser, hvad der sendes, og godkender det her."
     },
     "network": {
       "disabledCue": "Synkronisering sendes ikke længere gennem Tor. Nye forbindelser går direkte til synkroniseringsserveren.",
