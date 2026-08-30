@@ -311,10 +311,41 @@ steps:
   # crate's tests — stay in the first stage and still fail at minute two. This
   # one is a publish-time property, and the trade it makes is explicit: it now
   # surfaces at minute ~15 instead of minute ~4.
+  # ─── This step's run condition belongs to its CONSUMER, not to itself ────────
+  # `web-build` bundles `web/src/worker/worker.ts`, which imports
+  # `../../wasm/pkg/myne_web_wasm.js`. That directory is gitignored, so it is
+  # never in a checkout, and `web:build` does not generate it. This step is the
+  # only thing in the pipeline that populates it, through
+  # `scripts/wasm-repro-check.sh` calling `build-wasm.sh --verify`.
+  #
+  # `web-build` deliberately carries `status: [success, failure]`, because the
+  # A15 compensating controls it runs — the recovery-phrase-absence grep among
+  # them — are worth asking about even on a red pipeline. This step carried a
+  # BARE `when`, whose implicit `status: success` is pipeline-wide rather than
+  # `depends_on`-scoped, and a bare `depends_on` edge that a red
+  # `cargo-test-tauri` also skips. So the consumer ran on red and its producer
+  # did not, and `web-build` died with
+  # `[UNRESOLVED_IMPORT] Could not resolve '../../wasm/pkg/myne_web_wasm.js'`.
+  #
+  # That message is worse than a plain failure: it names a missing dependency,
+  # so it reads as a broken branch rather than as a step that was skipped, and
+  # it MASKS the pipeline's real first failure. Six open PRs were red behind it
+  # at once.
+  #
+  # Both halves have to move together or the hole stays open on the other path.
+  # The optional edge still ORDERS — it only stops requiring that the parent
+  # SUCCEEDED — so the serial chain that keeps two heavy workspace builds off
+  # the same host at once is unchanged. The rule this restores is stated at the
+  # `code-paths` anchor above: a producer and its consumer share a run
+  # condition, and this step was the one place it was not applied.
   wasm-repro:
     image: rust:1.96.0-slim
-    when: *code-paths
-    depends_on: [cargo-test-tauri]
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    depends_on:
+      - name: cargo-test-tauri
+        optional: true
     environment:
       RUSTC_WRAPPER: /cache/bin/sccache
       SCCACHE_DIR: /cache/sccache
