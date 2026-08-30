@@ -110,7 +110,7 @@ Used in: `decisions.md` 2026-08-16
 
 ### **agentic note editing** &nbsp; 📦 *Product*
 
-The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Two verbs, edit a note body and create a note; deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, move, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` or `folder:` line is a rename or a move by the same mechanism trashing is. What bounds those is that each appears in the diff the user approves. Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
+The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Three verbs, edit a note body, append to a note body and create a note (the [append verb](#append-verb) was added by myne-md/myne#616); deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. **Moving a note is the exception, and it is refused rather than merely visible**: the [folder lock](#folder-lock) compares the note's folder before and after every agent write and rejects any that changes it, under both approval labels, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0542`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -127,6 +127,14 @@ Used in: `decisions.md` 2026-08-19
 Kept rather than deleted because the retired names outlived the controls in three places at once: `ai.composer-mode-edit` was driven by every scenario in `e2e/agent-run.e2e.ts` for months after it stopped rendering, which killed that whole suite invisibly, and two comments in `ChatComposer.tsx` still described Edit-mode-only blocks (`decisions.md` 2026-08-28 entry 0538, myne-md/myne#596).
 
 Used in: `decisions.md` 2026-08-19, 2026-08-22 entry 0524, 2026-08-28 entry 0538
+
+### **append verb** &nbsp; 📦 *Product*
+
+The third verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#616): it adds text at the end of a note's body rather than replacing an [edit anchor](#edit-anchor). It exists because there was no way to write into an EMPTY note. An empty anchor is refused, so "add this list to the open note" failed for a structural reason no message explained, and the model answered by asking the user for the list it had just written. Appending to a long note was possible but expensive, since the model had to reproduce the whole tail verbatim as an anchor.
+
+Two rules keep it from becoming a frontmatter writer, and both are about the RESULT rather than the input. The text is positioned after the note's frontmatter block rather than at the end of the raw file, so in a note that has one, appended text can never be the first line. And an append that would give the note a frontmatter block it did not have is refused outright, which closes the case positioning alone does not: a note whose body merely BEGINS with `---` has an opener nothing closed, and an ordinary `---` separator in the appended text would close it and turn the user's own first lines into frontmatter.
+
+Used in: `decisions/ai/0542`
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -913,6 +921,14 @@ A *virtual* organizational container for notes, shown as a nested tree in the si
 
 Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2, `spec/protocol.md` §9.1, §9.5.2; `decisions.md` 2026-05-29
 
+### **folder lock** &nbsp; 📦 *Product*
+
+The host-side rule that no [agent run](#agent-run) write may change which [folder](#folder) a note is in (myne-md/myne#616). It compares the note's `folder:` frontmatter value before and after the write is composed and refuses any write that changes it, under BOTH approval labels, and it is re-derived host-side rather than read from the IPC payload.
+
+The reason it is a refusal rather than a line in the diff: the folder is what `ai_excluded_folders` is keyed on, so a move is the one edit that can change which notes a LATER run may read. A user approving a diff is judging the text in front of them, not re-deriving an exclusion set from it. It covers `folder:` and nothing else, deliberately, because a blanket frontmatter lock would silently withdraw the agent's ability to archive.
+
+Used in: `decisions/ai/0542`, `threat-model.md` §7
+
 ### **folder note** &nbsp; 📦 *Product*
 
 A note designated the **index note** of its [folder](#folder) via the value-strict `folder_index: true` frontmatter flag — the sixth [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field) (`spec/markdown-dialect.md` §3.6.1). The note indexes whichever folder its own `folder:` names; the binding is the boolean alone and carries **no path**, so a folder rename rewrites `folder:` and the binding follows for free (rename drift is structurally impossible). A folder has **exactly one** folder note. It is **hidden from the sidebar folder tree** — no separate row, no pin, no badge — and is opened (or lazily created on first activation) by **double-clicking the folder**; the undesignate inverse lives on the folder's context menu ("Remove folder note"). The hiding is **sidebar-tree-only**: unlike a [note template](#note-template) or a trashed note (hidden everywhere), a folder note stays a fully real, enumerable note in **search, saved views, backlinks, the graph**, and [`[[<folder>/]]`](#folder-target-wikilink) resolution — it is content the user reads, not a hidden skeleton (decisions.md 2026-06-27, supersedes the original "fully visible, pinned, badged" behaviour). Value-strict exactly like `template:`: only the canonical unquoted `true` designates it; `1` / `yes` / `"true"` / absence leave the note ordinary. Owned by the folder-note designate / undesignate actions (`src/notes/folderNote.ts`) only — never written by body autosave; surgery via `patchFolderIndexField`, read via `readFolderIndexFromFmBody`. If two in-folder notes both carry the flag (legacy / imported data only — the UI now prevents a second designation), a deterministic winner is chosen (smallest `note_uuid`) and the rest stay visible, flagged for the user to resolve. Rides the existing `.myn` AEAD envelope — no new magic byte, no AAD / version bump, no on-disk-layout change (within v0.1; forward-incompatible-by-design with a later major version). See also [folder](#folder), [folder-target wikilink](#folder-target-wikilink), [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field). (MYND-370)
@@ -1388,11 +1404,21 @@ Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **conversational AI chat** &nbsp; 📦 *Product*
 
-The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history; a run's task was addressed to a different loop, under a scope this call knows nothing about. History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
+The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history to the ASK model; a run's task was addressed to a different loop, under a scope this call knows nothing about. The reverse direction is not symmetric and changed on 2026-08-30: an [agent run](#agent-run) IS seeded with the visible transcript, under a [chat history budget](#chat-history-budget), so a follow-up can refer to the answer before it (`decisions/ai/0541`). History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
 
 ### **streaming token channel** &nbsp; 📋 *Protocol*
 
 The IPC mechanism that streams a [local-inference](#local-inference) generation's tokens to the WebView as they are produced: a `tauri::ipc::Channel<String>` opened by the `chat_stream` command, each decoded token forwarded through a publish-guarded callback (checked against the shared cancel flag before every send, so a vault-lock mid-stream never emits into a torn-down transcript). It is the SYNC-7 "supersede" the local-ai ledger anticipated — streaming was deferred in the spike and added here for the [conversational AI chat](#conversational-ai-chat) surface. Each token is AS1-class plaintext (never logged, DENY-list). See `decisions.md` 2026-07-04.
+
+### **chat history budget** &nbsp; 📦 *Product*
+
+How many CHARACTERS of the visible [conversational AI chat](#conversational-ai-chat) transcript an [agent run](#agent-run) may be seeded with (myne-md/myne#617). Stored as `chat_history_budget` on `PrefsView`, device-local and never synced, because a bound on how much THIS machine sends to a provider is a property of that machine. Default 3000, clamped at the write to 12000.
+
+A character count rather than a turn count, deliberately: the request is re-sent on every one of up to 24 iterations, so the number is multiplied by the iteration count and, on a remote provider, by characters that leave the device. Three long answers and three short ones are the same turn count and a very different cost. Oldest turns are dropped first, and a turn that alone exceeds the budget is truncated and marked rather than dropped, with a matching system-prompt instruction that a shortened earlier message must never be treated as complete.
+
+Its canonical key sorts after `auto_lock_seconds`, which is a format requirement and not a naming preference: see `protocol.md` §9.5.2 on why a new prefs key inside the prefix-matched run silently blinds every field behind it in an older client.
+
+Used in: `decisions/ai/0541`, `protocol.md` §9.5.2, `threat-model.md` TB12, TB13, §7
 
 ### **chat citation** &nbsp; 📦 *Product*
 
@@ -1750,9 +1776,17 @@ The one-time MAC algorithm by Daniel J. Bernstein, used as the authenticator ins
 
 Used in: `spec/protocol.md` §5.1
 
+### **prompt-cache marker** &nbsp; 📋 *Protocol*
+
+The `cache_control` field Myne attaches to the SYSTEM turn of an OpenRouter request (myne-md/myne#620), asking the provider to cache that prefix. The system turn is the one span byte-identical across every iteration of a run, which is what makes it worth caching; no other turn carries one, and a test pins that, because a marker on a user or assistant turn would be asking the provider to retain note content as a cache prefix.
+
+**A posture change rather than a boundary change.** A17 puts the provider operator's retention outside anything this threat model constrains, so the same bytes reach the same party either way. What is new is that Myne is now ASKING for retention rather than merely accepting whatever happens, and that is the part a reader deciding whether to trust the feature would want on the record. Ollama receives no marker: it serves the model directly and models no prefix cache.
+
+Used in: `decisions/ai/0543`, `threat-model.md` TB13
+
 ### **proposed edit** &nbsp; 📦 *Product*
 
-One anchored change an [agent run](#agent-run) suggests to a note body: an [edit anchor](#edit-anchor) plus the text that replaces it. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
+One change an [agent run](#agent-run) suggests to a note body. It comes in two kinds. A REPLACE carries an [edit anchor](#edit-anchor) plus the text that replaces it. An APPEND carries no anchor at all, because there is nothing to anchor to: it adds text at the end of the body, which is the only shape that can write into an empty note (see [append verb](#append-verb)). One kind field on one list, rather than a second list, so every check that already runs over proposed edits keeps running over both by construction. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -2608,6 +2642,14 @@ The vocabulary is also not the readability gate: the WCAG floors apply to the co
 Distinguish it from the **value-shape allowlist**, which is a security control over what a value may *look like* and is deliberately narrow (`threat-model.md` "Custom-theme CSS-value surface"). The vocabulary says which keys mean something; the allowlist says which values may exist at all. Widening the first has never required widening the second.
 
 Used in: `decisions.md` 2026-08-06; `spec/protocol.md` §9.21
+
+### **throughput routing preference** &nbsp; 📋 *Protocol*
+
+The `provider.sort = throughput` field on every OpenRouter request (myne-md/myne#620), including ordinary chat as well as [agent runs](#agent-run). OpenRouter is a broker that forwards to model vendors, so "who receives this" is a set Myne can bound only at its first hop; the `provider` object is the one surface Myne has over the second hop, and this is Myne starting to use it.
+
+**The criterion expressed is speed, and no data-handling term is expressed at all.** Myne is not selecting vendors on retention, jurisdiction or training policy, because the broker's routing object does not express those and Myne makes no claim it cannot check. What it buys is measured (a run served at 9 to 22 tokens per second where 150 would have been 63 seconds instead of 792); what it costs is that the set of possible recipients is now influenced by Myne rather than left to the broker's default.
+
+Used in: `decisions/ai/0543`, `threat-model.md` TB13
 
 ### **threat model** &nbsp; ⚠️ *Threat*
 

@@ -440,6 +440,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         item_order,
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
+        // Device-local for the reason the classification table gives: a bound
+        // on how much THIS machine sends to a provider. The local value always
+        // survives the merge.
+        chat_history_budget: local.chat_history_budget,
         ai_enabled: local.ai_enabled,
         // MYND-441: device-local like `ai_enabled`, and for the same reason —
         // battery and thermal capacity differ per device, so turning OCR off on

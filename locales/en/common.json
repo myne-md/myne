@@ -118,13 +118,17 @@
         "excludedFolder": "Not created: that folder is excluded from AI.",
         "createFailed": "Not created: writing the new note failed. The other changes were still applied.",
         "excludedNow": "Could not be applied: that note's folder is now excluded from AI.",
-        "notProposed": "Could not be applied: that change is not part of this run's proposal."
+        "notProposed": "Could not be applied: that change is not part of this run's proposal.",
+        "noteMoved": "Could not be applied: that change would move the note to another folder.",
+        "appendEmpty": "Could not be applied: there was nothing to add.",
+        "appendWouldWriteFrontmatter": "Could not be applied: that text would have become the note's properties block."
       },
       "applyFailed": "The changes could not be applied.",
       "undo": "Undo this run",
       "undoFailed": "The run could not be undone.",
       "undoReport": "{{reverted}} notes restored. {{kept}} notes the run created were left in place.",
       "alreadyApplied": "Applied",
+      "appendFlag": "adds to the end",
       "untitledNote": "Untitled note",
       "vaultRoot": "Vault root",
       "newNotesHeading_one": "{{count}} new note",
@@ -2916,6 +2920,8 @@
     },
     "ai": {
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
+      "historyBudgetLabel": "Conversation carried into each request",
       "autoTagLabel": "Suggest tags automatically",
       "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one. The switch turns on by itself in a build that includes it.",
       "consent": {
@@ -3245,6 +3251,7 @@
       "resultsLabel": "Search results",
       "keywords": {
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
+        "aiHistoryBudget": "conversation history context memory budget characters agent chat carried request",
         "aiEndpoint": "ollama endpoint address local runtime model server port loopback",
         "aiProvider": "provider remote cloud openrouter ollama cloud api key credential consent send notes",
         "aiProviderModel": "model catalogue list which model llama qwen gpt choose model remote provider",

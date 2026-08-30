@@ -452,11 +452,51 @@ export function failAgentTurn(message: string): void {
  *  the run epoch so any in-flight stream can no longer mutate the transcript. */
 export function clearChat(): void {
   runEpoch += 1;
+  // Nothing left to block: the turns the cut was protecting are gone, and a
+  // stale set would silently suppress seeding for turns that do not exist.
+  seedBlocked = new Set();
   dispatchChat({ type: "CLEARED" });
+}
+
+/** Turn ids that may no longer be seeded into a run.
+ *
+ *  **The exclusion set is a control the user TIGHTENS, and SYNC-14 carries no
+ *  in-flight carve-out.** `apply.rs` states that rule for writes: an exclusion
+ *  added while a run is open or a review is pending takes effect at once, and
+ *  the newest answer decides. Seeding is the same question one door over. An
+ *  agent turn's summary is model prose derived from notes it read, so once the
+ *  user excludes a folder, re-sending a summary derived from it on every
+ *  iteration of every later run is the egress that exclusion was performed to
+ *  stop.
+ *
+ *  The seed cannot be filtered per note, because a turn carries text and no
+ *  provenance: nothing records which notes produced which sentence. So the cut
+ *  is by TIME, which is the conservative reading, and it is a cut rather than a
+ *  `clearChat` so the user keeps the conversation on screen. What they lose is
+ *  the model's memory of it, which is exactly what they asked for.
+ *
+ *  A Set of ids rather than an index, because `replaceLast` keeps turn identity
+ *  and a positional cut would slide under a streaming turn. */
+let seedBlocked: ReadonlySet<string> = new Set();
+
+/** Stop every turn currently in the transcript from being seeded into a run.
+ *
+ *  Called when `ai_excluded_folders` changes. Idempotent, and deliberately not
+ *  tied to whether the change widened or narrowed the set: a folder LEAVING the
+ *  set does not un-derive the summaries, and reasoning about which direction is
+ *  safe is exactly the kind of thing that is wrong once and then stays wrong. */
+export function blockSeedingOfExistingTurns(): void {
+  seedBlocked = new Set(current.turns.map((t) => t.id));
+}
+
+/** Whether this turn may still be seeded into a new run. */
+export function isSeedable(turnId: string): boolean {
+  return !seedBlocked.has(turnId);
 }
 
 /** Test-only reset so the module store doesn't leak across tests. */
 export function __resetChatForTest(): void {
+  seedBlocked = new Set();
   current = CHAT_INITIAL;
   listeners.clear();
   turnSeq = 0;

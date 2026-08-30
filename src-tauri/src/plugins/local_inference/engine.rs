@@ -74,6 +74,25 @@ fn flatten_chat_to_prompt(system: &str, messages: &[ChatMessage]) -> String {
     s
 }
 
+/// One agent reply, plus whether the provider says it was cut off.
+///
+/// The bool exists because the token ceiling this branch introduced creates a
+/// failure mode it also has to answer for: a reply stopped at the ceiling is
+/// usually broken JSON, so it parses to zero actions, and the loop's generic
+/// "No valid action found" tells the model to fix a format error it did not
+/// make while a barren strike is spent. Carrying the reason up is what lets the
+/// loop say the true thing instead.
+#[derive(Debug, Clone)]
+pub struct AgentReply {
+    /// What the model said, as far as it got.
+    pub text: String,
+    /// True only when the provider itself reported a length stop. Never
+    /// inferred from the text: a reply can be short because the answer was
+    /// short, and guessing would tell a model that answered correctly to answer
+    /// more briefly.
+    pub truncated: bool,
+}
+
 /// On-device inference surface (SYNC-7): a blocking `infer(prompt) -> result`
 /// and `embed(text) -> vector`. No streaming (SYNC-7). Implementors must be
 /// `Send + Sync` so a single engine instance can back concurrent commands
@@ -149,6 +168,31 @@ pub trait Engine: Send + Sync {
         _cancelled: &CancelledFn,
     ) -> Result<String, EngineError> {
         self.chat_streaming(system, messages, on_token)
+    }
+
+    /// The agent loop's request, which may carry a generation ceiling.
+    ///
+    /// **A separate method rather than a parameter on the arm above**, so that
+    /// "this request is the agent's" is visible at the call site rather than
+    /// inferred from an argument, and so that an engine with no ceiling to
+    /// impose inherits the default and changes nothing. Only `RemoteEngine`
+    /// overrides it: a local model's ceiling is the machine's, and the stub has
+    /// no generation to bound.
+    fn chat_agent_cancellable(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
+        cancelled: &CancelledFn,
+    ) -> Result<AgentReply, EngineError> {
+        // `truncated: false` is a claim, not a placeholder: this arm imposes no
+        // ceiling, so nothing here can cut a reply off. An engine that grows one
+        // owes this method an override rather than a `false` it inherited.
+        self.chat_streaming_cancellable(system, messages, on_token, cancelled)
+            .map(|text| AgentReply {
+                text,
+                truncated: false,
+            })
     }
 
     /// Embedding vector for `text`. Real models return a fixed dimensionality
@@ -764,6 +808,28 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
         ));
     }
 
+    // An append, which is the only verb that can write into an EMPTY note.
+    //
+    // **Checked before the general read_note branch, and it has to be.** That
+    // branch derives its anchors from the body with `unique_body_lines`, so on a
+    // note with no body it finds none and returns `None`: the stub falls silent
+    // and the scenario times out on a review screen that was never coming. An
+    // append needs nothing from the body, which is the property under test.
+    //
+    // Keyed off the task text like its two siblings above, so the scenario asks
+    // for what it needs in the sentence a user would type.
+    if task.contains("append") && last_assistant.contains("\"action\":\"read_note\"") {
+        let id = last_assistant
+            .split("\"note_id\":\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())?;
+        return Some(format!(
+            "{{\"action\":\"append_to_note\",\"note_id\":\"{id}\",\
+             \"text\":\"appended by the stub\"}}\n\
+             {{\"action\":\"finish\",\"summary\":\"stub append run\"}}"
+        ));
+    }
+
     // Step 3: the previous turn asked to read a note, so this user turn is the
     // body. Checked before step 2 so each check stays a simple containment.
     if last_assistant.contains("\"action\":\"read_note\"") {
@@ -1349,7 +1415,7 @@ mod agent_script_tests {
     fn ask(messages: &[ChatMessage]) -> String {
         let mut sink = |_: &str| ControlFlow::Continue(());
         StubEngine
-            .chat_streaming(&system_instructions(), messages, &mut sink)
+            .chat_streaming(&system_instructions(None), messages, &mut sink)
             .expect("the stub answers")
     }
 
@@ -1397,6 +1463,7 @@ mod agent_script_tests {
                     .chat_streaming(&system, &messages, &mut sink)
                     .map_err(|_| AgentError::ReadFailed)?;
                 Ok(AgentCompletion {
+                    truncated: false,
                     reply,
                     chars_off_device: None,
                 })
@@ -1626,7 +1693,7 @@ mod agent_script_tests {
 
     #[test]
     fn the_plain_echo_could_never_have_driven_a_run() {
-        let echo = format!("stub-infer: {}", system_instructions());
+        let echo = format!("stub-infer: {}", system_instructions(None));
         let actions = parse_actions(&echo);
         assert!(
             actions.len() > 1,
@@ -1659,7 +1726,7 @@ mod agent_script_tests {
     #[test]
     fn infer_is_a_pure_echo_again() {
         // The agent no longer reaches `infer`, so it carries no agent branch.
-        let out = StubEngine.infer(&system_instructions()).unwrap();
+        let out = StubEngine.infer(&system_instructions(None)).unwrap();
         assert!(out.starts_with("stub-infer: "), "got: {}", &out[..40]);
     }
 

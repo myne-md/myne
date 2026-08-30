@@ -2320,6 +2320,88 @@ pub(crate) async fn set_attachment_ocr_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for `chat_history_budget` (myne-md/myne#617):
+/// how many characters of visible chat history an agent run may be seeded with.
+///
+/// **The clamp is HERE, at the write, and that placement is the control.**
+/// `MAX_HISTORY_BUDGET` bounds how much of the user's plaintext one run can
+/// send to a provider, multiplied by the loop's iteration ceiling, and TB13
+/// records that no other per-run volume cap exists. A bound applied in the
+/// settings input instead would be a host-side rule whose trigger came from the
+/// caller, which is the exact shape `apply.rs` already learned about itself: one
+/// field away from off. Any path that reaches this command gets the same
+/// ceiling, including one that never rendered a control.
+///
+/// `None` clears the override and returns the host to its own default.
+pub async fn set_chat_history_budget_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    budget: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_chat_history_budget_with_dir(&dir, state, hooks, budget, io, host).await
+}
+
+/// IPC wrapper. Delegates; this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_chat_history_budget<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    budget: Option<u32>,
+) -> Result<(), PrefsWriteError> {
+    set_chat_history_budget_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        budget,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_chat_history_budget`].
+pub(crate) async fn set_chat_history_budget_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    budget: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let clamped = budget.map(|b| b.min(crate::plugins::agent::history::MAX_HISTORY_BUDGET as u32));
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.chat_history_budget = clamped;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // The VALUE is a bound the user chose, not content, so it is safe to log
+    // and useful when a run's cost is being read back.
+    //
+    // `value = clamped`, matching `set_reminder_horizon_days` rather than
+    // inventing a field name, and carrying the `Option` rather than flattening
+    // it: `unwrap_or(0)` made "unset" and an explicit zero log identically, and
+    // zero is a real distinct choice here ("seed nothing") rather than an
+    // absence.
+    tracing::info!(
+        event = "prefs_written",
+        field = "chat_history_budget",
+        value = ?clamped
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `developer_mode` toggle (MYND-593,
 /// `developer-mode` feature task 3) — the gate the AI opt-in and the local-model
 /// override pickers sit behind. Read-modify-write under the per-plugin write
@@ -6013,6 +6095,7 @@ mod tests {
                     item_order: Default::default(),
                     keymap: Default::default(),
                     active_workspace: None,
+                    chat_history_budget: None,
                     archive_disabled: None,
                     archived_folders: Vec::new(),
                     editor_layout: None,
@@ -6455,6 +6538,88 @@ mod tests {
     }
 
     // ---- Developer mode setter (developer-mode, MYND-593) -------------
+
+    /// **The clamp is the control, so it is asserted through the COMMAND, not
+    /// through a helper** (myne-md/myne#617). This number bounds how much of the
+    /// user's plaintext one agent run sends to a provider, multiplied by the
+    /// loop's iteration ceiling, and TB13 records that no other per-run volume
+    /// cap exists. A test that called a clamping function directly would prove
+    /// the function clamps and say nothing about whether the write path uses it,
+    /// which is exactly the gap between a host-side rule and a host-side rule
+    /// whose trigger came from the caller.
+    #[test]
+    fn chat_history_budget_is_clamped_at_the_write_not_in_the_ui() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x53).await;
+            let io = crate::vault_io::StdVaultIo;
+            let max = crate::plugins::agent::history::MAX_HISTORY_BUDGET as u32;
+
+            // Unset by default: the host applies its own, and the field is
+            // omitted from the blob entirely.
+            let base = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(base.chat_history_budget, None);
+
+            // A value over the ceiling is STORED at the ceiling. Read back from
+            // disk rather than trusted from the return value: a host that
+            // reported success and wrote the raw number would pass a
+            // return-value assertion.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(max + 50_000),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let over = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(
+                over.chat_history_budget,
+                Some(max),
+                "an over-ceiling budget must be stored at the ceiling, not as sent"
+            );
+
+            // An ordinary value survives unchanged, which is the direction that
+            // would make the clamp a bug rather than a bound.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(1_500),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let ordinary = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(ordinary.chat_history_budget, Some(1_500));
+
+            // And `None` clears the override rather than storing a zero: unset
+            // and "seed nothing" are different states, and only one of them is
+            // the default.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                None,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(cleared.chat_history_budget, None);
+        });
+    }
 
     #[test]
     fn developer_mode_persist_and_reload_round_trip() {

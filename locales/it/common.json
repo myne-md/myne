@@ -130,13 +130,17 @@
         "excludedFolder": "Non creata: quella cartella è esclusa dall'AI.",
         "createFailed": "Non creata: la scrittura della nuova nota non è riuscita. Le altre modifiche sono state comunque applicate.",
         "excludedNow": "Impossibile applicare: la cartella di quella nota è ora esclusa dall'AI.",
-        "notProposed": "Impossibile applicare: quella modifica non fa parte della proposta di questa esecuzione."
+        "notProposed": "Impossibile applicare: quella modifica non fa parte della proposta di questa esecuzione.",
+        "noteMoved": "Impossibile applicare: quella modifica sposterebbe la nota in un'altra cartella.",
+        "appendEmpty": "Impossibile applicare: non c'era nulla da aggiungere.",
+        "appendWouldWriteFrontmatter": "Impossibile applicare: quel testo sarebbe diventato il blocco delle proprietà della nota."
       },
       "applyFailed": "Non è stato possibile applicare le modifiche.",
       "undo": "Annulla questa esecuzione",
       "undoFailed": "Non è stato possibile annullare l'esecuzione.",
       "undoReport": "{{reverted}} note ripristinate. {{kept}} note create dall'esecuzione sono state lasciate al loro posto.",
       "alreadyApplied": "Applicata",
+      "appendFlag": "aggiunge alla fine",
       "untitledNote": "Nota senza titolo",
       "vaultRoot": "Radice della cassaforte",
       "newNotesHeading_one": "{{count}} nuova nota",
@@ -3130,7 +3134,9 @@
       "recommendedFilesGeneration": "Richiede il file .gguf + tokenizer.json nella stessa cartella.",
       "recommendedFilesTranscription": "Richiede il file .gguf di Whisper + config.json + tokenizer.json nella stessa cartella.",
       "title": "AI",
-      "providerModelCount_many": "{{count}} modelli disponibili."
+      "providerModelCount_many": "{{count}} modelli disponibili.",
+      "historyBudgetHelper": "Quanta parte della conversazione recente porta ogni richiesta, in caratteri. Lascia vuoto per il valore predefinito. Un numero maggiore permette all'IA di seguire conversazioni più lunghe e ne invia di più: con un provider che non è su questo dispositivo, significa più tuo testo che lo lascia, a ogni passo di un'esecuzione.",
+      "historyBudgetLabel": "Conversazione inviata a ogni richiesta"
     },
     "network": {
       "disabledCue": "La sincronizzazione non passa più attraverso Tor. Le nuove connessioni vanno direttamente al server di sincronizzazione.",
@@ -3447,7 +3453,8 @@
         "viewMode": "modalità visualizzazione predefinita live lettura sorgente anteprima view mode",
         "dateFormat": "formato data giorno mese anno iso gg/mm mm/gg dd/mm calendario date format calendar",
         "timeFormat": "formato ora orario 24 ore 12 ore orologio am pm time format clock",
-        "timezone": "fuso orario fusi tz utc iana regione oggi timezone time zone"
+        "timezone": "fuso orario fusi tz utc iana regione oggi timezone time zone",
+        "aiHistoryBudget": "conversazione cronologia contesto memoria budget caratteri agente chat richiesta"
       }
     },
     "dateTime": {

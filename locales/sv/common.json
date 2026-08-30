@@ -118,13 +118,17 @@
         "excludedFolder": "Skapades inte: den mappen är undantagen från AI.",
         "createFailed": "Skapades inte: det gick inte att skriva den nya anteckningen. De andra ändringarna tillämpades ändå.",
         "excludedNow": "Kunde inte tillämpas: anteckningens mapp är nu undantagen från AI.",
-        "notProposed": "Kunde inte tillämpas: den ändringen ingår inte i den här körningens förslag."
+        "notProposed": "Kunde inte tillämpas: den ändringen ingår inte i den här körningens förslag.",
+        "noteMoved": "Kunde inte tillämpas: den ändringen skulle flytta anteckningen till en annan mapp.",
+        "appendEmpty": "Kunde inte tillämpas: det fanns inget att lägga till.",
+        "appendWouldWriteFrontmatter": "Kunde inte tillämpas: den texten skulle ha blivit anteckningens egenskapsblock."
       },
       "applyFailed": "Ändringarna kunde inte tillämpas.",
       "undo": "Ångra den här körningen",
       "undoFailed": "Körningen kunde inte ångras.",
       "undoReport": "{{reverted}} anteckningar återställdes. {{kept}} anteckningar som körningen skapade lämnades kvar.",
       "alreadyApplied": "Tillämpad",
+      "appendFlag": "läggs till i slutet",
       "untitledNote": "Namnlös anteckning",
       "vaultRoot": "Valvets rot",
       "newNotesHeading_one": "{{count}} ny anteckning",
@@ -3024,7 +3028,9 @@
       "recommendedFilesEmbedding": "Behöver model.safetensors + config.json + tokenizer.json i en och samma mapp.",
       "recommendedFilesGeneration": "Behöver .gguf-filen + tokenizer.json i samma mapp.",
       "recommendedFilesTranscription": "Behöver .gguf-filen för Whisper + config.json + tokenizer.json i samma mapp.",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "Hur mycket av den senaste konversationen varje förfrågan bär med sig, i tecken. Lämna tomt för standardvärdet. Ett större tal låter AI:n följa längre konversationer och skickar mer av dem: hos en leverantör som inte finns på den här enheten innebär det mer av din text som lämnar den, vid varje steg i en körning.",
+      "historyBudgetLabel": "Konversation som skickas med varje förfrågan"
     },
     "network": {
       "disabledCue": "Synkroniseringen går inte längre via Tor. Nya anslutningar går direkt till synkservern.",
@@ -3337,7 +3343,8 @@
         "viewMode": "standardvisningsläge visningsläge direkt läsning källa förhandsgranskning view mode",
         "dateFormat": "datumformat datum dag månad år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat tid 24-timmars 12-timmars klocka am pm time format 24 hour 12 hour",
-        "timezone": "tidszon zon tz utc iana region idag timezone time zone"
+        "timezone": "tidszon zon tz utc iana region idag timezone time zone",
+        "aiHistoryBudget": "konversation historik kontext minne budget tecken agent chatt förfrågan"
       }
     },
     "dateTime": {

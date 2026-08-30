@@ -130,13 +130,17 @@
         "excludedFolder": "Non créée : ce dossier est exclu de l'IA.",
         "createFailed": "Non créée : l'écriture de la nouvelle note a échoué. Les autres modifications ont tout de même été appliquées.",
         "excludedNow": "Impossible à appliquer : le dossier de cette note est désormais exclu de l'IA.",
-        "notProposed": "Impossible à appliquer : cette modification ne fait pas partie de la proposition de cette exécution."
+        "notProposed": "Impossible à appliquer : cette modification ne fait pas partie de la proposition de cette exécution.",
+        "noteMoved": "Impossible à appliquer : cette modification déplacerait la note vers un autre dossier.",
+        "appendEmpty": "Impossible à appliquer : il n'y avait rien à ajouter.",
+        "appendWouldWriteFrontmatter": "Impossible à appliquer : ce texte serait devenu le bloc de propriétés de la note."
       },
       "applyFailed": "Les modifications n'ont pas pu être appliquées.",
       "undo": "Annuler cette exécution",
       "undoFailed": "L'exécution n'a pas pu être annulée.",
       "undoReport": "{{reverted}} notes restaurées. {{kept}} notes créées par l'exécution ont été conservées.",
       "alreadyApplied": "Appliquée",
+      "appendFlag": "ajouté à la fin",
       "untitledNote": "Note sans titre",
       "vaultRoot": "Racine du coffre-fort",
       "newNotesHeading_one": "{{count}} nouvelle note",
@@ -3130,7 +3134,9 @@
       "recommendedFilesGeneration": "Nécessite le fichier .gguf + tokenizer.json dans le même dossier.",
       "recommendedFilesTranscription": "Nécessite le fichier .gguf Whisper + config.json + tokenizer.json dans le même dossier.",
       "title": "IA",
-      "providerModelCount_many": "{{count}} de modèles disponibles."
+      "providerModelCount_many": "{{count}} de modèles disponibles.",
+      "historyBudgetHelper": "Quelle part de la conversation récente chaque requête emporte, en caractères. Laissez vide pour la valeur par défaut. Un nombre plus grand permet à l'IA de suivre des conversations plus longues et en envoie davantage : avec un fournisseur qui n'est pas sur cet appareil, cela fait plus de votre texte qui le quitte, à chaque étape d'une exécution.",
+      "historyBudgetLabel": "Conversation envoyée avec chaque requête"
     },
     "network": {
       "disabledCue": "La synchronisation ne passe plus par Tor. Les nouvelles connexions vont directement au serveur de synchronisation.",
@@ -3447,7 +3453,8 @@
         "viewMode": "mode d'affichage par défaut direct lecture source aperçu",
         "dateFormat": "format de date jour mois année iso jj/mm mm/jj calendrier date format",
         "timeFormat": "format d'heure 24 heures 12 heures horloge am pm time format",
-        "timezone": "fuseau horaire zone tz utc iana région aujourd'hui timezone"
+        "timezone": "fuseau horaire zone tz utc iana région aujourd'hui timezone",
+        "aiHistoryBudget": "conversation historique contexte mémoire budget caractères agent chat requête"
       }
     },
     "dateTime": {

@@ -27,6 +27,7 @@ use myne_core::host::tauri_host::TauriHost;
 use myne_core::plugins::agent::apply::{ApplyOutcome, Approval, RefusedEdit};
 use myne_core::plugins::agent::engine::{Content, Message};
 use myne_core::plugins::agent::error::{AgentError, EditRejection};
+use myne_core::plugins::agent::history::{seed_messages, HistoryTurn, DEFAULT_HISTORY_BUDGET};
 use myne_core::plugins::agent::probe::{run_probe, ProbeProgress, ProbeThreshold, ProbeVerdict};
 use myne_core::plugins::agent::prompt::{Proposal, ProposedNote};
 use myne_core::plugins::agent::run::{AgentRunState, AgentRunView, AppliedRun, GrantOrigin};
@@ -41,6 +42,7 @@ use myne_core::plugins::vault_indices::state::NoteRecord;
 use myne_core::plugins::vault_indices::VaultIndicesState;
 use myne_core::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
 use myne_core::vault_io::StdVaultIo;
+use protocol::PrefsView;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
@@ -135,6 +137,51 @@ fn probe_threshold() -> ProbeThreshold {
 #[derive(Default)]
 struct Session {
     task: String,
+    /// The user's interface language, as the WebView reported it at start.
+    ///
+    /// Held on the session rather than passed per step, because a run resumed
+    /// after a scope approval goes through the same `step` and would otherwise
+    /// lose the instruction halfway through: the model would answer the first
+    /// half of a run in the user's language and the second half in English.
+    /// `prompt::system_instructions` shape-checks it; nothing here trusts it.
+    language: Option<String>,
+    /// The visible chat history this run was seeded with, already budgeted.
+    ///
+    /// Held rather than re-derived per step for the reason `language` is: a run
+    /// resumed after a scope approval goes through the same `step`, and losing
+    /// the seed halfway through would leave the model answering the second half
+    /// of a conversation it can no longer see the first half of.
+    history: Vec<Message>,
+    /// The egress controls as they stood when this run's seed was built.
+    ///
+    /// **Why a snapshot and not a re-read alone.** SYNC-14 carries no in-flight
+    /// carve-out: an exclusion added while a run is open takes effect at once,
+    /// which is why `apply.rs` re-reads it at the write and the read tools
+    /// re-ask on every call. The seed is the one thing that cannot be re-asked,
+    /// because a turn carries text and no note provenance, so there is nothing
+    /// to filter. What can be done is notice that the answer changed and drop
+    /// the seed, which is the same cut the WebView makes for LATER runs
+    /// (`chatStore::blockSeedingOfExistingTurns`). Without this the frontend's
+    /// cut covered future runs only, while a run PAUSED for a scope approval
+    /// went on re-sending the pre-change conversation on every remaining leg,
+    /// and `docs/decisions/ai/0541` cited SYNC-14 for a bound half of which did
+    /// not exist.
+    ///
+    /// The provider is in the snapshot for the reason `lib/prefs.ts` gives for
+    /// cutting on a provider change at all: a conversation held under one
+    /// recipient is not consented to a different one.
+    seed_context: SeedContext,
+    /// Which notes this run has already read, across every leg.
+    ///
+    /// Held here rather than re-created per `step` for the reason the transcript
+    /// is held: a run resumed after a scope approval re-enters the loop, and the
+    /// transcript comes back with leg one's note bodies still in it. A fresh set
+    /// would tell leg two it had read nothing, so the repeat-read pointer
+    /// (myne-md/myne#619) would let a re-read through and push a second copy of
+    /// a body already sitting above it, which then rides every remaining
+    /// iteration up to the 24-iteration ceiling. A multi-leg run has the longest
+    /// transcript there is, which is exactly where that costs most.
+    read_ids: std::collections::BTreeSet<String>,
     transcript: Vec<Message>,
     proposal: Proposal,
     /// Whether a `step` is inside its model call for this run.
@@ -391,6 +438,28 @@ fn wipe_session(session: &mut Session) {
         }
     }
     session.transcript.clear();
+    // The seeded history, and the SAME loop rather than a bare `clear()`. It
+    // holds the visible chat text, it survives a leg (`step` writes the
+    // transcript back, but the history lives on the session), so skipping it
+    // would leave the conversation resident for the process lifetime. Today
+    // `seed_messages` emits `Content::note` exclusively, so `Zeroizing` would
+    // cover it and a `clear()` would be enough. That is exactly the reasoning
+    // the transcript block above rejects for itself: the answer moves, and a
+    // teardown keyed to today's answer is one tagging change away from being
+    // partial again. A host-written header span in a future seed would be
+    // `Trusted`, and this loop already covers it.
+    for message in &mut session.history {
+        for span in &mut message.content {
+            if let Content::Trusted(t) = span {
+                t.zeroize();
+            }
+        }
+    }
+    session.history.clear();
+    // Note ids rather than bodies, so this is structure rather than plaintext,
+    // but it is still vault structure the model produced a run against and it
+    // costs one line to include.
+    session.read_ids.clear();
     for edit in &mut session.proposal.edits {
         edit.anchor.zeroize();
         edit.replacement.zeroize();
@@ -468,16 +537,90 @@ pub struct AgentStepResult {
 /// every sibling generation surface re-reads this host-side before touching a
 /// model. Without it, agent mode is the one AI surface whose opt-in lives only
 /// in the page that the opt-in is supposed to constrain.
+/// The chat-history seed budget a prefs view carries.
+///
+/// Read at START rather than held as a constant, so a change in Settings takes
+/// effect on the next run rather than on the next launch.
+///
+/// Takes the view rather than reading one, because the caller has already paid
+/// for it: `require_ai_enabled` decrypts `vault.prefs` to check the gate, and a
+/// second read here meant two file reads, two subkey derivations and two AEAD
+/// decrypts back to back, with nothing in between that could change the blob.
+///
+/// The value on disk is already clamped by the setter; this does not re-clamp,
+/// because a second clamp would read as the control and hide the day the real
+/// one stopped working.
+/// The egress controls a seeded conversation was built under.
+#[derive(Default, Clone, PartialEq, Eq)]
+struct SeedContext {
+    excluded_folders: Vec<String>,
+    provider: Option<String>,
+}
+
+impl SeedContext {
+    fn of(view: &PrefsView) -> Self {
+        Self {
+            excluded_folders: view.ai_excluded_folders.clone(),
+            provider: view.ai_provider.clone(),
+        }
+    }
+}
+
+/// Drop a run's seeded conversation when the egress controls moved under it.
+///
+/// Called from the resume path, which already reads `vault.prefs` for the AI
+/// gate, so this costs no second decrypt: the comment on [`history_budget`]
+/// records why a second read there would be the wrong trade.
+///
+/// A drop rather than a filter, and the transcript is deliberately untouched.
+/// The seed is prose with no note provenance, so nothing can be selected out of
+/// it; the transcript is this run's own reads, which the tools already clamp
+/// against the live exclusion set on every call.
+fn cut_seed_if_context_changed(sessions: &AgentSessionState, run_id: &str, view: &PrefsView) {
+    let now = SeedContext::of(view);
+    let mut table = sessions
+        .sessions
+        .lock()
+        .expect("agent session table poisoned");
+    let Some(session) = table.get_mut(run_id) else {
+        return;
+    };
+    if session.seed_context == now {
+        return;
+    }
+    // Overwrite before dropping, the same rule and the same reason as
+    // `wipe_session`: `UntrustedNote` wipes through `Zeroizing`, `Trusted` is a
+    // plain `String` that a bare `clear()` would free untouched.
+    for message in &mut session.history {
+        for span in &mut message.content {
+            if let Content::Trusted(t) = span {
+                t.zeroize();
+            }
+        }
+    }
+    session.history.clear();
+    session.seed_context = now;
+}
+
+fn history_budget(view: &PrefsView) -> usize {
+    view.chat_history_budget
+        .map(|b| b as usize)
+        .unwrap_or(DEFAULT_HISTORY_BUDGET)
+}
+
 async fn require_ai_enabled<R: Runtime>(
     app: &AppHandle<R>,
     vault: &VaultRuntimeState,
-) -> Result<(), AgentError> {
+) -> Result<PrefsView, AgentError> {
     let host = TauriHost::new(app.clone());
     let view = prefs_read_from_host(&host, vault, &StdVaultIo)
         .await
         .map_err(|_| AgentError::ReadFailed)?;
     if view.ai_enabled {
-        Ok(())
+        // Returned rather than dropped: reading `vault.prefs` costs a file read,
+        // a subkey derivation and an AEAD decrypt, and the caller needs another
+        // field off the same view. Handing it back is what keeps that one read.
+        Ok(view)
     } else {
         Err(AgentError::AiDisabled)
     }
@@ -578,7 +721,7 @@ async fn step<R: Runtime>(
     // Claimed under the SAME lock the take happens under, so there is no window
     // between deciding to proceed and emptying the session. Released in the
     // write-back below, on every exit from this function.
-    let (task, mut transcript, mut proposal) = {
+    let (task, language, history, mut read_ids, mut transcript, mut proposal) = {
         let mut table = sessions
             .sessions
             .lock()
@@ -590,6 +733,9 @@ async fn step<R: Runtime>(
         s.in_flight = true;
         (
             s.task.clone(),
+            s.language.clone(),
+            s.history.clone(),
+            std::mem::take(&mut s.read_ids),
             std::mem::take(&mut s.transcript),
             std::mem::take(&mut s.proposal),
         )
@@ -612,6 +758,8 @@ async fn step<R: Runtime>(
         searcher: &searcher,
         records: &records,
         exclusions: &exclusions,
+        language: language.as_deref(),
+        history: &history,
     };
 
     // **Not `?`.** The transcript and the proposal were taken out of the session
@@ -625,7 +773,7 @@ async fn step<R: Runtime>(
     // disagreed and the reachable one was the lossy one. Any transient engine
     // error had the same effect on a paused-for-scope run, whose resume depends
     // on the transcript that vanished.
-    let driven = drive(&runs, &run_id, &task, &mut transcript, &deps).await;
+    let driven = drive(&runs, &run_id, &task, &mut transcript, &deps, &mut read_ids).await;
     let outcome: LoopOutcome = match driven {
         Ok(o) => o,
         Err(e) => {
@@ -638,6 +786,7 @@ async fn step<R: Runtime>(
                 .expect("agent session table poisoned");
             if let Some(s) = table.get_mut(&run_id) {
                 s.transcript = transcript;
+                s.read_ids = read_ids;
                 s.proposal = proposal;
                 // **And the flag, on the FAILURE path too.** Releasing only on
                 // success is how an in-flight marker turns one failed model call
@@ -677,6 +826,7 @@ async fn step<R: Runtime>(
             .expect("agent session table poisoned");
         if let Some(s) = table.get_mut(&run_id) {
             s.transcript = transcript;
+            s.read_ids = read_ids;
             s.proposal = proposal.clone();
             s.in_flight = false;
         }
@@ -717,6 +867,16 @@ pub async fn agent_start<R: Runtime>(
     app: AppHandle<R>,
     task: String,
     grant: ScopeGrant,
+    // The user's interface language, as a BCP-47 tag. Supplied by the WebView
+    // because that is where it lives: the chosen language is in `localStorage`
+    // (`src/i18n/index.ts`), not in `vault.prefs`, so the host cannot read it.
+    // Shape-checked before it reaches the system message; see
+    // `prompt::system_instructions`, which drops anything that is not a tag.
+    language: Option<String>,
+    // The visible chat turns, oldest first, as the client reports them. The
+    // BUDGET is applied here rather than by the caller: what reaches the model
+    // is host policy, and a WebView that pre-trimmed would be deciding it.
+    history: Vec<HistoryTurn>,
     on_open: Channel<AgentRunView>,
     runs: State<'_, Arc<AgentRunState>>,
     sessions: State<'_, AgentSessionState>,
@@ -726,7 +886,10 @@ pub async fn agent_start<R: Runtime>(
     vectors: State<'_, LocalInferenceVectorState>,
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
-    require_ai_enabled(&app, &vault).await?;
+    // One prefs read serves both the gate and the budget.
+    let start_view = require_ai_enabled(&app, &vault).await?;
+    let seed_context = SeedContext::of(&start_view);
+    let budget = history_budget(&start_view);
     let source = DesktopScopeSource {
         app: app.clone(),
         vault: vault.inner(),
@@ -761,6 +924,9 @@ pub async fn agent_start<R: Runtime>(
             run_id.clone(),
             Session {
                 task,
+                language,
+                history: seed_messages(&history, budget),
+                seed_context,
                 ..Default::default()
             },
         );
@@ -836,7 +1002,11 @@ pub async fn agent_approve_scope<R: Runtime>(
     vectors: State<'_, LocalInferenceVectorState>,
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
-    require_ai_enabled(&app, &vault).await?;
+    // The view is KEPT rather than discarded: the scope-approval pause is a
+    // user-length window, and it is the window in which the exclusion set or the
+    // provider can move under a run that is already seeded.
+    let view = require_ai_enabled(&app, &vault).await?;
+    cut_seed_if_context_changed(&sessions, &run_id, &view);
     let source = DesktopScopeSource {
         app: app.clone(),
         vault: vault.inner(),
@@ -1157,6 +1327,47 @@ pub async fn agent_capability<R: Runtime>(
 
 #[cfg(test)]
 mod tests {
+
+    /// The READ half of `chat_history_budget`, which had no test at all: the
+    /// write is asserted on disk in `core/src/plugins/prefs/commands.rs`, and
+    /// replacing this function's body with `DEFAULT_HISTORY_BUDGET` left every
+    /// suite green. The three-way is the user-visible contract the settings
+    /// panel states, and only one of the three arms is the default.
+    #[test]
+    fn the_history_budget_read_distinguishes_unset_from_zero() {
+        use myne_core::plugins::agent::history::DEFAULT_HISTORY_BUDGET;
+
+        let unset = PrefsView {
+            chat_history_budget: None,
+            ..PrefsView::default()
+        };
+        assert_eq!(
+            super::history_budget(&unset),
+            DEFAULT_HISTORY_BUDGET,
+            "empty means the host default"
+        );
+
+        let none_at_all = PrefsView {
+            chat_history_budget: Some(0),
+            ..PrefsView::default()
+        };
+        assert_eq!(
+            super::history_budget(&none_at_all),
+            0,
+            "zero means seed nothing, which is a real choice and not the default"
+        );
+
+        let chosen = PrefsView {
+            chat_history_budget: Some(500),
+            ..PrefsView::default()
+        };
+        assert_eq!(super::history_budget(&chosen), 500);
+        assert_ne!(
+            super::history_budget(&chosen),
+            DEFAULT_HISTORY_BUDGET,
+            "a smaller number must actually send less, which is the direction that matters"
+        );
+    }
     use super::*;
     use std::collections::BTreeSet;
 
