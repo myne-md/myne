@@ -102,8 +102,12 @@
      A PAIR, not one token, because the two are one contrast decision and the
      drift that caused the bug was exactly the surface moving while the ink did
      not. Naming only the surface would leave that possible in the other
-     direction. Same values in every theme block by construction: defined here
-     and overridden nowhere. */
+     direction. Same values in every BUILT-IN theme block: defined here
+     and overridden in none of them. Not "by construction": a custom theme may set
+     any `--name` that is not `--_`-prefixed, so an imported palette can reinstate the
+     dark-ink-on-a-dark-card drift this trio was added to close. Reserving the prefix
+     would make the claim true and would also put the values out of a theme author's
+     reach, which is a separate decision nobody has taken. */
   --diagram-surface: #fbfbfa;
   --diagram-ink:     #1a1a17;
   --diagram-danger:  #8a2a23;   /* the render-failure line, on that same surface */

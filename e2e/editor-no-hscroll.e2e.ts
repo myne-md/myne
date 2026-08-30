@@ -184,7 +184,15 @@ describeE2E("hs1 the editor never scrolls horizontally in a narrow split (#630)"
         // `settleOn` rather than a hand-rolled measure-twice: only a reading that
         // REPEATS is the layout's answer rather than one frame of it, and
         // COMPARING the two readings is the part a measure-twice leaves out.
-        const w = await settleOn(s, () => sample(s), {
+        // `|| null`, which `graph-tab.e2e.ts` and `task-panel.e2e.ts` already
+        // carry and this scenario shipped without: `settleOn`'s not-ready
+        // sentinel is `null`, not `''`. Two consecutive `''` readings satisfy
+        // its stability run and reach `parse('')`, so `JSON.parse` throws and
+        // `waitUntil` re-throws a `SyntaxError` instead of retrying. The probe
+        // returns `''` on a real state (the pane walk finding no overflow
+        // ancestor), so the scenario would report a JSON error rather than the
+        // property it tests.
+        const w = await settleOn(s, async () => (await sample(s)) || null, {
           label: "the Properties widget and the table settle at one measurement",
           parse: (raw) => JSON.parse(raw) as Widths,
           timeoutMs: 20_000,

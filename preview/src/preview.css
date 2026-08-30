@@ -212,7 +212,8 @@
 .ͼk .cm-task-query-dropped ul { margin: 4px 0px 0px; padding-left: 18px; }
 .ͼk .cm-tag-suggestion-band { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0px 10px; font-family: var(--font-sans); font-size: 12px; line-height: 1.5; }
 .ͼk .cm-tag-suggestion-label { color: var(--fg-3, #6b6a64); font-size: 11px; letter-spacing: 0.02em; }
-.ͼk .cm-tag-suggestion-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 3px 1px 8px; border: 1px solid var(--line-1, #d8d5cc); border-radius: var(--radius-1, 4px); background: none; }
+.ͼk .cm-tag-suggestion-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 3px 1px 8px; border: 1px solid var(--line-1, #d8d5cc); border-radius: var(--radius-1, 4px); background: none; min-width: 0px; max-width: 100%; }
+.ͼk .cm-tag-suggestion-chip > * { min-width: 0px; overflow: hidden; text-overflow: ellipsis; }
 .ͼk .cm-tag-suggestion-chip-new { border-style: dashed; }
 .ͼk .cm-tag-suggestion-accept { background: none; border: medium; padding: 0px; margin: 0px; color: var(--fg-2, #4a4943); font-family: inherit; font-size: 12px; font-weight: var(--weight-medium); cursor: pointer; }
 .ͼk .cm-tag-suggestion-dismiss { background: none; border: medium; padding: 0px 3px; margin: 0px; color: var(--fg-3, #6b6a64); font-family: inherit; font-size: 12px; line-height: 1; cursor: pointer; }

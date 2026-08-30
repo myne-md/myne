@@ -134,7 +134,20 @@ const verticalGoalField = StateField.define<readonly number[] | null>({
 function rowStart(view: EditorView, range: SelectionRange): number {
   const boundary = verifiedLineBoundary(view, range, false).head;
   const content = listContentStart(view.state, range.head);
-  return content === null ? boundary : Math.min(content, range.head);
+  // Only when the content start is BEHIND the row start, which is another way of
+  // saying "the caret is on the item's first visual row". `listContentStart` is
+  // LINE-based (it resolves `state.doc.lineAt(head)`), so on the second visual
+  // row of a soft-wrapped list or task item it answers with the FIRST row's
+  // content start, and taking it there measures the column across a wrap
+  // boundary. On a bullet wrapping into three rows with the caret 60 characters
+  // past the marker, the column came out 60, the landing row's origin came out
+  // `content` again, and `min(from + column, to)` resolved back to the position
+  // it started from: `moveVerticalByColumn` then sees an unchanged selection,
+  // returns false, and the press falls through to `defaultKeymap`, into the very
+  // `moveToLineBoundary` path this module exists to shadow. Wrapped list items
+  // are the common case in a prose editor and they are what #631 reported.
+  if (content === null || content <= boundary) return boundary;
+  return Math.min(content, range.head);
 }
 
 /** End of the visual row `range` sits on. */

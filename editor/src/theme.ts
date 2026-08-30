@@ -531,6 +531,13 @@ export const myneTheme = EditorView.theme({
     fontSize: "11px",
     letterSpacing: "0.02em",
   },
+  // `min-width: 0` and `max-width: 100%`, for the same reason the Properties
+  // grid gained them (myne-md/myne#630): an `inline-flex` item in a wrapping
+  // flex container has the flex default `min-width: auto`, so it floors at its
+  // own min-content width and a long tag name would widen `.cm-content` past the
+  // scroller. With the `.cm-scroller { overflow-x: hidden }` floor now in place
+  // that shows up as a clip rather than a sideways swipe, which is the failure
+  // the floor's own comment says it converts silence into.
   ".cm-tag-suggestion-chip": {
     display: "inline-flex",
     alignItems: "center",
@@ -539,7 +546,10 @@ export const myneTheme = EditorView.theme({
     border: "1px solid var(--line-1, #d8d5cc)",
     borderRadius: "var(--radius-1, 4px)",
     background: "transparent",
+    minWidth: 0,
+    maxWidth: "100%",
   },
+  ".cm-tag-suggestion-chip > *": { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" },
   ".cm-tag-suggestion-chip-new": { borderStyle: "dashed" },
   ".cm-tag-suggestion-accept": {
     background: "none",

@@ -34,6 +34,7 @@ import {
   runPaletteAction,
   unlockToEditor,
 } from "./support/flows";
+import { KEY, pressKey } from "./support/keyboard";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 /** Right-click an element and pick a context-menu item by its
@@ -119,9 +120,27 @@ describeE2E("et1 palette empty-trash confirms with count; cancel keeps, confirm 
         await s.waitForGone(testIdSelector("delete-confirm.cancel"));
         await expectTrashCount(s, 2);
 
-        // Run again → confirm → the purge lands and the trash is empty.
+        // Run again → confirm with ENTER → the purge lands and the trash is
+        // empty.
+        //
+        // Enter rather than a click, and this is the only lane that can say
+        // anything about it. myne-md/myne#628 made Enter perform the destructive
+        // action, and this dialog is one of the two that perform the
+        // cryptographic erase of `design-notes/storage/0105`: no undo, and
+        // nothing outside a `.myne-backup` gets the note back. Its jsdom tests
+        // are not evidence for the shipping WebView, which `design-notes/ui/
+        // 0541` records measuring: `requestAnimationFrame` never fired there and
+        // left Enter inert for a full 45 s budget, three attempts over.
+        //
+        // It also exercises guard 4 end to end. The palette selects its row on an
+        // Enter KEYDOWN, so the dialog mounts with that key still down and
+        // refuses to confirm until an Enter keyup has been seen. The keyup from
+        // the palette's own press is what opens it, so a user who releases and
+        // presses again gets a confirm, and a user who simply holds the key does
+        // not. `pressKey` sends a keydown and a keyup, which is that sequence.
         await runPaletteAction(s, "trash.empty", "Empty trash");
-        await (await s.byTestId("delete-confirm.confirm")).click();
+        await s.byTestId("delete-confirm.confirm");
+        await pressKey(s, KEY.ENTER);
         await s.waitForGone(testIdSelector("delete-confirm.confirm"));
         await expectTrashCount(s, 0);
 

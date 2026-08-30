@@ -155,6 +155,23 @@ export type DeleteConfirmModalProps = {
    * deliberate act there is a click or a Tab rather than a reflex.
    */
   initialFocus?: "cancel" | "confirm";
+  /**
+   * The activating gesture was a KEY rather than a pointer, so the key that
+   * opened this dialog may still be down. Enter then refuses to confirm until
+   * an Enter keyup has been seen: a held key emits repeats and no keyup, so it
+   * cannot answer a dialog it opened.
+   *
+   * Default `false`, because for a pointer-opened dialog the first Enter is
+   * always a deliberate new press and demanding a release would cost that press
+   * for nothing. Pass the activating event's own answer rather than a constant:
+   * a React `onClick` carries `detail === 0` exactly when the button was
+   * activated from the keyboard.
+   *
+   * Set at the two `TrashPanel` purge buttons and at the palette's empty-trash
+   * action, which are the openers that fire on Enter KEYDOWN and the two paths
+   * that perform the cryptographic erase of `design-notes/storage/0105`.
+   */
+  openedByKey?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -170,6 +187,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     confirmTestId,
     cancelTestId,
     initialFocus = "confirm",
+    openedByKey,
     onCancel,
     onConfirm,
   } = props;
@@ -184,13 +202,21 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     initialFocusRef: initialFocus === "confirm" ? confirmRef : cancelRef,
   });
 
-  // Esc → Cancel.
+  // Esc → Cancel, contained the same way Enter is.
+  //
+  // The listener is on `document`, so without the containment check an Escape
+  // pressed inside a dialog STACKED over this one closes the one behind it, and
+  // dismissing an `ThemeInstallDialog` that arrived from an OS deep link would
+  // silently take the delete confirmation with it. Cancelling is benign next to
+  // confirming, which is why Enter's version of this guard came first, but the
+  // two handlers having different ideas of their own scope is not a state to
+  // leave in place.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCancel();
-      }
+      if (e.key !== "Escape") return;
+      if (dialogRef.current?.contains(document.activeElement) !== true) return;
+      e.preventDefault();
+      onCancel();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -228,10 +254,16 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   //     and destroy the trash between two frames. At the merge base Enter was
   //     inert, so the same held key was harmless: making Enter act is what
   //     creates this, which is why the guard ships with it.
-  //  2. One frame of arming. Belt and braces for a WebView that under-reports
-  //     `repeat`, and principled rather than a timing hack: a human cannot
-  //     answer a dialog within the frame it appeared in, so an Enter arriving in
-  //     that frame is not an answer to it.
+  //  2. One frame of arming, and it covers ONLY an Enter already in flight when
+  //     the dialog appeared: a human cannot answer a dialog within the frame it
+  //     appeared in, so an Enter arriving in that frame is not an answer to it.
+  //     It is NOT the backstop for guard 1, and an earlier revision of this
+  //     comment said it was. The arithmetic refutes that: OS typematic delay
+  //     before the first auto-repeat is 250 ms to 660 ms on every platform this
+  //     ships to, by which time both the paint and the wall clock below have
+  //     armed the dialog, so a held Enter whose `repeat` flag was under-reported
+  //     would have walked straight through. Guard 4 is what actually closes
+  //     that, and it closes it without depending on a flag or on a clock.
   //     **A paint OR the elapsed time, and the disjunction is the whole point.**
   //     `requestAnimationFrame` is the better signal of the two, because it fires
   //     when the dialog has actually been PAINTED, which is what "could have been
@@ -265,6 +297,16 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   //     any modal already open, and focus inside it reads as "not Cancel". That
   //     is the ring and the key disagreeing again, one dialog over.
   //
+  //  4. Key release, on the openers that fire on an Enter KEYDOWN. `openedByKey`
+  //     says the activating gesture was a key, so the key may still be down when
+  //     this listener is installed; Enter then refuses until an Enter keyup has
+  //     been seen. A HELD key emits repeats and no keyup, so it cannot satisfy
+  //     this by continuing to be held, and unlike guards 1 and 2 that is a
+  //     property of the input rather than a flag the WebView reports or an
+  //     interval the OS chooses. It costs a pointer-opened dialog nothing,
+  //     because the default is off and the caller passes the activating event's
+  //     own answer (`detail === 0` on a React `onClick` is keyboard activation).
+  //
   // Containment is also what makes the confirm-on-unreadable fallback safe:
   // "unreadable" now means unreadable inside THIS dialog, where the trap has
   // already placed focus on the confirm button unless a caller asked otherwise.
@@ -281,6 +323,10 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     const frame = requestAnimationFrame(() => {
       painted = true;
     });
+    // Guard 4 starts shut only when the caller says the dialog was opened by a
+    // key, and the first Enter keyup opens it. A key that is being HELD emits
+    // repeats and no keyup, so this cannot be satisfied by continuing to hold.
+    let released = openedByKey !== true;
     const isArmed = () => painted || performance.now() - mountedAt >= ARM_AFTER_MS;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter") return;
@@ -288,16 +334,21 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
       // Swallowed even while disarmed: the point is that Enter does nothing
       // here, not that it falls through to whatever is behind the dialog.
       e.preventDefault();
-      if (e.repeat || !isArmed()) return;
+      if (e.repeat || !isArmed() || !released) return;
       if (document.activeElement === cancelRef.current) answerRef.current.onCancel();
       else answerRef.current.onConfirm();
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Enter") released = true;
+    };
     document.addEventListener("keydown", onKey);
+    document.addEventListener("keyup", onKeyUp);
     return () => {
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keyup", onKeyUp);
     };
-  }, []);
+  }, [openedByKey]);
 
   const handleBackdropClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
