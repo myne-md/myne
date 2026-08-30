@@ -102,7 +102,11 @@ function sample(s: Session): Promise<string> {
 }
 
 const caret = (s: Session, label: string): Promise<Caret> =>
-  settleOn(s, () => sample(s), {
+  // `|| null` because `settleOn`'s not-ready sentinel is `null`: two `''`
+  // readings would satisfy its stability run and reach `JSON.parse('')`, which
+  // throws a `SyntaxError` `waitUntil` re-throws. `sample` returns `''` before
+  // the click lands a selection, which is a real state on every run.
+  settleOn(s, async () => (await sample(s)) || null, {
     label,
     parse: (raw) => JSON.parse(raw) as Caret,
     timeoutMs: 20_000,

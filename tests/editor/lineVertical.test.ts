@@ -29,6 +29,7 @@ import {
   verticalTarget,
 } from "@myne/editor/line-vertical";
 import { myneExtensions } from "../../src/editor/extensions";
+import { tableKeymap } from "@myne/editor/decorations/table";
 
 //        0                   20 21   26 27                  47 48         59
 const DOC = "0123456789ABCDEFGHIJ\nabcde\n0123456789ABCDEFGHIJ\n- [ ] label\n";
@@ -87,6 +88,45 @@ function stubView(
   return view as unknown as EditorView;
 }
 
+/** Offset where the task line's single logical line breaks into two rows. */
+const TASK_WRAP = TASK.from + 8;
+
+/**
+ * The shared stub with ONE line soft-wrapped, which is the only difference that
+ * matters here: `coordsAtPos` gives the task line's two rows different y values,
+ * and `moveToLineBoundary` answers with the ROW start rather than the line's.
+ */
+function wrappedTaskStubView(): EditorView {
+  const state = EditorState.create({
+    doc: DOC,
+    extensions: [markdown({ base: markdownLanguage })],
+  });
+  const rowOf = (pos: number) => (pos >= TASK_WRAP && pos <= TASK.to ? 1 : 0);
+  const view = {
+    state,
+    moveToLineBoundary: (range: { head: number }, forward: boolean) => {
+      const line = state.doc.lineAt(range.head);
+      if (line.from !== TASK.from) {
+        return EditorSelection.cursor(forward ? line.to : line.from, forward ? -1 : 1);
+      }
+      const second = rowOf(range.head) === 1;
+      const at = forward ? (second ? line.to : TASK_WRAP) : second ? TASK_WRAP : line.from;
+      return EditorSelection.cursor(at, forward ? -1 : 1);
+    },
+    coordsAtPos: (pos: number) => {
+      const y = state.doc.lineAt(pos).number * 20 + rowOf(pos) * 10;
+      return { top: y, bottom: y + 8, left: 0, right: 0 };
+    },
+    moveVertically: (range: { head: number }, forward: boolean) => {
+      const line = state.doc.lineAt(range.head);
+      const n = line.number + (forward ? 1 : -1);
+      if (n < 1 || n > state.doc.lines) return EditorSelection.cursor(range.head);
+      return EditorSelection.cursor(state.doc.line(n).to, -1);
+    },
+  };
+  return view as unknown as EditorView;
+}
+
 describe("verticalTarget", () => {
   it("lands on the same column, not the row's end, when the next row is longer", () => {
     const view = stubView();
@@ -131,6 +171,28 @@ describe("verticalTarget", () => {
     expect(atStart!.goal, "column at the label's first character").toBe(0);
     const oneIn = verticalTarget(view, EditorSelection.cursor(TASK.content + 1), false, null);
     expect(oneIn!.goal, "column one character later").toBe(1);
+  });
+
+  it("measures a wrapped list item from its own visual row, not the item's", () => {
+    // `listContentStart` is LINE-based, so on the second visual row of a
+    // soft-wrapped list or task item it answers with the FIRST row's content
+    // start. Taking it there measures the column across a wrap boundary, and the
+    // arithmetic then cancels: the landing row's origin comes out as the same
+    // content start, so `min(from + column, to)` resolves back to the position
+    // the caret was already at, `moveVerticalByColumn` sees an unchanged
+    // selection and returns false, and the press falls through to
+    // `defaultKeymap` and into the `moveToLineBoundary` probe this whole module
+    // exists to shadow.
+    //
+    // Wrapped list items are the common case in a prose editor, and no other
+    // test here models wrapping: the shared stub gives one y per LINE, which is
+    // what let this ship. This stub gives the task line two rows.
+    const view = wrappedTaskStubView();
+    const out = verticalTarget(view, EditorSelection.cursor(TASK_WRAP + 1), false, null);
+    expect(out).not.toBeNull();
+    // One character into the second row. Measured from the item's content start
+    // it would be 3, which is a position on the row above.
+    expect(out!.goal, "column measured from the caret's own visual row").toBe(1);
   });
 
   it("mirrors upward", () => {
@@ -314,6 +376,26 @@ describe("the bindings are actually mounted", () => {
       .filter((b) => b.key === "ArrowDown")
       .map((b) => b.run);
     expect(bound).toContain(ours);
+  });
+
+  it("stays behind tableKeymap, which is a source-order contract nothing else holds", () => {
+    // `extensions.ts` pins the position in a comment ("AFTER tableKeymap, so
+    // arrowing into a read-only table still wins") and both are entries of one
+    // `keymap.of([...])` array, so source order IS the mechanism. The test above
+    // asserts only that ours is among the bindings, which stays true after a
+    // reorder, so the contract had nothing holding it: moving our entry up would
+    // break table entry with the whole suite green.
+    const state = EditorState.create({ doc: DOC, extensions: [...myneExtensions()] });
+    const bound = state
+      .facet(keymap)
+      .flat()
+      .filter((b) => b.key === "ArrowDown")
+      .map((b) => b.run);
+    const ours = bound.indexOf(lineVerticalKeymap.find((b) => b.key === "ArrowDown")!.run!);
+    const table = bound.indexOf(tableKeymap.find((b) => b.key === "ArrowDown")!.run!);
+    expect(table, "tableKeymap binds ArrowDown").toBeGreaterThanOrEqual(0);
+    expect(ours, "lineVerticalKeymap binds ArrowDown").toBeGreaterThanOrEqual(0);
+    expect(table, "tableKeymap must be asked first").toBeLessThan(ours);
   });
 
   it("installs the goal field, proven by storing a goal and reading it back", () => {

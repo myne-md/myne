@@ -54,7 +54,7 @@ function StackedDialog() {
   );
 }
 
-function mount(props?: { initialFocus?: "cancel" | "confirm" }) {
+function mount(props?: { initialFocus?: "cancel" | "confirm"; openedByKey?: boolean }) {
   const onConfirm = vi.fn();
   const onCancel = vi.fn();
   const r = render(
@@ -134,6 +134,12 @@ describe("DeleteConfirmModal keyboard contract", () => {
       fireEvent.keyDown(document, { key: "Enter" });
       expect(onConfirm).not.toHaveBeenCalled();
       expect(onCancel).not.toHaveBeenCalled();
+
+      // Escape too. Closing the dialog behind is benign next to confirming it,
+      // which is why Enter's containment came first, but a stacked dialog whose
+      // dismissal silently takes the delete confirmation with it is still wrong.
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onCancel).not.toHaveBeenCalled();
     });
 
     it("arms on elapsed time when the frame callback never arrives", async () => {
@@ -159,6 +165,41 @@ describe("DeleteConfirmModal keyboard contract", () => {
       } finally {
         raf.mockRestore();
       }
+    });
+
+    it("refuses a held Enter that opened the dialog, whatever `repeat` reports", async () => {
+      // Guard 2 cannot do this and an earlier revision of the component claimed
+      // it could. OS typematic delay before the first auto-repeat is 250 ms to
+      // 660 ms, so both the paint and the 16 ms clock have long armed the dialog
+      // by the time a held key's first repeat arrives. If the WebView reports
+      // `repeat: false` for that repeat, guard 1 admits it too.
+      //
+      // Guard 4 keys off the input instead of off a flag or a clock: a HELD key
+      // emits repeats and never a keyup, so a caller that says "a key opened
+      // this" gets an Enter that refuses until an Enter keyup has been seen. The
+      // press below carries `repeat: false` deliberately, which is the exact
+      // case the other two guards cannot tell from a fresh press.
+      const { onConfirm, onCancel } = mount({ openedByKey: true });
+      await armed();
+      fireEvent.keyDown(document, { key: "Enter", repeat: false });
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(onCancel).not.toHaveBeenCalled();
+
+      // Releasing is what a person does and a held key cannot.
+      fireEvent.keyUp(document, { key: "Enter" });
+      fireEvent.keyDown(document, { key: "Enter" });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("costs a pointer-opened dialog nothing", async () => {
+      // The other direction, and the reason the guard is opt-in. Demanding a
+      // release from someone who never pressed the key that opened the dialog
+      // would eat their first Enter, which is the #397 inertness this whole
+      // entry set out to remove, narrowed to one dialog.
+      const { onConfirm } = mount();
+      await armed();
+      fireEvent.keyDown(document, { key: "Enter" });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
     });
 
     it("stays armed when the parent re-renders with fresh callbacks", async () => {
@@ -231,9 +272,13 @@ describe("DeleteConfirmModal keyboard contract", () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
-  // The retained value. No call site selects it today, which is exactly why it
-  // needs a test: without one, deleting it would look free. Keying Enter off
-  // focus is also what makes it meaningful rather than vestigial: a caller that
+  // The retained value, and it has a caller: `src/components/sync/RecoveredNotes.tsx`
+  // pins it for the quarantine delete, which destroys the last copy of a note
+  // anywhere, since `quarantine/` is not inside the `.myne-backup` container.
+  // Saying so matters here, because an earlier revision of this comment claimed
+  // nothing used it, which invites the next reader to delete the prop and with it
+  // that dialog's only protection against a reflex Enter. Keying Enter off focus
+  // is what makes the value meaningful rather than vestigial: a caller that
   // starts the ring on Cancel gets an Enter that cancels.
   describe('initialFocus="cancel"', () => {
     it("focuses Cancel", () => {

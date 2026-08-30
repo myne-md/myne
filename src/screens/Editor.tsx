@@ -2842,7 +2842,9 @@ function CommandPaletteHost({
   // fires straight from the palette — this renders the same count-aware
   // DeleteConfirmModal the TrashPanel footer uses, and only confirm purges.
   // Rendered as a sibling like `picker`, so it survives the palette closing.
-  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<number | null>(null);
+  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<
+    { count: number; viaKey: boolean } | null
+  >(null);
   // The note cover's picker (myne-md/myne#410). Editor-local boolean, per the
   // desktop modal carve-out that governs every other modal here. Deliberately
   // its OWN mount, separate from the cards-view picker inside `PaneView`: this
@@ -3027,11 +3029,11 @@ function CommandPaletteHost({
       onTrashNote: () => {
         if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
       },
-      onEmptyTrash: () => {
+      onEmptyTrash: (viaKey: boolean) => {
         // Permanent purge — request the count-aware confirm instead of firing
         // directly (the TrashPanel footer's flow); the purge runs on confirm.
         const count = trashedRecords(ctx.cache).length;
-        if (count > 0) setEmptyTrashConfirm(count);
+        if (count > 0) setEmptyTrashConfirm({ count, viaKey });
       },
       onToggleFavorite: () => {
         if (ctx.selectedId === null) return;
@@ -3627,8 +3629,14 @@ function CommandPaletteHost({
       {emptyTrashConfirm !== null && (
         <DeleteConfirmModal
           title={t("notes.trash.emptyConfirmTitle")}
-          body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm })}
+          body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm.count })}
           confirmLabel={t("notes.trash.emptyConfirmCta")}
+          // The palette's own answer, threaded through `CommandContext`. It was
+          // an unconditional `true` for one E2E run, on the reasoning that the
+          // palette is a keyboard-first surface, and `et1` failed three times
+          // over: a row selected with a click leaves no Enter to release, so the
+          // dialog ate the user's first press.
+          openedByKey={emptyTrashConfirm.viaKey}
           onCancel={() => setEmptyTrashConfirm(null)}
           onConfirm={() => {
             setEmptyTrashConfirm(null);

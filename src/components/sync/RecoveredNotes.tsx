@@ -192,6 +192,14 @@ export type RecoveredNotesProps = {
   onRestored?: () => Promise<void> | void;
 };
 
+/** Size and age, joined the one way both the row and its confirm dialog show
+ *  them. Two copies of this expression is how the dialog came to show less than
+ *  the list it was opened from, which is the shape that makes a confirmation a
+ *  formality. */
+function entryFacts(size: number, age: string): string {
+  return [formatBytes(size), age].filter(Boolean).join(" · ");
+}
+
 export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
   const { t } = useTranslation();
   const [entries, setEntries] = useState<QuarantineEntry[]>([]);
@@ -297,9 +305,7 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
                 data-file-name={e.file_name}
               >
                 <span style={ROW_ID_STYLE}>{e.note_id_hex.slice(0, 8)}…</span>
-                <span style={ROW_META_STYLE}>
-                  {[formatBytes(e.size), age].filter(Boolean).join(" · ")}
-                </span>
+                <span style={ROW_META_STYLE}>{entryFacts(e.size, age)}</span>
                 <button
                   type="button"
                   style={BTN_STYLE}
@@ -377,13 +383,20 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
             entry?.modified_epoch_ms != null
               ? formatRelativeTime(new Date(entry.modified_epoch_ms))
               : "";
-          const facts = entry ? [formatBytes(entry.size), age].filter(Boolean).join(" · ") : "";
-          const id = (entry?.note_id_hex ?? confirmDelete).slice(0, 8);
+          const facts = entry ? entryFacts(entry.size, age) : "";
+          // No fallback id when the entry has already left `entries`. The
+          // previous one sliced the FILE NAME to eight characters and rendered
+          // it where the note id goes, so the dialog could name something that
+          // was not the id it looked like. Nothing is more honest than a wrong
+          // thing here: the warning still says what the button does.
+          const id = entry === undefined ? null : entry.note_id_hex.slice(0, 8);
+          const body =
+            id === null ? "" : facts === "" ? `${id}…` : `${id}… · ${facts}`;
           return (
             <DeleteConfirmModal
               initialFocus="cancel"
               title={t("sync.panel.recovered.deleteConfirmTitle")}
-              body={facts === "" ? `${id}…` : `${id}… · ${facts}`}
+              body={body === "" ? undefined : body}
               warning={t("sync.panel.recovered.deleteConfirmWarning")}
               confirmTestId="sync.recovered-delete-confirm"
               onCancel={() => setConfirmDelete(null)}

@@ -1,8 +1,8 @@
 {
-  "commit": "5e1ebb8696b1b12a01db07bd1756c49454d82ca6",
-  "capturedAt": "2026-08-30T12:31:21.378Z",
-  "htmlBytes": 45613,
-  "cssBytes": 152622,
+  "commit": "ae664ee6839731da3e67d456479ed26c27fcece3",
+  "capturedAt": "2026-08-30T16:17:20.576Z",
+  "htmlBytes": 45005,
+  "cssBytes": 152750,
   "note": "Captured from the running desktop app by e2e/capture/theme-preview.capture.ts. Do not hand-edit — re-run the capture.",
-  "surfaceHash": "59a64d065a74ef007cc9ce715283adc602bc507291854f9acc5cebaddeb1db5f"
+  "surfaceHash": "6a1daa9625d89755b96e856f407b32ab47d1a9706158d187116c690f12977ccb"
 }

@@ -3461,7 +3461,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                 >
                   {t("notes.list.deleteFolderConfirm")}
                 </Button>
-                <Button variant="ghost" data-testid="notes.folder-delete-cancel" onClick={close}>
+                {/* `secondary`, not `ghost`: this Cancel sits under a filled
+                    `--danger` button, and a borderless label is a weak way out
+                    of a sheet that moves a whole subtree to the Trash. The
+                    hand-rolled button it replaced carried a border too. */}
+                <Button
+                  variant="secondary"
+                  data-testid="notes.folder-delete-cancel"
+                  onClick={close}
+                >
                   {t("common.prompt.cancel")}
                 </Button>
               </div>
@@ -3479,7 +3487,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             <Button variant="danger" onClick={() => void confirmPurge()}>
               {t("notes.trash.purgeConfirmCta")}
             </Button>
-            <Button variant="ghost" onClick={close}>
+            {/* `secondary` for the same reason as the folder-delete sheet: this
+                one is the permanent purge, so the way out reads as a button. */}
+            <Button variant="secondary" onClick={close}>
               {t("common.prompt.cancel")}
             </Button>
           </div>

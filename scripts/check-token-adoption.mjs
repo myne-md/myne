@@ -212,6 +212,16 @@ const scanFlag = process.argv.indexOf("--scan");
 async function scanOne(dir) {
   const out = {};
   for (const file of await walk(dir)) {
+    // EXEMPT applies here too, and it did not until myne-md/myne#629's review.
+    // The exemption is the one branch a whole-file excuse turns on, so leaving
+    // it out of the `--scan` path meant the guard's own tests could not reach
+    // it: the entry that retires 105 recorded literals from `mobile/src/styles/
+    // tokens.css` was unreachable from every test in `tests/scripts/`, and
+    // `--scan mobile/src/styles` reported that file at 108 as though it were
+    // still on the ratchet. Keyed on the REPO-relative path, the same key
+    // `EXEMPT` holds, so a scan pointed at a directory inside the repo excuses
+    // exactly what the full scan excuses.
+    if (EXEMPT.includes(relative(ROOT, file))) continue;
     const n = countLiterals(readFileSync(file, "utf8"));
     if (n > 0) out[relative(dir, file)] = n;
   }
