@@ -8,10 +8,14 @@
 // `decisions.md` 2026-05-07 "Note delete cryptographic erase" (hard-
 // delete; no soft-trash until MYND-133 / v0.2).
 //
-// PRD stories 35-38:
-// - Title "Delete this note?" + body `"{title}"` + warning "This cannot be undone."
-// - Cancel (default focus, safer) + Delete (destructive `var(--warning)` fill).
-// - Esc → Cancel; Enter on focused Delete → Confirm; backdrop click → Cancel.
+// PRD stories 35-38: title, body and warning copy, and the two-button row with
+// the destructive `var(--warning)` fill.
+//
+// The KEYBOARD contract those stories originally specified was reversed by
+// myne-md/myne#628; `docs/decisions/ui/0541` is the record and the effect below
+// carries the reasoning. In one line: focus starts on the destructive button and
+// Enter follows the focus ring, so the ring always names what Enter does.
+// Escape, the backdrop and Tab-to-Cancel are the ways out.
 
 import {
   useCallback,
@@ -22,6 +26,13 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+
+/**
+ * One frame at 60 Hz, in milliseconds. The floor under the Enter guard's
+ * "the dialog has been on screen long enough to have been read" test; see the
+ * effect that uses it for why a paint alone is not enough of a signal.
+ */
+const ARM_AFTER_MS = 16;
 
 // Shared modal backdrop envelope — also imported by `<TrashPanel>` so the two
 // trash-related modals don't re-declare the same fixed-inset dim layer.
@@ -132,10 +143,16 @@ export type DeleteConfirmModalProps = {
    */
   cancelTestId?: string;
   /**
-   * Which button receives initial focus. Default `"cancel"` — the safer
-   * choice for irreversible actions (folder delete, permanent purge), where a
-   * stray Enter must not confirm. Pass `"confirm"` for the reversible
-   * keyboard soft-trash gate (MYND-487) so Enter confirms / Escape cancels.
+   * Which button receives initial focus. Default `"confirm"`: the ring lands
+   * on the destructive button, so Enter and the ring name the same action and
+   * Escape (or the backdrop, or Tab to Cancel) is the way out
+   * (myne-md/myne#628).
+   *
+   * `"cancel"` moves the ring back to Cancel, and because Enter follows the
+   * ring, Enter there cancels. One call site uses it: the recovered-note delete
+   * in `src/components/sync/RecoveredNotes.tsx`, which destroys the last copy
+   * anywhere (quarantine is not in the `.myne-backup` container), so the
+   * deliberate act there is a click or a Tab rather than a reflex.
    */
   initialFocus?: "cancel" | "confirm";
   onCancel: () => void;
@@ -152,17 +169,16 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     confirmLabel,
     confirmTestId,
     cancelTestId,
-    initialFocus = "cancel",
+    initialFocus = "confirm",
     onCancel,
     onConfirm,
   } = props;
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const confirmRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  // Trap + restore focus while open. Default-focus Cancel (safer destructive
-  // UX); `initialFocus="confirm"` moves it to the confirm button for the
-  // reversible keyboard soft-trash gate. The modal only mounts while shown, so
-  // always enabled (MYND-93).
+  // Trap + restore focus while open. Default-focus the CONFIRM button, so the
+  // focus ring sits on the action Enter performs; `initialFocus="cancel"` moves
+  // it back. The modal only mounts while shown, so always enabled (MYND-93).
   useFocusTrap(dialogRef, {
     enabled: true,
     initialFocusRef: initialFocus === "confirm" ? confirmRef : cancelRef,
@@ -180,35 +196,108 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onCancel]);
 
-  // Enter handling, both branches load-bearing:
+  // Enter follows the FOCUS RING, not a prop.
   //
-  // - `initialFocus="confirm"` (reversible keyboard soft-trash gate, MYND-487)
-  //   promises "Enter confirms / Escape cancels". An explicit handler is
-  //   required — the focus trap places the confirm button's focus
-  //   asynchronously and a focused <button>'s Enter→click default action is not
-  //   fired reliably across WebViews (WebKitGTK under the E2E harness), so
-  //   relying on button focus alone drops the confirm.
+  // That is the whole of what myne-md/myne#628 is about. The shipped dialog put
+  // the ring on Cancel, the accent-filled primary styling on Delete, and made
+  // Enter inert, so three things named three different actions. #397 had settled
+  // on inert for a real reason (before it, Enter silently activated the focused
+  // Cancel, a close indistinguishable from a successful delete) but inert left
+  // a keyboard user with no way to say yes at all.
   //
-  // - cancel-focused (the default; irreversible folder delete / permanent
-  //   purge, and the recoverable soft-trash confirms we still withhold from
-  //   Enter) swallows Enter as a no-op. Cancel holds initial focus, so a bare
-  //   Enter would otherwise fire its native click and dismiss the dialog
-  //   silently — a close indistinguishable from a successful confirm, so the
-  //   user believes the delete went through when nothing happened (MYND-497 /
-  //   #397). preventDefault stops the focused button's activation; keeping the
-  //   dialog open forces a deliberate click or Tab to a real answer. A stray
-  //   Enter must never confirm here — that reasoning still stands, this only
-  //   stops it from silently cancelling either.
+  // Keying off `document.activeElement` answers both: the ring always names what
+  // Enter does. Focus starts on the destructive button (`initialFocus`), so the
+  // reflex press confirms; a user who deliberately Tabs to Cancel and presses
+  // Enter cancels, which is what the ring under their finger promised. #397's
+  // failure cannot recur, because it was the ring and the key disagreeing.
+  //
+  // The handler exists at all, rather than being left to the buttons' own
+  // Enter-to-click, because the focus trap places focus asynchronously and a
+  // focused <button>'s default activation is not fired reliably across WebViews
+  // (WebKitGTK under the E2E harness), so relying on it alone drops the confirm.
+  //
+  // THREE GUARDS, and each closes a way this dialog could confirm without having
+  // been read. None is a nicety: two of its call sites perform the cryptographic
+  // erase of `docs/decisions/storage/0105`, where there is no undo and no copy
+  // outside a `.myne-backup`.
+  //
+  //  1. `e.repeat`. Both openers of the permanent purge fire on Enter KEYDOWN
+  //     (the palette action, and the Trash footer's focused button). The opening
+  //     keydown is dispatched before this listener exists, but a HELD Enter
+  //     auto-repeats, and every repeat after the first would otherwise land here
+  //     and destroy the trash between two frames. At the merge base Enter was
+  //     inert, so the same held key was harmless: making Enter act is what
+  //     creates this, which is why the guard ships with it.
+  //  2. One frame of arming. Belt and braces for a WebView that under-reports
+  //     `repeat`, and principled rather than a timing hack: a human cannot
+  //     answer a dialog within the frame it appeared in, so an Enter arriving in
+  //     that frame is not an answer to it.
+  //     **A paint OR the elapsed time, and the disjunction is the whole point.**
+  //     `requestAnimationFrame` is the better signal of the two, because it fires
+  //     when the dialog has actually been PAINTED, which is what "could have been
+  //     read" means. It is also a signal a WebView is free not to deliver, and
+  //     under WebKitGTK it measurably does not: an instrumented E2E run of `nc5`
+  //     captured `armed=false repeat=false contains=true
+  //     active=delete-confirm.confirm` on a dialog that was visible in the
+  //     screenshot taken from the same failure. The callback had not run, so Enter
+  //     was inert for the full 45 s budget, three attempts over. A gate that can
+  //     stay shut forever is not a gate, it is the #397 behaviour with extra
+  //     steps, so `ARM_AFTER_MS` of wall clock arms it whether or not the frame
+  //     callback ever arrives.
+  //     **Armed once at MOUNT, which is why the callbacks come through a ref.**
+  //     The obvious spelling, `[onCancel, onConfirm]` as the effect's deps,
+  //     re-runs the whole effect whenever the PARENT hands down a new callback
+  //     identity, and both of this modal's `NoteList` call sites do: the
+  //     keyboard soft-trash's `onConfirm` closes over the very state that opened
+  //     the dialog, so it is a new function on every render of a component whose
+  //     sidebar re-renders on save settles, sync ticks and a relative-time
+  //     ticker. Each of those re-runs put the arming back to false, so the guard
+  //     stopped meaning "one frame since the dialog appeared" and started
+  //     meaning "one frame since the list last re-rendered", which is a gate
+  //     that can be shut when the user presses Enter. The same instrumented run
+  //     counted one effect setup per mount, so this was NOT what `nc5` was
+  //     failing on; it is a second way to reach the same inert Enter, found while
+  //     looking for the first, and it is what makes the wall clock above measure
+  //     from the dialog rather than from the list's last render.
+  //  3. Containment. The listener is on `document`, so without this an Enter
+  //     pressed in a dialog STACKED over this one confirms the one behind it.
+  //     `ThemeInstallDialog` opens from an OS deep link, which can arrive over
+  //     any modal already open, and focus inside it reads as "not Cancel". That
+  //     is the ring and the key disagreeing again, one dialog over.
+  //
+  // Containment is also what makes the confirm-on-unreadable fallback safe:
+  // "unreadable" now means unreadable inside THIS dialog, where the trap has
+  // already placed focus on the confirm button unless a caller asked otherwise.
+  //
+  // `docs/decisions/ui/0541` records the reversal, including what it costs on
+  // the cryptographic-erase paths.
+  const answerRef = useRef({ onCancel, onConfirm });
   useEffect(() => {
+    answerRef.current = { onCancel, onConfirm };
+  });
+  useEffect(() => {
+    const mountedAt = performance.now();
+    let painted = false;
+    const frame = requestAnimationFrame(() => {
+      painted = true;
+    });
+    const isArmed = () => painted || performance.now() - mountedAt >= ARM_AFTER_MS;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter") return;
+      if (dialogRef.current?.contains(document.activeElement) !== true) return;
+      // Swallowed even while disarmed: the point is that Enter does nothing
+      // here, not that it falls through to whatever is behind the dialog.
       e.preventDefault();
-      if (initialFocus === "confirm") onConfirm();
-      // cancel-focused: swallow — no action, dialog stays open.
+      if (e.repeat || !isArmed()) return;
+      if (document.activeElement === cancelRef.current) answerRef.current.onCancel();
+      else answerRef.current.onConfirm();
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [initialFocus, onConfirm]);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   const handleBackdropClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {

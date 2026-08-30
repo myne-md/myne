@@ -1216,7 +1216,8 @@
       "titlePlaceholder": "بلا عنوان"
     },
     "mermaid": {
-      "rendering": "ڈایاگرام بن رہا ہے…"
+      "rendering": "ڈایاگرام بن رہا ہے…",
+      "renderFailed": "یہ خاکہ رینڈر نہیں ہو سکا: {{reason}}"
     },
     "slash": {
       "aiContinue": "لکھنا جاری رکھیں (AI)",

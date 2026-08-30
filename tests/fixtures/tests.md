@@ -489,6 +489,26 @@ sequenceDiagram
     Server-->>Client: Encrypted blobs
 ```
 
+```mermaid
+flowchart LR
+  subgraph Clients["🖥️ Clients"]
+    direction TB
+    D["Desktop"]
+    W["Web"]
+    M["Mobile"]
+  end
+  subgraph Shared["Shared crates"]
+    subgraph Crypto["Crypto"]
+      P["protocol"]
+      V["myne-test-vectors"]
+    end
+    C["myne-core"]
+  end
+  Clients --> Shared
+  P --> V
+  C --> P
+```
+
 ---
 
 ## Emoji

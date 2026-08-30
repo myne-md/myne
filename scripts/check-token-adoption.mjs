@@ -83,6 +83,13 @@ const SCAN_ROOTS = presentSharedRoots().present;
  */
 const EXEMPT = [
   "src/styles/tokens.css", // the token sheet itself
+  // Mobile's token sheet, the same file one client over. Its absence here was
+  // drift rather than a decision: the two are the same kind of file, and the
+  // consequence is that a token DEFINITION added to mobile trips a guard whose
+  // whole subject is consuming tokens rather than defining them. That is the
+  // `check-prefs-nonce` shape the root CLAUDE.md records, where a roster kept a
+  // client out and the success line still read ok (myne-md/myne#629).
+  "mobile/src/styles/tokens.css",
   "src/dialect/html/print-stylesheet.ts", // standalone PDF doc; embeds its own :root
   "src/lib/themeMeasure.ts", // the token roster
   "src/lib/syntaxTheme.ts", // the built-in dark ramp it aliases to

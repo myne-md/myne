@@ -1512,7 +1512,15 @@ export function PaneView({
           flex: 1,
           minHeight: 0,
           // Which frame this is, and why, is on `PaneBody` above.
-          overflow: paneBody.fill ? "hidden" : "auto",
+          //
+          // Vertical only (myne-md/myne#630). `overflow: auto` is both axes, so
+          // this div was a horizontal scroll container in its own right, sitting
+          // outside `.cm-scroller` and reachable even after the editor stopped
+          // scrolling sideways. A pane is a fixed-width column by construction,
+          // one of a split, so there is nothing here that should be reached by
+          // scrolling right.
+          overflowX: "hidden",
+          overflowY: paneBody.fill ? "hidden" : "auto",
           // No TOP padding here: this div is the scroll parent of the in-note
           // find bar's sticky top panel, and a top padding leaves a band above the
           // bar where scrolled text bleeds through (MYND-299 QA). The 12px top

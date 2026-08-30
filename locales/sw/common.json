@@ -1216,7 +1216,8 @@
       "titlePlaceholder": "Bila kichwa"
     },
     "mermaid": {
-      "rendering": "Inachora mchoro…"
+      "rendering": "Inachora mchoro…",
+      "renderFailed": "Mchoro huu haukuweza kuonyeshwa: {{reason}}"
     },
     "slash": {
       "aiContinue": "Endelea kuandika (AI)",

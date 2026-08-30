@@ -91,6 +91,23 @@
   --ink-1:    #1a1a17;   /* primary text */
   --ink-0:    #0b0b09;   /* high-emphasis / display */
 
+  /* Diagram surface and ink (myne-md/myne#629). Deliberately NOT theme-aware and
+     deliberately not aliases of --paper / --ink-1: a mermaid diagram is drawn
+     with mermaid's own light palette baked into the SVG, so the card under it
+     has to stay light in every theme or the ink lands on its own colour. The
+     card's comment in editor/src/theme.ts said "fixed-light" while the surface
+     had drifted to var(--paper), which is how the dark and AMOLED themes ended
+     up with dark ink on a dark card.
+
+     A PAIR, not one token, because the two are one contrast decision and the
+     drift that caused the bug was exactly the surface moving while the ink did
+     not. Naming only the surface would leave that possible in the other
+     direction. Same values in every theme block by construction: defined here
+     and overridden nowhere. */
+  --diagram-surface: #fbfbfa;
+  --diagram-ink:     #1a1a17;
+  --diagram-danger:  #8a2a23;   /* the render-failure line, on that same surface */
+
   /* Semantic foreground/background aliases */
   --bg-1:     var(--paper);
   --bg-2:     var(--paper-2);

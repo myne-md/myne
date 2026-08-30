@@ -57,6 +57,7 @@ import { TaskField } from "@myne/dialect/lezer/task-field";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { lineBoundaryKeymap } from "./line-boundary";
+import { lineVerticalExtension, lineVerticalKeymap } from "./line-vertical";
 import { taskRowSelection } from "./task-selection";
 import { viewModeExtension, type ViewMode } from "./view-mode";
 import { textDirectionExtension } from "./direction";
@@ -401,6 +402,13 @@ export function myneExtensions(opts?: {
       // than CodeMirror's raw coordinate probe against the editor's right edge,
       // which drops the caret a row in this app's centred column (myne#286).
       ...lineBoundaryKeymap,
+      // Before defaultKeymap for the same reason one layer up: `cursorLineUp` /
+      // `cursorLineDown` fall back to that SAME probe internally, where no
+      // keymap can reach it, and their pixel-x goal means two different columns
+      // on a 2em heading and the 14px line under it. These keep a character
+      // column instead (myne-md/myne#631). AFTER tableKeymap, so arrowing into a
+      // read-only table still wins.
+      ...lineVerticalKeymap,
       ...defaultKeymap,
       { key: "Mod-u", run: undoSelection, preventDefault: true },
     ]),
@@ -415,6 +423,8 @@ export function myneExtensions(opts?: {
     // the rebindable Compartment above) reads this facet.
     indentUnit.of("    "),
     EditorView.lineWrapping,
+    // The sticky character column the arrow bindings above read (myne#631).
+    lineVerticalExtension(),
     // Scroll slack below the last line (#375) so the tail of a long note can be
     // lifted off the bottom edge of the viewport. NOT CodeMirror's
     // `scrollPastEnd()` — see the module header for why that one is wrong here.

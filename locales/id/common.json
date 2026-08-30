@@ -1225,7 +1225,8 @@
       "titlePlaceholder": "Tanpa judul"
     },
     "mermaid": {
-      "rendering": "Merender diagram…"
+      "rendering": "Merender diagram…",
+      "renderFailed": "Diagram ini tidak dapat ditampilkan: {{reason}}"
     },
     "slash": {
       "aiContinue": "Lanjutkan menulis (AI)",

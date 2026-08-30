@@ -357,16 +357,40 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
         />
       )}
 
-      {confirmDelete !== null && (
-        <DeleteConfirmModal
-          title={t("sync.panel.recovered.deleteConfirmTitle")}
-          body={`${confirmDelete.slice(0, 8)}…`}
-          warning={t("sync.panel.recovered.deleteConfirmWarning")}
-          confirmTestId="sync.recovered-delete-confirm"
-          onCancel={() => setConfirmDelete(null)}
-          onConfirm={doDelete}
-        />
-      )}
+      {confirmDelete !== null &&
+        (() => {
+          // The ONE call site that keeps the ring on Cancel, and it is the most
+          // final of the three irreversible ones. `quarantineDelete` destroys the
+          // last copy anywhere: the note's server record was deleted and
+          // reclaimed remotely, it is not in the vault's note set or in Trash,
+          // and `quarantine/` is not one of the directories the `.myne-backup`
+          // container enumerates. `docs/decisions/ui/0541` accepts a reflex Enter
+          // on the two erase paths that a backup can still answer for; this is
+          // not one of them, so the deliberate act here is a click or a Tab.
+          //
+          // The body names what is lost rather than eight hex characters of a
+          // file name: the row above already shows size and age, so the dialog
+          // showing less than the list it was opened from is the shape that
+          // makes a confirmation a formality.
+          const entry = entries.find((e) => e.file_name === confirmDelete);
+          const age =
+            entry?.modified_epoch_ms != null
+              ? formatRelativeTime(new Date(entry.modified_epoch_ms))
+              : "";
+          const facts = entry ? [formatBytes(entry.size), age].filter(Boolean).join(" · ") : "";
+          const id = (entry?.note_id_hex ?? confirmDelete).slice(0, 8);
+          return (
+            <DeleteConfirmModal
+              initialFocus="cancel"
+              title={t("sync.panel.recovered.deleteConfirmTitle")}
+              body={facts === "" ? `${id}…` : `${id}… · ${facts}`}
+              warning={t("sync.panel.recovered.deleteConfirmWarning")}
+              confirmTestId="sync.recovered-delete-confirm"
+              onCancel={() => setConfirmDelete(null)}
+              onConfirm={doDelete}
+            />
+          );
+        })()}
 
       <Toast message={toast} onDone={() => setToast(null)} variant="success" />
     </>

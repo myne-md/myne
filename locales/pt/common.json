@@ -1274,7 +1274,8 @@
       "titlePlaceholder": "Sem título"
     },
     "mermaid": {
-      "rendering": "A processar diagrama…"
+      "rendering": "A processar diagrama…",
+      "renderFailed": "Não foi possível renderizar este diagrama: {{reason}}"
     },
     "slash": {
       "aiContinue": "Continuar a escrever (IA)",

@@ -1216,7 +1216,8 @@
       "titlePlaceholder": "ไม่มีชื่อ"
     },
     "mermaid": {
-      "rendering": "กำลังเรนเดอร์ไดอะแกรม…"
+      "rendering": "กำลังเรนเดอร์ไดอะแกรม…",
+      "renderFailed": "ไม่สามารถแสดงผลไดอะแกรมนี้ได้: {{reason}}"
     },
     "slash": {
       "aiContinue": "เขียนต่อ (AI)",

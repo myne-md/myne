@@ -1225,7 +1225,8 @@
       "titlePlaceholder": "Uten tittel"
     },
     "mermaid": {
-      "rendering": "Tegner diagram…"
+      "rendering": "Tegner diagram…",
+      "renderFailed": "Dette diagrammet kunne ikke tegnes: {{reason}}"
     },
     "slash": {
       "aiContinue": "Fortsett å skrive (AI)",
