@@ -94,9 +94,11 @@ export async function setScreenCaptureOverride(
  * **The host performs the whole sequence**, rather than this side calling
  * `window.show()` and a re-apply after it. Two independent calls whose ordering
  * lives in a comment is the shape that failed at the other three re-show sites,
- * and it was worst here. It also let `core:window:allow-show` be dropped: this
- * was its only consumer, and a fixed sequence page context cannot parameterise
- * is narrower than a raw window operation.
+ * and it was worst here. It also let `core:window:allow-show` be dropped, this
+ * being its only consumer. That is a TRADE rather than a narrowing: the page
+ * loses its one window mutator and gains `unminimize` and `set_focus`, which
+ * `core:window:default`'s 28 read-only grants never included. What narrows is
+ * parameterisation, since page context chooses none of the values.
  *
  * Takes nothing and chooses nothing. Safe to call more than once.
  */

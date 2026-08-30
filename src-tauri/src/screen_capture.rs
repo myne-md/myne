@@ -42,7 +42,8 @@
 //!
 //! ## The device-local override
 //!
-//! Every state this module applies is `requested && !override`, where
+//! Every state the MAIN-WINDOW entry points apply ([`init`], [`apply`],
+//! [`reassert`], [`show_protected`]) is `requested && !override`, where
 //! the override is the device-local escape hatch of myne-md/myne#482
 //! ([`myne_core::screen_capture_override`]) plus the
 //! `--disable-screen-capture-protection` process flag. It exists because
@@ -52,6 +53,15 @@
 //! to the control. It is **device-wide, not pre-unlock-only**: an
 //! override that lapsed at unlock would put the black window straight
 //! back in front of the person it exists for.
+//!
+//! [`apply_inner`] is deliberately outside that sentence, and the four
+//! lines above say why it is `pub(crate)`: the pdf-export plugin drives
+//! its own hidden render window through it with an unconditional `true`,
+//! bypassing [`resolve`] and therefore the override. That window is never
+//! user-visible, so always-on costs nothing there and a device-local
+//! escape has no referent. Said out loud because a blanket "every state"
+//! in a security module's header is the class of over-claim this
+//! repository records against rosters and failure messages.
 //!
 //! ## Failure-mode asymmetry
 //!
@@ -268,6 +278,55 @@ where
     args.into_iter().any(|a| a.as_ref() == flag)
 }
 
+/// Any `myne://` element in an argv.
+///
+/// Matched on the scheme prefix rather than parsed, deliberately: a parser that
+/// rejected a malformed URL would answer "not a deep link" for exactly the
+/// inputs worth refusing. Case-insensitive because a URL scheme is.
+fn carries_deep_link<S: AsRef<std::ffi::OsStr>>(arg: &S) -> bool {
+    arg.as_ref()
+        .to_string_lossy()
+        .trim_start()
+        .to_ascii_lowercase()
+        .starts_with("myne://")
+}
+
+/// The form of [`flag_in`] every OS-DELIVERED argv goes through, and the whole
+/// difference is a refusal.
+///
+/// The `myne://` ingress and this flag arrive on the same vector, and
+/// `threat-model.md` § 7 rates that ingress as reachable by **any website** and
+/// as a nuisance-class capability, "not a data one". Whether a URL can become a
+/// second argv token at all depends on the Windows `"%1"` registry quoting and
+/// on browser escaping. That was not measured, and a rating resting on an
+/// unmeasured assumption is the shape this refusal exists to remove: an argv
+/// carrying a deep link cannot carry this flag under any quoting, so the
+/// ingress's authority is unchanged **by construction** rather than by
+/// argument.
+///
+/// **Both entry paths use it, and an earlier revision used it on only one.**
+/// That revision reasoned that the cold start was safe because "no website can
+/// start the process with an argv the user did not type", which `lib.rs`'s own
+/// MYND-567 comment contradicts twelve lines from the call site: on Windows and
+/// Linux the OS delivers a deep link by **spawning a process whose only argv is
+/// the URL**, and when the app is closed that process is the FIRST one, so it
+/// resolves through [`override_at_startup`]. Same unmeasured quoting question,
+/// other path, and that path is the one that reaches the pre-unlock screen
+/// carrying the account number. What the refusal costs is a launch that passes
+/// a deep link and the flag at once, which is not a shape a terminal user
+/// produces.
+pub fn flag_in_delivered_argv<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    let args: Vec<S> = args.into_iter().collect();
+    if args.iter().any(carries_deep_link) {
+        return false;
+    }
+    flag_in(args)
+}
+
 /// Resolve the device-local override at startup: the file AND the flag.
 ///
 /// **Both, always, with no short-circuit.** An earlier version returned as soon
@@ -287,7 +346,10 @@ where
 /// its own device-local config when `app_config_dir` is unreachable, and the
 /// same direction a damaged file takes.
 pub fn override_at_startup(app: &tauri::App) -> ScreenCaptureState {
-    let via_flag = flag_in(std::env::args_os().skip(1));
+    // The refusing form on this path too: when the app is CLOSED, a
+    // `myne://` deep link starts the process, so this argv is OS-delivered
+    // exactly like the relaunch one. See `flag_in_delivered_argv`.
+    let via_flag = flag_in_delivered_argv(std::env::args_os().skip(1));
     let host = myne_core::host::tauri_host::TauriHost::new(app.handle().clone());
     let file_disabled = tauri::async_runtime::block_on(async {
         use myne_core::screen_capture_override as sco;
@@ -398,10 +460,19 @@ pub fn init(app: &tauri::App) -> Result<(), tauri::Error> {
 /// request; `vault_unlock` and `vault_lock` always pass the persisted
 /// preference and `true` respectively.
 pub fn apply<R: tauri::Runtime>(app: &tauri::AppHandle<R>, enabled: bool, site: &'static str) {
+    // RECORD FIRST, then look the window up. `ScreenCaptureState`'s whole
+    // design rests on "`apply` is the only writer and every caller routes
+    // through it", and looking up first broke that on the one path where the
+    // lookup fails: a `vault_lock`'s `apply(app, true, "lock_reset")` returned
+    // without recording, leaving `last_requested` holding the UNLOCKED vault's
+    // preference, and the next `show_protected` then replayed that stale
+    // `false` onto the unlock screen. Recording is pure and cannot fail, so
+    // hoisting it costs nothing on the degraded path and closes the gap by
+    // construction rather than by remembering.
+    let effective = resolve(app, enabled, site);
     let Some(window) = main_window(app, site) else {
         return;
     };
-    let effective = resolve(app, enabled, site);
     apply_inner(&window, effective, site);
 }
 
@@ -463,8 +534,8 @@ pub fn reassert<R: tauri::Runtime>(app: &tauri::AppHandle<R>, site: &'static str
 ///
 /// **The one implementation of "re-show the main window", for every client.**
 /// Before myne-md/myne#483 the three-line `unminimize` / `show` / `set_focus`
-/// block was written out at three call sites and the fourth thing. Re-applying
-/// protection. Was missing from all three. One function is what makes that
+/// block was written out at three call sites, and the fourth thing, re-applying
+/// protection, was missing from all three. One function is what makes that
 /// omission impossible to repeat rather than merely fixed three times.
 ///
 /// **The fourth site goes through it too**, from page context, as
@@ -776,6 +847,126 @@ mod tests {
     }
 
     #[test]
+    fn apply_records_before_it_looks_the_window_up() {
+        // `ScreenCaptureState`'s design rests on "`apply` is the only writer and
+        // every caller routes through it". Looking the window up FIRST broke
+        // that on the one path where the lookup fails: a `vault_lock`'s
+        // `apply(app, true, "lock_reset")` returned without recording, leaving
+        // `last_requested` holding the unlocked vault's preference, and the next
+        // `show_protected` replayed that stale `false` onto the unlock screen.
+        //
+        // Asserted at the source because `apply` needs a running Tauri app.
+        // What that buys is narrow and real: it catches the ordering being
+        // swapped back, which is the way this regresses.
+        let src = include_str!("screen_capture.rs");
+        let body = src
+            .split_once("pub fn apply<R: tauri::Runtime>")
+            .expect("apply must still be named that")
+            .1
+            .split_once("\n}\n")
+            .expect("apply must have an end")
+            .0;
+
+        let resolve_at = body.find("resolve(app,").expect("apply must resolve");
+        let lookup_at = body
+            .find("main_window(app,")
+            .expect("apply must look the window up");
+        assert!(
+            resolve_at < lookup_at,
+            "apply must record through `resolve` BEFORE the window lookup that \
+             can early-return, or a failed lookup silently drops the request"
+        );
+    }
+
+    #[test]
+    fn a_relaunch_flag_is_folded_in_and_a_later_launch_cannot_clear_it() {
+        // The recovery route the module doc names: the app is already running,
+        // showing a black window, and the user reaches for a terminal. Emptying
+        // `note_flag_relaunch`'s body used to change nothing any test or
+        // scenario observed, which for the documented fallback of the
+        // fail-towards-protection arm is the one place inertness costs most.
+        let state = ScreenCaptureState::new(false, false);
+        assert!(!state.override_disabled(), "starts protected");
+
+        state.note_flag_relaunch();
+        assert!(state.via_flag(), "the second launch's flag is folded in");
+        assert!(state.override_disabled());
+        assert!(!state.file_disabled(), "and it never touches the file half");
+
+        // Set-only. A later launch WITHOUT the flag is a request to run
+        // normally, not a request to cancel an override asked for a moment ago,
+        // and quitting is how a flag is un-passed.
+        state.note_flag_relaunch();
+        assert!(state.via_flag(), "still set");
+        state.set_file_disabled(false);
+        assert!(
+            state.override_disabled(),
+            "clearing the FILE cannot clear a flag this run was given"
+        );
+    }
+
+    #[test]
+    fn the_relaunch_scan_skips_the_program_name_the_way_the_call_site_does() {
+        // `tauri-plugin-single-instance` sends `std::env::args()`, argv[0]
+        // included, and the call site is `args.iter().skip(1)`. Every other
+        // case in this module passes a list with no program name, so the shape
+        // that actually arrives was asserted nowhere.
+        let real = ["/usr/bin/myne", DISABLE_FLAG];
+        assert!(flag_in_delivered_argv(real.iter().skip(1)));
+
+        // And the skip has to be a skip rather than decoration: a program path
+        // that happens to end in the flag's text must not count as passing it.
+        let impostor = [DISABLE_FLAG, "--other"];
+        assert!(
+            !flag_in_delivered_argv(impostor.iter().skip(1)),
+            "argv[0] is the program name, never an argument"
+        );
+    }
+
+    #[test]
+    fn an_argv_carrying_a_deep_link_cannot_carry_the_flag_on_relaunch() {
+        // The relaunch path is the one place this flag reaches a session that
+        // may already be UNLOCKED, and the single-instance callback hands the
+        // same vector to the `myne://` ingress, which `threat-model.md` § 7
+        // rates as reachable by any website. Whether a URL can become a second
+        // argv token at all depends on Windows registry quoting nobody here
+        // measured, so the refusal makes the answer not matter.
+        assert!(
+            !flag_in_delivered_argv([DISABLE_FLAG, "myne://theme/install?x=1"]),
+            "a deep link anywhere in the vector refuses the flag"
+        );
+        assert!(
+            !flag_in_delivered_argv(["myne://x", DISABLE_FLAG]),
+            "order does not matter"
+        );
+        assert!(
+            !flag_in_delivered_argv([DISABLE_FLAG, "MYNE://X"]),
+            "a URL scheme is case-insensitive"
+        );
+        assert!(
+            !flag_in_delivered_argv([DISABLE_FLAG, "  myne://x"]),
+            "leading whitespace does not smuggle one past"
+        );
+
+        // And the ordinary terminal case still works, or the flag would be
+        // documented for a recovery it cannot perform.
+        assert!(flag_in_delivered_argv([DISABLE_FLAG]));
+        assert!(flag_in_delivered_argv(["--other", DISABLE_FLAG]));
+        assert!(
+            !flag_in_delivered_argv(["myne://x"]),
+            "a deep link alone is not it"
+        );
+        assert!(!flag_in_delivered_argv(Vec::<&str>::new()));
+
+        // A near-miss must NOT be treated as a deep link, or an unrelated
+        // argument could switch the refusal on and silently disarm the flag.
+        assert!(
+            flag_in_delivered_argv([DISABLE_FLAG, "notmyne://x"]),
+            "the scheme is matched at the start, not anywhere"
+        );
+    }
+
+    #[test]
     fn a_non_utf8_argv_does_not_stop_the_flag_being_found() {
         // `std::env::args()` panics on non-UTF-8 argv, which is why this takes
         // `OsStr`. A deep link arriving as a second launch is one way such an
@@ -801,25 +992,74 @@ mod tests {
     ///
     /// This is the regression [`show_protected`] exists to make impossible, and
     /// nothing else can see it: the block compiles, the window comes back, and
-    /// only the protection is missing. Asserted over the source of the three
-    /// files that used to carry a copy, because there is no runtime moment at
-    /// which a hand-rolled block announces itself.
+    /// only the protection is missing. There is no runtime moment at which a
+    /// hand-rolled block announces itself, so this reads the source.
+    ///
+    /// **It WALKS the tree rather than naming files, and matches the lookup
+    /// plus `show()` rather than `.unminimize()`.** The first version did both
+    /// the narrow things and its name claimed neither: a roster of the three
+    /// files that happened to carry a copy could not see a fifth site added
+    /// anywhere else, and `.unminimize()` is not in the shape that actually had
+    /// to be folded in. The WebView's own block was
+    /// `get_webview_window("main")` + `show()` + `set_focus()` with no
+    /// `unminimize` at all, so the guard was blind to the exact site
+    /// `show_protected`'s doc records as the worst of the four.
     ///
     /// Deleting the body of `show_protected` is the other half, and it surfaces
     /// as a `dead_code` warning on `raise_sequence` and `TauriRaise` under
     /// `-D warnings`, which `pre-push` and CI both run.
     #[test]
     fn the_reshow_sequence_is_not_hand_rolled_anywhere_else() {
-        for (name, src) in [
-            ("lib.rs", include_str!("lib.rs")),
-            ("clipper/relay_app.rs", include_str!("clipper/relay_app.rs")),
-            ("auto_lock.rs", include_str!("auto_lock.rs")),
-        ] {
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(dir).expect("src-tauri/src must be readable") {
+                let path = entry.expect("a readable entry").path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    out.push(path);
+                }
+            }
+        }
+
+        // BOTH trees. `src-tauri/CLAUDE.md` "Where the code actually lives"
+        // puts the plugin bodies in `core/` and names screen-capture apply as
+        // one of the side effects a shared core reaches through
+        // `VaultLifecycleHooks`, so a fifth re-show site added there would be
+        // invisible to a guard whose name says "anywhere else".
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let roots = [manifest.join("src"), manifest.join("../core/src")];
+        let mut files = Vec::new();
+        for root in &roots {
+            assert!(root.exists(), "{} must exist", root.display());
+            walk(root, &mut files);
+        }
+        // Non-vacuity floor: a walk that found nothing would pass silently, and
+        // this crate is far larger than this. The number is a floor rather than
+        // an equality so ordinary growth does not redden it.
+        assert!(
+            files.len() > 200,
+            "the walk found only {} file(s); it is not reading the tree",
+            files.len()
+        );
+
+        for path in files {
+            // This module IS the one implementation, so it is the one file
+            // allowed to carry the sequence.
+            if path.file_name().is_some_and(|n| n == "screen_capture.rs") {
+                continue;
+            }
+            let src = std::fs::read_to_string(&path).expect("a readable file");
+            let rel = path.strip_prefix(manifest).unwrap_or(&path).display();
+            assert!(
+                !(src.contains("get_webview_window(\"main\")") && src.contains(".show()")),
+                "{rel} looks up the main window and shows it by hand; every \
+                 re-show goes through `screen_capture::show_protected`, which \
+                 is what keeps the protect/show/protect ordering a property of \
+                 the code rather than a convention"
+            );
             assert!(
                 !src.contains(".unminimize()"),
-                "{name} raises a window by hand; every re-show goes through \
-                 `screen_capture::show_protected`, which is what keeps the \
-                 protect/show/protect ordering a property of the code"
+                "{rel} raises a window by hand; same rule, other shape"
             );
         }
     }

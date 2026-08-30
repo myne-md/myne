@@ -64,8 +64,17 @@ let readInFlight = false;
 let readLanded = false;
 const listeners = new Set<Listener>();
 
+// Bumped on every publish, so a read that started before a write and settled
+// after it can tell. Without it that read is a LOST UPDATE: the retry above
+// makes a second read ordinary (a failed boot read, then Settings opening), and
+// a toggle inside that window was silently reverted to the pre-write value on
+// both surfaces. Counting publishes rather than timestamping is what makes the
+// comparison exact regardless of clock or scheduling.
+let publishEpoch = 0;
+
 function publish(next: ScreenCaptureOverrideView | null): void {
   shared = next;
+  publishEpoch += 1;
   for (const listener of listeners) listener(next);
 }
 
@@ -73,9 +82,15 @@ function publish(next: ScreenCaptureOverrideView | null): void {
 function readOnce(): void {
   if (readInFlight || readLanded) return;
   readInFlight = true;
+  const startedAt = publishEpoch;
   void getScreenCaptureOverride()
     .then((next) => {
       readLanded = true;
+      // A write that landed while this read was in flight is NEWER than what
+      // the read is holding, so adopting it would revert the user's toggle.
+      // The read still counts as landed: it did reach the backend, and the
+      // value it lost to came from that same backend.
+      if (publishEpoch !== startedAt) return;
       publish(next);
     })
     .catch(() => {
@@ -91,11 +106,31 @@ function readOnce(): void {
     });
 }
 
+/**
+ * Whether the device override is suppressing protection right now, for callers
+ * outside React.
+ *
+ * The command palette needs this and cannot use the hook. `src/CLAUDE.md` states
+ * the rule it exists to satisfy: "a command-palette action that reaches the same
+ * setting needs the same guard, or the palette reopens the door the panel just
+ * closed." The Privacy panel renders the per-vault switch inert while the
+ * override is on, and `app.toggle-screen-capture` reached the identical
+ * `vault.prefs` setter with no guard at all, so `Cmd+K` wrote the preference,
+ * reported success, and `resolve()` turned it into `false` at the native call.
+ *
+ * Answers `false` before the first read lands, which is the same direction the
+ * two surfaces render: an unread override is not an override.
+ */
+export function screenCaptureOverrideIsActive(): boolean {
+  return shared?.effective ?? false;
+}
+
 /** Test seam: drop the shared cell so each spec starts from a cold process. */
 export function resetScreenCaptureOverrideForTest(): void {
   shared = null;
   readInFlight = false;
   readLanded = false;
+  publishEpoch = 0;
   listeners.clear();
 }
 

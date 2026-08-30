@@ -181,7 +181,15 @@ describe("pre-unlock escape: reachable without being visible", () => {
     fireEvent.click(await screen.findByTestId("screen-capture-escape.trigger"));
     fireEvent.click(await screen.findByTestId("screen-capture-escape.confirm"));
 
-    expect(await screen.findByTestId("screen-capture-escape.status")).toBeTruthy();
+    // The CONTENT, not the node: `ActionStatus` is persistently mounted with
+    // `message={null}` for as long as the dialog is open, so asserting the node
+    // exists passes on every path. Injecting `false` for the `status ===
+    // "failed"` condition left all 18 cases green, which is how this was found.
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("screen-capture-escape.status").textContent,
+      ).toBe(t("screenCaptureEscape.saveFailed")),
+    );
     // Still open: the window is unchanged, and a silent close would leave the
     // user looking at the same black rectangle with no reason given.
     expect(screen.getByTestId("screen-capture-escape.dialog")).toBeTruthy();
@@ -393,6 +401,76 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
       expect(row.getAttribute("data-superseded")).toBe("true"),
     );
     expect(reads).toBe(2);
+  });
+
+  it("holds the per-vault switch inert when the override could not be read", async () => {
+    // `null` is UNKNOWN, and collapsing it to "no override" left this switch
+    // LIVE on a device whose override may be on. Its `onChange` writes
+    // `vault.prefs`, which is AEAD-sealed and synced, then reports success
+    // while the window stays capturable. Asserted as the STATE: a click must
+    // not reach the setter.
+    stub({
+      [GET]: () => Promise.reject({ kind: "Io" }),
+      [PREFS_SET]: () => Promise.resolve(undefined),
+    });
+    render(<PrivacyPanel />);
+    const row = await screen.findByTestId("settings.screen-capture");
+    await waitFor(() =>
+      expect(row.getAttribute("data-superseded")).toBe("true"),
+    );
+    expect(
+      screen.getByText(t("settings.privacy.screenCaptureOverrideUnknown")),
+    ).toBeTruthy();
+
+    const toggle = screen.getByTestId("settings.screen-capture-toggle");
+    expect(toggle.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(toggle);
+    expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(false);
+  });
+
+  it("a write on one surface reaches the other without a remount", async () => {
+    // The regression the shared module cell was introduced for, and the half
+    // nobody asserted: two independent `view` cells meant turning the override
+    // ON in Settings left the Unlock screen's escape still reporting it off,
+    // offering "turn protection off" over a window that was already capturable
+    // and offering no way back on the one surface that has no Settings.
+    //
+    // Both surfaces are mounted in ONE tree here, which is the arrangement the
+    // module header says is real. The nearest existing case unmounts the first
+    // before rendering the second, so it exercises the initial read rather than
+    // the fan-out.
+    stub({
+      [SET]: () =>
+        Promise.resolve({ disabled: true, via_flag: false, effective: true }),
+    });
+    render(
+      <>
+        <ScreenCaptureEscape />
+        <PrivacyPanel />
+      </>,
+    );
+
+    const trigger = await screen.findByTestId("screen-capture-escape.trigger");
+    await waitFor(() =>
+      expect(trigger.getAttribute("data-override")).toBe("false"),
+    );
+
+    fireEvent.click(screen.getByTestId("settings.screen-capture-override-toggle"));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(SET, { disabled: true }),
+    );
+
+    // The escape, which nobody touched, now reports the new value.
+    await waitFor(() =>
+      expect(trigger.getAttribute("data-override")).toBe("true"),
+    );
+    // And the per-vault switch above the row goes inert in the same paint,
+    // which is what the panel needs the shared cell for.
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("settings.screen-capture").getAttribute("data-superseded"),
+      ).toBe("true"),
+    );
   });
 
   it("mirrors the override as its own row, and writes through it", async () => {

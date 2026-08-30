@@ -281,7 +281,10 @@ pub fn run() {
         // already resolved against it.
         use tauri::Manager as _;
         if let Some(state) = app.try_state::<screen_capture::ScreenCaptureState>() {
-            if screen_capture::flag_in(args.iter().skip(1)) {
+            // `flag_in_delivered_argv`, not `flag_in`: this same `args` vector
+            // is the `myne://` deep-link payload twelve lines above, and that
+            // ingress is reachable by any website. See the function's own doc.
+            if screen_capture::flag_in_delivered_argv(args.iter().skip(1)) {
                 state.note_flag_relaunch();
                 tracing::info!(event = "screen_capture_override_flag_relaunch");
             }

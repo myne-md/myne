@@ -18,8 +18,8 @@
 // ## READ THIS BEFORE CHANGING AN ASSERTION HERE
 //
 // This harness is Linux-only (tauri-driver has no macOS support, SYNC-1), and
-// `tauri::WebviewWindow::set_content_protected` is a compile-time no-op on Linux
-//. Tao gates it to macOS and Windows, and Tauri answers `Ok(())` regardless. So
+// `tauri::WebviewWindow::set_content_protected` is a compile-time no-op on Linux:
+// tao gates it to macOS and Windows, and Tauri answers `Ok(())` regardless. So
 // **nothing here proves the native state**, and it cannot: `decisions.md`
 // 0378 already records that the native side is not E2E-observable, because
 // `set_content_protected` is window state WebDriver cannot read.
@@ -50,7 +50,8 @@
 // SYNC-13: nothing here touches a password, a phrase or an account number.
 
 import { expect, it } from "vitest";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
 import { screenCaptureOverridePath, seedVault } from "./support/fixtures";
 import { ipcOk } from "./support/flows";
@@ -173,8 +174,21 @@ describeE2E("sc1 the escape is keyboard-reachable and consented (myne#482)", () 
       // Device-local: under app_config_dir, beside the other three
       // (`tor-routing.json`, `vault-names.json`, `ai-endpoint.json`), and NOT
       // inside any vault. A file in a vault directory would sync.
-      expect(screenCaptureOverridePath(app.appConfigDir)).toContain(app.appConfigDir);
+      // Asserted where the file is NOT, because that is the half that can
+      // fail. `screenCaptureOverridePath` is `join(appConfigDir, ...)`, so a
+      // line checking its output contains `appConfigDir` restates its own
+      // input and passes no matter what the code does.
       expect(existsSync(screenCaptureOverridePath(app.appDataDir))).toBe(false);
+      const vaultsDir = join(app.appDataDir, "vaults");
+      // Annotated rather than inferred: `@types/node` is not a dependency, so
+      // `readdirSync` is untyped here and `id` would be an implicit any, which
+      // `check-test-typecheck.mjs` counts. That guard is the only reporter for
+      // this tree, since `tsconfig.json` is `include: ["src"]`.
+      const vaultIds: string[] = existsSync(vaultsDir) ? readdirSync(vaultsDir) : [];
+      const strayInAVault = vaultIds.filter((id) =>
+        existsSync(join(vaultsDir, id, "screen-capture.json")),
+      );
+      expect(strayInAVault, "the override must not land in any vault").toEqual([]);
 
       // And the label now offers the way back, which is what stops the escape
       // being one-way for a user who took it by accident.
