@@ -10,6 +10,28 @@
 
 import { defineConfig, devices } from "@playwright/test";
 
+/**
+ * The dev-server port, overridable.
+ *
+ * **Why it is not simply 1422.** The port is a MACHINE-wide resource and
+ * `reuseExistingServer` is on, so a mobile dev server started from another
+ * worktree answers on it and this suite then drives THAT branch's app while
+ * reporting against this one's spec files. It happened while myne-md/myne#609
+ * was being reviewed: six new specs failed with "waiting for
+ * getByTestId('settings.dateTime.date-select')" and a page snapshot showing an
+ * Editor panel that genuinely had no such row, because the row is on this branch
+ * and the server was on another. That reads as a missing testid, not as a wrong
+ * server, which is why it cost an hour. The repo already records the same trap
+ * one port down, where a desktop `tauri dev` on 1420 made this tier connect to
+ * the desktop app.
+ *
+ * `MYNE_MOBILE_DEV_PORT=1522 pnpm test:flow` runs against a server you started
+ * yourself, which is the answer when the shared port is taken and killing
+ * somebody else's server is not.
+ */
+const PORT = process.env.MYNE_MOBILE_DEV_PORT ?? "1422";
+const BASE_URL = `http://localhost:${PORT}`;
+
 export default defineConfig({
   testDir: "./tests/flow-logic",
   testMatch: "**/*.flow.ts",
@@ -17,7 +39,7 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:1422",
+    baseURL: BASE_URL,
     trace: "off",
   },
   projects: [
@@ -57,8 +79,8 @@ export default defineConfig({
     // already has running; start one otherwise. `pnpm dev` resolves against
     // `mobile/package.json` because Playwright runs it with this config's
     // directory as cwd, so it starts the mobile server and not the desktop one.
-    command: "pnpm dev",
-    url: "http://localhost:1422",
+    command: `pnpm dev --port ${PORT} --strictPort`,
+    url: BASE_URL,
     reuseExistingServer: true,
     timeout: 120_000,
   },

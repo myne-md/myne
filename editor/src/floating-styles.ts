@@ -664,6 +664,19 @@ const CSS = `
   gap: var(--space-2);
   width: 100%;
 }
+/* The date-fallback notice (myne-md/myne#609): a quiet line of prose, not a row
+   of controls, so it overrides the flex row it inherits from. Muted like the
+   "No matches" status rather than coloured as a warning, because nothing went wrong,
+   the bar is saying which text produced the matches. It sits between the find
+   row and the replace row, which puts it directly above the Replace buttons it
+   explains being disabled. */
+.cm-find-bar-fallback-row {
+  display: block;
+  color: var(--fg-3, #6b6a64);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  padding-left: 2px;
+}
 /* The replace row's leading glyph sits in the same lead column as the find
    row's search icon (the toggle is the first element on the find row; the
    replace row reuses the lead-icon slot so the two inputs align). */

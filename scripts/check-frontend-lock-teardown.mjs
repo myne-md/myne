@@ -72,6 +72,21 @@ export const LEAVING_PATHS = [
     fn: "leaveActiveVault",
     why: "Vault CHANGE specifically, which is a superset of a lock: it is the only path where the next thing opened is a different vault.",
   },
+  {
+    file: "src/lib/vault-delete.ts",
+    fn: "deleteVault",
+    why: "The one desktop leaving path that reaches NEITHER of the two above, and the sharpest of the three: the vault it leaves no longer exists, so nothing will ever republish over what a store kept. Added by myne-md/myne#609 after a reviewer traced it; every store on this roster had been asserted on two paths and was resident after the third.",
+  },
+  {
+    file: "mobile/src/lib/vault-unlock.ts",
+    fn: "lockVault",
+    why: "Mobile's single lock choke point. `mobile/src/lib/vault-switch.ts` routes its switch through it, so one entry covers both. Added by myne-md/myne#609: the roster was DESKTOP-ONLY, which meant an entry claiming 'every leaving path' was asserted for one of the two clients and a reviewer could delete the mobile call with this guard still printing ok. That is the roster-blind-to-a-whole-client shape `check-prefs-nonce.mjs` is on record for.",
+  },
+  {
+    file: "mobile/src/lib/vault-delete.ts",
+    fn: "deleteVault",
+    why: "Mobile's delete, which bypasses `lockVault` exactly as desktop's bypasses both of its chokepoints. Worse here than on desktop: the stage leaves the editor without advancing the prefs nonce, so mobile's publisher never re-reads and the erased vault's values stay resident for the rest of the process.",
+  },
 ];
 
 /** The clear-on-leave call each module-scope vault-derived store exposes.
@@ -99,7 +114,41 @@ export const TEARDOWN_CALLS = [
     // ones. Also asserted on the switch, because that path is reached through
     // `leaveActiveVault` and a later refactor could stop routing it through
     // `lockVault` without anything noticing.
-    appliesTo: ["lockVault", "leaveActiveVault"],
+    appliesTo: ["src/lib/vault-unlock.ts::lockVault", "src/lib/vault-switch.ts::leaveActiveVault"],
+    skips: {
+      "mobile/src/lib/vault-unlock.ts::lockVault":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on this client to clear. Stated rather than left silent: the two mobile paths joined this roster in myne-md/myne#609, and a skip with no reason is exactly what this guard length-checks for.",
+      "mobile/src/lib/vault-delete.ts::deleteVault":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on this client to clear. Stated rather than left silent: the two mobile paths joined this roster in myne-md/myne#609, and a skip with no reason is exactly what this guard length-checks for.",
+      "src/lib/vault-delete.ts::deleteVault":
+        "the vault is being ERASED, and this store describes that vault's CONTENT, which is going away with it. The display store is on the delete path instead, because what it holds describes the READER (their formats and their zone) and therefore outlives the vault.",
+    },
+  },
+  {
+    call: "resetDateTimeDisplayForLock",
+    declaredIn: "editor/src/host/lib/datetimeFormat.ts",
+    holds:
+      "the reader's date format, time format and TIME ZONE, all derived from decrypted vault.prefs",
+    // Every leaving path. The zone is what puts this on the roster rather than
+    // the formats: it is a coarse-location datum that every other layer keeps
+    // per vault, and `dialect/src/taskFields.ts` keeps it out of note bytes for
+    // that reason. The store is module scope in a SHARED package, read by every
+    // surface that prints a date, and nothing in production returned it to
+    // defaults, so after one unlock the previous vault's zone stayed resident
+    // through a lock and into the next session until that vault's publisher
+    // happened to overwrite it (myne-md/myne#609, found by review).
+    //
+    // Asserted on the switch as well as the lock for the reason the three AI
+    // stores above are: a vault CHANGE is precisely the case where the resident
+    // value belongs to a different vault, and a later refactor could stop
+    // routing that path through `lockVault`.
+    appliesTo: [
+      "src/lib/vault-unlock.ts::lockVault",
+      "src/lib/vault-switch.ts::leaveActiveVault",
+      "src/lib/vault-delete.ts::deleteVault",
+      "mobile/src/lib/vault-unlock.ts::lockVault",
+      "mobile/src/lib/vault-delete.ts::deleteVault",
+    ],
     skips: {},
   },
   {
@@ -114,8 +163,15 @@ export const TEARDOWN_CALLS = [
     // into the next session, and nothing would say so.
     // `docs/decisions/ai/0276` rests its "no new at-rest magic byte, KEK or
     // format" argument on this transcript being RAM-only and dropped on lock.
-    appliesTo: ["lockVault", "leaveActiveVault"],
-    skips: {},
+    appliesTo: ["src/lib/vault-unlock.ts::lockVault", "src/lib/vault-switch.ts::leaveActiveVault"],
+    skips: {
+      "mobile/src/lib/vault-unlock.ts::lockVault":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on this client to clear. Stated rather than left silent: the two mobile paths joined this roster in myne-md/myne#609, and a skip with no reason is exactly what this guard length-checks for.",
+      "mobile/src/lib/vault-delete.ts::deleteVault":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on this client to clear. Stated rather than left silent: the two mobile paths joined this roster in myne-md/myne#609, and a skip with no reason is exactly what this guard length-checks for.",
+      "src/lib/vault-delete.ts::deleteVault":
+        "the vault is being ERASED, and this store describes that vault's CONTENT, which is going away with it. The display store is on the delete path instead, because what it holds describes the READER (their formats and their zone) and therefore outlives the vault.",
+    },
   },
   {
     call: "clearAiOutput",
@@ -132,17 +188,30 @@ export const TEARDOWN_CALLS = [
     // The note-SWITCH call in the Editor stays where it is. That one is about a
     // different event (note A's summary must not be insertable into note B) and
     // neither leaving path can speak for it.
-    appliesTo: ["lockVault", "leaveActiveVault"],
-    skips: {},
+    appliesTo: ["src/lib/vault-unlock.ts::lockVault", "src/lib/vault-switch.ts::leaveActiveVault"],
+    skips: {
+      "mobile/src/lib/vault-unlock.ts::lockVault":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on this client to clear. Stated rather than left silent: the two mobile paths joined this roster in myne-md/myne#609, and a skip with no reason is exactly what this guard length-checks for.",
+      "mobile/src/lib/vault-delete.ts::deleteVault":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on this client to clear. Stated rather than left silent: the two mobile paths joined this roster in myne-md/myne#609, and a skip with no reason is exactly what this guard length-checks for.",
+      "src/lib/vault-delete.ts::deleteVault":
+        "the vault is being ERASED, and this store describes that vault's CONTENT, which is going away with it. The display store is on the delete path instead, because what it holds describes the READER (their formats and their zone) and therefore outlives the vault.",
+    },
   },
   {
     call: "resetSessionIgnored",
     declaredIn: "editor/src/decorations/spell.ts",
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",
-    appliesTo: ["leaveActiveVault"],
+    appliesTo: ["src/lib/vault-switch.ts::leaveActiveVault"],
     skips: {
-      lockVault:
+      "src/lib/vault-unlock.ts::lockVault":
         "A plain lock does not change vault, and the ignore-this-session set is scoped to the session the user is still in. Clearing it at the lock choke point would discard a choice they made about the vault they are about to re-open. The store's own comment states the reason as a vault CHANGE, which is why this one is asserted on the switch path only.",
+      "mobile/src/lib/vault-unlock.ts::lockVault":
+        "mobile compiles `editor/src` and therefore does hold this store, but it runs no spell layer: there is no `spell_enabled` surface and no dictionary plugin under `mobile/src`, so nothing on this client ever puts a word in the set. If a mobile spell surface lands, this skip is what should fail first.",
+      "mobile/src/lib/vault-delete.ts::deleteVault":
+        "mobile compiles `editor/src` and therefore does hold this store, but it runs no spell layer: there is no `spell_enabled` surface and no dictionary plugin under `mobile/src`, so nothing on this client ever puts a word in the set. If a mobile spell surface lands, this skip is what should fail first.",
+      "src/lib/vault-delete.ts::deleteVault":
+        "the vault is being ERASED, and this store describes that vault's CONTENT, which is going away with it. The display store is on the delete path instead, because what it holds describes the READER (their formats and their zone) and therefore outlives the vault.",
     },
   },
 ];
@@ -247,12 +316,19 @@ export function analyse({ files, leavingPaths, teardownCalls }) {
       errors.push(`${path.fn}'s extracted body in ${path.file} spans another function`);
       continue;
     }
+    // `<file>::<fn>`, never the bare `fn`. Two clients name their choke point
+    // `lockVault` and both name their delete `deleteVault`, so a bare name is
+    // the same conflation `check-ipc-binding-callers.mjs` was corrected for one
+    // guard over: with it, mobile's `lockVault` was required to call the four
+    // DESKTOP-only stores, and a mobile skip could not be written at all
+    // (myne-md/myne#609, found when the mobile paths joined the roster).
+    const key = `${path.file}::${path.fn}`;
     for (const t of teardownCalls) {
-      if (!t.appliesTo.includes(path.fn)) {
+      if (!t.appliesTo.includes(key)) {
         // A skip needs a stated reason, on the same rule the exemption list in
         // the sibling guard follows: a silent absence is indistinguishable from
         // an oversight.
-        const why = t.skips?.[path.fn];
+        const why = t.skips?.[key];
         if (typeof why !== "string" || why.trim().length < 20) {
           errors.push(`${t.call} does not apply to ${path.fn} and gives no reason`);
         }

@@ -1189,6 +1189,7 @@
     },
     "find": {
       "close": "关闭查找",
+      "dateFallback": "正在搜索 {{stored}}，这是该日期的存储形式。",
       "matchCase": "区分大小写",
       "matchCount": "第 {{current}} 个，共 {{total}} 个",
       "nextMatch": "下一个匹配项",
@@ -1197,6 +1198,7 @@
       "previousMatch": "上一个匹配项",
       "replaceAll": "全部替换",
       "replaceAllCount": "全部替换（{{total}}）",
+      "replaceOffOnDateFallback": "当日期是以其存储形式匹配到的时候，替换会关闭，以免一次替换让该日期无法读取。",
       "replaceOne": "替换",
       "replacePlaceholder": "替换为",
       "toggleReplace": "切换替换"
@@ -3342,7 +3344,7 @@
     },
     "dateTime": {
       "dateLabel": "日期格式",
-      "dateHelper": "任务、已保存的视图和附件中日期的显示方式。",
+      "dateHelper": "在 Myne 显示日期的每个位置，日期以何种方式书写。",
       "dateSystem": "跟随语言",
       "timeLabel": "时间格式",
       "timeHelper": "选择时间以 24 小时制还是 12 小时制显示。",

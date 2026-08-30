@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
@@ -298,14 +299,56 @@ export function Segmented({
   active = 0,
   onChange,
   style,
+  label,
+  testId,
+  optionIds,
 }: {
   options: string[];
   active?: number;
   onChange?: (index: number) => void;
   style?: CSSProperties;
+  /** Accessible name for the group. A segmented control with none is a row of
+   *  words to a screen reader, with nothing saying what the choice is about. */
+  label?: string;
+  /** Testid for the group; each segment gets `<testId>.<optionId or index>`.
+   *  Added with myne-md/myne#609, whose date and time rows were the first
+   *  settings block in this sheet to ship with none while twelve siblings had
+   *  them. */
+  testId?: string;
+  optionIds?: readonly string[];
 }) {
+  // `radiogroup` plus `radio`, which is what this IS: one choice out of a small
+  // closed set. Before myne-md/myne#609 every segment was a bare `div` with an
+  // `onClick`, so the control had no role, could not be reached by keyboard at
+  // all, and announced nothing about which option was current. That is a
+  // pre-existing gap rather than one this issue introduced, fixed here because
+  // the issue added two more dependents to it.
+  const pick = (i: number) => (): void => onChange?.(i);
+  // ARROW KEYS, and they are not decoration. The roving `tabIndex` below makes
+  // only the SELECTED segment focusable, which is the standard radiogroup
+  // pattern and is unusable without them: Tab reaches the current choice, Enter
+  // re-picks the choice already made, and no key reaches any other. The first
+  // version shipped the roles and the roving index and no arrow handler, so the
+  // control announced itself as an operable radiogroup while being inoperable,
+  // which is worse than the un-roled `div` it replaced (myne-md/myne#609, found
+  // in review). Wrapping is what a radiogroup does; `dir` is not consulted
+  // because the visual order follows the DOM order under `flex` either way.
+  const ref = useRef<HTMLDivElement | null>(null);
+  const move = (i: number, delta: number) => (): void => {
+    if (onChange === undefined || options.length === 0) return;
+    const next = (i + delta + options.length) % options.length;
+    onChange(next);
+    // Focus follows selection, which is what makes the next arrow key continue
+    // from where the reader is rather than from where they started.
+    const el = ref.current?.children[next];
+    if (el instanceof HTMLElement) el.focus();
+  };
   return (
     <div
+      ref={ref}
+      role="radiogroup"
+      aria-label={label}
+      data-testid={testId}
       style={{
         display: "flex",
         padding: 2,
@@ -319,9 +362,36 @@ export function Segmented({
       {options.map((o, i) => (
         <div
           key={o}
-          onClick={onChange ? () => onChange(i) : undefined}
+          role="radio"
+          aria-checked={i === active}
+          tabIndex={onChange ? (i === active ? 0 : -1) : undefined}
+          data-testid={testId === undefined ? undefined : `${testId}.${optionIds?.[i] ?? i}`}
+          onClick={onChange ? pick(i) : undefined}
+          onKeyDown={
+            onChange
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onChange(i);
+                  } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                    e.preventDefault();
+                    move(i, 1)();
+                  } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    move(i, -1)();
+                  }
+                }
+              : undefined
+          }
           style={{
             flex: 1,
+            // Without it a long label refuses to shrink below its content and
+            // pushes the row past the card. Five options at 358 px is where that
+            // starts to matter, which is why it arrives with #609.
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
             textAlign: "center",
             padding: "7px 12px",
             borderRadius: 6,

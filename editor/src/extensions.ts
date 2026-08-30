@@ -156,6 +156,7 @@ import { buildMyneKeymap, collapseMultiSelection } from "./keymap";
 import { vimExtension } from "./vim";
 import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
+import { ambientLabelRefresh } from "./decorations/plugin-factory";
 import { scrollSlackExtension } from "./scroll-slack";
 import { myneTheme } from "./theme";
 
@@ -450,5 +451,19 @@ export function myneExtensions(opts?: {
     // editor's `data-focus-typewriter` ancestor gate is present (focusActive &&
     // pref). Keeps the active line vertically centered as the cursor moves.
     focusModeExtension(),
+    // Ambient-label refresh (myne-md/myne#609): turns a display-settings or
+    // language change into the rebuild signal the shared decoration gate reads.
+    // It decorates nothing.
+    //
+    // HERE rather than inside `myneDecorations()`, and the difference is real:
+    // that array lives in `viewModeDecorationsCompartment`, which `source` mode
+    // empties and every mode switch rebuilds. Mounted there, the subscription
+    // was destroyed and re-registered on each live/reading/source toggle and
+    // absent entirely in source mode, while its own comment claimed one mount
+    // per editor. No user-visible defect followed, since source mode draws no
+    // ambient label and a mode switch rebuilds everything anyway, but the
+    // lifetime did not match the claim and `view-mode.ts` describes that array
+    // as the decoration stack, which an extension that decorates nothing is not.
+    ambientLabelRefresh(),
   ];
 }

@@ -15,8 +15,8 @@
 //   - the click handler must resolve position LIVE, not from a closure captured
 //     at build time.
 
-import { describe, expect, it } from "vitest";
-import { EditorState } from "@codemirror/state";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { parser } from "../../src/dialect/lezer/parser";
@@ -28,11 +28,19 @@ import {
   TASK_CHIP_EVENT,
 } from "@myne/editor/decorations/task-chip";
 import { taskListDecorations } from "@myne/editor/decorations/task-list";
+import { ambientLabelRefresh } from "@myne/editor/decorations/plugin-factory";
+import {
+  DEFAULT_DISPLAY,
+  setDateTimeDisplay,
+  __resetDateTimeDisplayForTest,
+  type DateFormat,
+  type TimeFormat,
+} from "@myne/editor/host/lib/datetimeFormat";
 import i18n from "../../src/i18n";
 
 const DOC = "- [ ] pay the rent [due:: 2026-08-01]\n- [ ] second [due:: 2026-08-01]\n";
 
-function mount(doc = DOC): { view: EditorView; host: HTMLElement } {
+function mount(doc = DOC, extra: Extension[] = []): { view: EditorView; host: HTMLElement } {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const view = new EditorView({
@@ -41,6 +49,7 @@ function mount(doc = DOC): { view: EditorView; host: HTMLElement } {
       doc,
       extensions: [
         markdown({ base: { parser } as never }),
+        ...extra,
         taskListDecorations(),
         taskChipDecorations(),
       ],
@@ -53,6 +62,29 @@ function teardown(view: EditorView, host: HTMLElement): void {
   view.destroy();
   host.remove();
 }
+
+/**
+ * Pin the display settings for the file.
+ *
+ * myne-md/myne#609 routes the `due` and `remind` chip labels through the shared
+ * formatter, so what a chip prints now depends on ambient settings rather than
+ * on the source bytes alone. Every assertion below that was written against the
+ * source text still means "the chip carries the value", and `iso` is the one
+ * format whose output equals the source, so pinning it here keeps those tests
+ * testing what they were written to test. The formatting itself is exercised
+ * deliberately, in its own block, by varying this.
+ */
+function pinDisplay(dateFormat: DateFormat = "iso", timeFormat: TimeFormat = "24h"): void {
+  setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat, timeFormat });
+}
+
+beforeEach(() => {
+  pinDisplay();
+});
+
+afterEach(() => {
+  __resetDateTimeDisplayForTest();
+});
 
 describe("the chip renders", () => {
   it("replaces the due field with a chip carrying the value", () => {
@@ -540,9 +572,42 @@ describe("accessibility (task 10)", () => {
     const labels = [...host.querySelectorAll("[data-task-chip]")].map((e) =>
       e.getAttribute("aria-label"),
     );
-    expect(labels).toContain("due, 2026-08-01");
-    expect(labels).toContain("repeat, every week");
-    expect(labels).toContain("priority, low");
+    // The field name is the TRANSLATED one (myne-md/myne#609). It used to be the
+    // internal identifier, so a Turkish reader heard "due".
+    expect(labels).toContain("Due date, 2026-08-01");
+    expect(labels).toContain("Repeat, every week");
+    expect(labels).toContain("Priority, low");
+    teardown(view, host);
+  });
+
+  it("announces the field name in the reader's language, not the internal id", async () => {
+    i18n.addResourceBundle(
+      "tr",
+      "common",
+      { editor: { taskField: { title: { due: "Bitiş tarihi" } } } },
+      true,
+      true,
+    );
+    await i18n.changeLanguage("tr");
+    const { view, host } = mount("- [ ] x [due:: 2026-08-01]\n");
+    const label = host.querySelector("[data-task-chip]")?.getAttribute("aria-label") ?? "";
+    expect(label).toContain("Bitiş tarihi");
+    // The regression guard proper: the raw kind must not reappear. `due` is a
+    // substring of nothing else here, so this fails loudly if the interpolation
+    // is reverted.
+    expect(label.startsWith("due,")).toBe(false);
+    teardown(view, host);
+    await i18n.changeLanguage("en");
+  });
+
+  it("announces what a sighted reader sees, not the stored bytes", () => {
+    // A screen-reader user and the person next to them must hear and see the
+    // same date. The accessible name therefore carries the LABEL.
+    pinDisplay("dmy");
+    const { view, host } = mount("- [ ] x [due:: 2026-08-01]\n");
+    const label = host.querySelector("[data-task-chip]")?.getAttribute("aria-label") ?? "";
+    expect(label).toBe("Due date, 01/08/2026");
+    expect(label).not.toContain("2026-08-01");
     teardown(view, host);
   });
 
@@ -926,5 +991,215 @@ describe("the remind chip (myne#280)", () => {
     );
     expect(host.querySelectorAll('[data-testid="editor.task-chip-repeat"]').length).toBe(1);
     teardown(view, host);
+  });
+});
+
+describe("the chip prints the reader's chosen format (myne#609)", () => {
+  it("renders a due date in each of the numeric date formats", () => {
+    const cases: Array<[DateFormat, string]> = [
+      ["iso", "2026-08-01"],
+      ["dmy", "01/08/2026"],
+      ["mdy", "08/01/2026"],
+    ];
+    for (const [dateFormat, expected] of cases) {
+      pinDisplay(dateFormat);
+      const { view, host } = mount("- [ ] pay rent [due:: 2026-08-01]\n");
+      const chip = host.querySelector('[data-testid="editor.task-chip-due"]');
+      expect(chip?.textContent, `format ${dateFormat}`).toBe(expected);
+      teardown(view, host);
+    }
+  });
+
+  it("renders the month-name and system presets without falling back to the source", () => {
+    // These two go through `Intl`, so the exact string is the platform's to
+    // choose. What is asserted is that the chip is NOT the raw source, which is
+    // the regression this whole issue is about, plus that the year survives.
+    for (const dateFormat of ["dmmmy", "system"] as const) {
+      pinDisplay(dateFormat);
+      const { view, host } = mount("- [ ] pay rent [due:: 2026-08-01]\n");
+      const text = host.querySelector('[data-testid="editor.task-chip-due"]')?.textContent ?? "";
+      expect(text, `format ${dateFormat}`).not.toBe("2026-08-01");
+      expect(text, `format ${dateFormat}`).toContain("2026");
+      teardown(view, host);
+    }
+  });
+
+  it("prints a carried time on the chosen clock", () => {
+    pinDisplay("iso", "24h");
+    const a = mount("- [ ] ship it [due:: 2026-08-01 13:30]\n");
+    expect(a.host.querySelector('[data-testid="editor.task-chip-due"]')?.textContent).toBe(
+      "2026-08-01 13:30",
+    );
+    teardown(a.view, a.host);
+
+    pinDisplay("iso", "12h");
+    const b = mount("- [ ] ship it [due:: 2026-08-01 13:30]\n");
+    expect(b.host.querySelector('[data-testid="editor.task-chip-due"]')?.textContent).toBe(
+      "2026-08-01 1:30 PM",
+    );
+    teardown(b.view, b.host);
+  });
+
+  it("formats a remind chip on the same rule as a due chip", () => {
+    pinDisplay("dmy");
+    const { view, host } = mount("- [ ] call mother [remind:: 2026-08-01]\n");
+    expect(host.querySelector('[data-testid="editor.task-chip-remind"]')?.textContent).toBe(
+      "01/08/2026",
+    );
+    teardown(view, host);
+  });
+
+  it("never formats a value the dialect could not read", () => {
+    // The untyped arm renders raw source with a hint, deliberately: never a
+    // blank chip and never a silently corrected value. A formatter running
+    // before the typed check would turn this into a guess, so assert both that
+    // no chip appeared AND that the source text is still on screen.
+    pinDisplay("dmy");
+    const { view, host } = mount("- [ ] x [due:: not a date]\n");
+    expect(host.querySelectorAll('[data-testid="editor.task-chip-due"]').length).toBe(0);
+    expect(
+      host.querySelector('[data-testid="editor.task-field-invalid-due"]')?.textContent,
+    ).toContain("not a date");
+    teardown(view, host);
+  });
+
+  it("leaves the priority chip alone", () => {
+    pinDisplay("dmy");
+    const { view, host } = mount("- [ ] x [due:: 2026-08-01] [priority:: low]\n");
+    expect(host.querySelector('[data-testid="editor.task-chip-priority"]')?.textContent).toBe(
+      "low",
+    );
+    teardown(view, host);
+  });
+
+  it("keeps the stored bytes untouched while the label changes", () => {
+    // The whole point of the value and label split: a formatted label may never
+    // travel back into a write.
+    pinDisplay("dmy");
+    const { view, host } = mount("- [ ] pay rent [due:: 2026-08-01]\n");
+    expect(host.querySelector('[data-testid="editor.task-chip-due"]')?.textContent).toBe(
+      "01/08/2026",
+    );
+    expect(view.state.doc.toString()).toBe("- [ ] pay rent [due:: 2026-08-01]\n");
+    teardown(view, host);
+  });
+});
+
+describe("a settings change repaints an open note (myne#609)", () => {
+  /** As `mount`, plus the ambient-refresh plugin the real editor bundle carries.
+   *  A second copy of the extension list is a second thing to keep in step, so
+   *  this passes the one extra extension through `mount` instead. */
+  const mountLive = (doc: string) => mount(doc, [ambientLabelRefresh()]);
+
+  it("rebuilds the chip with no document change at all", () => {
+    pinDisplay("iso");
+    const { view, host } = mountLive("- [ ] pay rent [due:: 2026-08-01]\n");
+    const sel = '[data-testid="editor.task-chip-due"]';
+    expect(host.querySelector(sel)?.textContent).toBe("2026-08-01");
+
+    const docBefore = view.state.doc.toString();
+    pinDisplay("dmy");
+
+    // The assertion that would fail if the rebuild came from somewhere else:
+    // nothing here touched the document, the selection, the viewport or the
+    // focus, which are the four signals the default gate watches. Only the
+    // ambient effect can explain the new label.
+    expect(host.querySelector(sel)?.textContent).toBe("01/08/2026");
+    expect(view.state.doc.toString()).toBe(docBefore);
+    teardown(view, host);
+  });
+
+  it("follows a language change through the store's locale", () => {
+    // The language is not a second subscription: it rides `DateTimeDisplay`'s
+    // `locale`, which the host adapter republishes and `setDateTimeDisplay`
+    // diffs. Asserted with the `dmmmy` preset, the one whose output is
+    // language-dependent by construction.
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "dmmmy", locale: "en" });
+    const { view, host } = mountLive("- [ ] pay rent [due:: 2026-08-01]\n");
+    const sel = '[data-testid="editor.task-chip-due"]';
+    const inEnglish = host.querySelector(sel)?.textContent ?? "";
+
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "dmmmy", locale: "de" });
+    const inGerman = host.querySelector(sel)?.textContent ?? "";
+
+    expect(inEnglish).not.toBe("");
+    expect(inGerman).not.toBe(inEnglish);
+    teardown(view, host);
+  });
+
+  it("does not repaint when the published settings are identical", () => {
+    // `setDateTimeDisplay` no-ops on an equal value, so a prefs write that
+    // touched something else must not dispatch into every open editor. Proven
+    // through the transaction count rather than the label, because an identical
+    // label is exactly what a wasted rebuild also produces.
+    pinDisplay("dmy");
+    const { view, host } = mountLive("- [ ] pay rent [due:: 2026-08-01]\n");
+    let dispatched = 0;
+    const original = view.dispatch.bind(view);
+    // @ts-expect-error - test seam
+    view.dispatch = (...specs) => {
+      dispatched += 1;
+      return original(...(specs as never));
+    };
+    pinDisplay("dmy");
+    expect(dispatched).toBe(0);
+    teardown(view, host);
+  });
+
+  it("re-labels an OPEN note's recurrence chip on a language change", async () => {
+    // The date half rides `locale`; this is the other half, an `i18n.t` label
+    // read at build time. It is the case `callout.ts:109-114` documents and
+    // accepts today ("a switched language re-labels on the next rebuild (any
+    // edit, scroll or selection move). It isn't wired."), and the callout title
+    // is the same mechanism one decoration over, so wiring it here retires both.
+    //
+    // The language change is paired with a store publish because that is what
+    // production does: the host adapter carries the active language in
+    // `DateTimeDisplay.locale` and republishes when it changes. `i18n` itself is
+    // deliberately not a second subscription here, since this package sees only
+    // `t` through the `EditorHost` seam.
+    pinDisplay("iso");
+    const doc = "- [ ] x [due:: 2026-08-01] [repeat:: every week]\n";
+    const { view, host } = mountLive(doc);
+    const sel = '[data-testid="editor.task-chip-repeat"]';
+    expect(host.querySelector(sel)?.textContent).toBe("every week");
+
+    i18n.addResourceBundle(
+      "tr",
+      "common",
+      { recurrence: { every: { week: "her hafta" } } },
+      true,
+      true,
+    );
+    await i18n.changeLanguage("tr");
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "iso", locale: "tr" });
+
+    expect(host.querySelector(sel)?.textContent).toBe("her hafta");
+    expect(view.state.doc.toString()).toBe(doc);
+    teardown(view, host);
+    await i18n.changeLanguage("en");
+  });
+
+  it("releases its subscription when the view is destroyed", () => {
+    pinDisplay("iso");
+    const { view, host } = mountLive("- [ ] pay rent [due:: 2026-08-01]\n");
+
+    // Count dispatches through the view itself, not exceptions. CodeMirror does
+    // NOT throw on a dispatch into a destroyed view, which was measured rather
+    // than assumed: the first version of this test asserted `not.toThrow()` and
+    // passed with the `destroy()` body deleted, so it was asserting nothing.
+    // The subscription holds this `view` in a closure and reads `.dispatch` at
+    // call time, so replacing the property observes the leak directly.
+    let dispatched = 0;
+    const original = view.dispatch.bind(view);
+    // @ts-expect-error - test seam
+    view.dispatch = (...specs) => {
+      dispatched += 1;
+      return original(...(specs as never));
+    };
+
+    teardown(view, host);
+    pinDisplay("dmy");
+    expect(dispatched, "a listener outlived its view").toBe(0);
   });
 });

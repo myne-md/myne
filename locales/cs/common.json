@@ -1287,6 +1287,7 @@
     },
     "find": {
       "close": "Zavřít hledání",
+      "dateFallback": "Hledá se {{stored}}, tedy podoba, ve které je toto datum uloženo.",
       "matchCase": "Rozlišovat velikost písmen",
       "matchCount": "{{current}} z {{total}}",
       "nextMatch": "Další shoda",
@@ -1295,6 +1296,7 @@
       "previousMatch": "Předchozí shoda",
       "replaceAll": "Nahradit vše",
       "replaceAllCount": "Nahradit vše ({{total}})",
+      "replaceOffOnDateFallback": "Nahrazování je vypnuté, dokud se datum shoduje ve své uložené podobě, aby náhrada datum neučinila nečitelným.",
       "replaceOne": "Nahradit",
       "replacePlaceholder": "Nahradit za",
       "toggleReplace": "Přepnout nahrazování"
@@ -3562,7 +3564,7 @@
     },
     "dateTime": {
       "dateLabel": "Formát data",
-      "dateHelper": "Jak se datum zobrazuje v úkolech, uložených pohledech a přílohách.",
+      "dateHelper": "Jak se zapisuje datum všude, kde ho Myne zobrazuje.",
       "dateSystem": "Podle jazyka",
       "timeLabel": "Formát času",
       "timeHelper": "Zda se čas zobrazuje ve 24hodinovém, nebo 12hodinovém formátu.",

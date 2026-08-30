@@ -1,4 +1,4 @@
-import { type ChangeEvent, type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ChangeEvent, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
@@ -56,7 +56,21 @@ import {
   setCustomTheme,
   type PrefsView,
   setRemindersEnabled,
+  setDateFormat,
+  setTimeFormat,
+  setTimezone,
 } from "../../lib/prefs";
+import {
+  DATE_FORMATS,
+  TIME_FORMATS,
+  asDateFormat,
+  asTimeFormat,
+  formatCivilDate,
+  isSupportedTimeZone,
+  type DateFormat,
+  type TimeFormat,
+} from "@myne/editor/host/lib/datetimeFormat";
+import { useDateTimeDisplay } from "@myne/editor/host/lib/useDateTimeDisplay";
 import { formatBarLabelKey, resolveFormatBarOrder } from "../../lib/formatBarItems";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { VaultId } from "../../lib/stage";
@@ -243,19 +257,37 @@ function FieldLabel({ children, mt }: { children: ReactNode; mt: number }) {
 function SheetInput({
   value,
   onChange,
+  onBlur,
+  onKeyDown,
+  ariaLabel,
+  describedBy,
   type = "text",
   placeholder,
   autoFocus = false,
   mono = false,
   inputMode,
+  testId,
 }: {
   value: string;
   onChange: (v: string) => void;
+  /** Commit point for a field whose value is validated rather than free text.
+   *  Optional, so every existing caller is unchanged. */
+  onBlur?: () => void;
+  /** The SECOND commit point such a field needs. Blur alone is not enough on
+   *  Android, where the hardware back button dismisses a sheet without ever
+   *  blurring the focused input. Optional, same reason as `onBlur`. */
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
   type?: "text" | "password";
   placeholder?: string;
   autoFocus?: boolean;
   mono?: boolean;
   inputMode?: "numeric";
+  testId?: string;
+  /** Accessible NAME. A sibling `<div>` label carries no `for`, so a field
+   *  without this has none at all. */
+  ariaLabel?: string;
+  /** Id of the element carrying this field's helper or error text. */
+  describedBy?: string;
 }) {
   return (
     <input
@@ -268,6 +300,11 @@ function SheetInput({
       autoCorrect="off"
       spellCheck={false}
       onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+      data-testid={testId}
+      aria-label={ariaLabel}
+      aria-describedby={describedBy}
       style={{
         width: "100%",
         height: 50,
@@ -292,19 +329,316 @@ function SegmentBlock<T extends string | number>({
   labels,
   value,
   onPick,
+  testId,
 }: {
   label: string;
   options: readonly T[];
   labels: string[];
   value: T;
   onPick: (v: T) => void;
+  testId?: string;
 }) {
   const active = Math.max(0, options.indexOf(value));
   return (
     <div style={CARD_STYLE}>
-      <div style={{ fontSize: 16, marginBottom: 10, color: "var(--fg-1)" }}>{label}</div>
-      <Segmented options={labels} active={active} onChange={(i) => onPick(options[i])} />
+      <div style={BLOCK_LABEL_STYLE}>{label}</div>
+      <Segmented
+        options={labels}
+        active={active}
+        onChange={(i) => onPick(options[i])}
+        label={label}
+        testId={testId}
+        optionIds={options.map(String)}
+      />
     </div>
+  );
+}
+
+/**
+ * The same card with a native `<select>` instead of a segmented control.
+ *
+ * **Which of the two a setting gets is decided by option COUNT, not by taste**:
+ * `docs/design/README.md` puts two-to-four on Segmented and five-to-twelve on a
+ * Select. Five equal-width segments inside a card about 358 px wide leaves each
+ * one around 68 px, which is narrower than the shortest date sample it would
+ * have to show. The date format has exactly five, which is what this block was
+ * extracted for (myne-md/myne#609); the desktop twin carries the same
+ * over-count as a scoped deferral, and its dialog is wide.
+ *
+ * Extracted rather than written a second time: `LanguageBlock` already held one
+ * of these inline, hardcoding eight visual values that no custom theme could
+ * reach. Both now bind to tokens through this one control.
+ */
+function SelectBlock<T extends string>({
+  label,
+  options,
+  labels,
+  value,
+  onPick,
+  helper,
+  testId,
+}: {
+  label: string;
+  options: readonly T[];
+  labels: string[];
+  value: T;
+  onPick: (v: T) => void;
+  helper?: string;
+  testId: string;
+}) {
+  return (
+    <div style={CARD_STYLE}>
+      <div style={BLOCK_LABEL_STYLE}>{label}</div>
+      <select
+        value={value}
+        onChange={(e) => onPick(e.currentTarget.value as T)}
+        aria-label={label}
+        data-testid={testId}
+        style={SELECT_STYLE}
+      >
+        {options.map((o, i) => (
+          <option key={o} value={o}>
+            {labels[i]}
+          </option>
+        ))}
+      </select>
+      {helper === undefined ? null : <div style={SELECT_HELPER_STYLE}>{helper}</div>}
+    </div>
+  );
+}
+
+/** Bound to tokens rather than the eight literals `LanguageBlock` carried
+ *  inline, because a literal in an inline style outranks every stylesheet and is
+ *  permanently unreachable to a custom theme. */
+const SELECT_STYLE: CSSProperties = {
+  width: "100%",
+  height: 44,
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-2)",
+  background: "var(--bg-1)",
+  padding: "0 var(--space-3)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-md)",
+  color: "var(--fg-1)",
+  cursor: "pointer",
+  appearance: "none",
+  WebkitAppearance: "none",
+};
+
+/** The id the zone field's `aria-describedby` points at, so the helper line
+ *  and the refusal message are part of the field's description. */
+const ZONE_HELP_ID = "settings-datetime-zone-help";
+
+const SELECT_HELPER_STYLE: CSSProperties = {
+  marginTop: "var(--space-2)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  lineHeight: 1.4,
+};
+
+/** The label above a full-width control inside a settings card. Extracted from
+ *  {@link SegmentBlock} when a second card needed the identical heading, rather
+ *  than copied: two hand-written copies of one heading is how two settings rows
+ *  end up a pixel apart. Bound to tokens, since a literal in an inline style
+ *  outranks every stylesheet and is unreachable to any custom theme. */
+const BLOCK_LABEL_STYLE: CSSProperties = {
+  fontSize: "var(--text-md)",
+  marginBottom: "var(--space-2)",
+  color: "var(--fg-1)",
+};
+
+
+/**
+ * Settings → Editor date & time (myne#279, reached mobile in myne-md/myne#609).
+ *
+ * Three rows over `date_format` / `time_format` / `timezone`, deliberately the
+ * desktop's own copy keys (`settings.dateTime.*`), which are already translated
+ * into all 31 catalogs. A second set of strings for the same three settings is
+ * two things to keep in step and one of them would drift on the first copy edit.
+ *
+ * Each vocabulary is CLOSED, the same reasoning that keeps the recurrence
+ * vocabulary closed: a free-text pattern string is a mini-language to validate,
+ * localize and round-trip, for a setting most people set once.
+ *
+ * The date options carry a WORKED EXAMPLE rather than a name, because what the
+ * output looks like is the entire question the setting answers. The sample is
+ * rendered through the same formatter the chips and rows use, so the preview
+ * cannot disagree with the result.
+ *
+ * The timezone row is worth reading twice, because what it does is narrower
+ * than it looks and because it is the one of the three a computer's choice never
+ * overwrites here. `date_format` and `time_format` are shared scalar-LWW and
+ * arrive by sync from whichever device set them last; `timezone` is device-local
+ * by an explicit decision, since the right zone is a property of where a device
+ * IS, so a phone that travels and a computer that does not should not have to
+ * agree.
+ *
+ * Be exact about what device-local buys, because the looser claim was written
+ * here first: it is a MERGE classification (`PrefClass::DeviceLocal`,
+ * sync-protocol.md 10.2), not a transmission one. The zone never enters a `.myn`
+ * file, so a note never records where its author was, but it DOES live in the
+ * encrypted `vault.prefs` blob, which is pushed and pulled like every other
+ * prefs field; what device-local means is that the local value survives the
+ * merge, and 10.2.1 has a newly enrolled device adopt it as a starting default.
+ *
+ * It decides what counts as "today" and how a real instant prints. A time
+ * written in a note is never converted: 09:00 reads 09:00 everywhere.
+ */
+function DateTimeBlock({
+  dateFormat,
+  timeFormat,
+  timezone,
+  onDate,
+  onTime,
+  onZone,
+}: {
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+  timezone: string;
+  /** All three take the STORED shape, not the control's: `null` is "no explicit
+   *  choice", which is what the blob omits. The mapping lives here rather than
+   *  at the call site, where it was written four times and had to agree; `onZone`
+   *  already had this contract and the other two now match it. */
+  onDate: (v: DateFormat | null) => void;
+  onTime: (v: TimeFormat | null) => void;
+  /** @param onFailed run when the write is rejected, so this block can put the
+   *   stored zone back into its own text state. The two above need none: they
+   *   render straight off the prop. */
+  onZone: (v: string | null, onFailed: () => void) => void;
+}) {
+  const { t } = useTranslation();
+  const display = useDateTimeDisplay();
+  // A fixed sample, so every option is compared on the same date rather than on
+  // whatever today happens to be.
+  const SAMPLE_DATE = "2026-08-01";
+  // Seeded once. There is no effect mirroring the prop, deliberately: the first
+  // version had one, justified as "follow a sync arriving, another surface
+  // writing", and both are impossible for this field. `timezone` is device-local
+  // so it never arrives by sync, and this sheet is the only place on mobile that
+  // can set it. So the only thing that moves the prop is `commitZone` below,
+  // which sets the text itself.
+  const [zoneText, setZoneText] = useState(timezone);
+  const [zoneError, setZoneError] = useState(false);
+  // Re-seed when the PROP changes identity from the initial render, which on
+  // this path means exactly one thing: the first prefs read resolved. `usePrefs`
+  // answers `DEFAULT_PREFS` until then, so a reader who reaches Settings then
+  // Editor faster than a local blob decrypt saw an empty field over a set zone,
+  // and blurring it committed the emptiness (myne-md/myne#609, found in review).
+  // Keyed on the prop rather than on a loading flag so it stays correct if a
+  // second writer ever appears; `commitZone` sets the text itself, so the echo
+  // it writes equals the prop and this is a no-op on that path.
+  const seeded = useRef(timezone);
+  if (seeded.current !== timezone) {
+    seeded.current = timezone;
+    setZoneText(timezone);
+  }
+
+  const commitZone = (): void => {
+    const next = zoneText.trim();
+    // Refuse a zone this runtime cannot format in, rather than storing a value
+    // that silently reads as "unset" forever. Clearing the field is always
+    // allowed: empty IS "follow this device".
+    if (next !== "" && !isSupportedTimeZone(next)) {
+      setZoneError(true);
+      // Put the LAST STORED value back on screen, rather than leaving a value
+      // that was refused sitting in the field. Leaving it there is what the
+      // first version did, and it produces the worst of both readings: the row
+      // shows a zone, the vault holds a different one, and dismissing the sheet
+      // makes the wrong one look settled. The error line above says what was
+      // refused; the field says what is in effect.
+      setZoneText(timezone);
+      return;
+    }
+    setZoneError(false);
+    // Echo the trimmed value back into the field, so what is on screen is what
+    // was stored. This is the assignment the removed mirroring effect was doing
+    // by accident, made explicit and local to the one thing that causes it.
+    setZoneText(next);
+    // The field holds its own text, so a rejected write has to put the stored
+    // value back here as well as in the draft.
+    onZone(next === "" ? null : next, () => setZoneText(timezone));
+  };
+
+  // Typing clears the error, rather than only a successful commit doing it.
+  // Otherwise the red line and the refused-zone message stay under the field
+  // while the reader is midway through correcting exactly the thing it is
+  // complaining about.
+  const editZone = (v: string): void => {
+    setZoneText(v);
+    if (zoneError) setZoneError(false);
+  };
+
+  const dateLabels = (DATE_FORMATS as readonly DateFormat[]).map((value) =>
+    value === "system"
+      ? t("settings.dateTime.dateSystem")
+      : formatCivilDate(SAMPLE_DATE, { ...display, dateFormat: value }),
+  );
+  const timeLabels = (TIME_FORMATS as readonly TimeFormat[]).map((value) =>
+    value === "system"
+      ? t("settings.dateTime.timeSystem")
+      : t(value === "24h" ? "settings.dateTime.time24" : "settings.dateTime.time12"),
+  );
+
+  return (
+    <>
+      <SelectBlock
+        label={t("settings.dateTime.dateLabel")}
+        options={DATE_FORMATS}
+        labels={dateLabels}
+        value={dateFormat}
+        onPick={(v) => onDate(v === "system" ? null : v)}
+        testId="settings.dateTime.date-select"
+      />
+      <SegmentBlock
+        label={t("settings.dateTime.timeLabel")}
+        options={TIME_FORMATS}
+        labels={timeLabels}
+        value={timeFormat}
+        onPick={(v) => onTime(v === "system" ? null : v)}
+        testId="settings.dateTime.time-segmented"
+      />
+      <div style={CARD_STYLE}>
+        <div style={BLOCK_LABEL_STYLE}>{t("settings.dateTime.zoneLabel")}</div>
+        <SheetInput
+          value={zoneText}
+          onChange={editZone}
+          onBlur={commitZone}
+          // Enter commits too, not blur alone. On Android the hardware back
+          // button dismisses this sheet without ever blurring the field, so a
+          // blur-only commit silently discarded a zone the reader had typed and
+          // considered entered. The desktop twin commits on both.
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitZone();
+            }
+          }}
+          testId="settings.dateTime.zone-input"
+          // The label is a sibling div with no `for`, so without this the field
+          // has no accessible name at all. Its desktop twin sets one; the two
+          // sibling rows in this same block do too, which made the zone row the
+          // odd one out inside its own block.
+          ariaLabel={t("settings.dateTime.zoneLabel")}
+          describedBy={ZONE_HELP_ID}
+          placeholder={t("settings.dateTime.zonePlaceholder")}
+        />
+        <div
+          id={ZONE_HELP_ID}
+          // `alert` while it is a refusal, `status` while it is a helper. Colour
+          // alone is not a state signal, and the refusal also restores the field
+          // to the stored value, so without this a non-sighted user gets no
+          // indication that what they typed was rejected.
+          role={zoneError ? "alert" : "status"}
+          style={{
+            fontSize: "var(--text-sm)",
+            marginTop: "var(--space-2)",
+            color: zoneError ? "var(--danger)" : "var(--fg-2)",
+          }}
+        >
+          {zoneError ? t("settings.dateTime.zoneUnknown") : t("settings.dateTime.zoneHelper")}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -322,36 +656,17 @@ function LanguageBlock() {
   const active = i18n.resolvedLanguage ?? i18n.language;
   const value = SUPPORTED_CODES.includes(active) ? active : "en";
   return (
-    <div style={CARD_STYLE}>
-      <div style={{ fontSize: 16, marginBottom: 10, color: "var(--fg-1)" }}>{t("settings.language.label")}</div>
-      <select
-        value={value}
-        onChange={(e) => setLanguage(e.currentTarget.value as LanguageCode)}
-        aria-label={t("settings.language.label")}
-        data-testid="settings.language-select"
-        style={{
-          width: "100%",
-          height: 44,
-          border: "1px solid var(--line-2)",
-          borderRadius: 6,
-          background: "var(--bg-1)",
-          padding: "0 12px",
-          fontFamily: "var(--font-sans)",
-          fontSize: 16,
-          color: "var(--fg-1)",
-          cursor: "pointer",
-          appearance: "none",
-          WebkitAppearance: "none",
-        }}
-      >
-        {SUPPORTED_LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code}>
-            {l.label}
-          </option>
-        ))}
-      </select>
-      <div style={{ marginTop: 8, fontSize: 12, color: "var(--fg-3)", lineHeight: 1.4 }}>{t("settings.language.helper")}</div>
-    </div>
+    <SelectBlock
+      label={t("settings.language.label")}
+      options={SUPPORTED_CODES as readonly LanguageCode[]}
+      labels={SUPPORTED_CODES.map(
+        (code) => SUPPORTED_LANGUAGES.find((l) => l.code === code)?.label ?? code,
+      )}
+      value={value as LanguageCode}
+      onPick={setLanguage}
+      helper={t("settings.language.helper")}
+      testId="settings.language-select"
+    />
   );
 }
 
@@ -947,7 +1262,20 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
    *  failure path needs no bump because the draft key is dropped, leaving `eff`
    *  back on the unchanged `prefs`. In browser-dev (no Tauri host) the draft-only
    *  path keeps the UI interactive. */
-  function writeDraftPref<K extends keyof PrefsView>(key: K, value: PrefsView[K], persist: () => Promise<void>) {
+  /**
+   * @param onFailed run when the write is REJECTED, after the draft has been
+   *   rolled back. Optional, because most rows render straight off `eff` and the
+   *   rollback is the whole repair. A row holding its own text state does not:
+   *   the zone field kept the value that failed to store while the vault held
+   *   the old one, which is the reading its own validation branch was written to
+   *   prevent (myne-md/myne#609, found in review).
+   */
+  function writeDraftPref<K extends keyof PrefsView>(
+    key: K,
+    value: PrefsView[K],
+    persist: () => Promise<void>,
+    onFailed?: () => void,
+  ) {
     setDraft((d) => ({ ...d, [key]: value }));
     if (!HAS_TAURI) return;
     void persist().catch(() => {
@@ -957,6 +1285,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         return next;
       });
       setToast(t("settings.saveSettingError"));
+      onFailed?.();
     });
   }
 
@@ -1637,6 +1966,19 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 }}
               />
             </Group>
+            {/* Date & time (myne#279, reached mobile in myne-md/myne#609). In
+                the Editor panel, matching the desktop, where the same three rows
+                live in `EditorPanel`. Two of them arrive by sync and are here so
+                the phone can change them; the third, the zone, is device-local
+                and this is the ONLY place it can be set at all. */}
+            <DateTimeBlock
+              dateFormat={asDateFormat(eff.date_format)}
+              timeFormat={asTimeFormat(eff.time_format)}
+              timezone={eff.timezone ?? ""}
+              onDate={(v) => writeDraftPref("date_format", v, () => setDateFormat(v))}
+              onTime={(v) => writeDraftPref("time_format", v, () => setTimeFormat(v))}
+              onZone={(v, onFailed) => writeDraftPref("timezone", v, () => setTimezone(v), onFailed)}
+            />
             {/* MYND-555: the format-bar layout editor is its own panel — it is a
                 12-row reorder/hide list, too tall to inline under the toggles. */}
             <Group>

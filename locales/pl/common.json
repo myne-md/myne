@@ -1287,6 +1287,7 @@
     },
     "find": {
       "close": "Zamknij wyszukiwanie",
+      "dateFallback": "Trwa wyszukiwanie {{stored}}, czyli postaci, w jakiej ta data jest zapisana.",
       "matchCase": "Uwzględnij wielkość liter",
       "matchCount": "{{current}} z {{total}}",
       "nextMatch": "Następne dopasowanie",
@@ -1295,6 +1296,7 @@
       "previousMatch": "Poprzednie dopasowanie",
       "replaceAll": "Zamień wszystko",
       "replaceAllCount": "Zamień wszystko ({{total}})",
+      "replaceOffOnDateFallback": "Zamiana jest wyłączona, dopóki data jest znajdowana przez swoją zapisaną postać, żeby zamiana nie uczyniła jej nieczytelną.",
       "replaceOne": "Zamień",
       "replacePlaceholder": "Zamień na",
       "toggleReplace": "Przełącz zamianę"
@@ -3562,7 +3564,7 @@
     },
     "dateTime": {
       "dateLabel": "Format daty",
-      "dateHelper": "Jak daty są pokazywane w zadaniach, zapisanych widokach i załącznikach.",
+      "dateHelper": "Jak zapisywana jest data wszędzie tam, gdzie Myne ją pokazuje.",
       "dateSystem": "Zgodnie z językiem",
       "timeLabel": "Format godziny",
       "timeHelper": "Czy godziny są pokazywane w formacie 24- czy 12-godzinnym.",

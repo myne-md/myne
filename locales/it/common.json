@@ -1238,6 +1238,7 @@
     },
     "find": {
       "close": "Chiudi ricerca",
+      "dateFallback": "Ricerca di {{stored}}, la forma in cui questa data è salvata.",
       "matchCase": "Maiuscole/minuscole",
       "matchCount": "{{current}} di {{total}}",
       "nextMatch": "Corrispondenza successiva",
@@ -1246,6 +1247,7 @@
       "previousMatch": "Corrispondenza precedente",
       "replaceAll": "Sostituisci tutto",
       "replaceAllCount": "Sostituisci tutto ({{total}})",
+      "replaceOffOnDateFallback": "La sostituzione è disattivata finché una data viene trovata tramite la sua forma salvata, così una sostituzione non può renderla illeggibile.",
       "replaceOne": "Sostituisci",
       "replacePlaceholder": "Sostituisci con",
       "toggleReplace": "Attiva/disattiva sostituzione"
@@ -3452,7 +3454,7 @@
     },
     "dateTime": {
       "dateLabel": "Formato data",
-      "dateHelper": "Come vengono mostrate le date nelle attività, nelle viste salvate e negli allegati.",
+      "dateHelper": "Come viene scritta una data, ovunque Myne ne mostri una.",
       "dateSystem": "Segui la lingua",
       "timeLabel": "Formato ora",
       "timeHelper": "Se gli orari vengono mostrati nel formato a 24 ore o a 12 ore.",

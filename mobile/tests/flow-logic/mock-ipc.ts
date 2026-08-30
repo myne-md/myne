@@ -60,6 +60,10 @@ export interface MockConfig {
   /** What the status becomes after the user returns from the platform screen —
    *  the granted case, which a mock cannot otherwise reach. */
   exactAlarmAfterRequest?: "exact" | "approximate" | "not-applicable";
+  /** Make `set_timezone` REJECT, so a spec can drive the persist-failure
+   *  path: the row has to put the stored value back rather than keep the one
+   *  that did not land (myne-md/myne#609). */
+  timezoneWriteFails?: boolean;
   endpoint?: { endpoint_url: string | null; cert_pin_hex: string | null; pin_source: "static" | "tofu" | null };
   setEndpoint?: { fingerprint: string | null; pin_source: "static" | "tofu" | null };
   devices?: MockDevice[];
@@ -331,6 +335,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // would never produce: the seed would keep winning and the write would look
     // like a no-op on re-read.
     let customTheme: string | null = (config.prefs?.custom_theme as string | null | undefined) ?? null;
+    // Display date & time (myne#279, mobile in myne-md/myne#609). `null` is
+    // "no explicit choice", which is what the blob omits.
+    let dateFormat: string | null = (config.prefs?.date_format as string | null | undefined) ?? null;
+    let timeFormat: string | null = (config.prefs?.time_format as string | null | undefined) ?? null;
+    let timezone: string | null = (config.prefs?.timezone as string | null | undefined) ?? null;
     // STATEFUL vault icon (vault-icons). Same argument as custom_theme above,
     // with one extra reason: the catch-all at the bottom of this table resolves
     // an UNMOCKED command to `[]`, so without a real handler + store a picker
@@ -469,6 +478,9 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         editor_toolbar_order: toolbarOrder,
         editor_toolbar_hidden: toolbarHidden,
         custom_theme: customTheme,
+        date_format: dateFormat,
+        time_format: timeFormat,
+        timezone,
         item_order: itemOrder,
         icon: vaultIcon,
       }),
@@ -476,6 +488,32 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
       // real Rust codec, so mirror that here or the mock would let a test pass
       // against an ordering the device would never return.
+      // ── Display date & time (myne#279, mobile in myne-md/myne#609) ─────
+      // Record AND mutate, like the format-bar pair above: a handler that only
+      // records lets a test pass while the row renders the old value, which is
+      // the shape the whole issue was about.
+      "plugin:prefs|set_date_format": (args) => {
+        const v = (args.value ?? null) as string | null;
+        const w = window as unknown as { __dateFormatWrites?: (string | null)[] };
+        (w.__dateFormatWrites ??= []).push(v);
+        dateFormat = v;
+        return null;
+      },
+      "plugin:prefs|set_time_format": (args) => {
+        const v = (args.value ?? null) as string | null;
+        const w = window as unknown as { __timeFormatWrites?: (string | null)[] };
+        (w.__timeFormatWrites ??= []).push(v);
+        timeFormat = v;
+        return null;
+      },
+      "plugin:prefs|set_timezone": (args) => {
+        const v = (args.value ?? null) as string | null;
+        const w = window as unknown as { __timezoneWrites?: (string | null)[] };
+        (w.__timezoneWrites ??= []).push(v);
+        if (config.timezoneWriteFails) throw { kind: "Io", detail: { io_error_kind: "Other" } };
+        timezone = v;
+        return null;
+      },
       // ── Task reminders (MYND-619) ──────────────────────────────────────
       "plugin:prefs|set_reminders_enabled": (args) => {
         const enabled = Boolean(args.enabled);
