@@ -48,6 +48,34 @@ pub enum EngineError {
     AudioTooLong,
 }
 
+impl From<super::audio::AudioError> for EngineError {
+    /// One mapping, in one place, so a new [`AudioError`](super::audio::AudioError)
+    /// variant cannot quietly land in a catch-all.
+    ///
+    /// This was a `map_err(|e| match e { TooLong => …, _ => … })` at the call
+    /// site. That shape compiles forever: a ninth decode failure compile-fails
+    /// `AudioError::kind` in `audio.rs` and then arrives at the user as
+    /// "transcription failed, please try again", which is the exact collapse
+    /// `AudioTooLong` exists to undo. Written here and exhaustively, adding a
+    /// variant stops the build at this match instead (myne-md/myne#510).
+    fn from(e: super::audio::AudioError) -> Self {
+        use super::audio::AudioError;
+        match e {
+            // Not worth retrying: the same clip is refused every time.
+            AudioError::TooLong => EngineError::AudioTooLong,
+            // Every other decode failure is a malformed or unsupported
+            // container, which the surface reports as a generic failure.
+            AudioError::NotWave
+            | AudioError::NoFmtChunk
+            | AudioError::NoDataChunk
+            | AudioError::UnsupportedFormat
+            | AudioError::UnsupportedBitDepth
+            | AudioError::BadLayout
+            | AudioError::Empty => EngineError::TranscriptionFailed,
+        }
+    }
+}
+
 impl EngineError {
     /// Bounded, content-free tag for structured logging (DENY-list safe).
     // Consumed by command DENY-list logging in task 6; forward-declared here.
@@ -60,5 +88,42 @@ impl EngineError {
             EngineError::TranscriptionFailed => "transcription_failed",
             EngineError::AudioTooLong => "audio_too_long",
         }
+    }
+}
+
+#[cfg(test)]
+mod audio_error_mapping_tests {
+    use super::*;
+    use crate::plugins::local_inference::audio::AudioError;
+
+    /// Both directions, for the reason the desktop twin's copy states: asserting
+    /// only that `TooLong` maps to `AudioTooLong` would pass against a `From`
+    /// that answered `AudioTooLong` for everything.
+    #[test]
+    fn too_long_maps_to_its_own_engine_error_and_nothing_else_does() {
+        assert_eq!(
+            EngineError::from(AudioError::TooLong),
+            EngineError::AudioTooLong
+        );
+        for other in [
+            AudioError::NotWave,
+            AudioError::NoFmtChunk,
+            AudioError::NoDataChunk,
+            AudioError::UnsupportedFormat,
+            AudioError::UnsupportedBitDepth,
+            AudioError::BadLayout,
+            AudioError::Empty,
+        ] {
+            assert_eq!(
+                EngineError::from(other),
+                EngineError::TranscriptionFailed,
+                "{other:?} is a malformed-container failure and must stay retryable"
+            );
+        }
+    }
+
+    #[test]
+    fn the_too_long_kind_tag_is_the_one_the_frontend_maps() {
+        assert_eq!(EngineError::AudioTooLong.kind(), "audio_too_long");
     }
 }

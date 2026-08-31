@@ -917,13 +917,15 @@
           "captureFailed": "No se pudo iniciar la grabación. Comprueba el acceso al micrófono en Ajustes del sistema.",
           "generic": "No se pudo iniciar la grabación.",
           "locked": "Desbloquea tu bóveda para grabar una nota de voz.",
-          "noInputDevice": "No se encontró ningún micrófono. Conecta uno e inténtalo de nuevo."
+          "noInputDevice": "No se encontró ningún micrófono. Conecta uno e inténtalo de nuevo.",
+          "unsupportedSampleRate": "Tu micrófono graba a una frecuencia de muestreo que Myne no puede transcribir. Elige otro dispositivo de entrada o cambia su frecuencia de muestreo en los ajustes de sonido del sistema."
         },
         "stopError": {
           "captureFailed": "La grabación falló. Comprueba tu micrófono.",
           "emptyRecording": "No se grabó nada.",
           "generic": "No se pudo guardar la grabación.",
-          "silentRecording": "La grabación quedó en silencio y se descartó. Comprueba tu micrófono."
+          "silentRecording": "La grabación quedó en silencio y se descartó. Comprueba tu micrófono.",
+          "unsupportedSampleRate": "Tu micrófono graba a una frecuencia de muestreo que Myne no puede transcribir. No se guardó nada. Elige otro dispositivo de entrada o cambia su frecuencia de muestreo en los ajustes de sonido del sistema."
         }
       },
       "widget": {
@@ -969,6 +971,7 @@
             "featureOff": "La conversión de voz a texto está desactivada. Actívala en Ajustes → Transcripción.",
             "modelLoadFailed": "No se pudo cargar el modelo de voz a texto. Si has configurado un modelo personalizado en Ajustes → Desarrollador → IA, comprueba sus archivos; si no, al reinstalar Myne se restaura el integrado.",
             "noModel": "Falta el modelo de voz a texto. Al reinstalar Myne se restaura.",
+            "tooLong": "Esta grabación es demasiado larga para transcribirla. El audio sigue adjunto, así que puedes reproducirlo.",
             "vaultLocked": "Desbloquea tu bóveda para transcribir."
           },
           "disabledReason": "Activa la IA en Ajustes → Developer → IA para transcribir.",
