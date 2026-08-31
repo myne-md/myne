@@ -257,7 +257,26 @@ export function decideRenames(
       ambiguousLinks += inbound;
       continue;
     }
-    renames.set(note.title, renamedTitleFor(note.title, importLabel));
+    // The label is legal for THIS title, or there is no rename to make.
+    //
+    // `renamedTitleFor` returns the title unchanged when the label would push
+    // the result past `MAX_SEGMENT_BYTES`, which is deliberate (a skipped note
+    // rather than a corrupted one) and was silent. The input gate cannot cover
+    // it: `MyneVaultSetup` runs BEFORE the source vault is open, so it has no
+    // titles to measure against and validates the label's SHAPE only.
+    //
+    // Storing the no-op was the second half of the cost. A title-to-itself
+    // entry makes `planInboundRewrites` count rewrites that retargeted nothing,
+    // so `linksRetargeted` was inflated and the durable report note stated a
+    // number that described nothing. The note then took the skip arm anyway,
+    // because `decideMyneImport`'s second identity check found the unchanged
+    // key already present, and it landed on the note with the LONGEST title.
+    const renamed = renamedTitleFor(note.title, importLabel);
+    if (renamed === note.title) {
+      ambiguousLinks += inbound;
+      continue;
+    }
+    renames.set(note.title, renamed);
   }
   return { renames, ambiguousLinks };
 }
@@ -390,7 +409,20 @@ export function createMyneSource(
         // between the two calls, so the two hooks share no mutable state.
         const ids = planned.get(ctx.relPath)?.attachmentIds ?? new Set<string>();
         for (const id of ids) {
-          if (resealed.has(id)) continue;
+          // BOTH sets, and `refused` is the half that was missing. A failure
+          // records the id in `refused`, not in `resealed`, so a second note
+          // referencing the same failed attachment re-entered this loop, re-ran
+          // a full host-side AEAD open of up to 64 MiB against the source vault,
+          // failed again, and incremented `attachmentsFailed` again.
+          //
+          // `attachmentsCrossed` and `attachmentsDeduped` are counted once per
+          // ATTACHMENT; `attachmentsFailed` was counted once per (note,
+          // attachment) PAIR. They sit in the same report rows and the same
+          // summary block, so one refused file shared by twelve notes read as
+          // twelve refused attachments. The repeated decrypt is also wasted work
+          // proportional to the reference count, on the one path that touches
+          // source plaintext.
+          if (resealed.has(id) || refused.has(id)) continue;
           try {
             const out = await importSourceResealAttachment(sourceVaultId, id);
             resealed.set(id, out.target_id);

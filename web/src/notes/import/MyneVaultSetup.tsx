@@ -28,7 +28,14 @@
 // # What this file keeps
 //
 // The type and the export name, so the shared modal type-checks against the
-// same signature. The body throws rather than rendering a placeholder: this is
+// same signature -- EXCEPT that nothing checks that claim, which is worth
+// stating where the claim is made. `web/tsconfig.json` includes `src` and
+// `../src` with no `paths` mapping for `SUBSTITUTED_MODULES` (the substitution
+// is a Vite alias applied at BUILD time), so `tsc` resolves the desktop module
+// and never type-checks this file against the call site. The parity is
+// therefore a convention held by review, and it had already drifted inside the
+// change that asserted it: `error` was passed at the call site and missing
+// here. The body throws rather than rendering a placeholder: this is
 // not a "not available here" screen a user can reach, it is a branch that
 // should be unreachable, and a silent empty render would hide a routing bug
 // that made it reachable.
@@ -44,6 +51,10 @@ export interface MyneVaultSetupProps {
   }) => void;
   readonly onCancel: () => void;
   readonly onBack?: (() => void) | undefined;
+  /** The setup-step error banner, held by the parent so it survives the
+   *  remount a failed open causes. Present here because the call site passes
+   *  it; see the header for why no compiler was going to say so. */
+  readonly error?: string | null | undefined;
 }
 
 export function MyneVaultSetup(_props: MyneVaultSetupProps): ReactElement {

@@ -53,6 +53,30 @@ describe("decideRenames", () => {
     expect(got.ambiguousLinks).toBe(1);
   });
 
+  it("refuses a rename the label cannot legally produce, and reports it", () => {
+    // `renamedTitleFor` returns the title UNCHANGED when `<title> (<label>)`
+    // would pass `MAX_SEGMENT_BYTES`. That is deliberate, a skipped note rather
+    // than a corrupted one, and it used to be stored anyway: a title-to-itself
+    // entry made `planInboundRewrites` count rewrites that retargeted nothing,
+    // so `linksRetargeted` was inflated and the durable report note stated a
+    // number describing nothing. The note took the skip arm regardless.
+    //
+    // The input gate cannot catch this: `MyneVaultSetup` runs before the source
+    // vault is open, so it validates the label against a one-character sample
+    // and knows nothing about real title lengths.
+    const long = "L".repeat(250);
+    const notes = [{ title: long, folder: "A" }];
+    const existing = new Set([noteIdentityKey("A", long)]);
+    const got = decideRenames(
+      notes,
+      existing,
+      links({ [long.toLowerCase()]: ["n1"] }),
+      "A very long import label that pushes it over",
+    );
+    expect(got.renames.size).toBe(0);
+    expect(got.ambiguousLinks).toBe(1);
+  });
+
   it("leaves a colliding title with no inbound links alone", () => {
     // Nothing points at it, so there is nothing to retarget and no rename is
     // owed. This is the arm that keeps `ambiguousLinks` from counting titles

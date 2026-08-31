@@ -91,6 +91,24 @@ export interface MyneVaultSetupProps {
    * since the open failed and the run never started.
    */
   readonly error?: string | null;
+  /**
+   * The non-secret cells to come back to after a retryable failure.
+   *
+   * A wrong source password is the likeliest failure of this flow, and the
+   * retryable arm sets `phase` back to `setup`, which mounts a FRESH instance:
+   * every cell reset, including the 24 recovery words. The comment justifying
+   * that arm lists re-choosing the vault and re-typing the label as the outcome
+   * it avoids, and the user got exactly that plus a banner.
+   *
+   * Only the non-secret cells come back. The password and the phrase stay local
+   * and die with the unmount on purpose: carrying them up would keep a source
+   * vault's credential in a parent that outlives the setup step, and for a
+   * mistyped password the secret is the one thing the user has to retype
+   * anyway.
+   */
+  readonly initialChosen?: string | undefined;
+  readonly initialLabel?: string | undefined;
+  readonly initialKind?: CredentialKind | undefined;
 }
 
 const FIELD: CSSProperties = {
@@ -274,17 +292,22 @@ export function MyneVaultSetup({
   onCancel,
   onBack,
   error = null,
+  initialChosen,
+  initialLabel,
+  initialKind,
 }: MyneVaultSetupProps): ReactElement {
   const { t } = useTranslation();
   const [vaults, setVaults] = useState<VaultSummary[] | null>(null);
-  const [chosen, setChosen] = useState<string>(NO_VAULT);
-  const [kind, setKind] = useState<CredentialKind>("password");
+  const [chosen, setChosen] = useState<string>(initialChosen ?? NO_VAULT);
+  const [kind, setKind] = useState<CredentialKind>(initialKind ?? "password");
+  // Secret cells start EMPTY on every mount, including a retry. See
+  // `initialChosen` on the props for why they are not carried back.
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [cells, setCells] = useState<string[]>(() =>
     Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
   );
-  const [label, setLabel] = useState("");
+  const [label, setLabel] = useState(initialLabel ?? "");
 
   useEffect(() => {
     let live = true;
@@ -380,9 +403,22 @@ export function MyneVaultSetup({
   // collision down the skip path; refusing at the input is what turns that into
   // a sentence the user can act on.
   //
-  // Checked against a SAMPLE title rather than the label alone, because the
-  // rule bounds the whole segment: `isLegalSegment` rejects a trailing dot and
-  // a byte length, both properties of the result.
+  // Checked against a one-character SAMPLE title, and what that can and cannot
+  // establish is worth stating, because an earlier version of this comment
+  // claimed the length property and the check does not carry it.
+  //
+  // `isLegalSegment` rejects a trailing dot, illegal characters AND a byte
+  // length, and only the first two are properties of the label alone. The third
+  // is a property of the RESULT, so a label legal against `x` can still push a
+  // real title past `MAX_SEGMENT_BYTES`. This screen runs BEFORE the source
+  // vault is open and has no titles to measure against, so it cannot check it:
+  // the sample is the shortest possible title, which makes this the most
+  // permissive form of the rule rather than the intended one.
+  //
+  // The length case is therefore handled where the titles are known, in
+  // `decideRenames`: a title the label cannot legally extend is left unrenamed
+  // and its inbound links are counted as unresolved, so it appears in the
+  // report instead of taking the skip arm silently.
   const labelIllegal = !isLegalImportLabel("x", label);
 
   // §3.2 normalisation happens inside the derivation (`protocol.md` §7.4), so
