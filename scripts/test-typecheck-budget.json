@@ -22,7 +22,6 @@
     "tests/commands/workspaceHotkeysModalGate.test.tsx": 1,
     "tests/components/accountPanel.test.tsx": 1,
     "tests/components/AiPanel.test.tsx": 4,
-    "tests/components/settingsModal.test.tsx": 1,
     "tests/dialect/_genDialectVectors.test.ts": 1,
     "tests/dialect/_helpers.ts": 2,
     "tests/dialect/civilDate.test.ts": 3,
@@ -87,5 +86,5 @@
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 213
+  "total": 212
 }

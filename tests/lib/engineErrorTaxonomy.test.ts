@@ -99,6 +99,8 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     transcription_failed: "no provider accepts audio (decisions.md 2026-08-09)",
     deferred:
       "only a backend that serializes compute can defer, and this one runs out of process — Backend::serializes_compute is false for it",
+    audio_too_long:
+      "no provider accepts audio (decisions.md 2026-08-09), so this refusal is raised only by the in-process WAV decoder and never arrives from a provider call (myne#510)",
   },
   tagSuggest: {
     feature_off:
@@ -131,6 +133,8 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     index_not_ready: "same — the tag pass retrieves nothing",
     request_rejected:
       "the SYNC-14 bar means auto-tag never reaches a provider, so none can reject its request (myne#547)",
+    audio_too_long:
+      "transcription-only (myne#510): the tag pass is handed note TEXT and never opens an audio attachment, so the WAV decoder's ceiling is not on its path",
   },
 };
 

@@ -256,7 +256,7 @@
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
       "transcribeFailed": "Transcription failed. Please try again.",
-      "transcribeTooLong": "This recording is too long to transcribe.",
+      "transcribeTooLong": "This recording is too long to transcribe. The audio stays attached, so you can still play it back.",
       "transcribeFeatureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
       "transcribeModelLoadFailed": "Couldn't load the speech-to-text model. Reinstall Myne, or check your custom model in Settings → Developer → AI.",
       "transcribeNoModel": "Select a speech-to-text model in Settings → Developer → AI.",
@@ -878,13 +878,15 @@
           "captureFailed": "Couldn't start recording. Check microphone access in System Settings.",
           "generic": "Couldn't start recording.",
           "locked": "Unlock your vault to record a voice note.",
-          "noInputDevice": "No microphone found. Connect one and try again."
+          "noInputDevice": "No microphone found. Connect one and try again.",
+          "unsupportedSampleRate": "Your microphone records at a rate Myne can't transcribe. Pick a different input device, or change its sample rate in your system's sound settings."
         },
         "stopError": {
           "captureFailed": "Recording failed. Check your microphone.",
           "emptyRecording": "Nothing was recorded.",
           "generic": "Couldn't save the recording.",
-          "silentRecording": "Recording was silent and discarded. Check your microphone."
+          "silentRecording": "Recording was silent and discarded. Check your microphone.",
+          "unsupportedSampleRate": "Your microphone records at a rate Myne can't transcribe. Nothing was saved. Pick a different input device, or change its sample rate in your system's sound settings."
         }
       },
       "widget": {
@@ -930,6 +932,7 @@
             "featureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
             "modelLoadFailed": "Couldn't load the speech-to-text model. If you set a custom model in Settings → Developer → AI, check its files; otherwise reinstalling Myne restores the built-in one.",
             "noModel": "The speech-to-text model is missing. Reinstalling Myne restores it.",
+            "tooLong": "This recording is too long to transcribe. The audio stays attached, so you can still play it back.",
             "vaultLocked": "Unlock your vault to transcribe."
           },
           "failed": "Transcription failed. Please try again.",
@@ -3049,6 +3052,9 @@
       "exactLabel": "Exact timing",
       "exactOn": "On",
       "horizon": "Reminders are registered through {{date}}. Open Myne before then to keep them coming.",
+      "horizonLabel": "Schedule ahead",
+      "horizonLabelHelper": "Reminders are set up this far in advance. Myne has to be open and unlocked for one to arrive.",
+      "horizonInertHelper": "Saved on this device. Nothing reads it yet: this build does not deliver task reminders.",
       "label": "Task reminders",
       "saveError": "Could not save that setting. Try again.",
       "showTextAria": "Show task text in the notification",
@@ -3296,7 +3302,7 @@
         "newNoteLocation": "new note location folder default where notes created",
         "torRouting": "tor routing onion proxy network ip address location hide sync anonymity",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
-        "reminders": "reminders notify notification alert task due remind",
+        "reminders": "reminders notify notification alert task due remind horizon registration ahead days",
         "screenCapture": "screen capture protection screenshot recording block privacy",
         "showEditTimes": "show edit times timestamps modified dates notes",
         "spell": "spell check spelling dictionary autocorrect",

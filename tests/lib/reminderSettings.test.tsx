@@ -59,7 +59,7 @@ describe("the disclosure is load-bearing copy", () => {
     // must NOT appear: disclosing a leak that does not exist is its own kind of
     // dishonesty, and it would also imply closed-app delivery that is not there.
     const { host, cleanup } = render(
-      <ReminderSettings enabled horizonDays={null} onEnabledChange={() => {}} today="2026-07-28" />,
+      <ReminderSettings enabled onEnabledChange={() => {}} />,
     );
     expect(q(host, "settings.reminders.in-app-only")?.textContent).toBe(
       REMINDER_IN_APP_ONLY_SENTENCE,
@@ -94,7 +94,7 @@ describe("the disclosure is load-bearing copy", () => {
     // could not persist. A switch that forgets is worse than an absent one; the
     // reviewed wording is kept for the tier that will carry it.
     const { host, cleanup } = render(
-      <ReminderSettings enabled horizonDays={null} onEnabledChange={() => {}} today="2026-07-28" />,
+      <ReminderSettings enabled onEnabledChange={() => {}} />,
     );
     expect(q(host, "settings.reminders-text-toggle")).toBeNull();
     expect(q(host, "settings.reminders.text-disclosure")).toBeNull();
@@ -116,21 +116,15 @@ describe("the switch", () => {
   it("keeps the limitation visible when reminders are off", () => {
     // It explains what the switch does, so it stays either way.
     const { host, cleanup } = render(
-      <ReminderSettings
-        enabled={false}
-        horizonDays={null}
-        onEnabledChange={() => {}}
-        today="2026-07-28"
-      />,
+      <ReminderSettings enabled={false} onEnabledChange={() => {}} />,
     );
     expect(q(host, "settings.reminders.in-app-only")).not.toBeNull();
-    expect(q(host, "settings.reminders.horizon")).toBeNull();
     cleanup();
   });
 
   it("creates no new settings panel — it is a block, not a rail entry", () => {
     const { host, cleanup } = render(
-      <ReminderSettings enabled horizonDays={null} onEnabledChange={() => {}} />,
+      <ReminderSettings enabled onEnabledChange={() => {}} />,
     );
     expect(host.querySelectorAll("[role='tablist']")).toHaveLength(0);
     cleanup();
@@ -152,15 +146,12 @@ describe("the horizon line (task 13)", () => {
     expect(horizonThrough(null, "2026-07-28")).toBe(horizonThrough(7, "2026-07-28"));
   });
 
-  it("is NOT rendered while reminders are in-app only", () => {
-    // A registration horizon is only observable when the OS holds the
-    // registration. While reminders fire from the running app, "registered
-    // through 3 August" would describe a mechanism that is not running — so the
-    // line is gated with the tier rather than shown as decoration. The
-    // arithmetic above stays covered for the tier that will render it.
-    const { host, cleanup } = render(
-      <ReminderSettings enabled horizonDays={7} onEnabledChange={() => {}} today="2026-07-28" />,
-    );
+  it("is not rendered by the switch row, which owns no horizon at all", () => {
+    // The line moved to `ReminderHorizonSettings` in myne#508, beside the
+    // control that moves it. Its tier gate and its rendering are covered in
+    // `reminderHorizonPicker.test.tsx`; what this pins is that the switch row
+    // did not keep a second copy.
+    const { host, cleanup } = render(<ReminderSettings enabled onEnabledChange={() => {}} />);
     expect(q(host, "settings.reminders.horizon")).toBeNull();
     cleanup();
   });

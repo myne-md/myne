@@ -884,13 +884,15 @@
           "captureFailed": "Kayıt başlatılamadı. Sistem Ayarları’ndan mikrofon erişimini kontrol edin.",
           "generic": "Kayıt başlatılamadı.",
           "locked": "Sesli not kaydetmek için kasanızın kilidini açın.",
-          "noInputDevice": "Mikrofon bulunamadı. Bir tane bağlayıp tekrar deneyin."
+          "noInputDevice": "Mikrofon bulunamadı. Bir tane bağlayıp tekrar deneyin.",
+          "unsupportedSampleRate": "Mikrofonunuz Myne’in yazıya dökemeyeceği bir örnekleme hızında kaydediyor. Başka bir giriş aygıtı seçin ya da sisteminizin ses ayarlarından örnekleme hızını değiştirin."
         },
         "stopError": {
           "captureFailed": "Kayıt başarısız oldu. Mikrofonunuzu kontrol edin.",
           "emptyRecording": "Hiçbir şey kaydedilmedi.",
           "generic": "Kayıt kaydedilemedi.",
-          "silentRecording": "Kayıt sessizdi ve silindi. Mikrofonunuzu kontrol edin."
+          "silentRecording": "Kayıt sessizdi ve silindi. Mikrofonunuzu kontrol edin.",
+          "unsupportedSampleRate": "Mikrofonunuz Myne’in yazıya dökemeyeceği bir örnekleme hızında kaydediyor. Hiçbir şey kaydedilmedi. Başka bir giriş aygıtı seçin ya da sisteminizin ses ayarlarından örnekleme hızını değiştirin."
         }
       },
       "widget": {
@@ -936,6 +938,7 @@
             "featureOff": "Konuşmadan metne kapalı. Ayarlar → Yazıya dökme bölümünden açın.",
             "modelLoadFailed": "Konuşmadan metne modeli yüklenemedi. Ayarlar → Geliştirici → Yapay Zeka bölümünde özel bir model belirlediyseniz dosyalarını kontrol edin; aksi hâlde Myne’i yeniden kurmak yerleşik modeli geri getirir.",
             "noModel": "Konuşmadan metne modeli eksik. Myne’i yeniden kurmak onu geri getirir.",
+            "tooLong": "Bu kayıt yazıya dökülemeyecek kadar uzun. Ses dosyası ekli kalır, dolayısıyla dinleyebilirsiniz.",
             "vaultLocked": "Yazıya dökmek için kasanızın kilidini açın."
           },
           "disabledReason": "Yazıya dökmek için Ayarlar → Developer → Yapay Zeka bölümünden yapay zekayı açın.",
@@ -3071,6 +3074,9 @@
       "exactLabel": "Tam zamanlama",
       "exactOn": "Açık",
       "horizon": "Hatırlatıcılar {{date}} tarihine kadar kaydedildi. Gelmeye devam etmeleri için o tarihten önce Myne’i açın.",
+      "horizonLabel": "Önceden planla",
+      "horizonLabelHelper": "Hatırlatıcılar bu kadar önceden hazırlanır. Birinin gelmesi için Myne açık ve kilidi açılmış olmalı.",
+      "horizonInertHelper": "Bu cihazda saklandı. Henüz kimse okumuyor: bu sürüm görev hatırlatıcısı göndermiyor.",
       "label": "Görev hatırlatıcıları",
       "saveError": "O ayar kaydedilemedi. Tekrar deneyin.",
       "showTextAria": "Bildirimde görev metnini göster",
