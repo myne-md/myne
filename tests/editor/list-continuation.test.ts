@@ -13,7 +13,7 @@ import { EditorSelection, EditorState, type Transaction } from "@codemirror/stat
 import { EditorView } from "@codemirror/view";
 import { forceParsing } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { continueListMarkup } from "../../src/editor/list-continuation";
+import { continueListMarkup } from "@myne/editor/list-continuation";
 
 interface Mounted {
   readonly view: EditorView;

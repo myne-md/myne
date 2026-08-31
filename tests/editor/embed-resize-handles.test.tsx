@@ -15,7 +15,7 @@
 // can be asserted here: the arithmetic and the commit shape, not the pixels.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setWidthPx, toggleWidthPx } from "../../src/editor/attachments/embedLayoutActions";
+import { setWidthPx, toggleWidthPx } from "@myne/editor/attachments/embedLayoutActions";
 
 afterEach(() => {
   vi.restoreAllMocks();

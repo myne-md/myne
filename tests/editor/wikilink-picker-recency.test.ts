@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { rankNotes } from "../../src/editor/wikilink/picker-rank";
-import type { ResolverNote } from "../../src/editor/host/notes/resolveWikilink";
+import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 
 const note = (noteUuid: string, title: string): ResolverNote => ({
   noteUuid,
