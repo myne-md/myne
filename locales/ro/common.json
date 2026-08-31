@@ -3139,7 +3139,7 @@
       "title": "AI",
       "providerModelCount_few": "{{count}} modele disponibile.",
       "mobileEnableLabel": "Folosește IA pe acest telefon",
-      "mobileEnableHelper": "Oprit implicit. Myne nu rulează niciun model pe telefon, așa că fiecare cerere merge la un serviciu pe care îl numești mai jos, iar notițele tale părăsesc atunci acest dispozitiv.",
+      "mobileEnableHelper": "Dezactivat implicit. Niciun model AI de pe acest telefon nu răspunde la întrebări și nu îți citește notițele, deci fiecare cerere merge către un serviciu pe care îl numești mai jos, iar notițele tale părăsesc atunci acest dispozitiv. Transcrierea și textul din imagini rulează în continuare aici, pe modele livrate cu Myne.",
       "mobileKeyAdd": "Salvează cheia",
       "mobileKeyReplace": "Înlocuiește cheia",
       "mobileRevokeHelper": "Elimină împreună furnizorul, cheia lui și aprobarea acestui telefon, lăsând exact starea de dinaintea oricărei configurări. Celelalte dispozitive funcționează mai departe până le elimini și acolo.",

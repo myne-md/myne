@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Benötigt die Whisper-.gguf-Datei + config.json + tokenizer.json im selben Ordner.",
       "title": "KI",
       "mobileEnableLabel": "KI auf diesem Telefon nutzen",
-      "mobileEnableHelper": "Standardmäßig aus. Myne führt auf einem Telefon kein Modell aus, also geht jede Anfrage an einen Dienst, den Sie unten benennen, und Ihre Notizen verlassen dabei dieses Gerät.",
+      "mobileEnableHelper": "Standardmäßig aus. Kein KI-Modell auf diesem Telefon beantwortet Fragen oder liest Ihre Notizen, also geht jede Anfrage an einen Dienst, den Sie unten benennen, und Ihre Notizen verlassen dabei dieses Gerät. Transkription und Bildtext laufen weiterhin hier, auf Modellen, die mit Myne ausgeliefert werden.",
       "mobileKeyAdd": "Schlüssel speichern",
       "mobileKeyReplace": "Schlüssel ersetzen",
       "mobileRevokeHelper": "Entfernt den Anbieter, seinen Schlüssel und die Zustimmung dieses Telefons zusammen und stellt genau den Zustand her, als wäre nie etwas eingerichtet worden. Andere Geräte funktionieren weiter, bis Sie es dort ebenfalls entfernen.",

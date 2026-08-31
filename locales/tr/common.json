@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Aynı klasörde Whisper .gguf dosyası + config.json + tokenizer.json gerektirir.",
       "title": "Yapay Zeka",
       "mobileEnableLabel": "Bu telefonda yapay zekâyı kullan",
-      "mobileEnableHelper": "Varsayılan olarak kapalı. Myne telefonda hiçbir model çalıştırmaz; bu yüzden her istek aşağıda adını verdiğiniz bir hizmete gider ve notlarınız o sırada bu cihazdan çıkar.",
+      "mobileEnableHelper": "Varsayılan olarak kapalı. Bu telefondaki hiçbir yapay zekâ modeli soruları yanıtlamıyor ya da notlarınızı okumuyor, bu yüzden her istek aşağıda adını verdiğiniz hizmete gider ve notlarınız o anda bu cihazdan çıkar. Sesi yazıya dökme ve görsellerdeki metin yine burada, Myne ile gelen modellerle çalışır.",
       "mobileKeyAdd": "Anahtarı kaydet",
       "mobileKeyReplace": "Anahtarı değiştir",
       "mobileRevokeHelper": "Sağlayıcıyı, anahtarını ve bu telefonun onayını birlikte kaldırır; tam olarak hiç kurulmamış hâline döner. Diğer cihazlar, oradan da kaldırana kadar çalışmayı sürdürür.",

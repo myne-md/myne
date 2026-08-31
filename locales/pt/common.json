@@ -3139,7 +3139,7 @@
       "title": "IA",
       "providerModelCount_many": "{{count}} modelos disponíveis.",
       "mobileEnableLabel": "Usar IA neste telemóvel",
-      "mobileEnableHelper": "Desligado por predefinição. O Myne não executa nenhum modelo num telemóvel, por isso cada pedido vai para um serviço que indicar abaixo, e as suas notas saem deste dispositivo.",
+      "mobileEnableHelper": "Desativado por predefinição. Nenhum modelo de IA neste telemóvel responde a perguntas nem lê as suas notas, por isso cada pedido vai para um serviço que indicar abaixo, e as suas notas saem deste dispositivo nesse momento. A transcrição e o texto de imagens continuam a correr aqui, em modelos que vêm com o Myne.",
       "mobileKeyAdd": "Guardar chave",
       "mobileKeyReplace": "Substituir chave",
       "mobileRevokeHelper": "Remove o fornecedor, a sua chave e a aprovação deste telemóvel em conjunto, deixando exatamente o estado de nunca ter sido configurado. Os outros dispositivos continuam a funcionar até os remover lá também.",

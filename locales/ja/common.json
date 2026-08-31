@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Whisperの .gguf ファイル + config.json + tokenizer.json が同じフォルダに必要です。",
       "title": "AI",
       "mobileEnableLabel": "この端末で AI を使う",
-      "mobileEnableHelper": "既定でオフです。Myne は携帯端末でモデルを実行しないため、すべての要求は下で指定したサービスに送られ、そのときノートはこの端末を離れます。",
+      "mobileEnableHelper": "既定でオフ。この端末上の AI モデルが質問に答えたりノートを読んだりすることはないため、すべての要求は下で指定したサービスに送られ、そのときノートはこの端末を離れます。文字起こしと画像内テキストは引き続きこの端末で、Myne に同梱されたモデルで動きます。",
       "mobileKeyAdd": "キーを保存",
       "mobileKeyReplace": "キーを差し替え",
       "mobileRevokeHelper": "提供者、そのキー、この端末の承認をまとめて削除し、設定前とまったく同じ状態に戻します。他の端末は、そちらでも削除するまで動作を続けます。",

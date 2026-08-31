@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Szükséges a Whisper .gguf fájl + config.json + tokenizer.json ugyanabban a mappában.",
       "title": "AI",
       "mobileEnableLabel": "MI használata ezen a telefonon",
-      "mobileEnableHelper": "Alapértelmezés szerint kikapcsolva. A Myne telefonon nem futtat modellt, így minden kérés az alább megnevezett szolgáltatáshoz megy, és a jegyzeteid ilyenkor elhagyják ezt az eszközt.",
+      "mobileEnableHelper": "Alapértelmezetten kikapcsolva. Ezen a telefonon egyetlen MI-modell sem válaszol kérdésekre és nem olvassa a jegyzeteit, így minden kérés az alább megnevezett szolgáltatáshoz megy, és a jegyzetei ekkor elhagyják ezt az eszközt. Az átiratozás és a képek szövege továbbra is itt fut, a Myne-nal szállított modelleken.",
       "mobileKeyAdd": "Kulcs mentése",
       "mobileKeyReplace": "Kulcs cseréje",
       "mobileRevokeHelper": "Egyszerre távolítja el a szolgáltatót, a kulcsát és ennek a telefonnak a jóváhagyását, pontosan azt az állapotot hagyva, mintha soha nem lett volna beállítva. A többi eszköz addig működik tovább, amíg ott is el nem távolítod.",

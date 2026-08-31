@@ -3013,7 +3013,7 @@
       "recommendedFilesTranscription": "Inahitaji faili la Whisper la .gguf + config.json + tokenizer.json katika folda ile ile.",
       "title": "AI",
       "mobileEnableLabel": "Tumia AI kwenye simu hii",
-      "mobileEnableHelper": "Imezimwa kwa chaguo-msingi. Myne haiendeshi modeli yoyote kwenye simu, hivyo kila ombi huenda kwa huduma unayotaja hapa chini, na madokezo yako huondoka kwenye kifaa hiki wakati huo.",
+      "mobileEnableHelper": "Imezimwa kwa chaguo-msingi. Hakuna modeli ya AI kwenye simu hii inayojibu maswali au kusoma madokezo yako, kwa hivyo kila ombi huenda kwa huduma unayoitaja hapa chini, na madokezo yako huondoka kwenye kifaa hiki wakati huo. Unukuzi na maandishi ya picha bado hufanyika hapa, kwa modeli zinazokuja na Myne.",
       "mobileKeyAdd": "Hifadhi ufunguo",
       "mobileKeyReplace": "Badilisha ufunguo",
       "mobileRevokeHelper": "Huondoa mtoa huduma, ufunguo wake na idhini ya simu hii kwa pamoja, ikiacha hali ile ile ya kutokuwahi kusanidiwa. Vifaa vingine huendelea kufanya kazi hadi uviondoe huko pia.",

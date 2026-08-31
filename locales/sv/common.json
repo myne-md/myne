@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Behöver .gguf-filen för Whisper + config.json + tokenizer.json i samma mapp.",
       "title": "AI",
       "mobileEnableLabel": "Använd AI på den här telefonen",
-      "mobileEnableHelper": "Av som standard. Myne kör ingen modell på en telefon, så varje begäran går till en tjänst du anger nedan, och dina anteckningar lämnar då den här enheten.",
+      "mobileEnableHelper": "Av som standard. Ingen AI-modell i den här telefonen svarar på frågor eller läser dina anteckningar, så varje förfrågan går till en tjänst du namnger nedan, och dina anteckningar lämnar då enheten. Transkribering och text i bilder körs fortfarande här, på modeller som följer med Myne.",
       "mobileKeyAdd": "Spara nyckel",
       "mobileKeyReplace": "Byt nyckel",
       "mobileRevokeHelper": "Tar bort leverantören, dess nyckel och den här telefonens godkännande tillsammans, och lämnar exakt det tillstånd som rådde innan något ställdes in. Andra enheter fortsätter fungera tills du tar bort det där också.",
