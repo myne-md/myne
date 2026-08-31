@@ -177,6 +177,14 @@ const V = {
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
+  "src/lib/agent-protocol.ts": [
+    "ported",
+    "The wire TYPES and the pure predicates over them, split out of `agent-run.ts` so mobile could share them. It has no host reach at all \u2014 type declarations, a marker table and four functions over their own arguments \u2014 so it compiles and runs in the browser exactly as written. It is unreachable there for the same reason its siblings are (`agent` is `Class::Unsupported` in web/wasm/src/capability.rs), but unreachable is not the same as adapted: nothing about this module changes shape on web, and marking it `adapted` would claim a divergence that does not exist.",
+  ],
+  "src/lib/agent-run-core.ts": [
+    "adapted",
+    "The agent plugin's IPC bindings as a FACTORY: `invoke` and `Channel` arrive as arguments because a shared module may not import either (`scripts/check-platform-seam.mjs`). Same verdict and same reason as `agent-run.ts`, which is its desktop caller: every command it wraps is refused on web, since `agent` is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope). The factory itself would construct on web; what it returns has nothing to talk to.",
+  ],
   "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused."],
   "src/lib/ai-model-store.ts": ["adapted", "Unreachable where `localAi` is absent: no AI surface mounts on web, so nothing reads the store."],
   "src/lib/ai-capability.ts": [
