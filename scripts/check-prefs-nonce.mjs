@@ -126,8 +126,15 @@ export const { present: SCANNED_TREES, missing: SCANNED_TREES_MISSING } = presen
 
 // `writePref(` is optional in the pattern and mandatory in the rule: any prefs
 // literal NOT sitting as writePref's first argument is the violation.
-// Quote-agnostic and generic-agnostic, because both are the caller's free choice.
-const PREFS_WRITE_CALL = /(writePref\s*\(\s*)?["'`]plugin:prefs\|([a-z0-9_]+)["'`]/g;
+//
+// Quote-agnostic and generic-agnostic, because both are the caller's free
+// choice. The generic half is not hypothetical: `writePref<number>("plugin:…")`
+// is how the set mutators read their budget refusal count back
+// (myne-md/myne#613), and a pattern blind to `<…>` reports every one of them as
+// a direct invoke. The type-argument list is bounded to exclude `<`, `>` and
+// parens so it cannot run past its own closing angle bracket into the call.
+const PREFS_WRITE_CALL =
+  /(writePref\s*(?:<[^<>()]*>\s*)?\(\s*)?["'`]plugin:prefs\|([a-z0-9_]+)["'`]/g;
 
 // Rule 3's matcher: any BINDING named `writePref`, in any of the spellings a
 // module can use, outside a prefs module.
@@ -227,7 +234,11 @@ export function analyse({ prefsSource, missingTrees } = {}) {
       });
     }
 
-    if (!/async function writePref\(/.test(prefsSrc)) {
+    // Same generic tolerance as `PREFS_WRITE_CALL` above, and for the same
+    // reason: `async function writePref<T = void>(` IS the chokepoint, and
+    // reading it as absent turns every legitimate write in the file into a
+    // violation while hiding the one arm that would have been real.
+    if (!/async function writePref\s*(?:<[^<>()]*>\s*)?\(/.test(prefsSrc)) {
       failures.push({
         file: rel,
         line: 0,

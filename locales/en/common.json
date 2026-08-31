@@ -1794,6 +1794,8 @@
       "moveCollision": "There's already a folder with that name there.",
       "unsettledSave": "An open note hasn't finished saving, so the folder was left alone. Try again once it has.",
       "renameFailed": "Couldn't rename the folder, so it is unchanged.",
+      "folderListFull": "Myne can remember a limited number of folders, and that list is full. This folder still works, but it will disappear when its last note leaves it. Deleting a folder you no longer need makes room.",
+      "folderNotRemembered": "The folder was created, but Myne couldn't record it. It will disappear when its last note leaves it, and it is gone at the next unlock if it is still empty. Creating it again is safe.",
       "deliberateWriteFailed": "The folder was renamed, but one of its settings could not be saved. An empty folder will reappear under the old name each time you unlock; deleting it is safe and changes nothing else. Renaming the folder again will not clear it."
     },
     "folderNote": {
@@ -1865,6 +1867,9 @@
         "cancelledNotImported_one": "{{count}} not imported",
         "cancelledNotImported_other": "{{count}} not imported",
         "cancelling": "Cancelling…",
+        "foldersNotKeptNote": "{{count}} will vanish when its last note leaves",
+        "foldersNotKeptNote_one": "{{count}} will vanish when its last note leaves",
+        "foldersNotKeptNote_other": "{{count}} will vanish when their last note leaves",
         "chooseFolder": "Choose folder…",
         "close": "Close",
         "closeAriaLabel": "Close",
@@ -1913,6 +1918,7 @@
         "statCanvasSkipped": ".canvas files skipped",
         "statCompressed": "Images compressed",
         "statEmptyFoldersKept": "Empty folders kept",
+        "statFoldersNotKept": "Folders not kept",
         "statMedia": "Media",
         "statOtherSkipped": "Other files skipped",
         "statSkipped": "Skipped (already exist)",
@@ -2614,7 +2620,7 @@
       "openGraph": "Open graph"
     },
     "archive": {
-      "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder and hides the archive controls.",
+      "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder, un-archives every archived folder, and hides the archive controls. It applies to the whole vault, on every device.",
       "label": "Archiving",
       "off": "Off",
       "on": "On",
@@ -3027,6 +3033,7 @@
       "torLabel": "Route sync through Tor"
     },
     "prefs": {
+      "folderListFull": "That folder list is full. Remove a folder from it before adding another.",
       "saveError": "Couldn't save preference. Try again."
     },
     "reminders": {

@@ -786,6 +786,22 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
           <StatRow label={t("notes.import.modal.statExcalidrawSkipped")} value={result.ignore.excalidrawSkipped} muted />
           <StatRow label={t("notes.import.modal.statOtherSkipped")} value={result.ignore.nonMarkdownSkipped} muted />
           <StatRow label={t("notes.import.modal.statEmptyFoldersKept")} value={result.emptyFoldersPreserved} muted />
+          {/* myne-md/myne#613: shown only when the reserved byte budget refused
+              some of the folders this import created. Silence here would mean
+              the user learns about it weeks later, when a folder they emptied
+              disappears. Warning-coloured like the cancelled row, because it is
+              the same class of fact: the import succeeded, and part of what was
+              asked for did not land. */}
+          {result.foldersNotPreserved > 0 && (
+            <StatRow
+              label={t("notes.import.modal.statFoldersNotKept")}
+              valueNode={
+                <span style={{ fontSize: "var(--text-sm)", color: "var(--warning)" }}>
+                  {t("notes.import.modal.foldersNotKeptNote", { count: result.foldersNotPreserved })}
+                </span>
+              }
+            />
+          )}
           {result.cancelled !== null && (
             <StatRow
               label={t("notes.import.modal.statCancelled")}

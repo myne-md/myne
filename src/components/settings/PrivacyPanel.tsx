@@ -14,6 +14,8 @@
 // hareketsizlik sonrası kasayı kilitle.") await an app-wide i18n layer.
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+
+import { mutationFrom } from "../../lib/prefs";
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import {
@@ -352,8 +354,15 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           onSetEnabled={(next) => {
             void setCliEnabled(next);
           }}
-          onSetExcludedFolders={(folders) => {
-            void setCliExcludedFolders(folders);
+          onSetExcludedFolders={(folders, seededFrom) => {
+            // Diffed against what this panel last saw, not against the current
+            // cache. Same reasoning as AiPanel: an exclusion a peer added while
+            // the user was editing is in the cache and not in the editor's
+            // list, and diffing against the cache would call that a removal
+            // (myne-md/myne#613). The CLI exclusion list is an egress control,
+            // so the fail-open direction is the terminal reading a folder the
+            // user marked hidden.
+            void setCliExcludedFolders(mutationFrom(seededFrom, folders), folders);
           }}
           onSetRateLimitDisabled={(next) => {
             void setCliRateLimitDisabled(next);

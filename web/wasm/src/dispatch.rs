@@ -2426,7 +2426,9 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
             struct Args {
-                languages: Vec<String>,
+                // myne#613: verbs, not a whole set. A whole-set write
+                // let a stale caller claim a deletion it never made.
+                mutation: myne_core::plugins::prefs::set_mutation::SetMutation,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -2441,12 +2443,15 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 crate::session::state(),
                 crate::session::hooks(),
-                a.languages,
+                a.mutation,
                 vault_io(),
             )
             .await
             {
-                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                // The count of additions the byte budget refused (myne-md/myne#613).
+                // Answering `null` here would make every web write read as a
+                // clean success and put the budget notice out of reach.
+                Ok(refused) => Outcome::ok(&refused),
                 Err(e) => Outcome::error(&e),
             }
         }
@@ -2486,7 +2491,9 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
             struct Args {
-                folders: Vec<String>,
+                // myne#613: verbs, not a whole set. A whole-set write
+                // let a stale caller claim a deletion it never made.
+                mutation: myne_core::plugins::prefs::set_mutation::SetMutation,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -2501,12 +2508,15 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 crate::session::state(),
                 crate::session::hooks(),
-                a.folders,
+                a.mutation,
                 vault_io(),
             )
             .await
             {
-                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                // The count of additions the byte budget refused (myne-md/myne#613).
+                // Answering `null` here would make every web write read as a
+                // clean success and put the budget notice out of reach.
+                Ok(refused) => Outcome::ok(&refused),
                 Err(e) => Outcome::error(&e),
             }
         }
@@ -2515,7 +2525,9 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
             struct Args {
-                folders: Vec<String>,
+                // myne#613: verbs, not a whole set. A whole-set write
+                // let a stale caller claim a deletion it never made.
+                mutation: myne_core::plugins::prefs::set_mutation::SetMutation,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -2530,12 +2542,15 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 crate::session::state(),
                 crate::session::hooks(),
-                a.folders,
+                a.mutation,
                 vault_io(),
             )
             .await
             {
-                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                // The count of additions the byte budget refused (myne-md/myne#613).
+                // Answering `null` here would make every web write read as a
+                // clean success and put the budget notice out of reach.
+                Ok(refused) => Outcome::ok(&refused),
                 Err(e) => Outcome::error(&e),
             }
         }
@@ -2660,7 +2675,9 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
             struct Args {
-                folders: Vec<String>,
+                // myne#613: verbs, not a whole set. A whole-set write
+                // let a stale caller claim a deletion it never made.
+                mutation: myne_core::plugins::prefs::set_mutation::SetMutation,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -2675,12 +2692,15 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 crate::session::state(),
                 crate::session::hooks(),
-                a.folders,
+                a.mutation,
                 vault_io(),
             )
             .await
             {
-                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                // The count of additions the byte budget refused (myne-md/myne#613).
+                // Answering `null` here would make every web write read as a
+                // clean success and put the budget notice out of reach.
+                Ok(refused) => Outcome::ok(&refused),
                 Err(e) => Outcome::error(&e),
             }
         }

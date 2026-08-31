@@ -28,6 +28,7 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -58,6 +59,7 @@ import {
   setAiProviderConsent,
   setAiProviderKey,
   setAiProviderModel,
+  mutationFrom,
 } from "../../lib/prefs";
 import {
   aiCapabilityReport,
@@ -341,6 +343,32 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const [excludedDraft, setExcludedDraft] = useState<string>(
     prefs.ai_excluded_folders.join("\n"),
   );
+  // What the draft was seeded from, which is what a commit must diff against.
+  // NOT `prefs.ai_excluded_folders` at commit time: the user may have been
+  // typing for minutes, and an exclusion a peer added in that window is in the
+  // cache and not in the draft, so diffing against the cache would call it a
+  // removal and delete it on every device (myne-md/myne#613). An entry that
+  // arrived after the seed is in neither side and is therefore never claimed.
+  const excludedSeedRef = useRef<string[]>(prefs.ai_excluded_folders);
+  // Both of the two above are `useState`/`useRef` INITIALISERS, so they captured
+  // the first render's value, and at first render `usePrefs` still holds
+  // `DEFAULT_PREFS` (its disk read lands in an effect). That made the textarea
+  // render empty over a non-empty stored set, and worse, it made
+  // `mutationFrom(seed, folders)` add-only: an exclusion stored before the panel
+  // opened could not be removed through this surface AT ALL. Before the
+  // add/remove verbs the whole-set write removed it, destructively but
+  // effectively, so this regressed the control `docs/threat-model.md` A17 rests
+  // its remote-provider mitigation on.
+  //
+  // Re-seed once, when the read lands. `touchedRef` is what keeps a user who
+  // started typing before the read from having their edit replaced: the guard is
+  // the reason this is an effect rather than a `key` on the textarea.
+  const excludedTouchedRef = useRef(false);
+  useEffect(() => {
+    if (excludedTouchedRef.current) return;
+    excludedSeedRef.current = prefs.ai_excluded_folders;
+    setExcludedDraft(prefs.ai_excluded_folders.join("\n"));
+  }, [prefs.ai_excluded_folders]);
   // The endpoint edit buffer. Starts empty and STAYS empty until the host says
   // otherwise — the placeholder is the only place the conventional address
   // appears (see `ENDPOINT_PLACEHOLDER`).
@@ -680,7 +708,10 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       .split("\n")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-    void setAiExcludedFolders(folders);
+    void setAiExcludedFolders(mutationFrom(excludedSeedRef.current, folders), folders);
+    excludedSeedRef.current = folders;
+    // The draft now IS the seed, so a later prefs change may re-seed again.
+    excludedTouchedRef.current = false;
   };
 
   // The catalogue, filtered to what this arm can actually use. Myne's remote
@@ -1234,7 +1265,10 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           data-testid="ai.excluded-folders"
           value={excludedDraft}
           disabled={!aiEnabled}
-          onChange={(e) => setExcludedDraft(e.target.value)}
+          onChange={(e) => {
+            excludedTouchedRef.current = true;
+            setExcludedDraft(e.target.value);
+          }}
           onBlur={commitExcluded}
           rows={3}
           spellCheck={false}

@@ -24,7 +24,7 @@ const SOURCE = "src/notes/components/useFolderManagement.ts";
  * The orchestrator behind the hook, added to the scan because the class moved
  * there and the guard stayed here.
  *
- * `renameFolder` awaits `setDeliberateFolders` PAST its transactional batch, so
+ * `renameFolder` awaits `mutateDeliberateFolders` PAST its transactional batch, so
  * it can fail with the rename already on disk, and myne-md/myne#520's review put
  * the handling for that in `folderActions.ts` as a `try`/`catch`. This file read
  * one source and one literal shape (`.catch(() => {})`), so a swallow in its own
@@ -73,10 +73,10 @@ describe("folder prefs writes", () => {
   });
 
   it("each archived_folders write captures the previous value first", () => {
-    // The revert needs something to revert TO. A `setArchivedFolders(...)` whose
+    // The revert needs something to revert TO. A `mutateArchivedFolders(...)` whose
     // catch does not restore a captured value is the same bug wearing a catch.
     const src = readFileSync(SOURCE, "utf8");
-    const persists = [...src.matchAll(/void setArchivedFolders\([^)]*\)\.catch\(\(\) => \{([^}]*)\}\)/g)];
+    const persists = [...src.matchAll(/void mutateArchivedFolders\((?:[^()]|\([^()]*\))*\)\.catch\(\(\) => \{([^}]*)\}\)/g)];
     expect(
       persists.length,
       "the archived-folder persist sites must still be recognisable here",
@@ -98,7 +98,9 @@ describe("the orchestrator's post-commit prefs write", () => {
     // neither is the defect this file exists for, one file over from where it
     // used to look.
     const src = readFileSync(ORCHESTRATOR, "utf8");
-    const block = /await setDeliberateFolders\(plan\.nextDeliberate\);/g;
+    // myne#613: the write states the mutation the planner computed rather than
+    // handing over a whole set for the backend to diff.
+    const block = /await mutateDeliberateFolders\(plan\.deliberateMutation\);/g;
     const writes = [...src.matchAll(block)];
     expect(
       writes.length,

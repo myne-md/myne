@@ -51,7 +51,6 @@
     "tests/notes/conflictsView.test.tsx": 1,
     "tests/notes/dailyNote.test.ts": 1,
     "tests/notes/folderActions.test.ts": 2,
-    "tests/notes/folderArchive.test.ts": 1,
     "tests/notes/folderPrefsRollback.test.ts": 2,
     "tests/notes/folderRow.test.tsx": 1,
     "tests/notes/folderTreeRows.test.ts": 1,
@@ -73,7 +72,7 @@
     "tests/notes/unlinkedMentions.test.ts": 1,
     "tests/notes/unlinkedMentionsVerify.test.ts": 1,
     "tests/notes/useFilterCount.test.ts": 1,
-    "tests/notes/useFolderManagement.test.ts": 15,
+    "tests/notes/useFolderManagement.test.ts": 14,
     "tests/notes/viewsSection.test.tsx": 8,
     "tests/notes/workspaceState.test.ts": 1,
     "tests/recover/recover-variant-mapping.test.tsx": 3,
@@ -87,5 +86,5 @@
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 213
+  "total": 211
 }

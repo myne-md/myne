@@ -4,6 +4,7 @@
 // Mirror of the desktop `src/notes/conflictCopy.ts`.
 
 import { noteCreate, noteRead, noteUpdate } from "./notes";
+import { readNoteFolder } from "./note-organize";
 import { prefsRead as ioPrefsRead, setFavorites, setItemOrder } from "./prefs";
 import { patchDeletedField } from "../dialect/surgery";
 import {
@@ -17,7 +18,11 @@ import {
 const host: ConflictCopyHost = {
   noteRead,
   noteUpdate,
-  noteCreate,
+  // A conflict copy inherits the source note's folder, which the shared
+  // orchestrator does not know about, so the adapter reads it off the body it
+  // is about to write. Desktop's `duplicateNote.ts` twin does the same.
+  noteCreate: (plaintext: string) =>
+    noteCreate(plaintext, readNoteFolder(plaintext) || null),
   // Routed / propagating delete: tombstone the note by patching its managed
   // `deleted:` frontmatter (RFC3339 UTC now) + rewriting it, so the deletion
   // SYNCS to other devices rather than a local-only hard unlink — the mobile

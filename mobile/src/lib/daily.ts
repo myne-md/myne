@@ -89,7 +89,11 @@ async function createNoteFromBody(body: string, name: string, folder: string | n
   bytes = patchTitleField(bytes, name);
   const nf = normalizeFolderPath(folder);
   if (nf !== null) bytes = patchFolderField(bytes, nf);
-  return await noteCreate(stampUpdated(dec.decode(bytes)));
+  // `nf` is the folder this note is being filed into, and it was dropped:
+  // the daily folder is the single most likely folder to be emptied by
+  // trashing its notes, which is the case the unlock back-fill cannot cover
+  // because it walks LIVE notes (myne#613 review round 2).
+  return await noteCreate(stampUpdated(dec.decode(bytes)), nf);
 }
 
 /** Create a blank note with a given title + folder; resolves to the new id. */

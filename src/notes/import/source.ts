@@ -194,7 +194,13 @@ export interface ImportSink {
   /** Encrypt + write one note; returns its id. */
   createNote(plaintext: string): Promise<string>;
   /** Persist the importer's empty-dir folders (the impl unions with existing prefs). */
-  setDeliberateFolders(folders: readonly string[]): Promise<void>;
+  /**
+   * Register folders the import created. Returns how many additions the
+   * reserved byte budget refused (myne-md/myne#613): zero in every ordinary
+   * case, non-zero on a vault large enough to overflow the reserve, and the
+   * number the report shows the user.
+   */
+  setDeliberateFolders(folders: readonly string[]): Promise<number>;
 }
 
 /**

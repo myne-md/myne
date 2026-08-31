@@ -56,7 +56,9 @@ function fakePorts(tree: Record<string, string[]>, files: Record<string, string>
     async createNote() {
       return "id";
     },
-    async setDeliberateFolders() {},
+    async setDeliberateFolders() {
+      return 0; // nothing refused for budget (myne-md/myne#613)
+    },
   };
 }
 
@@ -68,7 +70,9 @@ function recordingSink(): ImportSink & { created: string[] } {
       created.push(p);
       return `id-${created.length}`;
     },
-    async setDeliberateFolders() {},
+    async setDeliberateFolders() {
+      return 0; // nothing refused for budget (myne-md/myne#613)
+    },
   };
 }
 
@@ -523,6 +527,7 @@ describe("import-report note", () => {
       omitted: { image: 0, pdf: 0, audio: 0, video: 0, other: 0 },
     },
     emptyFoldersPreserved: 0,
+    foldersNotPreserved: 0,
     cancelled: null,
     total: 3,
   };

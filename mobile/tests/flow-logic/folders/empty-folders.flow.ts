@@ -56,8 +56,14 @@ test.describe("empty folders in the mobile folder tree", () => {
     // …and it was persisted as a deliberate entry (the carrier that makes it
     // survive being empty), canonical trailing-slash.
     await expect
-      .poll(() => page.evaluate(() => (window as unknown as { __deliberateFolderWrites?: string[][] }).__deliberateFolderWrites ?? []))
-      .toContainEqual(["Ideas/"]);
+      .poll(() => page.evaluate(() => (window as unknown as { __deliberateFolderWrites?: Array<Record<string, unknown>> }).__deliberateFolderWrites ?? []))
+      .toContainEqual({
+        add: ["Ideas/"],
+        addUnlessRemoved: [],
+        remove: [],
+        removePrefix: [],
+        renamePrefix: [],
+      });
   });
 
   test("an empty folder is the vault's only content — no 'no notes yet' short-circuit", async ({ page }) => {
@@ -108,7 +114,65 @@ test.describe("empty folders in the mobile folder tree", () => {
     await expandFolder(page, "Ideas");
     await expect(folderNamed(page, "Inbox")).toBeVisible();
     await expect
-      .poll(() => page.evaluate(() => (window as unknown as { __deliberateFolderWrites?: string[][] }).__deliberateFolderWrites ?? []))
-      .toContainEqual(["Ideas/", "Ideas/Inbox/"]);
+      .poll(() => page.evaluate(() => (window as unknown as { __deliberateFolderWrites?: Array<Record<string, unknown>> }).__deliberateFolderWrites ?? []))
+      // States the ADDITION, not the resulting set. Under myne-md/myne#613 a
+      // subfolder create says what it added; the whole-set write this used to
+      // assert is the shape that let a stale view delete a peer's folder.
+      .toContainEqual({
+        add: ["Ideas/Inbox/"],
+        addUnlessRemoved: [],
+        remove: [],
+        removePrefix: [],
+        renamePrefix: [],
+      });
+  });
+  test("deleting a folder states the SUBTREE, not the survivors this view holds", async ({
+    page,
+  }) => {
+    // myne-md/myne#613, review round 2. `trashFolderFromMenu` used to build its
+    // removal by filtering `prefs.deliberate_folders`, which is the `usePrefs`
+    // cache: it starts at DEFAULT_PREFS and catches up only through a nonce-bump
+    // round trip, and this same change gave mobile fire-and-forget at-fill
+    // registrations that write behind it. A delete inside that window stated
+    // `remove: []`, the registration survived on disk, and the folder came back
+    // EMPTY at the next unlock and on every device, because the surviving entry
+    // carries a newer add clock than the removal.
+    //
+    // The assertion is on the VERB, not on the resulting set. A resulting set
+    // cannot tell "removed this subtree" from "wrote the set I happened to
+    // hold", and telling those apart is the whole issue.
+    //
+    // Mobile has no other automated UI lane, so without this case nothing
+    // anywhere reaches the mobile delete.
+    await installMockIpc(page, {
+      prefs: { deliberate_folders: ["Ideas/", "Ideas/Inbox/", "IdeasX/"] },
+    });
+    await page.goto("/");
+    await expect(folderNamed(page, "Ideas")).toBeVisible();
+
+    await longPress(page, '[data-testid="notes.folder-row"][data-folder-path="Ideas"]');
+    await page.getByTestId("notes.folder-delete").click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __deliberateFolderWrites?: Array<Record<string, unknown>> })
+              .__deliberateFolderWrites ?? [],
+        ),
+      )
+      .toContainEqual({
+        add: [],
+        addUnlessRemoved: [],
+        remove: [],
+        removePrefix: ["ideas/"],
+        renamePrefix: [],
+      });
+
+    // And the core's rule really applied: the descendant went, the name-prefix
+    // sibling stayed. This is the half a `remove:` list could not have got
+    // right, because the cache never held `Ideas/Inbox/` as a separate concern.
+    await expect(folderNamed(page, "Ideas")).toHaveCount(0);
+    await expect(folderNamed(page, "IdeasX")).toBeVisible();
   });
 });

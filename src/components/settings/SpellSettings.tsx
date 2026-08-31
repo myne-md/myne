@@ -21,7 +21,8 @@ import { ERROR_STYLE } from "./panel-styles";
 import {
   prefsRead,
   setSpellEnabled,
-  setSpellLanguages,
+  mutateSpellLanguages,
+  mutationFrom,
 } from "../../lib/prefs";
 import {
   BUNDLED_SPELL_LANGUAGES,
@@ -116,7 +117,9 @@ export function SpellSettings() {
     const prev = active;
     setActive(next); // optimistic
     try {
-      await setSpellLanguages(next);
+      // `prev` is this component's own previous value, so the delta is what
+      // the user just did rather than a claim about the whole stored set.
+      await mutateSpellLanguages(mutationFrom(prev, next));
       setSpellConfig(enabled, next); // live-update the open editor
       // Drop the dicts of just-removed languages; added ones lazy-load on the
       // next scan. Only when enabled (disabled → already freed in toggleEnabled).

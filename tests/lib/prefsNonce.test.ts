@@ -86,6 +86,37 @@ describe("the prefs-nonce guard", () => {
     for (const f of failures) expect(f.command).toBe("set_ai_enabled");
   });
 
+  it("accepts the GENERIC chokepoint and the generic call (myne-md/myne#613)", () => {
+    // `writePref` became `writePref<T = void>` so the five set mutators can
+    // return the budget refusal count. Both of this guard's `writePref`
+    // matchers required a bare `(`, so the chokepoint read as MISSING and all
+    // five set writes read as direct invokes: six failures, none of them real.
+    // The fixture above declares the OLD shape, so it exercises neither arm.
+    const generic = [
+      "async function writePref<T = void>(",
+      "  command: string,",
+      ") {}",
+      'await writePref<number>("plugin:prefs|set_deliberate_folders", { mutation });',
+      'await writePref("plugin:prefs|set_ai_enabled", { enabled });',
+    ].join("\n");
+    expect(analyse({ prefsSource: generic }).failures).toEqual([]);
+  });
+
+  it("still catches a raw invoke beside a GENERIC chokepoint", () => {
+    // The other direction, and the one nobody thinks to try: widening a matcher
+    // must not stop it catching what it caught before. A guard that has stopped
+    // checking is green by definition.
+    const generic = [
+      "async function writePref<T = void>(",
+      "  command: string,",
+      ") {}",
+      ...EVASIONS.split("\n"),
+    ].join("\n");
+    const { failures } = analyse({ prefsSource: generic });
+    expect(failures).toHaveLength(5);
+    for (const f of failures) expect(f.command).toBe("set_ai_enabled");
+  });
+
   it("accepts the chokepoint, including when the call spans lines", () => {
     // The multi-line arm is what pins the whole-file scan: a same-line-only
     // implementation of the fix reports the second literal as a violation.
