@@ -260,6 +260,27 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
         return Err(AudioError::BadLayout);
     }
 
+    // BEFORE the size projection, and before the collect. Both placements matter
+    // and they are different properties.
+    //
+    // Before the COLLECT is the allocation property: `samples.len()` is
+    // `data.len() / 2` by construction, so the check needs no samples, and
+    // running it after meant a malformed 64 MiB attachment allocated and filled
+    // 64 MiB of `i16` and was then rejected one branch from the refusal that
+    // exists to stop exactly that.
+    //
+    // Before the PROJECTION is the diagnosis property, and it was missing. A WAV
+    // that is BOTH malformed and oversized was reported as `TooLong`, because
+    // the size bound ran first and returned. `TooLong` is the one refusal in
+    // this enum that reaches the user as a specific, actionable sentence about
+    // the clip's length, and it deliberately suppresses a retry; saying it about
+    // a file whose channel layout does not divide sends the user to shorten
+    // something that will be refused at any length. The layout is a fact about
+    // the header alone, so it is cheaper and it is answerable first.
+    if !(data.len() / 2).is_multiple_of(channels as usize) {
+        return Err(AudioError::BadLayout);
+    }
+
     // Bound the decode HERE, where the size is first knowable and nothing has
     // been allocated from it yet. `data.len() / 2` is the i16 count the collect
     // below would produce, dividing by `channels` gives frames, and the
@@ -297,15 +318,6 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
         None => return Err(AudioError::BadLayout),
         Some(projected) if projected > MAX_PCM_SAMPLES as u128 => return Err(AudioError::TooLong),
         Some(_) => {}
-    }
-
-    // BEFORE the collect, which is the same property the size bound above was
-    // moved up to obtain. `samples.len()` is `data.len() / 2` by construction,
-    // so the check needs no samples: running it after meant a malformed 64 MiB
-    // attachment allocated and filled 64 MiB of `i16` and then rejected, one
-    // branch away from the refusal that exists to stop exactly that.
-    if !(data.len() / 2).is_multiple_of(channels as usize) {
-        return Err(AudioError::BadLayout);
     }
 
     // i16 LE samples; a trailing odd byte (never expected for 16-bit) is dropped.
@@ -595,6 +607,42 @@ mod tests {
         wav[20] = 3;
         wav[21] = 0;
         assert_eq!(wav_to_mono_16k(&wav), Err(AudioError::UnsupportedFormat));
+    }
+
+    #[test]
+    fn a_wav_that_is_both_malformed_and_oversized_is_reported_as_malformed() {
+        // The ordering finding. The layout check used to sit BELOW the size
+        // projection, so a WAV that is both malformed and oversized returned
+        // `TooLong`.
+        //
+        // That is not a tie broken arbitrarily. `TooLong` is the one refusal in
+        // this enum that reaches the user as a specific sentence about the
+        // clip's LENGTH, and it deliberately suppresses the retry, so saying it
+        // about a file whose channel layout does not divide sends the user to
+        // shorten something that will be refused at any length. The layout is a
+        // fact about the header alone.
+        //
+        // Two channels and an ODD i16 count is the malformed half: 3 samples do
+        // not divide by 2. A declared rate of 4 kHz is the oversized half, since
+        // it is the lowest admissible rate and therefore the largest expansion,
+        // and `frames` here is computed from a `data` length that the projection
+        // would take at face value.
+        //
+        // Constructed at a size that is oversized by PROJECTION rather than by
+        // allocation, so the test costs bytes rather than gigabytes: the
+        // projection multiplies frames by 4 at this rate, so a `data` slice just
+        // over `MAX_PCM_SAMPLES / 4` frames crosses the ceiling.
+        let frames = (MAX_PCM_SAMPLES / 4) + 16;
+        let odd_sample_count = frames * 2 + 1;
+        let samples = vec![0i16; odd_sample_count];
+        let wav = build_wav(2, 4_000, &samples);
+
+        assert_eq!(
+            parse_wav(&wav).map(|_| ()),
+            Err(AudioError::BadLayout),
+            "a malformed header must be diagnosed as malformed even when the \
+             clip would also be refused for length"
+        );
     }
 
     #[test]

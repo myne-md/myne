@@ -880,13 +880,15 @@
           "captureFailed": "Opname kon niet worden gestart. Controleer de microfoontoegang in Systeeminstellingen.",
           "generic": "Opname kon niet worden gestart.",
           "locked": "Ontgrendel je kluis om een spraaknotitie op te nemen.",
-          "noInputDevice": "Geen microfoon gevonden. Sluit er een aan en probeer het opnieuw."
+          "noInputDevice": "Geen microfoon gevonden. Sluit er een aan en probeer het opnieuw.",
+          "unsupportedSampleRate": "Je microfoon neemt op met een samplefrequentie die Myne niet kan transcriberen. Kies een ander invoerapparaat, of wijzig de samplefrequentie in de geluidsinstellingen van je systeem."
         },
         "stopError": {
           "captureFailed": "Opname is mislukt. Controleer je microfoon.",
           "emptyRecording": "Er is niets opgenomen.",
           "generic": "De opname kon niet worden opgeslagen.",
-          "silentRecording": "De opname was stil en is verwijderd. Controleer je microfoon."
+          "silentRecording": "De opname was stil en is verwijderd. Controleer je microfoon.",
+          "unsupportedSampleRate": "Je microfoon neemt op met een samplefrequentie die Myne niet kan transcriberen. Er is niets opgeslagen. Kies een ander invoerapparaat, of wijzig de samplefrequentie in de geluidsinstellingen van je systeem."
         }
       },
       "widget": {
@@ -932,6 +934,7 @@
             "featureOff": "Spraak-naar-tekst staat uit. Schakel het in via Instellingen → Transcriptie.",
             "modelLoadFailed": "Het spraak-naar-tekstmodel kon niet worden geladen. Als je een eigen model hebt ingesteld in Instellingen → Developer → AI, controleer dan de bestanden ervan; anders herstelt het opnieuw installeren van Myne het ingebouwde model.",
             "noModel": "Het spraak-naar-tekstmodel ontbreekt. Myne opnieuw installeren herstelt het.",
+            "tooLong": "Deze opname is te lang om te transcriberen. De audio blijft bijgevoegd, dus je kunt hem nog afspelen.",
             "vaultLocked": "Ontgrendel je kluis om te transcriberen."
           },
           "disabledReason": "Schakel AI in via Instellingen → Developer → AI om te transcriberen.",

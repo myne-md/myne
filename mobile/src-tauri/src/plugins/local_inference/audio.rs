@@ -239,16 +239,41 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
     // it does: an attacker who can already place a file on the device. A7 is
     // Best-effort there, so this stays hardening inside a conceded boundary
     // rather than a new guarantee, and the conclusion is unchanged. The
-    // reachability is not. It is also a remote-ish DoS in the A6 shape rather
-    // than a purely local one, and that is the half the rewrite deleted its
-    // lead-in for: ONE synced attachment kills the app on every device that
-    // tries to transcribe it. `transcribe` takes an `attachment_id` and reads the WAV out
+    // reachability is not. What that reachability buys the attacker is worth
+    // stating without a row citation, because no row describes it: ONE synced
+    // attachment kills the app on every device that tries to transcribe it,
+    // which is wider than a purely local denial of service and is the half the
+    // rewrite deleted its lead-in for. An earlier version of this sentence
+    // reached for A6 to name that shape. A6 is not this adversary, the desktop
+    // twin names A7 alone, and inventing a second row here made the two twins
+    // disagree about who the attacker is. `transcribe` takes an `attachment_id` and reads the WAV out
     // of the vault (`commands.rs`), so a blob written by a compromised second
     // device reaches this parser without the user picking a file, and
     // `transcription_enabled` defaults ON.
     //
     // The range itself, and why those two numbers, is on the constants.
     if !(MIN_SAMPLE_RATE_HZ..=MAX_SAMPLE_RATE_HZ).contains(&sample_rate) {
+        return Err(AudioError::BadLayout);
+    }
+
+    // BEFORE the size projection, and before the collect. Both placements matter
+    // and they are different properties.
+    //
+    // Before the COLLECT is the allocation property: `samples.len()` is
+    // `data.len() / 2` by construction, so the check needs no samples, and
+    // running it after meant a malformed 64 MiB attachment allocated and filled
+    // 64 MiB of `i16` and was then rejected one branch from the refusal that
+    // exists to stop exactly that.
+    //
+    // Before the PROJECTION is the diagnosis property, and it was missing. A WAV
+    // that is BOTH malformed and oversized was reported as `TooLong`, because
+    // the size bound ran first and returned. `TooLong` is the one refusal in
+    // this enum that reaches the user as a specific, actionable sentence about
+    // the clip's length, and it deliberately suppresses a retry; saying it about
+    // a file whose channel layout does not divide sends the user to shorten
+    // something that will be refused at any length. The layout is a fact about
+    // the header alone, so it is cheaper and it is answerable first.
+    if !(data.len() / 2).is_multiple_of(channels as usize) {
         return Err(AudioError::BadLayout);
     }
 
@@ -288,15 +313,6 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
         None => return Err(AudioError::BadLayout),
         Some(projected) if projected > MAX_PCM_SAMPLES as u128 => return Err(AudioError::TooLong),
         Some(_) => {}
-    }
-
-    // BEFORE the collect, which is the same property the size bound above was
-    // moved up to obtain. `samples.len()` is `data.len() / 2` by construction,
-    // so the check needs no samples: running it after meant a malformed 64 MiB
-    // attachment allocated and filled 64 MiB of `i16` and then rejected, one
-    // branch away from the refusal that exists to stop exactly that.
-    if !(data.len() / 2).is_multiple_of(channels as usize) {
-        return Err(AudioError::BadLayout);
     }
 
     // i16 LE samples; a trailing odd byte (never expected for 16-bit) is dropped.
@@ -560,6 +576,69 @@ mod tests {
         wav[20] = 3;
         wav[21] = 0;
         assert_eq!(wav_to_mono_16k(&wav), Err(AudioError::UnsupportedFormat));
+    }
+
+    #[test]
+    fn the_real_parser_accepts_a_projection_landing_on_the_ceiling() {
+        // Ported from the desktop twin, which closed this gap first. The bound
+        // is `>`, so a projection landing exactly ON the ceiling is legal;
+        // flipping it to `>=` makes this the only test in the module that
+        // fails. Both twins now carry it, and the injection was run on both.
+        let rate = 8_000u32;
+        let boundary_frames = MAX_PCM_SAMPLES / 2;
+        // Precondition, so a change to either constant fails HERE with a clear
+        // cause rather than silently making this test assert something else.
+        assert_eq!(
+            projected_out_samples(boundary_frames, rate).expect("a non-zero rate"),
+            MAX_PCM_SAMPLES as u128,
+            "the fixture no longer lands on the ceiling",
+        );
+
+        let header_bytes = build_wav(1, rate, &[]);
+        let header = header_bytes.len();
+        let data_len = boundary_frames * 2;
+        let mut wav = vec![0u8; header + data_len];
+        wav[..header].copy_from_slice(&header_bytes);
+        wav[header - 4..header].copy_from_slice(&(data_len as u32).to_le_bytes());
+
+        let out = wav_to_mono_16k(&wav).expect("a projection on the ceiling is accepted");
+        assert_eq!(out.len(), MAX_PCM_SAMPLES);
+    }
+
+    #[test]
+    fn a_wav_that_is_both_malformed_and_oversized_is_reported_as_malformed() {
+        // The ordering finding. The layout check used to sit BELOW the size
+        // projection, so a WAV that is both malformed and oversized returned
+        // `TooLong`.
+        //
+        // That is not a tie broken arbitrarily. `TooLong` is the one refusal in
+        // this enum that reaches the user as a specific sentence about the
+        // clip's LENGTH, and it deliberately suppresses the retry, so saying it
+        // about a file whose channel layout does not divide sends the user to
+        // shorten something that will be refused at any length. The layout is a
+        // fact about the header alone.
+        //
+        // Two channels and an ODD i16 count is the malformed half: 3 samples do
+        // not divide by 2. A declared rate of 4 kHz is the oversized half, since
+        // it is the lowest admissible rate and therefore the largest expansion,
+        // and `frames` here is computed from a `data` length that the projection
+        // would take at face value.
+        //
+        // Constructed at a size that is oversized by PROJECTION rather than by
+        // allocation, so the test costs bytes rather than gigabytes: the
+        // projection multiplies frames by 4 at this rate, so a `data` slice just
+        // over `MAX_PCM_SAMPLES / 4` frames crosses the ceiling.
+        let frames = (MAX_PCM_SAMPLES / 4) + 16;
+        let odd_sample_count = frames * 2 + 1;
+        let samples = vec![0i16; odd_sample_count];
+        let wav = build_wav(2, 4_000, &samples);
+
+        assert_eq!(
+            parse_wav(&wav).map(|_| ()),
+            Err(AudioError::BadLayout),
+            "a malformed header must be diagnosed as malformed even when the \
+             clip would also be refused for length"
+        );
     }
 
     #[test]
