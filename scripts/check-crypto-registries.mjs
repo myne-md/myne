@@ -254,6 +254,9 @@ const KNOWN = [
     rule: "magic-parity",
     file: "protocol/src/blob.rs",
     contains: "MAGIC",
+    // The generations this entry excuses, and ONLY these. A third note
+    // generation changes the missing set and this entry stops applying.
+    missing: "NC05_MAGIC",
     why:
       "`decode_note` is deliberately v0.1-only and its single-generation rejection at " +
       "`if &blob[0..MAGIC.len()] != MAGIC` is the correct behaviour for it: the version-aware " +
@@ -273,6 +276,10 @@ const KNOWN = [
     rule: "magic-parity",
     file: "protocol/src/vault_meta.rs",
     contains: "VAULT_META_MAGIC",
+    // Same: a `VAULT_META_V0_3_MAGIC` in a sibling module changes this set and
+    // the file starts failing again, which is the property a file-wide entry
+    // could not have.
+    missing: "VAULT_META_V0_2_MAGIC",
     why:
       "`parse_vault_meta` is deliberately v0.1-only and its single-generation rejection at " +
       "`bytes[0..4] != VAULT_META_MAGIC` is the correct behaviour for it: the version-aware " +
@@ -631,6 +638,50 @@ for (const p of EXTRA_MAGIC_PAIRS) {
     });
     continue;
   }
+  // The SPELLINGS, checked. The block comment above claims named entries are
+  // compared both ways so a pair cannot outlive its subject, and until now that
+  // was true only of the magic VALUES: `registry.get("MY01")` succeeds as long
+  // as SOMETHING declares `MY01`, whatever it is called. Rename or re-home
+  // `protocol::blob::MAGIC` and both lookups still pass while `reFor(...)`
+  // matches nothing, every file short-circuits at the `baseRe` test, and the
+  // note family's parity check ceases to exist with the guard printing ok. That
+  // is the silent-pass shape rule 5 exists to remove, and this is the pair the
+  // round-2 commit already had to repair once for a spelling reason.
+  //
+  // The registry records the CONSTANT NAME it saw at the declaration, so the
+  // final segment of each hand-typed token must equal it. `selfToken`, when
+  // present, IS that bare name and is compared to the same thing.
+  for (const [side, tok, reg] of [
+    ["v1", p.v1, base],
+    ["v2", p.v2, later],
+  ]) {
+    const spelled = tok.token.split("::").pop();
+    if (spelled !== reg.name) {
+      failures.push({
+        rule: "magic-parity",
+        file: "scripts/check-crypto-registries.mjs",
+        line: 1,
+        why:
+          `EXTRA_MAGIC_PAIRS spells the ${p.family} family's ${side} token ` +
+          `\`${tok.token}\`, whose final segment is \`${spelled}\`, but ${tok.magic} is ` +
+          `declared as \`${reg.name}\` in ${reg.file}. The magic VALUE still resolves, so ` +
+          "both roster lookups pass while every match in rule 5 silently stops firing for " +
+          "this family. Fix the token spelling or the constant name.",
+      });
+    }
+  }
+  if (p.v1.selfToken && p.v1.selfToken !== base.name) {
+    failures.push({
+      rule: "magic-parity",
+      file: "scripts/check-crypto-registries.mjs",
+      line: 1,
+      why:
+        `EXTRA_MAGIC_PAIRS gives the ${p.family} family the declaring-file spelling ` +
+        `\`${p.v1.selfToken}\`, but ${p.v1.magic} is declared as \`${base.name}\` in ` +
+        `${base.file}. The declaring file is exactly the one this spelling exists to make ` +
+        "visible, so a wrong one restores the blind spot it was added to close.",
+    });
+  }
   magicFamilies.push({
     family: p.family,
     base: {
@@ -700,10 +751,18 @@ function comparesMagic(s, tokens) {
  *  The stale-entry check at the report section already skips under `FIXTURE_RUN`
  *  for the mirror-image reason (a fixture tree cannot satisfy entries about the
  *  real one). Suppression had to follow it. */
-function isKnown(rule, rel, text) {
+function isKnown(rule, rel, text, missingTokens = null) {
   if (FIXTURE_RUN) return false;
   const idx = KNOWN.findIndex(
-    (k) => k.rule === rule && k.file === rel && text.includes(k.contains),
+    (k) =>
+      k.rule === rule &&
+      k.file === rel &&
+      text.includes(k.contains) &&
+      // `missing` is required for `magic-parity` and absent everywhere else.
+      // Compared for EQUALITY rather than membership: an entry excusing "this
+      // file knows MY01 and not NC05" must stop applying the moment the file
+      // also fails to know a third generation, which is a different fact.
+      (missingTokens === null || k.missing === missingTokens),
   );
   if (idx === -1) return false;
   knownHit.add(idx);
@@ -879,7 +938,25 @@ for (const [rel, s] of scanned) {
     if (missing.length === 0) continue; // the file knows every generation
     const hit = s.bare.findIndex((t, i) => !s.testLines.has(i + 1) && baseRe.test(t));
     if (hit === -1) continue; // named only inside a test region
-    if (isKnown("magic-parity", rel, s.bare[hit])) continue;
+    // Generation-SPECIFIC, and the distinction is the whole point. `isKnown`
+    // matches `contains` against the first non-test line naming the base magic,
+    // which in a codec is the declaration itself, so a `magic-parity` entry
+    // keyed only on that line suppresses every failure the file can ever
+    // produce, for any generation. A `VAULT_META_V0_3_MAGIC` in a sibling module
+    // joins the derived family table with no edit, `vault_meta.rs` then knows one
+    // of three generations, and a file-wide entry swallows it: the exact blanket
+    // the rule 5 header condemns as myne-md/myne#638's shape, re-entered through
+    // the ratchet. The fixture at `cryptoRegistriesMagicParity.test.ts` asserts
+    // the guard fires for precisely that shape, so a file-wide entry would leave
+    // the tree contradicting its own test.
+    //
+    // A `magic-parity` entry therefore names the generations it excuses, and it
+    // excuses the file only when the missing set is EXACTLY that. A new
+    // generation changes the set and the entry stops applying, which is also
+    // what lets it go stale: keyed on the declaration line it never could,
+    // because the base magic is always named there.
+    const missingTokens = missing.map((g) => g.token).sort().join(",");
+    if (isKnown("magic-parity", rel, s.bare[hit], missingTokens)) continue;
     failures.push({
       rule: "magic-parity",
       file: rel,
