@@ -100,12 +100,27 @@ function mountRerenderable(makeOptions: () => ReminderSchedulerOptions) {
 }
 
 describe("the tick is computed, not a coarse interval", () => {
-  it("sleeps until the next instant when it is soon", () => {
-    // 10:00 now, reminder at 10:00:30 → half a minute, not five.
-    const soon = new Date(2026, 6, 28, 10, 0, 0);
-    const ms = msUntilNextPass([task({ remind: "2026-07-28 10:00" })], soon);
-    // The instant is not strictly in the future, so it is not registered at
-    // all and the sleep falls back to the ceiling.
+  it("wakes at the floor for an instant due THIS minute", () => {
+    // 10:00:00 now, reminder stamped 10:00. The stamp is minute-resolution, so
+    // this instant is due now rather than past, and `targetReminders` admits it:
+    // the lower bound is `at < from`, which skips a past instant and keeps one
+    // equal to `from` (myne-md/myne#508, the midnight case that was registered on
+    // neither side of the boundary).
+    //
+    // `delta` is 0, so the sleep is the FLOOR rather than the ceiling. That is
+    // the behaviour to want: the pass wakes a second later and fires it.
+    const due = new Date(2026, 6, 28, 10, 0, 0);
+    const ms = msUntilNextPass([task({ remind: "2026-07-28 10:00" })], due);
+    expect(ms).toBe(MIN_SLEEP_MS);
+  });
+
+  it("falls back to the ceiling for an instant strictly in the past", () => {
+    // The other direction, and what the case above used to assert before the
+    // bound moved: a stamp whose minute has gone is not registered, so there is
+    // no next instant and the sleep is the ceiling. Both are kept, because a
+    // change that admitted overdue reminders would pass the first alone.
+    const after = new Date(2026, 6, 28, 10, 1, 0);
+    const ms = msUntilNextPass([task({ remind: "2026-07-28 10:00" })], after);
     expect(ms).toBe(MAX_SLEEP_MS);
   });
 
