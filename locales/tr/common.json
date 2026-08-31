@@ -2335,6 +2335,13 @@
     },
     "workspace": {
       "defaultSlotName": "Varsayılan"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Dışa aktar…",
+      "txt": "Düz metin"
     }
   },
   "password": {
@@ -3049,6 +3056,9 @@
       "exactLabel": "Tam zamanlama",
       "exactOn": "Açık",
       "horizon": "Hatırlatıcılar {{date}} tarihine kadar kaydedildi. Gelmeye devam etmeleri için o tarihten önce Myne’i açın.",
+      "horizonLabel": "Önceden planla",
+      "horizonLabelHelper": "Hatırlatıcılar bu kadar önceden hazırlanır. Birinin gelmesi için Myne açık ve kilidi açılmış olmalı.",
+      "horizonInertHelper": "Bu cihazda saklandı. Henüz kimse okumuyor: bu sürüm görev hatırlatıcısı göndermiyor.",
       "label": "Görev hatırlatıcıları",
       "saveError": "O ayar kaydedilemedi. Tekrar deneyin.",
       "showTextAria": "Bildirimde görev metnini göster",

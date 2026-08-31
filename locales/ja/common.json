@@ -2335,6 +2335,13 @@
     },
     "workspace": {
       "defaultSlotName": "デフォルト"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "書き出し…",
+      "txt": "プレーンテキスト"
     }
   },
   "password": {
@@ -3049,6 +3056,9 @@
       "exactLabel": "正確な時刻",
       "exactOn": "オン",
       "horizon": "リマインダーは{{date}}まで登録されています。それまでにMyneを開くと、以降も通知が続きます。",
+      "horizonLabel": "事前にスケジュール",
+      "horizonLabelHelper": "リマインダーはこの日数だけ前に用意されます。届くには Myne が開いていてロック解除されている必要があります。",
+      "horizonInertHelper": "この端末に保存されました。まだ何も読み取っていません。このビルドはタスクリマインダーを配信しません。",
       "label": "タスクのリマインダー",
       "saveError": "設定を保存できませんでした。もう一度お試しください。",
       "showTextAria": "通知にタスクの本文を表示",

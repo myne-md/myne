@@ -2425,6 +2425,13 @@
     },
     "workspace": {
       "defaultSlotName": "Implicit"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportă…",
+      "txt": "Text simplu"
     }
   },
   "password": {
@@ -3155,6 +3162,9 @@
       "exactLabel": "Moment exact",
       "exactOn": "Activat",
       "horizon": "Mementourile sunt înregistrate până la {{date}}. Deschide Myne înainte de acea dată pentru ca ele să continue.",
+      "horizonLabel": "Programează din timp",
+      "horizonLabelHelper": "Mementourile sunt pregătite cu acest avans. Myne trebuie să fie deschis și deblocat ca un memento să ajungă.",
+      "horizonInertHelper": "Salvat pe acest dispozitiv. Nimic nu îl citește încă: această versiune nu livrează mementouri pentru sarcini.",
       "label": "Mementouri pentru sarcini",
       "saveError": "Acea setare nu a putut fi salvată. Încearcă din nou.",
       "showTextAria": "Arată textul sarcinii în notificare",

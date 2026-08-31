@@ -35,6 +35,9 @@ interface SegmentedProps {
   onChange: (value: string) => void;
   /** Accessible group name. */
   ariaLabel: string;
+  /** Id of the text explaining the group, for `aria-describedby`. `SettingRow`
+   *  hands this to its `control` render function. */
+  ariaDescribedBy?: string;
   /** Per-segment accessible name. Defaults to the segment's own label; supply
    *  this where the caption alone reads oddly out of context (the theme picker
    *  announces "Switch to the Dark theme", not "Dark"). */
@@ -102,6 +105,7 @@ export function Segmented({
   value,
   onChange,
   ariaLabel,
+  ariaDescribedBy,
   optionAriaLabel,
   testId,
 }: SegmentedProps) {
@@ -120,7 +124,13 @@ export function Segmented({
   }, [value, options]);
 
   return (
-    <div role="radiogroup" aria-label={ariaLabel} data-testid={testId} style={SEGMENTED_STYLE}>
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      data-testid={testId}
+      style={SEGMENTED_STYLE}
+    >
       <span
         aria-hidden="true"
         style={{ ...THUMB_STYLE, width: thumb.width, transform: `translateX(${thumb.left}px)` }}

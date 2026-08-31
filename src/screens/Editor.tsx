@@ -1038,6 +1038,7 @@ function EditorChrome({
     enabled: barPrefs.reminders_enabled,
     tasks: reminderTasks,
     notifier: reminderNotifier,
+    horizonDays: barPrefs.reminder_horizon_days,
   });
   // `barMenu` holds the open menu's anchor coords + which mode it is in: a
   // plain `{x, y}` opens the bar-wide visibility checklist (right-click on
