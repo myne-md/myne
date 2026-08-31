@@ -4,12 +4,27 @@
   granted at install in the sense that matters: POST_NOTIFICATIONS is a RUNTIME
   request on Android 13+, asked at the first reminder after an in-app
   explanation; SCHEDULE_EXACT_ALARM is a *special app access* the user grants on
-  a settings screen, reached only from an in-app affordance they tapped; and
+  a settings screen, which was reached from an in-app affordance they tapped; and
   RECEIVE_BOOT_COMPLETED grants no access to anything — it is the only way an app
   can learn that the platform threw its alarms away.
 
   The app's entire permission set before this was two audio permissions. The
   off-the-shelf notification plugin would have added three at install time.
+
+  **The in-app affordance is gated off in every build today, and this comment
+  said otherwise (myne-md/myne#508).** `ExactAlarmBlock`'s only production render
+  site sits behind `remindersReachTheOs()`, which returns a constant `false`,
+  because nothing on this client registers with the operating system yet. So the
+  sentence above described a route the user cannot walk, and the declaration ships
+  a Play Console declarable special access with no path to granting it. It is left
+  DECLARED rather than removed, deliberately: the manifest is the plugin's, the
+  Kotlin behind it is complete, and taking the line out now means putting it back
+  with the wiring change that flips the predicate, which is a second edit to a
+  Play-reviewed file for no gain in the interval. What is not left standing is the
+  justification: it reads as past and conditional above, and both exact-alarm
+  procedures are carried as SUSPENDED in `scripts/manual-test-roster.mjs` and in
+  `mobile/docs/dev/reminders-device-checklist.md` rather than as steps a tester
+  should be able to perform.
 
   SCHEDULE_EXACT_ALARM must be DECLARED to be requestable at all — declaring it
   is not asking for it. Until the user grants it on that screen,
