@@ -210,6 +210,58 @@ export interface MyneSourceConflictInput {
   readonly importLabel: string;
 }
 
+/** Decide which colliding titles may be renamed, and how many inbound links are
+ *  left unresolved because they may not.
+ *
+ *  Pure, and extracted for exactly that reason: the decision is the one place
+ *  this import path can silently mis-link a note, and it sat inside `plan()`
+ *  behind a live source vault, an IPC seam and an Argon2id, where no test was
+ *  going to reach it.
+ *
+ *  **The rule.** A rename is applied by folded link target with NO folder
+ *  filter (`planInboundRewrites`), while the collision that triggers it is
+ *  decided per `(folder, title)`. Those are the same question only while a
+ *  folded title belongs to one source note. When two notes share it, renaming
+ *  on behalf of one retargets the links that meant the other, and the result
+ *  resolves to a different note than the one it was written against, which is
+ *  the mis-link the rename rule exists to prevent, inverted.
+ *
+ *  So an ambiguous title is SKIPPED and its inbound links are counted as
+ *  unresolved. A link nobody rewrote shows up in the report; a link rewritten to
+ *  the wrong note does not, and the feature's own copy calls the unresolved
+ *  residual the thing that must not be silent.
+ *
+ *  Keys are the RAW old title: `planInboundRewrites` folds it itself. */
+export function decideRenames(
+  notes: readonly { title: string | null; folder: string | null }[],
+  existing: ReadonlySet<string>,
+  inboundLinks: ReadonlyMap<string, ReadonlySet<string>>,
+  importLabel: string,
+): { renames: Map<string, string>; ambiguousLinks: number } {
+  const foldedCount = new Map<string, number>();
+  for (const note of notes) {
+    if (note.title === null) continue;
+    const f = foldSegment(note.title);
+    foldedCount.set(f, (foldedCount.get(f) ?? 0) + 1);
+  }
+
+  const renames = new Map<string, string>();
+  let ambiguousLinks = 0;
+  for (const note of notes) {
+    if (note.title === null) continue;
+    const folded = foldSegment(note.title);
+    if (!existing.has(noteIdentityKey(note.folder, note.title))) continue;
+    const inbound = inboundLinks.get(folded)?.size ?? 0;
+    if (inbound === 0) continue;
+    if ((foldedCount.get(folded) ?? 0) > 1) {
+      ambiguousLinks += inbound;
+      continue;
+    }
+    renames.set(note.title, renamedTitleFor(note.title, importLabel));
+  }
+  return { renames, ambiguousLinks };
+}
+
 export function createMyneSource(
   sourceVaultId: string,
   conflictInput: MyneSourceConflictInput,
@@ -240,7 +292,12 @@ export function createMyneSource(
    * the body is identical and only the cause differs.
    */
   const refused = new Set<string>();
-  /** Folded OLD title to the NEW title, accumulated as notes are decided. */
+  /** RAW old title to the NEW title, accumulated as notes are decided.
+   *
+   *  Raw rather than folded, and the comment used to say the opposite:
+   *  `planInboundRewrites` folds `oldTitle` itself (`renameWikilinks.ts`), so a
+   *  pre-folded key would be folded twice, which is harmless but made the two
+   *  files disagree about what this map holds. */
   const renamedTitles = new Map<string, string>();
   /**
    * The conflict context, assembled HERE rather than taken as a parameter.
@@ -513,19 +570,35 @@ export function createMyneSource(
       // `plan()` can decide them all because it already holds both inputs: the
       // target's pre-run identity set and the source's own link graph.
       renamedTitles.clear();
-      for (const note of notes) {
-        if (note.title === null) continue;
-        const folded = foldSegment(note.title);
-        const collides = conflictInput.existing.has(
-          noteIdentityKey(note.folder, note.title),
-        );
-        const linked = (inboundLinks.get(folded)?.size ?? 0) > 0;
-        if (!collides || !linked) continue;
-        renamedTitles.set(
-          note.title,
-          renamedTitleFor(note.title, conflictInput.importLabel),
-        );
-      }
+      // How many SOURCE notes carry each folded title. A rewrite is applied by
+      // folded link target with no folder filter, while the collision that
+      // triggers it is decided per `(folder, title)`, and those two are not the
+      // same question the moment one title appears in two folders.
+      //
+      // Concretely: `Beta` in folder A collides with the target and is renamed,
+      // `Beta` in folder B does not collide and keeps its name, and every
+      // `[[Beta]]` in every imported note is then retargeted to the renamed
+      // one, including the links that meant B/Beta. Those links now resolve to a
+      // different note than the one they were written against, which is the
+      // silent mis-link the rename rule exists to prevent, inverted.
+      //
+      // The rewrite is SKIPPED in that case rather than guessed, and the links
+      // are counted as unresolved. A link nobody rewrote is visible in the
+      // report; a link rewritten to the wrong note is not, and the feature's own
+      // copy calls the unresolved residual the thing that must not be silent.
+      //
+      // Renaming per `(folder, title)` and filtering rewrites by folder would be
+      // the fuller answer. It changes `planInboundRewrites`'s signature and the
+      // wikilink resolution semantics it shares with the rest of the app, which
+      // is a larger decision than this import path should be making on its own.
+      const decided = decideRenames(
+        notes,
+        conflictInput.existing,
+        inboundLinks,
+        conflictInput.importLabel,
+      );
+      for (const [k, v] of decided.renames) renamedTitles.set(k, v);
+      tally.linksLeftUnresolved += decided.ambiguousLinks;
 
       return {
         items: [...planned.keys()].map((relPath) => ({ relPath })),
