@@ -37,8 +37,7 @@ pub const WHISPER_SAMPLE_RATE: u32 = 16_000;
 /// Module scope rather than function-local, because the ceiling's own test
 /// derives the worst reachable output from `MIN` and would otherwise restate the
 /// number.
-pub const MIN_SAMPLE_RATE_HZ: u32 = 4_000;
-pub const MAX_SAMPLE_RATE_HZ: u32 = 384_000;
+use crate::audio_rate::{MAX_SAMPLE_RATE_HZ, MIN_SAMPLE_RATE_HZ};
 
 /// Failure modes of WAV decode. Closed + content-free (DENY-list): no sample
 /// data, no path, no raw error string.

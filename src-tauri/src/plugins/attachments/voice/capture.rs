@@ -118,8 +118,14 @@ pub enum RecordError {
     /// accepts, so a clip recorded at it would be refused by this application's
     /// own decoder. Distinct from `CaptureFailed` because nothing failed: the
     /// device works and the rate is the problem, which is what a user needs to
-    /// be told and what a bug report needs to carry.
-    UnsupportedSampleRate { sample_rate: u32 },
+    /// be told.
+    ///
+    /// A unit variant rather than one carrying the rate: the rate is logged at
+    /// the refusal site, where a bug report picks it up, and threading it to the
+    /// frontend would change the serialized error shape for a number the UI has
+    /// no copy to render. A field nothing reads is a `dead_code` error under
+    /// `-D warnings` in both build configurations, which is how this was found.
+    UnsupportedSampleRate,
 }
 
 /// Finalized mono PCM from one recording session. `samples` is `Zeroizing` so
@@ -281,11 +287,16 @@ impl CpalSource {
         // which is the decoder's job and would silently change what was recorded.
         // The bound is IMPORTED from the decoder rather than restated, so the two
         // cannot drift into disagreeing about the same window.
-        if !(crate::plugins::local_inference::audio::MIN_SAMPLE_RATE_HZ
-            ..=crate::plugins::local_inference::audio::MAX_SAMPLE_RATE_HZ)
+        if !(crate::audio_rate::MIN_SAMPLE_RATE_HZ..=crate::audio_rate::MAX_SAMPLE_RATE_HZ)
             .contains(&sample_rate)
         {
-            return Err(RecordError::UnsupportedSampleRate { sample_rate });
+            tracing::warn!(
+                sample_rate,
+                min = crate::audio_rate::MIN_SAMPLE_RATE_HZ,
+                max = crate::audio_rate::MAX_SAMPLE_RATE_HZ,
+                "input device reports a sample rate outside the decodable window; refusing to record"
+            );
+            return Err(RecordError::UnsupportedSampleRate);
         }
         let channels = supported.channels();
         let sample_format = supported.sample_format();
