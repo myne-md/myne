@@ -94,8 +94,8 @@ describe("AiScopeSheet", () => {
   });
 
   it("says the notes leave the device only when they do", () => {
-    // Two arms, not desktop's three. Myne runs no model on a phone, so there is
-    // no device-local arm to describe, and the `"local"` branch this case used
+    // Two arms, not desktop's three. No model on a phone SERVES AN AGENT RUN, so
+    // there is no device-local arm to describe, and the `"local"` branch this used
     // to exercise was unreachable code carrying desktop wording ("a program
     // running on this COMPUTER") that would have been wrong the day it fired.
     // Removed from the type with it, so there is no third member left to test.

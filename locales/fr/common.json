@@ -3139,7 +3139,7 @@
       "title": "IA",
       "providerModelCount_many": "{{count}} de modèles disponibles.",
       "mobileEnableLabel": "Utiliser l'IA sur ce téléphone",
-      "mobileEnableHelper": "Désactivé par défaut. Myne n'exécute aucun modèle sur un téléphone : chaque requête part vers un service que vous désignez ci-dessous, et vos notes quittent alors cet appareil.",
+      "mobileEnableHelper": "Désactivé par défaut. Aucun modèle d'IA sur ce téléphone ne répond aux questions ni ne lit vos notes, donc chaque requête part vers un service que vous nommez ci-dessous, et vos notes quittent alors cet appareil. La transcription et le texte des images continuent de s'exécuter ici, sur des modèles fournis avec Myne.",
       "mobileKeyAdd": "Enregistrer la clé",
       "mobileKeyReplace": "Remplacer la clé",
       "mobileRevokeHelper": "Supprime le fournisseur, sa clé et l'accord de ce téléphone en une fois, rétablissant exactement l'état d'avant toute configuration. Les autres appareils continuent de fonctionner tant que vous ne les supprimez pas là aussi.",

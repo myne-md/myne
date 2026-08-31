@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "같은 폴더에 Whisper .gguf 파일 + config.json + tokenizer.json이 필요합니다.",
       "title": "AI",
       "mobileEnableLabel": "이 휴대폰에서 AI 사용",
-      "mobileEnableHelper": "기본적으로 꺼져 있습니다. Myne은 휴대폰에서 어떤 모델도 실행하지 않으므로 모든 요청은 아래에서 지정한 서비스로 가고, 그때 노트가 이 기기를 떠납니다.",
+      "mobileEnableHelper": "기본값은 꺼짐. 이 휴대전화의 AI 모델이 질문에 답하거나 메모를 읽지 않으므로, 모든 요청은 아래에서 지정한 서비스로 가고 그때 메모가 이 기기를 떠납니다. 받아쓰기와 이미지 속 텍스트는 여기서 계속 실행되며, Myne과 함께 제공되는 모델을 사용합니다.",
       "mobileKeyAdd": "키 저장",
       "mobileKeyReplace": "키 교체",
       "mobileRevokeHelper": "제공자, 그 키, 이 휴대폰의 승인을 함께 제거하여 설정한 적 없는 상태로 되돌립니다. 다른 기기는 거기서도 제거할 때까지 계속 작동합니다.",

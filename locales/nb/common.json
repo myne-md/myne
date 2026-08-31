@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Trenger .gguf-filen fra Whisper + config.json + tokenizer.json i samme mappe.",
       "title": "AI",
       "mobileEnableLabel": "Bruk KI på denne telefonen",
-      "mobileEnableHelper": "Av som standard. Myne kjører ingen modell på en telefon, så hver forespørsel går til en tjeneste du oppgir nedenfor, og notatene dine forlater da denne enheten.",
+      "mobileEnableHelper": "Av som standard. Ingen KI-modell på denne telefonen svarer på spørsmål eller leser notatene dine, så hver forespørsel går til en tjeneste du navngir nedenfor, og notatene dine forlater enheten da. Transkripsjon og tekst i bilder kjører fortsatt her, på modeller som følger med Myne.",
       "mobileKeyAdd": "Lagre nøkkel",
       "mobileKeyReplace": "Bytt nøkkel",
       "mobileRevokeHelper": "Fjerner leverandøren, nøkkelen og denne telefonens godkjenning samlet, og etterlater nøyaktig tilstanden fra før noe var satt opp. Andre enheter fortsetter å virke til du fjerner det der også.",

@@ -3245,7 +3245,7 @@
       "providerModelCount_few": "K dispozici jsou {{count}} modely.",
       "providerModelCount_many": "K dispozici je {{count}} modelu.",
       "mobileEnableLabel": "Používat AI na tomto telefonu",
-      "mobileEnableHelper": "Ve výchozím stavu vypnuto. Myne na telefonu nespouští žádný model, takže každý požadavek jde do služby, kterou níže určíte, a vaše poznámky tím opouštějí toto zařízení.",
+      "mobileEnableHelper": "Ve výchozím stavu vypnuto. Žádný model AI v tomto telefonu neodpovídá na otázky ani nečte vaše poznámky, takže každý požadavek jde do služby, kterou níže pojmenujete, a vaše poznámky tehdy opouštějí toto zařízení. Přepis řeči a text z obrázků běží dál zde, na modelech dodávaných s Myne.",
       "mobileKeyAdd": "Uložit klíč",
       "mobileKeyReplace": "Vyměnit klíč",
       "mobileRevokeHelper": "Odebere poskytovatele, jeho klíč i souhlas tohoto telefonu naráz a zanechá přesně stav, jako by nikdy nic nastaveno nebylo. Ostatní zařízení fungují dál, dokud to neodeberete i tam.",

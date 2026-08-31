@@ -3004,7 +3004,7 @@
       "providerModelShowTextOnly": "Show text models only",
       "providerModelUnfetched": "Load the list to choose a model.",
       "mobileEnableLabel": "Use AI on this phone",
-      "mobileEnableHelper": "Off by default. Myne runs no model on a phone, so every request goes to a service you name below, and your notes leave this device when it does.",
+      "mobileEnableHelper": "Off by default. No AI model on this phone answers questions or reads your notes for AI, so every request goes to a service you name below, and your notes leave this device when it does. Transcription and image text still run here, on models that ship with Myne.",
       "mobileKeyAdd": "Save key",
       "mobileKeyReplace": "Replace key",
       "mobileRevokeHelper": "Removes the provider, its key and this phone's approval together, leaving exactly the state of never having set it up. Other devices keep working until you remove it there too.",

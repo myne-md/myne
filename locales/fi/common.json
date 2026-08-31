@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Tarvitsee Whisperin .gguf-tiedoston + config.json + tokenizer.json samassa kansiossa.",
       "title": "Tekoäly",
       "mobileEnableLabel": "Käytä tekoälyä tässä puhelimessa",
-      "mobileEnableHelper": "Oletuksena pois. Myne ei suorita puhelimessa mitään mallia, joten jokainen pyyntö menee alla nimeämääsi palveluun, ja muistiinpanosi poistuvat silloin tästä laitteesta.",
+      "mobileEnableHelper": "Oletuksena pois päältä. Mikään tekoälymalli tässä puhelimessa ei vastaa kysymyksiin eikä lue muistiinpanojasi, joten jokainen pyyntö menee alla nimeämääsi palveluun, ja muistiinpanosi lähtevät silloin tältä laitteelta. Litterointi ja kuvien teksti toimivat yhä täällä, Mynen mukana tulevilla malleilla.",
       "mobileKeyAdd": "Tallenna avain",
       "mobileKeyReplace": "Vaihda avain",
       "mobileRevokeHelper": "Poistaa palveluntarjoajan, sen avaimen ja tämän puhelimen hyväksynnän yhdessä, jolloin tila on täsmälleen sama kuin ennen käyttöönottoa. Muut laitteet toimivat edelleen, kunnes poistat sen sielläkin.",

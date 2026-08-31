@@ -3245,7 +3245,7 @@
       "providerModelCount_few": "Dostępne {{count}} modele.",
       "providerModelCount_many": "Dostępnych {{count}} modeli.",
       "mobileEnableLabel": "Używaj SI na tym telefonie",
-      "mobileEnableHelper": "Domyślnie wyłączone. Myne nie uruchamia żadnego modelu na telefonie, więc każde żądanie trafia do usługi, którą wskażesz poniżej, a twoje notatki opuszczają wtedy to urządzenie.",
+      "mobileEnableHelper": "Domyślnie wyłączone. Żaden model AI w tym telefonie nie odpowiada na pytania ani nie czyta Twoich notatek, więc każde żądanie trafia do usługi wskazanej poniżej, a Twoje notatki wtedy opuszczają to urządzenie. Transkrypcja i tekst ze zdjęć nadal działają tutaj, na modelach dostarczanych z Myne.",
       "mobileKeyAdd": "Zapisz klucz",
       "mobileKeyReplace": "Zmień klucz",
       "mobileRevokeHelper": "Usuwa razem dostawcę, jego klucz i zgodę tego telefonu, pozostawiając dokładnie stan sprzed jakiejkolwiek konfiguracji. Inne urządzenia działają dalej, dopóki nie usuniesz tego również tam.",

@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "需要 Whisper 的 .gguf 文件 + config.json + tokenizer.json 位于同一文件夹中。",
       "title": "AI",
       "mobileEnableLabel": "在这部手机上使用 AI",
-      "mobileEnableHelper": "默认关闭。Myne 不在手机上运行任何模型，因此每次请求都会发往你在下方指定的服务，你的笔记也会在那时离开这台设备。",
+      "mobileEnableHelper": "默认关闭。这台手机上没有任何 AI 模型会回答问题或读取你的笔记，所以每个请求都会发往你在下面指定的服务，你的笔记也会在那时离开本设备。转写和图片文字仍在本机运行，使用随 Myne 一起提供的模型。",
       "mobileKeyAdd": "保存密钥",
       "mobileKeyReplace": "更换密钥",
       "mobileRevokeHelper": "同时移除提供方、其密钥和这部手机的许可，恢复到从未设置过的状态。其他设备会继续工作，直到你在那里也移除为止。",

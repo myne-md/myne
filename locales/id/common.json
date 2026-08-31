@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Membutuhkan berkas Whisper .gguf + config.json + tokenizer.json dalam folder yang sama.",
       "title": "AI",
       "mobileEnableLabel": "Gunakan AI di ponsel ini",
-      "mobileEnableHelper": "Mati secara bawaan. Myne tidak menjalankan model apa pun di ponsel, jadi setiap permintaan pergi ke layanan yang Anda sebutkan di bawah, dan catatan Anda meninggalkan perangkat ini saat itu.",
+      "mobileEnableHelper": "Nonaktif secara bawaan. Tidak ada model AI di ponsel ini yang menjawab pertanyaan atau membaca catatan Anda, jadi setiap permintaan dikirim ke layanan yang Anda sebutkan di bawah, dan catatan Anda meninggalkan perangkat ini saat itu. Transkripsi dan teks gambar tetap berjalan di sini, pada model yang disertakan bersama Myne.",
       "mobileKeyAdd": "Simpan kunci",
       "mobileKeyReplace": "Ganti kunci",
       "mobileRevokeHelper": "Menghapus penyedia, kuncinya, dan persetujuan ponsel ini sekaligus, meninggalkan keadaan persis seperti belum pernah disiapkan. Perangkat lain tetap bekerja sampai Anda menghapusnya di sana juga.",

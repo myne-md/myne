@@ -39,12 +39,21 @@ import { Button } from "../../components/Button";
  *
  *  **Two members, not desktop's three.** The desktop dialog's `ProviderArm`
  *  carries `"local"` because that client can answer from a model file or a
- *  loopback runtime. This one runs no model on a phone (`mobile/src/lib/
+ *  loopback runtime. No model on a phone SERVES AN AGENT RUN (`mobile/src/lib/
  *  agent-run.ts`), so its only producer emits `"none"` or `"remote"` and a
  *  `"local"` branch here was unreachable code whose copy said "a program
  *  running on this COMPUTER": desktop wording that would have been wrong the
  *  day it fired. Narrowed rather than defended: the day mobile gains a local
- *  arm, this type is where that decision surfaces. */
+ *  arm, this type is where that decision surfaces.
+ *
+ *  **Scoped to agent runs on purpose, and the loose form of this sentence is a
+ *  privacy overclaim.** "Myne runs no model on a phone" is false: a quantized
+ *  whisper-tiny GGUF ships in the mobile bundle and runs IN PROCESS for
+ *  transcription, and OCR weights ship there too. So the in-process,
+ *  not-sandboxed residual `docs/threat-model.md` states for a bundled
+ *  first-party model applies on this client as much as on the desktop, and a
+ *  sentence that removes it for a whole platform is the direction the
+ *  marketing-copy rule exists to prevent. */
 export type ProviderArm = "none" | "remote";
 
 const FACT: CSSProperties = {

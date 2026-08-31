@@ -3033,7 +3033,7 @@
       "recommendedFilesTranscription": "Cần tệp .gguf của Whisper + config.json + tokenizer.json trong cùng một thư mục.",
       "title": "AI",
       "mobileEnableLabel": "Dùng AI trên điện thoại này",
-      "mobileEnableHelper": "Mặc định tắt. Myne không chạy mô hình nào trên điện thoại, nên mọi yêu cầu đều tới dịch vụ bạn nêu bên dưới, và ghi chú của bạn rời khỏi thiết bị này khi đó.",
+      "mobileEnableHelper": "Tắt theo mặc định. Không có mô hình AI nào trên điện thoại này trả lời câu hỏi hay đọc ghi chú của bạn, nên mọi yêu cầu đều đi tới dịch vụ bạn nêu bên dưới, và khi đó ghi chú của bạn rời khỏi thiết bị này. Chuyển giọng nói thành văn bản và văn bản trong ảnh vẫn chạy ở đây, trên các mô hình đi kèm Myne.",
       "mobileKeyAdd": "Lưu khóa",
       "mobileKeyReplace": "Thay khóa",
       "mobileRevokeHelper": "Gỡ nhà cung cấp, khóa của nó và sự chấp thuận của điện thoại này cùng lúc, để lại đúng trạng thái như chưa từng thiết lập. Các thiết bị khác vẫn hoạt động cho đến khi bạn gỡ ở đó nữa.",
