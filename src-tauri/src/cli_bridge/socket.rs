@@ -60,6 +60,15 @@ const ACCEPT_POLL: Duration = Duration::from_millis(50);
 /// the cheapest possible client. Generous enough that no honest `myne`
 /// invocation can hit it (the CLI writes its whole request before reading),
 /// short enough that a stalled connection frees its thread promptly.
+///
+/// **It is passed to TWO mechanisms and they bound different things**, which
+/// this doc used to conflate. As `SO_RCVTIMEO`/`SO_SNDTIMEO` it is a
+/// PER-SYSCALL bound: it resets whenever a read returns data, so it bounds a
+/// SILENT peer and not a dribbling one. As [`Watchdog`]'s deadline it is the
+/// connection TOTAL, wall-clock from accept, and that is the one that makes the
+/// "a peer that connects and sends a partial length prefix pins its handler
+/// thread forever" claim below true for every peer rather than only for a
+/// silent one.
 #[cfg(not(test))]
 const IO_DEADLINE: Duration = Duration::from_secs(10);
 
@@ -166,14 +175,34 @@ pub struct ListenerHandle {
 #[cfg(unix)]
 use crate::uds::bind_listener;
 
-/// The deadline of last resort: a thread that shuts the connection down once
-/// [`IO_DEADLINE`] has elapsed. `shutdown(Both)` makes every in-flight and
+/// The connection's TOTAL bound: a thread that shuts it down once the deadline
+/// the caller supplied has elapsed. `shutdown(Both)` makes every in-flight and
 /// subsequent read return EOF and every write fail, which is what releases the
-/// handler thread — the same bound `SO_RCVTIMEO` gives, obtained without it.
+/// handler thread. Production passes [`IO_DEADLINE`]; the deadline tests pass
+/// [`STALL_TEST_DEADLINE`]. `Drop` disarms it, so a connection that finishes
+/// normally does not leave a thread sitting out the full deadline.
 ///
-/// Armed ONLY when the socket options were refused, so the ordinary connection
-/// still costs exactly one thread. `Drop` disarms it, so a connection that
-/// finishes normally does not leave a thread sitting out the full deadline.
+/// **It is armed on EVERY connection, and it used to be armed only when the
+/// socket options were REFUSED.** That was a thread saved against a bound not
+/// held, because `SO_RCVTIMEO` is a per-SYSCALL timeout that resets every time a
+/// read returns data, while `framing::read_up_to` loops until its buffer fills.
+/// A peer sending one byte every 9 s therefore never trips a 10 s
+/// `SO_RCVTIMEO` and holds its handler thread for as long as it likes. The rate
+/// limiter cannot charge it anything, because that is checked AFTER `read_frame`
+/// returns. Sixteen such peers reach [`MAX_INFLIGHT_CONNECTIONS`] and every
+/// later connection is dropped at the cap, which is the door-closed state
+/// myne#314 fixed one other arm of in this file: the socket stops answering
+/// while the status marker still reads `O`.
+///
+/// The hole predates this file's O_NONBLOCK fix on Linux and was closed on macOS
+/// only by accident, because every read there returned instantly and a dribbling
+/// peer could not hold anything either. Making the reads block is what opened
+/// it, so it is closed in the same change.
+///
+/// The cost is one extra thread per in-flight connection, bounded by
+/// [`MAX_INFLIGHT_CONNECTIONS`] at 16, each parked in `recv_timeout` rather than
+/// running. The adversary is a same-user process, which the cap's own doc
+/// already scopes as robustness rather than a new trust boundary.
 #[cfg(unix)]
 struct Watchdog {
     disarm: Option<std::sync::mpsc::Sender<()>>,
@@ -182,17 +211,12 @@ struct Watchdog {
 
 #[cfg(unix)]
 impl Watchdog {
-    /// `Ok(None)` when the socket already carries its own deadline and there
-    /// is nothing to arm. `Err` means neither mechanism is available — the
-    /// caller must drop the connection rather than serve it unbounded.
-    fn arm(
-        stream: &std::os::unix::net::UnixStream,
-        deadline_set: bool,
-        deadline: Duration,
-    ) -> io::Result<Option<Self>> {
-        if deadline_set {
-            return Ok(None);
-        }
+    /// `Err` means the total bound is unavailable, and the caller must drop the
+    /// connection rather than serve it unbounded. There is no `Ok(None)` arm any
+    /// more: the previous signature returned one when the socket already carried
+    /// `SO_RCVTIMEO`, on the reading that the two bounds were interchangeable.
+    /// They are not, and the type doc above says why.
+    fn arm(stream: &std::os::unix::net::UnixStream, deadline: Duration) -> io::Result<Self> {
         let fd = stream.try_clone()?;
         let (disarm, rx) = std::sync::mpsc::channel::<()>();
         let join = std::thread::Builder::new()
@@ -206,10 +230,10 @@ impl Watchdog {
                     let _ = fd.shutdown(std::net::Shutdown::Both);
                 }
             })?;
-        Ok(Some(Self {
+        Ok(Self {
             disarm: Some(disarm),
             join: Some(join),
-        }))
+        })
     }
 }
 
@@ -319,12 +343,12 @@ fn serve_connection(
             event = "socket_opt_refused"
         );
     }
-    let _deadline = match Watchdog::arm(&stream, deadline_set, deadline) {
+    let _deadline = match Watchdog::arm(&stream, deadline) {
         Ok(guard) => guard,
         Err(e) => {
-            // No socket deadline AND no watchdog: this is the unbounded state
-            // the deadline exists to prevent, so here the connection really
-            // does die rather than be served.
+            // No total bound at all: this is the unbounded state the deadline
+            // exists to prevent, so here the connection really does die rather
+            // than be served.
             let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
             tracing::debug!(stage = "cli_bridge_conn_deadline", io_failure_kind = ?kind);
             return;
@@ -514,11 +538,18 @@ pub fn spawn(
 /// [`spawn`] with the per-connection deadline stated rather than inherited.
 ///
 /// Production has exactly one deadline and calls [`spawn`]. This exists for the
-/// two tests that exist to watch the deadline FIRE: they need a short one, and
-/// every other test in this file needs a long one, which is the split
-/// [`IO_DEADLINE`]'s `cfg(test)` doc records. Not `#[cfg(test)]` itself, so the
-/// production path and the tested path are the same code rather than two arms
-/// that can drift.
+/// tests that watch the deadline FIRE: they need a short one, and every other
+/// test in this file needs a long one, which is the split [`IO_DEADLINE`]'s
+/// `cfg(test)` doc records. Not `#[cfg(test)]` itself, so the production path
+/// and the tested path are the same code rather than two arms that can drift.
+///
+/// **One** test spawns through here
+/// (`a_connection_that_never_finishes_its_frame_is_released_by_the_deadline`).
+/// The other deadline test builds a raw `UnixListener` and calls
+/// [`Watchdog::arm`] directly, because it is proving the watchdog rather than
+/// the socket option. Both pass [`STALL_TEST_DEADLINE`]; they reach it by
+/// different routes.
+#[cfg(unix)]
 fn spawn_with_deadline(
     app_data_dir: &Path,
     lister: Arc<dyn NoteLister>,
@@ -709,51 +740,54 @@ mod tests {
         SharedLastAccess::default()
     }
 
-    /// Write one whole frame — length prefix and body — in a SINGLE `write_all`.
+    /// Write one whole frame, length prefix and body, in a SINGLE `write_all`.
     ///
-    /// NOT a tidy-up. The two-call form these tests used,
+    /// NOT a tidy-up, and the reason it was added is NOT the reason it is kept.
+    /// The history is here rather than deleted because the correction is the
+    /// useful part: this helper was written to close a window that turned out
+    /// not to be the cause.
+    ///
+    /// **What it still does, and this survives.** The two-call form these tests
+    /// used,
     ///
     ///     client.write_all(&(body.len() as u32).to_le_bytes()).unwrap();
     ///     client.write_all(body).unwrap();
     ///
-    /// leaves a real window between the two syscalls, and the server is
-    /// entitled to close inside it. `serve_connection` sets `SO_RCVTIMEO` to
-    /// [`IO_DEADLINE`] before its first read; `framing::read_up_to` treats the
-    /// resulting `WouldBlock` as an error rather than a retry (correctly — that
-    /// error IS the deadline firing); `dispatch::serve_connection` returns
-    /// without a reply and the stream drops. The client's SECOND write then
-    /// fails against a peer that is already gone.
+    /// leaves a real window between the two syscalls, and a server that closes
+    /// inside it fails the client's SECOND write. Injecting a 1500 ms sleep
+    /// between the two writes fails the test at that second write, every time.
+    /// The window is real, and a test that writes one frame in one call cannot
+    /// lose it. Keep the helper.
     ///
-    /// That is why this read as flake and only under
-    /// `cargo test --workspace`: [`IO_DEADLINE`] is **1 s** under `cfg(test)`,
-    /// and a client thread descheduled a whole second between two adjacent
-    /// statements is ordinary on a machine running the full workspace suite.
+    /// **What it did NOT fix, superseded by the O_NONBLOCK finding.** This block
+    /// used to attribute the round-trip flake to that window plus a short
+    /// `cfg(test)` deadline, and read "`IO_DEADLINE` is **1 s** under
+    /// `cfg(test)`, and a client thread descheduled a whole second between two
+    /// adjacent statements is ordinary on a machine running the full workspace
+    /// suite". The constant has since been 1 s, then 5 s, and is 60 s now, and
+    /// the account was wrong on the mechanism rather than on the number: the
+    /// accepted stream INHERITED the listener's `O_NONBLOCK` on macOS, so the
+    /// server's first read never waited at all. `serve_connection`'s comment on
+    /// `set_nonblocking(false)` carries the measurement: the window was 2.75
+    /// microseconds wide, not one second. No deadline value could have closed
+    /// it, which is why raising the constant twice looked like progress and was
+    /// not.
     ///
-    /// TWO KINDS OF EVIDENCE, and they are not the same strength.
+    /// **The A/B that was read as confirmation.** `CARGO_TARGET_DIR=target/pre-push
+    /// cargo test --workspace`, same machine, same session: 2 failures in 3 runs
+    /// before this helper, 0 in 6 after. The measurement is real and was taken
+    /// honestly. What it could not distinguish is a window narrowed from two
+    /// syscalls to one against a race whose odds simply fell, and the flake
+    /// returned later at 2 failures in 2 runs, which is what reopened this.
+    /// A statistical A/B over a race is evidence about frequency, never about
+    /// mechanism.
     ///
-    /// Injection (strong, deterministic): a 1500 ms sleep between the two
-    /// writes fails the test in 1.5 s, at the second write, every time, with no
-    /// other change. The window is real.
-    ///
-    /// A/B (strong, statistical): `CARGO_TARGET_DIR=target/pre-push cargo test
-    /// --workspace`, same machine, same session — **2 failures in 3 runs**
-    /// before, **0 in 6** after.
-    ///
-    /// What is NOT established: the errno taxonomy. The failure was seen
-    /// wearing `ENOTCONN`, `BrokenPipe` and `UnexpectedEof`, which is consistent
-    /// with one cause (the server closing without a reply, racing the client's
-    /// second write) — but standalone probes of every close shape in this file's
-    /// path (plain close, `shutdown(Both)`, a listener closed with the
-    /// connection unaccepted, read-then-deadline-then-close) produced
-    /// `BrokenPipe` on macOS and never `ENOTCONN`. So the account above explains
-    /// the window and the measurement, and does NOT fully explain which errno
-    /// surfaces when. Anyone re-opening this should start there rather than
-    /// assume it was settled.
-    ///
-    /// The constant's own doc comment already states the invariant that makes
-    /// 1 s safe — "each writes its whole frame and flushes before the server's
-    /// first read". These tests were the ones not honouring it, and it now has
-    /// exactly one place to be honoured.
+    /// **Still not established: the errno taxonomy.** The failure was seen
+    /// wearing `ENOTCONN`, `BrokenPipe` and `UnexpectedEof`. Standalone probes
+    /// of every close shape in this file's path (plain close, `shutdown(Both)`,
+    /// a listener closed with the connection unaccepted,
+    /// read-then-deadline-then-close) produced `BrokenPipe` on macOS and never
+    /// `ENOTCONN`. Anyone re-opening this should start there.
     ///
     /// Production is unaffected and deliberately left alone: `framing::write_frame`
     /// writes in two calls too, but against the real 10 s deadline, and making it
@@ -850,6 +884,11 @@ mod tests {
         let path = socket_path(dir.path());
         let mut client =
             std::os::unix::net::UnixStream::connect(&path).expect("connect to cli bridge socket");
+        // See the ceiling's own doc: the server deadline is 60 s under
+        // `cfg(test)`, so a round trip needs a bound of its own to fail fast.
+        client
+            .set_read_timeout(Some(CLIENT_OBSERVATION_CEILING))
+            .expect("set client read timeout");
         let body = b"{}";
         write_whole_frame(&mut client, body);
 
@@ -901,6 +940,11 @@ mod tests {
         let path = socket_path(dir.path());
         let mut client =
             std::os::unix::net::UnixStream::connect(&path).expect("connect to cli bridge socket");
+        // See the ceiling's own doc: the server deadline is 60 s under
+        // `cfg(test)`, so a round trip needs a bound of its own to fail fast.
+        client
+            .set_read_timeout(Some(CLIENT_OBSERVATION_CEILING))
+            .expect("set client read timeout");
         let body = br#"{"cmd":"list"}"#;
         write_whole_frame(&mut client, body);
 
@@ -934,8 +978,25 @@ mod tests {
         // usually already in the socket buffer and the race is only lost under
         // load. Here the server is GUARANTEED to reach its first read with
         // nothing to read, which turns a 2-in-3 flake into a deterministic
-        // assertion. Verified by deleting the `set_nonblocking(false)` call and
-        // watching this fail while the whole rest of the module stayed green.
+        // assertion.
+        //
+        // **What this asserts depends on the platform, and the difference is the
+        // finding rather than a footnote.** Linux `accept()` does not inherit
+        // file status flags (Rust std uses `accept4` with `SOCK_CLOEXEC` only),
+        // so the accepted stream is blocking there whether or not
+        // `set_nonblocking(false)` runs. On Linux this test pins the
+        // blocking-first-read CONTRACT: it fails if someone makes the stream
+        // non-blocking. On macOS and the BSDs it is the regression guard for the
+        // inherited flag.
+        //
+        // The deletion experiment was run on macOS: removing
+        // `set_nonblocking(false)` fails this test by name and leaves the whole
+        // rest of the module green. **That experiment is not reproducible on
+        // CI**, which is Linux-only, so on the platform where every gate
+        // actually executes this guard cannot be broken. The macOS half is a
+        // MANUAL verdict, recorded in `docs/dev/manual-test-roster.md` under the
+        // CLI entry, and a future removal of the call is caught there rather
+        // than here.
         //
         // 250 ms is far inside the connection deadline (`IO_DEADLINE`, 60 s
         // under cfg(test)), so a failure here is the flag and never the timeout.
@@ -945,6 +1006,12 @@ mod tests {
         let path = socket_path(dir.path());
         let mut client =
             std::os::unix::net::UnixStream::connect(&path).expect("connect to cli bridge socket");
+        // A liveness ceiling of the client's own. Without one the only bound is
+        // the SERVER's deadline, 60 s under `cfg(test)`, so a genuine regression
+        // reads as a hang rather than as a timeout.
+        client
+            .set_read_timeout(Some(CLIENT_OBSERVATION_CEILING))
+            .expect("set client read timeout");
 
         std::thread::sleep(Duration::from_millis(250));
         write_whole_frame(&mut client, b"{}");
@@ -1029,11 +1096,10 @@ mod tests {
             std::os::unix::net::UnixStream::connect(&path).expect("connect to probe socket");
         let (server, _) = listener.accept().expect("accept probe connection");
 
-        // `deadline_set: false` is the refusal this exists for. The peer then
-        // stalls exactly like the test above: it sends nothing and waits.
-        let armed = Watchdog::arm(&server, false, STALL_TEST_DEADLINE)
-            .expect("arm the watchdog")
-            .expect("a refused deadline must produce a watchdog");
+        // The peer stalls exactly like the test above: it sends nothing and
+        // waits. This is the watchdog on its own, against a socket carrying no
+        // `SO_RCVTIMEO` of its own, which is the arm no other test reaches.
+        let armed = Watchdog::arm(&server, STALL_TEST_DEADLINE).expect("arm the watchdog");
 
         client
             .set_read_timeout(Some(CLIENT_OBSERVATION_CEILING))
@@ -1067,9 +1133,7 @@ mod tests {
         // test whose deadline must NOT fire, so it takes the long one the
         // round-trip tests take. A short one here would make the assertion race
         // the very timer it is proving was disarmed.
-        let armed = Watchdog::arm(&server, false, IO_DEADLINE)
-            .expect("arm")
-            .expect("armed");
+        let armed = Watchdog::arm(&server, IO_DEADLINE).expect("arm");
         drop(armed); // the exchange "finished" well inside the deadline
 
         server.write_all(b"x").expect("write after disarm");
