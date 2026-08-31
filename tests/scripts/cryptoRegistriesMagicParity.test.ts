@@ -218,6 +218,43 @@ pub fn decode(blob: &[u8]) -> bool {
     expect(run(root).code).toBe(0);
   });
 
+  it("FIRES for the hand-named note family: blob::MAGIC alone is a violation", () => {
+    // The stale-roster case below proves the pair is still connected to the
+    // tree. It does not prove the pair FIRES, and those are different claims:
+    // this family's base token is the hand-typed string "blob::MAGIC" at
+    // scripts/check-crypto-registries.mjs. If that spelling were ever wrong, or
+    // the source spelling moved, `fam.base.re` would match nothing, the loop
+    // would `continue`, and the note family's parity check would silently stop
+    // existing while the guard printed ok. That is the same silent-pass shape
+    // the whole rule exists to remove, so it gets the injection root CLAUDE.md
+    // asks for: put the defect in, watch it named, take it out.
+    const root = fixture({
+      "core/src/note_reader.rs":
+        "use protocol::blob;\n" +
+        "pub fn is_note(b: &[u8]) -> bool {\n" +
+        "    b.len() >= 4 && &b[0..4] == blob::MAGIC\n" +
+        "}\n",
+    });
+    const { code, out } = run(root);
+    expect(code).toBe(1);
+    expect(out).toContain("core/src/note_reader.rs");
+    expect(out).toContain("NC05_MAGIC");
+  });
+
+  it("and clears once the same file names NC05_MAGIC too", () => {
+    // The paired direction. Without it the case above would also pass against a
+    // guard that failed every file unconditionally.
+    const root = fixture({
+      "core/src/note_reader.rs":
+        "use protocol::blob;\n" +
+        "use protocol::NC05_MAGIC;\n" +
+        "pub fn is_note(b: &[u8]) -> bool {\n" +
+        "    b.len() >= 4 && (&b[0..4] == blob::MAGIC || &b[0..4] == NC05_MAGIC)\n" +
+        "}\n",
+    });
+    expect(run(root).code).toBe(0);
+  });
+
   it("fails when a NAMED pair's magic is gone from the registry", () => {
     // The note family is paired by hand because `blob::MAGIC` / `NC05_MAGIC`
     // fit no naming pattern. A hand-written pair that outlives its subject
