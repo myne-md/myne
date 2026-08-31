@@ -265,6 +265,10 @@ describe("it never throws", () => {
         tasks: [task({ remind: "2026-07-30 09:00" })],
         notifier: impl,
         clock: () => NOW,
+        // The horizon is REQUIRED since myne-md/myne#508: it used to be a
+        // defaulted parameter, which is the shape that excuses every call site
+        // from the check in advance, and making it required is what named these.
+        horizonDays: 7,
       });
       await act(async () => {
         await Promise.resolve();
@@ -306,6 +310,10 @@ describe("the default clock is stable across renders (myne#318)", () => {
       notifier: n.impl,
       // A fresh closure per render, the shape every `EditorChrome` render has.
       onPass: () => {},
+      // The horizon is REQUIRED since myne-md/myne#508: it used to be a
+      // defaulted parameter, which is the shape that excuses every call site
+      // from the check in advance, and making it required is what named these.
+      horizonDays: 7,
     }));
     const afterMount = n.calls.listed;
     expect(afterMount).toBeGreaterThan(0);
@@ -325,6 +333,10 @@ describe("the default clock is stable across renders (myne#318)", () => {
       enabled: true,
       tasks,
       notifier: n.impl,
+      // The horizon is REQUIRED since myne-md/myne#508: it used to be a
+      // defaulted parameter, which is the shape that excuses every call site
+      // from the check in advance, and making it required is what named these.
+      horizonDays: 7,
     }));
     const afterMount = n.calls.listed;
     tasks = [task({ remind: "2026-07-28 11:00" })];

@@ -43,6 +43,21 @@ vi.mock("../../src/components/settings/PrivacyPanel", () => ({
 // (myne#508). Deleting `onShowToast={onShowToast}` at the shell left every
 // suite green before this captured it.
 let editorPanelProps: { onShowToast?: (message: string) => void } | undefined;
+
+/** Read `editorPanelProps` through a call, so control-flow analysis cannot
+ *  narrow it.
+ *
+ *  Each test assigns `undefined` and then `render`s, and the mocked panel fills
+ *  it during that render. TypeScript cannot see a mutation that happens inside
+ *  a callback it does not follow, so at the assertion it still has the variable
+ *  narrowed to `undefined` and the property access lands on `never`. A local
+ *  copy inherits the same narrowing; only crossing a function boundary drops
+ *  it. The mutation is real, the narrowing is what is wrong, and this is the
+ *  smallest way to say so without a cast that would also hide a genuine
+ *  mistake. */
+function capturedEditorProps(): { onShowToast?: (message: string) => void } | undefined {
+  return editorPanelProps;
+}
 vi.mock("../../src/components/settings/EditorPanel", () => ({
   EditorPanel: (props: { onShowToast?: (message: string) => void }) => {
     editorPanelProps = props;
@@ -80,6 +95,10 @@ afterEach(cleanup);
 
 function renderModal(over: Partial<Parameters<typeof SettingsModal>[0]> = {}) {
   const props = {
+    // Required by `SettingsModalProps`, and absent here until the test tree
+    // started typechecking: `renderModal()` with no override produced an object
+    // missing it, which `render` accepts at runtime and no gate reported.
+    vaultId: null,
     open: true,
     onClose: vi.fn(),
     onDeleteVaultSuccess: vi.fn(),
@@ -101,8 +120,9 @@ describe("SettingsModal panel wiring", () => {
     renderModal({ onShowToast });
     fireEvent.click(screen.getByTestId("settings.tab-editor"));
     await screen.findByTestId("panel.editor");
-    expect(typeof editorPanelProps?.onShowToast).toBe("function");
-    editorPanelProps?.onShowToast?.("boom");
+    const captured = capturedEditorProps();
+    expect(typeof captured?.onShowToast).toBe("function");
+    captured?.onShowToast?.("boom");
     expect(onShowToast).toHaveBeenCalledWith("boom");
   });
 });
