@@ -16,6 +16,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setWidthPx, toggleWidthPx } from "@myne/editor/attachments/embedLayoutActions";
+import { emptyEmbedLayout } from "@myne/dialect/embedLayout";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -33,7 +34,7 @@ describe("setWidthPx", () => {
     // The drag calls `setWidthPx` and the menu calls `toggleWidthPx`. If they
     // disagreed about what "set a width" means, the same 320 would produce two
     // different embeds depending on which affordance the user reached for.
-    const applied = toggleWidthPx(320)({ widthPx: null, widthPercent: 50 });
+    const applied = toggleWidthPx(320)({ ...emptyEmbedLayout(), widthPercent: 50 });
     expect(applied.widthPx).toBe(320);
     expect(applied.widthPercent).toBeNull();
   });
@@ -42,7 +43,7 @@ describe("setWidthPx", () => {
     // The drag has no such behaviour on purpose: dragging to the width you are
     // already at must not clear the width. Pinned here so the shared arm cannot
     // grow a toggle that the drag would inherit.
-    const cleared = toggleWidthPx(320)({ widthPx: 320, widthPercent: null });
+    const cleared = toggleWidthPx(320)({ ...emptyEmbedLayout(), widthPx: 320 });
     expect(cleared.widthPx).toBeNull();
     expect(cleared.widthPercent).toBeNull();
   });
