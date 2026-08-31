@@ -156,12 +156,24 @@ pub async fn import_source_merge_dictionary<R: Runtime>(
     if !spell.is_hydrated() {
         return Err(ImportSourceDictionaryError::Unreadable);
     }
+    // PLAN, persist, then commit. The order is the fix, not an aesthetic:
+    // merging into the live state first and persisting second meant a failed
+    // persist returned `Io`, `carrySourceDictionary` reported `unreadable`, and
+    // the report note told the user nothing came across while the source
+    // vault's words were already in the target's live spell state and would be
+    // written to `vault.dictionary` and synced by the next unrelated
+    // `add_to_personal_dictionary`. This is the one non-additive, synced write
+    // in the flow, so it is also the one where telling the user the opposite of
+    // what happened costs the most.
     let (snapshot, added) = spell
-        .merge_personal(&words)
+        .plan_personal_merge(&words)
         .ok_or(ImportSourceDictionaryError::Io)?;
     crate::spell::sync::persist_dictionary_with_dir(&dir, state.inner(), &snapshot)
         .await
         .map_err(|_| ImportSourceDictionaryError::Io)?;
+    spell
+        .commit_personal(&snapshot)
+        .ok_or(ImportSourceDictionaryError::Io)?;
     Ok(DictionaryCarry { added, read })
 }
 
