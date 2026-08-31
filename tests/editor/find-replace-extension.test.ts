@@ -95,13 +95,13 @@ afterEach(() => {
  *  enters the DOM already carrying its text is not reliably announced
  *  (myne-md/myne#609, found in review). These tests asserted `toBeNull()` and
  *  would have gone on passing against a row that was present and silent. */
-function fallbackShown(m: HTMLElement): boolean {
+function fallbackShown(m: Mounted): boolean {
   const row = byTestId(m, "find.date-fallback") as HTMLElement | null;
   return row !== null && !row.hidden;
 }
 
 /** What the notice says while it is showing, or `""` while it is not. */
-function fallbackText(m: HTMLElement): string {
+function fallbackText(m: Mounted): string {
   return fallbackShown(m) ? (byTestId(m, "find.date-fallback")?.textContent ?? "") : "";
 }
 

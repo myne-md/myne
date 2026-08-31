@@ -205,7 +205,7 @@ const CASE_PATHS = LEAVING_PATHS.filter(
  *  narrowed to the two paths above for the same reason. */
 const CASE_CALLS = TEARDOWN_CALLS.filter((t: { call: string }) =>
   ["clearAgentForLock", "clearChat", "clearAiOutput", "resetSessionIgnored"].includes(t.call),
-).map((t: { appliesTo: string[]; skips?: Record<string, string> }) => ({
+).map((t) => ({
   ...t,
   appliesTo: t.appliesTo.filter(
     (k) => k.startsWith("src/lib/vault-unlock.ts") || k.startsWith("src/lib/vault-switch.ts"),

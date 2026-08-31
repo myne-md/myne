@@ -16,7 +16,7 @@
 //     at build time.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EditorState, type Extension } from "@codemirror/state";
+import { EditorState, type Extension, type TransactionSpec } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { parser } from "../../src/dialect/lezer/parser";
@@ -390,11 +390,17 @@ describe("chip write path (task 7)", () => {
     const { view, host } = docView("- [ ] pay rent [due:: 2026-08-01]\n");
     const seen: (string | undefined)[] = [];
     const original = view.dispatch.bind(view);
-    // @ts-expect-error - test seam
-    view.dispatch = (...specs) => {
-      for (const spec of specs) seen.push((spec as { userEvent?: string }).userEvent);
-      return original(...(specs as never));
-    };
+    // A test seam over `dispatch`, typed rather than suppressed. The
+    // `@ts-expect-error` this replaces stopped suppressing anything when the
+    // overload it fought was narrowed, and TypeScript then reported the
+    // directive itself as unused AND inferred `specs` as `never`, so the
+    // `for...of` below could not iterate. A directive that has stopped
+    // suppressing is worse than no directive: it reads as a known, accepted
+    // mismatch while the code under it has quietly changed meaning.
+    view.dispatch = ((...specs: TransactionSpec[]) => {
+      for (const spec of specs) seen.push(spec.userEvent);
+      original(...specs);
+    }) as typeof view.dispatch;
 
     const changed = applyTaskFieldEdit(view, { from: 15, to: 33, kind: "due" }, "2026-09-09");
 
@@ -1136,11 +1142,12 @@ describe("a settings change repaints an open note (myne#609)", () => {
     const { view, host } = mountLive("- [ ] pay rent [due:: 2026-08-01]\n");
     let dispatched = 0;
     const original = view.dispatch.bind(view);
-    // @ts-expect-error - test seam
-    view.dispatch = (...specs) => {
+    // Typed test seam; see the first one in this file for why the
+    // `@ts-expect-error` it replaces had stopped meaning anything.
+    view.dispatch = ((...specs: TransactionSpec[]) => {
       dispatched += 1;
-      return original(...(specs as never));
-    };
+      original(...specs);
+    }) as typeof view.dispatch;
     pinDisplay("dmy");
     expect(dispatched).toBe(0);
     teardown(view, host);
@@ -1192,11 +1199,12 @@ describe("a settings change repaints an open note (myne#609)", () => {
     // call time, so replacing the property observes the leak directly.
     let dispatched = 0;
     const original = view.dispatch.bind(view);
-    // @ts-expect-error - test seam
-    view.dispatch = (...specs) => {
+    // Typed test seam; see the first one in this file for why the
+    // `@ts-expect-error` it replaces had stopped meaning anything.
+    view.dispatch = ((...specs: TransactionSpec[]) => {
       dispatched += 1;
-      return original(...(specs as never));
-    };
+      original(...specs);
+    }) as typeof view.dispatch;
 
     teardown(view, host);
     pinDisplay("dmy");
