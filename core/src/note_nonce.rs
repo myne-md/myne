@@ -25,7 +25,7 @@ use std::path::Path;
 /// `.myn` magic — sourced from `protocol::blob` (protocol.md §9.2 offset 0) so
 /// a header-format change can't silently rot this decryption-free reader.
 const MYN_MAGIC: [u8; 4] = *protocol::blob::MAGIC;
-/// The next-major `NC05` CRDT note magic (`protocol.md` §10.5). A `.myn` file may
+/// The allocated v0.2 `NC05` CRDT note magic (`protocol.md` §10.7). A `.myn` file may
 /// hold EITHER family, and `NC05` reuses `blob.rs`'s `OFFSET_CONTENT_NONCE`
 /// verbatim, so the `content_nonce` sits at the identical header offset in both —
 /// the decryption-free staleness signal is magic-agnostic across the note

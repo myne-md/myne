@@ -231,6 +231,25 @@ const EXTRA_MAGIC_PAIRS = [
  */
 const KNOWN = [
   {
+    rule: "magic-parity",
+    file: "protocol/src/vault_meta.rs",
+    contains: "VAULT_META_MAGIC",
+    why:
+      "`parse_vault_meta` is deliberately v0.1-only and its single-generation rejection at " +
+      "`bytes[0..4] != VAULT_META_MAGIC` is the correct behaviour for it: the version-aware " +
+      "entry point is `parse_vault_meta_any` in `vault_meta_v0_2.rs`, which reads the first " +
+      "four bytes, decides `MetaVersion`, and calls this function only once it has established " +
+      "the blob IS v0.1. This is the one case rule 5's failure text names as legitimate, a " +
+      "codec behind a dispatcher, rather than the myne-md/myne#638 shape of a reader that " +
+      "silently answers `None`. " +
+      "Who holds the other half: `scripts/check-version-routing.mjs` is the ratchet on the " +
+      "CALLERS, and it is what fails when a new reader reaches for `parse_vault_meta` where a " +
+      "version-aware helper exists. That split is why this entry is a recorded exemption and " +
+      "not a hole: this guard owns the codec, that one owns who may call it. " +
+      "Delete this entry if `parse_vault_meta` ever learns both generations, or if the v0.1 " +
+      "path is retired.",
+  },
+  {
     rule: "length-prefix",
     file: "protocol/src/attachments_catalog.rs",
     contains: ".len() as u16",
@@ -582,6 +601,42 @@ for (const p of EXTRA_MAGIC_PAIRS) {
   });
 }
 
+/** Does this file COMPARE bytes against one of the family's magic constants,
+ *  outside a `#[cfg(test)]` region?
+ *
+ *  This is the one condition that narrows rule 5's declaration exemption, so
+ *  what it matches and what it deliberately does not both matter.
+ *
+ *  MATCHES a decision about what the file accepts:
+ *      if bytes[0..4] != VAULT_META_MAGIC
+ *      if &blob[0..MAGIC.len()] != MAGIC
+ *      Some(m) if m == VAULT_META_MAGIC.as_slice()
+ *      header.starts_with(&NC05_MAGIC)
+ *
+ *  DOES NOT MATCH a write, which is what keeps every encoder exempt:
+ *      out[0..4].copy_from_slice(&VAULT_META_MAGIC)
+ *
+ *  The token may be namespaced (`blob::MAGIC` in `EXTRA_MAGIC_PAIRS`), so the
+ *  final segment is what a call site actually spells after a `use`. Both forms
+ *  are accepted rather than only the bare one, because a fully-qualified
+ *  comparison is still a comparison. */
+function comparesMagic(s, tokens) {
+  for (let i = 0; i < s.bare.length; i += 1) {
+    if (s.testLines.has(i + 1)) continue;
+    const text = s.bare[i];
+    if (text === "") continue;
+    for (const t of tokens) {
+      const bare = t.token.split("::").pop();
+      const name = `(?:[A-Za-z_][A-Za-z0-9_]*::)*${bare}`;
+      // `x == NAME` / `x != NAME`, either operand order, optional `&`.
+      if (new RegExp(`[!=]=\\s*&?${name}\\b`).test(text)) return true;
+      if (new RegExp(`\\b${name}\\b[^=!<>]*[!=]=`).test(text)) return true;
+      if (new RegExp(`starts_with\\(\\s*&?${name}\\b`).test(text)) return true;
+    }
+  }
+  return false;
+}
+
 function isKnown(rule, rel, text) {
   const idx = KNOWN.findIndex(
     (k) => k.rule === rule && k.file === rel && text.includes(k.contains),
@@ -705,9 +760,25 @@ for (const [rel, s] of scanned) {
     // at the moment it should fire: a third generation declared in a sibling
     // module leaves the original codec exempt while its dispatch still handles
     // two generations out of three.
+    //
+    // The exemption is narrowed by one condition, and the condition is the
+    // difference between a file that only DECLARES and one that also READS.
+    // The paragraph above rests on "a declaration accepts nothing", and that
+    // sentence is false of every codec in this set: `protocol/src/vault_meta.rs`
+    // declares `MYV1` and then rejects anything else at `parse_vault_meta`, so
+    // a file-scoped skip excused the tree's remaining live single-generation
+    // first-bytes rejection of a two-generation family — the exact shape of
+    // myne-md/myne#638, in the rule written to catch it. `blob.rs`,
+    // `crdt_note_blob.rs` and `vault_meta_v0_2.rs` carried the same blanket.
+    //
+    // A COMPARISON is the discriminator rather than any mention, and the
+    // distinction is load-bearing: `out[0..4].copy_from_slice(&MAGIC)` is an
+    // encoder legitimately writing one generation, while `bytes[0..4] != MAGIC`
+    // is a reader deciding what it accepts. Only the second form matches below,
+    // so the encoders stay exempt and the readers do not.
     const declaredHere = all.filter((g) => g.file === rel).length;
     const declaredIn = new Set(all.map((g) => g.file));
-    if (declaredHere === 1 && declaredIn.size > 1) continue;
+    if (declaredHere === 1 && declaredIn.size > 1 && !comparesMagic(s, all)) continue;
     // Keyed on the BASE magic, and the symmetric form was tried and rejected
     // rather than not considered. Asking "a file naming ANY generation must
     // name all of them" reports two legitimate sites as violations:
