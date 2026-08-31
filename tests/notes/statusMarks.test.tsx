@@ -49,7 +49,7 @@ function iconOf(el: Element): string | null {
     return host.innerHTML;
   };
   const body = normalise(svg.innerHTML);
-  return Object.keys(ICON_PATHS).find((n) => normalise(ICON_PATHS[n]) === body) ?? null;
+  return Object.entries(ICON_PATHS).find(([, markup]) => normalise(markup) === body)?.[0] ?? null;
 }
 
 function readout(status: Parameters<typeof SaveStatus>[0]["status"], unsynced = false) {
