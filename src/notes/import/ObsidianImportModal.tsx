@@ -253,6 +253,18 @@ export function ObsidianImportModal({
   // A retryable credential message shown ON the setup step. Cleared on every
   // fresh submission, so a corrected password does not sit under the old error.
   const [setupError, setSetupError] = useState<string | null>(null);
+  // The non-secret setup cells, held HERE so a retryable failure comes back to
+  // them. `setPhase("running")` unmounts `MyneVaultSetup`, and the retryable arm
+  // mounts a fresh one, so without this every cell resets on the single likeliest
+  // failure of this flow (a mistyped source password) and the 20-line comment
+  // justifying that arm describes the outcome it produces. The password and the
+  // phrase are deliberately NOT here: they stay local to the setup step and die
+  // with its unmount.
+  const [setupCells, setSetupCells] = useState<{
+    chosen: string;
+    label: string;
+    kind: "password" | "phrase";
+  } | null>(null);
 
   const startMyneImport = useCallback(
     ({
@@ -267,6 +279,13 @@ export function ObsidianImportModal({
       cancelRef.current = false;
       setCancelling(false);
       setSetupError(null);
+      // Remember the non-secret cells BEFORE the unmount, so the retryable arm
+      // below comes back to a filled form rather than an empty one.
+      setSetupCells({
+        chosen: sourceVaultId,
+        label: importLabel,
+        kind: "password" in credential ? "password" : "phrase",
+      });
       setProgress({ done: 0, total: 0 });
       setPhase("running");
       void (async () => {
@@ -479,6 +498,9 @@ export function ObsidianImportModal({
             onCancel={handleClose}
             onBack={initialSource === undefined ? () => setPhase("pick") : undefined}
             error={setupError}
+            initialChosen={setupCells?.chosen}
+            initialLabel={setupCells?.label}
+            initialKind={setupCells?.kind}
           />
         )}
         {phase === "setup" && spec.pick !== "vault" && (
@@ -922,6 +944,18 @@ function SummaryBody({
               <StatRow
                 label={t("notes.import.myne.report.linksRetargeted")}
                 value={myneExtras.linksRetargeted}
+              />
+              {/* The residual, and it is on screen because the feature's own
+                  copy calls it the highest-risk behaviour and says silent is
+                  not an option. It was computed, carried through the cancelled
+                  path deliberately, and rendered nowhere: no locale key, no
+                  StatRow, no test. On a cancelled run SYNC-6 keeps the partial
+                  result, so notes really are in the vault carrying links that
+                  will not open, and nothing said so. */}
+              <StatRow
+                label={t("notes.import.myne.report.linksLeftUnresolved")}
+                value={myneExtras.linksLeftUnresolved}
+                muted
               />
               <StatRow
                 label={t("notes.import.myne.report.attachmentsCrossed")}
