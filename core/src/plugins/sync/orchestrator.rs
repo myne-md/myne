@@ -1328,6 +1328,33 @@ struct PrefsPhase {
     shared_hash: String,
 }
 
+/// The two fields an enrollment seed does NOT adopt.
+///
+/// Extracted so it has a name, a place for its argument and a test. Inline it
+/// was two assignments in the middle of a 300-line phase, and the review that
+/// found the spec still describing the old behaviour also found that nothing
+/// asserted the new one: the carve-out could have been deleted and every test in
+/// this crate would have stayed green.
+///
+/// **Why these two and not "device-local fields".** `ai_provider_consent` is
+/// device-local, and a device that inherited a consent it never gave would begin
+/// sending this vault's note text to a named remote provider with nobody at that
+/// device having seen the consent screen. `docs/spec/sync-protocol.md` §10.2.1
+/// and `docs/threat-model.md` TB13 both name this seed path as one of the two
+/// that had to close for the per-device claim to hold. `ai_enabled` goes with it
+/// because it is the other half of the same gate: inherited "AI is on", plus an
+/// inherited consent, plus the key (which still syncs), is a device fully
+/// configured to send before anyone has touched it.
+///
+/// **Withheld, not derived from the classification table.** A loop over the
+/// device-local fields would silently withhold the next field somebody
+/// classifies device-local for an unrelated reason, and withholding a field from
+/// a new device's seed is a decision rather than a consequence.
+fn withhold_from_enrollment_seed(seeded: &mut protocol::PrefsView) {
+    seeded.ai_provider_consent = None;
+    seeded.ai_enabled = false;
+}
+
 /// Pull-side `vault.prefs` reconciliation (MYND-478; `sync-protocol.md`
 /// §10.2.1). The `sync_catalog_phase` twin with one twist: the push gate is
 /// the **shared-subset hash**, not the blob nonce — a purely device-local
@@ -1371,7 +1398,14 @@ async fn sync_prefs_phase(
     // Enrollment wholesale seed (§10.2.1): a VIRGIN vault — no `vault.prefs`
     // on disk, the just-joined-device state (`sync_join_account` materializes
     // meta + notes but never a prefs blob) — adopts the server's blob
-    // VERBATIM, device-local fields included as starting defaults. This runs
+    // wholesale, device-local fields included as starting defaults, EXCEPT
+    // `ai_provider_consent` and `ai_enabled`, which are cleared and the blob
+    // re-encoded before the write (myne-md/myne#456). It said VERBATIM directly
+    // above the code that stopped doing that, which is the shape a comment is
+    // most expensive in. The carve-out is a security one: a device that
+    // inherited a consent it never gave would begin sending this vault's note
+    // text to a named remote provider with nobody at that device having seen the
+    // consent screen, and `threat-model.md` TB13 cites this path by name. This runs
     // on the first authed cycle (a pending device has no token at join time)
     // and exactly once: after the seed the file exists, so every later cycle
     // merges. A server blob that fails decode falls through to the general
@@ -1422,8 +1456,7 @@ async fn sync_prefs_phase(
                 // device-local fields in general, and writing it as a loop over
                 // `CLASSIFICATION` would silently withhold the next field
                 // somebody classifies device-local for an unrelated reason.
-                seeded.ai_provider_consent = None;
-                seeded.ai_enabled = false;
+                withhold_from_enrollment_seed(&mut seeded);
                 // **The VERSIONED encoder, like every other write in this
                 // function.** The v0.1-only twin compiles, passes every test run
                 // against an unmigrated vault, and stamps the v0.1 magic
@@ -3780,6 +3813,42 @@ async fn sync_cycle_attempt(
 
 #[cfg(test)]
 mod tests {
+
+    /// The enrollment seed withholds the consent and the AI switch, and nothing
+    /// else.
+    ///
+    /// Both directions, because the first half alone passes against a function
+    /// that clears the whole view: what a seed is FOR is adopting the server's
+    /// preferences, so a carve-out that took more than its two fields would be a
+    /// different defect wearing this one's fix.
+    #[test]
+    fn the_enrollment_seed_withholds_exactly_two_fields() {
+        let mut seeded = protocol::PrefsView {
+            ai_provider_consent: Some("openrouter".into()),
+            ai_enabled: true,
+            ai_provider: Some("openrouter".into()),
+            daily_folder: Some("Daily/".into()),
+            ..Default::default()
+        };
+
+        withhold_from_enrollment_seed(&mut seeded);
+
+        assert_eq!(
+            seeded.ai_provider_consent, None,
+            "an inherited consent is a device sending before anyone at it saw the screen"
+        );
+        assert!(!seeded.ai_enabled, "the other half of the same gate");
+        assert_eq!(
+            seeded.ai_provider,
+            Some("openrouter".into()),
+            "the provider is adopted: naming one is not permission to send to it"
+        );
+        assert_eq!(
+            seeded.daily_folder,
+            Some("Daily/".into()),
+            "every other preference is adopted, which is what a seed is for"
+        );
+    }
     use super::*;
     use crate::plugins::notes::note_id::NoteId;
     use crate::plugins::sync::enroll::{self, EnrollPath};
