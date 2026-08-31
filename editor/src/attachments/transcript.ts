@@ -21,7 +21,7 @@ import i18n from "@myne/editor/i18n";
 import { getHost, type TranscribeHandle, type TranscribeErrorKind } from "../host";
 import { showAttachmentToast } from "./toast";
 import { ensureAttachmentInsertStyles } from "./styles";
-import { transcriptStore } from "./session-caches";
+import { isCurrentGeneration, sessionGeneration, transcriptStore } from "./session-caches";
 
 // The session cache of the last completed transcript per attachment id lets the
 // expander re-render synchronously when the widget's DOM is rebuilt on scroll
@@ -230,12 +230,21 @@ export function createTranscriptSection(opts: {
 
     stopped = false;
     const { onSegment } = renderProgress();
+    // Captured at ISSUE and compared before the store below. `stopped` covers a
+    // user cancel; it does not cover a LOCK or a vault switch, which clear the
+    // store without cancelling a transcription already running, so a late
+    // resolution wrote the previous vault's transcript text into the next
+    // session's cache. `resetTranscripts` bumps this.
+    const issuedAt = sessionGeneration();
     handle = host.transcribe(view, id, { onSegment });
 
     handle.done
       .then((transcript) => {
         handle = null;
         if (stopped) return; // user cancelled — ignore any late resolution
+        // The vault this read belongs to is no longer open. Dropping it is the
+        // right answer: there is nothing to render into and nowhere to store it.
+        if (!isCurrentGeneration(issuedAt)) return;
         transcriptStore.set(id, transcript);
         renderExpander(transcript);
       })
