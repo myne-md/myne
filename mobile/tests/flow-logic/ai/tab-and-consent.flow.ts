@@ -149,10 +149,41 @@ test.describe("consent does not arrive with the key", () => {
     // Recorded per provider. An approval stored as a boolean would carry over
     // to a provider the user never saw a screen about, which is why the host
     // compares by equality rather than truthiness.
-    const writes = await page.evaluate(
-      () => (window as unknown as { __aiConsentWrites?: unknown[] }).__aiConsentWrites ?? [],
+    // Polled rather than read once: the provider write is AWAITED before the
+    // consent one is dispatched, so nothing is recorded at the instant of the
+    // click. The mock's provider handler is deliberately slow, which is what
+    // makes the ordering assertion below able to fail.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { __aiConsentWrites?: unknown[] }).__aiConsentWrites ?? [],
+        ),
+      )
+      .toEqual(["openrouter"]);
+
+    // **And the PROVIDER write landed first.** `set_ai_provider` clears the
+    // consent whenever the selection changes, which on a first approval it
+    // always has, so a consent that arrives first is erased by the very next
+    // call. The handler declared that order load-bearing in a comment while
+    // `writeDraftPref` fired and forgot, so both commands raced to the prefs
+    // mutex and the written order decided nothing. The failure is not visible
+    // here either: the optimistic draft keeps rendering the consent as granted
+    // until the sheet is closed and reopened, and only then does the device look
+    // configured while refusing every request as ConsentMissing.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { __aiPrefWrites?: string[] }).__aiPrefWrites ?? [],
+        ),
+      )
+      .toEqual(["provider", "consent"]);
+
+    // The state the order exists to produce, asserted rather than inferred from
+    // it: the consent survived the provider write.
+    const consentWrites = await page.evaluate(
+      () => (window as unknown as { __aiConsentWrites?: (string | null)[] }).__aiConsentWrites ?? [],
     );
-    expect(writes).toEqual(["openrouter"]);
+    expect(consentWrites.at(-1)).toBe("openrouter");
   });
 
   test("dismissing the consent screen stores nothing", async ({ page }) => {

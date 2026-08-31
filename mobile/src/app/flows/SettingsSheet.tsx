@@ -1329,10 +1329,32 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
    *  failure path needs no bump because the draft key is dropped, leaving `eff`
    *  back on the unchanged `prefs`. In browser-dev (no Tauri host) the draft-only
    *  path keeps the UI interactive. */
-  function writeDraftPref<K extends keyof PrefsView>(key: K, value: PrefsView[K], persist: () => Promise<void>) {
+  /** Optimistic write, and it RETURNS the settled promise.
+   *
+   *  Almost every caller ignores it, which is correct: a settings toggle has
+   *  nothing to sequence against and awaiting it would only make the control
+   *  feel slower than the draft it already updated.
+   *
+   *  It is returned for the callers that DO have something to sequence against.
+   *  This used to be `void persist().catch(...)`, so two back-to-back calls
+   *  dispatched two independent Tauri commands whose arrival at the prefs write
+   *  mutex was not ordered by the order they were written in. The AI consent
+   *  handler is exactly that case and it declared the ordering load-bearing in a
+   *  comment directly above the two calls, which is the more expensive kind of
+   *  wrong: the reason was right, the code did not implement it, and the comment
+   *  made the next reader believe it did.
+   *
+   *  The rejection is still handled here, so an awaiting caller gets a promise
+   *  that settles rather than one that can reject and take the handler with it.
+   */
+  function writeDraftPref<K extends keyof PrefsView>(
+    key: K,
+    value: PrefsView[K],
+    persist: () => Promise<void>,
+  ): Promise<void> {
     setDraft((d) => ({ ...d, [key]: value }));
-    if (!HAS_TAURI) return;
-    void persist().catch(() => {
+    if (!HAS_TAURI) return Promise.resolve();
+    return persist().catch(() => {
       setDraft((d) => {
         const next = { ...d };
         delete next[key];
@@ -2224,7 +2246,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
           <AiConsentScreen
             provider={aiConsentFor}
             onCancel={() => setAiConsentFor(null)}
-            onAccept={() => {
+            onAccept={async () => {
               const wire = aiConsentFor;
               setAiConsentFor(null);
               // **The PROVIDER first, then the consent, and the order is not a
@@ -2241,7 +2263,11 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               // The desktop twin already carries this order under a comment
               // naming the same failure. This copy had the opposite order and an
               // argument for it, which is the more expensive kind of wrong.
-              writeDraftPref("ai_provider", wire, () => setAiProvider(wire));
+              // AWAITED, which is what makes the order above real. The
+              // comment predates the await: `writeDraftPref` used to fire
+              // and forget, so both commands raced to the prefs mutex and
+              // the order written here decided nothing.
+              await writeDraftPref("ai_provider", wire, () => setAiProvider(wire));
               writeDraftPref("ai_provider_consent", wire, () =>
                 setAiProviderConsent(wire),
               );

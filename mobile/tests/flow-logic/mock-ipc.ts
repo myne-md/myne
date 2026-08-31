@@ -510,8 +510,26 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         aiEnabled = Boolean(args.enabled);
         return null;
       },
-      "plugin:prefs|set_ai_provider": (args) => {
+      // **Deliberately SLOW, and that is what makes the ordering assertion real.**
+      // The two prefs writes the consent handler makes are separate Tauri
+      // commands, and in production their arrival at the prefs write mutex is
+      // not ordered by the order they were dispatched in. A synchronous mock
+      // resolves them in call order no matter what the caller does, so an
+      // ordering test over it passes against an unawaited dispatch: measured,
+      // with `await` replaced by `void`, the flow suite stayed green. A delay
+      // here lets the second command land first unless the caller awaits the
+      // first, which is the only shape that fails when the await is removed.
+      "plugin:prefs|set_ai_provider": async (args) => {
+        await new Promise((r) => setTimeout(r, 40));
         aiProvider = (args.provider as string | null) ?? null;
+        // **The host clears the consent whenever the selection CHANGES**, which
+        // on a first-time approval it always has. Modelled here rather than
+        // ignored, because the ORDER of the two writes is what the accept
+        // handler declares load-bearing, and a mock that keeps a consent through
+        // a provider change cannot tell a correct order from a raced one.
+        if (aiConsent !== aiProvider) aiConsent = null;
+        const w = window as unknown as { __aiPrefWrites?: string[] };
+        (w.__aiPrefWrites ??= []).push("provider");
         return null;
       },
       "plugin:prefs|set_ai_provider_consent": (args) => {
@@ -524,8 +542,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         // the provider" failed against a correct implementation. A mock that
         // guesses an argument name tests the guess.
         aiConsent = (args.grantedFor as string | null) ?? null;
-        const w = window as unknown as { __aiConsentWrites?: (string | null)[] };
+        const w = window as unknown as {
+          __aiConsentWrites?: (string | null)[];
+          __aiPrefWrites?: string[];
+        };
         (w.__aiConsentWrites ??= []).push(aiConsent);
+        (w.__aiPrefWrites ??= []).push("consent");
         return null;
       },
       "plugin:prefs|set_ai_provider_key": (args) => {
