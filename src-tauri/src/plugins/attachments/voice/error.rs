@@ -41,7 +41,7 @@ impl From<RecordError> for VoiceRecordError {
         match e {
             RecordError::NoInputDevice => VoiceRecordError::NoInputDevice,
             RecordError::CaptureFailed => VoiceRecordError::CaptureFailed,
-            RecordError::UnsupportedSampleRate { .. } => VoiceRecordError::UnsupportedSampleRate,
+            RecordError::UnsupportedSampleRate => VoiceRecordError::UnsupportedSampleRate,
         }
     }
 }
