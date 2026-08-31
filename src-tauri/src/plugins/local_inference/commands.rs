@@ -675,9 +675,10 @@ pub async fn transcribe<R: Runtime>(
         let wav = decode_attachment_plaintext(&vault_dir, &keys, &attachment_id)
             .map_err(|_| EngineError::TranscriptionFailed)?;
         // Decode + resample to 16 kHz mono; wrap the derived PCM too.
-        let pcm = Zeroizing::new(
-            super::audio::wav_to_mono_16k(&wav).map_err(|_| EngineError::TranscriptionFailed)?,
-        );
+        // `?` through `From<AudioError>` (`error.rs`), which is exhaustive, so a
+        // new decode failure stops the build there rather than collapsing into
+        // `TranscriptionFailed` silently (myne#510).
+        let pcm = Zeroizing::new(super::audio::wav_to_mono_16k(&wav)?);
         drop(wav);
         // Stream each decoded segment through the cancel publish-guard into the
         // IPC channel; the transcript text is never logged.
