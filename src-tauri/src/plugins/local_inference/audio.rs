@@ -23,6 +23,7 @@
 // non-test build sees these as dead.
 #![cfg_attr(not(test), allow(dead_code))]
 
+use myne_core::inference::error::EngineError;
 use serde::Serialize;
 
 /// Sample rate the Whisper front end requires (`pcm_to_mel` input).
@@ -518,6 +519,47 @@ pub fn wav_to_mono_16k(bytes: &[u8]) -> Result<Vec<f32>, AudioError> {
         return Err(AudioError::Empty);
     }
     Ok(out)
+}
+
+// The audio-decode error's mapping onto the engine taxonomy.
+//
+// **It lives here rather than beside `EngineError`, and that is the merge of
+// myne-md/myne#510 and myne-md/myne#456 forcing a choice.** #510 wrote this impl
+// in the desktop's own `local_inference/error.rs`, where `AudioError` and
+// `EngineError` were siblings. #456 then moved `EngineError` into `myne-core`
+// and deleted that file, while `AudioError` stayed here, because the decoder is
+// desktop-side. An impl needs one of its two types to be local, and after the
+// move the local one is `AudioError`, so the impl belongs in its module.
+//
+// Nothing about the mapping changed. What it buys is unchanged too, and is the
+// reason it is exhaustive rather than a `match` at the call site: a ninth decode
+// failure stops the build here instead of arriving at the user as "transcription
+// failed, please try again", which is the collapse `AudioTooLong` exists to undo.
+impl From<AudioError> for EngineError {
+    /// One mapping, in one place, so a new [`AudioError`](AudioError)
+    /// variant cannot quietly land in a catch-all.
+    ///
+    /// The obvious form is `map_err(|e| match e { TooLong => …, _ => … })` at the
+    /// call site, and it is what this replaced. That shape compiles forever: a
+    /// ninth decode failure compile-fails `AudioError::kind` in `audio.rs` and
+    /// then arrives at the user as "transcription failed, please try again",
+    /// which is the exact collapse `AudioTooLong` exists to undo. Written here
+    /// and exhaustively, adding a variant stops the build at this match.
+    fn from(e: AudioError) -> Self {
+        match e {
+            // Not worth retrying: the same clip is refused every time.
+            AudioError::TooLong => EngineError::AudioTooLong,
+            // Every other decode failure is a malformed or unsupported
+            // container, which the surface reports as a generic failure.
+            AudioError::NotWave
+            | AudioError::NoFmtChunk
+            | AudioError::NoDataChunk
+            | AudioError::UnsupportedFormat
+            | AudioError::UnsupportedBitDepth
+            | AudioError::BadLayout
+            | AudioError::Empty => EngineError::TranscriptionFailed,
+        }
+    }
 }
 
 #[cfg(test)]
