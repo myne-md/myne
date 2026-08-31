@@ -21,18 +21,19 @@ import i18n from "@myne/editor/i18n";
 import { getHost, type TranscribeHandle, type TranscribeErrorKind } from "../host";
 import { showAttachmentToast } from "./toast";
 import { ensureAttachmentInsertStyles } from "./styles";
+import { isCurrentGeneration, sessionGeneration, transcriptStore } from "./session-caches";
 
-/** Session cache of the last completed transcript per attachment id. Lets the
- *  expander re-render synchronously when the widget's DOM is rebuilt on scroll
- *  (same posture as the text-preview `previewCache`). The user's own content,
- *  already resident in the WebView — dropped when the module unloads (lock/quit
- *  tears down the editor). */
-const transcriptStore = new Map<string, string>();
-
-/** Test-only: clear the session transcript cache between cases. */
-export function __clearTranscriptStore(): void {
-  transcriptStore.clear();
-}
+// The session cache of the last completed transcript per attachment id lets the
+// expander re-render synchronously when the widget's DOM is rebuilt on scroll
+// (same posture as the text-preview cache). It holds the user's own decrypted
+// content, so it lives in `./session-caches` with the vault-leaving reset beside
+// it.
+//
+// Its comment here used to end "dropped when the module unloads (lock/quit tears
+// down the editor)", and that is what kept it off the teardown roster. A JS
+// module never unloads: the idle auto-lock path reloads the WebView, the manual
+// Lock button and the vault SWITCH do not, so one vault's transcript text was
+// still resident in the next vault's session.
 
 /** i18n key for each actionable transcription-failure cause (MYND-591). Keyed by
  *  the normalized {@link TranscribeErrorKind} minus `"failed"` (which is a
@@ -230,12 +231,21 @@ export function createTranscriptSection(opts: {
 
     stopped = false;
     const { onSegment } = renderProgress();
+    // Captured at ISSUE and compared before the store below. `stopped` covers a
+    // user cancel; it does not cover a LOCK or a vault switch, which clear the
+    // store without cancelling a transcription already running, so a late
+    // resolution wrote the previous vault's transcript text into the next
+    // session's cache. `resetTranscripts` bumps this.
+    const issuedAt = sessionGeneration();
     handle = host.transcribe(view, id, { onSegment });
 
     handle.done
       .then((transcript) => {
         handle = null;
         if (stopped) return; // user cancelled — ignore any late resolution
+        // The vault this read belongs to is no longer open. Dropping it is the
+        // right answer: there is nothing to render into and nowhere to store it.
+        if (!isCurrentGeneration(issuedAt)) return;
         transcriptStore.set(id, transcript);
         renderExpander(transcript);
       })

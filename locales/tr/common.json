@@ -1167,10 +1167,6 @@
       "turnedIntoTemplate": "Şablona dönüştürüldü",
       "convertedToNote": "Nota dönüştürüldü",
       "versionHistory": "Sürüm geçmişi",
-      "exportMarkdown": "Markdown olarak dışa aktar…",
-      "exportPdf": "PDF olarak dışa aktar…",
-      "exportHtml": "HTML olarak dışa aktar…",
-      "exportTxt": "Düz Metin olarak dışa aktar…",
       "trash": "Çöp Kutusu’na taşı"
     },
     "codeBlock": {
@@ -2037,10 +2033,6 @@
       "duplicate": "Çoğalt",
       "editFilterTitle": "Filtreyi düzenle",
       "emptyState": "Henüz not yok.",
-      "exportHtml": "HTML olarak dışa aktar…",
-      "exportMarkdown": "Markdown olarak dışa aktar…",
-      "exportPdf": "PDF olarak dışa aktar…",
-      "exportTxt": "Düz Metin olarak dışa aktar…",
       "favoritesHeading": "Favoriler",
       "icon": "Simge…",
       "mergeAnyway": "Yine de birleştir",
@@ -2346,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "Varsayılan"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Dışa aktar…",
+      "txt": "Düz metin"
     }
   },
   "password": {

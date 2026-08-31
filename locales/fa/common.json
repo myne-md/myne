@@ -1158,10 +1158,6 @@
       "turnedIntoTemplate": "به الگو تبدیل شد",
       "convertedToNote": "به یادداشت تبدیل شد",
       "versionHistory": "تاریخچهٔ نسخه‌ها",
-      "exportMarkdown": "برون‌ریزی به Markdown…",
-      "exportPdf": "برون‌ریزی به PDF…",
-      "exportHtml": "برون‌ریزی به HTML…",
-      "exportTxt": "برون‌ریزی به متن ساده…",
       "trash": "انتقال به زباله‌دان"
     },
     "codeBlock": {
@@ -2025,10 +2021,6 @@
       "duplicate": "تکثیر",
       "editFilterTitle": "ویرایش فیلتر",
       "emptyState": "هنوز یادداشتی نیست.",
-      "exportHtml": "برون‌ریزی به HTML…",
-      "exportMarkdown": "برون‌ریزی به Markdown…",
-      "exportPdf": "برون‌ریزی به PDF…",
-      "exportTxt": "برون‌ریزی به متن ساده…",
       "favoritesHeading": "علاقه‌مندی‌ها",
       "icon": "نماد…",
       "mergeAnyway": "به‌هرحال ادغام شود",
@@ -2332,6 +2324,13 @@
     },
     "workspace": {
       "defaultSlotName": "پیش‌فرض"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "برون‌بری…",
+      "txt": "متن ساده"
     }
   },
   "password": {

@@ -1167,10 +1167,6 @@
       "turnedIntoTemplate": "テンプレートにしました",
       "convertedToNote": "ノートに変換しました",
       "versionHistory": "バージョン履歴",
-      "exportMarkdown": "Markdownとしてエクスポート…",
-      "exportPdf": "PDFとしてエクスポート…",
-      "exportHtml": "HTMLとしてエクスポート…",
-      "exportTxt": "プレーンテキストとしてエクスポート…",
       "trash": "ゴミ箱に移動"
     },
     "codeBlock": {
@@ -2037,10 +2033,6 @@
       "duplicate": "複製",
       "editFilterTitle": "フィルタを編集",
       "emptyState": "ノートはまだありません。",
-      "exportHtml": "HTMLとしてエクスポート…",
-      "exportMarkdown": "Markdownとしてエクスポート…",
-      "exportPdf": "PDFとしてエクスポート…",
-      "exportTxt": "プレーンテキストとしてエクスポート…",
       "favoritesHeading": "お気に入り",
       "icon": "アイコン…",
       "mergeAnyway": "そのまま統合",
@@ -2346,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "デフォルト"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "書き出し…",
+      "txt": "プレーンテキスト"
     }
   },
   "password": {

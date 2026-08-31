@@ -1167,10 +1167,6 @@
       "turnedIntoTemplate": "템플릿으로 만들었습니다",
       "convertedToNote": "노트로 변환했습니다",
       "versionHistory": "버전 기록",
-      "exportMarkdown": "Markdown으로 내보내기…",
-      "exportPdf": "PDF로 내보내기…",
-      "exportHtml": "HTML로 내보내기…",
-      "exportTxt": "일반 텍스트로 내보내기…",
       "trash": "휴지통으로 이동"
     },
     "codeBlock": {
@@ -2037,10 +2033,6 @@
       "duplicate": "복제",
       "editFilterTitle": "필터 편집",
       "emptyState": "아직 노트가 없습니다.",
-      "exportHtml": "HTML로 내보내기…",
-      "exportMarkdown": "Markdown으로 내보내기…",
-      "exportPdf": "PDF로 내보내기…",
-      "exportTxt": "일반 텍스트로 내보내기…",
       "favoritesHeading": "즐겨찾기",
       "icon": "아이콘…",
       "mergeAnyway": "그대로 병합",
@@ -2346,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "기본"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "내보내기…",
+      "txt": "일반 텍스트"
     }
   },
   "password": {

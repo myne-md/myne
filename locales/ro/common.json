@@ -1216,10 +1216,6 @@
       "turnedIntoTemplate": "Transformată în șablon",
       "convertedToNote": "Convertită în notă",
       "versionHistory": "Istoricul versiunilor",
-      "exportMarkdown": "Exportă ca Markdown…",
-      "exportPdf": "Exportă ca PDF…",
-      "exportHtml": "Exportă ca HTML…",
-      "exportTxt": "Exportă ca text simplu…",
       "trash": "Mută în Coș"
     },
     "codeBlock": {
@@ -2117,10 +2113,6 @@
       "duplicate": "Duplică",
       "editFilterTitle": "Editează filtrul",
       "emptyState": "Nicio notă încă.",
-      "exportHtml": "Exportă ca HTML…",
-      "exportMarkdown": "Exportă ca Markdown…",
-      "exportPdf": "Exportă ca PDF…",
-      "exportTxt": "Exportă ca text simplu…",
       "favoritesHeading": "Favorite",
       "icon": "Pictogramă…",
       "mergeAnyway": "Îmbină oricum",
@@ -2436,6 +2428,13 @@
     },
     "workspace": {
       "defaultSlotName": "Implicit"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportă…",
+      "txt": "Text simplu"
     }
   },
   "password": {

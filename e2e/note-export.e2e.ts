@@ -47,7 +47,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
-import { dismissImporterOffer, pageSeatInvoke, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOffer,
+  openExportSubmenuItem,
+  pageSeatInvoke,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 import {
   EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL,
@@ -73,7 +78,9 @@ async function openExportMenuItem(s: Session, noteId: string) {
     testIdSelector("notes.row", { "data-note-id": noteId }),
   );
   await row.rightClick();
-  return s.waitForElement(EXPORT_ITEM_SELECTOR);
+  // One level down since myne-md/myne#611: the four formats live under one
+  // `Export…` row rather than four top-level ones.
+  return openExportSubmenuItem(s, "export-markdown");
 }
 
 function seededExportSuite(seeded: SeededVault) {
