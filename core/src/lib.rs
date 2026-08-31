@@ -28,6 +28,10 @@ pub const DEFAULT_AUTO_LOCK_SECS: u32 = 300;
 
 pub mod atomic_write;
 pub mod attachment_nonce;
+/// The one decryption-free `content_nonce` reader, shared by every blob family
+/// that has one. The generation pair is a required argument, so a
+/// single-generation reader cannot be written by accident (myne-md/myne#638).
+pub mod content_nonce;
 /// The double-buffered container the web client stores singletons in
 /// (phase3-web-client task 18) — framing, slot selection, and the write/open
 /// algorithm over the [`vault_io`] seam, with the fault-injection points task 19
