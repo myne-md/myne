@@ -301,6 +301,15 @@ spot opened another, one line away. Both directions have to be injected, and the
 one nobody thinks to try: prove the guard still catches what it caught BEFORE, not only what it
 missed.
 
+**Extracting the arithmetic out of a test is only half the fix, and the half you skip is the one
+that stays uncalled.** myne-md/myne#510 pulled a parser's projection into a named function so its
+test would drive production code instead of restating the formula, and left the comparison against
+the ceiling written out in the test. Injecting the off-by-one the test was named for (`>` to `>=`)
+left all eighteen tests green, because the threshold the test spelled was not the threshold
+production used. A predicate is a rounding AND a comparison; moving one into a shared function and
+leaving the other in the test is a copy compared against a second copy with an extra step. Move the
+whole decision, then re-inject.
+
 **And when a test can assert either a return value or a state, assert the state.** The same feature's
 first plaintext-fallback test checked `expect_err` before walking the disk, which is the weaker fact:
 a fallback could report either result while the name sat on the medium. A failure message may not
@@ -422,6 +431,20 @@ Full primitive details, audit anchors, and subkey derivation discipline rule (wh
 - **A scan that matches an identifier BY NAME is defeated by `import { x as y }`, and the strip that makes the scan honest is what destroys the evidence.** `check-ipc-binding-callers.mjs` asks whether any production file calls a binding, and it strips import lines first, deliberately, so that a mention inside an import cannot count as a call. That strip also deletes the only place the original name and the local name appear together: what is left says `clipboardWriteText(...)` and never says `writeText`, so a binding four call sites reach was reported dead. The direction matters more than the miss. A false NEGATIVE on a ratchet is loud and gets fixed; a false POSITIVE sends the reader to the exemption file, and an exemption recorded against live code turns a list of defects into a list of names somebody once argued about, permanently. Harvest the aliases from the UNSTRIPPED text and test both names, then verify BOTH directions: that a renamed call counts, and that a renamed import with no call still does not. The same shape hides in any grep-shaped check over TypeScript, Rust `use x as y`, and a shell alias.
 - **A guard parameter with a default value is an opt-in guard, and the default is the arm that never fires.** `settleStep(result, epoch = runEpoch)` reads as though every caller is checked. It is not: a default is evaluated at the call, so an omitted argument compares the CURRENT epoch against itself and matches unconditionally, which makes the one call site that forgot to thread the epoch precisely the site running unguarded. `tsc` is happy, because the signature is satisfied, and nothing else looks at it. myne-md/myne#533's agent store shipped that shape: the epoch exists to drop a step that lands after a vault lock, a vault switch or a "New chat", each of which repopulates the proposal with anchors and replacements copied verbatim out of note bodies, and the default excused every future call site from the check in advance. Make the parameter REQUIRED and let the compiler name every site (five, here), then verify the way a guard is verified: delete the comparison and watch a test fail by name (`tests/notes/agentUndoLifetime.test.ts`). The same shape hides in a Rust argument defaulted to the ambient value and in a script flag whose absence means "check nothing".
 - **A negative lookahead after `\s*` is not a guard, because `\s*` backtracks into it.** `/["'](data-[a-z0-9-]+)["']\s*:\s*(?!["'`])/` looks like "the value must not be a string literal" and matches every string literal: the engine tries the lookahead after the space, fails, gives the space back, re-tries at the space, and a space is not a quote. Written into `check-web-testids.mjs` it made the object-form leak detector report clean on exactly the input it was added for. Capture the first non-space character and test it instead, since a capture cannot backtrack past itself. The same shape is a hazard in any guard that reads a value's first token.
+- **`cargo check --no-default-features` never compiles test code, so the AI-free gate is blind to a
+  dead-code break in a test-only helper.** `cargo check` without `--all-targets` skips `#[cfg(test)]`
+  entirely, so a helper gated `#[cfg(test)]` whose only caller sits behind a feature is dead when that
+  feature is off, and only a `--all-targets` clippy sees it. myne-md/myne#510 shipped exactly that for
+  one review round, because the `--no-default-features` gate in `.woodpecker/main.yml` was a bare
+  `cargo check`. The same change closed it: that step now also runs
+  `cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings`, so CI covers this
+  and there is nothing left to run by hand. The paragraph is kept rather than deleted because the
+  REASON is what generalises: any gate spelled `check` rather than `clippy --all-targets` is blind to
+  the test tree, and this repository has more than one.
+  Gate such a helper on the FEATURE its caller needs rather than on `cfg(test)`, and run that clippy
+  line by hand when a change adds one. Gating on the feature has a second payoff: the caller can then
+  leave the test module, so a `const _: () = assert!(...)` comparing two duplicated constants runs on
+  every build rather than only under `cargo test`.
 - **`Cargo.lock` is single-shared at workspace root** (TB9 audit anchor). Do not split into per-crate locks.
 - **Vite `strictPort: 1420`** — `pnpm dev` fails fast if port taken; this is intentional (Tauri expects exact port).
 - **Vite `clearScreen: false`** — keep it; otherwise Rust errors get hidden during `pnpm tauri dev`.

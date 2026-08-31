@@ -921,13 +921,15 @@
           "captureFailed": "Înregistrarea nu a putut începe. Verifică accesul la microfon în Setări sistem.",
           "generic": "Înregistrarea nu a putut începe.",
           "locked": "Deblochează seiful pentru a înregistra o notă vocală.",
-          "noInputDevice": "Niciun microfon găsit. Conectează unul și încearcă din nou."
+          "noInputDevice": "Niciun microfon găsit. Conectează unul și încearcă din nou.",
+          "unsupportedSampleRate": "Microfonul înregistrează la o rată de eșantionare pe care Myne nu o poate transcrie. Alege alt dispozitiv de intrare sau schimbă-i rata de eșantionare din setările de sunet ale sistemului."
         },
         "stopError": {
           "captureFailed": "Înregistrarea a eșuat. Verifică microfonul.",
           "emptyRecording": "Nu s-a înregistrat nimic.",
           "generic": "Înregistrarea nu a putut fi salvată.",
-          "silentRecording": "Înregistrarea a fost silențioasă și a fost eliminată. Verifică microfonul."
+          "silentRecording": "Înregistrarea a fost silențioasă și a fost eliminată. Verifică microfonul.",
+          "unsupportedSampleRate": "Microfonul înregistrează la o rată de eșantionare pe care Myne nu o poate transcrie. Nu s-a salvat nimic. Alege alt dispozitiv de intrare sau schimbă-i rata de eșantionare din setările de sunet ale sistemului."
         }
       },
       "widget": {
@@ -973,6 +975,7 @@
             "featureOff": "Funcția vorbire în text este dezactivată. Activeaz-o din Setări → Transcriere.",
             "modelLoadFailed": "Modelul de transcriere nu a putut fi încărcat. Dacă ai setat un model personalizat din Setări → Developer → AI, verifică-i fișierele; altfel, reinstalarea aplicației Myne îl restaurează pe cel integrat.",
             "noModel": "Modelul de transcriere lipsește. Reinstalarea aplicației Myne îl restaurează.",
+            "tooLong": "Această înregistrare este prea lungă pentru a fi transcrisă. Sunetul rămâne atașat, așa că îl poți reda.",
             "vaultLocked": "Deblochează-ți seiful pentru a transcrie."
           },
           "disabledReason": "Activează AI din Setări → Developer → AI pentru a transcrie.",
@@ -3177,6 +3180,9 @@
       "exactLabel": "Moment exact",
       "exactOn": "Activat",
       "horizon": "Mementourile sunt înregistrate până la {{date}}. Deschide Myne înainte de acea dată pentru ca ele să continue.",
+      "horizonLabel": "Programează din timp",
+      "horizonLabelHelper": "Mementourile sunt pregătite cu acest avans. Myne trebuie să fie deschis și deblocat ca un memento să ajungă.",
+      "horizonInertHelper": "Salvat pe acest dispozitiv. Nimic nu îl citește încă: această versiune nu livrează mementouri pentru sarcini.",
       "label": "Mementouri pentru sarcini",
       "saveError": "Acea setare nu a putut fi salvată. Încearcă din nou.",
       "showTextAria": "Arată textul sarcinii în notificare",

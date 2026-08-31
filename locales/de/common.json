@@ -884,13 +884,15 @@
           "captureFailed": "Aufnahme konnte nicht gestartet werden. Prüfen Sie den Mikrofonzugriff in den Systemeinstellungen.",
           "generic": "Aufnahme konnte nicht gestartet werden.",
           "locked": "Entsperren Sie Ihren Tresor, um eine Sprachnotiz aufzunehmen.",
-          "noInputDevice": "Kein Mikrofon gefunden. Schließen Sie eines an und versuchen Sie es erneut."
+          "noInputDevice": "Kein Mikrofon gefunden. Schließen Sie eines an und versuchen Sie es erneut.",
+          "unsupportedSampleRate": "Ihr Mikrofon nimmt mit einer Abtastrate auf, die Myne nicht transkribieren kann. Wählen Sie ein anderes Eingabegerät, oder ändern Sie dessen Abtastrate in den Toneinstellungen des Systems."
         },
         "stopError": {
           "captureFailed": "Aufnahme fehlgeschlagen. Überprüfen Sie Ihr Mikrofon.",
           "emptyRecording": "Es wurde nichts aufgenommen.",
           "generic": "Die Aufnahme konnte nicht gespeichert werden.",
-          "silentRecording": "Die Aufnahme war stumm und wurde verworfen. Überprüfen Sie Ihr Mikrofon."
+          "silentRecording": "Die Aufnahme war stumm und wurde verworfen. Überprüfen Sie Ihr Mikrofon.",
+          "unsupportedSampleRate": "Ihr Mikrofon nimmt mit einer Abtastrate auf, die Myne nicht transkribieren kann. Es wurde nichts gespeichert. Wählen Sie ein anderes Eingabegerät, oder ändern Sie dessen Abtastrate in den Toneinstellungen des Systems."
         }
       },
       "widget": {
@@ -936,6 +938,7 @@
             "featureOff": "Sprache zu Text ist aus. Schalten Sie es unter Einstellungen → Transkription ein.",
             "modelLoadFailed": "Das Sprache-zu-Text-Modell konnte nicht geladen werden. Wenn Sie unter Einstellungen → Developer → KI ein eigenes Modell festgelegt haben, prüfen Sie dessen Dateien; andernfalls stellt eine Neuinstallation von Myne das integrierte wieder her.",
             "noModel": "Das Sprache-zu-Text-Modell fehlt. Eine Neuinstallation von Myne stellt es wieder her.",
+            "tooLong": "Diese Aufnahme ist zu lang für eine Transkription. Die Audiodatei bleibt angehängt, Sie können sie also weiterhin abspielen.",
             "vaultLocked": "Entsperren Sie Ihren Tresor, um zu transkribieren."
           },
           "disabledReason": "Aktivieren Sie die KI unter Einstellungen → Developer → KI, um zu transkribieren.",
@@ -3071,6 +3074,9 @@
       "exactLabel": "Exakte Zeitpunkte",
       "exactOn": "An",
       "horizon": "Erinnerungen sind bis {{date}} registriert. Öffnen Sie Myne vorher, damit sie weiterlaufen.",
+      "horizonLabel": "Im Voraus planen",
+      "horizonLabelHelper": "Erinnerungen werden so weit im Voraus eingerichtet. Myne muss geöffnet und entsperrt sein, damit eine ankommt.",
+      "horizonInertHelper": "Auf diesem Gerät gespeichert. Noch liest es niemand: dieser Build liefert keine Aufgabenerinnerungen.",
       "label": "Aufgabenerinnerungen",
       "saveError": "Die Einstellung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
       "showTextAria": "Aufgabentext in der Benachrichtigung anzeigen",
