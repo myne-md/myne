@@ -126,11 +126,21 @@
 //
 // # Exemptions, and why they are not loopholes
 //
-//   - **`#[cfg(test)]` regions are skipped for all four rules.** A golden test
-//     asserting `&blob[0..4] == b"MYI1"` SHOULD spell the literal — otherwise
-//     it asserts that a constant equals itself. Same for a test that hand-rolls
-//     expected AAD bytes, or drives a `_raw` encoder with a fixed nonce, which
-//     is what those functions exist for.
+//   - **`#[cfg(test)]` regions are skipped for rules 1 to 4, and for rule 5 in
+//     ONE direction only.** A golden test asserting `&blob[0..4] == b"MYI1"`
+//     SHOULD spell the literal — otherwise it asserts that a constant equals
+//     itself. Same for a test that hand-rolls expected AAD bytes, or drives a
+//     `_raw` encoder with a fixed nonce, which is what those functions exist for.
+//
+//     Rule 5 is deliberately asymmetric and this section used to say the
+//     opposite. Its BASE side reads non-test lines only (a golden test pinning
+//     v0.1 bytes is legitimate and says nothing about what the reader accepts),
+//     while its LATER side matches `bareText`, which spans the whole file
+//     including test regions, because the question there is only whether the
+//     file knows the generation exists at all. The rule 5 header twenty lines
+//     above states this; the count said "all four" after a fifth rule landed,
+//     and a stale count beside an inverted claim is how somebody records the
+//     wrong exemption.
 //   - **Comments and doc comments are stripped before matching.** The AAD /
 //     HKDF prefixes and the magic values are discussed in prose all over the
 //     crate; a guard that could not tell prose from code would be disabled
@@ -213,11 +223,21 @@ const RAW_ALLOWED_TREES = ["protocol/src", "e2e/fixture-gen"];
  * `v1.token` / `v2.token` are the source spellings a file uses, not the constant
  * names: `MAGIC` alone matches half the crate, while `blob::MAGIC` is how every
  * caller actually writes it.
+ *
+ * `selfToken` is the spelling used INSIDE the declaring file, and it exists
+ * because the caller spelling and the declaration spelling are different words
+ * for this family alone. `protocol/src/blob.rs` declares `MAGIC` and then
+ * rejects on it (`if &blob[0..MAGIC.len()] != MAGIC` at :587), the identical
+ * shape `vault_meta.rs` is failed and then recorded for, but `blob::MAGIC`
+ * never matches inside `blob.rs`, so the file the rule most wants to see was
+ * the one file it could not. Matching `selfToken` ANYWHERE would be the
+ * half-the-crate problem the paragraph above rejects, so it is matched only
+ * within the declaring file, which the registry already names.
  */
 const EXTRA_MAGIC_PAIRS = [
   {
     family: "note",
-    v1: { magic: "MY01", token: "blob::MAGIC" },
+    v1: { magic: "MY01", token: "blob::MAGIC", selfToken: "MAGIC" },
     v2: { magic: "NC05", token: "NC05_MAGIC" },
   },
 ];
@@ -230,6 +250,25 @@ const EXTRA_MAGIC_PAIRS = [
  * scrutiny the rule itself got. A stale entry FAILS the run.
  */
 const KNOWN = [
+  {
+    rule: "magic-parity",
+    file: "protocol/src/blob.rs",
+    contains: "MAGIC",
+    why:
+      "`decode_note` is deliberately v0.1-only and its single-generation rejection at " +
+      "`if &blob[0..MAGIC.len()] != MAGIC` is the correct behaviour for it: the version-aware " +
+      "entry point is `decode_note_any` in `core/src/plugins/notes/decode.rs`, which reads the " +
+      "first four bytes, decides the generation, and calls this codec only once it has " +
+      "established the blob IS `MY01`. Structurally identical to the `vault_meta.rs` entry above, " +
+      "and recorded for the same reason: a codec behind a dispatcher, not the myne-md/myne#638 " +
+      "shape of a reader that silently answers `None`. " +
+      "This file became visible to rule 5 only when `EXTRA_MAGIC_PAIRS` gained `selfToken`: the " +
+      "note family's caller spelling is `blob::MAGIC` and this file writes the bare `MAGIC`, so " +
+      "before that the rule skipped the one file it most wanted to read, and the guard's own " +
+      "comment claiming the codecs were covered was overstating what it checked. " +
+      "Who holds the other half: `scripts/check-version-routing.mjs` is the ratchet on the " +
+      "CALLERS. Delete this entry if `decode_note` ever learns both generations.",
+  },
   {
     rule: "magic-parity",
     file: "protocol/src/vault_meta.rs",
@@ -594,7 +633,17 @@ for (const p of EXTRA_MAGIC_PAIRS) {
   }
   magicFamilies.push({
     family: p.family,
-    base: { magic: p.v1.magic, token: p.v1.token, gen: "base", file: base.file, re: reFor(p.v1.token) },
+    base: {
+      magic: p.v1.magic,
+      token: p.v1.token,
+      gen: "base",
+      file: base.file,
+      // Inside the declaring file the base is spelled `selfToken`; everywhere
+      // else it is the namespaced `token`. One regex per file, chosen by which
+      // file is being scanned, so the bare spelling never leaks outside.
+      re: reFor(p.v1.token),
+      selfRe: p.v1.selfToken ? reFor(p.v1.selfToken) : null,
+    },
     later: [
       { magic: p.v2.magic, token: p.v2.token, gen: "v0.2", file: later.file, re: reFor(p.v2.token) },
     ],
@@ -637,7 +686,22 @@ function comparesMagic(s, tokens) {
   return false;
 }
 
+/** Is this violation on the recorded ratchet?
+ *
+ *  ALWAYS false under `--root`, and that is the load-bearing half. `KNOWN` names
+ *  real paths in this repository, and a fixture is free to write a file at any
+ *  path it likes, so a fixture that reproduces `protocol/src/vault_meta.rs` was
+ *  being suppressed by the real entry for that file. The case asserting the
+ *  declaration exemption still holds was therefore comparing the guard against a
+ *  second copy of itself: injecting `return true` into `comparesMagic`, which
+ *  disables the exemption outright, left all ten cases green. That is the exact
+ *  non-evidence pattern root CLAUDE.md records.
+ *
+ *  The stale-entry check at the report section already skips under `FIXTURE_RUN`
+ *  for the mirror-image reason (a fixture tree cannot satisfy entries about the
+ *  real one). Suppression had to follow it. */
 function isKnown(rule, rel, text) {
+  if (FIXTURE_RUN) return false;
   const idx = KNOWN.findIndex(
     (k) => k.rule === rule && k.file === rel && text.includes(k.contains),
   );
@@ -788,14 +852,32 @@ for (const [rel, s] of scanned) {
     // generation PREDICATE from a generation-blind READER and every future
     // predicate would owe an exemption.
     //
-    // What the asymmetry leaves open, dropping the base magic to make room for
-    // a third generation, is closed on the other side instead:
-    // `content_nonce_at` takes a SLICE, so adding a generation is an append and
-    // never a swap.
-    if (!fam.base.re.test(bareText)) continue; // the base is not named in this file
-    const missing = all.filter((g) => !g.re.test(bareText));
+    // What the asymmetry leaves open is stated rather than claimed closed, and
+    // the claim it replaces was circular. Three places used to say the hole was
+    // covered "on the other side": this comment pointed at `content_nonce_at`
+    // taking a slice, `core/src/content_nonce.rs` pointed BACK at rule 5 plus
+    // the unused-import lint, and decision entry 0541 repeated both. Nothing
+    // forces `base` to be the family's oldest generation, and rule 5 fires only
+    // when the base magic is NAMED in the file, so a reader spelling only later
+    // generations is seen by neither layer.
+    //
+    // What the slice does buy is real and smaller than the old sentence: adding
+    // a generation is an append to `later` rather than a change to `base`, and
+    // a zero-generation reader is refused by the signature. What it does not
+    // buy is any check that `base` is the oldest. Closing that needs either an
+    // assertion inside `content_nonce_at` or a symmetric rule with the two
+    // known predicates recorded, and the symmetric rule was measured and
+    // rejected above; the honest position until then is that this direction is
+    // unguarded.
+    // Inside the declaring file the base is spelled `selfToken` (see
+    // EXTRA_MAGIC_PAIRS); everywhere else it is the namespaced form.
+    const baseRe = fam.base.selfRe && fam.base.file === rel ? fam.base.selfRe : fam.base.re;
+    if (!baseRe.test(bareText)) continue; // the base is not named in this file
+    const missing = all.filter((g) =>
+      !(g === fam.base ? baseRe : g.re).test(bareText),
+    );
     if (missing.length === 0) continue; // the file knows every generation
-    const hit = s.bare.findIndex((t, i) => !s.testLines.has(i + 1) && fam.base.re.test(t));
+    const hit = s.bare.findIndex((t, i) => !s.testLines.has(i + 1) && baseRe.test(t));
     if (hit === -1) continue; // named only inside a test region
     if (isKnown("magic-parity", rel, s.bare[hit])) continue;
     failures.push({
