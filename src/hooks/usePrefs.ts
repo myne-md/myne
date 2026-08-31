@@ -42,7 +42,17 @@ import {
   setBarItemsOrder as persistBarItemsOrder,
   setHiddenBarItems as persistHiddenBarItems,
   setKeymapBinding as persistKeymapBinding,
-  setReminderHorizonDays as persistReminderHorizonDays,
+  // Imported UNALIASED, deliberately. `check-ipc-binding-callers.mjs` strips
+  // whole import statements and then bare-word matches the binding's name in
+  // what is left, so an alias makes the desktop call site invisible to it: the
+  // remainder contains only `persistReminderHorizonDays`. With this branch also
+  // removing `ReminderSettings.tsx`'s unaliased call, the sole surviving
+  // unaliased production reference was mobile's own same-named setter, and the
+  // guard's caller loop is not module-scoped, so MOBILE's call was what kept the
+  // DESKTOP binding reported as live. Delete mobile's picker and a fully wired
+  // desktop binding reads as dead; delete the desktop wire and the guard stays
+  // green. There is no name collision here to justify the alias.
+  setReminderHorizonDays,
   setRightPanelActiveTab as persistRightPanelActiveTab,
   setRightPanelHiddenTabs as persistRightPanelHiddenTabs,
   setRightPanelTabOrder as persistRightPanelTabOrder,
@@ -508,7 +518,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   const setReminderHorizon = useCallback(
     (days: number) =>
       writeOptimisticPref({ reminder_horizon_days: days }, () =>
-        persistReminderHorizonDays(days),
+        setReminderHorizonDays(days),
       ),
     [writeOptimisticPref],
   );

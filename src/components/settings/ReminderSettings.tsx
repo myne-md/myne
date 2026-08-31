@@ -139,10 +139,18 @@ export type ReminderHorizonSettingsProps = {
  * registration and no build has one; the CONTROL is not, because
  * `useReminderScheduler` threads this value into `runReminderPass` on every
  * build, so shortening it really does shrink the set of instants the running
- * app arms. Gating it would also have made `check-ipc-binding-callers.mjs` go
- * green on a branch nothing renders, which is the precise invisibility that let
- * myne#508 ship: the setter had a Rust core, an ACL row and its tests, and no
- * caller on either client.
+ * app arms.
+ *
+ * The second half of that argument used to read that gating it would also have
+ * made `check-ipc-binding-callers.mjs` go green on a branch nothing renders. The
+ * invisibility it names is real and is what let myne#508 ship, with the setter
+ * carrying a Rust core, an ACL row and its tests and no caller on either client.
+ * But the guard could not have caught it either way, and the reason is unrelated
+ * to gating: it strips whole import statements and then bare-word matches the
+ * name, so an aliased import is invisible to it, and `usePrefs.ts` imported this
+ * setter under an alias until myne-md/myne#508's review found it. The import is
+ * unaliased now. Stated rather than quietly dropped, because a comment claiming
+ * a guard holds a property it does not is the same defect one altitude up.
  *
  * Deliberately absent from `settingsSearchIndex.ts`, which is a departure from
  * `src/CLAUDE.md` and is recorded as one in `docs/decisions/clients/0541`

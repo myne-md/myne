@@ -261,23 +261,39 @@ export function targetReminders(
   // on the `YYYY-MM-DDTHH:MM` string and a reminder is stored to the minute.
   const to = `${horizonEndDate(now, horizonDays)}T23:59`;
   // At horizon 1, during the final minute of a local day, `from` and `to` are
-  // the same string and the set is empty. That is correct rather than
-  // degenerate: a one-day horizon covers today, and at 23:59 no instant today
-  // is still in the future. What it costs is one minute of churn at the day
-  // boundary, since the pass cancels what it holds and re-registers after
-  // midnight. Harmless on the in-app tier, where the notifier's own timers are
-  // already armed, and worth knowing on the OS tier both clients are one wiring
-  // change from. Pinned in `reminderSchedule.test.ts` so the shape is a
-  // recorded property rather than a surprise. The old rolling cutoff had no
-  // such minute, and it bought that by registering a day past the date the
-  // settings line stated.
+  // the same string. The window is one minute wide rather than empty, and that
+  // is load-bearing rather than a detail.
+  //
+  // **The lower bound is `at < from`, not `at <= from`, and the `<=` form lost a
+  // reminder outright.** At horizon 1 an instant at exactly midnight is excluded
+  // by `at > to` on the previous day (`to` is that day's `23:59`) and, one pass
+  // later, by `at <= from` on the day it belongs to, because a pass re-runs
+  // within 60 s so the first pass of the new day sees `from` equal to the
+  // instant. It was in the target set on neither side of midnight and no timer
+  // was ever armed for it. Horizons of 2 and up recover, because the window
+  // rolls a full day before the instant arrives; horizon 1 has no recovery day,
+  // and horizon 1 is both the shortest offered value and the one
+  // `docs/threat-model.md` § 7's short-horizon axis steers a privacy-motivated
+  // user toward.
+  //
+  // Admitting `at == from` is also the right behaviour on its own terms: the
+  // stamp is minute-resolution, so an instant equal to `from` is due THIS
+  // minute, and registering it fires it now rather than dropping it. An instant
+  // strictly before `from` is past and still skipped.
+  //
+  // What remains at the boundary is one minute of churn rather than a loss: the
+  // pass cancels what it holds and re-registers after midnight. Harmless on the
+  // in-app tier, where the notifier's own timers are already armed, and worth
+  // knowing on the OS tier both clients are one wiring change from. Pinned in
+  // `reminderSchedule.test.ts`, including the midnight instant, whose earlier
+  // pinned case used 09:00 and so sidestepped the boundary exactly.
 
   const out: PendingReminder[] = [];
   for (const task of tasks) {
     if (task.completed) continue;
     if (task.remind == null) continue;
     const at = instantOf(task.remind);
-    if (at <= from || at > to) continue;
+    if (at < from || at > to) continue;
     out.push({ id: reminderId(task), at });
   }
   // Sorted so two runs over the same input produce byte-identical output — a

@@ -849,7 +849,25 @@ describe("the production factory is opaque by construction (MYND-619 task 4)", (
 // that both setters EXIST in `prefs.ts`, and its comment says the sheet "writes
 // them through exactly the two shared setters". No assertion in it made that
 // claim. These are that claim, checked.
-describe("the horizon can actually be set (myne#508)", () => {
+// **What these are, stated so they are not read as coverage.** Five of the six
+// cases below are source-TEXT assertions over `SettingsSheet.tsx` and
+// `ReminderSettings.tsx`: a regex over the `writeDraftPref` call, two
+// `toContain` checks and two window slices. Every one of them passes even if
+// `ReminderSwitchBlock` never renders a `Segmented` or `onHorizonChange` is
+// never threaded to it, which is exactly the shape this file's preamble and
+// `mobile/src/components/inputs.tsx`'s header say they exist to eliminate.
+//
+// They are kept, and kept labelled, rather than deleted or promoted. The
+// BEHAVIOUR is covered at the flow-logic tier, in
+// `mobile/tests/flow-logic/settings/reminders.flow.ts`, which renders the sheet,
+// presses keys and reads what was written; these are cheap drift locks over
+// facts a render assertion states less directly ("the call sits inside the
+// chokepoint", "there is no hand-written day list beside the shared one"). So
+// the cost here is duplication, not an uncovered path. The one case that is not
+// a grep is the `remindersReachTheOs`-against-`check-unwired` agreement, which
+// is a real cross-file assertion and the reason this block is worth keeping at
+// all.
+describe("the horizon can actually be set (myne#508): source-text drift locks, behaviour is in reminders.flow.ts", () => {
   const sheet = (): string => read("../src/app/flows/SettingsSheet.tsx");
   const component = (): string => read("../src/components/ReminderSettings.tsx");
 
