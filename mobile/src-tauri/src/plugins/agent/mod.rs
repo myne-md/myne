@@ -53,15 +53,27 @@ use tauri::{Manager, Runtime};
 /// already past its cancel check must find the flag set rather than merely find
 /// its run gone.
 ///
-/// Both tables are cleared, and that pairing is the thing to keep true.
-/// Clearing only the run table would leave the transcript, which is the half
-/// that actually holds note bodies.
+/// **Three pieces of state, and the third was missed.** The run table and the
+/// session table are the two that hold note bodies, and clearing only the first
+/// would leave the transcript. The third is `AgentInferenceState`'s preferences
+/// snapshot, which holds `ai_provider_key` as a plaintext `Zeroizing<String>`:
+/// desktop wipes it at `local_inference/mod.rs`, whose comment names
+/// myne-md/myne#437 and calls it "the one vault-derived secret that survived a
+/// teardown which wipes `root_key`". Mobile left it resident.
+///
+/// `scripts/check-lock-teardown.mjs` is green either way, and that is not a bug
+/// in the guard so much as its stated limit: its roster is keyed on NAMED state
+/// types, and it carried no row for this one. The roster gains that row in the
+/// same change, so the next client to hold this state is held to it.
 pub fn teardown_on_lock<R: Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(runs) = app.try_state::<Arc<myne_core::plugins::agent::run::AgentRunState>>() {
         runs.clear();
     }
     if let Some(sessions) = app.try_state::<AgentSessionState>() {
         sessions.clear();
+    }
+    if let Some(ai) = app.try_state::<AgentInferenceState>() {
+        ai.inner().invalidate();
     }
 }
 

@@ -105,6 +105,27 @@ impl AgentInferenceState {
         self.inner.refresh().await;
     }
 
+    /// Drop the cached preferences snapshot.
+    ///
+    /// **The snapshot is vault content and it holds the plaintext API key.**
+    /// `prefs_reader` fills the cell with a whole `PrefsView`, whose
+    /// `ai_provider_key` is a plaintext `Zeroizing<String>`. Desktop wipes
+    /// exactly this on lock, and its call site names myne-md/myne#437 as the
+    /// reason: the cached provider authorization used to be the one
+    /// vault-derived secret that survived a teardown which wipes `root_key`,
+    /// the search index, the spell dictionary and the vectors.
+    ///
+    /// Mobile had no way to say it. `AgentInferenceState` exposed only
+    /// `registry()` and `engine_adapter()`, so `teardown_on_lock` cleared the
+    /// run table and the session table and left the third piece of state this
+    /// plugin manages untouched. `check-lock-teardown.mjs` could not see it
+    /// either: its roster is keyed on named state types and had no row for this
+    /// one, so the guard was green over a client that kept a plaintext API key
+    /// resident past a lock.
+    pub fn invalidate(&self) {
+        self.inner.invalidate();
+    }
+
     /// The registry, for the selection and the capability report.
     ///
     /// `cfg(test)` rather than an `allow(dead_code)`: production reaches the
@@ -197,6 +218,69 @@ mod tests {
             BackendClass::Remote,
             "a phone with the provider, the consent, the key and the model named must reach it"
         );
+    }
+
+    /// The cached snapshot is DROPPED on invalidate, which is what the lock path
+    /// calls.
+    ///
+    /// The snapshot holds `ai_provider_key` as a plaintext `Zeroizing<String>`,
+    /// so this is the assertion behind the teardown rather than a coverage
+    /// gesture: a phone that keeps selecting the remote arm after a lock is a
+    /// phone still holding that key.
+    #[test]
+    fn invalidating_drops_the_cached_snapshot_and_with_it_the_provider_key() {
+        let vault = myne_core::vault_id::VaultId::mint();
+        let s = state_with(Some(configured(vault)), Some(vault));
+        assert_eq!(
+            s.registry().active_class(),
+            BackendClass::Remote,
+            "precondition: the fixture must reach the remote arm, or this asserts nothing"
+        );
+
+        s.invalidate();
+
+        assert_eq!(
+            s.registry().active_class(),
+            BackendClass::InProcessLocal,
+            "after invalidate the snapshot is gone, so the selection cannot reach a provider"
+        );
+    }
+
+    /// `teardown_on_lock` CALLS it, asserted at the source.
+    ///
+    /// The behavioural test above proves `invalidate` works and says nothing
+    /// about whether the lock path reaches it, which is the half that was
+    /// missing: the hook cleared two of its three states and shipped.
+    /// `scripts/check-lock-teardown.mjs` cannot close that, and its header now
+    /// says why: its only assertion on an implemented hook is non-emptiness, so
+    /// on a hook with three holders, losing one clear leaves the body non-empty
+    /// and the guard green. A per-holder text check was written and reverted,
+    /// because these hooks are thin wrappers that delegate and requiring the body
+    /// to name its type reported ten false findings on a correct tree.
+    ///
+    /// What is a call-graph question in general is a text question in THIS file,
+    /// so it is asked here. Driven at the source, the way
+    /// `cli_bridge::socket`'s accept-loop test is, because constructing a real
+    /// `AppHandle` in a unit test is not available.
+    #[test]
+    fn the_lock_teardown_reaches_the_inference_state() {
+        let src = include_str!("mod.rs");
+        let at = src
+            .find("pub fn teardown_on_lock")
+            .expect("teardown_on_lock must exist");
+        let end = src[at..]
+            .find("\n}\n")
+            .map(|i| at + i)
+            .expect("its body must end");
+        let body = &src[at..end];
+
+        for state in ["AgentRunState", "AgentSessionState", "AgentInferenceState"] {
+            assert!(
+                body.contains(state),
+                "teardown_on_lock no longer clears {state}; all three are plaintext-derived \
+                 and the third holds the provider key"
+            );
+        }
     }
 
     /// And the snapshot's vault has to be the one that is open.

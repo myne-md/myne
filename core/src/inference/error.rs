@@ -233,34 +233,6 @@ pub enum EngineError {
     RequestRejected,
 }
 
-impl From<super::audio::AudioError> for EngineError {
-    /// One mapping, in one place, so a new [`AudioError`](super::audio::AudioError)
-    /// variant cannot quietly land in a catch-all.
-    ///
-    /// The obvious form is `map_err(|e| match e { TooLong => …, _ => … })` at the
-    /// call site, and it is what this replaced. That shape compiles forever: a
-    /// ninth decode failure compile-fails `AudioError::kind` in `audio.rs` and
-    /// then arrives at the user as "transcription failed, please try again",
-    /// which is the exact collapse `AudioTooLong` exists to undo. Written here
-    /// and exhaustively, adding a variant stops the build at this match.
-    fn from(e: super::audio::AudioError) -> Self {
-        use super::audio::AudioError;
-        match e {
-            // Not worth retrying: the same clip is refused every time.
-            AudioError::TooLong => EngineError::AudioTooLong,
-            // Every other decode failure is a malformed or unsupported
-            // container, which the surface reports as a generic failure.
-            AudioError::NotWave
-            | AudioError::NoFmtChunk
-            | AudioError::NoDataChunk
-            | AudioError::UnsupportedFormat
-            | AudioError::UnsupportedBitDepth
-            | AudioError::BadLayout
-            | AudioError::Empty => EngineError::TranscriptionFailed,
-        }
-    }
-}
-
 impl EngineError {
     /// Bounded, content-free tag for structured logging (DENY-list safe).
     // Consumed by command DENY-list logging in task 6; forward-declared here.

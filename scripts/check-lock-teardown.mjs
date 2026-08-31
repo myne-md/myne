@@ -65,6 +65,27 @@
 //
 // # What it deliberately does NOT claim
 //
+// **WHAT THIS GUARD DOES NOT CHECK, measured rather than assumed.** The roster
+// below is keyed `<hook, holder>`, and the comment above the agent rows says one
+// row would leave the other state's arrival silent, "which is the shape this
+// guard exists to refuse". It does not refuse it. The only assertion on an
+// implemented hook is that its body is NON-EMPTY, so on a hook with several
+// holders, deleting one holder's clear leaves the body non-empty and this guard
+// green. Measured on myne-md/myne#456: mobile's `agent_teardown_on_lock` cleared
+// two of its three states, the third held `ai_provider_key` as plaintext, and
+// this guard reported ok throughout.
+//
+// A per-holder check was written and reverted, because it was wrong at this
+// altitude: these hooks are thin wrappers that delegate into their plugin, so
+// requiring the hook body to NAME its holder type reported ten false findings on
+// a correct tree, desktop's included. Following one level of delegation is a
+// call-graph question rather than a text one, which is where this guard stops.
+//
+// So the roster row is a record rather than an enforcement, and the honest
+// statement is that a MISSING holder is caught by review, while an EMPTY hook is
+// caught here. Adding a row still matters: it is what makes the omission legible
+// to the next reader, and it is what a future call-graph-aware check would read.
+//
 // This guard is keyed on NAMED state types. A client whose equivalent RAM
 // lives under a different type is not covered by that row — web's attachment
 // half is the live example: it holds no `AttachmentRefsState`, its equivalent
@@ -138,6 +159,22 @@ const PAIRS = [
   // this guard exists to refuse.
   { hook: "agent_teardown_on_lock", holder: { kind: "state", type: "AgentRunState" } },
   { hook: "agent_teardown_on_lock", holder: { kind: "state", type: "AgentSessionState" } },
+  // A THIRD row on the same hook, added by myne-md/myne#456's review. The two
+  // above are the tables that hold note bodies; this one is the cached
+  // preferences snapshot, which holds `ai_provider_key` as a plaintext
+  // `Zeroizing<String>`. Desktop has wiped it since myne-md/myne#437, whose call
+  // site calls it "the one vault-derived secret that survived a teardown which
+  // wipes root_key, the search index, the spell dictionary and the vectors".
+  // Mobile shipped the same state and left it resident, and this guard was green
+  // the whole time, because a roster keyed on named state types cannot see a type
+  // nobody added. That is the guard's stated limit rather than a defect in it,
+  // and adding the row is the documented way a surface gets covered.
+  //
+  // Read the header's "WHAT THIS GUARD DOES NOT CHECK" before trusting this row:
+  // with three holders on one hook, this guard cannot tell that one of the three
+  // clears went missing, because the body is still non-empty. The row records the
+  // state; review is what enforces it.
+  { hook: "agent_teardown_on_lock", holder: { kind: "state", type: "AgentInferenceState" } },
   { hook: "clear_staged_descriptor", holder: { kind: "command", name: "workspace_stage" } },
 ];
 

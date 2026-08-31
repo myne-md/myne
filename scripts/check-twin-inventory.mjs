@@ -1242,7 +1242,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine error enum, 345 lines against 129. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
+      "The engine error enum, 317 lines against 129. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/commands.rs",
@@ -1274,7 +1274,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Plugin registration for the agent surface, new on mobile in myne-md/myne#456, 337 lines against 354. `absent` rather than `decision` because what these two files hold is each host's own wiring: the `tauri::plugin::Builder`, the `generate_handler!` roster and the state each client manages. The shared answer they both call is already in `myne-core` (`plugins/agent/host_commands.rs`), which is why the two are close in size while sharing no logic. Neither is a copy of the other: mobile registers nine commands against desktop's eight, and the ninth (`agent_list_provider_models`) exists because mobile has no local model to fall back on.",
+      "Plugin registration for the agent surface, new on mobile in myne-md/myne#456, 337 lines against 366. `absent` rather than `decision` because what these two files hold is each host's own wiring: the `tauri::plugin::Builder`, the `generate_handler!` roster and the state each client manages. The shared answer they both call is already in `myne-core` (`plugins/agent/host_commands.rs`), which is why the two are close in size while sharing no logic. Neither is a copy of the other: mobile registers nine commands against desktop's eight, and the ninth (`agent_list_provider_models`) exists because mobile has no local model to fall back on.",
   },
   {
     a: "src-tauri/src/plugins/agent/commands.rs",
