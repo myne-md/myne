@@ -157,6 +157,13 @@ function startErrorMessage(err: unknown): string {
       return i18n.t("editor.attachment.voice.startError.noInputDevice");
     case "captureFailed":
       return i18n.t("editor.attachment.voice.startError.captureFailed");
+    // Its own arm rather than falling through to `generic`. The Rust variant's
+    // own doc says it is carried separately from `CaptureFailed` "so the user is
+    // told what is actually wrong", and until this arm existed that sentence was
+    // false: it landed on "Couldn't start recording", which names neither the
+    // cause nor the one thing that fixes it.
+    case "unsupportedSampleRate":
+      return i18n.t("editor.attachment.voice.startError.unsupportedSampleRate");
     default:
       return i18n.t("editor.attachment.voice.startError.generic");
   }
@@ -171,6 +178,11 @@ function stopErrorMessage(err: unknown): string {
     case "noInputDevice":
     case "captureFailed":
       return i18n.t("editor.attachment.voice.stopError.captureFailed");
+    // Same reason as the start mapper, and worse here: the take is discarded, so
+    // "Couldn't save the recording" reads as a transient save failure the user
+    // should retry, and retrying on the same device fails identically.
+    case "unsupportedSampleRate":
+      return i18n.t("editor.attachment.voice.stopError.unsupportedSampleRate");
     default:
       return i18n.t("editor.attachment.voice.stopError.generic");
   }

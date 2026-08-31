@@ -42,6 +42,7 @@ const HINT_KEY: Record<Exclude<TranscribeErrorKind, "failed">, string> = {
   vault_locked: "editor.attachment.widget.transcribe.cause.vaultLocked",
   no_model: "editor.attachment.widget.transcribe.cause.noModel",
   model_load_failed: "editor.attachment.widget.transcribe.cause.modelLoadFailed",
+  too_long: "editor.attachment.widget.transcribe.cause.tooLong",
 };
 
 export interface TranscriptSection {

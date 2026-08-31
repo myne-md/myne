@@ -21,6 +21,7 @@ describe("normalizeTranscribeError (MYND-591)", () => {
     expect(normalizeTranscribeError("VaultLocked").kind).toBe("vault_locked");
     expect(normalizeTranscribeError("NoModel").kind).toBe("no_model");
     expect(normalizeTranscribeError("ModelLoadFailed").kind).toBe("model_load_failed");
+    expect(normalizeTranscribeError("AudioTooLong").kind).toBe("too_long");
   });
 
   it("accepts the defensive snake_case { kind } object shape", () => {
@@ -29,6 +30,9 @@ describe("normalizeTranscribeError (MYND-591)", () => {
     expect(normalizeTranscribeError({ kind: "no_model" }).kind).toBe("no_model");
     expect(normalizeTranscribeError({ kind: "model_load_failed" }).kind).toBe(
       "model_load_failed",
+    );
+    expect(normalizeTranscribeError({ kind: "audio_too_long" }).kind).toBe(
+      "too_long",
     );
   });
 
