@@ -1242,7 +1242,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine error enum, 317 lines against 129. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
+      "The engine error enum, 268 lines against 129. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/commands.rs",
@@ -1282,7 +1282,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "The `#[tauri::command]` layer, 438 lines against 338, and the pair is the three-layer command shape working rather than drift. myne-md/myne#456 reduced desktop's side from 1442 lines to thin wrappers by moving the body into `myne-core`; mobile's was written against that same core from the start. The /simplify pass then took two more: `agent_apply` and `agent_undo` were still retyped verbatim on both sides, and the undo retype had silently DROPPED the myne-md/myne#531 fix that puts failed restore points back, so a partial undo failure consumed the record permanently on mobile. Both moved to `host_commands::{apply_from_host, undo_from_host}`. What is left on each side is argument marshalling and the client's own two seams (its engine and its scope searcher), which are BY DEFINITION per-client. Measured rather than assumed: neither file carries a security rule, a precondition or a refusal of its own.",
+      "The `#[tauri::command]` layer, 505 lines against 338, and the pair is the three-layer command shape working rather than drift. myne-md/myne#456 reduced desktop's side from 1442 lines to thin wrappers by moving the body into `myne-core`; mobile's was written against that same core from the start. The /simplify pass then took two more: `agent_apply` and `agent_undo` were still retyped verbatim on both sides, and the undo retype had silently DROPPED the myne-md/myne#531 fix that puts failed restore points back, so a partial undo failure consumed the record permanently on mobile. Both moved to `host_commands::{apply_from_host, undo_from_host}`. What is left on each side is argument marshalling and the client's own two seams (its engine and its scope searcher), which are BY DEFINITION per-client. Measured rather than assumed: neither file carries a security rule, a precondition or a refusal of its own.",
   },
   {
     a: "src-tauri/src/plugins/agent/adapters.rs",
