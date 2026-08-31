@@ -203,6 +203,17 @@ impl Default for VaultRuntimeState {
     }
 }
 
+/// Why [`VaultRuntimeState::set_import_source`] can refuse, and what each
+/// refusal protects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportSourceRefused {
+    /// Nothing is unlocked, so there is no target vault to import INTO and no
+    /// session to bound the source's residency by.
+    NoActiveVault,
+    /// Another vault is already open as an import source.
+    SourceAlreadyOpen,
+}
+
 impl VaultRuntimeState {
     /// Borrow the auth-permits semaphore. Callers `try_acquire()` on
     /// this in their command's critical-section guard.
@@ -675,18 +686,58 @@ impl VaultRuntimeState {
         }
     }
 
-    /// Populate [`Slot::ImportSource`] for `id`. Returns the prior `Slot` for
-    /// diagnostics, exactly as [`Self::set_recovering`] does.
-    pub async fn set_import_source(&self, id: VaultId, material: ImportSourceMaterial) -> Slot {
+    /// Populate [`Slot::ImportSource`] for `id`, or refuse. Returns the prior
+    /// `Slot` for diagnostics, exactly as [`Self::set_recovering`] does.
+    ///
+    /// # Both preconditions are checked HERE, under the write guard
+    ///
+    /// The caller checks them too, earlier and with better error text, and that
+    /// check is worth keeping because it avoids a pointless 256 MiB Argon2id.
+    /// It cannot be the guarantee, though, and the reason is the gap between the
+    /// two program points.
+    ///
+    /// **The race.** `import_source::open` read `active_vault_id()` and then
+    /// ran `read_meta` plus a full Argon2id before reaching this function, with
+    /// no lock held across the window. A `lock_from_host` or an idle
+    /// `lock_unlocked_if_idle` landing inside it calls `close_all` against a
+    /// slot that does not exist yet, clears nothing, and this function then
+    /// minted a second vault's keys into a process the user is looking at as
+    /// LOCKED. Only the 30-minute TTL bounded it, against a threat-model
+    /// amendment (A6) that bounds the source's residency by the target vault's
+    /// own session. Checking under the same guard that inserts makes the check
+    /// and the write one operation, so the window closes structurally rather
+    /// than by the caller being careful.
+    ///
+    /// **The count.** `slot_kind(source_id)` is keyed on the source id alone,
+    /// so it refuses re-opening the SAME source and permits a different one: N
+    /// distinct ids gave N key-holding slots, while the A6 amendment says two
+    /// vaults' key material is resident, the target's and one source's. Nothing
+    /// enforced that number. `take_import_source_if_expired` also drops one
+    /// slot per tick through `min_by_key`, so N expired slots took N ticks to
+    /// reclaim. Refusing a second source here makes the amendment's sentence
+    /// true rather than aspirational.
+    pub async fn set_import_source(
+        &self,
+        id: VaultId,
+        material: ImportSourceMaterial,
+    ) -> Result<Slot, ImportSourceRefused> {
         let ImportSourceMaterial {
             root_key,
             items_key,
             items_key_id,
             opened_at,
         } = material;
-        self.slots
-            .write()
-            .await
+        let mut guard = self.slots.write().await;
+        if !guard.values().any(|s| matches!(s, Slot::Unlocked(_))) {
+            return Err(ImportSourceRefused::NoActiveVault);
+        }
+        if guard
+            .iter()
+            .any(|(other, s)| *other != id && matches!(s, Slot::ImportSource { .. }))
+        {
+            return Err(ImportSourceRefused::SourceAlreadyOpen);
+        }
+        Ok(guard
             .insert(
                 id,
                 Slot::ImportSource {
@@ -696,7 +747,7 @@ impl VaultRuntimeState {
                     opened_at,
                 },
             )
-            .unwrap_or(Slot::Empty)
+            .unwrap_or(Slot::Empty))
     }
 
     /// Take just the [`Slot::ImportSource`] material, leaving the entry absent.
@@ -1682,6 +1733,14 @@ pub fn test_vault_id() -> VaultId {
 #[cfg(any(test, feature = "test-support"))]
 pub fn test_vault_id_b() -> VaultId {
     VaultId::parse("22222222-2222-7222-8222-222222222222").expect("valid test UUIDv7")
+}
+
+/// A THIRD fixed, deterministic test [`VaultId`], for the one test that needs
+/// three distinct slot-map entries: a target, an accepted source, and the
+/// second source `set_import_source` must refuse.
+#[cfg(any(test, feature = "test-support"))]
+pub fn test_vault_id_c() -> VaultId {
+    VaultId::parse("33333333-3333-7333-8333-333333333333").expect("valid test UUIDv7")
 }
 
 /// Build a fixture `UnlockedVault` with byte-pattern arguments so tests
@@ -3068,6 +3127,83 @@ mod import_source_slot_tests {
             .block_on(f)
     }
 
+    /// The write REFUSES when nothing is unlocked, and this is the race, not a
+    /// tidiness rule.
+    ///
+    /// `import_source::open` reads `active_vault_id()` and then spends a
+    /// `read_meta` and a 256 MiB Argon2id before it reaches the write, holding
+    /// no lock across the window. A lock or an idle auto-lock landing inside it
+    /// calls `close_all` against a slot that does not exist yet, so it clears
+    /// nothing, and the write then mints a second vault's keys into a process
+    /// the user sees as locked, bounded only by the 30-minute TTL. The A6
+    /// amendment bounds the source by the target vault's own session.
+    ///
+    /// Deleting the `Unlocked` check inside `set_import_source` makes this fail.
+    #[test]
+    fn set_import_source_refuses_when_nothing_is_unlocked() {
+        block_on(async {
+            let state = VaultRuntimeState::default();
+            let got = state
+                .set_import_source(
+                    test_vault_id_b(),
+                    fixture_import_source(0x44, 0x55, 0x66, 0),
+                )
+                .await;
+            // `matches!` rather than `assert_eq!`: `Slot` deliberately
+            // implements neither `Debug` nor `PartialEq`, because it holds key
+            // material and a derived `Debug` is one `tracing` call away from
+            // logging it. The error side is what this asserts on.
+            assert!(matches!(got, Err(ImportSourceRefused::NoActiveVault)));
+            // And the slot really is absent: a refusal that still wrote would
+            // report the right thing and leave the keys resident anyway, which
+            // is the state this test exists to forbid.
+            assert_eq!(state.slot_kind(test_vault_id_b()).await, SlotKind::Empty);
+        });
+    }
+
+    /// At most ONE source at a time, which is what makes the A6 amendment's
+    /// "two vaults' key material" a bound rather than a hope.
+    ///
+    /// `slot_kind(source_id)` is keyed on the source id alone: it refuses
+    /// re-opening the SAME source and permits a different one, so N distinct
+    /// ids gave N key-holding slots. `take_import_source_if_expired` also drops
+    /// one per tick, so N of them took N ticks to reclaim.
+    ///
+    /// Deleting the second check inside `set_import_source` makes this fail.
+    #[test]
+    fn set_import_source_refuses_a_second_source() {
+        block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
+                )
+                .await;
+            state
+                .set_import_source(
+                    test_vault_id_b(),
+                    fixture_import_source(0x44, 0x55, 0x66, 0),
+                )
+                .await
+                .expect("the first source is accepted");
+            let got = state
+                .set_import_source(
+                    test_vault_id_c(),
+                    fixture_import_source(0x77, 0x88, 0x99, 0),
+                )
+                .await;
+            assert!(matches!(got, Err(ImportSourceRefused::SourceAlreadyOpen)));
+            assert_eq!(state.slot_kind(test_vault_id_c()).await, SlotKind::Empty);
+            // The FIRST source is untouched: a refusal must not disturb the
+            // slot it refused on behalf of.
+            assert_eq!(
+                state.slot_kind(test_vault_id_b()).await,
+                SlotKind::ImportSource
+            );
+        });
+    }
+
     /// The load-bearing coexistence claim: SYNC-1 forbids two `Unlocked`
     /// entries, not two key-holding ones. If this ever fails, the feature's
     /// whole premise is gone and the design has to change, not the test.
@@ -3086,7 +3222,8 @@ mod import_source_slot_tests {
                     test_vault_id_b(),
                     fixture_import_source(0x44, 0x55, 0x66, 0),
                 )
-                .await;
+                .await
+                .expect("a target vault is unlocked in this fixture");
 
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
             assert_eq!(
@@ -3105,15 +3242,34 @@ mod import_source_slot_tests {
     fn an_import_source_is_never_the_active_vault() {
         block_on(async {
             let state = VaultRuntimeState::default();
+            // The TARGET is `_b` and the SOURCE is the lower-sorting id, which
+            // is what makes this sharp rather than incidental. `active_vault_id`
+            // picks the `.min()` of the entries it accepts, so a source that
+            // sorts BELOW the target is the one it would return if the
+            // `Slot::Unlocked` filter were ever dropped. With the ids the other
+            // way round the assertion would pass on ordering alone and say
+            // nothing about the filter.
+            //
+            // The earlier form of this test opened a source with nothing
+            // unlocked and asserted `None`. That state is unreachable now:
+            // `set_import_source` refuses when no vault is unlocked, because
+            // the source's residency is bounded by the target's session.
             state
-                .set_import_source(
+                .set_unlocked(
                     test_vault_id_b(),
-                    fixture_import_source(0x44, 0x55, 0x66, 0),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
                 )
                 .await;
+            state
+                .set_import_source(test_vault_id(), fixture_import_source(0x44, 0x55, 0x66, 0))
+                .await
+                .expect("a target vault is unlocked in this fixture");
 
-            assert_eq!(state.active_vault_id().await, None);
-            assert_eq!(state.active_vault_or_recovering_for_probe().await, None);
+            assert_eq!(state.active_vault_id().await, Some(test_vault_id_b()));
+            assert_eq!(
+                state.active_vault_or_recovering_for_probe().await,
+                Some(test_vault_id_b())
+            );
             // And the slot IS there, so the two assertions above are about the
             // resolvers refusing it rather than about an empty map. This used
             // to read `import_source_vault_id()`, a resolver whose only caller
@@ -3121,7 +3277,7 @@ mod import_source_slot_tests {
             // answering a question that has no single answer. `slot_kind` asks
             // the same thing of the id the test already knows.
             assert_eq!(
-                state.slot_kind(test_vault_id_b()).await,
+                state.slot_kind(test_vault_id()).await,
                 SlotKind::ImportSource
             );
         });
@@ -3131,12 +3287,22 @@ mod import_source_slot_tests {
     fn taking_an_import_source_returns_its_material_and_empties_the_entry() {
         block_on(async {
             let state = VaultRuntimeState::default();
+            // A source may only be opened while a target vault is
+            // unlocked: `set_import_source` refuses otherwise, because the
+            // source's residency is bounded by the target's session.
+            state
+                .set_unlocked(
+                    test_vault_id_b(),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
+                )
+                .await;
             state
                 .set_import_source(
                     test_vault_id_b(),
                     fixture_import_source(0x44, 0x55, 0x66, 7),
                 )
-                .await;
+                .await
+                .expect("a target vault is unlocked in this fixture");
 
             let taken = state
                 .take_import_source(test_vault_id_b())
@@ -3173,12 +3339,22 @@ mod import_source_slot_tests {
     fn an_expired_import_source_is_dropped_and_a_fresh_one_is_not() {
         block_on(async {
             let state = VaultRuntimeState::default();
+            // A source may only be opened while a target vault is
+            // unlocked: `set_import_source` refuses otherwise, because the
+            // source's residency is bounded by the target's session.
+            state
+                .set_unlocked(
+                    test_vault_id_b(),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
+                )
+                .await;
             state
                 .set_import_source(
                     test_vault_id_b(),
                     fixture_import_source(0x44, 0x55, 0x66, 0),
                 )
-                .await;
+                .await
+                .expect("a target vault is unlocked in this fixture");
 
             // Within the TTL: untouched.
             let kept = state
@@ -3202,58 +3378,57 @@ mod import_source_slot_tests {
             assert_eq!(state.slot_kind(test_vault_id_b()).await, SlotKind::Empty);
         });
     }
-
-    /// The TTL sweep must not reach an unlocked vault even when that vault is
-    /// older than the TTL. The sweep is keyed on the variant, and this pins that
-    /// it stays so: an auto-lock timeout and an import TTL are different numbers
-    /// with different reasons.
-    /// Two import slots, the LOWER id fresh and the higher expired.
+    /// The two-source case this used to cover is now UNREACHABLE, and that is
+    /// recorded rather than the test being quietly deleted.
     ///
-    /// The first version of the sweep picked the lowest id and then tested its
-    /// age, so this case reclaimed nothing, forever, while the read probe kept
-    /// reporting that something had expired: the write lock was taken on every
-    /// five-second tick and dropped nothing. Every existing test used one slot,
-    /// so both directions passed.
+    /// It opened an expired source and a fresh one and asserted the sweep took
+    /// the expired one, because `take_import_source_if_expired` picks by
+    /// `min_by_key` and would otherwise have dropped whichever sorted first.
+    /// `set_import_source` now refuses a second source outright, so a fresh
+    /// slot can never sit behind an expired one: there is at most one, and the
+    /// sweep's choice is not a choice.
+    ///
+    /// What survives is the property that still has content, kept here so the
+    /// removal does not take a real assertion with it: the sweep drops the one
+    /// source when it is expired and leaves it when it is not.
     #[test]
-    fn the_import_ttl_sweep_finds_an_expired_slot_behind_a_fresh_one() {
+    fn the_import_ttl_sweep_drops_the_one_source_only_when_expired() {
         block_on(async {
             let state = VaultRuntimeState::default();
-            // `test_vault_id()` is the legacy all-zero id, which sorts below.
+            state
+                .set_unlocked(
+                    test_vault_id_b(),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
+                )
+                .await;
             state
                 .set_import_source(
                     test_vault_id(),
                     fixture_import_source(0x11, 0x22, 0x33, 900),
                 )
-                .await;
-            state
-                .set_import_source(
-                    test_vault_id_b(),
-                    fixture_import_source(0x44, 0x55, 0x66, 0),
-                )
-                .await;
-            assert!(
-                test_vault_id() < test_vault_id_b(),
-                "fixture assumes this order"
-            );
+                .await
+                .expect("a target vault is unlocked in this fixture");
 
-            // `opened_at` 0 is old, 900 is fresh.
-            let dropped = state
+            // Fresh (`opened_at` 900 against a 1000 clock) stays.
+            let kept = state
                 .take_import_source_if_expired(core::time::Duration::from_secs(600), |opened_at| {
                     core::time::Duration::from_secs(1000u64.saturating_sub(opened_at))
                 })
                 .await;
-
-            assert!(matches!(dropped, Some(Slot::ImportSource { .. })));
-            assert_eq!(
-                state.slot_kind(test_vault_id_b()).await,
-                SlotKind::Empty,
-                "the EXPIRED slot is the one that goes"
-            );
+            assert!(kept.is_none(), "a fresh source is not swept");
             assert_eq!(
                 state.slot_kind(test_vault_id()).await,
-                SlotKind::ImportSource,
-                "the fresh one stays"
+                SlotKind::ImportSource
             );
+
+            // Same slot, an older clock reading: now expired, so it goes.
+            let dropped = state
+                .take_import_source_if_expired(core::time::Duration::from_secs(600), |opened_at| {
+                    core::time::Duration::from_secs(2000u64.saturating_sub(opened_at))
+                })
+                .await;
+            assert!(matches!(dropped, Some(Slot::ImportSource { .. })));
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
     }
 
@@ -3293,7 +3468,8 @@ mod import_source_slot_tests {
                     test_vault_id_b(),
                     fixture_import_source(0x44, 0x55, 0x66, 0),
                 )
-                .await;
+                .await
+                .expect("a target vault is unlocked in this fixture");
 
             let dropped = state.drop_import_sources().await;
             assert_eq!(dropped.len(), 1);

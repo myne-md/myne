@@ -45,7 +45,7 @@
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::error::VaultUnlockError;
 use crate::plugins::vault_unlock::state::{
-    ImportSourceMaterial, Slot, SlotKind, VaultRuntimeState,
+    ImportSourceMaterial, ImportSourceRefused, Slot, SlotKind, VaultRuntimeState,
 };
 use crate::vault_id::VaultId;
 use crate::vault_io::VaultIo;
@@ -216,9 +216,38 @@ pub async fn open(
         }
     };
 
-    // Populate LAST. Every failure above returns with the slot untouched and
-    // the derived bytes dropped, so there is no half-open state to clean up.
-    state.set_import_source(source_id, material).await;
+    // Populate LAST, and the population is what CHECKS. Every failure above
+    // returns with the slot untouched and the derived bytes dropped, so there
+    // is no half-open state to clean up.
+    //
+    // The precondition read at the top of this function is an early, readable
+    // refusal that saves a 256 MiB Argon2id; it is not the guarantee. Between
+    // it and here sit `read_meta` and that derivation, with no lock held, so a
+    // lock or an idle auto-lock landing in the window found no slot to clear
+    // and this line then minted one into a locked process. `set_import_source`
+    // re-checks under the write guard it inserts with, which makes the two one
+    // operation; its doc carries the full reasoning and the second precondition
+    // (at most one source open) that the same guard now enforces.
+    match state.set_import_source(source_id, material).await {
+        Ok(_) => {}
+        Err(ImportSourceRefused::NoActiveVault) => {
+            tracing::error!(
+                stage = "slot_write",
+                error_kind = "NoActiveVaultToImportInto",
+                "import source refused at the write: the target vault was locked while this \
+                 source was being opened"
+            );
+            return Err(VaultUnlockError::NoActiveVaultToImportInto);
+        }
+        Err(ImportSourceRefused::SourceAlreadyOpen) => {
+            tracing::error!(
+                stage = "slot_write",
+                error_kind = "VaultOpenAsImportSource",
+                "import source refused at the write: another vault is already open as a source"
+            );
+            return Err(VaultUnlockError::VaultOpenAsImportSource);
+        }
+    }
 
     tracing::info!(
         event = "import_source_opened",
@@ -675,7 +704,9 @@ pub async fn import_source_read_note<R: Runtime>(
 #[cfg(test)]
 mod import_source_read_tests {
     use super::*;
-    use crate::plugins::vault_unlock::state::{fixture_import_source, test_vault_id_b};
+    use crate::plugins::vault_unlock::state::{
+        fixture_import_source, fixture_unlocked_with_keys, test_vault_id, test_vault_id_b,
+    };
     use crate::test_support::{block_on, ScopedTempDir};
 
     const ITEMS_KEY: [u8; protocol::AEAD_KEY_LEN] = [0x5A; protocol::AEAD_KEY_LEN];
@@ -735,11 +766,30 @@ mod import_source_read_tests {
         target
     }
 
+    /// Open a source slot the way production can: with a target vault unlocked.
+    ///
+    /// `set_import_source` refuses when nothing is unlocked, because the
+    /// source's residency is bounded by the target vault's own session
+    /// (`docs/threat-model.md` A6). These read tests care about what comes back
+    /// through the slot, not about how it was created, so the target is set up
+    /// here once rather than in each of them.
+    ///
+    /// The target is `test_vault_id()` and the source is whatever the caller
+    /// names, so a caller passing `test_vault_id()` itself would be asking for a
+    /// vault that is its own import source. That is refused by the `Unlocked`
+    /// slot kind before it reaches here, and no caller does it.
     fn open_slot(state: &VaultRuntimeState, id: VaultId) {
         block_on(async {
             state
-                .set_import_source(id, fixture_import_source(0x44, 0x5A, 0x66, 0))
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x11, 0x22, 0x33),
+                )
                 .await;
+            state
+                .set_import_source(id, fixture_import_source(0x44, 0x5A, 0x66, 0))
+                .await
+                .expect("a target vault is unlocked in this fixture");
         });
     }
 
@@ -1570,7 +1620,8 @@ mod import_source_reseal_tests {
                     test_vault_id_b(),
                     fixture_import_source(0xA1, 0xA2, 0xA3, 0),
                 )
-                .await;
+                .await
+                .expect("a target vault is unlocked in this fixture");
         });
     }
 
