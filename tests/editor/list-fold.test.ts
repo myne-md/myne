@@ -19,18 +19,44 @@ import { EditorState } from "@codemirror/state";
 import { ensureSyntaxTree, foldable } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { listFoldRange, listFoldService } from "../../src/editor/list-fold";
+import { PARSE_BUDGET_MS } from "./_parse-budget";
 
 /** A markdown-parsed EditorState with the list-fold service mounted. The docs
  *  here are tiny, but the lezer parse is lazy — `syntaxTree` alone only reads
  *  whatever slice has already been realized, which under CI load/timing can be
  *  the empty root. `ensureSyntaxTree` forces a full synchronous parse to the end
- *  of the doc so the foldService reads a complete tree deterministically. */
+ *  of the doc so the foldService reads a complete tree deterministically.
+ *
+ *  The budget is `_parse-budget.ts`'s, shared rather than copied; that file
+ *  carries the reasoning and the measurements.
+ *
+ *  Be precise about what the check below is and is not. Unlike the conformance
+ *  `mount`, this helper ALREADY forced the parse, so nothing here was silently
+ *  skipping it. This file did fail once in thirteen full-suite runs (in the one
+ *  run sharing the machine with a concurrent `cargo test --workspace`, and it
+ *  passed every isolated run), and instrumenting it across sixty-four
+ *  subsequent parses recorded a complete tree every time — `ensured=tree`,
+ *  `treeLen == docLen`, 0 ms. So a partial tree is NOT an established cause of
+ *  that failure, and this throw is not presented as its fix.
+ *
+ *  What it does is remove the one way that failure could be a partial tree
+ *  without anybody being able to tell. `ensureSyntaxTree` returns `null` when it
+ *  did not finish, discarding that let an incomplete tree reach `listFoldRange`,
+ *  and the result would be `null` — identical to a genuinely non-foldable item.
+ *  If this test fails again, the message now distinguishes the two. */
 function parsed(doc: string): EditorState {
   const s = EditorState.create({
     doc,
     extensions: [markdown({ base: markdownLanguage }), listFoldService()],
   });
-  ensureSyntaxTree(s, s.doc.length, 5000);
+  if (ensureSyntaxTree(s, s.doc.length, PARSE_BUDGET_MS) === null) {
+    throw new Error(
+      `list-fold: the syntax parse did not reach ${s.doc.length} within ` +
+        `${PARSE_BUDGET_MS} ms, so the tree is PARTIAL and listFoldRange below ` +
+        `reads an incomplete tree. The list item below is not necessarily ` +
+        `non-foldable: the parser had not reached it.`,
+    );
+  }
   return s;
 }
 
