@@ -54,8 +54,14 @@ use protocol::AEAD_NONCE_LEN;
 /// The honest limit, stated because the alternative is a comment that promises
 /// more than the type does: `later: &[]` is legal here, and the pair form made
 /// a one-generation call visibly absurd (you had to pass the same constant
-/// twice). That property is not in the type any more. Rule 5 and the
-/// unused-import lint carry it instead, as the module doc explains.
+/// twice). That property is not in the type any more, and the sentence that
+/// used to say rule 5 and the unused-import lint carry it was pointing at a
+/// layer pointing back here. Neither forces `base` to be the family's OLDEST
+/// generation: rule 5 fires only when the base magic is named in the file, so a
+/// reader spelling `MYA5` and `MYA9` and never `MYA1` is invisible to it. What
+/// the slice does buy is that adding a generation is an append to `later` and a
+/// zero-generation reader is a signature error. Whether `base` is the oldest is
+/// unguarded, and it is written down here rather than delegated.
 pub fn content_nonce_at(
     header: &[u8],
     offset: usize,
