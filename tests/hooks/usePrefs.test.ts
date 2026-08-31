@@ -19,6 +19,7 @@ const setEditorLineSpacing = vi.fn();
 const setEditorContentWidth = vi.fn();
 const setEditorFontFamily = vi.fn();
 const setKeymapBinding = vi.fn();
+const setReminderHorizonDays = vi.fn();
 
 vi.mock("../../src/lib/prefs", () => ({
   prefsRead: (...a: unknown[]) => prefsRead(...a),
@@ -30,6 +31,7 @@ vi.mock("../../src/lib/prefs", () => ({
   setEditorContentWidth: (...a: unknown[]) => setEditorContentWidth(...a),
   setEditorFontFamily: (...a: unknown[]) => setEditorFontFamily(...a),
   setKeymapBinding: (...a: unknown[]) => setKeymapBinding(...a),
+  setReminderHorizonDays: (...a: unknown[]) => setReminderHorizonDays(...a),
 }));
 
 import { usePrefs } from "../../src/hooks/usePrefs";
@@ -136,6 +138,35 @@ describe("optimistic write success", () => {
     });
     expect(setAutoLockTimeout).toHaveBeenCalledWith(600);
     expect(result.current.prefs.auto_lock_seconds).toBe(600);
+  });
+
+  it("setReminderHorizon persists the chosen days and updates cache", async () => {
+    // myne#508: the horizon's setter had no caller anywhere, on either client.
+    // It lives here rather than in the settings row so the row holds no state
+    // and the panel holds no echo for it, the shape the ~40 setters beside it
+    // already have.
+    const { result } = renderHook(() => usePrefs());
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    await act(async () => {
+      await result.current.setReminderHorizon(14);
+    });
+    expect(setReminderHorizonDays).toHaveBeenCalledWith(14);
+    expect(result.current.prefs.reminder_horizon_days).toBe(14);
+  });
+
+  it("setReminderHorizon converges on disk truth when the write is rejected", async () => {
+    // A control still showing the new window after a failed write tells the
+    // user a bound is in force that is not. Re-reading rather than rolling back
+    // to a captured value is this hook's discipline throughout: the disk is
+    // authoritative, and a rollback can invert UI against it.
+    const { result } = renderHook(() => usePrefs());
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    setReminderHorizonDays.mockRejectedValueOnce(new Error("Io"));
+    prefsRead.mockResolvedValueOnce(view({ reminder_horizon_days: 30 }));
+    await act(async () => {
+      await result.current.setReminderHorizon(1);
+    });
+    expect(result.current.prefs.reminder_horizon_days).toBe(30);
   });
 
   it("setHiddenBarItems persists the full set optimistically", async () => {
