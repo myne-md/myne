@@ -419,11 +419,15 @@ Full primitive details, audit anchors, and subkey derivation discipline rule (wh
 - **A guard parameter with a default value is an opt-in guard, and the default is the arm that never fires.** `settleStep(result, epoch = runEpoch)` reads as though every caller is checked. It is not: a default is evaluated at the call, so an omitted argument compares the CURRENT epoch against itself and matches unconditionally, which makes the one call site that forgot to thread the epoch precisely the site running unguarded. `tsc` is happy, because the signature is satisfied, and nothing else looks at it. myne-md/myne#533's agent store shipped that shape: the epoch exists to drop a step that lands after a vault lock, a vault switch or a "New chat", each of which repopulates the proposal with anchors and replacements copied verbatim out of note bodies, and the default excused every future call site from the check in advance. Make the parameter REQUIRED and let the compiler name every site (five, here), then verify the way a guard is verified: delete the comparison and watch a test fail by name (`tests/notes/agentUndoLifetime.test.ts`). The same shape hides in a Rust argument defaulted to the ambient value and in a script flag whose absence means "check nothing".
 - **A negative lookahead after `\s*` is not a guard, because `\s*` backtracks into it.** `/["'](data-[a-z0-9-]+)["']\s*:\s*(?!["'`])/` looks like "the value must not be a string literal" and matches every string literal: the engine tries the lookahead after the space, fails, gives the space back, re-tries at the space, and a space is not a quote. Written into `check-web-testids.mjs` it made the object-form leak detector report clean on exactly the input it was added for. Capture the first non-space character and test it instead, since a capture cannot backtrack past itself. The same shape is a hazard in any guard that reads a value's first token.
 - **`cargo check --no-default-features` never compiles test code, so the AI-free gate is blind to a
-  dead-code break in a test-only helper.** The gate that guards the `--no-default-features` build runs
-  `cargo check` without `--all-targets`, which skips `#[cfg(test)]` entirely. A helper gated
-  `#[cfg(test)]` whose only caller sits behind a feature is therefore dead when that feature is off,
-  and `cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings` fails on it
-  while every wired check stays green (myne-md/myne#510 shipped exactly that for one review round).
+  dead-code break in a test-only helper.** `cargo check` without `--all-targets` skips `#[cfg(test)]`
+  entirely, so a helper gated `#[cfg(test)]` whose only caller sits behind a feature is dead when that
+  feature is off, and only a `--all-targets` clippy sees it. myne-md/myne#510 shipped exactly that for
+  one review round, because the `--no-default-features` gate in `.woodpecker/main.yml` was a bare
+  `cargo check`. The same change closed it: that step now also runs
+  `cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings`, so CI covers this
+  and there is nothing left to run by hand. The paragraph is kept rather than deleted because the
+  REASON is what generalises: any gate spelled `check` rather than `clippy --all-targets` is blind to
+  the test tree, and this repository has more than one.
   Gate such a helper on the FEATURE its caller needs rather than on `cfg(test)`, and run that clippy
   line by hand when a change adds one. Gating on the feature has a second payoff: the caller can then
   leave the test module, so a `const _: () = assert!(...)` comparing two duplicated constants runs on

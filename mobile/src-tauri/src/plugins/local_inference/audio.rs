@@ -239,9 +239,10 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
     // it does: an attacker who can already place a file on the device. A7 is
     // Best-effort there, so this stays hardening inside a conceded boundary
     // rather than a new guarantee, and the conclusion is unchanged. The
-    // reachability is not.
-    // ONE synced attachment kills the app on every device that tries to
-    // transcribe it. `transcribe` takes an `attachment_id` and reads the WAV out
+    // reachability is not. It is also a remote-ish DoS in the A6 shape rather
+    // than a purely local one, and that is the half the rewrite deleted its
+    // lead-in for: ONE synced attachment kills the app on every device that
+    // tries to transcribe it. `transcribe` takes an `attachment_id` and reads the WAV out
     // of the vault (`commands.rs`), so a blob written by a compromised second
     // device reaches this parser without the user picking a file, and
     // `transcription_enabled` defaults ON.
@@ -416,7 +417,7 @@ fn resample_linear(input: Vec<f32>, from_rate: u32, to_rate: u32) -> Result<Vec<
 /// and that is the case worth refusing: `parse_wav`'s clamp holds expansion to
 /// 4x, so without this bound the same 64 MiB could still drive 134 M output
 /// samples. That was a worst case of roughly 768 MiB across the four buffers a
-/// four buffers a decode used to hold live (the WAV bytes 64, the `Vec<i16>`
+/// decode used to hold live (the WAV bytes 64, the `Vec<i16>`
 /// 64, the mono `Vec<f32>` 128, the output 512). It is now **320 MiB**, and the
 /// figure is worth spelling out because the obvious reading of it is wrong.
 ///
