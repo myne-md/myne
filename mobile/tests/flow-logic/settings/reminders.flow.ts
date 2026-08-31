@@ -112,8 +112,7 @@ test.describe("mobile task-reminder settings", () => {
     await expect(page.getByTestId("settings.reminders-horizon-picker-1")).toHaveAttribute(
       "data-active",
       "true",
-    );
-  });
+    );  });
 
   test("a horizon segment can be set from the keyboard", async ({ page }) => {
     // The `onKeyDown` block is the half a pointer test never reaches. Its own
@@ -176,6 +175,41 @@ test.describe("mobile task-reminder settings", () => {
       "data-active",
       "true",
     );
+
+
+    // **The focus half, which this case is named for and did not assert.**
+    // Everything above is the WRITE path, which the preceding case already
+    // covers, so the test passed with `segmentRefs.current[next]?.focus()`
+    // deleted outright AND under the defect that was actually shipping: the ref
+    // map recorded only the ACTIVE segment, so `focus()` on a non-active index
+    // was a no-op by construction, and focus sat one step behind selection
+    // permanently.
+    //
+    // Two assertions, because either alone still passes under that defect.
+    // Focus must have MOVED to the newly selected segment, and the tab stop
+    // must have moved with it, so exactly one segment remains reachable by Tab.
+    await expect(page.getByTestId("settings.reminders-horizon-picker-1")).toBeFocused();
+    await expect(group.locator('[role="radio"][tabindex="0"]')).toHaveCount(1);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-1")).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+
+    // A SECOND press, which is what separates "focus lands once" from "focus
+    // tracks selection". Under the shipped defect the second press fired from
+    // the stale element, recomputed the same target and rewrote the same value,
+    // so the write list stayed at [1] rather than growing.
+    await page.keyboard.press("ArrowRight");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __reminderHorizonWrites?: (number | null)[] })
+              .__reminderHorizonWrites,
+        ),
+      )
+      .toEqual([1, 3]);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-3")).toBeFocused();
   });
 
   test("the horizon control is a radiogroup, not four unannounced divs", async ({ page }) => {

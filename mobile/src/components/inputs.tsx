@@ -363,11 +363,36 @@ export function Segmented({
           // stops, which is the shape `role="radiogroup"` promises it is not.
           // Announcing a role and then not honouring its keyboard model is
           // worse than the unannounced divs this replaced.
-          tabIndex={wired ? (i === active ? 0 : -1) : undefined}
+          // `active < 0 ? 0` is the no-selection fallback, and it is only for
+          // the tab stop. `resolveHorizonDays` clamps a stored 2, 4 or 6 into
+          // range rather than snapping it onto the offered set, so `active` is
+          // -1 and no segment is checked. Without the fallback every segment
+          // took `tabIndex={-1}`: an announced radiogroup with zero tab stops,
+          // which a pointer user never notices and a keyboard user cannot enter
+          // at all. The convention is that the first radio takes the tab stop
+          // when none is checked. `aria-checked` and `data-active` are
+          // deliberately NOT given the same fallback, so the readout stays
+          // honest about there being no selection.
+          tabIndex={wired ? (i === (active < 0 ? 0 : active) ? 0 : -1) : undefined}
+          // EVERY mounted segment, not only the active one. Recording only the
+          // active segment made the arrow handler's `segmentRefs.current[next]`
+          // a silent no-op by construction, since `next` is never the active
+          // index: React commits the state change after the handler returns, so
+          // the still-focused segment then flipped to `tabIndex={-1}` and
+          // `aria-checked="false"` while selection moved elsewhere. The next
+          // key press fired from that same stale element, recomputed the same
+          // `next`, and rewrote the value it had already written. One step of
+          // traversal per two presses, permanently, with assistive technology
+          // reporting focus on an unselected radio.
+          //
+          // The `null` cleanup call DELETES the entry rather than ignoring it,
+          // so the map cannot outlive a changed option set and hand `focus()` a
+          // detached node.
           ref={
             wired
               ? (el) => {
-                  if (el !== null && i === active) segmentRefs.current[i] = el;
+                  if (el === null) delete segmentRefs.current[i];
+                  else segmentRefs.current[i] = el;
                 }
               : undefined
           }

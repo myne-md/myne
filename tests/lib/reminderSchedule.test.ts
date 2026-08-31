@@ -127,6 +127,38 @@ describe("the target set", () => {
     expect(targetReminders(tomorrow, lastMinute, 3)).toHaveLength(1);
   });
 
+  it("registers a midnight reminder at horizon 1, which the two bounds used to drop between them", () => {
+    // The case the test above sidesteps by using 09:00. An instant at exactly
+    // 00:00 is excluded by `at > to` on the previous day, whose `to` is that
+    // day's 23:59, and a pass re-runs within 60 s, so the first pass of the new
+    // day sees `from` equal to the instant. Under `at <= from` it was in the
+    // target set on neither side of midnight and no timer was ever armed for it.
+    const midnight = [task({ remind: "2026-07-29 00:00" })];
+
+    // The previous day: correctly out of range, and it is `to` that excludes it.
+    const dayBefore = new Date(2026, 6, 28, 23, 59);
+    expect(targetReminders(midnight, dayBefore, 1)).toEqual([]);
+
+    // The first pass of the new day, where `from` is the instant itself. This is
+    // the assertion that fails under `at <= from`.
+    const atMidnight = new Date(2026, 6, 29, 0, 0);
+    expect(targetReminders(midnight, atMidnight, 1)).toHaveLength(1);
+
+    // One minute later it is past, and past instants are still skipped. Stated
+    // so the fix cannot be read as admitting overdue reminders: it widens the
+    // lower bound by exactly one minute, the one the instant is due in.
+    const laterThatDay = new Date(2026, 6, 29, 0, 1);
+    expect(targetReminders(midnight, laterThatDay, 1)).toEqual([]);
+  });
+
+  it("skips an instant strictly in the past and admits one due this minute", () => {
+    // The other half of moving the bound from `<=` to `<`, so the change cannot
+    // be read as admitting overdue reminders. `from` is minute-resolution.
+    const now = new Date(2026, 6, 29, 9, 0);
+    expect(targetReminders([task({ remind: "2026-07-29 09:00" })], now, 1)).toHaveLength(1);
+    expect(targetReminders([task({ remind: "2026-07-29 08:59" })], now, 1)).toEqual([]);
+  });
+
   it("covers today and only today at the shortest horizon", () => {
     // The choice the issue was actually asking for, and the one where a rolling
     // 24-hour cutoff was most obviously wrong: "registered through today" has
