@@ -4,16 +4,15 @@
 // 2+3). The vitest *bench* (`render-perf.bench.ts`) reports raw timings; these
 // are the asserting *tests* that fail the suite on a regression.
 //
-// Two contracts are guarded here:
+// One contract is guarded here, and one used to be:
 //
-//   Task 2 — frame budget. The per-interaction hot path (a cursor-move
-//   decoration rebuild) must stay within a ~16 ms frame budget (60 fps) up to a
-//   documented doc-size ceiling. We assert the MEDIAN rebuild (not max/p99) so
-//   the canary is robust to GC/JIT/CI-noise spikes; a true O(n²) regression
-//   blows past the budget at the median, not just the tail. A second,
-//   machine-speed-independent assertion checks the cost stays ~linear (not
-//   quadratic) as the doc grows — that is the actual "no full-doc rescan per
-//   keystroke" property, independent of how fast the runner is.
+//   Task 2 — frame budget. NO LONGER ASSERTED HERE. Both of its assertions
+//   were wall-clock, and it is not only the absolute one that flakes in the
+//   parallel suite: the ratio does too, for a reason a ratio is normally
+//   immune to. The block below the imports carries the measurements, why a
+//   wider bound does not rescue it either, and what should replace them, which
+//   is a COUNT of what one rebuild visits rather than a third clock. Raw
+//   timings on known hardware stay in `render-perf.bench.ts`.
 //
 //   Task 3 — heavy-widget mount contract. KaTeX/Mermaid/embedded-HTML widgets
 //   memoize by a source-derived `key` in `eq()`. CodeMirror reuses the existing
@@ -29,65 +28,62 @@ import {
   setMathRenderer,
 } from "../../src/editor/decorations/math";
 import { type Mounted, mount, query, teardown } from "./_conformance";
-import { syntheticDoc } from "./_synthetic-doc";
 
-// ── doc-size ceiling ────────────────────────────────────────────────────────
-// CI-asserted ceiling for the hard 16 ms budget. Deliberately conservative so
-// the absolute-wall-clock assertion never flakes on a throttled shared runner
-// (median rebuild here is ~1–2 ms — ~8× headroom). The bench separately shows
-// the cursor-move rebuild stays under budget at the TAIL out to 10k lines
-// (p99 ≈ 11 ms), which is the real headroom; 2k is the figure we *guarantee*.
-const CEILING_LINES = 2_000;
-const FRAME_BUDGET_MS = 16;
-
-function median(xs: number[]): number {
-  const s = [...xs].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 === 0 ? (s[mid - 1] + s[mid]) / 2 : s[mid];
-}
-
-/** Time one cursor-move decoration rebuild (the per-interaction hot path). */
-function timeCursorMove(m: Mounted, pos: number): number {
-  const t0 = performance.now();
-  m.view.dispatch({ selection: { anchor: pos, head: pos } });
-  return performance.now() - t0;
-}
-
-/** Median cursor-move rebuild over `samples` moves scattered across `doc`,
- *  after a short warm-up to settle JIT/first-run allocation. */
-function medianRebuildMs(doc: string, samples = 21): number {
-  const m = mount(doc, 0);
-  m.view.focus();
-  try {
-    for (let i = 0; i < 3; i++) timeCursorMove(m, Math.floor((doc.length * i) / 3));
-    const ds: number[] = [];
-    for (let i = 0; i < samples; i++) {
-      ds.push(timeCursorMove(m, Math.floor((doc.length * (i + 1)) / (samples + 1))));
-    }
-    return median(ds);
-  } finally {
-    teardown(m);
-  }
-}
-
-describe("frame budget (task 2)", () => {
-  it(`cursor-move rebuild stays under ${FRAME_BUDGET_MS} ms (median) at the ${CEILING_LINES}-line ceiling`, () => {
-    const ms = medianRebuildMs(syntheticDoc(CEILING_LINES));
-    expect(ms).toBeLessThan(FRAME_BUDGET_MS);
-  });
-
-  it("rebuild cost stays ~linear (not quadratic) as the doc grows 4×", () => {
-    // Machine-speed-independent: 4× the lines should be ~4× the time if the
-    // pipeline is linear. A full-doc-per-keystroke O(n²) rescan would be ~16×.
-    // Allow a generous 6× to absorb constant-factor + noise while still
-    // catching any super-linear blow-up.
-    const small = medianRebuildMs(syntheticDoc(1_000));
-    const large = medianRebuildMs(syntheticDoc(4_000));
-    // Guard against a near-zero `small` making the ratio explode on noise.
-    const ratio = large / Math.max(small, 0.05);
-    expect(ratio).toBeLessThan(6);
-  });
-});
+// ── THE `frame budget (task 2)` BLOCK WAS REMOVED FROM THE CI SUITE ─────────
+//
+// It held two assertions. Both were wall-clock, both flake in the parallel
+// vitest suite, and the measurements are recorded here rather than the block
+// being deleted with a one-line excuse.
+//
+// 1. `cursor-move rebuild stays under 16 ms (median) at the 2000-line ceiling`.
+//    The comment justifying it claimed the median here is "~1–2 ms — ~8×
+//    headroom", so it "never flakes on a throttled shared runner". Measured:
+//
+//      idle dev machine (10-core Apple Silicon, nothing else running)   5.7 ms
+//      the CI runner, contended                                        19.6 ms
+//      threshold                                                         16 ms
+//
+//    Real headroom 2.8×, not 8×. On 2026-08-30 this single assertion was the
+//    ONLY failure in four separate pipelines, `develop` among them (1 failed
+//    against 681 passing). Woodpecker runs two workflows per host, so a queue
+//    is the normal condition, not the exceptional one.
+//
+// 2. `rebuild cost stays ~linear (not quadratic) as the doc grows 4×`, a RATIO
+//    of the 4 000-line median over the 1 000-line one, bounded at 6. A ratio
+//    cancels machine speed, so this one looked safe, and the first draft of
+//    this removal kept it on exactly that reasoning. Measuring refuted it:
+//
+//      idle, file run alone                          2.6 – 2.9
+//      isolated file, concurrent cargo build         2.7 – 3.9
+//      FULL suite + concurrent cargo build      2.31, 5.59, 8.37
+//
+//    Contention is not uniform. The 4 000-line measurement holds the CPU for
+//    longer, so it absorbs more descheduling than the 1 000-line one, and the
+//    ratio inflates rather than cancelling. In the full suite it ranged over
+//    3.6× on noise alone and crossed the bound of 6 once in three runs. The
+//    bound sits inside the noise band.
+//
+//    Widening the bound does not rescue it. Injecting a true O(n²) cost into
+//    the timed path — iterations scaling with the square of document length,
+//    so 4× the lines is 16× the work — measured 9.98 on an idle machine, and
+//    the observed noise already reaches 8.37. Any bound clear of the noise is
+//    close enough to the signal that the gate stops meaning anything.
+//
+// WHAT REPLACES THEM. Not a third clock. The property both were proxying —
+// no full-document rescan per keystroke — is a COUNT, so it should be counted:
+// instrument the decoration pipeline to report how many lines or nodes one
+// rebuild visits, and assert that scales with the edited range rather than
+// with the document. A counter is identical on an idle laptop and a saturated
+// runner, which is the whole problem here. That needs production-side
+// instrumentation and is deliberately not bundled into this removal.
+//
+// UNTIL THEN there is no automated performance gate on this path, which is
+// stated plainly because a quiet gap is worse than a known one. The absolute
+// numbers stay readable where a human reads them on known hardware:
+// `render-perf.bench.ts` already benches this exact hot path ("cursor-move
+// rebuild — 10k-line synthetic doc"). A gate that fires on noise is not a
+// weaker gate than none; it is worse, because it teaches people that red means
+// "run it again".
 
 describe("heavy-widget mount contract (task 3)", () => {
   const renderer: MathRenderer = (latex, display) => {
