@@ -5,7 +5,7 @@
 // rather than a `pub` in `plugins::local_inference::audio`. `parse_wav` refuses
 // anything outside this window, and `CpalSource::start` refuses to record
 // outside it, so the invariant `docs/threat-model.md` and
-// `docs/decisions/ai/0541` state as a construction -- no clip a Myne client
+// `docs/decisions/ai/0542` state as a construction -- no clip a Myne client
 // records is refused by a Myne decoder -- is held by two sites reading ONE pair
 // of constants rather than by two copies that agree today.
 //

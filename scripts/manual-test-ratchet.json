@@ -94,6 +94,20 @@
     "    minutes on the four clients that entry ships on, which is the whole of",
     "    9702 -> 9822.",
     "",
+    "CEILING RAISED 9822 -> 9842 by myne-md/myne#508, in the sanctioned direction.",
+    "What added the twenty minutes:",
+    "",
+    "  + the reminder-registration horizon picker, 5 minutes on four clients. It",
+    "    is a new user-facing control and had no verdict on any client, while two",
+    "    EXISTING items under the same entry were suspended in the same change",
+    "    because the surface they drive is gated off. What a human is for here is",
+    "    narrow and stated: the flow tier asserts the keyboard model on both",
+    "    clients and the arithmetic has unit coverage, but whether the focus RING",
+    "    moves where the tabindex says it does is a paint no container judges, and",
+    "    that is precisely what was wrong when this control shipped its first",
+    "    accessible version. The cross-device half needs two enrolled devices and",
+    "    a sync round.",
+    "",
     "WHY THESE GATED CLIENTS: every client this release ships, and only that.",
     "desktop-windows is the sole exclusion, because Windows is not shipped",
     "(myne#178 defers it). Its roster entries stay, because a recorded decision is",
@@ -142,6 +156,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 9822,
+  "totalMinutesCeiling": 9842,
   "gatedMinutes": 3533
 }
