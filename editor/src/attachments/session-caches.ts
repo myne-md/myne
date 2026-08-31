@@ -43,25 +43,67 @@ import type { PreviewCacheEntry, PreviewOutcome } from "./widgets";
 export const previewCache = new Map<string, PreviewCacheEntry>();
 
 /** In-flight de-dup for the reads that fill {@link previewCache}. Holds
- *  promises rather than plaintext, and is cleared with it so a read in flight
- *  across a lock cannot resolve into the next session's cache. */
+ *  promises rather than plaintext. Clearing it does NOT stop a read already in
+ *  flight from resolving; what stops it writing is {@link isCurrentGeneration},
+ *  which the completion closure consults. */
 export const previewInFlight = new Map<string, Promise<PreviewOutcome>>();
 
 /** Session cache of the last completed transcript per attachment id. Owned by
  *  `transcript.ts`. */
 export const transcriptStore = new Map<string, string>();
 
+/** The session generation. Bumped by every reset below.
+ *
+ *  **Clearing a map does not cancel a promise, and the doc above claimed it
+ *  did.** `previewInFlight` holds promises rather than plaintext, and its
+ *  comment said it is cleared with the cache "so a read in flight across a lock
+ *  cannot resolve into the next session's cache". That is not what clearing
+ *  does. The completion closure in `widgets.ts` captures its own key and writes
+ *  straight into the module-scope `previewCache`, so a read issued before a lock
+ *  repopulates the cache AFTER the clear, and on `leaveActiveVault` it does so
+ *  after a DIFFERENT vault has been unlocked. `transcript.ts`'s completion
+ *  callback has the same shape.
+ *
+ *  `check-frontend-lock-teardown.mjs` was green throughout, because it asserts
+ *  the CALL is present on both leaving paths. It is. The property the roster
+ *  entry certifies is a different statement, and no guard reads it. That is the
+ *  false-exhaustiveness shape this module's own header cites against the
+ *  previous transcript comment, one file over.
+ *
+ *  A counter rather than an `AbortController` per read: the host's read is not
+ *  abortable, so nothing would be saved by cancelling, and what has to be
+ *  prevented is the WRITE. Capture at issue, compare before storing, drop on
+ *  mismatch. */
+let generation = 0;
+
+/** The current session generation, captured by a caller at read-issue time. */
+export function sessionGeneration(): number {
+  return generation;
+}
+
+/** Whether a value captured at issue still belongs to the live session. A
+ *  completion callback that stores plaintext MUST consult this before writing,
+ *  and dropping the result is correct: the read belongs to a vault that is no
+ *  longer open. */
+export function isCurrentGeneration(captured: number): boolean {
+  return captured === generation;
+}
+
 /** Forget every cached attachment preview.
  *
  *  Called on both vault-leaving paths and asserted there by
  *  `scripts/check-frontend-lock-teardown.mjs`. The cost of clearing is one
- *  re-read per still-visible embed after a re-unlock. */
+ *  re-read per still-visible embed after a re-unlock. Bumps the generation, so
+ *  a read already in flight cannot write its result into the next session. */
 export function resetPreviewCache(): void {
   previewCache.clear();
   previewInFlight.clear();
+  generation += 1;
 }
 
-/** Forget every cached voice-note transcript. Same two paths, same guard. */
+/** Forget every cached voice-note transcript. Same two paths, same guard, and
+ *  the same generation bump for the same reason. */
 export function resetTranscripts(): void {
   transcriptStore.clear();
+  generation += 1;
 }

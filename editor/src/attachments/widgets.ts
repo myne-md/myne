@@ -21,7 +21,12 @@ import {
   decodedAspectOf,
   rememberAspect,
 } from "./decoded-aspect";
-import { previewCache, previewInFlight } from "./session-caches";
+import {
+  isCurrentGeneration,
+  previewCache,
+  previewInFlight,
+  sessionGeneration,
+} from "./session-caches";
 import { type EditorView, WidgetType } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
 import { getHost } from "../host";
@@ -1605,9 +1610,15 @@ function fetchPreviewOutcome(
 ): Promise<PreviewOutcome> {
   let inflight = previewInFlight.get(key);
   if (inflight === undefined) {
+    // Captured at ISSUE, compared before the write. A lock or a vault switch
+    // between the two bumps the generation, and the outcome is then returned to
+    // this caller (whose widget is about to be torn down anyway) without ever
+    // reaching the module-scope cache. Clearing the map cannot do this: the
+    // closure below already holds `key` and writes straight into `previewCache`.
+    const issuedAt = sessionGeneration();
     inflight = read().then((outcome) => {
       previewInFlight.delete(key);
-      previewCachePut(key, outcome);
+      if (isCurrentGeneration(issuedAt)) previewCachePut(key, outcome);
       return outcome;
     });
     previewInFlight.set(key, inflight);
