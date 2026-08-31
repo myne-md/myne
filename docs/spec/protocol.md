@@ -2454,18 +2454,18 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 
 **Magic-byte allocation (normative).** Each blob family has a distinct 4-byte magic. Implementations MUST reject any magic not in this table. This table is the single source of truth for magic-byte allocation — a new blob family MUST claim a free magic here before it is implemented (this discipline exists because the attachments index initially mis-claimed the already-reserved `MYI1`; see `decisions.md` 2026-06-07). **Every family in this table that seals data under AEAD inherits the nonce policy of §5.3 without restatement** — the policy is stated once, generally, and is deliberately not repeated per family.
 
-| Blob / file | v0.1 magic | next major (reserved) | Section | Owner |
+| Blob / file | v0.1 magic | v0.2 / next major | Section | Owner |
 |---|---|---|---|---|
 | Per-note (`.myn`) | `MY01` | `NT05` | §9.2 | core |
-| Vault metadata (`vault.meta`) | `MYV1` | `NTV5` | §9.3 | core |
-| Vault prefs (`vault.prefs`) | `MYP1` | `MYP5` | §9.5 | MYND-160 |
+| Vault metadata (`vault.meta`) | `MYV1` | `NTV5` (allocated, v0.2) | §9.3 | core |
+| Vault prefs (`vault.prefs`) | `MYP1` | `MYP5` (allocated, v0.2) | §9.5 | MYND-160 |
 | Search index (`vault.search`) | `MYS1` | `MYS5` | §9.6 | MYND-29 |
 | Workspace state (`vault.workspace`) | `MYW1` | `MYW5` | §9.7 | MYND-166 |
 | Vault indices (`vault.indices`) | `MYI1` | `MYI5` | §9.8 | MYND-31 design / MYND-271 persistence |
-| Attachment blob | `MYA1` | `MYA5` | §9.9 | MYND-164 |
-| Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` | §9.10 | MYND-164 |
+| Attachment blob | `MYA1` | `MYA5` (allocated, v0.2) | §9.9 | MYND-164 |
+| Attachments catalog (`vault.attachments`) | `MYC1` | `MYC5` (allocated, v0.2) | §9.10 | MYND-164 |
 | Vault backup container (`.myne-backup`) | `MYB1` | `MYB5` | §9.11 | MYND-58 |
-| Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` | §9.13 | MYND-266 |
+| Personal dictionary (`vault.dictionary`) | `MYD1` | `MYD5` (allocated, v0.2) | §9.13 | MYND-266 |
 | Quick-unlock credential (`vault.quickunlock`) | `MYQ1` | `MYQ5` | §9.14 | MYND-329 |
 | Extracted attachment text (`attachments-text/<id>`) | `MYE1` | `MYE5` | §9.15 | MYND-328 |
 | Device-local sync baseline (`vault.head-state`) | `MYH1` | `MYH5` | §9.16 | MYND-416 |
@@ -2473,11 +2473,11 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 | Pending-capture queue (`captures/<id>`) | `MYK1` | `MYK5` | §9.18 | watch-capture |
 | Graph layout cache (`vault.graph`) | `MYG1` | `MYG5` | §9.19 | graph-rework |
 | Share-import staging queue (`pending-shares/<id>`) | `MYF1` | `MYF5` | §9.20 | MYND-507 |
-| Custom-themes blob (`vault.themes`) | `MYT1` | `MYT5` | §9.21 | MYND-486 |
+| Custom-themes blob (`vault.themes`) | `MYT1` | `MYT5` (allocated, v0.2) | §9.21 | MYND-486 |
 | Sealed label store (`vault.label`) | `MYL1` | `MYL5` | §9.22 | myne-md/myne#411 |
 | CRDT note-type (`.myn`, v0.2) | — | `NC05` (allocated, v0.2) | §10.7 | automerge-sync-migration / #418 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` next-major reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` next-major convention. These reserved magic values are placeholders — the next major version finalizes them. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The **CRDT note-type** row (`NC05`) is **next-major-only** — it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09 — the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family).
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping; `NT05` was superseded for notes by `NC05`, §10.7); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `MYP5`, `MYA5`, `MYC5`, `MYD5` and `MYT5` name bytes on disk today rather than a reservation. The remaining next-major values (`NT05`, `MYS5`, `MYW5`, `MYI5`, `MYB5`, `MYQ5`, `MYE5`, `MYH5`, `MYR5`, `MYK5`, `MYG5`, `MYF5`, `MYL5`) are still placeholders that the next major version finalizes. The distinction is load-bearing rather than editorial: reading an allocated magic as an unallocated placeholder is the mental model behind myne-md/myne#638, where a reader taught only `MYA1` returned `None` for every body on a migrated vault and stopped attachment sync in both directions. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The **CRDT note-type** row (`NC05`) is **next-major-only** — it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09 — the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family).
 
 **One row's next-major reservation means something different from every other row's: the sealed label store.** `vault.label` is **generation-independent** (§9.22): it stays `MYL1` inside a v0.2 vault, beside that vault's `NTV5` and `MY?5` neighbours, so `MYL5` is **not** the magic a version cut moves this family to. It is reserved against a future revision of **this family's own** layout, and against nothing else. What lets it be that is the key: the file is sealed under an OS-keychain `wrap_key` rather than any `root_key` product (§9.22.2), so no KDF, KEK context or AAD prefix inherited from the vault ties its bytes to a generation. §10.4.1 point 2 records the migration's matching behaviour, which is that the file is left alone.
 

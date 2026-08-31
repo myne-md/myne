@@ -72,6 +72,58 @@
 //      release build would catch a new production caller. That is a slow, late
 //      signal. Do not "simplify" this rule away as redundant.
 //
+//   5. **Magic-generation parity.** A file that names a family's BASE magic
+//      constant must also name every later generation of it. Both halves exist
+//      for every family §10.4.1 migrates (`MYA1`/`MYA5`, `MYC1`/`MYC5`,
+//      `MYP1`/`MYP5`, `MYD1`/`MYD5`, `MYT1`/`MYT5`, `MYV1`/`NTV5`,
+//      `MY01`/`NC05`), and a reader taught only the base one does not degrade
+//      on a migrated vault. It stops, silently, because a magic mismatch
+//      returns `None` and `None` reads as "not this family, nothing to do".
+//
+//      This shipped (myne-md/myne#638); `docs/decisions/protocol/0541` carries
+//      the incident and the measurements. The short version: one hand-written
+//      comparison in `core/src/attachment_nonce.rs` named `MYA1` and not
+//      `MYA5`, so no attachment body moved in either direction on any migrated
+//      vault while the catalog kept syncing, and every gate in this repository
+//      was green. The deeper fix went in with it: all five families now read
+//      their nonce through `core/src/content_nonce.rs`, which takes the
+//      generations as a REQUIRED argument, so the one-generation reader is no
+//      longer expressible there. This rule is the backstop for the rest of the
+//      tree, where the codecs and the magic-detecting dispatches still name
+//      their constants directly.
+//
+//      The family table is derived from a `_V<n>_<m>_MAGIC` PATTERN rather than
+//      from the literal `_V0_2_MAGIC`, so a third generation joins it with no
+//      edit here. A rule that exists because one generation was missed must not
+//      itself be keyed to one named generation.
+//
+//      Neighbouring guard, and the distinction is worth knowing before adding
+//      an exemption to the wrong one: `scripts/check-version-routing.mjs` owns
+//      the same hazard one layer up, at the FUNCTION call (a v0.1-only
+//      `decode_note` / `derive_subkey` where a version-aware one exists). This
+//      rule owns it at the CONSTANT. A legitimately single-generation reader is
+//      recorded in `KNOWN` here and in that script's own `ALLOWED` there.
+//
+//      The base side is matched in non-test code only (a base-only golden test
+//      is legitimate); a later generation counts anywhere in the file,
+//      including tests, because the question is whether this file knows the
+//      generation exists at all. A file is exempt only when it declares exactly
+//      ONE of the family's generations and the rest live elsewhere
+//      (`vault_meta.rs` against `vault_meta_v0_2.rs`, `blob.rs` against
+//      `crdt_note_blob.rs`), because a declaration accepts nothing. A file that
+//      declares SEVERAL generations is a codec, and it gets no exemption: the
+//      blanket version of this rule excused every codec in `protocol/src` from
+//      the rule whose stated job is those files, most damagingly at the moment
+//      it should fire, when a third generation lands in a sibling module and the
+//      codec's dispatch still handles two out of three.
+//
+//      What it structurally cannot see, stated rather than implied: it is keyed
+//      on constant NAMES, so it reaches a file that mentions a magic and not
+//      one that calls a reader which mentions it, and it does not distinguish
+//      mentioning a generation from HANDLING it. Those are why the behavioural
+//      half, the two-generation sync scenarios in
+//      `core/src/plugins/sync/orchestrator.rs`, is not optional.
+//
 // # Exemptions, and why they are not loopholes
 //
 //   - **`#[cfg(test)]` regions are skipped for all four rules.** A golden test
@@ -100,10 +152,19 @@
 // Wired into: lefthook `pre-commit`, CI `pnpm-build`.
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { RUST_CLIENT_TREES } from "./lib/shared-roots.mjs";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+// `--root <dir>` points the scan at a synthetic tree, which is how this
+// guard's own tests inject each defect it claims to catch (root CLAUDE.md:
+// "verifying a guard means breaking it, not running it"). A guard verified only
+// by mutating the real checkout by hand is verified by evidence that expires
+// the moment somebody forgets to restore.
+const ROOT_FLAG = process.argv.indexOf("--root");
+const FIXTURE_RUN = ROOT_FLAG !== -1;
+const ROOT = FIXTURE_RUN
+  ? resolve(process.argv[ROOT_FLAG + 1])
+  : new URL("..", import.meta.url).pathname;
 
 /** Every Rust tree that can hold a violation of rules 2 or 4. */
 // The two shared crates by name, then every client tree from the one roster.
@@ -136,6 +197,30 @@ const LENGTH_PREFIX_OWNER = "protocol/src/aead.rs";
  * the day it needs a pinned nonce, not cover for a production caller).
  */
 const RAW_ALLOWED_TREES = ["protocol/src", "e2e/fixture-gen"];
+
+/**
+ * Rule 5: magic pairs the `<STEM>_MAGIC` / `<STEM>_V0_2_MAGIC` naming does not
+ * describe, named here rather than derived.
+ *
+ * The note family is the only one: its v0.1 half is `protocol::blob::MAGIC`
+ * (`MY01`, no stem at all) and its v0.2 half is `protocol::NC05_MAGIC`, so no
+ * pattern over the registry can pair them. Named entries are checked BOTH ways
+ * each magic below must still be in the registry, or this list is describing
+ * a family that no longer exists and the run fails. A purely derived pair table
+ * would silently drop this family; a purely named one would drop every family
+ * added later.
+ *
+ * `v1.token` / `v2.token` are the source spellings a file uses, not the constant
+ * names: `MAGIC` alone matches half the crate, while `blob::MAGIC` is how every
+ * caller actually writes it.
+ */
+const EXTRA_MAGIC_PAIRS = [
+  {
+    family: "note",
+    v1: { magic: "MY01", token: "blob::MAGIC" },
+    v2: { magic: "NC05", token: "NC05_MAGIC" },
+  },
+];
 
 /**
  * Recorded violations. `file` + `contains` must both match a live, non-test,
@@ -377,13 +462,20 @@ for (const tree of SCANNED_TREES) {
 }
 
 /**
- * A file with none of the four patterns anywhere in it — comment, string or
- * code — cannot hold a violation and cannot declare a registry constant, so it
+ * A file with none of the five patterns anywhere in it (comment, string or
+ * code) cannot hold a violation and cannot declare a registry constant, so it
  * is skipped before the character scanner runs. Keeps the whole-tree run under
  * a pre-commit hook's budget; deliberately over-broad (it does not care whether
  * the hit is real), because narrowing it here would duplicate the rules.
+ *
+ * `MAGIC` is the fifth, and it is here because rule 5 is the one rule whose
+ * subject is a CONSTANT NAME rather than a literal or a call. Without it a file
+ * that imports `PREFS_BLOB_MAGIC` and contains no byte-string, no `.expand(`,
+ * no `as u16` and no `_raw(` is skipped before rule 5 ever looks at it, and a
+ * prefilter blind spot is a rule that reports ok on input it never read, which
+ * is the failure mode this whole file exists to make impossible.
  */
-const CANDIDATE = /\.expand\(|b"|as u16|_raw\s*\(/;
+const CANDIDATE = /\.expand\(|b"|as u16|_raw\s*\(|MAGIC/;
 
 const scanned = new Map();
 let skipped = 0;
@@ -417,6 +509,78 @@ for (const [rel, s] of scanned) {
 
 const failures = [];
 const knownHit = new Set();
+
+// ── rule 5's family table: derived from the registry, plus the named
+// off-pattern family, and checked BOTH ways so neither half goes out of date ──
+
+/** `\b`-anchored matcher for a source token (a constant name, or `mod::NAME`). */
+const reFor = (token) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+
+/** constant name -> { magic, file } */
+const byName = new Map([...registry].map(([magic, e]) => [e.name, { magic, file: e.file }]));
+
+/**
+ * Every family carrying more than one generation, as
+ * `{ family, base, later: [...] }`, with each token's matcher compiled ONCE.
+ *
+ * The generation suffix is read as a PATTERN rather than as the literal
+ * `_V0_2_MAGIC`, and that is deliberate: a rule written because one generation
+ * was missed must not itself be keyed to one named generation. When a family
+ * grows a `_V0_3_MAGIC` constant it joins `later` with no edit here, and a file
+ * that knows v0.1 and v0.2 but not v0.3 starts failing by name.
+ */
+const magicFamilies = [];
+const GENERATION_SUFFIX = /^(.+)_V(\d+)_(\d+)_MAGIC$/;
+const laterByStem = new Map();
+for (const [name, e] of byName) {
+  const m = GENERATION_SUFFIX.exec(name);
+  if (!m) continue;
+  const generations = laterByStem.get(m[1]) ?? [];
+  generations.push({
+    magic: e.magic,
+    token: name,
+    gen: `v${m[2]}.${m[3]}`,
+    file: e.file,
+    re: reFor(name),
+  });
+  laterByStem.set(m[1], generations);
+}
+for (const [stem, later] of laterByStem) {
+  const baseToken = `${stem}_MAGIC`;
+  const base = byName.get(baseToken);
+  // A later-generation constant with no `<STEM>_MAGIC` base means the base is
+  // spelled differently; EXTRA_MAGIC_PAIRS is where such a family is named.
+  if (!base) continue;
+  magicFamilies.push({
+    family: stem.toLowerCase(),
+    base: { magic: base.magic, token: baseToken, gen: "base", file: base.file, re: reFor(baseToken) },
+    later,
+  });
+}
+for (const p of EXTRA_MAGIC_PAIRS) {
+  const base = registry.get(p.v1.magic);
+  const later = registry.get(p.v2.magic);
+  if (!base || !later) {
+    failures.push({
+      rule: "magic-parity",
+      file: "scripts/check-crypto-registries.mjs",
+      line: 1,
+      why:
+        `EXTRA_MAGIC_PAIRS names the ${p.family} family as ${p.v1.magic}/${p.v2.magic}, but ` +
+        `${base ? p.v2.magic : p.v1.magic} is no longer a declared §10.3 constant anywhere in ` +
+        "the tree. A named pair that outlives its subject checks nothing: fix the magic or " +
+        "delete the entry.",
+    });
+    continue;
+  }
+  magicFamilies.push({
+    family: p.family,
+    base: { magic: p.v1.magic, token: p.v1.token, gen: "base", file: base.file, re: reFor(p.v1.token) },
+    later: [
+      { magic: p.v2.magic, token: p.v2.token, gen: "v0.2", file: later.file, re: reFor(p.v2.token) },
+    ],
+  });
+}
 
 function isKnown(rule, rel, text) {
   const idx = KNOWN.findIndex(
@@ -511,11 +675,85 @@ for (const [rel, s] of scanned) {
       });
     }
   });
+
+  // rule 5: a family's base magic named without every later generation of it.
+  // File-scoped rather than line-scoped: the question is whether this file knows
+  // the migrated generations exist, and the answer can legitimately live in a
+  // test or in a `use` twenty lines from the comparison.
+  //
+  // The cheap disqualifier runs FIRST and against the joined file rather than
+  // per line. Measured on this tree, the naive order (whole-file scan for the
+  // later generation, per-line regex construction) cost 552 ms of the guard's
+  // 1142 ms whole-tree run, which `pre-commit` pays on every commit including a
+  // docs-only one: 1449 file-times-family combos were evaluated and 21 of them
+  // had the base token at all.
+  const bareText = magicFamilies.length > 0 ? s.bare.join("\n") : "";
+  for (const fam of magicFamilies) {
+    const all = [fam.base, ...fam.later];
+    // A file is exempt only when it declares exactly ONE of the family's
+    // generations and the others live elsewhere. `vault_meta.rs` declares `MYV1`
+    // while `NTV5` is a sibling module: a declaration accepts nothing, so
+    // requiring both names there would fail the declaration itself. A file that
+    // declares SEVERAL of a family's generations is a codec, and a codec that
+    // knows two generations out of three is exactly what this rule is for.
+    //
+    // The distinction is not pedantry, and it is where the first version of this
+    // rule was wrong. Exempting every declaration site excused all six codecs and
+    // their magic-detecting dispatches (`attachment_blob.rs`, `attachments_catalog.rs`,
+    // `prefs.rs`, `themes_blob.rs`, `dictionary_blob.rs`, `vault_meta*.rs`) from a
+    // rule whose stated job is exactly those files, and it did so most damagingly
+    // at the moment it should fire: a third generation declared in a sibling
+    // module leaves the original codec exempt while its dispatch still handles
+    // two generations out of three.
+    const declaredHere = all.filter((g) => g.file === rel).length;
+    const declaredIn = new Set(all.map((g) => g.file));
+    if (declaredHere === 1 && declaredIn.size > 1) continue;
+    // Keyed on the BASE magic, and the symmetric form was tried and rejected
+    // rather than not considered. Asking "a file naming ANY generation must
+    // name all of them" reports two legitimate sites as violations:
+    // `core/src/plugins/notes/crdt.rs`'s `is_nc05_blob` and `protocol/src/lib.rs`'s
+    // re-export. Both ask "is this ONE generation", which is a real question
+    // with a one-generation answer, so the symmetric rule cannot tell a
+    // generation PREDICATE from a generation-blind READER and every future
+    // predicate would owe an exemption.
+    //
+    // What the asymmetry leaves open, dropping the base magic to make room for
+    // a third generation, is closed on the other side instead:
+    // `content_nonce_at` takes a SLICE, so adding a generation is an append and
+    // never a swap.
+    if (!fam.base.re.test(bareText)) continue; // the base is not named in this file
+    const missing = all.filter((g) => !g.re.test(bareText));
+    if (missing.length === 0) continue; // the file knows every generation
+    const hit = s.bare.findIndex((t, i) => !s.testLines.has(i + 1) && fam.base.re.test(t));
+    if (hit === -1) continue; // named only inside a test region
+    if (isKnown("magic-parity", rel, s.bare[hit])) continue;
+    failures.push({
+      rule: "magic-parity",
+      file: rel,
+      line: hit + 1,
+      why:
+        `names the ${fam.family} family's base magic (${fam.base.magic}) with no ` +
+        "mention of " +
+        `${missing.map((g) => `${g.token} (${g.magic}, ${g.gen})`).join(", ")} anywhere in the ` +
+        "file. " +
+        "A vault carries whichever generation it was written under, and a reader taught only " +
+        "some of them does not fail. It returns `None`, which every caller " +
+        'reads as "not this family, nothing to do". That is how myne-md/myne#638 stopped ' +
+        "attachment sync dead in BOTH directions with every compiler, every lint and every " +
+        "other gate green. Read the nonce through `core/src/content_nonce.rs`, which takes the " +
+        "generations as a required argument, route the codec through a `_versioned` helper, or " +
+        "record a KNOWN entry saying why one generation is right here.",
+    });
+  }
 }
 
 // ── report ──────────────────────────────────────────────────────────────────
 
-const stale = KNOWN.map((k, i) => ({ k, i })).filter(({ i }) => !knownHit.has(i));
+// The KNOWN ratchet describes THIS checkout, so a synthetic tree has no
+// business being measured against it.
+const stale = FIXTURE_RUN
+  ? []
+  : KNOWN.map((k, i) => ({ k, i })).filter(({ i }) => !knownHit.has(i));
 
 if (failures.length || stale.length) {
   for (const f of failures) {
@@ -540,6 +778,6 @@ if (failures.length || stale.length) {
 
 console.log(
   `crypto-registries: ok (${scanned.size} of ${scanned.size + skipped} Rust file(s) scanned; ` +
-    `${registry.size} §10.3 magic(s) in the registry; ${KNOWN.length} recorded violation(s) ` +
+    `${registry.size} §10.3 magic(s) in the registry, ${magicFamilies.length} multi-generation famil(ies) among them; ${KNOWN.length} recorded violation(s) ` +
     "left to clear)",
 );

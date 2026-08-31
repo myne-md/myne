@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! Decryption-free `MYA1` `content_nonce` primitives — the attachment twin of
-//! [`crate::note_nonce`] (MYND-468).
+//! Decryption-free attachment `content_nonce` primitives, the attachment twin
+//! of [`crate::note_nonce`] (MYND-468).
 //!
-//! An `MYA1` header carries the attachment's `content_nonce` in the clear at a
-//! fixed offset (`protocol.md` §9.9: the wrapped attachment-key segment is
-//! fixed-width, so the offset never varies). Attachments are immutable per id,
+//! An attachment header carries the `content_nonce` in the clear at a fixed
+//! offset (`protocol.md` §9.9: the wrapped attachment-key segment is
+//! fixed-width, so the offset never varies), and BOTH generations of the family
+//! share that layout byte for byte: `MYA5` (v0.2, §10.4.1) differs from `MYA1`
+//! only in the magic, the version byte and the AADs, so one offset reads the
+//! nonce for either. Attachments are immutable per id,
 //! but two devices independently importing the same file mint the same id with
 //! **different** ciphertext/nonce (the id is a plaintext HMAC; encryption is
 //! randomized) — so the nonce is still the sync discriminator that detects the
@@ -24,8 +27,19 @@ use std::path::Path;
 /// `MYA1` magic — sourced from `protocol::attachment_blob` so a header-format
 /// change can't silently rot this decryption-free reader.
 const MYA1_MAGIC: [u8; 4] = *protocol::attachment_blob::ATTACHMENT_BLOB_MAGIC;
-/// Minimum `MYA1` header bytes needed to read `content_nonce`.
-pub const MYA1_HEADER_PREFIX_FOR_NONCE: usize = OFFSET_CONTENT_NONCE + AEAD_NONCE_LEN;
+/// The v0.2 `MYA5` attachment magic (`protocol.md` §10.4.1). A file under
+/// `attachments/` may hold EITHER generation, and this reader accepts both.
+///
+/// Accepting only one is a silent stop rather than a degradation: the reader
+/// answers `None`, which every caller reads as "not this family, nothing to
+/// do". It shipped that way and stopped attachment sync in both directions on
+/// every migrated vault; `docs/decisions/protocol/0541` carries the incident,
+/// the measurements and why the pair is now a required argument to
+/// [`crate::content_nonce::content_nonce_at`] (myne-md/myne#638).
+const MYA5_MAGIC: [u8; 4] = *protocol::attachment_blob::ATTACHMENT_BLOB_V0_2_MAGIC;
+/// Minimum attachment header bytes needed to read `content_nonce` (identical
+/// for both generations).
+pub const ATTACHMENT_HEADER_PREFIX_FOR_NONCE: usize = OFFSET_CONTENT_NONCE + AEAD_NONCE_LEN;
 /// Width of the attachment sync-id — the manifest/wire key (`sync-protocol.md`
 /// §4.2: the first 16 bytes of the 32-byte attachment-id).
 pub const ATTACHMENT_SYNC_ID_LEN: usize = 16;
@@ -41,20 +55,23 @@ pub struct AttachmentManifestEntry {
     pub content_nonce: [u8; AEAD_NONCE_LEN],
 }
 
-/// Read an `MYA1` file's `content_nonce` from its header bytes WITHOUT
+/// Read an attachment file's `content_nonce` from its header bytes WITHOUT
 /// decrypting. `header` must be at least the first
-/// [`MYA1_HEADER_PREFIX_FOR_NONCE`] bytes; `None` if too short or the magic
-/// is wrong (not an `MYA1`).
-pub fn read_mya1_content_nonce(header: &[u8]) -> Option<[u8; AEAD_NONCE_LEN]> {
-    if header.len() < MYA1_HEADER_PREFIX_FOR_NONCE {
-        return None;
-    }
-    if header[0..4] != MYA1_MAGIC {
-        return None;
-    }
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    nonce.copy_from_slice(&header[OFFSET_CONTENT_NONCE..MYA1_HEADER_PREFIX_FOR_NONCE]);
-    Some(nonce)
+/// [`ATTACHMENT_HEADER_PREFIX_FOR_NONCE`] bytes; `None` if too short or the
+/// magic is neither attachment generation (`MYA1` nor `MYA5`).
+///
+/// Both generations share the §9.9 header layout, so one offset reads the nonce
+/// for either. The comparison itself lives in
+/// [`crate::content_nonce::content_nonce_at`], which takes the pair as a
+/// required argument. See [`MYA5_MAGIC`] for what this file cost when it was
+/// a hand-written comparison that could name one generation.
+pub fn read_attachment_content_nonce(header: &[u8]) -> Option<[u8; AEAD_NONCE_LEN]> {
+    crate::content_nonce::content_nonce_at(
+        header,
+        OFFSET_CONTENT_NONCE,
+        &MYA1_MAGIC,
+        &[&MYA5_MAGIC],
+    )
 }
 
 /// Parse a canonical attachment filename (exactly 64 lowercase-hex chars)
@@ -81,7 +98,8 @@ fn hex_nibble_lower(b: u8) -> Option<u8> {
     }
 }
 
-/// Scan `attachments_dir` for canonical `MYA1` blobs and build the sync-plane
+/// Scan `attachments_dir` for canonical attachment blobs of EITHER generation
+/// (`MYA1`, `MYA5`) and build the sync-plane
 /// manifest, keyed by sync-id so the caller consumes it in the same shape as
 /// [`crate::note_nonce::scan_on_disk_manifest_io`]. Non-canonical names (temp
 /// files, partials — anything not 64 lowercase hex) and unreadable/bad-magic
@@ -114,13 +132,13 @@ pub async fn scan_attachments_manifest(
         let Ok(header) = io
             .read_prefix(
                 &attachments_dir.join(&entry.name),
-                MYA1_HEADER_PREFIX_FOR_NONCE,
+                ATTACHMENT_HEADER_PREFIX_FOR_NONCE,
             )
             .await
         else {
             continue;
         };
-        let Some(content_nonce) = read_mya1_content_nonce(&header) else {
+        let Some(content_nonce) = read_attachment_content_nonce(&header) else {
             continue;
         };
         let mut sync_id = [0u8; ATTACHMENT_SYNC_ID_LEN];
@@ -142,7 +160,7 @@ mod tests {
     use super::*;
 
     fn header_with(magic: &[u8; 4], nonce_byte: u8) -> Vec<u8> {
-        let mut h = vec![0u8; MYA1_HEADER_PREFIX_FOR_NONCE];
+        let mut h = vec![0u8; ATTACHMENT_HEADER_PREFIX_FOR_NONCE];
         h[0..4].copy_from_slice(magic);
         h[OFFSET_CONTENT_NONCE..].fill(nonce_byte);
         h
@@ -151,14 +169,31 @@ mod tests {
     #[test]
     fn reads_content_nonce_from_valid_header() {
         let h = header_with(&MYA1_MAGIC, 0xAB);
-        assert_eq!(read_mya1_content_nonce(&h), Some([0xAB; AEAD_NONCE_LEN]));
+        assert_eq!(
+            read_attachment_content_nonce(&h),
+            Some([0xAB; AEAD_NONCE_LEN])
+        );
+    }
+
+    /// The v0.2 half of the reader. Its own case rather than an extra
+    /// assertion inside the v0.1 one, so a regression names the generation it
+    /// broke: this is the arm whose absence stopped attachment sync dead on
+    /// every migrated vault while `MYA1` kept working and every gate stayed
+    /// green.
+    #[test]
+    fn reads_content_nonce_from_v0_2_header() {
+        let h = header_with(&MYA5_MAGIC, 0x5A);
+        assert_eq!(
+            read_attachment_content_nonce(&h),
+            Some([0x5A; AEAD_NONCE_LEN])
+        );
     }
 
     #[test]
     fn rejects_wrong_magic_and_short_header() {
         let h = header_with(b"XXXX", 0xAB);
-        assert_eq!(read_mya1_content_nonce(&h), None);
-        assert_eq!(read_mya1_content_nonce(b"MYA1short"), None);
+        assert_eq!(read_attachment_content_nonce(&h), None);
+        assert_eq!(read_attachment_content_nonce(b"MYA1short"), None);
     }
 
     #[test]
@@ -211,13 +246,44 @@ mod tests {
         });
     }
 
+    /// Both generations reach the manifest from ONE directory.
+    ///
+    /// The scan is what the sync cycle's push-detect loop iterates, so a family
+    /// missing here is not a degraded push, it is no push at all: the loop runs
+    /// zero times and the bodies stay on this device forever, with the catalog
+    /// still syncing so other devices show names and sizes over nothing. A
+    /// migrated vault holds only `MYA5`, so the mixed directory below is the
+    /// weaker case and is deliberately what is asserted: it fails if EITHER
+    /// arm is dropped.
+    #[test]
+    fn scan_accepts_both_attachment_generations() {
+        let tmp = crate::test_support::ScopedTempDir::new("attachment-nonce-both").unwrap();
+        let dir = tmp.path();
+
+        crate::test_support::block_on(async {
+            let io = io();
+            let v0_1 = "11".repeat(32);
+            let v0_2 = "22".repeat(32);
+            put(&io, &dir.join(&v0_1), &header_with(&MYA1_MAGIC, 0xCD)).await;
+            put(&io, &dir.join(&v0_2), &header_with(&MYA5_MAGIC, 0x5A)).await;
+
+            let manifest = scan_attachments_manifest(&io, dir).await;
+            assert_eq!(manifest.len(), 2, "both generations are manifest entries");
+            assert_eq!(
+                manifest.get(&[0x22; 16]).map(|e| e.content_nonce),
+                Some([0x5A; AEAD_NONCE_LEN]),
+                "the MYA5 blob's nonce is read at the shared §9.9 offset"
+            );
+        });
+    }
+
     /// A blob SHORTER than the header prefix is skipped, not misread.
     ///
     /// New with the seam port and worth its own case: `File::read_exact` failed
     /// outright on a short file, while `read_prefix` is specified to return
     /// fewer bytes than asked for at EOF — "shorter than expected is a normal
     /// answer". So the length check moved from the IO call into
-    /// `read_mya1_content_nonce`, and this pins that it is still made. Without
+    /// `read_attachment_content_nonce`, and this pins that it is still made. Without
     /// it a truncated blob would read a nonce out of whatever followed.
     #[test]
     fn scan_skips_a_truncated_blob() {
@@ -226,7 +292,7 @@ mod tests {
         crate::test_support::block_on(async {
             let io = io();
             let mut short = header_with(&MYA1_MAGIC, 0xCD);
-            short.truncate(MYA1_HEADER_PREFIX_FOR_NONCE - 1);
+            short.truncate(ATTACHMENT_HEADER_PREFIX_FOR_NONCE - 1);
             put(&io, &dir.join("11".repeat(32)), &short).await;
             assert!(scan_attachments_manifest(&io, dir).await.is_empty());
         });

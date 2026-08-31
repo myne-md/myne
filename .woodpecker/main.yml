@@ -1291,7 +1291,15 @@ steps:
       # Quoted: the `:: ` (colon-colon-space) in the test-path filter is parsed
       # as a YAML key:value map otherwise, failing config-compile ("cannot
       # unmarshal map into string").
-      - "/cache/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim)' --no-fail-fast"
+      # BOTH server-backed suites, not just the sim. The `orchestrator::tests`
+      # half self-skips without a server exactly like the sim half does, so
+      # before myne-md/myne#638 it ran in NO step: `cargo-test-tauri` compiles it
+      # and sets no `MYNE_E2E_SERVER`, and this filter did not match it. That
+      # left the four `_on_a_migrated_vault` attachment scenarios passing
+      # everywhere by never executing, and they are the only behavioural proof
+      # that a v0.2 vault syncs its attachments at all, which is the #425 shape the
+      # comment above describes, one filter over.
+      - "/cache/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim) + test(plugins::sync::orchestrator)' --no-fail-fast"
 
   # ─── Cross-impl vector verification, both lanes ─────────────────────────────
   # `protocol/tests/vectors.rs` reads the companion fixtures and asserts
