@@ -23,6 +23,38 @@
 // telephony and Bluetooth HFP/SCO at 8 kHz, and 384 kHz is above every
 // professional interface. They are a sanity window on a header field an
 // attacker controls, not a statement about hardware.
+//
+// THE TRADE THE RECORDER SIDE MAKES, decided rather than inherited. Review asked
+// it directly, and the question is fair: refusing to record loses the TAKE,
+// which is a larger loss than losing the transcript, and the two are not
+// symmetric. Storing an untranscribable clip would keep the audio.
+//
+// The refusal stays, for three reasons in order of weight.
+//
+// It is the only thing that makes the invariant a construction. `0541` and
+// `docs/threat-model.md` § 7 both state "no clip a Myne client records is
+// refused by a Myne decoder" as something the code holds rather than something
+// the format guarantees. The LENGTH clamp in `capture.rs` holds one half of it;
+// this refusal holds the other. Record outside the window and the sentence is
+// false, and the ceiling those two documents argue for stops being safe to state.
+//
+// The refusal cannot fire on hardware that exists. The window is wider than
+// every real capture path in both directions, per the paragraph above, and the
+// rate is reported by the OS rather than chosen by an attacker, so unlike the
+// decoder's copy this one is not a defence against anything. It is a
+// consistency check on a device that would have to be reporting nonsense.
+//
+// And the cost of it firing is now bounded by copy rather than by mystery.
+// `RecordError::UnsupportedSampleRate` reaches the user through
+// `VoiceRecordError::UnsupportedSampleRate` and its own sentence in both voice
+// mappers, naming the device and the one setting that fixes it. Until those arms
+// existed it landed on "Couldn't save the recording", which is what made this
+// trade look worse than it is: a silent, unexplained loss rather than a stated
+// refusal with a route out.
+//
+// The residual, stated: if a device ever does report outside the window, the take
+// is lost rather than stored untranscribable. That is the choice, not an
+// oversight.
 
 /// Lowest sample rate `parse_wav` accepts and `CpalSource` will record at.
 pub const MIN_SAMPLE_RATE_HZ: u32 = 4_000;

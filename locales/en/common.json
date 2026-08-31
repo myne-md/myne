@@ -874,13 +874,15 @@
           "captureFailed": "Couldn't start recording. Check microphone access in System Settings.",
           "generic": "Couldn't start recording.",
           "locked": "Unlock your vault to record a voice note.",
-          "noInputDevice": "No microphone found. Connect one and try again."
+          "noInputDevice": "No microphone found. Connect one and try again.",
+          "unsupportedSampleRate": "Your microphone records at a rate Myne can't transcribe. Pick a different input device, or change its sample rate in your system's sound settings."
         },
         "stopError": {
           "captureFailed": "Recording failed. Check your microphone.",
           "emptyRecording": "Nothing was recorded.",
           "generic": "Couldn't save the recording.",
-          "silentRecording": "Recording was silent and discarded. Check your microphone."
+          "silentRecording": "Recording was silent and discarded. Check your microphone.",
+          "unsupportedSampleRate": "Your microphone records at a rate Myne can't transcribe. Nothing was saved. Pick a different input device, or change its sample rate in your system's sound settings."
         }
       },
       "widget": {

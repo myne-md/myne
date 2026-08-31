@@ -954,13 +954,15 @@
           "captureFailed": "Nahrávání se nepodařilo spustit. Zkontrolujte přístup k mikrofonu v Nastavení systému.",
           "generic": "Nahrávání se nepodařilo spustit.",
           "locked": "Pro nahrání hlasové poznámky odemkněte trezor.",
-          "noInputDevice": "Nebyl nalezen žádný mikrofon. Připojte ho a zkuste to znovu."
+          "noInputDevice": "Nebyl nalezen žádný mikrofon. Připojte ho a zkuste to znovu.",
+          "unsupportedSampleRate": "Váš mikrofon nahrává vzorkovací frekvencí, kterou Myne neumí přepsat. Vyberte jiné vstupní zařízení nebo změňte jeho vzorkovací frekvenci v nastavení zvuku systému."
         },
         "stopError": {
           "captureFailed": "Nahrávání selhalo. Zkontrolujte mikrofon.",
           "emptyRecording": "Nic nebylo nahráno.",
           "generic": "Nahrávku se nepodařilo uložit.",
-          "silentRecording": "Nahrávka byla tichá a byla zahozena. Zkontrolujte mikrofon."
+          "silentRecording": "Nahrávka byla tichá a byla zahozena. Zkontrolujte mikrofon.",
+          "unsupportedSampleRate": "Váš mikrofon nahrává vzorkovací frekvencí, kterou Myne neumí přepsat. Nic nebylo uloženo. Vyberte jiné vstupní zařízení nebo změňte jeho vzorkovací frekvenci v nastavení zvuku systému."
         }
       },
       "widget": {
@@ -1006,6 +1008,7 @@
             "featureOff": "Převod řeči na text je vypnutý. Zapněte ho v Nastavení → Přepis.",
             "modelLoadFailed": "Model pro převod řeči na text se nepodařilo načíst. Pokud jste v Nastavení → Developer → AI nastavili vlastní model, zkontrolujte jeho soubory; jinak přeinstalování Myne obnoví ten vestavěný.",
             "noModel": "Model pro převod řeči na text chybí. Přeinstalování Myne ho obnoví.",
+            "tooLong": "Tato nahrávka je pro přepis příliš dlouhá. Zvuk zůstává přiložený, takže si jej můžete přehrát.",
             "vaultLocked": "Pro přepis odemkněte svůj trezor."
           },
           "disabledReason": "Pro přepis zapněte AI v Nastavení → Developer → AI.",

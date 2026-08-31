@@ -190,6 +190,11 @@ pub enum SourceFactory {
     /// `#![cfg_attr(…, allow(dead_code))]` because it could not use `test`.
     #[cfg(any(test, feature = "voice-capture-stub"))]
     Fixture,
+    /// The same synthetic tone at a STATED rate, for the tests that exercise
+    /// the per-rate clip clamp. `Fixture` is fixed at 48 kHz, where that clamp
+    /// is `MAX_SAMPLES` and therefore invisible.
+    #[cfg(test)]
+    FixtureAt(u32),
 }
 
 impl SourceFactory {
@@ -198,6 +203,8 @@ impl SourceFactory {
             SourceFactory::Cpal => Ok(Box::new(CpalSource::start()?)),
             #[cfg(any(test, feature = "voice-capture-stub"))]
             SourceFactory::Fixture => Ok(Box::new(FixtureSource::default())),
+            #[cfg(test)]
+            SourceFactory::FixtureAt(rate) => Ok(Box::new(FixtureSource::at_rate(rate))),
         }
     }
 }
@@ -215,6 +222,20 @@ pub struct FixtureSource {
     phase: f32,
     step: f32,
     samples_per_poll: usize,
+}
+
+#[cfg(test)]
+impl FixtureSource {
+    /// The default tone at a stated sample rate, so a test can drive the
+    /// per-rate clip clamp in `run_session`. Only the rate moves: the poll size
+    /// stays at 480 samples so the clamp is reached in a bounded number of
+    /// polls whatever the rate says.
+    fn at_rate(sample_rate: u32) -> Self {
+        Self {
+            sample_rate,
+            ..Self::default()
+        }
+    }
 }
 
 #[cfg(any(test, feature = "voice-capture-stub"))]
@@ -609,6 +630,73 @@ mod tests {
             "flushed clips are cap-sized"
         );
         assert!(final_clip < SMALL, "the final remainder is below the cap");
+    }
+
+    #[test]
+    fn the_per_rate_clamp_bounds_a_session_and_not_only_the_helper() {
+        // `run_session`'s `max_samples_for_rate(sample_rate).min(max_samples)`
+        // was covered by nothing: `max_samples_for_rate` has its own unit tests,
+        // and every session test runs the 48 kHz fixture, where the clamp equals
+        // `MAX_SAMPLES` and is therefore invisible. Deleting that line left the
+        // whole desktop suite green.
+        //
+        // **Why not 8 kHz, which is the rate the clamp exists for.** At 8 kHz
+        // the bound is `MAX_SAMPLES / 2 + 11`, which is 16,777,216 samples. The
+        // fixture emits 480 per poll on a 10 ms interval, so driving one clip to
+        // that boundary is roughly an hour of wall clock. `max_samples_for_rate`
+        // asserts the 8 kHz value directly one test above; what is untested
+        // there is whether `run_session` APPLIES it, and that is arithmetic over
+        // whatever `source.sample_rate()` returns rather than anything about
+        // telephony.
+        //
+        // So the rate here is chosen to make the same bound small: at 1 Hz it is
+        // `TRANSCRIPTION_CEILING_SAMPLES / 16000`, 2097 samples, four polls. The
+        // rate is unphysical and says so; the line under test does not know that
+        // and cannot.
+        const RATE: u32 = 1;
+        let expected = max_samples_for_rate(RATE);
+        assert!(
+            expected < MAX_SAMPLES,
+            "the chosen rate must make the per-rate bound the tighter one, \
+             or this test passes with the clamp deleted"
+        );
+
+        let (tx, rx) = mpsc::channel();
+        let clips = Arc::new(Mutex::new(Vec::<usize>::new()));
+        let clips_cb = clips.clone();
+        let handle = std::thread::spawn(move || {
+            run_session(
+                SourceFactory::FixtureAt(RATE),
+                &rx,
+                &|_| {},
+                &move |samples, _| clips_cb.lock().unwrap().push(samples.len()),
+                // The caller's cap is the blob cap, deliberately: the RATE bound
+                // has to be what binds, so a regression cannot hide behind this
+                // argument being the smaller of the two.
+                MAX_SAMPLES,
+            )
+        });
+        std::thread::sleep(Duration::from_millis(120));
+        tx.send(StopKind::Finalize).unwrap();
+        let final_clip = match handle.join().unwrap() {
+            SessionResult::Captured(a) => a.samples.len(),
+            _ => panic!("expected Captured"),
+        };
+
+        let emitted = clips.lock().unwrap();
+        assert!(
+            !emitted.is_empty(),
+            "the per-rate bound must force a continuation clip; it did not, so \
+             `run_session` is using the caller's cap of {MAX_SAMPLES}"
+        );
+        assert!(
+            emitted.iter().all(|&n| n == expected),
+            "every flushed clip must be exactly the per-rate bound {expected}, got {emitted:?}"
+        );
+        assert!(
+            final_clip < expected,
+            "the final remainder is below the bound"
+        );
     }
 
     #[test]

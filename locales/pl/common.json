@@ -954,13 +954,15 @@
           "captureFailed": "Nie udało się rozpocząć nagrywania. Sprawdź dostęp do mikrofonu w Ustawieniach systemowych.",
           "generic": "Nie udało się rozpocząć nagrywania.",
           "locked": "Odblokuj skarbiec, aby nagrać notatkę głosową.",
-          "noInputDevice": "Nie znaleziono mikrofonu. Podłącz go i spróbuj ponownie."
+          "noInputDevice": "Nie znaleziono mikrofonu. Podłącz go i spróbuj ponownie.",
+          "unsupportedSampleRate": "Twój mikrofon nagrywa z częstotliwością próbkowania, której Myne nie potrafi transkrybować. Wybierz inne urządzenie wejściowe albo zmień jego częstotliwość próbkowania w ustawieniach dźwięku systemu."
         },
         "stopError": {
           "captureFailed": "Nagrywanie nie powiodło się. Sprawdź mikrofon.",
           "emptyRecording": "Nic nie zostało nagrane.",
           "generic": "Nie udało się zapisać nagrania.",
-          "silentRecording": "Nagranie było ciche i zostało odrzucone. Sprawdź mikrofon."
+          "silentRecording": "Nagranie było ciche i zostało odrzucone. Sprawdź mikrofon.",
+          "unsupportedSampleRate": "Twój mikrofon nagrywa z częstotliwością próbkowania, której Myne nie potrafi transkrybować. Nic nie zostało zapisane. Wybierz inne urządzenie wejściowe albo zmień jego częstotliwość próbkowania w ustawieniach dźwięku systemu."
         }
       },
       "widget": {
@@ -1006,6 +1008,7 @@
             "featureOff": "Zamiana mowy na tekst jest wyłączona. Włącz ją w Ustawienia → Transkrypcja.",
             "modelLoadFailed": "Nie udało się załadować modelu zamiany mowy na tekst. Jeśli ustawiono własny model w Ustawienia → Deweloper → AI, sprawdź jego pliki; w przeciwnym razie ponowna instalacja Myne przywróci wbudowany.",
             "noModel": "Brakuje modelu zamiany mowy na tekst. Ponowna instalacja Myne go przywraca.",
+            "tooLong": "To nagranie jest zbyt długie, aby je transkrybować. Dźwięk pozostaje w załączniku, więc nadal możesz go odtworzyć.",
             "vaultLocked": "Odblokuj skarbiec, aby transkrybować."
           },
           "disabledReason": "Włącz AI w Ustawienia → Developer → AI, aby transkrybować.",
