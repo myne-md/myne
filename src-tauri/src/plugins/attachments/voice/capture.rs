@@ -114,6 +114,12 @@ pub enum RecordError {
     /// The capture device/stream could not be configured, built, or started,
     /// or uses an unsupported sample format.
     CaptureFailed,
+    /// The input device reports a sample rate outside the window `parse_wav`
+    /// accepts, so a clip recorded at it would be refused by this application's
+    /// own decoder. Distinct from `CaptureFailed` because nothing failed: the
+    /// device works and the rate is the problem, which is what a user needs to
+    /// be told and what a bug report needs to carry.
+    UnsupportedSampleRate { sample_rate: u32 },
 }
 
 /// Finalized mono PCM from one recording session. `samples` is `Zeroizing` so
@@ -262,6 +268,25 @@ impl CpalSource {
             .default_input_config()
             .map_err(|_| RecordError::CaptureFailed)?;
         let sample_rate = supported.sample_rate().0;
+        // The clip LENGTH is bounded by `max_samples_for_rate`; the RATE was not
+        // bounded at all, and the invariant both `docs/threat-model.md` and
+        // decision 0541 state as a construction ("no clip a Myne client records
+        // is refused by a Myne decoder") holds only inside the decoder's window.
+        // `parse_wav` refuses anything outside `MIN_SAMPLE_RATE_HZ..=MAX_SAMPLE_RATE_HZ`,
+        // and `default_input_config()` is whatever the OS reports, so a device
+        // outside that window produced a clip its own decoder would reject.
+        //
+        // Refusing here rather than clamping is deliberate: clamping would either
+        // mislabel the rate, which corrupts playback, or resample at capture time,
+        // which is the decoder's job and would silently change what was recorded.
+        // The bound is IMPORTED from the decoder rather than restated, so the two
+        // cannot drift into disagreeing about the same window.
+        if !(crate::plugins::local_inference::audio::MIN_SAMPLE_RATE_HZ
+            ..=crate::plugins::local_inference::audio::MAX_SAMPLE_RATE_HZ)
+            .contains(&sample_rate)
+        {
+            return Err(RecordError::UnsupportedSampleRate { sample_rate });
+        }
         let channels = supported.channels();
         let sample_format = supported.sample_format();
         let config: cpal::StreamConfig = supported.config();

@@ -5,7 +5,9 @@
 // `mobile/src` for `transcribe:`). That matters beyond tidiness, because the
 // widget indexes its hint table by the EDITOR's union and this module's union
 // carries `"not_ready"`, which has no row there; wiring the slot without
-// reconciling the two would render an empty hint. myne-md/myne#510. It opens a per-segment streaming `Channel<string>`
+// reconciling the two would render an empty hint (myne-md/myne#510).
+//
+// It opens a per-segment streaming `Channel<string>`
 // feeding `onSegment`, and resolves with the FULL transcript when transcription
 // ends. The decrypted PCM + transcript never leave Rust except as this final
 // string / the streamed segments — AS1-class content, never logged here.

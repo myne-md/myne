@@ -733,7 +733,10 @@ steps:
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.
       # Now that AI is default-on this path would otherwise never compile in CI and
-      # could bit-rot. Cheap `check` (no link) - the full build is the one above.
+      # could bit-rot. Two commands, and the second is the one that sees the test
+      # tree: `check` skips `#[cfg(test)]` entirely, so a helper gated on it whose
+      # only caller sits behind a feature is dead when the feature is off and no
+      # bare `check` reports it (myne-md/myne#510 shipped that for one review round).
       #
       # `--all-targets`, added by myne-md/myne#510, and the flag is the whole
       # point: without it this never compiles `#[cfg(test)]` code, so a helper

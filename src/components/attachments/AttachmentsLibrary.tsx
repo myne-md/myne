@@ -523,6 +523,17 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
           // the union and a new cause fails to compile here. The fallback form
           // typechecked with a missing row and rendered the generic copy for a
           // cause the backend had named (myne#510).
+          //
+          // Why this stays an object literal while `CAUSE_BY_TAG` in
+          // `src/lib/transcribe.ts` became a `Map` in the same change: the two
+          // solve different problems and the asymmetry is deliberate. That one
+          // looks up a STRING the backend sent, so `constructor` or `toString`
+          // would walk `Object.prototype` and resolve to a truthy function; a
+          // `Map` is the fix and costs nothing there. This one is indexed by a
+          // value from a CLOSED union that the compiler checks, and being an
+          // object literal is what makes a missing row a compile error. A `Map`
+          // here would trade that compile-time exhaustiveness for a runtime
+          // guard against an input this site cannot receive.
           const toastKey =
             kind === "failed" ? "attachments.library.transcribeFailed" : TRANSCRIBE_TOAST_KEY[kind];
           showAttachmentToast(t(toastKey), "error");

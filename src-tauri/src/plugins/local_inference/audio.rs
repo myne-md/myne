@@ -37,8 +37,8 @@ pub const WHISPER_SAMPLE_RATE: u32 = 16_000;
 /// Module scope rather than function-local, because the ceiling's own test
 /// derives the worst reachable output from `MIN` and would otherwise restate the
 /// number.
-const MIN_SAMPLE_RATE_HZ: u32 = 4_000;
-const MAX_SAMPLE_RATE_HZ: u32 = 384_000;
+pub const MIN_SAMPLE_RATE_HZ: u32 = 4_000;
+pub const MAX_SAMPLE_RATE_HZ: u32 = 384_000;
 
 /// Failure modes of WAV decode. Closed + content-free (DENY-list): no sample
 /// data, no path, no raw error string.
@@ -423,7 +423,9 @@ fn resample_linear(input: Vec<f32>, from_rate: u32, to_rate: u32) -> Result<Vec<
 /// Putting the ceiling exactly there gives it the property a picked number
 /// cannot have. Nothing a legal attachment can carry at the target rate is ever
 /// refused, so no recording any Myne client produced can hit it. The desktop
-/// `cpal` encoder captures at 44.1/48 kHz, where 64 MiB is at most 11 min 39 s,
+/// `cpal` encoder captures at 44.1/48 kHz, where a cap-sized attachment is at most
+/// 12 min 41 s at 44.1 kHz and 11 min 39 s at 48 kHz (33,554,410 frames over each
+/// rate, so the SLOWER rate is the longer clip),
 /// and the mobile WebView recorder writes 16 kHz with no duration cap, whose
 /// worst case is the 34 min 57 s above and syncs here to be transcribed. What IS
 /// refused is a clip that reaches this length by EXPANSION from a lower declared
@@ -783,7 +785,8 @@ mod tests {
         // the recording the first draft of the mobile fix actually refused, so
         // it is the number carrying information. The desktop `cpal` encoder
         // captures at 44.1/48 kHz, where the cap itself allows at most about
-        // 11 min 39 s, and that must project under the ceiling too.
+        // 12 min 41 s at 44.1 kHz and 11 min 39 s at 48 kHz, and that must project
+        // under the ceiling too.
         let thirty_two_minutes_at_16k = 32 * 60 * WHISPER_SAMPLE_RATE as usize;
         assert!(
             MAX_PCM_SAMPLES >= thirty_two_minutes_at_16k,
@@ -797,10 +800,13 @@ mod tests {
         // definition of `MAX_PCM_SAMPLES`, so the assertion would reduce to
         // `ceil(N * 16000 / 44100) <= N`, true for every N at every rate above
         // 16 kHz and therefore unable to fail: the copy-against-a-copy shape
-        // this test's own opening paragraph rejects. Twelve minutes is just past
-        // what the § 9.9 cap allows at either rate (11 min 39 s at 48 kHz), so
-        // it is the longest desktop recording worth defending and it fails if
-        // the ceiling drops under about 11.5 M samples.
+        // this test's own opening paragraph rejects. Twelve minutes is PAST the
+        // § 9.9 cap at 48 kHz (11 min 39 s) and just inside it at 44.1 kHz
+        // (12 min 41 s), so it is not the boundary an earlier version of this
+        // comment claimed. It is a sanity bound on the longest desktop recording
+        // worth defending, with roughly a 2.9x margin (11.52 M against a 33.55 M
+        // ceiling); it fails if the ceiling drops under about 11.5 M samples, and
+        // it is honest about being loose rather than presented as tight.
         // The largest clip a legal attachment can hold at the target rate, which
         // is the input the derivation was chosen to protect and clears the
         // ceiling by 22 frames (about 1.4 ms). The REFUSE direction at that
@@ -961,6 +967,46 @@ mod tests {
     /// `error.rs`. That is the shipped-inert-wiring signature one layer up from
     /// where the comment looked for it. The mapping is covered by
     /// `error.rs::audio_error_mapping_tests`.
+    /// The REAL parser at a projection landing exactly ON the ceiling.
+    ///
+    /// `the_ceiling_binds_at_a_rate_below_the_target_too` computes the boundary
+    /// with `projected_out_samples` and then asserts against `MAX_PCM_SAMPLES`,
+    /// which is the rounding half of the predicate checked against the same
+    /// constant the rounding was derived from. The comparison half lives inline
+    /// in `parse_wav` (`projected > MAX_PCM_SAMPLES`), and every other test that
+    /// touches the parse-time bound restates `<= MAX_PCM_SAMPLES` itself or
+    /// drives the parser at `MAX_PCM_SAMPLES + 1`. So nothing drove the real
+    /// parser at the boundary, and a predicate is a rounding AND a comparison:
+    /// flipping `>` to `>=` was green across the whole suite.
+    ///
+    /// 8 kHz because it is the rate the projection actually binds at (telephony
+    /// and Bluetooth HFP/SCO report it on all three platforms), and because the
+    /// halving makes the boundary exact rather than a rounding artefact.
+    #[test]
+    fn the_real_parser_accepts_a_projection_landing_on_the_ceiling() {
+        let rate = 8_000u32;
+        let boundary_frames = MAX_PCM_SAMPLES / 2;
+        // Precondition, so a change to either constant fails HERE with a clear
+        // cause rather than silently making this test assert something else.
+        assert_eq!(
+            projected_out_samples(boundary_frames, rate).expect("a non-zero rate"),
+            MAX_PCM_SAMPLES as u128,
+            "the fixture no longer lands on the ceiling",
+        );
+
+        let header_bytes = build_wav(1, rate, &[]);
+        let header = header_bytes.len();
+        let data_len = boundary_frames * 2;
+        let mut wav = vec![0u8; header + data_len];
+        wav[..header].copy_from_slice(&header_bytes);
+        wav[header - 4..header].copy_from_slice(&(data_len as u32).to_le_bytes());
+
+        // Accepted: the bound is `>`, so landing ON it is legal. Flipping that
+        // comparison to `>=` in `parse_wav` makes this the only test that fails.
+        let out = wav_to_mono_16k(&wav).expect("a projection on the ceiling is accepted");
+        assert_eq!(out.len(), MAX_PCM_SAMPLES);
+    }
+
     #[test]
     fn the_public_entry_point_refuses_too_long_as_its_own_kind() {
         // `vec![0u8; n]`, not `resize`: in the unoptimized test profile `resize`
