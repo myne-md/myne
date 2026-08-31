@@ -64,6 +64,26 @@ pub async fn agent_start<R: Runtime>(
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
+    // **Re-read the gate, do not trust the cell.** `require_ai_enabled` reads
+    // `ai_enabled` from disk, and that is the ONLY part of the gate that was
+    // genuinely read at request time: the consent, the key and the model come
+    // from `LocalInferenceState`'s cached snapshot, which some other surface
+    // filled whenever it last happened to. `provider_gate.rs`'s module doc says
+    // the gate is "host-side, and re-read at request time", and three mobile
+    // comments say the refresh is done "exactly as desktop does". It was not:
+    // `.refresh()` appeared only in `local_inference/commands.rs` and
+    // `invalidate()` only on the lock path.
+    //
+    // That matters more since myne-md/myne#456, which removed `developer_mode`
+    // from this gate and names the device-local consent as the compensating
+    // control. A control read from a cache cannot carry that weight.
+    //
+    // A refresh here rather than an invalidate inside the consent and key
+    // setters, which is the cheaper shape and the wrong one: `ai_provider_key`
+    // still SYNCS, so a key that arrives from another device passes through no
+    // setter on this one and would leave the cell stale exactly where a
+    // revocation matters most.
+    ai.refresh().await;
     let source = HostScopeSource {
         app: app.clone(),
         vault: vault.inner(),
@@ -172,6 +192,8 @@ pub async fn agent_approve_scope<R: Runtime>(
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
+    // Same reason as `agent_start`: the gate is read here, not remembered.
+    ai.refresh().await;
     let source = HostScopeSource {
         app: app.clone(),
         vault: vault.inner(),
@@ -357,6 +379,8 @@ pub async fn agent_capability<R: Runtime>(
 ) -> Result<ProbeVerdict, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
+    // Same reason as `agent_start`: the gate is read here, not remembered.
+    ai.refresh().await;
     let engine = EngineAdapter {
         state: ai.inner(),
         cancel: Arc::new(AtomicBool::new(false)),
@@ -434,5 +458,48 @@ mod tests {
             "the view must be sent before the loop is driven, or the first leg \
              has no id again and nothing can cancel it"
         );
+    }
+
+    /// Every command that consults the provider gate re-reads it first.
+    ///
+    /// `provider_gate.rs` says the gate is "host-side, and re-read at request
+    /// time", and until myne-md/myne#456's review that was true of `ai_enabled`
+    /// alone: the consent, the key and the model came from a cached snapshot
+    /// filled by whichever surface last touched it. The compensating control for
+    /// dropping `developer_mode` from the gate cannot be a cached one.
+    ///
+    /// Driven at the source, like `cli_bridge::socket`'s accept-loop test:
+    /// asserting this behaviourally would mean standing up a real `AppHandle`
+    /// and a vault. The three names are spelled out rather than derived, so a
+    /// FOURTH gate-consulting command does not join silently; it fails review
+    /// instead, which is where that decision belongs.
+    #[test]
+    fn every_gate_consulting_command_refreshes_the_snapshot_first() {
+        let src = include_str!("commands.rs");
+        for name in [
+            "pub async fn agent_start",
+            "pub async fn agent_approve_scope",
+            "pub async fn agent_capability",
+        ] {
+            let at = src
+                .find(name)
+                .unwrap_or_else(|| panic!("{name} must exist"));
+            let end = src[at..]
+                .find("\n}\n")
+                .map(|i| at + i)
+                .unwrap_or_else(|| panic!("{name} must have a body"));
+            let body = &src[at..end];
+            let gate = body
+                .find("require_ai_enabled")
+                .unwrap_or_else(|| panic!("{name} must consult the gate"));
+            let refresh = body.find("ai.refresh().await").unwrap_or_else(|| {
+                panic!("{name} no longer refreshes the snapshot before the gate")
+            });
+            assert!(
+                refresh > gate,
+                "{name} refreshes before it checks ai_enabled, which reads the disk anyway; \
+                 the refresh belongs after it so a refused request costs no prefs read"
+            );
+        }
     }
 }
