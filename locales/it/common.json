@@ -917,13 +917,15 @@
           "captureFailed": "Impossibile avviare la registrazione. Controlla l'accesso al microfono nelle Impostazioni di sistema.",
           "generic": "Impossibile avviare la registrazione.",
           "locked": "Sblocca la cassaforte per registrare una nota vocale.",
-          "noInputDevice": "Nessun microfono trovato. Collegane uno e riprova."
+          "noInputDevice": "Nessun microfono trovato. Collegane uno e riprova.",
+          "unsupportedSampleRate": "Il microfono registra a una frequenza di campionamento che Myne non può trascrivere. Scegli un altro dispositivo di ingresso, oppure cambia la sua frequenza di campionamento nelle impostazioni audio del sistema."
         },
         "stopError": {
           "captureFailed": "Registrazione non riuscita. Controlla il microfono.",
           "emptyRecording": "Non è stato registrato nulla.",
           "generic": "Impossibile salvare la registrazione.",
-          "silentRecording": "La registrazione era silenziosa ed è stata scartata. Controlla il microfono."
+          "silentRecording": "La registrazione era silenziosa ed è stata scartata. Controlla il microfono.",
+          "unsupportedSampleRate": "Il microfono registra a una frequenza di campionamento che Myne non può trascrivere. Non è stato salvato nulla. Scegli un altro dispositivo di ingresso, oppure cambia la sua frequenza di campionamento nelle impostazioni audio del sistema."
         }
       },
       "widget": {
@@ -969,6 +971,7 @@
             "featureOff": "La conversione da voce a testo è disattivata. Attivala in Impostazioni → Trascrizione.",
             "modelLoadFailed": "Impossibile caricare il modello da voce a testo. Se hai impostato un modello personalizzato in Impostazioni → Developer → AI, controllane i file; altrimenti reinstallando Myne viene ripristinato quello integrato.",
             "noModel": "Il modello da voce a testo è mancante. Reinstallando Myne viene ripristinato.",
+            "tooLong": "Questa registrazione è troppo lunga per essere trascritta. L'audio resta allegato, quindi puoi comunque riprodurlo.",
             "vaultLocked": "Sblocca la cassaforte per trascrivere."
           },
           "disabledReason": "Abilita l'AI in Impostazioni → Developer → AI per trascrivere.",
