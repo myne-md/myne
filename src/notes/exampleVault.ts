@@ -20,6 +20,8 @@ import {
   EXAMPLE_NOTES,
 } from "../dialect/exampleVault";
 import i18n from "../i18n";
+import { normalizeFolderPath } from "../dialect/folderPath";
+import { mutateDeliberateFolders } from "../lib/prefs";
 import { noteCreate } from "./createNote";
 import { emptyWorkspace, openInFocusedTab } from "./workspaceState";
 import { serializeWorkspace, workspaceWrite } from "../lib/workspace-persist";
@@ -72,9 +74,28 @@ export function resolveExampleNotes(): ResolvedExampleNote[] {
 export async function seedExampleVault(): Promise<void> {
   try {
     let indexNoteId: string | null = null;
+    const folders: string[] = [];
     for (const note of resolveExampleNotes()) {
-      const noteId = await noteCreate(note.markdown);
+      // `null` because this is a BULK path: ONE registration for the whole
+      // seed is issued below, rather than one prefs write per example note,
+      // each of which re-encrypts the entire blob (myne-md/myne#613).
+      const noteId = await noteCreate(note.markdown, null);
       if (note.index) indexNoteId = noteId;
+      // `note.folder` is the value that went INTO the frontmatter a line above,
+      // so it is taken rather than re-parsed back out of it.
+      const folder = normalizeFolderPath(note.folder);
+      if (folder !== null && !folders.includes(folder)) folders.push(folder);
+    }
+
+    // The registration the comment above promises. It was NOT here, so the
+    // example vault's folders were the one create path that both skipped
+    // at-fill and had a comment saying it did not: exactly the "claim stated
+    // one layer above where it is enforced" shape myne#613's review kept
+    // finding. A seeded folder emptied by trashing its notes would have
+    // vanished, and the unlock back-fill could not have saved it either,
+    // because it walks LIVE notes.
+    if (folders.length > 0) {
+      await mutateDeliberateFolders({ add: folders });
     }
 
     if (indexNoteId !== null) {

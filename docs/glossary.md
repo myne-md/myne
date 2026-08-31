@@ -174,6 +174,14 @@ A region of CodeMirror 6 editor state registered with `EditorView.atomicRanges` 
 
 Used in: `spec/wikilink.md` §5.2
 
+### **at-fill registration** &nbsp; 📦 *Product*
+
+The rule that a folder becomes a [deliberate folder](#deliberate-folder) the first time it holds a note, rather than only when the user reaches a "New folder" command (myne-md/myne#613). Creating a note in a folder, moving one into it, and importing a vault that contains it all register it; so does an explicit folder create. Nothing UNregisters it, in particular not its last note leaving, which is the behaviour the rule exists to produce: a folder made by dragging a note into a name the user typed is as deliberate as one made from a menu, and used to disappear silently when emptied because nothing had recorded it.
+
+Registration is an ADD, never a whole-set write, so a client holding a stale view cannot claim a removal it never made. It is idempotent, and a client registers once per user operation rather than once per note: a fifty-note bulk move is one write, because each write re-encrypts the whole `vault.prefs` blob. A vault created before the rule is registered once, after unlock, by walking the folders its live notes prove; trashed and archived notes prove nothing, so a folder the user had already emptied is not resurrected. Bounded by the [set-field byte budget](#set-field-byte-budget).
+
+Used in: `spec/protocol.md` §9.5.2; myne-md/myne#613
+
 ### **at-rest encryption** &nbsp; 🏗️ *Construction*
 
 The property that data stored persistently is encrypted whenever it is not actively being processed. Myne's at-rest encryption applies to every byte of note content, vault metadata, and key material on the user's disk (`spec/protocol.md` §9). Distinct from in-transit encryption (TLS), which protects only data crossing the network.
@@ -474,6 +482,16 @@ Adversary class A2: subpoena, court order, national security letter, or other le
 
 Used in: `threat-model.md` §1 (A2)
 
+### **content-scaled field** &nbsp; 📋 *Protocol*
+
+A stored field whose size grows with how much the user has MADE, rather than with how many features the software has. `deliberate_folders` is the first one in `vault.prefs`: one more folder is one more entry, and the user does not think of a folder as a setting.
+
+Its opposite is a **feature-scaled** field, where one more preference is one more key, so the plaintext grows only when the software does and a cap chosen once stays generous indefinitely. `vault.prefs` was sized on that assumption, and the two kinds sharing one fixed cap is what makes the [set-field byte budget](#set-field-byte-budget) necessary: an over-cap save FAILS rather than truncating, so an unbounded content-scaled field can leave a vault unable to save any preference at all.
+
+The distinction is worth naming because the next such field will be added by somebody who is not thinking about the cap. `spec/protocol.md` §9.5.4 exists to be the thing it is checked against.
+
+Used in: `spec/protocol.md` §9.5.4; myne-md/myne#613
+
 ### **conflict copy** &nbsp; 📋 *Protocol*
 
 The artifact of [keep-both conflict resolution](#keep-both-conflict-resolution): when the sync engine detects a concurrent edit, it materializes the remote revision as a **new** `.myn` note carrying the Myne-managed `conflict: true` + `conflict_of: <original note_uuid>` frontmatter fields (`spec/markdown-dialect.md` §3.6.1) so both edits survive. A conflict copy is excluded from the live sidebar, folder-tree, full-text search, and the backlink resolver — surfaced only in the **Conflicts view**, reached via a count badge — until the user resolves it ("Keep as separate" clears the markers so it re-enters the live set; "Discard" deletes it). TS orchestrator (`src/notes/conflictCopy.ts`) over `note_create` + `patchFrontmatterField`; no backend command, no `.myn` envelope change (MYND-427). Phase 2.
@@ -652,9 +670,11 @@ The styleable placeholder an editor embed renders when its [attachment-id](#atta
 
 ### **deliberate folder** &nbsp; 📦 *Product*
 
-A folder the user explicitly created that persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). The set is *cold* — written only on explicit folder create / delete, never on note move — and merges as a union (add-wins) under Phase 2 sync. A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2). See also [folder](#folder), [item order](#item-order).
+A folder the user means to keep, which persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2).
 
-Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2; `decisions.md` 2026-05-29
+**Revised by myne-md/myne#613, in both halves.** The set used to be *cold*, written on explicit folder create and delete alone, which meant a folder made by dragging a note into a new name was never recorded and vanished the moment it was emptied. It is now written by [at-fill registration](#at-fill-registration) as well, and bounded by a [set-field byte budget](#set-field-byte-budget). And it used to merge as a clockless add-wins union, under which a folder delete could never reach a second device; it now carries per-entry removal clocks (`spec/sync-protocol.md` §10.2). The two egress-control sets that share its codec, [AI-excluded folder](#ai-excluded-folder) and [CLI-excluded folder](#cli-excluded-folder), deliberately kept the clockless union. See also [folder](#folder), [item order](#item-order).
+
+Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2, `spec/sync-protocol.md` §10.2; `decisions.md` 2026-05-29, myne-md/myne#613
 
 ### **Developer mode** &nbsp; 📦 *Product*
 
@@ -891,7 +911,7 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-15
 
 ### **field clock** &nbsp; 📋 *Protocol*
 
-The per-field LWW timestamp of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): an epoch-milliseconds integer, one per [shared pref](#shared-pref) LWW field (or per `device_names/<key>` entry), stored in the additive `field_clocks` map inside the encrypted [vault.prefs](#vaultprefs) payload (`spec/protocol.md` §9.5.2) and stamped by the setter that last changed the field. The merge takes the newer clock per field, counts an absent clock as 0 (pre-feature blobs), and breaks equal clocks byte-lexicographically toward the greater value — the attachments-catalog `filename` precedent — so replicas converge without coordination. Per-field (rather than per-blob) clocks are what let concurrent edits to *different* fields both survive.
+The per-field LWW timestamp of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): an epoch-milliseconds integer, one per [shared pref](#shared-pref) LWW field, or per ENTRY of a per-key map (`device_names/<key>`, `item_colors/<key>`, `folder_icons/<key>`, `item_order/<container>`) or of a clocked set-union field (`deliberate_folders/<foldedEntry>`, `archived_folders/<foldedEntry>`, `spell_languages/<rawCode>`, myne-md/myne#613; the two monotone egress sets are never stamped and have no key here, see [removal clock](#removal-clock)), stored in the additive `field_clocks` map inside the encrypted [vault.prefs](#vaultprefs) payload (`spec/protocol.md` §9.5.2) and stamped by the setter that last changed the field. The merge takes the newer clock per field, counts an absent clock as 0 (pre-feature blobs), and breaks equal clocks byte-lexicographically toward the greater value (the attachments-catalog `filename` precedent), so replicas converge without coordination. Per-field (rather than per-blob) clocks are what let concurrent edits to *different* fields both survive.
 
 Used in: `sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; `decisions.md` 2026-07-13
 
@@ -1912,6 +1932,16 @@ The intermediate variant of the [`Slot`] enum representing a vault that has succ
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **removal clock** &nbsp; 📋 *Protocol*
+
+The per-entry timestamp that lets a set-union preference express a DELETION (myne-md/myne#613). A union alone cannot: an entry removed on one device is an absence, indistinguishable from "this device never had the entry", so the peer's copy is restored by the next union and the deletion undoes itself within two rounds, with no concurrency required. The clock is the tombstone that makes the difference legible.
+
+Stamped on `<field>/<entry>` in the [field clock](#field-clock) map for the three CLOCKED set fields, [deliberate folder](#deliberate-folder), [archived folder](#archived-folder) and the spell-language set. **A removal is a stamped absence**: the removing side stamps the key, and a single-sided entry is dropped when the absent side's clock is strictly greater than the present side's. Equal clocks keep the entry, "absent sorts lowest", which is the recoverable direction. **An addition is stamped too**, which the per-key maps do not need: without an add stamp a re-added entry carries no clock of its own and loses to its own tombstone permanently, so a folder deleted and later refilled could never come back. A clock is retained even when neither side holds the entry, indefinitely, because dropping it lets a third device that still holds the entry at an older clock resurrect what two others deleted.
+
+**The two egress controls deliberately have none.** [AI-excluded folder](#ai-excluded-folder) and [CLI-excluded folder](#cli-excluded-folder) keep the clockless monotone union: a removal clock orders un-exclusion by wall clock, so a forward-skewed device could unexclude a folder no correctly-clocked device can restore, and the failure direction there is note plaintext leaving the device. The cost, stated rather than implied, is that once a second device holds an exclusion it is add-only. See [set-field byte budget](#set-field-byte-budget), which the retained clocks are measured against.
+
+Used in: `spec/sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; myne-md/myne#613
+
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
 The 24-word BIP-39-encoded representation of 256 bits of secret entropy plus an 8-bit checksum, used as Myne's secondary credential for vault unlock. Generated at vault creation from OS CSPRNG output, presented to the user with a forced-confirmation flow before vault creation completes (`spec/protocol.md` §7.2; full UX in `spec/recovery-flow.md` §2). The phrase string, after NFKD normalization, is fed directly to Argon2id with `salt_recovery` to derive `recovery_wrap_key`. **Myne does not use BIP-39's standard PBKDF2-HMAC-SHA512 derivation** — that step is replaced by Argon2id with the same parameters as the password path. The phrase is never sent to any server. If the user loses both the phrase and the master password, the vault is permanently unrecoverable; this is a hard architectural commitment.
@@ -2104,6 +2134,18 @@ Used in: `spec/protocol.md` §9.7; `decisions.md` 2026-06-17 (MYND-308)
 ### **workspace-state blob** &nbsp; 📦 *Product*
 
 The encrypted `vault.workspace` artifact (`MYW1`, `spec/protocol.md` §9.7) carrying the editor's **workspace state** — the open-tab set per pane, the recursive pane-split layout, each pane's active tab, the focused pane, per-tab cursor/scroll positions, and per-tab [view mode](#view-mode) (MYND-166; per-tab view mode added by MYND-299, named slots by MYND-308). AS3-Sensitive (note ids + structure): persisting *which notes are open* is activity metadata, so it rides inside the AEAD envelope under [session-state-key](#session-state-key) rather than as plaintext local state. The inner descriptor is client-opaque to the protocol layer (like the [search index](#search-index)); since MYND-308 it holds `{slots, active}` ([named workspaces](#named-workspace)) and `workspace_format_version` is `0x02` (an old `0x01` binary hits `FormatUnsupported` → single empty pane). Write cadence is **graceful-exit only** in the single-workspace baseline (manual lock / idle auto-lock grace / quit, never per tab-switch), **coalesced to ≤ once per ~5 min of active use** once named workspaces are in play (MYND-308 — a bounded relaxation of §9.7.4, `threat-model.md` §7), and on **mobile** resolves "quit" to **app-background** alongside lock, dirty-gated (MYND-561 — the platform has no quit signal; §9.7.4 "Mobile exit analogs") — so the blob's mtime stays a coarse signal, never a high-resolution editor-activity log. Best-effort, not crash-durable; a missing / tampered / malformed / wrong-version blob falls back to a single empty pane (§9.7.4).
+
+### **set-field byte budget** &nbsp; 📋 *Protocol*
+
+The bound a `vault.prefs` write is held to so that the 64 KiB plaintext cap (`spec/protocol.md` §9.5.4) is never reached. It is measured over the WHOLE canonical plaintext, every [content-scaled field](#content-scaled-field) and feature-scaled one together with the retained `field_clocks` tombstones, and it sits at the cap less 4 KiB of headroom in the reference implementation.
+
+**Not a per-field share, and the correction is worth stating** because the first version of this entry described one. Five set fields share one cap, so each of them cannot be granted half of it; and an estimate over one field's live entries can see neither the other four fields nor the tombstones that outlive their entries, so it reports room in a blob already past the cap.
+
+It exists because `deliberate_folders` is the first preference whose size grows with the user's CONTENT rather than with the number of features, and an over-cap `vault.prefs` save fails outright rather than truncating. Without a bound, a vault with enough folders would stop being able to save any preference at all. Past the budget an individual addition is REFUSED and the write still succeeds, so the folder behaves as folders did before [at-fill registration](#at-fill-registration): it exists while it holds a note, and stops existing when the last one leaves. The user is told, because deleting a folder is a real remedy.
+
+Two properties are normative rather than incidental. Refusals are **ordered** shallowest-first then alphabetically, so a full budget leaves the vault's top-level structure standing rather than an arbitrary slice, which is what makes the limit explainable. And a **removal is never refused**. That one is a property rather than an assertion: a removal does not shrink the blob, it trades a live member for a permanent tombstone, and on a folder set the tombstone is the larger of the two. What makes the promise true is that every live entry is charged for the tombstone it will one day mint, so the room a removal needs was reserved when the entry was admitted.
+
+Used in: `spec/protocol.md` §9.5.4; myne-md/myne#613
 
 ### **selection toolbar** &nbsp; 📦 *Product*
 

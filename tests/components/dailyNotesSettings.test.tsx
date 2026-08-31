@@ -17,11 +17,16 @@ const setDailyFolder = vi.fn();
 const setDailyTemplate = vi.fn();
 const listTemplates = vi.fn();
 
-vi.mock("../../src/lib/prefs", () => ({
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   prefsRead: (...a: unknown[]) => prefsRead(...a),
   setDailyDateFormat: (...a: unknown[]) => setDailyDateFormat(...a),
   setDailyFolder: (...a: unknown[]) => setDailyFolder(...a),
   setDailyTemplate: (...a: unknown[]) => setDailyTemplate(...a),
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 // The folder PICKER (MYND-624) enumerates the vault; these tests are about the
 // persistence wiring, so stub it empty and exercise the free-text fallback the

@@ -11,6 +11,25 @@
 
 use alloc::vec::Vec;
 
+/// How many bytes [`push_json_string`] would append for `s`, quotes included.
+///
+/// Exists because a caller that has to BUDGET a canonical-JSON blob before
+/// emitting it needs the escaped length, and `s.len() + 2` is not it: a `"` or a
+/// `\` costs two bytes where one is charged, and a C0 control character costs
+/// six. myne#613's set-field budget charged the raw length, so a folder name
+/// carrying either could overshoot the reserve the budget exists to hold.
+///
+/// Implemented by running the encoder rather than by re-deriving its rules,
+/// deliberately. A second copy of the escape table is a second thing to keep in
+/// step with the first, and this module's own header says single-homing the
+/// escaper is what keeps the cross-implementation byte contract auditable. The
+/// scratch buffer is the price of not having that copy.
+pub(crate) fn json_string_len(s: &str) -> usize {
+    let mut out = Vec::with_capacity(s.len() + 2);
+    push_json_string(&mut out, s);
+    out.len()
+}
+
 /// Append `s` as a JSON string literal (with surrounding quotes), escaping `"`,
 /// `\`, and C0 control chars per RFC 8259. `/` is left unescaped (canonical).
 /// Non-control characters pass through as UTF-8.

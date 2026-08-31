@@ -534,7 +534,9 @@ mod tests {
                 &host,
                 &state,
                 &hooks,
-                vec!["Daily/".to_string()],
+                myne_core::plugins::prefs::set_mutation::SetMutation::adding_all(vec![
+                    "Daily/".to_string()
+                ]),
                 &io,
             )
             .await
@@ -566,7 +568,9 @@ mod tests {
                 &host,
                 &state,
                 &hooks,
-                vec!["Private/".to_string()],
+                myne_core::plugins::prefs::set_mutation::SetMutation::adding_all(vec![
+                    "Private/".to_string()
+                ]),
                 &io,
             )
             .await

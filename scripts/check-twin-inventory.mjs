@@ -237,6 +237,31 @@ const SHIM_REASON =
 
 const CURATED_TWINS = [
   {
+    a: "src/notes/folderBackfill.ts",
+    b: "mobile/src/lib/folderBackfill.ts",
+    what: "registers an existing vault's folders once, on the first load after unlock",
+    why:
+      "The once-per-unlock back-fill (myne-md/myne#613), written twice because mobile carries a " +
+      "note's folder in its BODY and has no `TitleRecord`, so the parsing half is genuinely " +
+      "different code. Everything else is the same four properties in the same order, and each " +
+      "file's header names the other as its twin, which is precisely the pair a path sweep cannot " +
+      "see: they sit at different relative paths. The pr-review found the mobile test already " +
+      "omitting the `deleted` and `conflict` cases the desktop one covers, which is the drift this " +
+      "entry exists to make visible.",
+  },
+  {
+    a: "src/notes/moveNote.ts",
+    b: "mobile/src/lib/note-organize.ts",
+    what: "moves a note between folders and registers the destination",
+    why:
+      "The move-and-register pair. Desktop split `moveNote` into a non-registering form plus one " +
+      "`registerDestination` so a bulk gesture pays ONE prefs write; mobile kept the registration " +
+      "inside its move and its folder rename therefore issued one full `vault.prefs` re-encrypt per " +
+      "note in the subtree, outside the `withPrefsBatch` that exists to stop exactly that. " +
+      "`check-twin-drift.mjs` cannot see it either, for the same different-paths reason, so nothing " +
+      "reported the asymmetry until a human read both files (myne-md/myne#613 pr-review).",
+  },
+  {
     a: "src/App.tsx",
     b: "mobile/src/app/AppShell.tsx",
     what: "carries the twin boot probe, reprobe, Stage switch and dispatch",
@@ -332,6 +357,26 @@ const CURATED_TWINS = [
  * on every entry. The projection renders live counts instead.
  */
 const ROSTER = [
+  // The two myne-md/myne#613 folder-registration pairs. Both are cross-path, so
+  // the sweep cannot find them and both sit in `CURATED_TWINS` above; both are
+  // `decision`, because mobile's half is genuinely different code answering the
+  // same product question rather than a copy of desktop's.
+  {
+    a: "src/notes/folderBackfill.ts",
+    b: "mobile/src/lib/folderBackfill.ts",
+    verdict: "decision",
+    destination: "stays per-client",
+    reason:
+      "Same four properties in the same order, deliberately not shared: mobile carries a note's folder in its BODY and has no `TitleRecord`, so the input shape and therefore the parsing half differ, and sharing would mean a seam for one function. What must not drift is the liveness rule and the identity fold; each header names the other file so a reader lands on both.",
+  },
+  {
+    a: "src/notes/moveNote.ts",
+    b: "mobile/src/lib/note-organize.ts",
+    verdict: "decision",
+    destination: "stays per-client",
+    reason:
+      "Per-client by construction: a registration site is a client-side surface, and mobile's file also holds its note-flag readers. Both now carry the same split (a non-registering move plus one caller-side registration), which is the asymmetry the pr-review found: mobile's folder rename issued one prefs write per note in the subtree while desktop batched.",
+  },
   // ── src/dialect/: nine re-export shims into the shared @myne/dialect package
   //
   // Every one is a one-line `export * from "@myne/dialect/<module>"`. The source

@@ -305,8 +305,12 @@ pub struct PrefsView {
     /// Deliberately-created folder paths (canonical trailing-slash display
     /// form) that persist independently of whether any note carries them —
     /// the carrier for empty folders in the virtual-folder model (MYND-144 /
-    /// grill 2026-05-29). Default empty. Conflict semantics (Phase 2) =
-    /// union + add-wins. Encoded as a canonical JSON string array
+    /// grill 2026-05-29). Default empty. Conflict semantics are a union that
+    /// carries a per-entry removal clock in `field_clocks` (myne#613,
+    /// `sync-protocol.md` §10.2), NOT the clockless add-wins union this line
+    /// described until then: without the clock a deletion is indistinguishable
+    /// from never having had the entry, so a peer restores it. Encoded as a
+    /// canonical JSON string array
     /// (NFC-normalized, lexicographically sorted, exact-deduped, and **omitted
     /// entirely when empty** so a vault with no deliberate folders is
     /// byte-identical to a v0.1.0 `vault.prefs`).
@@ -3869,6 +3873,54 @@ fn find_top_level_marker(rest: &[u8], from: usize, marker: &[u8]) -> Option<usiz
 }
 
 // ---- encode / decode primitives ---------------------------------------
+
+/// Length in bytes of the canonical JSON plaintext `prefs` encodes to.
+///
+/// Exposed for the set-field byte budget in `myne-core` (myne-md/myne#613),
+/// which has to answer "how close is this whole blob to
+/// [`MAX_PREFS_PLAINTEXT_LEN`]" rather than "how big is this one field". The two
+/// are not the same question, and the difference is everything the earlier
+/// per-field estimate could not see: the four other set fields, the
+/// `field_clocks` entries that outlive the entries they belonged to, and the
+/// rest of the blob.
+///
+/// This encodes, so it is not free. Call it once for a base and add per-entry
+/// deltas rather than calling it per candidate.
+pub fn canonical_plaintext_len(prefs: &PrefsView) -> usize {
+    canonical_json_encode(prefs).len()
+}
+
+/// Bytes one set-field entry costs inside the canonical plaintext, comma
+/// included.
+///
+/// The companion to [`canonical_plaintext_len`], and exposed for the same
+/// caller: a budget that measures the blob once and then adds per-entry deltas
+/// needs those deltas in the ENCODER's units, not the caller's. Two rules make
+/// `entry.len() + 3` wrong, and both are in this file rather than in the
+/// caller's: the entry is NFC-normalised ([`canonical_folder_list`]), which can
+/// move its byte length in either direction, and it is escaped
+/// ([`crate::canonical_json`]), where a `"` or a `\` costs two bytes and a C0
+/// control character costs six.
+///
+/// So the arithmetic lives here, next to the encoder it has to agree with,
+/// rather than being re-derived by `myne-core`. A second copy of an escape table
+/// is a second thing to keep in step.
+pub fn canonical_set_entry_cost(entry: &str) -> usize {
+    let normalized = entry.nfc().collect::<String>();
+    crate::canonical_json::json_string_len(&normalized) + 1
+}
+
+/// Bytes one `field_clocks` member costs inside the canonical plaintext: the
+/// key, a colon, the decimal value and a comma.
+///
+/// Same contract and same reason as [`canonical_set_entry_cost`]. The value's
+/// own width is passed rather than assumed, because the caller is budgeting for
+/// a clock that does not exist yet and the only honest input is the width the
+/// stamper will write.
+pub fn canonical_clock_member_cost(key: &str, value_digits: usize) -> usize {
+    let normalized = key.nfc().collect::<String>();
+    crate::canonical_json::json_string_len(&normalized) + 1 + value_digits + 1
+}
 
 /// Encode a `vault.prefs` blob with caller-supplied randomness
 /// (`_raw` per `protocol/CLAUDE.md` randomness-injection convention).
@@ -11577,6 +11629,196 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write vault-prefs field-clocks vectors dump");
+    }
+
+    /// Generator for the **set-entry removal clock** `vault-prefs` cases
+    /// (myne-md/myne#613).
+    ///
+    /// `cargo test -p protocol --lib emit_set_removal_clock_prefs_vectors -- --ignored`
+    ///
+    /// The suite had exactly one `field_clocks` case before this
+    /// (`encrypt-field-clocks`), and its clocks are a bare field name plus a
+    /// `device_names/<key>` entry. Neither is the shape myne#613 introduces:
+    /// a clock keyed by a **set** entry, and the same clock with the entry
+    /// **absent**, which is how a removal is expressed at rest. A port that
+    /// encoded either differently would diverge on bytes that no existing case
+    /// covers, and `sync-protocol.md` §10.2 now rests on those bytes meaning the
+    /// same thing on both sides of a sync.
+    ///
+    /// The third case is the one that catches an encoder rather than a merge:
+    /// a folded non-ASCII folder key sitting beside an ASCII one, which pins
+    /// that `field_clocks` keys sort by **byte** order (so `deliberate_folders/b`
+    /// precedes `deliberate_folders/bücher/`) and that the multi-byte key is
+    /// emitted as raw UTF-8 rather than `\u`-escaped. An implementation that
+    /// sorted by code point, or escaped non-ASCII, would produce a different
+    /// blob for the same vault and lose the entry on every merge.
+    #[test]
+    #[ignore]
+    fn emit_set_removal_clock_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        // Case 1: the entry is LIVE and carries its own clock.
+        let nonce_live: [u8; AEAD_NONCE_LEN] = [0xE1; AEAD_NONCE_LEN];
+        let mut clocks_live = BTreeMap::new();
+        clocks_live.insert(
+            String::from("deliberate_folders/projects/myne/"),
+            1_765_432_101_000u64,
+        );
+        let prefs_live = PrefsView {
+            deliberate_folders: alloc::vec![String::from("Projects/Myne/")],
+            field_clocks: clocks_live,
+            ..PrefsView::default()
+        };
+        let canonical_live = canonical_json_encode(&prefs_live);
+        assert_eq!(
+            canonical_live.as_slice(),
+            br#"{"deliberate_folders":["Projects/Myne/"],"field_clocks":{"deliberate_folders/projects/myne/":1765432101000},"screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin deliberate_folders (d) < field_clocks (fi) < screen_capture_protection (s), and the clock key as the FOLDED entry identity while the set holds the raw display form",
+        );
+        let blob_live =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_live, &nonce_live)
+                .expect("encode set-entry live");
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_live).expect("decode"),
+            prefs_live,
+            "live set-entry blob must round-trip exactly"
+        );
+
+        // Case 2: the SAME clock with the entry gone. This is a removal at rest.
+        // `deliberate_folders` is omit-when-empty, so the set key disappears
+        // entirely and the clock is the only thing left saying it ever existed.
+        let nonce_removed: [u8; AEAD_NONCE_LEN] = [0xE2; AEAD_NONCE_LEN];
+        let mut clocks_removed = BTreeMap::new();
+        clocks_removed.insert(
+            String::from("deliberate_folders/projects/myne/"),
+            1_765_432_102_000u64,
+        );
+        let prefs_removed = PrefsView {
+            field_clocks: clocks_removed,
+            ..PrefsView::default()
+        };
+        let canonical_removed = canonical_json_encode(&prefs_removed);
+        assert_eq!(
+            canonical_removed.as_slice(),
+            br#"{"field_clocks":{"deliberate_folders/projects/myne/":1765432102000},"screen_capture_protection":true}"#.as_slice(),
+            "a removal encodes as a clock with NO corresponding set key: the empty set is omitted entirely, so the stamp is the whole claim",
+        );
+        let blob_removed = encode_prefs_blob_raw(
+            &prefs_key_a,
+            &account_hash_a,
+            &prefs_removed,
+            &nonce_removed,
+        )
+        .expect("encode set-entry removed");
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_removed).expect("decode"),
+            prefs_removed,
+            "removal blob must round-trip exactly"
+        );
+
+        // Case 3: a folded non-ASCII key beside an ASCII one.
+        let nonce_folded: [u8; AEAD_NONCE_LEN] = [0xE3; AEAD_NONCE_LEN];
+        let mut clocks_folded = BTreeMap::new();
+        clocks_folded.insert(
+            String::from("deliberate_folders/bücher/"),
+            1_765_432_103_000u64,
+        );
+        clocks_folded.insert(
+            String::from("deliberate_folders/archive/"),
+            1_765_432_104_000u64,
+        );
+        let prefs_folded = PrefsView {
+            deliberate_folders: alloc::vec![String::from("Archive/"), String::from("Bücher/")],
+            field_clocks: clocks_folded,
+            ..PrefsView::default()
+        };
+        let canonical_folded = canonical_json_encode(&prefs_folded);
+        assert_eq!(
+            canonical_folded.as_slice(),
+            r#"{"deliberate_folders":["Archive/","Bücher/"],"field_clocks":{"deliberate_folders/archive/":1765432104000,"deliberate_folders/bücher/":1765432103000},"screen_capture_protection":true}"#.as_bytes(),
+            "pins how a non-ASCII folder key is escaped and where it sorts among the clock keys; an implementation that disagrees produces a different blob for the same vault",
+        );
+        let blob_folded =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_folded, &nonce_folded)
+                .expect("encode set-entry folded");
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_folded).expect("decode"),
+            prefs_folded,
+            "folded-key blob must round-trip exactly"
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        let mut case =
+            |id: &str, desc: &str, canonical: &[u8], nonce: &[u8], blob: &[u8], last: bool| {
+                dump.push_str("    {\n");
+                dump.push_str(&alloc::format!("      \"vector_id\": \"{id}\",\n"));
+                dump.push_str(&alloc::format!("      \"description\": \"{desc}\",\n"));
+                dump.push_str("      \"case_kind\": \"encrypt\",\n");
+                dump.push_str(&alloc::format!(
+                    "      \"input_root_key_hex\": \"{}\",\n",
+                    hex_lower(&root_a)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"input_account_number_hash_hex\": \"{}\",\n",
+                    hex_lower(&account_hash_a)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+                    hex_lower(canonical)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"input_prefs_nonce_hex\": \"{}\",\n",
+                    hex_lower(nonce)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"informational_prefs_key_hex\": \"{}\",\n",
+                    hex_lower(&*prefs_key_a)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"expected_prefs_blob_hex\": \"{}\"\n",
+                    hex_lower(blob)
+                ));
+                dump.push_str(if last { "    }\n" } else { "    },\n" });
+            };
+
+        case(
+            "vault-prefs/v0.1/encrypt-set-entry-clock-live",
+            "Set-entry removal clock, live half (myne-md/myne#613, sync-protocol.md \\u00a710.2). A set-union field carries a per-entry clock under `<field>/<entry>`, where the entry key is the FOLDED folder identity (`projects/myne/`) while the set itself holds the raw display form (`Projects/Myne/`). Pins the canonical key order deliberate_folders (d) < field_clocks (fi) < screen_capture_protection (s) with a set-keyed clock present. Same vault-A inputs as the sibling cases; prefs_nonce=0xE1x24. Generated by emit_set_removal_clock_prefs_vectors in protocol/src/prefs.rs.",
+            &canonical_live,
+            &nonce_live,
+            &blob_live,
+            false,
+        );
+        case(
+            "vault-prefs/v0.1/encrypt-set-entry-clock-removed",
+            "Set-entry removal clock, removed half (myne-md/myne#613). The SAME clock key with no corresponding set entry: `deliberate_folders` is omit-when-empty so the set key is absent entirely, and the stamp is the whole claim that the entry was deleted rather than never held. This is the shape sync-protocol.md \\u00a710.2 resolves against a peer that still holds the entry. What this ENCRYPT case pins is that the orphan key survives the encode and is present in the plaintext, byte for byte: it does not, and cannot, pin that a DECODER preserves it, because an encrypt case never hands a port a blob to read. The decode half is asserted in the reference implementation by the round-trip in `emit_set_removal_clock_prefs_vectors`'s own module tests, and a port that wants the same assurance owes itself a decode of this blob; a decoder that dropped the orphan key would silently undo every folder deletion on a multi-device vault, and nothing in this file would say so. Same vault-A inputs; prefs_nonce=0xE2x24. Generated by emit_set_removal_clock_prefs_vectors in protocol/src/prefs.rs.",
+            &canonical_removed,
+            &nonce_removed,
+            &blob_removed,
+            false,
+        );
+        case(
+            "vault-prefs/v0.1/encrypt-set-entry-clock-folded-non-ascii",
+            "Set-entry removal clock with a non-ASCII folded key (myne-md/myne#613). Two clock keys, one ASCII and one multi-byte, beside their raw set entries. Pins two things a port can get wrong with no test noticing. First, non-ASCII is emitted as RAW UTF-8 and never \\\\u-escaped, in both the set entry and the clock key: an implementation whose JSON writer escapes by default (many do) produces a different plaintext, a different AEAD tag, and a blob the other side cannot decrypt. Second, the multi-byte key sorts in the same sequence as its ASCII sibling, which pins that a port sorts the clock map at all and does not reorder around a non-ASCII key. It deliberately does NOT claim to discriminate byte order from code-point order: UTF-8 byte order and code-point order are identical by construction, so no case can separate them, and the only ordering a vector here could discriminate is UTF-16 code-unit order, which needs an astral character against a BMP one and is not what these two keys are. Same vault-A inputs; prefs_nonce=0xE3x24. Generated by emit_set_removal_clock_prefs_vectors in protocol/src/prefs.rs.",
+            &canonical_folded,
+            &nonce_folded,
+            &blob_folded,
+            true,
+        );
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_set_removal_clock_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs set-removal-clock vectors dump");
     }
 
     /// Generator for the display-formatting quartet's `vault-prefs` cases —

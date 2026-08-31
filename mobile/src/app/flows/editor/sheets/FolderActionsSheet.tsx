@@ -74,7 +74,14 @@ export function FolderActionsSheet({
             />
           )}
           {sep}
-          {row(t("notes.list.deleteFolderConfirm"), onTrash, { danger: true, groupTop: true })}
+          {row(t("notes.list.deleteFolderConfirm"), onTrash, {
+            danger: true,
+            groupTop: true,
+            // myne-md/myne#613: the delete had no testid, so mobile's only
+            // automated lane could not reach it, which is why the cache-derived
+            // removal shipped unnoticed.
+            testId: "notes.folder-delete",
+          })}
         </>
       )}
     </Sheet>

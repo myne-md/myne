@@ -64,7 +64,8 @@ export async function drainPendingCaptures(): Promise<number> {
     }
     for (const cap of pending) {
       try {
-        await noteCreate(cap.text);
+        // A watch dictation carries no folder: it lands at the vault root.
+        await noteCreate(cap.text, null);
         created += 1;
       } catch {
         // Vault locked mid-drain (or note-create failure) — stop; the un-acked

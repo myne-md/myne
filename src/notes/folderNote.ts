@@ -43,7 +43,7 @@ export async function createFolderNote(folderPath: string): Promise<string> {
   let bytes: Uint8Array = encoder.encode(buildInitialPlaintext(norm));
   bytes = patchTitleField(bytes, folderNoteTitle(norm));
   bytes = patchFolderIndexField(bytes, true);
-  return await noteCreate(decoder.decode(bytes));
+  return await noteCreate(decoder.decode(bytes), norm);
 }
 
 /**

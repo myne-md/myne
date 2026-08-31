@@ -24,12 +24,13 @@ import i18n from "../i18n";
 import {
   PrefsView,
   prefsRead,
+  type SetMutation,
   setAiEnabled as persistAiEnabled,
-  setAiExcludedFolders as persistAiExcludedFolders,
+  mutateAiExcludedFolders as persistAiExcludedFolders,
   setAutoLockTimeout,
   setAutoTagEnabled as persistAutoTagEnabled,
   setCliEnabled as persistCliEnabled,
-  setCliExcludedFolders as persistCliExcludedFolders,
+  mutateCliExcludedFolders as persistCliExcludedFolders,
   setCliRateLimitDisabled as persistCliRateLimitDisabled,
   setDeveloperMode as persistDeveloperMode,
   setDateFormat,
@@ -154,8 +155,15 @@ interface UsePrefsResult {
   /** Flip the auto-tag sub-toggle (optimistic; same pattern). Co-gated on
    *  `ai_enabled` at the surface, not here. */
   setAutoTagEnabled: (enabled: boolean) => Promise<void>;
-  /** Replace the AI excluded-folders set (optimistic; same pattern). */
-  setAiExcludedFolders: (folders: string[]) => Promise<void>;
+  /**
+   * Add to and remove from the AI excluded-folders set (optimistic; same
+   * pattern). Takes verbs rather than a whole set: see `SetMutation`, and
+   * myne-md/myne#613 for what a whole-set write cost.
+   */
+  setAiExcludedFolders: (
+    mutation: SetMutation,
+    next: string[],
+  ) => Promise<void>;
   /** Flip the Developer mode toggle (optimistic; same converge-on-error pattern). */
   setDeveloperMode: (enabled: boolean) => Promise<void>;
   /**
@@ -164,8 +172,11 @@ interface UsePrefsResult {
    * within one supervisor tick — this only writes the preference.
    */
   setCliEnabled: (enabled: boolean) => Promise<void>;
-  /** Replace the CLI excluded-folders set (optimistic; same pattern). */
-  setCliExcludedFolders: (folders: string[]) => Promise<void>;
+  /** Add to and remove from the CLI excluded-folders set (optimistic). */
+  setCliExcludedFolders: (
+    mutation: SetMutation,
+    next: string[],
+  ) => Promise<void>;
   /**
    * Remove (or restore) the default-on CLI command rate limit. A pace bound on
    * a runaway script, NOT a permission check — see `cli_bridge::rate_limit`.
@@ -394,22 +405,66 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
-  const setAiExcludedFoldersPref = useCallback(
-    async (folders: string[]) => {
-      setPrefs((p) => ({ ...p, ai_excluded_folders: folders }));
+  /**
+   * The shared core of the two EGRESS-control setters (`ai_excluded_folders`,
+   * `cli_excluded_folders`). One copy rather than two, because what it holds is
+   * a fail-open guard and two copies is the shape where one of them later stops
+   * guarding.
+   *
+   * `next` is only the optimistic cache value; `mutation` is what is written.
+   * They are separate arguments because the caller's optimistic view and its
+   * claim about what changed are genuinely different things, and collapsing them
+   * is what let a stale view delete a peer's entry (myne-md/myne#613).
+   *
+   * Three outcomes, and the middle one is the reason this is not
+   * `writeOptimisticPref`, which discards what the write returned:
+   *
+   *   - clean, so the optimistic value stands;
+   *   - the reserved byte budget REFUSED some additions
+   *     (`SET_FIELD_BUDGET_BYTES`), so the cache is now claiming a folder is
+   *     excluded from the AI or the CLI that is not excluded on disk. That is a
+   *     fail-open reading of a control `docs/threat-model.md` A17 names, so
+   *     converge to disk truth and say what happened rather than leaving the
+   *     safer-looking value up;
+   *   - the write threw, so re-read disk truth and report the ordinary error.
+   *
+   * A failed re-read leaves the optimistic value in place on both failure paths:
+   * the notice still fires, and the next successful read corrects the cache.
+   */
+  const writeExcludedFolders = useCallback(
+    async (
+      patch: Partial<PrefsView>,
+      persist: (mutation: SetMutation) => Promise<number>,
+      mutation: SetMutation,
+    ) => {
+      setPrefs((p) => ({ ...p, ...patch }));
+      let messageKey: string | null = null;
       try {
-        await persistAiExcludedFolders(folders);
-      } catch {
-        try {
-          const view = await prefsRead();
-          setPrefs(view);
-        } catch {
-          // Keep the optimistic value; the backend tracing logged the failure.
+        if ((await persist(mutation)) > 0) {
+          messageKey = "settings.prefs.folderListFull";
         }
-        onError?.(i18n.t("settings.prefs.saveError"));
+      } catch {
+        messageKey = "settings.prefs.saveError";
       }
+      if (messageKey === null) return;
+      try {
+        setPrefs(await prefsRead());
+      } catch {
+        // Keep the optimistic value; backend tracing logged the original write.
+      }
+      onError?.(i18n.t(messageKey));
     },
     [onError],
+  );
+
+  const setAiExcludedFoldersPref = useCallback(
+    (mutation: SetMutation, next: string[]) =>
+      writeExcludedFolders(
+        { ai_excluded_folders: next },
+        persistAiExcludedFolders,
+        mutation,
+      ),
+    [writeExcludedFolders],
   );
 
   /**
@@ -455,10 +510,16 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [writeOptimisticPref],
   );
 
+  // The AI setter's twin, through the same core: see `writeExcludedFolders` for
+  // why these two do not go through `writeOptimisticPref`.
   const setCliExcludedFoldersPref = useCallback(
-    (folders: string[]) =>
-      writeOptimisticPref({ cli_excluded_folders: folders }, () => persistCliExcludedFolders(folders)),
-    [writeOptimisticPref],
+    (mutation: SetMutation, next: string[]) =>
+      writeExcludedFolders(
+        { cli_excluded_folders: next },
+        persistCliExcludedFolders,
+        mutation,
+      ),
+    [writeExcludedFolders],
   );
 
   const setCliRateLimitDisabledPref = useCallback(

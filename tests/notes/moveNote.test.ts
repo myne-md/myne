@@ -153,3 +153,108 @@ describe("createNote(folder) — a2 create-timing", () => {
     );
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// myne-md/myne#613: a folder is registered the first time a note lands in it.
+//
+// Every assertion here keys off what reached `invoke`, never off a function
+// name: the defect this closes was a WRITE with the wrong payload, and a spy on
+// the binding would have passed for both the broken and the fixed version. Each
+// block also states a floor, so a call site that silently stops firing fails
+// rather than passing vacuously.
+// ---------------------------------------------------------------------------
+
+/** Every `prefs|set_deliberate_folders` payload that reached `invoke`. */
+function deliberateWrites(): Array<{ add?: string[]; remove?: string[] }> {
+  return invokeMock.mock.calls
+    .filter(([cmd]) => cmd === "plugin:prefs|set_deliberate_folders")
+    .map(([, args]) => (args as { mutation: { add?: string[]; remove?: string[] } }).mutation);
+}
+
+/** Route note_read / note_update AND accept the prefs write. */
+function routeWithPrefs(read: string, updateFails = false): void {
+  invokeMock.mockImplementation((cmd: string) => {
+    if (cmd === "plugin:notes|note_read") return Promise.resolve(read);
+    if (cmd === "plugin:notes|note_update") {
+      return updateFails ? Promise.reject(new Error("nope")) : Promise.resolve(undefined);
+    }
+    if (cmd === "plugin:prefs|set_deliberate_folders") return Promise.resolve(0);
+    return Promise.resolve(undefined);
+  });
+}
+
+/** Let the fire-and-forget registration settle before asserting. */
+const settle = () => new Promise((r) => setTimeout(r, 0));
+
+describe("moveNote folder registration (myne-md/myne#613)", () => {
+  it("registers the destination as an ADD, claiming no removal", async () => {
+    routeWithPrefs("# Hello\n");
+    await moveNote("id-1", "Projects/");
+    await settle();
+    const writes = deliberateWrites();
+    expect(writes).toHaveLength(1); // floor: the call site fired at all
+    expect(writes[0]?.add).toEqual(["Projects/"]);
+    // The whole point of the verb payload: a move can never claim a deletion,
+    // whatever the caller's view of the set was. A `remove` here would be the
+    // lost-update-becomes-distributed-delete defect back again.
+    expect(writes[0]?.remove ?? []).toEqual([]);
+  });
+
+  it("registers the NORMALIZED path, which is what the note now carries", async () => {
+    routeWithPrefs("# Hello\n");
+    await moveNote("id-1", "Projects/Myne"); // no trailing slash
+    await settle();
+    expect(deliberateWrites()[0]?.add).toEqual(["Projects/Myne/"]);
+  });
+
+  it("registers nothing for a move to the vault root", async () => {
+    routeWithPrefs("---\nfolder: Projects/\n---\n\n# Hello\n");
+    await moveNote("id-1", null);
+    await settle();
+    // Leaving a folder is not deleting it, so the folder the note LEFT is
+    // untouched too: no write of any kind.
+    expect(deliberateWrites()).toEqual([]);
+  });
+});
+
+describe("bulkMoveNotes: one prefs write per operation (myne-md/myne#613)", () => {
+  it("issues exactly ONE write for fifty notes, not fifty", async () => {
+    routeWithPrefs("# Hello\n");
+    const ids = Array.from({ length: 50 }, (_, i) => `id-${i}`);
+    const r = await bulkMoveNotes(ids, "Projects/");
+    await settle();
+    expect(r.moved).toHaveLength(50); // floor: the moves really happened
+    // Asserted on the COUNT rather than the end state, deliberately: an
+    // end-state assertion passes for the fifty-write implementation too, and
+    // each write re-encrypts the whole `vault.prefs` blob.
+    expect(deliberateWrites()).toHaveLength(1);
+    expect(deliberateWrites()[0]?.add).toEqual(["Projects/"]);
+  });
+
+  it("registers nothing when every note in the bulk failed", async () => {
+    routeWithPrefs("# Hello\n", true);
+    const r = await bulkMoveNotes(["a", "b", "c"], "Projects/");
+    await settle();
+    expect(r.failed).toHaveLength(3); // floor: they really all failed
+    expect(deliberateWrites()).toEqual([]);
+  });
+
+  it("registers once when only some of the bulk landed", async () => {
+    let reads = 0;
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "plugin:notes|note_read") {
+        reads += 1;
+        return reads === 2 ? Promise.reject(new Error("nope")) : Promise.resolve("# Hello\n");
+      }
+      if (cmd === "plugin:notes|note_update") return Promise.resolve(undefined);
+      return Promise.resolve(0);
+    });
+    const r = await bulkMoveNotes(["a", "b", "c"], "Projects/");
+    await settle();
+    expect(r.moved).toHaveLength(2);
+    expect(r.failed).toHaveLength(1);
+    expect(deliberateWrites()).toHaveLength(1);
+    expect(deliberateWrites()[0]?.add).toEqual(["Projects/"]);
+  });
+});
