@@ -2515,6 +2515,13 @@
     },
     "workspace": {
       "defaultSlotName": "Domyślny"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Eksportuj…",
+      "txt": "Zwykły tekst"
     }
   },
   "password": {
@@ -3261,6 +3268,9 @@
       "exactLabel": "Dokładny czas",
       "exactOn": "Włączone",
       "horizon": "Przypomnienia są zarejestrowane do {{date}}. Otwórz Myne przed tą datą, aby nadal przychodziły.",
+      "horizonLabel": "Planuj z wyprzedzeniem",
+      "horizonLabelHelper": "Przypomnienia są przygotowywane z takim wyprzedzeniem. Myne musi być otwarty i odblokowany, aby przypomnienie dotarło.",
+      "horizonInertHelper": "Zapisano na tym urządzeniu. Nic tego jeszcze nie odczytuje: ta wersja nie dostarcza przypomnień o zadaniach.",
       "label": "Przypomnienia o zadaniach",
       "saveError": "Nie udało się zapisać tego ustawienia. Spróbuj ponownie.",
       "showTextAria": "Pokazuj treść zadania w powiadomieniu",

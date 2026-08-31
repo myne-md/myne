@@ -2321,6 +2321,13 @@
     },
     "workspace": {
       "defaultSlotName": "Chaguomsingi"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Hamisha…",
+      "txt": "Maandishi sahili"
     }
   },
   "password": {
@@ -3029,6 +3036,9 @@
       "exactLabel": "Muda kamili",
       "exactOn": "Imewashwa",
       "horizon": "Vikumbusho vimesajiliwa hadi {{date}}. Fungua Myne kabla ya hapo ili viendelee kufika.",
+      "horizonLabel": "Ratibu mapema",
+      "horizonLabelHelper": "Vikumbusho huandaliwa mapema kiasi hiki. Myne lazima iwe wazi na imefunguliwa ili kikumbusho kifike.",
+      "horizonInertHelper": "Imehifadhiwa kwenye kifaa hiki. Bado hakuna kinachoisoma: toleo hili halitumi vikumbusho vya kazi.",
       "label": "Vikumbusho vya kazi",
       "saveError": "Imeshindwa kuhifadhi mpangilio huo. Jaribu tena.",
       "showTextAria": "Onyesha maandishi ya kazi kwenye arifa",

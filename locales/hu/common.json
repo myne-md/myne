@@ -2335,6 +2335,13 @@
     },
     "workspace": {
       "defaultSlotName": "Alapértelmezett"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportálás…",
+      "txt": "Egyszerű szöveg"
     }
   },
   "password": {
@@ -3049,6 +3056,9 @@
       "exactLabel": "Pontos időzítés",
       "exactOn": "Be",
       "horizon": "Az emlékeztetők eddig vannak regisztrálva: {{date}}. Addig nyisd meg a Myne-t, hogy továbbra is érkezzenek.",
+      "horizonLabel": "Előre ütemezés",
+      "horizonLabelHelper": "Az emlékeztetők ennyivel előre készülnek el. A Myne-nak nyitva és feloldva kell lennie, hogy megérkezzen egy.",
+      "horizonInertHelper": "Elmentve ezen az eszközön. Még semmi sem olvassa: ez a build nem kézbesít feladat-emlékeztetőket.",
       "label": "Feladatemlékeztetők",
       "saveError": "Nem sikerült menteni a beállítást. Próbáld újra.",
       "showTextAria": "A feladat szövegének megjelenítése az értesítésben",

@@ -2335,6 +2335,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Eksportér…",
+      "txt": "Almindelig tekst"
     }
   },
   "password": {
@@ -3049,6 +3056,9 @@
       "exactLabel": "Præcis timing",
       "exactOn": "Til",
       "horizon": "Påmindelser er registreret til og med {{date}}. Åbn Myne inden da for at holde dem i gang.",
+      "horizonLabel": "Planlæg forud",
+      "horizonLabelHelper": "Påmindelser klargøres så lang tid i forvejen. Myne skal være åben og låst op, for at en påmindelse kan komme frem.",
+      "horizonInertHelper": "Gemt på denne enhed. Intet læser den endnu: denne version leverer ikke opgavepåmindelser.",
       "label": "Opgavepåmindelser",
       "saveError": "Kunne ikke gemme indstillingen. Prøv igen.",
       "showTextAria": "Vis opgavens tekst i notifikationen",

@@ -61,14 +61,21 @@ const ACCEPT_POLL: Duration = Duration::from_millis(50);
 /// invocation can hit it (the CLI writes its whole request before reading),
 /// short enough that a stalled connection frees its thread promptly.
 ///
-/// **It is passed to TWO mechanisms and they bound different things**, which
-/// this doc used to conflate. As `SO_RCVTIMEO`/`SO_SNDTIMEO` it is a
-/// PER-SYSCALL bound: it resets whenever a read returns data, so it bounds a
-/// SILENT peer and not a dribbling one. As [`Watchdog`]'s deadline it is the
-/// connection TOTAL, wall-clock from accept, and that is the one that makes the
-/// "a peer that connects and sends a partial length prefix pins its handler
-/// thread forever" claim below true for every peer rather than only for a
-/// silent one.
+/// **It is passed to THREE mechanisms and they bound different things**, which
+/// this doc used to conflate into one.
+///
+/// As `SO_RCVTIMEO`/`SO_SNDTIMEO` it is a PER-SYSCALL bound: it resets whenever
+/// a read returns data, so it bounds a SILENT peer and not a dribbling one.
+///
+/// As `framing::Budget` it is a ceiling on ONE frame read, checked between
+/// syscalls, which is what bounds the dribbling peer. It stops at the read, so
+/// `dispatch` keeps no wall-clock cap: that call decrypts every candidate note,
+/// and a bound spanning it would kill a healthy `myne list` on a large vault.
+///
+/// As [`Watchdog`]'s deadline it is the connection total, but it is armed only
+/// when the socket options were REFUSED, so on the ordinary path it bounds
+/// nothing. That type's doc records what happened when it was briefly armed on
+/// every connection.
 #[cfg(not(test))]
 const IO_DEADLINE: Duration = Duration::from_secs(10);
 
@@ -175,34 +182,34 @@ pub struct ListenerHandle {
 #[cfg(unix)]
 use crate::uds::bind_listener;
 
-/// The connection's TOTAL bound: a thread that shuts it down once the deadline
-/// the caller supplied has elapsed. `shutdown(Both)` makes every in-flight and
+/// The deadline of last resort: a thread that shuts the connection down once the
+/// deadline the caller supplied has elapsed. `shutdown(Both)` makes every in-flight and
 /// subsequent read return EOF and every write fail, which is what releases the
 /// handler thread. Production passes [`IO_DEADLINE`]; the deadline tests pass
 /// [`STALL_TEST_DEADLINE`]. `Drop` disarms it, so a connection that finishes
 /// normally does not leave a thread sitting out the full deadline.
 ///
-/// **It is armed on EVERY connection, and it used to be armed only when the
-/// socket options were REFUSED.** That was a thread saved against a bound not
-/// held, because `SO_RCVTIMEO` is a per-SYSCALL timeout that resets every time a
-/// read returns data, while `framing::read_up_to` loops until its buffer fills.
-/// A peer sending one byte every 9 s therefore never trips a 10 s
-/// `SO_RCVTIMEO` and holds its handler thread for as long as it likes. The rate
-/// limiter cannot charge it anything, because that is checked AFTER `read_frame`
-/// returns. Sixteen such peers reach [`MAX_INFLIGHT_CONNECTIONS`] and every
-/// later connection is dropped at the cap, which is the door-closed state
-/// myne#314 fixed one other arm of in this file: the socket stops answering
-/// while the status marker still reads `O`.
+/// **Armed ONLY when the socket options were refused**, so the ordinary
+/// connection still costs exactly one thread. `Drop` disarms it, so a connection
+/// that finishes normally does not leave a thread sitting out the full deadline.
 ///
-/// The hole predates this file's O_NONBLOCK fix on Linux and was closed on macOS
-/// only by accident, because every read there returned instantly and a dribbling
-/// peer could not hold anything either. Making the reads block is what opened
-/// it, so it is closed in the same change.
+/// **It was briefly armed on every connection and that was wrong, in a way worth
+/// recording.** The reasoning was that `SO_RCVTIMEO` is a PER-SYSCALL bound that
+/// resets whenever a read returns data, so it bounds a silent peer and not a
+/// dribbling one, and that a total bound was therefore missing. The premise is
+/// correct. The conclusion was not: this watchdog's deadline runs from ACCEPT and
+/// spans the whole exchange, including `dispatch`, which decrypts every candidate
+/// note. A healthy `myne list` on a large vault crosses 10 s, and the watchdog
+/// would then `shutdown(Both)` it mid-flight, so the CLI reported a generic IO
+/// failure that reads like the app not running. It bought a compute cap and did
+/// not even buy the property claimed for it, because `shutdown(Both)` does not
+/// interrupt a thread inside `block_on`. It also made an `arm` failure fatal on a
+/// path that never ran on Linux, and per-connection cost went from two
+/// descriptors and one thread to three and two, against a cap of 16, on a loop
+/// whose own comment names fd exhaustion as reachable without malice.
 ///
-/// The cost is one extra thread per in-flight connection, bounded by
-/// [`MAX_INFLIGHT_CONNECTIONS`] at 16, each parked in `recv_timeout` rather than
-/// running. The adversary is a same-user process, which the cap's own doc
-/// already scopes as robustness rather than a new trust boundary.
+/// The dribbling peer is bounded where it actually is: `framing::Budget`, a
+/// ceiling on ONE frame read, checked between syscalls, and stopping at the read.
 #[cfg(unix)]
 struct Watchdog {
     disarm: Option<std::sync::mpsc::Sender<()>>,
@@ -211,12 +218,17 @@ struct Watchdog {
 
 #[cfg(unix)]
 impl Watchdog {
-    /// `Err` means the total bound is unavailable, and the caller must drop the
-    /// connection rather than serve it unbounded. There is no `Ok(None)` arm any
-    /// more: the previous signature returned one when the socket already carried
-    /// `SO_RCVTIMEO`, on the reading that the two bounds were interchangeable.
-    /// They are not, and the type doc above says why.
-    fn arm(stream: &std::os::unix::net::UnixStream, deadline: Duration) -> io::Result<Self> {
+    /// `Ok(None)` when the socket already carries its own deadline and there
+    /// is nothing to arm. `Err` means neither mechanism is available and the
+    /// caller must drop the connection rather than serve it unbounded.
+    fn arm(
+        stream: &std::os::unix::net::UnixStream,
+        deadline_set: bool,
+        deadline: Duration,
+    ) -> io::Result<Option<Self>> {
+        if deadline_set {
+            return Ok(None);
+        }
         let fd = stream.try_clone()?;
         let (disarm, rx) = std::sync::mpsc::channel::<()>();
         let join = std::thread::Builder::new()
@@ -230,10 +242,10 @@ impl Watchdog {
                     let _ = fd.shutdown(std::net::Shutdown::Both);
                 }
             })?;
-        Ok(Self {
+        Ok(Some(Self {
             disarm: Some(disarm),
             join: Some(join),
-        })
+        }))
     }
 }
 
@@ -313,6 +325,7 @@ fn serve_connection(
             stage = "cli_bridge_conn_deadline",
             event = "set_blocking_refused"
         );
+        last_access.record(std::time::Instant::now());
         return;
     }
 
@@ -343,14 +356,18 @@ fn serve_connection(
             event = "socket_opt_refused"
         );
     }
-    let _deadline = match Watchdog::arm(&stream, deadline) {
+    let _deadline = match Watchdog::arm(&stream, deadline_set, deadline) {
         Ok(guard) => guard,
         Err(e) => {
-            // No total bound at all: this is the unbounded state the deadline
-            // exists to prevent, so here the connection really does die rather
-            // than be served.
+            // No socket deadline AND no watchdog: this is the unbounded state
+            // the deadline exists to prevent, so here the connection really
+            // does die rather than be served.
             let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
             tracing::debug!(stage = "cli_bridge_conn_deadline", io_failure_kind = ?kind);
+            // The door indicator still records that something ARRIVED. An early
+            // return that skips it is the defect the comment above the timeouts
+            // describes, so every early return in this function carries it.
+            last_access.record(std::time::Instant::now());
             return;
         }
     };
@@ -359,10 +376,21 @@ fn serve_connection(
         Err(e) => {
             let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
             tracing::debug!(stage = "cli_bridge_conn_clone", io_failure_kind = ?kind);
+            last_access.record(std::time::Instant::now());
             return;
         }
     };
-    super::dispatch::serve_connection(&mut read_half, &mut stream, lister, limiter);
+    super::dispatch::serve_connection(
+        &mut read_half,
+        &mut stream,
+        lister,
+        limiter,
+        // The ceiling on reading the REQUEST. Same number as the socket timeout,
+        // different property: that bounds one syscall, this bounds the whole
+        // frame, which is what a dribbling peer stalls on. It stops at the read,
+        // so dispatch keeps no wall-clock cap.
+        Some(super::framing::Budget::new(deadline)),
+    );
     // Task 12: the Settings last-access line. Recorded AFTER the exchange, and
     // for every outcome — a refused, throttled or malformed request still
     // means something reached the door, which is precisely what the indicator
@@ -980,23 +1008,18 @@ mod tests {
         // nothing to read, which turns a 2-in-3 flake into a deterministic
         // assertion.
         //
-        // **What this asserts depends on the platform, and the difference is the
-        // finding rather than a footnote.** Linux `accept()` does not inherit
-        // file status flags (Rust std uses `accept4` with `SOCK_CLOEXEC` only),
-        // so the accepted stream is blocking there whether or not
-        // `set_nonblocking(false)` runs. On Linux this test pins the
-        // blocking-first-read CONTRACT: it fails if someone makes the stream
-        // non-blocking. On macOS and the BSDs it is the regression guard for the
-        // inherited flag.
+        // **What this asserts depends on the platform.** Linux `accept()` does not
+        // inherit file status flags (Rust std uses `accept4` with `SOCK_CLOEXEC`
+        // only), so the accepted stream is blocking there whether or not
+        // `set_nonblocking(false)` runs. On Linux this pins the
+        // blocking-first-read CONTRACT; on macOS and the BSDs it is the
+        // regression guard for the inherited flag.
         //
-        // The deletion experiment was run on macOS: removing
-        // `set_nonblocking(false)` fails this test by name and leaves the whole
-        // rest of the module green. **That experiment is not reproducible on
-        // CI**, which is Linux-only, so on the platform where every gate
-        // actually executes this guard cannot be broken. The macOS half is a
-        // MANUAL verdict, recorded in `docs/dev/manual-test-roster.md` under the
-        // CLI entry, and a future removal of the call is caught there rather
-        // than here.
+        // `the_fix_holds_on_a_stream_that_arrives_non_blocking` below is the
+        // half that fails on EVERY platform, by setting the flag itself instead
+        // of waiting for a kernel to inherit it. Read the two together: this one
+        // proves the real accept path is served, that one proves the line doing
+        // it is load-bearing.
         //
         // 250 ms is far inside the connection deadline (`IO_DEADLINE`, 60 s
         // under cfg(test)), so a failure here is the flag and never the timeout.
@@ -1028,6 +1051,76 @@ mod tests {
         assert_eq!(reply["error"]["kind"], "invalid_request");
 
         teardown(Some(handle));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_fix_holds_on_a_stream_that_arrives_non_blocking() {
+        // The regression guard that fails on every platform, including the only
+        // one CI runs.
+        //
+        // The test above goes through the real accept path, where whether the
+        // stream arrives non-blocking is the KERNEL's choice: macOS and the BSDs
+        // inherit the listener's flag, Linux does not. So on Linux it cannot
+        // fail, and Linux is where every gate executes. An earlier version of
+        // this branch answered that with a manual roster item whose stated
+        // reason was that reproducing it needs a BSD-family kernel. It does not.
+        //
+        // `serve_connection` is private and this module already calls private
+        // items, so the flag can simply be SET here. That reproduces the exact
+        // condition the fix clears, on any Unix, and `set_nonblocking(false)` is
+        // then the only thing standing between it and a connection served.
+        let dir = ShortDir::new();
+        let path = dir.path().join("nb.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).expect("bind probe socket");
+        let mut client =
+            std::os::unix::net::UnixStream::connect(&path).expect("connect to probe socket");
+        let (server, _) = listener.accept().expect("accept probe connection");
+        // The condition under test, arranged rather than waited for.
+        server
+            .set_nonblocking(true)
+            .expect("make the accepted stream non-blocking");
+
+        let marker = test_marker();
+        let handle = std::thread::spawn({
+            let marker = marker.clone();
+            move || {
+                serve_connection(
+                    server,
+                    test_lister().as_ref(),
+                    open_limiter().as_ref(),
+                    &marker,
+                    IO_DEADLINE,
+                )
+            }
+        });
+
+        // The pause is what makes the flag decide the outcome: the server thread
+        // reaches its first read with nothing to read, which on a non-blocking
+        // stream returns `WouldBlock` in microseconds instead of waiting.
+        std::thread::sleep(Duration::from_millis(250));
+        client
+            .set_read_timeout(Some(CLIENT_OBSERVATION_CEILING))
+            .expect("set client read timeout");
+        write_whole_frame(&mut client, b"{}");
+
+        let mut prefix = [0u8; 4];
+        client
+            .read_exact(&mut prefix)
+            .expect("a stream that arrived non-blocking must still be served");
+        let len = u32::from_le_bytes(prefix) as usize;
+        let mut reply = vec![0u8; len];
+        client.read_exact(&mut reply).expect("read reply body");
+        let reply: serde_json::Value = serde_json::from_slice(&reply).expect("reply is JSON");
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+
+        handle.join().expect("server thread");
+        // Every exit path records the door indicator, including the early ones.
+        assert!(
+            marker.elapsed_secs(std::time::Instant::now()).is_some(),
+            "the door indicator must record the arrival"
+        );
     }
 
     // ---- stalled connections cannot pin the door ------------------------
@@ -1099,7 +1192,10 @@ mod tests {
         // The peer stalls exactly like the test above: it sends nothing and
         // waits. This is the watchdog on its own, against a socket carrying no
         // `SO_RCVTIMEO` of its own, which is the arm no other test reaches.
-        let armed = Watchdog::arm(&server, STALL_TEST_DEADLINE).expect("arm the watchdog");
+        // `deadline_set: false` is the refusal this exists for.
+        let armed = Watchdog::arm(&server, false, STALL_TEST_DEADLINE)
+            .expect("arm the watchdog")
+            .expect("a refused deadline must produce a watchdog");
 
         client
             .set_read_timeout(Some(CLIENT_OBSERVATION_CEILING))
@@ -1133,7 +1229,9 @@ mod tests {
         // test whose deadline must NOT fire, so it takes the long one the
         // round-trip tests take. A short one here would make the assertion race
         // the very timer it is proving was disarmed.
-        let armed = Watchdog::arm(&server, IO_DEADLINE).expect("arm");
+        let armed = Watchdog::arm(&server, false, IO_DEADLINE)
+            .expect("arm")
+            .expect("armed");
         drop(armed); // the exchange "finished" well inside the deadline
 
         server.write_all(b"x").expect("write after disarm");

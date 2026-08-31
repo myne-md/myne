@@ -2681,6 +2681,13 @@
     },
     "workspace": {
       "defaultSlotName": "افتراضية"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "تصدير…",
+      "txt": "نص عادي"
     }
   },
   "password": {
@@ -3453,6 +3460,9 @@
       "exactLabel": "توقيت دقيق",
       "exactOn": "مُفعّل",
       "horizon": "التذكيرات مسجّلة حتى {{date}}. افتح Myne قبل ذلك لتستمر.",
+      "horizonLabel": "الجدولة مسبقًا",
+      "horizonLabelHelper": "يتم إعداد التذكيرات قبل هذه المدة. يجب أن يكون Myne مفتوحًا وغير مقفل كي يصل التذكير.",
+      "horizonInertHelper": "محفوظ على هذا الجهاز. لا شيء يقرأه بعد: هذه النسخة لا توصّل تذكيرات المهام.",
       "label": "تذكيرات المهام",
       "saveError": "تعذّر حفظ هذا الإعداد. أعد المحاولة.",
       "showTextAria": "إظهار نص المهمة في الإشعار",

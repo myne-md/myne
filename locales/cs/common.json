@@ -2515,6 +2515,13 @@
     },
     "workspace": {
       "defaultSlotName": "Výchozí"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportovat…",
+      "txt": "Prostý text"
     }
   },
   "password": {
@@ -3261,6 +3268,9 @@
       "exactLabel": "Přesné načasování",
       "exactOn": "Zapnuto",
       "horizon": "Připomínky jsou zaregistrovány do {{date}}. Otevřete Myne do té doby, aby chodily dál.",
+      "horizonLabel": "Plánovat dopředu",
+      "horizonLabelHelper": "Připomenutí se připravují s tímto předstihem. Aby dorazilo, musí být Myne spuštěné a odemčené.",
+      "horizonInertHelper": "Uloženo v tomto zařízení. Zatím to nikdo nečte: toto sestavení připomenutí úkolů nedoručuje.",
       "label": "Připomínky úkolů",
       "saveError": "Toto nastavení se nepodařilo uložit. Zkuste to znovu.",
       "showTextAria": "Zobrazit text úkolu v oznámení",
