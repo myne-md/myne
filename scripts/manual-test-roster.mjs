@@ -1154,16 +1154,8 @@ export const ROSTER = Object.freeze([
     automatedBy: [
       "e2e/cli-thin-client.e2e.ts",
     ],
-    manual: [
-      {
-        see: "On macOS, with the app running and unlocked, run `myne list` from a shell twenty times in a row and confirm every invocation returns the note list rather than reporting the app is not running. Then, in `src-tauri/src/cli_bridge/socket.rs`, delete the `stream.set_nonblocking(false)` call at the top of `serve_connection`, rebuild, and repeat: invocations must now fail. Restore the line. The pass condition is that the deletion is VISIBLE from the CLI, because on Linux it is not.",
-        whyNotAutomated: "Linux accept() does not inherit the listener's O_NONBLOCK and Rust std uses accept4 with SOCK_CLOEXEC only, so the accepted stream is blocking there whether or not the call runs; macOS and the BSDs inherit it. The regression is therefore invisible to every test on the Linux container that runs the whole suite, and reproducing it needs a BSD-family kernel rather than a fixture.",
-        clients: ["desktop-macos"],
-        estimateMin: 6,
-        tier: "core",
-      },
-    ],
-    exemptionReason: "Three of the four original candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues): the 0600 mode is asserted by bind_listener_sets_owner_only_0600_perms, the over-cap socket path is constructible in a test rather than designed out of the run, and the lock-during-flight teardown is one step past cli3. The fourth is no longer exempt and is the manual item above. This reason used to read that the stalled-peer deadline and its watchdog fallback are cargo-tested and that the watchdog exists precisely so the macOS AF_UNIX difference is not load-bearing; myne-md/myne#642 falsified the second half. The accepted stream inherited O_NONBLOCK on macOS, so the socket deadline was dead code there and the deadline test passed in 0.00 s whatever the deadline was, and no Linux test can see either fact.",
+    manual: [],
+    exemptionReason: "All four candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues): the 0600 mode is asserted by bind_listener_sets_owner_only_0600_perms, the over-cap socket path is constructible in a test rather than designed out of the run, and the lock-during-flight teardown is one step past cli3. The fourth, the stalled-peer deadline and its watchdog fallback, is cargo-tested in src-tauri/src/cli_bridge/socket.rs. myne-md/myne#642 falsified the old wording of that last clause, which said the watchdog exists precisely so the macOS AF_UNIX difference is not load-bearing: the accepted stream inherited O_NONBLOCK on macOS, so the socket deadline was dead code there and the deadline test passed in 0.00 s whatever the deadline was. That fix briefly carried a macOS-only manual item on the ground that reproducing the regression needs a BSD-family kernel. It does not, and the item is withdrawn: serve_connection is private, the test module in the same file already calls private items, so the_fix_holds_on_a_stream_that_arrives_non_blocking SETS the flag itself and fails on every Unix including the Linux container every gate runs in. A reason that names a real mechanism and is simply wrong about it is one the guard's phrase denylist cannot catch, which is why it is written out here.",
   },
   {
     id: "cli.write-new",
