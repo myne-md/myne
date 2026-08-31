@@ -65,12 +65,31 @@ const IO_DEADLINE: Duration = Duration::from_secs(10);
 
 /// The same deadline, shortened under `cfg(test)` so the test that proves a
 /// stalled connection IS released does not cost ten seconds of suite time.
-/// Still two orders of magnitude above anything the round-trip tests in this
-/// file take (each writes its whole frame and flushes before the server's
-/// first read), so shortening it changes which test is slow, not which
-/// behaviour is exercised.
+///
+/// **It was 1 s, and the claim that made 1 s safe was wrong.** That claim, kept
+/// here because the correction is the useful part, read: "two orders of
+/// magnitude above anything the round-trip tests in this file take (each writes
+/// its whole frame and flushes before the server's first read)". The first half
+/// of the window it describes was closed by `write_whole_frame`, which replaced
+/// two adjacent `write_all` calls with one. The second half was not, and it is
+/// the one that kept firing: the deadline starts at ACCEPT, so a client thread
+/// descheduled between `connect` and its first write loses the same way, with
+/// no second syscall involved. Measured on this tree: three consecutive
+/// `cargo test --workspace` runs under a loaded machine, three `BrokenPipe`
+/// failures in `a_connected_client_can_send_a_frame_and_get_a_reply`, each
+/// passing 3/3 when run alone.
+///
+/// 5 s rather than 10 s is a trade stated rather than assumed: it is five times
+/// the interval that was actually lost, and the stall test pays it once per
+/// suite run. Matching production's 10 s exactly would be more faithful and
+/// costs another five seconds on every `cargo test`; that is the knob to turn if
+/// this ever fires again, and turning it is cheaper than the argument.
+///
+/// What no number here can fix: a deadline is a wall-clock bound on a machine
+/// whose scheduling this test does not control. This raises the bar the load has
+/// to clear, it does not remove the bar.
 #[cfg(test)]
-const IO_DEADLINE: Duration = Duration::from_secs(1);
+const IO_DEADLINE: Duration = Duration::from_secs(5);
 
 /// How many connections may be in flight at once. A same-user process can
 /// already SIGKILL the app, so this is robustness rather than a new adversary
