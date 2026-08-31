@@ -6,9 +6,21 @@
 // out (MYND-630), on the reasoning that a spinner stopped mid-arc reads as hung
 // rather than as calm. This header used to claim the opposite, and the two
 // statements sat in the same repo contradicting each other.
+//
+// The small inline marks that used to live beside it are gone (myne-md/myne#603):
+// the three-quarter arc, and the triangle that briefly replaced part of it.
+// Both were hand-drawn geometry at 7 to 8px, and both were reported as unreadable
+// by the person using them: an arc with a gap reads as a paused spinner, and a
+// solid triangle at that size reads as a bullet. What replaced them is
+// `<StatusMark>` below, which draws a NAMED icon at 12px. The argument the
+// bespoke geometry rested on ("no Lucide pair distinguishes a filled dot from a
+// hollow one at 7px") was true and answered the wrong question: the fix is not a
+// better 7px glyph, it is not being at 7px.
 
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { Icon } from "./primitives/Icon";
+import type { IconName } from "../lib/icons";
 
 interface SpinnerProps {
   size?: number;
@@ -37,138 +49,123 @@ export function Spinner({ size = 32, style }: SpinnerProps) {
 }
 
 /**
- * The two sizes the arc is drawn at, named rather than written as a literal at
- * each call site.
+ * The size every inline status mark is drawn at.
  *
- * They differ by a pixel and both call sites' comments claim the glyph is "one
- * fact seen twice", which read as a contradiction until it was measured: the
- * save readout's arc sits INSIDE a text run at the readout's font size, and the
- * sidebar's sits at row level beside a title. Optical size follows the text it
- * sits in, so the shape is shared and the pixel count is not. Naming them says
- * that out loud; two bare literals said the opposite.
+ * **One number, where there used to be two.** The 7px/8px pair existed to
+ * optically compensate a hand-drawn ring: a bespoke shape at that scale needs a
+ * different pixel count inside a text run than beside a title. A stroke icon
+ * does not, because its weight comes from the stroke rather than from the
+ * silhouette, so it reads the same in both places. 12 is also what the sidebar
+ * row already draws its other icons at (`list`, `book-open`), so a mark now
+ * matches its neighbours instead of being the one glyph with private sizing.
+ *
+ * It is deliberately BELOW the 16px icon floor in `docs/design/README.md`, and
+ * that carve-out is the whole reason the inline-status-mark class exists: at 16
+ * a glyph in a row's trailing slot reads as a badge attached to the note rather
+ * than as a mark on it.
  */
-export const SYNC_ARC_INLINE_PX = 7;
-export const SYNC_ARC_ROW_PX = 8;
+const STATUS_MARK_PX = 12;
 
 /**
- * The small inline sibling of `<Spinner>`: a three-quarter arc that says whether
- * work is outstanding, and whether anything is currently moving on it
- * (myne-md/myne#566).
+ * A named icon standing in a text run to say what a surface owes
+ * (myne-md/myne#566 for the class, myne-md/myne#603 for this shape of it).
  *
- * # Why a second shape rather than a second colour
+ * # Why an icon and not geometry
  *
- * The two places this replaces were both 6px circles: a pulsing dot beside the
- * save readout, and a hollow ring on an unsynced row in the sidebar. At that
- * size a filled dot and a hollow one are the same glyph, and a slow opacity
- * pulse does not read as "in progress" so much as "this is a dot". One grammar,
- * three states, told by SHAPE first:
+ * The two glyphs this replaces were drawn from CSS borders at 7 to 8px, on the
+ * reasoning that no Lucide pair distinguishes a filled dot from a hollow one at
+ * that size. True, and the wrong conclusion: what followed was a three-quarter
+ * ring that everybody read as a stalled spinner, and then a solid triangle that
+ * read as a bullet point down a column of sidebar rows. Neither one could be
+ * learned, because neither one depicted anything. A named icon at 12px depicts
+ * the thing it means, and 12px is small enough that the badge problem the size
+ * floor guards against does not arise.
  *
- *   - solid dot        → settled. Nothing is owed. (Callers keep their own dot.)
- *   - static arc       → outstanding, but nothing is moving on it right now.
- *                        An edit waiting for a device that is offline is exactly
- *                        this, and so is text waiting on the autosave debounce.
- *                        A spinner there would be a lie about work in flight,
- *                        and it would also be a LOOPING animation, which
- *                        `docs/design/README.md` bans outright.
- *   - rotating arc     → in flight, and bounded: a disk write, a push. Never a
- *                        state a user can sit in.
+ * # Motion is a state, not a shape
  *
- * The gap is what carries "incomplete" when the arc is standing still, which is
- * why this is three quarters of a ring and not a full one.
- *
- * # Motion
- *
- * `myne-spinner` supplies the rotation from `tokens.css`, and with it the
- * MYND-630 reduced-motion carve-out. An indicator that freezes reads as hung,
- * so it slows to half speed instead of stopping. Not applied when `spinning` is
- * false: a static arc must have no animation to slow down.
- *
- * # The canon
- *
- * The one member of the design canon's **inline status mark** class
- * (`docs/design/README.md`, "Inline status marks are a separate class from
- * icons"). That section was written for this glyph in myne-md/myne#520's
- * review, which found the implementation and the canon disagreeing on four
- * rules at once: size, colour, hand-rolled geometry, and the Lucide status set.
- * The canon now carries the carve-out and the argument for it, so a reader of
- * either side finds the same answer.
+ * `spinning` wraps the icon in `.myne-spinner`, which supplies the rotation from
+ * `tokens.css` and with it the MYND-630 reduced-motion carve-out (half speed
+ * rather than frozen: a spinner stopped mid-turn reads as hung). Only ever true
+ * for work that ENDS. `docs/design/README.md` bans looping animation, so a state
+ * a user can sit in (text waiting on the autosave debounce, a note waiting for
+ * a device that is offline) is always still.
  *
  * # Never a live region
  *
- * The prop that made it one is gone.
- *
- * It used to take `announces`, which swapped `role="img"` for `role="status"`
- * where the arc was the only carrier of the state. That did not work and could
- * not: an `aria-live` region announces a CONTENT change, this span has no text
- * content (its only accessible name is `aria-label`), and the one caller that
- * opted in mounted it conditionally, so the region did not exist before the
- * change it was supposed to announce. A caller that needs the state spoken
- * renders a persistently-mounted `<ActionStatus visuallyHidden>` beside the
- * glyph, which is what `SaveStatus` does; that component's own comment explains
- * why a region removed from the accessibility tree announces nothing.
+ * `role="img"` in every position. An `aria-live` region announces a CONTENT
+ * change and this span has no text content, so `role="status"` on it announces
+ * nothing; the earlier version of this component shipped exactly that and was
+ * silent. A surface that needs the state spoken renders a persistently-mounted
+ * `<ActionStatus visuallyHidden>` beside it, which is what `SaveStatus` does.
+ * The sidebar renders none, because one live region per unsynced row, all
+ * re-labelled at once when a push starts, is a storm nobody can mute.
  */
-export function SyncArc({
-  size,
-  spinning,
+export function StatusMark({
+  name,
   label,
   title,
+  spinning = false,
+  tone = "muted",
   testId,
   style,
 }: {
-  /** `SYNC_ARC_INLINE_PX` or `SYNC_ARC_ROW_PX`, and the TYPE says so rather than
-   *  the sentence: naming the two constants is pointless if `size={12}` still
-   *  compiles, and the pixel count is a decision the canon owns
-   *  (`docs/design/README.md`, "Inline status marks are a separate class from
-   *  icons"). Required, not defaulted: every caller passes one anyway, and a
-   *  default is the opt-in shape `CLAUDE.md` warns about, where the arm that
-   *  never fires is the one a new call site silently takes. */
-  size: typeof SYNC_ARC_INLINE_PX | typeof SYNC_ARC_ROW_PX;
-  /** True only while work is actually in flight. See the state table above. */
-  spinning: boolean;
+  /** Which icon. The set is `editor/src/host/lib/icons.ts`; a mark that needs a
+   *  glyph the set lacks adds it there rather than drawing one here. */
+  name: IconName;
   /**
    * Accessible name. The shape alone is not a readout, and neither is the
    * MOTION: a state told only by rotation is told only to sighted users, so a
    * caller with two states passes two names.
+   *
+   * `null` says the mark is DECORATIVE because the same phrase is already
+   * rendered as visible text beside it, and it renders `aria-hidden` instead.
+   * Required rather than optional, so that stays a decision each caller makes:
+   * an omitted prop would default the whole class back to silent, which is the
+   * defect this component was written to end. `SaveStatus` draws the mark and
+   * the words together, so a name here made a screen reader say the state
+   * twice, once off the `role="img"` and once off the text.
    */
-  label: string;
+  label: string | null;
   /**
-   * Hover text. NOT defaulted to `label`, deliberately: this glyph is 7 to 8px
-   * and usually sits inside a span that already carries a longer `title`, so a
-   * default would shadow that sentence with a terser one for whichever pixel the
-   * pointer happened to land on. A caller wanting the same string in both passes
-   * it twice, which is cheap and visible.
+   * Hover text. NOT defaulted to `label`, deliberately: a mark usually sits
+   * inside a span that already carries a longer sentence, and a default would
+   * shadow it with a terser one for whichever pixel the pointer landed on.
    */
   title?: string;
+  /** True only while work is actually in flight, and only for work that ends. */
+  spinning?: boolean;
+  /**
+   * `accent` marks the one thing on the surface that is actually happening;
+   * `muted` is everything merely outstanding. This is the sanctioned exception
+   * to the canon's "never coloured independently" rule rather than a hole in it,
+   * for exactly that reason.
+   */
+  tone?: "accent" | "muted";
   testId?: string;
   style?: CSSProperties;
 }) {
   return (
     <span
       className={spinning ? "myne-spinner" : undefined}
-      role="img"
-      aria-label={label}
+      // A constant hook, present in both forms. The tests used to find a mark by
+      // its `role="img"`, which is the very thing a decorative mark drops, so
+      // asserting the decorative shape would have meant losing the selector for
+      // it. This separates finding the mark from what is being asserted about it.
+      data-status-mark=""
+      role={label === null ? undefined : "img"}
+      aria-hidden={label === null ? true : undefined}
+      aria-label={label ?? undefined}
       title={title}
       data-testid={testId}
       style={{
-        display: "inline-block",
-        boxSizing: "border-box",
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        // Hairline-plus: at the 7-8px this ships at, 1px vanishes against
-        // `--fg-3` and 2px closes the gap that carries the "incomplete" reading.
-        // There is no width token between the two, so this is a literal on
-        // purpose.
-        borderWidth: 1.5,
-        borderStyle: "solid",
-        // Three sides drawn, one left open: the gap is the "not finished" cue
-        // that survives the arc standing still.
-        borderColor: spinning ? "var(--accent)" : "var(--fg-3)",
-        borderTopColor: "transparent",
-        background: "transparent",
+        display: "inline-flex",
+        alignItems: "center",
+        color: tone === "accent" ? "var(--accent)" : "var(--fg-3)",
         flexShrink: 0,
         ...style,
       }}
-    />
+    >
+      <Icon name={name} size={STATUS_MARK_PX} />
+    </span>
   );
 }

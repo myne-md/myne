@@ -1167,10 +1167,6 @@
       "turnedIntoTemplate": "Gjort om til mal",
       "convertedToNote": "Konvertert til notat",
       "versionHistory": "Versjonshistorikk",
-      "exportMarkdown": "Eksporter som Markdown…",
-      "exportPdf": "Eksporter som PDF…",
-      "exportHtml": "Eksporter som HTML…",
-      "exportTxt": "Eksporter som ren tekst…",
       "trash": "Flytt til papirkurven"
     },
     "codeBlock": {
@@ -2037,10 +2033,6 @@
       "duplicate": "Dupliser",
       "editFilterTitle": "Rediger filter",
       "emptyState": "Ingen notater ennå.",
-      "exportHtml": "Eksporter som HTML…",
-      "exportMarkdown": "Eksporter som Markdown…",
-      "exportPdf": "Eksporter som PDF…",
-      "exportTxt": "Eksporter som ren tekst…",
       "favoritesHeading": "Favoritter",
       "icon": "Ikon…",
       "mergeAnyway": "Slå sammen likevel",
@@ -2346,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Eksporter…",
+      "txt": "Ren tekst"
     }
   },
   "password": {

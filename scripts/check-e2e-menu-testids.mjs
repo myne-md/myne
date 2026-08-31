@@ -13,6 +13,22 @@
 // referenced ONLY through `clickNewMenuItem`, which opens the menu first (and
 // checks it is not already open, since clicking `+` while open toggles it shut).
 //
+// SECOND RULE, same failure one menu over (myne#611). The four export formats
+// moved behind a single `Export…` row with a submenu, and their leaf ids did NOT
+// change, so a scenario reaching straight for `export-markdown` still compiles,
+// still reads correct, and simply times out. The first rule cannot express this:
+// every row in these menus shares ONE testid (`notes.context-menu-item`,
+// `editor.note-actions-menu-item`) and the row is identified by a `data-item-id`
+// or `data-action` VALUE, so the roster is keyed on the value instead.
+//
+// It is also FILE-scoped rather than line-scoped, and that is a deliberate
+// weakening. `clickNewMenuItem` takes the testid as an argument, so the helper
+// and the id sit on one line and a line check is exact. The submenu helper takes
+// a format and returns the row, so the id and the helper are lines apart, and a
+// line rule would fire on the file that legitimately drives the submenu. What
+// the file rule still catches is the whole failure mode: a scenario that reaches
+// a leaf id without knowing the submenu is there.
+//
 // Run by hand: node scripts/check-e2e-menu-testids.mjs
 // Wired into: lefthook `pre-commit`, CI `pnpm-build`.
 
@@ -33,6 +49,17 @@ const MENU_ONLY = [
 
 /** The one helper allowed to name them — it opens the menu first. */
 const HELPER = "clickNewMenuItem";
+
+/** Row discriminator VALUES that render only inside an open SUBMENU, and the
+ *  helper that opens it. A file naming one of these must mention that helper. */
+const SUBMENU_ONLY = [
+  {
+    attrs: ["data-item-id", "data-action"],
+    values: ["export-markdown", "export-pdf", "export-html", "export-txt"],
+    helper: "openExportSubmenuItem",
+    why: 'those rows render only inside the open "Export…" submenu (myne#611)',
+  },
+];
 
 function* walk(dir) {
   let entries;
@@ -74,13 +101,41 @@ for (const tree of TREES) {
   }
 }
 
+// Second rule: file-scoped, over the submenu row values.
+for (const tree of TREES) {
+  for (const file of walk(join(ROOT, tree))) {
+    const rel = relative(ROOT, file);
+    const src = readFileSync(file, "utf8");
+    for (const group of SUBMENU_ONLY) {
+      // The file knows about the submenu, so its reaches are sanctioned. The
+      // helper's own definition is covered by the same test.
+      if (src.includes(group.helper)) continue;
+      src.split("\n").forEach((line, i) => {
+        for (const attr of group.attrs) {
+          for (const value of group.values) {
+            const re = new RegExp(`"${attr}"\\s*:\\s*"${value}"`);
+            if (re.test(line)) {
+              violations.push({ file: rel, line: i + 1, id: value, group });
+            }
+          }
+        }
+      });
+    }
+  }
+}
+
 if (violations.length > 0) {
   for (const v of violations) {
+    const helper = v.group === undefined ? HELPER : v.group.helper;
+    const why =
+      v.group === undefined
+        ? "that control renders only inside the open `+` menu (#230)"
+        : v.group.why;
     console.error(
       `✗ e2e-menu-testid: ${v.file}:${v.line} reaches for "${v.id}" directly.\n` +
-        `  That control renders only inside the open \`+\` menu (#230), so this waits\n` +
-        `  for something that is not on screen and fails as a timeout. Use\n` +
-        `  \`${HELPER}(session, "${v.id}")\`, which opens the menu first.`,
+        `  ${why}, so this waits for something that is not on\n` +
+        `  screen and fails as a timeout, which reads like flake. Go through\n` +
+        `  \`${helper}\`, which opens the menu first.`,
     );
   }
   console.error(`\n${violations.length} violation(s).`);
@@ -88,5 +143,7 @@ if (violations.length > 0) {
 }
 
 console.log(
-  `e2e-menu-testid: ok (${MENU_ONLY.length} menu-only testid(s) reachable only through ${HELPER})`,
+  `e2e-menu-testid: ok (${MENU_ONLY.length} menu-only testid(s) through ${HELPER}; ` +
+    `${SUBMENU_ONLY.reduce((n, g) => n + g.values.length, 0)} submenu row value(s) through ` +
+    `${SUBMENU_ONLY.map((g) => g.helper).join(", ")})`,
 );

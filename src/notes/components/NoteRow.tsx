@@ -33,7 +33,7 @@ import type { TitleRecord } from "../loadNoteBatch";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { uuidv7Ms } from "../sidebarState";
 import { Icon } from "../../components/primitives/Icon";
-import { SYNC_ARC_ROW_PX, SyncArc } from "../../components/Spinner";
+import { StatusMark } from "../../components/Spinner";
 import { formatRelativeTime, useTick } from "./relativeTime";
 
 export type NoteRowProps = {
@@ -289,35 +289,33 @@ const indexConflictStyle: CSSProperties = {
  *  on a note the server has not acknowledged. Row-level, not title-level:
  *  inline-rename swaps the title node out, and the marker must survive that.
  *
- *  **Not filled, and that is the whole design.** The filled shapes on this row
- *  are already spoken for (the colour dot leads, the index-conflict dot trails),
- *  and a third filled dot would read as a fourth kind of status nobody can rank.
+ *  **`cloud-off`, and it took three tries to get here.** It was a closed 6px
+ *  ring, and at that size a ring and a dot are the same glyph, which is what it
+ *  was reported as: a mark nobody could read anything off (myne-md/myne#566). It
+ *  became the save readout's own arc, which was the same mistake one level up,
+ *  two facts wearing one glyph, adjacent on the bottom bar. It became a solid
+ *  triangle, which at least was distinct, and depicted nothing, so down a column
+ *  of rows it read as a bullet point (myne-md/myne#603).
  *
- *  It was a closed 6px ring, and at that size a ring and a dot are the same
- *  glyph, which is what it was reported as: a mark nobody could read anything
- *  off (myne-md/myne#566). It is now the shared `<SyncArc>` at `SYNC_ARC_ROW_PX`
- *  with a gap: the same three-quarter arc the save readout uses, so one shape
- *  means "outstanding" everywhere in the app. The readout draws it a pixel
- *  smaller because its arc sits inside a text run; the shape is what is shared,
- *  not the pixel count.
+ *  What the first three shared is that each was hand-drawn geometry small enough
+ *  to be unlearnable. A cloud with a slash is a picture of the sentence, at 12px
+ *  because that is where an icon starts being an icon, and 12px is what this row
+ *  already draws its other icons at.
  *
  *  It never TURNS, and that is a design-canon decision rather than an oversight.
  *  `docs/design/README.md` bans looping animation by name, and the sidebar draws
- *  one of these per unsynced note: a screenful of accent rings rotating together
- *  is the ambient motion that rule exists to keep out of a writing surface.
- *  Rotation stays where the work is bounded and there is one of it, the save
- *  readout in the bottom bar. This shape says "outstanding", which is what a note
- *  the server has not seen IS, and it says it whether the machine is online or
- *  has been shut for a week.
+ *  one of these per unsynced note: a screenful of marks moving together is the
+ *  ambient motion that rule exists to keep out of a writing surface. Motion stays
+ *  where the work is bounded and there is one of it, the save readout in the
+ *  bottom bar. This mark says "the server does not have this", which is true
+ *  whether the machine is online or has been shut for a week.
  *
- *  `--fg-3` rather than `--warning`: an unsynced edit is the normal state of a
- *  note you just typed, and painting it as a warning would make the ordinary
- *  case look broken — the alarm belongs to eviction and tab-close (tasks 22/93),
- *  not to the second between a save and a push. */
-const unsyncedMarkerStyle: CSSProperties = {
-  marginInlineStart: 6,
-  verticalAlign: "middle",
-};
+ *  It carries no style of its own, and the object that used to sit here is gone
+ *  rather than emptied: the row is `display: flex` with `gap: var(--space-2)`,
+ *  so its `margin-inline-start: 6` ADDED to that and put the mark 14px from the
+ *  title block rather than 8, and its `vertical-align: middle` does nothing
+ *  whatever to a flex item. The row's own gap and `align-items: center` are what
+ *  place it (myne-md/myne#603). */
 
 const renameInputStyle: CSSProperties = {
   display: "block",
@@ -520,13 +518,11 @@ export function NoteRow(props: NoteRowProps) {
           does not become safe because the user is retitling it, and that is
           exactly the moment the sidebar is being looked at. */}
       {unsynced && (
-        <SyncArc
-          spinning={false}
-          size={SYNC_ARC_ROW_PX}
+        <StatusMark
+          name="cloud-off"
           testId="notes.row-unsynced"
           label={t("notes.row.unsyncedLabel")}
           title={t("notes.row.unsyncedTitle")}
-          style={unsyncedMarkerStyle}
         />
       )}
       {showStar &&

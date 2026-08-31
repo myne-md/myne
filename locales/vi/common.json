@@ -1167,10 +1167,6 @@
       "turnedIntoTemplate": "Đã biến thành mẫu",
       "convertedToNote": "Đã chuyển thành ghi chú",
       "versionHistory": "Lịch sử phiên bản",
-      "exportMarkdown": "Xuất dạng Markdown…",
-      "exportPdf": "Xuất dạng PDF…",
-      "exportHtml": "Xuất dạng HTML…",
-      "exportTxt": "Xuất dạng văn bản thuần…",
       "trash": "Chuyển vào Thùng rác"
     },
     "codeBlock": {
@@ -2037,10 +2033,6 @@
       "duplicate": "Nhân bản",
       "editFilterTitle": "Chỉnh sửa bộ lọc",
       "emptyState": "Chưa có ghi chú nào.",
-      "exportHtml": "Xuất dạng HTML…",
-      "exportMarkdown": "Xuất dạng Markdown…",
-      "exportPdf": "Xuất dạng PDF…",
-      "exportTxt": "Xuất dạng văn bản thuần…",
       "favoritesHeading": "Yêu thích",
       "icon": "Biểu tượng…",
       "mergeAnyway": "Vẫn hợp nhất",
@@ -2346,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "Mặc định"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Xuất…",
+      "txt": "Văn bản thuần"
     }
   },
   "password": {

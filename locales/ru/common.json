@@ -1265,10 +1265,6 @@
       "turnedIntoTemplate": "Преобразовано в шаблон",
       "convertedToNote": "Преобразовано в заметку",
       "versionHistory": "История версий",
-      "exportMarkdown": "Экспортировать как Markdown…",
-      "exportPdf": "Экспортировать как PDF…",
-      "exportHtml": "Экспортировать как HTML…",
-      "exportTxt": "Экспортировать как обычный текст…",
       "trash": "Переместить в корзину"
     },
     "codeBlock": {
@@ -2197,10 +2193,6 @@
       "duplicate": "Дублировать",
       "editFilterTitle": "Изменить фильтр",
       "emptyState": "Заметок пока нет.",
-      "exportHtml": "Экспортировать как HTML…",
-      "exportMarkdown": "Экспортировать как Markdown…",
-      "exportPdf": "Экспортировать как PDF…",
-      "exportTxt": "Экспортировать как обычный текст…",
       "favoritesHeading": "Избранное",
       "icon": "Значок…",
       "mergeAnyway": "Всё равно объединить",
@@ -2526,6 +2518,13 @@
     },
     "workspace": {
       "defaultSlotName": "По умолчанию"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Экспорт…",
+      "txt": "Обычный текст"
     }
   },
   "password": {

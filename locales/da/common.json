@@ -1167,10 +1167,6 @@
       "turnedIntoTemplate": "Gjort til skabelon",
       "convertedToNote": "Konverteret til note",
       "versionHistory": "Versionshistorik",
-      "exportMarkdown": "Eksportér som Markdown…",
-      "exportPdf": "Eksportér som PDF…",
-      "exportHtml": "Eksportér som HTML…",
-      "exportTxt": "Eksportér som almindelig tekst…",
       "trash": "Flyt til papirkurv"
     },
     "codeBlock": {
@@ -2037,10 +2033,6 @@
       "duplicate": "Dublér",
       "editFilterTitle": "Redigér filter",
       "emptyState": "Ingen noter endnu.",
-      "exportHtml": "Eksportér som HTML…",
-      "exportMarkdown": "Eksportér som Markdown…",
-      "exportPdf": "Eksportér som PDF…",
-      "exportTxt": "Eksportér som almindelig tekst…",
       "favoritesHeading": "Favoritter",
       "icon": "Ikon…",
       "mergeAnyway": "Flet alligevel",
@@ -2346,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Eksportér…",
+      "txt": "Almindelig tekst"
     }
   },
   "password": {

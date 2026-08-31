@@ -50,10 +50,19 @@ function deriveFolderPaths(notes: readonly ResolverNote[]): string[] {
  * paths the note-set implies (matched on the trailing-slash path), capped. Notes
  * without a title are excluded (can't author a link to a titleless note).
  * Folder rows sort after note rows of equal score (notes are the common case).
+ *
+ * `recent` (note UUIDs, newest first; myne-md/myne#601) breaks ties the score
+ * cannot: many titles fuzzy-match two letters equally well, and the one being
+ * linked to is almost always a note that was just open. It is a TIEBREAK rather
+ * than a boost, so a better match still wins, except on an EMPTY query, where
+ * `fuzzyFilter` gives every candidate the same score and the order is therefore
+ * recency's alone. That case is the one that matters most: the picker opens on
+ * `[[`, before a character is typed.
  */
 export function rankNotes(
   query: string,
   notes: readonly ResolverNote[],
+  recent: readonly string[],
   cap: number = PICKER_CAP,
 ): PickerRow[] {
   // The fuzzy item carries the row's discriminant so the scorer ranks notes and
@@ -67,7 +76,35 @@ export function rankNotes(
   const folderCandidates: FuzzyCandidate<RankItem>[] = deriveFolderPaths(notes).map(
     (path) => ({ item: { kind: "folder", path }, haystacks: [path] }),
   );
-  return fuzzyFilter([...noteCandidates, ...folderCandidates], query)
+  // Position in `recent`, or `Infinity` for a note that is not in it, so an
+  // untouched note sorts after every touched one, and a folder row (which has no
+  // note to have been touched) keeps the place its score gave it.
+  const recencyOf = new Map(recent.map((id, i) => [id, i] as const));
+  const recencyRank = (item: RankItem): number =>
+    item.kind === "note"
+      ? (recencyOf.get(item.note.noteUuid) ?? Number.POSITIVE_INFINITY)
+      : Number.POSITIVE_INFINITY;
+  const scored = fuzzyFilter([...noteCandidates, ...folderCandidates], query);
+  // Reorder only WITHIN equal scores. `fuzzyFilter` has already sorted by score
+  // and `Array.prototype.sort` is stable, so anything this comparator calls
+  // equal keeps the scorer's order; comparing scores here would re-implement it.
+  //
+  // Skipped entirely when nothing is recent, and that is not a micro-optimism:
+  // on an EMPTY query `fuzzyFilter` returns every candidate at score 1, so this
+  // sort is O(n log n) over every titled note plus every derived folder path,
+  // with two map lookups per comparison, to choose `cap` rows. Before recency
+  // existed the empty-query path was a bare `slice`. A host that tracks no
+  // recency, and every mount before the first note is opened, gets that back.
+  // `sort` mutates, so the copy is only needed on the path that sorts.
+  const ordered =
+    recencyOf.size === 0
+      ? scored
+      : scored
+          .slice()
+          .sort((a, b) =>
+            a.score === b.score ? recencyRank(a.item) - recencyRank(b.item) : 0,
+          );
+  return ordered
     .slice(0, cap)
     .map((m) =>
       m.item.kind === "note"
