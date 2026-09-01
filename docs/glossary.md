@@ -1448,7 +1448,7 @@ Used in: `spec/protocol.md` §10.4.1, `decisions.md` 2026-08-09 + 2026-08-11.
 
 ### **magic bytes** &nbsp; 📋 *Protocol*
 
-Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. Reserved for the next major version: `NT05`, `NTV5`. **Allocated for v0.2:** `NC05`, the CRDT note-type (`spec/protocol.md` §10.7). Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
+Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. **Allocated and shipping under v0.2** (`spec/protocol.md` §10.3, §10.3.1: a vault created today is v0.2 throughout): `NC05` the CRDT note-type, `NTV5` `vault.meta`, plus `MYP5`, `MYA5`, `MYC5`, `MYD5` and `MYT5`. Reserved for the next major version, still placeholders: `NT05` and the remaining `MY?5` values. Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
 
 Used in: `spec/protocol.md` §9.1, §9.2, §9.3, §10.3, §10.7
 
@@ -3148,7 +3148,8 @@ The **Library** column names what Myne's own clients actually link — `protocol
 | Major version | Per-note magic | Vault-meta magic | AAD prefix | Context-string prefix | Status |
 |---|---|---|---|---|---|
 | v0.1 | `MY01` | `MYV1` | `"myne.v0.1|"` | `"myne.v0.1 "` | Active (this document) |
-| next major (reserved) | `NT05` | `NTV5` | not pre-allocated | not pre-allocated | Reserved; the next major version defines its own AAD/HKDF prefix |
+| v0.2 | `NC05` | `NTV5` | `"myne.v0.2\|"` | `"myne.v0.2 "` | Active: the birth format since 2026-08-13 (§10.3.1); `MYP5`/`MYA5`/`MYC5`/`MYD5`/`MYT5` ship with it |
+| next major (reserved) | `NT05` | `NTV5` | not pre-allocated | not pre-allocated | Reserved; the next major version defines its own AAD/HKDF prefix. Note `NTV5` is consumed by v0.2 above, so which magic the next major's `vault.meta` carries is an open question rather than a settled reservation |
 
 The four prefixes for a single major version are deliberately non-interchangeable: each lives in a different cryptographic call site, and using one in place of another is a protocol violation. See entry **`myne.v0.1` prefix** and `spec/protocol.md` §10.3.
 

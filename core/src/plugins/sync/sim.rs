@@ -1,5 +1,19 @@
 //! Multi-device sync **simulation harness** (Phase 1 of the sync test-env work).
 //!
+//! **KNOWN GAP, whole-harness: every scenario here is a v0.1 vault.** Not just
+//! the two `MetaVersion::V0_1` literals below, but every version-less v0.1-only
+//! helper this file reaches for (`encode_new_note`, `encode_prefs_blob`,
+//! `derive_subkey`, `encode_themes_map`). A vault created today is v0.2
+//! throughout (`protocol.md` §10.3.1), so this harness exercises the generation
+//! nobody runs. It is not widened because `Device` builds its notes through
+//! those v0.1-only free functions, and a device claiming a generation its notes
+//! do not honour would be worse than an honest v0.1 one. What that leaves
+//! uncovered here is covered in `orchestrator::tests` instead: four
+//! `_on_a_migrated_vault` attachment scenarios, `a_migrated_vault_keeps_its_myp5_prefs…`
+//! and `a_migrated_vault_still_pushes_its_myt5_theme_store`. Until this harness
+//! is widened, a v0.2 behaviour proven nowhere else does not get to claim this
+//! file as its coverage (myne-md/myne#638).
+//!
 //! WHY THIS EXISTS. The pre-existing two-device tests (`orchestrator.rs` tests,
 //! `e2e/sync-replication.e2e.ts`) feed the engine its *idealized* inputs — a
 //! direct `note_update`, the *correct* `deleted:`-marker tombstone encoding — and
@@ -408,6 +422,8 @@ impl Device {
             &self.notes_dir,
             &self.vault_dir,
             crate::plugins::sync::orchestrator::PushGate::Allowed,
+            // v0.1 throughout: see the whole-harness KNOWN GAP at the top of
+            // this file (myne-md/myne#638).
             protocol::MetaVersion::V0_1,
             Some(super::orchestrator::AttachmentKeys {
                 items_key: &self.acct.items_key,
@@ -1126,6 +1142,8 @@ fn themes_three_device_counterexample_converges_no_ping_pong() {
     let palette = |c: &str| ThemePalette::from([(String::from("--accent"), String::from(c))]);
     let write_themes = |d: &Device, map: &ThemesMap| {
         let bytes = encode_themes_map(
+            // v0.1 throughout: see the whole-harness KNOWN GAP at the top of
+            // this file (myne-md/myne#638).
             protocol::MetaVersion::V0_1,
             &themes_key,
             &acct.account_hash,
