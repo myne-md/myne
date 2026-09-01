@@ -21,6 +21,10 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: { count?: number }) =>
       opts?.count !== undefined ? `${key}:${opts.count}` : key,
+    // The composer reads `i18n.language` and passes it to the run, because the
+    // host cannot read the chosen language (it lives in localStorage). A mock
+    // returning only `t` made every send throw before it reached `startAgentRun`.
+    i18n: { language: "en" },
   }),
 }));
 
@@ -240,11 +244,18 @@ describe("ChatComposer", () => {
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(agentStart).toHaveBeenCalled());
     expect(agentCapability).toHaveBeenCalledTimes(1);
-    // The third argument is the open-channel callback the run reports its id
-    // through (myne-md/myne#544); the scope is what this test is about.
+    // Third is the interface language, which the host cannot read for itself
+    // (myne-md/myne#618); fourth is the visible chat history the run is seeded
+    // with (myne-md/myne#617); fifth is the open-channel callback the run
+    // reports its id through (myne-md/myne#544). The scope is what this test is
+    // about, and asserting the whole call is what keeps a new argument from
+    // being added without anyone deciding it should be.
     expect(agentStart).toHaveBeenCalledWith(
       "tidy the headings",
       { kind: "notes", value: ["n1"] },
+      "en",
+      expect.any(Array),
+      expect.any(Function),
       expect.any(Function),
     );
     // A second send reuses the verdict rather than paying for it again.
@@ -273,6 +284,9 @@ describe("ChatComposer", () => {
     expect(agentStart).toHaveBeenCalledWith(
       "rename the concept",
       { kind: "folder", value: "Projects" },
+      "en",
+      expect.any(Array),
+      expect.any(Function),
       expect.any(Function),
     );
   });

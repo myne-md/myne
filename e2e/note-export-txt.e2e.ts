@@ -33,6 +33,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import {
   dismissImporterOffer,
+  openExportSubmenuItem,
   pageSeatInvoke,
   unlockToEditor,
 } from "./support/flows";
@@ -61,7 +62,7 @@ async function openTxtExportMenuItem(s: Session, noteId: string) {
     testIdSelector("notes.row", { "data-note-id": noteId }),
   );
   await row.rightClick();
-  return s.waitForElement(TXT_ITEM_SELECTOR);
+  return openExportSubmenuItem(s, "export-txt");
 }
 
 describeE2E("tt1 plain-text export writes the stripped file (MYND-340)", () => {

@@ -129,7 +129,7 @@ describeE2E("et1 palette empty-trash confirms with count; cancel keeps, confirm 
         // cryptographic erase of `design-notes/storage/0105`: no undo, and
         // nothing outside a `.myne-backup` gets the note back. Its jsdom tests
         // are not evidence for the shipping WebView, which `design-notes/ui/
-        // 0541` records measuring: `requestAnimationFrame` never fired there and
+        // 0564` records measuring: `requestAnimationFrame` never fired there and
         // left Enter inert for a full 45 s budget, three attempts over.
         //
         // It also exercises guard 4 end to end. The palette selects its row on an

@@ -37,7 +37,28 @@
 //! would instead apply to whatever now sits at that position.
 
 use super::error::EditRejection;
+use crate::plugins::notes::title_extract::{body_after_frontmatter, extract_title_slices};
 use serde::{Deserialize, Serialize};
+
+/// Which shape of write this edit is.
+///
+/// **A discriminator on the existing type rather than a second list on the
+/// proposal, and that placement is the design.** The removal carve-out, the
+/// bulk-approval split, the not-proposed check, the undo restore point and the
+/// review screen are all keyed on `Proposal::edits`; a parallel `appends` list
+/// would mean re-deriving five checks by hand, and `hide.rs` exists because one
+/// of those checks was once incomplete. Here, an append inherits every one of
+/// them by construction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum EditKind {
+    /// Replace [`ProposedEdit::anchor`] with [`ProposedEdit::replacement`].
+    #[default]
+    Replace,
+    /// Append [`ProposedEdit::replacement`] to the end of the note's body.
+    /// [`ProposedEdit::anchor`] is unused and must be empty.
+    Append,
+}
 
 /// One proposed edit against one note.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,7 +66,12 @@ use serde::{Deserialize, Serialize};
 pub struct ProposedEdit {
     /// The note this edit applies to.
     pub note_id: String,
-    /// The exact existing text the model copied out of the note.
+    /// Replace or append. `#[serde(default)]` so a payload written before the
+    /// append verb existed still deserializes as the replace it was.
+    #[serde(default)]
+    pub kind: EditKind,
+    /// The exact existing text the model copied out of the note. Empty for an
+    /// append, where there is nothing to anchor to.
     pub anchor: String,
     /// What replaces it. An empty replacement is a deletion of the anchor, which
     /// is ordinary and allowed; it is the review surface's job to flag a large
@@ -87,9 +113,161 @@ pub fn place(body: &str, anchor: &str, replacement: &str) -> Result<String, Edit
     Ok(out)
 }
 
+/// Append `text` to a note's body.
+///
+/// **The verb that makes "write this into the note" possible at all.** An
+/// anchored edit needs text copied out of the note, occurring exactly once, and
+/// an empty anchor is refused by [`place`], so before this existed there was no
+/// way to write into an empty note: the request failed for a structural reason
+/// no message explained. Appending to a long note was possible but expensive
+/// and brittle, since the model had to anchor on the whole tail and reproduce
+/// it verbatim.
+///
+/// ## The append lands after the frontmatter, always
+///
+/// This is what stops an append from authoring frontmatter. The body region is
+/// located with [`body_after_frontmatter`], the same scan the folder clamp uses,
+/// and the text goes at the end of THAT rather than at the end of the file. In
+/// a note that has a frontmatter block, appended text therefore cannot be the
+/// first line, whatever it starts with.
+///
+/// Positioning alone does not close it, though, and the precondition this doc
+/// used to state ("a note with NO frontmatter block and no body") was the wrong
+/// one. A note with no frontmatter whose body merely BEGINS with `---` has an
+/// opener nothing has closed, so appended text containing an ordinary `---`
+/// separator closes it and the user's own first lines become a frontmatter
+/// block. So the check is on the RESULT rather than on the shape of the input:
+/// an append that gives the note a frontmatter block it did not have is
+/// refused. That is the rule [`crate::plugins::agent::apply`] already applies
+/// twice, in `edit_moves_note` and `edit_hides_note`, both of which compare
+/// before against after rather than inspecting the replacement. Refused rather
+/// than mangled, because silently rewriting the model's text would leave the
+/// user approving something nobody wrote.
+///
+/// ## Separation
+///
+/// Trailing newlines on the existing body are normalised away and exactly one
+/// blank line is inserted, so an append reads as a new block rather than
+/// running into the last paragraph. In markdown a missing blank line is not
+/// cosmetic: it makes the appended text part of the preceding paragraph.
+///
+/// The empty-body case needs the same care on the HEAD side, and that is not
+/// symmetry for its own sake. [`crate::plugins::notes::title_extract`] accepts
+/// a closing `---` that ends the file with no newline after it, so a note can
+/// legitimately arrive whose head does not end in `\n` and whose body region is
+/// empty. Pushing the text straight after that head glues it onto the closer
+/// line, the closer stops closing, and the whole block ceases to be
+/// frontmatter: `title:`, `folder:`, tags and task fields all become one
+/// malformed body line. Normalising here is what makes the two spellings of
+/// the same note append identically.
+pub fn append(body: &str, text: &str) -> Result<String, EditRejection> {
+    if text.trim().is_empty() {
+        return Err(EditRejection::AppendEmpty);
+    }
+    // `body_after_frontmatter` returns the body SLICE; the difference in length
+    // is where it begins, and that boundary is always just past a `\n`, so the
+    // split cannot land inside a character.
+    let rest = body_after_frontmatter(body.as_bytes());
+    let head_len = body.len() - rest.len();
+    let (head, tail) = body.split_at(head_len);
+    let tail = tail.trim_end_matches('\n');
+    let text = text.trim_end_matches('\n');
+
+    let mut out = String::with_capacity(body.len() + text.len() + 2);
+    out.push_str(head);
+    if !head.is_empty() && !head.ends_with('\n') {
+        // A frontmatter closer that ends the file with no newline after it.
+        // Without this the text lands ON the closer line and unmakes the block.
+        out.push('\n');
+    }
+    if !tail.is_empty() {
+        out.push_str(tail);
+        out.push_str("\n\n");
+    }
+    out.push_str(text);
+    out.push('\n');
+
+    // The result check. An append writes BODY text, so whether the note has a
+    // frontmatter block is not its to change. The gaining direction is the one
+    // an untrusted replacement can force, and it is refused here; the losing
+    // direction is our own head handling and is pinned by test instead, since a
+    // refusal named `AppendWouldWriteFrontmatter` would be the wrong sentence to
+    // show a user whose frontmatter we had just destroyed.
+    let had_frontmatter = extract_title_slices(body.as_bytes())
+        .frontmatter_bytes
+        .is_some();
+    let has_frontmatter = extract_title_slices(out.as_bytes())
+        .frontmatter_bytes
+        .is_some();
+    if has_frontmatter && !had_frontmatter {
+        return Err(EditRejection::AppendWouldWriteFrontmatter);
+    }
+
+    Ok(out)
+}
+
+/// Apply one proposed edit, whichever shape it is.
+///
+/// The single entry point the apply path calls, so a new edit kind is one arm
+/// here rather than a second call site to keep in step.
+pub fn apply_edit(body: &str, edit: &ProposedEdit) -> Result<String, EditRejection> {
+    match edit.kind {
+        EditKind::Replace => place(body, &edit.anchor, &edit.replacement),
+        EditKind::Append => append(body, &edit.replacement),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ---- the two frontmatter hazards positioning alone does not close ----
+    //
+    // Both were found by the myne-md/myne#622 review and both are the same
+    // question asked at the wrong end: `append` used to reason about its INPUT
+    // (is the head empty, does the text open with `---`) when what matters is
+    // the RESULT. `apply.rs` already learned this twice, in `edit_moves_note`
+    // and `edit_hides_note`, which compare before against after rather than
+    // inspecting the replacement.
+
+    #[test]
+    fn append_to_a_closer_without_a_trailing_newline_keeps_the_frontmatter() {
+        // `scan_frontmatter` accepts a closing `---` that ends the file with no
+        // newline after it, so the body region is empty AND the head does not
+        // end in `\n`. Pushing the text straight after the head glued it onto
+        // the closer line, which stops being a closer: the whole block ceases
+        // to be frontmatter and `title:`, `folder:`, tags and task fields all
+        // become one malformed body line.
+        let without_nl = append("---\ntitle: Real Title\n---", "the list").unwrap();
+        let with_nl = append("---\ntitle: Real Title\n---\n", "the list").unwrap();
+        // The two spellings of the same note are the same note, so they append
+        // identically. Asserting convergence rather than a literal is what makes
+        // this a property instead of a transcription of today's output.
+        assert_eq!(without_nl, with_nl);
+        assert!(
+            extract_title_slices(without_nl.as_bytes())
+                .frontmatter_bytes
+                .is_some(),
+            "append destroyed the frontmatter block: {without_nl:?}"
+        );
+    }
+
+    #[test]
+    fn append_may_not_turn_existing_body_text_into_frontmatter() {
+        // A note with no frontmatter whose body merely BEGINS with `---\n`.
+        // Nothing has closed that opener, so appending text containing a `---`
+        // line closes it, and the user's own first lines become a frontmatter
+        // block that stops rendering. A `---` separator is ordinary in
+        // model-written markdown, so this is not an exotic input.
+        let before = "---\nmy shopping list\nmilk\n";
+        assert!(extract_title_slices(before.as_bytes())
+            .frontmatter_bytes
+            .is_none());
+        assert_eq!(
+            append(before, "## Summary\n\n---\n\ndone").unwrap_err(),
+            EditRejection::AppendWouldWriteFrontmatter
+        );
+    }
 
     #[test]
     fn exactly_one_match_applies() {
@@ -200,5 +378,125 @@ mod tests {
         // says so rather than trusting it.
         assert_eq!(place("önce sonra", "önce", "ilk").unwrap(), "ilk sonra");
         assert_eq!(place("a 🙂 b", "🙂", "X").unwrap(), "a X b");
+    }
+
+    // ---- append ---------------------------------------------------------
+
+    const FM: &str = "---\ntitle: A\nfolder: Work\n---\n";
+
+    /// The case the whole verb exists for: before it, this was impossible, and
+    /// the failure had no message that explained itself.
+    #[test]
+    fn an_append_into_an_empty_body_writes_the_text() {
+        // `{FM}\n` is a frontmatter block followed by the blank line a note
+        // carries between it and the body. `body_after_frontmatter` counts that
+        // separator as part of the head, so it survives and the text lands
+        // directly after it.
+        let out = append(&format!("{FM}\n"), "hello").unwrap();
+        assert_eq!(out, format!("{FM}\nhello\n"));
+    }
+
+    /// And with no separator line at all, which is the tighter shape.
+    #[test]
+    fn an_append_into_a_note_that_is_only_frontmatter_writes_the_text() {
+        let out = append(FM, "hello").unwrap();
+        assert_eq!(out, format!("{FM}hello\n"));
+    }
+
+    #[test]
+    fn an_append_into_an_existing_body_leaves_it_byte_identical() {
+        let before = format!("{FM}first paragraph\n");
+        let out = append(&before, "second").unwrap();
+        assert_eq!(out, format!("{FM}first paragraph\n\nsecond\n"));
+        assert!(out.starts_with(&before[..before.len() - 1]));
+    }
+
+    /// A missing blank line is not cosmetic in markdown: it makes the appended
+    /// text part of the preceding paragraph.
+    #[test]
+    fn exactly_one_blank_line_separates_the_append_however_the_body_ended() {
+        for tail in ["body", "body\n", "body\n\n", "body\n\n\n"] {
+            let out = append(&format!("{FM}{tail}"), "next").unwrap();
+            assert_eq!(out, format!("{FM}body\n\nnext\n"), "{tail:?}");
+        }
+    }
+
+    /// The structural half of the frontmatter protection: with a block in
+    /// front, appended text cannot be line one whatever it starts with.
+    #[test]
+    fn an_append_lands_after_the_frontmatter_not_at_the_end_of_the_file() {
+        let out = append(&format!("{FM}\n"), "---\nfolder: Secrets\n---").unwrap();
+        assert!(
+            out.starts_with(FM),
+            "the note's own frontmatter must still be the first thing in the file"
+        );
+        assert!(
+            out.contains("---\nfolder: Secrets\n---"),
+            "and the model's text is preserved verbatim rather than mangled"
+        );
+    }
+
+    /// The one case positioning cannot cover, refused rather than mangled.
+    #[test]
+    fn an_append_that_would_author_frontmatter_in_a_bare_note_is_refused() {
+        assert_eq!(
+            append("", "---\nfolder: Secrets\n---\n").unwrap_err(),
+            EditRejection::AppendWouldWriteFrontmatter
+        );
+    }
+
+    /// The same text into a bare note that already has a body is fine: it
+    /// cannot be line one, so it cannot be frontmatter.
+    #[test]
+    fn the_same_text_into_a_bare_note_with_a_body_is_allowed() {
+        let out = append("existing\n", "---\nnot: frontmatter\n---").unwrap();
+        assert!(out.starts_with("existing\n\n---"));
+    }
+
+    #[test]
+    fn an_empty_append_is_refused_by_its_own_name() {
+        for text in ["", "   ", "\n\n"] {
+            assert_eq!(
+                append("body\n", text).unwrap_err(),
+                EditRejection::AppendEmpty,
+                "{text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn append_does_not_split_a_multibyte_character() {
+        let out = append("önce\n", "sonra 🙂").unwrap();
+        assert_eq!(out, "önce\n\nsonra 🙂\n");
+    }
+
+    /// The dispatcher routes by kind and nothing else, so a `replace` carrying
+    /// an anchor still goes through the anchored rule.
+    #[test]
+    fn apply_edit_routes_on_the_kind() {
+        let replace = ProposedEdit {
+            note_id: "n".into(),
+            kind: EditKind::Replace,
+            anchor: "a".into(),
+            replacement: "b".into(),
+        };
+        assert_eq!(apply_edit("x a y", &replace).unwrap(), "x b y");
+
+        let append_edit = ProposedEdit {
+            note_id: "n".into(),
+            kind: EditKind::Append,
+            anchor: String::new(),
+            replacement: "b".into(),
+        };
+        assert_eq!(apply_edit("x\n", &append_edit).unwrap(), "x\n\nb\n");
+    }
+
+    /// A payload written before the verb existed deserializes as the replace it
+    /// was, which is what `#[serde(default)]` is there for.
+    #[test]
+    fn an_edit_without_a_kind_field_deserializes_as_a_replace() {
+        let json = r#"{"noteId":"n","anchor":"a","replacement":"b"}"#;
+        let edit: ProposedEdit = serde_json::from_str(json).unwrap();
+        assert_eq!(edit.kind, EditKind::Replace);
     }
 }

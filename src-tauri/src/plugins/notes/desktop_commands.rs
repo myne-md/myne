@@ -142,7 +142,7 @@ pub(crate) async fn note_export_with_dir(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",
@@ -340,7 +340,7 @@ pub(crate) async fn note_export_text_to_path(
     let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             tracing::debug!(
                 stage = "slot_check",
                 outcome = "vault_locked",
@@ -1354,7 +1354,7 @@ pub(crate) async fn note_snapshot_flush_with_dir(
     let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
-        Slot::Empty | Slot::Recovering { .. } => {
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
             return Err(NoteUpdateError::VaultNotUnlocked);
         }
     }

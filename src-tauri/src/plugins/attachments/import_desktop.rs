@@ -65,7 +65,14 @@ pub async fn attachment_import<R: Runtime>(
         &dir,
         state.inner(),
         source,
-        created_at,
+        // The ordinary paste / drop / file-pick path: bytes arriving from
+        // outside the vault for the first time, so the user's compression
+        // preference is the answer about them. `created_at` is `Some` only when
+        // the caller is re-materializing a file that carries its own age.
+        myne_core::plugins::attachments::commands::IngestPolicy {
+            created_at_override: created_at,
+            compression: myne_core::plugins::attachments::commands::IngestCompression::Apply,
+        },
         extractor,
     )
     .await;
@@ -154,7 +161,7 @@ mod tests {
             vault_dir,
             state,
             source,
-            None,
+            myne_core::plugins::attachments::commands::IngestPolicy::fresh(),
             extract::extract,
         )
         .await

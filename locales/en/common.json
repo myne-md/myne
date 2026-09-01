@@ -37,6 +37,7 @@
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
       "scopeCountUnavailable": "How many notes that folder holds could not be checked just now.",
+      "scopeNone": "no note open, so there is nothing to work on yet",
       "startFailed": "The agent could not start.",
       "autoApplyFailed": "The changes could not be applied automatically. Nothing was written; open the review to apply them yourself.",
       "permissionLabel": "When the run finishes",
@@ -61,6 +62,7 @@
       "scopeTotal_other": "can change {{count}} notes",
       "cancel": "Stop",
       "expandFailed": "The scope could not be widened.",
+      "cancelledBackground": "The run was cancelled because Myne went to the background. Nothing was written. Ask again when you are ready.",
       "grantsUser_one": "{{count}} scope you set",
       "grantsUser_other": "{{count}} scopes you set",
       "grantsModel_one": "{{count}} it asked for",
@@ -118,13 +120,17 @@
         "excludedFolder": "Not created: that folder is excluded from AI.",
         "createFailed": "Not created: writing the new note failed. The other changes were still applied.",
         "excludedNow": "Could not be applied: that note's folder is now excluded from AI.",
-        "notProposed": "Could not be applied: that change is not part of this run's proposal."
+        "notProposed": "Could not be applied: that change is not part of this run's proposal.",
+        "noteMoved": "Could not be applied: that change would move the note to another folder.",
+        "appendEmpty": "Could not be applied: there was nothing to add.",
+        "appendWouldWriteFrontmatter": "Could not be applied: that text would have become the note's properties block."
       },
       "applyFailed": "The changes could not be applied.",
       "undo": "Undo this run",
       "undoFailed": "The run could not be undone.",
       "undoReport": "{{reverted}} notes restored. {{kept}} notes the run created were left in place.",
       "alreadyApplied": "Applied",
+      "appendFlag": "adds to the end",
       "untitledNote": "Untitled note",
       "vaultRoot": "Vault root",
       "newNotesHeading_one": "{{count}} new note",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} note could not be restored.",
       "failed_other": "{{count}} notes could not be restored.",
       "createdNotReverted_one": "{{count}} note the run created was left in place.",
-      "createdNotReverted_other": "{{count}} notes the run created were left in place."
+      "createdNotReverted_other": "{{count}} notes the run created were left in place.",
+      "sessionOnly": "This one-tap undo lasts until you lock the vault or close the app. After that, restore notes one at a time from a note's version history.",
+      "sessionOnlyLink": "Open version history"
     }
   },
   "ai": {
@@ -252,7 +260,7 @@
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
       "transcribeFailed": "Transcription failed. Please try again.",
-      "transcribeTooLong": "This recording is too long to transcribe.",
+      "transcribeTooLong": "This recording is too long to transcribe. The audio stays attached, so you can still play it back.",
       "transcribeFeatureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
       "transcribeModelLoadFailed": "Couldn't load the speech-to-text model. Reinstall Myne, or check your custom model in Settings → Developer → AI.",
       "transcribeNoModel": "Select a speech-to-text model in Settings → Developer → AI.",
@@ -605,6 +613,12 @@
       "openTodayNote": {
         "label": "Open today's note"
       },
+      "openThisWeekNote": {
+        "label": "Open this week's note"
+      },
+      "openThisMonthNote": {
+        "label": "Open this month's note"
+      },
       "randomNote": {
         "label": "Open random note"
       },
@@ -874,13 +888,15 @@
           "captureFailed": "Couldn't start recording. Check microphone access in System Settings.",
           "generic": "Couldn't start recording.",
           "locked": "Unlock your vault to record a voice note.",
-          "noInputDevice": "No microphone found. Connect one and try again."
+          "noInputDevice": "No microphone found. Connect one and try again.",
+          "unsupportedSampleRate": "Your microphone records at a rate Myne can't transcribe. Pick a different input device, or change its sample rate in your system's sound settings."
         },
         "stopError": {
           "captureFailed": "Recording failed. Check your microphone.",
           "emptyRecording": "Nothing was recorded.",
           "generic": "Couldn't save the recording.",
-          "silentRecording": "Recording was silent and discarded. Check your microphone."
+          "silentRecording": "Recording was silent and discarded. Check your microphone.",
+          "unsupportedSampleRate": "Your microphone records at a rate Myne can't transcribe. Nothing was saved. Pick a different input device, or change its sample rate in your system's sound settings."
         }
       },
       "widget": {
@@ -926,6 +942,7 @@
             "featureOff": "Speech-to-text is off. Turn it on in Settings → Transcription.",
             "modelLoadFailed": "Couldn't load the speech-to-text model. If you set a custom model in Settings → Developer → AI, check its files; otherwise reinstalling Myne restores the built-in one.",
             "noModel": "The speech-to-text model is missing. Reinstalling Myne restores it.",
+            "tooLong": "This recording is too long to transcribe. The audio stays attached, so you can still play it back.",
             "vaultLocked": "Unlock your vault to transcribe."
           },
           "failed": "Transcription failed. Please try again.",
@@ -1153,10 +1170,6 @@
       "turnedIntoTemplate": "Turned into template",
       "convertedToNote": "Converted to note",
       "versionHistory": "Version history",
-      "exportMarkdown": "Export as Markdown…",
-      "exportPdf": "Export as PDF…",
-      "exportHtml": "Export as HTML…",
-      "exportTxt": "Export as Plain Text…",
       "trash": "Move to trash"
     },
     "codeBlock": {
@@ -1178,6 +1191,7 @@
     },
     "find": {
       "close": "Close find",
+      "dateFallback": "Searching for {{stored}}, the form this date is stored in.",
       "matchCase": "Match case",
       "matchCount": "{{current}} of {{total}}",
       "nextMatch": "Next match",
@@ -1186,6 +1200,7 @@
       "previousMatch": "Previous match",
       "replaceAll": "Replace all",
       "replaceAllCount": "Replace all ({{total}})",
+      "replaceOffOnDateFallback": "Replace is off while a date is matched by its stored form, so a replacement cannot make the date unreadable.",
       "replaceOne": "Replace",
       "replacePlaceholder": "Replace with",
       "toggleReplace": "Toggle replace"
@@ -1524,6 +1539,13 @@
     "commandPalette": {
       "searchPlaceholder": "Search notes or run a command…",
       "noMatches": "No commands or notes match."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Could not open today's note.",
+        "weekly": "Could not open this week's note.",
+        "monthly": "Could not open this month's note."
+      }
     }
   },
   "export": {
@@ -1856,6 +1878,13 @@
       },
       "tagPlaceholder": "Tag…"
     },
+    "export": {
+      "submenuLabel": "Export…",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "html": "HTML",
+      "txt": "Plain text"
+    },
     "import": {
       "base": {
         "untitledView": "Untitled view"
@@ -1950,7 +1979,53 @@
       "picker": {
         "intro": "Where are your notes coming from?"
       },
+      "myne": {
+        "loading": "Looking for your other vaults…",
+        "noOtherVaults": "There are no other vaults on this device to import from. Restore a backup first, and it becomes a vault you can import from here.",
+        "vaultLabel": "Import from",
+        "vaultPlaceholder": "Choose a vault",
+        "passwordLabel": "That vault's password",
+        "phraseLabel": "That vault's 24-word recovery phrase",
+        "wordAria": "Word {{number}} of 24",
+        "usePhrase": "Use the recovery phrase instead",
+        "usePassword": "Use the password instead",
+        "importLabel": "Name this import",
+        "importLabelHint": "If a note you import has the same name as one you already have, and something you import links to it, the imported one is renamed with this. Keep the same name if you run this import again and nothing will be brought in twice.",
+        "importLabelIllegal": "That name cannot be used: a note name may not contain \\ / | # ^ [ or ], or start or end with a space.",
+        "opening": "Opening…",
+        "unnamedVault": "Vault {{n}}",
+        "errors": {
+          "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
+          "busy": "Another vault operation is running. Wait for it to finish and try again.",
+          "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first."
+        },
+        "done": {
+          "sourceUnchanged": "The vault you imported from has not been changed. If you sync it, it keeps syncing.",
+          "manageVaults": "Manage vaults",
+          "historyStays": "Version history stays in the vault you imported from."
+        },
+        "report": {
+          "trashedLeftBehind": "Notes in the source vault's trash, left behind",
+          "templatesLeftBehind": "Templates, left behind",
+          "untitledImported": "Untitled notes brought over",
+          "attachmentsCrossed": "Attachments brought over",
+          "attachmentsDeduped": "Attachments you already had",
+          "attachmentsFailed": "Attachments the vault would not accept",
+          "linksRetargeted": "Links pointed at a renamed note",
+          "tombstonedEmbeds": "Embeds whose file was already deleted in the source",
+          "dictionaryWordsAdded": "Dictionary words brought over",
+          "dictionaryUnreadable": "The source vault's dictionary could not be read, so no words were brought over.",
+          "linksLeftUnresolved": "Links that could not be pointed anywhere"
+        }
+      },
       "source": {
+        "myne": {
+          "label": "Myne vault",
+          "pickerTitle": "Choose the vault to import from",
+          "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
+          "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
+          "short": "Another vault on this device"
+        },
         "obsidian": {
           "label": "Obsidian",
           "pickerTitle": "Choose your Obsidian vault folder",
@@ -2021,10 +2096,6 @@
       "duplicate": "Duplicate",
       "editFilterTitle": "Edit filter",
       "emptyState": "No notes yet.",
-      "exportHtml": "Export as HTML…",
-      "exportMarkdown": "Export as Markdown…",
-      "exportPdf": "Export as PDF…",
-      "exportTxt": "Export as Plain Text…",
       "favoritesHeading": "Favorites",
       "icon": "Icon…",
       "mergeAnyway": "Merge anyway",
@@ -2381,6 +2452,7 @@
   "recover": {
     "errors": {
       "cancelledVaultLocked": "Recovery cancelled: vault was locked.",
+      "openAsImportSource": "An import is reading this vault right now. Finish or cancel that import, then recover this vault.",
       "operationInProgress": "Operation in progress. Please wait.",
       "unexpected": "Unexpected error. Please try again.",
       "vaultNotFound": "Vault file not found. Please restart the app."
@@ -2754,20 +2826,33 @@
     },
     "dailyNotes": {
       "blankTemplate": "Blank (no template)",
-      "dateFormatHelper": "The title of each daily note. Supports YYYY, MM, DD. Defaults to {{default}}.",
-      "dateFormatLabel": "Daily note date format",
-      "dateFormatSaveError": "Couldn't save the date format. Please try again.",
-      "folderHelper": "Where new daily notes are filed. Defaults to {{default}}. The folder is kept even when empty.",
-      "folderLabel": "Daily note folder",
-      "folderSaveError": "Couldn't save the daily folder. Please try again.",
       "folderSearchEmpty": "No folders match.",
       "folderSearchPlaceholder": "Search folders…",
       "searchEmpty": "No templates match.",
       "searchPlaceholder": "Search templates…",
-      "templateHelper": "Pick a template to start each daily note from, or leave blank for an empty note titled with the date.",
-      "templateLabel": "Daily note template",
-      "templateSaveError": "Couldn't save the daily template. Please try again.",
-      "untitledTemplate": "Untitled template"
+      "untitledTemplate": "Untitled template",
+      "sectionDaily": "Daily notes",
+      "sectionWeekly": "Weekly notes",
+      "sectionMonthly": "Monthly notes",
+      "periodFolderLabel": "Folder",
+      "periodFolderHelper": "Where new {{period}} notes are filed. Defaults to {{default}}. The folder is kept even when empty.",
+      "periodFormatLabel": "Title format",
+      "periodFormatHelperDaily": "The title of each daily note. Supports YYYY, MM, DD, gggg (ISO week-year), ww (ISO week number), and [text] for literal text. Defaults to {{default}}.",
+      "periodFormatHelperWeekly": "The title of each weekly note. Supports gggg (ISO week-year), ww (ISO week number), YYYY, MM, DD, and [text] for literal text. Defaults to {{default}}.",
+      "periodFormatHelperMonthly": "The title of each monthly note. Supports YYYY, MM, gggg (ISO week-year), ww (ISO week number), and [text] for literal text. Defaults to {{default}}.",
+      "periodTemplateLabel": "Template",
+      "periodTemplateHelper": "Pick a template to start each {{period}} note from, or leave blank for an empty note titled with the date.",
+      "collisionWarning": "{{first}} and {{second}} notes resolve to the same note, because they share a folder and produce the same title. Both commands will open it.",
+      "weekStartNote": "Weeks start on Monday (ISO 8601), so the first days of January can belong to the previous year's last week, and the last days of December to the next year's first.",
+      "periodFolderSaveError": "Couldn't save the {{period}} folder. Please try again.",
+      "periodFormatSaveError": "Couldn't save the {{period}} title format. Please try again.",
+      "periodTemplateSaveError": "Couldn't save the {{period}} template. Please try again.",
+      "periodNameDaily": "daily",
+      "periodNameWeekly": "weekly",
+      "periodNameMonthly": "monthly",
+      "periodFolderAriaLabel": "{{period}} note folder",
+      "periodFormatAriaLabel": "{{period}} note title format",
+      "periodTemplateAriaLabel": "{{period}} note template"
     },
     "deleteVault": {
       "cancel": "Cancel",
@@ -2917,12 +3002,15 @@
     },
     "ai": {
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
+      "historyBudgetLabel": "Conversation carried into each request",
       "autoTagLabel": "Suggest tags automatically",
       "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one. The switch turns on by itself in a build that includes it.",
       "consent": {
         "accept": "Send my notes to {{provider}}",
         "cancel": "Cancel",
         "cannotVerifyLabel": "What Myne cannot check",
+        "connectionLabel": "How it travels",
         "revokeLabel": "How to undo this",
         "scopeLabel": "Which devices this covers",
         "title": "Before Myne sends anything to {{provider}}",
@@ -2950,6 +3038,8 @@
       "endpointThirdParty": "{{name}} is a separate program with its own network behaviour, and Myne does not control it. Your notes are sent to it while it runs on this computer.",
       "providerError": {
         "barred": "This kind of request never goes to a provider: it runs on this device or not at all.",
+        "featureOff": "AI is switched off on this device. Nothing was sent. Turn it on in Settings, under AI.",
+        "consentMissing": "You have not agreed to send notes to this provider from this device. Nothing was sent. Choose the provider again in Settings, under AI, and read what it will send.",
         "failed": "That did not work. Nothing was saved and nothing was sent again.",
         "localModelMissing": "The local model recorded in settings is not on this device any more. Nothing was sent anywhere. Pick a model again, or name a provider, in Settings → Developer → AI.",
         "noCredential": "No API key is set for this provider. Add one in Settings → Developer → AI.",
@@ -2997,6 +3087,13 @@
       "providerModelShowAll": "Show all models",
       "providerModelShowTextOnly": "Show text models only",
       "providerModelUnfetched": "Load the list to choose a model.",
+      "mobileEnableLabel": "Use AI on this phone",
+      "mobileEnableHelper": "Off by default. No AI model on this phone answers questions or reads your notes for AI, so every request goes to a service you name below, and your notes leave this device when it does. Transcription and image text still run here, on models that ship with Myne.",
+      "mobileKeyAdd": "Save key",
+      "mobileKeyReplace": "Replace key",
+      "mobileRevokeHelper": "Removes the provider, its key and this phone's approval together, leaving exactly the state of never having set it up. Other devices keep working until you remove it there too.",
+      "mobileApproveLabel": "Approve sending on this phone",
+      "mobileApproveHelper": "The provider and its key came from another device. Nothing is sent from this phone until you read what it will send and approve it here.",
       "providerNone": "None",
       "providerNothingAnswering": "Nothing is set up to answer yet.",
       "modelsLabel": "Models",
@@ -3036,6 +3133,9 @@
       "exactLabel": "Exact timing",
       "exactOn": "On",
       "horizon": "Reminders are registered through {{date}}. Open Myne before then to keep them coming.",
+      "horizonLabel": "Schedule ahead",
+      "horizonLabelHelper": "Reminders are set up this far in advance. Myne has to be open and unlocked for one to arrive.",
+      "horizonInertHelper": "Saved on this device. Nothing reads it yet: this build does not deliver task reminders.",
       "label": "Task reminders",
       "saveError": "Could not save that setting. Try again.",
       "showTextAria": "Show task text in the notification",
@@ -3057,6 +3157,11 @@
       "screenCaptureHelperOff": "Protection always applies before unlock. After unlock, follows this preference.",
       "screenCaptureHelperOn": "Effective on Windows 10 (May 2020 Update) and later. macOS and Linux have no system API for this, so it cannot block capture there.",
       "screenCaptureLabel": "Screen-capture protection",
+      "screenCaptureOverrideHelper": "Turns screen-capture protection off on this device only, before you unlock a vault and after. Set it if a screen magnifier, remote-desktop software or someone helping you remotely sees a black window. It is not synced.",
+      "screenCaptureOverrideLabel": "Allow screen capture on this device",
+      "screenCaptureOverrideUnknown": "This device's screen-capture setting could not be read, so this preference is not being applied. Reopen Settings to try again.",
+      "screenCaptureSuperseded": "Off on this device. See \"Allow screen capture on this device\" below. This preference is kept and applies again when you turn that off.",
+      "screenCaptureSupersededByFlag": "Off for this session, because Myne was started with --disable-screen-capture-protection. This preference is kept and applies again the next time you open Myne without it.",
       "screenCaptureSubtitle": "Block screenshots and screen recording",
       "screenshotBlocked": "Screen protection is on: screenshots of Myne come out blank.",
       "autoLockAfter": "Auto-lock after",
@@ -3246,6 +3351,7 @@
       "resultsLabel": "Search results",
       "keywords": {
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
+        "aiHistoryBudget": "conversation history context memory budget characters agent chat carried request",
         "aiEndpoint": "ollama endpoint address local runtime model server port loopback",
         "aiProvider": "provider remote cloud openrouter ollama cloud api key credential consent send notes",
         "aiProviderModel": "model catalogue list which model llama qwen gpt choose model remote provider",
@@ -3283,8 +3389,9 @@
         "newNoteLocation": "new note location folder default where notes created",
         "torRouting": "tor routing onion proxy network ip address location hide sync anonymity",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
-        "reminders": "reminders notify notification alert task due remind",
+        "reminders": "reminders notify notification alert task due remind horizon registration ahead days",
         "screenCapture": "screen capture protection screenshot recording block privacy",
+        "screenCaptureOverride": "screen capture override allow disable magnifier remote desktop accessibility unlock screen black",
         "showEditTimes": "show edit times timestamps modified dates notes",
         "spell": "spell check spelling dictionary autocorrect",
         "spellLanguages": "spell languages dictionaries locale words",
@@ -3308,12 +3415,13 @@
         "viewMode": "default view mode live reading source preview",
         "dateFormat": "date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "time format 24 hour 12 hour clock am pm",
-        "timezone": "timezone time zone tz utc iana region today"
+        "timezone": "timezone time zone tz utc iana region today",
+        "periodicNotes": "periodic notes weekly monthly week month folder template format"
       }
     },
     "dateTime": {
       "dateLabel": "Date format",
-      "dateHelper": "How dates are shown across tasks, saved views and attachments.",
+      "dateHelper": "How a date is written wherever Myne shows one.",
       "dateSystem": "Match language",
       "timeLabel": "Time format",
       "timeHelper": "Whether times are shown on a 24-hour or 12-hour clock.",
@@ -3321,7 +3429,7 @@
       "time24": "24-hour",
       "time12": "12-hour",
       "zoneLabel": "Time zone",
-      "zoneHelper": "Which zone decides what counts as today. Leave empty to follow this device. Times you write in a note are never changed; 09:00 stays 09:00 everywhere.",
+      "zoneHelper": "Which zone decides what counts as today, and so which note your daily, weekly and monthly notes open. Leave empty to follow this device. The choice settles per device: no other device overwrites it, so an override can put this device on a different day from your others. Times you write in a note are never changed; 09:00 stays 09:00 everywhere.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne doesn't know that time zone. Use a name like Europe/Berlin.",
       "errorSave": "Couldn't save that setting."
@@ -3774,6 +3882,20 @@
     "question": "Do you want to use this theme?",
     "title": "Install theme"
   },
+  "screenCaptureEscape": {
+    "disableBody": "Screen-capture protection asks the operating system to keep this window out of screenshots and screen recordings. It is effective on Windows 10 (May 2020 Update) and later; macOS and Linux have no system API for it, so it cannot block capture there. Where it does work, what it hides the window from includes remote-desktop software and screen magnifiers, which is why this way out exists.",
+    "disableConfirm": "Turn protection off",
+    "disableCost": "Turning it off applies to this device only and stays off until you turn it back on, before you unlock a vault and after. Nothing is sent anywhere and no vault setting changes, but the choice is saved in a settings file on this device, and that file stays there after you turn protection back on.",
+    "disableTitle": "Turn off screen-capture protection?",
+    "disableTrigger": "Turn off screen-capture protection",
+    "flagNotice": "This session was started with --disable-screen-capture-protection, so protection stays off until you quit, whatever this setting says.",
+    "restoreBody": "Screen-capture protection is off on this device. Turning it back on asks the operating system to keep this window out of screenshots and screen recordings again, which on Windows 10 (May 2020 Update) and later also hides it from remote-desktop software and screen magnifiers. On macOS and Linux there is no system API for it, so it cannot block capture there.",
+    "restoreConfirm": "Turn protection on",
+    "restoreTitle": "Turn screen-capture protection back on?",
+    "restoreTrigger": "Turn on screen-capture protection",
+    "savedForNextLaunch": "Saved. This session still has protection off because it was started with --disable-screen-capture-protection, so it comes back the next time you open Myne without that.",
+    "saveFailed": "That could not be saved, so nothing changed. Try again, or start Myne with --disable-screen-capture-protection."
+  },
   "unlock": {
     "backToPicker": "Choose a different vault",
     "continue": "Continue",
@@ -3785,6 +3907,7 @@
       "kdfMemoryExceedsHost": "This vault needs {{required}} MiB of memory to open, more than this browser can give it ({{available}} MiB). The vault is fine; open it in the Myne desktop app.",
       "unexpected": "Unexpected error. Please try again.",
       "vaultNotFound": "Vault file not found. Please restart the app.",
+      "openAsImportSource": "An import is reading this vault right now. Finish or cancel that import, then unlock this vault.",
       "vaultUpgraded": "This vault was upgraded to a newer format this version of Myne doesn’t support yet. Your data is fine. Update Myne to the latest version to open it."
     },
     "passwordLabel": "Password",

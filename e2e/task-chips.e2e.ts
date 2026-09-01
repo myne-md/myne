@@ -15,9 +15,12 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   ESCAPE_KEY,
+  closeSettings,
   createNote,
   dismissImporterOffer,
   editorText,
+  editorSourceText,
+  openSettings,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -126,8 +129,13 @@ describeE2E("tc2 chip editor dismissal leaves the value alone (MYND-614)", () =>
         // before.
         await (await s.byTestId("editor.task-field-input")).sendKeys("\uE00C");
 
+        // SOURCE text, not the rendered text. The chip is a replace widget and
+        // since myne-md/myne#609 its label is the reader's chosen format, so the
+        // ISO date is no longer anywhere in the render. Reading it there was how
+        // this assertion used to pass, and it is what makes the property being
+        // asserted (the bytes did not move) worth asserting at all.
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("2026-08-01") ? true : null),
+          async () => ((await editorSourceText(s)).includes("2026-08-01") ? true : null),
           { label: "value unchanged after Escape" },
         );
       },
@@ -210,6 +218,127 @@ describeE2E("tc3 the + affordance adds a task field end to end", () => {
         await s.waitUntil(
           async () => ((await editorText(s)).includes("[repeat:: every 3 weeks]") ? true : null),
           { label: "added repeat rule reached the document" },
+        );
+      },
+    );
+  });
+});
+
+describeE2E("tc4 the chosen date format reaches the chip (myne-md/myne#609)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  //
+  // What the unit suite structurally cannot answer: whether the SETTING the user
+  // picks in the real Settings panel arrives at the decoration builder at all.
+  // The unit tests publish into the display store directly, so they prove the
+  // formatter is wired to the store and say nothing about whether the store is
+  // wired to the preference. That gap is the whole of myne-md/myne#609: every
+  // formatting surface read a store that, on one client, nothing ever wrote to.
+  it("renders a due chip in the picked format while the file keeps its bytes", async () => {
+    let password = "";
+    await scenario(
+      "tc4-chip-date-format",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Format Note");
+
+        await typeIntoEditor(s, "- [ ] pay the rent [due:: 2026-08-01]", {
+          landedText: "pay the rent",
+        });
+        await waitForSaved(s);
+        await s.waitForElement(testIdSelector("editor.task-chip-due"));
+
+        // Pick day-first explicitly rather than asserting the default. The
+        // default is the `system` preset, whose output is the platform's to
+        // choose, so asserting it would test `Intl` rather than the wiring.
+        await openSettings(s, "editor");
+        await (await s.byTestId("settings.date-format-dmy")).click();
+        await closeSettings(s);
+
+        await s.waitUntil(
+          async () => {
+            const chips = await s.byTestIdAll("editor.task-chip-due");
+            const text = chips.length === 1 ? await chips[0]!.textContent() : "";
+            return text.trim() === "01/08/2026" ? true : null;
+          },
+          { label: "due chip renders in the chosen day-first format" },
+        );
+
+        // And the other half of the value/label split: the label moved, the
+        // bytes did not. A formatted label reaching a write is the one failure
+        // this feature must never produce, and the file is where that shows.
+        // SOURCE text, not the rendered text. The chip is a replace widget and
+        // since myne-md/myne#609 its label is the reader's chosen format, so the
+        // ISO date is no longer anywhere in the render. Reading it there was how
+        // this assertion used to pass, and it is what makes the property being
+        // asserted (the bytes did not move) worth asserting at all.
+        await s.waitUntil(
+          async () => ((await editorSourceText(s)).includes("[due:: 2026-08-01]") ? true : null),
+          { label: "the stored civil date is untouched" },
+        );
+      },
+    );
+  });
+});
+
+describeE2E("tc5 the chip repaints while Settings is still open (myne-md/myne#609)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  //
+  // **The modal stays OPEN, and that is the whole scenario.** Closing Settings
+  // returns focus to the editor, and the shared rebuild gate has always watched
+  // `focusChanged`, so a scenario that closed the modal first would pass with
+  // the ambient-refresh plugin deleted. That is not a hypothetical: it is why
+  // tc4 above, which does close the modal, cannot be the coverage for this.
+  // Asserting under the open modal leaves the ambient effect as the only thing
+  // that can explain a changed label.
+  it("changes the rendered date with no edit, no scroll and no focus change", async () => {
+    let password = "";
+    await scenario(
+      "tc5-chip-repaint-live",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Repaint Note");
+
+        await typeIntoEditor(s, "- [ ] pay the rent [due:: 2026-08-01]", {
+          landedText: "pay the rent",
+        });
+        await waitForSaved(s);
+
+        await openSettings(s, "editor");
+        await (await s.byTestId("settings.date-format-iso")).click();
+
+        const chipText = async (): Promise<string> => {
+          const chips = await s.byTestIdAll("editor.task-chip-due");
+          return chips.length === 1 ? (await chips[0]!.textContent()).trim() : "";
+        };
+        await s.waitUntil(
+          async () => ((await chipText()) === "2026-08-01" ? true : null),
+          { label: "chip settled on the ISO baseline before the change under test" },
+        );
+
+        // The only action between the two reads. The modal is still up, the
+        // caret has not moved, the document has not changed, nothing scrolled.
+        await (await s.byTestId("settings.date-format-dmy")).click();
+
+        await s.waitUntil(
+          async () => ((await chipText()) === "01/08/2026" ? true : null),
+          { label: "chip repainted under the open modal" },
+        );
+
+        await closeSettings(s);
+        // SOURCE text, not the rendered text. The chip is a replace widget and
+        // since myne-md/myne#609 its label is the reader's chosen format, so the
+        // ISO date is no longer anywhere in the render. Reading it there was how
+        // this assertion used to pass, and it is what makes the property being
+        // asserted (the bytes did not move) worth asserting at all.
+        await s.waitUntil(
+          async () => ((await editorSourceText(s)).includes("[due:: 2026-08-01]") ? true : null),
+          { label: "the stored civil date is untouched" },
         );
       },
     );

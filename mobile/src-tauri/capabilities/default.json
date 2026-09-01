@@ -9,6 +9,7 @@
     "core:window:default",
     "opener:default",
     "deep-link:default",
+    "agent:default",
     "vault-creation:default",
     "vault-unlock:default",
     "vault-recover:default",

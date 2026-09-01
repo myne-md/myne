@@ -48,7 +48,8 @@
       "unsupportedDetail": "{{attempts}} ellenőrzésből {{passes}} sikerült; {{required}} szükséges.",
       "checking": "Modell ellenőrzése…",
       "checkingAt": "Modell ellenőrzése… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Ezt a ponthatárt még nem mérték több modellen, ezért lehet, hogy szigorúbb vagy megengedőbb a kelleténél."
+      "unsupportedProvisional": "Ezt a ponthatárt még nem mérték több modellen, ezért lehet, hogy szigorúbb vagy megengedőbb a kelleténél.",
+      "scopeNone": "nincs megnyitott jegyzet, így még nincs min dolgozni"
     },
     "progress": {
       "working": "Dolgozik",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} általad megadott hatókör",
       "grantsUser_other": "{{count}} általad megadott hatókör",
       "grantsModel_one": "{{count}} általa kért",
-      "grantsModel_other": "{{count}} általa kért"
+      "grantsModel_other": "{{count}} általa kért",
+      "cancelledBackground": "A futás megszakadt, mert a Myne a háttérbe került. Semmi nem íródott ki. Kérdezd meg újra, amikor szeretnéd."
     },
     "scope": {
       "title": "Bevonod a(z) {{folder}} mappát?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Nem jött létre: az a mappa ki van zárva az AI elől.",
         "createFailed": "Nem jött létre: az új jegyzet mentése nem sikerült. A többi módosítás így is alkalmazva lett.",
         "excludedNow": "Nem sikerült alkalmazni: annak a jegyzetnek a mappája már ki van zárva az AI elől.",
-        "notProposed": "Nem sikerült alkalmazni: az a módosítás nem része a futtatás javaslatának."
+        "notProposed": "Nem sikerült alkalmazni: az a módosítás nem része a futtatás javaslatának.",
+        "noteMoved": "Nem sikerült alkalmazni: ez a módosítás másik mappába helyezné a jegyzetet.",
+        "appendEmpty": "Nem sikerült alkalmazni: nem volt mit hozzáadni.",
+        "appendWouldWriteFrontmatter": "Nem sikerült alkalmazni: ez a szöveg a jegyzet tulajdonságblokkjává vált volna."
       },
       "applyFailed": "A módosításokat nem sikerült alkalmazni.",
       "undo": "A futtatás visszavonása",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} jegyzet elolvasva",
       "runSummaryOffDevice_one": "a jegyzeteidből körülbelül {{count}} karakter lett elküldve a szolgáltatónak",
       "runSummaryOffDevice_other": "a jegyzeteidből körülbelül {{count}} karakter lett elküldve a szolgáltatónak",
-      "runSummaryOnDevice": "semmi sem hagyta el ezt az eszközt"
+      "runSummaryOnDevice": "semmi sem hagyta el ezt az eszközt",
+      "appendFlag": "a végére kerül"
     },
     "undo": {
       "offer_one": "Az utolsó futtatás {{count}} jegyzetet módosított.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} jegyzetet nem sikerült visszaállítani.",
       "failed_other": "{{count}} jegyzetet nem sikerült visszaállítani.",
       "createdNotReverted_one": "A futtatás által létrehozott {{count}} jegyzet a helyén maradt.",
-      "createdNotReverted_other": "A futtatás által létrehozott {{count}} jegyzet a helyén maradt."
+      "createdNotReverted_other": "A futtatás által létrehozott {{count}} jegyzet a helyén maradt.",
+      "sessionOnly": "Ez az egy koppintásos visszavonás addig él, amíg le nem zárod a széfet vagy be nem zárod az alkalmazást. Utána a jegyzeteket egyesével állítod vissza a jegyzet verziótörténetéből.",
+      "sessionOnlyLink": "Verziótörténet megnyitása"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Összes kibontása"
+      },
+      "openThisWeekNote": {
+        "label": "A heti jegyzet megnyitása"
+      },
+      "openThisMonthNote": {
+        "label": "A havi jegyzet megnyitása"
       }
     },
     "hotkeys": {
@@ -880,13 +894,15 @@
           "captureFailed": "Nem sikerült elindítani a felvételt. Ellenőrizd a mikrofonhozzáférést a Rendszerbeállításokban.",
           "generic": "Nem sikerült elindítani a felvételt.",
           "locked": "Hangjegyzet rögzítéséhez nyisd ki a széfet.",
-          "noInputDevice": "Nem található mikrofon. Csatlakoztass egyet, és próbáld újra."
+          "noInputDevice": "Nem található mikrofon. Csatlakoztass egyet, és próbáld újra.",
+          "unsupportedSampleRate": "A mikrofonja olyan mintavételi frekvenciával rögzít, amelyet a Myne nem tud átiratozni. Válasszon másik bemeneti eszközt, vagy módosítsa a mintavételi frekvenciáját a rendszer hangbeállításaiban."
         },
         "stopError": {
           "captureFailed": "A felvétel meghiúsult. Ellenőrizd a mikrofont.",
           "emptyRecording": "Semmi sem lett rögzítve.",
           "generic": "Nem sikerült menteni a felvételt.",
-          "silentRecording": "A felvétel néma volt, ezért el lett vetve. Ellenőrizd a mikrofont."
+          "silentRecording": "A felvétel néma volt, ezért el lett vetve. Ellenőrizd a mikrofont.",
+          "unsupportedSampleRate": "A mikrofonja olyan mintavételi frekvenciával rögzít, amelyet a Myne nem tud átiratozni. Semmi nem lett mentve. Válasszon másik bemeneti eszközt, vagy módosítsa a mintavételi frekvenciáját a rendszer hangbeállításaiban."
         }
       },
       "widget": {
@@ -932,6 +948,7 @@
             "featureOff": "A beszéd szöveggé alakítása ki van kapcsolva. Kapcsold be a Beállítások → Átirat menüben.",
             "modelLoadFailed": "Nem sikerült betölteni a beszédfelismerő modellt. Ha egyéni modellt állítottál be a Beállítások → Fejlesztő → AI menüben, ellenőrizd a fájljait; egyébként a Myne újratelepítése visszaállítja a beépítettet.",
             "noModel": "Hiányzik a beszédfelismerő modell. A Myne újratelepítése visszaállítja.",
+            "tooLong": "Ez a felvétel túl hosszú az átiratozáshoz. A hang mellékletként megmarad, így le tudja játszani.",
             "vaultLocked": "Az átirat készítéséhez oldd fel a széfedet."
           },
           "disabledReason": "Az átirathoz kapcsold be az AI-t a Beállítások → Developer → AI menüben.",
@@ -1164,10 +1181,6 @@
       "turnedIntoTemplate": "Sablonná alakítva",
       "convertedToNote": "Jegyzetté alakítva",
       "versionHistory": "Verzióelőzmények",
-      "exportMarkdown": "Exportálás Markdownként…",
-      "exportPdf": "Exportálás PDF-ként…",
-      "exportHtml": "Exportálás HTML-ként…",
-      "exportTxt": "Exportálás egyszerű szövegként…",
       "trash": "Kukába helyezés"
     },
     "codeBlock": {
@@ -1199,7 +1212,9 @@
       "replaceAllCount": "Mind cseréje ({{total}})",
       "replaceOne": "Csere",
       "replacePlaceholder": "Csere erre",
-      "toggleReplace": "Csere be-/kikapcsolása"
+      "toggleReplace": "Csere be-/kikapcsolása",
+      "dateFallback": "Keresés erre: {{stored}}, ebben a formában van tárolva ez a dátum.",
+      "replaceOffOnDateFallback": "A csere ki van kapcsolva, amíg egy dátum a tárolt formájával található meg, hogy egy csere ne tehesse olvashatatlanná a dátumot."
     },
     "cover": {
       "add": "Borító hozzáadása",
@@ -1535,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "Jegyzetek keresése vagy parancs futtatása…",
       "noMatches": "Nincs egyező parancs vagy jegyzet."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "A mai jegyzetet nem sikerült megnyitni.",
+        "weekly": "A heti jegyzetet nem sikerült megnyitni.",
+        "monthly": "A havi jegyzetet nem sikerült megnyitni."
+      }
     }
   },
   "export": {
@@ -2035,10 +2057,6 @@
       "duplicate": "Másolat",
       "editFilterTitle": "Szűrő szerkesztése",
       "emptyState": "Még nincs jegyzet.",
-      "exportHtml": "Exportálás HTML-ként…",
-      "exportMarkdown": "Exportálás Markdownként…",
-      "exportPdf": "Exportálás PDF-ként…",
-      "exportTxt": "Exportálás egyszerű szövegként…",
       "favoritesHeading": "Kedvencek",
       "icon": "Ikon…",
       "mergeAnyway": "Összevonás mindenképp",
@@ -2344,6 +2362,13 @@
     },
     "workspace": {
       "defaultSlotName": "Alapértelmezett"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportálás…",
+      "txt": "Egyszerű szöveg"
     }
   },
   "password": {
@@ -2776,20 +2801,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Üres (nincs sablon)",
+      "folderSearchEmpty": "Nincs egyező mappa.",
+      "folderSearchPlaceholder": "Mappák keresése…",
+      "searchEmpty": "Nincs egyező sablon.",
+      "searchPlaceholder": "Sablonok keresése…",
+      "untitledTemplate": "Névtelen sablon",
+      "sectionDaily": "Napi jegyzetek",
+      "sectionWeekly": "Heti jegyzetek",
+      "sectionMonthly": "Havi jegyzetek",
+      "periodFolderLabel": "Mappa",
+      "periodFolderHelper": "Ide kerülnek az új {{period}} jegyzetek. Alapértelmezés: {{default}}. A mappa üresen is megmarad.",
+      "periodFormatLabel": "Címformátum",
+      "periodFormatHelperDaily": "Minden napi jegyzet címe. Támogatja a YYYY, MM, DD, gggg (ISO hétév), ww (ISO hétszám) elemeket és a [szöveg] formát a szó szerinti szöveghez. Alapértelmezés: {{default}}.",
+      "periodFormatHelperWeekly": "Minden heti jegyzet címe. Támogatja a gggg (ISO hétév), ww (ISO hétszám), YYYY, MM, DD elemeket és a [szöveg] formát a szó szerinti szöveghez. Alapértelmezés: {{default}}.",
+      "periodFormatHelperMonthly": "Minden havi jegyzet címe. Támogatja a YYYY, MM, gggg (ISO hétév), ww (ISO hétszám) elemeket és a [szöveg] formát a szó szerinti szöveghez. Alapértelmezés: {{default}}.",
+      "periodTemplateLabel": "Sablon",
+      "periodTemplateHelper": "Válasszon sablont, amellyel minden {{period}} jegyzet kezdődik, vagy hagyja üresen egy dátummal címzett üres jegyzethez.",
+      "collisionWarning": "A(z) {{first}} és {{second}} jegyzetek ugyanarra a jegyzetre mutatnak, mert közös mappát használnak és ugyanazt a címet adják. Mindkét parancs ezt nyitja meg.",
+      "weekStartNote": "A hetek hétfőn kezdődnek (ISO 8601), ezért január első napjai az előző év utolsó hetéhez tartozhatnak, december utolsó napjai pedig a következő év első hetéhez.",
+      "periodFolderSaveError": "A(z) {{period}} mappát nem sikerült menteni. Próbálja újra.",
+      "periodFormatSaveError": "A(z) {{period}} címformátumot nem sikerült menteni. Próbálja újra.",
+      "periodTemplateSaveError": "A(z) {{period}} sablont nem sikerült menteni. Próbálja újra.",
+      "periodNameDaily": "napi",
+      "periodNameWeekly": "heti",
+      "periodNameMonthly": "havi",
+      "periodFolderAriaLabel": "{{period}} jegyzetek mappája",
+      "periodFormatAriaLabel": "{{period}} jegyzetek címformátuma",
+      "periodTemplateAriaLabel": "{{period}} jegyzetek sablonja",
       "dateFormatHelper": "Minden napi jegyzet címe. Támogatja: ÉÉÉÉ, HH, NN. Alapértelmezett: {{default}}.",
       "dateFormatLabel": "Napi jegyzet dátumformátuma",
       "dateFormatSaveError": "Nem sikerült menteni a dátumformátumot. Kérlek, próbáld újra.",
       "folderHelper": "Hová kerülnek az új napi jegyzetek. Alapértelmezés: {{default}}. A mappa üresen is megmarad.",
       "folderLabel": "Napi jegyzetek mappája",
       "folderSaveError": "Nem sikerült menteni a napi jegyzetek mappáját. Kérlek, próbáld újra.",
-      "folderSearchEmpty": "Nincs egyező mappa.",
-      "folderSearchPlaceholder": "Mappák keresése…",
-      "searchEmpty": "Nincs egyező sablon.",
-      "searchPlaceholder": "Sablonok keresése…",
       "templateHelper": "Válassz egy sablont, amelyből minden napi jegyzet indul, vagy hagyd üresen egy dátummal címzett üres jegyzethez.",
       "templateLabel": "Napi jegyzet sablonja",
-      "templateSaveError": "Nem sikerült menteni a napi jegyzet sablonját. Kérlek, próbáld újra.",
-      "untitledTemplate": "Névtelen sablon"
+      "templateSaveError": "Nem sikerült menteni a napi jegyzet sablonját. Kérlek, próbáld újra."
     },
     "deleteVault": {
       "cancel": "Mégse",
@@ -2950,7 +2997,8 @@
         "title": "Mielőtt a Myne bármit elküldene ide: {{provider}}",
         "whatLabel": "Mi hagyja el az eszközödet",
         "whenLabel": "Mikor hagyja el",
-        "whoLabel": "Ki kapja meg"
+        "whoLabel": "Ki kapja meg",
+        "connectionLabel": "Hogyan utazik"
       },
       "disclosureToggle": "Hogyan működik ez?",
       "enableHelper": "Egy általad biztosított modellt futtat. Hogy hol fut, és hogy a jegyzeteid elhagyják-e ezt az eszközt, az attól a szolgáltatótól függ, amelyet alább megnevezel. Kísérleti, alapértelmezés szerint kikapcsolva.",
@@ -2984,7 +3032,9 @@
         "refused": "A szolgáltató visszautasította a kapcsolatot. Lehet, hogy nem üzemel, vagy blokkolja ezt a hálózatot.",
         "timeout": "A szolgáltató nem válaszolt időben. Semmi nem maradt futásban.",
         "unauthorized": "A szolgáltató elutasította az API-kulcsodat. Cseréld le: lehet, hogy hibás, visszavonták, vagy egy másik fiókhoz tartozik.",
-        "unreachable": "Nem sikerült elérni a szolgáltatót. Ellenőrizd a hálózati kapcsolatodat."
+        "unreachable": "Nem sikerült elérni a szolgáltatót. Ellenőrizd a hálózati kapcsolatodat.",
+        "featureOff": "Az MI ki van kapcsolva ezen az eszközön. Semmi nem lett elküldve. Kapcsold be a Beállításokban, az MI résznél.",
+        "consentMissing": "Nem járultál hozzá, hogy erről az eszközről jegyzeteket küldj ennek a szolgáltatónak. Semmi nem lett elküldve. Válaszd ki újra a szolgáltatót a Beállításokban, az MI résznél, és olvasd el, mi kerül elküldésre."
       },
       "modelChoose": "Fájl kiválasztása…",
       "modelEmbeddingLabel": "Keresőmodell: szemantikus keresés és kérdés-válasz",
@@ -3025,7 +3075,16 @@
       "recommendedFilesEmbedding": "Szükséges a model.safetensors + config.json + tokenizer.json egy mappában.",
       "recommendedFilesGeneration": "Szükséges a .gguf fájl + tokenizer.json ugyanabban a mappában.",
       "recommendedFilesTranscription": "Szükséges a Whisper .gguf fájl + config.json + tokenizer.json ugyanabban a mappában.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "MI használata ezen a telefonon",
+      "mobileEnableHelper": "Alapértelmezetten kikapcsolva. Ezen a telefonon egyetlen MI-modell sem válaszol kérdésekre és nem olvassa a jegyzeteit, így minden kérés az alább megnevezett szolgáltatáshoz megy, és a jegyzetei ekkor elhagyják ezt az eszközt. Az átiratozás és a képek szövege továbbra is itt fut, a Myne-nal szállított modelleken.",
+      "mobileKeyAdd": "Kulcs mentése",
+      "mobileKeyReplace": "Kulcs cseréje",
+      "mobileRevokeHelper": "Egyszerre távolítja el a szolgáltatót, a kulcsát és ennek a telefonnak a jóváhagyását, pontosan azt az állapotot hagyva, mintha soha nem lett volna beállítva. A többi eszköz addig működik tovább, amíg ott is el nem távolítod.",
+      "mobileApproveLabel": "Küldés jóváhagyása ezen a telefonon",
+      "mobileApproveHelper": "A szolgáltató és a kulcsa egy másik eszközről érkezett. Erről a telefonról semmi nem megy el, amíg el nem olvasod, mi kerül elküldésre, és itt jóvá nem hagyod.",
+      "historyBudgetHelper": "Mennyit visz magával a legutóbbi beszélgetésből minden kérés, karakterben. Hagyd üresen az alapértelmezéshez. A nagyobb szám hosszabb beszélgetéseket enged követni az AI-nak, és többet küld el belőlük: olyan szolgáltatónál, amely nem ezen az eszközön fut, ez több szöveged távozását jelenti, a futás minden lépésénél.",
+      "historyBudgetLabel": "Minden kéréssel elküldött beszélgetés"
     },
     "network": {
       "disabledCue": "A szinkronizálás már nem a Toron keresztül megy. Az új kapcsolatok közvetlenül a szinkronszerverhez csatlakoznak.",
@@ -3058,6 +3117,9 @@
       "exactLabel": "Pontos időzítés",
       "exactOn": "Be",
       "horizon": "Az emlékeztetők eddig vannak regisztrálva: {{date}}. Addig nyisd meg a Myne-t, hogy továbbra is érkezzenek.",
+      "horizonLabel": "Előre ütemezés",
+      "horizonLabelHelper": "Az emlékeztetők ennyivel előre készülnek el. A Myne-nak nyitva és feloldva kell lennie, hogy megérkezzen egy.",
+      "horizonInertHelper": "Elmentve ezen az eszközön. Még semmi sem olvassa: ez a build nem kézbesít feladat-emlékeztetőket.",
       "label": "Feladatemlékeztetők",
       "saveError": "Nem sikerült menteni a beállítást. Próbáld újra.",
       "showTextAria": "A feladat szövegének megjelenítése az értesítésben",
@@ -3338,12 +3400,14 @@
         "viewMode": "alapértelmezett nézetmód élő olvasás forrás előnézet view mode",
         "dateFormat": "dátumformátum dátum formátum nap hónap év iso dd/mm mm/dd naptár date format calendar",
         "timeFormat": "időformátum idő formátum 24 órás 12 órás óra de du am pm time format clock",
-        "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today"
+        "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today",
+        "periodicNotes": "időszakos jegyzetek heti havi hét hónap mappa sablon formátum",
+        "aiHistoryBudget": "beszélgetés előzmények kontextus memória keret karakterek ügynök chat kérés"
       }
     },
     "dateTime": {
       "dateLabel": "Dátumformátum",
-      "dateHelper": "Hogyan jelennek meg a dátumok a feladatoknál, a mentett nézeteknél és a mellékleteknél.",
+      "dateHelper": "Hogyan írja ki a Myne a dátumot mindenütt, ahol megjelenít egyet.",
       "dateSystem": "Nyelv szerint",
       "timeLabel": "Időformátum",
       "timeHelper": "Az időpontok 24 órás vagy 12 órás formátumban jelenjenek-e meg.",

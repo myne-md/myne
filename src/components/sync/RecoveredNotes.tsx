@@ -370,7 +370,7 @@ export function RecoveredNotes({ onRestored }: RecoveredNotesProps) {
           // last copy anywhere: the note's server record was deleted and
           // reclaimed remotely, it is not in the vault's note set or in Trash,
           // and `quarantine/` is not one of the directories the `.myne-backup`
-          // container enumerates. `design-notes/ui/0541` accepts a reflex Enter
+          // container enumerates. `design-notes/ui/0564` accepts a reflex Enter
           // on the two erase paths that a backup can still answer for; this is
           // not one of them, so the deliberate act here is a click or a Tab.
           //

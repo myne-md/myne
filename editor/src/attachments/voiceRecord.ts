@@ -12,7 +12,7 @@ import type { EditorView } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
 import { addCatalogRows } from "./catalog";
-import { fileNameTimestamp } from "./insert";
+import { fileNameTimestamp, ownLineInsertion } from "./insert";
 import { showAttachmentToast } from "./toast";
 import { mountRecordingBar, type RecordingBarHandle } from "./recordingBar";
 
@@ -51,9 +51,11 @@ function insertVoiceEmbed(view: EditorView, imported: ImportedAttachment): void 
   ]);
   const embed = emitAttachmentEmbed(imported.id, imported.filename);
   const at = view.state.selection.main.head;
+  // Its own line, like every other embed Myne writes (myne-md/myne#604).
+  const { insert, anchor } = ownLineInsertion(view.state.doc, at, embed);
   view.dispatch({
-    changes: { from: at, insert: embed },
-    selection: { anchor: at + embed.length },
+    changes: { from: at, insert },
+    selection: { anchor },
     userEvent: "input.voice-note",
   });
 }
@@ -157,6 +159,13 @@ function startErrorMessage(err: unknown): string {
       return i18n.t("editor.attachment.voice.startError.noInputDevice");
     case "captureFailed":
       return i18n.t("editor.attachment.voice.startError.captureFailed");
+    // Its own arm rather than falling through to `generic`. The Rust variant's
+    // own doc says it is carried separately from `CaptureFailed` "so the user is
+    // told what is actually wrong", and until this arm existed that sentence was
+    // false: it landed on "Couldn't start recording", which names neither the
+    // cause nor the one thing that fixes it.
+    case "unsupportedSampleRate":
+      return i18n.t("editor.attachment.voice.startError.unsupportedSampleRate");
     default:
       return i18n.t("editor.attachment.voice.startError.generic");
   }
@@ -171,6 +180,11 @@ function stopErrorMessage(err: unknown): string {
     case "noInputDevice":
     case "captureFailed":
       return i18n.t("editor.attachment.voice.stopError.captureFailed");
+    // Same reason as the start mapper, and worse here: the take is discarded, so
+    // "Couldn't save the recording" reads as a transient save failure the user
+    // should retry, and retrying on the same device fails identically.
+    case "unsupportedSampleRate":
+      return i18n.t("editor.attachment.voice.stopError.unsupportedSampleRate");
     default:
       return i18n.t("editor.attachment.voice.stopError.generic");
   }

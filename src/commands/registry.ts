@@ -16,6 +16,7 @@
 
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 import type { NoteId } from "../notes/sidebarState";
+import type { Period } from "../notes/dailyNote";
 import type { PrefsView } from "../lib/prefs";
 
 export type AppStageName =
@@ -76,8 +77,11 @@ export type CommandContext = {
   onManageTemplates: () => void;
   /** Open the new-note-from-template flow (picker → name → create) (MYND-190). */
   onNewNoteFromTemplate: () => void;
-  /** Open (or idempotently create) today's daily note (MYND-191). */
-  onOpenTodayNote: () => void;
+  /** Open (or idempotently create) one period's note: daily (MYND-191),
+   *  weekly or monthly (myne#177). ONE callback for all three: the prefs
+   *  asymmetry between daily and the other two lives in `periodSettings`, and
+   *  a second callback for daily would put that knowledge in a second place. */
+  onOpenPeriodNote: (period: Period) => void;
   /** Pick a random non-trashed, non-template note from the vault and open it (MYND-323). */
   onOpenRandomNote: () => void;
   /** Open the attachments library (full-pane center-pane view, MYND-170). */

@@ -17,6 +17,7 @@
 // `src-tauri/src/plugins/attachments/{commands,error}.rs`; the shapes below are
 // hand-mirrored per the no-codegen note in `src/CLAUDE.md`.
 
+import type { Text } from "@codemirror/state";
 import { getHost } from "../host";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
@@ -537,4 +538,42 @@ export function planRewrite(ref: ImportedImageRef, imported: ImportedAttachment)
   // C1 is honored: this is post-import, user-initiated, diff-previewed).
   const filename = imported.filename || displayNameForRef(ref);
   return { ref, replacement: emitAttachmentEmbed(imported.id, filename, ref.layout) };
+}
+
+/**
+ * Place freshly-emitted embed text on a line of its own (myne-md/myne#604).
+ *
+ * # Why the INSERT path and not the renderer
+ *
+ * The renderer draws an embed as a block only when the source has it alone on
+ * its line (`embedIsAlone`), and CodeMirror will not accept a block decoration
+ * on anything narrower than whole lines. So "an embed gets its own row" is half
+ * a rendering rule and half this: what Myne itself writes is what Myne can then
+ * draw well.
+ *
+ * # Why this is not a byte-stability violation
+ *
+ * `markdown-dialect.md` §6 C1 binds the PARSER: a note's existing bytes survive
+ * a round trip unchanged. This is Myne composing its own output at the moment
+ * the user asks for an attachment, which is the same latitude every other
+ * insertion in the editor has. An embed already in a note is never moved.
+ *
+ * # The rule
+ *
+ * A newline is added only where one is actually needed. Whitespace before the
+ * cursor is left alone rather than trimmed, so a screenshot pasted at the indent
+ * under a task item stays at that indent, which `embedIsAlone` accepts because
+ * it compares against the trimmed line.
+ */
+export function ownLineInsertion(
+  doc: Text,
+  at: number,
+  text: string,
+): { readonly insert: string; readonly anchor: number } {
+  const line = doc.lineAt(at);
+  const before = doc.sliceString(line.from, at);
+  const after = doc.sliceString(at, line.to);
+  const prefix = before.trim() === "" ? "" : "\n";
+  const suffix = after.trim() === "" ? "" : "\n";
+  return { insert: `${prefix}${text}${suffix}`, anchor: at + prefix.length + text.length };
 }

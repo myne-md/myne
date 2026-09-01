@@ -48,7 +48,8 @@
       "unsupportedDetail": "Imepita ukaguzi {{passes}} kati ya {{attempts}}; {{required}} zinahitajika.",
       "checking": "Inakagua modeli…",
       "checkingAt": "Inakagua modeli… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Kiwango hicho cha kufaulu bado hakijapimwa katika modeli mbalimbali, kwa hivyo kinaweza kuwa kikali au chepesi kuliko inavyostahili."
+      "unsupportedProvisional": "Kiwango hicho cha kufaulu bado hakijapimwa katika modeli mbalimbali, kwa hivyo kinaweza kuwa kikali au chepesi kuliko inavyostahili.",
+      "scopeNone": "hakuna dokezo lililofunguliwa, hivyo bado hakuna cha kufanyia kazi"
     },
     "progress": {
       "working": "Inafanya kazi",
@@ -64,7 +65,8 @@
       "grantsUser_one": "wigo {{count}} uliouweka",
       "grantsUser_other": "wigo {{count}} uliouweka",
       "grantsModel_one": "{{count}} alioomba",
-      "grantsModel_other": "{{count}} alioomba"
+      "grantsModel_other": "{{count}} alioomba",
+      "cancelledBackground": "Uendeshaji ulighairiwa kwa sababu Myne ilihamia chinichini. Hakuna kilichoandikwa. Uliza tena ukiwa tayari."
     },
     "scope": {
       "title": "Ujumuishe {{folder}}?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Halikutengenezwa: folda hiyo imetengwa na AI.",
         "createFailed": "Halikutengenezwa: kuandika dokezo jipya kumeshindikana. Mabadiliko mengine bado yametumika.",
         "excludedNow": "Hayakuweza kutumika: folda ya dokezo hilo sasa imetengwa na AI.",
-        "notProposed": "Hayakuweza kutumika: badiliko hilo si sehemu ya pendekezo la uendeshaji huu."
+        "notProposed": "Hayakuweza kutumika: badiliko hilo si sehemu ya pendekezo la uendeshaji huu.",
+        "noteMoved": "Hayakuweza kutumika: mabadiliko hayo yangehamisha dokezo kwenye folda nyingine.",
+        "appendEmpty": "Hayakuweza kutumika: hakukuwa na kitu cha kuongeza.",
+        "appendWouldWriteFrontmatter": "Hayakuweza kutumika: maandishi hayo yangekuwa kizuizi cha sifa za dokezo."
       },
       "applyFailed": "Mabadiliko hayakuweza kutumika.",
       "undo": "Tendua uendeshaji huu",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "madokezo {{count}} yamesomwa",
       "runSummaryOffDevice_one": "takriban herufi {{count}} ya madokezo yako ilitumwa kwa mtoa huduma",
       "runSummaryOffDevice_other": "takriban herufi {{count}} za madokezo yako zilitumwa kwa mtoa huduma",
-      "runSummaryOnDevice": "hakuna kilichotoka kwenye kifaa hiki"
+      "runSummaryOnDevice": "hakuna kilichotoka kwenye kifaa hiki",
+      "appendFlag": "huongeza mwishoni"
     },
     "undo": {
       "offer_one": "Uendeshaji uliopita ulibadilisha dokezo {{count}}.",
@@ -148,7 +154,9 @@
       "failed_one": "Dokezo {{count}} halikuweza kurejeshwa.",
       "failed_other": "Madokezo {{count}} hayakuweza kurejeshwa.",
       "createdNotReverted_one": "Dokezo {{count}} lililoundwa na uendeshaji huo limeachwa palepale.",
-      "createdNotReverted_other": "Madokezo {{count}} yaliyoundwa na uendeshaji huo yameachwa palepale."
+      "createdNotReverted_other": "Madokezo {{count}} yaliyoundwa na uendeshaji huo yameachwa palepale.",
+      "sessionOnly": "Kutendua huku kwa mguso mmoja hudumu hadi ufunge kasha au ufunge programu. Baada ya hapo, rejesha madokezo moja baada ya jingine kutoka historia ya matoleo ya dokezo.",
+      "sessionOnlyLink": "Fungua historia ya matoleo"
     }
   },
   "ai": {
@@ -655,6 +663,12 @@
       },
       "unfoldAll": {
         "label": "Kunjua zote"
+      },
+      "openThisWeekNote": {
+        "label": "Fungua dokezo la wiki hii"
+      },
+      "openThisMonthNote": {
+        "label": "Fungua dokezo la mwezi huu"
       }
     },
     "hotkeys": {
@@ -874,13 +888,15 @@
           "captureFailed": "Imeshindwa kuanza kurekodi. Kagua ruhusa ya maikrofoni katika Mipangilio ya Mfumo.",
           "generic": "Imeshindwa kuanza kurekodi.",
           "locked": "Fungua kasha lako ili kurekodi dokezo la sauti.",
-          "noInputDevice": "Hakuna maikrofoni iliyopatikana. Unganisha moja kisha ujaribu tena."
+          "noInputDevice": "Hakuna maikrofoni iliyopatikana. Unganisha moja kisha ujaribu tena.",
+          "unsupportedSampleRate": "Maikrofoni yako inarekodi kwa kiwango ambacho Myne haiwezi kunukuu. Chagua kifaa kingine cha kuingiza sauti, au ubadilishe kiwango chake cha sampuli katika mipangilio ya sauti ya mfumo."
         },
         "stopError": {
           "captureFailed": "Urekodi umeshindikana. Kagua maikrofoni yako.",
           "emptyRecording": "Hakuna kilichorekodiwa.",
           "generic": "Imeshindwa kuhifadhi urekodi.",
-          "silentRecording": "Urekodi ulikuwa kimya na umetupwa. Kagua maikrofoni yako."
+          "silentRecording": "Urekodi ulikuwa kimya na umetupwa. Kagua maikrofoni yako.",
+          "unsupportedSampleRate": "Maikrofoni yako inarekodi kwa kiwango ambacho Myne haiwezi kunukuu. Hakuna kilichohifadhiwa. Chagua kifaa kingine cha kuingiza sauti, au ubadilishe kiwango chake cha sampuli katika mipangilio ya sauti ya mfumo."
         }
       },
       "widget": {
@@ -926,6 +942,7 @@
             "featureOff": "Ubadilishaji wa sauti kuwa maandishi umezimwa. Uwashe katika Mipangilio → Unukuzi.",
             "modelLoadFailed": "Imeshindwa kupakia modeli ya kubadilisha sauti kuwa maandishi. Ikiwa umeweka modeli maalum katika Mipangilio → Msanidi → AI, kagua mafaili yake; vinginevyo kusakinisha Myne upya kunarejesha ile iliyojengwa ndani.",
             "noModel": "Modeli ya kubadilisha sauti kuwa maandishi haipo. Kusakinisha Myne upya kunairejesha.",
+            "tooLong": "Rekodi hii ni ndefu mno kunukuliwa. Sauti inabaki imeambatishwa, hivyo bado unaweza kuicheza.",
             "vaultLocked": "Fungua kasha lako ili kunukuu."
           },
           "failed": "Unukuzi umeshindikana. Tafadhali jaribu tena.",
@@ -1155,10 +1172,6 @@
       "turnedIntoTemplate": "Limegeuzwa kuwa kiolezo",
       "convertedToNote": "Limegeuzwa kuwa dokezo",
       "versionHistory": "Historia ya matoleo",
-      "exportMarkdown": "Hamisha kama Markdown…",
-      "exportPdf": "Hamisha kama PDF…",
-      "exportHtml": "Hamisha kama HTML…",
-      "exportTxt": "Hamisha kama maandishi wazi…",
       "trash": "Peleka kwenye tupio"
     },
     "codeBlock": {
@@ -1190,7 +1203,9 @@
       "replaceAllCount": "Badilisha zote ({{total}})",
       "replaceOne": "Badilisha",
       "replacePlaceholder": "Badilisha na",
-      "toggleReplace": "Washa/zima ubadilishaji"
+      "toggleReplace": "Washa/zima ubadilishaji",
+      "dateFallback": "Inatafuta {{stored}}, ndiyo hali ambayo tarehe hii huhifadhiwa.",
+      "replaceOffOnDateFallback": "Kubadilisha kumezimwa maadamu tarehe inapatikana kwa umbo lake lililohifadhiwa, ili ubadilishaji usiifanye tarehe isisomeke."
     },
     "cover": {
       "add": "Ongeza jalada",
@@ -1526,6 +1541,13 @@
     "commandPalette": {
       "searchPlaceholder": "Tafuta madokezo au endesha amri…",
       "noMatches": "Hakuna amri wala dokezo linalolingana."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Dokezo la leo halikuweza kufunguliwa.",
+        "weekly": "Dokezo la wiki hii halikuweza kufunguliwa.",
+        "monthly": "Dokezo la mwezi huu halikuweza kufunguliwa."
+      }
     }
   },
   "export": {
@@ -2023,10 +2045,6 @@
       "duplicate": "Nakili",
       "editFilterTitle": "Hariri kichujio",
       "emptyState": "Bado hakuna madokezo.",
-      "exportHtml": "Hamisha kama HTML…",
-      "exportMarkdown": "Hamisha kama Markdown…",
-      "exportPdf": "Hamisha kama PDF…",
-      "exportTxt": "Hamisha kama maandishi wazi…",
       "favoritesHeading": "Vipendwa",
       "icon": "Aikoni…",
       "mergeAnyway": "Unganisha hata hivyo",
@@ -2330,6 +2348,13 @@
     },
     "workspace": {
       "defaultSlotName": "Chaguomsingi"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Hamisha…",
+      "txt": "Maandishi sahili"
     }
   },
   "password": {
@@ -2756,20 +2781,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Wazi (bila kiolezo)",
+      "folderSearchEmpty": "Hakuna folda inayolingana.",
+      "folderSearchPlaceholder": "Tafuta folda…",
+      "searchEmpty": "Hakuna kiolezo kinacholingana.",
+      "searchPlaceholder": "Tafuta violezo…",
+      "untitledTemplate": "Kiolezo kisicho na kichwa",
+      "sectionDaily": "Madokezo ya kila siku",
+      "sectionWeekly": "Madokezo ya kila wiki",
+      "sectionMonthly": "Madokezo ya kila mwezi",
+      "periodFolderLabel": "Folda",
+      "periodFolderHelper": "Mahali madokezo mapya ya {{period}} yanapohifadhiwa. Chaguo-msingi: {{default}}. Folda hubaki hata ikiwa tupu.",
+      "periodFormatLabel": "Muundo wa kichwa",
+      "periodFormatHelperDaily": "Kichwa cha kila dokezo la kila siku. Inakubali YYYY, MM, DD, gggg (mwaka wa wiki wa ISO), ww (namba ya wiki ya ISO) na [maandishi] kwa maandishi halisi. Chaguo-msingi: {{default}}.",
+      "periodFormatHelperWeekly": "Kichwa cha kila dokezo la kila wiki. Inakubali gggg (mwaka wa wiki wa ISO), ww (namba ya wiki ya ISO), YYYY, MM, DD na [maandishi] kwa maandishi halisi. Chaguo-msingi: {{default}}.",
+      "periodFormatHelperMonthly": "Kichwa cha kila dokezo la kila mwezi. Inakubali YYYY, MM, gggg (mwaka wa wiki wa ISO), ww (namba ya wiki ya ISO) na [maandishi] kwa maandishi halisi. Chaguo-msingi: {{default}}.",
+      "periodTemplateLabel": "Kiolezo",
+      "periodTemplateHelper": "Chagua kiolezo ambacho kila dokezo la {{period}} litaanzia, au acha wazi ili kupata dokezo tupu lenye tarehe kama kichwa.",
+      "collisionWarning": "Madokezo ya {{first}} na {{second}} yanaishia kwenye dokezo moja, kwa sababu yanashiriki folda na yanatoa kichwa kilekile. Amri zote mbili zitalifungua.",
+      "weekStartNote": "Wiki huanza Jumatatu (ISO 8601), kwa hivyo siku za mwanzo za Januari zinaweza kuwa katika wiki ya mwisho ya mwaka uliopita, na siku za mwisho za Desemba katika wiki ya kwanza ya mwaka unaofuata.",
+      "periodFolderSaveError": "Folda ya madokezo ya {{period}} haikuweza kuhifadhiwa. Tafadhali jaribu tena.",
+      "periodFormatSaveError": "Muundo wa kichwa wa madokezo ya {{period}} haukuweza kuhifadhiwa. Tafadhali jaribu tena.",
+      "periodTemplateSaveError": "Kiolezo cha madokezo ya {{period}} hakikuweza kuhifadhiwa. Tafadhali jaribu tena.",
+      "periodNameDaily": "kila siku",
+      "periodNameWeekly": "kila wiki",
+      "periodNameMonthly": "kila mwezi",
+      "periodFolderAriaLabel": "Folda ya madokezo ya {{period}}",
+      "periodFormatAriaLabel": "Muundo wa kichwa wa madokezo ya {{period}}",
+      "periodTemplateAriaLabel": "Kiolezo cha madokezo ya {{period}}",
       "dateFormatHelper": "Kichwa cha kila dokezo la kila siku. Inakubali YYYY, MM, DD. Chaguomsingi ni {{default}}.",
       "dateFormatLabel": "Muundo wa tarehe wa dokezo la kila siku",
       "dateFormatSaveError": "Imeshindwa kuhifadhi muundo wa tarehe. Tafadhali jaribu tena.",
       "folderHelper": "Mahali madokezo mapya ya kila siku yanapowekwa. Chaguomsingi ni {{default}}. Folda huhifadhiwa hata ikiwa tupu.",
       "folderLabel": "Folda ya dokezo la kila siku",
       "folderSaveError": "Imeshindwa kuhifadhi folda ya kila siku. Tafadhali jaribu tena.",
-      "folderSearchEmpty": "Hakuna folda inayolingana.",
-      "folderSearchPlaceholder": "Tafuta folda…",
-      "searchEmpty": "Hakuna kiolezo kinacholingana.",
-      "searchPlaceholder": "Tafuta violezo…",
       "templateHelper": "Chagua kiolezo cha kuanzia kila dokezo la kila siku, au liache wazi ili upate dokezo tupu lenye kichwa cha tarehe.",
       "templateLabel": "Kiolezo cha dokezo la kila siku",
-      "templateSaveError": "Imeshindwa kuhifadhi kiolezo cha kila siku. Tafadhali jaribu tena.",
-      "untitledTemplate": "Kiolezo kisicho na kichwa"
+      "templateSaveError": "Imeshindwa kuhifadhi kiolezo cha kila siku. Tafadhali jaribu tena."
     },
     "deleteVault": {
       "cancel": "Ghairi",
@@ -2930,7 +2977,8 @@
         "title": "Kabla Myne haijatuma chochote kwa {{provider}}",
         "whatLabel": "Kinachotoka kwenye kifaa chako",
         "whenLabel": "Wakati kinapotoka",
-        "whoLabel": "Nani anayekipokea"
+        "whoLabel": "Nani anayekipokea",
+        "connectionLabel": "Jinsi inavyosafiri"
       },
       "disclosureToggle": "Hii inafanyaje kazi?",
       "enableHelper": "Huendesha modeli unayoitoa wewe. Mahali inapoendeshwa, na iwapo madokezo yako yanatoka kwenye kifaa hiki, hutegemea mtoa huduma unayemtaja hapa chini. Ya majaribio, imezimwa kwa chaguomsingi.",
@@ -2964,7 +3012,9 @@
         "refused": "Mtoa huduma amekataa muunganisho. Huenda hafanyi kazi au anazuia mtandao huu.",
         "timeout": "Mtoa huduma hakujibu kwa wakati. Hakuna kilichoachwa kikiendelea.",
         "unauthorized": "Mtoa huduma amekataa ufunguo wako wa API. Ubadilishe: huenda si sahihi, umebatilishwa, au ni wa akaunti nyingine.",
-        "unreachable": "Imeshindwa kumfikia mtoa huduma. Kagua muunganisho wako wa mtandao."
+        "unreachable": "Imeshindwa kumfikia mtoa huduma. Kagua muunganisho wako wa mtandao.",
+        "featureOff": "AI imezimwa kwenye kifaa hiki. Hakuna kilichotumwa. Iwashe katika Mipangilio, chini ya AI.",
+        "consentMissing": "Hujakubali kutuma madokezo kwa mtoa huduma huyu kutoka kifaa hiki. Hakuna kilichotumwa. Chagua tena mtoa huduma katika Mipangilio, chini ya AI, na usome kitakachotumwa."
       },
       "modelChoose": "Chagua faili…",
       "modelEmbeddingLabel": "Modeli ya utafutaji: utafutaji wa kimaana na maswali na majibu",
@@ -3005,7 +3055,16 @@
       "recommendedFilesEmbedding": "Inahitaji model.safetensors + config.json + tokenizer.json katika folda moja.",
       "recommendedFilesGeneration": "Inahitaji faili la .gguf + tokenizer.json katika folda ile ile.",
       "recommendedFilesTranscription": "Inahitaji faili la Whisper la .gguf + config.json + tokenizer.json katika folda ile ile.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Tumia AI kwenye simu hii",
+      "mobileEnableHelper": "Imezimwa kwa chaguo-msingi. Hakuna modeli ya AI kwenye simu hii inayojibu maswali au kusoma madokezo yako, kwa hivyo kila ombi huenda kwa huduma unayoitaja hapa chini, na madokezo yako huondoka kwenye kifaa hiki wakati huo. Unukuzi na maandishi ya picha bado hufanyika hapa, kwa modeli zinazokuja na Myne.",
+      "mobileKeyAdd": "Hifadhi ufunguo",
+      "mobileKeyReplace": "Badilisha ufunguo",
+      "mobileRevokeHelper": "Huondoa mtoa huduma, ufunguo wake na idhini ya simu hii kwa pamoja, ikiacha hali ile ile ya kutokuwahi kusanidiwa. Vifaa vingine huendelea kufanya kazi hadi uviondoe huko pia.",
+      "mobileApproveLabel": "Idhinisha kutuma kwenye simu hii",
+      "mobileApproveHelper": "Mtoa huduma na ufunguo wake vilitoka kwenye kifaa kingine. Hakuna kinachotumwa kutoka simu hii hadi usome kitakachotumwa na uidhinishe hapa.",
+      "historyBudgetHelper": "Ni kiasi gani cha mazungumzo ya hivi karibuni ambacho kila ombi hubeba, kwa herufi. Acha wazi kutumia thamani chaguo-msingi. Namba kubwa humruhusu AI kufuatilia mazungumzo marefu zaidi na hutuma zaidi kati yake: kwa mtoa huduma asiye kwenye kifaa hiki, hiyo ni maandishi yako zaidi yanayoondoka kwenye kifaa, katika kila hatua ya utekelezaji.",
+      "historyBudgetLabel": "Mazungumzo yanayotumwa na kila ombi"
     },
     "network": {
       "disabledCue": "Usawazishaji hausafirishwi tena kupitia Tor. Miunganisho mipya huenda moja kwa moja kwenye seva ya usawazishaji.",
@@ -3038,6 +3097,9 @@
       "exactLabel": "Muda kamili",
       "exactOn": "Imewashwa",
       "horizon": "Vikumbusho vimesajiliwa hadi {{date}}. Fungua Myne kabla ya hapo ili viendelee kufika.",
+      "horizonLabel": "Ratibu mapema",
+      "horizonLabelHelper": "Vikumbusho huandaliwa mapema kiasi hiki. Myne lazima iwe wazi na imefunguliwa ili kikumbusho kifike.",
+      "horizonInertHelper": "Imehifadhiwa kwenye kifaa hiki. Bado hakuna kinachoisoma: toleo hili halitumi vikumbusho vya kazi.",
       "label": "Vikumbusho vya kazi",
       "saveError": "Imeshindwa kuhifadhi mpangilio huo. Jaribu tena.",
       "showTextAria": "Onyesha maandishi ya kazi kwenye arifa",
@@ -3310,12 +3372,14 @@
         "viewMode": "hali chaguomsingi ya mwonekano moja kwa moja kusoma chanzo hakikisho",
         "dateFormat": "muundo wa tarehe siku mwezi mwaka iso dd/mm mm/dd kalenda",
         "timeFormat": "muundo wa saa am pm saa 24 saa 12 muda",
-        "timezone": "eneo la saa ukanda wa saa tz utc iana kanda leo"
+        "timezone": "eneo la saa ukanda wa saa tz utc iana kanda leo",
+        "periodicNotes": "madokezo ya mara kwa mara kila wiki kila mwezi wiki mwezi folda kiolezo muundo",
+        "aiHistoryBudget": "mazungumzo historia muktadha kumbukumbu bajeti herufi wakala gumzo ombi"
       }
     },
     "dateTime": {
       "dateLabel": "Muundo wa tarehe",
-      "dateHelper": "Jinsi tarehe zinavyoonyeshwa katika kazi, mionekano iliyohifadhiwa na viambatisho.",
+      "dateHelper": "Jinsi tarehe inavyoandikwa kila mahali Myne inapoonyesha moja.",
       "dateSystem": "Fuata lugha",
       "timeLabel": "Muundo wa saa",
       "timeHelper": "Ikiwa saa zinaonyeshwa kwa mfumo wa saa 24 au saa 12.",

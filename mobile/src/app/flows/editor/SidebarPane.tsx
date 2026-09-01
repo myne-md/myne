@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon, VaultMark, LIST_TOP } from "../../../components";
+import type { WorkspaceTab } from "./chrome/TabBar";
 
 /** Expanded-only workspace sidebar (the WS-01 iPad three-pane reference:
  *  sidebar 248 / list 316 / editor flex — `src/ipad/index.tsx`). It absorbs the
  *  phone's AppHeader + TabBar destinations, so neither renders on expanded:
  *  vault switcher on top, search (opens the command palette), the tab
  *  destinations + list slices as nav items, and a sync + settings footer.
+ *  "Every TabBar destination" now includes the conditional one: Chat renders
+ *  here exactly when it renders in the bar, because expanded shows no bar at
+ *  all and an absorbed set missing one member leaves it unreachable.
  *  Purely presentational — every row calls back into EditorFlow's existing
  *  setters, so it adds no new state or navigation machinery. */
 
@@ -71,6 +75,7 @@ export function SidebarPane({
   onGraph,
   onFiles,
   onTemplates,
+  onChat,
   onViews,
   onTags,
   onArchive,
@@ -81,7 +86,7 @@ export function SidebarPane({
 }: {
   label: string;
   icon: string | null;
-  tab: "notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates";
+  tab: WorkspaceTab;
   listView: "notes" | "archive" | "trash";
   onAllNotes: () => void;
   onTasks: () => void;
@@ -91,6 +96,14 @@ export function SidebarPane({
   onGraph: () => void;
   onFiles: () => void;
   onTemplates: () => void;
+  /** Omitted when `ai_enabled` is off (myne-md/myne#457). Optional for the same
+   *  reason `onNoteTasks` is: the caller expresses "this destination does not
+   *  exist right now" by not passing it, so the row cannot render without a
+   *  handler behind it. The bottom bar makes the same call by not rendering
+   *  its fifth column, and expanded is where that bar does not render at all,
+   *  so without this the destination would be unreachable on a landscape
+   *  tablet. */
+  onChat?: () => void;
   onViews: () => void;
   onTags: () => void;
   onArchive: () => void;
@@ -184,6 +197,15 @@ export function SidebarPane({
           onClick={onTemplates}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>}
         />
+        {onChat !== undefined && (
+          <NavItem
+            testid="sidebar.nav-chat"
+            label={t("settings.shell.panels.ai")}
+            active={tab === "chat"}
+            onClick={onChat}
+            icon={<svg width="17" height="17" viewBox="0 0 24 24"><path d="M20.5 12.2c0 4-3.8 7.2-8.5 7.2a10 10 0 01-2.6-.34L4.5 20.5l1.2-3.4A6.9 6.9 0 013.5 12.2c0-4 3.8-7.2 8.5-7.2s8.5 3.2 8.5 7.2z" {...gi} /><path d="M9 11.5h6M9 14.5h3.5" {...gi} /></svg>}
+          />
+        )}
 
         <GroupLabel>{t("editor.sidebar.browse")}</GroupLabel>
         <NavItem

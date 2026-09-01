@@ -30,8 +30,15 @@ import {
   providerLabelOf,
 } from "../../../lib/ai-capability";
 import { usePrefs } from "../../../hooks/usePrefs";
-import { currentRunEpoch, failRun, resumeRun, useAgent } from "../agentStore";
+import {
+  currentRunEpoch,
+  failRun,
+  reportRunProgress,
+  resumeRun,
+  useAgent,
+} from "../agentStore";
 import { settleRunIntoChat } from "../../ai/agentToChat";
+import { RunCostLine } from "./RunCostLine";
 import { ScopeExpansionDialog, type ProviderArm } from "./ScopeExpansionDialog";
 
 /** How a stopped run is described, given the tag its loop ended on.
@@ -175,10 +182,20 @@ export function AgentProgress() {
             // Captured before the await, so a vault lock during the approval
             // invalidates the reply rather than being raced by it.
             const epoch = currentRunEpoch();
-            void agentApproveScope(runId, {
-              kind: "folder",
-              value: awaiting.folder,
-            })
+            void agentApproveScope(
+              runId,
+              {
+                kind: "folder",
+                value: awaiting.folder,
+              },
+              // The approved leg reports its cost too (myne-md/myne#456), or
+              // the figures would freeze the moment a run widened its scope:
+              // which is precisely when a user most wants to see them moving,
+              // because widening is what makes a run expensive.
+              (progress) => {
+                reportRunProgress(progress, epoch);
+              },
+            )
               // The transcript half comes with the settle rather than after it:
               // this is the SECOND place a step settles, and a mirror written
               // only at the start site would leave an approved expansion's
@@ -201,14 +218,40 @@ export function AgentProgress() {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "var(--space-3)",
+        // One step tighter than before: `--space-3` was spacing three separate
+        // items, and these now read as one sentence with a separator in it.
+        gap: "var(--space-2)",
         padding: "var(--space-2) var(--space-3)",
         background: "var(--bg-1)",
         borderBottom: "1px solid var(--line-1)",
         color: "var(--fg-2)",
       }}
     >
-      <span data-testid="agentProgress.status">{status}</span>
+      {/* **Three catalog strings, one sentence** (myne-md/myne#621). They used
+          to sit side by side with nothing between them, rendering as "Finished
+          can change 1 note 1 scope you set, 0 it asked for", three facts with
+          no boundary, of which the middle one is load-bearing.
+
+          Fixed with punctuation and hierarchy rather than by merging the keys:
+          a merged key would drop all 32 catalogs and write i18n-coverage debt
+          for a legibility fix, and the words were never the problem. The
+          separator and the parentheses live here because they are marks, not
+          copy, the same reason the `", "` between the two grant counts already
+          did.
+
+          The hierarchy is the design canon's own: the outcome reads at
+          `--fg-1`, the scope total keeps the strip's `--fg-2`, and the grant
+          breakdown drops to `--fg-3`, which `docs/design/README.md` uses for
+          exactly this kind of caption. That is what makes the scope total the
+          thing the eye lands on, which is the point: it is documented as the
+          only bound on scope accumulation across repeated approvals. */}
+      <span data-testid="agentProgress.status" style={{ color: "var(--fg-1)" }}>
+        {status}
+      </span>
+
+      <span aria-hidden="true" style={{ color: "var(--fg-3)" }}>
+        &middot;
+      </span>
 
       {/* Continuously visible, by design. See the module note. */}
       <span data-testid="agentProgress.scopeTotal">
@@ -216,12 +259,42 @@ export function AgentProgress() {
       </span>
 
       {/* How the scope got that big, split by who asked. A run whose model-grant
-          count is climbing is the shape the no-cap decision leaves visible. */}
-      <span data-testid="agentProgress.grants">
+          count is climbing is the shape the no-cap decision leaves visible.
+          Parenthesised because it qualifies the total beside it rather than
+          standing as a third independent fact. */}
+      <span data-testid="agentProgress.grants" style={{ color: "var(--fg-3)" }}>
+        {"("}
         {t("agent.progress.grantsUser", { count: view.userGrants })}
         {", "}
         {t("agent.progress.grantsModel", { count: view.modelGrants })}
+        {")"}
       </span>
+
+      {/* **The run's cost, WHILE it runs** (myne-md/myne#456).
+       *
+       *  `design-notes/ai/0515` rests the remote arm's lack of a volume bound
+       *  on this disclosure: "the residual is disclosed rather than capped: a
+       *  finished run reports the requests it made, the notes it read, and how
+       *  much text left the device". Rendering it only on a FINISHED turn is
+       *  what that entry said and it is not enough, because a run that does not
+       *  finish has still spent its requests. On mobile that case is ordinary
+       *  rather than exotic: a run dies with the foreground, so locking the
+       *  vault or pocketing the phone mid-run leaves a user who paid for four
+       *  provider round-trips and was told about none of them.
+       *
+       *  The figures need no new plumbing. The store already accumulates them
+       *  per settled step, so this is the same three numbers the finished turn
+       *  reports, read one step earlier, the same COMPONENT, too, so the two
+       *  cannot word the control differently.
+       *
+       *  Deliberately not gated on `running`: a cancelled or failed run keeps
+       *  its figures on screen, which is the case this exists for. */}
+      <RunCostLine
+        testId="agentProgress.runCost"
+        iterations={agent.iterations}
+        notesRead={agent.notesRead}
+        charsOffDevice={agent.charsOffDevice}
+      />
 
       <span style={{ flex: 1 }} />
 
