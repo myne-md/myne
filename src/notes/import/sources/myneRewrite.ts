@@ -157,7 +157,7 @@ export function rewriteMyneBody(
   // `Beta (Eski laptop) -> Beta (Eski laptop) (Eski laptop)`. A sequential
   // application rewrites `[[Beta]]` on the first iteration and then MATCHES ITS
   // OWN OUTPUT on the second, landing the link on the other note's renamed
-  // title. `decisions/editor/0543` states both transforms are idempotent and
+  // title. `decisions/editor/0549` states both transforms are idempotent and
   // cannot compound; for the title half that held only against a single pass,
   // which this now is.
   //

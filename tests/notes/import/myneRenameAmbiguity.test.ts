@@ -50,7 +50,7 @@ describe("decideRenames", () => {
     //
     // It matters because `linksLeftUnresolved` is rendered as a summary row and
     // written into the durable import report note, which
-    // `design-notes/storage/0544` calls the residual that must not be silent.
+    // `design-notes/storage/0550` calls the residual that must not be silent.
     // The direction is fail-safe (over-reporting), which is exactly why nothing
     // else would ever have caught it: the number stays plausible.
     //

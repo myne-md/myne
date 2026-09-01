@@ -74,6 +74,15 @@ export interface Mounted {
  *  isolated run. That is the shape that reads as a broken test rather than as a
  *  missing parse.
  *
+ *  An independent measurement from the editor-bugs branch (myne-md/myne#626),
+ *  which found this helper's missing parse separately and is preserved here
+ *  because it is the wider sample: roughly one full-suite run in three, moving
+ *  between files rather than settling on one, seen in `list-render`'s nested
+ *  ring and `taskLineEditing`'s second Enter, and always passing when the file
+ *  is run alone. Only the OBSERVATION is carried over. That branch also
+ *  attributed the cause to the time budget, which the paragraph below refutes by
+ *  measurement.
+ *
  *  Note what is NOT the cause, because the obvious reading is wrong and
  *  `_parse-budget.ts` records the measurement that refutes it: the budget is not
  *  reached at these document sizes. Setting it to 0 leaves these tests passing,

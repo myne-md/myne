@@ -72,7 +72,7 @@ describe("capability descriptor", () => {
       "vaultMigration",
       "backup",
       "nativeSaveAs",
-      // `decisions/clients/0545`, myne-md/myne#464. Absent on two independent
+      // `decisions/clients/0551`, myne-md/myne#464. Absent on two independent
       // grounds, and either alone would be enough. A browser origin holds ONE
       // container under a constant vault id, so there is no second vault to
       // import FROM and the source list would be permanently empty. And the
