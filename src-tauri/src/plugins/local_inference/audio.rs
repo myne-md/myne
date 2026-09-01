@@ -23,6 +23,7 @@
 // non-test build sees these as dead.
 #![cfg_attr(not(test), allow(dead_code))]
 
+use myne_core::inference::error::EngineError;
 use serde::Serialize;
 
 /// Sample rate the Whisper front end requires (`pcm_to_mel` input).
@@ -518,6 +519,47 @@ pub fn wav_to_mono_16k(bytes: &[u8]) -> Result<Vec<f32>, AudioError> {
         return Err(AudioError::Empty);
     }
     Ok(out)
+}
+
+// The audio-decode error's mapping onto the engine taxonomy.
+//
+// **It lives here rather than beside `EngineError`, and that is the merge of
+// myne-md/myne#510 and myne-md/myne#456 forcing a choice.** #510 wrote this impl
+// in the desktop's own `local_inference/error.rs`, where `AudioError` and
+// `EngineError` were siblings. #456 then moved `EngineError` into `myne-core`
+// and deleted that file, while `AudioError` stayed here, because the decoder is
+// desktop-side. An impl needs one of its two types to be local, and after the
+// move the local one is `AudioError`, so the impl belongs in its module.
+//
+// Nothing about the mapping changed. What it buys is unchanged too, and is the
+// reason it is exhaustive rather than a `match` at the call site: a ninth decode
+// failure stops the build here instead of arriving at the user as "transcription
+// failed, please try again", which is the collapse `AudioTooLong` exists to undo.
+impl From<AudioError> for EngineError {
+    /// One mapping, in one place, so a new [`AudioError`](AudioError)
+    /// variant cannot quietly land in a catch-all.
+    ///
+    /// The obvious form is `map_err(|e| match e { TooLong => …, _ => … })` at the
+    /// call site, and it is what this replaced. That shape compiles forever: a
+    /// ninth decode failure compile-fails `AudioError::kind` in `audio.rs` and
+    /// then arrives at the user as "transcription failed, please try again",
+    /// which is the exact collapse `AudioTooLong` exists to undo. Written here
+    /// and exhaustively, adding a variant stops the build at this match.
+    fn from(e: AudioError) -> Self {
+        match e {
+            // Not worth retrying: the same clip is refused every time.
+            AudioError::TooLong => EngineError::AudioTooLong,
+            // Every other decode failure is a malformed or unsupported
+            // container, which the surface reports as a generic failure.
+            AudioError::NotWave
+            | AudioError::NoFmtChunk
+            | AudioError::NoDataChunk
+            | AudioError::UnsupportedFormat
+            | AudioError::UnsupportedBitDepth
+            | AudioError::BadLayout
+            | AudioError::Empty => EngineError::TranscriptionFailed,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1121,5 +1163,54 @@ mod tests {
         w[4..8].copy_from_slice(&riff_size.to_le_bytes());
         let out = wav_to_mono_16k(&w).expect("decode with interleaved LIST chunk");
         assert_eq!(out.len(), samples.len());
+    }
+}
+
+#[cfg(test)]
+mod audio_error_mapping_tests {
+    use super::*;
+    use myne_core::inference::error::EngineError;
+
+    /// The split, not the mapping.
+    ///
+    /// This existed as a `map_err` catch-all at the call site and had no test on
+    /// either side, which myne-md/myne#510's review proved by injection:
+    /// rewriting the arm to `TooLong => TranscriptionFailed` left the whole
+    /// desktop lib suite green (1228 passed), clippy clean, and the JS taxonomy
+    /// drift-lock unmoved, because that lock parses `kind()`'s arms and
+    /// `AudioTooLong` is still one of them. The four-layer chain from the decoder
+    /// to the user's sentence collapsed with nothing red.
+    ///
+    /// So both directions are asserted. The refusal maps to its own variant, and
+    /// a sibling decode failure does not: a test that only checked the first
+    /// would pass against a `From` that answered `AudioTooLong` for everything.
+    #[test]
+    fn too_long_maps_to_its_own_engine_error_and_nothing_else_does() {
+        assert_eq!(
+            EngineError::from(AudioError::TooLong),
+            EngineError::AudioTooLong
+        );
+        for other in [
+            AudioError::NotWave,
+            AudioError::NoFmtChunk,
+            AudioError::NoDataChunk,
+            AudioError::UnsupportedFormat,
+            AudioError::UnsupportedBitDepth,
+            AudioError::BadLayout,
+            AudioError::Empty,
+        ] {
+            assert_eq!(
+                EngineError::from(other),
+                EngineError::TranscriptionFailed,
+                "{other:?} is a malformed-container failure and must stay retryable"
+            );
+        }
+    }
+
+    /// The tag the frontend keys off, so the Rust half of the wire is pinned to
+    /// the string `src/lib/transcribe.ts` normalizes.
+    #[test]
+    fn the_too_long_kind_tag_is_the_one_the_frontend_maps() {
+        assert_eq!(EngineError::AudioTooLong.kind(), "audio_too_long");
     }
 }

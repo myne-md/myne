@@ -9,6 +9,7 @@ import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
 import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { HideVaultNamesBlock } from "../../components";
+import { AiConsentScreen } from "../../components";
 import { applyTheme } from "../../formfactor/theme";
 import type { ThemeName } from "../../formfactor/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -61,6 +62,14 @@ import {
   setDateFormat,
   setTimeFormat,
   setTimezone,
+  // AI (myne-md/myne#456). `aiProviderHasKey` is the odd one: a READ that
+  // answers a boolean, so the key itself never needs a getter.
+  aiProviderHasKey,
+  setAiEnabled,
+  setAiProvider,
+  setAiProviderConsent,
+  setAiProviderKey,
+  setAiProviderModel,
 } from "../../lib/prefs";
 import {
   DATE_FORMATS,
@@ -73,6 +82,8 @@ import {
   type TimeFormat,
 } from "@myne/editor/host/lib/datetimeFormat";
 import { useDateTimeDisplay } from "@myne/editor/host/lib/useDateTimeDisplay";
+import { listProviderModels } from "../../lib/ai";
+import { consentIsDeviceScoped, providerLabelOf } from "@myne/copy";
 import { formatBarLabelKey, resolveFormatBarOrder } from "../../lib/formatBarItems";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { VaultId } from "../../lib/stage";
@@ -139,6 +150,27 @@ function readStoredChoice(): ThemeChoice {
 // ── Shared presentational bits (mirror the ST grouped-list geometry) ─────────
 
 const rowLabel: CSSProperties = { fontSize: 16, color: "var(--fg-1)" };
+/** A helper line under a group or a field. See {@link PanelHint}. */
+/** The vertical stack a category panel's body sits in.
+ *
+ *  Hoisted from four inline copies (myne-md/myne#456): the AI panel would have
+ *  been a fifth, and `scripts/check-token-adoption.mjs` counts hardcoded visual
+ *  values per file with a ratchet that may shrink and never grow. One constant
+ *  turns an addition into a reduction.
+ */
+const PANEL_STACK: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  marginTop: 4,
+};
+/** A helper line under a group or a field. See {@link PanelHint}. */
+const HINT_STYLE: CSSProperties = {
+  marginTop: 2,
+  fontSize: 13,
+  lineHeight: 1.5,
+  color: "var(--fg-3)",
+};
 
 function SectionLabel({ children, mt = 18 }: { children: ReactNode; mt?: number }) {
   return (
@@ -829,6 +861,12 @@ const CAT_GLYPH: Record<string, ReactNode> = {
       <path d="M5 15v3a1.5 1.5 0 001.5 1.5h11a1.5 1.5 0 001.5-1.5v-3" />
     </svg>
   ),
+  ai: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 4.5l1.7 4.3 4.3 1.7-4.3 1.7L12 16.5l-1.7-4.3L6 10.5l4.3-1.7z" />
+      <path d="M17.5 16.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
+    </svg>
+  ),
   about: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="8.2" />
@@ -838,22 +876,294 @@ const CAT_GLYPH: Record<string, ReactNode> = {
   ),
 };
 
+/** A helper line under a settings group, in the sheet's own geometry.
+ *
+ *  The geometry is hoisted into {@link HINT_STYLE} rather than written inline,
+ *  which is not tidiness: `scripts/check-token-adoption.mjs` counts hardcoded
+ *  visual values PER FILE and the count may shrink, never grow. Two inline
+ *  copies of these same numbers already existed here before this component; one
+ *  constant is what they should have been, and it is what lets a third helper
+ *  line cost nothing.
+ */
+function PanelHint({ children }: { children: ReactNode }) {
+  return <div style={HINT_STYLE}>{children}</div>;
+}
+
+/** The two providers this build can reach, as proper nouns.
+ *
+ *  From `@myne/copy` rather than from i18n: a brand name reads identically in
+ *  every locale, and a translated one is a wrong one. Resolved once here so the
+ *  render sites read as labels rather than as calls.
+ */
+const PROVIDER_OPENROUTER = providerLabelOf("openrouter") ?? "OpenRouter";
+const PROVIDER_OLLAMA_CLOUD = providerLabelOf("ollama-cloud") ?? "Ollama Cloud";
+
+/** What the root row says about AI without opening the panel.
+ *
+ *  Deliberately the CURRENT STATE rather than a badge. "Off" is the shipped
+ *  default and the honest thing to show, and once a provider is named, naming it
+ *  here tells the user where their notes would go without a drill-down. Same
+ *  reasoning the sync row's summary follows.
+ */
+function aiSummary(prefs: PrefsView, t: TFunction): string {
+  if (!prefs.ai_enabled) return t("settings.archive.off");
+  const provider = prefs.ai_provider;
+  if (provider === null) return t("settings.ai.providerNone");
+  // A stored provider this build does not know reads as "None", not as its raw
+  // wire value: the host treats it as no provider rather than guessing, and a
+  // summary that named it would describe a selection the request path ignores.
+  if (provider !== "openrouter" && provider !== "ollama-cloud") {
+    return t("settings.ai.providerNone");
+  }
+  return providerLabelOf(provider) ?? t("settings.ai.providerNone");
+}
+
+/**
+ * AI settings: the device opt-in, the provider, its key, and its model.
+ *
+ * **Discovery, not enforcement.** Every control here writes a preference, and
+ * the host re-reads all of them at request time through its own gate
+ * (`provider_gate.rs`). A panel that hid a control would not stop a request, and
+ * a panel that showed one does not authorise it. That split is why this can be
+ * read as ordinary UI.
+ *
+ * **The key is write-only.** There is no getter for it anywhere: the host marks
+ * the field serde-skip so it never reaches page context, and this panel decides
+ * between "Add key" and "Replace key" from the boolean `aiProviderHasKey`
+ * returns. The draft is cleared the moment it is submitted.
+ *
+ * **The consent screen is not here.** Naming a provider and pasting a key are
+ * configuration; agreeing to send note text to a named recipient is a decision,
+ * and it gets its own screen. Putting an approval control in a settings list is
+ * how consent becomes a checkbox nobody reads.
+ */
+function AiPanel({
+  prefs,
+  hasKey,
+  models,
+  modelsState,
+  onEnabled,
+  onProvider,
+  onKey,
+  onModel,
+  onLoadModels,
+  onRevoke,
+}: {
+  prefs: PrefsView;
+  hasKey: boolean;
+  models: string[];
+  modelsState: "idle" | "loading" | "failed";
+  onEnabled: (on: boolean) => void;
+  onProvider: (wire: string | null) => void;
+  onKey: (key: string) => void;
+  onModel: (model: string) => void;
+  onLoadModels: () => void;
+  onRevoke: () => void;
+}) {
+  const { t } = useTranslation();
+  const [keyDraft, setKeyDraft] = useState("");
+  const provider = prefs.ai_provider;
+
+  return (
+    <div style={PANEL_STACK}>
+      <Group>
+        <ToggleRow
+          first
+          title={t("settings.ai.mobileEnableLabel")}
+          subtitle={t("settings.ai.mobileEnableHelper")}
+          on={prefs.ai_enabled}
+          onToggle={() => onEnabled(!prefs.ai_enabled)}
+          testId="settings.ai-enabled"
+        />
+      </Group>
+
+      {/* Everything below is meaningless with the switch off, and rendering it
+          disabled would be an offer this device will not honour. Omitted rather
+          than greyed, which is the call `decisions.md` 2026-07-26 makes
+          normative for a capability a platform lacks. */}
+      {prefs.ai_enabled && (
+        <>
+          <SectionLabel>{t("settings.ai.providerLabel")}</SectionLabel>
+          <Group>
+            <ToggleRow
+              first
+              title={PROVIDER_OPENROUTER}
+              on={provider === "openrouter"}
+              onToggle={() => onProvider(provider === "openrouter" ? null : "openrouter")}
+              testId="settings.ai-provider-openrouter"
+            />
+            <ToggleRow
+              title={PROVIDER_OLLAMA_CLOUD}
+              on={provider === "ollama-cloud"}
+              onToggle={() => onProvider(provider === "ollama-cloud" ? null : "ollama-cloud")}
+              testId="settings.ai-provider-ollama-cloud"
+            />
+          </Group>
+          <PanelHint>{t("settings.ai.providerHelper")}</PanelHint>
+
+          {provider !== null && (
+            <>
+              <SectionLabel>{t("settings.ai.providerKeyLabel")}</SectionLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <SheetInput
+                  type="password"
+                  mono
+                  value={keyDraft}
+                  onChange={setKeyDraft}
+                  placeholder={
+                    hasKey
+                      ? t("settings.ai.providerKeyReplace")
+                      : t("settings.ai.providerKeyAdd")
+                  }
+                />
+                <div data-testid="settings.ai-key-save">
+                  <Button
+                    disabled={keyDraft.trim() === ""}
+                    onClick={() => {
+                      onKey(keyDraft.trim());
+                      // Cleared immediately: the draft is the only copy of the
+                      // key in page context, and it has served its purpose the
+                      // moment the write is dispatched.
+                      setKeyDraft("");
+                    }}
+                  >
+                    {hasKey ? t("settings.ai.mobileKeyReplace") : t("settings.ai.mobileKeyAdd")}
+                  </Button>
+                </div>
+              </div>
+              <PanelHint>{hasKey ? t("settings.ai.providerKeyStored") : t("settings.ai.providerKeyNone")}</PanelHint>
+
+              {hasKey && (
+                <>
+                  <SectionLabel>{t("settings.ai.providerModelLabel")}</SectionLabel>
+                  {modelsState === "loading" && (
+                    <Group>
+                      <Row first>
+                        <span style={rowLabel}>{t("settings.ai.providerModelLoad")}</span>
+                        <Spinner size={18} />
+                      </Row>
+                    </Group>
+                  )}
+                  {modelsState === "failed" && (
+                    <Group>
+                      <Row first onClick={onLoadModels} testId="settings.ai-models-retry">
+                        <span style={rowLabel}>{t("settings.ai.providerError.failed")}</span>
+                        <RowChevron />
+                      </Row>
+                    </Group>
+                  )}
+                  {modelsState === "idle" && models.length === 0 && (
+                    <Group>
+                      <Row first onClick={onLoadModels} testId="settings.ai-models-load">
+                        <span style={rowLabel}>{t("settings.ai.providerModelLoad")}</span>
+                        <RowChevron />
+                      </Row>
+                    </Group>
+                  )}
+                  {modelsState === "idle" && models.length > 0 && (
+                    <Group>
+                      {models.map((m, i) => (
+                        <ToggleRow
+                          key={m}
+                          first={i === 0}
+                          title={m}
+                          on={prefs.ai_provider_model === m}
+                          onToggle={() => onModel(m)}
+                        />
+                      ))}
+                    </Group>
+                  )}
+                  {/* Stated whether or not a model is chosen, because "no model
+                      chosen" is a REFUSAL state rather than a neutral one: the
+                      host ships no fallback, so an unchosen model means every
+                      request is turned away. */}
+                  <PanelHint>
+                    {prefs.ai_provider_model === null
+                      ? t("settings.ai.providerModelUnfetched")
+                      : t("settings.ai.providerModelHelper")}
+                  </PanelHint>
+                </>
+              )}
+
+              {/* **The approval this device has not given.** Shown when a
+                  provider is selected and the stored consent does not NAME it,
+                  which is the ordinary state of a phone enrolled into a vault
+                  someone configured on a laptop: `ai_provider_consent` is
+                  device-local (myne-md/myne#456) while the provider, the model
+                  and the key all sync.
+
+                  It exists because without it the panel is actively
+                  misleading. The provider row reads as ON, every field below it
+                  is filled in, and the one thing missing is invisible: the only
+                  route to the consent screen was to toggle the provider off and
+                  on, which nobody would think to do and which reads as breaking
+                  a working setup. */}
+              {/* `consentIsDeviceScoped`, not an equality against the provider
+                  name. A legacy bare-name value is what a device enrolled before
+                  the reclassification holds, and an equality would read it as
+                  current and hide this row, leaving the phone silently sending
+                  under an approval nobody at this device gave
+                  (myne-md/myne#456). */}
+              {!consentIsDeviceScoped(prefs.ai_provider_consent, provider) && (
+                <>
+                  <SectionLabel>{t("settings.ai.mobileApproveLabel")}</SectionLabel>
+                  <Group>
+                    <Row
+                      first
+                      onClick={() => onProvider(provider)}
+                      testId="settings.ai-approve-here"
+                    >
+                      <span style={rowLabel}>{t("settings.ai.mobileApproveLabel")}</span>
+                      <RowChevron />
+                    </Row>
+                  </Group>
+                  <PanelHint>{t("settings.ai.mobileApproveHelper")}</PanelHint>
+                </>
+              )}
+
+              <SectionLabel>{t("settings.ai.providerKeyLabel")}</SectionLabel>
+              <Group>
+                <Row first onClick={onRevoke} testId="settings.ai-revoke">
+                  <span style={{ ...rowLabel, color: "var(--danger)" }}>
+                    {t("settings.ai.providerKeyRevoke")}
+                  </span>
+                  <RowChevron />
+                </Row>
+              </Group>
+              {/* The exact promise the host keeps: clearing the provider clears
+                  the key and the consent with it, so "turn this off" leaves the
+                  state of never having turned it on. */}
+              <PanelHint>{t("settings.ai.mobileRevokeHelper")}</PanelHint>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 /** A root drill-down row: leading glyph, label, optional trailing value, chevron. */
 function CategoryRow({
   glyph,
   label,
   value,
   first = false,
+  testId,
   onClick,
 }: {
   glyph: string;
   label: string;
   value?: string;
   first?: boolean;
+  /** Optional, and only where a scenario has to reach the panel behind this
+   *  row. Without one a spec matches the translated LABEL, which passes in
+   *  English and fails in every other locale as though the feature were
+   *  broken. */
+  testId?: string;
   onClick: () => void;
 }) {
   return (
-    <Row first={first} onClick={onClick}>
+    <Row first={first} testId={testId} onClick={onClick}>
       <span style={{ display: "flex", alignItems: "center", gap: 13, minWidth: 0 }}>
         <span style={{ display: "flex", color: "var(--fg-2)", flex: "none" }}>{CAT_GLYPH[glyph]}</span>
         <span style={rowLabel}>{label}</span>
@@ -880,6 +1190,11 @@ type Panel =
   | "editor"
   | "privacy"
   | "data"
+  // Remote AI providers and the agent (myne-md/myne#456). A TOP-LEVEL panel,
+  // peer to the categories above rather than nested under Privacy: the feature
+  // has its own tab in the bottom bar, and burying its configuration under
+  // another category would say the opposite of what that tab says.
+  | "ai"
   | "about"
   // deeper action panels (nested under a category)
   | "change-password"
@@ -946,7 +1261,7 @@ function FormatBarPanel({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+    <div style={PANEL_STACK}>
       <Group>
         {resolved.map((id, i) => {
           const isHidden = hiddenSet.has(id);
@@ -1047,6 +1362,7 @@ const PANEL_PARENT: Record<Panel, Panel> = {
   editor: "root",
   privacy: "root",
   data: "root",
+  ai: "root",
   about: "root",
   rename: "account",
   "change-password": "account",
@@ -1069,6 +1385,7 @@ const PANEL_DEPTH: Record<Panel, number> = {
   editor: 1,
   privacy: 1,
   data: 1,
+  ai: 1,
   about: 1,
   rename: 2,
   "change-password": 2,
@@ -1091,6 +1408,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   editor: "settings.shell.panels.editor",
   privacy: "settings.panelTitle.privacy",
   data: "settings.panelTitle.data",
+  ai: "settings.shell.panels.ai",
   about: "settings.shell.panels.about",
   rename: "settings.panelTitle.vaultName",
   "change-password": "settings.changePassword.title",
@@ -1254,6 +1572,69 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   const hiddenHomeTiles = useHiddenHomeTiles();
   const [draft, setDraft] = useState<Partial<PrefsView>>({});
   const eff: PrefsView = { ...prefs, ...draft };
+
+  // ---- AI (myne-md/myne#456) ------------------------------------------------
+  //
+  // `aiHasKey` is a boolean rather than the key, and that is the whole shape:
+  // the host marks the key serde-skip so it never reaches page context, and the
+  // panel decides between "Add key" and "Replace key" from this.
+  const [aiHasKey, setAiHasKey] = useState(false);
+  // **Which provider is awaiting this device's approval.** Non-null puts the
+  // consent screen on top of the panel, and the only writer of
+  // `ai_provider_consent` is that screen's accept path: so there is no route
+  // to a recorded consent that skips the disclosure.
+  const [aiConsentFor, setAiConsentFor] = useState<string | null>(null);
+  const [aiModels, setAiModels] = useState<string[]>([]);
+  const [aiModelsState, setAiModelsState] = useState<"idle" | "loading" | "failed">("idle");
+
+  // Re-read whenever the panel is opened, and whenever the provider changes.
+  // NOT on mount: this is one IPC call and the panel is a seconds-long visit,
+  // so reading it for every settings session that never goes near AI is work
+  // nobody asked for.
+  useEffect(() => {
+    if (panel !== "ai" || !HAS_TAURI) return;
+    let live = true;
+    void aiProviderHasKey()
+      .then((has) => {
+        if (live) setAiHasKey(has);
+      })
+      .catch(() => {
+        // Fail to "no key", which is the safe direction: it offers "Add key"
+        // rather than "Replace key", so the user is never told a credential is
+        // stored when the host could not confirm one.
+        if (live) setAiHasKey(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [panel, eff.ai_provider]);
+
+  /** Ask the provider what it publishes. Opens a socket, so it is a user act. */
+  function loadAiModels() {
+    if (!HAS_TAURI) return;
+    setAiModelsState("loading");
+    void listProviderModels()
+      .then((list) => {
+        setAiModels(list.map((m) => m.id));
+        setAiModelsState("idle");
+      })
+      .catch(() => {
+        // Reported as a retryable state rather than a toast: the chooser is
+        // where the user is looking, and a failed listing is a thing to try
+        // again rather than a thing that went wrong elsewhere.
+        setAiModels([]);
+        setAiModelsState("failed");
+      });
+  }
+
+  /** Clear the provider, which clears the key and the consent with it. */
+  function revokeAiProvider() {
+    setAiModels([]);
+    setAiModelsState("idle");
+    setAiHasKey(false);
+    writeDraftPref("ai_provider", null, () => setAiProvider(null));
+  }
+
   const [renameText, setRenameText] = useState("");
 
   /** Optimistic prefs setter: reflect instantly, persist, revert the one key on
@@ -1279,8 +1660,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     onFailed?: () => void,
   ) {
     setDraft((d) => ({ ...d, [key]: value }));
-    if (!HAS_TAURI) return;
-    void persist().catch(() => {
+    if (!HAS_TAURI) return Promise.resolve();
+    return persist().catch(() => {
       setDraft((d) => {
         const next = { ...d };
         delete next[key];
@@ -1720,6 +2101,17 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 onClick={() => setPanel("privacy")}
               />
               <CategoryRow glyph="data" label={t("settings.panelTitle.data")} onClick={() => setPanel("data")} />
+              {/* Value column carries the CURRENT state rather than a badge:
+                  "Off" is the shipped default and the honest thing to show, and
+                  a named provider tells the user where their notes would go
+                  without opening the panel. */}
+              <CategoryRow
+                glyph="ai"
+                label={t("settings.shell.panels.ai")}
+                value={aiSummary(eff, t)}
+                testId="settings.category-ai"
+                onClick={() => setPanel("ai")}
+              />
               <CategoryRow glyph="sync" label={t("settings.shell.panels.sync")} value={syncSummary(syncStatus, t)} onClick={() => setPanel("sync")} />
               <CategoryRow glyph="about" label={t("settings.shell.panels.about")} value="0.1.0" onClick={() => setPanel("about")} />
             </Group>
@@ -1834,7 +2226,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         )}
 
         {panel === "appearance" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+          <div style={PANEL_STACK}>
             <div style={{ padding: "12px 14px", border: "1px solid var(--line-1)", borderRadius: 10, background: "var(--bg-1)" }}>
               <div style={{ fontSize: 16, marginBottom: 10, color: "var(--fg-1)" }}>{t("settings.appearance.themeLabel")}</div>
               <div style={{ display: "flex", gap: 4, background: "var(--bg-2)", border: "1px solid var(--line-1)", borderRadius: 8, padding: 3 }}>
@@ -1928,7 +2320,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         )}
 
         {panel === "editor" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+          <div style={PANEL_STACK}>
             <SegmentBlock
               label={t("settings.editor.defaultView")}
               options={["live", "reading", "source"]}
@@ -2002,7 +2394,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         )}
 
         {panel === "privacy" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+          <div style={PANEL_STACK}>
             <Group>
               <ToggleRow
                 first
@@ -2081,7 +2473,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         )}
 
         {panel === "data" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+          <div style={PANEL_STACK}>
             <Group>
               <ToggleRow
                 first
@@ -2104,6 +2496,104 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               </Row>
             </Group>
           </div>
+        )}
+
+        {panel === "ai" && (
+          <AiPanel
+            prefs={eff}
+            hasKey={aiHasKey}
+            models={aiModels}
+            modelsState={aiModelsState}
+            onEnabled={(on) => writeDraftPref("ai_enabled", on, () => setAiEnabled(on))}
+            onProvider={(wire) => {
+              // **Only when the selection ACTUALLY changes.** The host clears
+              // the key and the model on a change, so resetting the local view
+              // mirrors it. But the "approve sending on this phone" row calls
+              // this with the provider that is already selected, and on that
+              // path nothing is cleared host-side: resetting anyway made a
+              // phone that inherited a key report "no key stored", offer "Save
+              // key" instead of "Replace key", and hide the model chooser that
+              // every request needs. The re-read that would correct it is keyed
+              // on `eff.ai_provider`, which by definition did not move.
+              if (wire !== eff.ai_provider) {
+                setAiModels([]);
+                setAiModelsState("idle");
+                setAiHasKey(false);
+              }
+              if (wire === null) {
+                writeDraftPref("ai_provider", null, () => setAiProvider(null));
+                return;
+              }
+              // **The consent screen, unless THIS DEVICE has already approved
+              // this provider.** The comparison is against the local consent
+              // rather than against "has a consent": an approval recorded for a
+              // different recipient is not transferable, which is why the field
+              // stores a provider NAME and why the host compares it for
+              // equality rather than reading a boolean.
+              //
+              // A vault configured on a laptop arrives here with the provider,
+              // the model and the key already set and `ai_provider_consent`
+              // empty, because myne-md/myne#456 made that field device-local.
+              // This branch is what that change exists for.
+              if (consentIsDeviceScoped(eff.ai_provider_consent, wire)) {
+                writeDraftPref("ai_provider", wire, () => setAiProvider(wire));
+                return;
+              }
+              setAiConsentFor(wire);
+            }}
+            onKey={(key) => {
+              // Optimistic, like every other write here, but on a value the
+              // draft cannot hold: there is no `ai_provider_key` in `PrefsView`.
+              // So the optimism is the has-key boolean, and a failed write
+              // reverts it.
+              setAiHasKey(true);
+              if (!HAS_TAURI) return;
+              void setAiProviderKey(key).catch(() => {
+                setAiHasKey(false);
+                setToast(t("settings.saveSettingError"));
+              });
+            }}
+            onModel={(m) => writeDraftPref("ai_provider_model", m, () => setAiProviderModel(m))}
+            onLoadModels={loadAiModels}
+            onRevoke={revokeAiProvider}
+          />
+        )}
+
+        {/* **Over the panel, not beside it.** The accepting action is rendered
+            by this component and only by this component, so there is no route
+            to a recorded consent that skips the disclosure. Dismissing stores
+            nothing. */}
+        {panel === "ai" && aiConsentFor !== null && (
+          <AiConsentScreen
+            provider={aiConsentFor}
+            onCancel={() => setAiConsentFor(null)}
+            onAccept={async () => {
+              const wire = aiConsentFor;
+              setAiConsentFor(null);
+              // **The PROVIDER first, then the consent, and the order is not a
+              // preference.** `set_ai_provider_with_dir` clears
+              // `ai_provider_consent`, `ai_provider_key` and
+              // `ai_provider_model` whenever the selection CHANGES, which on a
+              // first-time approval it always has. Writing the consent first
+              // therefore had it erased by the very next call, leaving a device
+              // that looks configured, refuses every request as
+              // `ConsentMissing`, and hides its own recovery row: the optimistic
+              // draft keeps rendering the consent as granted until the sheet is
+              // closed and reopened.
+              //
+              // The desktop twin already carries this order under a comment
+              // naming the same failure. This copy had the opposite order and an
+              // argument for it, which is the more expensive kind of wrong.
+              // AWAITED, which is what makes the order above real. The
+              // comment predates the await: `writeDraftPref` used to fire
+              // and forget, so both commands raced to the prefs mutex and
+              // the order written here decided nothing.
+              await writeDraftPref("ai_provider", wire, () => setAiProvider(wire));
+              writeDraftPref("ai_provider_consent", wire, () =>
+                setAiProviderConsent(wire),
+              );
+            }}
+          />
         )}
 
         {panel === "sync" && (

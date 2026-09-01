@@ -16,6 +16,14 @@ import { usePrefsNonce } from "./prefsNonce";
  *  optional field unset (`null` / empty), timestamps shown, screen-capture off. */
 export const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: false,
+  // AI (myne-md/myne#456). OFF and unset, matching the Rust default, and the
+  // default is the property rather than a convention: unset means the remote
+  // path is UNREACHABLE rather than merely disabled, so the pre-read view must
+  // not read as anything else even for the frames before the first read lands.
+  ai_enabled: false,
+  ai_provider: null,
+  ai_provider_consent: null,
+  ai_provider_model: null,
   // ENABLED, matching the Rust default (MYND-563/592; opt-out). An absent key
   // reads as on — the transcribe command re-reads it host-side, so this default
   // only affects UI visibility, never the gate.

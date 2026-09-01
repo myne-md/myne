@@ -328,6 +328,39 @@ const CURATED_TWINS = [
       "at 37 lines, so the copy is not even a stale duplicate of it. This is the English-only " +
       "welcomeNote named in `check-twin-drift.mjs`'s own header.",
   },
+  {
+    a: "core/src/inference/engine.rs",
+    b: "mobile/src-tauri/src/plugins/local_inference/engine.rs",
+    what: "is the shared engine trait against mobile's surviving copy of it",
+    why:
+      "Cross-path since myne-md/myne#456 moved the desktop side into `myne-core`, so the sweep " +
+      "cannot see it and only a curated entry keeps it in the denominator. The pair is not a " +
+      "desktop-against-mobile comparison any more: `a` is the shared answer both clients are " +
+      "supposed to reach, and `b` is a copy mobile still declares `mod engine;` for. That is the " +
+      "class this record exists to name, and losing the pair at the moment the shared side landed " +
+      "would have read as the duplication being resolved.",
+  },
+  {
+    a: "core/src/inference/error.rs",
+    b: "mobile/src-tauri/src/plugins/local_inference/error.rs",
+    what: "is the shared engine-error enum against mobile's subset of it",
+    why:
+      "Same move, same reason as `engine.rs` above. Worth its own entry rather than a mention " +
+      "inside that one because this file has a second reader: `tests/lib/engineErrorTaxonomy.test.ts` " +
+      "reads `a` by an exact path and fails by NAME when it moves, which is how the move was " +
+      "caught. Nothing reads `b` that way.",
+  },
+  {
+    a: "core/src/inference/state.rs",
+    b: "mobile/src-tauri/src/plugins/local_inference/state.rs",
+    what: "is the shared inference state machine against an unrelated file of the same name",
+    why:
+      "The pair worth keeping precisely because the two files are NOT versions of each other: " +
+      "1466 lines of chat and embedding session state against 40 lines of transcription wiring " +
+      "that happens to share a basename inside the same plugin directory. Recorded so a future " +
+      "reader who greps `state.rs` in the inference area is told which one is which, rather than " +
+      "assuming the small one is a trimmed copy of the large one.",
+  },
 ];
 
 
@@ -1209,12 +1242,12 @@ const ROSTER = [
       "Model resolution and integrity checking, 1019 lines against 766. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
   },
   {
-    a: "src-tauri/src/plugins/local_inference/engine.rs",
+    a: "core/src/inference/engine.rs",
     b: "mobile/src-tauri/src/plugins/local_inference/engine.rs",
     verdict: "decision",
-    destination: "undecided",
+    destination: "myne-core",
     reason:
-      "The engine trait and its shared implementation. Mobile narrows it rather than omitting it: `transcribe` is real, `infer` and `embed` return `NotReady`, measured. The contract is one answer even where a client declines part of it.",
+      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 1969 lines against 389 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/engine_candle.rs",
@@ -1233,12 +1266,12 @@ const ROSTER = [
       "Cancellation plumbing for a long-running inference. Both clients run cancellable transcription, so how a cancel is observed is one answer.",
   },
   {
-    a: "src-tauri/src/plugins/local_inference/error.rs",
+    a: "core/src/inference/error.rs",
     b: "mobile/src-tauri/src/plugins/local_inference/error.rs",
     verdict: "decision",
-    destination: "undecided",
+    destination: "myne-core",
     reason:
-      "The engine error enum. Mobile's is a subset of desktop's, which is the same drift class as the `src/types/*-error.ts` mirrors one layer up.",
+      "The engine error enum, 268 lines against 129. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/commands.rs",
@@ -1254,15 +1287,47 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Plugin registration for a surface mobile ships a two-command slice of. 1096 lines against 112, and mobile's is independently written rather than a trimmed copy.",
+      "Plugin registration for a surface mobile ships a two-command slice of. 1081 lines against 112, and mobile's is independently written rather than a trimmed copy.",
   },
   {
-    a: "src-tauri/src/plugins/local_inference/state.rs",
-    b: "mobile/src-tauri/src/plugins/local_inference/state.rs",
+    a: "src/lib/agent-run.ts",
+    b: "mobile/src/lib/agent-run.ts",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "Each client's SEAM INJECTION for the agent's IPC bindings, and nothing else: 29 lines against 40, of which the difference is one import specifier and the comment explaining it. The bindings themselves, their command names and their argument shapes, live in `src/lib/agent-run-core.ts` and are consumed by both, which is what myne-md/myne#456 built rather than letting mobile retype them. `delegated` is the right verdict even though the shared half is not in `myne-core`: this record's `destination` vocabulary is about where a shared answer LIVES, and for a TypeScript module that place is a shared package, which is what `@myne/agent-run-core` aliases to. What could not be delegated is exactly the two names `invoke` and `Channel`, because `scripts/check-platform-seam.mjs` requires each guarded root to reach them through its own directory. The pair stays in the record rather than being dropped as trivial, since it is where a client could quietly stop delegating.",
+  },
+  {
+    a: "src-tauri/src/plugins/agent/mod.rs",
+    b: "mobile/src-tauri/src/plugins/agent/mod.rs",
     verdict: "absent",
     destination: "undecided",
     reason:
-      "The inference state machine, 1416 lines against 40. It exists for chat and embedding sessions, which mobile does not ship at all, so mobile's 40 lines are wiring for the transcription path rather than a reduced version of the same thing.",
+      "Plugin registration for the agent surface, new on mobile in myne-md/myne#456, 337 lines against 366. `absent` rather than `decision` because what these two files hold is each host's own wiring: the `tauri::plugin::Builder`, the `generate_handler!` roster and the state each client manages. The shared answer they both call is already in `myne-core` (`plugins/agent/host_commands.rs`), which is why the two are close in size while sharing no logic. Neither is a copy of the other: mobile registers nine commands against desktop's eight, and the ninth (`agent_list_provider_models`) exists because mobile has no local model to fall back on.",
+  },
+  {
+    a: "src-tauri/src/plugins/agent/commands.rs",
+    b: "mobile/src-tauri/src/plugins/agent/commands.rs",
+    verdict: "absent",
+    destination: "undecided",
+    reason:
+      "The `#[tauri::command]` layer, 516 lines against 338, and the pair is the three-layer command shape working rather than drift. myne-md/myne#456 reduced desktop's side from 1442 lines to thin wrappers by moving the body into `myne-core`; mobile's was written against that same core from the start. The /simplify pass then took two more: `agent_apply` and `agent_undo` were still retyped verbatim on both sides, and the undo retype had silently DROPPED the myne-md/myne#531 fix that puts failed restore points back, so a partial undo failure consumed the record permanently on mobile. Both moved to `host_commands::{apply_from_host, undo_from_host}`. What is left on each side is argument marshalling and the client's own two seams (its engine and its scope searcher), which are BY DEFINITION per-client. Measured rather than assumed: neither file carries a security rule, a precondition or a refusal of its own.",
+  },
+  {
+    a: "src-tauri/src/plugins/agent/adapters.rs",
+    b: "mobile/src-tauri/src/plugins/agent/adapters.rs",
+    verdict: "absent",
+    destination: "undecided",
+    reason:
+      "Each client's implementation of the two seams `myne-core`'s agent loop asks for, 222 lines against 117. The desktop one bridges to a local Candle engine and desktop's own search index; mobile's bridges to `NoLocalEngine` plus the remote provider registry. The gap is the whole of what #456 is about, so treating them as one answer would be classifying the seam as drift. Desktop's extra 105 lines are the local-inference arm and the capability-probe test that moved here with it.",
+  },
+  {
+    a: "core/src/inference/state.rs",
+    b: "mobile/src-tauri/src/plugins/local_inference/state.rs",
+    verdict: "decision",
+    destination: "myne-core",
+    reason:
+      "The inference state machine, 1467 lines against 40. Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
   },
 ];
 

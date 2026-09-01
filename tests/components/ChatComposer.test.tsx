@@ -256,6 +256,7 @@ describe("ChatComposer", () => {
       "en",
       expect.any(Array),
       expect.any(Function),
+      expect.any(Function),
     );
     // A second send reuses the verdict rather than paying for it again.
     type("and the lists");
@@ -285,6 +286,7 @@ describe("ChatComposer", () => {
       { kind: "folder", value: "Projects" },
       "en",
       expect.any(Array),
+      expect.any(Function),
       expect.any(Function),
     );
   });

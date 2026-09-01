@@ -332,6 +332,53 @@ pub struct LoopDeps<'a> {
     /// the character budget is applied, which is host policy and belongs at the
     /// command boundary, not in the loop.
     pub history: &'a [Message],
+    /// Report the run's cost as it accrues, once per model round-trip
+    /// (myne-md/myne#456).
+    ///
+    /// **Why the loop reports at all, rather than the caller reading the
+    /// outcome.** `docs/decisions/ai/0515` rests the remote arm's lack of a
+    /// volume bound on disclosure: a finished run reports the requests it made,
+    /// the notes it read, and how much text left the device. But `drive`
+    /// returns only when the loop has STOPPED, which on a remote provider is
+    /// minutes, so a caller that reads the outcome learns the cost strictly
+    /// after it has been spent. A run that is cancelled, or that dies with the
+    /// foreground on a phone, then discloses nothing at all while having paid
+    /// for every round-trip it made.
+    ///
+    /// The figures are the RUNNING TOTALS for this leg, not deltas. A delta
+    /// would make the receiver responsible for summing, and a receiver that
+    /// dropped one message would under-report the disclosure figure forever
+    /// after: which is the one number that must never read low.
+    ///
+    /// Synchronous and infallible on purpose: a reporting channel that can fail
+    /// must not be able to stop or slow a run, and a run that stalled because
+    /// nobody was listening would be a disclosure control taking the product
+    /// down with it. A caller with nowhere to send it passes a closure that
+    /// does nothing.
+    /// `Send + Sync` because `LoopDeps` is held across the model `await` inside
+    /// a `#[tauri::command]`, whose future must be `Send`. Without the bounds
+    /// the whole command stops compiling, with an error that names the command
+    /// rather than this field.
+    pub on_progress: &'a (dyn Fn(RunProgress) + Send + Sync),
+}
+
+/// What a run has cost so far, for this leg (myne-md/myne#456).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunProgress {
+    /// Model round-trips so far.
+    pub iterations: usize,
+    /// Distinct notes read in full so far.
+    pub notes_read: usize,
+    /// Characters that have left the device, or `None` when the run has been
+    /// answered entirely on this device.
+    ///
+    /// `None` and `Some(0)` are DIFFERENT statements and are kept apart all the
+    /// way to the screen: "the run stayed on this device" versus "the run is
+    /// remote and has sent nothing yet". Collapsing one into the other reports
+    /// the second as the first, which is the wrong direction for a disclosure
+    /// control to be wrong in.
+    pub chars_off_device: Option<usize>,
 }
 
 /// Run the loop until it stops.
@@ -517,6 +564,15 @@ async fn drive_inner(
             chars_off_device = Some(chars_off_device.unwrap_or(0) + n);
         }
         let truncated = completion.truncated;
+        // Report IMMEDIATELY after the round-trip that spent the request, and
+        // before this iteration's tool work. The whole point is that a run which
+        // never reaches its own exit has still disclosed what it cost, so the
+        // report cannot sit behind anything that might not happen.
+        (deps.on_progress)(RunProgress {
+            iterations,
+            notes_read,
+            chars_off_device,
+        });
         let reply = completion.reply;
         // Parse before the reply moves into the transcript, so the reply is not
         // cloned just to be borrowed.
@@ -1343,6 +1399,14 @@ mod tests {
 
     static NO_EXCL: std::sync::LazyLock<Excl> = std::sync::LazyLock::new(|| Excl(Vec::new()));
 
+    /// A progress sink that drops what it is handed.
+    ///
+    /// Most tests here are about what the loop DOES, not about what it reports,
+    /// and threading a recorder through every one of them would obscure the
+    /// tests that are about the reporting. Those build their own sink; see
+    /// `the_run_reports_its_cost_before_it_stops`.
+    fn no_progress(_: RunProgress) {}
+
     fn deps<'a>(engine: &'a ScriptEngine, recs: &'a BTreeMap<String, NoteRecord>) -> LoopDeps<'a> {
         LoopDeps {
             engine,
@@ -1352,6 +1416,7 @@ mod tests {
             exclusions: &*NO_EXCL,
             language: None,
             history: &[],
+            on_progress: &no_progress,
         }
     }
 
@@ -1377,6 +1442,7 @@ mod tests {
             exclusions: &*NO_EXCL,
             language: None,
             history: &[],
+            on_progress: &no_progress,
         }
     }
 
@@ -2419,12 +2485,99 @@ mod tests {
             records: &recs,
             language: None,
             history: &[],
+            on_progress: &no_progress,
         };
         let mut t = Vec::new();
         let out = block_on(drive(&runs, "r", "task", &mut t, &d, &mut BTreeSet::new())).unwrap();
         assert_eq!(out.end, LoopEnd::ExhaustedIterations);
         assert_eq!(out.iterations, MAX_ITERATIONS);
         drop(engine);
+    }
+
+    // ---- the live cost report (myne-md/myne#456) -------------------------
+
+    /// The loop discloses its cost BEFORE it stops, and the last thing it says
+    /// matches what it returns.
+    ///
+    /// **Why the second half is the load-bearing one.** A live counter that
+    /// drifts from the outcome is worse than no live counter: the surface would
+    /// show one figure while the run was going and swap it for a different one
+    /// the moment it stopped, and `docs/decisions/ai/0515` names the off-device
+    /// figure as the compensating control for an arm with no volume bound. A
+    /// control that visibly disagrees with itself is not one.
+    ///
+    /// Asserted on a REMOTE engine, because `chars_off_device` is `None` on the
+    /// local arm and the interesting number would be absent from both sides.
+    #[test]
+    fn the_run_reports_its_cost_before_it_stops_and_the_last_report_matches_the_outcome() {
+        use std::sync::Mutex as StdMutex;
+
+        // Two reads then a finish: three round-trips, so a report-per-iteration
+        // gives three reports and a report-at-the-end gives one.
+        let engine = ScriptEngine::remote(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"read_note","note_id":"b"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records_ab();
+        let seen: StdMutex<Vec<RunProgress>> = StdMutex::new(Vec::new());
+        let record = |p: RunProgress| seen.lock().unwrap().push(p);
+        let d = LoopDeps {
+            engine: &engine,
+            reader: &Reader,
+            searcher: &Searcher,
+            records: &recs,
+            exclusions: &*NO_EXCL,
+            language: None,
+            history: &[],
+            on_progress: &record,
+        };
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let mut t = Vec::new();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &d, &mut BTreeSet::new())).unwrap();
+
+        let reports = seen.lock().unwrap().clone();
+
+        // ONE report per model round-trip. Not one at the end, which is the
+        // behaviour this replaces.
+        assert_eq!(
+            reports.len(),
+            out.iterations,
+            "one report per round-trip: {reports:?}"
+        );
+        assert!(reports.len() > 1, "the fixture must run more than one round-trip, or 'before it stops' is not being tested");
+
+        // Running totals, never deltas, and never falling. A figure that went
+        // down would mean the receiver had to remember, which is exactly the
+        // shape a dropped message under-reports forever after.
+        for pair in reports.windows(2) {
+            assert!(
+                pair[1].iterations >= pair[0].iterations
+                    && pair[1].notes_read >= pair[0].notes_read,
+                "the totals must never fall: {pair:?}"
+            );
+        }
+        assert_eq!(
+            reports[0].iterations, 1,
+            "the first report is the first round-trip"
+        );
+
+        // The last thing said while running is what the outcome says. This is
+        // the assertion that stops the live figure from becoming a second,
+        // drifting count of the same thing.
+        let last = reports.last().copied().expect("a report");
+        assert_eq!(last.iterations, out.iterations);
+        assert_eq!(last.notes_read, out.notes_read);
+        assert_eq!(last.chars_off_device, out.chars_off_device);
+
+        // And it is a real number rather than an absent one, or the equality
+        // above would hold for two `None`s and prove nothing about the figure
+        // the disclosure control actually rests on.
+        assert!(
+            last.chars_off_device.is_some_and(|n| n > 0),
+            "the remote arm must report text leaving the device: {last:?}"
+        );
     }
 
     // ---- the diagnostic trail (myne-md/myne#546) ------------------------
@@ -2768,6 +2921,7 @@ mod tests {
             exclusions: &excl,
             language: None,
             history: &seeded,
+            on_progress: &no_progress,
         };
         let mut t = Vec::new();
         let _ = block_on(drive(

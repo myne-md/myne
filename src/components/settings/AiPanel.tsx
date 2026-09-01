@@ -26,6 +26,7 @@
 // constants VERBATIM (never i18n'd, E2E-pinned by literal equality); it makes
 // no absolute-privacy claim past the threat model (A7/A13 acknowledged).
 
+import { consentIsDeviceScoped } from "@myne/copy";
 import {
   useEffect,
   useState,
@@ -556,7 +557,10 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     prefs.ai_provider,
     prefs.ai_provider_consent,
     prefs.ai_provider_model,
-    prefs.developer_mode,
+    // `prefs.developer_mode` was in this list until myne-md/myne#456, when it
+    // stopped being a precondition in `provider_gate`. The capability report no
+    // longer moves when it changes, so re-running the effect on it would be a
+    // dependency on a value the answer does not depend on.
     hasKey,
     // `saveAiEndpoint` writes to the device-local model store, not `vault.prefs`,
     // so none of the fields above move when an endpoint is configured. Without
@@ -638,7 +642,12 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       setKeyDraft("");
       return;
     }
-    if (prefs.ai_provider_consent === wire) {
+    // `consentIsDeviceScoped`, not an equality against the provider name. A
+    // legacy bare-name value is what a desktop install that turned Developer
+    // mode off holds, and an equality would read it as current and skip the
+    // consent screen, which is the upgrade that starts sending note text with
+    // no user act (myne-md/myne#456).
+    if (consentIsDeviceScoped(prefs.ai_provider_consent, wire)) {
       // Already consented to this exact provider — switching back does not
       // re-ask, because the recipient is one they have already agreed to.
       void setAiProvider(wire);

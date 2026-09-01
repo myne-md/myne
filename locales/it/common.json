@@ -49,7 +49,8 @@
       "unsupportedDetail": "Ha superato {{passes}} verifiche su {{attempts}}; ne servono {{required}}.",
       "checking": "Verifica del modello…",
       "checkingAt": "Verifica del modello… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Quella soglia di superamento non è ancora stata misurata su più modelli, quindi potrebbe essere più severa o più permissiva del dovuto."
+      "unsupportedProvisional": "Quella soglia di superamento non è ancora stata misurata su più modelli, quindi potrebbe essere più severa o più permissiva del dovuto.",
+      "scopeNone": "nessuna nota aperta, quindi non c'è ancora nulla su cui lavorare"
     },
     "progress": {
       "working": "In esecuzione",
@@ -68,7 +69,8 @@
       "grantsUser_other": "{{count}} ambiti impostati da te",
       "grantsModel_one": "{{count}} richiesto dall'agente",
       "grantsModel_many": "{{count}} richiesti dall'agente",
-      "grantsModel_other": "{{count}} richiesti dall'agente"
+      "grantsModel_other": "{{count}} richiesti dall'agente",
+      "cancelledBackground": "L'esecuzione è stata annullata perché Myne è passata in secondo piano. Non è stato scritto nulla. Richiedi quando vuoi."
     },
     "scope": {
       "title": "Includere {{folder}}?",
@@ -140,7 +142,6 @@
       "undoFailed": "Non è stato possibile annullare l'esecuzione.",
       "undoReport": "{{reverted}} note ripristinate. {{kept}} note create dall'esecuzione sono state lasciate al loro posto.",
       "alreadyApplied": "Applicata",
-      "appendFlag": "aggiunge alla fine",
       "untitledNote": "Nota senza titolo",
       "vaultRoot": "Radice della cassaforte",
       "newNotesHeading_one": "{{count}} nuova nota",
@@ -158,7 +159,8 @@
       "runSummaryOffDevice_one": "circa {{count}} carattere delle tue note è stato inviato al provider",
       "runSummaryOffDevice_many": "circa {{count}} caratteri delle tue note sono stati inviati al provider",
       "runSummaryOffDevice_other": "circa {{count}} caratteri delle tue note sono stati inviati al provider",
-      "runSummaryOnDevice": "nulla ha lasciato questo dispositivo"
+      "runSummaryOnDevice": "nulla ha lasciato questo dispositivo",
+      "appendFlag": "aggiunge alla fine"
     },
     "undo": {
       "offer_one": "L'ultima esecuzione ha modificato {{count}} nota.",
@@ -173,7 +175,9 @@
       "failed_other": "Impossibile ripristinare {{count}} note.",
       "createdNotReverted_one": "{{count}} nota creata dall'esecuzione è stata lasciata al suo posto.",
       "createdNotReverted_many": "{{count}} note create dall'esecuzione sono state lasciate al loro posto.",
-      "createdNotReverted_other": "{{count}} note create dall'esecuzione sono state lasciate al loro posto."
+      "createdNotReverted_other": "{{count}} note create dall'esecuzione sono state lasciate al loro posto.",
+      "sessionOnly": "Questo annullamento con un tocco dura finché non blocchi la cassaforte o chiudi l'app. Dopo, ripristina le note una alla volta dalla cronologia delle versioni di una nota.",
+      "sessionOnlyLink": "Apri cronologia versioni"
     }
   },
   "ai": {
@@ -1241,7 +1245,6 @@
     },
     "find": {
       "close": "Chiudi ricerca",
-      "dateFallback": "Ricerca di {{stored}}, la forma in cui questa data è salvata.",
       "matchCase": "Maiuscole/minuscole",
       "matchCount": "{{current}} di {{total}}",
       "nextMatch": "Corrispondenza successiva",
@@ -1250,10 +1253,11 @@
       "previousMatch": "Corrispondenza precedente",
       "replaceAll": "Sostituisci tutto",
       "replaceAllCount": "Sostituisci tutto ({{total}})",
-      "replaceOffOnDateFallback": "La sostituzione è disattivata finché una data viene trovata tramite la sua forma salvata, così una sostituzione non può renderla illeggibile.",
       "replaceOne": "Sostituisci",
       "replacePlaceholder": "Sostituisci con",
-      "toggleReplace": "Attiva/disattiva sostituzione"
+      "toggleReplace": "Attiva/disattiva sostituzione",
+      "dateFallback": "Ricerca di {{stored}}, la forma in cui questa data è salvata.",
+      "replaceOffOnDateFallback": "La sostituzione è disattivata finché una data viene trovata tramite la sua forma salvata, così una sostituzione non può renderla illeggibile."
     },
     "cover": {
       "add": "Aggiungi copertina",
@@ -3061,7 +3065,8 @@
         "title": "Prima che Myne invii qualcosa a {{provider}}",
         "whatLabel": "Cosa esce dal tuo dispositivo",
         "whenLabel": "Quando esce",
-        "whoLabel": "Chi lo riceve"
+        "whoLabel": "Chi lo riceve",
+        "connectionLabel": "Come viaggia"
       },
       "disclosureToggle": "Come funziona?",
       "enableHelper": "Esegue un modello fornito da te. Dove viene eseguito, e se le tue note escono da questo dispositivo, dipende dal provider che indichi qui sotto. Sperimentale, disattivato per impostazione predefinita.",
@@ -3095,7 +3100,9 @@
         "refused": "Il provider ha rifiutato la connessione. Potrebbe non essere attivo o bloccare questa rete.",
         "timeout": "Il provider non ha risposto in tempo. Non è rimasto nulla in esecuzione.",
         "unauthorized": "Il provider ha rifiutato la tua chiave API. Sostituiscila: potrebbe essere errata, revocata o di un altro account.",
-        "unreachable": "Impossibile raggiungere il provider. Controlla la tua connessione di rete."
+        "unreachable": "Impossibile raggiungere il provider. Controlla la tua connessione di rete.",
+        "featureOff": "L'IA è disattivata su questo dispositivo. Non è stato inviato nulla. Attivala in Impostazioni, sezione IA.",
+        "consentMissing": "Non hai acconsentito a inviare note a questo fornitore da questo dispositivo. Non è stato inviato nulla. Scegli di nuovo il fornitore in Impostazioni, sezione IA, e leggi cosa verrà inviato."
       },
       "modelChoose": "Scegli file…",
       "modelEmbeddingLabel": "Modello di ricerca: ricerca semantica e domande e risposte",
@@ -3139,6 +3146,13 @@
       "recommendedFilesTranscription": "Richiede il file .gguf di Whisper + config.json + tokenizer.json nella stessa cartella.",
       "title": "AI",
       "providerModelCount_many": "{{count}} modelli disponibili.",
+      "mobileEnableLabel": "Usa l'IA su questo telefono",
+      "mobileEnableHelper": "Disattivato per impostazione predefinita. Nessun modello di IA su questo telefono risponde alle domande né legge le tue note, quindi ogni richiesta va a un servizio che indichi qui sotto, e in quel momento le tue note lasciano questo dispositivo. La trascrizione e il testo delle immagini continuano a girare qui, su modelli forniti con Myne.",
+      "mobileKeyAdd": "Salva chiave",
+      "mobileKeyReplace": "Sostituisci chiave",
+      "mobileRevokeHelper": "Rimuove insieme il fornitore, la sua chiave e l'approvazione di questo telefono, lasciando esattamente lo stato di non averlo mai configurato. Gli altri dispositivi continuano a funzionare finché non lo rimuovi anche lì.",
+      "mobileApproveLabel": "Approva l'invio su questo telefono",
+      "mobileApproveHelper": "Il fornitore e la sua chiave provengono da un altro dispositivo. Da questo telefono non viene inviato nulla finché non leggi cosa verrà inviato e lo approvi qui.",
       "historyBudgetHelper": "Quanta parte della conversazione recente porta ogni richiesta, in caratteri. Lascia vuoto per il valore predefinito. Un numero maggiore permette all'IA di seguire conversazioni più lunghe e ne invia di più: con un provider che non è su questo dispositivo, significa più tuo testo che lo lascia, a ogni passo di un'esecuzione.",
       "historyBudgetLabel": "Conversazione inviata a ogni richiesta"
     },

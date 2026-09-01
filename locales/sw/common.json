@@ -48,7 +48,8 @@
       "unsupportedDetail": "Imepita ukaguzi {{passes}} kati ya {{attempts}}; {{required}} zinahitajika.",
       "checking": "Inakagua modeli…",
       "checkingAt": "Inakagua modeli… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Kiwango hicho cha kufaulu bado hakijapimwa katika modeli mbalimbali, kwa hivyo kinaweza kuwa kikali au chepesi kuliko inavyostahili."
+      "unsupportedProvisional": "Kiwango hicho cha kufaulu bado hakijapimwa katika modeli mbalimbali, kwa hivyo kinaweza kuwa kikali au chepesi kuliko inavyostahili.",
+      "scopeNone": "hakuna dokezo lililofunguliwa, hivyo bado hakuna cha kufanyia kazi"
     },
     "progress": {
       "working": "Inafanya kazi",
@@ -64,7 +65,8 @@
       "grantsUser_one": "wigo {{count}} uliouweka",
       "grantsUser_other": "wigo {{count}} uliouweka",
       "grantsModel_one": "{{count}} alioomba",
-      "grantsModel_other": "{{count}} alioomba"
+      "grantsModel_other": "{{count}} alioomba",
+      "cancelledBackground": "Uendeshaji ulighairiwa kwa sababu Myne ilihamia chinichini. Hakuna kilichoandikwa. Uliza tena ukiwa tayari."
     },
     "scope": {
       "title": "Ujumuishe {{folder}}?",
@@ -128,7 +130,6 @@
       "undoFailed": "Uendeshaji haukuweza kutenduliwa.",
       "undoReport": "Madokezo {{reverted}} yamerejeshwa. Madokezo {{kept}} yaliyotengenezwa na uendeshaji yameachwa yalipo.",
       "alreadyApplied": "Yametumika",
-      "appendFlag": "huongeza mwishoni",
       "untitledNote": "Dokezo lisilo na kichwa",
       "vaultRoot": "Mzizi wa kasha",
       "newNotesHeading_one": "dokezo jipya {{count}}",
@@ -141,7 +142,8 @@
       "runSummaryNotes_other": "madokezo {{count}} yamesomwa",
       "runSummaryOffDevice_one": "takriban herufi {{count}} ya madokezo yako ilitumwa kwa mtoa huduma",
       "runSummaryOffDevice_other": "takriban herufi {{count}} za madokezo yako zilitumwa kwa mtoa huduma",
-      "runSummaryOnDevice": "hakuna kilichotoka kwenye kifaa hiki"
+      "runSummaryOnDevice": "hakuna kilichotoka kwenye kifaa hiki",
+      "appendFlag": "huongeza mwishoni"
     },
     "undo": {
       "offer_one": "Uendeshaji uliopita ulibadilisha dokezo {{count}}.",
@@ -152,7 +154,9 @@
       "failed_one": "Dokezo {{count}} halikuweza kurejeshwa.",
       "failed_other": "Madokezo {{count}} hayakuweza kurejeshwa.",
       "createdNotReverted_one": "Dokezo {{count}} lililoundwa na uendeshaji huo limeachwa palepale.",
-      "createdNotReverted_other": "Madokezo {{count}} yaliyoundwa na uendeshaji huo yameachwa palepale."
+      "createdNotReverted_other": "Madokezo {{count}} yaliyoundwa na uendeshaji huo yameachwa palepale.",
+      "sessionOnly": "Kutendua huku kwa mguso mmoja hudumu hadi ufunge kasha au ufunge programu. Baada ya hapo, rejesha madokezo moja baada ya jingine kutoka historia ya matoleo ya dokezo.",
+      "sessionOnlyLink": "Fungua historia ya matoleo"
     }
   },
   "ai": {
@@ -1183,7 +1187,6 @@
     },
     "find": {
       "close": "Funga utafutaji",
-      "dateFallback": "Inatafuta {{stored}}, ndiyo hali ambayo tarehe hii huhifadhiwa.",
       "matchCase": "Linganisha herufi kubwa na ndogo",
       "matchCount": "{{current}} kati ya {{total}}",
       "nextMatch": "Tokeo linalofuata",
@@ -1192,10 +1195,11 @@
       "previousMatch": "Tokeo lililotangulia",
       "replaceAll": "Badilisha zote",
       "replaceAllCount": "Badilisha zote ({{total}})",
-      "replaceOffOnDateFallback": "Kubadilisha kumezimwa maadamu tarehe inapatikana kwa umbo lake lililohifadhiwa, ili ubadilishaji usiifanye tarehe isisomeke.",
       "replaceOne": "Badilisha",
       "replacePlaceholder": "Badilisha na",
-      "toggleReplace": "Washa/zima ubadilishaji"
+      "toggleReplace": "Washa/zima ubadilishaji",
+      "dateFallback": "Inatafuta {{stored}}, ndiyo hali ambayo tarehe hii huhifadhiwa.",
+      "replaceOffOnDateFallback": "Kubadilisha kumezimwa maadamu tarehe inapatikana kwa umbo lake lililohifadhiwa, ili ubadilishaji usiifanye tarehe isisomeke."
     },
     "cover": {
       "add": "Ongeza jalada",
@@ -2937,7 +2941,8 @@
         "title": "Kabla Myne haijatuma chochote kwa {{provider}}",
         "whatLabel": "Kinachotoka kwenye kifaa chako",
         "whenLabel": "Wakati kinapotoka",
-        "whoLabel": "Nani anayekipokea"
+        "whoLabel": "Nani anayekipokea",
+        "connectionLabel": "Jinsi inavyosafiri"
       },
       "disclosureToggle": "Hii inafanyaje kazi?",
       "enableHelper": "Huendesha modeli unayoitoa wewe. Mahali inapoendeshwa, na iwapo madokezo yako yanatoka kwenye kifaa hiki, hutegemea mtoa huduma unayemtaja hapa chini. Ya majaribio, imezimwa kwa chaguomsingi.",
@@ -2971,7 +2976,9 @@
         "refused": "Mtoa huduma amekataa muunganisho. Huenda hafanyi kazi au anazuia mtandao huu.",
         "timeout": "Mtoa huduma hakujibu kwa wakati. Hakuna kilichoachwa kikiendelea.",
         "unauthorized": "Mtoa huduma amekataa ufunguo wako wa API. Ubadilishe: huenda si sahihi, umebatilishwa, au ni wa akaunti nyingine.",
-        "unreachable": "Imeshindwa kumfikia mtoa huduma. Kagua muunganisho wako wa mtandao."
+        "unreachable": "Imeshindwa kumfikia mtoa huduma. Kagua muunganisho wako wa mtandao.",
+        "featureOff": "AI imezimwa kwenye kifaa hiki. Hakuna kilichotumwa. Iwashe katika Mipangilio, chini ya AI.",
+        "consentMissing": "Hujakubali kutuma madokezo kwa mtoa huduma huyu kutoka kifaa hiki. Hakuna kilichotumwa. Chagua tena mtoa huduma katika Mipangilio, chini ya AI, na usome kitakachotumwa."
       },
       "modelChoose": "Chagua faili…",
       "modelEmbeddingLabel": "Modeli ya utafutaji: utafutaji wa kimaana na maswali na majibu",
@@ -3013,6 +3020,13 @@
       "recommendedFilesGeneration": "Inahitaji faili la .gguf + tokenizer.json katika folda ile ile.",
       "recommendedFilesTranscription": "Inahitaji faili la Whisper la .gguf + config.json + tokenizer.json katika folda ile ile.",
       "title": "AI",
+      "mobileEnableLabel": "Tumia AI kwenye simu hii",
+      "mobileEnableHelper": "Imezimwa kwa chaguo-msingi. Hakuna modeli ya AI kwenye simu hii inayojibu maswali au kusoma madokezo yako, kwa hivyo kila ombi huenda kwa huduma unayoitaja hapa chini, na madokezo yako huondoka kwenye kifaa hiki wakati huo. Unukuzi na maandishi ya picha bado hufanyika hapa, kwa modeli zinazokuja na Myne.",
+      "mobileKeyAdd": "Hifadhi ufunguo",
+      "mobileKeyReplace": "Badilisha ufunguo",
+      "mobileRevokeHelper": "Huondoa mtoa huduma, ufunguo wake na idhini ya simu hii kwa pamoja, ikiacha hali ile ile ya kutokuwahi kusanidiwa. Vifaa vingine huendelea kufanya kazi hadi uviondoe huko pia.",
+      "mobileApproveLabel": "Idhinisha kutuma kwenye simu hii",
+      "mobileApproveHelper": "Mtoa huduma na ufunguo wake vilitoka kwenye kifaa kingine. Hakuna kinachotumwa kutoka simu hii hadi usome kitakachotumwa na uidhinishe hapa.",
       "historyBudgetHelper": "Ni kiasi gani cha mazungumzo ya hivi karibuni ambacho kila ombi hubeba, kwa herufi. Acha wazi kutumia thamani chaguo-msingi. Namba kubwa humruhusu AI kufuatilia mazungumzo marefu zaidi na hutuma zaidi kati yake: kwa mtoa huduma asiye kwenye kifaa hiki, hiyo ni maandishi yako zaidi yanayoondoka kwenye kifaa, katika kila hatua ya utekelezaji.",
       "historyBudgetLabel": "Mazungumzo yanayotumwa na kila ombi"
     },

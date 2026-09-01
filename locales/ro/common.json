@@ -49,7 +49,8 @@
       "unsupportedDetail": "A trecut {{passes}} din {{attempts}} verificări; sunt necesare {{required}}.",
       "checking": "Se verifică modelul…",
       "checkingAt": "Se verifică modelul… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Acel prag de trecere nu a fost încă măsurat pe mai multe modele, așa că poate fi mai strict sau mai permisiv decât ar trebui."
+      "unsupportedProvisional": "Acel prag de trecere nu a fost încă măsurat pe mai multe modele, așa că poate fi mai strict sau mai permisiv decât ar trebui.",
+      "scopeNone": "nicio notiță deschisă, deci încă nu este nimic de lucrat"
     },
     "progress": {
       "working": "Se lucrează",
@@ -68,7 +69,8 @@
       "grantsUser_other": "{{count}} de domenii stabilite de tine",
       "grantsModel_one": "{{count}} cerut de agent",
       "grantsModel_few": "{{count}} cerute de agent",
-      "grantsModel_other": "{{count}} cerute de agent"
+      "grantsModel_other": "{{count}} cerute de agent",
+      "cancelledBackground": "Rularea a fost anulată pentru că Myne a trecut în fundal. Nu s-a scris nimic. Întreabă din nou când vrei."
     },
     "scope": {
       "title": "Incluzi {{folder}}?",
@@ -140,7 +142,6 @@
       "undoFailed": "Rularea nu a putut fi anulată.",
       "undoReport": "{{reverted}} note restaurate. {{kept}} note create de rulare au fost lăsate pe loc.",
       "alreadyApplied": "Aplicată",
-      "appendFlag": "adaugă la final",
       "untitledNote": "Notă fără titlu",
       "vaultRoot": "Rădăcina seifului",
       "newNotesHeading_one": "{{count}} notă nouă",
@@ -158,7 +159,8 @@
       "runSummaryOffDevice_one": "aproximativ {{count}} caracter din notele tale a fost trimis către furnizor",
       "runSummaryOffDevice_few": "aproximativ {{count}} caractere din notele tale au fost trimise către furnizor",
       "runSummaryOffDevice_other": "aproximativ {{count}} de caractere din notele tale au fost trimise către furnizor",
-      "runSummaryOnDevice": "nimic nu a părăsit acest dispozitiv"
+      "runSummaryOnDevice": "nimic nu a părăsit acest dispozitiv",
+      "appendFlag": "adaugă la final"
     },
     "undo": {
       "offer_one": "Ultima rulare a modificat {{count}} notă.",
@@ -173,7 +175,9 @@
       "failed_other": "{{count}} de note nu au putut fi restaurate.",
       "createdNotReverted_one": "{{count}} notă creată de rulare a fost lăsată pe loc.",
       "createdNotReverted_few": "{{count}} note create de rulare au fost lăsate pe loc.",
-      "createdNotReverted_other": "{{count}} de note create de rulare au fost lăsate pe loc."
+      "createdNotReverted_other": "{{count}} de note create de rulare au fost lăsate pe loc.",
+      "sessionOnly": "Această anulare dintr-o atingere durează până blochezi seiful sau închizi aplicația. După aceea, restaurezi notițele una câte una din istoricul versiunilor unei notițe.",
+      "sessionOnlyLink": "Deschide istoricul versiunilor"
     }
   },
   "ai": {
@@ -1241,7 +1245,6 @@
     },
     "find": {
       "close": "Închide căutarea",
-      "dateFallback": "Se caută {{stored}}, forma în care este stocată această dată.",
       "matchCase": "Potrivire majuscule",
       "matchCount": "{{current}} din {{total}}",
       "nextMatch": "Următorul rezultat",
@@ -1250,10 +1253,11 @@
       "previousMatch": "Rezultatul anterior",
       "replaceAll": "Înlocuiește tot",
       "replaceAllCount": "Înlocuiește tot ({{total}})",
-      "replaceOffOnDateFallback": "Înlocuirea este dezactivată cât timp o dată este găsită prin forma ei stocată, ca o înlocuire să nu o facă imposibil de citit.",
       "replaceOne": "Înlocuiește",
       "replacePlaceholder": "Înlocuiește cu",
-      "toggleReplace": "Comută înlocuirea"
+      "toggleReplace": "Comută înlocuirea",
+      "dateFallback": "Se caută {{stored}}, forma în care este stocată această dată.",
+      "replaceOffOnDateFallback": "Înlocuirea este dezactivată cât timp o dată este găsită prin forma ei stocată, ca o înlocuire să nu o facă imposibil de citit."
     },
     "cover": {
       "add": "Adaugă copertă",
@@ -3061,7 +3065,8 @@
         "title": "Înainte ca Myne să trimită ceva către {{provider}}",
         "whatLabel": "Ce părăsește dispozitivul tău",
         "whenLabel": "Când pleacă",
-        "whoLabel": "Cine le primește"
+        "whoLabel": "Cine le primește",
+        "connectionLabel": "Cum călătorește"
       },
       "disclosureToggle": "Cum funcționează?",
       "enableHelper": "Rulează un model furnizat de tine. Unde rulează și dacă notele tale părăsesc acest dispozitiv depind amândouă de furnizorul pe care îl indici mai jos. Experimental, dezactivat implicit.",
@@ -3095,7 +3100,9 @@
         "refused": "Furnizorul a refuzat conexiunea. Este posibil să fie oprit sau să blocheze această rețea.",
         "timeout": "Furnizorul nu a răspuns la timp. Nu a rămas nimic în execuție.",
         "unauthorized": "Furnizorul ți-a respins cheia API. Înlocuiește-o: poate fi greșită, revocată sau pentru un alt cont.",
-        "unreachable": "Furnizorul nu a putut fi accesat. Verifică-ți conexiunea la rețea."
+        "unreachable": "Furnizorul nu a putut fi accesat. Verifică-ți conexiunea la rețea.",
+        "featureOff": "IA este oprită pe acest dispozitiv. Nu s-a trimis nimic. Pornește-o în Setări, la IA.",
+        "consentMissing": "Nu ai fost de acord să trimiți notițe către acest furnizor de pe acest dispozitiv. Nu s-a trimis nimic. Alege furnizorul din nou în Setări, la IA, și citește ce se va trimite."
       },
       "modelChoose": "Alege fișierul…",
       "modelEmbeddingLabel": "Model de căutare: căutare semantică și întrebări-răspunsuri",
@@ -3139,6 +3146,13 @@
       "recommendedFilesTranscription": "Necesită fișierul Whisper .gguf + config.json + tokenizer.json în același dosar.",
       "title": "AI",
       "providerModelCount_few": "{{count}} modele disponibile.",
+      "mobileEnableLabel": "Folosește IA pe acest telefon",
+      "mobileEnableHelper": "Dezactivat implicit. Niciun model AI de pe acest telefon nu răspunde la întrebări și nu îți citește notițele, deci fiecare cerere merge către un serviciu pe care îl numești mai jos, iar notițele tale părăsesc atunci acest dispozitiv. Transcrierea și textul din imagini rulează în continuare aici, pe modele livrate cu Myne.",
+      "mobileKeyAdd": "Salvează cheia",
+      "mobileKeyReplace": "Înlocuiește cheia",
+      "mobileRevokeHelper": "Elimină împreună furnizorul, cheia lui și aprobarea acestui telefon, lăsând exact starea de dinaintea oricărei configurări. Celelalte dispozitive funcționează mai departe până le elimini și acolo.",
+      "mobileApproveLabel": "Aprobă trimiterea de pe acest telefon",
+      "mobileApproveHelper": "Furnizorul și cheia lui au venit de pe alt dispozitiv. Nu se trimite nimic de pe acest telefon până nu citești ce se va trimite și nu aprobi aici.",
       "historyBudgetHelper": "Cât din conversația recentă duce cu sine fiecare cerere, în caractere. Lasă gol pentru valoarea implicită. Un număr mai mare permite AI-ului să urmărească conversații mai lungi și trimite mai mult din ele: la un furnizor care nu se află pe acest dispozitiv, înseamnă mai mult din textul tău părăsindu-l, la fiecare pas al unei rulări.",
       "historyBudgetLabel": "Conversația trimisă cu fiecare cerere"
     },

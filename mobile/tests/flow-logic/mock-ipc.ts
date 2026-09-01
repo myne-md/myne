@@ -264,7 +264,32 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       label: null,
       saved_views: [],
       view_order: [],
+      // The AI gate's four preconditions (myne-md/myne#456). All four default
+      // to the OFF state, which is the property rather than a convention: unset
+      // must mean the remote path is UNREACHABLE, so a spec that forgets to
+      // seed them cannot accidentally exercise a configured device.
+      //
+      // `ai_provider_consent` is DEVICE-LOCAL while the other three sync, which
+      // is the whole point of this feature and the thing the scenario below
+      // drives: a phone enrolled into a configured vault gets the provider, the
+      // model and the key, and does not get the approval.
+      ai_enabled: false,
+      ai_provider: null,
+      ai_provider_model: null,
+      ai_provider_consent: null,
     };
+
+    // AI state, stateful for the same reason every other store here is: a
+    // toggle or an approval made through the UI is only meaningful if it
+    // survives into the next `prefs_read`. Seeded from `config.prefs` so a spec
+    // can start from "another device already configured this vault".
+    let aiEnabled = (config.prefs?.ai_enabled as boolean | undefined) ?? false;
+    let aiProvider = (config.prefs?.ai_provider as string | null | undefined) ?? null;
+    let aiConsent = (config.prefs?.ai_provider_consent as string | null | undefined) ?? null;
+    // Whether a key is stored. Write-only on the real host: there is no getter,
+    // and the panel decides between "Save key" and "Replace key" from this
+    // boolean alone, so the mock exposes exactly that and no more.
+    let aiHasKey = Boolean(config.prefs?.ai_provider_key);
 
     // Quick-unlock canned state — mutable so a setup/disable call is reflected
     // by the next `quick_unlock_status` read (the settings toggle round-trip).
@@ -483,6 +508,9 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         timezone,
         item_order: itemOrder,
         icon: vaultIcon,
+        ai_enabled: aiEnabled,
+        ai_provider: aiProvider,
+        ai_provider_consent: aiConsent,
       }),
       // Format-bar layout setters (MYND-555): record the write AND mutate the
       // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
@@ -515,6 +543,94 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         return null;
       },
       // ── Task reminders (MYND-619) ──────────────────────────────────────
+      // ── AI (myne-md/myne#456) ────────────────────────────────────────
+      "plugin:prefs|set_ai_enabled": (args) => {
+        aiEnabled = Boolean(args.enabled);
+        return null;
+      },
+      // **Deliberately SLOW, and that is what makes the ordering assertion real.**
+      // The two prefs writes the consent handler makes are separate Tauri
+      // commands, and in production their arrival at the prefs write mutex is
+      // not ordered by the order they were dispatched in. A synchronous mock
+      // resolves them in call order no matter what the caller does, so an
+      // ordering test over it passes against an unawaited dispatch: measured,
+      // with `await` replaced by `void`, the flow suite stayed green. A delay
+      // here lets the second command land first unless the caller awaits the
+      // first, which is the only shape that fails when the await is removed.
+      "plugin:prefs|set_ai_provider": async (args) => {
+        await new Promise((r) => setTimeout(r, 40));
+        aiProvider = (args.provider as string | null) ?? null;
+        // **The host clears the consent whenever the selection CHANGES**, which
+        // on a first-time approval it always has. Modelled here rather than
+        // ignored, because the ORDER of the two writes is what the accept
+        // handler declares load-bearing, and a mock that keeps a consent through
+        // a provider change cannot tell a correct order from a raced one.
+        if (aiConsent !== aiProvider) aiConsent = null;
+        const w = window as unknown as { __aiPrefWrites?: string[] };
+        (w.__aiPrefWrites ??= []).push("provider");
+        return null;
+      },
+      "plugin:prefs|set_ai_provider_consent": (args) => {
+        // Recorded per provider, never as a flag: an approval for a different
+        // provider names a different recipient than the one about to receive
+        // the text, and the host compares by equality.
+        // `grantedFor`, which is what `setAiProviderConsent` actually sends.
+        // The first version of this handler read `args.provider` and recorded
+        // `null` for every approval, so the scenario asserting "the write names
+        // the provider" failed against a correct implementation. A mock that
+        // guesses an argument name tests the guess.
+        aiConsent = (args.grantedFor as string | null) ?? null;
+        const w = window as unknown as {
+          __aiConsentWrites?: (string | null)[];
+          __aiPrefWrites?: string[];
+        };
+        (w.__aiConsentWrites ??= []).push(aiConsent);
+        (w.__aiPrefWrites ??= []).push("consent");
+        return null;
+      },
+      "plugin:prefs|set_ai_provider_key": (args) => {
+        aiHasKey = typeof args.key === "string" && args.key.length > 0;
+        return null;
+      },
+      "plugin:prefs|ai_provider_has_key": () => aiHasKey,
+      // The agent's own reads. `agent_start` RECORDS rather than answers: every
+      // scenario here is about what reaches the host, and a canned proposal
+      // would invite assertions about the mock's own fixture.
+      "plugin:agent|agent_preview_grant": () => ({
+        noteCount: 3,
+        excludedCount: 0,
+        unknownCount: 0,
+        newTotal: 3,
+      }),
+      "plugin:agent|agent_last_run": () => null,
+      // **The capability probe goes through the same gate a run does**, and
+      // that is the whole reason this arm exists rather than always answering
+      // a passing verdict. The composer probes on Send before it starts a run,
+      // so on a device that inherited the provider and the key but has not
+      // consented HERE, the probe is the call the host refuses. A mock that
+      // answered `passed` regardless would let the surface report "we could not
+      // check your model" over a configuration problem whose fix is one tap
+      // away, which is precisely the collapse the error taxonomy exists to
+      // prevent, and no spec would have seen it.
+      //
+      // Mirrors `authorize_remote` in the order the host checks: the feature
+      // flag, a named provider, then a consent that names THAT provider, then a
+      // key. Equality on the provider name rather than a boolean, for the same
+      // reason the host uses it: an approval for one provider is not an
+      // approval for another.
+      "plugin:agent|agent_capability": () => {
+        if (!aiEnabled) throw "FeatureOff";
+        if (aiProvider === null || aiProvider === "") throw "NotReady";
+        if (aiConsent !== aiProvider) throw "ConsentMissing";
+        if (!aiHasKey) throw "NoCredential";
+        return { passed: true };
+      },
+      "plugin:agent|agent_start": (args) => {
+        const w = window as unknown as { __agentStarts?: unknown[] };
+        (w.__agentStarts ??= []).push(args?.task ?? null);
+        throw "FeatureOff";
+      },
+      "plugin:agent|agent_list_provider_models": () => [{ id: "a/model" }],
       "plugin:prefs|set_reminders_enabled": (args) => {
         const enabled = Boolean(args.enabled);
         const w = window as unknown as { __remindersEnabledWrites?: boolean[] };

@@ -21,6 +21,12 @@ permissions = [
   "allow-set-reminder-horizon-days",
   "allow-set-transcription-enabled",
   "allow-set-screen-capture-protection",
+  "allow-set-ai-enabled",
+  "allow-set-ai-provider",
+  "allow-set-ai-provider-consent",
+  "allow-set-ai-provider-key",
+  "allow-set-ai-provider-model",
+  "allow-ai-provider-has-key",
   "allow-set-attachment-compression-enabled",
   "allow-set-deliberate-folders",
   "allow-set-archived-folders",
@@ -471,3 +477,35 @@ commands.allow = ["set_reminder_horizon_days"]
 identifier = "allow-set-transcription-enabled"
 description = "Allow invoking prefs:set_transcription_enabled (Slot::Unlocked-gated setter for whether on-device voice-to-text is available, MYND-563/592). A plain bool defaulting true (opt-OUT), omitted from the canonical encoding at its default so an untouched vault stays byte-identical. It is a SEPARATE switch from the AI-beta ai_enabled opt-in — transcription ships a bundled model and is a product feature, not part of the AI beta. Non-load-bearing: the transcribe command re-reads this host-side before any decrypt, so a tampered value can at worst enable/disable a feature, never bypass the gate. Main-window-only, same invariant as every other prefs setter."
 commands.allow = ["set_transcription_enabled"]
+
+# ---- AI (myne-md/myne#456) --------------------------------------------------
+
+[[permission]]
+identifier = "allow-set-ai-enabled"
+description = "Allow invoking prefs:set_ai_enabled (Slot::Unlocked-gated setter for the DEVICE-LOCAL AI beta opt-in; since myne-md/myne#456 removed developer_mode from the request-time gate this is one of only two device-local controls on the remote path, the other being the consent below)."
+commands.allow = ["set_ai_enabled"]
+
+[[permission]]
+identifier = "allow-set-ai-provider"
+description = "Allow invoking prefs:set_ai_provider (Slot::Unlocked-gated setter naming the remote provider; clearing it also clears the consent and the key host-side, because a key for a provider nobody selected is a credential with no owner). A value outside the host's known set is refused rather than stored."
+commands.allow = ["set_ai_provider"]
+
+[[permission]]
+identifier = "allow-set-ai-provider-consent"
+description = "Allow invoking prefs:set_ai_provider_consent (Slot::Unlocked-gated setter recording WHICH provider the consent was given for; DEVICE-LOCAL since myne-md/myne#456, so an approval made on a laptop does not arrive here by sync). This is the persistence, not the enforcement: the host re-reads it before every remote request."
+commands.allow = ["set_ai_provider_consent"]
+
+[[permission]]
+identifier = "allow-set-ai-provider-key"
+description = "Allow invoking prefs:set_ai_provider_key (Slot::Unlocked-gated setter for the provider API key, or null to revoke). WRITE-ONLY by construction: there is no command that returns the key and the host marks the field serde-skip, so it never crosses into page context."
+commands.allow = ["set_ai_provider_key"]
+
+[[permission]]
+identifier = "allow-set-ai-provider-model"
+description = "Allow invoking prefs:set_ai_provider_model (Slot::Unlocked-gated setter choosing which of the provider's models answers). No default and no fallback: the value comes from the list the provider itself reports."
+commands.allow = ["set_ai_provider_model"]
+
+[[permission]]
+identifier = "allow-ai-provider-has-key"
+description = "Allow invoking prefs:ai_provider_has_key (Slot::Unlocked-gated READ answering WHETHER a key is stored, never what). It exists so the key can stay serde-skipped: the UI decides between Add key and Replace key from a boolean."
+commands.allow = ["ai_provider_has_key"]

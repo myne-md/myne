@@ -51,6 +51,7 @@ import {
   getAgent,
   landedEditIndices,
   openRun,
+  reportRunProgress,
   settleApply,
   settleStep,
 } from "../agent/agentStore";
@@ -155,12 +156,27 @@ export async function startAgentRun(
   // comes back rather than being raced by it.
   const epoch = currentRunEpoch();
   try {
-    const result = await agentStart(task, grant, language, history, (view) => {
-      // The run has an id now, minutes before this call resolves. Same epoch
-      // as the settle below, so a run the user let go of mid-flight cannot
-      // mount a progress strip for itself behind them.
-      openRun(view, epoch);
-    });
+    const result = await agentStart(
+      task,
+      grant,
+      language,
+      history,
+      (view) => {
+        // The run has an id now, minutes before this call resolves. Same epoch
+        // as the settle below, so a run the user let go of mid-flight cannot
+        // mount a progress strip for itself behind them.
+        openRun(view, epoch);
+      },
+      // What the run has cost so far, once per model round-trip
+      // (myne-md/myne#456). Same epoch, for the same reason and one that is
+      // sharper here: the off-device figure is the compensating control
+      // `docs/decisions/ai/0515` names for the uncapped remote arm, so a
+      // stale run's report landing on a live one is a false statement about
+      // how much text left the device rather than a cosmetic mix-up.
+      (progress) => {
+        reportRunProgress(progress, epoch);
+      },
+    );
     // **Raised BEFORE the step settles**, which is the ordering the flag exists
     // for: the review dialog derives its open state from a settled run, so a
     // flag set afterwards lets the screen it is meant to skip open for a few

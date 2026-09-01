@@ -238,6 +238,30 @@ pub enum AgentError {
     /// them to look at their vault for a fault in the request Myne built.
     #[error("the backend failed")]
     ProviderFailed,
+    /// A GATE refused the request: the user has not agreed to send to this
+    /// provider, AI is off, no credential is stored, or the backend is not
+    /// ready.
+    ///
+    /// **One variant per gate would be four; one variant carrying the cause is
+    /// one, and the cause is what a surface needs** (myne-md/myne#456, found by
+    /// review). Every gate refusal used to collapse into `ProviderFailed`, so
+    /// the phone that inherited a provider and a key and holds no local consent,
+    /// which is exactly the population the device-scoped consent creates, was
+    /// told "That did not work. Nothing was saved and nothing was sent again."
+    /// rather than the sentence that names the fix. `AiChatFlow`'s
+    /// `GATE_REFUSALS` branch could not fire at all, and deleting it would have
+    /// changed nothing.
+    ///
+    /// This is the defect `EngineError` splits `ConsentMissing` out of
+    /// `RemoteBarred` to fix, one layer down: that split reached the desktop
+    /// `local_inference` path and not the only path mobile has.
+    #[error("a gate refused the request: {cause}")]
+    GateRefused {
+        /// The `EngineError::kind()` of the refusing gate, which is bounded and
+        /// content-free by construction, so it is safe to log and safe to send
+        /// across IPC.
+        cause: &'static str,
+    },
 }
 
 impl AgentError {
@@ -266,6 +290,7 @@ impl AgentError {
             Self::StepAlreadyRunning => "step_already_running",
             Self::ProviderRejected => "provider_rejected",
             Self::ProviderFailed => "provider_failed",
+            Self::GateRefused { .. } => "gate_refused",
         }
     }
 }

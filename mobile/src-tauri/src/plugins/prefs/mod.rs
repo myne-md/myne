@@ -129,6 +129,17 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // name. Shared `myne-core` body; mobile only registers it. Same
             // three-site lockstep as every other prefs setter.
             commands::vault_set_icon,
+            // AI (myne-md/myne#456). Six commands, and the sixth is the
+            // interesting one: `ai_provider_has_key` is a READ that answers a
+            // boolean, and it exists precisely so the key itself never needs a
+            // getter. The host marks that field serde-skip, so it does not
+            // reach page context on an ordinary `prefs_read` either.
+            commands::set_ai_enabled,
+            commands::set_ai_provider,
+            commands::set_ai_provider_consent,
+            commands::set_ai_provider_key,
+            commands::set_ai_provider_model,
+            commands::ai_provider_has_key,
             commands::set_spell_enabled,
             commands::set_spell_languages,
             commands::set_show_note_timestamps,

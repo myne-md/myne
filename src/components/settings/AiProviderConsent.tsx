@@ -21,7 +21,7 @@
 // be offering to skip something that does not repeat.
 //
 // **Nothing here decides anything.** Accepting calls back to the panel, which
-// writes the consent; the host re-reads all five preconditions at request time
+// writes the consent; the host re-reads all four preconditions at request time
 // (`provider_gate.rs`) and would refuse regardless of what this dialog did.
 // The dialog is the asking, not the enforcement — the same discipline the AI
 // panel already follows.
@@ -35,7 +35,8 @@ import { useTranslation } from "react-i18next";
 
 import {
   AI_TRUST_A7_RESIDUAL,
-  CONSENT_ACCOUNT_SCOPE,
+  CONSENT_DEVICE_SCOPE,
+  CONSENT_DIRECT_CONNECTION,
   CONSENT_HOW_TO_REVOKE,
   CONSENT_WHAT_LEAVES,
   CONSENT_WHEN_IT_LEAVES,
@@ -153,8 +154,16 @@ export function AiProviderConsent({
         />
         <Clause
           label={t("settings.ai.consent.scopeLabel")}
-          body={CONSENT_ACCOUNT_SCOPE}
+          body={CONSENT_DEVICE_SCOPE}
           testId="ai-consent.scope"
+        />
+        {/* HOW it travels. Added by myne-md/myne#456 and stated nowhere else: a
+            reader who has seen the Tor routing option elsewhere in the product
+            would reasonably assume it applies to this too, and it does not. */}
+        <Clause
+          label={t("settings.ai.consent.connectionLabel")}
+          body={CONSENT_DIRECT_CONNECTION}
+          testId="ai-consent.connection"
         />
 
         <p data-testid="ai-consent.residual" style={CLAUSE_STYLE}>

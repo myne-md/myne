@@ -1,21 +1,60 @@
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
+/** The workspace tab vocabulary, declared ONCE and imported by every consumer.
+ *
+ *  Wider than this bar's own columns on purpose: `search`, `note-tasks` and
+ *  `templates` are reachable from the sidebar, the palette or a note, never
+ *  from a bar button. What makes it one type is that they are all values of
+ *  `EditorFlow`'s single `tab` state.
+ *
+ *  It is a shared type rather than four inline unions because myne-md/myne#457
+ *  added `chat` and the four copies did not fail together. Three accepted the
+ *  new member silently (they only widened) and the fourth, `TAB_ORDER`, failed
+ *  with `TS7053` on an unrelated line, which is the reader's only clue that a
+ *  page transition was about to slide the wrong way. Now the next addition
+ *  fails at every site that has to answer for it.
+ */
+export type WorkspaceTab =
+  | "notes"
+  | "tasks"
+  | "note-tasks"
+  | "search"
+  | "graph"
+  | "files"
+  | "templates"
+  | "chat";
+
 /** Bottom tab bar. Notes/Search/Graph switch the list-view tab; Settings opens
  *  the sheet. Active tab is accent-tinted. Bottom padding clears the home
- *  indicator via the safe-area inset (falls back to 30px in the gallery). */
+ *  indicator via the safe-area inset (falls back to 30px in the gallery).
+ *
+ *  **Chat is the one conditional column** (myne-md/myne#457). It renders only
+ *  when `ai` is true, and with it false the bar is exactly the four columns it
+ *  was, no reserved gap. That is a deliberate divergence from desktop, where
+ *  `rightPanelTabs.ts` keeps `ai-chat` in the vocabulary unconditionally and
+ *  lets the tab BODY carry the off state: desktop's is a hideable, reorderable
+ *  strip with room to spare, and this is top-level navigation with a hard
+ *  column budget on a phone. A permanently-present fifth column would spend a
+ *  fifth of the bar on a feature the user has turned off. */
 export function TabBar({
   active,
+  ai,
   onNotes,
   onTasks,
   onGraph,
   onAttachments,
+  onChat,
 }: {
-  active: "notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates";
+  active: WorkspaceTab;
+  /** `ai_enabled`. Required rather than defaulted, so a new call site cannot
+   *  quietly render a four-tab bar while the other renders five. */
+  ai: boolean;
   onNotes: () => void;
   onTasks: () => void;
   onGraph: () => void;
   onAttachments: () => void;
+  onChat: () => void;
 }) {
   const { t } = useTranslation();
   const col = (on: boolean) => (on ? "var(--accent)" : "var(--fg-3)");
@@ -29,8 +68,28 @@ export function TabBar({
     background: "transparent",
     cursor: "pointer",
     padding: 0,
+    // A flex item defaults to `min-width: auto`, which refuses to shrink below
+    // its longest word. Without this the widest label decides the column
+    // widths and the bar stops being five equal columns.
+    minWidth: 0,
   };
-  const label = (on: boolean): CSSProperties => ({ fontSize: 10, fontWeight: on ? 600 : 500, color: col(on) });
+  // The label is CONTAINED rather than measured. At five columns each gets a
+  // fifth of the width instead of a quarter, and the labels are translated:
+  // `fi` renders "Muistiinpanot" (13 characters) and `tr` renders "Yapay Zeka"
+  // for this very tab, both of which are marginal at 10px on a 390px phone and
+  // overflow outright on a narrower one. Measuring a font metric per locale is
+  // not a thing this file can do, and asserting it in a test would pin one
+  // engine's metrics; ellipsis makes the worst case a truncated word next to an
+  // icon rather than text crossing into the neighbouring column.
+  const label = (on: boolean): CSSProperties => ({
+    fontSize: 10,
+    fontWeight: on ? 600 : 500,
+    color: col(on),
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  });
   return (
     <div
       data-testid="workspace.tab-bar"
@@ -81,6 +140,19 @@ export function TabBar({
         </svg>
         <span style={label(active === "files")}>{t("settings.shell.panels.files")}</span>
       </button>
+      {/* Last, deliberately: it is the newest destination and the only optional
+          one, so appending keeps every existing column where users learned it.
+          Reordering top-level navigation is the one change a user cannot be
+          told about. */}
+      {ai && (
+        <button data-testid="workspace.tab-chat" onClick={onChat} aria-label={t("settings.shell.panels.ai")} style={tab}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M20.5 12.2c0 4-3.8 7.2-8.5 7.2a10 10 0 01-2.6-.34L4.5 20.5l1.2-3.4A6.9 6.9 0 013.5 12.2c0-4 3.8-7.2 8.5-7.2s8.5 3.2 8.5 7.2z" stroke={col(active === "chat")} strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M9 11.5h6M9 14.5h3.5" stroke={col(active === "chat")} strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <span style={label(active === "chat")}>{t("settings.shell.panels.ai")}</span>
+        </button>
+      )}
     </div>
   );
 }

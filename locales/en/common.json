@@ -37,6 +37,7 @@
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
       "scopeCountUnavailable": "How many notes that folder holds could not be checked just now.",
+      "scopeNone": "no note open, so there is nothing to work on yet",
       "startFailed": "The agent could not start.",
       "autoApplyFailed": "The changes could not be applied automatically. Nothing was written; open the review to apply them yourself.",
       "permissionLabel": "When the run finishes",
@@ -61,6 +62,7 @@
       "scopeTotal_other": "can change {{count}} notes",
       "cancel": "Stop",
       "expandFailed": "The scope could not be widened.",
+      "cancelledBackground": "The run was cancelled because Myne went to the background. Nothing was written. Ask again when you are ready.",
       "grantsUser_one": "{{count}} scope you set",
       "grantsUser_other": "{{count}} scopes you set",
       "grantsModel_one": "{{count}} it asked for",
@@ -152,7 +154,9 @@
       "failed_one": "{{count}} note could not be restored.",
       "failed_other": "{{count}} notes could not be restored.",
       "createdNotReverted_one": "{{count}} note the run created was left in place.",
-      "createdNotReverted_other": "{{count}} notes the run created were left in place."
+      "createdNotReverted_other": "{{count}} notes the run created were left in place.",
+      "sessionOnly": "This one-tap undo lasts until you lock the vault or close the app. After that, restore notes one at a time from a note's version history.",
+      "sessionOnlyLink": "Open version history"
     }
   },
   "ai": {
@@ -2979,6 +2983,7 @@
         "accept": "Send my notes to {{provider}}",
         "cancel": "Cancel",
         "cannotVerifyLabel": "What Myne cannot check",
+        "connectionLabel": "How it travels",
         "revokeLabel": "How to undo this",
         "scopeLabel": "Which devices this covers",
         "title": "Before Myne sends anything to {{provider}}",
@@ -3006,6 +3011,8 @@
       "endpointThirdParty": "{{name}} is a separate program with its own network behaviour, and Myne does not control it. Your notes are sent to it while it runs on this computer.",
       "providerError": {
         "barred": "This kind of request never goes to a provider: it runs on this device or not at all.",
+        "featureOff": "AI is switched off on this device. Nothing was sent. Turn it on in Settings, under AI.",
+        "consentMissing": "You have not agreed to send notes to this provider from this device. Nothing was sent. Choose the provider again in Settings, under AI, and read what it will send.",
         "failed": "That did not work. Nothing was saved and nothing was sent again.",
         "localModelMissing": "The local model recorded in settings is not on this device any more. Nothing was sent anywhere. Pick a model again, or name a provider, in Settings → Developer → AI.",
         "noCredential": "No API key is set for this provider. Add one in Settings → Developer → AI.",
@@ -3053,6 +3060,13 @@
       "providerModelShowAll": "Show all models",
       "providerModelShowTextOnly": "Show text models only",
       "providerModelUnfetched": "Load the list to choose a model.",
+      "mobileEnableLabel": "Use AI on this phone",
+      "mobileEnableHelper": "Off by default. No AI model on this phone answers questions or reads your notes for AI, so every request goes to a service you name below, and your notes leave this device when it does. Transcription and image text still run here, on models that ship with Myne.",
+      "mobileKeyAdd": "Save key",
+      "mobileKeyReplace": "Replace key",
+      "mobileRevokeHelper": "Removes the provider, its key and this phone's approval together, leaving exactly the state of never having set it up. Other devices keep working until you remove it there too.",
+      "mobileApproveLabel": "Approve sending on this phone",
+      "mobileApproveHelper": "The provider and its key came from another device. Nothing is sent from this phone until you read what it will send and approve it here.",
       "providerNone": "None",
       "providerNothingAnswering": "Nothing is set up to answer yet.",
       "modelsLabel": "Models",
