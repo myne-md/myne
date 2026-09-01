@@ -260,7 +260,7 @@
       "title": "Vedhæftede filer",
       "transcribeDone": "Transskription fuldført.",
       "transcribeFailed": "Transskription mislykkedes. Prøv igen.",
-      "transcribeTooLong": "Denne optagelse er for lang til at blive transskriberet.",
+      "transcribeTooLong": "Denne optagelse er for lang til at blive transskriberet. Lyden forbliver vedhæftet, så du kan stadig afspille den.",
       "transcribeFeatureOff": "Tale-til-tekst er slået fra. Slå det til under Indstillinger → Transskription.",
       "transcribeModelLoadFailed": "Kunne ikke indlæse tale-til-tekst-modellen. Geninstallér Myne, eller tjek din egen model under Indstillinger → Developer → AI.",
       "transcribeNoModelHint": "Tale-til-tekst-modellen mangler. En geninstallation af Myne gendanner den.",
@@ -1830,7 +1830,9 @@
       "moveCollision": "Der findes allerede en mappe med det navn dér.",
       "unsettledSave": "En åben note er ikke færdig med at blive gemt, så mappen blev ikke rørt. Prøv igen, når den er færdig.",
       "renameFailed": "Kunne ikke omdøbe mappen, så den er uændret.",
-      "deliberateWriteFailed": "Mappen blev omdøbt, men en af dens indstillinger kunne ikke gemmes. Der dukker en tom mappe op med det gamle navn, hver gang du låser op; den kan trygt slettes, og intet andet ændres. Omdøber du mappen igen, forsvinder den ikke."
+      "deliberateWriteFailed": "Mappen blev omdøbt, men en af dens indstillinger kunne ikke gemmes. Der dukker en tom mappe op med det gamle navn, hver gang du låser op; den kan trygt slettes, og intet andet ændres. Omdøber du mappen igen, forsvinder den ikke.",
+      "folderListFull": "Myne kan huske et begrænset antal mapper, og den liste er fuld. Denne mappe virker stadig, men den forsvinder, når dens sidste note forlader den. Sletter du en mappe, du ikke længere har brug for, bliver der plads.",
+      "folderNotRemembered": "Mappen blev oprettet, men Myne kunne ikke registrere den. Den forsvinder, når dens sidste note forlader den, og den er væk ved næste oplåsning, hvis den stadig er tom. Du kan trygt oprette den igen."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne havde ikke lov til at læse denne fil.",
         "reasonNotFound": "Denne fil var væk, da Myne nåede frem til den.",
         "reasonNoSpace": "Denne enhed løb tør for plads.",
-        "reasonUnknown": "Myne kunne ikke sige hvorfor."
+        "reasonUnknown": "Myne kunne ikke sige hvorfor.",
+        "foldersNotKeptNote": "{{count}} forsvinder, når dens sidste note forlader den",
+        "foldersNotKeptNote_one": "{{count}} forsvinder, når dens sidste note forlader den",
+        "foldersNotKeptNote_other": "{{count}} forsvinder, når deres sidste note forlader dem",
+        "statFoldersNotKept": "Mapper ikke beholdt"
       },
       "offer": {
         "body": "Hent dine eksisterende noter ind i Myne. Hver enkelt krypteres, mens den importeres. Intet forlader denne enhed, og dine oprindelige filer bliver præcis, hvor de er.",
@@ -2021,6 +2027,51 @@
           "survives": "Bliver til én note, der indeholder tabellen.",
           "loses": "Det bliver én note, ikke én note pr. række: Myne er ikke en database. Meget brede eller meget lange filer beskæres, og importrapporten fortæller, hvor meget.",
           "short": "En enkelt regnearksfil"
+        },
+        "myne": {
+          "label": "Myne-boks",
+          "pickerTitle": "Vælg den boks, du vil importere fra",
+          "survives": "Noter, mapper, tags, links mellem de noter, du importerer, og de vedhæftede filer, de noter bruger. Ord, du har tilføjet til kildeboksens ordbog, kommer også med.",
+          "loses": "Versionshistorik, slettede noter og skabeloner bliver i kildeboksen. Vedhæftede filer, som ingen importeret note bruger, efterlades. Kildeboksen ændres ikke, og hvis du synkroniserer den, bliver den ved med at synkronisere.",
+          "short": "En anden boks på denne enhed"
+        }
+      },
+      "myne": {
+        "loading": "Leder efter dine andre bokse…",
+        "noOtherVaults": "Der er ingen andre bokse på denne enhed at importere fra. Gendan først en sikkerhedskopi, så bliver den en boks, du kan importere fra her.",
+        "vaultLabel": "Importér fra",
+        "vaultPlaceholder": "Vælg en boks",
+        "passwordLabel": "Adgangskoden til den boks",
+        "phraseLabel": "Gendannelsessætningen på 24 ord til den boks",
+        "wordAria": "Ord {{number}} af 24",
+        "usePhrase": "Brug gendannelsessætningen i stedet",
+        "usePassword": "Brug adgangskoden i stedet",
+        "importLabel": "Navngiv denne import",
+        "importLabelHint": "Hvis en note, du importerer, har samme navn som en, du allerede har, og noget, du importerer, linker til den, omdøbes den importerede med dette. Behold det samme navn, hvis du kører denne import igen, så bliver intet hentet ind to gange.",
+        "importLabelIllegal": "Det navn kan ikke bruges: et notenavn må ikke indeholde \\ / | # ^ [ ], eller begynde eller slutte med et mellemrum.",
+        "opening": "Åbner…",
+        "unnamedVault": "Boks {{n}}",
+        "errors": {
+          "credential": "Den adgangskode eller gendannelsessætning åbnede ikke boksen. Tjek den, og prøv igen.",
+          "busy": "En anden handling på boksen er i gang. Vent, til den er færdig, og prøv igen.",
+          "alreadyOpen": "Den boks er allerede åben for en import. Afslut eller annullér den import først."
+        },
+        "done": {
+          "sourceUnchanged": "Den boks, du importerede fra, er ikke blevet ændret. Hvis du synkroniserer den, bliver den ved med at synkronisere.",
+          "historyStays": "Versionshistorikken bliver i den boks, du importerede fra."
+        },
+        "report": {
+          "trashedLeftBehind": "Noter i kildeboksens papirkurv, efterladt",
+          "templatesLeftBehind": "Skabeloner, efterladt",
+          "untitledImported": "Noter uden titel taget med",
+          "attachmentsCrossed": "Vedhæftede filer taget med",
+          "attachmentsDeduped": "Vedhæftede filer, du allerede havde",
+          "attachmentsFailed": "Vedhæftede filer, boksen ikke ville acceptere",
+          "linksRetargeted": "Links, der blev omdirigeret til en omdøbt note",
+          "tombstonedEmbeds": "Indlejringer, hvis fil allerede var slettet i kilden",
+          "dictionaryWordsAdded": "Ord fra ordbogen taget med",
+          "dictionaryUnreadable": "Kildeboksens ordbog kunne ikke læses, så ingen ord blev taget med.",
+          "linksLeftUnresolved": "Links, der ikke kunne omdirigeres til noget"
         }
       }
     },
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Gendannelse annulleret: boksen blev låst.",
       "operationInProgress": "Handling i gang. Vent venligst.",
       "unexpected": "Uventet fejl. Prøv igen.",
-      "vaultNotFound": "Boks-filen blev ikke fundet. Genstart appen."
+      "vaultNotFound": "Boks-filen blev ikke fundet. Genstart appen.",
+      "openAsImportSource": "En import læser denne boks lige nu. Afslut eller annullér den import, og gendan så denne boks."
     },
     "vaultUnreadable": "Boksfilen kan ikke læses. Gendan fra en sikkerhedskopi.",
     "genericError": "Noget gik galt. Prøv igen.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Åbn graf"
     },
     "archive": {
-      "helper": "Lad noter blive flyttet til et arkiv, så de holdes ude af hovedlisten. Slår du dette fra, gendannes alle arkiverede noter til deres mappe, og arkivknapperne skjules.",
+      "helper": "Lad noter blive flyttet til et arkiv, så de holdes ude af hovedlisten. Slår du dette fra, gendannes alle arkiverede noter til deres mappe, alle arkiverede mapper tages ud af arkivet, og arkivknapperne skjules. Det gælder hele boksen, på alle enheder.",
       "label": "Arkivering",
       "off": "Fra",
       "on": "Til",
@@ -3109,7 +3161,8 @@
       "torLabel": "Send synkronisering gennem Tor"
     },
     "prefs": {
-      "saveError": "Kunne ikke gemme indstillingen. Prøv igen."
+      "saveError": "Kunne ikke gemme indstillingen. Prøv igen.",
+      "folderListFull": "Den mappeliste er fuld. Fjern en mappe fra den, før du tilføjer en ny."
     },
     "reminders": {
       "aria": "Vis opgavepåmindelser på denne enhed",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "På en enhed med en brugbar nøglering viser boksvælgeren en boks' navn, når denne enhed har låst den op. Når dette er slået til, viser hver boks i stedet en pladsholder som Boks 2, og det nummer følger boksen, uanset hvordan listen omrokeres.",
       "hideVaultNamesErases": "Når du slår det til, destrueres de nøgler, der gør de navne, som er gemt her, læsbare, så de navne ikke kan gendannes på denne enhed, og der skrives ikke flere navne, så længe det er slået til.",
       "hideVaultNamesResidue": "Det gælder ikke en kopi, der er taget tidligere: en fuld systemsikkerhedskopi, et diskbillede eller enhver anden kopi af denne disk på systemniveau, der er lavet, mens navnene blev vist, indeholder både de gemte navne og deres nøgler.",
-      "hideVaultNamesUnavailable": "Denne enhed har ingen brugbar nøglering, så Myne gemmer ingen boksnavne her, og denne indstilling kan ikke slås til. Vælgeren viser allerede en pladsholder for hver boks.",
+      "hideVaultNamesUnavailable": "Myne kan ikke gemme boksnavne i denne kopi af appen, så den gemmer ingen her, og denne indstilling kan ikke slås til. Vælgeren viser allerede en pladsholder for hver boks.",
       "hideVaultNamesErrorRead": "Kunne ikke læse den nuværende indstilling. Slå kontakten om for at sætte den igen.",
       "hideVaultNamesErrorSave": "Kunne ikke gemme indstillingen, så den er uændret. Hvis du var ved at slå den til, kan nogle gemte navne allerede være destrueret; slå den til igen for at gøre det færdigt.",
       "hideVaultNamesErrorErase": "Et gemt navn kunne ikke destrueres, så indstillingen blev efterladt slået fra i stedet for at påstå en sletning, der ikke skete. Prøv igen.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 t",
       "quickUnlockSubtitleAndroid": "Indtast igen med en PIN efter automatisk låsning",
-      "quickUnlockSubtitle": "Indtast igen med {{method}} eller en PIN efter automatisk låsning"
+      "quickUnlockSubtitle": "Indtast igen med {{method}} eller en PIN efter automatisk låsning",
+      "screenCaptureOverrideLabel": "Tillad skærmoptagelse på denne enhed",
+      "screenCaptureOverrideHelper": "Slår beskyttelse mod skærmoptagelse fra på denne enhed alene — både før du låser en boks op og efter. Slå denne indstilling til, hvis et skærmforstørrelsesprogram, et fjernskrivebordsprogram eller en, der hjælper dig på afstand, ser et sort vindue. Den synkroniseres ikke.",
+      "screenCaptureOverrideUnknown": "Denne enheds indstilling for skærmoptagelse kunne ikke læses, så denne indstilling anvendes ikke. Åbn Indstillinger igen for at prøve på ny.",
+      "screenCaptureSuperseded": "Slået fra på denne enhed. Se “Tillad skærmoptagelse på denne enhed” nedenfor. Denne indstilling bevares og gælder igen, når du slår den mulighed fra.",
+      "screenCaptureSupersededByFlag": "Slået fra i denne session, fordi Myne blev startet med --disable-screen-capture-protection. Denne indstilling bevares og gælder igen, næste gang du åbner Myne uden det."
     },
     "quickUnlock": {
       "errorBusy": "En anden handling på boksen er i gang. Prøv igen om et øjeblik.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "ny note placering mappe standard hvor oprettes noter",
         "torRouting": "tor routing onion proxy netværk ip-adresse placering skjul synkronisering anonymitet",
         "quickUnlock": "hurtig oplåsning pin touch id biometrisk ansigt lås op",
-        "reminders": "påmindelser notifikation besked alarm opgave forfald påmind reminders",
+        "reminders": "påmindelser notifikation besked alarm opgave forfald påmind horisont registrering forud dage reminders",
         "realtimeSync": "realtid realtidssynkronisering synkronisering live forbindelse polling sync",
         "screenCapture": "skærmoptagelse skærmbillede beskyttelse optagelse bloker privatliv screenshot",
         "showEditTimes": "vis redigeringstidspunkter tidsstempler ændret datoer noter timestamps",
@@ -3402,7 +3460,8 @@
         "timeFormat": "tidsformat klokkeslæt 24 timer 12 timer ur am pm time format",
         "timezone": "tidszone zone tz utc iana region i dag timezone",
         "periodicNotes": "periodiske noter ugentlig månedlig uge måned mappe skabelon format",
-        "aiHistoryBudget": "samtale historik kontekst hukommelse budget tegn agent chat forespørgsel"
+        "aiHistoryBudget": "samtale historik kontekst hukommelse budget tegn agent chat forespørgsel",
+        "screenCaptureOverride": "skærmoptagelse tilsidesæt tillad deaktiver forstørrelse skærmforstørrelse fjernskrivebord tilgængelighed oplåsning låseskærm sort screen capture override"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24-timers",
       "time12": "12-timers",
       "zoneLabel": "Tidszone",
-      "zoneHelper": "Hvilken zone der afgør, hvad der tæller som i dag. Lad feltet stå tomt for at følge denne enhed. Klokkeslæt, du skriver i en note, ændres aldrig; 09:00 er 09:00 alle steder.",
+      "zoneHelper": "Hvilken zone der afgør, hvad der tæller som i dag, og dermed hvilken note dine daglige, ugentlige og månedlige noter åbner. Lad feltet stå tomt for at følge denne enhed. Valget afgøres pr. enhed: ingen anden enhed overskriver det, så en tilsidesættelse kan sætte denne enhed på en anden dag end dine andre. Klokkeslæt, du skriver i en note, ændres aldrig; 09:00 er 09:00 alle steder.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kender ikke den tidszone. Brug et navn som Europe/Berlin.",
       "errorSave": "Kunne ikke gemme den indstilling."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Denne boks kræver {{required}} MiB hukommelse for at kunne åbnes, mere end denne browser kan give den ({{available}} MiB). Der er ikke noget galt med boksen; åbn den i Mynes desktop-app.",
       "unexpected": "Uventet fejl. Prøv igen.",
       "vaultNotFound": "Boks-filen blev ikke fundet. Genstart appen.",
-      "vaultUpgraded": "Denne boks blev opgraderet til et nyere format, som denne version af Myne endnu ikke understøtter. Der er ikke noget galt med dine data. Opdatér Myne til den nyeste version for at åbne den."
+      "vaultUpgraded": "Denne boks blev opgraderet til et nyere format, som denne version af Myne endnu ikke understøtter. Der er ikke noget galt med dine data. Opdatér Myne til den nyeste version for at åbne den.",
+      "openAsImportSource": "En import læser denne boks lige nu. Afslut eller annullér den import, og lås så denne boks op."
     },
     "passwordLabel": "Adgangskode",
     "passwordPlaceholder": "Adgangskode",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Denne browser stiller ikke en kryptografisk kilde til tilfældige tal til rådighed."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableTitle": "Slå beskyttelse mod skærmoptagelse fra?",
+    "disableTrigger": "Slå beskyttelse mod skærmoptagelse fra",
+    "disableBody": "Beskyttelse mod skærmoptagelse beder styresystemet om at holde dette vindue ude af skærmbilleder og skærmoptagelser. Den virker på Windows 10 (May 2020 Update) og nyere; macOS og Linux har ikke noget system-API til det, så der kan den ikke blokere optagelse. Dér, hvor den virker, skjuler den også vinduet for fjernskrivebordsprogrammer og skærmforstørrelsesprogrammer, og det er derfor, denne udvej findes.",
+    "disableCost": "Når du slår den fra, gælder det kun denne enhed, og den forbliver slået fra, indtil du slår den til igen — både før du låser en boks op og efter. Intet sendes nogen steder hen, og ingen boksindstilling ændres, men valget gemmes i en indstillingsfil på denne enhed, og den fil bliver liggende, efter at du har slået beskyttelsen til igen.",
+    "disableConfirm": "Slå beskyttelsen fra",
+    "restoreTitle": "Slå beskyttelse mod skærmoptagelse til igen?",
+    "restoreTrigger": "Slå beskyttelse mod skærmoptagelse til",
+    "restoreBody": "Beskyttelse mod skærmoptagelse er slået fra på denne enhed. Når du slår den til igen, bliver styresystemet igen bedt om at holde dette vindue ude af skærmbilleder og skærmoptagelser, hvilket på Windows 10 (May 2020 Update) og nyere også skjuler det for fjernskrivebordsprogrammer og skærmforstørrelsesprogrammer. På macOS og Linux findes der ikke noget system-API til det, så der kan den ikke blokere optagelse.",
+    "restoreConfirm": "Slå beskyttelsen til",
+    "flagNotice": "Denne session blev startet med --disable-screen-capture-protection, så beskyttelsen forbliver slået fra, indtil du afslutter, uanset hvad denne indstilling siger.",
+    "savedForNextLaunch": "Gemt. Denne session har stadig beskyttelsen slået fra, fordi den blev startet med --disable-screen-capture-protection, så den kommer tilbage, næste gang du åbner Myne uden det.",
+    "saveFailed": "Det kunne ikke gemmes, så intet blev ændret. Prøv igen, eller start Myne med --disable-screen-capture-protection."
   }
 }

@@ -260,7 +260,7 @@
       "title": "Ekler",
       "transcribeDone": "Yazıya dökme tamamlandı.",
       "transcribeFailed": "Yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
-      "transcribeTooLong": "Bu kayıt yazıya dökülemeyecek kadar uzun.",
+      "transcribeTooLong": "Bu kayıt yazıya dökülemeyecek kadar uzun. Ses ekli kalır, yani onu yine de dinleyebilirsiniz.",
       "transcribeFeatureOff": "Konuşmadan metne kapalı. Ayarlar → Yazıya dökme bölümünden açın.",
       "transcribeModelLoadFailed": "Konuşmadan metne modeli yüklenemedi. Myne’i yeniden kurun ya da Ayarlar → Geliştirici → Yapay Zeka bölümündeki özel modelinizi kontrol edin.",
       "transcribeNoModelHint": "Konuşmadan metne modeli eksik. Myne’i yeniden kurmak onu geri getirir.",
@@ -440,7 +440,7 @@
         "label": "Yapay zeka özelliklerini aç/kapat (beta)"
       },
       "toggleScreenCapture": {
-        "label": "Ekran yakalama korumasını aç/kapat"
+        "label": "Ekran görüntüsü korumasını aç/kapat"
       },
       "cycleTheme": {
         "label": "Temayı değiştir"
@@ -1830,7 +1830,9 @@
       "moveCollision": "Orada bu adda bir klasör zaten var.",
       "unsettledSave": "Açık bir notun kaydedilmesi henüz bitmedi, bu yüzden klasöre dokunulmadı. Bittiğinde tekrar deneyin.",
       "renameFailed": "Klasör yeniden adlandırılamadı, bu yüzden değişmeden kaldı.",
-      "deliberateWriteFailed": "Klasör yeniden adlandırıldı ancak ayarlarından biri kaydedilemedi. Kasanın kilidini her açışınızda eski adla boş bir klasör yeniden belirecek; onu silmek güvenlidir ve başka hiçbir şeyi değiştirmez. Klasörü yeniden adlandırmak bunu temizlemez."
+      "deliberateWriteFailed": "Klasör yeniden adlandırıldı ancak ayarlarından biri kaydedilemedi. Kasanın kilidini her açışınızda eski adla boş bir klasör yeniden belirecek; onu silmek güvenlidir ve başka hiçbir şeyi değiştirmez. Klasörü yeniden adlandırmak bunu temizlemez.",
+      "folderListFull": "Myne yalnızca sınırlı sayıda klasörü hatırlayabilir ve o liste dolu. Bu klasör yine de çalışır, ancak içindeki son not ondan ayrıldığında kaybolacak. Artık ihtiyacınız olmayan bir klasörü silmek yer açar.",
+      "folderNotRemembered": "Klasör oluşturuldu ancak Myne onu kaydedemedi. İçindeki son not ondan ayrıldığında kaybolacak ve hâlâ boşsa bir sonraki kilit açılışında gitmiş olacak. Yeniden oluşturmak güvenlidir."
     },
     "folderNote": {
       "defaultTitle": "Dizin"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne’in bu dosyayı okuma izni yoktu.",
         "reasonNotFound": "Myne bu dosyaya ulaştığında dosya gitmişti.",
         "reasonNoSpace": "Bu cihazda yer kalmadı.",
-        "reasonUnknown": "Myne nedenini söyleyemedi."
+        "reasonUnknown": "Myne nedenini söyleyemedi.",
+        "foldersNotKeptNote": "{{count}} tanesi, içindeki son not ayrıldığında kaybolacak",
+        "foldersNotKeptNote_one": "{{count}} tanesi, içindeki son not ayrıldığında kaybolacak",
+        "foldersNotKeptNote_other": "{{count}} tanesi, içindeki son not ayrıldığında kaybolacak",
+        "statFoldersNotKept": "Korunmayan klasörler"
       },
       "offer": {
         "body": "Mevcut notlarınızı Myne’e getirin. Her biri içe aktarılırken şifrelenir. Hiçbir şey bu cihazdan ayrılmaz ve özgün dosyalarınız tam olduğu yerde kalır.",
@@ -2021,7 +2027,52 @@
           "survives": "Tabloyu tutan tek bir nota dönüşür.",
           "loses": "Bu tek bir nottur, satır başına bir not değil: Myne bir veritabanı değildir. Çok geniş veya çok uzun dosyalar kırpılır ve içe aktarma raporu ne kadar kırpıldığını söyler.",
           "short": "Tek bir hesap tablosu dosyası"
+        },
+        "myne": {
+          "label": "Myne kasası",
+          "loses": "Sürüm geçmişi, silinen notlar ve şablonlar kaynak kasada kalır. İçe aktarılan hiçbir notun kullanmadığı ekler geride bırakılır. Kaynak kasa değiştirilmez ve onu eşitliyorsanız eşitlenmeye devam eder.",
+          "pickerTitle": "Kaynak kasayı seçin",
+          "short": "Bu cihazdaki başka bir kasa",
+          "survives": "Notlar, klasörler, etiketler, içe aktardığınız notlar arasındaki bağlantılar ve o notların kullandığı ekler. Kaynak kasanın sözlüğüne eklediğiniz sözcükler de gelir."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Sürüm geçmişi, içe aktarma yaptığınız kasada kalır.",
+          "sourceUnchanged": "İçe aktarma yaptığınız kasa değiştirilmedi. Onu eşitliyorsanız eşitlenmeye devam eder."
+        },
+        "errors": {
+          "alreadyOpen": "O kasa zaten bir içe aktarma için açık. Önce onu bitirin ya da iptal edin.",
+          "busy": "Başka bir kasa işlemi sürüyor. Bitmesini bekleyip tekrar deneyin.",
+          "credential": "Bu parola ya da kurtarma ifadesi kasayı açmadı. Kontrol edip tekrar deneyin."
+        },
+        "importLabel": "Bu içe aktarmaya ad verin",
+        "importLabelHint": "İçe aktardığınız bir notun adı, zaten sahip olduğunuz bir notun adıyla aynıysa ve içe aktardığınız bir şey ona bağlanıyorsa, içe aktarılan not bu adla yeniden adlandırılır. Bu içe aktarmayı tekrar çalıştırırsanız aynı adı kullanın; böylece hiçbir şey iki kez getirilmez.",
+        "importLabelIllegal": "Bu ad kullanılamaz: bir not adı \\ / | # ^ [ ] içeremez ve başında veya sonunda boşluk olamaz.",
+        "loading": "Diğer kasalarınız aranıyor…",
+        "noOtherVaults": "Bu cihazda içe aktarma yapabileceğiniz başka bir kasa yok. Önce bir yedeği geri yükleyin; o yedek, buradan içe aktarabileceğiniz bir kasaya dönüşür.",
+        "opening": "Açılıyor…",
+        "passwordLabel": "O kasanın parolası",
+        "phraseLabel": "O kasanın 24 sözcüklük kurtarma ifadesi",
+        "report": {
+          "attachmentsCrossed": "Aktarılan ekler",
+          "attachmentsDeduped": "Zaten sahip olduğunuz ekler",
+          "attachmentsFailed": "Kasanın kabul etmediği ekler",
+          "dictionaryUnreadable": "Kaynak kasanın sözlüğü okunamadı, bu yüzden hiçbir sözcük aktarılmadı.",
+          "dictionaryWordsAdded": "Aktarılan sözlük sözcükleri",
+          "linksLeftUnresolved": "Hiçbir yere yönlendirilemeyen bağlantılar",
+          "linksRetargeted": "Yeniden adlandırılmış bir nota yönlendirilen bağlantılar",
+          "templatesLeftBehind": "Geride bırakılan şablonlar",
+          "tombstonedEmbeds": "Dosyası kaynakta zaten silinmiş gömülü içerikler",
+          "trashedLeftBehind": "Kaynak kasanın Çöp Kutusu’nda geride bırakılan notlar",
+          "untitledImported": "Aktarılan başlıksız notlar"
+        },
+        "unnamedVault": "Kasa {{n}}",
+        "usePassword": "Bunun yerine parolayı kullan",
+        "usePhrase": "Bunun yerine kurtarma ifadesini kullan",
+        "vaultLabel": "Kaynak kasa",
+        "vaultPlaceholder": "Bir kasa seçin",
+        "wordAria": "24 sözcükten {{number}}. sözcük"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Kurtarma iptal edildi: kasa kilitliydi.",
       "operationInProgress": "İşlem sürüyor. Lütfen bekleyin.",
       "unexpected": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
-      "vaultNotFound": "Kasa dosyası bulunamadı. Lütfen uygulamayı yeniden başlatın."
+      "vaultNotFound": "Kasa dosyası bulunamadı. Lütfen uygulamayı yeniden başlatın.",
+      "openAsImportSource": "Şu anda bir içe aktarma bu kasayı okuyor. O içe aktarmayı bitirin ya da iptal edin, sonra bu kasayı kurtarın."
     },
     "vaultUnreadable": "Kasa dosyası okunamıyor. Bir yedekten geri yükleyin.",
     "genericError": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Grafiği aç"
     },
     "archive": {
-      "helper": "Notların, ana listeden ayrı tutulan bir Arşiv’e taşınmasına izin verin. Bunu kapatmak arşivlenmiş her notu kendi klasörüne geri yükler ve arşiv denetimlerini gizler.",
+      "helper": "Notların, ana listeden ayrı tutulan bir Arşiv’e taşınmasına izin verin. Bunu kapatmak arşivlenmiş her notu kendi klasörüne geri yükler, arşivlenmiş her klasörü arşivden çıkarır ve arşiv denetimlerini gizler. Tüm kasa için, her cihazda geçerlidir.",
       "label": "Arşivleme",
       "off": "Kapalı",
       "on": "Açık",
@@ -3109,7 +3161,8 @@
       "torLabel": "Eşitlemeyi Tor üzerinden yönlendir"
     },
     "prefs": {
-      "saveError": "Tercih kaydedilemedi. Tekrar deneyin."
+      "saveError": "Tercih kaydedilemedi. Tekrar deneyin.",
+      "folderListFull": "Bu klasör listesi dolu. Başka bir klasör eklemeden önce listeden bir klasör çıkarın."
     },
     "reminders": {
       "aria": "Bu cihazda görev hatırlatıcılarını göster",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "Kullanılabilir bir anahtar zinciri olan cihazlarda, bu cihaz bir kasanın kilidini bir kez açtıktan sonra kasa seçici o kasanın adını gösterir. Bu açıkken her kasa bunun yerine Kasa 2 gibi bir yer tutucu gösterir ve liste nasıl sıralanırsa sıralansın o numara kasada kalır.",
       "hideVaultNamesErases": "Bunu açmak, burada saklanan adları okunabilir kılan anahtarları yok eder; böylece o adlar bu cihazda kurtarılamaz ve ayar açık kaldığı sürece başka bir ad yazılmaz.",
       "hideVaultNamesResidue": "Daha önce alınmış bir kopyaya erişemez: adlar görünürken alınmış bir tam sistem yedeklemesi, bir disk imajı ya da bu diskin sistem düzeyindeki başka herhangi bir kopyası hem saklanan adları hem de anahtarlarını taşır.",
-      "hideVaultNamesUnavailable": "Bu cihazda kullanılabilir bir anahtar zinciri yok, bu yüzden Myne burada hiçbir kasa adı saklamaz ve bu seçenek açılamaz. Seçici zaten her kasa için bir yer tutucu gösteriyor.",
+      "hideVaultNamesUnavailable": "Myne, uygulamanın bu kopyasında kasa adlarını saklayamaz, bu yüzden burada hiçbir kasa adı saklamaz ve bu seçenek açılamaz. Seçici zaten her kasa için bir yer tutucu gösteriyor.",
       "hideVaultNamesErrorRead": "Geçerli ayar okunamadı. Yeniden belirlemek için düğmeyi kapatıp açın.",
       "hideVaultNamesErrorSave": "Ayar kaydedilemedi, bu yüzden değişmedi. Açmaya çalışıyorduysanız saklanan bazı adlar çoktan yok edilmiş olabilir; tamamlamak için yeniden açın.",
       "hideVaultNamesErrorErase": "Saklanan bir ad yok edilemedi; gerçekleşmemiş bir silme iddia edilmesin diye ayar kapalı bırakıldı. Tekrar deneyin.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 dk",
       "autoLock1h": "1 sa",
       "quickUnlockSubtitleAndroid": "Otomatik kilit sonrası PIN ile tekrar girin",
-      "quickUnlockSubtitle": "Otomatik kilit sonrası {{method}} veya PIN ile tekrar girin"
+      "quickUnlockSubtitle": "Otomatik kilit sonrası {{method}} veya PIN ile tekrar girin",
+      "screenCaptureOverrideHelper": "Ekran görüntüsü korumasını yalnızca bu cihazda kapatır; bir kasanın kilidini açmadan önce de sonra da. Bir ekran büyüteci, uzak masaüstü yazılımı ya da size uzaktan yardım eden biri siyah bir pencere görüyorsa bunu açın. Eşitlenmez.",
+      "screenCaptureOverrideLabel": "Bu cihazda ekran yakalamaya izin ver",
+      "screenCaptureOverrideUnknown": "Bu cihazın ekran yakalama ayarı okunamadı, bu yüzden bu tercih uygulanmıyor. Tekrar denemek için Ayarlar’ı yeniden açın.",
+      "screenCaptureSuperseded": "Bu cihazda kapalı. Aşağıdaki “Bu cihazda ekran yakalamaya izin ver” ayarına bakın. Bu tercih korunur ve o ayarı kapattığınızda yeniden geçerli olur.",
+      "screenCaptureSupersededByFlag": "Bu oturum için kapalı, çünkü Myne --disable-screen-capture-protection ile başlatıldı. Bu tercih korunur ve Myne’i bu seçenek olmadan bir dahaki açışınızda yeniden geçerli olur."
     },
     "quickUnlock": {
       "errorBusy": "Başka bir kasa işlemi sürüyor. Birazdan tekrar deneyin.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "yeni not konumu klasör varsayılan nerede oluşturulur new note location default",
         "torRouting": "tor yönlendirme onion vekil sunucu ağ ip adresi konum gizle eşitleme anonimlik proxy",
         "quickUnlock": "hızlı kilit açma pin touch id biyometrik yüz parmak izi face id unlock",
-        "reminders": "hatırlatıcı hatırlatıcılar bildirim uyarı görev son tarih hatırlat reminders notify",
+        "reminders": "hatırlatıcı hatırlatıcılar bildirim uyarı görev son tarih hatırlat önceden planla kayıt gün horizon reminders notify",
         "realtimeSync": "gerçek zamanlı eşitleme canlı bağlantı yoklama sync realtime live",
         "screenCapture": "ekran yakalama koruma ekran görüntüsü kayıt engelle gizlilik screenshot capture",
         "showEditTimes": "düzenleme zamanları zaman damgaları değiştirilme tarih notlar timestamps modified",
@@ -3402,7 +3460,8 @@
         "timeFormat": "saat biçimi 24 saat 12 saat öğleden önce öğleden sonra am pm time format clock",
         "timezone": "saat dilimi zaman dilimi tz utc iana bölge bugün timezone",
         "periodicNotes": "periyodik notlar haftalık aylık hafta ay klasör şablon biçim",
-        "aiHistoryBudget": "konuşma geçmiş bağlam bellek bütçe karakter ajan sohbet istek"
+        "aiHistoryBudget": "konuşma geçmiş bağlam bellek bütçe karakter ajan sohbet istek",
+        "screenCaptureOverride": "ekran yakalama geçersiz kıl izin ver kapat büyüteç ekran büyüteci uzak masaüstü erişilebilirlik kilit açma siyah ekran screen capture remote desktop override"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24 saat",
       "time12": "12 saat",
       "zoneLabel": "Saat dilimi",
-      "zoneHelper": "Hangi günün bugün sayılacağına karar veren saat dilimi. Bu cihazın saat dilimini kullanmak için boş bırakın. Bir notta yazdığınız saatler asla değiştirilmez; 09:00 her yerde 09:00 kalır.",
+      "zoneHelper": "Hangi günün bugün sayılacağına ve dolayısıyla günlük, haftalık ve aylık notlarınızın hangi notu açacağına karar veren saat dilimi. Bu cihazın saat dilimini kullanmak için boş bırakın. Seçim her cihazda ayrı yerleşir: başka hiçbir cihaz onun üzerine yazmaz, bu yüzden buradaki bir seçim bu cihazı diğerlerinden farklı bir güne koyabilir. Bir notta yazdığınız saatler asla değiştirilmez; 09:00 her yerde 09:00 kalır.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne bu saat dilimini tanımıyor. Europe/Berlin gibi bir ad kullanın.",
       "errorSave": "Bu ayar kaydedilemedi."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Bu kasanın açılması için {{required}} MiB bellek gerekir, bu tarayıcının verebileceğinden ({{available}} MiB) fazlası. Kasada bir sorun yok; onu Myne masaüstü uygulamasında açın.",
       "unexpected": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
       "vaultNotFound": "Kasa dosyası bulunamadı. Lütfen uygulamayı yeniden başlatın.",
-      "vaultUpgraded": "Bu kasa, Myne’in bu sürümünün henüz desteklemediği daha yeni bir biçime yükseltildi. Verilerinizde bir sorun yok. Açmak için Myne’i en son sürüme güncelleyin."
+      "vaultUpgraded": "Bu kasa, Myne’in bu sürümünün henüz desteklemediği daha yeni bir biçime yükseltildi. Verilerinizde bir sorun yok. Açmak için Myne’i en son sürüme güncelleyin.",
+      "openAsImportSource": "Şu anda bir içe aktarma bu kasayı okuyor. O içe aktarmayı bitirin ya da iptal edin, sonra bu kasanın kilidini açın."
     },
     "passwordLabel": "Parola",
     "passwordPlaceholder": "Parola",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Bu tarayıcı kriptografik bir rastgele sayı kaynağı sağlamıyor."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Ekran görüntüsü koruması, işletim sisteminden bu pencereyi ekran görüntülerinin ve ekran kayıtlarının dışında tutmasını ister. Windows 10’da (Mayıs 2020 Güncellemesi) ve sonrasında etkilidir; macOS ve Linux bunun için bir sistem API’si sunmaz, bu yüzden orada yakalamayı engelleyemez. Çalıştığı yerlerde pencereyi gizlediği şeyler arasında uzak masaüstü yazılımları ve ekran büyüteçleri de vardır; bu çıkış yolu da bu yüzden var.",
+    "disableConfirm": "Korumayı kapat",
+    "disableCost": "Kapatmak yalnızca bu cihaz için geçerlidir ve siz yeniden açana kadar kapalı kalır; bir kasanın kilidini açmadan önce de sonra da. Hiçbir yere hiçbir şey gönderilmez ve hiçbir kasa ayarı değişmez, ancak bu tercih bu cihazdaki bir ayar dosyasına kaydedilir ve korumayı yeniden açtıktan sonra da o dosya orada kalır.",
+    "disableTitle": "Ekran görüntüsü koruması kapatılsın mı?",
+    "disableTrigger": "Ekran görüntüsü korumasını kapat",
+    "flagNotice": "Bu oturum --disable-screen-capture-protection ile başlatıldı, bu yüzden bu ayar ne derse desin, siz uygulamadan çıkana kadar koruma kapalı kalır.",
+    "restoreBody": "Ekran görüntüsü koruması bu cihazda kapalı. Yeniden açmak, işletim sisteminden bu pencereyi tekrar ekran görüntülerinin ve ekran kayıtlarının dışında tutmasını ister; Windows 10’da (Mayıs 2020 Güncellemesi) ve sonrasında bu, pencereyi uzak masaüstü yazılımlarından ve ekran büyüteçlerinden de gizler. macOS ve Linux’ta bunun için bir sistem API’si yoktur, bu yüzden orada yakalamayı engelleyemez.",
+    "restoreConfirm": "Korumayı aç",
+    "restoreTitle": "Ekran görüntüsü koruması yeniden açılsın mı?",
+    "restoreTrigger": "Ekran görüntüsü korumasını aç",
+    "saveFailed": "Bu kaydedilemedi, bu yüzden hiçbir şey değişmedi. Tekrar deneyin ya da Myne’i --disable-screen-capture-protection ile başlatın.",
+    "savedForNextLaunch": "Kaydedildi. Bu oturumda koruma hâlâ kapalı, çünkü oturum --disable-screen-capture-protection ile başlatıldı; Myne’i bu seçenek olmadan bir dahaki açışınızda koruma geri gelir."
   }
 }

@@ -286,7 +286,7 @@
       "title": "Pièces jointes",
       "transcribeDone": "Transcription terminée.",
       "transcribeFailed": "La transcription a échoué. Veuillez réessayer.",
-      "transcribeTooLong": "Cet enregistrement est trop long pour être transcrit.",
+      "transcribeTooLong": "Cet enregistrement est trop long pour être transcrit. L'audio reste en pièce jointe, vous pouvez donc toujours l'écouter.",
       "transcribeFeatureOff": "La reconnaissance vocale est désactivée. Activez-la dans Paramètres → Transcription.",
       "transcribeModelLoadFailed": "Impossible de charger le modèle de reconnaissance vocale. Réinstallez Myne, ou vérifiez votre modèle personnalisé dans Paramètres → Développeur → IA.",
       "transcribeNoModelHint": "Le modèle de reconnaissance vocale est manquant. Réinstaller Myne le rétablit.",
@@ -1900,7 +1900,9 @@
       "moveCollision": "Un dossier portant ce nom existe déjà à cet endroit.",
       "unsettledSave": "Une note ouverte n'a pas fini d'être enregistrée, le dossier n'a donc pas été modifié. Réessayez une fois que ce sera fait.",
       "renameFailed": "Impossible de renommer le dossier, il est donc inchangé.",
-      "deliberateWriteFailed": "Le dossier a été renommé, mais l'un de ses réglages n'a pas pu être enregistré. Un dossier vide réapparaîtra sous l'ancien nom à chaque déverrouillage ; vous pouvez le supprimer sans risque, cela ne change rien d'autre. Renommer le dossier à nouveau ne le fera pas disparaître."
+      "deliberateWriteFailed": "Le dossier a été renommé, mais l'un de ses réglages n'a pas pu être enregistré. Un dossier vide réapparaîtra sous l'ancien nom à chaque déverrouillage ; vous pouvez le supprimer sans risque, cela ne change rien d'autre. Renommer le dossier à nouveau ne le fera pas disparaître.",
+      "folderListFull": "Myne ne peut mémoriser qu'un nombre limité de dossiers, et cette liste est pleine. Ce dossier fonctionne toujours, mais il disparaîtra quand sa dernière note en sortira. Supprimer un dossier dont vous n'avez plus besoin libère de la place.",
+      "folderNotRemembered": "Le dossier a été créé, mais Myne n'a pas pu l'enregistrer. Il disparaîtra quand sa dernière note en sortira, et il aura disparu au prochain déverrouillage s'il est encore vide. Vous pouvez le recréer sans risque."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2050,7 +2052,12 @@
         "reasonPermissionDenied": "Myne n'a pas été autorisé à lire ce fichier.",
         "reasonNotFound": "Ce fichier avait disparu lorsque Myne y est arrivé.",
         "reasonNoSpace": "Cet appareil n'a plus d'espace disponible.",
-        "reasonUnknown": "Myne n'a pas pu en dire la raison."
+        "reasonUnknown": "Myne n'a pas pu en dire la raison.",
+        "foldersNotKeptNote": "{{count}} disparaîtront quand leur dernière note en sortira",
+        "foldersNotKeptNote_one": "{{count}} disparaîtra quand sa dernière note en sortira",
+        "foldersNotKeptNote_many": "{{count}} disparaîtront quand leur dernière note en sortira",
+        "foldersNotKeptNote_other": "{{count}} disparaîtront quand leur dernière note en sortira",
+        "statFoldersNotKept": "Dossiers non conservés"
       },
       "offer": {
         "body": "Importez vos notes existantes dans Myne. Chacune est chiffrée au moment de l'import. Rien ne quitte cet appareil, et vos fichiers d'origine restent exactement où ils sont.",
@@ -2097,7 +2104,52 @@
           "survives": "Devient une seule note contenant le tableau.",
           "loses": "C'est une seule note, pas une note par ligne : Myne n'est pas une base de données. Les fichiers très larges ou très longs sont tronqués, et le rapport d'importation indique dans quelle mesure.",
           "short": "Un seul fichier de feuille de calcul"
+        },
+        "myne": {
+          "label": "Coffre-fort Myne",
+          "loses": "L'historique des versions, les notes supprimées et les modèles restent dans le coffre-fort source. Les pièces jointes qu'aucune note importée n'utilise sont laissées de côté. Le coffre-fort source n'est pas modifié et, si vous le synchronisez, il continue de se synchroniser.",
+          "pickerTitle": "Choisissez le coffre-fort depuis lequel importer",
+          "short": "Un autre coffre-fort sur cet appareil",
+          "survives": "Les notes, les dossiers, les étiquettes, les liens entre les notes que vous importez, et les pièces jointes que ces notes utilisent. Les mots que vous avez ajoutés au dictionnaire du coffre-fort source sont importés eux aussi."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "L'historique des versions reste dans le coffre-fort depuis lequel vous avez importé.",
+          "sourceUnchanged": "Le coffre-fort depuis lequel vous avez importé n'a pas été modifié. Si vous le synchronisez, il continue de se synchroniser."
+        },
+        "errors": {
+          "alreadyOpen": "Ce coffre-fort est déjà ouvert pour une importation. Terminez ou annulez d'abord celle qui est en cours.",
+          "busy": "Une autre opération sur le coffre-fort est en cours. Attendez qu'elle se termine, puis réessayez.",
+          "credential": "Ce mot de passe ou cette phrase de récupération n'a pas ouvert le coffre-fort. Vérifiez votre saisie et réessayez."
+        },
+        "importLabel": "Nommez cette importation",
+        "importLabelHint": "Si une note que vous importez porte le même nom qu'une note que vous avez déjà, et qu'un élément importé pointe vers elle, la note importée est renommée avec le nom que vous saisissez ici. Conservez le même nom si vous relancez cette importation, et rien ne sera importé deux fois.",
+        "importLabelIllegal": "Ce nom ne peut pas être utilisé : un nom de note ne peut pas contenir \\ / | # ^ [ ] ni commencer ou finir par un espace.",
+        "loading": "Recherche de vos autres coffres-forts…",
+        "noOtherVaults": "Il n'y a aucun autre coffre-fort sur cet appareil depuis lequel importer. Restaurez d'abord une sauvegarde : elle devient alors un coffre-fort depuis lequel vous pouvez importer ici.",
+        "opening": "Ouverture…",
+        "passwordLabel": "Mot de passe de ce coffre-fort",
+        "phraseLabel": "Phrase de récupération de 24 mots de ce coffre-fort",
+        "report": {
+          "attachmentsCrossed": "Pièces jointes importées",
+          "attachmentsDeduped": "Pièces jointes que vous aviez déjà",
+          "attachmentsFailed": "Pièces jointes refusées par le coffre-fort",
+          "dictionaryUnreadable": "Le dictionnaire du coffre-fort source n'a pas pu être lu, aucun mot n'a donc été importé.",
+          "dictionaryWordsAdded": "Mots du dictionnaire importés",
+          "linksLeftUnresolved": "Liens qui n'ont pu être dirigés nulle part",
+          "linksRetargeted": "Liens redirigés vers une note renommée",
+          "templatesLeftBehind": "Modèles, laissés de côté",
+          "tombstonedEmbeds": "Contenus intégrés dont le fichier était déjà supprimé dans la source",
+          "trashedLeftBehind": "Notes dans la corbeille du coffre-fort source, laissées de côté",
+          "untitledImported": "Notes sans titre importées"
+        },
+        "unnamedVault": "Coffre-fort {{n}}",
+        "usePassword": "Utiliser plutôt le mot de passe",
+        "usePhrase": "Utiliser plutôt la phrase de récupération",
+        "vaultLabel": "Importer depuis",
+        "vaultPlaceholder": "Choisir un coffre-fort",
+        "wordAria": "Mot {{number}} sur 24"
       }
     },
     "list": {
@@ -2515,7 +2567,8 @@
       "cancelledVaultLocked": "Récupération annulée : le coffre-fort était verrouillé.",
       "operationInProgress": "Opération en cours. Veuillez patienter.",
       "unexpected": "Erreur inattendue. Veuillez réessayer.",
-      "vaultNotFound": "Fichier du coffre-fort introuvable. Veuillez redémarrer l'application."
+      "vaultNotFound": "Fichier du coffre-fort introuvable. Veuillez redémarrer l'application.",
+      "openAsImportSource": "Une importation est en train de lire ce coffre-fort. Terminez ou annulez cette importation, puis récupérez ce coffre-fort."
     },
     "vaultUnreadable": "Le fichier du coffre-fort est illisible. Restaurez depuis une sauvegarde.",
     "genericError": "Une erreur s'est produite. Veuillez réessayer.",
@@ -2756,7 +2809,7 @@
       "openGraph": "Ouvrir le graphe"
     },
     "archive": {
-      "helper": "Permet de déplacer des notes vers une archive, à l'écart de la liste principale. Désactiver cette option restaure chaque note archivée dans son dossier et masque les commandes d'archivage.",
+      "helper": "Permet de déplacer des notes vers une archive, à l'écart de la liste principale. Désactiver cette option restaure chaque note archivée dans son dossier, désarchive chaque dossier archivé et masque les commandes d'archivage. Elle s'applique à tout le coffre-fort, sur tous les appareils.",
       "label": "Archivage",
       "off": "Désactivé",
       "on": "Activé",
@@ -3215,7 +3268,8 @@
       "torLabel": "Faire passer la synchronisation par Tor"
     },
     "prefs": {
-      "saveError": "Impossible d'enregistrer la préférence. Réessayez."
+      "saveError": "Impossible d'enregistrer la préférence. Réessayez.",
+      "folderListFull": "Cette liste de dossiers est pleine. Retirez-en un avant d'en ajouter un autre."
     },
     "reminders": {
       "aria": "Afficher les rappels de tâches sur cet appareil",
@@ -3240,7 +3294,7 @@
       "hideVaultNamesHelper": "Sur un appareil doté d'un trousseau de clés utilisable, le sélecteur affiche le nom d'un coffre-fort dès que cet appareil l'a déverrouillé. Avec cette option activée, chaque coffre-fort affiche à la place un nom générique tel que « Coffre-fort 2 », et ce numéro reste attaché au coffre-fort quel que soit le réordonnancement de la liste.",
       "hideVaultNamesErases": "L'activer détruit les clés qui rendent lisibles les noms enregistrés ici : ces noms ne peuvent donc plus être récupérés sur cet appareil, et aucun autre nom n'est écrit tant qu'elle reste activée.",
       "hideVaultNamesResidue": "Elle ne peut pas atteindre une copie faite auparavant : une sauvegarde complète du système, une image disque ou toute autre copie de ce disque effectuée au niveau système pendant que les noms étaient affichés contient à la fois les noms enregistrés et leurs clés.",
-      "hideVaultNamesUnavailable": "Cet appareil ne dispose d'aucun trousseau de clés utilisable : Myne n'y enregistre donc aucun nom de coffre-fort et cette option ne peut pas être activée. Le sélecteur affiche déjà un nom générique pour chaque coffre-fort.",
+      "hideVaultNamesUnavailable": "Cette copie de l'application ne peut pas enregistrer de noms de coffres-forts : Myne n'en enregistre donc aucun ici et cette option ne peut pas être activée. Le sélecteur affiche déjà un nom générique pour chaque coffre-fort.",
       "hideVaultNamesErrorRead": "Impossible de lire le réglage actuel. Basculez l'interrupteur pour le redéfinir.",
       "hideVaultNamesErrorSave": "Impossible d'enregistrer le réglage : il reste donc inchangé. Si vous étiez en train de l'activer, certains noms enregistrés ont peut-être déjà été détruits ; activez-le de nouveau pour terminer.",
       "hideVaultNamesErrorErase": "Un nom enregistré n'a pas pu être détruit : le réglage a donc été laissé désactivé plutôt que d'annoncer un effacement qui n'a pas eu lieu. Réessayez.",
@@ -3258,7 +3312,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 h",
       "quickUnlockSubtitleAndroid": "Déverrouiller de nouveau avec un PIN après le verrouillage automatique",
-      "quickUnlockSubtitle": "Déverrouiller de nouveau avec {{method}} ou un PIN après le verrouillage automatique"
+      "quickUnlockSubtitle": "Déverrouiller de nouveau avec {{method}} ou un PIN après le verrouillage automatique",
+      "screenCaptureOverrideHelper": "Désactive la protection contre la capture d'écran sur cet appareil uniquement, avant le déverrouillage d'un coffre-fort comme après. Activez cette option si une loupe d'écran, un logiciel de bureau à distance ou une personne qui vous aide à distance voit une fenêtre noire. Elle n'est pas synchronisée.",
+      "screenCaptureOverrideLabel": "Autoriser la capture d'écran sur cet appareil",
+      "screenCaptureOverrideUnknown": "Le réglage de capture d'écran de cet appareil n'a pas pu être lu, cette préférence n'est donc pas appliquée. Rouvrez les Paramètres pour réessayer.",
+      "screenCaptureSuperseded": "Désactivée sur cet appareil. Voir « Autoriser la capture d'écran sur cet appareil » ci-dessous. Cette préférence est conservée et s'applique de nouveau lorsque vous désactivez cette autorisation.",
+      "screenCaptureSupersededByFlag": "Désactivée pour cette session, car Myne a été démarré avec --disable-screen-capture-protection. Cette préférence est conservée et s'applique de nouveau la prochaine fois que vous ouvrirez Myne sans cette option."
     },
     "quickUnlock": {
       "errorBusy": "Une autre opération sur le coffre-fort est en cours. Réessayez dans un instant.",
@@ -3484,7 +3543,7 @@
         "newNoteLocation": "emplacement nouvelle note dossier par défaut création notes",
         "torRouting": "tor routage onion proxy réseau adresse ip position masquer synchronisation anonymat",
         "quickUnlock": "déverrouillage rapide pin touch id biométrie visage empreinte",
-        "reminders": "rappels notifier notification alerte tâche échéance rappeler",
+        "reminders": "rappels notifier notification alerte tâche échéance rappeler horizon enregistrement planification avance jours",
         "realtimeSync": "synchronisation temps réel direct connexion présence polling sync realtime",
         "screenCapture": "capture écran protection captures enregistrement bloquer confidentialité screenshot",
         "showEditTimes": "heures de modification horodatages dates notes afficher modifiée",
@@ -3512,7 +3571,8 @@
         "timeFormat": "format d'heure 24 heures 12 heures horloge am pm time format",
         "timezone": "fuseau horaire zone tz utc iana région aujourd'hui timezone",
         "periodicNotes": "notes périodiques hebdomadaire mensuel semaine mois dossier modèle format",
-        "aiHistoryBudget": "conversation historique contexte mémoire budget caractères agent chat requête"
+        "aiHistoryBudget": "conversation historique contexte mémoire budget caractères agent chat requête",
+        "screenCaptureOverride": "capture écran dérogation autoriser désactiver loupe bureau à distance accessibilité déverrouillage écran noir override screen capture"
       }
     },
     "dateTime": {
@@ -3525,7 +3585,7 @@
       "time24": "24 heures",
       "time12": "12 heures",
       "zoneLabel": "Fuseau horaire",
-      "zoneHelper": "Le fuseau qui détermine ce qui compte comme aujourd'hui. Laissez vide pour suivre cet appareil. Les heures que vous écrivez dans une note ne sont jamais modifiées ; 09:00 reste 09:00 partout.",
+      "zoneHelper": "Le fuseau qui détermine ce qui compte comme aujourd'hui, et donc quelle note vos notes quotidiennes, hebdomadaires et mensuelles ouvrent. Laissez vide pour suivre cet appareil. Le choix se règle par appareil : aucun autre appareil ne l'écrase, une valeur définie ici peut donc placer cet appareil sur un jour différent de celui de vos autres appareils. Les heures que vous écrivez dans une note ne sont jamais modifiées ; 09:00 reste 09:00 partout.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne ne connaît pas ce fuseau horaire. Utilisez un nom comme Europe/Berlin.",
       "errorSave": "Impossible d'enregistrer ce paramètre."
@@ -3998,7 +4058,8 @@
       "kdfMemoryExceedsHost": "Ce coffre-fort a besoin de {{required}} MiB de mémoire pour s'ouvrir, plus que ce que ce navigateur peut lui accorder ({{available}} MiB). Le coffre-fort est intact ; ouvrez-le dans l'application de bureau Myne.",
       "unexpected": "Erreur inattendue. Veuillez réessayer.",
       "vaultNotFound": "Fichier du coffre-fort introuvable. Veuillez redémarrer l'application.",
-      "vaultUpgraded": "Ce coffre-fort a été mis à niveau vers un format plus récent que cette version de Myne ne prend pas encore en charge. Vos données sont intactes. Mettez Myne à jour vers la dernière version pour l'ouvrir."
+      "vaultUpgraded": "Ce coffre-fort a été mis à niveau vers un format plus récent que cette version de Myne ne prend pas encore en charge. Vos données sont intactes. Mettez Myne à jour vers la dernière version pour l'ouvrir.",
+      "openAsImportSource": "Une importation est en train de lire ce coffre-fort. Terminez ou annulez cette importation, puis déverrouillez ce coffre-fort."
     },
     "passwordLabel": "Mot de passe",
     "passwordPlaceholder": "Mot de passe",
@@ -4565,5 +4626,19 @@
         "crypto-getrandomvalues": "Ce navigateur ne fournit pas de source cryptographique de nombres aléatoires."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "La protection contre la capture d'écran demande au système d'exploitation de tenir cette fenêtre à l'écart des captures d'écran et des enregistrements d'écran. Elle est effective sur Windows 10 (mise à jour de mai 2020) et versions ultérieures ; macOS et Linux n'offrent aucune API système pour cela, la capture n'y est donc pas bloquée. Là où elle fonctionne, elle masque notamment la fenêtre aux logiciels de bureau à distance et aux loupes d'écran, et c'est pourquoi cette porte de sortie existe.",
+    "disableConfirm": "Désactiver la protection",
+    "disableCost": "La désactiver ne concerne que cet appareil, et la protection reste désactivée jusqu'à ce que vous la réactiviez, avant le déverrouillage d'un coffre-fort comme après. Rien n'est envoyé nulle part et aucun réglage du coffre-fort n'est modifié, mais ce choix est enregistré dans un fichier de réglages sur cet appareil, et ce fichier y reste après que vous avez réactivé la protection.",
+    "disableTitle": "Désactiver la protection contre la capture d'écran ?",
+    "disableTrigger": "Désactiver la protection contre la capture d'écran",
+    "flagNotice": "Cette session a été démarrée avec --disable-screen-capture-protection : la protection reste donc désactivée jusqu'à ce que vous quittiez l'application, quoi que dise ce réglage.",
+    "restoreBody": "La protection contre la capture d'écran est désactivée sur cet appareil. La réactiver demande au système d'exploitation de tenir de nouveau cette fenêtre à l'écart des captures d'écran et des enregistrements d'écran, ce qui, sur Windows 10 (mise à jour de mai 2020) et versions ultérieures, la masque aussi aux logiciels de bureau à distance et aux loupes d'écran. Sur macOS et Linux, il n'existe aucune API système pour cela, la capture n'y est donc pas bloquée.",
+    "restoreConfirm": "Activer la protection",
+    "restoreTitle": "Réactiver la protection contre la capture d'écran ?",
+    "restoreTrigger": "Activer la protection contre la capture d'écran",
+    "saveFailed": "Cela n'a pas pu être enregistré, rien n'a donc changé. Réessayez, ou démarrez Myne avec --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Enregistré. Cette session garde la protection désactivée, car elle a été démarrée avec --disable-screen-capture-protection ; la protection reviendra la prochaine fois que vous ouvrirez Myne sans cette option."
   }
 }

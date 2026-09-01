@@ -286,7 +286,7 @@
       "title": "Anexos",
       "transcribeDone": "Transcrição concluída.",
       "transcribeFailed": "A transcrição falhou. Tente novamente.",
-      "transcribeTooLong": "Esta gravação é demasiado longa para transcrever.",
+      "transcribeTooLong": "Esta gravação é demasiado longa para ser transcrita. O áudio continua anexado, por isso ainda pode reproduzi-lo.",
       "transcribeFeatureOff": "A voz para texto está desligada. Ligue-a em Definições → Transcrição.",
       "transcribeModelLoadFailed": "Não foi possível carregar o modelo de voz para texto. Reinstale o Myne ou verifique o seu modelo personalizado em Definições → Programador → IA.",
       "transcribeNoModelHint": "Falta o modelo de voz para texto. Reinstalar o Myne repõe-no.",
@@ -1900,7 +1900,9 @@
       "moveCollision": "Já existe aí uma pasta com esse nome.",
       "unsettledSave": "Uma nota aberta ainda não terminou de guardar, por isso a pasta ficou como estava. Tente novamente quando terminar.",
       "renameFailed": "Não foi possível mudar o nome da pasta, por isso mantém-se inalterada.",
-      "deliberateWriteFailed": "A pasta mudou de nome, mas não foi possível guardar uma das suas definições. Sempre que desbloquear, uma pasta vazia volta a aparecer com o nome antigo; pode apagá-la em segurança, sem que mais nada mude. Mudar o nome da pasta outra vez não a apaga."
+      "deliberateWriteFailed": "A pasta mudou de nome, mas não foi possível guardar uma das suas definições. Sempre que desbloquear, uma pasta vazia volta a aparecer com o nome antigo; pode apagá-la em segurança, sem que mais nada mude. Mudar o nome da pasta outra vez não a apaga.",
+      "folderListFull": "O Myne só consegue guardar um número limitado de pastas, e essa lista está cheia. Esta pasta continua a funcionar, mas desaparece quando a sua última nota sair dela. Apagar uma pasta de que já não precisa liberta espaço.",
+      "folderNotRemembered": "A pasta foi criada, mas o Myne não conseguiu registá-la. Vai desaparecer quando a sua última nota sair dela e, se ainda estiver vazia, desaparece no próximo desbloqueio. Pode voltar a criá-la em segurança."
     },
     "folderNote": {
       "defaultTitle": "Índice"
@@ -2050,7 +2052,12 @@
         "reasonPermissionDenied": "O Myne não teve permissão para ler este ficheiro.",
         "reasonNotFound": "Este ficheiro já não existia quando o Myne chegou a ele.",
         "reasonNoSpace": "Este dispositivo ficou sem espaço.",
-        "reasonUnknown": "O Myne não conseguiu dizer porquê."
+        "reasonUnknown": "O Myne não conseguiu dizer porquê.",
+        "foldersNotKeptNote": "{{count}} vai desaparecer quando a última nota sair dela",
+        "foldersNotKeptNote_many": "{{count}} vão desaparecer quando a última nota sair de cada uma",
+        "foldersNotKeptNote_one": "{{count}} vai desaparecer quando a última nota sair dela",
+        "foldersNotKeptNote_other": "{{count}} vão desaparecer quando a última nota sair de cada uma",
+        "statFoldersNotKept": "Pastas não mantidas"
       },
       "offer": {
         "body": "Traga as suas notas existentes para o Myne. Cada uma é encriptada à medida que é importada. Nada sai deste dispositivo e os seus ficheiros originais permanecem exatamente onde estão.",
@@ -2097,7 +2104,52 @@
           "survives": "Torna-se uma única nota com a tabela.",
           "loses": "É uma nota, não uma nota por linha: o Myne não é uma base de dados. Os ficheiros muito largos ou muito longos são cortados, e o relatório de importação indica em quanto.",
           "short": "Um ficheiro de folha de cálculo"
+        },
+        "myne": {
+          "label": "Cofre do Myne",
+          "loses": "O histórico de versões, as notas apagadas e os modelos ficam no cofre de origem. Os anexos que nenhuma nota importada usa ficam para trás. O cofre de origem não é alterado e, se o sincronizar, continua a sincronizar.",
+          "pickerTitle": "Escolha o cofre a partir do qual importar",
+          "short": "Outro cofre neste dispositivo",
+          "survives": "As notas, as pastas, as etiquetas, as ligações entre as notas que importa e os anexos que essas notas usam. As palavras que adicionou ao dicionário do cofre de origem também vêm."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "O histórico de versões permanece no cofre a partir do qual importou.",
+          "sourceUnchanged": "O cofre a partir do qual importou não foi alterado. Se o sincronizar, continua a sincronizar."
+        },
+        "errors": {
+          "alreadyOpen": "Esse cofre já está aberto para uma importação. Termine ou cancele essa importação primeiro.",
+          "busy": "Está a decorrer outra operação no cofre. Aguarde que termine e tente novamente.",
+          "credential": "Essa palavra-passe ou frase de recuperação não abriu o cofre. Verifique e tente novamente."
+        },
+        "importLabel": "Dê um nome a esta importação",
+        "importLabelHint": "Se uma nota que importar tiver o mesmo nome de uma que já tem, e algo que importar lhe fizer uma ligação, a nota importada é renomeada com o nome que indicar aqui. Mantenha o mesmo nome se voltar a executar esta importação e nada será trazido duas vezes.",
+        "importLabelIllegal": "Esse nome não pode ser usado: um nome de nota não pode conter \\ / | # ^ [ ], nem começar ou terminar com um espaço.",
+        "loading": "A procurar os seus outros cofres…",
+        "noOtherVaults": "Não há outros cofres neste dispositivo a partir dos quais importar. Restaure primeiro uma cópia de segurança e ela passa a ser um cofre a partir do qual pode importar aqui.",
+        "opening": "A abrir…",
+        "passwordLabel": "Palavra-passe desse cofre",
+        "phraseLabel": "Frase de recuperação de 24 palavras desse cofre",
+        "report": {
+          "attachmentsCrossed": "Anexos trazidos",
+          "attachmentsDeduped": "Anexos que já tinha",
+          "attachmentsFailed": "Anexos que o cofre não aceitou",
+          "dictionaryUnreadable": "Não foi possível ler o dicionário do cofre de origem, por isso não foi trazida nenhuma palavra.",
+          "dictionaryWordsAdded": "Palavras do dicionário trazidas",
+          "linksLeftUnresolved": "Ligações que não foi possível apontar para lado nenhum",
+          "linksRetargeted": "Ligações apontadas para uma nota renomeada",
+          "templatesLeftBehind": "Modelos, deixados para trás",
+          "tombstonedEmbeds": "Incorporações cujo ficheiro já tinha sido apagado na origem",
+          "trashedLeftBehind": "Notas na Lixeira do cofre de origem, deixadas para trás",
+          "untitledImported": "Notas sem título trazidas"
+        },
+        "unnamedVault": "Cofre {{n}}",
+        "usePassword": "Usar a palavra-passe",
+        "usePhrase": "Usar a frase de recuperação",
+        "vaultLabel": "Importar de",
+        "vaultPlaceholder": "Escolha um cofre",
+        "wordAria": "Palavra {{number}} de 24"
       }
     },
     "list": {
@@ -2515,7 +2567,8 @@
       "cancelledVaultLocked": "Recuperação cancelada: o cofre estava bloqueado.",
       "operationInProgress": "Operação em curso. Aguarde, por favor.",
       "unexpected": "Erro inesperado. Tente novamente, por favor.",
-      "vaultNotFound": "Ficheiro do cofre não encontrado. Reinicie a aplicação, por favor."
+      "vaultNotFound": "Ficheiro do cofre não encontrado. Reinicie a aplicação, por favor.",
+      "openAsImportSource": "Uma importação está a ler este cofre neste momento. Termine ou cancele essa importação e depois recupere este cofre."
     },
     "vaultUnreadable": "O ficheiro do cofre é ilegível. Restaure a partir de um backup.",
     "genericError": "Algo correu mal. Tente novamente.",
@@ -2756,7 +2809,7 @@
       "openGraph": "Abrir o gráfico"
     },
     "archive": {
-      "helper": "Permite que as notas sejam movidas para um Arquivo, mantido fora da lista principal. Ao desativar isto, todas as notas arquivadas voltam à sua pasta e os controlos do arquivo ficam ocultos.",
+      "helper": "Permite que as notas sejam movidas para um Arquivo, mantido fora da lista principal. Ao desativar isto, todas as notas arquivadas voltam à sua pasta, todas as pastas arquivadas são desarquivadas e os controlos do arquivo ficam ocultos. Aplica-se a todo o cofre, em todos os dispositivos.",
       "label": "Arquivamento",
       "off": "Desativado",
       "on": "Ativado",
@@ -3215,7 +3268,8 @@
       "torLabel": "Encaminhar a sincronização através do Tor"
     },
     "prefs": {
-      "saveError": "Não foi possível guardar a preferência. Tente novamente."
+      "saveError": "Não foi possível guardar a preferência. Tente novamente.",
+      "folderListFull": "Essa lista de pastas está cheia. Remova uma pasta dela antes de adicionar outra."
     },
     "reminders": {
       "aria": "Mostrar lembretes de tarefas neste dispositivo",
@@ -3240,7 +3294,7 @@
       "hideVaultNamesHelper": "Num dispositivo com um porta-chaves utilizável, o seletor de cofres mostra o nome de um cofre depois de este dispositivo o ter desbloqueado. Com isto ligado, cada cofre mostra antes um marcador de posição como Cofre 2, e esse número mantém-se com o cofre, seja qual for a ordem da lista.",
       "hideVaultNamesErases": "Ligar isto destrói as chaves que tornam legíveis os nomes guardados aqui, por isso esses nomes não podem ser recuperados neste dispositivo, e não é escrito mais nenhum nome enquanto se mantiver ligado.",
       "hideVaultNamesResidue": "Isto não abrange uma cópia feita anteriormente: uma cópia de segurança completa do sistema, uma imagem de disco ou qualquer outra cópia deste disco ao nível do sistema, feita enquanto os nomes estavam visíveis, contém tanto os nomes guardados como as respetivas chaves.",
-      "hideVaultNamesUnavailable": "Este dispositivo não tem um porta-chaves utilizável, por isso o Myne não guarda aqui nenhum nome de cofre e esta opção não pode ser ligada. O seletor já mostra um marcador de posição para cada cofre.",
+      "hideVaultNamesUnavailable": "O Myne não consegue guardar nomes de cofres nesta cópia da aplicação, por isso não guarda aqui nenhum e esta opção não pode ser ligada. O seletor já mostra um marcador de posição para cada cofre.",
       "hideVaultNamesErrorRead": "Não foi possível ler a definição atual. Mude o interruptor para a voltar a definir.",
       "hideVaultNamesErrorSave": "Não foi possível guardar a definição, por isso está inalterada. Se a estava a ligar, alguns nomes guardados podem já ter sido destruídos; ligue-a novamente para concluir.",
       "hideVaultNamesErrorErase": "Não foi possível destruir um dos nomes guardados, por isso a definição ficou desligada, em vez de alegar um apagamento que não aconteceu. Tente novamente.",
@@ -3258,7 +3312,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 h",
       "quickUnlockSubtitleAndroid": "Reintroduzir com um PIN após bloqueio automático",
-      "quickUnlockSubtitle": "Reintroduzir com {{method}} ou um PIN após bloqueio automático"
+      "quickUnlockSubtitle": "Reintroduzir com {{method}} ou um PIN após bloqueio automático",
+      "screenCaptureOverrideHelper": "Desativa a proteção contra captura de ecrã apenas neste dispositivo, tanto antes de desbloquear um cofre como depois. Ative esta opção se uma lupa de ecrã, software de ambiente de trabalho remoto ou alguém que o ajuda à distância vir uma janela preta. Não é sincronizada.",
+      "screenCaptureOverrideLabel": "Permitir a captura de ecrã neste dispositivo",
+      "screenCaptureOverrideUnknown": "Não foi possível ler a definição de captura de ecrã deste dispositivo, por isso esta preferência não está a ser aplicada. Volte a abrir as Definições para tentar novamente.",
+      "screenCaptureSuperseded": "Desativada neste dispositivo. Consulte “Permitir a captura de ecrã neste dispositivo” mais abaixo. Esta preferência é mantida e volta a aplicar-se quando desativar essa opção.",
+      "screenCaptureSupersededByFlag": "Desativada nesta sessão, porque o Myne foi iniciado com --disable-screen-capture-protection. Esta preferência é mantida e volta a aplicar-se da próxima vez que abrir o Myne sem essa opção."
     },
     "quickUnlock": {
       "errorBusy": "Está a decorrer outra operação no cofre. Tente novamente dentro de momentos.",
@@ -3484,7 +3543,7 @@
         "newNoteLocation": "localização de novas notas pasta predefinida onde são criadas",
         "torRouting": "tor encaminhamento onion proxy rede endereço ip localização ocultar sincronização anonimato",
         "quickUnlock": "desbloqueio rápido pin touch id biometria biométrico rosto desbloquear",
-        "reminders": "lembretes notificar notificação alerta tarefa data limite lembrar prazo",
+        "reminders": "lembretes notificar notificação alerta tarefa data limite lembrar prazo horizonte registo agendar antecedência dias",
         "realtimeSync": "sincronização em tempo real ao vivo ligação presença sondagem sync",
         "screenCapture": "captura de ecrã proteção screenshot gravação bloquear privacidade",
         "showEditTimes": "mostrar horas de edição datas modificação notas timestamps",
@@ -3512,7 +3571,8 @@
         "timeFormat": "formato de hora 24 horas 12 horas relógio am pm time format",
         "timezone": "fuso horário zona horária tz utc iana região hoje timezone",
         "periodicNotes": "notas periódicas semanal mensal semana mês pasta modelo formato",
-        "aiHistoryBudget": "conversa histórico contexto memória orçamento caracteres agente chat pedido"
+        "aiHistoryBudget": "conversa histórico contexto memória orçamento caracteres agente chat pedido",
+        "screenCaptureOverride": "captura de ecrã screenshot permitir desativar exceção lupa ampliação ambiente de trabalho remoto acessibilidade desbloqueio ecrã preto override"
       }
     },
     "dateTime": {
@@ -3525,7 +3585,7 @@
       "time24": "24 horas",
       "time12": "12 horas",
       "zoneLabel": "Fuso horário",
-      "zoneHelper": "Que fuso decide o que conta como hoje. Deixe em branco para seguir este dispositivo. As horas que escreve numa nota nunca são alteradas; 09:00 continua a ser 09:00 em qualquer lado.",
+      "zoneHelper": "Que fuso decide o que conta como hoje e, por isso, que nota abrem as suas notas diárias, semanais e mensais. Deixe em branco para seguir este dispositivo. A escolha fixa-se por dispositivo: nenhum outro dispositivo a substitui, por isso definir um fuso aqui pode colocar este dispositivo num dia diferente dos seus outros dispositivos. As horas que escreve numa nota nunca são alteradas; 09:00 continua a ser 09:00 em qualquer lado.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "O Myne não conhece esse fuso horário. Use um nome como Europe/Berlin.",
       "errorSave": "Não foi possível guardar essa definição."
@@ -3998,7 +4058,8 @@
       "kdfMemoryExceedsHost": "Este cofre precisa de {{required}} MiB de memória para abrir, mais do que este navegador lhe consegue dar ({{available}} MiB). O cofre está bem; abra-o na aplicação de ambiente de trabalho do Myne.",
       "unexpected": "Erro inesperado. Tente novamente, por favor.",
       "vaultNotFound": "Ficheiro do cofre não encontrado. Reinicie a aplicação, por favor.",
-      "vaultUpgraded": "Este cofre foi atualizado para um formato mais recente que esta versão do Myne ainda não suporta. Os seus dados estão bem. Atualize o Myne para a versão mais recente para o abrir."
+      "vaultUpgraded": "Este cofre foi atualizado para um formato mais recente que esta versão do Myne ainda não suporta. Os seus dados estão bem. Atualize o Myne para a versão mais recente para o abrir.",
+      "openAsImportSource": "Uma importação está a ler este cofre neste momento. Termine ou cancele essa importação e depois desbloqueie este cofre."
     },
     "passwordLabel": "Palavra-passe",
     "passwordPlaceholder": "Palavra-passe",
@@ -4565,5 +4626,19 @@
         "crypto-getrandomvalues": "Este navegador não fornece uma fonte criptográfica de números aleatórios."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "A proteção contra captura de ecrã pede ao sistema operativo que mantenha esta janela fora das capturas de ecrã e das gravações de ecrã. É eficaz no Windows 10 (atualização de maio de 2020) e posterior; o macOS e o Linux não oferecem uma API de sistema para isto, por isso aí não é possível bloquear a captura. Onde funciona, também esconde a janela de software de ambiente de trabalho remoto e de lupas de ecrã, e é por isso que existe esta saída.",
+    "disableConfirm": "Desativar a proteção",
+    "disableCost": "Desativá-la aplica-se apenas a este dispositivo e continua desativada até a voltar a ativar, tanto antes de desbloquear um cofre como depois. Nada é enviado para lado nenhum e nenhuma definição do cofre muda, mas a escolha fica guardada num ficheiro de definições neste dispositivo, e esse ficheiro permanece lá depois de voltar a ativar a proteção.",
+    "disableTitle": "Desativar a proteção contra captura de ecrã?",
+    "disableTrigger": "Desativar a proteção contra captura de ecrã",
+    "flagNotice": "Esta sessão foi iniciada com --disable-screen-capture-protection, por isso a proteção permanece desativada até sair da aplicação, seja o que for que esta definição diga.",
+    "restoreBody": "A proteção contra captura de ecrã está desativada neste dispositivo. Voltar a ativá-la pede ao sistema operativo que mantenha de novo esta janela fora das capturas de ecrã e das gravações de ecrã, o que no Windows 10 (atualização de maio de 2020) e posterior também a esconde de software de ambiente de trabalho remoto e de lupas de ecrã. No macOS e no Linux não existe uma API de sistema para isto, por isso aí não é possível bloquear a captura.",
+    "restoreConfirm": "Ativar a proteção",
+    "restoreTitle": "Voltar a ativar a proteção contra captura de ecrã?",
+    "restoreTrigger": "Ativar a proteção contra captura de ecrã",
+    "saveFailed": "Não foi possível guardar isso, por isso nada mudou. Tente novamente ou inicie o Myne com --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Guardado. Esta sessão continua com a proteção desativada porque foi iniciada com --disable-screen-capture-protection, por isso ela volta da próxima vez que abrir o Myne sem essa opção."
   }
 }

@@ -286,7 +286,7 @@
       "title": "Allegati",
       "transcribeDone": "Trascrizione completata.",
       "transcribeFailed": "Trascrizione non riuscita. Riprova.",
-      "transcribeTooLong": "Questa registrazione è troppo lunga per essere trascritta.",
+      "transcribeTooLong": "Questa registrazione è troppo lunga per essere trascritta. L'audio resta allegato, quindi puoi comunque riprodurlo.",
       "transcribeFeatureOff": "La conversione da voce a testo è disattivata. Attivala in Impostazioni → Trascrizione.",
       "transcribeModelLoadFailed": "Impossibile caricare il modello da voce a testo. Reinstalla Myne, oppure controlla il tuo modello personalizzato in Impostazioni → Developer → AI.",
       "transcribeNoModelHint": "Il modello da voce a testo è mancante. Reinstallando Myne viene ripristinato.",
@@ -1900,7 +1900,9 @@
       "moveCollision": "Lì esiste già una cartella con quel nome.",
       "unsettledSave": "Una nota aperta non ha ancora finito di salvarsi, quindi la cartella non è stata toccata. Riprova quando avrà finito.",
       "renameFailed": "Impossibile rinominare la cartella, che resta quindi invariata.",
-      "deliberateWriteFailed": "La cartella è stata rinominata, ma non è stato possibile salvare una delle sue impostazioni. A ogni sblocco ricomparirà una cartella vuota con il vecchio nome; puoi eliminarla tranquillamente e non cambia nient'altro. Rinominare di nuovo la cartella non la farà sparire."
+      "deliberateWriteFailed": "La cartella è stata rinominata, ma non è stato possibile salvare una delle sue impostazioni. A ogni sblocco ricomparirà una cartella vuota con il vecchio nome; puoi eliminarla tranquillamente e non cambia nient'altro. Rinominare di nuovo la cartella non la farà sparire.",
+      "folderListFull": "Myne può ricordare un numero limitato di cartelle, e quell'elenco è pieno. Questa cartella funziona comunque, ma sparirà quando ne uscirà l'ultima nota. Eliminare una cartella che non ti serve più libera spazio.",
+      "folderNotRemembered": "La cartella è stata creata, ma Myne non è riuscito a registrarla. Sparirà quando ne uscirà l'ultima nota, e al prossimo sblocco non ci sarà più se è ancora vuota. Puoi crearla di nuovo senza problemi."
     },
     "folderNote": {
       "defaultTitle": "Indice"
@@ -2050,7 +2052,12 @@
         "reasonPermissionDenied": "Myne non aveva il permesso di leggere questo file.",
         "reasonNotFound": "Questo file non c'era più quando Myne è arrivato a leggerlo.",
         "reasonNoSpace": "Questo dispositivo ha esaurito lo spazio.",
-        "reasonUnknown": "Myne non è riuscito a dire perché."
+        "reasonUnknown": "Myne non è riuscito a dire perché.",
+        "foldersNotKeptNote": "{{count}} sparirà quando ne uscirà l'ultima nota",
+        "foldersNotKeptNote_many": "{{count}} spariranno quando ne uscirà l'ultima nota",
+        "foldersNotKeptNote_one": "{{count}} sparirà quando ne uscirà l'ultima nota",
+        "foldersNotKeptNote_other": "{{count}} spariranno quando ne uscirà l'ultima nota",
+        "statFoldersNotKept": "Cartelle non mantenute"
       },
       "offer": {
         "body": "Porta le tue note esistenti in Myne. Ognuna viene crittografata durante l'importazione. Nulla lascia questo dispositivo e i tuoi file originali restano esattamente dove sono.",
@@ -2097,7 +2104,52 @@
           "survives": "Diventa una singola nota che contiene la tabella.",
           "loses": "È una sola nota, non una nota per riga: Myne non è un database. I file molto larghi o molto lunghi vengono ridotti, e il rapporto di importazione indica di quanto.",
           "short": "Un singolo file di foglio di calcolo"
+        },
+        "myne": {
+          "label": "Cassaforte Myne",
+          "loses": "La cronologia delle versioni, le note eliminate e i modelli restano nella cassaforte di origine. Gli allegati che nessuna nota importata usa vengono lasciati indietro. La cassaforte di origine non viene modificata e, se la sincronizzi, continua a sincronizzarsi.",
+          "pickerTitle": "Scegli la cassaforte da cui importare",
+          "short": "Un'altra cassaforte su questo dispositivo",
+          "survives": "Note, cartelle, tag, gli allegati usati dalle note che importi e i collegamenti fra quelle note. Arrivano anche le parole che hai aggiunto al dizionario della cassaforte di origine."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "La cronologia delle versioni resta nella cassaforte da cui hai importato.",
+          "sourceUnchanged": "La cassaforte da cui hai importato non è stata modificata. Se la sincronizzi, continua a sincronizzarsi."
+        },
+        "errors": {
+          "alreadyOpen": "Quella cassaforte è già aperta per un'importazione. Concludi o annulla prima quell'importazione.",
+          "busy": "È in corso un'altra operazione sulla cassaforte. Attendi che finisca e riprova.",
+          "credential": "Quella password o frase di recupero non ha aperto la cassaforte. Controllala e riprova."
+        },
+        "importLabel": "Dai un nome a questa importazione",
+        "importLabelHint": "Se una nota che importi ha lo stesso nome di una che hai già, e qualcosa che importi punta a quella nota, la nota importata viene rinominata con questo nome. Mantieni lo stesso nome se riesegui questa importazione e nulla verrà importato due volte.",
+        "importLabelIllegal": "Quel nome non si può usare: il nome di una nota non può contenere \\ / | # ^ [ ], né iniziare o terminare con uno spazio.",
+        "loading": "Ricerca delle tue altre casseforti…",
+        "noOtherVaults": "Su questo dispositivo non ci sono altre casseforti da cui importare. Ripristina prima un backup: diventerà una cassaforte da cui puoi importare qui.",
+        "opening": "Apertura…",
+        "passwordLabel": "Password di quella cassaforte",
+        "phraseLabel": "Frase di recupero di 24 parole di quella cassaforte",
+        "report": {
+          "attachmentsCrossed": "Allegati importati",
+          "attachmentsDeduped": "Allegati che avevi già",
+          "attachmentsFailed": "Allegati che la cassaforte non ha accettato",
+          "dictionaryUnreadable": "Non è stato possibile leggere il dizionario della cassaforte di origine, quindi non è stata importata alcuna parola.",
+          "dictionaryWordsAdded": "Parole del dizionario importate",
+          "linksLeftUnresolved": "Collegamenti che non è stato possibile reindirizzare",
+          "linksRetargeted": "Collegamenti reindirizzati a una nota rinominata",
+          "templatesLeftBehind": "Modelli, lasciati indietro",
+          "tombstonedEmbeds": "Contenuti incorporati il cui file era già stato eliminato nell'origine",
+          "trashedLeftBehind": "Note nel cestino della cassaforte di origine, lasciate indietro",
+          "untitledImported": "Note senza titolo importate"
+        },
+        "unnamedVault": "Cassaforte {{n}}",
+        "usePassword": "Usa invece la password",
+        "usePhrase": "Usa invece la frase di recupero",
+        "vaultLabel": "Importa da",
+        "vaultPlaceholder": "Scegli una cassaforte",
+        "wordAria": "Parola {{number}} di 24"
       }
     },
     "list": {
@@ -2515,7 +2567,8 @@
       "cancelledVaultLocked": "Recupero annullato: la cassaforte era bloccata.",
       "operationInProgress": "Operazione in corso. Attendi.",
       "unexpected": "Errore imprevisto. Riprova.",
-      "vaultNotFound": "File della cassaforte non trovato. Riavvia l'app."
+      "vaultNotFound": "File della cassaforte non trovato. Riavvia l'app.",
+      "openAsImportSource": "Un'importazione sta leggendo questa cassaforte in questo momento. Concludi o annulla quell'importazione, poi recupera questa cassaforte."
     },
     "vaultUnreadable": "Il file della cassaforte è illeggibile. Ripristina da un backup.",
     "genericError": "Qualcosa è andato storto. Riprova.",
@@ -2756,7 +2809,7 @@
       "openGraph": "Apri il grafico"
     },
     "archive": {
-      "helper": "Consenti di spostare le note in un Archivio, tenendole fuori dall'elenco principale. Disattivando questa opzione ogni nota archiviata torna nella sua cartella e i controlli dell'archivio vengono nascosti.",
+      "helper": "Consenti di spostare le note in un Archivio, tenendole fuori dall'elenco principale. Disattivando questa opzione ogni nota archiviata torna nella sua cartella, ogni cartella archiviata viene rimossa dall'archivio e i controlli dell'archivio vengono nascosti. Vale per l'intera cassaforte, su ogni dispositivo.",
       "label": "Archiviazione",
       "off": "Disattivata",
       "on": "Attivata",
@@ -3215,7 +3268,8 @@
       "torLabel": "Instrada la sincronizzazione attraverso Tor"
     },
     "prefs": {
-      "saveError": "Impossibile salvare la preferenza. Riprova."
+      "saveError": "Impossibile salvare la preferenza. Riprova.",
+      "folderListFull": "Quell'elenco di cartelle è pieno. Rimuovi una cartella prima di aggiungerne un'altra."
     },
     "reminders": {
       "aria": "Mostra i promemoria delle attività su questo dispositivo",
@@ -3240,7 +3294,7 @@
       "hideVaultNamesHelper": "Su un dispositivo con un portachiavi utilizzabile, il selettore mostra il nome di una cassaforte dopo che questo dispositivo l'ha sbloccata. Con questa opzione attiva ogni cassaforte mostra invece un segnaposto come Cassaforte 2, e quel numero resta legato alla cassaforte comunque si riordini l'elenco.",
       "hideVaultNamesErases": "Attivandola si distruggono le chiavi che rendono leggibili i nomi memorizzati qui, quindi quei nomi non possono essere recuperati su questo dispositivo, e finché resta attiva non viene scritto alcun altro nome.",
       "hideVaultNamesResidue": "Non può raggiungere una copia fatta in precedenza: un backup completo del sistema, un'immagine del disco o qualsiasi altra copia a livello di sistema di questo disco, creata mentre i nomi erano visibili, contiene sia i nomi memorizzati sia le loro chiavi.",
-      "hideVaultNamesUnavailable": "Questo dispositivo non ha un portachiavi utilizzabile, quindi Myne non memorizza qui alcun nome di cassaforte e questa opzione non può essere attivata. Il selettore mostra già un segnaposto per ogni cassaforte.",
+      "hideVaultNamesUnavailable": "Myne non può memorizzare i nomi delle casseforti in questa copia dell'app, quindi qui non ne memorizza nessuno e questa opzione non può essere attivata. Il selettore mostra già un segnaposto per ogni cassaforte.",
       "hideVaultNamesErrorRead": "Impossibile leggere l'impostazione attuale. Sposta l'interruttore per impostarla di nuovo.",
       "hideVaultNamesErrorSave": "Impossibile salvare l'impostazione, che resta quindi invariata. Se la stavi attivando, alcuni nomi memorizzati potrebbero essere già stati distrutti; attivala di nuovo per completare.",
       "hideVaultNamesErrorErase": "Non è stato possibile distruggere un nome memorizzato, quindi l'impostazione è stata lasciata disattivata invece di dichiarare una cancellazione che non è avvenuta. Riprova.",
@@ -3258,7 +3312,12 @@
       "autoLock30m": "30m",
       "autoLock1h": "1h",
       "quickUnlockSubtitleAndroid": "Rientra con un PIN dopo il blocco automatico",
-      "quickUnlockSubtitle": "Rientra con {{method}} o un PIN dopo il blocco automatico"
+      "quickUnlockSubtitle": "Rientra con {{method}} o un PIN dopo il blocco automatico",
+      "screenCaptureOverrideHelper": "Disattiva la protezione dalla cattura schermo solo su questo dispositivo, sia prima di sbloccare una cassaforte sia dopo. Attiva questa opzione se un ingranditore dello schermo, un software di desktop remoto o qualcuno che ti assiste da remoto vede una finestra nera. Questa impostazione non viene sincronizzata.",
+      "screenCaptureOverrideLabel": "Consenti la cattura schermo su questo dispositivo",
+      "screenCaptureOverrideUnknown": "Non è stato possibile leggere l'impostazione di cattura schermo di questo dispositivo, quindi questa preferenza non viene applicata. Riapri le Impostazioni per riprovare.",
+      "screenCaptureSuperseded": "Disattivata su questo dispositivo. Vedi “Consenti la cattura schermo su questo dispositivo” qui sotto. Questa preferenza viene conservata e torna ad applicarsi quando disattivi quell'opzione.",
+      "screenCaptureSupersededByFlag": "Disattivata per questa sessione, perché Myne è stato avviato con --disable-screen-capture-protection. Questa preferenza viene conservata e torna ad applicarsi la prossima volta che apri Myne senza quell'opzione."
     },
     "quickUnlock": {
       "errorBusy": "È in corso un'altra operazione sulla cassaforte. Riprova tra un momento.",
@@ -3484,7 +3543,7 @@
         "newNoteLocation": "posizione nuove note cartella predefinita dove vengono create location",
         "torRouting": "tor instradamento onion proxy rete indirizzo ip posizione nascondi sincronizzazione anonimato routing",
         "quickUnlock": "sblocco rapido pin touch id biometrico impronta viso quick unlock",
-        "reminders": "promemoria notifica notifiche avviso attività scadenza ricorda reminders",
+        "reminders": "promemoria notifica notifiche avviso attività scadenza ricorda orizzonte pianifica in anticipo giorni registrazione reminders notification",
         "realtimeSync": "sincronizzazione tempo reale live connessione presenza realtime sync polling",
         "screenCapture": "protezione cattura schermo screenshot registrazione blocca privacy screen capture",
         "showEditTimes": "orari modifica date ora note mostra timestamp modificate",
@@ -3512,7 +3571,8 @@
         "timeFormat": "formato ora orario 24 ore 12 ore orologio am pm time format clock",
         "timezone": "fuso orario fusi tz utc iana regione oggi timezone time zone",
         "periodicNotes": "note periodiche settimanale mensile settimana mese cartella modello formato",
-        "aiHistoryBudget": "conversazione cronologia contesto memoria budget caratteri agente chat richiesta"
+        "aiHistoryBudget": "conversazione cronologia contesto memoria budget caratteri agente chat richiesta",
+        "screenCaptureOverride": "cattura schermo consenti permetti disattiva ingranditore lente desktop remoto accessibilità sblocco schermo nero screen capture override remote desktop"
       }
     },
     "dateTime": {
@@ -3525,7 +3585,7 @@
       "time24": "24 ore",
       "time12": "12 ore",
       "zoneLabel": "Fuso orario",
-      "zoneHelper": "Quale fuso stabilisce cosa conta come oggi. Lascia vuoto per seguire questo dispositivo. Gli orari che scrivi in una nota non vengono mai modificati; le 09:00 restano le 09:00 ovunque.",
+      "zoneHelper": "Quale fuso stabilisce cosa conta come oggi, e quindi quale nota aprono le tue note giornaliere, settimanali e mensili. Lascia vuoto per seguire questo dispositivo. La scelta è indipendente su ogni dispositivo: nessun altro dispositivo la sovrascrive, quindi un fuso impostato a mano può mettere questo dispositivo in un giorno diverso dagli altri. Gli orari che scrivi in una nota non vengono mai modificati; le 09:00 restano le 09:00 ovunque.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne non conosce quel fuso orario. Usa un nome come Europe/Berlin.",
       "errorSave": "Impossibile salvare quell'impostazione."
@@ -3998,7 +4058,8 @@
       "kdfMemoryExceedsHost": "Per aprire questa cassaforte servono {{required}} MiB di memoria, più di quanti questo browser possa concederne ({{available}} MiB). La cassaforte è integra; aprila nell'app desktop di Myne.",
       "unexpected": "Errore imprevisto. Riprova.",
       "vaultNotFound": "File della cassaforte non trovato. Riavvia l'app.",
-      "vaultUpgraded": "Questa cassaforte è stata aggiornata a un formato più recente che questa versione di Myne non supporta ancora. I tuoi dati sono integri. Aggiorna Myne all'ultima versione per aprirla."
+      "vaultUpgraded": "Questa cassaforte è stata aggiornata a un formato più recente che questa versione di Myne non supporta ancora. I tuoi dati sono integri. Aggiorna Myne all'ultima versione per aprirla.",
+      "openAsImportSource": "Un'importazione sta leggendo questa cassaforte in questo momento. Concludi o annulla quell'importazione, poi sblocca questa cassaforte."
     },
     "passwordLabel": "Password",
     "passwordPlaceholder": "Password",
@@ -4565,5 +4626,19 @@
         "crypto-getrandomvalues": "Questo browser non fornisce una sorgente crittografica di numeri casuali."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "La protezione dalla cattura schermo chiede al sistema operativo di tenere questa finestra fuori da screenshot e registrazioni dello schermo. È attiva su Windows 10 (aggiornamento di maggio 2020) e versioni successive; macOS e Linux non offrono un'API di sistema per questo, quindi lì non può bloccare la cattura. Dove funziona, tra le cose a cui nasconde la finestra ci sono i software di desktop remoto e gli ingranditori dello schermo: per questo esiste questa via d'uscita.",
+    "disableConfirm": "Disattiva la protezione",
+    "disableCost": "La disattivazione vale solo per questo dispositivo e resta in vigore finché non riattivi la protezione, sia prima di sbloccare una cassaforte sia dopo. Non viene inviato nulla da nessuna parte e nessuna impostazione della cassaforte cambia, ma la scelta viene salvata in un file di impostazioni su questo dispositivo, e quel file resta lì anche dopo che riattivi la protezione.",
+    "disableTitle": "Disattivare la protezione dalla cattura schermo?",
+    "disableTrigger": "Disattiva la protezione dalla cattura schermo",
+    "flagNotice": "Questa sessione è stata avviata con --disable-screen-capture-protection, quindi la protezione resta disattivata finché non esci, qualunque cosa dica questa impostazione.",
+    "restoreBody": "La protezione dalla cattura schermo è disattivata su questo dispositivo. Riattivandola, Myne chiede di nuovo al sistema operativo di tenere questa finestra fuori da screenshot e registrazioni dello schermo, il che su Windows 10 (aggiornamento di maggio 2020) e versioni successive la nasconde anche ai software di desktop remoto e agli ingranditori dello schermo. Su macOS e Linux non esiste un'API di sistema per questo, quindi lì non può bloccare la cattura.",
+    "restoreConfirm": "Attiva la protezione",
+    "restoreTitle": "Riattivare la protezione dalla cattura schermo?",
+    "restoreTrigger": "Attiva la protezione dalla cattura schermo",
+    "saveFailed": "Non è stato possibile salvare, quindi non è cambiato nulla. Riprova, oppure avvia Myne con --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Salvato. In questa sessione la protezione resta comunque disattivata perché è stata avviata con --disable-screen-capture-protection, quindi tornerà la prossima volta che apri Myne senza quell'opzione."
   }
 }

@@ -260,7 +260,7 @@
       "title": "Liitteet",
       "transcribeDone": "Litterointi valmis.",
       "transcribeFailed": "Litterointi epäonnistui. Yritä uudelleen.",
-      "transcribeTooLong": "Tämä tallenne on liian pitkä litteroitavaksi.",
+      "transcribeTooLong": "Tämä tallenne on liian pitkä litteroitavaksi. Ääni pysyy liitteenä, joten voit yhä toistaa sen.",
       "transcribeFeatureOff": "Puheesta tekstiksi on pois päältä. Ota se käyttöön kohdasta Asetukset → Litterointi.",
       "transcribeModelLoadFailed": "Puheentunnistusmallia ei voitu ladata. Asenna Myne uudelleen tai tarkista oma mallisi kohdasta Asetukset → Kehittäjä → Tekoäly.",
       "transcribeNoModelHint": "Puheentunnistusmalli puuttuu. Mynen uudelleenasennus palauttaa sen.",
@@ -1830,7 +1830,9 @@
       "moveCollision": "Siellä on jo samanniminen kansio.",
       "unsettledSave": "Avoinna oleva muistiinpano ei ole vielä tallentunut loppuun, joten kansio jätettiin ennalleen. Yritä uudelleen, kun tallennus on valmis.",
       "renameFailed": "Kansion uudelleennimeäminen ei onnistunut, joten se pysyi ennallaan.",
-      "deliberateWriteFailed": "Kansio nimettiin uudelleen, mutta yhtä sen asetuksista ei voitu tallentaa. Tyhjä kansio ilmestyy vanhalla nimellä uudelleen aina, kun avaat holvin; sen voi poistaa turvallisesti, eikä poistaminen muuta mitään muuta. Kansion uudelleennimeäminen ei poista sitä."
+      "deliberateWriteFailed": "Kansio nimettiin uudelleen, mutta yhtä sen asetuksista ei voitu tallentaa. Tyhjä kansio ilmestyy vanhalla nimellä uudelleen aina, kun avaat holvin; sen voi poistaa turvallisesti, eikä poistaminen muuta mitään muuta. Kansion uudelleennimeäminen ei poista sitä.",
+      "folderListFull": "Myne voi muistaa vain rajallisen määrän kansioita, ja tuo luettelo on täynnä. Tämä kansio toimii silti, mutta se katoaa, kun siitä poistuu viimeinen muistiinpano. Tilaa vapautuu, kun poistat kansion, jota et enää tarvitse.",
+      "folderNotRemembered": "Kansio luotiin, mutta Myne ei saanut sitä muistiin. Se katoaa, kun siitä poistuu viimeinen muistiinpano, ja se on poissa, kun avaat holvin seuraavan kerran, jos se on silloin yhä tyhjä. Sen voi turvallisesti luoda uudelleen."
     },
     "folderNote": {
       "defaultTitle": "Hakemisto"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Mynellä ei ollut oikeutta lukea tätä tiedostoa.",
         "reasonNotFound": "Tämä tiedosto oli jo poissa, kun Myne pääsi siihen.",
         "reasonNoSpace": "Tästä laitteesta loppui tila.",
-        "reasonUnknown": "Myne ei osannut sanoa syytä."
+        "reasonUnknown": "Myne ei osannut sanoa syytä.",
+        "foldersNotKeptNote": "{{count}} kansio katoaa, kun siitä poistuu viimeinen muistiinpano",
+        "foldersNotKeptNote_one": "{{count}} kansio katoaa, kun siitä poistuu viimeinen muistiinpano",
+        "foldersNotKeptNote_other": "{{count}} kansiota katoaa, kun niistä poistuu viimeinen muistiinpano",
+        "statFoldersNotKept": "Kansioita ei säilytetty"
       },
       "offer": {
         "body": "Tuo olemassa olevat muistiinpanosi Myneen. Jokainen salataan tuonnin yhteydessä. Mikään ei poistu tältä laitteelta, ja alkuperäiset tiedostosi pysyvät täsmälleen paikoillaan.",
@@ -2021,7 +2027,52 @@
           "survives": "Muuttuu yhdeksi muistiinpanoksi, joka sisältää taulukon.",
           "loses": "Se on yksi muistiinpano, ei yhtä muistiinpanoa riviä kohden: Myne ei ole tietokanta. Hyvin leveät tai hyvin pitkät tiedostot karsitaan, ja tuontiraportti kertoo, kuinka paljon.",
           "short": "Yksi taulukkotiedosto"
+        },
+        "myne": {
+          "label": "Myne-holvi",
+          "loses": "Versiohistoria, poistetut muistiinpanot ja mallit jäävät lähdeholviin. Liitteet, joita mikään tuotu muistiinpano ei käytä, jäävät tuomatta. Lähdeholvia ei muuteta, ja jos synkronoit sen, se jatkaa synkronointia.",
+          "pickerTitle": "Valitse holvi, josta tuodaan",
+          "short": "Toinen holvi tällä laitteella",
+          "survives": "Muistiinpanot, kansiot, tunnisteet, tuomiesi muistiinpanojen väliset linkit sekä liitteet, joita nuo muistiinpanot käyttävät. Myös lähdeholvin sanakirjaan lisäämäsi sanat tulevat mukaan."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Versiohistoria jää holviin, josta toit.",
+          "sourceUnchanged": "Holvia, josta toit, ei ole muutettu. Jos synkronoit sen, se jatkaa synkronointia."
+        },
+        "errors": {
+          "alreadyOpen": "Tuo holvi on jo avattu tuontia varten. Vie kyseinen tuonti ensin loppuun tai peruuta se.",
+          "busy": "Toinen holvitoiminto on käynnissä. Odota, että se päättyy, ja yritä uudelleen.",
+          "credential": "Tuo salasana tai palautuslause ei avannut holvia. Tarkista se ja yritä uudelleen."
+        },
+        "importLabel": "Nimeä tämä tuonti",
+        "importLabelHint": "Jos tuomallasi muistiinpanolla on sama nimi kuin jollakin jo olemassa olevalla ja jokin tuomasi sisältö linkittää siihen, tuotu muistiinpano nimetään uudelleen tällä nimellä. Käytä samaa nimeä, jos ajat tämän tuonnin uudelleen, niin mitään ei tuoda kahdesti.",
+        "importLabelIllegal": "Tuota nimeä ei voi käyttää: muistiinpanon nimi ei voi sisältää merkkejä \\ / | # ^ [ ] eikä alkaa tai päättyä välilyöntiin.",
+        "loading": "Etsitään muita holvejasi…",
+        "noOtherVaults": "Tällä laitteella ei ole muita holveja, joista tuoda. Palauta ensin varmuuskopio, niin siitä tulee holvi, josta voit tuoda täällä.",
+        "opening": "Avataan…",
+        "passwordLabel": "Kyseisen holvin salasana",
+        "phraseLabel": "Kyseisen holvin 24-sanainen palautuslause",
+        "report": {
+          "attachmentsCrossed": "Liitteitä tuotu",
+          "attachmentsDeduped": "Liitteitä, joita sinulla oli jo",
+          "attachmentsFailed": "Liitteitä, joita holvi ei hyväksynyt",
+          "dictionaryUnreadable": "Lähdeholvin sanakirjaa ei voitu lukea, joten sanoja ei tuotu.",
+          "dictionaryWordsAdded": "Sanakirjan sanoja tuotu",
+          "linksLeftUnresolved": "Linkkejä, joita ei voitu kohdistaa mihinkään",
+          "linksRetargeted": "Linkkejä ohjattu uudelleennimettyyn muistiinpanoon",
+          "templatesLeftBehind": "Malleja jäi lähdeholviin",
+          "tombstonedEmbeds": "Upotuksia, joiden tiedosto oli jo poistettu lähteestä",
+          "trashedLeftBehind": "Muistiinpanoja jäi lähdeholvin roskakoriin",
+          "untitledImported": "Nimettömiä muistiinpanoja tuotu"
+        },
+        "unnamedVault": "Holvi {{n}}",
+        "usePassword": "Käytä sen sijaan salasanaa",
+        "usePhrase": "Käytä sen sijaan palautuslausetta",
+        "vaultLabel": "Tuo holvista",
+        "vaultPlaceholder": "Valitse holvi",
+        "wordAria": "Sana {{number}}/24"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Palautus peruutettu: holvi oli lukittu.",
       "operationInProgress": "Toiminto on käynnissä. Odota.",
       "unexpected": "Odottamaton virhe. Yritä uudelleen.",
-      "vaultNotFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen."
+      "vaultNotFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen.",
+      "openAsImportSource": "Tuonti lukee tätä holvia juuri nyt. Vie tuonti loppuun tai peruuta se, ja palauta sitten tämä holvi."
     },
     "vaultUnreadable": "Holvitiedostoa ei voi lukea. Palauta varmuuskopiosta.",
     "genericError": "Jokin meni vikaan. Yritä uudelleen.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Avaa kaavio"
     },
     "archive": {
-      "helper": "Salli muistiinpanojen siirtäminen arkistoon, pois päälistalta. Tämän poistaminen käytöstä palauttaa jokaisen arkistoidun muistiinpanon kansioonsa ja piilottaa arkistointitoiminnot.",
+      "helper": "Salli muistiinpanojen siirtäminen arkistoon, pois päälistalta. Tämän poistaminen käytöstä palauttaa jokaisen arkistoidun muistiinpanon kansioonsa, poistaa jokaisen arkistoidun kansion arkistosta ja piilottaa arkistointitoiminnot. Se koskee koko holvia jokaisella laitteella.",
       "label": "Arkistointi",
       "off": "Pois",
       "on": "Päällä",
@@ -3109,7 +3161,8 @@
       "torLabel": "Reititä synkronointi Torin kautta"
     },
     "prefs": {
-      "saveError": "Asetusta ei voitu tallentaa. Yritä uudelleen."
+      "saveError": "Asetusta ei voitu tallentaa. Yritä uudelleen.",
+      "folderListFull": "Tuo kansioluettelo on täynnä. Poista siitä kansio, ennen kuin lisäät uuden."
     },
     "reminders": {
       "aria": "Näytä tehtävämuistutukset tällä laitteella",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "Laitteella, jolla on käytettävissä oleva avainnippu, holvivalitsin näyttää holvin nimen sen jälkeen, kun tämä laite on avannut sen. Kun tämä on päällä, jokainen holvi näyttää sen sijaan paikanvaraajan, kuten Holvi 2, ja tuo numero pysyy holvilla riippumatta siitä, miten luettelo järjestyy uudelleen.",
       "hideVaultNamesErases": "Käyttöönotto tuhoaa avaimet, jotka tekevät tänne tallennetuista nimistä luettavia, joten niitä nimiä ei voi palauttaa tällä laitteella, eikä uusia nimiä kirjoiteta niin kauan kuin asetus on päällä.",
       "hideVaultNamesResidue": "Se ei ylety aiemmin otettuun kopioon: koko järjestelmän varmuuskopio, levykuva tai mikä tahansa muu järjestelmätason kopio tästä levystä, joka on otettu nimien näkyessä, sisältää sekä tallennetut nimet että niiden avaimet.",
-      "hideVaultNamesUnavailable": "Tällä laitteella ei ole käytettävissä olevaa avainnippua, joten Myne ei tallenna tänne holvien nimiä eikä tätä asetusta voi ottaa käyttöön. Valitsin näyttää jo paikanvaraajan jokaiselle holville.",
+      "hideVaultNamesUnavailable": "Myne ei voi tallentaa holvien nimiä tässä sovelluksen kopiossa, joten se ei tallenna niitä tänne eikä tätä asetusta voi ottaa käyttöön. Valitsin näyttää jo paikanvaraajan jokaiselle holville.",
       "hideVaultNamesErrorRead": "Nykyistä asetusta ei voitu lukea. Aseta se uudelleen kytkimellä.",
       "hideVaultNamesErrorSave": "Asetusta ei voitu tallentaa, joten se on ennallaan. Jos olit ottamassa sitä käyttöön, osa tallennetuista nimistä on saatettu jo tuhota; ota se uudelleen käyttöön viimeistelläksesi.",
       "hideVaultNamesErrorErase": "Yhtä tallennettua nimeä ei voitu tuhota, joten asetus jätettiin pois päältä sen sijaan, että olisi väitetty tuhoamisen onnistuneen. Yritä uudelleen.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 t",
       "quickUnlockSubtitleAndroid": "Avaa uudelleen PIN-koodilla automaattilukituksen jälkeen",
-      "quickUnlockSubtitle": "Avaa uudelleen {{method}} tai PIN-koodilla automaattilukituksen jälkeen"
+      "quickUnlockSubtitle": "Avaa uudelleen {{method}} tai PIN-koodilla automaattilukituksen jälkeen",
+      "screenCaptureOverrideHelper": "Poistaa näytönkaappaussuojauksen käytöstä vain tällä laitteella, sekä ennen holvin avaamista että sen jälkeen. Ota tämä käyttöön, jos näytönsuurennusohjelma, etätyöpöytäohjelma tai etänä sinua auttava henkilö näkee mustan ikkunan. Tätä ei synkronoida.",
+      "screenCaptureOverrideLabel": "Salli näytönkaappaus tällä laitteella",
+      "screenCaptureOverrideUnknown": "Tämän laitteen näytönkaappausasetusta ei voitu lukea, joten tätä asetusta ei sovelleta. Avaa Asetukset uudelleen ja yritä uudestaan.",
+      "screenCaptureSuperseded": "Pois päältä tällä laitteella. Katso alta ”Salli näytönkaappaus tällä laitteella”. Tämä asetus säilytetään ja on taas voimassa, kun poistat tuon asetuksen käytöstä.",
+      "screenCaptureSupersededByFlag": "Pois päältä tämän istunnon ajan, koska Myne käynnistettiin valitsimella --disable-screen-capture-protection. Tämä asetus säilytetään ja on taas voimassa, kun avaat Mynen seuraavan kerran ilman sitä."
     },
     "quickUnlock": {
       "errorBusy": "Toinen holvitoiminto on käynnissä. Yritä hetken kuluttua uudelleen.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "uusien muistiinpanojen sijainti kansio oletus mihin luodaan new note",
         "torRouting": "tor reititys onion välityspalvelin verkko ip-osoite sijainti piilota synkronointi anonymiteetti",
         "quickUnlock": "pika-avaus pikaavaus pin touch id biometrinen kasvotunnistus lukituksen avaus",
-        "reminders": "muistutukset ilmoita ilmoitus hälytys tehtävä eräpäivä muistuta reminders",
+        "reminders": "muistutukset ilmoita ilmoitus hälytys tehtävä eräpäivä muistuta etukäteen ajoita rekisteröinti päivät reminders",
         "realtimeSync": "reaaliaikainen synkronointi live yhteys läsnäolo kysely realtime sync",
         "screenCapture": "näytönkaappaussuojaus kuvakaappaus näytön tallennus esto yksityisyys screen capture",
         "showEditTimes": "näytä muokkausajat aikaleimat muokattu päivämäärät muistiinpanot timestamps",
@@ -3402,7 +3460,8 @@
         "timeFormat": "kellonajan muoto kellonaika 24 tunnin 12 tunnin kello ap ip time format am pm",
         "timezone": "aikavyöhyke vyöhyke tz utc iana alue tänään timezone time zone",
         "periodicNotes": "jaksottaiset muistiinpanot viikoittainen kuukausittainen viikko kuukausi kansio malli muoto",
-        "aiHistoryBudget": "keskustelu historia konteksti muisti budjetti merkit agentti chat pyyntö"
+        "aiHistoryBudget": "keskustelu historia konteksti muisti budjetti merkit agentti chat pyyntö",
+        "screenCaptureOverride": "näytönkaappaus ohitus salli poista käytöstä suurennuslasi näytönsuurennusohjelma etätyöpöytä saavutettavuus avaaminen avaus musta ikkuna näyttö screen capture override"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24 tunnin kello",
       "time12": "12 tunnin kello",
       "zoneLabel": "Aikavyöhyke",
-      "zoneHelper": "Vyöhyke, joka ratkaisee, mikä lasketaan tämänpäiväiseksi. Jätä tyhjäksi, niin Myne seuraa tätä laitetta. Muistiinpanoon kirjoittamiasi kellonaikoja ei koskaan muuteta; 09:00 pysyy 09:00 kaikkialla.",
+      "zoneHelper": "Vyöhyke, joka ratkaisee, mikä lasketaan tämänpäiväiseksi ja siten minkä muistiinpanon päivittäiset, viikoittaiset ja kuukausittaiset muistiinpanosi avaavat. Jätä tyhjäksi, niin Myne seuraa tätä laitetta. Valinta säilyy laitekohtaisesti: mikään toinen laite ei korvaa sitä, joten ohitus voi asettaa tämän laitteen eri päivään kuin muut laitteesi. Muistiinpanoon kirjoittamiasi kellonaikoja ei koskaan muuteta; 09:00 pysyy 09:00 kaikkialla.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne ei tunne tuota aikavyöhykettä. Käytä nimeä, kuten Europe/Berlin.",
       "errorSave": "Tuota asetusta ei voitu tallentaa."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Tämän holvin avaaminen vaatii {{required}} MiB muistia, enemmän kuin tämä selain voi antaa ({{available}} MiB). Holvi on kunnossa; avaa se Mynen työpöytäsovelluksessa.",
       "unexpected": "Odottamaton virhe. Yritä uudelleen.",
       "vaultNotFound": "Holvitiedostoa ei löytynyt. Käynnistä sovellus uudelleen.",
-      "vaultUpgraded": "Tämä holvi päivitettiin uudempaan muotoon, jota tämä Mynen versio ei vielä tue. Tietosi ovat kunnossa. Avaa se päivittämällä Myne uusimpaan versioon."
+      "vaultUpgraded": "Tämä holvi päivitettiin uudempaan muotoon, jota tämä Mynen versio ei vielä tue. Tietosi ovat kunnossa. Avaa se päivittämällä Myne uusimpaan versioon.",
+      "openAsImportSource": "Tuonti lukee tätä holvia juuri nyt. Vie tuonti loppuun tai peruuta se, ja avaa sitten tämä holvi."
     },
     "passwordLabel": "Salasana",
     "passwordPlaceholder": "Salasana",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Tämä selain ei tarjoa kryptografista satunnaislukulähdettä."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Näytönkaappaussuojaus pyytää käyttöjärjestelmää pitämään tämän ikkunan poissa kuvakaappauksista ja näytön tallenteista. Se toimii Windows 10:ssä (toukokuun 2020 päivitys) ja uudemmissa; macOS:ssä ja Linuxissa ei ole tähän järjestelmärajapintaa, joten siellä se ei estä kaappausta. Siellä missä se toimii, se piilottaa ikkunan myös etätyöpöytäohjelmilta ja näytönsuurennusohjelmilta, ja juuri siksi tämä poistumistie on olemassa.",
+    "disableConfirm": "Poista suojaus käytöstä",
+    "disableCost": "Käytöstä poistaminen koskee vain tätä laitetta, ja suojaus pysyy pois päältä sekä ennen holvin avaamista että sen jälkeen, kunnes otat sen takaisin käyttöön. Mitään ei lähetetä minnekään eikä yksikään holvin asetus muutu, mutta valinta tallennetaan asetustiedostoon tällä laitteella, ja tuo tiedosto jää sinne senkin jälkeen, kun otat suojauksen takaisin käyttöön.",
+    "disableTitle": "Poistetaanko näytönkaappaussuojaus käytöstä?",
+    "disableTrigger": "Poista näytönkaappaussuojaus käytöstä",
+    "flagNotice": "Tämä istunto käynnistettiin valitsimella --disable-screen-capture-protection, joten suojaus pysyy pois päältä, kunnes suljet Mynen, riippumatta siitä, mitä tämä asetus sanoo.",
+    "restoreBody": "Näytönkaappaussuojaus on poissa käytöstä tällä laitteella. Kun otat sen takaisin käyttöön, käyttöjärjestelmää pyydetään jälleen pitämään tämä ikkuna poissa kuvakaappauksista ja näytön tallenteista, mikä Windows 10:ssä (toukokuun 2020 päivitys) ja uudemmissa piilottaa sen myös etätyöpöytäohjelmilta ja näytönsuurennusohjelmilta. macOS:ssä ja Linuxissa ei ole tähän järjestelmärajapintaa, joten siellä se ei estä kaappausta.",
+    "restoreConfirm": "Ota suojaus käyttöön",
+    "restoreTitle": "Otetaanko näytönkaappaussuojaus takaisin käyttöön?",
+    "restoreTrigger": "Ota näytönkaappaussuojaus käyttöön",
+    "saveFailed": "Tätä ei voitu tallentaa, joten mikään ei muuttunut. Yritä uudelleen tai käynnistä Myne valitsimella --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Tallennettu. Tässä istunnossa suojaus on yhä pois päältä, koska istunto käynnistettiin valitsimella --disable-screen-capture-protection, joten suojaus palaa, kun avaat Mynen seuraavan kerran ilman sitä."
   }
 }

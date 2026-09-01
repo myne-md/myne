@@ -176,7 +176,7 @@
       "createdNotReverted_one": "{{count}} nota creada por la ejecución se dejó tal cual.",
       "createdNotReverted_many": "{{count}} notas creadas por la ejecución se dejaron tal cual.",
       "createdNotReverted_other": "{{count}} notas creadas por la ejecución se dejaron tal cual.",
-      "sessionOnly": "Este deshacer de un toque dura hasta que bloquees la caja fuerte o cierres la aplicación. Después, restaura las notas de una en una desde el historial de versiones de cada nota.",
+      "sessionOnly": "Este deshacer de un toque dura hasta que bloquees la bóveda o cierres la aplicación. Después, restaura las notas de una en una desde el historial de versiones de cada nota.",
       "sessionOnlyLink": "Abrir historial de versiones"
     }
   },
@@ -286,7 +286,7 @@
       "title": "Adjuntos",
       "transcribeDone": "Transcripción completada.",
       "transcribeFailed": "La transcripción falló. Inténtalo de nuevo.",
-      "transcribeTooLong": "Esta grabación es demasiado larga para transcribirla.",
+      "transcribeTooLong": "Esta grabación es demasiado larga para transcribirla. El audio sigue adjunto, así que puedes reproducirlo.",
       "transcribeFeatureOff": "La conversión de voz a texto está desactivada. Actívala en Ajustes → Transcripción.",
       "transcribeModelLoadFailed": "No se pudo cargar el modelo de voz a texto. Reinstala Myne o comprueba tu modelo personalizado en Ajustes → Desarrollador → IA.",
       "transcribeNoModelHint": "Falta el modelo de voz a texto. Al reinstalar Myne se restaura.",
@@ -470,7 +470,7 @@
         "label": "Alternar funciones de IA (beta)"
       },
       "toggleScreenCapture": {
-        "label": "Alternar protección contra captura de pantalla"
+        "label": "Alternar protección contra capturas de pantalla"
       },
       "cycleTheme": {
         "label": "Cambiar tema"
@@ -1900,7 +1900,9 @@
       "moveCollision": "Ahí ya hay una carpeta con ese nombre.",
       "unsettledSave": "Una nota abierta aún no ha terminado de guardarse, así que la carpeta no se ha tocado. Inténtalo de nuevo cuando termine.",
       "renameFailed": "No se pudo cambiar el nombre de la carpeta, así que sigue igual.",
-      "deliberateWriteFailed": "Se cambió el nombre de la carpeta, pero no se pudo guardar uno de sus ajustes. Cada vez que desbloquees, volverá a aparecer una carpeta vacía con el nombre anterior; puedes eliminarla sin riesgo y no cambia nada más. Volver a cambiar el nombre de la carpeta no la quitará."
+      "deliberateWriteFailed": "Se cambió el nombre de la carpeta, pero no se pudo guardar uno de sus ajustes. Cada vez que desbloquees, volverá a aparecer una carpeta vacía con el nombre anterior; puedes eliminarla sin riesgo y no cambia nada más. Volver a cambiar el nombre de la carpeta no la quitará.",
+      "folderListFull": "Myne solo puede recordar un número limitado de carpetas, y esa lista está llena. Esta carpeta sigue funcionando, pero desaparecerá cuando salga su última nota. Si eliminas una carpeta que ya no necesitas, harás sitio.",
+      "folderNotRemembered": "La carpeta se creó, pero Myne no pudo registrarla. Desaparecerá cuando salga su última nota, y en el próximo desbloqueo ya no estará si sigue vacía. Puedes volver a crearla sin riesgo."
     },
     "folderNote": {
       "defaultTitle": "Índice"
@@ -2050,7 +2052,12 @@
         "reasonPermissionDenied": "Myne no tuvo permiso para leer este archivo.",
         "reasonNotFound": "Este archivo ya no estaba cuando Myne llegó a él.",
         "reasonNoSpace": "Este dispositivo se quedó sin espacio.",
-        "reasonUnknown": "Myne no pudo determinar el motivo."
+        "reasonUnknown": "Myne no pudo determinar el motivo.",
+        "foldersNotKeptNote": "{{count}} desaparecerá cuando salga su última nota",
+        "foldersNotKeptNote_many": "{{count}} desaparecerán cuando salga su última nota",
+        "foldersNotKeptNote_one": "{{count}} desaparecerá cuando salga su última nota",
+        "foldersNotKeptNote_other": "{{count}} desaparecerán cuando salga su última nota",
+        "statFoldersNotKept": "Carpetas no conservadas"
       },
       "offer": {
         "body": "Lleva tus notas existentes a Myne. Cada una se cifra a medida que se importa. Nada sale de este dispositivo y tus archivos originales se quedan exactamente donde están.",
@@ -2097,7 +2104,52 @@
           "survives": "Se convierte en una sola nota que contiene la tabla.",
           "loses": "Es una sola nota, no una nota por fila: Myne no es una base de datos. Los archivos muy anchos o muy largos se recortan, y el informe de importación indica en cuánto.",
           "short": "Un único archivo de hoja de cálculo"
+        },
+        "myne": {
+          "label": "Bóveda de Myne",
+          "loses": "El historial de versiones, las notas eliminadas y las plantillas se quedan en la bóveda de origen. Los adjuntos que no use ninguna nota importada se quedan fuera. La bóveda de origen no se modifica y, si la sincronizas, sigue sincronizándose.",
+          "pickerTitle": "Elige la bóveda desde la que importar",
+          "short": "Otra bóveda de este dispositivo",
+          "survives": "Las notas, las carpetas, las etiquetas, los enlaces entre las notas que importas y los adjuntos que esas notas usan. Las palabras que añadiste al diccionario de la bóveda de origen también vienen."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "El historial de versiones se queda en la bóveda desde la que importaste.",
+          "sourceUnchanged": "La bóveda desde la que importaste no se ha modificado. Si la sincronizas, sigue sincronizándose."
+        },
+        "errors": {
+          "alreadyOpen": "Esa bóveda ya está abierta para una importación. Termina o cancela esa importación primero.",
+          "busy": "Hay otra operación de la bóveda en curso. Espera a que termine e inténtalo de nuevo.",
+          "credential": "Esa contraseña o frase de recuperación no abrió la bóveda. Compruébala e inténtalo de nuevo."
+        },
+        "importLabel": "Ponle nombre a esta importación",
+        "importLabelHint": "Si una nota que importas tiene el mismo nombre que otra que ya tienes, y algo de lo que importas enlaza con ella, a la importada se le cambia el nombre usando esto. Usa el mismo nombre si vuelves a ejecutar esta importación y no se traerá nada dos veces.",
+        "importLabelIllegal": "Ese nombre no se puede usar: un nombre de nota no puede contener \\ / | # ^ [ ], ni empezar o terminar con un espacio.",
+        "loading": "Buscando tus otras bóvedas…",
+        "noOtherVaults": "No hay otras bóvedas en este dispositivo desde las que importar. Restaura primero una copia de seguridad y se convertirá en una bóveda desde la que podrás importar aquí.",
+        "opening": "Abriendo…",
+        "passwordLabel": "La contraseña de esa bóveda",
+        "phraseLabel": "La frase de recuperación de 24 palabras de esa bóveda",
+        "report": {
+          "attachmentsCrossed": "Adjuntos traídos",
+          "attachmentsDeduped": "Adjuntos que ya tenías",
+          "attachmentsFailed": "Adjuntos que la bóveda no aceptó",
+          "dictionaryUnreadable": "No se pudo leer el diccionario de la bóveda de origen, así que no se trajo ninguna palabra.",
+          "dictionaryWordsAdded": "Palabras del diccionario traídas",
+          "linksLeftUnresolved": "Enlaces que no se pudieron dirigir a ninguna parte",
+          "linksRetargeted": "Enlaces redirigidos a una nota renombrada",
+          "templatesLeftBehind": "Plantillas, que se quedan fuera",
+          "tombstonedEmbeds": "Contenidos incrustados cuyo archivo ya se había eliminado en el origen",
+          "trashedLeftBehind": "Notas en la papelera de la bóveda de origen, que se quedan fuera",
+          "untitledImported": "Notas sin título traídas"
+        },
+        "unnamedVault": "Bóveda {{n}}",
+        "usePassword": "Usar la contraseña en su lugar",
+        "usePhrase": "Usar la frase de recuperación en su lugar",
+        "vaultLabel": "Importar desde",
+        "vaultPlaceholder": "Elige una bóveda",
+        "wordAria": "Palabra {{number}} de 24"
       }
     },
     "list": {
@@ -2515,7 +2567,8 @@
       "cancelledVaultLocked": "Recuperación cancelada: la bóveda estaba bloqueada.",
       "operationInProgress": "Operación en curso. Espera, por favor.",
       "unexpected": "Error inesperado. Inténtalo de nuevo.",
-      "vaultNotFound": "No se encontró el archivo de la bóveda. Reinicia la aplicación."
+      "vaultNotFound": "No se encontró el archivo de la bóveda. Reinicia la aplicación.",
+      "openAsImportSource": "Ahora mismo hay una importación leyendo esta bóveda. Termina o cancela esa importación y luego recupera esta bóveda."
     },
     "vaultUnreadable": "El archivo de la bóveda no se puede leer. Restaura desde una copia de seguridad.",
     "genericError": "Algo salió mal. Inténtalo de nuevo.",
@@ -2756,7 +2809,7 @@
       "openGraph": "Abrir el grafo"
     },
     "archive": {
-      "helper": "Permite mover las notas a un archivo, fuera de la lista principal. Al desactivarlo, todas las notas archivadas vuelven a su carpeta y se ocultan los controles del archivo.",
+      "helper": "Permite mover las notas a un archivo, fuera de la lista principal. Al desactivarlo, todas las notas archivadas vuelven a su carpeta, se desarchivan todas las carpetas archivadas y se ocultan los controles del archivo. Se aplica a toda la bóveda, en todos los dispositivos.",
       "label": "Archivado",
       "off": "Desactivado",
       "on": "Activado",
@@ -3215,7 +3268,8 @@
       "torLabel": "Enrutar la sincronización a través de Tor"
     },
     "prefs": {
-      "saveError": "No se pudo guardar la preferencia. Inténtalo de nuevo."
+      "saveError": "No se pudo guardar la preferencia. Inténtalo de nuevo.",
+      "folderListFull": "Esa lista de carpetas está llena. Quita una carpeta de la lista antes de añadir otra."
     },
     "reminders": {
       "aria": "Mostrar recordatorios de tareas en este dispositivo",
@@ -3240,7 +3294,7 @@
       "hideVaultNamesHelper": "En un dispositivo con un llavero utilizable, el selector de bóvedas muestra el nombre de una bóveda en cuanto este dispositivo la ha desbloqueado. Con esta opción activada, cada bóveda muestra en su lugar un nombre genérico como Bóveda 2, y ese número se mantiene con la bóveda aunque la lista se reordene.",
       "hideVaultNamesErases": "Al activarla se destruyen las claves que hacen legibles los nombres guardados aquí, por lo que esos nombres no se pueden recuperar en este dispositivo, y no se escribe ningún nombre más mientras siga activada.",
       "hideVaultNamesResidue": "No llega a una copia hecha antes: una copia de seguridad completa del sistema, una imagen de disco o cualquier otra copia de este disco a nivel de sistema hecha mientras se mostraban los nombres contiene tanto los nombres guardados como sus claves.",
-      "hideVaultNamesUnavailable": "Este dispositivo no tiene un llavero utilizable, así que Myne no guarda aquí ningún nombre de bóveda y esta opción no se puede activar. El selector ya muestra un nombre genérico para cada bóveda.",
+      "hideVaultNamesUnavailable": "Myne no puede guardar nombres de bóvedas en esta copia de la aplicación, así que aquí no guarda ninguno y esta opción no se puede activar. El selector ya muestra un nombre genérico para cada bóveda.",
       "hideVaultNamesErrorRead": "No se pudo leer el ajuste actual. Cambia el interruptor para volver a establecerlo.",
       "hideVaultNamesErrorSave": "No se pudo guardar el ajuste, así que sigue como estaba. Si lo estabas activando, puede que ya se hayan destruido algunos nombres guardados; actívalo de nuevo para terminar.",
       "hideVaultNamesErrorErase": "No se pudo destruir uno de los nombres guardados, así que el ajuste se dejó desactivado en lugar de dar por hecho un borrado que no ocurrió. Inténtalo de nuevo.",
@@ -3258,7 +3312,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 h",
       "quickUnlockSubtitleAndroid": "Vuelve a entrar con un PIN tras el bloqueo automático",
-      "quickUnlockSubtitle": "Vuelve a entrar con {{method}} o un PIN tras el bloqueo automático"
+      "quickUnlockSubtitle": "Vuelve a entrar con {{method}} o un PIN tras el bloqueo automático",
+      "screenCaptureOverrideHelper": "Desactiva la protección contra capturas de pantalla solo en este dispositivo, tanto antes de desbloquear una bóveda como después. Activa esta opción si una lupa de pantalla, un software de escritorio remoto o alguien que te ayuda de forma remota ve una ventana negra. No se sincroniza.",
+      "screenCaptureOverrideLabel": "Permitir la captura de pantalla en este dispositivo",
+      "screenCaptureOverrideUnknown": "No se pudo leer el ajuste de captura de pantalla de este dispositivo, así que esta preferencia no se está aplicando. Vuelve a abrir Ajustes para intentarlo de nuevo.",
+      "screenCaptureSuperseded": "Desactivada en este dispositivo. Consulta «Permitir la captura de pantalla en este dispositivo» más abajo. Esta preferencia se conserva y vuelve a aplicarse cuando desactives esa opción.",
+      "screenCaptureSupersededByFlag": "Desactivada en esta sesión, porque Myne se inició con --disable-screen-capture-protection. Esta preferencia se conserva y vuelve a aplicarse la próxima vez que abras Myne sin ese parámetro."
     },
     "quickUnlock": {
       "errorBusy": "Hay otra operación de la bóveda en curso. Inténtalo de nuevo en un momento.",
@@ -3484,7 +3543,7 @@
         "newNoteLocation": "ubicación de notas nuevas carpeta predeterminada dónde se crean",
         "torRouting": "tor enrutamiento onion proxy red dirección ip ubicación ocultar sincronización anonimato",
         "quickUnlock": "desbloqueo rápido pin touch id biométrico huella cara desbloquear",
-        "reminders": "recordatorios notificar notificación aviso tarea vencimiento recordar",
+        "reminders": "recordatorios notificar notificación aviso tarea vencimiento recordar horizonte registro antelación días",
         "realtimeSync": "sincronización en tiempo real sync conexión directa presencia sondeo",
         "screenCapture": "captura de pantalla protección grabación bloquear privacidad screenshot",
         "showEditTimes": "mostrar horas de edición marcas de tiempo fechas modificación notas",
@@ -3512,7 +3571,8 @@
         "timeFormat": "formato de hora 24 horas 12 horas reloj am pm",
         "timezone": "zona horaria huso horario timezone tz utc iana región hoy",
         "periodicNotes": "notas periódicas semanal mensual semana mes carpeta plantilla formato",
-        "aiHistoryBudget": "conversación historial contexto memoria presupuesto caracteres agente chat solicitud"
+        "aiHistoryBudget": "conversación historial contexto memoria presupuesto caracteres agente chat solicitud",
+        "screenCaptureOverride": "captura de pantalla anular permitir desactivar lupa escritorio remoto accesibilidad desbloqueo pantalla negra screen capture"
       }
     },
     "dateTime": {
@@ -3525,7 +3585,7 @@
       "time24": "24 horas",
       "time12": "12 horas",
       "zoneLabel": "Zona horaria",
-      "zoneHelper": "Qué zona decide qué cuenta como hoy. Déjalo vacío para seguir la de este dispositivo. Las horas que escribes en una nota nunca se cambian: las 09:00 siguen siendo las 09:00 en todas partes.",
+      "zoneHelper": "Qué zona decide qué cuenta como hoy y, por tanto, qué nota abren tus notas diarias, semanales y mensuales. Déjalo vacío para seguir la de este dispositivo. La elección se fija por dispositivo: ningún otro dispositivo la sobrescribe, así que una anulación puede dejar este dispositivo en un día distinto al de los demás. Las horas que escribes en una nota nunca se cambian: las 09:00 siguen siendo las 09:00 en todas partes.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne no conoce esa zona horaria. Usa un nombre como Europe/Berlin.",
       "errorSave": "No se pudo guardar ese ajuste."
@@ -3998,7 +4058,8 @@
       "kdfMemoryExceedsHost": "Esta bóveda necesita {{required}} MiB de memoria para abrirse, más de lo que este navegador puede darle ({{available}} MiB). La bóveda está bien; ábrela en la aplicación de escritorio de Myne.",
       "unexpected": "Error inesperado. Inténtalo de nuevo.",
       "vaultNotFound": "No se encontró el archivo de la bóveda. Reinicia la aplicación.",
-      "vaultUpgraded": "Esta bóveda se actualizó a un formato más nuevo que esta versión de Myne aún no admite. Tus datos están bien: actualiza Myne a la última versión para abrirla."
+      "vaultUpgraded": "Esta bóveda se actualizó a un formato más nuevo que esta versión de Myne aún no admite. Tus datos están bien: actualiza Myne a la última versión para abrirla.",
+      "openAsImportSource": "Ahora mismo hay una importación leyendo esta bóveda. Termina o cancela esa importación y luego desbloquea esta bóveda."
     },
     "passwordLabel": "Contraseña",
     "passwordPlaceholder": "Contraseña",
@@ -4565,5 +4626,19 @@
         "crypto-getrandomvalues": "Este navegador no ofrece una fuente criptográfica de números aleatorios."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "La protección contra capturas de pantalla pide al sistema operativo que deje esta ventana fuera de las capturas de pantalla y las grabaciones de pantalla. Es efectiva en Windows 10 (actualización de mayo de 2020) y posteriores; macOS y Linux no ofrecen una API del sistema para esto, así que allí no puede bloquear la captura. Donde sí funciona, también oculta la ventana al software de escritorio remoto y a las lupas de pantalla, y por eso existe esta forma de desactivarla.",
+    "disableConfirm": "Desactivar la protección",
+    "disableCost": "Si la desactivas, el cambio se aplica solo a este dispositivo y la protección sigue desactivada hasta que vuelvas a activarla, tanto antes de desbloquear una bóveda como después. No se envía nada a ninguna parte ni cambia ningún ajuste de la bóveda, pero la elección se guarda en un archivo de ajustes de este dispositivo, y ese archivo sigue ahí después de que vuelvas a activar la protección.",
+    "disableTitle": "¿Desactivar la protección contra capturas de pantalla?",
+    "disableTrigger": "Desactivar la protección contra capturas de pantalla",
+    "flagNotice": "Esta sesión se inició con --disable-screen-capture-protection, así que la protección seguirá desactivada hasta que salgas de la aplicación, diga lo que diga este ajuste.",
+    "restoreBody": "La protección contra capturas de pantalla está desactivada en este dispositivo. Al volver a activarla se pide al sistema operativo que deje otra vez esta ventana fuera de las capturas de pantalla y las grabaciones de pantalla, lo que en Windows 10 (actualización de mayo de 2020) y posteriores también la oculta al software de escritorio remoto y a las lupas de pantalla. En macOS y Linux no hay una API del sistema para esto, así que allí no puede bloquear la captura.",
+    "restoreConfirm": "Activar la protección",
+    "restoreTitle": "¿Volver a activar la protección contra capturas de pantalla?",
+    "restoreTrigger": "Activar la protección contra capturas de pantalla",
+    "saveFailed": "No se pudo guardar, así que no ha cambiado nada. Inténtalo de nuevo o inicia Myne con --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Guardado. Esta sesión sigue con la protección desactivada porque se inició con --disable-screen-capture-protection, así que volverá la próxima vez que abras Myne sin ese parámetro."
   }
 }

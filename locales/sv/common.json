@@ -260,7 +260,7 @@
       "title": "Bilagor",
       "transcribeDone": "Transkriberingen är klar.",
       "transcribeFailed": "Transkriberingen misslyckades. Försök igen.",
-      "transcribeTooLong": "Den här inspelningen är för lång för att transkriberas.",
+      "transcribeTooLong": "Den här inspelningen är för lång för att transkriberas. Ljudet finns kvar som bilaga, så du kan fortfarande spela upp det.",
       "transcribeFeatureOff": "Tal till text är avstängt. Slå på det i Inställningar → Transkribering.",
       "transcribeModelLoadFailed": "Kunde inte läsa in tal-till-text-modellen. Installera om Myne, eller kontrollera din egen modell i Inställningar → Utvecklare → AI.",
       "transcribeNoModelHint": "Tal-till-text-modellen saknas. Att installera om Myne återställer den.",
@@ -1830,7 +1830,9 @@
       "moveCollision": "Det finns redan en mapp med det namnet där.",
       "unsettledSave": "En öppen anteckning har inte sparats färdigt, så mappen lämnades orörd. Försök igen när den har sparats.",
       "renameFailed": "Det gick inte att byta namn på mappen, så den är oförändrad.",
-      "deliberateWriteFailed": "Mappen fick ett nytt namn, men en av dess inställningar kunde inte sparas. En tom mapp dyker upp igen under det gamla namnet varje gång du låser upp; det är säkert att ta bort den, och inget annat påverkas. Att byta namn på mappen igen tar inte bort den."
+      "deliberateWriteFailed": "Mappen fick ett nytt namn, men en av dess inställningar kunde inte sparas. En tom mapp dyker upp igen under det gamla namnet varje gång du låser upp; det är säkert att ta bort den, och inget annat påverkas. Att byta namn på mappen igen tar inte bort den.",
+      "folderListFull": "Myne kan komma ihåg ett begränsat antal mappar, och den listan är full. Den här mappen fungerar fortfarande, men den försvinner när dess sista anteckning lämnar den. Att ta bort en mapp du inte längre behöver ger plats.",
+      "folderNotRemembered": "Mappen skapades, men Myne kunde inte registrera den. Den försvinner när dess sista anteckning lämnar den, och den är borta vid nästa upplåsning om den fortfarande är tom. Det är säkert att skapa den igen."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne fick inte läsa den här filen.",
         "reasonNotFound": "Den här filen var borta när Myne kom fram till den.",
         "reasonNoSpace": "Enheten fick slut på utrymme.",
-        "reasonUnknown": "Myne kunde inte säga varför."
+        "reasonUnknown": "Myne kunde inte säga varför.",
+        "foldersNotKeptNote": "{{count}} försvinner när dess sista anteckning lämnar den",
+        "foldersNotKeptNote_one": "{{count}} försvinner när dess sista anteckning lämnar den",
+        "foldersNotKeptNote_other": "{{count}} försvinner när deras sista anteckning lämnar dem",
+        "statFoldersNotKept": "Mappar som inte behölls"
       },
       "offer": {
         "body": "Ta med dina befintliga anteckningar till Myne. Varje anteckning krypteras när den importeras. Ingenting lämnar den här enheten, och dina originalfiler stannar exakt där de är.",
@@ -2021,7 +2027,52 @@
           "survives": "Blir en enda anteckning som innehåller tabellen.",
           "loses": "Det blir en anteckning, inte en anteckning per rad: Myne är ingen databas. Mycket breda eller mycket långa filer beskärs, och importrapporten anger hur mycket.",
           "short": "En kalkylarksfil"
+        },
+        "myne": {
+          "label": "Myne-valv",
+          "loses": "Versionshistorik, borttagna anteckningar och mallar stannar i källvalvet. Bilagor som ingen importerad anteckning använder lämnas kvar. Källvalvet ändras inte och, om du synkroniserar det, fortsätter det att synkroniseras.",
+          "pickerTitle": "Välj valvet att importera från",
+          "short": "Ett annat valv på den här enheten",
+          "survives": "Anteckningar, mappar, taggar, länkar mellan de anteckningar du importerar, och även de bilagor som de anteckningarna använder. Ord du har lagt till i källvalvets ordlista följer också med."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Versionshistoriken stannar i valvet du importerade från.",
+          "sourceUnchanged": "Valvet du importerade från har inte ändrats. Om du synkroniserar det fortsätter det att synkroniseras."
+        },
+        "errors": {
+          "alreadyOpen": "Det valvet är redan öppet för en import. Slutför eller avbryt den importen först.",
+          "busy": "En annan valvåtgärd pågår. Vänta tills den är klar och försök igen.",
+          "credential": "Det lösenordet eller den återställningsfrasen öppnade inte valvet. Kontrollera och försök igen."
+        },
+        "importLabel": "Ge den här importen ett namn",
+        "importLabelHint": "Om en anteckning du importerar har samma namn som en du redan har, och något du importerar länkar till den, får den importerade ett nytt namn med det här. Behåll samma namn om du kör den här importen igen, så tas ingenting in två gånger.",
+        "importLabelIllegal": "Det namnet kan inte användas: ett anteckningsnamn får inte innehålla \\ / | # ^ [ ], och får inte börja eller sluta med ett mellanslag.",
+        "loading": "Letar efter dina andra valv…",
+        "noOtherVaults": "Det finns inga andra valv på den här enheten att importera från. Återställ en säkerhetskopia först, så blir den ett valv du kan importera från här.",
+        "opening": "Öppnar…",
+        "passwordLabel": "Det valvets lösenord",
+        "phraseLabel": "Det valvets återställningsfras med 24 ord",
+        "report": {
+          "attachmentsCrossed": "Bilagor som följde med",
+          "attachmentsDeduped": "Bilagor du redan hade",
+          "attachmentsFailed": "Bilagor som valvet inte tog emot",
+          "dictionaryUnreadable": "Källvalvets ordlista kunde inte läsas, så inga ord följde med.",
+          "dictionaryWordsAdded": "Ord från ordlistan som följde med",
+          "linksLeftUnresolved": "Länkar som inte kunde peka någonstans",
+          "linksRetargeted": "Länkar som pekades om till en omdöpt anteckning",
+          "templatesLeftBehind": "Mallar, lämnade kvar",
+          "tombstonedEmbeds": "Inbäddningar vars fil redan var borttagen i källan",
+          "trashedLeftBehind": "Anteckningar i källvalvets papperskorg, lämnade kvar",
+          "untitledImported": "Namnlösa anteckningar som följde med"
+        },
+        "unnamedVault": "Valv {{n}}",
+        "usePassword": "Använd lösenordet i stället",
+        "usePhrase": "Använd återställningsfrasen i stället",
+        "vaultLabel": "Importera från",
+        "vaultPlaceholder": "Välj ett valv",
+        "wordAria": "Ord {{number}} av 24"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Återställning avbruten: valvet var låst.",
       "operationInProgress": "Åtgärd pågår. Vänta.",
       "unexpected": "Oväntat fel. Försök igen.",
-      "vaultNotFound": "Valvfilen hittades inte. Starta om appen."
+      "vaultNotFound": "Valvfilen hittades inte. Starta om appen.",
+      "openAsImportSource": "En import läser det här valvet just nu. Slutför eller avbryt den importen och återställ sedan det här valvet."
     },
     "vaultUnreadable": "Valvfilen går inte att läsa. Återställ från en säkerhetskopia.",
     "genericError": "Något gick fel. Försök igen.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Öppna grafen"
     },
     "archive": {
-      "helper": "Låt anteckningar flyttas till ett arkiv, utanför huvudlistan. Att stänga av detta återställer varje arkiverad anteckning till sin mapp och döljer arkivkontrollerna.",
+      "helper": "Låt anteckningar flyttas till ett arkiv, utanför huvudlistan. Att stänga av detta återställer varje arkiverad anteckning till sin mapp, avarkiverar varje arkiverad mapp och döljer arkivkontrollerna. Det gäller hela valvet, på alla enheter.",
       "label": "Arkivering",
       "off": "Av",
       "on": "På",
@@ -3109,7 +3161,8 @@
       "torLabel": "Dirigera synkroniseringen via Tor"
     },
     "prefs": {
-      "saveError": "Kunde inte spara inställningen. Försök igen."
+      "saveError": "Kunde inte spara inställningen. Försök igen.",
+      "folderListFull": "Den mapplistan är full. Ta bort en mapp från den innan du lägger till en till."
     },
     "reminders": {
       "aria": "Visa uppgiftspåminnelser på den här enheten",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "På en enhet med en användbar nyckelring visar valvväljaren ett valvs namn så snart den här enheten har låst upp det. Med det här på visar varje valv i stället en platshållare, till exempel Valv 2, och det numret följer valvet oavsett hur listan sorteras om.",
       "hideVaultNamesErases": "Att slå på det förstör de nycklar som gör de här lagrade namnen läsbara, så namnen kan inte återskapas på den här enheten, och inget ytterligare namn skrivs så länge det är på.",
       "hideVaultNamesResidue": "Det når inte en kopia som togs tidigare: en fullständig systemsäkerhetskopia, en diskavbildning eller någon annan kopia på systemnivå av den här disken som gjordes medan namnen visades innehåller både de lagrade namnen och deras nycklar.",
-      "hideVaultNamesUnavailable": "Den här enheten har ingen användbar nyckelring, så Myne lagrar inget valvnamn här och det här alternativet kan inte slås på. Väljaren visar redan en platshållare för varje valv.",
+      "hideVaultNamesUnavailable": "Myne kan inte lagra valvnamn i den här kopian av appen, så inga valvnamn lagras här och det här alternativet kan inte slås på. Väljaren visar redan en platshållare för varje valv.",
       "hideVaultNamesErrorRead": "Kunde inte läsa den aktuella inställningen. Slå om reglaget för att ställa in den igen.",
       "hideVaultNamesErrorSave": "Kunde inte spara inställningen, så den är oförändrad. Om du höll på att slå på den kan vissa lagrade namn redan ha förstörts; slå på den igen för att slutföra.",
       "hideVaultNamesErrorErase": "Ett lagrat namn kunde inte förstöras, så inställningen lämnades avstängd i stället för att påstå en radering som inte skedde. Försök igen.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 tim",
       "quickUnlockSubtitleAndroid": "Ange på nytt med en PIN-kod efter automatisk låsning",
-      "quickUnlockSubtitle": "Ange på nytt med {{method}} eller en PIN-kod efter automatisk låsning"
+      "quickUnlockSubtitle": "Ange på nytt med {{method}} eller en PIN-kod efter automatisk låsning",
+      "screenCaptureOverrideHelper": "Stänger av skyddet mot skärminspelning bara på den här enheten, både innan du låser upp ett valv och efter. Slå på det här alternativet om en skärmförstorare, ett fjärrskrivbordsprogram eller någon som hjälper dig på distans ser ett svart fönster. Alternativet synkroniseras inte.",
+      "screenCaptureOverrideLabel": "Tillåt skärminspelning på den här enheten",
+      "screenCaptureOverrideUnknown": "Den här enhetens inställning för skärminspelning kunde inte läsas, så det här alternativet tillämpas inte. Öppna Inställningar igen för att försöka på nytt.",
+      "screenCaptureSuperseded": "Avstängt på den här enheten. Se ”Tillåt skärminspelning på den här enheten” nedan. Den här inställningen behålls och gäller igen när du stänger av det alternativet.",
+      "screenCaptureSupersededByFlag": "Avstängt för den här sessionen, eftersom Myne startades med --disable-screen-capture-protection. Den här inställningen behålls och gäller igen nästa gång du öppnar Myne utan den flaggan."
     },
     "quickUnlock": {
       "errorBusy": "En annan valvåtgärd pågår. Försök igen om en stund.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "ny anteckning plats mapp standard var skapas nya anteckningar location",
         "torRouting": "tor routning onion proxy nätverk ip-adress plats dölj synkronisering anonymitet",
         "quickUnlock": "snabbupplåsning snabb upplåsning pin touch id biometrisk ansikte lås upp quick unlock",
-        "reminders": "påminnelser avisera avisering notis larm uppgift förfaller påminn",
+        "reminders": "påminnelser avisera avisering notis larm uppgift förfaller påminn schemalägg i förväg horisont registrering dagar reminders",
         "realtimeSync": "realtidssynkronisering realtid direkt synkronisering anslutning live polling sync realtime",
         "screenCapture": "skärmdump skärminspelning skydd blockera sekretess integritet screenshot capture",
         "showEditTimes": "visa redigeringstider tidsstämplar ändrad datum anteckningar timestamps",
@@ -3402,7 +3460,8 @@
         "timeFormat": "tidsformat tid 24-timmars 12-timmars klocka am pm time format 24 hour 12 hour",
         "timezone": "tidszon zon tz utc iana region idag timezone time zone",
         "periodicNotes": "periodiska anteckningar veckovis månatlig vecka månad mapp mall format",
-        "aiHistoryBudget": "konversation historik kontext minne budget tecken agent chatt förfrågan"
+        "aiHistoryBudget": "konversation historik kontext minne budget tecken agent chatt förfrågan",
+        "screenCaptureOverride": "skärminspelning skärmdump tillåt stäng av åsidosätt förstoringsglas skärmförstorare fjärrskrivbord tillgänglighet upplåsning låsskärm svart fönster screen capture override"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24-timmars",
       "time12": "12-timmars",
       "zoneLabel": "Tidszon",
-      "zoneHelper": "Vilken zon som avgör vad som räknas som idag. Lämna tomt för att följa den här enheten. Tider du skriver i en anteckning ändras aldrig; 09:00 förblir 09:00 överallt.",
+      "zoneHelper": "Vilken zon som avgör vad som räknas som idag, och därmed vilken anteckning dina dagliga, veckovisa och månatliga anteckningar öppnar. Lämna tomt för att följa den här enheten. Valet avgörs per enhet: ingen annan enhet skriver över det, så en egen inställning kan sätta den här enheten på en annan dag än dina andra. Tider du skriver i en anteckning ändras aldrig; 09:00 förblir 09:00 överallt.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne känner inte till den tidszonen. Använd ett namn som Europe/Berlin.",
       "errorSave": "Kunde inte spara inställningen."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Det här valvet behöver {{required}} MiB minne för att öppnas, mer än den här webbläsaren kan ge det ({{available}} MiB). Valvet är oskadat; öppna det i Mynes skrivbordsapp.",
       "unexpected": "Oväntat fel. Försök igen.",
       "vaultNotFound": "Valvfilen hittades inte. Starta om appen.",
-      "vaultUpgraded": "Det här valvet uppgraderades till ett nyare format som den här versionen av Myne inte stöder ännu. Dina data är oskadade. Uppdatera Myne till den senaste versionen för att öppna det."
+      "vaultUpgraded": "Det här valvet uppgraderades till ett nyare format som den här versionen av Myne inte stöder ännu. Dina data är oskadade. Uppdatera Myne till den senaste versionen för att öppna det.",
+      "openAsImportSource": "En import läser det här valvet just nu. Slutför eller avbryt den importen och lås sedan upp det här valvet."
     },
     "passwordLabel": "Lösenord",
     "passwordPlaceholder": "Lösenord",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Den här webbläsaren erbjuder ingen kryptografisk slumptalskälla."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Skyddet mot skärminspelning ber operativsystemet att hålla det här fönstret utanför skärmdumpar och skärminspelningar. Det fungerar på Windows 10 (May 2020 Update) och senare; macOS och Linux saknar system-API för det, så där kan inspelning inte blockeras. Där det fungerar döljs fönstret bland annat för fjärrskrivbordsprogram och skärmförstorare, och det är därför den här utvägen finns.",
+    "disableConfirm": "Stäng av skyddet",
+    "disableCost": "Att stänga av det gäller bara den här enheten, och det förblir avstängt tills du slår på det igen, både innan du låser upp ett valv och efter. Ingenting skickas någonstans och ingen valvinställning ändras, men valet sparas i en inställningsfil på den här enheten, och den filen ligger kvar där även efter att du slagit på skyddet igen.",
+    "disableTitle": "Stäng av skyddet mot skärminspelning?",
+    "disableTrigger": "Stäng av skyddet mot skärminspelning",
+    "flagNotice": "Den här sessionen startades med --disable-screen-capture-protection, så skyddet förblir avstängt tills du avslutar Myne, oavsett vad den här inställningen säger.",
+    "restoreBody": "Skyddet mot skärminspelning är avstängt på den här enheten. Att slå på det igen ber operativsystemet att åter hålla det här fönstret utanför skärmdumpar och skärminspelningar, vilket på Windows 10 (May 2020 Update) och senare också döljer det för fjärrskrivbordsprogram och skärmförstorare. På macOS och Linux finns inget system-API för det, så där kan inspelning inte blockeras.",
+    "restoreConfirm": "Slå på skyddet",
+    "restoreTitle": "Slå på skyddet mot skärminspelning igen?",
+    "restoreTrigger": "Slå på skyddet mot skärminspelning",
+    "saveFailed": "Det kunde inte sparas, så ingenting ändrades. Försök igen, eller starta Myne med --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Sparat. Den här sessionen har fortfarande skyddet avstängt eftersom den startades med --disable-screen-capture-protection, så skyddet kommer tillbaka nästa gång du öppnar Myne utan den flaggan."
   }
 }

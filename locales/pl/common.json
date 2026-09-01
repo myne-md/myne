@@ -312,7 +312,7 @@
       "title": "Załączniki",
       "transcribeDone": "Transkrypcja zakończona.",
       "transcribeFailed": "Transkrypcja nie powiodła się. Spróbuj ponownie.",
-      "transcribeTooLong": "To nagranie jest zbyt długie, aby je transkrybować.",
+      "transcribeTooLong": "To nagranie jest zbyt długie, aby je transkrybować. Dźwięk pozostaje załączony, więc nadal możesz go odtworzyć.",
       "transcribeFeatureOff": "Zamiana mowy na tekst jest wyłączona. Włącz ją w Ustawienia → Transkrypcja.",
       "transcribeModelLoadFailed": "Nie udało się załadować modelu zamiany mowy na tekst. Zainstaluj Myne ponownie lub sprawdź swój własny model w Ustawienia → Deweloper → AI.",
       "transcribeNoModelHint": "Brakuje modelu zamiany mowy na tekst. Ponowna instalacja Myne go przywraca.",
@@ -1860,7 +1860,7 @@
       "folderDeleteConfirm_one": "Przenieść {{count}} notatkę do kosza?",
       "folderDeleteConfirm_few": "Przenieść {{count}} notatki do kosza?",
       "folderDeleteConfirm_many": "Przenieść {{count}} notatek do kosza?",
-      "folderDeleteConfirm_other": "Przenieść {{count}} notatek do kosza?",
+      "folderDeleteConfirm_other": "Przenieść {{count}} notatki do kosza?",
       "folderDeleteConfirmCta": "Przenieś do kosza",
       "folderDeleteError": "Nie udało się przenieść notatek z tego folderu do kosza. Spróbuj ponownie.",
       "folderDeleteTitle": "Przenieść ten folder do kosza?",
@@ -1970,7 +1970,9 @@
       "moveCollision": "W tym miejscu jest już folder o takiej nazwie.",
       "unsettledSave": "Otwarta notatka nie zakończyła jeszcze zapisywania, więc folder pozostał nietknięty. Spróbuj ponownie, gdy zapis się zakończy.",
       "renameFailed": "Nie udało się zmienić nazwy folderu, więc pozostał on bez zmian.",
-      "deliberateWriteFailed": "Nazwa folderu została zmieniona, ale jednego z jego ustawień nie udało się zapisać. Przy każdym odblokowaniu pod starą nazwą będzie pojawiać się pusty folder; można go bezpiecznie usunąć, co nie zmieni niczego innego. Ponowna zmiana nazwy folderu go nie usunie."
+      "deliberateWriteFailed": "Nazwa folderu została zmieniona, ale jednego z jego ustawień nie udało się zapisać. Przy każdym odblokowaniu pod starą nazwą będzie pojawiać się pusty folder; można go bezpiecznie usunąć, co nie zmieni niczego innego. Ponowna zmiana nazwy folderu go nie usunie.",
+      "folderListFull": "Myne może zapamiętać ograniczoną liczbę folderów, a ta lista jest pełna. Ten folder nadal działa, ale zniknie, gdy opuści go ostatnia notatka. Usunięcie folderu, którego już nie potrzebujesz, zwolni miejsce.",
+      "folderNotRemembered": "Folder został utworzony, ale Myne nie mogło go zapamiętać. Zniknie, gdy opuści go ostatnia notatka, a przy następnym odblokowaniu przepadnie, jeśli nadal będzie pusty. Ponowne utworzenie go jest bezpieczne."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -2126,7 +2128,13 @@
         "reasonPermissionDenied": "Myne nie miało uprawnień do odczytu tego pliku.",
         "reasonNotFound": "Tego pliku już nie było, gdy Myne do niego dotarło.",
         "reasonNoSpace": "Na tym urządzeniu zabrakło miejsca.",
-        "reasonUnknown": "Myne nie potrafi podać przyczyny."
+        "reasonUnknown": "Myne nie potrafi podać przyczyny.",
+        "foldersNotKeptNote": "{{count}} zniknie, gdy opuści go ostatnia notatka",
+        "foldersNotKeptNote_few": "{{count}} znikną, gdy opuści je ostatnia notatka",
+        "foldersNotKeptNote_many": "{{count}} zniknie, gdy opuści je ostatnia notatka",
+        "foldersNotKeptNote_one": "{{count}} zniknie, gdy opuści go ostatnia notatka",
+        "foldersNotKeptNote_other": "{{count}} zniknie, gdy opuści je ostatnia notatka",
+        "statFoldersNotKept": "Niezachowane foldery"
       },
       "offer": {
         "body": "Przenieś swoje istniejące notatki do Myne. Każda z nich jest szyfrowana podczas importu. Nic nie opuszcza tego urządzenia, a Twoje oryginalne pliki pozostają dokładnie tam, gdzie były.",
@@ -2173,7 +2181,52 @@
           "survives": "Staje się jedną notatką zawierającą tabelę.",
           "loses": "To jedna notatka, a nie jedna notatka na wiersz: Myne nie jest bazą danych. Bardzo szerokie lub bardzo długie pliki są przycinane, a raport importu podaje, o ile.",
           "short": "Jeden plik arkusza kalkulacyjnego"
+        },
+        "myne": {
+          "label": "Skarbiec Myne",
+          "loses": "Historia wersji, usunięte notatki i szablony pozostają w źródłowym skarbcu. Załączniki, z których nie korzysta żadna zaimportowana notatka, zostają pominięte. Źródłowy skarbiec nie jest zmieniany i, jeśli go synchronizujesz, nadal się synchronizuje.",
+          "pickerTitle": "Wybierz skarbiec, z którego chcesz importować",
+          "short": "Inny skarbiec na tym urządzeniu",
+          "survives": "Notatki, foldery, tagi, linki między importowanymi notatkami oraz załączniki, z których te notatki korzystają. Przechodzą też słowa dodane do słownika źródłowego skarbca."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Historia wersji pozostaje w skarbcu, z którego pochodzi import.",
+          "sourceUnchanged": "Skarbiec, z którego pochodzi import, nie został zmieniony. Jeśli go synchronizujesz, nadal się synchronizuje."
+        },
+        "errors": {
+          "alreadyOpen": "Ten skarbiec jest już otwarty na potrzeby importu. Najpierw zakończ lub anuluj tamten import.",
+          "busy": "Trwa inna operacja na skarbcu. Poczekaj na jej zakończenie i spróbuj ponownie.",
+          "credential": "Tym hasłem lub frazą odzyskiwania nie udało się otworzyć skarbca. Sprawdź je i spróbuj ponownie."
+        },
+        "importLabel": "Nazwij ten import",
+        "importLabelHint": "Jeśli importowana notatka nazywa się tak samo jak notatka, którą już masz, i coś z tego importu do niej linkuje, zaimportowana notatka zostanie przemianowana przy użyciu tej nazwy. Jeśli powtórzysz ten import, zachowaj tę samą nazwę, a nic nie zostanie zaimportowane dwa razy.",
+        "importLabelIllegal": "Tej nazwy nie można użyć: nazwa notatki nie może zawierać \\ / | # ^ [ ], nie może też zaczynać się ani kończyć spacją.",
+        "loading": "Szukanie Twoich innych skarbców…",
+        "noOtherVaults": "Na tym urządzeniu nie ma innych skarbców, z których można importować. Najpierw przywróć kopię zapasową — stanie się skarbcem, z którego możesz tu zaimportować.",
+        "opening": "Otwieranie…",
+        "passwordLabel": "Hasło tamtego skarbca",
+        "phraseLabel": "24-słowna fraza odzyskiwania tamtego skarbca",
+        "report": {
+          "attachmentsCrossed": "Przeniesione załączniki",
+          "attachmentsDeduped": "Załączniki, które już masz",
+          "attachmentsFailed": "Załączniki, których skarbiec nie przyjął",
+          "dictionaryUnreadable": "Nie udało się odczytać słownika źródłowego skarbca, więc nie przeniesiono żadnych słów.",
+          "dictionaryWordsAdded": "Przeniesione słowa ze słownika",
+          "linksLeftUnresolved": "Linki, których nie dało się nigdzie skierować",
+          "linksRetargeted": "Linki skierowane na przemianowaną notatkę",
+          "templatesLeftBehind": "Pozostawione szablony",
+          "tombstonedEmbeds": "Osadzenia, których plik był już usunięty w źródle",
+          "trashedLeftBehind": "Pozostawione notatki z kosza źródłowego skarbca",
+          "untitledImported": "Przeniesione notatki bez tytułu"
+        },
+        "unnamedVault": "Skarbiec {{n}}",
+        "usePassword": "Użyj hasła zamiast tego",
+        "usePhrase": "Użyj frazy odzyskiwania zamiast tego",
+        "vaultLabel": "Importuj z",
+        "vaultPlaceholder": "Wybierz skarbiec",
+        "wordAria": "Słowo {{number}} z 24"
       }
     },
     "list": {
@@ -2606,7 +2659,8 @@
       "cancelledVaultLocked": "Odzyskiwanie anulowane: skarbiec został zablokowany.",
       "operationInProgress": "Operacja w toku. Poczekaj.",
       "unexpected": "Nieoczekiwany błąd. Spróbuj ponownie.",
-      "vaultNotFound": "Nie znaleziono pliku skarbca. Uruchom ponownie aplikację."
+      "vaultNotFound": "Nie znaleziono pliku skarbca. Uruchom ponownie aplikację.",
+      "openAsImportSource": "Import właśnie czyta ten skarbiec. Zakończ lub anuluj ten import, a potem odzyskaj ten skarbiec."
     },
     "vaultUnreadable": "Nie można odczytać pliku sejfu. Przywróć z kopii zapasowej.",
     "genericError": "Coś poszło nie tak. Spróbuj ponownie.",
@@ -2852,7 +2906,7 @@
       "openGraph": "Otwórz graf"
     },
     "archive": {
-      "helper": "Pozwól na przenoszenie notatek do Archiwum, poza główną listę. Wyłączenie tej opcji przywraca każdą zarchiwizowaną notatkę do jej folderu i ukrywa elementy sterujące archiwum.",
+      "helper": "Pozwól na przenoszenie notatek do Archiwum, poza główną listę. Wyłączenie tej opcji przywraca każdą zarchiwizowaną notatkę do jej folderu, cofa archiwizację każdego zarchiwizowanego folderu i ukrywa elementy sterujące archiwum. Dotyczy całego skarbca, na każdym urządzeniu.",
       "label": "Archiwizacja",
       "off": "Wył.",
       "on": "Wł.",
@@ -3321,7 +3375,8 @@
       "torLabel": "Kieruj synchronizację przez Tor"
     },
     "prefs": {
-      "saveError": "Nie udało się zapisać preferencji. Spróbuj ponownie."
+      "saveError": "Nie udało się zapisać preferencji. Spróbuj ponownie.",
+      "folderListFull": "Ta lista folderów jest pełna. Usuń z niej folder, zanim dodasz kolejny."
     },
     "reminders": {
       "aria": "Pokazuj przypomnienia o zadaniach na tym urządzeniu",
@@ -3346,7 +3401,7 @@
       "hideVaultNamesHelper": "Na urządzeniu ze sprawnym systemowym magazynem kluczy ekran wyboru skarbca pokazuje nazwę skarbca, gdy to urządzenie choć raz go odblokowało. Przy włączonej opcji każdy skarbiec pokazuje zamiast tego nazwę zastępczą, na przykład Skarbiec 2, a ten numer zostaje przy skarbcu niezależnie od tego, jak zmieni się kolejność listy.",
       "hideVaultNamesErases": "Włączenie niszczy klucze, dzięki którym przechowywane tutaj nazwy dają się odczytać, więc tych nazw nie da się odzyskać na tym urządzeniu, a dopóki opcja pozostaje włączona, żadna kolejna nazwa nie jest zapisywana.",
       "hideVaultNamesResidue": "Nie sięgnie do kopii wykonanej wcześniej: pełna kopia systemu, obraz dysku czy dowolna inna systemowa kopia tego dysku zrobiona, gdy nazwy były widoczne, zawiera zarówno zapisane nazwy, jak i ich klucze.",
-      "hideVaultNamesUnavailable": "To urządzenie nie ma sprawnego systemowego magazynu kluczy, więc Myne nie przechowuje tu żadnej nazwy skarbca i tej opcji nie da się włączyć. Ekran wyboru skarbca już teraz pokazuje nazwę zastępczą dla każdego skarbca.",
+      "hideVaultNamesUnavailable": "Ta kopia aplikacji nie może przechowywać nazw skarbców, więc Myne nie przechowuje tu żadnej i tej opcji nie da się włączyć. Ekran wyboru skarbca już teraz pokazuje nazwę zastępczą dla każdego skarbca.",
       "hideVaultNamesErrorRead": "Nie udało się odczytać bieżącego ustawienia. Przestaw przełącznik, aby ustawić je ponownie.",
       "hideVaultNamesErrorSave": "Nie udało się zapisać ustawienia, więc pozostaje bez zmian. Jeśli włączałeś(-aś) tę opcję, część zapisanych nazw mogła już zostać zniszczona; włącz ją ponownie, aby dokończyć.",
       "hideVaultNamesErrorErase": "Jednej zapisanej nazwy nie udało się zniszczyć, więc opcja pozostała wyłączona. Myne nie ogłasza wymazania, do którego nie doszło. Spróbuj ponownie.",
@@ -3364,7 +3419,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 godz.",
       "quickUnlockSubtitleAndroid": "Wejdź ponownie za pomocą PIN-u po automatycznej blokadzie",
-      "quickUnlockSubtitle": "Wejdź ponownie za pomocą {{method}} lub PIN-u po automatycznej blokadzie"
+      "quickUnlockSubtitle": "Wejdź ponownie za pomocą {{method}} lub PIN-u po automatycznej blokadzie",
+      "screenCaptureOverrideHelper": "Wyłącza ochronę przed przechwytywaniem ekranu tylko na tym urządzeniu, zarówno zanim odblokujesz skarbiec, jak i po odblokowaniu. Włącz to, jeśli lupa ekranowa, oprogramowanie do zdalnego pulpitu albo osoba pomagająca Ci zdalnie widzi czarne okno. Nie jest synchronizowane.",
+      "screenCaptureOverrideLabel": "Zezwalaj na przechwytywanie ekranu na tym urządzeniu",
+      "screenCaptureOverrideUnknown": "Nie udało się odczytać ustawienia przechwytywania ekranu na tym urządzeniu, więc ta preferencja nie jest stosowana. Otwórz Ustawienia ponownie, aby spróbować jeszcze raz.",
+      "screenCaptureSuperseded": "Wyłączona na tym urządzeniu. Zobacz „Zezwalaj na przechwytywanie ekranu na tym urządzeniu” poniżej. Ta preferencja jest zachowana i zacznie znów obowiązywać, gdy wyłączysz tamtą opcję.",
+      "screenCaptureSupersededByFlag": "Wyłączona w tej sesji, ponieważ Myne uruchomiono z --disable-screen-capture-protection. Ta preferencja jest zachowana i zacznie znów obowiązywać przy następnym otwarciu Myne bez tego przełącznika."
     },
     "quickUnlock": {
       "errorBusy": "Trwa inna operacja na skarbcu. Spróbuj ponownie za chwilę.",
@@ -3594,7 +3654,7 @@
         "newNoteLocation": "lokalizacja nowych notatek folder domyślny gdzie tworzone new note location",
         "torRouting": "tor kierowanie onion proxy sieć adres ip lokalizacja ukryj synchronizacja anonimowość routing",
         "quickUnlock": "szybkie odblokowanie pin touch id biometria twarz odblokuj quick unlock",
-        "reminders": "przypomnienia powiadomienia alert zadanie termin przypomnij reminders notify",
+        "reminders": "przypomnienia powiadomienia alert zadanie termin przypomnij wyprzedzenie planuj rejestracja dni horyzont reminders notify",
         "realtimeSync": "synchronizacja w czasie rzeczywistym na żywo połączenie realtime sync live",
         "screenCapture": "ochrona przed przechwytywaniem ekranu zrzut nagrywanie blokuj prywatność screenshot",
         "showEditTimes": "czasy edycji znaczniki czasu daty modyfikacji notatki timestamps",
@@ -3622,7 +3682,8 @@
         "timeFormat": "format godziny czas zegar 24 12 godzinny am pm time format clock",
         "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone",
         "periodicNotes": "notatki okresowe tygodniowe miesięczne tydzień miesiąc folder szablon format",
-        "aiHistoryBudget": "rozmowa historia kontekst pamięć budżet znaki agent czat żądanie"
+        "aiHistoryBudget": "rozmowa historia kontekst pamięć budżet znaki agent czat żądanie",
+        "screenCaptureOverride": "przechwytywanie ekranu zezwól wyłącz lupa powiększenie pulpit zdalny dostępność odblokowanie czarny ekran screen capture override"
       }
     },
     "dateTime": {
@@ -3635,7 +3696,7 @@
       "time24": "24-godzinny",
       "time12": "12-godzinny",
       "zoneLabel": "Strefa czasowa",
-      "zoneHelper": "Która strefa decyduje o tym, co liczy się jako dzisiaj. Zostaw puste, aby korzystać z ustawień tego urządzenia. Godziny wpisane w notatce nigdy się nie zmieniają; 09:00 wszędzie pozostaje 09:00.",
+      "zoneHelper": "Która strefa decyduje o tym, co liczy się jako dzisiaj, a więc którą notatkę otwierają Twoje notatki dzienne, tygodniowe i miesięczne. Zostaw puste, aby korzystać z ustawień tego urządzenia. Wybór ustala się osobno na każdym urządzeniu: żadne inne urządzenie go nie nadpisze, więc ustawienie własnej strefy może sprawić, że to urządzenie będzie miało inny dzień niż pozostałe. Godziny wpisane w notatce nigdy się nie zmieniają; 09:00 wszędzie pozostaje 09:00.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne nie zna tej strefy czasowej. Użyj nazwy takiej jak Europe/Berlin.",
       "errorSave": "Nie udało się zapisać tego ustawienia."
@@ -4117,7 +4178,8 @@
       "kdfMemoryExceedsHost": "Otwarcie tego skarbca wymaga {{required}} MiB pamięci. To więcej, niż może mu dać ta przeglądarka ({{available}} MiB). Ze skarbcem wszystko w porządku; otwórz go w aplikacji Myne na komputer.",
       "unexpected": "Nieoczekiwany błąd. Spróbuj ponownie.",
       "vaultNotFound": "Nie znaleziono pliku skarbca. Uruchom ponownie aplikację.",
-      "vaultUpgraded": "Ten skarbiec został uaktualniony do nowszego formatu, którego ta wersja Myne jeszcze nie obsługuje. Z Twoimi danymi wszystko w porządku. Zaktualizuj Myne do najnowszej wersji, aby go otworzyć."
+      "vaultUpgraded": "Ten skarbiec został uaktualniony do nowszego formatu, którego ta wersja Myne jeszcze nie obsługuje. Z Twoimi danymi wszystko w porządku. Zaktualizuj Myne do najnowszej wersji, aby go otworzyć.",
+      "openAsImportSource": "Import właśnie czyta ten skarbiec. Zakończ lub anuluj ten import, a potem odblokuj ten skarbiec."
     },
     "passwordLabel": "Hasło",
     "passwordPlaceholder": "Hasło",
@@ -4697,5 +4759,19 @@
         "crypto-getrandomvalues": "Ta przeglądarka nie udostępnia kryptograficznego źródła liczb losowych."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Ochrona przed przechwytywaniem ekranu prosi system operacyjny, aby nie umieszczał tego okna na zrzutach ekranu ani w nagraniach ekranu. Działa w systemie Windows 10 (aktualizacja z maja 2020) i nowszym; macOS i Linux nie udostępniają do tego systemowego API, więc tam przechwytywania nie da się zablokować. Tam, gdzie działa, ukrywa okno między innymi przed oprogramowaniem do zdalnego pulpitu i lupami ekranowymi — i właśnie dlatego istnieje to wyjście awaryjne.",
+    "disableConfirm": "Wyłącz ochronę",
+    "disableCost": "Wyłączenie dotyczy tylko tego urządzenia i pozostaje w mocy, dopóki nie włączysz ochrony z powrotem — zarówno zanim odblokujesz skarbiec, jak i po odblokowaniu. Nic nigdzie nie jest wysyłane i żadne ustawienie skarbca się nie zmienia, ale ten wybór jest zapisywany w pliku ustawień na tym urządzeniu, a plik ten pozostaje tam również po ponownym włączeniu ochrony.",
+    "disableTitle": "Wyłączyć ochronę przed przechwytywaniem ekranu?",
+    "disableTrigger": "Wyłącz ochronę przed przechwytywaniem ekranu",
+    "flagNotice": "Ta sesja została uruchomiona z --disable-screen-capture-protection, więc ochrona pozostanie wyłączona aż do zamknięcia aplikacji, niezależnie od tego, co mówi to ustawienie.",
+    "restoreBody": "Ochrona przed przechwytywaniem ekranu jest na tym urządzeniu wyłączona. Ponowne jej włączenie znów prosi system operacyjny, aby nie umieszczał tego okna na zrzutach ekranu ani w nagraniach ekranu, co w systemie Windows 10 (aktualizacja z maja 2020) i nowszym ukrywa je także przed oprogramowaniem do zdalnego pulpitu i lupami ekranowymi. macOS i Linux nie udostępniają do tego systemowego API, więc tam przechwytywania nie da się zablokować.",
+    "restoreConfirm": "Włącz ochronę",
+    "restoreTitle": "Włączyć z powrotem ochronę przed przechwytywaniem ekranu?",
+    "restoreTrigger": "Włącz ochronę przed przechwytywaniem ekranu",
+    "saveFailed": "Nie udało się tego zapisać, więc nic się nie zmieniło. Spróbuj ponownie albo uruchom Myne z --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Zapisano. W tej sesji ochrona nadal jest wyłączona, ponieważ sesję uruchomiono z --disable-screen-capture-protection, więc ochrona wróci przy następnym otwarciu Myne bez tego przełącznika."
   }
 }

@@ -260,7 +260,7 @@
       "title": "附件",
       "transcribeDone": "转录完成。",
       "transcribeFailed": "转录失败。请重试。",
-      "transcribeTooLong": "此录音过长，无法转录。",
+      "transcribeTooLong": "此录音过长，无法转录。音频仍作为附件保留，你仍然可以播放它。",
       "transcribeFeatureOff": "语音转文字已关闭。请在设置 → 转录 中开启。",
       "transcribeModelLoadFailed": "无法加载语音转文字模型。请重新安装 Myne，或在设置 → 开发者 → AI 中检查你的自定义模型。",
       "transcribeNoModelHint": "缺少语音转文字模型。重新安装 Myne 即可恢复它。",
@@ -1830,7 +1830,9 @@
       "moveCollision": "那里已经有同名的文件夹了。",
       "unsettledSave": "有一篇打开的笔记尚未保存完成，因此该文件夹未作改动。等它保存完成后再试一次。",
       "renameFailed": "无法重命名该文件夹，因此它保持不变。",
-      "deliberateWriteFailed": "文件夹已重命名，但它的一项设置未能保存。每次解锁时，都会有一个空文件夹以旧名称重新出现；删除它是安全的，不会改动其他任何内容。再次重命名该文件夹并不会清除它。"
+      "deliberateWriteFailed": "文件夹已重命名，但它的一项设置未能保存。每次解锁时，都会有一个空文件夹以旧名称重新出现；删除它是安全的，不会改动其他任何内容。再次重命名该文件夹并不会清除它。",
+      "folderListFull": "Myne 能记住的文件夹数量有限，而该列表已满。此文件夹仍可使用，但当最后一篇笔记离开它时，它就会消失。删除一个你不再需要的文件夹可以腾出空间。",
+      "folderNotRemembered": "文件夹已创建，但 Myne 未能记录它。当最后一篇笔记离开它时，它就会消失；如果它仍然是空的，下次解锁时它就不在了。再次创建它是安全的。"
     },
     "folderNote": {
       "defaultTitle": "索引"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne 没有读取此文件的权限。",
         "reasonNotFound": "Myne 处理到它时，此文件已经不在了。",
         "reasonNoSpace": "此设备的存储空间已用尽。",
-        "reasonUnknown": "Myne 无法说明原因。"
+        "reasonUnknown": "Myne 无法说明原因。",
+        "foldersNotKeptNote": "{{count}} 个会在最后一篇笔记离开时消失",
+        "foldersNotKeptNote_one": "{{count}} 个会在最后一篇笔记离开时消失",
+        "foldersNotKeptNote_other": "{{count}} 个会在最后一篇笔记离开时消失",
+        "statFoldersNotKept": "未保留的文件夹"
       },
       "offer": {
         "body": "将你现有的笔记导入 Myne。每篇笔记在导入时都会被加密。没有任何内容离开本设备，你的原始文件会完全留在原处。",
@@ -2021,7 +2027,52 @@
           "survives": "会变成一篇包含该表格的笔记。",
           "loses": "它是一篇笔记，而不是每行一篇：Myne 不是数据库。过宽或过长的文件会被截断，导入报告会说明截断了多少。",
           "short": "单个电子表格文件"
+        },
+        "myne": {
+          "label": "Myne 保险库",
+          "loses": "版本历史、已删除的笔记和模板留在来源保险库中。没有被任何导入笔记使用的附件不会带过来。来源保险库不会被改动；如果你在同步它，它会继续同步。",
+          "pickerTitle": "选择要从中导入的保险库",
+          "short": "此设备上的另一个保险库",
+          "survives": "笔记、文件夹、标签、你所导入笔记之间的链接，以及这些笔记使用的附件。你添加到来源保险库词典中的单词也会一并带过来。"
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "版本历史留在你导入来源的那个保险库中。",
+          "sourceUnchanged": "你导入来源的那个保险库没有被改动。如果你在同步它，它会继续同步。"
+        },
+        "errors": {
+          "alreadyOpen": "该保险库已为另一次导入打开。请先完成或取消那一次。",
+          "busy": "另一项保险库操作正在进行。请等它完成后再试一次。",
+          "credential": "该密码或恢复短语未能打开保险库。请检查后再试一次。"
+        },
+        "importLabel": "为此次导入命名",
+        "importLabelHint": "如果你导入的某篇笔记与你已有的笔记同名，并且导入的内容中有链接指向它，那么导入的那篇会用这个名称重命名。如果你再次运行这次导入，请沿用同一个名称，这样就不会有任何内容被导入两次。",
+        "importLabelIllegal": "该名称无法使用：笔记名称不能包含 \\ / | # ^ [ ]，也不能以空格开头或结尾。",
+        "loading": "正在查找你的其他保险库…",
+        "noOtherVaults": "此设备上没有可供导入的其他保险库。请先恢复一个备份，它就会成为你可以在这里导入的保险库。",
+        "opening": "正在打开…",
+        "passwordLabel": "该保险库的密码",
+        "phraseLabel": "该保险库的 24 个单词的恢复短语",
+        "report": {
+          "attachmentsCrossed": "已带入的附件",
+          "attachmentsDeduped": "你已经有的附件",
+          "attachmentsFailed": "此保险库未接受的附件",
+          "dictionaryUnreadable": "无法读取来源保险库的词典，因此没有带入任何单词。",
+          "dictionaryWordsAdded": "已带入的词典单词",
+          "linksLeftUnresolved": "无法指向任何位置的链接",
+          "linksRetargeted": "已指向重命名后笔记的链接",
+          "templatesLeftBehind": "未带入的模板",
+          "tombstonedEmbeds": "其文件已在来源中删除的嵌入内容",
+          "trashedLeftBehind": "来源保险库回收站中未带入的笔记",
+          "untitledImported": "已带入的无标题笔记"
+        },
+        "unnamedVault": "保险库 {{n}}",
+        "usePassword": "改用密码",
+        "usePhrase": "改用恢复短语",
+        "vaultLabel": "导入来源",
+        "vaultPlaceholder": "选择一个保险库",
+        "wordAria": "第 {{number}} 个单词，共 24 个"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "恢复已取消：保险库已锁定。",
       "operationInProgress": "操作正在进行中。请稍候。",
       "unexpected": "出现意外错误。请重试。",
-      "vaultNotFound": "未找到保险库文件。请重新启动应用。"
+      "vaultNotFound": "未找到保险库文件。请重新启动应用。",
+      "openAsImportSource": "当前有一次导入正在读取此保险库。请先完成或取消那次导入，然后再恢复此保险库。"
     },
     "vaultUnreadable": "保险库文件无法读取。请从备份恢复。",
     "genericError": "出了点问题。请重试。",
@@ -2660,7 +2712,7 @@
       "openGraph": "打开关系图"
     },
     "archive": {
-      "helper": "允许将笔记移入存档，使其不出现在主列表中。关闭此项会将每篇已存档的笔记恢复到其所在文件夹，并隐藏存档控件。",
+      "helper": "允许将笔记移入存档，使其不出现在主列表中。关闭此项会将每篇已存档的笔记恢复到其所在文件夹，取消每个已存档文件夹的存档状态，并隐藏存档控件。它作用于整个保险库，在所有设备上生效。",
       "label": "存档",
       "off": "关闭",
       "on": "开启",
@@ -3109,7 +3161,8 @@
       "torLabel": "通过 Tor 路由同步"
     },
     "prefs": {
-      "saveError": "无法保存偏好设置。请重试。"
+      "saveError": "无法保存偏好设置。请重试。",
+      "folderListFull": "该文件夹列表已满。请先从中移除一个文件夹，然后再添加。"
     },
     "reminders": {
       "aria": "在此设备上显示任务提醒",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "在有可用钥匙串的设备上，只要此设备解锁过某个保险库，保险库选择器就会显示它的名称。开启此项后，每个保险库改为显示“保险库 2”这样的占位名称，且无论列表如何重新排序，该编号都始终跟随同一个保险库。",
       "hideVaultNamesErases": "开启此项会销毁用于读取本机所存名称的密钥，因此这些名称在此设备上无法恢复；只要保持开启，就不会再写入任何名称。",
       "hideVaultNamesResidue": "它无法触及此前已生成的副本：在名称仍在显示时制作的全系统备份、磁盘映像或本磁盘的任何其他系统级副本，都同时包含已存储的名称及其密钥。",
-      "hideVaultNamesUnavailable": "此设备没有可用的钥匙串，因此 Myne 不会在此存储任何保险库名称，也无法开启此选项。选择器已经为每个保险库显示占位名称。",
+      "hideVaultNamesUnavailable": "此份 Myne 无法存储保险库名称，因此不会在这里存储任何名称，也无法开启此选项。选择器已经为每个保险库显示占位名称。",
       "hideVaultNamesErrorRead": "无法读取当前设置。请拨动开关重新设置。",
       "hideVaultNamesErrorSave": "无法保存设置，因此设置未更改。如果你当时正在开启它，部分已存储的名称可能已被销毁；请再次开启以完成操作。",
       "hideVaultNamesErrorErase": "有一个已存储的名称无法销毁，因此该设置保持关闭，而不是声称完成了并未发生的擦除。请重试。",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 分钟",
       "autoLock1h": "1 小时",
       "quickUnlockSubtitleAndroid": "自动锁定后使用 PIN 重新进入",
-      "quickUnlockSubtitle": "自动锁定后使用 {{method}} 或 PIN 重新进入"
+      "quickUnlockSubtitle": "自动锁定后使用 {{method}} 或 PIN 重新进入",
+      "screenCaptureOverrideHelper": "仅在此设备上关闭屏幕捕获保护，解锁保险库之前和之后都是如此。如果屏幕放大镜、远程桌面软件或正在远程协助你的人看到的是一个黑色窗口，请开启此项。它不会被同步。",
+      "screenCaptureOverrideLabel": "允许在此设备上进行屏幕捕获",
+      "screenCaptureOverrideUnknown": "无法读取此设备的屏幕捕获设置，因此当前没有应用此偏好设置。请重新打开“设置”再试一次。",
+      "screenCaptureSuperseded": "在此设备上已关闭。请参见下方的“允许在此设备上进行屏幕捕获”。此偏好设置会被保留，当你关闭那一项时会再次生效。",
+      "screenCaptureSupersededByFlag": "在本次会话中已关闭，因为 Myne 是以 --disable-screen-capture-protection 启动的。此偏好设置会被保留，下次你在不带该参数的情况下打开 Myne 时会再次生效。"
     },
     "quickUnlock": {
       "errorBusy": "另一项保险库操作正在进行中。请稍后重试。",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "新笔记 位置 保存位置 文件夹 默认 创建 new note location folder default",
         "torRouting": "tor 路由 洋葱 代理 网络 ip 地址 位置 隐藏 同步 匿名 routing onion proxy network address location hide sync anonymity",
         "quickUnlock": "快速解锁 解锁 pin 指纹 生物识别 面容 touch id quick unlock biometric",
-        "reminders": "提醒 通知 提示 警报 任务 截止 到期 reminders notify notification alert task due remind",
+        "reminders": "提醒 通知 提示 警报 任务 截止 到期 提前 天数 范围 注册 reminders notify notification alert task due remind horizon registration ahead days",
         "realtimeSync": "实时同步 实时 同步 连接 推送 轮询 real time sync live connection polling",
         "screenCapture": "屏幕捕获 截图 录屏 保护 阻止 隐私 screen capture protection screenshot recording",
         "showEditTimes": "编辑时间 时间戳 修改时间 日期 显示 笔记 show edit times timestamps modified",
@@ -3402,7 +3460,8 @@
         "timeFormat": "时间格式 时间 时钟 24小时制 12小时制 上午 下午 time format 24 hour 12 hour clock am pm",
         "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today",
         "periodicNotes": "周期笔记 每周 每月 周 月 文件夹 模板 格式",
-        "aiHistoryBudget": "对话 历史 上下文 记忆 预算 字符 代理 聊天 请求"
+        "aiHistoryBudget": "对话 历史 上下文 记忆 预算 字符 代理 聊天 请求",
+        "screenCaptureOverride": "屏幕捕获 覆盖 允许 关闭 禁用 放大镜 远程桌面 无障碍 解锁 黑屏 screen capture override allow disable magnifier remote desktop accessibility unlock black"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24 小时制",
       "time12": "12 小时制",
       "zoneLabel": "时区",
-      "zoneHelper": "由哪个时区决定什么算作今天。留空则跟随此设备。你在笔记中写下的时间永远不会被改动；09:00 在任何地方都还是 09:00。",
+      "zoneHelper": "由哪个时区决定什么算作今天，也因此决定你的每日、每周和每月笔记打开的是哪一篇。留空则跟随此设备。此选择按设备各自确定：其他设备不会覆盖它，因此一个覆盖设置可能让此设备与你的其他设备处在不同的一天。你在笔记中写下的时间永远不会被改动；09:00 在任何地方都还是 09:00。",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne 不认识该时区。请使用类似 Europe/Berlin 的名称。",
       "errorSave": "无法保存该设置。"
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "打开此保险库需要 {{required}} MiB 内存，超出了此浏览器能提供的上限（{{available}} MiB）。保险库本身没有问题；请在 Myne 桌面应用中打开它。",
       "unexpected": "出现意外错误。请重试。",
       "vaultNotFound": "未找到保险库文件。请重新启动应用。",
-      "vaultUpgraded": "此保险库已升级到当前版本 Myne 尚不支持的更新格式。你的数据没有问题。请将 Myne 更新到最新版本再打开它。"
+      "vaultUpgraded": "此保险库已升级到当前版本 Myne 尚不支持的更新格式。你的数据没有问题。请将 Myne 更新到最新版本再打开它。",
+      "openAsImportSource": "当前有一次导入正在读取此保险库。请先完成或取消那次导入，然后再解锁此保险库。"
     },
     "passwordLabel": "密码",
     "passwordPlaceholder": "密码",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "此浏览器不提供加密安全的随机数源。"
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "屏幕捕获保护会请求操作系统把此窗口排除在截屏和屏幕录制之外。它在 Windows 10（2020 年 5 月更新）及更高版本上有效；macOS 和 Linux 没有为此提供系统 API，因此在这些系统上无法阻止捕获。在它确实生效的系统上，远程桌面软件和屏幕放大镜同样看不到这个窗口，这正是这里提供关闭选项的原因。",
+    "disableConfirm": "关闭保护",
+    "disableCost": "关闭它仅对此设备生效，并且在你重新开启之前一直保持关闭，解锁保险库之前和之后都是如此。不会有任何内容被发送到任何地方，也不会改动任何保险库设置，但这个选择会保存在此设备上的一个设置文件中，而且在你重新开启保护之后，该文件仍会留在那里。",
+    "disableTitle": "关闭屏幕捕获保护？",
+    "disableTrigger": "关闭屏幕捕获保护",
+    "flagNotice": "本次会话是以 --disable-screen-capture-protection 启动的，因此无论此设置如何，保护都会一直关闭，直到你退出为止。",
+    "restoreBody": "屏幕捕获保护在此设备上已关闭。重新开启它会请求操作系统再次把此窗口排除在截屏和屏幕录制之外；在 Windows 10（2020 年 5 月更新）及更高版本上，这同时也会让远程桌面软件和屏幕放大镜看不到它。macOS 和 Linux 没有为此提供系统 API，因此在这些系统上无法阻止捕获。",
+    "restoreConfirm": "开启保护",
+    "restoreTitle": "重新开启屏幕捕获保护？",
+    "restoreTrigger": "开启屏幕捕获保护",
+    "saveFailed": "该设置无法保存，因此没有任何改动。请重试，或以 --disable-screen-capture-protection 启动 Myne。",
+    "savedForNextLaunch": "已保存。本次会话的保护仍处于关闭状态，因为它是以 --disable-screen-capture-protection 启动的；下次你在不带该参数的情况下打开 Myne 时，保护就会恢复。"
   }
 }

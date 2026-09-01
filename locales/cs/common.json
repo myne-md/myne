@@ -312,7 +312,7 @@
       "title": "Přílohy",
       "transcribeDone": "Přepis dokončen.",
       "transcribeFailed": "Přepis selhal. Zkuste to prosím znovu.",
-      "transcribeTooLong": "Tato nahrávka je pro přepis příliš dlouhá.",
+      "transcribeTooLong": "Tato nahrávka je pro přepis příliš dlouhá. Zvuk zůstává přiložený, takže si jej můžete přehrát.",
       "transcribeFeatureOff": "Převod řeči na text je vypnutý. Zapněte ho v Nastavení → Přepis.",
       "transcribeModelLoadFailed": "Model pro převod řeči na text se nepodařilo načíst. Přeinstalujte Myne, nebo zkontrolujte svůj vlastní model v Nastavení → Developer → AI.",
       "transcribeNoModelHint": "Model pro převod řeči na text chybí. Přeinstalování Myne ho obnoví.",
@@ -1970,7 +1970,9 @@
       "moveCollision": "Složka s tímto názvem tam už je.",
       "unsettledSave": "Ukládání otevřené poznámky ještě neskončilo, takže složka zůstala nedotčená. Až skončí, zkuste to znovu.",
       "renameFailed": "Složku se nepodařilo přejmenovat, takže zůstala beze změny.",
-      "deliberateWriteFailed": "Složka byla přejmenována, ale jedno z jejích nastavení se nepodařilo uložit. Při každém odemčení se pod původním názvem znovu objeví prázdná složka; je bezpečné ji smazat a nic jiného se tím nezmění. Dalším přejmenováním složky ji neodstraníte."
+      "deliberateWriteFailed": "Složka byla přejmenována, ale jedno z jejích nastavení se nepodařilo uložit. Při každém odemčení se pod původním názvem znovu objeví prázdná složka; je bezpečné ji smazat a nic jiného se tím nezmění. Dalším přejmenováním složky ji neodstraníte.",
+      "folderListFull": "Myne si pamatuje jen omezený počet složek a tento seznam je plný. Tato složka funguje dál, ale zmizí, až ji opustí její poslední poznámka. Smazáním složky, kterou už nepotřebujete, uvolníte místo.",
+      "folderNotRemembered": "Složka byla vytvořena, ale Myne si ji nedokázal zaznamenat. Zmizí, až ji opustí její poslední poznámka, a pokud bude ještě prázdná, bude při dalším odemčení pryč. Je bezpečné ji vytvořit znovu."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2126,7 +2128,13 @@
         "reasonPermissionDenied": "Myne neměl oprávnění tento soubor přečíst.",
         "reasonNotFound": "Tento soubor už tam nebyl, když se k němu Myne dostal.",
         "reasonNoSpace": "Na tomto zařízení došlo místo.",
-        "reasonUnknown": "Myne nedokázal určit proč."
+        "reasonUnknown": "Myne nedokázal určit proč.",
+        "foldersNotKeptNote": "{{count}} zmizí, až ji opustí její poslední poznámka",
+        "foldersNotKeptNote_few": "{{count}} zmizí, až je opustí jejich poslední poznámka",
+        "foldersNotKeptNote_many": "{{count}} zmizí, až je opustí jejich poslední poznámka",
+        "foldersNotKeptNote_one": "{{count}} zmizí, až ji opustí její poslední poznámka",
+        "foldersNotKeptNote_other": "{{count}} zmizí, až je opustí jejich poslední poznámka",
+        "statFoldersNotKept": "Složky nezachovány"
       },
       "offer": {
         "body": "Přeneste své stávající poznámky do Myne. Každá se při importu zašifruje. Nic neopustí toto zařízení a vaše původní soubory zůstanou přesně tam, kde jsou.",
@@ -2173,7 +2181,52 @@
           "survives": "Stane se jedinou poznámkou obsahující tabulku.",
           "loses": "Je to jedna poznámka, ne jedna poznámka na řádek: Myne není databáze. Velmi široké nebo velmi dlouhé soubory se ořežou a protokol importu uvede o kolik.",
           "short": "Jeden tabulkový soubor"
+        },
+        "myne": {
+          "label": "Trezor Myne",
+          "loses": "Historie verzí, smazané poznámky a šablony zůstávají ve zdrojovém trezoru. Přílohy, které nepoužívá žádná importovaná poznámka, se nepřenesou. Zdrojový trezor se nemění, a pokud jej synchronizujete, synchronizuje se dál.",
+          "pickerTitle": "Vyberte trezor, ze kterého chcete importovat",
+          "short": "Jiný trezor na tomto zařízení",
+          "survives": "Poznámky, složky, značky, odkazy mezi importovanými poznámkami a přílohy, které tyto poznámky používají. Přenesou se i slova, která jste přidali do slovníku zdrojového trezoru."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Historie verzí zůstává v trezoru, ze kterého jste importovali.",
+          "sourceUnchanged": "Trezor, ze kterého jste importovali, se nezměnil. Pokud jej synchronizujete, synchronizuje se dál."
+        },
+        "errors": {
+          "alreadyOpen": "Tento trezor je už otevřený pro import. Nejprve ten import dokončete nebo zrušte.",
+          "busy": "Probíhá jiná operace s trezorem. Počkejte, až skončí, a zkuste to znovu.",
+          "credential": "Tímto heslem ani frází pro obnovení se trezor neotevřel. Zkontrolujte je a zkuste to znovu."
+        },
+        "importLabel": "Pojmenujte tento import",
+        "importLabelHint": "Pokud má importovaná poznámka stejný název jako některá, kterou už máte, a něco z importu na ni odkazuje, bude importovaná poznámka přejmenována pomocí tohoto názvu. Pokud tento import spustíte znovu, ponechte stejný název a nic se nepřenese dvakrát.",
+        "importLabelIllegal": "Tento název nelze použít: název poznámky nesmí obsahovat \\ / | # ^ [ ] a nesmí začínat ani končit mezerou.",
+        "loading": "Hledají se vaše další trezory…",
+        "noOtherVaults": "Na tomto zařízení nejsou žádné další trezory, ze kterých by šlo importovat. Nejprve obnovte zálohu a stane se z ní trezor, ze kterého tu můžete importovat.",
+        "opening": "Otevírá se…",
+        "passwordLabel": "Heslo tohoto trezoru",
+        "phraseLabel": "24slovná fráze pro obnovení tohoto trezoru",
+        "report": {
+          "attachmentsCrossed": "Přenesené přílohy",
+          "attachmentsDeduped": "Přílohy, které jste už měli",
+          "attachmentsFailed": "Přílohy, které trezor nepřijal",
+          "dictionaryUnreadable": "Slovník zdrojového trezoru se nepodařilo přečíst, takže se nepřenesla žádná slova.",
+          "dictionaryWordsAdded": "Přenesená slova ze slovníku",
+          "linksLeftUnresolved": "Odkazy, které nešlo nikam nasměrovat",
+          "linksRetargeted": "Odkazy nasměrované na přejmenovanou poznámku",
+          "templatesLeftBehind": "Šablony ponechané ve zdrojovém trezoru",
+          "tombstonedEmbeds": "Vložení, jejichž soubor už byl ve zdroji smazán",
+          "trashedLeftBehind": "Poznámky ponechané v koši zdrojového trezoru",
+          "untitledImported": "Přenesené poznámky bez názvu"
+        },
+        "unnamedVault": "Trezor {{n}}",
+        "usePassword": "Použít místo toho heslo",
+        "usePhrase": "Použít místo toho frázi pro obnovení",
+        "vaultLabel": "Zdroj importu",
+        "vaultPlaceholder": "Vyberte trezor",
+        "wordAria": "Slovo {{number}} z 24"
       }
     },
     "list": {
@@ -2606,7 +2659,8 @@
       "cancelledVaultLocked": "Obnovení zrušeno: trezor byl uzamčen.",
       "operationInProgress": "Probíhá operace. Počkejte prosím.",
       "unexpected": "Neočekávaná chyba. Zkuste to prosím znovu.",
-      "vaultNotFound": "Soubor trezoru nebyl nalezen. Restartujte prosím aplikaci."
+      "vaultNotFound": "Soubor trezoru nebyl nalezen. Restartujte prosím aplikaci.",
+      "openAsImportSource": "Z tohoto trezoru právě čte import. Dokončete nebo zrušte tento import a pak trezor obnovte."
     },
     "vaultUnreadable": "Soubor trezoru je nečitelný. Obnovte jej ze zálohy.",
     "genericError": "Něco se pokazilo. Zkuste to prosím znovu.",
@@ -2852,7 +2906,7 @@
       "openGraph": "Otevřít graf"
     },
     "archive": {
-      "helper": "Umožní přesouvat poznámky do archivu mimo hlavní seznam. Vypnutím se každá archivovaná poznámka obnoví do své složky a ovládací prvky archivu se skryjí.",
+      "helper": "Umožní přesouvat poznámky do archivu mimo hlavní seznam. Vypnutím se každá archivovaná poznámka obnoví do své složky, každá archivovaná složka se z archivu vyjme a ovládací prvky archivu se skryjí. Platí pro celý trezor, na všech zařízeních.",
       "label": "Archivace",
       "off": "Vypnuto",
       "on": "Zapnuto",
@@ -3321,7 +3375,8 @@
       "torLabel": "Směrovat synchronizaci přes Tor"
     },
     "prefs": {
-      "saveError": "Předvolbu se nepodařilo uložit. Zkuste to znovu."
+      "saveError": "Předvolbu se nepodařilo uložit. Zkuste to znovu.",
+      "folderListFull": "Tento seznam složek je plný. Než přidáte další složku, jednu z něj odeberte."
     },
     "reminders": {
       "aria": "Zobrazovat připomínky úkolů na tomto zařízení",
@@ -3346,7 +3401,7 @@
       "hideVaultNamesHelper": "Na zařízení s použitelnou klíčenkou zobrazí výběr trezorů název trezoru, jakmile ho toto zařízení odemkne. Když je tato volba zapnutá, ukáže se místo toho u každého trezoru zástupný text jako Trezor 2 a toto číslo zůstane trezoru bez ohledu na to, jak se seznam přeuspořádá.",
       "hideVaultNamesErases": "Zapnutí zničí klíče, díky nimž jsou zde uložené názvy čitelné, takže tyto názvy už na tomto zařízení nelze obnovit, a dokud volba zůstane zapnutá, nezapíše se žádný další název.",
       "hideVaultNamesResidue": "Nedosáhne na kopii pořízenou dříve: úplná záloha systému, obraz disku nebo jakákoli jiná systémová kopie tohoto disku pořízená v době, kdy se názvy zobrazovaly, obsahuje jak uložené názvy, tak jejich klíče.",
-      "hideVaultNamesUnavailable": "Toto zařízení nemá použitelnou klíčenku, takže zde Myne neukládá žádný název trezoru a tuto volbu nelze zapnout. Výběr trezorů už u každého trezoru zobrazuje zástupný text.",
+      "hideVaultNamesUnavailable": "Myne v této kopii aplikace neumí ukládat názvy trezorů, takže zde žádný neukládá a tuto volbu nelze zapnout. Výběr trezorů už u každého trezoru zobrazuje zástupný text.",
       "hideVaultNamesErrorRead": "Aktuální nastavení se nepodařilo přečíst. Přepněte přepínač a nastavte ho znovu.",
       "hideVaultNamesErrorSave": "Nastavení se nepodařilo uložit, takže zůstává beze změny. Pokud jste ho zapínali, některé uložené názvy už mohly být zničeny; dokončete to opětovným zapnutím.",
       "hideVaultNamesErrorErase": "Jeden uložený název se nepodařilo zničit, proto zůstalo nastavení vypnuté, aby netvrdilo, že k vymazání došlo. Zkuste to znovu.",
@@ -3364,7 +3419,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 h",
       "quickUnlockSubtitleAndroid": "Po automatickém zamknutí zadejte znovu pomocí PINu",
-      "quickUnlockSubtitle": "Po automatickém zamknutí zadejte znovu pomocí {{method}} nebo PINu"
+      "quickUnlockSubtitle": "Po automatickém zamknutí zadejte znovu pomocí {{method}} nebo PINu",
+      "screenCaptureOverrideHelper": "Vypne ochranu proti snímání obrazovky pouze na tomto zařízení, a to jak před odemčením trezoru, tak po něm. Zapněte tuto volbu, pokud lupa obrazovky, software pro vzdálenou plochu nebo někdo, kdo vám pomáhá na dálku, vidí černé okno. Nesynchronizuje se.",
+      "screenCaptureOverrideLabel": "Povolit snímání obrazovky na tomto zařízení",
+      "screenCaptureOverrideUnknown": "Nastavení snímání obrazovky na tomto zařízení se nepodařilo přečíst, takže se tato předvolba neuplatňuje. Otevřete Nastavení znovu a zkuste to.",
+      "screenCaptureSuperseded": "Na tomto zařízení vypnuto. Viz „Povolit snímání obrazovky na tomto zařízení“ níže. Tato předvolba zůstává zachována a znovu se uplatní, jakmile toto povolení vypnete.",
+      "screenCaptureSupersededByFlag": "V této relaci vypnuto, protože Myne byl spuštěn s --disable-screen-capture-protection. Tato předvolba zůstává zachována a znovu se uplatní, až Myne příště otevřete bez tohoto přepínače."
     },
     "quickUnlock": {
       "errorBusy": "Probíhá jiná operace s trezorem. Zkuste to za chvíli znovu.",
@@ -3594,7 +3654,7 @@
         "newNoteLocation": "umístění nových poznámek složka výchozí kde se vytvářejí poznámky new note",
         "torRouting": "tor směrování onion proxy síť ip adresa poloha skrýt synchronizace anonymita routing",
         "quickUnlock": "rychlé odemknutí pin touch id biometrie obličej odemknout face",
-        "reminders": "připomínky oznámení upozornění úkol termín připomenout notifikace reminders",
+        "reminders": "připomínky oznámení upozornění úkol termín připomenout notifikace horizont dopředu dní registrace reminders",
         "realtimeSync": "synchronizace v reálném čase živé připojení dotazování real time sync",
         "screenCapture": "snímání obrazovky ochrana snímek nahrávání blokovat soukromí screenshot",
         "showEditTimes": "časy úprav časové značky upraveno data poznámky zobrazit timestamps",
@@ -3622,7 +3682,8 @@
         "timeFormat": "formát času čas 24hodinový 12hodinový hodiny dopoledne odpoledne am pm time format",
         "timezone": "časové pásmo časová zóna tz utc iana oblast dnes timezone",
         "periodicNotes": "periodické poznámky týdenní měsíční týden měsíc složka šablona formát",
-        "aiHistoryBudget": "konverzace historie kontext paměť rozpočet znaky agent chat požadavek"
+        "aiHistoryBudget": "konverzace historie kontext paměť rozpočet znaky agent chat požadavek",
+        "screenCaptureOverride": "snímání obrazovky výjimka povolit vypnout lupa vzdálená plocha přístupnost zamykací obrazovka odemčení černá screen capture override"
       }
     },
     "dateTime": {
@@ -3635,7 +3696,7 @@
       "time24": "24hodinový",
       "time12": "12hodinový",
       "zoneLabel": "Časové pásmo",
-      "zoneHelper": "Pásmo, které určuje, co se počítá jako dnešek. Nechte prázdné, chcete-li se řídit tímto zařízením. Časy, které napíšete do poznámky, se nikdy nemění; 09:00 zůstane všude 09:00.",
+      "zoneHelper": "Pásmo, které určuje, co se počítá jako dnešek, a tím i to, kterou poznámku otevřou vaše denní, týdenní a měsíční poznámky. Nechte prázdné, chcete-li se řídit tímto zařízením. Volba se ustaluje zvlášť na každém zařízení: žádné jiné ji nepřepíše, takže tímto nastavením se toto zařízení může ocitnout v jiném dni než vaše ostatní. Časy, které napíšete do poznámky, se nikdy nemění; 09:00 zůstane všude 09:00.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne toto časové pásmo nezná. Použijte název jako Europe/Berlin.",
       "errorSave": "Toto nastavení se nepodařilo uložit."
@@ -4117,7 +4178,8 @@
       "kdfMemoryExceedsHost": "Otevření tohoto trezoru vyžaduje {{required}} MiB paměti, víc, než mu tento prohlížeč dokáže dát ({{available}} MiB). S trezorem je vše v pořádku; otevřete jej v desktopové aplikaci Myne.",
       "unexpected": "Neočekávaná chyba. Zkuste to prosím znovu.",
       "vaultNotFound": "Soubor trezoru nebyl nalezen. Restartujte prosím aplikaci.",
-      "vaultUpgraded": "Tento trezor byl převeden na novější formát, který tato verze Myne zatím nepodporuje. S vašimi daty je vše v pořádku. Otevřete ho po aktualizaci Myne na nejnovější verzi."
+      "vaultUpgraded": "Tento trezor byl převeden na novější formát, který tato verze Myne zatím nepodporuje. S vašimi daty je vše v pořádku. Otevřete ho po aktualizaci Myne na nejnovější verzi.",
+      "openAsImportSource": "Z tohoto trezoru právě čte import. Dokončete nebo zrušte tento import a pak trezor odemkněte."
     },
     "passwordLabel": "Heslo",
     "passwordPlaceholder": "Heslo",
@@ -4697,5 +4759,19 @@
         "crypto-getrandomvalues": "Tento prohlížeč neposkytuje kryptografický zdroj náhodných čísel."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Ochrana proti snímání obrazovky žádá operační systém, aby toto okno vynechal ze snímků a nahrávek obrazovky. Účinná je na Windows 10 (aktualizace z května 2020) a novějších; macOS ani Linux pro to nemají systémové API, takže tam zachycení obrazovky zabránit nedokáže. Tam, kde funguje, skryje okno mimo jiné i před softwarem pro vzdálenou plochu a před lupami obrazovky, a právě proto tato cesta ven existuje.",
+    "disableConfirm": "Vypnout ochranu",
+    "disableCost": "Vypnutí platí pouze na tomto zařízení a ochrana zůstane vypnutá, dokud ji znovu nezapnete, a to jak před odemčením trezoru, tak po něm. Nikam se nic neodesílá a žádné nastavení trezoru se nemění, ale tato volba se uloží do souboru s nastavením na tomto zařízení a ten tam zůstane i poté, co ochranu znovu zapnete.",
+    "disableTitle": "Vypnout ochranu proti snímání obrazovky?",
+    "disableTrigger": "Vypnout ochranu proti snímání obrazovky",
+    "flagNotice": "Tato relace byla spuštěna s --disable-screen-capture-protection, takže ochrana zůstane vypnutá až do ukončení aplikace bez ohledu na to, co říká toto nastavení.",
+    "restoreBody": "Ochrana proti snímání obrazovky je na tomto zařízení vypnutá. Jejím opětovným zapnutím požádáte operační systém, aby toto okno znovu vynechal ze snímků a nahrávek obrazovky, což na Windows 10 (aktualizace z května 2020) a novějších okno skryje i před softwarem pro vzdálenou plochu a před lupami obrazovky. Na macOS ani Linuxu pro to systémové API neexistuje, takže tam zachycení obrazovky zabránit nedokáže.",
+    "restoreConfirm": "Zapnout ochranu",
+    "restoreTitle": "Znovu zapnout ochranu proti snímání obrazovky?",
+    "restoreTrigger": "Zapnout ochranu proti snímání obrazovky",
+    "saveFailed": "Uložení se nezdařilo, takže se nic nezměnilo. Zkuste to znovu, nebo spusťte Myne s --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Uloženo. Tato relace byla spuštěna s --disable-screen-capture-protection, takže v ní ochrana zůstává vypnutá; vrátí se, až Myne příště otevřete bez tohoto přepínače."
   }
 }

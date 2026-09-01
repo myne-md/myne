@@ -260,7 +260,7 @@
       "title": "Mellékletek",
       "transcribeDone": "Az átirat elkészült.",
       "transcribeFailed": "Az átirat készítése meghiúsult. Kérlek, próbáld újra.",
-      "transcribeTooLong": "Ez a felvétel túl hosszú az átirat készítéséhez.",
+      "transcribeTooLong": "Ez a felvétel túl hosszú az átirat készítéséhez. A hang mellékletként megmarad, így továbbra is le tudod játszani.",
       "transcribeFeatureOff": "A beszéd szöveggé alakítása ki van kapcsolva. Kapcsold be a Beállítások → Átirat menüben.",
       "transcribeModelLoadFailed": "Nem sikerült betölteni a beszédfelismerő modellt. Telepítsd újra a Myne-t, vagy ellenőrizd az egyéni modelledet a Beállítások → Fejlesztő → AI menüben.",
       "transcribeNoModelHint": "Hiányzik a beszédfelismerő modell. A Myne újratelepítése visszaállítja.",
@@ -1830,7 +1830,9 @@
       "moveCollision": "Ott már van ilyen nevű mappa.",
       "unsettledSave": "Egy nyitott jegyzet mentése még nem fejeződött be, ezért a mappa érintetlen maradt. Próbáld újra, amint befejeződött.",
       "renameFailed": "Nem sikerült átnevezni a mappát, ezért változatlan maradt.",
-      "deliberateWriteFailed": "A mappa átnevezése sikerült, de az egyik beállítását nem sikerült menteni. Minden feloldáskor újra megjelenik egy üres mappa a régi néven; nyugodtan törölheted, ez semmi mást nem változtat meg. Az ismételt átnevezés nem tünteti el."
+      "deliberateWriteFailed": "A mappa átnevezése sikerült, de az egyik beállítását nem sikerült menteni. Minden feloldáskor újra megjelenik egy üres mappa a régi néven; nyugodtan törölheted, ez semmi mást nem változtat meg. Az ismételt átnevezés nem tünteti el.",
+      "folderListFull": "A Myne csak korlátozott számú mappát tud megjegyezni, és ez a lista megtelt. Ez a mappa továbbra is működik, de eltűnik, amikor kikerül belőle az utolsó jegyzet. Ha törölsz egy már nem szükséges mappát, azzal helyet szabadítasz fel.",
+      "folderNotRemembered": "A mappa létrejött, de a Myne nem tudta feljegyezni. Eltűnik, amikor kikerül belőle az utolsó jegyzet, és a következő feloldáskor megszűnik, ha még mindig üres. Nyugodtan létrehozhatod újra."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "A Myne nem kapott jogosultságot a fájl olvasásához.",
         "reasonNotFound": "Ez a fájl már nem volt meg, mire a Myne odaért.",
         "reasonNoSpace": "Ezen az eszközön elfogyott a hely.",
-        "reasonUnknown": "A Myne nem tudta megmondani, miért."
+        "reasonUnknown": "A Myne nem tudta megmondani, miért.",
+        "foldersNotKeptNote": "{{count}} eltűnik, amikor kikerül belőle az utolsó jegyzet",
+        "foldersNotKeptNote_one": "{{count}} eltűnik, amikor kikerül belőle az utolsó jegyzet",
+        "foldersNotKeptNote_other": "{{count}} eltűnik, amikor kikerül belőle az utolsó jegyzet",
+        "statFoldersNotKept": "Meg nem tartott mappák"
       },
       "offer": {
         "body": "Hozd be a meglévő jegyzeteidet a Myne-ba. Mindegyik az importáláskor titkosítódik. Semmi nem hagyja el ezt az eszközt, és az eredeti fájljaid pontosan ott maradnak, ahol vannak.",
@@ -2021,7 +2027,52 @@
           "survives": "Egyetlen jegyzetté válik, amely a táblázatot tartalmazza.",
           "loses": "Egyetlen jegyzet lesz belőle, nem soronként egy: a Myne nem adatbázis. A nagyon széles vagy nagyon hosszú fájlokat levágja, és az importálási jelentés megmondja, mennyivel.",
           "short": "Egyetlen táblázatfájl"
+        },
+        "myne": {
+          "label": "Myne-széf",
+          "loses": "A verzióelőzmények, a törölt jegyzetek és a sablonok a forrásszéfben maradnak. Azok a mellékletek, amelyeket egyetlen importált jegyzet sem használ, hátramaradnak. A forrásszéf nem változik, és ha szinkronizálod, továbbra is szinkronizálódik.",
+          "pickerTitle": "Válaszd ki a széfet, amelyikből importálsz",
+          "short": "Egy másik széf ezen az eszközön",
+          "survives": "A jegyzetek, a mappák, a címkék, az importált jegyzetek közötti hivatkozások és az e jegyzetek által használt mellékletek. A forrásszéf szótárához hozzáadott szavak is átjönnek."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "A verzióelőzmények abban a széfben maradnak, amelyikből importáltál.",
+          "sourceUnchanged": "Az a széf, amelyikből importáltál, nem változott. Ha szinkronizálod, továbbra is szinkronizálódik."
+        },
+        "errors": {
+          "alreadyOpen": "Ez a széf már meg van nyitva egy importáláshoz. Előbb fejezd be vagy szakítsd meg azt az importálást.",
+          "busy": "Egy másik széfművelet van folyamatban. Várd meg, amíg befejeződik, majd próbáld újra.",
+          "credential": "Ez a jelszó vagy helyreállító mondat nem nyitotta meg a széfet. Ellenőrizd, és próbáld újra."
+        },
+        "importLabel": "Nevezd el ezt az importálást",
+        "importLabelHint": "Ha egy importált jegyzet neve megegyezik egy már meglévőével, és valami, amit importálsz, hivatkozik rá, akkor az importált jegyzet ennek segítségével kap új nevet. Ha újra lefuttatod ezt az importálást, tartsd meg ugyanezt a nevet, és semmi nem kerül be kétszer.",
+        "importLabelIllegal": "Ez a név nem használható: a jegyzet neve nem tartalmazhat \\ / | # ^ [ ] karaktert, és nem kezdődhet vagy végződhet szóközzel.",
+        "loading": "A többi széfed keresése…",
+        "noOtherVaults": "Ezen az eszközön nincs másik széf, amelyikből importálni lehetne. Állíts vissza előbb egy biztonsági mentést, és az olyan széffé válik, amelyikből itt importálhatsz.",
+        "opening": "Megnyitás…",
+        "passwordLabel": "Annak a széfnek a jelszava",
+        "phraseLabel": "Annak a széfnek a 24 szavas helyreállító mondata",
+        "report": {
+          "attachmentsCrossed": "Áthozott mellékletek",
+          "attachmentsDeduped": "Már meglévő mellékletek",
+          "attachmentsFailed": "A széf által el nem fogadott mellékletek",
+          "dictionaryUnreadable": "A forrásszéf szótárát nem sikerült beolvasni, ezért egyetlen szó sem került át.",
+          "dictionaryWordsAdded": "Áthozott szótári szavak",
+          "linksLeftUnresolved": "Sehová nem irányítható hivatkozások",
+          "linksRetargeted": "Átnevezett jegyzetre irányított hivatkozások",
+          "templatesLeftBehind": "Hátrahagyott sablonok",
+          "tombstonedEmbeds": "Beágyazások, amelyek fájlja a forrásban már törölve volt",
+          "trashedLeftBehind": "A forrásszéf Kukájában hátrahagyott jegyzetek",
+          "untitledImported": "Áthozott névtelen jegyzetek"
+        },
+        "unnamedVault": "{{n}}. széf",
+        "usePassword": "Inkább a jelszó használata",
+        "usePhrase": "Inkább a helyreállító mondat használata",
+        "vaultLabel": "Importálás innen",
+        "vaultPlaceholder": "Válassz széfet",
+        "wordAria": "{{number}}. szó a 24-ből"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "A helyreállítás megszakítva: a széf zárolva volt.",
       "operationInProgress": "Művelet van folyamatban. Kérlek, várj.",
       "unexpected": "Váratlan hiba. Kérlek, próbáld újra.",
-      "vaultNotFound": "A széf fájlja nem található. Kérlek, indítsd újra az alkalmazást."
+      "vaultNotFound": "A széf fájlja nem található. Kérlek, indítsd újra az alkalmazást.",
+      "openAsImportSource": "Éppen most olvassa ezt a széfet egy importálás. Fejezd be vagy szakítsd meg azt az importálást, majd állítsd helyre ezt a széfet."
     },
     "vaultUnreadable": "A széffájl olvashatatlan. Állítsa vissza biztonsági mentésből.",
     "genericError": "Valami hiba történt. Kérjük, próbálja újra.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Gráf megnyitása"
     },
     "archive": {
-      "helper": "Engedélyezi, hogy a jegyzetek az Archívumba kerüljenek, kihagyva a fő listából. Kikapcsolva minden archivált jegyzet visszakerül a mappájába, és elrejti az archívum vezérlőit.",
+      "helper": "Engedélyezi, hogy a jegyzetek az Archívumba kerüljenek, kihagyva a fő listából. Kikapcsolva minden archivált jegyzet visszakerül a mappájába, minden archivált mappa kikerül az archívumból, és elrejti az archívum vezérlőit. Az egész széfre érvényes, minden eszközön.",
       "label": "Archiválás",
       "off": "Ki",
       "on": "Be",
@@ -3109,7 +3161,8 @@
       "torLabel": "Szinkronizálás a Toron keresztül"
     },
     "prefs": {
-      "saveError": "Nem sikerült menteni a beállítást. Próbáld újra."
+      "saveError": "Nem sikerült menteni a beállítást. Próbáld újra.",
+      "folderListFull": "Ez a mappalista megtelt. Távolíts el belőle egy mappát, mielőtt újat adnál hozzá."
     },
     "reminders": {
       "aria": "Feladatemlékeztetők megjelenítése ezen az eszközön",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "Használható kulcstartóval rendelkező eszközön a széfválasztó megmutatja a széf nevét, amint ez az eszköz feloldotta. Ha ez be van kapcsolva, minden széfnél helyette helyőrző jelenik meg, például 2. széf, és ez a szám akkor is a széfnél marad, ha a lista átrendeződik.",
       "hideVaultNamesErases": "A bekapcsolás megsemmisíti azokat a kulcsokat, amelyekkel az itt tárolt nevek olvashatók, így ezek a nevek ezen az eszközön nem állíthatók helyre, és amíg bekapcsolva marad, a Myne több nevet nem tárol el.",
       "hideVaultNamesResidue": "A korábban készült másolatokat nem éri el: egy teljes rendszermentés, egy lemezkép vagy a lemez bármely más, rendszerszintű másolata, amely akkor készült, amikor a nevek még látszottak, a tárolt neveket és a kulcsaikat is tartalmazza.",
-      "hideVaultNamesUnavailable": "Ezen az eszközön nincs használható kulcstartó, ezért a Myne itt nem tárol széfnevet, és ez a beállítás nem kapcsolható be. A választó már most is minden széfnél helyőrzőt mutat.",
+      "hideVaultNamesUnavailable": "A Myne az alkalmazásnak ebben a példányában nem tud széfnevet tárolni, ezért itt egyet sem tárol, és ez a beállítás nem kapcsolható be. A választó már most is minden széfnél helyőrzőt mutat.",
       "hideVaultNamesErrorRead": "Nem sikerült beolvasni a jelenlegi beállítást. Kapcsold át a kapcsolót, hogy újra beállítsd.",
       "hideVaultNamesErrorSave": "Nem sikerült elmenteni a beállítást, ezért változatlan maradt. Ha éppen be akartad kapcsolni, néhány tárolt név már megsemmisülhetett; kapcsold be újra a befejezéshez.",
       "hideVaultNamesErrorErase": "Az egyik tárolt nevet nem sikerült megsemmisíteni, ezért a beállítás kikapcsolva maradt, hogy ne keltse olyan törlés látszatát, ami nem történt meg. Próbáld újra.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 p",
       "autoLock1h": "1 ó",
       "quickUnlockSubtitleAndroid": "Újbóli belépés PIN-kóddal automatikus zárolás után",
-      "quickUnlockSubtitle": "Újbóli belépés {{method}} vagy PIN-kód használatával automatikus zárolás után"
+      "quickUnlockSubtitle": "Újbóli belépés {{method}} vagy PIN-kód használatával automatikus zárolás után",
+      "screenCaptureOverrideHelper": "Csak ezen az eszközön kapcsolja ki a képernyőfelvétel-védelmet, a széf feloldása előtt és után is. Akkor kapcsold be, ha egy képernyőnagyító, egy távoli asztali szoftver vagy valaki, aki távolról segít neked, fekete ablakot lát. Nem szinkronizálódik.",
+      "screenCaptureOverrideLabel": "Képernyőfelvétel engedélyezése ezen az eszközön",
+      "screenCaptureOverrideUnknown": "Ennek az eszköznek a képernyőfelvétel-beállítását nem sikerült beolvasni, ezért ez a beállítás nincs érvényben. Nyisd meg újra a Beállításokat az újrapróbálkozáshoz.",
+      "screenCaptureSuperseded": "Ezen az eszközön ki van kapcsolva. Lásd lent: „Képernyőfelvétel engedélyezése ezen az eszközön”. Ez a beállítás megmarad, és újra érvénybe lép, ha azt kikapcsolod.",
+      "screenCaptureSupersededByFlag": "Ebben a munkamenetben ki van kapcsolva, mert a Myne a --disable-screen-capture-protection kapcsolóval indult. Ez a beállítás megmarad, és legközelebb újra érvénybe lép, amikor a Myne-t enélkül nyitod meg."
     },
     "quickUnlock": {
       "errorBusy": "Egy másik széfművelet van folyamatban. Próbáld újra egy pillanat múlva.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "új jegyzet helye mappa alapértelmezett hol létrehozás new note location",
         "torRouting": "tor útvonal onion proxy hálózat ip cím hely elrejtés szinkronizálás névtelenség anonymity",
         "quickUnlock": "gyors feloldás pin touch id biometrikus arcfelismerés ujjlenyomat unlock",
-        "reminders": "emlékeztetők értesítés riasztás feladat határidő emlékeztetés reminders",
+        "reminders": "emlékeztetők értesítés riasztás feladat határidő emlékeztetés előre ütemezés regisztrálva regisztráció napok horizont reminders",
         "realtimeSync": "valós idejű szinkronizálás élő kapcsolat jelenlét lekérdezés realtime sync",
         "screenCapture": "képernyőfelvétel képernyőkép védelem rögzítés letiltás adatvédelem screenshot",
         "showEditTimes": "szerkesztési idők időbélyegek módosítás dátumok jegyzetek timestamps",
@@ -3402,7 +3460,8 @@
         "timeFormat": "időformátum idő formátum 24 órás 12 órás óra de du am pm time format clock",
         "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today",
         "periodicNotes": "időszakos jegyzetek heti havi hét hónap mappa sablon formátum",
-        "aiHistoryBudget": "beszélgetés előzmények kontextus memória keret karakterek ügynök chat kérés"
+        "aiHistoryBudget": "beszélgetés előzmények kontextus memória keret karakterek ügynök chat kérés",
+        "screenCaptureOverride": "képernyőfelvétel felülbírálás engedélyezés kikapcsolás nagyító képernyőnagyító távoli asztal akadálymentesítés feloldás fekete képernyő override remote desktop accessibility"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24 órás",
       "time12": "12 órás",
       "zoneLabel": "Időzóna",
-      "zoneHelper": "Melyik zóna dönti el, mi számít mai napnak. Hagyd üresen, ha ezt az eszközt szeretnéd követni. A jegyzetbe írt időpontok soha nem változnak; a 09:00 mindenhol 09:00 marad.",
+      "zoneHelper": "Melyik zóna dönti el, mi számít mai napnak, és így azt is, melyik jegyzetet nyitja meg a napi, a heti és a havi jegyzeted. Hagyd üresen, ha ezt az eszközt szeretnéd követni. A választás eszközönként dől el: más eszköz nem írja felül, így egy felülbírálás ezt az eszközt a többitől eltérő napra állíthatja. A jegyzetbe írt időpontok soha nem változnak; a 09:00 mindenhol 09:00 marad.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "A Myne nem ismeri ezt az időzónát. Használj ilyen nevet: Europe/Berlin.",
       "errorSave": "Nem sikerült menteni ezt a beállítást."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Ennek a széfnek a megnyitásához {{required}} MiB memória kell, több, mint amennyit ez a böngésző adni tud ({{available}} MiB). A széffel nincs baj; nyisd meg a Myne asztali alkalmazásában.",
       "unexpected": "Váratlan hiba. Kérlek, próbáld újra.",
       "vaultNotFound": "A széf fájlja nem található. Kérlek, indítsd újra az alkalmazást.",
-      "vaultUpgraded": "Ezt a széfet olyan újabb formátumra frissítették, amelyet a Myne-nak ez a verziója még nem támogat. Az adataiddal nincs baj. A megnyitásához frissítsd a Myne-t a legújabb verzióra."
+      "vaultUpgraded": "Ezt a széfet olyan újabb formátumra frissítették, amelyet a Myne-nak ez a verziója még nem támogat. Az adataiddal nincs baj. A megnyitásához frissítsd a Myne-t a legújabb verzióra.",
+      "openAsImportSource": "Éppen most olvassa ezt a széfet egy importálás. Fejezd be vagy szakítsd meg azt az importálást, majd oldd fel ezt a széfet."
     },
     "passwordLabel": "Jelszó",
     "passwordPlaceholder": "Jelszó",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Ez a böngésző nem biztosít kriptográfiai véletlenszám-forrást."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "A képernyőfelvétel-védelem arra kéri az operációs rendszert, hogy ezt az ablakot hagyja ki a képernyőképekből és a képernyőfelvételekből. Windows 10 (2020. májusi frissítés) és újabb rendszereken működik; a macOS és a Linux nem kínál erre rendszer-API-t, ezért ott nem tudja megakadályozni a képernyőrögzítést. Ahol működik, ott többek között a távoli asztali szoftverek és a képernyőnagyítók elől is elrejti az ablakot, és ez az oka, hogy ez a kiút létezik.",
+    "disableConfirm": "Védelem kikapcsolása",
+    "disableCost": "A kikapcsolás csak erre az eszközre vonatkozik, és addig marad kikapcsolva, amíg vissza nem kapcsolod, a széf feloldása előtt és után is. Semmit nem küld el sehová, és egyetlen széfbeállítás sem változik, de a választás egy beállításfájlba kerül ezen az eszközön, és az a fájl akkor is ott marad, miután visszakapcsolod a védelmet.",
+    "disableTitle": "Kikapcsolod a képernyőfelvétel-védelmet?",
+    "disableTrigger": "Képernyőfelvétel-védelem kikapcsolása",
+    "flagNotice": "Ez a munkamenet a --disable-screen-capture-protection kapcsolóval indult, ezért a védelem kilépésig kikapcsolva marad, bármit is mond ez a beállítás.",
+    "restoreBody": "A képernyőfelvétel-védelem ki van kapcsolva ezen az eszközön. A visszakapcsolás újra arra kéri az operációs rendszert, hogy ezt az ablakot hagyja ki a képernyőképekből és a képernyőfelvételekből, ami Windows 10 (2020. májusi frissítés) és újabb rendszereken a távoli asztali szoftverek és a képernyőnagyítók elől is elrejti. A macOS és a Linux nem kínál erre rendszer-API-t, ezért ott nem tudja megakadályozni a képernyőrögzítést.",
+    "restoreConfirm": "Védelem bekapcsolása",
+    "restoreTitle": "Visszakapcsolod a képernyőfelvétel-védelmet?",
+    "restoreTrigger": "Képernyőfelvétel-védelem bekapcsolása",
+    "saveFailed": "Ezt nem sikerült menteni, ezért semmi nem változott. Próbáld újra, vagy indítsd a Myne-t a --disable-screen-capture-protection kapcsolóval.",
+    "savedForNextLaunch": "Mentve. Ebben a munkamenetben a védelem továbbra is ki van kapcsolva, mert a --disable-screen-capture-protection kapcsolóval indult, ezért legközelebb tér vissza, amikor a Myne-t enélkül nyitod meg."
   }
 }

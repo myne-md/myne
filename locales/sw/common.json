@@ -260,7 +260,7 @@
       "title": "Viambatisho",
       "transcribeDone": "Unukuzi umekamilika.",
       "transcribeFailed": "Unukuzi umeshindikana. Tafadhali jaribu tena.",
-      "transcribeTooLong": "Rekodi hii ni ndefu mno kunukuliwa.",
+      "transcribeTooLong": "Rekodi hii ni ndefu mno kunukuliwa. Sauti inabaki imeambatishwa, hivyo bado unaweza kuicheza.",
       "transcribeFeatureOff": "Ubadilishaji wa sauti kuwa maandishi umezimwa. Uwashe katika Mipangilio → Unukuzi.",
       "transcribeModelLoadFailed": "Imeshindwa kupakia modeli ya kubadilisha sauti kuwa maandishi. Sakinisha Myne upya, au kagua modeli yako maalum katika Mipangilio → Msanidi → AI.",
       "transcribeNoModel": "Chagua modeli ya kubadilisha sauti kuwa maandishi katika Mipangilio → Msanidi → AI.",
@@ -1819,7 +1819,9 @@
       "moveCollision": "Tayari kuna folda yenye jina hilo pale.",
       "unsettledSave": "Dokezo lililofunguliwa bado halijamaliza kuhifadhiwa, hivyo folda imeachwa kama ilivyo. Jaribu tena litakapomaliza.",
       "renameFailed": "Imeshindwa kubadilisha jina la folda, hivyo haijabadilika.",
-      "deliberateWriteFailed": "Jina la folda limebadilishwa, lakini mojawapo ya mipangilio yake haikuweza kuhifadhiwa. Folda tupu itaonekana tena kwa jina la zamani kila unapofungua kasha; kuifuta ni salama na hakubadilishi kitu kingine chochote. Kubadilisha jina la folda tena hakutaiondoa."
+      "deliberateWriteFailed": "Jina la folda limebadilishwa, lakini mojawapo ya mipangilio yake haikuweza kuhifadhiwa. Folda tupu itaonekana tena kwa jina la zamani kila unapofungua kasha; kuifuta ni salama na hakubadilishi kitu kingine chochote. Kubadilisha jina la folda tena hakutaiondoa.",
+      "folderListFull": "Myne inaweza kukumbuka idadi finyu ya folda, na orodha hiyo imejaa. Folda hii bado inafanya kazi, lakini itatoweka pale dokezo lake la mwisho litakapoondoka humo. Kufuta folda usiyoihitaji tena hutengeneza nafasi.",
+      "folderNotRemembered": "Folda imeundwa, lakini Myne haikuweza kuihifadhi kwenye orodha yake. Itatoweka pale dokezo lake la mwisho litakapoondoka humo, na itakuwa imekwisha utakapofungua kasha tena ikiwa bado ni tupu. Ni salama kuiunda tena."
     },
     "folderNote": {
       "defaultTitle": "Faharasa"
@@ -1962,7 +1964,11 @@
         "reasonPermissionDenied": "Myne haikuruhusiwa kusoma faili hili.",
         "reasonNotFound": "Faili hili lilikuwa limeondoka wakati Myne ilipolifikia.",
         "reasonNoSpace": "Kifaa hiki kimeishiwa nafasi.",
-        "reasonUnknown": "Myne haikuweza kubaini sababu."
+        "reasonUnknown": "Myne haikuweza kubaini sababu.",
+        "foldersNotKeptNote": "{{count}} itatoweka pale dokezo lake la mwisho litakapoondoka",
+        "foldersNotKeptNote_one": "{{count}} itatoweka pale dokezo lake la mwisho litakapoondoka",
+        "foldersNotKeptNote_other": "{{count}} zitatoweka pale dokezo lao la mwisho litakapoondoka",
+        "statFoldersNotKept": "Folda zisizohifadhiwa"
       },
       "offer": {
         "body": "Leta madokezo yako yaliyopo ndani ya Myne. Kila moja husimbwa kwa njia fiche linapoingizwa. Hakuna kinachotoka kwenye kifaa hiki, na mafaili yako ya awali yanabaki pale pale.",
@@ -2009,7 +2015,52 @@
           "survives": "Huwa dokezo moja lenye jedwali.",
           "loses": "Ni dokezo moja, si dokezo kwa kila safu: Myne si hifadhidata. Mafaili mapana au marefu mno hupunguzwa, na ripoti ya uingizaji husema kwa kiasi gani.",
           "short": "Faili moja la lahajedwali"
+        },
+        "myne": {
+          "label": "Kasha la Myne",
+          "loses": "Historia ya matoleo, madokezo yaliyofutwa, na violezo hubaki kwenye kasha chanzo. Viambatisho ambavyo hakuna dokezo lililoingizwa linavitumia huachwa nyuma. Kasha chanzo halibadilishwi na, ukilisawazisha, linaendelea kusawazishwa.",
+          "pickerTitle": "Chagua kasha la kuingiza kutoka humo",
+          "short": "Kasha jingine kwenye kifaa hiki",
+          "survives": "Madokezo, folda, lebo, viungo kati ya madokezo unayoingiza, na viambatisho ambavyo madokezo hayo yanavitumia. Maneno uliyoongeza kwenye kamusi ya kasha chanzo nayo huja pia."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Historia ya matoleo inabaki kwenye kasha chanzo.",
+          "sourceUnchanged": "Kasha chanzo halijabadilishwa. Ukilisawazisha, linaendelea kusawazishwa."
+        },
+        "errors": {
+          "alreadyOpen": "Kasha hilo tayari limefunguliwa kwa ajili ya uingizaji. Maliza au ghairi uingizaji huo kwanza.",
+          "busy": "Kuna shughuli nyingine ya kasha inayoendelea. Subiri ikamilike kisha ujaribu tena.",
+          "credential": "Nenosiri hilo au kifungu hicho cha urejeshaji hakikufungua kasha. Hakiki kisha ujaribu tena."
+        },
+        "importLabel": "Upe uingizaji huu jina",
+        "importLabelHint": "Kama dokezo unaloingiza lina jina sawa na dokezo ulilo nalo tayari, na kitu unachoingiza kina kiungo kinachoelekea kwake, dokezo lililoingizwa hubadilishiwa jina kwa kutumia jina hili. Tumia jina hilo hilo ukiendesha uingizaji huu tena, na hakuna kitakachoingizwa mara mbili.",
+        "importLabelIllegal": "Jina hilo haliwezi kutumika: jina la dokezo haliwezi kuwa na \\ / | # ^ [ ], wala kuanza au kuishia na nafasi.",
+        "loading": "Inatafuta makasha yako mengine…",
+        "noOtherVaults": "Hakuna makasha mengine kwenye kifaa hiki ya kuingiza kutoka humo. Rejesha hifadhi rudufu kwanza, nayo itakuwa kasha unaloweza kuingiza kutoka hapa.",
+        "opening": "Inafungua…",
+        "passwordLabel": "Nenosiri la kasha hilo",
+        "phraseLabel": "Kifungu cha urejeshaji cha maneno 24 cha kasha hilo",
+        "report": {
+          "attachmentsCrossed": "Viambatisho vilivyoletwa",
+          "attachmentsDeduped": "Viambatisho ulivyokuwa navyo tayari",
+          "attachmentsFailed": "Viambatisho ambavyo kasha halikuvikubali",
+          "dictionaryUnreadable": "Kamusi ya kasha chanzo haikuweza kusomwa, hivyo hakuna neno lililoletwa.",
+          "dictionaryWordsAdded": "Maneno ya kamusi yaliyoletwa",
+          "linksLeftUnresolved": "Viungo ambavyo havikuweza kuelekezwa popote",
+          "linksRetargeted": "Viungo vilivyoelekezwa kwenye dokezo lililobadilishwa jina",
+          "templatesLeftBehind": "Violezo, vilivyoachwa nyuma",
+          "tombstonedEmbeds": "Vipachiko ambavyo faili lake lilikuwa tayari limefutwa kwenye kasha chanzo",
+          "trashedLeftBehind": "Madokezo yaliyo kwenye tupio la kasha chanzo, yaliyoachwa nyuma",
+          "untitledImported": "Madokezo yasiyo na kichwa yaliyoletwa"
+        },
+        "unnamedVault": "Kasha {{n}}",
+        "usePassword": "Tumia nenosiri badala yake",
+        "usePhrase": "Tumia kifungu cha urejeshaji badala yake",
+        "vaultLabel": "Ingiza kutoka",
+        "vaultPlaceholder": "Chagua kasha",
+        "wordAria": "Neno {{number}} kati ya 24"
       }
     },
     "list": {
@@ -2410,7 +2461,8 @@
       "cancelledVaultLocked": "Urejeshaji umeghairiwa: kasha lilikuwa limefungwa.",
       "operationInProgress": "Kuna shughuli inayoendelea. Tafadhali subiri.",
       "unexpected": "Hitilafu isiyotarajiwa. Tafadhali jaribu tena.",
-      "vaultNotFound": "Faili la kasha halikupatikana. Tafadhali anzisha programu upya."
+      "vaultNotFound": "Faili la kasha halikupatikana. Tafadhali anzisha programu upya.",
+      "openAsImportSource": "Uingizaji unasoma kasha hili kwa sasa. Maliza au ghairi uingizaji huo, kisha urejeshe kasha hili."
     },
     "vaultUnreadable": "Faili la kasha halisomeki. Rejesha kutoka kwenye hifadhi rudufu.",
     "genericError": "Kuna kilichoenda vibaya. Tafadhali jaribu tena.",
@@ -2642,7 +2694,7 @@
       "openGraph": "Fungua grafu"
     },
     "archive": {
-      "helper": "Ruhusu madokezo kuhamishiwa kwenye Kumbukumbu, yakiwa nje ya orodha kuu. Kuzima hii kunarudisha kila dokezo lililowekwa kwenye kumbukumbu kwenye folda yake na kuficha vidhibiti vya kumbukumbu.",
+      "helper": "Ruhusu madokezo kuhamishiwa kwenye Kumbukumbu, yakiwa nje ya orodha kuu. Kuzima hii kunarudisha kila dokezo lililowekwa kwenye kumbukumbu kwenye folda yake, kunaondoa kila folda iliyowekwa kwenye kumbukumbu kutoka humo, na kuficha vidhibiti vya kumbukumbu. Inahusu kasha zima, kwenye kila kifaa.",
       "label": "Uwekaji kwenye kumbukumbu",
       "off": "Imezimwa",
       "on": "Imewashwa",
@@ -3089,7 +3141,8 @@
       "torLabel": "Safirisha usawazishaji kupitia Tor"
     },
     "prefs": {
-      "saveError": "Imeshindwa kuhifadhi mapendeleo. Jaribu tena."
+      "saveError": "Imeshindwa kuhifadhi mapendeleo. Jaribu tena.",
+      "folderListFull": "Orodha hiyo ya folda imejaa. Ondoa folda kutoka humo kabla ya kuongeza nyingine."
     },
     "reminders": {
       "aria": "Onyesha vikumbusho vya kazi kwenye kifaa hiki",
@@ -3114,7 +3167,7 @@
       "hideVaultNamesHelper": "Kwenye kifaa chenye hazina ya funguo inayotumika, kichagua kasha huonyesha jina la kasha mara tu kifaa hiki kinapokuwa kimelifungua. Hili likiwashwa, kila kasha huonyesha kishika nafasi kama Kasha 2 badala yake, na nambari hiyo hubaki na kasha hilo hata orodha ikipangwa upya.",
       "hideVaultNamesErases": "Kuliwasha huharibu funguo zinazofanya majina yaliyohifadhiwa hapa yasomeke, hivyo majina hayo hayawezi kurejeshwa kwenye kifaa hiki, na hakuna jina jingine linaloandikwa hili likiendelea kuwa limewashwa.",
       "hideVaultNamesResidue": "Haliwezi kufikia nakala iliyochukuliwa awali: hifadhi rudufu ya mfumo mzima, taswira ya diski, au nakala nyingine yoyote ya kiwango cha mfumo ya diski hii iliyotengenezwa wakati majina yalipokuwa yakionyeshwa hubeba majina yaliyohifadhiwa pamoja na funguo zake.",
-      "hideVaultNamesUnavailable": "Kifaa hiki hakina hazina ya funguo inayotumika, hivyo Myne haihifadhi jina lolote la kasha hapa na chaguo hili haliwezi kuwashwa. Kichagua tayari huonyesha kishika nafasi kwa kila kasha.",
+      "hideVaultNamesUnavailable": "Myne haiwezi kuhifadhi majina ya makasha katika nakala hii ya programu, hivyo haihifadhi jina lolote hapa na chaguo hili haliwezi kuwashwa. Kichagua tayari huonyesha kishika nafasi kwa kila kasha.",
       "hideVaultNamesErrorRead": "Imeshindwa kusoma mpangilio wa sasa. Geuza swichi ili kuuweka tena.",
       "hideVaultNamesErrorSave": "Imeshindwa kuhifadhi mpangilio, hivyo haujabadilika. Kama ulikuwa unauwasha, baadhi ya majina yaliyohifadhiwa huenda tayari yameharibiwa; uwashe tena ili kumaliza.",
       "hideVaultNamesErrorErase": "Jina moja lililohifadhiwa halikuweza kuharibiwa, hivyo mpangilio uliachwa umezimwa badala ya kudai ufutaji ambao haukutokea. Jaribu tena.",
@@ -3130,7 +3183,12 @@
       "autoLock30m": "dk 30",
       "autoLock1h": "saa 1",
       "quickUnlockSubtitleAndroid": "Ingia tena kwa PIN baada ya kujifunga kiotomatiki",
-      "quickUnlockSubtitle": "Ingia tena kwa {{method}} au PIN baada ya kujifunga kiotomatiki"
+      "quickUnlockSubtitle": "Ingia tena kwa {{method}} au PIN baada ya kujifunga kiotomatiki",
+      "screenCaptureOverrideHelper": "Huzima ulinzi dhidi ya kunasa skrini kwenye kifaa hiki pekee, kabla ya kufungua kasha na baada ya kulifungua. Liwashe ikiwa kikuzaji cha skrini, programu ya eneo-kazi la mbali au mtu anayekusaidia kwa mbali anaona dirisha jeusi. Halisawazishwi.",
+      "screenCaptureOverrideLabel": "Ruhusu kunasa skrini kwenye kifaa hiki",
+      "screenCaptureOverrideUnknown": "Mpangilio wa kunasa skrini wa kifaa hiki haukuweza kusomwa, hivyo mapendeleo haya hayatumiki. Fungua Mipangilio tena ili kujaribu upya.",
+      "screenCaptureSuperseded": "Umezimwa kwenye kifaa hiki. Angalia “Ruhusu kunasa skrini kwenye kifaa hiki” hapa chini. Mapendeleo haya yamehifadhiwa na yatatumika tena utakapozima chaguo hilo.",
+      "screenCaptureSupersededByFlag": "Umezimwa kwa kipindi hiki, kwa sababu Myne ilianzishwa kwa --disable-screen-capture-protection. Mapendeleo haya yamehifadhiwa na yatatumika tena utakapofungua Myne bila hiyo."
     },
     "quickUnlock": {
       "errorBusy": "Kuna shughuli nyingine ya kasha inayoendelea. Jaribu tena baada ya muda mfupi.",
@@ -3347,7 +3405,7 @@
         "newNoteLocation": "mahali pa dokezo jipya folda chaguomsingi madokezo yanapoundwa",
         "torRouting": "tor usafirishaji onion proksi mtandao anwani ya ip eneo ficha usawazishaji kutojulikana",
         "quickUnlock": "ufunguzi wa haraka pin touch id kibayometriki face unlock",
-        "reminders": "vikumbusho arifa taarifa tahadhari kazi tarehe ya mwisho kumbusha",
+        "reminders": "vikumbusho arifa taarifa tahadhari kazi tarehe ya mwisho kumbusha ratibu mapema usajili siku",
         "screenCapture": "kunasa skrini ulinzi picha ya skrini kurekodi zuia faragha",
         "showEditTimes": "onyesha nyakati za kuhariri alama za muda tarehe za mabadiliko madokezo",
         "spell": "ukaguzi wa tahajia tahajia kamusi sahihisha kiotomatiki",
@@ -3374,7 +3432,8 @@
         "timeFormat": "muundo wa saa am pm saa 24 saa 12 muda",
         "timezone": "eneo la saa ukanda wa saa tz utc iana kanda leo",
         "periodicNotes": "madokezo ya mara kwa mara kila wiki kila mwezi wiki mwezi folda kiolezo muundo",
-        "aiHistoryBudget": "mazungumzo historia muktadha kumbukumbu bajeti herufi wakala gumzo ombi"
+        "aiHistoryBudget": "mazungumzo historia muktadha kumbukumbu bajeti herufi wakala gumzo ombi",
+        "screenCaptureOverride": "kunasa skrini ruhusu zima batilisha kikuzaji cha skrini eneo kazi la mbali remote desktop ufikivu fungua skrini nyeusi"
       }
     },
     "dateTime": {
@@ -3387,7 +3446,7 @@
       "time24": "Saa 24",
       "time12": "Saa 12",
       "zoneLabel": "Eneo la saa",
-      "zoneHelper": "Ni eneo lipi linaloamua kinachohesabiwa kuwa leo. Acha wazi ili kufuata kifaa hiki. Saa unazoandika ndani ya dokezo hazibadilishwi kamwe; 09:00 inabaki 09:00 kila mahali.",
+      "zoneHelper": "Ni eneo lipi linaloamua kinachohesabiwa kuwa leo, na hivyo ni dokezo lipi linalofunguliwa kwa madokezo yako ya kila siku, kila wiki na kila mwezi. Acha wazi ili kufuata kifaa hiki. Chaguo hili hukaa kwa kila kifaa peke yake: hakuna kifaa kingine kinachoandika juu yake, hivyo kubadilisha hapa kunaweza kuweka kifaa hiki kwenye siku tofauti na vifaa vyako vingine. Saa unazoandika ndani ya dokezo hazibadilishwi kamwe; 09:00 inabaki 09:00 kila mahali.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne haitambui eneo hilo la saa. Tumia jina kama Europe/Berlin.",
       "errorSave": "Imeshindwa kuhifadhi mpangilio huo."
@@ -3851,7 +3910,8 @@
       "kdfMemoryExceedsHost": "Kasha hili linahitaji kumbukumbu ya MiB {{required}} ili kufunguka, zaidi ya kile kivinjari hiki kinachoweza kutoa (MiB {{available}}). Kasha lako liko salama; lifungue katika programu ya Myne ya kompyuta.",
       "unexpected": "Hitilafu isiyotarajiwa. Tafadhali jaribu tena.",
       "vaultNotFound": "Faili la kasha halikupatikana. Tafadhali anzisha programu upya.",
-      "vaultUpgraded": "Kasha hili limepandishwa kwenye muundo mpya ambao toleo hili la Myne bado haliuungi mkono. Data yako iko salama. Sasisha Myne hadi toleo la karibuni ili kulifungua."
+      "vaultUpgraded": "Kasha hili limepandishwa kwenye muundo mpya ambao toleo hili la Myne bado haliuungi mkono. Data yako iko salama. Sasisha Myne hadi toleo la karibuni ili kulifungua.",
+      "openAsImportSource": "Uingizaji unasoma kasha hili kwa sasa. Maliza au ghairi uingizaji huo, kisha ufungue kasha hili."
     },
     "passwordLabel": "Nenosiri",
     "passwordPlaceholder": "Nenosiri",
@@ -4404,5 +4464,19 @@
         "crypto-getrandomvalues": "Kivinjari hiki hakitoi chanzo cha nambari nasibu za kiusimbaji."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Ulinzi dhidi ya kunasa skrini huomba mfumo wa uendeshaji kuliweka dirisha hili nje ya picha za skrini na rekodi za skrini. Unafanya kazi kwenye Windows 10 (May 2020 Update) na baadaye; macOS na Linux hazina API ya mfumo kwa hili, hivyo huko hauwezi kuzuia kunasa. Pale unapofanya kazi, hulificha dirisha pia dhidi ya programu za eneo-kazi la mbali na vikuzaji vya skrini, na ndiyo maana njia hii ya kuuzima ipo.",
+    "disableConfirm": "Zima ulinzi",
+    "disableCost": "Kuuzima kunahusu kifaa hiki pekee, na unabaki umezimwa hadi utakapouwasha tena, kabla ya kufungua kasha na baada ya kulifungua. Hakuna kinachotumwa popote na hakuna mpangilio wa kasha unaobadilika, lakini chaguo lako huhifadhiwa kwenye faili la mipangilio kwenye kifaa hiki, na faili hilo hubaki hapo hata baada ya kuwasha ulinzi tena.",
+    "disableTitle": "Uzime ulinzi dhidi ya kunasa skrini?",
+    "disableTrigger": "Zima ulinzi dhidi ya kunasa skrini",
+    "flagNotice": "Kipindi hiki kilianzishwa kwa --disable-screen-capture-protection, hivyo ulinzi unabaki umezimwa hadi utakapofunga programu, chochote mpangilio huu unachosema.",
+    "restoreBody": "Ulinzi dhidi ya kunasa skrini umezimwa kwenye kifaa hiki. Kuuwasha tena huomba mfumo wa uendeshaji kuliweka dirisha hili nje ya picha za skrini na rekodi za skrini tena, jambo ambalo kwenye Windows 10 (May 2020 Update) na baadaye pia hulificha dhidi ya programu za eneo-kazi la mbali na vikuzaji vya skrini. Kwenye macOS na Linux hakuna API ya mfumo kwa hili, hivyo huko hauwezi kuzuia kunasa.",
+    "restoreConfirm": "Washa ulinzi",
+    "restoreTitle": "Uwashe tena ulinzi dhidi ya kunasa skrini?",
+    "restoreTrigger": "Washa ulinzi dhidi ya kunasa skrini",
+    "saveFailed": "Hilo halikuweza kuhifadhiwa, hivyo hakuna kilichobadilika. Jaribu tena, au anzisha Myne kwa --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Imehifadhiwa. Kipindi hiki bado kina ulinzi umezimwa kwa sababu kilianzishwa kwa --disable-screen-capture-protection, hivyo ulinzi utarudi utakapofungua Myne tena bila hiyo."
   }
 }
