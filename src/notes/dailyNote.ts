@@ -184,8 +184,21 @@ export function isoWeek(now: Date): { weekYear: number; week: number } {
  * under which `W` + `ww` and `ww` + `W` are the same string and neither reading
  * is more correct. A single left-to-right pass also means nothing the formatter
  * emits is eligible for another token match, which successive replaces could
- * not promise. The grammar is moment.js-compatible, so a format carried over
- * from another tool works as typed (myne#177).
+ * not promise.
+ *
+ * **The TOKEN SPELLINGS are moment.js-compatible; the week SEMANTICS are ISO
+ * unconditionally, and that is narrower than "a format carried over from
+ * another tool works as typed".** `gggg` and `ww` here always mean ISO
+ * week-year and ISO week number, which matches moment under its European
+ * locales and differs from its default `en` (dow 0, doy 6). So a `gggg-[W]ww`
+ * format pasted from a tool running moment's default locale reproduces
+ * different week numbers for part of the year, and the user gets a second set
+ * of weekly notes beside their old ones. That is the same silent re-pointing
+ * `decisions/storage/0556` gives as its reason for freezing the week start, so
+ * the divergence is deliberate rather than an oversight: an app whose week
+ * boundary depends on a locale setting cannot promise that "open this week" is
+ * idempotent. The user-facing settings copy already says ISO in both token
+ * hints, which is the accurate form (myne#177).
  *
  * LOCAL time — `now.getFullYear()`/`getMonth()`/`getDate()` are local-clock.
  */

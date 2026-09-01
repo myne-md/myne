@@ -217,6 +217,24 @@ pub fn print_daily_append(json: bool) {
 /// device-local so it never merges from a peer, and stderr is the channel that
 /// ends up in `2>` redirects, CI logs and pasted output. The user set the
 /// override, so naming it back adds nothing they do not know.
+///
+/// **THE RESIDUAL, and it is accepted rather than absent.** The line is
+/// conditional, so its presence in a `2>` capture says "this vault has a
+/// `timezone` override set". That is one bit, it is the existence of a setting
+/// rather than its value, and it is strictly weaker than the identifier the
+/// paragraph above refuses. The alternative that removes it is printing
+/// unconditionally, since "this command used the device clock" is true of every
+/// period command whether or not an override exists, and that trade was
+/// declined: it turns a line that explains a genuinely confusing outcome (the
+/// desktop shows Monday, `myne weekly` opens Sunday's note) into permanent
+/// noise for every user who set no override, which is nearly all of them, and a
+/// warning that always fires is a warning nobody reads. Deciding whether the
+/// two zones actually DIFFER today, which would be the precise condition, needs
+/// the zone database `decisions/storage/0556` argues down, so it is not
+/// available at any price this design pays.
+///
+/// It already prints at most once per invocation: one command, one call, and
+/// nothing loops over periods.
 const DEVICE_CLOCK_NOTE: &str =
     "note: this command used the device clock; the display timezone override is not applied to periodic-notes commands";
 

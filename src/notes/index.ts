@@ -43,6 +43,7 @@ export {
   buildRenderContext,
   extractTemplateBody,
   createNoteFromTemplate,
+  singleDay,
   createBlankNamedNote,
 } from "./newNoteFromTemplate";
 export {

@@ -107,6 +107,7 @@ import {
   noteList,
   loadNoteBatch,
   createNoteFromTemplate,
+  singleDay,
   createBlankNamedNote,
   resolvePeriodNote,
   periodSettings,
@@ -2258,7 +2259,11 @@ function EditorChrome({
         onCreateFromTemplate={(templateId, name) => {
           // Location-agnostic: lands at the root, where the header new-note
           // button's blank note would land (folder = null).
-          void createNoteFromTemplate(templateId, name, null)
+          // `singleDay(now)`: a note made by hand belongs to the day it was
+          // made on, so both period tokens render as today. Said explicitly
+          // because the parameter is required now, which is what stops a
+          // future weekly path from silently inheriting this meaning.
+          void createNoteFromTemplate(templateId, name, null, new Date(), singleDay(new Date()))
             .then((id) => ctx.open(id as NoteId))
             .catch(() => {
               /* creation failure surfaces via sidebar UX */
