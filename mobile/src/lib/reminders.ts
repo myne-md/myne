@@ -240,3 +240,27 @@ export function createExactAlarmApi(): ExactAlarmApi {
     },
   };
 }
+
+/**
+ * Whether this build hands any reminder to the operating system.
+ *
+ * **`false`, and that is a statement about the client rather than about the
+ * platform.** The plugin below works and the OS would hold the registration;
+ * what is missing is the caller. `mobile/src/lib/reminderPass.ts` holds
+ * `runBoundedReminderPass`, the pass that would reconcile the vault's tasks
+ * against what the OS is holding, and nothing in `mobile/src` calls it. The
+ * repo already records that: `scripts/check-unwired.mjs` carries the module as
+ * a known-UNWIRED exemption.
+ *
+ * It exists because a settings sentence may not describe a mechanism that is
+ * not running. "Reminders are registered through <date>" was rendered
+ * unconditionally, and it was false on every mobile build (myne#508). The
+ * desktop twin has said the same thing about itself since MYND-618, through
+ * `reminderPlatform.ts::showsInAppOnlyLimitation`, which this mirrors.
+ *
+ * Flips to a real check on the change that gives the pass a caller, and the
+ * sentence returns with it.
+ */
+export function remindersReachTheOs(): boolean {
+  return false;
+}

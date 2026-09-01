@@ -43,6 +43,11 @@ type RenderCase = {
   input_ctx_time_utf8_hex: string;
   input_ctx_datetime_utf8_hex: string;
   input_ctx_weekday_utf8_hex: string;
+  // myne#177. Optional in the type because a case minted before the period
+  // tokens existed carries neither field and uses neither token; the guard
+  // below is what stops that leniency from covering a case that DOES use one.
+  input_ctx_period_start_utf8_hex?: string;
+  input_ctx_period_end_utf8_hex?: string;
   expected_output_utf8_hex: string;
 };
 
@@ -77,7 +82,23 @@ function contextOf(c: RenderCase): RenderContext {
     time: fromHex(c.input_ctx_time_utf8_hex),
     datetime: fromHex(c.input_ctx_datetime_utf8_hex),
     weekday: fromHex(c.input_ctx_weekday_utf8_hex),
+    periodStart: fromHex(c.input_ctx_period_start_utf8_hex ?? ""),
+    periodEnd: fromHex(c.input_ctx_period_end_utf8_hex ?? ""),
   };
+}
+
+/** A case that USES a period token must PIN it, or the vector would be
+ *  asserting against an empty string this runner invented rather than against
+ *  published bytes (myne#177). */
+function pinsEveryTokenItUses(c: RenderCase): string | null {
+  const template = fromHex(c.input_template_utf8_hex);
+  for (const [token, pinned] of [
+    ["{{period_start}}", c.input_ctx_period_start_utf8_hex !== undefined],
+    ["{{period_end}}", c.input_ctx_period_end_utf8_hex !== undefined],
+  ] as const) {
+    if (template.includes(token) && !pinned) return token;
+  }
+  return null;
 }
 
 const present = fs.existsSync(CASES_PATH);
@@ -108,6 +129,7 @@ dv("note-template vectors", () => {
 
   for (const c of renders) {
     it(`renders ${c.vector_id}`, () => {
+      expect(pinsEveryTokenItUses(c)).toBeNull();
       expect(renderTemplate(fromHex(c.input_template_utf8_hex), contextOf(c))).toBe(
         fromHex(c.expected_output_utf8_hex),
       );

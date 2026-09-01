@@ -11,7 +11,14 @@
 // this setting does not walk that back. It decides what the app treats as
 // "today" and how a genuine INSTANT (an attachment's `created_at`) is printed.
 // A stored note date or time is never converted, and no zone identifier ever
-// reaches a `.myn` file, a blob, or the sync wire.
+// reaches a `.myn` file, so a note never records where its author was.
+//
+// Be exact about the rest of the reach, because the looser claim was written
+// here first and this file is one of nine that carried it: the zone DOES live in
+// the encrypted `vault.prefs` blob, which is pushed and pulled like every other
+// prefs field. `PrefClass::DeviceLocal` is a MERGE classification
+// (`sync-protocol.md` 10.2), meaning the local value survives the merge, and
+// 10.2.1 has a newly enrolled device adopt it as a starting default.
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,6 +28,8 @@ import { prefsRead, setDateFormat, setTimeFormat, setTimezone } from "../../lib/
 import {
   DATE_FORMATS,
   TIME_FORMATS,
+  asDateFormat,
+  asTimeFormat,
   formatCivilDate,
   isSupportedTimeZone,
   type DateFormat,
@@ -32,17 +41,6 @@ import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
  *  point of the setting is what the output looks like. */
 const SAMPLE_DATE = "2026-08-01";
 
-function asDateFormat(raw: string | null): DateFormat {
-  return (DATE_FORMATS as readonly string[]).includes(raw ?? "")
-    ? (raw as DateFormat)
-    : "system";
-}
-
-function asTimeFormat(raw: string | null): TimeFormat {
-  return (TIME_FORMATS as readonly string[]).includes(raw ?? "")
-    ? (raw as TimeFormat)
-    : "system";
-}
 
 export function DateTimeSettings() {
   const { t } = useTranslation();

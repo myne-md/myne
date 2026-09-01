@@ -71,6 +71,29 @@ describe("check-token-adoption", () => {
     expect(code).toBe(0);
   });
 
+  // The EXEMPT path, both directions, on a REAL directory rather than a scratch
+  // one, because that is the only place a repo-relative `EXEMPT` key exists.
+  //
+  // It had no coverage at all until myne-md/myne#629's review, and the gap was
+  // not academic: `--scan` did not consult `EXEMPT` either, so the entry that
+  // retires 105 recorded literals from `mobile/src/styles/tokens.css` was
+  // unreachable from every test here, and the guard reported that file at 108 as
+  // though it were still on the ratchet. An exemption is a decision; a decision
+  // nothing exercises is a decision nobody can check.
+  describe("EXEMPT", () => {
+    it("excuses a token-DEFINING sheet", () => {
+      const { out } = run(["--scan", "mobile/src/styles"]);
+      expect(out).not.toContain("tokens.css");
+    });
+
+    it("still counts a non-exempt file in the same directory", () => {
+      // The half that makes the assertion above mean something: a whole-file
+      // excuse that leaked to its neighbours would satisfy the first test.
+      const { out } = run(["--scan", "mobile/src/styles"]);
+      expect(out).toContain("mobile.css");
+    });
+  });
+
   it("names the token families in its failure message", () => {
     // The message has to teach, not just refuse: the next person needs to know
     // WHICH var to reach for, and why a literal here is permanent.

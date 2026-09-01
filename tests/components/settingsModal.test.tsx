@@ -37,8 +37,32 @@ vi.mock("../../src/components/settings/AccountPanel", () => ({
 vi.mock("../../src/components/settings/PrivacyPanel", () => ({
   PrivacyPanel: () => <div data-testid="panel.privacy">privacy</div>,
 }));
+// Records its props rather than ignoring them: the Editor panel is the only one
+// whose `usePrefs` writes have no error surface of their own, so the toast the
+// shell threads into it is the sole signal a failed optimistic write produces
+// (myne#508). Deleting `onShowToast={onShowToast}` at the shell left every
+// suite green before this captured it.
+let editorPanelProps: { onShowToast?: (message: string) => void } | undefined;
+
+/** Read `editorPanelProps` through a call, so control-flow analysis cannot
+ *  narrow it.
+ *
+ *  Each test assigns `undefined` and then `render`s, and the mocked panel fills
+ *  it during that render. TypeScript cannot see a mutation that happens inside
+ *  a callback it does not follow, so at the assertion it still has the variable
+ *  narrowed to `undefined` and the property access lands on `never`. A local
+ *  copy inherits the same narrowing; only crossing a function boundary drops
+ *  it. The mutation is real, the narrowing is what is wrong, and this is the
+ *  smallest way to say so without a cast that would also hide a genuine
+ *  mistake. */
+function capturedEditorProps(): { onShowToast?: (message: string) => void } | undefined {
+  return editorPanelProps;
+}
 vi.mock("../../src/components/settings/EditorPanel", () => ({
-  EditorPanel: () => <div data-testid="panel.editor">editor</div>,
+  EditorPanel: (props: { onShowToast?: (message: string) => void }) => {
+    editorPanelProps = props;
+    return <div data-testid="panel.editor">editor</div>;
+  },
 }));
 vi.mock("../../src/components/settings/AppearancePanel", () => ({
   AppearancePanel: () => <div data-testid="panel.appearance">appearance</div>,
@@ -71,6 +95,10 @@ afterEach(cleanup);
 
 function renderModal(over: Partial<Parameters<typeof SettingsModal>[0]> = {}) {
   const props = {
+    // Required by `SettingsModalProps`, and absent here until the test tree
+    // started typechecking: `renderModal()` with no override produced an object
+    // missing it, which `render` accepts at runtime and no gate reported.
+    vaultId: null,
     open: true,
     onClose: vi.fn(),
     onDeleteVaultSuccess: vi.fn(),
@@ -79,6 +107,25 @@ function renderModal(over: Partial<Parameters<typeof SettingsModal>[0]> = {}) {
   const utils = render(<SettingsModal {...props} />);
   return { ...utils, props };
 }
+
+describe("SettingsModal panel wiring", () => {
+  it("threads its toast surface into the Editor panel", async () => {
+    // The Editor panel's `usePrefs` writes have no error surface of their own,
+    // so this prop is the only signal a failed optimistic write produces there.
+    // `writeOptimisticPref` keeps the optimistic value when its converging
+    // re-read also fails, which means an unthreaded toast leaves a horizon that
+    // was never persisted on screen as though it were in force (myne#508).
+    const onShowToast = vi.fn();
+    editorPanelProps = undefined;
+    renderModal({ onShowToast });
+    fireEvent.click(screen.getByTestId("settings.tab-editor"));
+    await screen.findByTestId("panel.editor");
+    const captured = capturedEditorProps();
+    expect(typeof captured?.onShowToast).toBe("function");
+    captured?.onShowToast?.("boom");
+    expect(onShowToast).toHaveBeenCalledWith("boom");
+  });
+});
 
 describe("SettingsModal — open gate", () => {
   it("renders nothing when open is false", () => {

@@ -17,6 +17,11 @@ const CTX: RenderContext = {
   time: "01:00",
   datetime: "2026-06-07 01:00",
   weekday: "Sunday",
+  // A WEEK-long period around that instant (myne#177), deliberately not equal
+  // to `date`: a fixture whose period bounds equalled today would let a token
+  // wired to the wrong context field pass.
+  periodStart: "2026-06-01",
+  periodEnd: "2026-06-07",
 };
 
 describe("renderTemplate — identity + determinism", () => {
@@ -94,14 +99,38 @@ describe("renderTemplate — {{weekday}}", () => {
 });
 
 describe("SUPPORTED_TOKENS — single-source registry", () => {
-  it("is exactly the five v1 names", () => {
+  it("is exactly the registered names, in order", () => {
+    // The ORDER is pinned as well as the set: it is the `{{` autocomplete
+    // menu's order, and the published note-template vectors carry a
+    // `token_registry` case pinning the same list. The two period tokens land
+    // at the END (myne#177) so the five v1 names keep their positions.
     expect([...SUPPORTED_TOKENS]).toEqual([
       "date",
       "time",
       "title",
       "datetime",
       "weekday",
+      "period_start",
+      "period_end",
     ]);
+  });
+
+  it("leaves a format-arg shape on the new tokens literal too", () => {
+    // The anti-plugin commitment applies to the tokens added later as much as
+    // to the v1 five: `period_start:x` is not a registry key, so the whole
+    // placeholder passes through, which is also the escape mechanism.
+    expect(renderTemplate("{{period_start:x}} {{period_start}}", CTX)).toBe(
+      "{{period_start:x}} 2026-06-01",
+    );
+  });
+
+  it("keeps {{date}} meaning today even when a period is supplied", () => {
+    // The same template file can be a weekly template AND something a user
+    // instantiates by hand; a token whose meaning depended on the call site
+    // would make one file say two things (myne#177).
+    expect(renderTemplate("{{date}}|{{period_start}}|{{period_end}}", CTX)).toBe(
+      "2026-06-07|2026-06-01|2026-06-07",
+    );
   });
   it("every advertised token actually substitutes (no drift from render)", () => {
     for (const name of SUPPORTED_TOKENS) {

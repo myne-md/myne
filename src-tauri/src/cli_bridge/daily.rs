@@ -140,7 +140,19 @@ fn from_tm(tm: &libc::tm) -> LocalNow {
 /// `newNoteFromTemplate.ts::buildRenderContext`'s field shapes exactly
 /// (`YYYY-MM-DD` / `HH:mm` 24-hour / the two combined) — see module doc for
 /// the one documented divergence (`weekday` is always English).
-pub fn render_context(local: LocalNow, title: &str) -> protocol::template::RenderContext {
+///
+/// The period bounds are explicit (myne#177) rather than defaulted, so a caller
+/// cannot forget them and silently render a weekly note whose
+/// `{{period_start}}` is today. `{{date}}` still carries TODAY, not the period
+/// start: the same template file can be a period template and something
+/// instantiated by hand, so a token whose meaning depended on the call site
+/// would make one file say two things.
+pub fn render_context_for_period(
+    local: LocalNow,
+    title: &str,
+    period_start: (i32, u32, u32),
+    period_end: (i32, u32, u32),
+) -> protocol::template::RenderContext {
     let date = daily_match::format_daily_date(
         (local.year, local.month, local.day),
         daily_match::DEFAULT_DAILY_DATE_FORMAT,
@@ -154,6 +166,14 @@ pub fn render_context(local: LocalNow, title: &str) -> protocol::template::Rende
         .to_string();
     protocol::template::RenderContext {
         title: title.to_string(),
+        period_start: daily_match::format_daily_date(
+            period_start,
+            daily_match::DEFAULT_DAILY_DATE_FORMAT,
+        ),
+        period_end: daily_match::format_daily_date(
+            period_end,
+            daily_match::DEFAULT_DAILY_DATE_FORMAT,
+        ),
         date,
         time,
         datetime,
@@ -195,12 +215,13 @@ async fn render_daily_body(
 /// ever live outside that folder anyway; checking once, before the scan,
 /// both satisfies "never a silent no-op" and avoids a pointless full-vault
 /// decrypt pass when the answer is already known.
-async fn resolve_or_create_today_id(
+async fn resolve_or_create_period_id(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &Hooks,
     io: &dyn VaultIo,
-) -> Result<String, DailyError> {
+    period: daily_match::Period,
+) -> Result<(String, bool), DailyError> {
     let prefs = match prefs_read_from_host(host, state, io).await {
         Ok(view) => view,
         Err(PrefsReadError::SlotNotUnlocked) => return Err(DailyError::VaultLocked),
@@ -209,12 +230,21 @@ async fn resolve_or_create_today_id(
         }
     };
 
-    let folder_norm = normalize_folder_path(
-        prefs
-            .daily_folder
-            .as_deref()
-            .unwrap_or(daily_match::DEFAULT_DAILY_FOLDER),
+    // myne#177: daily reads its three legacy top-level fields, the other
+    // periods read the `periodic_notes` map. `period_settings` is the one place
+    // that knows the difference, shared with the two TypeScript clients by
+    // mirrored implementation rather than by a second rule written here.
+    let (folder_pref, format_pref, template_pref) = daily_match::period_settings(
+        period,
+        (
+            prefs.daily_folder.as_deref(),
+            prefs.daily_date_format.as_deref(),
+            prefs.daily_template.as_deref(),
+        ),
+        &prefs.periodic_notes,
     );
+    let (default_folder, default_format) = period.defaults();
+    let folder_norm = normalize_folder_path(folder_pref.unwrap_or(default_folder));
     // Against the exclusion list from the prefs read above, NOT a second
     // `folder_excluded_from_host` call — that helper exists for the callers
     // that do not already hold `vault.prefs`, and using it here would re-read
@@ -228,11 +258,29 @@ async fn resolve_or_create_today_id(
     let Some(now) = local_now((host.now_unix_millis() / 1_000) as i64) else {
         return Err(DailyError::Io);
     };
-    let format = prefs
-        .daily_date_format
-        .as_deref()
-        .unwrap_or(daily_match::DEFAULT_DAILY_DATE_FORMAT);
-    let date_title = daily_match::format_daily_date((now.year, now.month, now.day), format);
+    let format = format_pref.unwrap_or(default_format);
+    // The anchor is the period's FIRST day, so the title is stable across the
+    // whole period and the command is idempotent from any day inside it.
+    let (anchor, period_start, period_end) =
+        daily_match::period_range((now.year, now.month, now.day), period);
+    let date_title = daily_match::format_daily_date(anchor, format);
+    // myne#177: this side does NOT honour the `timezone` display override.
+    // `src-tauri/Cargo.toml` argues `chrono`/`time` down for this module and
+    // `localtime_r` has no way to answer for a named zone, so rather than
+    // pretend, the reply carries a note naming the override it is not applying
+    // and the client prints it. Silence here would let the GUI and the CLI open
+    // different notes on the same evening with nothing saying why.
+    // What crosses the socket is a FLAG, and the CLI owns the sentence. Two
+    // reasons, and the second is the load-bearing one. The zone is never named:
+    // an IANA identifier is a coarse geolocation datum, which is why
+    // `protocol.md` §9.5 classes `timezone` device-local so it never merges
+    // from a peer, and stderr is the channel that ends up in `2>` redirects, CI
+    // logs and pasted output. And a string here would put host-supplied bytes
+    // on the CLI's stderr, which is exactly what that crate's
+    // `logging_discipline` allowlist exists to forbid: it checks NAMES, so a
+    // later edit interpolating a folder or an `io::Error` into a wire string
+    // would pass it green. A bool cannot carry any of that.
+    let used_device_clock = prefs.timezone.as_deref().is_some_and(|z| !z.is_empty());
     let want_folder_key = folder_norm
         .as_deref()
         .map(daily_match::fold)
@@ -267,7 +315,7 @@ async fn resolve_or_create_today_id(
                     &want_folder_key,
                     &want_title_key,
                 ) {
-                    return Ok(id);
+                    return Ok((id, used_device_clock));
                 }
             }
             Err(NoteReadError::VaultNotUnlocked) => return Err(DailyError::VaultLocked),
@@ -280,27 +328,30 @@ async fn resolve_or_create_today_id(
     // No existing match — create, following the SAME template/blank rule
     // `newNoteFromTemplate.ts::createNoteFromTemplate`/`createBlankNamedNote`
     // use (behaviour-parity rule).
-    let ctx = render_context(now, &date_title);
-    let rendered_body =
-        render_daily_body(host, state, io, prefs.daily_template.as_deref(), &ctx).await;
+    let ctx = render_context_for_period(now, &date_title, period_start, period_end);
+    let rendered_body = render_daily_body(host, state, io, template_pref, &ctx).await;
     let plaintext = compose_daily_plaintext(&rendered_body, &date_title, folder_norm.as_deref());
     match note_create_from_host(host, state, hooks, plaintext, io).await {
-        Ok(id) => Ok(id),
+        Ok(id) => Ok((id, used_device_clock)),
         Err(NoteCreateError::VaultNotUnlocked) => Err(DailyError::VaultLocked),
         Err(_) => Err(DailyError::Io),
     }
 }
 
-/// `myne daily`: today's note's markdown, open-or-create.
-pub async fn daily_show(
+/// `myne daily` / `myne weekly` / `myne monthly`: the period note's markdown,
+/// open-or-create. The second element is the timezone note, present only when a
+/// display-timezone override is set that this side does not apply (myne#177).
+pub async fn period_show(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &Hooks,
     io: &dyn VaultIo,
-) -> Result<String, DailyError> {
-    let id = resolve_or_create_today_id(host, state, hooks, io).await?;
+    period: daily_match::Period,
+) -> Result<(String, bool), DailyError> {
+    let (id, used_device_clock) =
+        resolve_or_create_period_id(host, state, hooks, io, period).await?;
     match note_read_from_host(host, state, id, io).await {
-        Ok(body) => Ok(body),
+        Ok(body) => Ok((body, used_device_clock)),
         Err(NoteReadError::VaultNotUnlocked) => Err(DailyError::VaultLocked),
         Err(_) => Err(DailyError::Io),
     }
@@ -310,14 +361,16 @@ pub async fn daily_show(
 /// [`daily_show`], then append `line` — a newline is inserted before it iff
 /// the current body is non-empty and doesn't already end in one, and the
 /// result always ends in exactly one trailing newline.
-pub async fn daily_append(
+pub async fn period_append(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &Hooks,
     io: &dyn VaultIo,
+    period: daily_match::Period,
     line: &str,
-) -> Result<(), DailyError> {
-    let id = resolve_or_create_today_id(host, state, hooks, io).await?;
+) -> Result<bool, DailyError> {
+    let (id, used_device_clock) =
+        resolve_or_create_period_id(host, state, hooks, io, period).await?;
     let body = match note_read_from_host(host, state, id.clone(), io).await {
         Ok(b) => b,
         Err(NoteReadError::VaultNotUnlocked) => return Err(DailyError::VaultLocked),
@@ -330,7 +383,7 @@ pub async fn daily_append(
     new_body.push_str(line);
     new_body.push('\n');
     match note_update_from_host(host, state, hooks, id, new_body, None, io).await {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok(used_device_clock),
         Err(NoteUpdateError::VaultNotUnlocked) => Err(DailyError::VaultLocked),
         Err(_) => Err(DailyError::Io),
     }
@@ -426,7 +479,8 @@ mod tests {
             minute: 5,
             weekday: 4, // Thursday
         };
-        let ctx = render_context(local, "2026-07-30");
+        let day = (2026, 7, 30);
+        let ctx = render_context_for_period(local, "2026-07-30", day, day);
         assert_eq!(ctx.title, "2026-07-30");
         assert_eq!(ctx.date, "2026-07-30");
         assert_eq!(ctx.time, "09:05");
@@ -438,11 +492,12 @@ mod tests {
     fn daily_show_creates_a_blank_note_when_none_exists_and_no_template() {
         rt().block_on(async {
             let (_tmp, host, state) = make_temp_vault_with_unlocked_state(0x81).await;
-            let body = daily_show(
+            let (body, _tz) = period_show(
                 &host,
                 &state,
                 &noop_hooks(),
                 &myne_core::vault_io::StdVaultIo,
+                daily_match::Period::Daily,
             )
             .await
             .expect("daily_show must succeed");
@@ -455,13 +510,25 @@ mod tests {
         rt().block_on(async {
             let (_tmp, host, state) = make_temp_vault_with_unlocked_state(0x82).await;
             let io = myne_core::vault_io::StdVaultIo;
-            let first = daily_show(&host, &state, &noop_hooks(), &io)
-                .await
-                .expect("first daily_show must succeed");
+            let (first, _) = period_show(
+                &host,
+                &state,
+                &noop_hooks(),
+                &io,
+                daily_match::Period::Daily,
+            )
+            .await
+            .expect("first daily_show must succeed");
             let ids_after_first = note_list_from_host(&host, &state, &io).await.expect("list");
-            let second = daily_show(&host, &state, &noop_hooks(), &io)
-                .await
-                .expect("second daily_show must succeed");
+            let (second, _) = period_show(
+                &host,
+                &state,
+                &noop_hooks(),
+                &io,
+                daily_match::Period::Daily,
+            )
+            .await
+            .expect("second daily_show must succeed");
             let ids_after_second = note_list_from_host(&host, &state, &io).await.expect("list");
             assert_eq!(first, second, "second call must open the SAME note");
             assert_eq!(
@@ -491,7 +558,7 @@ mod tests {
                 .await
                 .expect("set daily template must succeed");
 
-            let body = daily_show(&host, &state, &hooks, &io)
+            let (body, _tz) = period_show(&host, &state, &hooks, &io, daily_match::Period::Daily)
                 .await
                 .expect("daily_show must succeed");
             assert!(body.contains("## "), "the {{title}} token must be rendered");
@@ -505,18 +572,32 @@ mod tests {
             let (_tmp, host, state) = make_temp_vault_with_unlocked_state(0x84).await;
             let io = myne_core::vault_io::StdVaultIo;
             let hooks = noop_hooks();
-            daily_append(&host, &state, &hooks, &io, "first line")
-                .await
-                .expect("first append must succeed");
-            let body = daily_show(&host, &state, &hooks, &io)
+            period_append(
+                &host,
+                &state,
+                &hooks,
+                &io,
+                daily_match::Period::Daily,
+                "first line",
+            )
+            .await
+            .expect("first append must succeed");
+            let (body, _tz) = period_show(&host, &state, &hooks, &io, daily_match::Period::Daily)
                 .await
                 .expect("daily_show must succeed");
             assert!(body.ends_with("first line\n"));
 
-            daily_append(&host, &state, &hooks, &io, "second line")
-                .await
-                .expect("second append must succeed");
-            let body = daily_show(&host, &state, &hooks, &io)
+            period_append(
+                &host,
+                &state,
+                &hooks,
+                &io,
+                daily_match::Period::Daily,
+                "second line",
+            )
+            .await
+            .expect("second append must succeed");
+            let (body, _tz) = period_show(&host, &state, &hooks, &io, daily_match::Period::Daily)
                 .await
                 .expect("daily_show must succeed");
             assert!(body.ends_with("first line\nsecond line\n"));
@@ -542,10 +623,12 @@ mod tests {
             .await
             .expect("set exclusions must succeed");
 
-            let show_result = daily_show(&host, &state, &hooks, &io).await;
+            let show_result =
+                period_show(&host, &state, &hooks, &io, daily_match::Period::Daily).await;
             assert_eq!(show_result, Err(DailyError::FolderExcluded));
 
-            let append_result = daily_append(&host, &state, &hooks, &io, "x").await;
+            let append_result =
+                period_append(&host, &state, &hooks, &io, daily_match::Period::Daily, "x").await;
             assert_eq!(append_result, Err(DailyError::FolderExcluded));
 
             let ids = note_list_from_host(&host, &state, &io)
@@ -576,7 +659,7 @@ mod tests {
             .await
             .expect("set exclusions must succeed");
 
-            let result = daily_show(&host, &state, &hooks, &io).await;
+            let result = period_show(&host, &state, &hooks, &io, daily_match::Period::Daily).await;
             assert_eq!(result, Err(DailyError::FolderExcluded));
         });
     }
@@ -594,7 +677,7 @@ mod tests {
                 .await
                 .expect("set daily date format must succeed");
 
-            let body = daily_show(&host, &state, &hooks, &io)
+            let (body, _tz) = period_show(&host, &state, &hooks, &io, daily_match::Period::Daily)
                 .await
                 .expect("daily_show must succeed");
             assert!(body.contains("folder: Journal/"));
@@ -622,7 +705,7 @@ mod tests {
             let ids_before = note_list_from_host(&host, &state, &io).await.expect("list");
             assert_eq!(ids_before.len(), 1);
 
-            daily_show(&host, &state, &hooks, &io)
+            period_show(&host, &state, &hooks, &io, daily_match::Period::Daily)
                 .await
                 .expect("daily_show must succeed");
 
@@ -657,7 +740,7 @@ mod tests {
                 .await
                 .expect("hand-written note create must succeed");
 
-            let body = daily_show(&host, &state, &hooks, &io)
+            let (body, _tz) = period_show(&host, &state, &hooks, &io, daily_match::Period::Daily)
                 .await
                 .expect("daily_show must succeed");
             assert!(
@@ -679,13 +762,15 @@ mod tests {
             let host = TestHost::with_dirs(tmp.path().to_path_buf(), tmp.path().join("config"));
             let state = VaultRuntimeState::default(); // never unlocked
 
-            let result = daily_show(
+            let result = period_show(
                 &host,
                 &state,
                 &noop_hooks(),
                 &myne_core::vault_io::StdVaultIo,
+                daily_match::Period::Daily,
             )
-            .await;
+            .await
+            .map(|(body, _tz)| body);
             assert_eq!(result, Err(DailyError::VaultLocked));
         });
     }

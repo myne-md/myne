@@ -32,7 +32,15 @@
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
+import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import { resetSessionIgnored } from "../editor/decorations/spell";
+import { resetScrollMemory } from "../notes/scrollMemory";
+import { resetRecentNotes } from "../notes/recentNotes";
+import { resetDecodedAspects } from "../editor/attachments/decoded-aspect";
+import {
+  resetPreviewCache,
+  resetTranscripts,
+} from "../editor/attachments/session-caches";
 import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
 import type { Action, VaultId } from "./stage";
 import { lockVault } from "./vault-unlock";
@@ -121,6 +129,28 @@ export async function leaveActiveVault(deps: {
   // vault being left, and the Q and A answers over its content, are as
   // vault-specific as the conversation above.
   clearAiOutput();
+  // The per-note scroll positions and the picker's recency order, on the same
+  // reasoning one step weaker: both are keyed by note id, so the next vault
+  // would not READ either of them, but both are a live record of what the vault
+  // being left contains and what was opened in it. The `lockVault()` above
+  // clears them too; asserted here for the same reason as the two calls above.
+  resetScrollMemory();
+  resetRecentNotes();
+  // And the decoded image shapes, which enumerate every attachment this vault
+  // rendered: an attachment-id key with a value derived from decrypted content
+  // has no business surviving into a different vault's session.
+  resetDecodedAspects();
+  // And the two that hold the decrypted content itself: cached file previews
+  // and completed voice-note transcripts. Carrying either into a DIFFERENT
+  // vault's session is wider than what `docs/threat-model.md` AS7 records for
+  // this surface, which is the whole reason a switch clears rather than trusts
+  // an unmount.
+  resetPreviewCache();
+  resetTranscripts();
+  // And the ambient date/time display store. Asserted on this path as well
+  // as on the lock, because a vault CHANGE is the case where the resident
+  // value is the PREVIOUS vault's zone and formats rather than this one's.
+  resetDateTimeDisplayForLock();
 }
 
 /**

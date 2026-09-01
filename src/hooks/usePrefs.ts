@@ -20,6 +20,7 @@
 // past ~5 fields, revisit (separate PRD).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { observeEgressControls } from "../notes/ai/chatStore";
 import i18n from "../i18n";
 import {
   PrefsView,
@@ -32,6 +33,7 @@ import {
   setCliEnabled as persistCliEnabled,
   mutateCliExcludedFolders as persistCliExcludedFolders,
   setCliRateLimitDisabled as persistCliRateLimitDisabled,
+  setChatHistoryBudget as persistChatHistoryBudget,
   setDeveloperMode as persistDeveloperMode,
   setDateFormat,
   setTimeFormat,
@@ -43,6 +45,17 @@ import {
   setBarItemsOrder as persistBarItemsOrder,
   setHiddenBarItems as persistHiddenBarItems,
   setKeymapBinding as persistKeymapBinding,
+  // Imported UNALIASED, deliberately. `check-ipc-binding-callers.mjs` strips
+  // whole import statements and then bare-word matches the binding's name in
+  // what is left, so an alias makes the desktop call site invisible to it: the
+  // remainder contains only `persistReminderHorizonDays`. With this branch also
+  // removing `ReminderSettings.tsx`'s unaliased call, the sole surviving
+  // unaliased production reference was mobile's own same-named setter, and the
+  // guard's caller loop is not module-scoped, so MOBILE's call was what kept the
+  // DESKTOP binding reported as live. Delete mobile's picker and a fully wired
+  // desktop binding reads as dead; delete the desktop wire and the guard stays
+  // green. There is no name collision here to justify the alias.
+  setReminderHorizonDays,
   setRightPanelActiveTab as persistRightPanelActiveTab,
   setRightPanelHiddenTabs as persistRightPanelHiddenTabs,
   setRightPanelTabOrder as persistRightPanelTabOrder,
@@ -75,6 +88,7 @@ const DEFAULT_PREFS: PrefsView = {
   attachment_ocr_enabled: true,
   ai_excluded_folders: [],
   developer_mode: false,
+  chat_history_budget: null,
   archived_folders: [],
   auto_lock_seconds: null,
   // MYND-651: matches the Rust default. A default-off positive opt-in, so the
@@ -89,6 +103,7 @@ const DEFAULT_PREFS: PrefsView = {
   daily_date_format: null,
   daily_folder: null,
   daily_template: null,
+  periodic_notes: {},
   favorites: [],
   item_order: {},
   editor_layout: null,
@@ -166,6 +181,9 @@ interface UsePrefsResult {
   ) => Promise<void>;
   /** Flip the Developer mode toggle (optimistic; same converge-on-error pattern). */
   setDeveloperMode: (enabled: boolean) => Promise<void>;
+  /** `null` clears the override. The stored value may be lower than the one
+   *  passed: the host clamps it, and this hook re-reads to show what stuck. */
+  setChatHistoryBudget: (budget: number | null) => Promise<void>;
   /**
    * Open or close the CLI terminal-access door (myne-cli epic, MYND-490).
    * Optimistic; same converge-on-error pattern. The socket itself follows
@@ -189,6 +207,16 @@ interface UsePrefsResult {
    * Same pattern as `toggleScreenCapture`.
    */
   setAutoLock: (seconds: number) => Promise<void>;
+  /**
+   * Set the reminder registration horizon (days). Same optimistic-then-converge
+   * discipline as {@link setAutoLock}, which it is the near-twin of: a numeric
+   * prefs field with a `null` never-set state and a fixed set of offered values.
+   *
+   * It lives here rather than as a component-local optimistic write (myne#508)
+   * so the settings row holds no state of its own and the panel holds no echo
+   * for it, the same reason the ~40 setters around it do.
+   */
+  setReminderHorizon: (days: number) => Promise<void>;
   /**
    * Persist the full hidden-bottom-bar-items set (bottom-bar customization).
    * Optimistic: the cache updates immediately so the BottomBar reflects the
@@ -294,6 +322,12 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
         // every consumer that reads a field off it.
         if (!cancelled && view && mine > applied.current) {
           applied.current = mine;
+          // Every applied view is observed, so a change to the egress controls
+          // cuts the chat-history seed whichever way it arrived. See
+          // `chatStore.observeEgressControls`: `ai_excluded_folders` is
+          // Shared(SetUnion), so it also arrives by sync merge, where no setter
+          // on this machine is called.
+          observeEgressControls(view.ai_excluded_folders, view.ai_provider);
           setPrefs(view);
         }
       } catch {
@@ -384,6 +418,37 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  // The agent's chat-history seed budget (myne-md/myne#617).
+  //
+  // Unlike every toggle here, this one re-reads on SUCCESS as well as on
+  // failure: the host CLAMPS the value, so what it stored can be lower than
+  // what was sent, and an optimistic update alone would leave a number on
+  // screen that is not the number a run will use.
+  const setChatHistoryBudgetPref = useCallback(
+    async (budget: number | null) => {
+      setPrefs((p) => ({ ...p, chat_history_budget: budget }));
+      try {
+        await persistChatHistoryBudget(budget);
+      } catch {
+        onError?.(i18n.t("settings.prefs.saveError"));
+      } finally {
+        // Converges on BOTH arms, which is why the re-read is in `finally`
+        // rather than written out twice. On failure it is the same rollback
+        // every other setter here does; on SUCCESS it is load-bearing, because
+        // the host clamps and the value it stored can be lower than the one
+        // sent. A setter that converged only on failure would leave the panel
+        // showing a bound no run will use.
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed. Keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+      }
+    },
+    [onError],
+  );
+
   // Developer mode toggle (`developer-mode` feature, MYND-593). Same
   // optimistic-then-converge discipline as `setAiEnabledPref`.
   const setDeveloperModePref = useCallback(
@@ -438,6 +503,12 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       mutation: SetMutation,
     ) => {
       setPrefs((p) => ({ ...p, ...patch }));
+      // The seed cut used to be here. It moved down into
+      // `prefs.setAiExcludedFolders`, which is the single point every exclusion
+      // write passes through, so it now sits beside the identical one in
+      // `setAiProvider` instead of a layer above it. `persistAiExcludedFolders`
+      // below is that binding, so the ordering the cut depends on (before the
+      // write, before any await) is unchanged.
       let messageKey: string | null = null;
       try {
         if ((await persist(mutation)) > 0) {
@@ -550,6 +621,17 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       }
     },
     [onError],
+  );
+
+  // myne#508. Through the shared `writeOptimisticPref` rather than a hand-rolled
+  // twin of `setAutoLock` above: the two differ only in the field and the
+  // persist call, which is exactly what that helper exists to absorb.
+  const setReminderHorizon = useCallback(
+    (days: number) =>
+      writeOptimisticPref({ reminder_horizon_days: days }, () =>
+        setReminderHorizonDays(days),
+      ),
+    [writeOptimisticPref],
   );
 
   const setHiddenBarItems = useCallback(
@@ -728,6 +810,11 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       const view = await prefsRead();
       if (mine <= applied.current) return;
       applied.current = mine;
+      // Same observation as the mount read, and this is the path a synced
+      // change actually takes: the sync apply bumps the prefs nonce, every
+      // `usePrefs` re-reads, and the change is visible here with no setter
+      // having run.
+      observeEgressControls(view.ai_excluded_folders, view.ai_provider);
       setPrefs(view);
     } catch {
       // Keep the current cache (safer-state per spec § 9.5.5).
@@ -750,8 +837,10 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setCliEnabled: setCliEnabledPref,
     setCliExcludedFolders: setCliExcludedFoldersPref,
     setCliRateLimitDisabled: setCliRateLimitDisabledPref,
+    setChatHistoryBudget: setChatHistoryBudgetPref,
     setDeveloperMode: setDeveloperModePref,
     setAutoLock,
+    setReminderHorizon,
     setHiddenBarItems,
     setBarItemsOrder,
     setRightPanelActiveTab,

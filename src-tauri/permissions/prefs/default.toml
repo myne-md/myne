@@ -31,6 +31,7 @@ permissions = [
   "allow-set-daily-date-format",
   "allow-set-daily-folder",
   "allow-set-daily-template",
+  "allow-set-periodic-note-setting",
   "allow-set-new-note-location",
   "allow-set-startup-open",
   "allow-set-editor-text-size",
@@ -58,6 +59,7 @@ permissions = [
   "allow-set-attachment-ocr-enabled",
   "allow-set-attachment-compression-enabled",
   "allow-set-ai-excluded-folders",
+  "allow-set-chat-history-budget",
   "allow-set-developer-mode",
   "allow-set-editor-default-view-mode",
   "allow-set-editor-focus-dim-inactive",
@@ -206,6 +208,11 @@ identifier = "allow-set-daily-template"
 description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_daily_template"]
 
+[[permission]]
+identifier = "allow-set-periodic-note-setting"
+description = "Allow invoking prefs:set_periodic_note_setting (myne#177: a Slot::Unlocked-gated setter for one periodic_notes entry, keyed <period>.<setting> where setting is folder/format/template; Some sets, None removes the key; a folder value is also registered as a deliberate folder so it survives empty, the set_daily_folder discipline; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_periodic_note_setting"]
+
 # MYND-462 "Files" settings panel: two write setters for the new-note default
 # location pair + the startup-open pair. Both inherit the same main-window-only
 # invariant as the other allow-set-* permissions — v0.2 multi-window MUST NOT
@@ -274,7 +281,21 @@ commands.allow = ["set_archive_disabled"]
 # validates — an unrecognised value reads as the `system` default rather than
 # failing a write. `timezone` is DISPLAY-ONLY: it decides what the app treats as
 # "today" and how a stored wall-clock value is printed, and never enters a .myn
-# file, a blob, or the sync wire.
+# file, so a note never records where its author was. It DOES live in the MYP1
+# vault.prefs blob this command writes, and that blob is pushed and pulled
+# verbatim; device-local is a MERGE classification (PrefClass::DeviceLocal,
+# sync-protocol.md 10.2), not a transmission one.
+#
+# Corrected by myne-md/myne#609 across every site a `git grep "sync wire"`
+# found, which was nine and not the five the first sweep visited: this file,
+# the mobile twin, both clients' prefs.ts (twice in the desktop one),
+# DateTimeSettings.tsx, core's set_timezone_from_host,
+# prefs_classification.rs's own DeviceLocal comment, protocol/src/prefs.rs
+# (the two field docs plus a published vector description),
+# docs/spec/protocol.md 9.5.2, and a user-guide article. The count is stated
+# as the grep rather than as a memory of the sweep, because a completeness
+# claim taken from memory is what let this sentence spread in the first
+# place.
 [[permission]]
 identifier = "allow-set-date-format"
 description = "Allow invoking prefs:set_date_format (Slot::Unlocked-gated setter for the date_format display preference — system/iso/dmy/mdy/dmmmy, Option<String> where None clears to the system default; atomic-writes vault.prefs with no native side-effect)."
@@ -563,6 +584,16 @@ commands.allow = ["ai_provider_has_key"]
 identifier = "allow-set-developer-mode"
 description = "Allow invoking prefs:set_developer_mode (Slot::Unlocked-gated setter for the developer_mode toggle, MYND-593; atomic-writes vault.prefs with no native side-effect; defaults to false, so it is emitted on disk only when true)."
 commands.allow = ["set_developer_mode"]
+
+# myne-md/myne#617: how many characters of visible chat history an agent run
+# may be seeded with. Same main-window-only invariant as the other allow-set-*
+# permissions. The command CLAMPS the value at the write rather than trusting
+# it, because this number bounds how much plaintext one run sends to a provider
+# and TB13 records that no other per-run volume cap exists.
+[[permission]]
+identifier = "allow-set-chat-history-budget"
+description = "Allow invoking prefs:set_chat_history_budget (Slot::Unlocked-gated setter for the agent chat-history seed budget, myne-md/myne#617; atomic-writes vault.prefs with no native side-effect; clamped host-side to MAX_HISTORY_BUDGET; omitted on disk when unset)."
+commands.allow = ["set_chat_history_budget"]
 
 # myne-cli epic (MYND-490; cli-thin-client task 2): three write setters for the
 # CLI terminal-access door prefs (design-notes.md "CLI terminal access is a

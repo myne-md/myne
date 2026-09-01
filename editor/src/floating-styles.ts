@@ -35,8 +35,15 @@ const CSS = `
   border-radius: var(--radius-1, 3px);
   cursor: pointer;
 }
+/* The keyboard's position in the list, and it has to be legible in EVERY theme
+   (myne-md/myne#601). This was one step up the surface ramp from the menu's own
+   background: a clear step in the light theme, and on AMOLED the difference
+   between #000000 and #0c0c0b, which is invisible on a screen. Arrowing through
+   the list then moved a highlight nobody could see, so the picker read as
+   mouse-only. The accent tint carries it on its own; a leading accent bar was
+   tried alongside and read as a notch cut out of the row. */
 .cm-slash-menu-row-selected {
-  background-color: var(--paper-2, #f3f1eb);
+  background-color: var(--accent-soft, #e8edf5);
 }
 .cm-slash-menu-icon {
   display: inline-flex;
@@ -397,6 +404,26 @@ const CSS = `
 
 .cm-fm-properties {
   padding: 2px 0 16px;
+  /* Contain the whole Properties block (myne-md/myne#630). This is a
+     block: true replace widget inside .cm-content, and .cm-content is a
+     flex item of .cm-scroller with the default min-width: auto, so anything
+     in here that refuses to shrink floors the editor's whole content width
+     and turns CodeMirror's own overflow-x: auto into a sideways swipe over
+     the entire note. The grid below plus its inputs were doing exactly that.
+
+     container-type: inline-size, NOT contain: inline-size beside it. The
+     container-type keyword applies inline-size containment by definition, so
+     the pair is one declaration doing one job twice; and it buys the narrow
+     layout further down a query container, so that layout responds to the PANE
+     rather than the window. A split view on a wide monitor is exactly as narrow
+     as a phone and has exactly the same problem.
+
+     The containment idiom is .cm-table-editable's in theme.ts, minus its
+     overflow-x: auto. A table has to scroll because its cells are nowrap by
+     design, whereas this block reflows and has nothing to scroll to. */
+  max-width: 100%;
+  box-sizing: border-box;
+  container-type: inline-size;
   font-family: var(--font-sans);
   /* Base for the widget's own text: the editor-typography preset (Settings →
      Editor → text size), matching the body text. Every child's font-size below
@@ -420,6 +447,12 @@ const CSS = `
 .cm-fm-properties-name {
   display: block;
   width: 100%;
+  /* A flex item floors at its min-content width unless told otherwise, and an
+     input's min-content width is its intrinsic default size (roughly 20
+     characters) no matter what width it is given. This input is the flex item
+     of .cm-fm-properties-name-row above, so without this the title row alone can
+     be wider than a phone (myne-md/myne#630). */
+  min-width: 0;
   appearance: none;
   -webkit-appearance: none;
   border: 0;
@@ -459,7 +492,11 @@ const CSS = `
 }
 .cm-fm-properties-list {
   display: grid;
-  grid-template-columns: 24px 160px 1fr;
+  /* minmax(0, …) on both flexible tracks, not the bare 160px / 1fr this used to
+     be. A grid track's automatic minimum is min-content, so the value column
+     floored at its input's intrinsic width and the whole grid at roughly 370px
+     (wider than a phone's usable text column, myne-md/myne#630). */
+  grid-template-columns: 24px minmax(0, 160px) minmax(0, 1fr);
   row-gap: 2px;
   column-gap: var(--space-2);
   align-items: center;
@@ -478,6 +515,7 @@ const CSS = `
 }
 .cm-fm-properties-key {
   width: 100%;
+  min-width: 0;
   appearance: none;
   -webkit-appearance: none;
   border: 0;
@@ -504,6 +542,7 @@ const CSS = `
 }
 .cm-fm-properties-value {
   width: 100%;
+  min-width: 0;
   appearance: none;
   -webkit-appearance: none;
   border: 0;
@@ -567,6 +606,7 @@ const CSS = `
 .cm-fm-properties-tags {
   display: flex;
   flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   gap: var(--space-1);
   padding: 2px 6px;
@@ -575,6 +615,13 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  /* A chip is nowrap by design, so without this it is an unshrinkable flex item
+     and a long tag name floors the whole Properties block's width
+     (myne-md/myne#630). The label below already carries overflow: hidden and an
+     ellipsis; a flex item's default min-width: auto is what was stopping that
+     ellipsis from ever engaging. (No backticks anywhere in this file: the CSS is
+     one template literal, and a stray backtick in a comment terminates it.) */
+  min-width: 0;
   padding: 2px 4px 2px 8px;
   background: var(--paper-2, #f3f1eb);
   border: 1px solid var(--line-1, #e3e2dd);
@@ -641,6 +688,32 @@ const CSS = `
   background: var(--paper-2, #f3f1eb);
 }
 
+/* Narrow Properties layout (myne-md/myne#630): a phone, or a split pane on a
+   wide monitor, which is the same width and the same problem. The three-column
+   grid keeps shrinking correctly now, but past a point a 160px key column beside
+   a value column leaves neither readable, so the pair stacks: the icon keeps its
+   own column and the key and the value each take the rest of the row.
+
+   POSITION IS LOAD-BEARING, same rule as the pointer: coarse block far above.
+   A container query adds no specificity, so with identical selectors source
+   order decides, and this must come after every base rule it overrides. */
+@container (max-width: 420px) {
+  .cm-fm-properties-list {
+    grid-template-columns: 24px minmax(0, 1fr);
+    row-gap: var(--space-1, 4px);
+  }
+  /* The row is display: contents, so its three cells are grid items directly.
+     The key spans nothing new; the value moves under it, skipping the icon
+     column so it lines up with the key rather than with the icon. */
+  .cm-fm-properties-key {
+    grid-column: 2;
+  }
+  .cm-fm-properties-value,
+  .cm-fm-properties-tags {
+    grid-column: 2;
+  }
+}
+
 /* In-note find bar (MYND-175). Docked CM panel chrome, NOT a floating popover:
    it reflows the editor so it never occludes the current match, so it carries a
    bottom hairline and NO shadow (DESIGN.md: nothing on the editor surface gets a
@@ -663,6 +736,19 @@ const CSS = `
   align-items: center;
   gap: var(--space-2);
   width: 100%;
+}
+/* The date-fallback notice (myne-md/myne#609): a quiet line of prose, not a row
+   of controls, so it overrides the flex row it inherits from. Muted like the
+   "No matches" status rather than coloured as a warning, because nothing went wrong,
+   the bar is saying which text produced the matches. It sits between the find
+   row and the replace row, which puts it directly above the Replace buttons it
+   explains being disabled. */
+.cm-find-bar-fallback-row {
+  display: block;
+  color: var(--fg-3, #6b6a64);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  padding-left: 2px;
 }
 /* The replace row's leading glyph sits in the same lead column as the find
    row's search icon (the toggle is the first element on the find row; the

@@ -83,7 +83,32 @@ const MARKERS = [
       "the device-enrolment phrase credential — the third phrase path, and the " +
       "one that is easy to miss because that screen is about adding a device",
   },
+  {
+    needle: "import-myne.phrase-cell",
+    meaning:
+      "the vault-import SOURCE credential (myne-md/myne#464), the fourth phrase " +
+      "path and the one this file's own rationale was cited to justify. The " +
+      "import setup step takes the other vault's password OR its 24 words, and " +
+      "an import is a ROUTINE action, which is exactly the training " +
+      "`decisions.md` 2026-08-15 bounds this client against on `threat-model.md` " +
+      "A18: web asks for the phrase in ONE situation, a recovery the user " +
+      "started themselves",
+  },
 ];
+
+// Why the list GREW rather than the three surfaces sharing one needle. Each of
+// the three implements the same 24-cell grid separately and carries its own
+// `data-testid` precisely so this file can tell them apart in the artefact: a
+// shared testid would make one entry cover three modules, and the finding would
+// then name a path that may not be the one that leaked.
+//
+// That reasoning is written into `MyneVaultSetup.tsx`, into `web/vite.config.ts`
+// and into `recovery-flow.md` §3.2, all three of which cite THIS guard as the
+// reason they duplicate a component. Landing the surface and not the needle made
+// all three citations false at once, and the guard went on printing ok over a
+// bundle it was not looking for the new grid in. Found in review on
+// myne-md/myne#636; it is the same shape `CLAUDE.md` records three times over,
+// a check passing on an input it could not see.
 
 // #273: every served byte, fail-closed on an unclassified extension. This read
 // `.js` only, so the bundle's 1.2 MB `pdf.worker.min-*.mjs` and 3.9 MB

@@ -151,7 +151,10 @@ test.describe("empty folders in the mobile folder tree", () => {
     await expect(folderNamed(page, "Ideas")).toBeVisible();
 
     await longPress(page, '[data-testid="notes.folder-row"][data-folder-path="Ideas"]');
-    await page.getByTestId("notes.folder-delete").click();
+    // `-action`, not the bare name. Both branches gave this control its first
+    // testid and named it differently; the control keeps develop's spelling
+    // because `folder-delete-confirm.flow.ts` was already clicking it.
+    await page.getByTestId("notes.folder-delete-action").click();
 
     await expect
       .poll(() =>

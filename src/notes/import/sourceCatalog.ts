@@ -15,10 +15,26 @@
 // never productized as Myne feature names, the same discipline the `.base` import
 // established.
 
-export type ImportSourceId = "obsidian" | "notion" | "evernote" | "html" | "csv";
+import { has, type Capability } from "../../platform/capabilities";
 
-/** Whether the source is a directory tree or a single picked file. */
-export type PickMode = "directory" | "file";
+export type ImportSourceId =
+  | "obsidian"
+  | "notion"
+  | "evernote"
+  | "html"
+  | "csv"
+  | "myne";
+
+/**
+ * How the user names the source.
+ *
+ * `"vault"` is not a file-dialog mode at all: the Myne source picks one of the
+ * user's OTHER local vaults from the list the app already keeps, so there is no
+ * path to browse to and no native dialog to open. Keeping it in this union
+ * rather than adding a parallel flag is what makes the picker exhaustive over
+ * the ways a source can be named.
+ */
+export type PickMode = "directory" | "file" | "vault";
 
 export interface ImportSourceSpec {
   readonly id: ImportSourceId;
@@ -39,6 +55,16 @@ export interface ImportSourceSpec {
    *  (typing "notion" still lands the user here) without five menu items that grow
    *  with every future adapter. */
   readonly keywords: readonly string[];
+  /**
+   * A platform capability this source needs. Absent means every client has it.
+   *
+   * A source whose capability is missing is OMITTED, not disabled: a greyed
+   * card is an offer the platform cannot honour, and `decisions.md` 2026-07-26
+   * makes omission the normative answer to that shape. It also keeps the
+   * keyword out of `allSourceKeywords()`, so the palette and the settings
+   * search do not route a user to a card that is not there.
+   */
+  readonly capability?: Capability;
 }
 
 export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> = {
@@ -87,6 +113,22 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
     losesKey: "notes.import.source.html.loses",
     keywords: ["html", "web", "page"],
   },
+  myne: {
+    id: "myne",
+    icon: "vault",
+    pick: "vault",
+    // Desktop only. A browser origin holds one container under a constant vault
+    // id, so the source list would be permanently empty, and the `importer:`
+    // plugin is `Class::Unsupported` there in any case. See the capability's own
+    // entry for the second reason, which the runtime flag alone cannot deliver.
+    capability: "vaultImport",
+    labelKey: "notes.import.source.myne.label",
+    shortKey: "notes.import.source.myne.short",
+    pickerTitleKey: "notes.import.source.myne.pickerTitle",
+    survivesKey: "notes.import.source.myne.survives",
+    losesKey: "notes.import.source.myne.loses",
+    keywords: ["myne", "vault", "merge", "combine", "consolidate"],
+  },
   csv: {
     id: "csv",
     icon: "list",
@@ -103,6 +145,10 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
 
 /** Display order in the picker: most-requested migrations first. */
 export const IMPORT_SOURCE_ORDER: readonly ImportSourceId[] = [
+  // First, and not by seniority: this is the only source whose format is
+  // Myne's own, and a user with two vaults looking for how to combine them has
+  // nowhere else in the product to look.
+  "myne",
   "obsidian",
   "notion",
   "evernote",
@@ -110,7 +156,38 @@ export const IMPORT_SOURCE_ORDER: readonly ImportSourceId[] = [
   "csv",
 ];
 
-/** Every source keyword, for the palette command + settings-search index. */
+/**
+ * The sources this platform can actually offer, in display order.
+ *
+ * The ONE place the capability filter is applied, so every consumer of the
+ * source list sees the same set. Today that is the picker
+ * (`ImportSourcePicker.tsx`) and `allSourceKeywords()` below.
+ *
+ * The first version of this comment claimed the filter kept the picker, the
+ * command palette and the settings-search index in agreement. It does not, and
+ * saying so was worse than saying nothing: `allSourceKeywords()` has no
+ * production caller at all, so neither of those two surfaces consumes this list
+ * in the first place. The filter is still the right shape, and the claim it
+ * made about the system was not checkable.
+ */
+export function availableSourceOrder(): readonly ImportSourceId[] {
+  return IMPORT_SOURCE_ORDER.filter((id) => {
+    const cap = IMPORT_SOURCES[id].capability;
+    return cap === undefined || has(cap);
+  });
+}
+
+/**
+ * Every keyword of every source this platform offers.
+ *
+ * **No production caller today.** It was written for the command palette and
+ * the settings-search index, and neither consumes it: the palette reaches the
+ * importer through one action with its own keywords, and the settings-search
+ * registry holds its own. Kept rather than deleted because it is the correct
+ * shape for both, and because it is the derived half of a list a future caller
+ * must not re-filter by hand; the honest version of that is this sentence
+ * rather than a comment naming callers that do not exist.
+ */
 export function allSourceKeywords(): string[] {
-  return IMPORT_SOURCE_ORDER.flatMap((id) => [...IMPORT_SOURCES[id].keywords]);
+  return availableSourceOrder().flatMap((id) => [...IMPORT_SOURCES[id].keywords]);
 }

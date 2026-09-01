@@ -48,7 +48,8 @@
       "unsupportedDetail": "Se läpäisi {{passes}}/{{attempts}} tarkistusta; vaaditaan {{required}}.",
       "checking": "Tarkistetaan mallia…",
       "checkingAt": "Tarkistetaan mallia… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Tätä läpäisyrajaa ei ole vielä mitattu eri malleilla, joten se voi olla tiukempi tai löysempi kuin sen pitäisi olla."
+      "unsupportedProvisional": "Tätä läpäisyrajaa ei ole vielä mitattu eri malleilla, joten se voi olla tiukempi tai löysempi kuin sen pitäisi olla.",
+      "scopeNone": "ei avointa muistiinpanoa, joten työstettävää ei vielä ole"
     },
     "progress": {
       "working": "Käsitellään",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} asettamasi rajaus",
       "grantsUser_other": "{{count}} asettamaasi rajausta",
       "grantsModel_one": "{{count}} sen pyytämä",
-      "grantsModel_other": "{{count}} sen pyytämää"
+      "grantsModel_other": "{{count}} sen pyytämää",
+      "cancelledBackground": "Ajo peruutettiin, koska Myne siirtyi taustalle. Mitään ei kirjoitettu. Kysy uudelleen, kun olet valmis."
     },
     "scope": {
       "title": "Otetaanko {{folder}} mukaan?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Ei luotu: tuo kansio on rajattu pois tekoälyltä.",
         "createFailed": "Ei luotu: uuden muistiinpanon kirjoittaminen epäonnistui. Muut muutokset otettiin silti käyttöön.",
         "excludedNow": "Ei voitu ottaa käyttöön: tuon muistiinpanon kansio on nyt rajattu pois tekoälyltä.",
-        "notProposed": "Ei voitu ottaa käyttöön: tuo muutos ei kuulu tämän ajon ehdotukseen."
+        "notProposed": "Ei voitu ottaa käyttöön: tuo muutos ei kuulu tämän ajon ehdotukseen.",
+        "noteMoved": "Ei voitu ottaa käyttöön: tuo muutos siirtäisi muistiinpanon toiseen kansioon.",
+        "appendEmpty": "Ei voitu ottaa käyttöön: ei ollut mitään lisättävää.",
+        "appendWouldWriteFrontmatter": "Ei voitu ottaa käyttöön: tuosta tekstistä olisi tullut muistiinpanon ominaisuuslohko."
       },
       "applyFailed": "Muutoksia ei voitu ottaa käyttöön.",
       "undo": "Kumoa tämä ajo",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} muistiinpanoa luettu",
       "runSummaryOffDevice_one": "noin {{count}} merkki muistiinpanoistasi lähetettiin palveluntarjoajalle",
       "runSummaryOffDevice_other": "noin {{count}} merkkiä muistiinpanoistasi lähetettiin palveluntarjoajalle",
-      "runSummaryOnDevice": "mitään ei poistunut tältä laitteelta"
+      "runSummaryOnDevice": "mitään ei poistunut tältä laitteelta",
+      "appendFlag": "lisätään loppuun"
     },
     "undo": {
       "offer_one": "Viimeisin ajo muutti {{count}} muistiinpanon.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} muistiinpanoa ei voitu palauttaa.",
       "failed_other": "{{count}} muistiinpanoa ei voitu palauttaa.",
       "createdNotReverted_one": "{{count}} muistiinpano, jonka ajo loi, jätettiin paikalleen.",
-      "createdNotReverted_other": "{{count}} muistiinpanoa, jotka ajo loi, jätettiin paikalleen."
+      "createdNotReverted_other": "{{count}} muistiinpanoa, jotka ajo loi, jätettiin paikalleen.",
+      "sessionOnly": "Tämä yhden napautuksen kumoaminen on voimassa, kunnes lukitset holvin tai suljet sovelluksen. Sen jälkeen palautat muistiinpanot yksitellen muistiinpanon versiohistoriasta.",
+      "sessionOnlyLink": "Avaa versiohistoria"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Laajenna kaikki"
+      },
+      "openThisWeekNote": {
+        "label": "Avaa tämän viikon muistiinpano"
+      },
+      "openThisMonthNote": {
+        "label": "Avaa tämän kuukauden muistiinpano"
       }
     },
     "hotkeys": {
@@ -880,13 +894,15 @@
           "captureFailed": "Tallennusta ei voitu aloittaa. Tarkista mikrofonin käyttöoikeus järjestelmäasetuksista.",
           "generic": "Tallennusta ei voitu aloittaa.",
           "locked": "Avaa holvi tallentaaksesi ääniviestin.",
-          "noInputDevice": "Mikrofonia ei löytynyt. Liitä mikrofoni ja yritä uudelleen."
+          "noInputDevice": "Mikrofonia ei löytynyt. Liitä mikrofoni ja yritä uudelleen.",
+          "unsupportedSampleRate": "Mikrofonisi tallentaa näytteenottotaajuudella, jota Myne ei voi litteroida. Valitse toinen syöttölaite tai muuta sen näytteenottotaajuutta järjestelmän ääniasetuksissa."
         },
         "stopError": {
           "captureFailed": "Tallennus epäonnistui. Tarkista mikrofonisi.",
           "emptyRecording": "Mitään ei tallennettu.",
           "generic": "Tallennusta ei voitu tallentaa.",
-          "silentRecording": "Tallennus oli äänetön ja hylättiin. Tarkista mikrofonisi."
+          "silentRecording": "Tallennus oli äänetön ja hylättiin. Tarkista mikrofonisi.",
+          "unsupportedSampleRate": "Mikrofonisi tallentaa näytteenottotaajuudella, jota Myne ei voi litteroida. Mitään ei tallennettu. Valitse toinen syöttölaite tai muuta sen näytteenottotaajuutta järjestelmän ääniasetuksissa."
         }
       },
       "widget": {
@@ -932,6 +948,7 @@
             "featureOff": "Puheesta tekstiksi on pois päältä. Ota se käyttöön kohdasta Asetukset → Litterointi.",
             "modelLoadFailed": "Puheentunnistusmallia ei voitu ladata. Jos asetit oman mallin kohdassa Asetukset → Kehittäjä → Tekoäly, tarkista sen tiedostot; muussa tapauksessa Mynen uudelleenasennus palauttaa sisäänrakennetun mallin.",
             "noModel": "Puheentunnistusmalli puuttuu. Mynen uudelleenasennus palauttaa sen.",
+            "tooLong": "Tämä tallenne on liian pitkä litteroitavaksi. Ääni pysyy liitteenä, joten voit toistaa sen.",
             "vaultLocked": "Avaa holvi litteroidaksesi."
           },
           "disabledReason": "Litterointi vaatii tekoälyn — ota se käyttöön kohdasta Asetukset → Developer → Tekoäly.",
@@ -1164,10 +1181,6 @@
       "turnedIntoTemplate": "Muutettu malliksi",
       "convertedToNote": "Muunnettu muistiinpanoksi",
       "versionHistory": "Versiohistoria",
-      "exportMarkdown": "Vie Markdown-muodossa…",
-      "exportPdf": "Vie PDF-muodossa…",
-      "exportHtml": "Vie HTML-muodossa…",
-      "exportTxt": "Vie pelkkänä tekstinä…",
       "trash": "Siirrä roskakoriin"
     },
     "codeBlock": {
@@ -1199,7 +1212,9 @@
       "replaceAllCount": "Korvaa kaikki ({{total}})",
       "replaceOne": "Korvaa",
       "replacePlaceholder": "Korvaa tällä",
-      "toggleReplace": "Vaihda korvaus"
+      "toggleReplace": "Vaihda korvaus",
+      "dateFallback": "Haetaan {{stored}}, eli muotoa jossa tämä päivämäärä on tallennettu.",
+      "replaceOffOnDateFallback": "Korvaus on pois käytöstä niin kauan kuin päivämäärä löytyy tallennetussa muodossaan, jottei korvaus tee päivämäärästä lukukelvotonta."
     },
     "cover": {
       "add": "Lisää kansikuva",
@@ -1225,7 +1240,8 @@
       "titlePlaceholder": "Nimetön"
     },
     "mermaid": {
-      "rendering": "Piirretään kaaviota…"
+      "rendering": "Piirretään kaaviota…",
+      "renderFailed": "Tätä kaaviota ei voitu piirtää: {{reason}}"
     },
     "slash": {
       "aiContinue": "Jatka kirjoittamista (tekoäly)",
@@ -1534,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "Hae muistiinpanoja tai suorita komento…",
       "noMatches": "Ei osuvia komentoja tai muistiinpanoja."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Tämän päivän muistiinpanoa ei voitu avata.",
+        "weekly": "Tämän viikon muistiinpanoa ei voitu avata.",
+        "monthly": "Tämän kuukauden muistiinpanoa ei voitu avata."
+      }
     }
   },
   "export": {
@@ -2034,10 +2057,6 @@
       "duplicate": "Kahdenna",
       "editFilterTitle": "Muokkaa suodatinta",
       "emptyState": "Ei vielä muistiinpanoja.",
-      "exportHtml": "Vie HTML-muodossa…",
-      "exportMarkdown": "Vie Markdown-muodossa…",
-      "exportPdf": "Vie PDF-muodossa…",
-      "exportTxt": "Vie pelkkänä tekstinä…",
       "favoritesHeading": "Suosikit",
       "icon": "Kuvake…",
       "mergeAnyway": "Yhdistä silti",
@@ -2343,6 +2362,13 @@
     },
     "workspace": {
       "defaultSlotName": "Oletus"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Vie…",
+      "txt": "Pelkkä teksti"
     }
   },
   "password": {
@@ -2775,20 +2801,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Tyhjä (ei mallia)",
+      "folderSearchEmpty": "Yksikään kansio ei vastaa hakua.",
+      "folderSearchPlaceholder": "Etsi kansioita…",
+      "searchEmpty": "Yksikään malli ei vastaa hakua.",
+      "searchPlaceholder": "Etsi malleja…",
+      "untitledTemplate": "Nimetön malli",
+      "sectionDaily": "Päivittäiset muistiinpanot",
+      "sectionWeekly": "Viikoittaiset muistiinpanot",
+      "sectionMonthly": "Kuukausittaiset muistiinpanot",
+      "periodFolderLabel": "Kansio",
+      "periodFolderHelper": "Mihin uudet {{period}} muistiinpanot tallennetaan. Oletus: {{default}}. Kansio säilyy, vaikka se olisi tyhjä.",
+      "periodFormatLabel": "Otsikon muoto",
+      "periodFormatHelperDaily": "Jokaisen päivittäisen muistiinpanon otsikko. Tukee muotoja YYYY, MM, DD, gggg (ISO-viikkovuosi), ww (ISO-viikkonumero) ja [teksti] kirjaimelliselle tekstille. Oletus: {{default}}.",
+      "periodFormatHelperWeekly": "Jokaisen viikoittaisen muistiinpanon otsikko. Tukee muotoja gggg (ISO-viikkovuosi), ww (ISO-viikkonumero), YYYY, MM, DD ja [teksti] kirjaimelliselle tekstille. Oletus: {{default}}.",
+      "periodFormatHelperMonthly": "Jokaisen kuukausittaisen muistiinpanon otsikko. Tukee muotoja YYYY, MM, gggg (ISO-viikkovuosi), ww (ISO-viikkonumero) ja [teksti] kirjaimelliselle tekstille. Oletus: {{default}}.",
+      "periodTemplateLabel": "Malli",
+      "periodTemplateHelper": "Valitse malli, josta jokainen {{period}} muistiinpano alkaa, tai jätä tyhjäksi, jolloin luodaan tyhjä muistiinpano päivämäärällä otsikoituna.",
+      "collisionWarning": "Muistiinpanot {{first}} ja {{second}} päätyvät samaan muistiinpanoon, koska ne jakavat kansion ja tuottavat saman otsikon. Molemmat komennot avaavat sen.",
+      "weekStartNote": "Viikot alkavat maanantaista (ISO 8601), joten tammikuun ensimmäiset päivät voivat kuulua edellisen vuoden viimeiseen viikkoon ja joulukuun viimeiset päivät seuraavan vuoden ensimmäiseen.",
+      "periodFolderSaveError": "Kansiota {{period}} muistiinpanoille ei voitu tallentaa. Yritä uudelleen.",
+      "periodFormatSaveError": "Otsikon muotoa {{period}} muistiinpanoille ei voitu tallentaa. Yritä uudelleen.",
+      "periodTemplateSaveError": "Mallia {{period}} muistiinpanoille ei voitu tallentaa. Yritä uudelleen.",
+      "periodNameDaily": "päivittäiset",
+      "periodNameWeekly": "viikoittaiset",
+      "periodNameMonthly": "kuukausittaiset",
+      "periodFolderAriaLabel": "{{period}} muistiinpanojen kansio",
+      "periodFormatAriaLabel": "{{period}} muistiinpanojen otsikkomuoto",
+      "periodTemplateAriaLabel": "{{period}} muistiinpanojen malli",
       "dateFormatHelper": "Kunkin päivämuistiinpanon otsikko. Tukee muotoja YYYY, MM, DD. Oletus on {{default}}.",
       "dateFormatLabel": "Päivämuistiinpanon päivämäärämuoto",
       "dateFormatSaveError": "Päivämäärämuotoa ei voitu tallentaa. Yritä uudelleen.",
       "folderHelper": "Mihin uudet päivämuistiinpanot tallennetaan. Oletus on {{default}}. Kansio säilytetään silloinkin, kun se on tyhjä.",
       "folderLabel": "Päivämuistiinpanojen kansio",
       "folderSaveError": "Päivämuistiinpanojen kansiota ei voitu tallentaa. Yritä uudelleen.",
-      "folderSearchEmpty": "Yksikään kansio ei vastaa hakua.",
-      "folderSearchPlaceholder": "Etsi kansioita…",
-      "searchEmpty": "Yksikään malli ei vastaa hakua.",
-      "searchPlaceholder": "Etsi malleja…",
       "templateHelper": "Valitse malli, josta kukin päivämuistiinpano aloitetaan, tai jätä tyhjäksi, jolloin saat tyhjän muistiinpanon, jonka otsikkona on päivämäärä.",
       "templateLabel": "Päivämuistiinpanon malli",
-      "templateSaveError": "Päivämuistiinpanon mallia ei voitu tallentaa. Yritä uudelleen.",
-      "untitledTemplate": "Nimetön malli"
+      "templateSaveError": "Päivämuistiinpanon mallia ei voitu tallentaa. Yritä uudelleen."
     },
     "deleteVault": {
       "cancel": "Peruuta",
@@ -2949,7 +2997,8 @@
         "title": "Ennen kuin Myne lähettää mitään palveluun {{provider}}",
         "whatLabel": "Mitä laitteeltasi lähtee",
         "whenLabel": "Milloin se lähtee",
-        "whoLabel": "Kuka sen vastaanottaa"
+        "whoLabel": "Kuka sen vastaanottaa",
+        "connectionLabel": "Miten se kulkee"
       },
       "disclosureToggle": "Miten tämä toimii?",
       "enableHelper": "Suorittaa antamasi mallin. Se, missä se suoritetaan ja poistuvatko muistiinpanosi tältä laitteelta, riippuu alla nimeämästäsi palveluntarjoajasta. Kokeellinen, oletuksena pois päältä.",
@@ -2983,7 +3032,9 @@
         "refused": "Palveluntarjoaja torjui yhteyden. Se voi olla poissa käytöstä tai estää tämän verkon.",
         "timeout": "Palveluntarjoaja ei vastannut ajoissa. Mitään ei jäänyt käyntiin.",
         "unauthorized": "Palveluntarjoaja hylkäsi API-avaimesi. Vaihda se: se voi olla väärä, peruutettu tai kuulua toiselle tilille.",
-        "unreachable": "Palveluntarjoajaan ei saatu yhteyttä. Tarkista verkkoyhteytesi."
+        "unreachable": "Palveluntarjoajaan ei saatu yhteyttä. Tarkista verkkoyhteytesi.",
+        "featureOff": "Tekoäly on pois käytöstä tässä laitteessa. Mitään ei lähetetty. Ota se käyttöön Asetuksissa kohdassa Tekoäly.",
+        "consentMissing": "Et ole hyväksynyt muistiinpanojen lähettämistä tälle palveluntarjoajalle tästä laitteesta. Mitään ei lähetetty. Valitse palveluntarjoaja uudelleen Asetuksissa kohdassa Tekoäly ja lue, mitä lähetetään."
       },
       "modelChoose": "Valitse tiedosto…",
       "modelEmbeddingLabel": "Hakumalli: semanttinen haku sekä kysymykset ja vastaukset",
@@ -3024,7 +3075,16 @@
       "recommendedFilesEmbedding": "Tarvitsee tiedostot model.safetensors + config.json + tokenizer.json samassa kansiossa.",
       "recommendedFilesGeneration": "Tarvitsee .gguf-tiedoston + tokenizer.json samassa kansiossa.",
       "recommendedFilesTranscription": "Tarvitsee Whisperin .gguf-tiedoston + config.json + tokenizer.json samassa kansiossa.",
-      "title": "Tekoäly"
+      "title": "Tekoäly",
+      "mobileEnableLabel": "Käytä tekoälyä tässä puhelimessa",
+      "mobileEnableHelper": "Oletuksena pois päältä. Mikään tekoälymalli tässä puhelimessa ei vastaa kysymyksiin eikä lue muistiinpanojasi, joten jokainen pyyntö menee alla nimeämääsi palveluun, ja muistiinpanosi lähtevät silloin tältä laitteelta. Litterointi ja kuvien teksti toimivat yhä täällä, Mynen mukana tulevilla malleilla.",
+      "mobileKeyAdd": "Tallenna avain",
+      "mobileKeyReplace": "Vaihda avain",
+      "mobileRevokeHelper": "Poistaa palveluntarjoajan, sen avaimen ja tämän puhelimen hyväksynnän yhdessä, jolloin tila on täsmälleen sama kuin ennen käyttöönottoa. Muut laitteet toimivat edelleen, kunnes poistat sen sielläkin.",
+      "mobileApproveLabel": "Hyväksy lähettäminen tässä puhelimessa",
+      "mobileApproveHelper": "Palveluntarjoaja ja sen avain tulivat toisesta laitteesta. Tästä puhelimesta ei lähetetä mitään, ennen kuin luet mitä lähetetään ja hyväksyt sen täällä.",
+      "historyBudgetHelper": "Kuinka paljon viimeaikaisesta keskustelusta jokainen pyyntö kuljettaa, merkkeinä. Jätä tyhjäksi käyttääksesi oletusarvoa. Suurempi luku antaa tekoälyn seurata pidempiä keskusteluja ja lähettää niitä enemmän: jos palveluntarjoaja ei ole tällä laitteella, sitä enemmän tekstiäsi poistuu laitteelta ajon jokaisella askeleella.",
+      "historyBudgetLabel": "Jokaisen pyynnön mukana lähetettävä keskustelu"
     },
     "network": {
       "disabledCue": "Synkronointia ei enää reititetä Torin kautta. Uudet yhteydet menevät suoraan synkronointipalvelimelle.",
@@ -3057,6 +3117,9 @@
       "exactLabel": "Tarkka ajoitus",
       "exactOn": "Päällä",
       "horizon": "Muistutukset on rekisteröity {{date}} asti. Avaa Myne ennen sitä, jotta ne jatkuvat.",
+      "horizonLabel": "Ajoita etukäteen",
+      "horizonLabelHelper": "Muistutukset valmistellaan näin paljon etukäteen. Mynen on oltava auki ja lukitus avattuna, jotta muistutus saapuu.",
+      "horizonInertHelper": "Tallennettu tälle laitteelle. Mikään ei vielä lue sitä: tämä versio ei toimita tehtävämuistutuksia.",
       "label": "Tehtävämuistutukset",
       "saveError": "Asetusta ei voitu tallentaa. Yritä uudelleen.",
       "showTextAria": "Näytä tehtävän teksti ilmoituksessa",
@@ -3337,12 +3400,14 @@
         "viewMode": "oletusnäkymätila näkymä reaaliaikainen lukeminen lähde esikatselu view mode",
         "dateFormat": "päivämäärämuoto päivämäärä päivä kuukausi vuosi iso dd/mm mm/dd kalenteri date format",
         "timeFormat": "kellonajan muoto kellonaika 24 tunnin 12 tunnin kello ap ip time format am pm",
-        "timezone": "aikavyöhyke vyöhyke tz utc iana alue tänään timezone time zone"
+        "timezone": "aikavyöhyke vyöhyke tz utc iana alue tänään timezone time zone",
+        "periodicNotes": "jaksottaiset muistiinpanot viikoittainen kuukausittainen viikko kuukausi kansio malli muoto",
+        "aiHistoryBudget": "keskustelu historia konteksti muisti budjetti merkit agentti chat pyyntö"
       }
     },
     "dateTime": {
       "dateLabel": "Päivämäärämuoto",
-      "dateHelper": "Miten päivämäärät näytetään tehtävissä, tallennetuissa näkymissä ja liitteissä.",
+      "dateHelper": "Miten päivämäärä kirjoitetaan kaikkialla missä Myne sellaisen näyttää.",
       "dateSystem": "Kielen mukaan",
       "timeLabel": "Kellonajan muoto",
       "timeHelper": "Näytetäänkö kellonajat 24- vai 12-tuntisina.",

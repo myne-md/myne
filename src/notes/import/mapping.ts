@@ -84,9 +84,24 @@ function segmentReason(segment: string): IllegalSegmentReason | null {
  * and surfaced via `preexistingFolder`. The caller decides how to surface both
  * in the post-import "needs attention" report; it never blocks the walk.
  */
+/** Per-source knobs for {@link mapImportedFile}. */
+export interface MapImportedFileOptions {
+  /**
+   * Inject the filename-derived title when the file has no frontmatter
+   * `title:`. Defaults to `true`, which is the Obsidian-shaped assumption every
+   * path-based source relies on: the filename IS the note's name there.
+   *
+   * `false` for a source whose filenames carry no name. Its notes then land
+   * Untitled exactly as they were in the source, which is the honest outcome
+   * and the one the identity layer handles by content hash instead.
+   */
+  readonly titleFromFilename?: boolean;
+}
+
 export function mapImportedFile(
   relativePath: string,
   rawText: string,
+  options: MapImportedFileOptions = {},
 ): ImportedFileMapping {
   const fm = parseFrontmatter(rawText).parsed as Record<string, unknown> | null;
   const fmTitle = typeof fm?.["title"] === "string" ? (fm["title"] as string) : null;
@@ -106,7 +121,15 @@ export function mapImportedFile(
   // verbatim — even an illegal value is preserved + flagged below, never
   // sanitized. A pre-existing FM `title:` wins and is left untouched. Composes
   // with the `folder:` injection above (each patcher touches only its own line).
-  if (fmTitle === null) {
+  //
+  // A source whose filenames are NOT names opts out (`titleFromFilename:
+  // false`). The Myne vault source is the case that forced the option: its
+  // filenames are note UUIDs, so injecting one would title the note `019…` hex
+  // rather than leave it Untitled, and "Untitled" is what the source actually
+  // says. `conflict.ts` used to assert that a title-less note "is not reachable
+  // through this import path"; a Myne source makes it reachable in bulk, which
+  // is why the claim is now false and the option exists.
+  if (fmTitle === null && options.titleFromFilename !== false) {
     plaintext = utf8Decoder.decode(
       patchTitleField(utf8Encoder.encode(plaintext), readTimeTitle),
     );
@@ -170,4 +193,17 @@ export function mapImportedFile(
   }
 
   return { plaintext, readTimeTitle, illegalFlags, preexistingFolder };
+}
+
+/**
+ * Write `title` into the note's Myne-managed `title:` field.
+ *
+ * The same surgery create and rename use, exported so the engine can apply a
+ * source's RENAME decision without keeping a second encoder pair. It is
+ * deliberately the same call the filename-injection above makes: a renamed note
+ * must be renamed in its own bytes, not merely reported as renamed, or the
+ * identity set and the note disagree the moment the import ends.
+ */
+export function applyTitle(markdown: string, title: string): string {
+  return utf8Decoder.decode(patchTitleField(utf8Encoder.encode(markdown), title));
 }

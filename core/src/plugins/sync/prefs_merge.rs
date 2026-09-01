@@ -583,6 +583,12 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     // clobbers another folder's order (whole-sequence LWW dropped one — the
     // exact loss MYND-562 fixed for the decoration maps above).
     let item_order = per_key!("item_order", item_order);
+    // periodic_notes (myne#177): keys are `<period>.<setting>`, so a folder edit
+    // on one device and a template edit on another, to the SAME period in the
+    // same round, race on separate clocks and both survive. That is the whole
+    // reason the field is a flat map rather than a map of nested objects: a
+    // per-period value would have put both edits on one clock and dropped one.
+    let periodic_notes = per_key!("periodic_notes", periodic_notes);
 
     // The struct literal lists EVERY PrefsView field with no `..` — the same
     // compile-time drift lock as the classification conformance test: a new
@@ -590,12 +596,16 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     // §10.2 classification row.
     PrefsView {
         // ---- shared: scalar-LWW -----------------------------------------
-        // The remote-provider triple (myne#415, SYNC-15/SYNC-22). LWW rather
+        // The remote-provider fields (myne#415, SYNC-15/SYNC-22). LWW rather
         // than a union because a credential cannot be merged — rotating on one
         // device must REPLACE, and revoking propagates as an LWW write of
         // `None`, which is what makes revocation reach the other devices.
+        //
+        // It was a TRIPLE until myne-md/myne#456. `ai_provider_consent` left for
+        // the device-local group below, which is what closes SYNC-22: a device
+        // now inherits the selection, the model and the key, and none of those
+        // is permission to use them.
         ai_provider: lww!("ai_provider", ai_provider),
-        ai_provider_consent: lww!("ai_provider_consent", ai_provider_consent),
         // The one LWW field whose value is `Zeroizing`-wrapped (myne-md/myne#444),
         // so it takes the keyed form for the same reason `saved_views` does: the
         // tiebreak bytes are NORMATIVE (§10.2 — "the values' canonical
@@ -707,9 +717,22 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // item_order (MYND-596): per-container map merge, computed above so it
         // borrows `clocks` once — moved here from the sequence-LWW group.
         item_order,
+        // periodic_notes (myne#177): per-setting map merge, same reason.
+        periodic_notes,
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
+        // Device-local for the reason the classification table gives: a bound
+        // on how much THIS machine sends to a provider. The local value always
+        // survives the merge.
+        chat_history_budget: local.chat_history_budget,
         ai_enabled: local.ai_enabled,
+        // myne-md/myne#456: moved out of the scalar-LWW group above. Approving a
+        // provider is a decision a person makes AT a device, not a fact about
+        // the account, so it must not arrive by sync. The local value winning
+        // "always" is exactly right here: a remote `Some("openrouter")` may not
+        // overwrite a local `None`, because that would be the whole SYNC-22
+        // defect wearing a merge rule's clothes.
+        ai_provider_consent: local.ai_provider_consent.clone(),
         // MYND-441: device-local like `ai_enabled`, and for the same reason —
         // battery and thermal capacity differ per device, so turning OCR off on
         // a phone must not turn it off on the desktop.
@@ -1098,6 +1121,95 @@ mod tests {
         assert!(!merged.field_clocks.contains_key("auto_lock_seconds"));
     }
 
+    /// myne-md/myne#456: the consent does NOT travel and the key DOES, and the
+    /// test asserts both in one merge because either half alone is satisfied by
+    /// a defect.
+    ///
+    /// Assert only "consent does not arrive" and a change that made the whole AI
+    /// cluster device-local passes, while silently breaking revocation: deleting
+    /// a key on one device would stop reaching the others, so a compromised
+    /// credential would keep working on every device the user did not visit.
+    /// Assert only "the key arrives" and the SYNC-22 defect this closes is
+    /// untouched. The pair is the property.
+    ///
+    /// The direction matters too. The remote carries a consent and the LOCAL
+    /// side has none, which is exactly the newly-enrolled-device shape: an
+    /// approval made on a laptop must not become an approval by this device.
+    #[test]
+    fn consent_does_not_travel_but_the_key_does() {
+        assert_eq!(
+            classify("ai_provider_consent"),
+            Some(PrefClass::DeviceLocal)
+        );
+
+        // The newly-enrolled device: nothing approved here.
+        let local = PrefsView {
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider: None,
+            ..PrefsView::default()
+        };
+        // The laptop that configured everything, with a clock that would win.
+        let mut remote = PrefsView {
+            ai_provider: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_key: Some(zeroize::Zeroizing::new("sk-remote".into())),
+            ..PrefsView::default()
+        };
+        stamped(&mut remote, "ai_provider", u64::MAX);
+        stamped(&mut remote, "ai_provider_consent", u64::MAX);
+        stamped(&mut remote, "ai_provider_key", u64::MAX);
+
+        let merged = merge_prefs(&local, &remote);
+
+        assert_eq!(
+            merged.ai_provider_consent, None,
+            "an approval made on another device must not arrive by sync (SYNC-22)"
+        );
+        assert_eq!(
+            merged.ai_provider.as_deref(),
+            Some("openrouter"),
+            "the SELECTION is an account fact and still travels"
+        );
+        assert_eq!(
+            merged.ai_provider_key.as_deref().map(|k| k.as_str()),
+            Some("sk-remote"),
+            "the credential still travels, so rotating it on one device reaches the rest"
+        );
+        // A device-local field carries no clock into the merged map, which is
+        // what stops a later merge from resurrecting it as a shared value.
+        assert!(!merged.field_clocks.contains_key("ai_provider_consent"));
+
+        // The other direction, because revocation is the case a one-way test
+        // would miss: clearing the key on the remote must reach this device.
+        let configured_local = PrefsView {
+            ai_provider: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_key: Some(zeroize::Zeroizing::new("sk-old".into())),
+            ..PrefsView::default()
+        };
+        let mut revoked_remote = PrefsView {
+            ai_provider: None,
+            ai_provider_key: None,
+            ..PrefsView::default()
+        };
+        stamped(&mut revoked_remote, "ai_provider", u64::MAX);
+        stamped(&mut revoked_remote, "ai_provider_key", u64::MAX);
+
+        let after_revoke = merge_prefs(&configured_local, &revoked_remote);
+        assert_eq!(
+            after_revoke.ai_provider_key, None,
+            "a revoke must reach every device, which is why the key stays shared"
+        );
+        assert_eq!(
+            after_revoke.ai_provider_consent.as_deref(),
+            Some("openrouter"),
+            "this device's own approval is untouched by a remote revoke; the gate \
+             is an equality against the active provider, so with the provider \
+             cleared it refuses anyway"
+        );
+    }
+
     /// MYND-651: `auto_tag_enabled` is Shared/ScalarLww, so the newer clock
     /// wins and the flag DOES cross devices — the deliberate contrast with its
     /// device-local co-gate `ai_enabled`, which does not. The pair is what makes
@@ -1250,6 +1362,52 @@ mod tests {
             assert_eq!(merged.folder_icons.get("work/").unwrap(), "briefcase");
             assert_eq!(merged.folder_icons.get("personal/").unwrap(), "leaf");
             assert_eq!(merged.field_clocks.get("item_colors/work/"), Some(&300));
+        }
+    }
+
+    #[test]
+    fn periodic_notes_merges_per_setting_not_per_period() {
+        // myne#177. The flat `<period>.<setting>` key shape was chosen over a
+        // map of nested objects for exactly this: two edits to the SAME period
+        // in the same round, on different settings, must both survive. With a
+        // per-period value they would have shared one clock and one would have
+        // been dropped. Asserting the property rather than the shape, because
+        // the shape is what a later refactor would change.
+        let mut a = PrefsView::default();
+        a.periodic_notes
+            .insert("weekly.folder".into(), "Weekly/".into());
+        a.periodic_notes
+            .insert("monthly.format".into(), "YYYY-MM".into());
+        stamped(&mut a, "periodic_notes/weekly.folder", 100);
+        stamped(&mut a, "periodic_notes/monthly.format", 100);
+
+        let mut b = PrefsView::default();
+        // Same period, different setting: must not clobber a's folder.
+        b.periodic_notes
+            .insert("weekly.template".into(), "0190a000-tmpl".into());
+        // Same key, newer clock: must win.
+        b.periodic_notes
+            .insert("monthly.format".into(), "YYYY/MM".into());
+        stamped(&mut b, "periodic_notes/weekly.template", 200);
+        stamped(&mut b, "periodic_notes/monthly.format", 300);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(
+                merged.periodic_notes.get("weekly.folder").unwrap(),
+                "Weekly/"
+            );
+            assert_eq!(
+                merged.periodic_notes.get("weekly.template").unwrap(),
+                "0190a000-tmpl"
+            );
+            assert_eq!(
+                merged.periodic_notes.get("monthly.format").unwrap(),
+                "YYYY/MM"
+            );
+            assert_eq!(
+                merged.field_clocks.get("periodic_notes/monthly.format"),
+                Some(&300)
+            );
         }
     }
 

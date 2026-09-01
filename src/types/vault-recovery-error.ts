@@ -96,6 +96,16 @@ export type VaultRecoveryError =
    */
   | { kind: "RecoveryInProgress" }
   /**
+   * A vault-import run is holding THIS vault open as a read-only source
+   * (myne-md/myne#464). The slot map is keyed by `VaultId`, so a recovery would
+   * have to evict a key context the import is actively reading through.
+   *
+   * **User-facing**, unlike `RecoveryInProgress` one line above, for the reason
+   * its unlock-side twin gives: that variant's window is one the frontend
+   * disables Submit across, and this state has no such window.
+   */
+  | { kind: "VaultOpenAsImportSource" }
+  /**
    * The vault is already unlocked (`Slot::Unlocked`). Returned by
    * the slot-peek guard when a recovery attempt arrives with a
    * fully-unlocked vault.

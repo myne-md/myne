@@ -38,6 +38,19 @@ pub trait MyneBackend {
     /// that variant's doc comment for why they must stay indistinguishable.
     fn show(&self, id: &str) -> Result<String, BackendError>;
 
+    /// One period's note (myne#177): `daily`, `weekly` or `monthly`, on the
+    /// same open-or-create contract `daily` has. The second element says whether the
+    /// host resolved the period on the DEVICE clock while a display-timezone
+    /// override was set, so the CLI can say why it and the app might disagree
+    /// about which note is the current one. A flag rather than the host's
+    /// sentence: `output::DEVICE_CLOCK_NOTE` owns the wording, so no
+    /// host-supplied bytes can reach this crate's stderr.
+    fn period(&self, period: &str) -> Result<(String, bool), BackendError>;
+
+    /// Append a line to one period's note, creating it first if needed.
+    /// Returns the same device-clock flag as [`MyneBackend::period`].
+    fn period_append(&self, period: &str, line: &str) -> Result<bool, BackendError>;
+
     /// Full-text search over notes in scope (task 7). Ranked hits, best
     /// match first. **An excluded hit is never distinguishable from a
     /// genuine no-match** — both are simply absent from the returned
@@ -58,17 +71,6 @@ pub trait MyneBackend {
     /// anything is written — never silently redirected to root. Returns the
     /// new note's id.
     fn create(&self, body: &str, folder: Option<&str>) -> Result<String, BackendError>;
-
-    /// Print today's daily note, resolving/creating it the SAME way the
-    /// app's own "open today's note" flow does (task 9) — same folder,
-    /// same template, same naming (the behaviour-parity rule). The
-    /// configured daily folder being excluded is a refusal via
-    /// [`BackendError::FolderExcluded`], not a silent no-op.
-    fn daily(&self) -> Result<String, BackendError>;
-
-    /// Append `line` to today's daily note, resolving/creating it exactly
-    /// like [`Self::daily`] first (task 9).
-    fn daily_append(&self, line: &str) -> Result<(), BackendError>;
 }
 
 /// One ranked search hit — an id + its title, nothing else (no score, no

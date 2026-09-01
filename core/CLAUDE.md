@@ -14,7 +14,9 @@ Three clients consume it, and each supplies its own edges:
 | `myne-mobile` (`mobile/src-tauri/`, this repo) | path dep `myne-core = { path = "../../core" }` | `MobileHooks`, its own `init()` shims, its own ACL |
 | `myne-web-wasm` (`web/wasm/`, this repo) | path dep with `default-features = false` | `WebHooks`, `WebHost`, `OpfsVaultIo`, a Worker command router instead of `generate_handler!` |
 
-**What does NOT live here:** the `tauri::Builder` app wiring, `generate_handler!` registration, capability/permission ACLs, and any plugin with no cross-client meaning (`backup`, `clipper_pairing`, `importer`, `local_inference`, `pdf_export`, `vault_repair`, `spell`, `clipper` — all desktop-side). The crate-level docs in `src/lib.rs` and `src/plugins/mod.rs` restate this split; keep them true.
+**What does NOT live here:** the `tauri::Builder` app wiring, `generate_handler!` registration, capability/permission ACLs, and any plugin with no cross-client meaning (`backup`, `clipper_pairing`, `importer`, `pdf_export`, `vault_repair`, `spell`, `clipper`, all desktop-side). The crate-level docs in `src/lib.rs` and `src/plugins/mod.rs` restate this split; keep them true.
+
+`local_inference` used to be on that list and is now **split** (myne-md/myne#456). Its LOCAL half stays desktop-side, the Candle engine, the Ollama loopback engine, retrieval, the vector store, the model store, whisper, the Tauri surface. Its portable half moved here as `src/inference/` and is covered below.
 
 ## The three seams
 
@@ -49,18 +51,18 @@ The trait is deliberately scoped to note-CRUD + unlock/lock. Hooks that fire onl
 
 | Plugin | Owns |
 |---|---|
-| `attachments` | attachment crypto pipeline (`MYA1`/`MYC1`), sniffing, ref-scan, OCR + text-extraction cache |
+| `attachments` | attachment crypto pipeline (`MYA1`/`MYA5` bodies, `MYC1`/`MYC5` catalog), sniffing, ref-scan, OCR + text-extraction cache |
 | `captures` | `MYK1` watch-dictation queue drained on unlock — mobile-only |
 | `export` | whole-vault plaintext markdown-tree export — native-only |
 | `graph_layout` | `vault.graph` (`MYG1`) layout cache read/write |
 | `notes` | per-note CRUD + listing, title extraction, drawing-text projection |
-| `prefs` | `vault.prefs` (`MYP1`) read + the per-field setters |
+| `prefs` | `vault.prefs` (`MYP1`/`MYP5`) read + the per-field setters |
 | `quick_unlock` | PIN + biometric wrap-key paths (`MYQ1`); `apple.rs` is macOS/iOS-gated |
 | `secret_export` | the single narrow-seam `save_secret_text` write |
 | `share_import` | `MYF1` OS-share-sheet staging queue — mobile-only |
 | `snapshots` | list / preview / restore / prune over encrypted note history |
 | `sync` | the whole Phase 2 client engine: transport, SCRAM enroll, cycle, reconcile, conflict, device roster |
-| `themes` | `vault.themes` (`MYT1`) custom-palette store, validated through `theme-validator` |
+| `themes` | `vault.themes` (`MYT1`/`MYT5`) custom-palette store, validated through `theme-validator` |
 | `vault_change_password` | `change_password` rotation |
 | `vault_creation` | begin / commit / cancel session flow — **and its own `init()`**, see below |
 | `vault_delete` | one-shot vault destruction |
@@ -69,7 +71,17 @@ The trait is deliberately scoped to note-CRUD + unlock/lock. Hooks that fire onl
 | `vault_unlock` | the `UnlockedVault` slot, unlock/lock, status probes, storage health |
 | `workspace` | `vault.workspace` (`MYW1`) pane tree + the RAM-only stage |
 
-Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence — shared, though only desktop feeds it), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_label` (the `MYL1` sealed label store: the per-vault keychain key + the device-local file the LOCKED picker reads a vault's name from), `vault_meta_hash`, `note_txn`, `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
+### `src/inference/`, the AI seam (myne-md/myne#456)
+
+Not a plugin core, which is why it sits at the crate root rather than under `plugins/`: nothing here registers a command. It is the [`Engine`] trait every backend implements, its error enum, the ChatML sanitizer, the cancellable-IO wrapper streaming reads poll through, the remote-provider registry, its TLS transport, its consent gate, and `state.rs`, the backend registry.
+
+**`state.rs` is here for a reason that is not tidiness.** It owns the rule that an ambient, background-class request is refused a remote-class backend, which is a security decision about unmetered billing and silent background egress. Leaving each client to write its own backend selection would have put that rule in two places that only a warning-level guard compares.
+
+**The whole module is behind the default-off `remote-ai` feature, and that gate is load-bearing.** The desktop auditable build is `cargo build -p myne-desktop --no-default-features`, which drops `local-inference` and, while this code lived inside that plugin, every line of remote-provider code with it. This crate compiles unconditionally, so an ungated move would have silently put the arm back into the audit build. Desktop's `local-inference` feature therefore implies `myne-core/remote-ai`; mobile enables it directly, having no local half to gate behind. `src-tauri/scripts/ai-no-network-check.sh` check 5 asserts both directions of that chain, and `AI_EGRESS_ROOTS` covers this directory.
+
+One caveat that belongs with the gate rather than in a commit message: **cargo unifies features across a workspace**, so `cargo test --workspace` always compiles this on. The feature only drops in an isolated single-package `--no-default-features` build, which is exactly how the audit build runs, and it protects nothing anywhere else.
+
+Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence, shared, though only desktop feeds it), `inference/` (above), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_label` (the `MYL1` sealed label store: the per-vault keychain key + the device-local file the LOCKED picker reads a vault's name from), `vault_meta_hash`, `note_txn`, `content_nonce` (the ONE decryption-free `content_nonce` reader, which takes the base magic and the later generations as separate parameters, so a zero-generation reader is refused by the signature and a third generation is an append rather than a swap. A ONE-generation reader is still expressible (`later: &[]`) and is caught by `check-crypto-registries.mjs` rule 5 plus the unused-import lint rather than by the type; myne-md/myne#638), `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
 
 ### Command shape — three layers
 
@@ -139,7 +151,9 @@ The seeders take the TLS pin as an **argument** rather than fetching it: the nat
 ## Feature flags
 
 - **`default = ["tauri-ipc"]`** — compiles the `#[tauri::command]` wrappers and the `TauriHost` adapter. A wasm build never enables it (the `tauri` dep is target-gated out of the wasm arm anyway); `web/wasm` takes the crate with `default-features = false`.
-- **`test-support`** — gates `test_support` (`ScopedTempDir`, `block_on`, seeded vault fixtures) and `double_buffer_fixtures` so clients can pull them as a dev-dependency while production builds never compile them. Both fixture emitters declare it as `required-features`.
+- **`test-support`**, gates `test_support` (`ScopedTempDir`, `block_on`, seeded vault fixtures) and `double_buffer_fixtures` so clients can pull them as a dev-dependency while production builds never compile them. Both fixture emitters declare it as `required-features`. It also gates the handful of accessors that exist only for a client's tests, of which `inference::state`'s `snapshot_cell` is the current example: `#[cfg(test)]` is per-crate, so an accessor that a client test reaches has to widen to `any(test, feature = "test-support")` or it silently disappears the moment its module moves into this crate.
+- **`remote-ai`**, the inference seam and the remote-provider arm (`src/inference/`), plus its `webpki-roots` trust anchor. **Default off, and that is the property rather than a convention**: see the `src/inference/` section above for the feature chain it is one link of, and for the workspace-unification caveat that bounds what it protects.
+- **`local-inference-stub`** (the E2E build variant, moved here with `inference/engine.rs` because that file is where it is read. Implies `remote-ai`. With it off, `stub_fault()` has no environment read at all, so `MYNE_E2E_AI_FAULT` on a shipped binary does nothing. It is declared here rather than left to the desktop crate for a reason worth keeping: without the declaration, cargo's check-cfg reduces every `#[cfg(feature = "local-inference-stub")]` in the moved file to the `not(...)` arm, which is the safe arm and therefore silent) the desktop stub build would keep compiling while quietly losing its fault injection.
 
 Three modules are gated OUT of the wasm build at the **module** level rather than ported: `captures`, `export` and `share_import` (no watch, no OS path, no share sheet in a tab). Gating the whole module is the honest shape: a ported command that always returns "unsupported" would be dead code pretending to be a feature.
 
@@ -152,6 +166,15 @@ cargo check -p myne-core
 cargo clippy -p myne-core --all-targets -- -D warnings
 cargo test -p myne-core                       # the crate's own battery
 cargo test -p myne-core <name>                # filter by name
+
+# …but NOT the inference seam. `remote-ai` is default-off, so a bare
+# `cargo test -p myne-core` compiles none of `src/inference/` and reports ok
+# while silently skipping ~105 tests, including the two accept-counting
+# default-off proofs. A workspace run hides this (cargo unifies features, so
+# `myne-desktop` turns it on), which is exactly why it is easy to miss when
+# narrowing to one package.
+cargo test -p myne-core --features remote-ai            # includes src/inference/
+cargo test -p myne-core --features remote-ai inference::
 
 # The wasm arm. CI runs both (`wasm-protocol` step, .woodpecker/main.yml)
 cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
