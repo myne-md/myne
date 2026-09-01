@@ -69,7 +69,7 @@ import {
   setAiProviderModel,
 } from "../../lib/prefs";
 import { listProviderModels } from "../../lib/ai";
-import { providerLabelOf } from "@myne/copy";
+import { consentIsDeviceScoped, providerLabelOf } from "@myne/copy";
 import { formatBarLabelKey, resolveFormatBarOrder } from "../../lib/formatBarItems";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { VaultId } from "../../lib/stage";
@@ -788,7 +788,13 @@ function AiPanel({
                   route to the consent screen was to toggle the provider off and
                   on, which nobody would think to do and which reads as breaking
                   a working setup. */}
-              {prefs.ai_provider_consent !== provider && (
+              {/* `consentIsDeviceScoped`, not an equality against the provider
+                  name. A legacy bare-name value is what a device enrolled before
+                  the reclassification holds, and an equality would read it as
+                  current and hide this row, leaving the phone silently sending
+                  under an approval nobody at this device gave
+                  (myne-md/myne#456). */}
+              {!consentIsDeviceScoped(prefs.ai_provider_consent, provider) && (
                 <>
                   <SectionLabel>{t("settings.ai.mobileApproveLabel")}</SectionLabel>
                   <Group>
@@ -2214,7 +2220,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               // the model and the key already set and `ai_provider_consent`
               // empty, because myne-md/myne#456 made that field device-local.
               // This branch is what that change exists for.
-              if (eff.ai_provider_consent === wire) {
+              if (consentIsDeviceScoped(eff.ai_provider_consent, wire)) {
                 writeDraftPref("ai_provider", wire, () => setAiProvider(wire));
                 return;
               }

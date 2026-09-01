@@ -1205,12 +1205,19 @@ pub(crate) async fn set_ai_provider_with_dir(
     Ok(())
 }
 
-/// `Slot::Unlocked`-gated setter for the one-time remote-provider consent
-/// (myne#415, SYNC-22).
+/// `Slot::Unlocked`-gated setter for the remote-provider consent
+/// (myne#415, SYNC-22; device-local since myne-md/myne#456).
 ///
 /// **A gate, not a display flag.** The request path checks it, so a client
-/// whose UI never showed the screen still cannot send. It is account-scoped —
-/// it syncs, so a newly enrolled device inherits it (`threat-model.md` §5).
+/// whose UI never showed the screen still cannot send.
+///
+/// **The caller hands a PROVIDER NAME and this function stores the
+/// device-scoped token.** The suffix is added here rather than by the caller so
+/// there is one writer of the stored spelling: the gate compares for equality,
+/// and a second spelling would be a silent refusal rather than an error anybody
+/// sees. `provider_gate::CONSENT_DEVICE_SUFFIX` carries the whole argument for
+/// why the token exists; in one line, a legacy bare-name value is what both
+/// silently-re-routed populations hold, and the gate must not accept it.
 pub async fn set_ai_provider_consent_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -1227,6 +1234,15 @@ pub async fn set_ai_provider_consent_from_host(
             return Err(PrefsWriteError::InvalidValue);
         }
     }
+    // Stored device-scoped. `granted_for` is validated against
+    // `KNOWN_AI_PROVIDERS` above, so `from_wire` cannot fail here; the
+    // `ok_or` is the fail-closed arm rather than a real branch.
+    let stored = match granted_for.as_deref() {
+        Some(name) => Some(
+            protocol::prefs::device_scoped_consent(name),
+        ),
+        None => None,
+    };
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     let present = granted_for.is_some();
@@ -1235,7 +1251,7 @@ pub async fn set_ai_provider_consent_from_host(
         state,
         hooks,
         |prefs| {
-            prefs.ai_provider_consent = granted_for.clone();
+            prefs.ai_provider_consent = stored.clone();
         },
         io,
         host,

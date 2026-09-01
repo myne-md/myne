@@ -112,7 +112,14 @@ pub fn authorize_remote(prefs: &PrefsView) -> Result<RemoteAuthorization, Engine
     // 3. Consent, FOR THIS PROVIDER. An equality, not a flag: an approval
     //    recorded for a different provider names a different recipient than
     //    the one about to receive the text.
-    if prefs.ai_provider_consent.as_deref() != Some(provider.wire_name()) {
+    // The consent must be DEVICE-SCOPED, not merely present and matching. A
+    // legacy bare-wire-name value is refused here for the reason
+    // `CONSENT_DEVICE_SUFFIX` states: it is what both re-routed populations
+    // hold, and accepting it leaves this gate where the review found it.
+    if !protocol::prefs::consent_is_device_scoped(
+        prefs.ai_provider_consent.as_deref(),
+        provider.wire_name(),
+    ) {
         // `ConsentMissing`, not `RemoteBarred` (myne-md/myne#456). The latter
         // is a rule about a request CLASS that no user choice can lift; this is
         // a permission nobody has given yet, and only one of the two has a fix
@@ -151,7 +158,7 @@ mod tests {
         PrefsView {
             ai_enabled: true,
             ai_provider: Some("openrouter".into()),
-            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter@device".into()),
             ai_provider_key: Some(Zeroizing::new("sk-test".into())),
             ..PrefsView::default()
         }
@@ -244,7 +251,7 @@ mod tests {
         let switched = PrefsView {
             ai_provider: Some("ollama-cloud".into()),
             // …still carrying yesterday's approval for OpenRouter.
-            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter@device".into()),
             ..ready()
         };
         assert_eq!(
@@ -253,7 +260,7 @@ mod tests {
         );
         // Re-consenting to the new one lets it through.
         let reconsented = PrefsView {
-            ai_provider_consent: Some("ollama-cloud".into()),
+            ai_provider_consent: Some("ollama-cloud@device".into()),
             ..switched
         };
         let auth = authorize_remote(&reconsented).expect("consented");
@@ -412,10 +419,77 @@ mod default_off_proof {
         PrefsView {
             ai_enabled: true,
             ai_provider: Some("openrouter".into()),
-            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter@device".into()),
             ai_provider_key: Some(Zeroizing::new("sk-test".into())),
             ..PrefsView::default()
         }
+    }
+
+    /// A LEGACY consent, the bare wire name, does NOT authorize a request.
+    ///
+    /// This is the Critical this token exists for (myne-md/myne#456, found by
+    /// review). Two populations hold exactly this value and neither performed
+    /// any act to reach it:
+    ///
+    /// * a desktop install that consented, then turned Developer mode OFF, and
+    ///   was answered by the LOCAL arm for as long as `developer_mode` was a
+    ///   request-time precondition. Dropping that precondition re-points the
+    ///   same preferences at the remote provider, so note plaintext starts
+    ///   crossing TB13 on upgrade with no user act and no notice;
+    /// * a device enrolled before the reclassification, which inherited the
+    ///   value under the old SHARED class and will never see a merge revise it.
+    ///
+    /// The refusal is `ConsentMissing`, which is the variant whose surface
+    /// shows the consent screen, so the user is ASKED rather than blocked.
+    ///
+    /// Deleting the suffix check in `authorize_remote` makes this fail.
+    #[test]
+    fn a_legacy_bare_name_consent_does_not_authorize_a_request() {
+        let mut legacy = configured();
+        legacy.ai_provider_consent = Some("openrouter".into());
+        // The exact shape of the re-routed desktop install: everything else is
+        // configured, and on the previous build `developer_mode: false` is what
+        // kept it on the local arm.
+        legacy.developer_mode = false;
+        assert!(
+            matches!(authorize_remote(&legacy), Err(EngineError::ConsentMissing)),
+            "a consent recorded before the reclassification must be re-asked, not honoured",
+        );
+        assert!(
+            protocol::prefs::consent_is_legacy(legacy.ai_provider_consent.as_deref(), "openrouter"),
+            "and it must be RECOGNISABLE as legacy, so a surface can say the user agreed once",
+        );
+    }
+
+    /// The token is self-extinguishing: re-consenting on this device authorizes.
+    ///
+    /// Without this the fix would read as "the gate now refuses everything",
+    /// which is the failure mode a fail-closed change has. The write side is
+    /// `set_ai_provider_consent_from_host`, which adds the suffix so there is
+    /// one writer of the stored spelling.
+    #[test]
+    fn re_consenting_on_this_device_authorizes_again() {
+        let mut fresh = configured();
+        fresh.ai_provider_consent = Some(protocol::prefs::device_scoped_consent("openrouter"));
+        assert!(
+            authorize_remote(&fresh).is_ok(),
+            "a consent recorded on this device under the new classification authorizes",
+        );
+    }
+
+    /// A scoped consent for ANOTHER provider still does not authorize.
+    ///
+    /// The suffix must not become a bypass of the equality the gate already
+    /// had: `ollama-cloud@device` names a different recipient than the one
+    /// about to receive the text.
+    #[test]
+    fn a_scoped_consent_for_another_provider_does_not_authorize() {
+        let mut crossed = configured();
+        crossed.ai_provider_consent = Some(protocol::prefs::device_scoped_consent("ollama-cloud"));
+        assert!(
+            matches!(authorize_remote(&crossed), Err(EngineError::ConsentMissing)),
+            "the recipient equality survives the scoping",
+        );
     }
 
     #[test]

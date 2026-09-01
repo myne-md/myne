@@ -251,6 +251,74 @@ export const CONSENT_HOW_TO_REVOKE =
  *  The KEY still travels, and the sentence says so, because that is the part a
  *  user could otherwise be surprised by: a phone can hold a credential it has
  *  not been permitted to use. */
+/** The suffix a consent recorded ON THIS DEVICE carries in `ai_provider_consent`.
+ *
+ *  **Not user-facing copy, and it lives here anyway**, which is the one thing
+ *  worth justifying. This package is source-consumed by the desktop, web and
+ *  mobile trees, and it is already where the consent's own wording lives, so a
+ *  second copy of this constant per client is exactly the twin-drift
+ *  `check-twin-inventory.mjs` exists over. A drifted spelling here is silent:
+ *  the backend gate compares for equality, so a client that computes the wrong
+ *  token shows the consent screen forever, or worse, decides a legacy consent
+ *  is current and never shows it at all.
+ *
+ *  The grammar is defined by `protocol::prefs::CONSENT_DEVICE_SUFFIX`, which
+ *  carries the whole argument for why the value marks its own classification.
+ *  In one line: a legacy bare-provider-name value is what an install that
+ *  turned Developer mode off, and a device enrolled before the
+ *  reclassification, both hold, and the gate must re-ask rather than honour it
+ *  (myne-md/myne#456). */
+/** The A7 residual, rendered as the LAST clause of every AI trust disclosure.
+ *
+ *  **It lives here rather than in `src/lib/load-bearing-copy.ts` because mobile
+ *  could not import it from there, and shipped a consent screen with seven
+ *  clauses where the desktop screen shows eight** (myne-md/myne#456, found by
+ *  review). `mobile/src/components/AiConsentScreen.tsx`'s own header says what
+ *  it carries is "the WHOLE disclosure, never a summary with the detail one tap
+ *  away" and that the clauses are "byte-identical to the desktop screen's by
+ *  construction", and the construction was a per-tree copy that had one file it
+ *  could not reach.
+ *
+ *  The residual applies to a phone in full, and this same change is the
+ *  evidence: it fixed a lock teardown because the mobile process holds the
+ *  plaintext provider key and note-derived text in app memory.
+ *
+ *  Bounded by `threat-model.md` A7. A later slice may say LESS than this,
+ *  never more. */
+export const AI_TRUST_A7_RESIDUAL =
+  "Like the rest of Myne, this does not protect against malware already running on your device: such software can read app memory.";
+
+export const CONSENT_DEVICE_SUFFIX = "@device";
+
+/** The value stored when this device records consent for `provider`. */
+export function deviceScopedConsent(provider: string): string {
+  return `${provider}${CONSENT_DEVICE_SUFFIX}`;
+}
+
+/** Whether `stored` is a consent recorded on THIS device for `provider`.
+ *
+ *  A legacy bare-name value is deliberately false here, so a surface that asks
+ *  this question shows the consent screen for the two populations that hold
+ *  one. Use `consentIsLegacy` to say the true thing about them. */
+export function consentIsDeviceScoped(
+  stored: string | null | undefined,
+  provider: string,
+): boolean {
+  return stored === deviceScopedConsent(provider);
+}
+
+/** Whether `stored` is a LEGACY consent for `provider`: the bare wire name.
+ *
+ *  Separate from "no consent at all" so a surface can say the user agreed once,
+ *  to this provider, under a build where a second host-side precondition also
+ *  had to hold, rather than implying Myne forgot. */
+export function consentIsLegacy(
+  stored: string | null | undefined,
+  provider: string,
+): boolean {
+  return stored === provider;
+}
+
 export const CONSENT_DEVICE_SCOPE =
   "This choice covers this device only. Your key does travel to your other devices, but each one asks before it sends anything.";
 

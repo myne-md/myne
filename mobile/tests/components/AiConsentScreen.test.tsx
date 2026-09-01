@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import {
+  AI_TRUST_A7_RESIDUAL,
   CONSENT_DEVICE_SCOPE,
   CONSENT_DIRECT_CONNECTION,
   CONSENT_HOW_TO_REVOKE,
@@ -70,6 +71,15 @@ describe("AiConsentScreen", () => {
     );
     expect(screen.getByTestId("ai-consent.connection").textContent).toBe(
       CONSENT_DIRECT_CONNECTION,
+    );
+    // The EIGHTH element, which this screen omitted while the desktop screen
+    // rendered it (myne-md/myne#456, found by review). This file's own subject
+    // is that the disclosure is whole rather than a summary, and it asserted
+    // seven of eight, so the miss was invisible to the one test written to
+    // catch exactly it. The sentence lived in `src/lib/load-bearing-copy.ts`,
+    // which mobile does not compile; it is in `@myne/copy` now.
+    expect(screen.getByTestId("ai-consent.residual").textContent).toBe(
+      AI_TRUST_A7_RESIDUAL,
     );
   });
 

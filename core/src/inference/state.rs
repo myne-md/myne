@@ -1175,7 +1175,7 @@ mod selection_proof {
         PrefsView {
             ai_enabled: true,
             ai_provider: Some("openrouter".into()),
-            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter@device".into()),
             ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
             ai_provider_model: Some("some/model".into()),
             ..PrefsView::default()
@@ -1208,7 +1208,7 @@ mod selection_proof {
             (
                 "consent for a DIFFERENT provider",
                 Some(snap(PrefsView {
-                    ai_provider_consent: Some("ollama-cloud".into()),
+                    ai_provider_consent: Some("ollama-cloud@device".into()),
                     ..configured()
                 })),
             ),
