@@ -1171,10 +1171,6 @@
       "turnedIntoTemplate": "Μετατράπηκε σε πρότυπο",
       "convertedToNote": "Μετατράπηκε σε σημείωση",
       "versionHistory": "Ιστορικό εκδόσεων",
-      "exportMarkdown": "Εξαγωγή ως Markdown…",
-      "exportPdf": "Εξαγωγή ως PDF…",
-      "exportHtml": "Εξαγωγή ως HTML…",
-      "exportTxt": "Εξαγωγή ως απλό κείμενο…",
       "trash": "Μετακίνηση στον Κάδο"
     },
     "codeBlock": {
@@ -2041,10 +2037,6 @@
       "duplicate": "Δημιουργία αντιγράφου",
       "editFilterTitle": "Επεξεργασία φίλτρου",
       "emptyState": "Δεν υπάρχουν ακόμη σημειώσεις.",
-      "exportHtml": "Εξαγωγή ως HTML…",
-      "exportMarkdown": "Εξαγωγή ως Markdown…",
-      "exportPdf": "Εξαγωγή ως PDF…",
-      "exportTxt": "Εξαγωγή ως απλό κείμενο…",
       "favoritesHeading": "Αγαπημένα",
       "icon": "Εικονίδιο…",
       "mergeAnyway": "Συγχώνευση ούτως ή άλλως",
@@ -2350,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "Προεπιλογή"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Εξαγωγή…",
+      "txt": "Απλό κείμενο"
     }
   },
   "password": {

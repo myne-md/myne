@@ -4,7 +4,7 @@
 // Source: docs/design/ui_kits/desktop/primitives.jsx
 // Stroke-based, 24x24 viewBox, 1.5px stroke (applied by the Icon component).
 
-export const ICON_PATHS: Record<string, string> = {
+export const ICON_PATHS = {
   "file-text":
     '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
   play: '<polygon points="6 3 20 12 6 21"/>',
@@ -42,6 +42,18 @@ export const ICON_PATHS: Record<string, string> = {
     '<circle cx="12" cy="12" r="10" stroke-dasharray="3 3"/>',
   "circle-alert":
     '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+  // "This save failed" (myne-md/myne#603). The readout drew a literal `✕` in an
+  // 8px box, which `docs/design/README.md` bans by name under "No unicode
+  // symbols as icons (e.g. ✓ ✗ →). Use Lucide's `check`, `x`, `arrow-right`".
+  "circle-x":
+    '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  // "This note is not on the server" (myne-md/myne#603). A cloud with the
+  // corner-to-corner slash, which is the one silhouette that says "absent from
+  // the server" without a legend. The three paths are in Lucide's own order,
+  // slash first; the order is not load-bearing here, since all three share one
+  // stroke and no fill, so nothing overlaps anything.
+  "cloud-off":
+    '<path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/>',
   bold:
     '<path d="M14 12a4 4 0 0 0 0-8H6v8"/><path d="M15 20a4 4 0 0 0 0-8H6v8Z"/>',
   italic:
@@ -140,6 +152,14 @@ export const ICON_PATHS: Record<string, string> = {
   // `rotate-ccw` — a counter-clockwise circular arrow reads as "put it back".
   "rotate-ccw":
     '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
-};
+} satisfies Record<string, string>;
 
+/**
+ * Every name `ICON_PATHS` actually defines.
+ *
+ * This is a real union only because the table above is `satisfies
+ * Record<string, string>` rather than annotated as one. With the annotation,
+ * `keyof` collapsed to `string`, so this type checked nothing: a misspelled
+ * `name` compiled, and the component rendered an empty `<svg>` at runtime.
+ */
 export type IconName = keyof typeof ICON_PATHS;

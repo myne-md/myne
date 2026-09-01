@@ -1269,10 +1269,6 @@
       "turnedIntoTemplate": "Zamieniono w szablon",
       "convertedToNote": "Przekonwertowano na notatkę",
       "versionHistory": "Historia wersji",
-      "exportMarkdown": "Eksportuj jako Markdown…",
-      "exportPdf": "Eksportuj jako PDF…",
-      "exportHtml": "Eksportuj jako HTML…",
-      "exportTxt": "Eksportuj jako zwykły tekst…",
       "trash": "Przenieś do kosza"
     },
     "codeBlock": {
@@ -2201,10 +2197,6 @@
       "duplicate": "Duplikuj",
       "editFilterTitle": "Edytuj filtr",
       "emptyState": "Brak notatek.",
-      "exportHtml": "Eksportuj jako HTML…",
-      "exportMarkdown": "Eksportuj jako Markdown…",
-      "exportPdf": "Eksportuj jako PDF…",
-      "exportTxt": "Eksportuj jako zwykły tekst…",
       "favoritesHeading": "Ulubione",
       "icon": "Ikona…",
       "mergeAnyway": "Scal mimo to",
@@ -2530,6 +2522,13 @@
     },
     "workspace": {
       "defaultSlotName": "Domyślny"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Eksportuj…",
+      "txt": "Zwykły tekst"
     }
   },
   "password": {

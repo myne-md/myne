@@ -1171,10 +1171,6 @@
       "turnedIntoTemplate": "已转为模板",
       "convertedToNote": "已转为笔记",
       "versionHistory": "版本历史",
-      "exportMarkdown": "导出为 Markdown…",
-      "exportPdf": "导出为 PDF…",
-      "exportHtml": "导出为 HTML…",
-      "exportTxt": "导出为纯文本…",
       "trash": "移至回收站"
     },
     "codeBlock": {
@@ -2041,10 +2037,6 @@
       "duplicate": "创建副本",
       "editFilterTitle": "编辑筛选器",
       "emptyState": "暂无笔记。",
-      "exportHtml": "导出为 HTML…",
-      "exportMarkdown": "导出为 Markdown…",
-      "exportPdf": "导出为 PDF…",
-      "exportTxt": "导出为纯文本…",
       "favoritesHeading": "收藏",
       "icon": "图标…",
       "mergeAnyway": "仍然合并",
@@ -2350,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "默认"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "导出…",
+      "txt": "纯文本"
     }
   },
   "password": {

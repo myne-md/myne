@@ -34,7 +34,6 @@ import { indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import {
   deleteMarkupBackward,
-  insertNewlineContinueMarkupCommand,
   markdown,
   markdownLanguage,
 } from "@codemirror/lang-markdown";
@@ -63,6 +62,10 @@ import { textDirectionExtension } from "./direction";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { noteSetExtension } from "./wikilink/note-set";
+import {
+  recentNotesExtension,
+  type RecentNotesSource,
+} from "./wikilink/recent-notes";
 import { drawingEmbedIoExtension } from "./drawing/embed-io";
 import { activeDrawingEmbedField } from "./decorations/drawing-embed";
 import { lineNumbersExtension } from "./line-numbers";
@@ -153,6 +156,7 @@ import { findExtension } from "./find/find-extension";
 import { spellDecorations } from "./decorations/spell";
 import { spellCorrectionMenu } from "./spell/correction-menu";
 import { buildMyneKeymap, collapseMultiSelection } from "./keymap";
+import { continueListMarkup } from "./list-continuation";
 import { vimExtension } from "./vim";
 import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
@@ -161,7 +165,10 @@ import { myneTheme } from "./theme";
 
 /**
  * The Enter / Backspace pair `markdown()` installs by default, rebuilt with
- * `nonTightLists: false` (myne-md/myne#562).
+ * `nonTightLists: false` (myne-md/myne#562) and, on Enter, with the two repairs
+ * that config cannot reach (`list-continuation.ts`, myne-md/myne#588 + #593:
+ * the list stays as tight as the user wrote it, and a task marker keeps the
+ * separator GFM requires).
  *
  * # What the default does
  *
@@ -196,7 +203,7 @@ import { myneTheme } from "./theme";
  */
 const markdownMarkupKeymap: Extension = Prec.high(
   keymap.of([
-    { key: "Enter", run: insertNewlineContinueMarkupCommand({ nonTightLists: false }) },
+    { key: "Enter", run: continueListMarkup },
     { key: "Backspace", run: deleteMarkupBackward },
   ]),
 );
@@ -226,6 +233,12 @@ export function myneExtensions(opts?: {
    *  from focus. Absent → `null`, which every consumer reads as "fall back to
    *  the focused note". */
   noteId?: string | null;
+  /** myne-md/myne#601: how to ask the host which notes were touched most
+   *  recently, newest first, for the `[[` picker's tiebreak. A SOURCE rather
+   *  than a snapshot, installed once here: the order has one owner on the host
+   *  side, and pushing snapshots in made it per view, so panes disagreed. See
+   *  `wikilink/recent-notes.ts`. Absent → the ranking is score alone. */
+  recentNotes?: RecentNotesSource;
 }): readonly Extension[] {
   const viewMode = opts?.viewMode ?? "live";
   const readOnly = opts?.readOnly ?? false;
@@ -290,8 +303,8 @@ export function myneExtensions(opts?: {
       ],
     }),
     // Replaces the keymap `markdown()` would have installed itself (declined
-    // above via `addKeymap: false`). Same two chords, same precedence; only
-    // `nonTightLists` differs. myne-md/myne#562.
+    // above via `addKeymap: false`). Same two chords, same precedence; Enter
+    // runs the repaired continuation (myne-md/myne#562, #588, #593).
     markdownMarkupKeymap,
     // A triple-click on a list row keeps the caret on that row (myne-md/myne#560).
     // Composed after the language so `listContentStart` has a parse tree to read.
@@ -325,6 +338,9 @@ export function myneExtensions(opts?: {
     // reconfigures it from `useResolverNotes()`). MUST precede the chip + hover
     // so the facet exists when they read it.
     noteSetExtension(),
+    // myne-md/myne#601: the recency order the `[[` picker breaks ties with,
+    // seeded empty (a host that tracks none leaves the ranking on score alone).
+    recentNotesExtension(opts?.recentNotes),
     // Inline drawing embeds (MYND-634): the host-injected note-CRUD IO seam +
     // the transient edit-in-place state. Mounted mode-INDEPENDENTLY (unlike the
     // drawing-embed decoration, which is inside the view-mode stack) so the IO

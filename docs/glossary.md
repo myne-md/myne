@@ -203,7 +203,7 @@ A [`vault.attachments`](#vaultattachments) entry whose optional `deleted_at` fie
 
 ### **attachment embed** &nbsp; 📦 *Product* *(Myne-divergent: yes; no Obsidian counterpart)*
 
-The Myne form for embedding an encrypted [attachment](#attachment) in a note, `spec/wikilink.md` §2 **form 12**: `![[att:<attachment-id-hex>|filename]]`, historically called **form C**. The `att:` scheme prefix routes resolution to the `vault.attachments` catalog rather than the note index, and the remainder must be a 64-character lowercase-hex [attachment-id](#attachment-id); a prefix with an invalid id is not an attachment embed and degrades to an ordinary embed chip rather than erroring. It renders as an ATOMIC widget with no source-lift, so the caret never enters it and the `att:` target is never exposed as editable text: a user cannot hand-write or hand-edit one inside Myne, and every authoring affordance emits it instead. What it renders as is a serve-time decision (inline image, PDF reader, audio or video player, file card, or a tombstone for an id the catalog cannot resolve), not an ingest gate. It may carry [embed layout segments](#embed-layout-segment). On an attachments-included export it is rewritten to a plain wikilink embed naming the exported file, carrying its layout segments in Obsidian’s own spelling where one exists, so it never reaches Obsidian in this form.
+The Myne form for embedding an encrypted [attachment](#attachment) in a note, `spec/wikilink.md` §2 **form 12**: `![[att:<attachment-id-hex>|filename]]`, historically called **form C**. The `att:` scheme prefix routes resolution to the `vault.attachments` catalog rather than the note index, and the remainder must be a 64-character lowercase-hex [attachment-id](#attachment-id); a prefix with an invalid id is not an attachment embed and degrades to an ordinary embed chip rather than erroring. It renders as an ATOMIC widget with no source-lift, so the caret never enters it and the `att:` target is never exposed as editable text: a user cannot hand-write or hand-edit one inside Myne, and every authoring affordance emits it instead. What it renders as is a serve-time decision (inline image, PDF reader, audio or video player, file card, or a tombstone for an id the catalog cannot resolve), not an ingest gate. **Where** it renders is a second serve-time decision with the same shape: an embed alone on its line, whitespace aside, is drawn as a whole-line BLOCK, and one sharing a line with prose stays inline. Every insert path Myne owns writes it onto a line of its own, so the block is the form a user meets; an embed already written mid-line, by an import or by hand, is never moved (myne-md/myne#604). It may carry [embed layout segments](#embed-layout-segment), which the block form can also author by drag. On an attachments-included export it is rewritten to a plain wikilink embed naming the exported file, carrying its layout segments in Obsidian’s own spelling where one exists, so it never reaches Obsidian in this form.
 
 Used in: `spec/wikilink.md` §2 form 12, §2.1, §5.1; `spec/markdown-dialect.md` §6
 
@@ -1016,7 +1016,7 @@ Used in: `threat-model.md` §1 (A10 discussion)
 
 ### **embed layout segment** &nbsp; 📦 *Product* *(Myne-divergent: yes; keyed segments, and `align=` has no Obsidian counterpart)*
 
-An author's size, alignment or alt-text choice for one embedded attachment, written as an extra **keyed** segment on the form-C [attachment embed](#attachment-embed) (`![[att:<id>|photo.png|w=300|align=center|alt=A sunset]]`; `spec/wikilink.md` §2 form 12 / §5.1, myne#409). The closed vocabulary is `w` (`1..8192` px or `1..100%`), `h` (`1..8192` px), `align` (`left`/`center`/`right`) and `alt` (free text). Three rules bind: **segment 1 is always the filename**, and from segment 2 on an unkeyed segment rejoins it with its `|` (an attachment filename may itself contain a pipe, so a positional reading would corrupt notes already on disk); **`alt=` is terminal**, swallowing the rest of the embed so alt prose may contain pipes, with an authored-EMPTY `alt=` meaning a deliberately decorative image; and an unreadable segment is **dropped without rewriting the note's bytes**, reported to the author when a known key carried a bad value and passed over silently when the key itself is unknown (an unknown key is a newer client's choice read by an older one, not an error the reader can act on). A width is a **maximum intent**: render clamps it to the editor's content column, which is itself a user preference. Segments are authored only through the embed's overflow menu, never typed, because the embed is atomic and never source-lifts. On an attachments-included export a pixel `w` becomes Obsidian's own `|300` / `|300x200` spelling and the rest travels through; `align` is a Myne extension Obsidian has no core syntax for.
+An author's size, alignment or alt-text choice for one embedded attachment, written as an extra **keyed** segment on the form-C [attachment embed](#attachment-embed) (`![[att:<id>|photo.png|w=300|align=center|alt=A sunset]]`; `spec/wikilink.md` §2 form 12 / §5.1, myne#409). The closed vocabulary is `w` (`1..8192` px or `1..100%`), `h` (`1..8192` px), `align` (`left`/`center`/`right`) and `alt` (free text). Three rules bind: **segment 1 is always the filename**, and from segment 2 on an unkeyed segment rejoins it with its `|` (an attachment filename may itself contain a pipe, so a positional reading would corrupt notes already on disk); **`alt=` is terminal**, swallowing the rest of the embed so alt prose may contain pipes, with an authored-EMPTY `alt=` meaning a deliberately decorative image; and an unreadable segment is **dropped without rewriting the note's bytes**, reported to the author when a known key carried a bad value and passed over silently when the key itself is unknown (an unknown key is a newer client's choice read by an older one, not an error the reader can act on). A width is a **maximum intent**: render clamps it to the editor's content column, which is itself a user preference. Segments are never typed, because the embed is atomic and never source-lifts. There are two authoring paths, both of which write through the same one function: the embed's overflow menu (the size presets, a custom size prompt, the alignment and alt rows), and dragging the resize handles on a [block-drawn](#attachment-embed) embed, which writes `w=` from the right edge and `w=` plus `h=` from the corner grip (myne-md/myne#604). On an attachments-included export a pixel `w` becomes Obsidian's own `|300` / `|300x200` spelling and the rest travels through; `align` is a Myne extension Obsidian has no core syntax for.
 
 Used in: `spec/wikilink.md` §2, §5.1; `spec/markdown-dialect.md` §6, §7; `decisions.md` 2026-08-15
 
@@ -1100,11 +1100,15 @@ Used in: `self-host-policy.md` §3, `decisions.md` 2026-06-20 (MYND-438)
 
 ### **inline status mark** &nbsp; 📦 *Product*
 
-A glyph that sits **inside a text run** to say what a surface owes: the trailing slot of a sidebar note row, the bottom bar beside the save readout. It is a distinct class from an **icon**, which names a thing, and `docs/design/README.md` carves three of the icon rules out for it rather than bending them: it is 7 to 8px rather than 16 and up, it is coloured by MEANING (`--accent` while work is in flight, `--fg-3` while it is merely outstanding) rather than by `currentColor`, and it is drawn as a three-sided border ring rather than from the Lucide set, because at that size no Lucide pair distinguishes a filled dot from a hollow one and the GAP is what carries "incomplete" while the glyph stands still.
+A named icon that sits **inside a text run** to say what a surface owes: the trailing slot of a sidebar note row, the bottom bar beside the save readout. It is a distinct class from an ordinary **icon**, which names a thing, and `docs/design/README.md` carves two of the icon rules out for it rather than bending them: it is drawn at 12px rather than 16 and up, because at 16 in a row's trailing slot it reads as a badge attached to the note rather than as a mark on it; and it is coloured by MEANING (`--accent` while work is in flight, `--fg-3` while it is merely outstanding) rather than by `currentColor`.
 
-The class exists so a second member argues for itself against the same rules rather than re-deciding them. Today it has exactly one: [sync arc](#sync-arc). A mark is never a live region. It has no text content, so `role="status"` on it announces nothing, and the surface renders a persistently-mounted visually-hidden region beside it instead.
+The class used to carve out a third rule, hand-drawn geometry at 7 to 8px, on the argument that no Lucide pair distinguishes a filled dot from a hollow one at that size. The premise held and the conclusion did not: what shipped under it was a three-quarter ring that read as a stalled spinner, and then a solid triangle that read as a bullet point down a column of rows. The answer to "no glyph is legible at 7px" is not a cleverer glyph but a larger one (myne-md/myne#603).
 
-Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`
+Two rules govern which mark is which. **One shape per fact**: two facts may not share a glyph, which is the report that created this class in the first place. **Motion is a state, never a shape**: rotation is shown only for work that ends, and two states are never told apart by rotation alone, since a distinction visible only to someone watching the screen is not a distinction.
+
+A mark is never a live region. It has no text content, so `role="status"` on it announces nothing, and the surface renders a persistently-mounted visually-hidden region beside it instead.
+
+Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx` (`StatusMark`)
 
 ### **inline tag** &nbsp; 📦 *Product*
 
@@ -2051,6 +2055,22 @@ The one assertion suite that pins the behaviour of the [platform seam](#platform
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
 
+### **save readout** &nbsp; 📦 *Product*
+
+The bottom-bar line that says what the current window owes the open note (myne-md/myne#566, reshaped by myne-md/myne#603). Five states, each with its own glyph, so the state is readable without reading the words:
+
+- **`Saved · N min ago`**: a solid dot. Settled, nothing owed.
+- **`Editing…`**: `circle-dashed`, still. Written and not yet saved: autosave is armed. The state a whole writing session is spent in, which is why it does not move.
+- **`Saving…`**: `loader-circle`, turning, in `--accent`. A disk write, which ends.
+- **`Resolving edit conflict…`**: the same turning `loader-circle`. A conflict copy is being written; it also ends.
+- **`Save failed · Retry`**: a cross, in `--warning`, with a retry control.
+
+It carried a **sixth, unrelated** fact until #603: whether the note had reached the server. That was drawn with the same glyph as `Editing…`, a pixel to its right, so the readout showed two identical grey marks meaning two different things. Sync debt is its own axis and has its own icon, the [unsynced mark](#unsynced-mark).
+
+Three of the five are [inline status marks](#inline-status-mark); `Saved` and `Save failed` are not, because neither is a degree of progress.
+
+Used in: `src/components/Spinner.tsx`, `src/notes/components/SaveStatus.tsx`
+
 ### **search index** &nbsp; 📦 *Product*
 
 Myne's full-text search over note content (MYND-29). A custom in-memory **BM25 inverted index** (AND-of-terms with a last-term prefix match for type-ahead, plus a title-boost) built from decrypted note plaintext while the vault is unlocked, queried in RAM, and persisted as the encrypted `vault.search` blob. Index-side, each note's language is detected (whatlang, EN/TR/DE) and single-stemmed (the raw token is always indexed too); query-side, terms are multi-stemmed across all supported languages (the query is too short to detect a language) — a deliberate index/query asymmetry. The index is **plaintext-derived RAM**, as sensitive as the open notes: zeroized on lock (`threat-model.md` A6), and never the source of truth (the `.myn` files are). Engine choice sits behind a swappable trait; the MYND-29 benchmark (`decisions.md` 2026-05-31) selected the custom engine over tantivy on the budget table. See also [search-index-key](#search-index-key), [fall-to-rebuild](#fall-to-rebuild).
@@ -2314,17 +2334,9 @@ Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships m
 
 Used in: `threat-model.md` §1 (A8), §7
 
-### **sync arc** &nbsp; 📦 *Product*
+### **sync arc** &nbsp; 📦 *Product* *(retired 2026-08-29; see decisions.md)*
 
-The three-state glyph that says whether Myne owes the note anything (myne-md/myne#566). One shape vocabulary in two places: beside the save readout in the bottom bar, and trailing an unsynced row in the sidebar.
-
-- **solid dot**: settled. Nothing is owed.
-- **static arc**: outstanding, and nothing is moving on it. An edit waiting on a device that is offline is this, and so is text waiting on the autosave debounce.
-- **rotating arc**: in flight, and bounded. A disk write, a push. Never a state a user can sit in, because `docs/design/README.md` bans looping animation and a calm product does not spin at someone while they write.
-
-The gap in the ring is what carries "incomplete" while the arc stands still, which is what a 6px filled dot and a 6px hollow one could not do: at that size they are the same glyph. Two independent facts drive it and are deliberately not merged. Whether the marker is SHOWN comes from the note's own sync debt, and whether it TURNS comes from whether the device is moving bytes this second. Rotating on the first alone would claim work is in flight whenever a laptop is shut.
-
-Used in: `src/components/Spinner.tsx`, `src/notes/components/SaveStatus.tsx`, `src/notes/components/NoteRow.tsx`
+*Retired by myne-md/myne#603. It named one glyph doing two jobs: what the current window owed a note, and whether that note had reached the server. Drawn as a three-quarter ring at 7 to 8px, it did neither legibly, and on the `Editing…` readout it drew both facts as two identical marks a pixel apart. The two facts now have their own names and their own icons, the [save readout](#save-readout) and the [unsynced mark](#unsynced-mark). Preserved for audit trail.*
 
 ### **sync cursor** &nbsp; 📋 *Protocol*
 
@@ -2674,6 +2686,16 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-17 (MYND-348)
 ### **unused attachment** &nbsp; 📋 *Protocol*
 
 An [attachment](#attachment) referenced by **zero live notes** — either orphaned (its referencing note(s) deleted) or never inserted (imported into the library but not yet embedded). It stays in the [`vault.attachments`](#vaultattachments) catalog and visible in the library (Myne is library-first; `protocol.md` §9.10 keeps metadata after note deletion); it is **never** auto-deleted. The only thing that removes it is the explicit user-triggered "Clean unused attachments" sweep, which recomputes the zero-reference set authoritatively (scanning every note, fail-closed) and cryptographically erases the confirmed set. Distinct from a [stray attachment file](#stray-attachment-file) (catalog-less crash remnant). (MYND-171; `decisions.md` 2026-06-13)
+
+### **unsynced mark** &nbsp; 📦 *Product*
+
+The [inline status mark](#inline-status-mark) that says a note's current bytes have not reached the server: `cloud-off`, a cloud with a corner-to-corner slash, at the trailing edge of a sidebar note row and after the [save readout](#save-readout) in the bottom bar (myne-md/myne#603).
+
+It **depicts the sentence**, and after three attempts that is the whole of the lesson. It was a hollow 6px ring, which at that size is the same glyph as a dot. It became the save readout's own three-quarter arc, which put two identical grey marks a pixel apart on the `Editing…` readout meaning two different things. It became a solid 8px triangle, which was at least distinct and depicted nothing, so down a column of sidebar rows it read as a bullet point. Each of the three was hand-drawn geometry small enough to be unlearnable; the fix was a named icon at a size where an icon works.
+
+It **never moves and is never `--accent`**, unlike the readout's own marks. There is no bounded in-flight variant of it to express: a note can sit unsynced for a week on a machine that is shut, so motion and the accent colour both stay with the save readout, where the work ends.
+
+Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`, `src/notes/components/NoteRow.tsx`, `src/notes/components/SaveStatus.tsx`
 
 ### **UUIDv4** &nbsp; 📋 *Protocol*
 

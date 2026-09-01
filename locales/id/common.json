@@ -1171,10 +1171,6 @@
       "turnedIntoTemplate": "Dijadikan templat",
       "convertedToNote": "Diubah menjadi catatan",
       "versionHistory": "Riwayat versi",
-      "exportMarkdown": "Ekspor sebagai Markdown…",
-      "exportPdf": "Ekspor sebagai PDF…",
-      "exportHtml": "Ekspor sebagai HTML…",
-      "exportTxt": "Ekspor sebagai Teks Biasa…",
       "trash": "Pindahkan ke Sampah"
     },
     "codeBlock": {
@@ -2041,10 +2037,6 @@
       "duplicate": "Duplikat",
       "editFilterTitle": "Sunting filter",
       "emptyState": "Belum ada catatan.",
-      "exportHtml": "Ekspor sebagai HTML…",
-      "exportMarkdown": "Ekspor sebagai Markdown…",
-      "exportPdf": "Ekspor sebagai PDF…",
-      "exportTxt": "Ekspor sebagai Teks Biasa…",
       "favoritesHeading": "Favorit",
       "icon": "Ikon…",
       "mergeAnyway": "Tetap gabung",
@@ -2350,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "Default"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Ekspor…",
+      "txt": "Teks biasa"
     }
   },
   "password": {
