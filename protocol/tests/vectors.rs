@@ -670,6 +670,17 @@ fn phrase_normalize_vectors() {
 fn assert_distinct_prefs_nonces(cases: &[serde_json::Value]) {
     /// The three pairs that already collided, keyed by the LATER case's id. Each
     /// entry is debt: remove it when that case is re-minted onto a free nonce.
+    ///
+    /// **Removing an entry is a PAIRED change across two repositories, and
+    /// nothing enforces the ordering.** The re-mint happens in
+    /// `myne-test-vectors` (a new nonce, a new blob, a new `expected_*_hex`) and
+    /// the deletion happens here, so doing either alone turns this test red:
+    /// delete first and the collision is still in the companion's cases; re-mint
+    /// first and this list names a collision that no longer exists, which the
+    /// stale-entry half of this check refuses. Stated because the whole point of
+    /// the ratchet is that whoever pays the debt down is a later reader, and a
+    /// later reader has no other way to learn that the two edits belong
+    /// together.
     const KNOWN_COLLISIONS: &[(&str, &str)] = &[
         (
             "vault-prefs/v0.1/encrypt-ai-provider",
