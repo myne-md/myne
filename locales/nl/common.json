@@ -260,7 +260,7 @@
       "title": "Bijlagen",
       "transcribeDone": "Transcriptie voltooid.",
       "transcribeFailed": "Transcriptie mislukt. Probeer het opnieuw.",
-      "transcribeTooLong": "Deze opname is te lang om te transcriberen.",
+      "transcribeTooLong": "Deze opname is te lang om te transcriberen. De audio blijft bijgevoegd, dus je kunt hem nog afspelen.",
       "transcribeFeatureOff": "Spraak-naar-tekst staat uit. Schakel het in via Instellingen → Transcriptie.",
       "transcribeModelLoadFailed": "Het spraak-naar-tekstmodel kon niet worden geladen. Installeer Myne opnieuw, of controleer je eigen model in Instellingen → Developer → AI.",
       "transcribeNoModelHint": "Het spraak-naar-tekstmodel ontbreekt. Myne opnieuw installeren herstelt het.",
@@ -1830,7 +1830,9 @@
       "moveCollision": "Daar bestaat al een map met die naam.",
       "unsettledSave": "Een geopende notitie is nog niet klaar met opslaan, dus de map is ongemoeid gelaten. Probeer het opnieuw zodra dat klaar is.",
       "renameFailed": "Kon de map niet hernoemen, dus die is ongewijzigd gebleven.",
-      "deliberateWriteFailed": "De map is hernoemd, maar een van de instellingen kon niet worden opgeslagen. Elke keer dat je ontgrendelt, verschijnt er weer een lege map onder de oude naam; die verwijderen is veilig en verandert verder niets. De map opnieuw hernoemen ruimt hem niet op."
+      "deliberateWriteFailed": "De map is hernoemd, maar een van de instellingen kon niet worden opgeslagen. Elke keer dat je ontgrendelt, verschijnt er weer een lege map onder de oude naam; die verwijderen is veilig en verandert verder niets. De map opnieuw hernoemen ruimt hem niet op.",
+      "folderListFull": "Myne kan een beperkt aantal mappen onthouden, en die lijst is vol. Deze map werkt gewoon, maar hij verdwijnt zodra de laatste notitie eruit gaat. Een map verwijderen die je niet meer nodig hebt, maakt weer ruimte.",
+      "folderNotRemembered": "De map is aangemaakt, maar Myne kon hem niet vastleggen. Hij verdwijnt zodra de laatste notitie eruit gaat, en bij de volgende ontgrendeling is hij weg als hij dan nog leeg is. Hem opnieuw aanmaken is veilig."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne mocht dit bestand niet lezen.",
         "reasonNotFound": "Dit bestand was al weg tegen de tijd dat Myne erbij kwam.",
         "reasonNoSpace": "Dit apparaat had geen ruimte meer.",
-        "reasonUnknown": "Myne kon niet zeggen waarom."
+        "reasonUnknown": "Myne kon niet zeggen waarom.",
+        "foldersNotKeptNote": "{{count}} verdwijnt zodra de laatste notitie eruit gaat",
+        "foldersNotKeptNote_one": "{{count}} verdwijnt zodra de laatste notitie eruit gaat",
+        "foldersNotKeptNote_other": "{{count}} verdwijnen zodra hun laatste notitie eruit gaat",
+        "statFoldersNotKept": "Mappen niet behouden"
       },
       "offer": {
         "body": "Breng je bestaande notities naar Myne. Elke notitie wordt versleuteld zodra die wordt geïmporteerd. Niets verlaat dit apparaat en je originele bestanden blijven precies waar ze zijn.",
@@ -2021,7 +2027,52 @@
           "survives": "Wordt één notitie die de tabel bevat.",
           "loses": "Het wordt één notitie, niet één notitie per rij: Myne is geen database. Heel brede of heel lange bestanden worden ingekort, en het importrapport vermeldt met hoeveel.",
           "short": "Eén spreadsheetbestand"
+        },
+        "myne": {
+          "label": "Myne-kluis",
+          "loses": "Versiegeschiedenis, verwijderde notities en sjablonen blijven in de bronkluis. Bijlagen die door geen enkele geïmporteerde notitie worden gebruikt, blijven achter. De bronkluis wordt niet gewijzigd en blijft synchroniseren als je hem synchroniseert.",
+          "pickerTitle": "Kies de kluis om uit te importeren",
+          "short": "Een andere kluis op dit apparaat",
+          "survives": "Notities, mappen, tags, links tussen de notities die je importeert, en de bijlagen die in die notities worden gebruikt. Woorden die je aan het woordenboek van de bronkluis hebt toegevoegd, komen ook mee."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "De versiegeschiedenis blijft in de kluis waaruit je hebt geïmporteerd.",
+          "sourceUnchanged": "De kluis waaruit je hebt geïmporteerd, is niet gewijzigd. Als je hem synchroniseert, blijft hij synchroniseren."
+        },
+        "errors": {
+          "alreadyOpen": "Die kluis is al geopend voor een import. Rond die import eerst af of annuleer hem.",
+          "busy": "Er is een andere kluisbewerking bezig. Wacht tot die klaar is en probeer het opnieuw.",
+          "credential": "Dat wachtwoord of die herstelzin opende de kluis niet. Controleer het en probeer het opnieuw."
+        },
+        "importLabel": "Geef deze import een naam",
+        "importLabelHint": "Als een notitie die je importeert dezelfde naam heeft als een notitie die je al hebt, en iets wat je importeert ernaar linkt, krijgt de geïmporteerde notitie hiermee een nieuwe naam. Gebruik dezelfde naam als je deze import opnieuw uitvoert, dan wordt er niets twee keer binnengehaald.",
+        "importLabelIllegal": "Die naam kan niet worden gebruikt: een notitienaam mag geen \\ / | # ^ [ ] bevatten en niet met een spatie beginnen of eindigen.",
+        "loading": "Je andere kluizen zoeken…",
+        "noOtherVaults": "Er staan op dit apparaat geen andere kluizen om uit te importeren. Herstel eerst een back-up; die wordt dan een kluis waaruit je hier kunt importeren.",
+        "opening": "Openen…",
+        "passwordLabel": "Het wachtwoord van die kluis",
+        "phraseLabel": "De herstelzin van 24 woorden van die kluis",
+        "report": {
+          "attachmentsCrossed": "Bijlagen meegekomen",
+          "attachmentsDeduped": "Bijlagen die je al had",
+          "attachmentsFailed": "Bijlagen die de kluis niet accepteerde",
+          "dictionaryUnreadable": "Het woordenboek van de bronkluis kon niet worden gelezen, dus er zijn geen woorden meegekomen.",
+          "dictionaryWordsAdded": "Woordenboekwoorden meegekomen",
+          "linksLeftUnresolved": "Links die nergens naartoe gericht konden worden",
+          "linksRetargeted": "Links omgeleid naar een hernoemde notitie",
+          "templatesLeftBehind": "Sjablonen, achtergelaten",
+          "tombstonedEmbeds": "Ingesloten bestanden die in de bron al waren verwijderd",
+          "trashedLeftBehind": "Notities in de prullenbak van de bronkluis, achtergelaten",
+          "untitledImported": "Naamloze notities meegekomen"
+        },
+        "unnamedVault": "Kluis {{n}}",
+        "usePassword": "In plaats daarvan het wachtwoord gebruiken",
+        "usePhrase": "In plaats daarvan de herstelzin gebruiken",
+        "vaultLabel": "Importeren uit",
+        "vaultPlaceholder": "Kies een kluis",
+        "wordAria": "Woord {{number}} van 24"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Herstel geannuleerd: de kluis was vergrendeld.",
       "operationInProgress": "Er is een bewerking bezig. Even geduld.",
       "unexpected": "Onverwachte fout. Probeer het opnieuw.",
-      "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op."
+      "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op.",
+      "openAsImportSource": "Deze kluis wordt op dit moment door een import gelezen. Rond die import af of annuleer hem, en herstel daarna deze kluis."
     },
     "vaultUnreadable": "Kluisbestand is onleesbaar. Herstel vanuit een back-up.",
     "genericError": "Er is iets misgegaan. Probeer het opnieuw.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Grafiek openen"
     },
     "archive": {
-      "helper": "Laat notities naar een archief verplaatsen, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar zijn map en verbergt de archiefknoppen.",
+      "helper": "Laat notities naar een archief verplaatsen, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar zijn map, dearchiveert elke gearchiveerde map en verbergt de archiefknoppen. Het geldt voor de hele kluis, op elk apparaat.",
       "label": "Archiveren",
       "off": "Uit",
       "on": "Aan",
@@ -3109,7 +3161,8 @@
       "torLabel": "Synchronisatie via Tor leiden"
     },
     "prefs": {
-      "saveError": "De voorkeur kon niet worden opgeslagen. Probeer het opnieuw."
+      "saveError": "De voorkeur kon niet worden opgeslagen. Probeer het opnieuw.",
+      "folderListFull": "Die mappenlijst is vol. Verwijder er een map uit voordat je er nog een toevoegt."
     },
     "reminders": {
       "aria": "Taakherinneringen op dit apparaat tonen",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "Op een apparaat met een bruikbare sleutelhanger toont de kluiskiezer de naam van een kluis zodra dit apparaat hem heeft ontgrendeld. Met deze optie aan toont elke kluis in plaats daarvan een tijdelijke aanduiding zoals Kluis 2, en dat nummer blijft bij de kluis, hoe de lijst ook wordt geordend.",
       "hideVaultNamesErases": "Als je dit aanzet, worden de sleutels vernietigd die de hier opgeslagen namen leesbaar maken, zodat die namen op dit apparaat niet meer te herstellen zijn, en er wordt geen nieuwe naam meer weggeschreven zolang dit aan blijft.",
       "hideVaultNamesResidue": "Het kan geen eerder gemaakte kopie bereiken: een volledige systeemback-up, een schijfkopie of elke andere kopie van deze schijf op systeemniveau die is gemaakt terwijl de namen zichtbaar waren, bevat zowel de opgeslagen namen als hun sleutels.",
-      "hideVaultNamesUnavailable": "Dit apparaat heeft geen bruikbare sleutelhanger, dus Myne slaat hier geen kluisnaam op en deze optie kan niet worden aangezet. De kiezer toont al voor elke kluis een tijdelijke aanduiding.",
+      "hideVaultNamesUnavailable": "In deze installatie van de app kan Myne geen kluisnamen opslaan, dus worden ze hier niet opgeslagen en kan deze optie niet worden aangezet. De kiezer toont al voor elke kluis een tijdelijke aanduiding.",
       "hideVaultNamesErrorRead": "Kon de huidige instelling niet lezen. Gebruik de schakelaar om die opnieuw in te stellen.",
       "hideVaultNamesErrorSave": "Kon de instelling niet opslaan, dus die is ongewijzigd. Als je hem aanzette, zijn sommige opgeslagen namen mogelijk al vernietigd; zet hem opnieuw aan om dat af te ronden.",
       "hideVaultNamesErrorErase": "Eén opgeslagen naam kon niet worden vernietigd. De instelling staat daarom nog uit, in plaats van te beweren dat er iets gewist is wat niet gebeurd is. Probeer het opnieuw.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 u",
       "quickUnlockSubtitleAndroid": "Opnieuw invoeren met een PIN na automatisch vergrendelen",
-      "quickUnlockSubtitle": "Opnieuw invoeren met {{method}} of een PIN na automatisch vergrendelen"
+      "quickUnlockSubtitle": "Opnieuw invoeren met {{method}} of een PIN na automatisch vergrendelen",
+      "screenCaptureOverrideHelper": "Schakelt de bescherming tegen schermopname alleen op dit apparaat uit, zowel voordat je een kluis ontgrendelt als daarna. Zet dit aan als een schermvergroter, software voor extern bureaublad of iemand die je op afstand helpt een zwart venster ziet. Deze instelling wordt niet gesynchroniseerd.",
+      "screenCaptureOverrideLabel": "Schermopname op dit apparaat toestaan",
+      "screenCaptureOverrideUnknown": "De schermopname-instelling van dit apparaat kon niet worden gelezen, dus deze voorkeur wordt niet toegepast. Open Instellingen opnieuw om het nog eens te proberen.",
+      "screenCaptureSuperseded": "Uit op dit apparaat. Zie “Schermopname op dit apparaat toestaan” hieronder. Deze voorkeur blijft bewaard en geldt weer zodra je die optie uitzet.",
+      "screenCaptureSupersededByFlag": "Uit voor deze sessie, omdat Myne is gestart met --disable-screen-capture-protection. Deze voorkeur blijft bewaard en geldt weer de volgende keer dat je Myne zonder die optie opent."
     },
     "quickUnlock": {
       "errorBusy": "Er is een andere kluisbewerking bezig. Probeer het zo opnieuw.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "nieuwe notitie locatie map standaard waar notities aangemaakt new note folder default",
         "torRouting": "tor routering onion proxy netwerk ip-adres locatie verbergen synchronisatie anonimiteit routing",
         "quickUnlock": "snel ontgrendelen pin touch id biometrisch gezicht face unlock",
-        "reminders": "herinneringen melden melding notificatie waarschuwing taak vervaldatum herinneren reminders",
+        "reminders": "herinneringen melden melding notificatie waarschuwing taak vervaldatum herinneren horizon registratie dagen vooruit reminders",
         "realtimeSync": "realtime synchronisatie live verbinding aanwezigheid polling sync",
         "screenCapture": "schermopname bescherming schermafbeelding screenshot opname blokkeren privacy",
         "showEditTimes": "bewerktijden tijdstempels gewijzigd datums notities tonen timestamps",
@@ -3402,7 +3460,8 @@
         "timeFormat": "tijdnotatie tijd notatie 24-uurs 12-uurs klok am pm time format 24 hour 12 hour",
         "timezone": "tijdzone zone tz utc iana regio vandaag timezone time zone",
         "periodicNotes": "periodieke notities wekelijks maandelijks week maand map sjabloon opmaak",
-        "aiHistoryBudget": "gesprek geschiedenis context geheugen budget tekens agent chat verzoek"
+        "aiHistoryBudget": "gesprek geschiedenis context geheugen budget tekens agent chat verzoek",
+        "screenCaptureOverride": "schermopname negeren toestaan uitschakelen schermvergroter vergrootglas extern bureaublad remote desktop toegankelijkheid vergrendelscherm ontgrendelen zwart scherm screen capture"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24-uurs",
       "time12": "12-uurs",
       "zoneLabel": "Tijdzone",
-      "zoneHelper": "Welke zone bepaalt wat als vandaag telt. Laat leeg om dit apparaat te volgen. Tijden die je in een notitie schrijft, worden nooit gewijzigd; 09:00 blijft overal 09:00.",
+      "zoneHelper": "Welke zone bepaalt wat als vandaag telt, en dus welke notitie je dagelijkse, wekelijkse en maandelijkse notities openen. Laat leeg om dit apparaat te volgen. De keuze geldt per apparaat: geen enkel ander apparaat overschrijft hem, dus een afwijkende instelling kan dit apparaat op een andere dag zetten dan je andere apparaten. Tijden die je in een notitie schrijft, worden nooit gewijzigd; 09:00 blijft overal 09:00.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kent die tijdzone niet. Gebruik een naam als Europe/Berlin.",
       "errorSave": "Kon die instelling niet opslaan."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Deze kluis heeft {{required}} MiB geheugen nodig om te openen, meer dan deze browser kan geven ({{available}} MiB). Er is niets mis met de kluis; open hem in de Myne-desktopapp.",
       "unexpected": "Onverwachte fout. Probeer het opnieuw.",
       "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op.",
-      "vaultUpgraded": "Deze kluis is bijgewerkt naar een nieuwere indeling die deze versie van Myne nog niet ondersteunt. Er is niets mis met je gegevens. Werk Myne bij naar de nieuwste versie om hem te openen."
+      "vaultUpgraded": "Deze kluis is bijgewerkt naar een nieuwere indeling die deze versie van Myne nog niet ondersteunt. Er is niets mis met je gegevens. Werk Myne bij naar de nieuwste versie om hem te openen.",
+      "openAsImportSource": "Deze kluis wordt op dit moment door een import gelezen. Rond die import af of annuleer hem, en ontgrendel daarna deze kluis."
     },
     "passwordLabel": "Wachtwoord",
     "passwordPlaceholder": "Wachtwoord",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Deze browser biedt geen cryptografische bron van willekeurige getallen."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Bescherming tegen schermopname vraagt het besturingssysteem om dit venster buiten schermafbeeldingen en schermopnamen te houden. Ze werkt op Windows 10 (mei 2020-update) en later; macOS en Linux bieden hiervoor geen systeem-API, dus daar kan opname niet worden geblokkeerd. Waar ze wel werkt, houdt ze het venster onder meer verborgen voor software voor extern bureaublad en voor schermvergroters, en daarom bestaat deze uitweg.",
+    "disableConfirm": "Bescherming uitschakelen",
+    "disableCost": "Uitschakelen geldt alleen op dit apparaat, en de bescherming blijft uit totdat je ze weer inschakelt, zowel voordat je een kluis ontgrendelt als daarna. Er wordt niets verstuurd en er verandert geen kluisinstelling, maar de keuze wordt opgeslagen in een instellingenbestand op dit apparaat, en dat bestand blijft daar staan nadat je de bescherming weer inschakelt.",
+    "disableTitle": "Bescherming tegen schermopname uitschakelen?",
+    "disableTrigger": "Bescherming tegen schermopname uitschakelen",
+    "flagNotice": "Deze sessie is gestart met --disable-screen-capture-protection, dus de bescherming blijft uit totdat je afsluit, wat deze instelling ook zegt.",
+    "restoreBody": "Bescherming tegen schermopname staat uit op dit apparaat. Als je ze weer inschakelt, wordt het besturingssysteem opnieuw gevraagd om dit venster buiten schermafbeeldingen en schermopnamen te houden, waardoor het op Windows 10 (mei 2020-update) en later ook verborgen blijft voor software voor extern bureaublad en voor schermvergroters. Op macOS en Linux is hiervoor geen systeem-API, dus daar kan opname niet worden geblokkeerd.",
+    "restoreConfirm": "Bescherming inschakelen",
+    "restoreTitle": "Bescherming tegen schermopname weer inschakelen?",
+    "restoreTrigger": "Bescherming tegen schermopname inschakelen",
+    "saveFailed": "Dat kon niet worden opgeslagen, dus er is niets gewijzigd. Probeer het opnieuw, of start Myne met --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Opgeslagen. In deze sessie blijft de bescherming uit omdat de sessie is gestart met --disable-screen-capture-protection, dus ze komt terug de volgende keer dat je Myne zonder die optie opent."
   }
 }

@@ -286,7 +286,7 @@
       "title": "Atașamente",
       "transcribeDone": "Transcriere finalizată.",
       "transcribeFailed": "Transcrierea a eșuat. Te rugăm să încerci din nou.",
-      "transcribeTooLong": "Această înregistrare este prea lungă pentru a fi transcrisă.",
+      "transcribeTooLong": "Această înregistrare este prea lungă pentru a fi transcrisă. Fișierul audio rămâne atașat, așa că îl poți reda în continuare.",
       "transcribeFeatureOff": "Funcția vorbire în text este dezactivată. Activeaz-o din Setări → Transcriere.",
       "transcribeModelLoadFailed": "Modelul de transcriere nu a putut fi încărcat. Reinstalează Myne sau verifică modelul personalizat din Setări → Developer → AI.",
       "transcribeNoModelHint": "Modelul de transcriere lipsește. Reinstalarea aplicației Myne îl restaurează.",
@@ -1900,7 +1900,9 @@
       "moveCollision": "Acolo există deja un folder cu acel nume.",
       "unsettledSave": "O notă deschisă nu a terminat de salvat, așa că folderul a rămas neatins. Încearcă din nou după ce termină.",
       "renameFailed": "Nu s-a putut redenumi folderul, așa că a rămas neschimbat.",
-      "deliberateWriteFailed": "Folderul a fost redenumit, dar una dintre setările lui nu a putut fi salvată. De fiecare dată când deblochezi, un folder gol va reapărea sub numele vechi; îl poți șterge în siguranță și nu se schimbă nimic altceva. O nouă redenumire a folderului nu îl va elimina."
+      "deliberateWriteFailed": "Folderul a fost redenumit, dar una dintre setările lui nu a putut fi salvată. De fiecare dată când deblochezi, un folder gol va reapărea sub numele vechi; îl poți șterge în siguranță și nu se schimbă nimic altceva. O nouă redenumire a folderului nu îl va elimina.",
+      "folderListFull": "Myne poate reține un număr limitat de foldere, iar acea listă este plină. Acest folder funcționează în continuare, dar va dispărea când ultima lui notă îl părăsește. Ștergerea unui folder de care nu mai ai nevoie face loc.",
+      "folderNotRemembered": "Folderul a fost creat, dar Myne nu l-a putut înregistra. Va dispărea când ultima lui notă îl părăsește, iar dacă este încă gol, dispare la următoarea deblocare. Îl poți crea din nou în siguranță."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -2050,7 +2052,12 @@
         "reasonPermissionDenied": "Myne nu a avut permisiunea de a citi acest fișier.",
         "reasonNotFound": "Acest fișier dispăruse până să ajungă Myne la el.",
         "reasonNoSpace": "Acest dispozitiv a rămas fără spațiu.",
-        "reasonUnknown": "Myne nu a putut spune de ce."
+        "reasonUnknown": "Myne nu a putut spune de ce.",
+        "foldersNotKeptNote": "{{count}} vor dispărea când ultima lor notă le părăsește",
+        "foldersNotKeptNote_few": "{{count}} vor dispărea când ultima lor notă le părăsește",
+        "foldersNotKeptNote_one": "{{count}} va dispărea când ultima lui notă îl părăsește",
+        "foldersNotKeptNote_other": "{{count}} vor dispărea când ultima lor notă le părăsește",
+        "statFoldersNotKept": "Foldere nepăstrate"
       },
       "offer": {
         "body": "Adu-ți notele existente în Myne. Fiecare este criptată pe măsură ce este importată. Nimic nu părăsește acest dispozitiv, iar fișierele tale originale rămân exact unde sunt.",
@@ -2097,7 +2104,52 @@
           "survives": "Devine o singură notă care conține tabelul.",
           "loses": "Este o singură notă, nu câte o notă pe rând: Myne nu este o bază de date. Fișierele cu foarte multe coloane sau foarte multe rânduri sunt trunchiate, iar raportul de import spune cu cât.",
           "short": "Un singur fișier de tip foaie de calcul"
+        },
+        "myne": {
+          "label": "Seif Myne",
+          "loses": "Istoricul versiunilor, notele șterse și șabloanele rămân în seiful sursă. Atașamentele pe care nu le folosește nicio notă importată sunt lăsate în urmă. Seiful sursă nu este modificat și, dacă îl sincronizezi, continuă să se sincronizeze.",
+          "pickerTitle": "Alege seiful din care să imporți",
+          "short": "Un alt seif de pe acest dispozitiv",
+          "survives": "Notele, folderele, etichetele, legăturile dintre notele pe care le imporți și atașamentele folosite de acele note. Vin și cuvintele pe care le-ai adăugat în dicționarul seifului sursă."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Istoricul versiunilor rămâne în seiful din care ai importat.",
+          "sourceUnchanged": "Seiful din care ai importat nu a fost modificat. Dacă îl sincronizezi, continuă să se sincronizeze."
+        },
+        "errors": {
+          "alreadyOpen": "Acel seif este deja deschis pentru un import. Finalizează sau anulează mai întâi acel import.",
+          "busy": "O altă operațiune asupra seifului este în curs. Așteaptă să se termine și încearcă din nou.",
+          "credential": "Acea parolă sau frază de recuperare nu a deschis seiful. Verific-o și încearcă din nou."
+        },
+        "importLabel": "Denumește acest import",
+        "importLabelHint": "Dacă o notă pe care o imporți are același nume cu una pe care o ai deja, iar ceva din ce imporți face legătură către ea, nota importată este redenumită cu acest text. Păstrează același nume dacă rulezi din nou acest import și nimic nu va fi adus de două ori.",
+        "importLabelIllegal": "Acel nume nu poate fi folosit: un nume de notă nu poate conține \\ / | # ^ [ ] și nu poate începe sau se termina cu un spațiu.",
+        "loading": "Se caută celelalte seifuri ale tale…",
+        "noOtherVaults": "Nu există alte seifuri pe acest dispozitiv din care să imporți. Restaurează mai întâi o copie de rezervă, iar aceasta devine un seif din care poți importa aici.",
+        "opening": "Se deschide…",
+        "passwordLabel": "Parola acelui seif",
+        "phraseLabel": "Fraza de recuperare din 24 de cuvinte a acelui seif",
+        "report": {
+          "attachmentsCrossed": "Atașamente aduse",
+          "attachmentsDeduped": "Atașamente pe care le aveai deja",
+          "attachmentsFailed": "Atașamente pe care seiful nu le-a acceptat",
+          "dictionaryUnreadable": "Dicționarul seifului sursă nu a putut fi citit, așa că niciun cuvânt nu a fost adus.",
+          "dictionaryWordsAdded": "Cuvinte de dicționar aduse",
+          "linksLeftUnresolved": "Legături care nu au putut fi îndreptate nicăieri",
+          "linksRetargeted": "Legături îndreptate către o notă redenumită",
+          "templatesLeftBehind": "Șabloane, lăsate în urmă",
+          "tombstonedEmbeds": "Elemente încorporate al căror fișier era deja șters în sursă",
+          "trashedLeftBehind": "Note din Coșul seifului sursă, lăsate în urmă",
+          "untitledImported": "Note fără titlu aduse"
+        },
+        "unnamedVault": "Seif {{n}}",
+        "usePassword": "Folosește în schimb parola",
+        "usePhrase": "Folosește în schimb fraza de recuperare",
+        "vaultLabel": "Importă din",
+        "vaultPlaceholder": "Alege un seif",
+        "wordAria": "Cuvântul {{number}} din 24"
       }
     },
     "list": {
@@ -2515,7 +2567,8 @@
       "cancelledVaultLocked": "Recuperare anulată: seiful a fost blocat.",
       "operationInProgress": "Operațiune în curs. Te rugăm să aștepți.",
       "unexpected": "Eroare neașteptată. Te rugăm să încerci din nou.",
-      "vaultNotFound": "Fișierul seifului nu a fost găsit. Te rugăm să repornești aplicația."
+      "vaultNotFound": "Fișierul seifului nu a fost găsit. Te rugăm să repornești aplicația.",
+      "openAsImportSource": "Un import citește chiar acum acest seif. Finalizează sau anulează acel import, apoi recuperează acest seif."
     },
     "vaultUnreadable": "Fișierul seifului nu poate fi citit. Restaurează dintr-o copie de rezervă.",
     "genericError": "Ceva nu a mers bine. Te rugăm să încerci din nou.",
@@ -2756,7 +2809,7 @@
       "openGraph": "Deschide graficul"
     },
     "archive": {
-      "helper": "Permite mutarea notelor într-o Arhivă, ținută în afara listei principale. Dezactivarea acestei opțiuni readuce fiecare notă arhivată în folderul ei și ascunde controalele arhivei.",
+      "helper": "Permite mutarea notelor într-o Arhivă, ținută în afara listei principale. Dezactivarea acestei opțiuni readuce fiecare notă arhivată în folderul ei, dezarhivează fiecare folder arhivat și ascunde controalele arhivei. Se aplică întregului seif, pe fiecare dispozitiv.",
       "label": "Arhivare",
       "off": "Dezactivat",
       "on": "Activat",
@@ -3215,7 +3268,8 @@
       "torLabel": "Rutează sincronizarea prin Tor"
     },
     "prefs": {
-      "saveError": "Preferința nu a putut fi salvată. Încearcă din nou."
+      "saveError": "Preferința nu a putut fi salvată. Încearcă din nou.",
+      "folderListFull": "Acea listă de foldere este plină. Elimină un folder din ea înainte de a adăuga altul."
     },
     "reminders": {
       "aria": "Arată mementourile pentru sarcini pe acest dispozitiv",
@@ -3240,7 +3294,7 @@
       "hideVaultNamesHelper": "Pe un dispozitiv cu un keychain utilizabil, selectorul de seifuri afișează numele unui seif după ce acest dispozitiv l-a deblocat. Cu această opțiune activată, fiecare seif afișează în schimb un substituent, precum Seif 2, iar acel număr rămâne al seifului, oricum s-ar reordona lista.",
       "hideVaultNamesErases": "Activarea ei distruge cheile care fac lizibile numele stocate aici, așa că acele nume nu mai pot fi recuperate pe acest dispozitiv și niciun alt nume nu mai este scris cât timp rămâne activată.",
       "hideVaultNamesResidue": "Nu poate ajunge la o copie făcută mai devreme: o copie de rezervă a întregului sistem, o imagine de disc sau orice altă copie la nivel de sistem a acestui disc, realizată cât timp numele erau afișate, conține atât numele stocate, cât și cheile lor.",
-      "hideVaultNamesUnavailable": "Acest dispozitiv nu are un keychain utilizabil, așa că Myne nu stochează aici niciun nume de seif, iar această opțiune nu poate fi activată. Selectorul afișează deja un substituent pentru fiecare seif.",
+      "hideVaultNamesUnavailable": "Myne nu poate stoca nume de seifuri în această copie a aplicației, așa că nu stochează niciunul aici, iar această opțiune nu poate fi activată. Selectorul afișează deja un substituent pentru fiecare seif.",
       "hideVaultNamesErrorRead": "Setarea curentă nu a putut fi citită. Comută din nou opțiunea pentru a o seta.",
       "hideVaultNamesErrorSave": "Setarea nu a putut fi salvată, deci a rămas neschimbată. Dacă tocmai o activai, este posibil ca unele nume stocate să fi fost deja distruse; activeaz-o din nou pentru a finaliza.",
       "hideVaultNamesErrorErase": "Un nume stocat nu a putut fi distrus, așa că setarea a rămas dezactivată, în loc să pretindă o ștergere care nu s-a produs. Încearcă din nou.",
@@ -3258,7 +3312,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 h",
       "quickUnlockSubtitleAndroid": "Reintră cu un PIN după blocarea automată",
-      "quickUnlockSubtitle": "Reintră cu {{method}} sau un PIN după blocarea automată"
+      "quickUnlockSubtitle": "Reintră cu {{method}} sau un PIN după blocarea automată",
+      "screenCaptureOverrideHelper": "Dezactivează protecția împotriva capturii de ecran doar pe acest dispozitiv, atât înainte de a debloca un seif, cât și după. Activeaz-o dacă o lupă de ecran, un program de desktop la distanță sau cineva care te ajută de la distanță vede o fereastră neagră. Nu se sincronizează.",
+      "screenCaptureOverrideLabel": "Permite capturarea ecranului pe acest dispozitiv",
+      "screenCaptureOverrideUnknown": "Setarea acestui dispozitiv privind capturarea ecranului nu a putut fi citită, așa că această preferință nu este aplicată. Redeschide Setările pentru a încerca din nou.",
+      "screenCaptureSuperseded": "Dezactivată pe acest dispozitiv. Vezi „Permite capturarea ecranului pe acest dispozitiv” mai jos. Această preferință este păstrată și se aplică din nou când dezactivezi acea opțiune.",
+      "screenCaptureSupersededByFlag": "Dezactivată pentru această sesiune, pentru că Myne a fost pornit cu --disable-screen-capture-protection. Această preferință este păstrată și se aplică din nou data viitoare când deschizi Myne fără acest parametru."
     },
     "quickUnlock": {
       "errorBusy": "Este în curs o altă operațiune asupra seifului. Încearcă din nou peste un moment.",
@@ -3484,7 +3543,7 @@
         "newNoteLocation": "locația notelor noi folder implicit unde se creează notele",
         "torRouting": "tor rutare onion proxy rețea adresă ip locație ascunde sincronizare anonimat",
         "quickUnlock": "deblocare rapidă pin touch id biometric amprentă față unlock",
-        "reminders": "mementouri notificare alertă sarcină termen amintește reminders",
+        "reminders": "mementouri notifică notificare alertă sarcină termen amintește orizont înregistrare în avans zile reminders",
         "realtimeSync": "sincronizare în timp real live conexiune prezență interogare realtime sync",
         "screenCapture": "captură de ecran protecție înregistrare blocare confidențialitate screenshot",
         "showEditTimes": "ore de editare marcaje de timp modificat date note timestamps",
@@ -3512,7 +3571,8 @@
         "timeFormat": "format oră 24 de ore 12 ore ceas am pm time format",
         "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone",
         "periodicNotes": "note periodice săptămânal lunar săptămână lună dosar șablon format",
-        "aiHistoryBudget": "conversație istoric context memorie buget caractere agent chat cerere"
+        "aiHistoryBudget": "conversație istoric context memorie buget caractere agent chat cerere",
+        "screenCaptureOverride": "captură de ecran permite dezactivează excepție lupă desktop la distanță accesibilitate deblocare ecran negru screen capture override"
       }
     },
     "dateTime": {
@@ -3525,7 +3585,7 @@
       "time24": "24 de ore",
       "time12": "12 ore",
       "zoneLabel": "Fus orar",
-      "zoneHelper": "Ce fus decide ce înseamnă „astăzi”. Lasă gol pentru a urma acest dispozitiv. Orele pe care le scrii într-o notă nu sunt niciodată modificate; 09:00 rămâne 09:00 peste tot.",
+      "zoneHelper": "Ce fus decide ce înseamnă „astăzi” și, prin urmare, ce notă deschid notele tale zilnice, săptămânale și lunare. Lasă gol pentru a urma acest dispozitiv. Alegerea se stabilește per dispozitiv: niciun alt dispozitiv nu o suprascrie, așa că o astfel de setare poate pune acest dispozitiv într-o zi diferită față de celelalte. Orele pe care le scrii într-o notă nu sunt niciodată modificate; 09:00 rămâne 09:00 peste tot.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne nu cunoaște acel fus orar. Folosește un nume precum Europe/Berlin.",
       "errorSave": "Acea setare nu a putut fi salvată."
@@ -3998,7 +4058,8 @@
       "kdfMemoryExceedsHost": "Acest seif are nevoie de {{required}} MiB de memorie pentru a fi deschis, mai mult decât îi poate oferi acest browser ({{available}} MiB). Seiful este în regulă; deschide-l în aplicația desktop Myne.",
       "unexpected": "Eroare neașteptată. Te rugăm să încerci din nou.",
       "vaultNotFound": "Fișierul seifului nu a fost găsit. Te rugăm să repornești aplicația.",
-      "vaultUpgraded": "Acest seif a fost actualizat la un format mai nou, pe care această versiune de Myne nu îl acceptă încă. Datele tale sunt în regulă. Actualizează Myne la ultima versiune pentru a-l deschide."
+      "vaultUpgraded": "Acest seif a fost actualizat la un format mai nou, pe care această versiune de Myne nu îl acceptă încă. Datele tale sunt în regulă. Actualizează Myne la ultima versiune pentru a-l deschide.",
+      "openAsImportSource": "Un import citește chiar acum acest seif. Finalizează sau anulează acel import, apoi deblochează acest seif."
     },
     "passwordLabel": "Parolă",
     "passwordPlaceholder": "Parolă",
@@ -4565,5 +4626,19 @@
         "crypto-getrandomvalues": "Acest browser nu oferă o sursă criptografică de numere aleatorii."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Protecția împotriva capturii de ecran cere sistemului de operare să țină această fereastră în afara capturilor de ecran și a înregistrărilor de ecran. Funcționează pe Windows 10 (May 2020 Update) și mai recent; macOS și Linux nu oferă un API de sistem pentru asta, așa că acolo nu poate bloca capturarea. Acolo unde funcționează, printre lucrurile de care ascunde fereastra se numără programele de desktop la distanță și lupele de ecran, iar de aceea există această cale de ieșire.",
+    "disableConfirm": "Dezactivează protecția",
+    "disableCost": "Dezactivarea se aplică doar acestui dispozitiv, iar protecția rămâne oprită până când o reactivezi, atât înainte de a debloca un seif, cât și după. Nu se trimite nimic nicăieri și nicio setare a seifului nu se schimbă, dar alegerea este salvată într-un fișier de setări de pe acest dispozitiv, iar acel fișier rămâne acolo și după ce reactivezi protecția.",
+    "disableTitle": "Dezactivezi protecția împotriva capturii de ecran?",
+    "disableTrigger": "Dezactivează protecția împotriva capturii de ecran",
+    "flagNotice": "Această sesiune a fost pornită cu --disable-screen-capture-protection, așa că protecția rămâne dezactivată până când închizi aplicația, indiferent ce spune această setare.",
+    "restoreBody": "Protecția împotriva capturii de ecran este dezactivată pe acest dispozitiv. Reactivarea ei cere din nou sistemului de operare să țină această fereastră în afara capturilor de ecran și a înregistrărilor de ecran, ceea ce, pe Windows 10 (May 2020 Update) și mai recent, o ascunde și de programele de desktop la distanță și de lupele de ecran. Pe macOS și Linux nu există un API de sistem pentru asta, așa că acolo nu poate bloca capturarea.",
+    "restoreConfirm": "Activează protecția",
+    "restoreTitle": "Reactivezi protecția împotriva capturii de ecran?",
+    "restoreTrigger": "Activează protecția împotriva capturii de ecran",
+    "saveFailed": "Această setare nu a putut fi salvată, așa că nimic nu s-a schimbat. Încearcă din nou sau pornește Myne cu --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Salvat. Această sesiune are în continuare protecția dezactivată, pentru că a fost pornită cu --disable-screen-capture-protection, așa că protecția revine data viitoare când deschizi Myne fără acest parametru."
   }
 }

@@ -1997,7 +1997,7 @@
         "usePassword": "Use the password instead",
         "importLabel": "Name this import",
         "importLabelHint": "If a note you import has the same name as one you already have, and something you import links to it, the imported one is renamed with this. Keep the same name if you run this import again and nothing will be brought in twice.",
-        "importLabelIllegal": "That name cannot be used: a note name may not contain \\ / | # ^ [ or ], or start or end with a space.",
+        "importLabelIllegal": "That name cannot be used: a note name may not contain \\ / | # ^ [ ] or start/end with a space.",
         "opening": "Opening…",
         "unnamedVault": "Vault {{n}}",
         "errors": {
@@ -2007,7 +2007,6 @@
         },
         "done": {
           "sourceUnchanged": "The vault you imported from has not been changed. If you sync it, it keeps syncing.",
-          "manageVaults": "Manage vaults",
           "historyStays": "Version history stays in the vault you imported from."
         },
         "report": {

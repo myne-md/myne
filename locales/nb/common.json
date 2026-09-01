@@ -260,7 +260,7 @@
       "title": "Vedlegg",
       "transcribeDone": "Transkribering fullført.",
       "transcribeFailed": "Transkribering mislyktes. Prøv igjen.",
-      "transcribeTooLong": "Dette opptaket er for langt til å transkriberes.",
+      "transcribeTooLong": "Dette opptaket er for langt til å transkriberes. Lydfilen er fortsatt vedlagt, så du kan fremdeles spille den av.",
       "transcribeFeatureOff": "Tale-til-tekst er av. Slå det på i Innstillinger → Transkribering.",
       "transcribeModelLoadFailed": "Kunne ikke laste tale-til-tekst-modellen. Installer Myne på nytt, eller sjekk den egendefinerte modellen din i Innstillinger → Utvikler → AI.",
       "transcribeNoModelHint": "Tale-til-tekst-modellen mangler. En ny installasjon av Myne gjenoppretter den.",
@@ -1830,7 +1830,9 @@
       "moveCollision": "Det finnes allerede en mappe med det navnet der.",
       "unsettledSave": "Et åpent notat er ikke ferdig lagret, så mappen ble ikke rørt. Prøv igjen når det er ferdig.",
       "renameFailed": "Kunne ikke endre navn på mappen, så den er uendret.",
-      "deliberateWriteFailed": "Mappen fikk nytt navn, men en av innstillingene kunne ikke lagres. En tom mappe dukker opp igjen under det gamle navnet hver gang du låser opp; det er trygt å slette den, og ingenting annet endres. Å gi mappen nytt navn igjen fjerner den ikke."
+      "deliberateWriteFailed": "Mappen fikk nytt navn, men en av innstillingene kunne ikke lagres. En tom mappe dukker opp igjen under det gamle navnet hver gang du låser opp; det er trygt å slette den, og ingenting annet endres. Å gi mappen nytt navn igjen fjerner den ikke.",
+      "folderListFull": "Myne kan huske et begrenset antall mapper, og den listen er full. Denne mappen virker fortsatt, men den forsvinner når det siste notatet forlater den. Å slette en mappe du ikke trenger lenger, gir plass.",
+      "folderNotRemembered": "Mappen ble opprettet, men Myne kunne ikke registrere den. Den forsvinner når det siste notatet forlater den, og den er borte ved neste opplåsing hvis den fortsatt er tom. Det er trygt å opprette den på nytt."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne fikk ikke lov til å lese denne filen.",
         "reasonNotFound": "Denne filen var borte da Myne kom til den.",
         "reasonNoSpace": "Denne enheten gikk tom for plass.",
-        "reasonUnknown": "Myne kunne ikke si hvorfor."
+        "reasonUnknown": "Myne kunne ikke si hvorfor.",
+        "foldersNotKeptNote": "{{count}} forsvinner når den mister sitt siste notat",
+        "foldersNotKeptNote_one": "{{count}} forsvinner når den mister sitt siste notat",
+        "foldersNotKeptNote_other": "{{count}} forsvinner når de mister sitt siste notat",
+        "statFoldersNotKept": "Mapper ikke beholdt"
       },
       "offer": {
         "body": "Hent dine eksisterende notater inn i Myne. Hvert enkelt krypteres etter hvert som det importeres. Ingenting forlater denne enheten, og originalfilene dine forblir nøyaktig der de er.",
@@ -2021,7 +2027,52 @@
           "survives": "Blir ett enkelt notat som inneholder tabellen.",
           "loses": "Det blir ett notat, ikke ett notat per rad: Myne er ingen database. Svært brede eller svært lange filer beskjæres, og importrapporten sier hvor mye.",
           "short": "Én regnearkfil"
+        },
+        "myne": {
+          "label": "Myne-hvelv",
+          "loses": "Versjonshistorikk, slettede notater og maler blir værende i kildehvelvet. Vedlegg som ingen importerte notater bruker, blir ikke med. Kildehvelvet endres ikke, og hvis du synkroniserer det, fortsetter det å synkroniseres.",
+          "pickerTitle": "Velg hvelvet du vil importere fra",
+          "short": "Et annet hvelv på denne enheten",
+          "survives": "Notater, mapper, etiketter, lenker mellom notatene du importerer, og vedleggene de notatene bruker. Ord du har lagt til i kildehvelvets ordliste, blir også med."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Versjonshistorikken blir værende i hvelvet du importerte fra.",
+          "sourceUnchanged": "Hvelvet du importerte fra, er ikke endret. Hvis du synkroniserer det, fortsetter det å synkroniseres."
+        },
+        "errors": {
+          "alreadyOpen": "Det hvelvet er allerede åpnet for en import. Fullfør eller avbryt den først.",
+          "busy": "En annen hvelvoperasjon pågår. Vent til den er ferdig og prøv igjen.",
+          "credential": "Det passordet eller den gjenopprettingsfrasen åpnet ikke hvelvet. Sjekk det og prøv igjen."
+        },
+        "importLabel": "Gi denne importen et navn",
+        "importLabelHint": "Hvis et notat du importerer har samme navn som et du allerede har, og noe du importerer lenker til det, får det importerte notatet nytt navn med dette. Bruk samme navn hvis du kjører denne importen på nytt, så blir ingenting hentet inn to ganger.",
+        "importLabelIllegal": "Det navnet kan ikke brukes: et notatnavn kan ikke inneholde \\ / | # ^ [ ], eller starte eller slutte med et mellomrom.",
+        "loading": "Ser etter de andre hvelvene dine…",
+        "noOtherVaults": "Det finnes ingen andre hvelv på denne enheten å importere fra. Gjenopprett en sikkerhetskopi først, så blir den et hvelv du kan importere fra her.",
+        "opening": "Åpner…",
+        "passwordLabel": "Passordet til det hvelvet",
+        "phraseLabel": "Den 24-ord lange gjenopprettingsfrasen til det hvelvet",
+        "report": {
+          "attachmentsCrossed": "Vedlegg tatt med",
+          "attachmentsDeduped": "Vedlegg du allerede hadde",
+          "attachmentsFailed": "Vedlegg hvelvet ikke tok imot",
+          "dictionaryUnreadable": "Kildehvelvets ordliste kunne ikke leses, så ingen ord ble tatt med.",
+          "dictionaryWordsAdded": "Ord fra ordlisten tatt med",
+          "linksLeftUnresolved": "Lenker som ikke kunne peke noe sted",
+          "linksRetargeted": "Lenker som ble pekt mot et notat med nytt navn",
+          "templatesLeftBehind": "Maler, ikke tatt med",
+          "tombstonedEmbeds": "Innbygginger der filen allerede var slettet i kilden",
+          "trashedLeftBehind": "Notater i kildehvelvets papirkurv, ikke tatt med",
+          "untitledImported": "Notater uten tittel tatt med"
+        },
+        "unnamedVault": "Hvelv {{n}}",
+        "usePassword": "Bruk passordet i stedet",
+        "usePhrase": "Bruk gjenopprettingsfrasen i stedet",
+        "vaultLabel": "Importer fra",
+        "vaultPlaceholder": "Velg et hvelv",
+        "wordAria": "Ord {{number}} av 24"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Gjenoppretting avbrutt: hvelvet ble låst.",
       "operationInProgress": "En operasjon pågår. Vent litt.",
       "unexpected": "Uventet feil. Prøv igjen.",
-      "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt."
+      "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt.",
+      "openAsImportSource": "En import leser dette hvelvet akkurat nå. Fullfør eller avbryt den importen, og gjenopprett så dette hvelvet."
     },
     "vaultUnreadable": "Hvelvfilen kan ikke leses. Gjenopprett fra en sikkerhetskopi.",
     "genericError": "Noe gikk galt. Vennligst prøv igjen.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Åpne grafen"
     },
     "archive": {
-      "helper": "La notater flyttes til et arkiv, holdt utenfor hovedlisten. Slår du dette av, gjenopprettes alle arkiverte notater til sine mapper, og arkivkontrollene skjules.",
+      "helper": "La notater flyttes til et arkiv, holdt utenfor hovedlisten. Slår du dette av, gjenopprettes alle arkiverte notater til sine mapper, alle arkiverte mapper fjernes fra arkivet, og arkivkontrollene skjules. Det gjelder hele hvelvet, på alle enheter.",
       "label": "Arkivering",
       "off": "Av",
       "on": "På",
@@ -3109,7 +3161,8 @@
       "torLabel": "Rut synkronisering gjennom Tor"
     },
     "prefs": {
-      "saveError": "Kunne ikke lagre innstillingen. Prøv igjen."
+      "saveError": "Kunne ikke lagre innstillingen. Prøv igjen.",
+      "folderListFull": "Den mappelisten er full. Fjern en mappe fra den før du legger til en ny."
     },
     "reminders": {
       "aria": "Vis oppgavepåminnelser på denne enheten",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "På en enhet med en brukbar nøkkelring viser hvelvvelgeren navnet på et hvelv når denne enheten har låst det opp. Når dette er på, viser hvert hvelv i stedet en plassholder som Hvelv 2, og det nummeret følger hvelvet uansett hvordan listen sorteres om.",
       "hideVaultNamesErases": "Å slå det på ødelegger nøklene som gjør de lagrede navnene lesbare, så disse navnene kan ikke gjenopprettes på denne enheten, og ingen flere navn skrives så lenge det står på.",
       "hideVaultNamesResidue": "Det hjelper ikke mot en kopi som ble tatt tidligere: en sikkerhetskopi av hele systemet, et diskbilde eller enhver annen kopi av denne disken på systemnivå som ble laget mens navnene ble vist, inneholder både de lagrede navnene og nøklene til dem.",
-      "hideVaultNamesUnavailable": "Denne enheten har ingen brukbar nøkkelring, så Myne lagrer ingen hvelvnavn her, og dette valget kan ikke slås på. Velgeren viser allerede en plassholder for hvert hvelv.",
+      "hideVaultNamesUnavailable": "Myne kan ikke lagre hvelvnavn i denne kopien av appen, så den lagrer ingen her, og dette valget kan ikke slås på. Velgeren viser allerede en plassholder for hvert hvelv.",
       "hideVaultNamesErrorRead": "Kunne ikke lese den gjeldende innstillingen. Bruk bryteren for å sette den på nytt.",
       "hideVaultNamesErrorSave": "Kunne ikke lagre innstillingen, så den er uendret. Hvis du holdt på å slå den på, kan noen lagrede navn allerede være ødelagt; slå den på igjen for å fullføre.",
       "hideVaultNamesErrorErase": "Ett lagret navn kunne ikke ødelegges, så innstillingen ble stående av i stedet for å hevde en sletting som ikke skjedde. Prøv igjen.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 min",
       "autoLock1h": "1 t",
       "quickUnlockSubtitleAndroid": "Lås opp igjen med en PIN etter automatisk låsing",
-      "quickUnlockSubtitle": "Lås opp igjen med {{method}} eller en PIN etter automatisk låsing"
+      "quickUnlockSubtitle": "Lås opp igjen med {{method}} eller en PIN etter automatisk låsing",
+      "screenCaptureOverrideHelper": "Slår av beskyttelsen mot skjermopptak, kun på denne enheten, både før du låser opp et hvelv og etter. Slå på denne innstillingen hvis en skjermforstørrer, et fjernskrivebordsprogram eller noen som hjelper deg eksternt, ser et svart vindu. Den synkroniseres ikke.",
+      "screenCaptureOverrideLabel": "Tillat skjermopptak på denne enheten",
+      "screenCaptureOverrideUnknown": "Denne enhetens innstilling for skjermopptak kunne ikke leses, så dette valget blir ikke brukt. Åpne Innstillinger på nytt for å prøve igjen.",
+      "screenCaptureSuperseded": "Av på denne enheten. Se «Tillat skjermopptak på denne enheten» nedenfor. Dette valget beholdes og gjelder igjen når du slår av den innstillingen.",
+      "screenCaptureSupersededByFlag": "Av for denne økten, fordi Myne ble startet med --disable-screen-capture-protection. Dette valget beholdes og gjelder igjen neste gang du åpner Myne uten det flagget."
     },
     "quickUnlock": {
       "errorBusy": "En annen hvelvoperasjon pågår. Prøv igjen om et øyeblikk.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "nye notater plassering mappe standard hvor opprettes new note location",
         "torRouting": "tor ruting onion proxy nettverk ip-adresse posisjon skjul synkronisering anonymitet tor routing",
         "quickUnlock": "rask opplåsing hurtig pin touch id biometri ansikt lås opp",
-        "reminders": "påminnelser varsle varsel varsling oppgave forfall minne reminders",
+        "reminders": "påminnelser varsle varsel varsling oppgave forfall minne horisont registrering dager fremover reminders",
         "realtimeSync": "sanntidssynkronisering sanntid live tilkobling synkronisering realtime sync",
         "screenCapture": "skjermopptak skjermbilde beskyttelse blokker personvern screen capture",
         "showEditTimes": "redigeringstidspunkter tidsstempler endret datoer notater vis edit times",
@@ -3402,7 +3460,8 @@
         "timeFormat": "tidsformat klokkeslett 24 timer 12 timer klokke am pm time format",
         "timezone": "tidssone sone tz utc iana region i dag timezone time zone",
         "periodicNotes": "periodiske notater ukentlig månedlig uke måned mappe mal format",
-        "aiHistoryBudget": "samtale historikk kontekst hukommelse budsjett tegn agent chat forespørsel"
+        "aiHistoryBudget": "samtale historikk kontekst hukommelse budsjett tegn agent chat forespørsel",
+        "screenCaptureOverride": "skjermopptak overstyring tillat deaktiver skjermforstørrer fjernskrivebord tilgjengelighet opplåsing opplåsingsskjerm svart skjerm screen capture remote desktop"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24-timers",
       "time12": "12-timers",
       "zoneLabel": "Tidssone",
-      "zoneHelper": "Hvilken sone som avgjør hva som regnes som i dag. La feltet stå tomt for å følge denne enheten. Klokkeslett du skriver i et notat, endres aldri; 09:00 er 09:00 overalt.",
+      "zoneHelper": "Hvilken sone som avgjør hva som regnes som i dag, og dermed hvilket notat de daglige, ukentlige og månedlige notatene dine åpner. La feltet stå tomt for å følge denne enheten. Valget avgjøres per enhet: ingen annen enhet overskriver det, så en overstyring kan sette denne enheten på en annen dag enn de andre enhetene dine. Klokkeslett du skriver i et notat, endres aldri; 09:00 er 09:00 overalt.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kjenner ikke den tidssonen. Bruk et navn som Europe/Berlin.",
       "errorSave": "Kunne ikke lagre den innstillingen."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Dette hvelvet trenger {{required}} MiB minne for å åpnes, mer enn denne nettleseren kan gi det ({{available}} MiB). Det er ingenting galt med hvelvet; åpne det i Myne-skrivebordsappen.",
       "unexpected": "Uventet feil. Prøv igjen.",
       "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt.",
-      "vaultUpgraded": "Dette hvelvet ble oppgradert til et nyere format som denne versjonen av Myne ikke støtter ennå. Dataene dine er i orden. Oppdater Myne til nyeste versjon for å åpne det."
+      "vaultUpgraded": "Dette hvelvet ble oppgradert til et nyere format som denne versjonen av Myne ikke støtter ennå. Dataene dine er i orden. Oppdater Myne til nyeste versjon for å åpne det.",
+      "openAsImportSource": "En import leser dette hvelvet akkurat nå. Fullfør eller avbryt den importen, og lås så opp dette hvelvet."
     },
     "passwordLabel": "Passord",
     "passwordPlaceholder": "Passord",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Denne nettleseren tilbyr ingen kryptografisk kilde til tilfeldige tall."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Beskyttelse mot skjermopptak ber operativsystemet om å holde dette vinduet utenfor skjermbilder og skjermopptak. Den virker på Windows 10 (May 2020 Update) og nyere; macOS og Linux har ikke noe system-API for det, så der kan den ikke blokkere opptak. Der den virker, skjuler den også vinduet for fjernskrivebordsprogrammer og skjermforstørrere, og det er derfor denne veien ut finnes.",
+    "disableConfirm": "Slå av beskyttelsen",
+    "disableCost": "Å slå den av gjelder kun denne enheten, og den forblir av til du slår den på igjen, både før du låser opp et hvelv og etter. Ingenting sendes noe sted, og ingen hvelvinnstilling endres, men valget lagres i en innstillingsfil på denne enheten, og den filen blir liggende der etter at du har slått beskyttelsen på igjen.",
+    "disableTitle": "Slå av beskyttelsen mot skjermopptak?",
+    "disableTrigger": "Slå av beskyttelse mot skjermopptak",
+    "flagNotice": "Denne økten ble startet med --disable-screen-capture-protection, så beskyttelsen forblir av til du avslutter, uansett hva denne innstillingen sier.",
+    "restoreBody": "Beskyttelse mot skjermopptak er slått av på denne enheten. Å slå den på igjen ber operativsystemet om å holde dette vinduet utenfor skjermbilder og skjermopptak igjen, noe som på Windows 10 (May 2020 Update) og nyere også skjuler det for fjernskrivebordsprogrammer og skjermforstørrere. På macOS og Linux finnes det ikke noe system-API for det, så der kan den ikke blokkere opptak.",
+    "restoreConfirm": "Slå på beskyttelsen",
+    "restoreTitle": "Slå beskyttelsen mot skjermopptak på igjen?",
+    "restoreTrigger": "Slå på beskyttelse mot skjermopptak",
+    "saveFailed": "Det kunne ikke lagres, så ingenting ble endret. Prøv igjen, eller start Myne med --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Lagret. Denne økten har fortsatt beskyttelsen av fordi den ble startet med --disable-screen-capture-protection, så den kommer tilbake neste gang du åpner Myne uten det flagget."
   }
 }

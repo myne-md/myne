@@ -260,7 +260,7 @@
       "title": "Tệp đính kèm",
       "transcribeDone": "Đã chép lời xong.",
       "transcribeFailed": "Chép lời thất bại. Vui lòng thử lại.",
-      "transcribeTooLong": "Bản ghi âm này quá dài để chép lời.",
+      "transcribeTooLong": "Bản ghi âm này quá dài để chép lời. Tệp âm thanh vẫn được đính kèm, nên bạn vẫn có thể phát lại.",
       "transcribeFeatureOff": "Chuyển giọng nói thành văn bản đang tắt. Hãy bật nó trong Cài đặt → Chép lời.",
       "transcribeModelLoadFailed": "Không thể tải mô hình chuyển giọng nói thành văn bản. Hãy cài đặt lại Myne, hoặc kiểm tra mô hình tùy chỉnh của bạn trong Cài đặt → Nhà phát triển → AI.",
       "transcribeNoModelHint": "Thiếu mô hình chuyển giọng nói thành văn bản. Cài đặt lại Myne sẽ khôi phục nó.",
@@ -1830,7 +1830,9 @@
       "moveCollision": "Ở đó đã có một thư mục trùng tên.",
       "unsettledSave": "Một ghi chú đang mở vẫn chưa lưu xong, nên thư mục được giữ nguyên. Hãy thử lại khi ghi chú đã lưu xong.",
       "renameFailed": "Không thể đổi tên thư mục, nên nó không thay đổi.",
-      "deliberateWriteFailed": "Thư mục đã được đổi tên, nhưng một cài đặt của nó không lưu được. Mỗi lần bạn mở khóa, một thư mục trống sẽ lại xuất hiện với tên cũ; xóa nó là an toàn và không thay đổi gì khác. Đổi tên thư mục lần nữa sẽ không làm nó biến mất."
+      "deliberateWriteFailed": "Thư mục đã được đổi tên, nhưng một cài đặt của nó không lưu được. Mỗi lần bạn mở khóa, một thư mục trống sẽ lại xuất hiện với tên cũ; xóa nó là an toàn và không thay đổi gì khác. Đổi tên thư mục lần nữa sẽ không làm nó biến mất.",
+      "folderListFull": "Myne chỉ ghi nhớ được một số lượng thư mục có hạn, và danh sách đó đã đầy. Thư mục này vẫn hoạt động, nhưng nó sẽ biến mất khi ghi chú cuối cùng rời khỏi nó. Xóa một thư mục bạn không cần nữa sẽ tạo thêm chỗ.",
+      "folderNotRemembered": "Thư mục đã được tạo, nhưng Myne không ghi nhận được nó. Nó sẽ biến mất khi ghi chú cuối cùng rời khỏi nó, và nếu vẫn còn trống thì nó sẽ mất ở lần mở khóa tiếp theo. Tạo lại thư mục này là an toàn."
     },
     "folderNote": {
       "defaultTitle": "Mục lục"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne không được phép đọc tệp này.",
         "reasonNotFound": "Tệp này đã không còn khi Myne đến nơi.",
         "reasonNoSpace": "Thiết bị này đã hết dung lượng.",
-        "reasonUnknown": "Myne không thể nói rõ lý do."
+        "reasonUnknown": "Myne không thể nói rõ lý do.",
+        "foldersNotKeptNote": "{{count}} thư mục sẽ biến mất khi ghi chú cuối cùng trong đó rời đi",
+        "foldersNotKeptNote_one": "{{count}} thư mục sẽ biến mất khi ghi chú cuối cùng trong đó rời đi",
+        "foldersNotKeptNote_other": "{{count}} thư mục sẽ biến mất khi ghi chú cuối cùng trong đó rời đi",
+        "statFoldersNotKept": "Thư mục không được giữ lại"
       },
       "offer": {
         "body": "Đưa các ghi chú hiện có của bạn vào Myne. Từng ghi chú được mã hóa khi nhập. Không có gì rời khỏi thiết bị này, và các tệp gốc của bạn vẫn ở nguyên vị trí.",
@@ -2021,7 +2027,52 @@
           "survives": "Trở thành một ghi chú duy nhất chứa bảng đó.",
           "loses": "Đó là một ghi chú, không phải mỗi hàng một ghi chú: Myne không phải là cơ sở dữ liệu. Các tệp quá rộng hoặc quá dài sẽ bị cắt bớt, và báo cáo nhập cho biết đã cắt bao nhiêu.",
           "short": "Một tệp bảng tính"
+        },
+        "myne": {
+          "label": "Kho Myne",
+          "loses": "Lịch sử phiên bản, ghi chú đã xóa và mẫu vẫn nằm lại trong kho nguồn. Những tệp đính kèm mà không ghi chú nào được nhập dùng đến sẽ bị bỏ lại. Kho nguồn không bị thay đổi và, nếu bạn đồng bộ nó, nó vẫn tiếp tục đồng bộ.",
+          "pickerTitle": "Chọn kho để nhập từ đó",
+          "short": "Một kho khác trên thiết bị này",
+          "survives": "Ghi chú, thư mục, thẻ, liên kết giữa các ghi chú bạn nhập, và những tệp đính kèm mà các ghi chú đó dùng. Những từ bạn đã thêm vào từ điển của kho nguồn cũng được đưa sang."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Lịch sử phiên bản vẫn nằm lại trong kho mà bạn đã nhập từ đó.",
+          "sourceUnchanged": "Kho mà bạn đã nhập từ đó không bị thay đổi. Nếu bạn đồng bộ nó, nó vẫn tiếp tục đồng bộ."
+        },
+        "errors": {
+          "alreadyOpen": "Kho đó đang được mở cho một lần nhập khác. Hãy hoàn tất hoặc hủy lần nhập đó trước.",
+          "busy": "Một thao tác kho khác đang chạy. Hãy chờ nó hoàn tất rồi thử lại.",
+          "credential": "Mật khẩu hoặc cụm từ khôi phục đó không mở được kho. Hãy kiểm tra lại rồi thử lần nữa."
+        },
+        "importLabel": "Đặt tên cho lần nhập này",
+        "importLabelHint": "Nếu một ghi chú bạn nhập trùng tên với ghi chú bạn đã có, và có thứ gì đó bạn nhập liên kết tới nó, thì ghi chú được nhập sẽ được đổi tên bằng tên này. Hãy giữ nguyên tên này nếu bạn chạy lại lần nhập này, và sẽ không có gì được đưa vào hai lần.",
+        "importLabelIllegal": "Không thể dùng tên đó: tên ghi chú không được chứa \\ / | # ^ [ ], và không được bắt đầu hoặc kết thúc bằng dấu cách.",
+        "loading": "Đang tìm các kho khác của bạn…",
+        "noOtherVaults": "Không có kho nào khác trên thiết bị này để nhập từ đó. Hãy khôi phục một bản sao lưu trước, và nó sẽ trở thành một kho mà bạn có thể nhập từ đây.",
+        "opening": "Đang mở…",
+        "passwordLabel": "Mật khẩu của kho đó",
+        "phraseLabel": "Cụm từ khôi phục 24 từ của kho đó",
+        "report": {
+          "attachmentsCrossed": "Tệp đính kèm được đưa sang",
+          "attachmentsDeduped": "Tệp đính kèm bạn đã có",
+          "attachmentsFailed": "Tệp đính kèm mà kho không nhận",
+          "dictionaryUnreadable": "Không đọc được từ điển của kho nguồn, nên không có từ nào được đưa sang.",
+          "dictionaryWordsAdded": "Từ trong từ điển được đưa sang",
+          "linksLeftUnresolved": "Liên kết không thể trỏ tới đâu",
+          "linksRetargeted": "Liên kết đã trỏ sang ghi chú được đổi tên",
+          "templatesLeftBehind": "Mẫu, bị bỏ lại",
+          "tombstonedEmbeds": "Nội dung nhúng có tệp đã bị xóa ở kho nguồn",
+          "trashedLeftBehind": "Ghi chú trong Thùng rác của kho nguồn, bị bỏ lại",
+          "untitledImported": "Ghi chú không có tiêu đề được đưa sang"
+        },
+        "unnamedVault": "Kho {{n}}",
+        "usePassword": "Dùng mật khẩu thay thế",
+        "usePhrase": "Dùng cụm từ khôi phục thay thế",
+        "vaultLabel": "Nhập từ",
+        "vaultPlaceholder": "Chọn một kho",
+        "wordAria": "Từ {{number}} trên 24"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Đã hủy khôi phục: kho đã bị khóa.",
       "operationInProgress": "Một thao tác đang diễn ra. Vui lòng chờ.",
       "unexpected": "Lỗi bất ngờ. Vui lòng thử lại.",
-      "vaultNotFound": "Không tìm thấy tệp kho. Vui lòng khởi động lại ứng dụng."
+      "vaultNotFound": "Không tìm thấy tệp kho. Vui lòng khởi động lại ứng dụng.",
+      "openAsImportSource": "Một lần nhập đang đọc kho này ngay lúc này. Hãy hoàn tất hoặc hủy lần nhập đó, rồi khôi phục kho này."
     },
     "vaultUnreadable": "Không thể đọc tệp kho lưu trữ. Khôi phục từ một bản sao lưu.",
     "genericError": "Đã xảy ra lỗi. Vui lòng thử lại.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Mở đồ thị"
     },
     "archive": {
-      "helper": "Cho phép chuyển ghi chú vào Kho lưu trữ, giữ chúng ngoài danh sách chính. Tắt tùy chọn này sẽ khôi phục mọi ghi chú đã lưu trữ về thư mục của nó và ẩn các nút điều khiển lưu trữ.",
+      "helper": "Cho phép chuyển ghi chú vào mục Lưu trữ, giữ chúng ngoài danh sách chính. Tắt tùy chọn này sẽ khôi phục mọi ghi chú đã lưu trữ về thư mục của nó, bỏ lưu trữ mọi thư mục đã lưu trữ, và ẩn các nút điều khiển lưu trữ. Áp dụng cho toàn bộ kho, trên mọi thiết bị.",
       "label": "Lưu trữ",
       "off": "Tắt",
       "on": "Bật",
@@ -3109,7 +3161,8 @@
       "torLabel": "Định tuyến đồng bộ qua Tor"
     },
     "prefs": {
-      "saveError": "Không thể lưu tùy chọn. Hãy thử lại."
+      "saveError": "Không thể lưu tùy chọn. Hãy thử lại.",
+      "folderListFull": "Danh sách thư mục đó đã đầy. Hãy bỏ một thư mục khỏi danh sách trước khi thêm thư mục khác."
     },
     "reminders": {
       "aria": "Hiện nhắc nhở công việc trên thiết bị này",
@@ -3134,14 +3187,14 @@
       "hideVaultNamesHelper": "Trên thiết bị có keychain dùng được, bộ chọn kho sẽ hiện tên của một kho sau khi thiết bị này đã mở khóa nó. Khi bật tùy chọn này, mọi kho sẽ hiện một tên tạm như Kho 2 thay vào đó, và con số đó gắn liền với kho dù danh sách có sắp xếp lại thế nào.",
       "hideVaultNamesErases": "Bật tùy chọn này sẽ hủy các khóa giúp đọc được những tên đã lưu tại đây, nên không thể khôi phục những tên đó trên thiết bị này, và sẽ không có tên nào được ghi thêm khi tùy chọn còn bật.",
       "hideVaultNamesResidue": "Nó không chạm tới được một bản sao đã tạo trước đó: một bản sao lưu toàn hệ thống, một ảnh đĩa, hoặc bất kỳ bản sao cấp hệ thống nào khác của đĩa này được tạo khi tên còn hiển thị đều mang theo cả những tên đã lưu lẫn khóa của chúng.",
-      "hideVaultNamesUnavailable": "Thiết bị này không có keychain dùng được, nên Myne không lưu tên kho nào tại đây và không thể bật tùy chọn này. Bộ chọn vốn đã hiện một tên tạm cho mọi kho.",
+      "hideVaultNamesUnavailable": "Myne không thể lưu tên kho trong bản ứng dụng này, nên nó không lưu tên nào tại đây và không thể bật tùy chọn này. Bộ chọn vốn đã hiện một tên tạm cho mọi kho.",
       "hideVaultNamesErrorRead": "Không thể đọc cài đặt hiện tại. Hãy gạt công tắc để đặt lại.",
       "hideVaultNamesErrorSave": "Không thể lưu cài đặt, nên nó không thay đổi. Nếu bạn đang bật nó, một số tên đã lưu có thể đã bị hủy; hãy bật lại để hoàn tất.",
       "hideVaultNamesErrorErase": "Một tên đã lưu không thể bị hủy, nên tùy chọn này được giữ ở trạng thái tắt thay vì tuyên bố một việc xóa chưa hề xảy ra. Hãy thử lại.",
       "realtimeSyncHelper": "Thay đổi từ các thiết bị khác đến trong vài giây qua một tín hiệu không chứa nội dung — máy chủ chỉ chuyển tiếp “có gì đó đã thay đổi”, không bao giờ là nội dung gì. Khi kho lưu trữ của bạn được mở khóa, ứng dụng vẫn kiểm tra máy chủ thường xuyên, nên điều này không làm lộ thêm gì đáng kể; không có gì để cấu hình.",
       "realtimeSyncLabel": "Đồng bộ thời gian thực",
       "screenCaptureHelperOff": "Bảo vệ luôn được áp dụng trước khi mở khóa. Sau khi mở khóa, theo tùy chọn này.",
-      "screenCaptureHelperOn": "Có hiệu lực trên Windows 10 (Bản cập nhật tháng 5 năm 2020) trở lên. macOS và Linux không có API hệ thống cho việc này, nên ở đó không thể chặn việc ghi màn hình.",
+      "screenCaptureHelperOn": "Có hiệu lực trên Windows 10 (Bản cập nhật tháng 5 năm 2020) trở lên. macOS và Linux không có API hệ thống cho việc này, nên ở đó không thể chặn việc chụp hay quay màn hình.",
       "screenCaptureLabel": "Chống chụp màn hình",
       "screenCaptureSubtitle": "Chặn chụp màn hình và quay màn hình",
       "screenshotBlocked": "Chống chụp màn hình đang bật: ảnh chụp màn hình của Myne sẽ bị trống.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 phút",
       "autoLock1h": "1 giờ",
       "quickUnlockSubtitleAndroid": "Nhập lại bằng mã PIN sau khi tự động khóa",
-      "quickUnlockSubtitle": "Nhập lại bằng {{method}} hoặc mã PIN sau khi tự động khóa"
+      "quickUnlockSubtitle": "Nhập lại bằng {{method}} hoặc mã PIN sau khi tự động khóa",
+      "screenCaptureOverrideHelper": "Tắt chống chụp màn hình chỉ trên thiết bị này, cả trước khi bạn mở khóa một kho lẫn sau đó. Hãy bật tùy chọn này nếu trình phóng to màn hình, phần mềm điều khiển máy tính từ xa hoặc người đang hỗ trợ bạn từ xa chỉ thấy một cửa sổ đen. Tùy chọn này không được đồng bộ.",
+      "screenCaptureOverrideLabel": "Cho phép chụp màn hình trên thiết bị này",
+      "screenCaptureOverrideUnknown": "Không đọc được cài đặt chụp màn hình của thiết bị này, nên tùy chọn này chưa được áp dụng. Hãy mở lại Cài đặt để thử lần nữa.",
+      "screenCaptureSuperseded": "Đang tắt trên thiết bị này. Xem “Cho phép chụp màn hình trên thiết bị này” bên dưới. Tùy chọn này vẫn được giữ và sẽ áp dụng trở lại khi bạn tắt tùy chọn kia.",
+      "screenCaptureSupersededByFlag": "Đang tắt trong phiên này, vì Myne được khởi động với --disable-screen-capture-protection. Tùy chọn này vẫn được giữ và sẽ áp dụng trở lại vào lần tiếp theo bạn mở Myne mà không dùng tùy chọn đó."
     },
     "quickUnlock": {
       "errorBusy": "Một thao tác kho khác đang diễn ra. Hãy thử lại sau giây lát.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "vị trí ghi chú mới thư mục mặc định nơi tạo new note",
         "torRouting": "tor định tuyến onion proxy mạng địa chỉ ip vị trí ẩn đồng bộ ẩn danh",
         "quickUnlock": "mở khóa nhanh pin touch id face id sinh trắc học khuôn mặt quick unlock",
-        "reminders": "nhắc nhở thông báo cảnh báo công việc đến hạn reminders notify",
+        "reminders": "nhắc nhở thông báo cảnh báo công việc đến hạn lên lịch trước đăng ký ngày reminders notify",
         "realtimeSync": "đồng bộ thời gian thực kết nối trực tiếp realtime sync",
         "screenCapture": "chụp màn hình quay màn hình bảo vệ chặn quyền riêng tư screenshot",
         "showEditTimes": "hiện thời gian chỉnh sửa dấu thời gian ngày ghi chú timestamps",
@@ -3402,7 +3460,8 @@
         "timeFormat": "định dạng giờ 24 giờ 12 giờ đồng hồ sáng chiều time format clock am pm",
         "timezone": "múi giờ vùng hôm nay timezone time zone tz utc iana region today",
         "periodicNotes": "ghi chú định kỳ hằng tuần hằng tháng tuần tháng thư mục mẫu định dạng",
-        "aiHistoryBudget": "trò chuyện lịch sử ngữ cảnh bộ nhớ hạn mức ký tự tác nhân chat yêu cầu"
+        "aiHistoryBudget": "trò chuyện lịch sử ngữ cảnh bộ nhớ hạn mức ký tự tác nhân chat yêu cầu",
+        "screenCaptureOverride": "chụp màn hình ghi đè cho phép tắt phóng to màn hình điều khiển từ xa trợ năng mở khóa màn hình đen screen capture override"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24 giờ",
       "time12": "12 giờ",
       "zoneLabel": "Múi giờ",
-      "zoneHelper": "Múi giờ nào quyết định thế nào là hôm nay. Để trống để theo thiết bị này. Giờ bạn viết trong ghi chú không bao giờ bị đổi; 09:00 vẫn là 09:00 ở mọi nơi.",
+      "zoneHelper": "Múi giờ nào quyết định thế nào là hôm nay, và do đó quyết định ghi chú hằng ngày, hằng tuần và hằng tháng của bạn sẽ mở ghi chú nào. Để trống để theo thiết bị này. Lựa chọn này được giữ riêng cho từng thiết bị: không thiết bị nào khác ghi đè lên nó, nên một thiết lập riêng có thể đặt thiết bị này ở một ngày khác với các thiết bị còn lại của bạn. Giờ bạn viết trong ghi chú không bao giờ bị đổi; 09:00 vẫn là 09:00 ở mọi nơi.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne không biết múi giờ đó. Hãy dùng một tên như Europe/Berlin.",
       "errorSave": "Không thể lưu cài đặt đó."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Kho này cần {{required}} MiB bộ nhớ để mở, nhiều hơn mức trình duyệt này có thể cấp ({{available}} MiB). Kho vẫn nguyên vẹn; hãy mở nó bằng ứng dụng Myne trên máy tính.",
       "unexpected": "Lỗi bất ngờ. Vui lòng thử lại.",
       "vaultNotFound": "Không tìm thấy tệp kho. Vui lòng khởi động lại ứng dụng.",
-      "vaultUpgraded": "Kho này đã được nâng cấp lên một định dạng mới hơn mà phiên bản Myne này chưa hỗ trợ. Dữ liệu của bạn vẫn nguyên vẹn. Hãy cập nhật Myne lên phiên bản mới nhất để mở nó."
+      "vaultUpgraded": "Kho này đã được nâng cấp lên một định dạng mới hơn mà phiên bản Myne này chưa hỗ trợ. Dữ liệu của bạn vẫn nguyên vẹn. Hãy cập nhật Myne lên phiên bản mới nhất để mở nó.",
+      "openAsImportSource": "Một lần nhập đang đọc kho này ngay lúc này. Hãy hoàn tất hoặc hủy lần nhập đó, rồi mở khóa kho này."
     },
     "passwordLabel": "Mật khẩu",
     "passwordPlaceholder": "Mật khẩu",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Trình duyệt này không cung cấp nguồn số ngẫu nhiên mật mã."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Chống chụp màn hình yêu cầu hệ điều hành giữ cửa sổ này ra khỏi ảnh chụp màn hình và bản quay màn hình. Nó có hiệu lực trên Windows 10 (Bản cập nhật tháng 5 năm 2020) trở lên; macOS và Linux không có API hệ thống cho việc này, nên ở đó không thể chặn việc chụp hay quay màn hình. Ở nơi nó có tác dụng, nó cũng ẩn cửa sổ khỏi phần mềm điều khiển máy tính từ xa và trình phóng to màn hình, và đó là lý do lối thoát này tồn tại.",
+    "disableConfirm": "Tắt bảo vệ",
+    "disableCost": "Việc tắt chỉ áp dụng cho thiết bị này và vẫn tắt cho đến khi bạn bật lại, cả trước khi bạn mở khóa một kho lẫn sau đó. Không có gì được gửi đi đâu và không có cài đặt nào của kho thay đổi, nhưng lựa chọn này được lưu trong một tệp cài đặt trên thiết bị này, và tệp đó vẫn nằm lại ở đó sau khi bạn bật bảo vệ trở lại.",
+    "disableTitle": "Tắt chống chụp màn hình?",
+    "disableTrigger": "Tắt chống chụp màn hình",
+    "flagNotice": "Phiên này đã được khởi động với --disable-screen-capture-protection, nên bảo vệ vẫn tắt cho đến khi bạn thoát, bất kể cài đặt này nói gì.",
+    "restoreBody": "Chống chụp màn hình đang tắt trên thiết bị này. Bật lại sẽ yêu cầu hệ điều hành giữ cửa sổ này ra khỏi ảnh chụp màn hình và bản quay màn hình một lần nữa; trên Windows 10 (Bản cập nhật tháng 5 năm 2020) trở lên, điều đó cũng ẩn cửa sổ khỏi phần mềm điều khiển máy tính từ xa và trình phóng to màn hình. Trên macOS và Linux không có API hệ thống cho việc này, nên ở đó không thể chặn việc chụp hay quay màn hình.",
+    "restoreConfirm": "Bật bảo vệ",
+    "restoreTitle": "Bật lại chống chụp màn hình?",
+    "restoreTrigger": "Bật chống chụp màn hình",
+    "saveFailed": "Không thể lưu lựa chọn đó, nên không có gì thay đổi. Hãy thử lại, hoặc khởi động Myne với --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Đã lưu. Phiên này vẫn đang tắt bảo vệ vì nó được khởi động với --disable-screen-capture-protection, nên bảo vệ sẽ trở lại vào lần tiếp theo bạn mở Myne mà không dùng tùy chọn đó."
   }
 }

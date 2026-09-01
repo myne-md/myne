@@ -260,7 +260,7 @@
       "title": "Anhänge",
       "transcribeDone": "Transkription abgeschlossen.",
       "transcribeFailed": "Transkription fehlgeschlagen. Bitte versuchen Sie es erneut.",
-      "transcribeTooLong": "Diese Aufnahme ist zu lang zum Transkribieren.",
+      "transcribeTooLong": "Diese Aufnahme ist zu lang für eine Transkription. Die Audiodatei bleibt angehängt, Sie können sie also weiterhin abspielen.",
       "transcribeFeatureOff": "Sprache zu Text ist aus. Schalten Sie es unter Einstellungen → Transkription ein.",
       "transcribeModelLoadFailed": "Das Sprache-zu-Text-Modell konnte nicht geladen werden. Installieren Sie Myne neu oder prüfen Sie Ihr eigenes Modell unter Einstellungen → Developer → KI.",
       "transcribeNoModelHint": "Das Sprache-zu-Text-Modell fehlt. Eine Neuinstallation von Myne stellt es wieder her.",
@@ -440,7 +440,7 @@
         "label": "KI-Funktionen umschalten (Beta)"
       },
       "toggleScreenCapture": {
-        "label": "Schutz vor Bildschirmaufnahmen umschalten"
+        "label": "Bildschirmaufnahme-Schutz umschalten"
       },
       "cycleTheme": {
         "label": "Design durchschalten"
@@ -1830,7 +1830,9 @@
       "moveCollision": "Dort gibt es bereits einen Ordner mit diesem Namen.",
       "unsettledSave": "Eine geöffnete Notiz ist noch nicht fertig gespeichert, daher wurde der Ordner nicht verändert. Versuchen Sie es erneut, sobald sie gespeichert ist.",
       "renameFailed": "Der Ordner konnte nicht umbenannt werden, daher ist er unverändert.",
-      "deliberateWriteFailed": "Der Ordner wurde umbenannt, aber eine seiner Einstellungen konnte nicht gespeichert werden. Bei jedem Entsperren erscheint erneut ein leerer Ordner mit dem alten Namen; Sie können ihn sicher löschen, ohne dass sich sonst etwas ändert. Ein erneutes Umbenennen des Ordners entfernt ihn nicht."
+      "deliberateWriteFailed": "Der Ordner wurde umbenannt, aber eine seiner Einstellungen konnte nicht gespeichert werden. Bei jedem Entsperren erscheint erneut ein leerer Ordner mit dem alten Namen; Sie können ihn sicher löschen, ohne dass sich sonst etwas ändert. Ein erneutes Umbenennen des Ordners entfernt ihn nicht.",
+      "folderListFull": "Myne kann sich nur eine begrenzte Anzahl von Ordnern merken, und diese Liste ist voll. Dieser Ordner funktioniert weiterhin, verschwindet aber, sobald seine letzte Notiz ihn verlässt. Wenn Sie einen Ordner löschen, den Sie nicht mehr brauchen, wird wieder Platz frei.",
+      "folderNotRemembered": "Der Ordner wurde erstellt, aber Myne konnte ihn nicht vermerken. Er verschwindet, sobald seine letzte Notiz ihn verlässt, und ist beim nächsten Entsperren weg, wenn er dann noch leer ist. Sie können ihn gefahrlos erneut erstellen."
     },
     "folderNote": {
       "defaultTitle": "Index"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne durfte diese Datei nicht lesen.",
         "reasonNotFound": "Diese Datei war nicht mehr da, als Myne sie erreichte.",
         "reasonNoSpace": "Auf diesem Gerät ist kein Speicherplatz mehr frei.",
-        "reasonUnknown": "Myne konnte nicht sagen, warum."
+        "reasonUnknown": "Myne konnte nicht sagen, warum.",
+        "foldersNotKeptNote": "{{count}} verschwindet, sobald seine letzte Notiz ihn verlässt",
+        "foldersNotKeptNote_one": "{{count}} verschwindet, sobald seine letzte Notiz ihn verlässt",
+        "foldersNotKeptNote_other": "{{count}} verschwinden, sobald ihre letzte Notiz sie verlässt",
+        "statFoldersNotKept": "Ordner nicht beibehalten"
       },
       "offer": {
         "body": "Holen Sie Ihre vorhandenen Notizen in Myne. Jede wird beim Import verschlüsselt. Nichts verlässt dieses Gerät und Ihre Originaldateien bleiben genau dort, wo sie sind.",
@@ -2021,7 +2027,52 @@
           "survives": "Wird zu einer einzigen Notiz, die die Tabelle enthält.",
           "loses": "Es ist eine Notiz, nicht eine Notiz pro Zeile: Myne ist keine Datenbank. Sehr breite oder sehr lange Dateien werden gekürzt, und der Importbericht nennt den Umfang.",
           "short": "Eine einzelne Tabellendatei"
+        },
+        "myne": {
+          "label": "Myne-Tresor",
+          "loses": "Versionsverlauf, gelöschte Notizen und Vorlagen bleiben im Quelltresor. Anhänge, die keine importierte Notiz verwendet, werden zurückgelassen. Der Quelltresor wird nicht verändert und wird, wenn Sie ihn synchronisieren, weiterhin synchronisiert.",
+          "pickerTitle": "Wählen Sie den Tresor, aus dem importiert werden soll",
+          "short": "Ein anderer Tresor auf diesem Gerät",
+          "survives": "Notizen, Ordner, Tags, Links zwischen den importierten Notizen und die Anhänge, die diese Notizen verwenden. Wörter, die Sie dem Wörterbuch des Quelltresors hinzugefügt haben, kommen ebenfalls mit."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Der Versionsverlauf bleibt in dem Tresor, aus dem Sie importiert haben.",
+          "sourceUnchanged": "Der Tresor, aus dem Sie importiert haben, wurde nicht verändert. Wenn Sie ihn synchronisieren, wird er weiterhin synchronisiert."
+        },
+        "errors": {
+          "alreadyOpen": "Dieser Tresor ist bereits für einen Import geöffnet. Schließen Sie diesen Import zuerst ab oder brechen Sie ihn ab.",
+          "busy": "Ein anderer Tresorvorgang läuft gerade. Warten Sie, bis er abgeschlossen ist, und versuchen Sie es erneut.",
+          "credential": "Mit diesem Passwort oder dieser Wiederherstellungsphrase ließ sich der Tresor nicht öffnen. Prüfen Sie die Eingabe und versuchen Sie es erneut."
+        },
+        "importLabel": "Diesen Import benennen",
+        "importLabelHint": "Wenn eine importierte Notiz denselben Namen hat wie eine, die Sie bereits haben, und etwas aus dem Import auf sie verweist, wird die importierte Notiz mit diesem Namen umbenannt. Verwenden Sie denselben Namen, wenn Sie diesen Import erneut ausführen, dann wird nichts doppelt übernommen.",
+        "importLabelIllegal": "Dieser Name kann nicht verwendet werden: Ein Notizname darf die Zeichen \\ / | # ^ [ ] nicht enthalten und nicht mit einem Leerzeichen beginnen oder enden.",
+        "loading": "Ihre anderen Tresore werden gesucht…",
+        "noOtherVaults": "Auf diesem Gerät gibt es keine weiteren Tresore, aus denen importiert werden könnte. Stellen Sie zuerst eine Sicherung wieder her, dann wird daraus ein Tresor, aus dem Sie hier importieren können.",
+        "opening": "Wird geöffnet…",
+        "passwordLabel": "Passwort dieses Tresors",
+        "phraseLabel": "24-Wort-Wiederherstellungsphrase dieses Tresors",
+        "report": {
+          "attachmentsCrossed": "Übernommene Anhänge",
+          "attachmentsDeduped": "Bereits vorhandene Anhänge",
+          "attachmentsFailed": "Vom Tresor nicht angenommene Anhänge",
+          "dictionaryUnreadable": "Das Wörterbuch des Quelltresors konnte nicht gelesen werden, daher wurden keine Wörter übernommen.",
+          "dictionaryWordsAdded": "Übernommene Wörterbuchwörter",
+          "linksLeftUnresolved": "Links, die auf kein Ziel gerichtet werden konnten",
+          "linksRetargeted": "Links, die auf eine umbenannte Notiz gerichtet wurden",
+          "templatesLeftBehind": "Zurückgelassene Vorlagen",
+          "tombstonedEmbeds": "Einbettungen, deren Datei in der Quelle bereits gelöscht war",
+          "trashedLeftBehind": "Zurückgelassene Notizen im Papierkorb des Quelltresors",
+          "untitledImported": "Übernommene Notizen ohne Titel"
+        },
+        "unnamedVault": "Tresor {{n}}",
+        "usePassword": "Stattdessen das Passwort verwenden",
+        "usePhrase": "Stattdessen die Wiederherstellungsphrase verwenden",
+        "vaultLabel": "Importieren aus",
+        "vaultPlaceholder": "Tresor auswählen",
+        "wordAria": "Wort {{number}} von 24"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Wiederherstellung abgebrochen: Der Tresor wurde gesperrt.",
       "operationInProgress": "Vorgang läuft. Bitte warten.",
       "unexpected": "Unerwarteter Fehler. Bitte versuchen Sie es erneut.",
-      "vaultNotFound": "Tresordatei nicht gefunden. Bitte starten Sie die App neu."
+      "vaultNotFound": "Tresordatei nicht gefunden. Bitte starten Sie die App neu.",
+      "openAsImportSource": "Dieser Tresor wird gerade von einem Import gelesen. Schließen Sie diesen Import ab oder brechen Sie ihn ab, und stellen Sie den Tresor danach wieder her."
     },
     "vaultUnreadable": "Tresordatei ist nicht lesbar. Aus einem Backup wiederherstellen.",
     "genericError": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Graph öffnen"
     },
     "archive": {
-      "helper": "Erlaubt es, Notizen in ein Archiv zu verschieben, das aus der Hauptliste herausgehalten wird. Beim Deaktivieren wird jede archivierte Notiz in ihren Ordner zurückgestellt und die Archiv-Bedienelemente werden ausgeblendet.",
+      "helper": "Erlaubt es, Notizen in ein Archiv zu verschieben, das aus der Hauptliste herausgehalten wird. Beim Deaktivieren wird jede archivierte Notiz in ihren Ordner zurückgestellt, jeder archivierte Ordner wird aus dem Archiv geholt und die Archiv-Bedienelemente werden ausgeblendet. Das gilt für den gesamten Tresor, auf allen Geräten.",
       "label": "Archivierung",
       "off": "Aus",
       "on": "Ein",
@@ -3109,7 +3161,8 @@
       "torLabel": "Sync über Tor leiten"
     },
     "prefs": {
-      "saveError": "Die Einstellung konnte nicht gespeichert werden. Versuchen Sie es erneut."
+      "saveError": "Die Einstellung konnte nicht gespeichert werden. Versuchen Sie es erneut.",
+      "folderListFull": "Diese Ordnerliste ist voll. Entfernen Sie einen Ordner daraus, bevor Sie einen weiteren hinzufügen."
     },
     "reminders": {
       "aria": "Aufgabenerinnerungen auf diesem Gerät anzeigen",
@@ -3134,7 +3187,7 @@
       "hideVaultNamesHelper": "Auf einem Gerät mit nutzbarem Schlüsselbund zeigt die Tresorauswahl den Namen eines Tresors, sobald dieses Gerät ihn entsperrt hat. Ist diese Option aktiv, zeigt jeder Tresor stattdessen einen Platzhalter wie „Tresor 2“, und diese Nummer bleibt beim Tresor, egal wie sich die Liste umsortiert.",
       "hideVaultNamesErases": "Das Aktivieren zerstört die Schlüssel, mit denen die hier gespeicherten Namen lesbar sind. Diese Namen lassen sich auf diesem Gerät nicht wiederherstellen, und solange die Option aktiv bleibt, wird kein weiterer Name gespeichert.",
       "hideVaultNamesResidue": "Auf eine früher angefertigte Kopie hat das keinen Zugriff: eine vollständige Systemsicherung, ein Datenträgerabbild oder jede andere Kopie dieses Datenträgers auf Systemebene, die angelegt wurde, während die Namen sichtbar waren, enthält sowohl die gespeicherten Namen als auch deren Schlüssel.",
-      "hideVaultNamesUnavailable": "Dieses Gerät hat keinen nutzbaren Schlüsselbund, daher speichert Myne hier keinen Tresornamen und diese Option kann nicht aktiviert werden. Die Auswahl zeigt bereits für jeden Tresor einen Platzhalter.",
+      "hideVaultNamesUnavailable": "Diese Myne-Installation kann keine Tresornamen speichern, daher speichert Myne hier keinen Tresornamen und diese Option kann nicht aktiviert werden. Die Auswahl zeigt bereits für jeden Tresor einen Platzhalter.",
       "hideVaultNamesErrorRead": "Die aktuelle Einstellung konnte nicht gelesen werden. Betätigen Sie den Schalter, um sie erneut zu setzen.",
       "hideVaultNamesErrorSave": "Die Einstellung konnte nicht gespeichert werden und ist unverändert. Wenn Sie sie gerade aktiviert haben, wurden möglicherweise schon einige gespeicherte Namen zerstört; aktivieren Sie sie erneut, um den Vorgang abzuschließen.",
       "hideVaultNamesErrorErase": "Ein gespeicherter Name konnte nicht zerstört werden. Die Einstellung blieb deshalb deaktiviert, statt eine Löschung zu behaupten, die nicht stattgefunden hat. Versuchen Sie es erneut.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 Min",
       "autoLock1h": "1 Std",
       "quickUnlockSubtitleAndroid": "Nach dem automatischen Sperren mit einer PIN erneut entsperren",
-      "quickUnlockSubtitle": "Nach dem automatischen Sperren mit {{method}} oder einer PIN erneut entsperren"
+      "quickUnlockSubtitle": "Nach dem automatischen Sperren mit {{method}} oder einer PIN erneut entsperren",
+      "screenCaptureOverrideHelper": "Deaktiviert den Bildschirmaufnahme-Schutz nur auf diesem Gerät – vor dem Entsperren eines Tresors wie danach. Aktivieren Sie diese Option, wenn eine Bildschirmlupe, Remote-Desktop-Software oder jemand, der Ihnen aus der Ferne hilft, nur ein schwarzes Fenster sieht. Sie wird nicht synchronisiert.",
+      "screenCaptureOverrideLabel": "Bildschirmaufnahme auf diesem Gerät erlauben",
+      "screenCaptureOverrideUnknown": "Die Bildschirmaufnahme-Einstellung dieses Geräts konnte nicht gelesen werden, daher wird diese Einstellung nicht angewendet. Öffnen Sie die Einstellungen erneut, um es noch einmal zu versuchen.",
+      "screenCaptureSuperseded": "Auf diesem Gerät deaktiviert. Siehe „Bildschirmaufnahme auf diesem Gerät erlauben“ unten. Diese Einstellung bleibt erhalten und greift wieder, sobald Sie jene Option deaktivieren.",
+      "screenCaptureSupersededByFlag": "Für diese Sitzung deaktiviert, weil Myne mit --disable-screen-capture-protection gestartet wurde. Diese Einstellung bleibt erhalten und greift wieder, wenn Sie Myne das nächste Mal ohne diese Option öffnen."
     },
     "quickUnlock": {
       "errorBusy": "Ein anderer Tresorvorgang läuft gerade. Versuchen Sie es gleich erneut.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "neue notiz speicherort ordner standard wo notizen erstellt",
         "torRouting": "tor routing onion proxy netzwerk ip adresse standort verbergen sync anonymität",
         "quickUnlock": "schnellentsperrung pin touch id biometrie biometrisch gesicht entsperren",
-        "reminders": "erinnerungen benachrichtigen benachrichtigung hinweis aufgabe fällig erinnern",
+        "reminders": "erinnerungen benachrichtigen benachrichtigung hinweis aufgabe fällig erinnern vorlauf horizont registrierung registriert im voraus tage",
         "realtimeSync": "echtzeit synchronisierung sync live verbindung abfrage polling",
         "screenCapture": "bildschirmaufnahme schutz screenshot aufnahme blockieren datenschutz bildschirmfoto",
         "showEditTimes": "bearbeitungszeiten zeitstempel geändert datum notizen anzeigen",
@@ -3402,7 +3460,8 @@
         "timeFormat": "zeitformat uhrzeit format 24 stunden 12 stunden uhr am pm",
         "timezone": "zeitzone zeitzonen zone tz utc iana region heute",
         "periodicNotes": "periodische Notizen wöchentlich monatlich Woche Monat Ordner Vorlage Format",
-        "aiHistoryBudget": "Gespräch Verlauf Kontext Gedächtnis Budget Zeichen Agent Chat Anfrage"
+        "aiHistoryBudget": "Gespräch Verlauf Kontext Gedächtnis Budget Zeichen Agent Chat Anfrage",
+        "screenCaptureOverride": "bildschirmaufnahme screenshot aufzeichnung ausnahme überschreiben erlauben deaktivieren bildschirmlupe lupe remote desktop fernwartung barrierefreiheit entsperren sperrbildschirm schwarz screen capture"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24 Stunden",
       "time12": "12 Stunden",
       "zoneLabel": "Zeitzone",
-      "zoneHelper": "Diese Zone bestimmt, was als heute gilt. Leer lassen, um diesem Gerät zu folgen. Uhrzeiten, die Sie in eine Notiz schreiben, werden nie geändert; 09:00 bleibt überall 09:00.",
+      "zoneHelper": "Diese Zone bestimmt, was als heute gilt – und damit, welche Notiz Ihre täglichen, wöchentlichen und monatlichen Notizen öffnen. Leer lassen, um diesem Gerät zu folgen. Die Auswahl gilt pro Gerät: Kein anderes Gerät überschreibt sie, eine abweichende Einstellung kann dieses Gerät also auf einen anderen Tag setzen als Ihre übrigen. Uhrzeiten, die Sie in eine Notiz schreiben, werden nie geändert; 09:00 bleibt überall 09:00.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kennt diese Zeitzone nicht. Verwenden Sie einen Namen wie Europe/Berlin.",
       "errorSave": "Diese Einstellung konnte nicht gespeichert werden."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Dieser Tresor benötigt {{required}} MiB Arbeitsspeicher zum Öffnen, mehr als dieser Browser bereitstellen kann ({{available}} MiB). Mit dem Tresor ist alles in Ordnung; öffnen Sie ihn in der Myne-Desktop-App.",
       "unexpected": "Unerwarteter Fehler. Bitte versuchen Sie es erneut.",
       "vaultNotFound": "Tresordatei nicht gefunden. Bitte starten Sie die App neu.",
-      "vaultUpgraded": "Dieser Tresor wurde auf ein neueres Format aktualisiert, das diese Myne-Version noch nicht unterstützt. Mit Ihren Daten ist alles in Ordnung. Aktualisieren Sie Myne auf die neueste Version, um ihn zu öffnen."
+      "vaultUpgraded": "Dieser Tresor wurde auf ein neueres Format aktualisiert, das diese Myne-Version noch nicht unterstützt. Mit Ihren Daten ist alles in Ordnung. Aktualisieren Sie Myne auf die neueste Version, um ihn zu öffnen.",
+      "openAsImportSource": "Dieser Tresor wird gerade von einem Import gelesen. Schließen Sie diesen Import ab oder brechen Sie ihn ab, und entsperren Sie den Tresor danach."
     },
     "passwordLabel": "Passwort",
     "passwordPlaceholder": "Passwort",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Dieser Browser stellt keine kryptografische Zufallsquelle bereit."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Der Bildschirmaufnahme-Schutz bittet das Betriebssystem, dieses Fenster aus Screenshots und Bildschirmaufnahmen herauszuhalten. Er ist unter Windows 10 (Mai-2020-Update) und neuer wirksam; macOS und Linux bieten dafür keine System-API, dort kann die Aufnahme also nicht blockiert werden. Wo er wirkt, verbirgt er das Fenster unter anderem auch vor Remote-Desktop-Software und Bildschirmlupen – und genau deshalb gibt es diesen Ausweg.",
+    "disableConfirm": "Schutz deaktivieren",
+    "disableCost": "Das Deaktivieren gilt nur für dieses Gerät und bleibt bestehen, bis Sie den Schutz wieder aktivieren – vor dem Entsperren eines Tresors wie danach. Es wird nichts nach außen gesendet und keine Tresoreinstellung geändert, aber die Entscheidung wird in einer Einstellungsdatei auf diesem Gerät gespeichert, und diese Datei bleibt dort, auch nachdem Sie den Schutz wieder aktiviert haben.",
+    "disableTitle": "Bildschirmaufnahme-Schutz deaktivieren?",
+    "disableTrigger": "Bildschirmaufnahme-Schutz deaktivieren",
+    "flagNotice": "Diese Sitzung wurde mit --disable-screen-capture-protection gestartet, daher bleibt der Schutz bis zum Beenden deaktiviert, unabhängig davon, was diese Einstellung sagt.",
+    "restoreBody": "Der Bildschirmaufnahme-Schutz ist auf diesem Gerät deaktiviert. Beim erneuten Aktivieren wird das Betriebssystem wieder gebeten, dieses Fenster aus Screenshots und Bildschirmaufnahmen herauszuhalten; unter Windows 10 (Mai-2020-Update) und neuer wird es dadurch auch vor Remote-Desktop-Software und Bildschirmlupen verborgen. Unter macOS und Linux gibt es dafür keine System-API, dort kann die Aufnahme also nicht blockiert werden.",
+    "restoreConfirm": "Schutz aktivieren",
+    "restoreTitle": "Bildschirmaufnahme-Schutz wieder aktivieren?",
+    "restoreTrigger": "Bildschirmaufnahme-Schutz aktivieren",
+    "saveFailed": "Das konnte nicht gespeichert werden, daher hat sich nichts geändert. Versuchen Sie es erneut oder starten Sie Myne mit --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Gespeichert. In dieser Sitzung bleibt der Schutz deaktiviert, weil sie mit --disable-screen-capture-protection gestartet wurde; er greift wieder, wenn Sie Myne das nächste Mal ohne diese Option öffnen."
   }
 }

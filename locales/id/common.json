@@ -260,7 +260,7 @@
       "title": "Lampiran",
       "transcribeDone": "Transkripsi selesai.",
       "transcribeFailed": "Transkripsi gagal. Silakan coba lagi.",
-      "transcribeTooLong": "Rekaman ini terlalu panjang untuk ditranskripsikan.",
+      "transcribeTooLong": "Rekaman ini terlalu panjang untuk ditranskripsi. Audionya tetap terlampir, jadi Anda masih bisa memutarnya.",
       "transcribeFeatureOff": "Ucapan-ke-teks mati. Nyalakan di Pengaturan → Transkripsi.",
       "transcribeModelLoadFailed": "Tidak dapat memuat model ucapan-ke-teks. Pasang ulang Myne, atau periksa model kustom Anda di Pengaturan → Developer → AI.",
       "transcribeNoModelHint": "Model ucapan-ke-teks tidak ada. Memasang ulang Myne akan memulihkannya.",
@@ -1830,7 +1830,9 @@
       "moveCollision": "Sudah ada folder dengan nama itu di sana.",
       "unsettledSave": "Sebuah catatan yang terbuka belum selesai disimpan, jadi folder itu tidak diubah. Coba lagi setelah selesai.",
       "renameFailed": "Tidak dapat mengganti nama folder, jadi folder itu tidak berubah.",
-      "deliberateWriteFailed": "Nama folder sudah diganti, tetapi salah satu pengaturannya tidak dapat disimpan. Sebuah folder kosong akan muncul lagi dengan nama lama setiap kali Anda membuka kunci; folder itu aman untuk dihapus dan menghapusnya tidak mengubah apa pun yang lain. Mengganti nama folder lagi tidak akan menghilangkannya."
+      "deliberateWriteFailed": "Nama folder sudah diganti, tetapi salah satu pengaturannya tidak dapat disimpan. Sebuah folder kosong akan muncul lagi dengan nama lama setiap kali Anda membuka kunci; folder itu aman untuk dihapus dan menghapusnya tidak mengubah apa pun yang lain. Mengganti nama folder lagi tidak akan menghilangkannya.",
+      "folderListFull": "Myne hanya dapat mengingat sejumlah folder tertentu, dan daftar itu sudah penuh. Folder ini tetap berfungsi, tetapi akan hilang saat catatan terakhirnya keluar dari folder ini. Menghapus folder yang tidak Anda perlukan lagi akan memberi ruang.",
+      "folderNotRemembered": "Folder berhasil dibuat, tetapi Myne tidak dapat mencatatnya. Folder itu akan hilang saat catatan terakhirnya keluar, dan akan lenyap saat Anda membuka kunci berikutnya jika folder itu masih kosong. Aman untuk membuatnya lagi."
     },
     "folderNote": {
       "defaultTitle": "Indeks"
@@ -1974,7 +1976,11 @@
         "reasonPermissionDenied": "Myne tidak diizinkan membaca berkas ini.",
         "reasonNotFound": "Berkas ini sudah tidak ada saat Myne mencapainya.",
         "reasonNoSpace": "Perangkat ini kehabisan ruang.",
-        "reasonUnknown": "Myne tidak dapat menyebutkan alasannya."
+        "reasonUnknown": "Myne tidak dapat menyebutkan alasannya.",
+        "foldersNotKeptNote": "{{count}} akan hilang saat catatan terakhirnya keluar",
+        "foldersNotKeptNote_one": "{{count}} akan hilang saat catatan terakhirnya keluar",
+        "foldersNotKeptNote_other": "{{count}} akan hilang saat catatan terakhirnya keluar",
+        "statFoldersNotKept": "Folder yang tidak dipertahankan"
       },
       "offer": {
         "body": "Bawa catatan Anda yang sudah ada ke Myne. Masing-masing dienkripsi saat diimpor. Tidak ada yang meninggalkan perangkat ini, dan berkas asli Anda tetap persis di tempatnya.",
@@ -2021,7 +2027,52 @@
           "survives": "Menjadi satu catatan yang memuat tabelnya.",
           "loses": "Hasilnya satu catatan, bukan satu catatan per baris: Myne bukan basis data. Berkas yang sangat lebar atau sangat panjang dipangkas, dan laporan impor menyebutkan seberapa banyak.",
           "short": "Satu berkas lembar kerja"
+        },
+        "myne": {
+          "label": "Brankas Myne",
+          "loses": "Riwayat versi, catatan yang dihapus, dan templat tetap berada di brankas sumber. Lampiran yang tidak digunakan oleh catatan mana pun yang diimpor ikut ditinggalkan. Brankas sumber tidak diubah dan, jika Anda menyinkronkannya, sinkronisasinya tetap berjalan.",
+          "pickerTitle": "Pilih brankas sumber impor",
+          "short": "Brankas lain di perangkat ini",
+          "survives": "Catatan, folder, tag, tautan antar catatan yang Anda impor, dan lampiran yang digunakan catatan-catatan itu. Kata-kata yang Anda tambahkan ke kamus brankas sumber juga ikut terbawa."
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "Riwayat versi tetap berada di brankas yang Anda jadikan sumber impor.",
+          "sourceUnchanged": "Brankas yang Anda jadikan sumber impor tidak diubah. Jika Anda menyinkronkannya, sinkronisasinya tetap berjalan."
+        },
+        "errors": {
+          "alreadyOpen": "Brankas itu sudah terbuka untuk sebuah impor. Selesaikan atau batalkan impor itu terlebih dahulu.",
+          "busy": "Operasi brankas lain sedang berjalan. Tunggu sampai selesai lalu coba lagi.",
+          "credential": "Kata sandi atau frasa pemulihan itu tidak membuka brankas. Periksa kembali lalu coba lagi."
+        },
+        "importLabel": "Beri nama impor ini",
+        "importLabelHint": "Jika sebuah catatan yang Anda impor bernama sama dengan catatan yang sudah Anda miliki, dan ada sesuatu yang Anda impor menautkan ke catatan itu, catatan yang diimpor akan diganti namanya dengan nama ini. Gunakan nama yang sama jika Anda menjalankan impor ini lagi, dan tidak ada yang akan terbawa masuk dua kali.",
+        "importLabelIllegal": "Nama itu tidak dapat digunakan: nama catatan tidak boleh memuat \\ / | # ^ [ ], atau diawali atau diakhiri dengan spasi.",
+        "loading": "Mencari brankas Anda yang lain…",
+        "noOtherVaults": "Tidak ada brankas lain di perangkat ini untuk dijadikan sumber impor. Pulihkan sebuah cadangan terlebih dahulu, dan cadangan itu menjadi brankas yang dapat Anda impor dari sini.",
+        "opening": "Membuka…",
+        "passwordLabel": "Kata sandi brankas itu",
+        "phraseLabel": "Frasa pemulihan 24 kata brankas itu",
+        "report": {
+          "attachmentsCrossed": "Lampiran yang terbawa",
+          "attachmentsDeduped": "Lampiran yang sudah Anda miliki",
+          "attachmentsFailed": "Lampiran yang ditolak brankas",
+          "dictionaryUnreadable": "Kamus brankas sumber tidak dapat dibaca, jadi tidak ada kata yang terbawa.",
+          "dictionaryWordsAdded": "Kata kamus yang terbawa",
+          "linksLeftUnresolved": "Tautan yang tidak dapat diarahkan ke mana pun",
+          "linksRetargeted": "Tautan yang diarahkan ke catatan yang diganti namanya",
+          "templatesLeftBehind": "Templat, ditinggalkan",
+          "tombstonedEmbeds": "Sematan yang berkasnya sudah dihapus di brankas sumber",
+          "trashedLeftBehind": "Catatan di Sampah brankas sumber, ditinggalkan",
+          "untitledImported": "Catatan tanpa judul yang terbawa"
+        },
+        "unnamedVault": "Brankas {{n}}",
+        "usePassword": "Gunakan kata sandi sebagai gantinya",
+        "usePhrase": "Gunakan frasa pemulihan sebagai gantinya",
+        "vaultLabel": "Impor dari",
+        "vaultPlaceholder": "Pilih brankas",
+        "wordAria": "Kata {{number}} dari 24"
       }
     },
     "list": {
@@ -2424,7 +2475,8 @@
       "cancelledVaultLocked": "Pemulihan dibatalkan: brankas terkunci.",
       "operationInProgress": "Operasi sedang berlangsung. Mohon tunggu.",
       "unexpected": "Kesalahan tak terduga. Silakan coba lagi.",
-      "vaultNotFound": "Berkas brankas tidak ditemukan. Silakan mulai ulang aplikasi."
+      "vaultNotFound": "Berkas brankas tidak ditemukan. Silakan mulai ulang aplikasi.",
+      "openAsImportSource": "Sebuah impor sedang membaca brankas ini. Selesaikan atau batalkan impor itu, lalu pulihkan brankas ini."
     },
     "vaultUnreadable": "Berkas brankas tidak dapat dibaca. Pulihkan dari cadangan.",
     "genericError": "Terjadi kesalahan. Silakan coba lagi.",
@@ -2660,7 +2712,7 @@
       "openGraph": "Buka grafik"
     },
     "archive": {
-      "helper": "Izinkan catatan dipindahkan ke Arsip, terpisah dari daftar utama. Mematikan ini akan mengembalikan setiap catatan yang diarsipkan ke foldernya dan menyembunyikan kontrol arsip.",
+      "helper": "Izinkan catatan dipindahkan ke Arsip, terpisah dari daftar utama. Mematikan ini akan mengembalikan setiap catatan yang diarsipkan ke foldernya, membatalkan pengarsipan setiap folder yang diarsipkan, dan menyembunyikan kontrol arsip. Ini berlaku untuk seluruh brankas, di semua perangkat.",
       "label": "Pengarsipan",
       "off": "Mati",
       "on": "Hidup",
@@ -3109,7 +3161,8 @@
       "torLabel": "Rutekan sinkronisasi melalui Tor"
     },
     "prefs": {
-      "saveError": "Tidak dapat menyimpan preferensi. Coba lagi."
+      "saveError": "Tidak dapat menyimpan preferensi. Coba lagi.",
+      "folderListFull": "Daftar folder itu sudah penuh. Keluarkan satu folder dari daftar itu sebelum menambahkan yang lain."
     },
     "reminders": {
       "aria": "Tampilkan pengingat tugas di perangkat ini",
@@ -3134,14 +3187,14 @@
       "hideVaultNamesHelper": "Di perangkat dengan keychain yang dapat dipakai, pemilih brankas menampilkan nama sebuah brankas setelah perangkat ini membuka kuncinya. Jika ini aktif, setiap brankas menampilkan teks pengganti seperti Brankas 2, dan nomor itu tetap melekat pada brankas tersebut bagaimanapun daftarnya diurutkan ulang.",
       "hideVaultNamesErases": "Mengaktifkannya menghancurkan kunci yang membuat nama yang tersimpan di sini dapat dibaca, sehingga nama-nama itu tidak dapat dipulihkan di perangkat ini, dan tidak ada nama baru yang ditulis selama opsi ini tetap aktif.",
       "hideVaultNamesResidue": "Ini tidak dapat menjangkau salinan yang dibuat sebelumnya: cadangan seluruh sistem, image disk, atau salinan tingkat sistem lain dari disk ini yang dibuat saat nama masih ditampilkan tetap membawa nama yang tersimpan sekaligus kuncinya.",
-      "hideVaultNamesUnavailable": "Perangkat ini tidak memiliki keychain yang dapat dipakai, jadi Myne tidak menyimpan nama brankas di sini dan opsi ini tidak dapat diaktifkan. Pemilih sudah menampilkan teks pengganti untuk setiap brankas.",
+      "hideVaultNamesUnavailable": "Myne tidak dapat menyimpan nama brankas di salinan aplikasi ini, jadi Myne tidak menyimpan satu nama pun di sini dan opsi ini tidak dapat diaktifkan. Pemilih sudah menampilkan teks pengganti untuk setiap brankas.",
       "hideVaultNamesErrorRead": "Tidak dapat membaca pengaturan saat ini. Alihkan sakelarnya untuk mengaturnya lagi.",
       "hideVaultNamesErrorSave": "Tidak dapat menyimpan pengaturan, jadi pengaturan tidak berubah. Jika Anda sedang mengaktifkannya, sebagian nama yang tersimpan mungkin sudah dihancurkan; aktifkan lagi untuk menyelesaikannya.",
       "hideVaultNamesErrorErase": "Satu nama yang tersimpan tidak dapat dihancurkan, jadi pengaturan dibiarkan nonaktif alih-alih mengklaim penghapusan yang tidak terjadi. Coba lagi.",
       "realtimeSyncHelper": "Perubahan dari perangkat lain tiba dalam hitungan detik melalui sinyal tanpa konten — server hanya meneruskan “ada yang berubah”, tidak pernah apa yang berubah. Selama brankas Anda tidak terkunci, aplikasi tetap memeriksa server secara berkala, jadi ini tidak menambah visibilitas berarti; tidak ada yang perlu dikonfigurasi.",
       "realtimeSyncLabel": "Sinkronisasi waktu nyata",
       "screenCaptureHelperOff": "Perlindungan selalu berlaku sebelum buka kunci. Setelah buka kunci, mengikuti preferensi ini.",
-      "screenCaptureHelperOn": "Berlaku di Windows 10 (Pembaruan Mei 2020) dan yang lebih baru. macOS dan Linux tidak menyediakan API sistem untuk ini, jadi di sana pengaturan ini tidak dapat memblokir perekaman.",
+      "screenCaptureHelperOn": "Berlaku di Windows 10 (Pembaruan Mei 2020) dan yang lebih baru. macOS dan Linux tidak menyediakan API sistem untuk ini, jadi di sana pengaturan ini tidak dapat memblokir tangkapan layar maupun perekaman.",
       "screenCaptureLabel": "Perlindungan tangkapan layar",
       "screenCaptureSubtitle": "Blokir tangkapan layar dan perekaman layar",
       "screenshotBlocked": "Perlindungan layar aktif: tangkapan layar Myne akan kosong.",
@@ -3152,7 +3205,12 @@
       "autoLock30m": "30 mnt",
       "autoLock1h": "1 jam",
       "quickUnlockSubtitleAndroid": "Masuk kembali dengan PIN setelah kunci otomatis",
-      "quickUnlockSubtitle": "Masuk kembali dengan {{method}} atau PIN setelah kunci otomatis"
+      "quickUnlockSubtitle": "Masuk kembali dengan {{method}} atau PIN setelah kunci otomatis",
+      "screenCaptureOverrideHelper": "Mematikan perlindungan tangkapan layar hanya di perangkat ini, baik sebelum Anda membuka kunci brankas maupun sesudahnya. Aktifkan jika pembesar layar, perangkat lunak remote desktop, atau seseorang yang membantu Anda dari jarak jauh melihat jendela hitam. Pengaturan ini tidak disinkronkan.",
+      "screenCaptureOverrideLabel": "Izinkan tangkapan layar di perangkat ini",
+      "screenCaptureOverrideUnknown": "Pengaturan tangkapan layar perangkat ini tidak dapat dibaca, jadi preferensi ini tidak sedang diterapkan. Buka kembali Pengaturan untuk mencoba lagi.",
+      "screenCaptureSuperseded": "Mati di perangkat ini. Lihat \"Izinkan tangkapan layar di perangkat ini\" di bawah. Preferensi ini tetap tersimpan dan berlaku lagi saat Anda mematikan opsi tersebut.",
+      "screenCaptureSupersededByFlag": "Mati untuk sesi ini, karena Myne dijalankan dengan --disable-screen-capture-protection. Preferensi ini tetap tersimpan dan berlaku lagi saat Anda membuka Myne berikutnya tanpa opsi tersebut."
     },
     "quickUnlock": {
       "errorBusy": "Operasi brankas lain sedang berlangsung. Coba lagi sebentar lagi.",
@@ -3374,7 +3432,7 @@
         "newNoteLocation": "lokasi catatan baru folder bawaan default tempat catatan dibuat",
         "torRouting": "tor perutean onion proksi jaringan alamat ip lokasi sembunyikan sinkronisasi anonimitas routing",
         "quickUnlock": "buka kunci cepat pin touch id biometrik wajah quick unlock",
-        "reminders": "pengingat notifikasi pemberitahuan peringatan tugas tenggat ingatkan reminders",
+        "reminders": "pengingat notifikasi pemberitahuan peringatan tugas tenggat ingatkan jadwalkan lebih awal di muka terdaftar pendaftaran hari reminders horizon",
         "realtimeSync": "sinkronisasi waktu nyata langsung koneksi realtime polling sync",
         "screenCapture": "tangkapan layar perlindungan rekaman blokir privasi screenshot",
         "showEditTimes": "waktu sunting stempel waktu tanggal diubah catatan timestamp",
@@ -3402,7 +3460,8 @@
         "timeFormat": "format waktu 24 jam 12 jam am pm penunjuk waktu time format",
         "timezone": "zona waktu tz utc iana wilayah hari ini timezone",
         "periodicNotes": "catatan berkala mingguan bulanan pekan bulan folder templat format",
-        "aiHistoryBudget": "percakapan riwayat konteks memori anggaran karakter agen chat permintaan"
+        "aiHistoryBudget": "percakapan riwayat konteks memori anggaran karakter agen chat permintaan",
+        "screenCaptureOverride": "tangkapan layar izinkan matikan nonaktifkan pembesar layar remote desktop aksesibilitas buka kunci layar hitam screen capture override"
       }
     },
     "dateTime": {
@@ -3415,7 +3474,7 @@
       "time24": "24 jam",
       "time12": "12 jam",
       "zoneLabel": "Zona waktu",
-      "zoneHelper": "Zona mana yang menentukan apa yang dihitung sebagai hari ini. Biarkan kosong untuk mengikuti perangkat ini. Waktu yang Anda tulis di dalam catatan tidak pernah diubah; 09:00 tetap 09:00 di mana pun.",
+      "zoneHelper": "Zona mana yang menentukan apa yang dihitung sebagai hari ini, dan karenanya catatan mana yang dibuka oleh catatan harian, mingguan, dan bulanan Anda. Biarkan kosong untuk mengikuti perangkat ini. Pilihan ini berlaku per perangkat: tidak ada perangkat lain yang menimpanya, jadi menyetelnya di sini dapat membuat perangkat ini berada di hari yang berbeda dari perangkat Anda yang lain. Waktu yang Anda tulis di dalam catatan tidak pernah diubah; 09:00 tetap 09:00 di mana pun.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne tidak mengenali zona waktu itu. Gunakan nama seperti Europe/Berlin.",
       "errorSave": "Tidak dapat menyimpan pengaturan itu."
@@ -3879,7 +3938,8 @@
       "kdfMemoryExceedsHost": "Brankas ini memerlukan {{required}} MiB memori untuk dibuka, lebih besar dari yang dapat diberikan peramban ini ({{available}} MiB). Brankasnya sendiri baik-baik saja; buka di aplikasi desktop Myne.",
       "unexpected": "Kesalahan tak terduga. Silakan coba lagi.",
       "vaultNotFound": "Berkas brankas tidak ditemukan. Silakan mulai ulang aplikasi.",
-      "vaultUpgraded": "Brankas ini ditingkatkan ke format yang lebih baru dan belum didukung versi Myne ini. Data Anda baik-baik saja. Perbarui Myne ke versi terbaru untuk membukanya."
+      "vaultUpgraded": "Brankas ini ditingkatkan ke format yang lebih baru dan belum didukung versi Myne ini. Data Anda baik-baik saja. Perbarui Myne ke versi terbaru untuk membukanya.",
+      "openAsImportSource": "Sebuah impor sedang membaca brankas ini. Selesaikan atau batalkan impor itu, lalu buka kunci brankas ini."
     },
     "passwordLabel": "Kata sandi",
     "passwordPlaceholder": "Kata sandi",
@@ -4433,5 +4493,19 @@
         "crypto-getrandomvalues": "Peramban ini tidak menyediakan sumber bilangan acak kriptografis."
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "Perlindungan tangkapan layar meminta sistem operasi untuk menjaga jendela ini agar tidak masuk ke tangkapan layar dan rekaman layar. Perlindungan ini berlaku di Windows 10 (Pembaruan Mei 2020) dan yang lebih baru; macOS dan Linux tidak menyediakan API sistem untuk ini, jadi di sana perlindungan ini tidak dapat memblokir tangkapan layar maupun perekaman. Pada sistem tempat perlindungan ini bekerja, jendela ini juga disembunyikan dari perangkat lunak remote desktop dan pembesar layar, dan karena itulah jalan keluar ini ada.",
+    "disableConfirm": "Matikan perlindungan",
+    "disableCost": "Mematikannya hanya berlaku di perangkat ini dan tetap mati sampai Anda mengaktifkannya kembali, baik sebelum Anda membuka kunci brankas maupun sesudahnya. Tidak ada yang dikirim ke mana pun dan tidak ada pengaturan brankas yang berubah, tetapi pilihan itu disimpan dalam sebuah berkas pengaturan di perangkat ini, dan berkas itu tetap ada setelah Anda mengaktifkan kembali perlindungan.",
+    "disableTitle": "Matikan perlindungan tangkapan layar?",
+    "disableTrigger": "Matikan perlindungan tangkapan layar",
+    "flagNotice": "Sesi ini dimulai dengan --disable-screen-capture-protection, jadi perlindungan tetap mati sampai Anda menutup aplikasi, apa pun yang dikatakan pengaturan ini.",
+    "restoreBody": "Perlindungan tangkapan layar mati di perangkat ini. Mengaktifkannya kembali meminta sistem operasi untuk kembali menjaga jendela ini agar tidak masuk ke tangkapan layar dan rekaman layar, yang di Windows 10 (Pembaruan Mei 2020) dan yang lebih baru juga menyembunyikannya dari perangkat lunak remote desktop dan pembesar layar. Di macOS dan Linux tidak ada API sistem untuk ini, jadi di sana perlindungan ini tidak dapat memblokir tangkapan layar maupun perekaman.",
+    "restoreConfirm": "Aktifkan perlindungan",
+    "restoreTitle": "Aktifkan kembali perlindungan tangkapan layar?",
+    "restoreTrigger": "Aktifkan perlindungan tangkapan layar",
+    "saveFailed": "Tidak dapat menyimpan pilihan itu, jadi tidak ada yang berubah. Coba lagi, atau jalankan Myne dengan --disable-screen-capture-protection.",
+    "savedForNextLaunch": "Disimpan. Di sesi ini perlindungan masih mati karena sesi ini dimulai dengan --disable-screen-capture-protection, jadi perlindungan itu kembali saat Anda membuka Myne berikutnya tanpa opsi tersebut."
   }
 }
