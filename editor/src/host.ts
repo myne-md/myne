@@ -57,6 +57,7 @@ export type TranscribeErrorKind =
   | "vault_locked"
   | "no_model"
   | "model_load_failed"
+  | "too_long"
   | "failed";
 
 /** A running transcription (SYNC-V5). `done` resolves with the FULL transcript

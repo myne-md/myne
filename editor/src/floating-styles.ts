@@ -35,8 +35,15 @@ const CSS = `
   border-radius: var(--radius-1, 3px);
   cursor: pointer;
 }
+/* The keyboard's position in the list, and it has to be legible in EVERY theme
+   (myne-md/myne#601). This was one step up the surface ramp from the menu's own
+   background: a clear step in the light theme, and on AMOLED the difference
+   between #000000 and #0c0c0b, which is invisible on a screen. Arrowing through
+   the list then moved a highlight nobody could see, so the picker read as
+   mouse-only. The accent tint carries it on its own; a leading accent bar was
+   tried alongside and read as a notch cut out of the row. */
 .cm-slash-menu-row-selected {
-  background-color: var(--paper-2, #f3f1eb);
+  background-color: var(--accent-soft, #e8edf5);
 }
 .cm-slash-menu-icon {
   display: inline-flex;

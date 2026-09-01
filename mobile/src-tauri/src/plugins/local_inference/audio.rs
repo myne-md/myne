@@ -116,9 +116,19 @@ impl AudioError {
 ///
 /// `u128` because `frames * WHISPER_SAMPLE_RATE` overflows `u64` for a `data`
 /// slice near `isize::MAX`, and this must not be the arithmetic that panics.
-/// Callers guarantee `sample_rate != 0` (the clamp rejects it first).
-fn projected_out_samples(frames: usize, sample_rate: u32) -> u128 {
-    ((frames as u128) * (WHISPER_SAMPLE_RATE as u128)).div_ceil(sample_rate as u128)
+///
+/// `None` on a zero rate rather than a doc line asking callers not to do it.
+/// `div_ceil(0)` panics, and the clamp in `parse_wav` does reject zero first, so
+/// this arm is unreachable through the one production caller. Its sibling
+/// `resample_linear` makes the same guarantee explicit for the same reason
+/// stated there: the block exists for a caller that did not come through the
+/// clamp, and hardening one helper by construction and the other by comment is
+/// the inconsistency, not the caution.
+fn projected_out_samples(frames: usize, sample_rate: u32) -> Option<u128> {
+    if sample_rate == 0 {
+        return None;
+    }
+    Some(((frames as u128) * (WHISPER_SAMPLE_RATE as u128)).div_ceil(sample_rate as u128))
 }
 
 /// Raw decoded PCM: interleaved 16-bit samples plus the format the WAV declared.
@@ -217,26 +227,53 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
     // hostile WAV must arrive by SYNC, where the blob is AEAD-verified before it
     // is written, so its author already holds `itemsKey`. That premise covers
     // one ingress and the parser has two more that need no key material at all:
-    // `sniff_content_type` maps any `RIFF….WAVE` to `audio/wav`, that type is
+    // `sniff_content_type` maps any `RIFF`…`WAVE` to `audio/wav`, that type is
     // allowlisted, and the Transcribe row is gated on it, so a WAV a user is
-    // SENT and imports through the OS share sheet (AS19) or the browser clipper
-    // (TB10) reaches this parser directly. That is the same pair the threat
+    // SENT and imports through the OS share sheet (AS19), or attaches through
+    // the ordinary picker, reaches this parser directly. (An earlier version of
+    // this sentence also named the browser clipper (TB10). There is no clipper
+    // on this client at all (`src-tauri/src/clipper/` is desktop-only), and on
+    // desktop its attachment seam is unimplemented, so neither client has that
+    // ingress today. myne#510.) That is the same pair the threat
     // model's OCR paragraph already names, and it reaches A7 by the same route
     // it does: an attacker who can already place a file on the device. A7 is
     // Best-effort there, so this stays hardening inside a conceded boundary
     // rather than a new guarantee, and the conclusion is unchanged. The
-    // reachability is not.
-    // ONE synced attachment kills the app on every device that tries to
-    // transcribe it. `transcribe` takes an `attachment_id` and reads the WAV out
+    // reachability is not. What that reachability buys the attacker is worth
+    // stating without a row citation, because no row describes it: ONE synced
+    // attachment kills the app on every device that tries to transcribe it,
+    // which is wider than a purely local denial of service and is the half the
+    // rewrite deleted its lead-in for. An earlier version of this sentence
+    // reached for A6 to name that shape. A6 is not this adversary, the desktop
+    // twin names A7 alone, and inventing a second row here made the two twins
+    // disagree about who the attacker is. `transcribe` takes an `attachment_id` and reads the WAV out
     // of the vault (`commands.rs`), so a blob written by a compromised second
     // device reaches this parser without the user picking a file, and
     // `transcription_enabled` defaults ON.
     //
-    // The range is the audio one, stated rather than implied: 4 kHz is below
-    // telephony (8 kHz), 384 kHz above any consumer or professional capture
-    // rate. Both ends bound the ratio, so the expansion is at most 4× and the
-    // contraction at most 24×.
+    // The range itself, and why those two numbers, is on the constants.
     if !(MIN_SAMPLE_RATE_HZ..=MAX_SAMPLE_RATE_HZ).contains(&sample_rate) {
+        return Err(AudioError::BadLayout);
+    }
+
+    // BEFORE the size projection, and before the collect. Both placements matter
+    // and they are different properties.
+    //
+    // Before the COLLECT is the allocation property: `samples.len()` is
+    // `data.len() / 2` by construction, so the check needs no samples, and
+    // running it after meant a malformed 64 MiB attachment allocated and filled
+    // 64 MiB of `i16` and was then rejected one branch from the refusal that
+    // exists to stop exactly that.
+    //
+    // Before the PROJECTION is the diagnosis property, and it was missing. A WAV
+    // that is BOTH malformed and oversized was reported as `TooLong`, because
+    // the size bound ran first and returned. `TooLong` is the one refusal in
+    // this enum that reaches the user as a specific, actionable sentence about
+    // the clip's length, and it deliberately suppresses a retry; saying it about
+    // a file whose channel layout does not divide sends the user to shorten
+    // something that will be refused at any length. The layout is a fact about
+    // the header alone, so it is cheaper and it is answerable first.
+    if !(data.len() / 2).is_multiple_of(channels as usize) {
         return Err(AudioError::BadLayout);
     }
 
@@ -270,17 +307,12 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
     // `data` slice near `isize::MAX`, and this must not be the arithmetic that
     // panics.
     let frames = (data.len() / 2) / channels as usize;
-    if projected_out_samples(frames, sample_rate) > MAX_PCM_SAMPLES as u128 {
-        return Err(AudioError::TooLong);
-    }
-
-    // BEFORE the collect, which is the same property the size bound above was
-    // moved up to obtain. `samples.len()` is `data.len() / 2` by construction,
-    // so the check needs no samples: running it after meant a malformed 64 MiB
-    // attachment allocated and filled 64 MiB of `i16` and then rejected, one
-    // branch away from the refusal that exists to stop exactly that.
-    if !(data.len() / 2).is_multiple_of(channels as usize) {
-        return Err(AudioError::BadLayout);
+    match projected_out_samples(frames, sample_rate) {
+        // Unreachable: the clamp above rejected zero. Spelled out rather than
+        // unwrapped so a future reordering of the two guards cannot panic here.
+        None => return Err(AudioError::BadLayout),
+        Some(projected) if projected > MAX_PCM_SAMPLES as u128 => return Err(AudioError::TooLong),
+        Some(_) => {}
     }
 
     // i16 LE samples; a trailing odd byte (never expected for 16-bit) is dropped.
@@ -313,10 +345,37 @@ fn downmix_to_mono_f32(pcm: &RawPcm) -> Vec<f32> {
         .collect()
 }
 
+/// The length [`resample_linear`] would allocate, or the refusal.
+///
+/// The ROUNDING AND THE COMPARISON, in one function, and that pairing is the
+/// point. A named function for the same reason [`projected_out_samples`] is
+/// one, and the omission was found the same way: `the_two_ceilings_agree_...`
+/// drove the parser's half through the real formula and restated this one, so
+/// injecting `out_len >= MAX_PCM_SAMPLES` (the exact off-by-one the test is
+/// named for) left every test green. Extracting only the length did not fix it:
+/// the test still spelled `<= MAX_PCM_SAMPLES` itself, so the injected
+/// comparison was still the one nobody called. A copy compared against a second
+/// copy checks nothing, and the copy can be either half.
+///
+/// `f64::round`, not `div_ceil`: this is the real output length, and
+/// `projected_out_samples` rounds UP so the parse-time bound is never looser
+/// than the comparison here.
+///
+/// Refuse rather than truncate: a silently shortened clip would transcribe the
+/// first fraction of the audio and report it as the whole thing.
+fn resample_out_len(input_len: usize, from_rate: u32, to_rate: u32) -> Result<usize, AudioError> {
+    let ratio = to_rate as f64 / from_rate as f64;
+    let out_len = ((input_len as f64) * ratio).round() as usize;
+    if out_len > MAX_PCM_SAMPLES {
+        return Err(AudioError::TooLong);
+    }
+    Ok(out_len)
+}
+
 /// Linear-interpolation resample from `from_rate` to `to_rate`. Dependency-free
 /// (SYNC-V3); adequate for speech ASR (Whisper's mel front end is tolerant).
 /// Identity fast-path when the rates already match.
-fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f32>, AudioError> {
+fn resample_linear(input: Vec<f32>, from_rate: u32, to_rate: u32) -> Result<Vec<f32>, AudioError> {
     // A zero on either side, explicitly, before any float touches it. `0 / 0` is
     // NaN and `NaN as usize` saturates to 0 in Rust, so a `from_rate == to_rate
     // == 0` call would compute an `out_len` of zero, clear the ceiling and take
@@ -327,23 +386,15 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f3
     if from_rate == 0 || to_rate == 0 {
         return Err(AudioError::BadLayout);
     }
-    let ratio = to_rate as f64 / from_rate as f64;
-    let out_len = ((input.len() as f64) * ratio).round() as usize;
-    // Defence in depth behind `parse_wav`, whose bound rounds UP so it is never
-    // looser than this one. Repeating it at the allocation keeps the helper
-    // sound for a caller that reaches it directly.
-    //
-    // Above the identity fast-path, not below it: below, a clip already at the
-    // target rate would return its clone unmeasured, and 16 kHz is exactly what
-    // the mobile recorder writes.
-    //
-    // Refuse rather than truncate: a silently shortened clip would transcribe
-    // the first fraction of the audio and report it as the whole thing.
-    if out_len > MAX_PCM_SAMPLES {
-        return Err(AudioError::TooLong);
-    }
+    let out_len = resample_out_len(input.len(), from_rate, to_rate)?;
+    // The refusal above is defence in depth behind `parse_wav`, whose bound
+    // rounds UP so it is never looser than this one. Repeating it at the
+    // allocation keeps the helper sound for a caller that reaches it directly,
+    // and `resample_out_len` runs ABOVE the identity fast-path below: taken
+    // after it, a clip already at the target rate would return its clone
+    // unmeasured, and 16 kHz is exactly what the mobile recorder writes.
     if from_rate == to_rate || input.is_empty() {
-        return Ok(input.to_vec());
+        return Ok(input);
     }
     if out_len == 0 {
         return Ok(Vec::new());
@@ -381,9 +432,21 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f3
 /// is a clip that reaches this length by EXPANSION from a lower declared rate,
 /// and that is the case worth refusing: `parse_wav`'s clamp holds expansion to
 /// 4x, so without this bound the same 64 MiB could still drive 134 M output
-/// samples. Counting the four buffers a decode holds live (the WAV bytes, the
-/// `Vec<i16>`, the mono `Vec<f32>`, and the output) that is a worst case of
-/// roughly 384 MiB instead of roughly 768 MiB.
+/// samples. That was a worst case of roughly 768 MiB across the four buffers a
+/// decode used to hold live (the WAV bytes 64, the `Vec<i16>`
+/// 64, the mono `Vec<f32>` 128, the output 512). It is now **320 MiB**, and the
+/// figure is worth spelling out because the obvious reading of it is wrong.
+///
+/// `drop(raw)` retires the `Vec<i16>` before the resample, so at most three
+/// buffers coexist. The worst case is NOT at 16 kHz: there `resample_linear`
+/// takes its input by value and the identity arm hands the same allocation
+/// back, so the peak is 64 + 64 + 128 = 256 MiB and it falls at the DOWNMIX. One
+/// hertz above, the identity arm is gone, a second 128 MiB output buffer is
+/// allocated beside the mono one, and the peak is 64 + 128 + 128 = 320 MiB at
+/// the RESAMPLE. 16 001 Hz is the worst admissible rate, not a pathological one:
+/// the parse-time bound accepts a cap-sized clip there. A first draft of this
+/// comment recorded 256 MiB by measuring only the identity path, which is the
+/// one rate the by-value change makes special (myne-md/myne#510 review).
 ///
 /// **The first draft of this fix picked 30 minutes and was wrong.** The mobile
 /// recorder writes 16 kHz mono with no duration cap
@@ -392,10 +455,12 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f3
 /// message the user cannot act on. A ceiling that refuses content the same app
 /// let the user create is a bug wearing a guard's clothes.
 ///
-/// Desktop picks 8 hours, which is 460.8 M samples. The cap and the 4x clamp
-/// together put that out of reach, so it never refuses anything and the desktop
-/// worst case stays at the 768 MiB figure. That divergence is real and is
-/// recorded rather than quietly matched.
+/// **Desktop reached the same value second, and the divergence is gone.** It
+/// picked 8 hours (460.8 M samples), which the § 9.9 cap and the 4x clamp
+/// together put permanently out of reach, so its ceiling refused nothing and its
+/// own test asserted around the branch. myne-md/myne#510 derived it from the
+/// same cap this constant uses; `design-notes/ai/0542` supersedes the clause
+/// of `0503` that recorded the divergence as deliberate.
 const MAX_PCM_SAMPLES: usize = protocol::MAX_ATTACHMENT_LEN / 2;
 
 /// Decode a canonical `audio/wav` byte stream to **16 kHz mono f32** PCM ready
@@ -418,7 +483,7 @@ pub fn wav_to_mono_16k(bytes: &[u8]) -> Result<Vec<f32>, AudioError> {
     // coexisting: about 64 MiB of the worst case, and `commands.rs` already uses
     // this idiom one frame up.
     drop(raw);
-    let out = resample_linear(&mono, rate, WHISPER_SAMPLE_RATE)?;
+    let out = resample_linear(mono, rate, WHISPER_SAMPLE_RATE)?;
     if out.is_empty() {
         return Err(AudioError::Empty);
     }
@@ -514,6 +579,69 @@ mod tests {
     }
 
     #[test]
+    fn the_real_parser_accepts_a_projection_landing_on_the_ceiling() {
+        // Ported from the desktop twin, which closed this gap first. The bound
+        // is `>`, so a projection landing exactly ON the ceiling is legal;
+        // flipping it to `>=` makes this the only test in the module that
+        // fails. Both twins now carry it, and the injection was run on both.
+        let rate = 8_000u32;
+        let boundary_frames = MAX_PCM_SAMPLES / 2;
+        // Precondition, so a change to either constant fails HERE with a clear
+        // cause rather than silently making this test assert something else.
+        assert_eq!(
+            projected_out_samples(boundary_frames, rate).expect("a non-zero rate"),
+            MAX_PCM_SAMPLES as u128,
+            "the fixture no longer lands on the ceiling",
+        );
+
+        let header_bytes = build_wav(1, rate, &[]);
+        let header = header_bytes.len();
+        let data_len = boundary_frames * 2;
+        let mut wav = vec![0u8; header + data_len];
+        wav[..header].copy_from_slice(&header_bytes);
+        wav[header - 4..header].copy_from_slice(&(data_len as u32).to_le_bytes());
+
+        let out = wav_to_mono_16k(&wav).expect("a projection on the ceiling is accepted");
+        assert_eq!(out.len(), MAX_PCM_SAMPLES);
+    }
+
+    #[test]
+    fn a_wav_that_is_both_malformed_and_oversized_is_reported_as_malformed() {
+        // The ordering finding. The layout check used to sit BELOW the size
+        // projection, so a WAV that is both malformed and oversized returned
+        // `TooLong`.
+        //
+        // That is not a tie broken arbitrarily. `TooLong` is the one refusal in
+        // this enum that reaches the user as a specific sentence about the
+        // clip's LENGTH, and it deliberately suppresses the retry, so saying it
+        // about a file whose channel layout does not divide sends the user to
+        // shorten something that will be refused at any length. The layout is a
+        // fact about the header alone.
+        //
+        // Two channels and an ODD i16 count is the malformed half: 3 samples do
+        // not divide by 2. A declared rate of 4 kHz is the oversized half, since
+        // it is the lowest admissible rate and therefore the largest expansion,
+        // and `frames` here is computed from a `data` length that the projection
+        // would take at face value.
+        //
+        // Constructed at a size that is oversized by PROJECTION rather than by
+        // allocation, so the test costs bytes rather than gigabytes: the
+        // projection multiplies frames by 4 at this rate, so a `data` slice just
+        // over `MAX_PCM_SAMPLES / 4` frames crosses the ceiling.
+        let frames = (MAX_PCM_SAMPLES / 4) + 16;
+        let odd_sample_count = frames * 2 + 1;
+        let samples = vec![0i16; odd_sample_count];
+        let wav = build_wav(2, 4_000, &samples);
+
+        assert_eq!(
+            parse_wav(&wav).map(|_| ()),
+            Err(AudioError::BadLayout),
+            "a malformed header must be diagnosed as malformed even when the \
+             clip would also be refused for length"
+        );
+    }
+
+    #[test]
     fn rejects_zero_sample_rate_without_panicking() {
         // A malformed `fmt ` chunk declaring sample_rate=0 must be rejected at
         // parse time — otherwise the resampler's `to_rate / 0` ratio overflows to
@@ -592,7 +720,7 @@ mod tests {
         // in depth, so it has to hold for a caller that did not come through
         // that clamp.
         assert_eq!(
-            resample_linear(&[0.0, 1.0], 1, u32::MAX),
+            resample_linear(vec![0.0, 1.0], 1, u32::MAX),
             Err(AudioError::TooLong),
             "a projected length past the ceiling must be refused, not truncated"
         );
@@ -600,7 +728,7 @@ mod tests {
         // The accept direction, so the guard is not passing by rejecting
         // everything: a legal 4x expansion still decodes and the length is the
         // ratio, not a clamp.
-        let out = resample_linear(&[0.0f32; 4_000], 4_000, 16_000)
+        let out = resample_linear(vec![0.0f32; 4_000], 4_000, 16_000)
             .expect("a legal expansion well under the ceiling must decode");
         assert_eq!(out.len(), 16_000);
     }
@@ -614,15 +742,15 @@ mod tests {
         // `BadLayout`, not `TooLong`: a zero rate is a malformed header, and
         // `TooLong`'s user-facing sentence is wrong for it.
         assert_eq!(
-            resample_linear(&[0.0, 1.0], 0, 0),
+            resample_linear(vec![0.0, 1.0], 0, 0),
             Err(AudioError::BadLayout)
         );
         assert_eq!(
-            resample_linear(&[0.0, 1.0], 0, WHISPER_SAMPLE_RATE),
+            resample_linear(vec![0.0, 1.0], 0, WHISPER_SAMPLE_RATE),
             Err(AudioError::BadLayout)
         );
         assert_eq!(
-            resample_linear(&[0.0, 1.0], WHISPER_SAMPLE_RATE, 0),
+            resample_linear(vec![0.0, 1.0], WHISPER_SAMPLE_RATE, 0),
             Err(AudioError::BadLayout)
         );
     }
@@ -642,6 +770,10 @@ mod tests {
         // itself calls, so weakening the parser's rounding fails here. An
         // earlier version of this test restated the arithmetic instead and
         // stayed green when the division was reverted to truncating.
+        // `16_001` is load-bearing, not filler. It is the smallest rate above the
+        // target, so the parse-time bound's `div_ceil` and the resampler's
+        // `f64::round` disagree there by the widest relative margin the clamp
+        // admits; every other entry is a real capture rate or a clamp endpoint.
         for rate in [
             4_000u32, 8_000, 11_025, 16_000, 16_001, 22_050, 44_100, 384_000,
         ] {
@@ -653,11 +785,18 @@ mod tests {
                 boundary + 1,
                 boundary + 2,
             ] {
-                let parse_accepts = projected_out_samples(f, rate) <= MAX_PCM_SAMPLES as u128;
-                let resample_len =
-                    ((f as f64) * (WHISPER_SAMPLE_RATE as f64 / rate as f64)).round() as usize;
+                let parse_accepts = projected_out_samples(f, rate).expect("a non-zero rate")
+                    <= MAX_PCM_SAMPLES as u128;
+                // Both halves through the functions production uses, so
+                // weakening EITHER rounding or EITHER comparison fails here.
+                let resampled = resample_out_len(f, rate, WHISPER_SAMPLE_RATE);
+                let resample_accepts = resampled.is_ok();
+                let resample_len = match resampled {
+                    Ok(n) => n.to_string(),
+                    Err(e) => format!("refused ({e})"),
+                };
                 assert!(
-                    !parse_accepts || resample_len <= MAX_PCM_SAMPLES,
+                    !parse_accepts || resample_accepts,
                     "rate={rate} frames={f}: parse_wav accepts but resample_linear \
                      refuses at {resample_len}, so the refusal would land after the \
                      Vec<i16> and the mono Vec<f32> were already allocated"
@@ -743,11 +882,16 @@ mod tests {
     /// shipped-inert-wiring signature.
     #[test]
     fn the_public_entry_point_refuses_too_long_as_its_own_kind() {
-        let mut wav = build_wav(1, WHISPER_SAMPLE_RATE, &[]);
-        let header = wav.len();
-        wav.resize(header + (MAX_PCM_SAMPLES + 1) * 2, 0);
-        let len = (wav.len() - header) as u32;
-        wav[header - 4..header].copy_from_slice(&len.to_le_bytes());
+        // `vec![0u8; n]`, not `resize`: in the unoptimized test profile `resize`
+        // is a per-byte `ptr::write` loop (measured 222 ms against 0.86 ms for
+        // the zeroed allocation), and `parse_wav` refuses without ever reading
+        // the data body, so the calloc'd pages are never faulted in either.
+        let header_bytes = build_wav(1, WHISPER_SAMPLE_RATE, &[]);
+        let header = header_bytes.len();
+        let data_len = (MAX_PCM_SAMPLES + 1) * 2;
+        let mut wav = vec![0u8; header + data_len];
+        wav[..header].copy_from_slice(&header_bytes);
+        wav[header - 4..header].copy_from_slice(&(data_len as u32).to_le_bytes());
         assert_eq!(wav_to_mono_16k(&wav), Err(AudioError::TooLong));
     }
 
@@ -757,15 +901,21 @@ mod tests {
         // The exact frame count whose projection lands ON the ceiling.
         let boundary = MAX_PCM_SAMPLES / 2;
         assert_eq!(
-            projected_out_samples(boundary, rate),
+            projected_out_samples(boundary, rate).expect("a non-zero rate"),
             MAX_PCM_SAMPLES as u128
         );
-        assert!(projected_out_samples(boundary + 1, rate) > MAX_PCM_SAMPLES as u128);
+        assert!(
+            projected_out_samples(boundary + 1, rate).expect("a non-zero rate")
+                > MAX_PCM_SAMPLES as u128
+        );
 
         // Accept one frame below, refuse one above. Asserted through the
         // projection rather than by decoding, because materialising either side
         // is a 67 MB fixture.
-        assert!(projected_out_samples(boundary - 1, rate) < MAX_PCM_SAMPLES as u128);
+        assert!(
+            projected_out_samples(boundary - 1, rate).expect("a non-zero rate")
+                < MAX_PCM_SAMPLES as u128
+        );
     }
 
     #[test]
@@ -786,11 +936,14 @@ mod tests {
         // the 30-minute draft's figures outlived the draft in these comments
         // once already.
         let data_len = (MAX_PCM_SAMPLES + 1) * 2;
-        let mut wav = build_wav(1, WHISPER_SAMPLE_RATE, &[]);
-        let header = wav.len();
+        let header_bytes = build_wav(1, WHISPER_SAMPLE_RATE, &[]);
+        let header = header_bytes.len();
+        // `vec![0u8; n]` rather than `resize`, for the reason given on the
+        // sibling fixture: `resize` is a per-byte write loop in the test profile.
+        let mut wav = vec![0u8; header + data_len];
+        wav[..header].copy_from_slice(&header_bytes);
         wav[4..8].copy_from_slice(&((36 + data_len) as u32).to_le_bytes());
         wav[header - 4..header].copy_from_slice(&(data_len as u32).to_le_bytes());
-        wav.resize(header + data_len, 0);
         assert!(
             matches!(parse_wav(&wav), Err(AudioError::TooLong)),
             "a 16 kHz clip past the ceiling must be refused before it is decoded"

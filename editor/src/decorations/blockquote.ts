@@ -65,9 +65,30 @@ export function quoteBarBackgroundCss(depth: number): string {
   ].join(";");
 }
 
-/** Per-line inline style for a blockquote body line: bars + matching indent. */
+/** Per-line inline style for a blockquote body line: bars, plus the indent as a
+ *  custom property that another construct on the same line can add to.
+ *
+ *  **This style deliberately sets no `padding-left`.** Two line decorations on
+ *  one line have their `style` attributes concatenated, and two declarations of
+ *  the same property do not compose: the later one simply wins, by extension
+ *  order, which nothing in either file states. A list item inside a quote is
+ *  exactly that case, and it was measured going wrong: `list.ts` writes a
+ *  `padding-left` that already folds `--cm-line-lead` into the hanging indent,
+ *  `blockquote.ts` is registered after it in `decorations/index.ts`, so the
+ *  list's declaration was discarded and only its negative `text-indent`
+ *  survived. That is the marker pulled left of the quote bar, which is the bug
+ *  the old `inBlockquote()` carve-out existed to prevent.
+ *
+ *  The quote's own inset comes from a `.cm-blockquote` rule in `theme.ts`
+ *  instead. A stylesheet rule loses to an inline style, so a quoted list line
+ *  takes the list's full calc (which includes the lead) and a quoted paragraph
+ *  takes the rule. One property, one winner, decided by what is on the line
+ *  rather than by which extension was registered last. */
 function blockquoteBarStyle(depth: number): string {
-  return `${quoteBarBackgroundCss(depth)};padding-left:${depth * QUOTE_BAR_STEP}px`;
+  return (
+    `${quoteBarBackgroundCss(depth)};` +
+    `--cm-line-lead:${depth * QUOTE_BAR_STEP}px`
+  );
 }
 
 function buildBlockquoteDecorations(view: EditorView): DecorationSet {

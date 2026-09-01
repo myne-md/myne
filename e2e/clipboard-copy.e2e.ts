@@ -29,7 +29,11 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOffer,
+  openExportSubmenuItem,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 
@@ -206,9 +210,7 @@ async function openExportMenuItem(s: Session, noteId: string) {
     testIdSelector("notes.row", { "data-note-id": noteId }),
   );
   await row.rightClick();
-  return s.waitForElement(
-    testIdSelector("notes.context-menu-item", { "data-item-id": "export-markdown" }),
-  );
+  return openExportSubmenuItem(s, "export-markdown");
 }
 
 describeE2E("cb2 a note copy toasts, from a stage the toast host only just reached", () => {

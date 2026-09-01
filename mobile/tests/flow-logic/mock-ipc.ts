@@ -523,7 +523,14 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         return null;
       },
       "plugin:prefs|set_reminder_horizon_days": (args) => {
-        reminderHorizonDays = (args.days ?? null) as number | null;
+        // Recorded as well as stored (myne#508), the same shape as the switch
+        // above. Mutating the store alone lets a spec assert what the UI shows
+        // and never that a write happened, which is the exact gap that let this
+        // setter ship with no caller at all.
+        const days = (args.days ?? null) as number | null;
+        const w = window as unknown as { __reminderHorizonWrites?: (number | null)[] };
+        (w.__reminderHorizonWrites ??= []).push(days);
+        reminderHorizonDays = days;
         return null;
       },
       // The precise-alarm surface. `config.exactAlarm` seeds what the platform

@@ -1845,3 +1845,48 @@ export async function collapseNotesSidebar(session: Session): Promise<void> {
     outcome: 'data-collapsed="true"',
   });
 }
+
+/**
+ * Open the sidebar context menu's `Export…` submenu and return the row for one
+ * format.
+ *
+ * The four formats used to be top-level rows. They moved behind one parent row
+ * (myne-md/myne#611) because eight rows across two menus for four actions is
+ * what the maintainer was looking at, and the leaf ids did not change, so a
+ * scenario that reaches straight for `export-markdown` still COMPILES, still
+ * reads correct, and simply times out. That is the failure
+ * `check-e2e-menu-testids.mjs` exists to prevent for the sidebar `+` menu, and
+ * its roster does not cover this menu, so this helper is the substitute: one
+ * place that knows the submenu is there.
+ *
+ * The parent click is safe to repeat. Unlike the `+` menu, whose every item
+ * COMMITS, a row carrying `children` performs no action at all: `ContextMenu`'s
+ * `handleSelect` returns early for it and the click handler only records where
+ * to put the submenu. So a missed click and a landed click are both recoverable
+ * by clicking again, and neither can double-fire an export.
+ *
+ * Call it with the menu already open (after `row.rightClick()`).
+ */
+export async function openExportSubmenuItem(
+  session: Session,
+  format: "export-markdown" | "export-pdf" | "export-html" | "export-txt",
+) {
+  const leaf = testIdSelector("notes.context-menu-item", {
+    "data-item-id": format,
+  });
+  await session.waitUntil(
+    async () => {
+      if ((await session.findElements(leaf)).length > 0) return true;
+      const parent = await session.findElements(
+        testIdSelector("notes.context-menu-item", { "data-item-id": "export" }),
+      );
+      // The menu itself may not have rendered yet; let the outer budget poll
+      // rather than throwing on a parent row that is simply not there.
+      if (parent.length === 0) return null;
+      await parent[0].click();
+      return (await session.findElements(leaf)).length > 0 ? true : null;
+    },
+    { label: `export submenu open, ${format} present` },
+  );
+  return session.waitForElement(leaf);
+}

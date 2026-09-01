@@ -303,7 +303,10 @@ describe("pickAndInsert anchors through document changes (myne#332)", () => {
     );
     const view = mount("ab");
     await pickAndInsert(view, 1);
-    expect(view.state.doc.toString()).toBe(`a![[att:${ID}|one.png]]b`);
+    // Offset 1 is mid-word, so the embed breaks the line on BOTH sides
+    // (myne-md/myne#604). The offset is still honoured, which is what this test
+    // is about: `a` stays before it and `b` after it, and neither is swallowed.
+    expect(view.state.doc.toString()).toBe(`a\n![[att:${ID}|one.png]]\nb`);
     view.destroy();
   });
 });

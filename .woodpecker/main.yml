@@ -740,8 +740,19 @@ steps:
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.
       # Now that AI is default-on this path would otherwise never compile in CI and
-      # could bit-rot. Cheap `check` (no link) — the full build is the one above.
-      - cargo check -p myne-desktop --no-default-features
+      # could bit-rot. Two commands, and the second is the one that sees the test
+      # tree: `check` skips `#[cfg(test)]` entirely, so a helper gated on it whose
+      # only caller sits behind a feature is dead when the feature is off and no
+      # bare `check` reports it (myne-md/myne#510 shipped that for one review round).
+      #
+      # `--all-targets`, added by myne-md/myne#510, and the flag is the whole
+      # point: without it this never compiles `#[cfg(test)]` code, so a helper
+      # gated on `cfg(test)` whose only caller sits behind `local-inference` is
+      # dead in this variant and nothing here sees it. That shipped for one
+      # review round and was caught by hand, not by this step. `clippy` rather
+      # than `check` for the same reason: dead code is a lint, and `-D warnings`
+      # is what turns it into a failure.
+      - cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings
       # Cache hit-rate visibility (H1) — never fails the step.
       - /cache/bin/sccache --show-stats || true
 
