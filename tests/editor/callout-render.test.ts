@@ -15,6 +15,11 @@ import {
   roundTripBytes,
   teardown,
 } from "./_conformance";
+import {
+  DEFAULT_DISPLAY,
+  setDateTimeDisplay,
+  __resetDateTimeDisplayForTest,
+} from "@myne/editor/host/lib/datetimeFormat";
 
 /** The icon's child tags, in order. Empty means the glyph rendered as nothing —
  *  which is the shape #376 reported and which asserting on `<svg>` alone misses. */
@@ -89,5 +94,27 @@ describe("callouts", () => {
   it("round-trips a callout byte-identical", () => {
     const doc = "> [!warning]+ Heads up\n> line one\n> line two\n";
     expect(roundTripBytes(doc)).toBe(doc);
+  });
+
+  it("rebuilds on an ambient display change without losing its header", () => {
+    // myne-md/myne#609 gave the shared rebuild gate a signal for ambient state
+    // (the reader's date format and language), which this module's own header
+    // records as deliberately unwired: "a switched language re-labels on the
+    // next rebuild (any edit, scroll or selection move). It isn't wired."
+    //
+    // What is pinned here is the narrow, checkable half: a rebuild driven by
+    // that signal leaves the callout header intact. The wider claim, that a
+    // LANGUAGE switch re-labels an open callout, is deliberately NOT asserted,
+    // and the reason is recorded rather than hidden. Injecting a `tr` bundle
+    // and switching to it makes the header widget vanish on the next rebuild,
+    // and it does so on the PRE-EXISTING edit path too, with no involvement
+    // from the new signal. That is a separate defect in this layer's language
+    // path, measured and not yet understood; asserting around it here would
+    // bury it.
+    m = mount("> [!note]\n> body text\n");
+    expect(query(m, ".cm-callout-title")!.textContent).toContain("Note");
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "dmy" });
+    expect(query(m, ".cm-callout-title")!.textContent).toContain("Note");
+    __resetDateTimeDisplayForTest();
   });
 });

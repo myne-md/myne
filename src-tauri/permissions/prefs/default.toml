@@ -275,7 +275,21 @@ commands.allow = ["set_archive_disabled"]
 # validates — an unrecognised value reads as the `system` default rather than
 # failing a write. `timezone` is DISPLAY-ONLY: it decides what the app treats as
 # "today" and how a stored wall-clock value is printed, and never enters a .myn
-# file, a blob, or the sync wire.
+# file, so a note never records where its author was. It DOES live in the MYP1
+# vault.prefs blob this command writes, and that blob is pushed and pulled
+# verbatim; device-local is a MERGE classification (PrefClass::DeviceLocal,
+# sync-protocol.md 10.2), not a transmission one.
+#
+# Corrected by myne-md/myne#609 across every site a `git grep "sync wire"`
+# found, which was nine and not the five the first sweep visited: this file,
+# the mobile twin, both clients' prefs.ts (twice in the desktop one),
+# DateTimeSettings.tsx, core's set_timezone_from_host,
+# prefs_classification.rs's own DeviceLocal comment, protocol/src/prefs.rs
+# (the two field docs plus a published vector description),
+# docs/spec/protocol.md 9.5.2, and a user-guide article. The count is stated
+# as the grep rather than as a memory of the sweep, because a completeness
+# claim taken from memory is what let this sentence spread in the first
+# place.
 [[permission]]
 identifier = "allow-set-date-format"
 description = "Allow invoking prefs:set_date_format (Slot::Unlocked-gated setter for the date_format display preference — system/iso/dmy/mdy/dmmmy, Option<String> where None clears to the system default; atomic-writes vault.prefs with no native side-effect)."

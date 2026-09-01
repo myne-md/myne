@@ -1192,6 +1192,7 @@
     },
     "find": {
       "close": "Lukk søk",
+      "dateFallback": "Søker etter {{stored}}, formen denne datoen er lagret i.",
       "matchCase": "Skill mellom store og små bokstaver",
       "matchCount": "{{current}} av {{total}}",
       "nextMatch": "Neste treff",
@@ -1200,6 +1201,7 @@
       "previousMatch": "Forrige treff",
       "replaceAll": "Erstatt alle",
       "replaceAllCount": "Erstatt alle ({{total}})",
+      "replaceOffOnDateFallback": "Erstatt er av så lenge en dato treffer via den lagrede formen sin, slik at en erstatning ikke kan gjøre datoen uleselig.",
       "replaceOne": "Erstatt",
       "replacePlaceholder": "Erstatt med",
       "toggleReplace": "Slå erstatt av/på"
@@ -3354,7 +3356,7 @@
     },
     "dateTime": {
       "dateLabel": "Datoformat",
-      "dateHelper": "Hvordan datoer vises i oppgaver, lagrede visninger og vedlegg.",
+      "dateHelper": "Hvordan en dato skrives, overalt der Myne viser en.",
       "dateSystem": "Følg språket",
       "timeLabel": "Tidsformat",
       "timeHelper": "Om klokkeslett vises på 24-timersklokke eller 12-timersklokke.",

@@ -41,6 +41,7 @@ const IDLE: FindBarState = {
   match: null,
   expanded: false,
   replace: "",
+  dateFallback: null,
 };
 
 let bar: FindBarView | null = null;

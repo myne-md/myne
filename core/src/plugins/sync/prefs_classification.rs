@@ -272,8 +272,15 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     // should not have to agree — which is the `theme` argument, not the
     // `daily_date_format` one. And an IANA zone is a coarse geolocation datum:
     // `dialect/src/taskFields.ts` keeps it out of note bytes for exactly that
-    // reason, so putting it on the sync wire would give back at the prefs layer
-    // what the note layer refuses to leak.
+    // reason, and this classification keeps a travelling phone's zone from being
+    // overwritten by a stationary desktop's.
+    //
+    // What it does NOT do, because this comment claimed otherwise until
+    // myne-md/myne#609 and four other sites were citing it: keep the zone off
+    // the wire. The whole `vault.prefs` blob is pushed and pulled verbatim,
+    // device-local fields included, and `sync-protocol.md` 10.2.1 has a newly
+    // enrolled device adopt them as starting defaults. This enum decides the
+    // MERGE, and nothing else. `prefs_merge.rs` next door already had it right.
     ("timezone", PrefClass::DeviceLocal),
     // MYND-592. **Shared**, for the same reason as `show_task_marker` above and
     // deliberately unlike `ai_enabled` (DeviceLocal): that flag is device-local

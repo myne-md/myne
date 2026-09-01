@@ -1192,6 +1192,7 @@
     },
     "find": {
       "close": "Suche schließen",
+      "dateFallback": "Es wird nach {{stored}} gesucht, der Form, in der dieses Datum gespeichert ist.",
       "matchCase": "Groß-/Kleinschreibung beachten",
       "matchCount": "{{current}} von {{total}}",
       "nextMatch": "Nächster Treffer",
@@ -1200,6 +1201,7 @@
       "previousMatch": "Vorheriger Treffer",
       "replaceAll": "Alle ersetzen",
       "replaceAllCount": "Alle ersetzen ({{total}})",
+      "replaceOffOnDateFallback": "Ersetzen ist deaktiviert, solange ein Datum über seine gespeicherte Form gefunden wird, damit eine Ersetzung das Datum nicht unlesbar macht.",
       "replaceOne": "Ersetzen",
       "replacePlaceholder": "Ersetzen durch",
       "toggleReplace": "Ersetzen umschalten"
@@ -3354,7 +3356,7 @@
     },
     "dateTime": {
       "dateLabel": "Datumsformat",
-      "dateHelper": "Wie Datumsangaben in Aufgaben, gespeicherten Ansichten und Anhängen angezeigt werden.",
+      "dateHelper": "Wie ein Datum geschrieben wird, überall dort, wo Myne eines anzeigt.",
       "dateSystem": "Der Sprache folgen",
       "timeLabel": "Zeitformat",
       "timeHelper": "Ob Uhrzeiten im 24-Stunden- oder im 12-Stunden-Format angezeigt werden.",

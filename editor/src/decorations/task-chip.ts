@@ -53,6 +53,7 @@ import { searchPanelOpen } from "@codemirror/search";
 import { readingModeFacet } from "./cursor-aware";
 import { makeGatedDecorationPlugin } from "./plugin-factory";
 import { recurrenceLabel } from "./task-recurrence";
+import { dateTimeDisplay, formatStoredValue } from "@myne/editor/host/lib/datetimeFormat";
 import i18n from "@myne/editor/i18n";
 import { parseTaskFields, parseTaskInstant, type TaskFields } from "@myne/dialect/taskFields";
 import { planTaskFieldWrite } from "@myne/dialect/taskFieldWriter";
@@ -163,16 +164,61 @@ function invalidHintKey(kind: ChipKind, value: string): string {
 /**
  * What a chip DISPLAYS, given the source bytes it stands for.
  *
- * Identity for everything except a recognized recurrence rule, which is stored
- * canonically in English and shown in the reader's language (task 11). An
- * unrecognized rule is never localized — there is nothing to localize, and the
- * raw text is exactly what the user needs to see to fix it.
+ * Two kinds diverge from the source, for the same underlying reason: the bytes
+ * are a canonical storage form and the reader has said how they want to read it.
+ *
+ *   - a recognized recurrence rule is stored canonically in English and shown in
+ *     the reader's language (MYND-615 task 11);
+ *   - a `due` or `remind` instant is stored as the normative `YYYY-MM-DD` civil
+ *     date of `markdown-dialect.md` 3.6.4 and shown in the reader's chosen date
+ *     and time format (myne-md/myne#609). This is the SAME formatter the task
+ *     rows and the saved-view property cells already use, so the same task
+ *     cannot read one way in a note and another way in a list. Seconds are
+ *     dropped here exactly as they are there, which is the formatter's existing
+ *     behaviour and not a decision taken again.
+ *
+ * The untyped guard is FIRST and must stay first. A value the dialect could not
+ * read is shown exactly as the user wrote it, with a hint: never a blank chip,
+ * and never a silently corrected value. Formatting before that check would turn
+ * an unreadable value into a guess, which is the one thing this layer promises
+ * not to do.
+ *
+ * The settings arrive from the ambient store rather than as an argument, because
+ * this runs inside the decoration builder, which CodeMirror calls. The rebuild
+ * on a settings change is the view plugin's job, not this function's.
  */
 function displayLabel(kind: ChipKind, value: string, typed: boolean): string {
-  if (kind !== "repeat" || !typed) return value;
+  if (!typed) return value;
+  if (kind === "due" || kind === "remind") return formatStoredValue(value, dateTimeDisplay());
+  if (kind !== "repeat") return value;
   const spec = parseRecurrenceSpec(value);
   return spec.ok ? recurrenceLabel(spec.spec) : value;
 }
+
+/**
+ * The translated field name a screen reader hears, per chip kind.
+ *
+ * Four literal call sites rather than the obvious computed key built from
+ * `kind`, and that shape is the point: `scripts/check-i18n.mjs` matches only a
+ * static dotted key written inside the call itself, so a computed key is
+ * invisible to it, and so is a key held in a plain string constant. A key
+ * renamed or dropped from the catalog would then surface as the raw dotted key
+ * read aloud to the one user who cannot see that it is wrong. Written this way
+ * the four sit under a gate that already runs in `pre-commit` and in CI.
+ *
+ * That the guard now reads them was verified rather than assumed: an example
+ * key spelled out in this very comment was reported as missing, which is the
+ * scan proving it reaches this block.
+ *
+ * They are the field editor's own headings, reused rather than duplicated: two
+ * sets of names for one concept is two things to keep in step.
+ */
+const FIELD_NAME: Record<ChipKind, () => string> = {
+  due: () => i18n.t("editor.taskField.title.due"),
+  remind: () => i18n.t("editor.taskField.title.remind"),
+  repeat: () => i18n.t("editor.taskField.title.repeat"),
+  priority: () => i18n.t("editor.taskField.title.priority"),
+};
 
 const PRIORITY_WORDS: ReadonlySet<string> = new Set([
   "highest",
@@ -195,9 +241,20 @@ export type ChipSpan = {
    */
   value: string;
   /**
-   * What the chip SHOWS. Equal to {@link value} everywhere except a recognized
-   * recurrence rule, which is stored canonically and rendered in the reader's
-   * language (MYND-615 task 11).
+   * What the chip SHOWS.
+   *
+   * It diverges from {@link value} for three of the four kinds now, and the
+   * count matters because this docstring said "everywhere except a recognized
+   * recurrence rule" while myne-md/myne#609 was already formatting two more:
+   * `due` and `remind` go through the shared display formatter, so a stored
+   * `2026-08-01` reads as whatever the reader chose, and `repeat` is stored
+   * canonically and rendered in the reader's language (MYND-615 task 11). Only
+   * `priority` is still the source bytes.
+   *
+   * **A lazy getter, not a field**, and that is a measured decision rather than
+   * a style: the atomic-ranges provider builds a `ChipSpan` per chip on every
+   * arrow key and discards the label, so formatting it eagerly ran the whole
+   * date formatter per chip per keystroke.
    */
   label: string;
   /**
@@ -254,7 +311,20 @@ export function chipRangesIn(state: EditorState, from: number, to: number): Chip
         to: node.to,
         kind,
         value: source,
-        label: displayLabel(kind, source, typed),
+        // LAZY, and the reason is the second caller. `chipRangesIn` feeds both
+        // the decoration builder and `taskChipAtomicRanges`, and the atomic
+        // provider reads only `from`, `to` and `typed`. CodeMirror invokes every
+        // atomic-ranges provider on `moveByChar` / `moveByGroup` /
+        // `moveVertically`, so eagerly formatting here spent an `Intl` pass per
+        // chip on EVERY arrow-key press, auto-repeat included, for a string
+        // nothing read. Measured at roughly 1 microsecond per chip on the
+        // `system` default (the three numeric presets take no `Intl` path and
+        // are ~120 ns), so a task-dense viewport paid tens of microseconds per
+        // keypress for nothing. A getter keeps the field's shape for both
+        // consumers and moves the work to the one that uses it.
+        get label() {
+          return displayLabel(kind, source, typed);
+        },
         typed,
         hintKey: typed ? "" : invalidHintKey(kind, value),
       });
@@ -267,8 +337,17 @@ export function chipRangesIn(state: EditorState, from: number, to: number): Chip
 class TaskChipWidget extends WidgetType {
   constructor(
     private readonly kind: ChipKind,
-    /** What the chip shows — already localized where that applies. */
-    private readonly value: string,
+    /**
+     * What the chip SHOWS: `ChipSpan.label`, already localized and already
+     * formatted where that applies.
+     *
+     * Named `label` rather than `value` because it has only ever received
+     * `span.label`, and the two are a deliberate pair: `ChipSpan.value` is the
+     * bytes in the file and the bytes an editor commits back, `ChipSpan.label`
+     * is what is drawn. A widget field called `value` holding the label is the
+     * one name that could talk somebody into writing it back.
+     */
+    private readonly label: string,
     /** Source position, part of widget IDENTITY — see `eq`. */
     private readonly from: number,
   ) {
@@ -285,7 +364,7 @@ class TaskChipWidget extends WidgetType {
    */
   eq(other: TaskChipWidget): boolean {
     return (
-      other.kind === this.kind && other.value === this.value && other.from === this.from
+      other.kind === this.kind && other.label === this.label && other.from === this.from
     );
   }
 
@@ -300,10 +379,25 @@ class TaskChipWidget extends WidgetType {
     // handler re-reads live (see `taskChipAt`), because the DOM outlives the
     // offset it was built at.
     span.setAttribute("data-chip-from", String(this.from));
-    // Accessible name: the field's meaning plus its value, so a screen reader
-    // announces "due, 2026-08-01" rather than a bare date with no context.
-    span.setAttribute("aria-label", `${this.kind}, ${this.value}`);
-    span.textContent = this.value;
+    // Accessible name: the field's meaning plus what the chip shows, so a
+    // screen reader gets "Due date, 1 August 2026" rather than a bare date with
+    // no context.
+    //
+    // The field name is TRANSLATED (myne-md/myne#609). It used to interpolate
+    // `kind`, which is the internal identifier `due` / `remind` / `repeat` /
+    // `priority` and is not a word in any catalog, so every language announced
+    // the English one. `editor.taskField.title.*` already carried these four
+    // names for the field editor's own heading, so this reuses them rather than
+    // adding a second set that could drift from the first.
+    //
+    // The value half is the LABEL, which is what a sighted reader sees. Hearing
+    // a different form of the same date than the person next to you is reading
+    // is the thing this is for.
+    span.setAttribute(
+      "aria-label",
+      `${FIELD_NAME[this.kind]()}, ${this.label}`,
+    );
+    span.textContent = this.label;
     return span;
   }
 

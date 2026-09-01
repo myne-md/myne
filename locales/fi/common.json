@@ -1192,6 +1192,7 @@
     },
     "find": {
       "close": "Sulje haku",
+      "dateFallback": "Haetaan {{stored}}, eli muotoa jossa tämä päivämäärä on tallennettu.",
       "matchCase": "Sama kirjainkoko",
       "matchCount": "{{current}} / {{total}}",
       "nextMatch": "Seuraava osuma",
@@ -1200,6 +1201,7 @@
       "previousMatch": "Edellinen osuma",
       "replaceAll": "Korvaa kaikki",
       "replaceAllCount": "Korvaa kaikki ({{total}})",
+      "replaceOffOnDateFallback": "Korvaus on pois käytöstä niin kauan kuin päivämäärä löytyy tallennetussa muodossaan, jottei korvaus tee päivämäärästä lukukelvotonta.",
       "replaceOne": "Korvaa",
       "replacePlaceholder": "Korvaa tällä",
       "toggleReplace": "Vaihda korvaus"
@@ -3354,7 +3356,7 @@
     },
     "dateTime": {
       "dateLabel": "Päivämäärämuoto",
-      "dateHelper": "Miten päivämäärät näytetään tehtävissä, tallennetuissa näkymissä ja liitteissä.",
+      "dateHelper": "Miten päivämäärä kirjoitetaan kaikkialla missä Myne sellaisen näyttää.",
       "dateSystem": "Kielen mukaan",
       "timeLabel": "Kellonajan muoto",
       "timeHelper": "Näytetäänkö kellonajat 24- vai 12-tuntisina.",

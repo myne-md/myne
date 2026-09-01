@@ -1181,6 +1181,7 @@
     },
     "find": {
       "close": "Close find",
+      "dateFallback": "Searching for {{stored}}, the form this date is stored in.",
       "matchCase": "Match case",
       "matchCount": "{{current}} of {{total}}",
       "nextMatch": "Next match",
@@ -1189,6 +1190,7 @@
       "previousMatch": "Previous match",
       "replaceAll": "Replace all",
       "replaceAllCount": "Replace all ({{total}})",
+      "replaceOffOnDateFallback": "Replace is off while a date is matched by its stored form, so a replacement cannot make the date unreadable.",
       "replaceOne": "Replace",
       "replacePlaceholder": "Replace with",
       "toggleReplace": "Toggle replace"
@@ -1959,7 +1961,53 @@
       "picker": {
         "intro": "Where are your notes coming from?"
       },
+      "myne": {
+        "loading": "Looking for your other vaults…",
+        "noOtherVaults": "There are no other vaults on this device to import from. Restore a backup first, and it becomes a vault you can import from here.",
+        "vaultLabel": "Import from",
+        "vaultPlaceholder": "Choose a vault",
+        "passwordLabel": "That vault's password",
+        "phraseLabel": "That vault's 24-word recovery phrase",
+        "wordAria": "Word {{number}} of 24",
+        "usePhrase": "Use the recovery phrase instead",
+        "usePassword": "Use the password instead",
+        "importLabel": "Name this import",
+        "importLabelHint": "If a note you import has the same name as one you already have, and something you import links to it, the imported one is renamed with this. Keep the same name if you run this import again and nothing will be brought in twice.",
+        "importLabelIllegal": "That name cannot be used: a note name may not contain \\ / | # ^ [ or ], or start or end with a space.",
+        "opening": "Opening…",
+        "unnamedVault": "Vault {{n}}",
+        "errors": {
+          "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
+          "busy": "Another vault operation is running. Wait for it to finish and try again.",
+          "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first."
+        },
+        "done": {
+          "sourceUnchanged": "The vault you imported from has not been changed. If you sync it, it keeps syncing.",
+          "manageVaults": "Manage vaults",
+          "historyStays": "Version history stays in the vault you imported from."
+        },
+        "report": {
+          "trashedLeftBehind": "Notes in the source vault's trash, left behind",
+          "templatesLeftBehind": "Templates, left behind",
+          "untitledImported": "Untitled notes brought over",
+          "attachmentsCrossed": "Attachments brought over",
+          "attachmentsDeduped": "Attachments you already had",
+          "attachmentsFailed": "Attachments the vault would not accept",
+          "linksRetargeted": "Links pointed at a renamed note",
+          "tombstonedEmbeds": "Embeds whose file was already deleted in the source",
+          "dictionaryWordsAdded": "Dictionary words brought over",
+          "dictionaryUnreadable": "The source vault's dictionary could not be read, so no words were brought over.",
+          "linksLeftUnresolved": "Links that could not be pointed anywhere"
+        }
+      },
       "source": {
+        "myne": {
+          "label": "Myne vault",
+          "pickerTitle": "Choose the vault to import from",
+          "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
+          "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
+          "short": "Another vault on this device"
+        },
         "obsidian": {
           "label": "Obsidian",
           "pickerTitle": "Choose your Obsidian vault folder",
@@ -2386,6 +2434,7 @@
   "recover": {
     "errors": {
       "cancelledVaultLocked": "Recovery cancelled: vault was locked.",
+      "openAsImportSource": "An import is reading this vault right now. Finish or cancel that import, then recover this vault.",
       "operationInProgress": "Operation in progress. Please wait.",
       "unexpected": "Unexpected error. Please try again.",
       "vaultNotFound": "Vault file not found. Please restart the app."
@@ -3324,7 +3373,7 @@
     },
     "dateTime": {
       "dateLabel": "Date format",
-      "dateHelper": "How dates are shown across tasks, saved views and attachments.",
+      "dateHelper": "How a date is written wherever Myne shows one.",
       "dateSystem": "Match language",
       "timeLabel": "Time format",
       "timeHelper": "Whether times are shown on a 24-hour or 12-hour clock.",
@@ -3796,6 +3845,7 @@
       "kdfMemoryExceedsHost": "This vault needs {{required}} MiB of memory to open, more than this browser can give it ({{available}} MiB). The vault is fine; open it in the Myne desktop app.",
       "unexpected": "Unexpected error. Please try again.",
       "vaultNotFound": "Vault file not found. Please restart the app.",
+      "openAsImportSource": "An import is reading this vault right now. Finish or cancel that import, then unlock this vault.",
       "vaultUpgraded": "This vault was upgraded to a newer format this version of Myne doesn’t support yet. Your data is fine. Update Myne to the latest version to open it."
     },
     "passwordLabel": "Password",
