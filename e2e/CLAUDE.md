@@ -190,6 +190,16 @@
   `dismissImporterOffer`, `enterRecoveryPhrase`, `completePasswordReset`),
   `support/realistic-fixture.ts` (`seedProductionVault` — VC-1 capture with
   generator fallback).
+- **A scenario whose fixture seeds ≥2 vaults boots to the PICKER, not the unlock
+  screen**, so it owes `selectPickerRow(session, vaultId)` before
+  `unlockToEditor`. `initialStageFromProbe` routes ≥2 vaults to `picker`, which
+  renders no `unlock.password-input`, so a scenario that skips the row wastes
+  three 45-second waits and then reports a timeout naming the ELEMENT rather
+  than the stage. That reads as flake and is a precondition. It cost a full
+  container round trip on `import-myne-vault` (myne-md/myne#464);
+  `prefs.e2e.ts` and `vault-label.e2e.ts` get it right and are the shape to
+  copy. This is the vault-count precondition above having a consequence, not
+  just a comment.
 - Selectors are `byTestId` / `testIdSelector(id, attrs?)` only — no CSS-class
   or text selectors. A fresh vault's first editor shows the importer
   onboarding offer overlay: call `dismissImporterOffer` before clicking

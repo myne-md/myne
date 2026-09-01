@@ -18,9 +18,27 @@ import { displayFromPrefs, setDateTimeDisplay } from "../lib/datetimeFormat";
 
 export function useDateTimeDisplaySync(): void {
   const { prefs } = usePrefs();
-  const language = i18n.resolvedLanguage ?? i18n.language;
 
   useEffect(() => {
-    setDateTimeDisplay(displayFromPrefs(prefs, language));
-  }, [prefs.date_format, prefs.time_format, prefs.timezone, language, prefs]);
+    // Republish on BOTH inputs, and the language half needs its own listener
+    // rather than a dependency (myne-md/myne#609). The first version read
+    // `i18n.resolvedLanguage` into a dep, which only works if this component
+    // re-renders when the language changes, and it does not: neither `Editor`
+    // nor `App` calls `useTranslation`, and `setLanguage` changes the language
+    // in place with no reload. So the language was published on the next
+    // incidental re-render rather than on the switch, and a `system` date
+    // preset kept the old language until something unrelated happened.
+    //
+    // Measured, not reasoned about: `grep -c useTranslation src/App.tsx` is 0,
+    // and the `useTranslation` calls in this screen's file are all below the
+    // component that mounts this hook.
+    const publish = (): void => {
+      setDateTimeDisplay(displayFromPrefs(prefs, i18n.resolvedLanguage ?? i18n.language));
+    };
+    publish();
+    i18n.on("languageChanged", publish);
+    return () => {
+      i18n.off("languageChanged", publish);
+    };
+  }, [prefs.date_format, prefs.time_format, prefs.timezone, prefs]);
 }

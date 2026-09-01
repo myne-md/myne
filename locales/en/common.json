@@ -37,6 +37,7 @@
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
       "scopeCountUnavailable": "How many notes that folder holds could not be checked just now.",
+      "scopeNone": "no note open, so there is nothing to work on yet",
       "startFailed": "The agent could not start.",
       "autoApplyFailed": "The changes could not be applied automatically. Nothing was written; open the review to apply them yourself.",
       "permissionLabel": "When the run finishes",
@@ -61,6 +62,7 @@
       "scopeTotal_other": "can change {{count}} notes",
       "cancel": "Stop",
       "expandFailed": "The scope could not be widened.",
+      "cancelledBackground": "The run was cancelled because Myne went to the background. Nothing was written. Ask again when you are ready.",
       "grantsUser_one": "{{count}} scope you set",
       "grantsUser_other": "{{count}} scopes you set",
       "grantsModel_one": "{{count}} it asked for",
@@ -118,13 +120,17 @@
         "excludedFolder": "Not created: that folder is excluded from AI.",
         "createFailed": "Not created: writing the new note failed. The other changes were still applied.",
         "excludedNow": "Could not be applied: that note's folder is now excluded from AI.",
-        "notProposed": "Could not be applied: that change is not part of this run's proposal."
+        "notProposed": "Could not be applied: that change is not part of this run's proposal.",
+        "noteMoved": "Could not be applied: that change would move the note to another folder.",
+        "appendEmpty": "Could not be applied: there was nothing to add.",
+        "appendWouldWriteFrontmatter": "Could not be applied: that text would have become the note's properties block."
       },
       "applyFailed": "The changes could not be applied.",
       "undo": "Undo this run",
       "undoFailed": "The run could not be undone.",
       "undoReport": "{{reverted}} notes restored. {{kept}} notes the run created were left in place.",
       "alreadyApplied": "Applied",
+      "appendFlag": "adds to the end",
       "untitledNote": "Untitled note",
       "vaultRoot": "Vault root",
       "newNotesHeading_one": "{{count}} new note",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} note could not be restored.",
       "failed_other": "{{count}} notes could not be restored.",
       "createdNotReverted_one": "{{count}} note the run created was left in place.",
-      "createdNotReverted_other": "{{count}} notes the run created were left in place."
+      "createdNotReverted_other": "{{count}} notes the run created were left in place.",
+      "sessionOnly": "This one-tap undo lasts until you lock the vault or close the app. After that, restore notes one at a time from a note's version history.",
+      "sessionOnlyLink": "Open version history"
     }
   },
   "ai": {
@@ -1183,6 +1191,7 @@
     },
     "find": {
       "close": "Close find",
+      "dateFallback": "Searching for {{stored}}, the form this date is stored in.",
       "matchCase": "Match case",
       "matchCount": "{{current}} of {{total}}",
       "nextMatch": "Next match",
@@ -1191,6 +1200,7 @@
       "previousMatch": "Previous match",
       "replaceAll": "Replace all",
       "replaceAllCount": "Replace all ({{total}})",
+      "replaceOffOnDateFallback": "Replace is off while a date is matched by its stored form, so a replacement cannot make the date unreadable.",
       "replaceOne": "Replace",
       "replacePlaceholder": "Replace with",
       "toggleReplace": "Toggle replace"
@@ -1968,7 +1978,53 @@
       "picker": {
         "intro": "Where are your notes coming from?"
       },
+      "myne": {
+        "loading": "Looking for your other vaults…",
+        "noOtherVaults": "There are no other vaults on this device to import from. Restore a backup first, and it becomes a vault you can import from here.",
+        "vaultLabel": "Import from",
+        "vaultPlaceholder": "Choose a vault",
+        "passwordLabel": "That vault's password",
+        "phraseLabel": "That vault's 24-word recovery phrase",
+        "wordAria": "Word {{number}} of 24",
+        "usePhrase": "Use the recovery phrase instead",
+        "usePassword": "Use the password instead",
+        "importLabel": "Name this import",
+        "importLabelHint": "If a note you import has the same name as one you already have, and something you import links to it, the imported one is renamed with this. Keep the same name if you run this import again and nothing will be brought in twice.",
+        "importLabelIllegal": "That name cannot be used: a note name may not contain \\ / | # ^ [ or ], or start or end with a space.",
+        "opening": "Opening…",
+        "unnamedVault": "Vault {{n}}",
+        "errors": {
+          "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
+          "busy": "Another vault operation is running. Wait for it to finish and try again.",
+          "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first."
+        },
+        "done": {
+          "sourceUnchanged": "The vault you imported from has not been changed. If you sync it, it keeps syncing.",
+          "manageVaults": "Manage vaults",
+          "historyStays": "Version history stays in the vault you imported from."
+        },
+        "report": {
+          "trashedLeftBehind": "Notes in the source vault's trash, left behind",
+          "templatesLeftBehind": "Templates, left behind",
+          "untitledImported": "Untitled notes brought over",
+          "attachmentsCrossed": "Attachments brought over",
+          "attachmentsDeduped": "Attachments you already had",
+          "attachmentsFailed": "Attachments the vault would not accept",
+          "linksRetargeted": "Links pointed at a renamed note",
+          "tombstonedEmbeds": "Embeds whose file was already deleted in the source",
+          "dictionaryWordsAdded": "Dictionary words brought over",
+          "dictionaryUnreadable": "The source vault's dictionary could not be read, so no words were brought over.",
+          "linksLeftUnresolved": "Links that could not be pointed anywhere"
+        }
+      },
       "source": {
+        "myne": {
+          "label": "Myne vault",
+          "pickerTitle": "Choose the vault to import from",
+          "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
+          "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
+          "short": "Another vault on this device"
+        },
         "obsidian": {
           "label": "Obsidian",
           "pickerTitle": "Choose your Obsidian vault folder",
@@ -2395,6 +2451,7 @@
   "recover": {
     "errors": {
       "cancelledVaultLocked": "Recovery cancelled: vault was locked.",
+      "openAsImportSource": "An import is reading this vault right now. Finish or cancel that import, then recover this vault.",
       "operationInProgress": "Operation in progress. Please wait.",
       "unexpected": "Unexpected error. Please try again.",
       "vaultNotFound": "Vault file not found. Please restart the app."
@@ -2944,12 +3001,15 @@
     },
     "ai": {
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
+      "historyBudgetLabel": "Conversation carried into each request",
       "autoTagLabel": "Suggest tags automatically",
       "autoTagUnavailable": "This build ships without the tag model, so no tags can be suggested. Myne never downloads one. The switch turns on by itself in a build that includes it.",
       "consent": {
         "accept": "Send my notes to {{provider}}",
         "cancel": "Cancel",
         "cannotVerifyLabel": "What Myne cannot check",
+        "connectionLabel": "How it travels",
         "revokeLabel": "How to undo this",
         "scopeLabel": "Which devices this covers",
         "title": "Before Myne sends anything to {{provider}}",
@@ -2977,6 +3037,8 @@
       "endpointThirdParty": "{{name}} is a separate program with its own network behaviour, and Myne does not control it. Your notes are sent to it while it runs on this computer.",
       "providerError": {
         "barred": "This kind of request never goes to a provider: it runs on this device or not at all.",
+        "featureOff": "AI is switched off on this device. Nothing was sent. Turn it on in Settings, under AI.",
+        "consentMissing": "You have not agreed to send notes to this provider from this device. Nothing was sent. Choose the provider again in Settings, under AI, and read what it will send.",
         "failed": "That did not work. Nothing was saved and nothing was sent again.",
         "localModelMissing": "The local model recorded in settings is not on this device any more. Nothing was sent anywhere. Pick a model again, or name a provider, in Settings → Developer → AI.",
         "noCredential": "No API key is set for this provider. Add one in Settings → Developer → AI.",
@@ -3024,6 +3086,13 @@
       "providerModelShowAll": "Show all models",
       "providerModelShowTextOnly": "Show text models only",
       "providerModelUnfetched": "Load the list to choose a model.",
+      "mobileEnableLabel": "Use AI on this phone",
+      "mobileEnableHelper": "Off by default. No AI model on this phone answers questions or reads your notes for AI, so every request goes to a service you name below, and your notes leave this device when it does. Transcription and image text still run here, on models that ship with Myne.",
+      "mobileKeyAdd": "Save key",
+      "mobileKeyReplace": "Replace key",
+      "mobileRevokeHelper": "Removes the provider, its key and this phone's approval together, leaving exactly the state of never having set it up. Other devices keep working until you remove it there too.",
+      "mobileApproveLabel": "Approve sending on this phone",
+      "mobileApproveHelper": "The provider and its key came from another device. Nothing is sent from this phone until you read what it will send and approve it here.",
       "providerNone": "None",
       "providerNothingAnswering": "Nothing is set up to answer yet.",
       "modelsLabel": "Models",
@@ -3276,6 +3345,7 @@
       "resultsLabel": "Search results",
       "keywords": {
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
+        "aiHistoryBudget": "conversation history context memory budget characters agent chat carried request",
         "aiEndpoint": "ollama endpoint address local runtime model server port loopback",
         "aiProvider": "provider remote cloud openrouter ollama cloud api key credential consent send notes",
         "aiProviderModel": "model catalogue list which model llama qwen gpt choose model remote provider",
@@ -3344,7 +3414,7 @@
     },
     "dateTime": {
       "dateLabel": "Date format",
-      "dateHelper": "How dates are shown across tasks, saved views and attachments.",
+      "dateHelper": "How a date is written wherever Myne shows one.",
       "dateSystem": "Match language",
       "timeLabel": "Time format",
       "timeHelper": "Whether times are shown on a 24-hour or 12-hour clock.",
@@ -3816,6 +3886,7 @@
       "kdfMemoryExceedsHost": "This vault needs {{required}} MiB of memory to open, more than this browser can give it ({{available}} MiB). The vault is fine; open it in the Myne desktop app.",
       "unexpected": "Unexpected error. Please try again.",
       "vaultNotFound": "Vault file not found. Please restart the app.",
+      "openAsImportSource": "An import is reading this vault right now. Finish or cancel that import, then unlock this vault.",
       "vaultUpgraded": "This vault was upgraded to a newer format this version of Myne doesn’t support yet. Your data is fine. Update Myne to the latest version to open it."
     },
     "passwordLabel": "Password",

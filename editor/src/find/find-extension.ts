@@ -41,6 +41,7 @@ import {
   SearchQuery,
 } from "@codemirror/search";
 import { createFindBarView } from "./find-bar-view";
+import { dateTimeDisplay, parseDisplayDate } from "@myne/editor/host/lib/datetimeFormat";
 import {
   getFindCaseSensitive,
   setFindCaseSensitive,
@@ -105,26 +106,69 @@ function createFindPanel(view: EditorView): Panel {
   let expanded = false;
   let replaceText = "";
 
-  const applyQuery = (query: string): void => {
-    view.dispatch({
-      effects: setSearchQuery.of(
-        // literal: true → plain substring, never regex (regex is out of scope v1).
-        // `replace` is carried on the query so @codemirror/search's replaceNext /
-        // replaceAll find the replacement; match-case is inherited (same field).
-        new SearchQuery({
-          search: query,
-          caseSensitive: getFindCaseSensitive(),
-          literal: true,
-          replace: replaceText,
-        }),
-      ),
+  // Date fallback (myne-md/myne#609): the STORED form currently being searched,
+  // or `null`, which is the state of nearly every search.
+  //
+  // Since myne#609 a due chip prints the reader's chosen format while the
+  // document holds the normative `YYYY-MM-DD`, so a user who types what is on
+  // screen finds nothing. The engine reads the document, not the DOM.
+  //
+  // TWO LITERAL PASSES, never one clever query. The typed text is searched
+  // first, exactly as before; only a zero-match result that reads back as a date
+  // triggers a second, also literal, search for the stored form. An alternation
+  // would need `literal: false`, and this bar has no regular-expression mode by
+  // deliberate design: turning one on would also route REPLACE through
+  // regular-expression substitution, whose `$1` / `$&` expansion is a hazard
+  // this repository already records.
+  //
+  // Literal-first ordering is not just caution about the engine. It preserves a
+  // match on a date written as ordinary prose: somebody who wrote `01/08/2026`
+  // in a sentence still finds it, and only when nothing matches does the second
+  // reading get a turn.
+  let dateFallback: string | null = null;
+
+  const searchQueryFor = (query: string): SearchQuery =>
+    // literal: true → plain substring, never regex (regex is out of scope v1).
+    // `replace` is carried on the query so @codemirror/search's replaceNext /
+    // replaceAll find the replacement; match-case is inherited (same field).
+    new SearchQuery({
+      search: query,
+      caseSensitive: getFindCaseSensitive(),
+      literal: true,
+      replace: replaceText,
     });
+
+  /**
+   * Whether a replace may run at all.
+   *
+   * THE RULE LIVES HERE, at the decision point, not on the buttons. The first
+   * version set `disabled` on the two buttons in the bar view and nowhere else,
+   * and the bar's replace INPUT is never disabled: its Enter handler, documented
+   * two dozen lines below as "the primary one-handed flow", called `replaceNext`
+   * unconditionally. So the control looked closed and the path most people use
+   * was open, which is worse than no gate, because the disabled buttons say the
+   * feature is protecting you.
+   *
+   * What that cost, traced end to end: with the fallback live the matched bytes
+   * are the stored `YYYY-MM-DD`, so `[due:: 2026-08-01]` became
+   * `[due:: 02/08/2026]`, `parseTaskInstant` refuses that, the field is
+   * functionally dead, the task leaves every dated view and its reminder, and
+   * the rewrite syncs to every device. The bar view's `disabled` is now a
+   * PRESENTATION of this predicate rather than the rule itself.
+   */
+  const canReplace = (): boolean => dateFallback === null;
+
+  const applyQuery = (query: string): void => {
+    // A new typed query always starts from the literal reading. Leaving a stale
+    // fallback set would let one search's second pass explain another's results.
+    dateFallback = null;
+    view.dispatch({ effects: setSearchQuery.of(searchQueryFor(query)) });
   };
 
   // Read the engine's matches across the whole doc — we never filter or exclude,
   // so the cached set IS the engine's set (folded tables / fenced code / YAML
   // frontmatter all count, since the cursor scans the canonical doc text).
-  const scan = (): void => {
+  const collect = (): { from: number; to: number }[] => {
     const query = getSearchQuery(view.state);
     const found: { from: number; to: number }[] = [];
     if (query.valid) {
@@ -135,7 +179,38 @@ function createFindPanel(view: EditorView): Panel {
         next = cursor.next();
       }
     }
-    matches = found;
+    return found;
+  };
+
+  const scan = (): void => {
+    matches = collect();
+
+    // The second pass, and the only place it can be decided: the first pass's
+    // result is not known until here. `dateFallback === null` is the whole loop
+    // guard, since it is set before the dispatch and cleared only by a NEW typed
+    // query. An earlier version also carried a `fallbackPending` flag; it was
+    // set and cleared inside the same synchronous block and no caller could
+    // observe it as true, so it was a comment describing a mechanism that was
+    // not there.
+    if (matches.length === 0 && dateFallback === null) {
+      const typed = bar.input.value;
+      const stored = parseDisplayDate(typed, dateTimeDisplay());
+      if (stored !== null && stored !== typed) {
+        dateFallback = stored;
+        view.dispatch({ effects: setSearchQuery.of(searchQueryFor(stored)) });
+        // The dispatch reaches this panel's own `update`, which sees the query
+        // change and arms `scheduleScan()`. That timer would repeat the walk
+        // below 120 ms later over the same state and same query, which is a
+        // whole frame's work on a large note (measured: 31 ms over 400 KiB) for
+        // an identical result. Disarm it: this pass is the answer.
+        if (scanTimer !== null) {
+          clearTimeout(scanTimer);
+          scanTimer = null;
+        }
+        matches = collect();
+      }
+    }
+
     render();
   };
 
@@ -172,12 +247,12 @@ function createFindPanel(view: EditorView): Panel {
     const query = bar.input.value;
     const caseSensitive = getFindCaseSensitive();
     if (query.length === 0) {
-      bar.update({ query, caseSensitive, status: "idle", match: null, expanded, replace: replaceText });
+      bar.update({ query, caseSensitive, status: "idle", match: null, expanded, replace: replaceText, dateFallback });
       return;
     }
     const total = matches.length;
     if (total === 0) {
-      bar.update({ query, caseSensitive, status: "no-match", match: null, expanded, replace: replaceText });
+      bar.update({ query, caseSensitive, status: "no-match", match: null, expanded, replace: replaceText, dateFallback });
       return;
     }
     bar.update({
@@ -187,6 +262,7 @@ function createFindPanel(view: EditorView): Panel {
       match: { current: currentOrdinal(), total },
       expanded,
       replace: replaceText,
+      dateFallback,
     });
   };
 
@@ -198,6 +274,7 @@ function createFindPanel(view: EditorView): Panel {
       match: null,
       expanded,
       replace: replaceText,
+      dateFallback: null,
     },
     {
       onQueryChange: (query) => applyQuery(query),
@@ -229,14 +306,16 @@ function createFindPanel(view: EditorView): Panel {
         applyQuery(bar.input.value);
       },
       onReplaceOne: () => {
+        if (!canReplace()) return;
         // Replaces the current match (if the selection sits on one) and advances
         // to the next; otherwise just advances. The selection move rides the
         // existing cursor-aware reveal (un-folds folded regions, SYNC-6).
         replaceNext(view);
       },
       onReplaceAll: () => {
+        if (!canReplace()) return;
         // One undoable transaction over the canonical buffer (folded regions
-        // included) — a single Cmd/Ctrl+Z reverts the whole bulk replace.
+        // included), so a single Cmd/Ctrl+Z reverts the whole bulk replace.
         replaceAll(view);
       },
     },
@@ -275,15 +354,36 @@ function createFindPanel(view: EditorView): Panel {
     }
     if (e.key === "Enter") {
       e.preventDefault();
+      // The gate is on the ACTION, so this path is closed by the same predicate
+      // the buttons render as `disabled`. It used to call `replaceNext` outright,
+      // which meant the one keyboard path the comment above calls primary was the
+      // one the gate did not cover.
+      if (!canReplace()) return;
       replaceNext(view);
     }
   });
 
   // Initial state. A fresh open is usually empty (idle). When a query already
-  // exists — selection-prefill (set by `openInNoteFind` before opening) or a
-  // reopen with a leftover query — scan IMMEDIATELY (not debounced) so the count
-  // + highlights are ready the instant the bar appears (Task 7).
-  if (getSearchQuery(view.state).valid) scan();
+  // exists, from the selection prefill `openInNoteFind` sets before opening or
+  // from a reopen with a leftover query, the count and highlights should be
+  // ready the instant the bar appears (Task 7).
+  //
+  // **Not `scan()`, and the difference is a crash rather than a nicety.** This
+  // function body runs INSIDE a CodeMirror update: the panel spec is called from
+  // `PanelGroup.update`, and `EditorView.update` throws "Calls to
+  // EditorView.update are not allowed while an update is in progress" when it is
+  // re-entered. Since myne-md/myne#609, `scan()` can dispatch, because the
+  // date-fallback second pass installs a new query. Reachable in one gesture:
+  // close the bar inside the 120 ms scan debounce with a display-format date
+  // still typed, so `destroy()` clears the timer and the engine keeps the raw
+  // text, then reopen. The leftover query is valid, the first pass matches
+  // nothing, the fallback fires, and the dispatch lands mid-update.
+  //
+  // `scheduleScan()` is a 0-to-120 ms timer, which is off the update stack, and
+  // it costs nothing the immediate call was buying: the bar renders its idle
+  // state first and the count arrives a frame later, which is what a debounced
+  // keystroke already does.
+  if (getSearchQuery(view.state).valid) scheduleScan();
 
   return {
     dom: bar.dom,

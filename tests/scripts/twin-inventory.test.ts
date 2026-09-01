@@ -180,12 +180,47 @@ describe("check-twin-inventory", () => {
     // that stops being a twin because the duplication was resolved leaves the
     // roster the same way a deleted file does.
     //
+    // Then 104 to 107, in myne-md/myne#456, and it is worth reading as two
+    // moves that happen to net out plus one that does not.
+    //
+    // THREE LEFT THE SWEEP AND CAME BACK CURATED. `engine.rs`, `error.rs` and
+    // `state.rs` moved out of `src-tauri/src/plugins/local_inference/` into
+    // `core/src/inference/`, so their desktop side is no longer under a sweep
+    // root and the STALE direction named all three by path. Mobile still holds
+    // its own copy of each, so the duplication is not resolved and dropping the
+    // pairs would have shrunk the denominator at the exact moment the shared
+    // side landed, which reads as progress and is the opposite. They are in
+    // `CURATED_TWINS` now, cross-path, the way every other pair the sweep
+    // cannot see already is. Net zero.
+    //
+    // THREE ENTERED. `src-tauri/src/plugins/agent/{mod,commands,adapters}.rs`
+    // gained mobile counterparts, because the same change ships the agent on
+    // the phone. That is the guard's stated purpose working once more: each of
+    // the three failed as unclassified and cost a verdict and a reason before
+    // this number could move, and all three came out `absent` after measuring
+    // rather than assuming, since what is left in each file after the shared
+    // half went to `myne-core` is per-client host wiring.
+    //
+    // Then 107 to 108, in the same issue one task later: `src/lib/agent-run.ts`
+    // gained a mobile counterpart. Both are `delegated` shells around a shared
+    // `agent-run-core.ts`, and the pair is recorded rather than waved through
+    // as trivial precisely because it is the place a client could quietly stop
+    // delegating and start retyping a command name.
+    //
+    // Then 108 to 109 when this branch met myne-md/myne#622 at a merge:
+    // `core/src/plugins/agent/history.rs` arrived from develop while the agent
+    // command surface had already moved into `myne-core` here, so the pair the
+    // sweep sees is new to the merged tree rather than to either branch.
+    expect(full.out).toContain("110 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("105 twin(s) discovered");
+    expect(full.out).toContain("110 twin(s) discovered");
+    //
+    // Then 109 to 110 when the two met at a merge: neither branch could see
+    // the other's pair, and both are real.
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -359,7 +394,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(105);
+    expect(ROSTER.length).toBe(110);
   });
 
   it("keeps `screen` narrow", () => {

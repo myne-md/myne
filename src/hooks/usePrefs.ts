@@ -20,6 +20,7 @@
 // past ~5 fields, revisit (separate PRD).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { observeEgressControls } from "../notes/ai/chatStore";
 import i18n from "../i18n";
 import {
   PrefsView,
@@ -31,6 +32,7 @@ import {
   setCliEnabled as persistCliEnabled,
   setCliExcludedFolders as persistCliExcludedFolders,
   setCliRateLimitDisabled as persistCliRateLimitDisabled,
+  setChatHistoryBudget as persistChatHistoryBudget,
   setDeveloperMode as persistDeveloperMode,
   setDateFormat,
   setTimeFormat,
@@ -85,6 +87,7 @@ const DEFAULT_PREFS: PrefsView = {
   attachment_ocr_enabled: true,
   ai_excluded_folders: [],
   developer_mode: false,
+  chat_history_budget: null,
   archived_folders: [],
   auto_lock_seconds: null,
   // MYND-651: matches the Rust default. A default-off positive opt-in, so the
@@ -170,6 +173,9 @@ interface UsePrefsResult {
   setAiExcludedFolders: (folders: string[]) => Promise<void>;
   /** Flip the Developer mode toggle (optimistic; same converge-on-error pattern). */
   setDeveloperMode: (enabled: boolean) => Promise<void>;
+  /** `null` clears the override. The stored value may be lower than the one
+   *  passed: the host clamps it, and this hook re-reads to show what stuck. */
+  setChatHistoryBudget: (budget: number | null) => Promise<void>;
   /**
    * Open or close the CLI terminal-access door (myne-cli epic, MYND-490).
    * Optimistic; same converge-on-error pattern. The socket itself follows
@@ -305,6 +311,12 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
         // every consumer that reads a field off it.
         if (!cancelled && view && mine > applied.current) {
           applied.current = mine;
+          // Every applied view is observed, so a change to the egress controls
+          // cuts the chat-history seed whichever way it arrived. See
+          // `chatStore.observeEgressControls`: `ai_excluded_folders` is
+          // Shared(SetUnion), so it also arrives by sync merge, where no setter
+          // on this machine is called.
+          observeEgressControls(view.ai_excluded_folders, view.ai_provider);
           setPrefs(view);
         }
       } catch {
@@ -395,6 +407,37 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  // The agent's chat-history seed budget (myne-md/myne#617).
+  //
+  // Unlike every toggle here, this one re-reads on SUCCESS as well as on
+  // failure: the host CLAMPS the value, so what it stored can be lower than
+  // what was sent, and an optimistic update alone would leave a number on
+  // screen that is not the number a run will use.
+  const setChatHistoryBudgetPref = useCallback(
+    async (budget: number | null) => {
+      setPrefs((p) => ({ ...p, chat_history_budget: budget }));
+      try {
+        await persistChatHistoryBudget(budget);
+      } catch {
+        onError?.(i18n.t("settings.prefs.saveError"));
+      } finally {
+        // Converges on BOTH arms, which is why the re-read is in `finally`
+        // rather than written out twice. On failure it is the same rollback
+        // every other setter here does; on SUCCESS it is load-bearing, because
+        // the host clamps and the value it stored can be lower than the one
+        // sent. A setter that converged only on failure would leave the panel
+        // showing a bound no run will use.
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed. Keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+      }
+    },
+    [onError],
+  );
+
   // Developer mode toggle (`developer-mode` feature, MYND-593). Same
   // optimistic-then-converge discipline as `setAiEnabledPref`.
   const setDeveloperModePref = useCallback(
@@ -416,9 +459,18 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  // Changing the AI exclusion set stops every turn now on screen from being
+  // seeded into a later run (myne-md/myne#617 review). See
+  // `chatStore.blockSeedingOfExistingTurns` for why the cut is by time.
   const setAiExcludedFoldersPref = useCallback(
     async (folders: string[]) => {
       setPrefs((p) => ({ ...p, ai_excluded_folders: folders }));
+      // The seed cut used to be here. It moved down into
+      // `prefs.setAiExcludedFolders`, which is the single point every exclusion
+      // write passes through, so it now sits beside the identical one in
+      // `setAiProvider` instead of a layer above it. `persistAiExcludedFolders`
+      // below is that binding, so the ordering the cut depends on (before the
+      // write, before any await) is unchanged.
       try {
         await persistAiExcludedFolders(folders);
       } catch {
@@ -700,6 +752,11 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       const view = await prefsRead();
       if (mine <= applied.current) return;
       applied.current = mine;
+      // Same observation as the mount read, and this is the path a synced
+      // change actually takes: the sync apply bumps the prefs nonce, every
+      // `usePrefs` re-reads, and the change is visible here with no setter
+      // having run.
+      observeEgressControls(view.ai_excluded_folders, view.ai_provider);
       setPrefs(view);
     } catch {
       // Keep the current cache (safer-state per spec § 9.5.5).
@@ -722,6 +779,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setCliEnabled: setCliEnabledPref,
     setCliExcludedFolders: setCliExcludedFoldersPref,
     setCliRateLimitDisabled: setCliRateLimitDisabledPref,
+    setChatHistoryBudget: setChatHistoryBudgetPref,
     setDeveloperMode: setDeveloperModePref,
     setAutoLock,
     setReminderHorizon,

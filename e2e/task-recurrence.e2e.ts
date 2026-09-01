@@ -27,6 +27,7 @@ import {
   createNote,
   dismissImporterOffer,
   editorText,
+  editorSourceText,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -112,12 +113,15 @@ describeE2E("rc2 skipping an occurrence advances the line in place", () => {
         await (await s.byTestId("editor.task-field-menu-skip")).click();
         await s.waitForGone(testIdSelector("editor.task-field-menu"));
 
+        // SOURCE text: the due chip prints the reader's chosen format since
+        // myne-md/myne#609, so the advanced ISO date is in the document and not
+        // in the render.
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("2030-02-15") ? true : null),
+          async () => ((await editorSourceText(s)).includes("2030-02-15") ? true : null),
           { label: "skipped occurrence advanced the date" },
         );
 
-        const text = await editorText(s);
+        const text = await editorSourceText(s);
         // In place: the old date is gone, the rule survives, and no second task
         // line appeared. A skipped occurrence did not happen, so there is also
         // no completion record of it.

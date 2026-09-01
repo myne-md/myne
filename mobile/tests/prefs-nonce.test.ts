@@ -126,11 +126,16 @@ describe("the mobile prefs chokepoint", () => {
 
     // Non-vacuity, pinned at the REAL count rather than under it. A floor fires
     // when the number drops, and an addition raises it, so slack below reality
-    // buys nothing and costs coverage: at 40 against 47, seven setters could stop
+    // buys nothing and costs coverage: at 40 against 50, ten setters could stop
     // reaching `invoke` (an early return skips them via `writes.length === 0`)
     // with this file still green. `grep -c 'await writePref(' mobile/src/lib/prefs.ts`
     // is the number, and raising it is the whole point of a floor.
-    expect(covered.length).toBeGreaterThanOrEqual(47);
+    //
+    // Raised 47 -> 50 by myne-md/myne#609, which added the three date/time
+    // setters. The slack was found by review rather than by this file: a floor
+    // left behind an addition is exactly as green as a correct one, so the raise
+    // is part of adding a setter and not a follow-up.
+    expect(covered.length).toBeGreaterThanOrEqual(50);
     // Two names pinned rather than left to the count, because these two toggles
     // are the ones a user reads as a privacy promise, so a surface showing the
     // old value is worse here than a stale font size. Deliberately NOT cited to

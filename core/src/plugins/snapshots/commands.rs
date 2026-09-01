@@ -101,7 +101,9 @@ pub(crate) async fn snapshot_list_in(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+            return Err(SnapshotError::VaultNotUnlocked)
+        }
     };
 
     if let Some(notes_dir) = notes_dir_beside(&snapshots_dir) {
@@ -220,7 +222,9 @@ pub(crate) async fn snapshot_preview_in(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+            return Err(SnapshotError::VaultNotUnlocked)
+        }
     };
 
     let note_uuid_bytes = *note_id.as_uuid().as_bytes();
@@ -378,7 +382,9 @@ pub(crate) async fn snapshot_restore_in(
         let slot = state.slot_read_active().await;
         let (items_key, items_key_id) = match &*slot {
             Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-            Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+            Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+                return Err(SnapshotError::VaultNotUnlocked)
+            }
         };
         let note_uuid_bytes = *note_id_parsed.as_uuid().as_bytes();
         let live_path = notes_dir.join(format!("{}.myn", note_id_parsed.as_uuid()));
@@ -418,7 +424,9 @@ pub(crate) async fn snapshot_restore_in(
         let slot = state.slot_read_active().await;
         let (items_key, items_key_id) = match &*slot {
             Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-            Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+            Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+                return Err(SnapshotError::VaultNotUnlocked)
+            }
         };
         let note_uuid_bytes = *note_id_parsed.as_uuid().as_bytes();
         let path = snapshots_dir.join(crate::snapshot_store::snapshot_filename(
@@ -617,7 +625,9 @@ pub(crate) async fn snapshot_prune_in(
     let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
-        Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+            return Err(SnapshotError::VaultNotUnlocked)
+        }
     }
 
     let note_uuid = note_id.as_uuid().to_string();

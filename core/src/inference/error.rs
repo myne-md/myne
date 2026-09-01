@@ -107,6 +107,24 @@ pub enum EngineError {
     /// routed nowhere because Myne's own code declines to route it there.
     #[error("this request may not use a remote backend")]
     RemoteBarred,
+    /// **No consent has been recorded on THIS DEVICE for the selected
+    /// provider.** Actionable: accept the consent screen, once, here.
+    ///
+    /// Split out of [`EngineError::RemoteBarred`] by myne-md/myne#456, and the
+    /// reason is that one variant was carrying two unrelated meanings. The
+    /// other is a rule Myne applies to a request CLASS: an ambient request or
+    /// any embedding may not use a remote backend, ever, whatever the user
+    /// says. This one is a permission the user has simply not given yet, and
+    /// the difference is the whole of what the user does next. Collapsed
+    /// together, someone who had never seen the consent screen was told "this
+    /// kind of request never goes to a provider", which is both false about
+    /// their request and silent about the one action that would fix it.
+    ///
+    /// Distinct from [`EngineError::NoCredential`] for the same class of
+    /// reason: one means there is nothing to send, the other that you have not
+    /// agreed to send it, and the two fixes are in different places.
+    #[error("no consent recorded on this device for the selected provider")]
+    ConsentMissing,
     // ---- provider-credential + quota causes (ai-remote-providers task 7) ---
     // The issue asks for "three distinct states, not one"; these are two of the
     // five, and the two the tree could not otherwise express. Unit and
@@ -215,34 +233,6 @@ pub enum EngineError {
     RequestRejected,
 }
 
-impl From<super::audio::AudioError> for EngineError {
-    /// One mapping, in one place, so a new [`AudioError`](super::audio::AudioError)
-    /// variant cannot quietly land in a catch-all.
-    ///
-    /// The obvious form is `map_err(|e| match e { TooLong => …, _ => … })` at the
-    /// call site, and it is what this replaced. That shape compiles forever: a
-    /// ninth decode failure compile-fails `AudioError::kind` in `audio.rs` and
-    /// then arrives at the user as "transcription failed, please try again",
-    /// which is the exact collapse `AudioTooLong` exists to undo. Written here
-    /// and exhaustively, adding a variant stops the build at this match.
-    fn from(e: super::audio::AudioError) -> Self {
-        use super::audio::AudioError;
-        match e {
-            // Not worth retrying: the same clip is refused every time.
-            AudioError::TooLong => EngineError::AudioTooLong,
-            // Every other decode failure is a malformed or unsupported
-            // container, which the surface reports as a generic failure.
-            AudioError::NotWave
-            | AudioError::NoFmtChunk
-            | AudioError::NoDataChunk
-            | AudioError::UnsupportedFormat
-            | AudioError::UnsupportedBitDepth
-            | AudioError::BadLayout
-            | AudioError::Empty => EngineError::TranscriptionFailed,
-        }
-    }
-}
-
 impl EngineError {
     /// Bounded, content-free tag for structured logging (DENY-list safe).
     // Consumed by command DENY-list logging in task 6; forward-declared here.
@@ -262,6 +252,7 @@ impl EngineError {
             EngineError::Unreachable => "unreachable",
             EngineError::Refused => "refused",
             EngineError::RemoteBarred => "remote_barred",
+            EngineError::ConsentMissing => "consent_missing",
             EngineError::NoCredential => "no_credential",
             EngineError::Unauthorized => "unauthorized",
             EngineError::QuotaExhausted => "quota_exhausted",
@@ -273,54 +264,5 @@ impl EngineError {
             EngineError::IndexNotReady => "index_not_ready",
             EngineError::RequestRejected => "request_rejected",
         }
-    }
-}
-
-#[cfg(test)]
-mod audio_error_mapping_tests {
-    use super::*;
-    use crate::plugins::local_inference::audio::AudioError;
-
-    /// The split, not the mapping.
-    ///
-    /// This existed as a `map_err` catch-all at the call site and had no test on
-    /// either side, which myne-md/myne#510's review proved by injection:
-    /// rewriting the arm to `TooLong => TranscriptionFailed` left the whole
-    /// desktop lib suite green (1228 passed), clippy clean, and the JS taxonomy
-    /// drift-lock unmoved, because that lock parses `kind()`'s arms and
-    /// `AudioTooLong` is still one of them. The four-layer chain from the decoder
-    /// to the user's sentence collapsed with nothing red.
-    ///
-    /// So both directions are asserted. The refusal maps to its own variant, and
-    /// a sibling decode failure does not: a test that only checked the first
-    /// would pass against a `From` that answered `AudioTooLong` for everything.
-    #[test]
-    fn too_long_maps_to_its_own_engine_error_and_nothing_else_does() {
-        assert_eq!(
-            EngineError::from(AudioError::TooLong),
-            EngineError::AudioTooLong
-        );
-        for other in [
-            AudioError::NotWave,
-            AudioError::NoFmtChunk,
-            AudioError::NoDataChunk,
-            AudioError::UnsupportedFormat,
-            AudioError::UnsupportedBitDepth,
-            AudioError::BadLayout,
-            AudioError::Empty,
-        ] {
-            assert_eq!(
-                EngineError::from(other),
-                EngineError::TranscriptionFailed,
-                "{other:?} is a malformed-container failure and must stay retryable"
-            );
-        }
-    }
-
-    /// The tag the frontend keys off, so the Rust half of the wire is pinned to
-    /// the string `src/lib/transcribe.ts` normalizes.
-    #[test]
-    fn the_too_long_kind_tag_is_the_one_the_frontend_maps() {
-        assert_eq!(EngineError::AudioTooLong.kind(), "audio_too_long");
     }
 }

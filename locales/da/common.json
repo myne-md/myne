@@ -48,7 +48,8 @@
       "unsupportedDetail": "Den bestod {{passes}} af {{attempts}} tjek; der kræves {{required}}.",
       "checking": "Tjekker modellen…",
       "checkingAt": "Tjekker modellen… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Den beståelsesgrænse er endnu ikke målt på tværs af modeller, så den kan være strengere eller mere lempelig, end den bør være."
+      "unsupportedProvisional": "Den beståelsesgrænse er endnu ikke målt på tværs af modeller, så den kan være strengere eller mere lempelig, end den bør være.",
+      "scopeNone": "ingen note åben, så der er endnu ikke noget at arbejde med"
     },
     "progress": {
       "working": "Arbejder",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} omfang, du har angivet",
       "grantsUser_other": "{{count}} omfang, du har angivet",
       "grantsModel_one": "{{count}} den bad om",
-      "grantsModel_other": "{{count}} omfang, den bad om"
+      "grantsModel_other": "{{count}} omfang, den bad om",
+      "cancelledBackground": "Kørslen blev annulleret, fordi Myne gik i baggrunden. Der blev ikke skrevet noget. Spørg igen, når du er klar."
     },
     "scope": {
       "title": "Inkludér {{folder}}?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Ikke oprettet: den mappe er udelukket fra AI.",
         "createFailed": "Ikke oprettet: den nye note kunne ikke skrives. De øvrige ændringer blev stadig anvendt.",
         "excludedNow": "Kunne ikke anvendes: notens mappe er nu udelukket fra AI.",
-        "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag."
+        "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag.",
+        "noteMoved": "Kunne ikke anvendes: den ændring ville flytte noten til en anden mappe.",
+        "appendEmpty": "Kunne ikke anvendes: der var intet at tilføje.",
+        "appendWouldWriteFrontmatter": "Kunne ikke anvendes: den tekst ville være blevet notens egenskabsblok."
       },
       "applyFailed": "Ændringerne kunne ikke anvendes.",
       "undo": "Fortryd denne kørsel",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} noter læst",
       "runSummaryOffDevice_one": "omkring {{count}} tegn fra dine noter blev sendt til udbyderen",
       "runSummaryOffDevice_other": "omkring {{count}} tegn fra dine noter blev sendt til udbyderen",
-      "runSummaryOnDevice": "intet forlod denne enhed"
+      "runSummaryOnDevice": "intet forlod denne enhed",
+      "appendFlag": "tilføjes til slutningen"
     },
     "undo": {
       "offer_one": "Den seneste kørsel ændrede {{count}} note.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} note kunne ikke gendannes.",
       "failed_other": "{{count}} noter kunne ikke gendannes.",
       "createdNotReverted_one": "{{count}} note, som kørslen oprettede, blev efterladt.",
-      "createdNotReverted_other": "{{count}} noter, som kørslen oprettede, blev efterladt."
+      "createdNotReverted_other": "{{count}} noter, som kørslen oprettede, blev efterladt.",
+      "sessionOnly": "Denne fortryd-med-ét-tryk gælder, indtil du låser boksen eller lukker appen. Derefter gendanner du noter én ad gangen fra en notes versionshistorik.",
+      "sessionOnlyLink": "Åbn versionshistorik"
     }
   },
   "ai": {
@@ -1204,7 +1212,9 @@
       "replaceAllCount": "Erstat alle ({{total}})",
       "replaceOne": "Erstat",
       "replacePlaceholder": "Erstat med",
-      "toggleReplace": "Slå erstat til/fra"
+      "toggleReplace": "Slå erstat til/fra",
+      "dateFallback": "Søger efter {{stored}}, den form denne dato er gemt i.",
+      "replaceOffOnDateFallback": "Erstat er slået fra, mens en dato findes i sin gemte form, så en erstatning ikke kan gøre datoen ulæselig."
     },
     "cover": {
       "add": "Tilføj omslag",
@@ -2816,7 +2826,16 @@
       "periodNameMonthly": "månedlige",
       "periodFolderAriaLabel": "Mappe til {{period}} noter",
       "periodFormatAriaLabel": "Titelformat til {{period}} noter",
-      "periodTemplateAriaLabel": "Skabelon til {{period}} noter"
+      "periodTemplateAriaLabel": "Skabelon til {{period}} noter",
+      "dateFormatHelper": "Titlen på hver daglig note. Understøtter ÅÅÅÅ, MM, DD. Standard er {{default}}.",
+      "dateFormatLabel": "Datoformat for daglige noter",
+      "dateFormatSaveError": "Kunne ikke gemme datoformatet. Prøv igen.",
+      "folderHelper": "Hvor nye daglige noter placeres. Standard er {{default}}. Mappen beholdes, også når den er tom.",
+      "folderLabel": "Mappe til daglige noter",
+      "folderSaveError": "Kunne ikke gemme den daglige mappe. Prøv igen.",
+      "templateHelper": "Vælg en skabelon, som hver daglig note skal starte fra, eller lad være tom for en tom note med datoen som titel.",
+      "templateLabel": "Skabelon til daglige noter",
+      "templateSaveError": "Kunne ikke gemme den daglige skabelon. Prøv igen."
     },
     "deleteVault": {
       "cancel": "Annullér",
@@ -2977,7 +2996,8 @@
         "title": "Før Myne sender noget til {{provider}}",
         "whatLabel": "Hvad der forlader din enhed",
         "whenLabel": "Hvornår det sendes",
-        "whoLabel": "Hvem der modtager det"
+        "whoLabel": "Hvem der modtager det",
+        "connectionLabel": "Hvordan det rejser"
       },
       "disclosureToggle": "Hvordan fungerer det?",
       "enableHelper": "Kører en model, du selv leverer. Hvor den kører, og om dine noter forlader denne enhed, afhænger begge dele af den udbyder, du angiver nedenfor. Eksperimentel, slået fra som standard.",
@@ -3011,7 +3031,9 @@
         "refused": "Udbyderen afviste forbindelsen. Den er måske nede eller blokerer dette netværk.",
         "timeout": "Udbyderen svarede ikke i tide. Intet blev efterladt kørende.",
         "unauthorized": "Udbyderen afviste din API-nøgle. Udskift den: den kan være forkert, tilbagekaldt eller høre til en anden konto.",
-        "unreachable": "Kunne ikke nå udbyderen. Tjek din netværksforbindelse."
+        "unreachable": "Kunne ikke nå udbyderen. Tjek din netværksforbindelse.",
+        "featureOff": "AI er slået fra på denne enhed. Der blev ikke sendt noget. Slå det til under Indstillinger, i AI.",
+        "consentMissing": "Du har ikke accepteret at sende noter til denne udbyder fra denne enhed. Der blev ikke sendt noget. Vælg udbyderen igen under Indstillinger, i AI, og læs, hvad der sendes."
       },
       "modelChoose": "Vælg fil…",
       "modelEmbeddingLabel": "Søgemodel: semantisk søgning og spørgsmål/svar",
@@ -3052,7 +3074,16 @@
       "recommendedFilesEmbedding": "Kræver model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Kræver .gguf-filen + tokenizer.json i samme mappe.",
       "recommendedFilesTranscription": "Kræver Whisper .gguf-filen + config.json + tokenizer.json i samme mappe.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Brug AI på denne telefon",
+      "mobileEnableHelper": "Slået fra som standard. Ingen AI-model på denne telefon besvarer spørgsmål eller læser dine noter, så hver forespørgsel går til en tjeneste, du navngiver nedenfor, og dine noter forlader enheden når den gør. Transskription og tekst i billeder kører stadig her, på modeller der følger med Myne.",
+      "mobileKeyAdd": "Gem nøgle",
+      "mobileKeyReplace": "Udskift nøgle",
+      "mobileRevokeHelper": "Fjerner udbyderen, dens nøgle og denne telefons godkendelse på én gang og efterlader præcis den tilstand, hvor der aldrig var sat noget op. Andre enheder fungerer videre, indtil du også fjerner det der.",
+      "mobileApproveLabel": "Godkend afsendelse på denne telefon",
+      "mobileApproveHelper": "Udbyderen og dens nøgle kom fra en anden enhed. Der sendes intet fra denne telefon, før du læser, hvad der sendes, og godkender det her.",
+      "historyBudgetHelper": "Hvor meget af den seneste samtale hver forespørgsel bærer, i tegn. Lad feltet stå tomt for standardværdien. Et større tal lader AI'en følge længere samtaler og sender mere af dem: hos en udbyder, der ikke er på denne enhed, betyder det mere af din tekst, der forlader den, ved hvert trin i en kørsel.",
+      "historyBudgetLabel": "Samtale der sendes med hver forespørgsel"
     },
     "network": {
       "disabledCue": "Synkronisering sendes ikke længere gennem Tor. Nye forbindelser går direkte til synkroniseringsserveren.",
@@ -3369,12 +3400,13 @@
         "dateFormat": "datoformat dato dag måned år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat klokkeslæt 24 timer 12 timer ur am pm time format",
         "timezone": "tidszone zone tz utc iana region i dag timezone",
-        "periodicNotes": "periodiske noter ugentlig månedlig uge måned mappe skabelon format"
+        "periodicNotes": "periodiske noter ugentlig månedlig uge måned mappe skabelon format",
+        "aiHistoryBudget": "samtale historik kontekst hukommelse budget tegn agent chat forespørgsel"
       }
     },
     "dateTime": {
       "dateLabel": "Datoformat",
-      "dateHelper": "Hvordan datoer vises i opgaver, gemte visninger og vedhæftede filer.",
+      "dateHelper": "Hvordan en dato skrives, overalt hvor Myne viser en.",
       "dateSystem": "Følg sproget",
       "timeLabel": "Tidsformat",
       "timeHelper": "Om klokkeslæt vises på et 24-timers eller 12-timers ur.",

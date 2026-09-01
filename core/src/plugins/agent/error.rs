@@ -95,6 +95,38 @@ pub enum EditRejection {
     /// also puts a sentence in front of the user that would be false for the
     /// other four.
     RemovalNeedsOwnAct,
+    /// The edit would move the note to a different folder.
+    ///
+    /// `folder:` is what the `ai_excluded_folders` clamp reads, and the clamp
+    /// runs against the note as it was BEFORE the batch. So without this, an
+    /// anchored edit spanning that line could move a note into an
+    /// excluded folder with no control seeing it: the clamp had already run and
+    /// the removal roster does not carry the field.
+    ///
+    /// Distinct from [`Self::RemovalNeedsOwnAct`], which covers the five
+    /// working-set markers and only inside a bulk approval. This one refuses
+    /// under every approval label, because there is no act a user can take that
+    /// makes an agent-chosen folder move correct.
+    ///
+    /// Deliberately narrower than "the frontmatter changed": `title:` and note
+    /// properties are fields the agent legitimately edits.
+    /// [`super::frontmatter::edit_moves_note`] carries that argument.
+    NoteMoved,
+    /// An append carried nothing to append.
+    ///
+    /// Its own reason rather than [`Self::AnchorEmpty`], which would be a false
+    /// sentence: an append has no anchor by design, so telling the user there
+    /// was "no text to match" describes a rule that does not apply to it.
+    AppendEmpty,
+    /// An append into a note with neither a frontmatter block nor a body would
+    /// have authored one.
+    ///
+    /// Appended text normally lands after the frontmatter block, which makes it
+    /// structurally impossible for it to be the first line. That positioning has
+    /// nothing to work with when the note is entirely empty, so the one
+    /// remaining case is refused rather than silently rewritten: mangling the
+    /// model's text would leave the user approving something nobody wrote.
+    AppendWouldWriteFrontmatter,
 }
 
 /// The agent plugin's failure surface.
@@ -206,6 +238,30 @@ pub enum AgentError {
     /// them to look at their vault for a fault in the request Myne built.
     #[error("the backend failed")]
     ProviderFailed,
+    /// A GATE refused the request: the user has not agreed to send to this
+    /// provider, AI is off, no credential is stored, or the backend is not
+    /// ready.
+    ///
+    /// **One variant per gate would be four; one variant carrying the cause is
+    /// one, and the cause is what a surface needs** (myne-md/myne#456, found by
+    /// review). Every gate refusal used to collapse into `ProviderFailed`, so
+    /// the phone that inherited a provider and a key and holds no local consent,
+    /// which is exactly the population the device-scoped consent creates, was
+    /// told "That did not work. Nothing was saved and nothing was sent again."
+    /// rather than the sentence that names the fix. `AiChatFlow`'s
+    /// `GATE_REFUSALS` branch could not fire at all, and deleting it would have
+    /// changed nothing.
+    ///
+    /// This is the defect `EngineError` splits `ConsentMissing` out of
+    /// `RemoteBarred` to fix, one layer down: that split reached the desktop
+    /// `local_inference` path and not the only path mobile has.
+    #[error("a gate refused the request: {cause}")]
+    GateRefused {
+        /// The `EngineError::kind()` of the refusing gate, which is bounded and
+        /// content-free by construction, so it is safe to log and safe to send
+        /// across IPC.
+        cause: &'static str,
+    },
 }
 
 impl AgentError {
@@ -234,6 +290,7 @@ impl AgentError {
             Self::StepAlreadyRunning => "step_already_running",
             Self::ProviderRejected => "provider_rejected",
             Self::ProviderFailed => "provider_failed",
+            Self::GateRefused { .. } => "gate_refused",
         }
     }
 }

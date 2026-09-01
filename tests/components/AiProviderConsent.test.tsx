@@ -152,9 +152,24 @@ describe("the per-provider consent screen", () => {
     expect(screen.getByTestId("ai-consent.revoke").textContent).toContain(
       "at the provider",
     );
-    // The account-scope residual (SYNC-22) is on the screen, not discovered.
-    expect(screen.getByTestId("ai-consent.scope").textContent).toContain(
-      "any device you add later",
+    // **Device scope, and this assertion is inverted from what it was.** The
+    // clause used to state the SYNC-22 residual, that a device added later
+    // inherits the choice and does not ask. myne-md/myne#456 made the consent
+    // device-local, so the screen must no longer say it, and asserting the
+    // ABSENCE of the old sentence is what stops it coming back in a copy edit.
+    const scope = screen.getByTestId("ai-consent.scope").textContent ?? "";
+    expect(scope).toContain("this device only");
+    expect(scope).not.toContain("any device you add later");
+    // The key DOES still travel, and the sentence says so: a phone can hold a
+    // credential it has not been permitted to use, which is the part a user
+    // could otherwise be surprised by.
+    expect(scope).toContain("key does travel");
+
+    // **How it travels** (myne-md/myne#456). Stated nowhere else, and a reader
+    // who has seen the Tor routing option elsewhere would reasonably assume it
+    // applies here.
+    expect(screen.getByTestId("ai-consent.connection").textContent).toContain(
+      "direct",
     );
   });
 
@@ -213,13 +228,36 @@ describe("the per-provider consent screen", () => {
     expect(setAiProviderConsent).not.toHaveBeenCalled();
   });
 
-  it("does not re-ask for a provider already consented to", async () => {
-    consentFor = "openrouter";
+  it("does not re-ask for a provider already consented to ON THIS DEVICE", async () => {
+    consentFor = "openrouter@device";
     render(<AiPanel />);
     fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
     await waitFor(() => expect(setAiProvider).toHaveBeenCalledWith("openrouter"));
-    // No screen: the recipient is one they have already agreed to.
+    // No screen: the recipient is one they have already agreed to, here.
     expect(screen.queryByTestId("ai-consent.screen")).toBeNull();
+  });
+
+  it("DOES ask again for a LEGACY consent, the bare provider name", async () => {
+    // The Critical this token exists for (myne-md/myne#456, found by review).
+    // A desktop install that named a provider, consented, stored a key and then
+    // turned Developer mode OFF was answered by the LOCAL arm for as long as
+    // `developer_mode` was a request-time precondition. Dropping that
+    // precondition re-points the identical preferences at the remote provider,
+    // so note plaintext starts crossing TB13 on upgrade with no user act and no
+    // notice. A device enrolled before the reclassification holds the same
+    // value, inherited under the old SHARED class, and no merge will revise it.
+    //
+    // The screen is how the user is ASKED rather than blocked, so this asserts
+    // the screen appears and that no provider write happened first.
+    //
+    // Reverting `consentIsDeviceScoped` to an equality against the provider
+    // name makes this fail.
+    consentFor = "openrouter";
+    render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    const screenEl = await screen.findByTestId("ai-consent.screen");
+    expect(screenEl.textContent).toContain("OpenRouter");
+    expect(setAiProvider).not.toHaveBeenCalled();
   });
 
   it("DOES ask again when switching to a different provider", async () => {
