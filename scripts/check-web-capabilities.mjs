@@ -77,6 +77,20 @@ const CAPABILITY_BACKING = {
   // backing is non-empty even though the feature they served still ships on web
   // through a different mechanism (the directory picker, task 71).
   hostDirectoryRead: ["importer"],
+  // The SAME plugin entry as the line above, and that is correct rather than a
+  // copy-paste (myne-md/myne#464). The `importer` namespace holds two unrelated
+  // command groups: the host-confined directory read, and the six
+  // `import_source_*` commands that open a SECOND local vault read-only. Both
+  // capabilities are absent on web, and the dispatcher refuses the whole plugin,
+  // so both name the plugin.
+  //
+  // Naming the six commands individually was tried and is wrong here: this map
+  // is compared against the literal `(name, Class::Unsupported)` entries in the
+  // Rust table, and the table classifies by PLUGIN. A per-command backing
+  // therefore fails direction 1 for a plugin that genuinely refuses every one of
+  // them, which is the guard reporting on the shape of its own input rather than
+  // on the system.
+  vaultImport: ["importer"],
   // The two READ commands are the whole backend surface of this capability;
   // extraction itself has no command (it runs inside `attachment_import`, and
   // web already injects the no-op extractor `attachment_import_with_dir` has

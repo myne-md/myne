@@ -4206,8 +4206,15 @@ pub async fn set_time_format<R: Runtime>(
 /// — an IANA zone identifier, or `None` to clear to the `system` default.
 ///
 /// **Display only.** It decides what the app treats as "today" and how a stored
-/// wall-clock value is printed; it never enters a `.myn` file, a blob, or the
-/// sync wire (`prefs_classification` files it DeviceLocal for that reason).
+/// wall-clock value is printed; it never enters a `.myn` file, so a note never
+/// records where its author was.
+///
+/// It DOES enter a blob, and this comment said otherwise until myne-md/myne#609:
+/// the body below writes the zone into `vault.prefs`, which the sync layer
+/// pushes and pulls verbatim. `PrefClass::DeviceLocal` is a MERGE
+/// classification (`docs/spec/sync-protocol.md` 10.2) meaning the local value
+/// survives the merge, not a statement that the value stays on the device, and
+/// 10.2.1 has a newly enrolled device adopt it as a starting default.
 pub async fn set_timezone_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,

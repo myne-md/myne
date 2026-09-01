@@ -20,6 +20,7 @@ import {
   resetPreviewCache,
   resetTranscripts,
 } from "@myne/editor/attachments/session-caches";
+import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -64,6 +65,16 @@ export async function lockVault(): Promise<void> {
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  // The ambient date/time DISPLAY store, which is module scope in
+  // `@myne/editor` and read by every surface that prints a date. It holds the
+  // reader's chosen formats and their TIME ZONE, all derived from decrypted
+  // `vault.prefs`, and nothing in production returned it to defaults: after one
+  // unlock it stayed resident through a lock and into the next vault's session
+  // until that vault's publisher happened to overwrite it. The zone is the
+  // reason this is on the leaving path rather than left to the next mount: it
+  // is a coarse-location datum kept per vault everywhere else, and
+  // `dialect/src/taskFields.ts` keeps it out of note bytes for that reason.
+  resetDateTimeDisplayForLock();
   await invoke<void>("plugin:vault-unlock|lock");
 }
 

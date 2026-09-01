@@ -108,11 +108,25 @@ interface CalloutType {
   readonly color: "info" | "success" | "warning" | "danger" | "accent";
   readonly icon: string;
   /** i18n key (under `editor.callout.label.*`) for the default title, resolved
-   *  via `i18n.t()` when the decoration set is BUILT — the plugin's rebuild gate
-   *  (`plugin-factory.ts`) watches doc / viewport / selection / focus / tree, not
-   *  `languageChanged`, so a live re-label would need the builder re-run through
-   *  `makeGatedDecorationPlugin`. It isn't wired; a switched language re-labels
-   *  on the next rebuild (any edit, scroll or selection move). */
+   *  via `i18n.t()` when the decoration set is BUILT.
+   *
+   *  This used to read "it isn't wired; a switched language re-labels on the
+   *  next rebuild (any edit, scroll or selection move)", and myne-md/myne#609
+   *  wired the CHANNEL: `ambientLabelsChanged` is a term in the shared rebuild
+   *  gate in `plugin-factory.ts`, and `ambientLabelRefresh()` dispatches it when
+   *  the display settings or the app language change, so an ambient change now
+   *  rebuilds this layer instead of waiting for an incidental edit.
+   *
+   *  **What is NOT established is the language outcome**, and this comment
+   *  claimed it until a reviewer checked. `tests/editor/callout-render.test.ts`
+   *  covers the display half and explicitly declines the language half, because
+   *  the measurement it records is that switching the i18n bundle makes the
+   *  header widget VANISH on the next rebuild. That is a separate defect on this
+   *  layer's language path, measured and not yet understood, and it is named
+   *  here rather than left in a test file a reader of this line will not open.
+   *
+   *  Recorded rather than deleted, because the sentence it replaces was cited
+   *  from two other files. */
   readonly labelKey: string;
 }
 

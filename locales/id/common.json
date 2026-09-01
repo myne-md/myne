@@ -1192,6 +1192,7 @@
     },
     "find": {
       "close": "Tutup pencarian",
+      "dateFallback": "Mencari {{stored}}, bentuk penyimpanan tanggal ini.",
       "matchCase": "Cocokkan huruf besar/kecil",
       "matchCount": "{{current}} dari {{total}}",
       "nextMatch": "Hasil berikutnya",
@@ -1200,6 +1201,7 @@
       "previousMatch": "Hasil sebelumnya",
       "replaceAll": "Ganti semua",
       "replaceAllCount": "Ganti semua ({{total}})",
+      "replaceOffOnDateFallback": "Ganti dimatikan selama sebuah tanggal cocok lewat bentuk simpanannya, agar penggantian tidak membuat tanggal itu tak terbaca.",
       "replaceOne": "Ganti",
       "replacePlaceholder": "Ganti dengan",
       "toggleReplace": "Alihkan ganti"
@@ -3354,7 +3356,7 @@
     },
     "dateTime": {
       "dateLabel": "Format tanggal",
-      "dateHelper": "Bagaimana tanggal ditampilkan di tugas, tampilan tersimpan, dan lampiran.",
+      "dateHelper": "Bagaimana sebuah tanggal ditulis di mana pun Myne menampilkannya.",
       "dateSystem": "Ikuti bahasa",
       "timeLabel": "Format waktu",
       "timeHelper": "Apakah waktu ditampilkan dalam format 24 jam atau 12 jam.",
