@@ -19,8 +19,8 @@ import type {
   ProbeVerdict,
   Proposal,
   ProposedEdit,
-} from "../../lib/agent-run";
-import { hasRefusals } from "../../lib/agent-run";
+} from "../../lib/agent-protocol";
+import { hasRefusals } from "../../lib/agent-protocol";
 
 /** The whole of what a screen needs to render a run. */
 export interface AgentState {
@@ -180,6 +180,21 @@ export function useAgent(): AgentState {
   );
 }
 
+/** What LEGS THAT HAVE ALREADY SETTLED contributed to the three cost figures.
+ *
+ *  A run is driven in legs, `agent_start`, then one `agent_approve_scope` per
+ *  scope expansion, and each leg's host-side counters start at zero. The live
+ *  report carries the CURRENT leg's running totals, so the displayed figure is
+ *  this base plus that report. Without the split, a second leg's first report
+ *  would replace the first leg's total rather than continue it, and the
+ *  disclosure figure would fall as the run progressed. That is the one
+ *  direction it must never move in.
+ *
+ *  Module-scope rather than a store field because nothing renders it, and a
+ *  public field that is not a fact about the surface is a field somebody
+ *  renders by mistake. It is reset wherever the counters are. */
+let legBase = { iterations: 0, notesRead: 0, charsOffDevice: null as number | null };
+
 /** A run is starting.
  *
  *  **`undoable` is carried over, and that is not tidiness.** The host's record
@@ -204,6 +219,7 @@ export function beginRun(): void {
   // remote arm, so a merged total is a false statement about how much left the
   // device rather than a mislabel.
   runEpoch += 1;
+  legBase = { iterations: 0, notesRead: 0, charsOffDevice: null };
   set({
     ...INITIAL,
     undoable: state.undoable,
@@ -241,6 +257,38 @@ export function beginRun(): void {
 export function openRun(view: AgentRunView, epoch: number): boolean {
   if (epoch !== runEpoch) return false;
   set({ view });
+  return true;
+}
+
+
+
+/** The host reports what the current leg has cost so far (myne-md/myne#456).
+ *
+ *  Called once per model round-trip, from the channel `agentStart` and
+ *  `agentApproveScope` open. Epoch-checked for the reason `settleStep` states:
+ *  a run the user let go of mid-flight must not write figures over the one that
+ *  replaced it, and the disclosure figure is exactly the number where a merged
+ *  total would be a false statement rather than a cosmetic one.
+ *
+ *  Does NOT touch `running`, `view`, `proposal` or `end`. This is a report
+ *  about a run in flight, not a step settling. */
+export function reportRunProgress(
+  progress: { iterations: number; notesRead: number; charsOffDevice: number | null },
+  epoch: number,
+): boolean {
+  if (epoch !== runEpoch) return false;
+  set({
+    iterations: legBase.iterations + progress.iterations,
+    notesRead: legBase.notesRead + progress.notesRead,
+    // Null plus a figure is that figure, and null plus null stays null, the
+    // same rule `settleStep` applies, for the same reason: "the run stayed on
+    // this device" and "the run is remote and has sent nothing" are different
+    // statements.
+    charsOffDevice:
+      progress.charsOffDevice === null
+        ? legBase.charsOffDevice
+        : (legBase.charsOffDevice ?? 0) + progress.charsOffDevice,
+  });
   return true;
 }
 
@@ -299,19 +347,33 @@ export function settleStep(
   epoch: number,
 ): boolean {
   if (epoch !== runEpoch) return false;
-  set({
-    view: result.view,
-    proposal: result.proposal,
-    end: result.end,
-    iterations: state.iterations + result.iterations,
-    notesRead: state.notesRead + result.notesRead,
+  // **Accumulated onto the LEG BASE, not onto the displayed value**
+  // (myne-md/myne#456). The live report has already advanced the displayed
+  // figures to `legBase + this leg's running total`, and `result` carries that
+  // same leg total, so adding it to the display would count the whole leg
+  // twice. Folding it into the base instead leaves the displayed figure exactly
+  // where the last report put it and leaves the next leg somewhere correct to
+  // start from. With no reports at all, a host that passes no channel, or a
+  // leg that stopped before its first round-trip: the base is still zero and
+  // this reduces to the accumulation it replaced.
+  legBase = {
+    iterations: legBase.iterations + result.iterations,
+    notesRead: legBase.notesRead + result.notesRead,
     // Null plus a figure is that figure, not null: a run that resumes onto a
     // remote provider after a local first leg did send something, and reporting
     // nothing would be the wrong half of the truth.
     charsOffDevice:
       result.charsOffDevice === null
-        ? state.charsOffDevice
-        : (state.charsOffDevice ?? 0) + result.charsOffDevice,
+        ? legBase.charsOffDevice
+        : (legBase.charsOffDevice ?? 0) + result.charsOffDevice,
+  };
+  set({
+    view: result.view,
+    proposal: result.proposal,
+    end: result.end,
+    iterations: legBase.iterations,
+    notesRead: legBase.notesRead,
+    charsOffDevice: legBase.charsOffDevice,
     excludedCount: result.excludedCount,
     running: false,
   });
@@ -603,6 +665,11 @@ export function clearAgent(): void {
   // `AgentReviewTakeover`'s derived `reviewable` true, opening a full-screen
   // review of a conversation the user had just deleted.
   runEpoch += 1;
+  // Reset with the counters it accompanies. A base that outlived a cleared
+  // store would make the NEXT run's first live report start from the previous
+  // run's total, which is the merged-figure defect `beginRun`'s note above
+  // describes, arriving by a different door.
+  legBase = { iterations: 0, notesRead: 0, charsOffDevice: null };
   state = {
     ...INITIAL,
     // Kept for the reason `beginRun` states: closing the review screen is not

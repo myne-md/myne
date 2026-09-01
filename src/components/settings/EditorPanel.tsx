@@ -29,10 +29,10 @@ import { DateTimeSettings } from "./DateTimeSettings";
 import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
 import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
-import { DailyNotesSettings } from "./DailyNotesSettings";
+import { PeriodicNotesSettings } from "./PeriodicNotesSettings";
 import { ArchiveSettings } from "./ArchiveSettings";
 import { ViewsSettings } from "./ViewsSettings";
-import { ReminderSettings } from "./ReminderSettings";
+import { ReminderHorizonSettings, ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
 import { useSettingsCompact } from "./settingsCompact";
@@ -259,12 +259,25 @@ function EditorSettingsPreview() {
   );
 }
 
-export function EditorPanel() {
+export interface EditorPanelProps {
+  /**
+   * Toast surface, threaded from `SettingsModal.onShowToast` exactly as
+   * `PrivacyPanel` and `AiPanel` thread it. Without it `usePrefs`'s optimistic
+   * writes fail silently: `writeOptimisticPref` calls `onError?.(…)` into
+   * nothing, and when its converging re-read also fails it deliberately keeps
+   * the optimistic value, so a horizon that was never persisted goes on being
+   * displayed (myne#508). Optional for the dev and non-Tauri mounts that have
+   * no toast surface.
+   */
+  onShowToast?: (message: string) => void;
+}
+
+export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
   const { t } = useTranslation();
   // Task reminders (MYND-618) read their pref here and echo the toggle locally:
   // `usePrefs` reads once on mount, so the panel — not the hook — is what keeps
   // the switch in step with the write the block performs itself.
-  const { prefs } = usePrefs();
+  const { prefs, setReminderHorizon } = usePrefs(onShowToast);
   // On a narrow dialog the 264px preview column is dropped (#391): it is
   // decoration for the settings, not a setting, and the space it frees lets the
   // controls column keep its rows side-by-side instead of overlapping.
@@ -273,6 +286,9 @@ export function EditorPanel() {
   useEffect(() => {
     setRemindersEnabledEcho(null);
   }, [prefs.reminders_enabled]);
+  // Resolved once: two adjacent rows read it, and the horizon row's visibility
+  // is the switch's own state rather than a second copy of it.
+  const remindersOn = remindersEnabled ?? prefs.reminders_enabled;
 
   return (
     <div style={EDITOR_LAYOUT_STYLE}>
@@ -327,18 +343,30 @@ export function EditorPanel() {
       >
         {/* Spell-check configuration (MYND-267) — toggle + language picker. */}
         <SpellSettings />
-        {/* Daily-notes configuration (MYND-191) — folder / date-format /
-            template. */}
-        <DailyNotesSettings />
         {/* Task reminders (MYND-618) — note-authoring behaviour, which is why it
             belongs in this group rather than under Appearance. Device-local:
             whether THIS machine is interrupted is a property of the machine. */}
-        <ReminderSettings
-          enabled={remindersEnabled ?? prefs.reminders_enabled}
+        <ReminderSettings enabled={remindersOn} onEnabledChange={setRemindersEnabledEcho} />
+        {/* Its own row rather than a control nested under the switch (myne#508):
+            the canon's shape for a setting, and the only one that gives the
+            picker a visible label. It holds no state of its own:
+            `setReminderHorizon` is `usePrefs`'s optimistic setter, so
+            `prefs.reminder_horizon_days` is already current by the time this
+            re-renders. */}
+        <ReminderHorizonSettings
+          enabled={remindersOn}
           horizonDays={prefs.reminder_horizon_days}
-          onEnabledChange={setRemindersEnabledEcho}
+          onChange={(days) => void setReminderHorizon(days)}
         />
       </SettingsSection>
+
+      {/* Periodic notes (MYND-191 daily, myne#177 weekly + monthly): folder /
+          title format / template, one section per period. Rendered at PANEL
+          level rather than inside Writing above: `SettingsSection` draws a rule
+          to the panel edge, so nesting three of them made the Reminder rows
+          that followed sit under the Monthly divider and read as monthly
+          settings. */}
+      <PeriodicNotesSettings />
 
       <SettingsSection
         title={t("settings.editor.sections.features")}

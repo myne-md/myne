@@ -12,7 +12,7 @@
 // string / the streamed segments — AS1-class content, never logged here.
 
 import { Channel, invoke } from "../platform/core";
-import { engineErrorTag } from "./engine-error";
+import { engineErrorTag, snakeCase } from "./engine-error";
 
 /** Normalized transcription-failure cause (MYND-591). Each value except
  *  `"failed"` maps 1:1 to a distinct `EngineError` the transcribe command can
@@ -22,12 +22,17 @@ import { engineErrorTag } from "./engine-error";
  *  - `"vault_locked"`     — no unlocked vault / key material
  *  - `"no_model"`         — no transcription model available at all
  *  - `"model_load_failed"`— a model is present but could not be loaded
+ *  - `"too_long"`         the clip is longer than the decoder will decode.
+ *                           The same clip is refused every time, so the generic
+ *                           "Please try again" copy would be advice that cannot
+ *                           work (myne#510)
  *  - `"failed"`           — any other engine / decrypt / decode failure. */
 export type TranscribeErrorKind =
   | "feature_off"
   | "vault_locked"
   | "no_model"
   | "model_load_failed"
+  | "too_long"
   | "failed";
 
 export interface TranscribeError {
@@ -67,28 +72,36 @@ export function startTranscription(
   };
 }
 
-/** Serialized-`EngineError` tag → normalized cause. Accepts the bare PascalCase
- *  variant string (the unit-variant serde form the command actually returns) and
- *  a defensive snake_case `{ kind }` object. A pre-MYND-591 backend collapsed
- *  every cause into `NotReady`, whose historical copy said "select a model", so
- *  legacy `NotReady` maps to `"no_model"`. */
-const CAUSE_BY_TAG: Readonly<Record<string, TranscribeErrorKind>> = {
-  FeatureOff: "feature_off",
-  feature_off: "feature_off",
-  VaultLocked: "vault_locked",
-  vault_locked: "vault_locked",
-  NoModel: "no_model",
-  no_model: "no_model",
-  ModelLoadFailed: "model_load_failed",
-  model_load_failed: "model_load_failed",
-  NotReady: "no_model", // legacy skew fallback
-  not_ready: "no_model",
-};
+/** Serialized-`EngineError` tag → normalized cause.
+ *
+ *  Two spellings reach this seam: Tauri serializes a unit variant as its
+ *  identifier (`AudioTooLong`) while `EngineError::kind` emits snake_case
+ *  (`audio_too_long`). The tag is normalized through {@link snakeCase} first
+ *  rather than written twice, which is the shape `normalizeProviderError` was
+ *  refactored into for the reason stated there: hand-writing both rows put a
+ *  silent fall-through to `"failed"` one transcription error away, twice per
+ *  cause. This table went from ten rows to six by adopting it.
+ *
+ *  A `Map`, not an object literal, for that module's other stated reason: an
+ *  object's lookup walks `Object.prototype`, so a tag of `constructor` or
+ *  `toString` would resolve to a truthy function and be returned as a cause.
+ *
+ *  A pre-MYND-591 backend collapsed every cause into `NotReady`, whose
+ *  historical copy said "select a model", so legacy `not_ready` maps to
+ *  `"no_model"`. */
+const CAUSE_BY_TAG = new Map<string, TranscribeErrorKind>([
+  ["feature_off", "feature_off"],
+  ["vault_locked", "vault_locked"],
+  ["no_model", "no_model"],
+  ["model_load_failed", "model_load_failed"],
+  ["audio_too_long", "too_long"],
+  ["not_ready", "no_model"], // legacy skew fallback
+]);
 
 /** Map the raw IPC rejection (a serialized `EngineError` — a bare variant string
  *  like `"NoModel"`, or a `{ kind }` object) to a normalized cause. Anything
  *  unrecognized (including `"TranscriptionFailed"`) degrades to `"failed"`. */
 export function normalizeTranscribeError(raw: unknown): TranscribeError {
-  const tag = engineErrorTag(raw);
-  return { kind: CAUSE_BY_TAG[tag] ?? "failed" };
+  const tag = snakeCase(engineErrorTag(raw));
+  return { kind: CAUSE_BY_TAG.get(tag) ?? "failed" };
 }

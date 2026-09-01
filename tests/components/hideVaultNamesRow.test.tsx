@@ -81,6 +81,11 @@ function mountPanel(
         return Promise.resolve({ available: true });
       case "plugin:prefs|prefs_read":
         return Promise.resolve({});
+      // myne-md/myne#482: the same panel now reads the device-local
+      // screen-capture override on mount. Stubbed rather than left to
+      // reject, so a rename shows up here as an unstubbed command.
+      case "plugin:screen-capture|screen_capture_override_get":
+        return Promise.resolve({ disabled: false, via_flag: false, effective: false });
       default:
         return Promise.reject(new Error(`unstubbed command: ${cmd}`));
     }

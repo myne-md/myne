@@ -73,6 +73,7 @@ import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
 import { RemoteMergeHint } from "../components/sync/RemoteMergeHint";
 import { Icon } from "../components/primitives/Icon";
+import { PanelToggleGlyph } from "../components/primitives/PanelToggleGlyph";
 import { Tooltip } from "../components/primitives/Tooltip";
 import {
   hoverSurface,
@@ -108,8 +109,12 @@ import {
   noteList,
   loadNoteBatch,
   createNoteFromTemplate,
+  singleDay,
   createBlankNamedNote,
-  resolveTodayNote,
+  resolvePeriodNote,
+  periodSettings,
+  zonedNow,
+  type Period,
   convertNoteToTemplate,
   convertTemplateToNote,
 } from "../notes";
@@ -133,6 +138,10 @@ import {
   type ExportToast,
   type NoteExportUiHooks,
 } from "../notes/exportFlow";
+import {
+  noteExportFormats,
+  type NoteExportFormat,
+} from "../notes/noteExportMenu";
 import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
 import { ExportEgressNotice } from "../components/export/ExportEgressNotice";
 import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
@@ -213,6 +222,8 @@ import {
 } from "../notes/components/ContextMenu";
 import {
   HAS_OVERLAY_WINDOW_CONTROLS,
+  TITLE_BAR_CONTROL_HEIGHT,
+  TITLE_BAR_CONTROL_TOP,
   TRAFFIC_LIGHT_GAP,
   dragRegionProps,
 } from "./titlebar";
@@ -1032,6 +1043,7 @@ function EditorChrome({
     enabled: barPrefs.reminders_enabled,
     tasks: reminderTasks,
     notifier: reminderNotifier,
+    horizonDays: barPrefs.reminder_horizon_days,
   });
   // `barMenu` holds the open menu's anchor coords + which mode it is in: a
   // plain `{x, y}` opens the bar-wide visibility checklist (right-click on
@@ -2002,7 +2014,7 @@ function EditorChrome({
         data-editor-chrome
         style={{
           position: "absolute",
-          top: 6,
+          top: TITLE_BAR_CONTROL_TOP,
           left: leftToggleX,
           zIndex: 30,
           display: "flex",
@@ -2038,7 +2050,7 @@ function EditorChrome({
         <div
           style={{
             position: "absolute",
-            top: 6,
+            top: TITLE_BAR_CONTROL_TOP,
             right: RIGHT_TOGGLE_X,
             zIndex: 30,
           }}
@@ -2256,7 +2268,11 @@ function EditorChrome({
         onCreateFromTemplate={(templateId, name) => {
           // Location-agnostic: lands at the root, where the header new-note
           // button's blank note would land (folder = null).
-          void createNoteFromTemplate(templateId, name, null)
+          // `singleDay(now)`: a note made by hand belongs to the day it was
+          // made on, so both period tokens render as today. Said explicitly
+          // because the parameter is required now, which is what stops a
+          // future weekly path from silently inheriting this meaning.
+          void createNoteFromTemplate(templateId, name, null, new Date(), singleDay(new Date()))
             .then((id) => ctx.open(id as NoteId))
             .catch(() => {
               /* creation failure surfaces via sidebar UX */
@@ -2564,7 +2580,7 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
   alignSelf: "center",
   alignItems: "center",
   justifyContent: "center",
-  height: 26,
+  height: TITLE_BAR_CONTROL_HEIGHT,
   flexShrink: 0,
   border: 0,
   borderRadius: "var(--radius-1)",
@@ -2652,14 +2668,6 @@ function TitleBarToggle({
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const icon =
-    side === "left"
-      ? collapsed
-        ? "panel-left"
-        : "panel-left-close"
-      : collapsed
-        ? "panel-right"
-        : "panel-right-close";
   const label =
     side === "left"
       ? collapsed
@@ -2686,7 +2694,7 @@ function TitleBarToggle({
         opacity: disabled ? 0.4 : 1,
       }}
     >
-      <Icon name={icon} size={16} />
+      <PanelToggleGlyph side={side} collapsed={collapsed} />
     </button>
   );
 }
@@ -2783,6 +2791,15 @@ type CommandPaletteHostProps = {
   setToast: Dispatch<SetStateAction<EditorToast | null>>;
 };
 
+// One period-note failure string per period. Spelled out as literals rather
+// than built from the period name, because a template-built key is invisible to
+// `check-i18n.mjs` and would go missing from the catalog silently.
+const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
+  daily: "editor.periodicNotes.openFailed.daily",
+  weekly: "editor.periodicNotes.openFailed.weekly",
+  monthly: "editor.periodicNotes.openFailed.monthly",
+};
+
 function CommandPaletteHost({
   open,
   onClose,
@@ -2843,7 +2860,9 @@ function CommandPaletteHost({
   // fires straight from the palette — this renders the same count-aware
   // DeleteConfirmModal the TrashPanel footer uses, and only confirm purges.
   // Rendered as a sibling like `picker`, so it survives the palette closing.
-  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<number | null>(null);
+  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<
+    { count: number; viaKey: boolean } | null
+  >(null);
   // The note cover's picker (myne-md/myne#410). Editor-local boolean, per the
   // desktop modal carve-out that governs every other modal here. Deliberately
   // its OWN mount, separate from the cards-view picker inside `PaneView`: this
@@ -2894,45 +2913,64 @@ function CommandPaletteHost({
   useEffect(() => {
     clearAiOutput();
   }, [ctx.selectedId]);
-  // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
-  // set (authoritative note_list + loadNoteBatch, not the partial sidebar cache).
-  // Found → open; not found → create (from the daily template if set, else a
-  // blank note titled today's date, the eager-title specialization of #5) in the
-  // daily folder, then open. Past days are reached via the ordinary sidebar
-  // folder — no calendar.
-  const onOpenTodayNote = useCallback(async () => {
-    try {
-      const prefs = await prefsRead();
-      const ids = await noteList();
-      const notes = await loadNoteBatch(ids);
-      const res = resolveTodayNote(
-        new Date(),
-        prefs.daily_date_format,
-        prefs.daily_folder,
-        notes,
-      );
-      let id: NoteId;
-      if (res.kind === "open") {
-        id = res.id;
-      } else if (prefs.daily_template) {
-        // Daily template set → instantiate from it (date as eager title).
-        id = (await createNoteFromTemplate(
-          prefs.daily_template,
-          res.dateTitle,
-          res.folder,
-        )) as NoteId;
-      } else {
-        // No daily template → a blank note titled with the date.
-        id = (await createBlankNamedNote(res.dateTitle, res.folder)) as NoteId;
+  // Open this period's note (MYND-191 daily, myne#177 weekly + monthly): one
+  // entry point for all three, error handling included. Idempotent
+  // open-or-create over the FULL note set (authoritative note_list +
+  // loadNoteBatch, not the partial sidebar cache). Found → open; not found →
+  // create, from that period's template if it has one and otherwise a blank
+  // note titled with the period, in that period's folder, then open. Past
+  // periods are reached through the ordinary sidebar folder, no calendar.
+  //
+  // Daily is not special here: `periodSettings` is where the prefs asymmetry
+  // lives (daily reads three flat fields, the others read the map), and a
+  // second wrapper for it would put that knowledge in a second place.
+  const onOpenPeriodNote = useCallback(
+    async (period: Period) => {
+      try {
+        const prefs = await prefsRead();
+        const ids = await noteList();
+        const notes = await loadNoteBatch(ids);
+        const settings = periodSettings(prefs, period);
+        // ONE instant, read once, in the DISPLAY timezone (myne#177). It
+        // anchors the period AND renders the template's `{{date}}`/`{{time}}`:
+        // the date the app shows, the date it files under and the date the body
+        // carries all have to be the same date, and with a `timezone` override
+        // set none of the three agreed.
+        const now = zonedNow(new Date(), prefs.timezone);
+        const res = resolvePeriodNote(now, period, settings, notes);
+        let id: NoteId;
+        if (res.kind === "open") {
+          id = res.id;
+        } else if (settings.template) {
+          // Template set → instantiate from it (the period title as eager
+          // title, the period's own bounds behind
+          // {{period_start}}/{{period_end}}).
+          id = (await createNoteFromTemplate(
+            settings.template,
+            res.dateTitle,
+            res.folder,
+            now,
+            { start: res.range.start, end: res.range.end },
+          )) as NoteId;
+        } else {
+          // No template → a blank note titled with the period.
+          id = (await createBlankNamedNote(res.dateTitle, res.folder)) as NoteId;
+        }
+        await ctx.open(id);
+      } catch (err) {
+        // The user is TOLD. A DEV-only console.warn is an empty catch in a
+        // production build, which makes the palette command a silent no-op:
+        // seven awaits run behind this, any of which can fail, and the mobile
+        // twin of this function has always surfaced it.
+        setToast({ message: t(PERIOD_OPEN_FAILED_KEY[period]), variant: "error" });
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn(`[Editor] open the ${period} note failed:`, err);
+        }
       }
-      await ctx.open(id);
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.warn("[Editor] open today's note failed:", err);
-      }
-    }
-  }, [ctx]);
+    },
+    [ctx, setToast, t],
+  );
   // "Open random note" (MYND-323): serendipitous review. Picks uniformly from the
   // live, non-template notes (mirrors sidebar visibility — trashed/templates are
   // excluded). With ≥2 eligible notes the current one is dropped so the pick
@@ -3028,11 +3066,11 @@ function CommandPaletteHost({
       onTrashNote: () => {
         if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
       },
-      onEmptyTrash: () => {
+      onEmptyTrash: (viaKey: boolean) => {
         // Permanent purge — request the count-aware confirm instead of firing
         // directly (the TrashPanel footer's flow); the purge runs on confirm.
         const count = trashedRecords(ctx.cache).length;
-        if (count > 0) setEmptyTrashConfirm(count);
+        if (count > 0) setEmptyTrashConfirm({ count, viaKey });
       },
       onToggleFavorite: () => {
         if (ctx.selectedId === null) return;
@@ -3202,7 +3240,7 @@ function CommandPaletteHost({
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
-      onOpenTodayNote,
+      onOpenPeriodNote,
       onOpenRandomNote,
       onOpenAttachments,
       onOpenSnapshots,
@@ -3263,7 +3301,7 @@ function CommandPaletteHost({
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
-      onOpenTodayNote,
+      onOpenPeriodNote,
       onOpenRandomNote,
       onOpenAttachments,
       onOpenSnapshots,
@@ -3470,6 +3508,18 @@ function CommandPaletteHost({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNoteId]);
 
+  // The palette's four export handlers, keyed by the shared format id, so the
+  // "…" menu's submenu stays a projection of `noteExportFormats()` instead of a
+  // third copy of the list. `?.()` rather than a bare reference because
+  // `CommandContext` declares several of its callbacks optional, and a submenu
+  // row owes a handler either way.
+  const exportHandlerByFormat: Record<NoteExportFormat["id"], () => void> = {
+    "export-markdown": () => commandCtx.onExportNoteMarkdown?.(),
+    "export-pdf": () => commandCtx.onExportNotePdf?.(),
+    "export-html": () => commandCtx.onExportNoteHtml?.(),
+    "export-txt": () => commandCtx.onExportNoteTxt?.(),
+  };
+
   const noteActionItems: NoteActionMenuItem[] = [
     {
       kind: "action",
@@ -3528,31 +3578,27 @@ function CommandPaletteHost({
     { kind: "divider" },
     {
       kind: "action",
-      action: "export-markdown",
+      action: "export",
       icon: "download",
-      label: t("editor.noteActions.exportMarkdown"),
-      onSelect: commandCtx.onExportNoteMarkdown,
-    },
-    {
-      kind: "action",
-      action: "export-pdf",
-      icon: "download",
-      label: t("editor.noteActions.exportPdf"),
-      onSelect: commandCtx.onExportNotePdf,
-    },
-    {
-      kind: "action",
-      action: "export-html",
-      icon: "download",
-      label: t("editor.noteActions.exportHtml"),
-      onSelect: commandCtx.onExportNoteHtml,
-    },
-    {
-      kind: "action",
-      action: "export-txt",
-      icon: "download",
-      label: t("editor.noteActions.exportTxt"),
-      onSelect: commandCtx.onExportNoteTxt,
+      // ONE row with a submenu, where there used to be one row per format. Four
+      // of them made up a third of this menu, and the sidebar row's menu
+      // carried the same four again. The list itself now comes from
+      // `noteExportFormats()`, shared with that menu, including the
+      // `pdfExport` gate, which used to be on the sidebar side only, so this
+      // menu was the one still offering PDF on a host that cannot make one.
+      label: t("notes.export.submenuLabel"),
+      // Never called: a row with `children` opens them instead of acting.
+      onSelect: () => {},
+      children: noteExportFormats().map((format) => ({
+        action: format.id,
+        label: t(format.labelKey),
+        // Still the palette's own handlers, so this stays a second SURFACE onto
+        // one IPC path rather than a second path, the rule this menu's header
+        // states. They also close the palette, which the direct-flow runner in
+        // `noteExportEntries` has no business doing, and that is the whole
+        // reason the shared module stops at the format list here.
+        onSelect: exportHandlerByFormat[format.id],
+      })),
     },
     { kind: "divider" },
     {
@@ -3578,7 +3624,7 @@ function CommandPaletteHost({
         <div
           style={{
             position: "absolute",
-            top: 6,
+            top: TITLE_BAR_CONTROL_TOP,
             // Sits just left of the right-sidebar toggle (at RIGHT_TOGGLE_X),
             // one cluster gap between them, so the two read as one group.
             right: RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + TITLE_BAR_CLUSTER_GAP,
@@ -3628,8 +3674,14 @@ function CommandPaletteHost({
       {emptyTrashConfirm !== null && (
         <DeleteConfirmModal
           title={t("notes.trash.emptyConfirmTitle")}
-          body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm })}
+          body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm.count })}
           confirmLabel={t("notes.trash.emptyConfirmCta")}
+          // The palette's own answer, threaded through `CommandContext`. It was
+          // an unconditional `true` for one E2E run, on the reasoning that the
+          // palette is a keyboard-first surface, and `et1` failed three times
+          // over: a row selected with a click leaves no Enter to release, so the
+          // dialog ate the user's first press.
+          openedByKey={emptyTrashConfirm.viaKey}
           onCancel={() => setEmptyTrashConfirm(null)}
           onConfirm={() => {
             setEmptyTrashConfirm(null);

@@ -135,6 +135,7 @@ describe("Attachments Library Transcribe entry (SYNC-V9)", () => {
     ["vault_locked", "attachments.library.transcribeVaultLocked"],
     ["no_model", "attachments.library.transcribeNoModelHint"],
     ["model_load_failed", "attachments.library.transcribeModelLoadFailed"],
+    ["too_long", "attachments.library.transcribeTooLong"],
     ["failed", "attachments.library.transcribeFailed"],
   ] as const)("shows the per-cause toast when the run rejects %s", async (kind, key) => {
     transcriptionEnabled = true;

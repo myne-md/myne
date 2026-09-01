@@ -28,6 +28,10 @@ pub const DEFAULT_AUTO_LOCK_SECS: u32 = 300;
 
 pub mod atomic_write;
 pub mod attachment_nonce;
+/// The one decryption-free `content_nonce` reader, shared by every blob family
+/// that has one. The generation pair is a required argument, so a
+/// single-generation reader cannot be written by accident (myne-md/myne#638).
+pub mod content_nonce;
 /// The double-buffered container the web client stores singletons in
 /// (phase3-web-client task 18) — framing, slot selection, and the write/open
 /// algorithm over the [`vault_io`] seam, with the fault-injection points task 19
@@ -44,6 +48,15 @@ pub mod export_naming;
 /// by the `ai_excluded_folders` (SYNC-14) clamp in every place that applies it.
 pub mod folder_key;
 pub mod http;
+// The inference seam (myne-md/myne#456): the `Engine` trait, the backend
+// registry with its ambient-versus-remote refusal, and the remote-provider arm.
+// Behind the default-off `remote-ai` feature so the desktop auditable build
+// (`cargo build -p myne-desktop --no-default-features`) keeps containing no
+// remote-provider code, which it did while this tree lived inside the
+// feature-gated desktop plugin. See the module doc for why that gate is
+// load-bearing and what it does not protect.
+#[cfg(feature = "remote-ai")]
+pub mod inference;
 // The process-host seam (phase3-web-client task 79) — what a command core needs
 // from its host that is not already an ordinary Rust value. Sibling of `hooks`,
 // which is the same idea one axis over (lifecycle side effects).
@@ -58,6 +71,12 @@ pub mod note_txn;
 pub mod paths;
 pub mod plugins;
 pub mod protocol_error_kind;
+/// The device-local screen-capture override (myne-md/myne#482). One plaintext
+/// boolean under `<app_config_dir>` that the startup hook reads BEFORE any
+/// vault exists, which is what makes the pre-unlock lockout escapable.
+/// Top-level rather than under `plugins/` for the reason `vault_label` is:
+/// the plugin, the setup hook and the lock path all consume it and none owns it.
+pub mod screen_capture_override;
 pub mod task;
 // The full-text search engine (MYS1) + its encrypted persistence/reconcile core.
 // Top-level (not under `plugins/`) mirroring the desktop `mod search;` it

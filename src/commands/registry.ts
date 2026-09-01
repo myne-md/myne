@@ -16,6 +16,7 @@
 
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 import type { NoteId } from "../notes/sidebarState";
+import type { Period } from "../notes/dailyNote";
 import type { PrefsView } from "../lib/prefs";
 
 export type AppStageName =
@@ -76,8 +77,11 @@ export type CommandContext = {
   onManageTemplates: () => void;
   /** Open the new-note-from-template flow (picker → name → create) (MYND-190). */
   onNewNoteFromTemplate: () => void;
-  /** Open (or idempotently create) today's daily note (MYND-191). */
-  onOpenTodayNote: () => void;
+  /** Open (or idempotently create) one period's note: daily (MYND-191),
+   *  weekly or monthly (myne#177). ONE callback for all three: the prefs
+   *  asymmetry between daily and the other two lives in `periodSettings`, and
+   *  a second callback for daily would put that knowledge in a second place. */
+  onOpenPeriodNote: (period: Period) => void;
   /** Pick a random non-trashed, non-template note from the vault and open it (MYND-323). */
   onOpenRandomNote: () => void;
   /** Open the attachments library (full-pane center-pane view, MYND-170). */
@@ -146,8 +150,31 @@ export type CommandContext = {
   onRenameNote: () => void;
   /** Move the selected note to the trash (soft delete, recoverable). */
   onTrashNote: () => void;
-  /** Permanently empty the trash. */
-  onEmptyTrash: () => void;
+  /**
+   * Whether THIS invocation was activated by a key rather than a pointer.
+   *
+   * Set per call by whoever runs the action (`CommandPalette` clones the context
+   * with it), so it is a fact about one activation rather than ambient state.
+   * Absent when nobody knows, which reads as "not a key".
+   *
+   * It exists for one consumer, `onEmptyTrash`, and the reason is below.
+   */
+  activatedByKey?: boolean;
+  /**
+   * Permanently empty the trash, taking whether the ACTIVATION was a key.
+   *
+   * It reaches `DeleteConfirmModal`'s `openedByKey`, which makes Enter wait for
+   * an Enter keyup before it will confirm. The dialog behind this action is one
+   * of the two that perform the cryptographic erase of
+   * `docs/decisions/storage/0105`, and it opens DURING the Enter keydown that
+   * selects the palette row, so the key that opened it may still be down.
+   *
+   * A constant `true` here was tried and is wrong in the other direction: a
+   * palette row that was CLICKED leaves no Enter to release, so the user's first
+   * Enter would be eaten on a dialog that has to answer the first press.
+   * `e2e/palette-empty-trash.e2e.ts` caught exactly that, three runs over.
+   */
+  onEmptyTrash: (viaKey: boolean) => void;
   /** Add/remove the selected note from favorites. */
   onToggleFavorite: () => void;
   /** Reveal a specific right-panel tab. */

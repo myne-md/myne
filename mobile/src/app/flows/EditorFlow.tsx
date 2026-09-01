@@ -13,6 +13,7 @@ import type { EditorView } from "@codemirror/view";
 import { emit, listen } from "../../platform/event";
 import { documentDir, join } from "../../platform/path";
 import {
+  Button,
   Screen,
   ScreenScroll,
   Icon,
@@ -80,7 +81,10 @@ import { deriveTree, subtreeCount, orderedChildren, childOrderIndex, reorderChil
 import type { Child, OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
 import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expand-store";
 import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
-import { resolveTodayNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
+import { endAgentRun } from "../../lib/agent-lifetime";
+import { resolvePeriodNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
+import { periodSettings, zonedNow } from "../../lib/daily";
+import type { Period } from "../../lib/daily";
 import { normalizeFolderPath, ancestorPaths, foldSegment, folderKey } from "../../dialect/folderPath";
 import {
   archivedFolderKeys,
@@ -127,7 +131,10 @@ import { GraphTab } from "./editor/chrome/GraphTab";
 import { NoteRow } from "./editor/chrome/NoteRow";
 import { FolderTreeRow } from "./editor/chrome/FolderTreeRow";
 import { ReadingBar } from "./editor/chrome/ReadingBar";
-import { TabBar } from "./editor/chrome/TabBar";
+import { TabBar, type WorkspaceTab } from "./editor/chrome/TabBar";
+import { defaultGrantFor } from "@myne/agent-protocol";
+
+import { AiChatFlow } from "./AiChatFlow";
 import { TaskSurface } from "../../components/TaskSurface";
 import { EMPTY_SCOPE, type TaskScope } from "@myne/task-scope";
 import { takeReminderLanding } from "../../lib/reminderLanding";
@@ -153,6 +160,16 @@ import { VaultSwitcher } from "./editor/sheets/VaultSwitcher";
 import { ViewsSheet } from "./editor/sheets/ViewsSheet";
 import type { NoteEntry, OutlineItem, PaletteCommand } from "./editor/types";
 
+// One period-note failure string per period (myne#177), the desktop twin of
+// `src/screens/Editor.tsx::PERIOD_OPEN_FAILED_KEY`. Spelled out as literals
+// rather than built from the period name, because a template-built key is
+// invisible to `check-i18n.mjs` and would go missing from the catalog silently.
+const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
+  daily: "editor.periodicNotes.openFailed.daily",
+  weekly: "editor.periodicNotes.openFailed.weekly",
+  monthly: "editor.periodicNotes.openFailed.monthly",
+};
+
 /**
  * Editor flow — the wired main surface after unlock. Mirrors the static
  * `notes/05·06` list + `notes/07` reading + `workspace/08` editor +
@@ -175,7 +192,7 @@ type Editing = { id: string | null };
 /** Left-to-right tab position — drives the slide direction of the page
  *  transition: moving to a higher-indexed tab enters from the right, a
  *  lower-indexed tab from the left (an iOS push/pop feel across the tab row). */
-const TAB_ORDER: Record<"notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates", number> = {
+const TAB_ORDER: Record<WorkspaceTab, number> = {
   notes: 0,
   // MYND-620: `tasks` is placed between notes and graph rather than appended,
   // because this record is what decides the push/pop slide direction — a tab
@@ -187,6 +204,10 @@ const TAB_ORDER: Record<"notes" | "tasks" | "note-tasks" | "search" | "graph" | 
   graph: 4,
   files: 5,
   templates: 6,
+  // Last, matching its position in the bar. The comment above is the reason
+  // this is not a free choice: a tab that sits last in the bar and earlier here
+  // slides in from the wrong side, and nothing but the eye reports that.
+  chat: 7,
 };
 
 /** Editor typography presets (mirror the desktop `editor-typography` prefs), so
@@ -230,6 +251,49 @@ const EDITOR_TEXT_PX: Record<string, number> = { sm: 13, md: 14, lg: 16, xl: 18 
  */
 const ignorePrefsWriteFailure = (): void => {};
 
+/**
+ * Shared chrome for the `Sheet`s below that ask a question and offer two
+ * buttons: purge a note, move a note to a folder, delete a folder.
+ *
+ * The first two had their own copies, identical except where one had drifted (a
+ * 13px body against a 14px one, with nothing choosing between them). Collapsed
+ * when the folder-delete sheet made it three (myne-md/myne#628), because a third
+ * copy is where a change to one of them quietly stops reaching the others.
+ *
+ * The BUTTONS are not here, and that is the point of the shape: mobile already
+ * has the primitive, and `UnlockFlow`'s delete-vault sheet is the same dialog
+ * built out of it. Keeping a private geometry beside it would have made a fourth
+ * answer to "how tall is the destructive button on a bottom sheet" (this file
+ * had 50/r8, `Button` has 52 and 48/r6, `AttachmentsSheet` has 48/r8). These
+ * three now use `Button`, so the design system reaches them.
+ */
+const SHEET_TITLE = {
+  fontSize: 17,
+  fontWeight: 600,
+  color: "var(--fg-1)",
+  textAlign: "center",
+} as const;
+const SHEET_BODY = {
+  marginTop: 8,
+  fontSize: 14,
+  lineHeight: 1.5,
+  color: "var(--fg-3)",
+  textAlign: "center",
+} as const;
+/**
+ * The same paragraph in full ink, for a sheet whose body IS the decision rather
+ * than reassurance about it: the folder delete names how many notes move, and
+ * that count is what the user is agreeing to. Two named constants rather than a
+ * spread with an inline colour, so the distinction is a choice a call site makes
+ * by name instead of a literal a reader has to interpret.
+ */
+const SHEET_LEAD = { ...SHEET_BODY, color: "var(--fg-1)" } as const;
+const SHEET_ACTIONS = {
+  marginTop: 18,
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+} as const;
 const DEV_SEED: string[] = [
   "# Threat model v2\n\nWe assume a powerful network adversary that can observe all traffic and compromise the relay. The vault key never leaves the device.",
   "# Weekly review — 2026-06-15\n\nShipped the sync conflict resolver. Next: mobile share sheet and editor polish.",
@@ -273,7 +337,7 @@ function useIndexDeltaTracker(): IndexDeltaTracker {
 export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<"list" | "editor">("list");
-  const [tab, setTab] = useState<"notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates">("notes");
+  const [tab, setTab] = useState<WorkspaceTab>("notes");
   // Layout axis (SizeClassContext): compact = the phone's full-screen list ⇄
   // editor swap; medium/expanded ("regular") = persistent multi-pane split.
   // `view` stays the compact navigation intent; `editing` drives the detail
@@ -451,6 +515,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     const flushAll = () => {
       flushRef.current();
       void flushWorkspaceNow();
+      // **Not a flush.** The other two here are writes racing an OS kill; this
+      // is a drop. The OS suspends a backgrounded WebView and may reclaim the
+      // process, so an in-flight run's reply can simply never arrive, leaving a
+      // screen that says "Working" forever over a provider that may still be
+      // charging for it. Cancel it, clear the note-derived plaintext, and leave
+      // a notice: the user is coming back to this screen and is owed a reason
+      // for it being empty.
+      endAgentRun("background", t("agent.progress.cancelledBackground"));
     };
     const onHidden = () => {
       if (document.visibilityState === "hidden") flushAll();
@@ -461,7 +533,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       document.removeEventListener("visibilitychange", onHidden);
       window.removeEventListener("pagehide", flushAll);
     };
-  }, []);
+  }, [t]);
 
   // Compact-only left-edge swipe-back: same semantics as the top-bar chevron
   // (autosave + return to the list), same busy guard. `saveNote` is a hoisted
@@ -485,6 +557,19 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // shared editor's `/record` slash all raise this).
   const [recordOpen, setRecordOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // **The note the AI tab runs over, which is NOT `editing`.** On a phone the
+  // editor REPLACES the list, so the bottom bar (and therefore the AI tab) is
+  // only reachable with no note on screen, and `exitEditor` clears `editing`.
+  // Deriving the default scope from `editing` alone therefore meant the tab
+  // ALWAYS had a null scope: Send was disabled on every phone and an agent run
+  // was unreachable. Found by the /simplify pass, after the same pass corrected
+  // the other half of this (the vault-wide fallback the host refuses).
+  //
+  // "The note you were just working in" is the honest mobile analogue of
+  // desktop's "the note open in a pane", which is what its composer uses. It is
+  // RAM only and lives as long as this component, so it goes with the vault: a
+  // lock or a switch unmounts `EditorFlow`.
+  const [lastNoteId, setLastNoteId] = useState<string | null>(null);
   // Editor side panel (mobile stand-in for the desktop side sheet): note
   // context + actions, sliding in from the right.
   const [rightPanel, setRightPanel] = useState(false);
@@ -587,6 +672,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   const [moveInput, setMoveInput] = useState("");
   // Folder create + long-press actions (MYND-473 / MYND-480).
   const [folderActions, setFolderActions] = useState<{ path: string; name: string } | null>(null);
+  // Folder delete confirmation (myne-md/myne#628). The desktop has asked before
+  // moving a non-empty folder's subtree to Trash since MYND-133; mobile's danger
+  // row called the delete straight through, so the same action was one tap here
+  // and a dialog there. Carries the note count so the sheet can name what goes.
+  const [folderTrash, setFolderTrash] = useState<
+    { path: string; name: string; noteCount: number } | null
+  >(null);
   const [folderPrompt, setFolderPrompt] = useState<
     | { mode: "new" }
     | { mode: "subfolder"; parent: string }
@@ -1375,6 +1467,30 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
 
   // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
   // emits `PREFS_SYNC_APPLIED_EVENT` (never for this device's own IPC writes).
+  // A vault is open, and this is the ONE place on mobile that is true (myne-md/myne#609).
+  //
+  // Announce it on the prefs nonce, because that nonce is how a root-mounted
+  // consumer learns prefs became readable. Before this, the only two bump sites
+  // were `writePref` and the sync bridge below, and neither fires on an unlock:
+  // `useDateTimeDisplaySync` mounts in `AppShell`, above the stage machine, so
+  // its first `prefsRead()` hit a locked slot, the rejection was swallowed, and
+  // nothing re-ran. The shared display store then held its defaults for the whole
+  // session, which is exactly the inert-on-mobile defect this feature was filed
+  // to fix, one layer over.
+  //
+  // Keyed on `vaultId` rather than mount, so a vault SWITCH re-announces too.
+  // Without that the store keeps the previous vault's format and zone until the
+  // next prefs write, and the zone is a coarse-location datum the multi-vault
+  // posture keeps per vault everywhere else.
+  //
+  // Here rather than in each unlock path: password, quick unlock, recovery,
+  // creation and vault switch all land on the `editor` stage, and this component
+  // renders for that stage alone. A bump per unlock path is the partial fix that
+  // works for whichever path its author was looking at.
+  useEffect(() => {
+    bumpPrefsNonce();
+  }, [vaultId]);
+
   // Bridge it into the prefs nonce so an incoming vault rename / shared-pref
   // change refreshes the header + settings live; the switcher's vault list
   // re-fetches on its next open (its RAM-cache label was refreshed core-side).
@@ -1627,6 +1743,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       loadedTextRef.current = { id, text };
       setEditorText(text);
       setEditing({ id });
+      setLastNoteId(id);
       setView("editor");
     },
     [devStore],
@@ -2044,9 +2161,31 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     }
   }
 
-  /** Move a folder's whole subtree to Trash (folder long-press → Delete folder). */
-  async function trashFolderFromMenu(path: string) {
+  /** Folder long-press → Delete folder. Mirrors the desktop's
+   *  `deleteFolderAction` (myne-md/myne#628): a note-empty folder goes without a
+   *  prompt, a non-empty one asks first and names how many notes move.
+   *
+   *  The subtree is walked again at confirm time rather than reused from here,
+   *  because notes can move while the sheet is open and the set that goes should
+   *  be the live one. On the empty path there is no sheet and no elapsed time,
+   *  so that second walk is redundant; it is left in place because the
+   *  alternative is a second entry point into the delete with a
+   *  pre-computed list, which is how the two get to disagree. */
+  function requestFolderTrash(path: string, name: string) {
     setFolderActions(null);
+    const noteCount = notesInSubtree(folderOf, path).length;
+    if (noteCount === 0) {
+      void trashFolderFromMenu(path);
+      return;
+    }
+    setFolderTrash({ path, name, noteCount });
+  }
+
+  /** Move a folder's whole subtree to Trash. Reached only through
+   *  `requestFolderTrash`, which owns the actions sheet, so this closes only the
+   *  confirmation it was opened from. */
+  async function trashFolderFromMenu(path: string) {
+    setFolderTrash(null);
     const ids = notesInSubtree(folderOf, path);
     try {
       for (const id of ids) await trashNote(id);
@@ -2127,26 +2266,55 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     else devStore().delete(id);
   }
 
-  /** Open (or create) today's daily note per the daily-notes prefs. */
-  async function openToday() {
+  /** Open (or create) a period's note per the periodic-notes prefs (myne#177).
+   *  One function for all three periods: daily reads its three legacy top-level
+   *  prefs fields and the other two read the `periodic_notes` map, which
+   *  `periodSettings` resolves, so this flow does not know the difference. */
+  async function openPeriod(period: Period) {
     try {
       const candidates = liveNotes.map((n) => ({ id: n.id, title: n.title, folder: folderOf.get(n.id) ?? null }));
-      const res = resolveTodayNote(new Date(), prefs.daily_date_format, prefs.daily_folder, candidates);
+      const settings = periodSettings(prefs, period);
+      // ONE instant, read once: it anchors the period AND renders the
+      // template's `{{date}}`/`{{time}}`. Two calls could title the note with
+      // one date and stamp its body with another.
+      //
+      // `null`, not `prefs.timezone`, and that is deliberate (myne#177). The
+      // pref is device-local as a MERGE class, which is not an exclusion from
+      // the blob: enrolment adopts the whole prefs blob as this device's
+      // starting defaults (`sync-protocol.md` §10.2.1), so a phone enrolled
+      // after a computer set an override starts out holding that zone. Mobile
+      // ships no control for it and displays nothing derived from it, so
+      // applying it here would move which note this opens while changing
+      // nothing the user can see or alter. A client honours the override where
+      // it can also show and change it. Pass `prefs.timezone` on the day mobile
+      // ships the setting, and not before.
+      const now = zonedNow(new Date(), null);
+      const res = resolvePeriodNote(now, period, settings, candidates);
       if (res.kind === "open") {
         void openFromList(res.id);
         return;
       }
       const id =
-        prefs.daily_template != null
-          ? await createNoteFromTemplate(prefs.daily_template, res.dateTitle, res.folder, new Date())
+        settings.template != null
+          ? await createNoteFromTemplate(settings.template, res.dateTitle, res.folder, now, {
+              start: res.range.start,
+              end: res.range.end,
+            })
           : await createBlankNamedNote(res.dateTitle, res.folder);
       await refreshOne(id);
       void openFromList(id);
     } catch (e) {
-      // Never let the daily-note path crash the app — surface a message instead.
-      console.error("[today] failed:", e);
-      if (HAS_TAURI) setListError(t("editor.flow.openTodayFailed"));
+      // Never let the period-note path crash the app: surface a message instead,
+      // naming the period that failed rather than always saying "today".
+      console.error(`[${period}] failed:`, e);
+      if (HAS_TAURI) setListError(t(PERIOD_OPEN_FAILED_KEY[period]));
     }
+  }
+
+  /** Open (or create) today's daily note. The name the pre-myne#177 call sites
+   *  use; a delegation, so daily cannot drift from the other two periods. */
+  async function openToday() {
+    await openPeriod("daily");
   }
 
   /** Copy the current note's Markdown to the clipboard (WebView clipboard API —
@@ -2283,10 +2451,19 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // the CommandPalette overlay, which renders at the layout level (reachable
   // from every size class), so it lives OUTSIDE the list-pane render helper.
   const gi = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  // One calendar glyph for all three periods (myne#177): three byte-identical
+  // copies of the same markup is three places to edit when it changes.
+  const calendarGlyph = (
+    <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>
+  );
   const paletteCommands: PaletteCommand[] = [
     { id: "new-note", label: t("notes.list.newNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
     { id: "new-drawing", label: t("notes.newTab.createDrawing"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" {...gi} /></svg>, run: () => newDrawing() },
-    { id: "daily", label: t("editor.nav.dailyNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>, run: () => void openToday() },
+    { id: "daily", label: t("commands.actions.openTodayNote.label"), icon: calendarGlyph, run: () => void openToday() },
+    // myne#177: the weekly and monthly siblings, palette-only like daily and
+    // reusing daily's calendar glyph rather than inventing two more icons.
+    { id: "weekly", label: t("commands.actions.openThisWeekNote.label"), icon: calendarGlyph, run: () => void openPeriod("weekly") },
+    { id: "monthly", label: t("commands.actions.openThisMonthNote.label"), icon: calendarGlyph, run: () => void openPeriod("monthly") },
     { id: "templates", label: t("templates.manager.listLabel"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
     { id: "files", label: t("attachments.library.title"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
     { id: "graph", label: t("editor.chrome.barItems.graph"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>, run: () => setTab("graph") },
@@ -2818,6 +2995,72 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         )}
 
         {tab === "graph" && <GraphTab model={graphModel} onOpen={(id) => void openFromList(id)} />}
+        {/* The AI destination (myne-md/myne#457). The scope is the open note
+            when there is one and the whole vault otherwise, which is the
+            default `docs/decisions/ai/0515` names; task 11 makes it something
+            the user sets and shows what it costs before the run starts. */}
+        {/* Gated on the pref as well as the tab. Turning the device opt-in off
+            drops the fifth bar column and the sidebar row, and without this the
+            body kept rendering underneath them: a destination navigation no
+            longer offers, with a Send that fires a request the host refuses. */}
+        {tab === "chat" && prefs.ai_enabled && (
+          <AiChatFlow
+            // The review lists note ids; these resolve them into what a person
+            // reads. Passed in rather than looked up inside the flow, so the
+            // flow keeps no second copy of the note table.
+            titleOf={(id) => deriveTitleSnippet(bodies.get(id) ?? "").title}
+            bodyOf={(id) => bodies.get(id) ?? null}
+            // An applied edit rewrote notes behind this screen, so they are
+            // re-read one at a time rather than through `refreshAll`, which
+            // re-decrypts the whole vault.
+            //
+            // **And the OPEN EDITOR'S buffer with them, which `refreshOne`
+            // does not touch.** On the regular size class the AI tab does not
+            // close the editor, so `editing` and `editorText` survive holding
+            // PRE-apply bytes; `editorUnchanged(id)` then reads true, and the
+            // next keystroke saves that stale buffer over the change the user
+            // just approved. `src/CLAUDE.md` states this as a rule ("the pane's
+            // next autosave writes that stale buffer back over the change"), the
+            // desktop screen discharges it with `reloadOpenNote`, and this file
+            // already carries the same pattern for `SnapshotsSheet.onRestored`.
+            // What is lost is an approved edit, and the run's own snapshot
+            // restores the text from BEFORE the apply, so nothing recovers it.
+            onNotesWritten={(ids) => {
+              for (const id of ids) void refreshOne(id);
+              const open = editing?.id;
+              if (open != null && ids.includes(open) && HAS_TAURI) {
+                void noteRead(open)
+                  .then((text) => {
+                    // The baseline moves with the buffer. Setting only the text
+                    // would leave `editorUnchanged` comparing against the old
+                    // bytes, so the very next save would write it back.
+                    loadedTextRef.current = { id: open, text };
+                    setEditorText(text);
+                  })
+                  .catch(() => {
+                    // A failed re-read must not leave a baseline claiming the
+                    // stale buffer is current. Dropping it makes the next save
+                    // a real write rather than a silent no-op.
+                    if (loadedTextRef.current?.id === open) loadedTextRef.current = null;
+                  });
+              }
+            }}
+            // The durable path the undo strip's copy names. Opening the note
+            // first is not incidental: the history sheet is per note and reads
+            // `editing.id`, so a route that only flipped `historyOpen` would
+            // render a sheet for whatever note happened to be open, or for
+            // none. Landing on the note also puts the user where a restore
+            // will be visible.
+            onOpenHistory={(noteId) => {
+              setTab("notes");
+              void openNote(noteId).then(() => setHistoryOpen(true));
+            }}
+            // One rule, shared with desktop. `editing.id` is null for a note
+            // that has never been saved, and a run over an id the vault does
+            // not hold is not a narrower scope, it is a broken one.
+            grant={defaultGrantFor(editing?.id ?? lastNoteId)}
+          />
+        )}
         {tab === "files" && <AttachmentsSheet variant="page" onClose={() => setTab("notes")} />}
         {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
             Files destination above — one component serving both a full-screen
@@ -2923,10 +3166,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         {chrome.tabBar && (
           <TabBar
             active={tab}
+            ai={prefs.ai_enabled}
             onNotes={() => { setTab("notes"); setPanesRevealed(true); }}
             onTasks={() => setTab("tasks")}
             onGraph={() => setTab("graph")}
             onAttachments={() => setTab("files")}
+            onChat={() => setTab("chat")}
           />
         )}
       </>
@@ -3122,7 +3367,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             onRename={() => openFolderPrompt({ mode: "rename", path: folderActions.path })}
             onDecorate={() => openFolderDecoration(folderActions.path)}
             onArchive={() => void archiveFolderFromMenu(folderActions.path)}
-            onTrash={() => void trashFolderFromMenu(folderActions.path)}
+            onTrash={() => requestFolderTrash(folderActions.path, folderActions.name)}
             reorder={folderReorder(folderActions.path)}
           />
         )}
@@ -3158,7 +3403,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
           <Sheet onClose={() => setFolderPrompt(null)}>
             {() => (
               <>
-                <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>
+                <div style={SHEET_TITLE}>
                   {folderPrompt.mode === "rename"
                     ? t("attachments.library.menuRename")
                     : folderPrompt.mode === "subfolder"
@@ -3182,13 +3427,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                   style={{ marginTop: 14, width: "100%", height: 48, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--bg-1)", padding: "0 14px", fontFamily: "var(--font-sans)", fontSize: 16, color: "var(--fg-1)", outline: "none", boxSizing: "border-box" }}
                 />
                 <div style={{ marginTop: 16 }}>
-                  <button
+                  <Button
+                    variant="primary"
                     data-testid="notes.folder-prompt-submit"
                     onClick={() => void submitFolderPrompt()}
-                    style={{ width: "100%", height: 50, border: "none", borderRadius: 8, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
                   >
                     {folderPrompt.mode === "rename" ? t("attachments.library.menuRename") : t("notes.list.newFolder")}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -3281,11 +3526,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         // the wrapper are OVERRIDDEN by CM's own `var(--editor-*)` rules, so a
         // change never reached the editor. `maxWidth` stays off (full-width phone).
         <div
+          // `.m-scroll` rather than the four declarations it is (mobile.css):
+          // flex/min-height/overflow-y/overflow-x/-webkit-overflow-scrolling.
+          // The editor pane used to hand-roll three of them and leave the fourth
+          // out, and the missing one was `overflow-x`. CSS resolves `visible`
+          // to `auto` on one axis when the other is not `visible`, so the pane
+          // was a horizontal scroll container in its own right, outside
+          // `.cm-scroller` (myne-md/myne#630). Wearing the class means the next
+          // thing that class learns reaches the app's busiest scroll surface.
+          className="m-scroll"
           style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            WebkitOverflowScrolling: "touch",
             background: "var(--bg-1)",
             ...typographyStyle(prefs),
             maxWidth: undefined,
@@ -3494,49 +3744,67 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
           disappeared after a few seconds, pointing at a place the user had no
           reason to open. */}
       <ShareImportToast onOpenLibrary={() => setTab("files")} />
+      {/* Folder delete confirmation (myne-md/myne#628). Copy is the desktop
+          modal's, key for key, so the two clients promise the same thing about
+          where the notes go. Danger button first, matching the purge sheet
+          below and the desktop button row. */}
+      {folderTrash !== null && (
+        <Sheet onClose={() => setFolderTrash(null)}>
+          {(close) => (
+            <>
+              <div style={SHEET_TITLE}>{t("notes.list.deleteFolderTitle")}</div>
+              {/* Two tones, the same split the desktop twin uses. The count is
+                  the decision the user is making, so it carries full ink; the
+                  reassurance about Trash is the quieter body tone, which is
+                  where `DeleteConfirmModal` puts the identical string. */}
+              <div data-testid="notes.folder-delete-body" style={SHEET_LEAD}>
+                {t("notes.list.deleteFolderBody", {
+                  name: folderTrash.name,
+                  count: folderTrash.noteCount,
+                })}
+              </div>
+              <div style={{ ...SHEET_BODY, marginTop: 4 }}>
+                {t("notes.list.deleteFolderWarning")}
+              </div>
+              <div style={SHEET_ACTIONS}>
+                <Button
+                  variant="danger"
+                  data-testid="notes.folder-delete-confirm"
+                  onClick={() => void trashFolderFromMenu(folderTrash.path)}
+                >
+                  {t("notes.list.deleteFolderConfirm")}
+                </Button>
+                {/* `secondary`, not `ghost`: this Cancel sits under a filled
+                    `--danger` button, and a borderless label is a weak way out
+                    of a sheet that moves a whole subtree to the Trash. The
+                    hand-rolled button it replaced carried a border too. */}
+                <Button
+                  variant="secondary"
+                  data-testid="notes.folder-delete-cancel"
+                  onClick={close}
+                >
+                  {t("common.prompt.cancel")}
+                </Button>
+              </div>
+            </>
+          )}
+        </Sheet>
+      )}
       {purgeId != null && (
         <Sheet onClose={() => setPurgeId(null)}>
           {(close) => (
             <>
-          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>{t("notes.trash.purgeConfirmTitle")}</div>
-          <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.5, color: "var(--fg-3)", textAlign: "center" }}>
-            {t("editor.purge.body")}
-          </div>
-          <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-            <button
-              onClick={() => void confirmPurge()}
-              style={{
-                width: "100%",
-                height: 50,
-                border: "none",
-                borderRadius: 8,
-                background: "var(--danger)",
-                color: "#fff",
-                fontFamily: "var(--font-sans)",
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
+          <div style={SHEET_TITLE}>{t("notes.trash.purgeConfirmTitle")}</div>
+          <div style={SHEET_BODY}>{t("editor.purge.body")}</div>
+          <div style={SHEET_ACTIONS}>
+            <Button variant="danger" onClick={() => void confirmPurge()}>
               {t("notes.trash.purgeConfirmCta")}
-            </button>
-            <button
-              onClick={close}
-              style={{
-                width: "100%",
-                height: 50,
-                border: "1px solid var(--line-2)",
-                borderRadius: 8,
-                background: "transparent",
-                color: "var(--fg-1)",
-                fontFamily: "var(--font-sans)",
-                fontSize: 16,
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
+            </Button>
+            {/* `secondary` for the same reason as the folder-delete sheet: this
+                one is the permanent purge, so the way out reads as a button. */}
+            <Button variant="secondary" onClick={close}>
               {t("common.prompt.cancel")}
-            </button>
+            </Button>
           </div>
             </>
           )}
@@ -3547,10 +3815,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         <Sheet onClose={() => setMoveTarget(null)}>
           {(close) => (
             <>
-              <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>{t("editor.move.title")}</div>
-              <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)", textAlign: "center" }}>
-                {t("editor.move.body")}
-              </div>
+              <div style={SHEET_TITLE}>{t("editor.move.title")}</div>
+              <div style={SHEET_BODY}>{t("editor.move.body")}</div>
               <input
                 value={moveInput}
                 onChange={(e) => setMoveInput(e.target.value)}
@@ -3561,19 +3827,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                 spellCheck={false}
                 style={{ marginTop: 14, width: "100%", height: 48, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--bg-1)", padding: "0 14px", fontFamily: "var(--font-mono)", fontSize: 16, color: "var(--fg-1)", outline: "none", boxSizing: "border-box" }}
               />
-              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <button
-                  onClick={() => void confirmMove()}
-                  style={{ width: "100%", height: 50, border: "none", borderRadius: 8, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
-                >
+              {/* 16 rather than the shared 18: the input above already carries
+                  its own top margin, so the usual gap reads as a wider one. */}
+              <div style={{ ...SHEET_ACTIONS, marginTop: 16 }}>
+                <Button variant="primary" onClick={() => void confirmMove()}>
                   {t("editor.move.confirm")}
-                </button>
-                <button
-                  onClick={close}
-                  style={{ width: "100%", height: 50, border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--fg-1)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 500, cursor: "pointer" }}
-                >
+                </Button>
+                <Button variant="ghost" onClick={close}>
                   {t("common.prompt.cancel")}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -3631,6 +3893,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             onGraph={() => setTab("graph")}
             onFiles={() => setTab("files")}
             onTemplates={() => setTab("templates")}
+            {...(prefs.ai_enabled ? { onChat: () => setTab("chat") } : {})}
             onViews={() => setViewsOpen(true)}
             onTags={() => setTagBrowserOpen(true)}
             onArchive={() => { setTab("notes"); setListView("archive"); setActiveTag(null); setActiveViewId(null); }}
@@ -3676,10 +3939,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       {sizeClass === "medium" && panesCollapsed && (
         <TabBar
           active={tab}
+          ai={prefs.ai_enabled}
           onNotes={() => { setTab("notes"); setPanesRevealed(true); }}
           onTasks={() => setTab("tasks")}
           onGraph={() => setTab("graph")}
           onAttachments={() => setTab("files")}
+          onChat={() => setTab("chat")}
         />
       )}
       {renderListOverlays()}

@@ -25,7 +25,7 @@ use std::path::Path;
 /// `.myn` magic — sourced from `protocol::blob` (protocol.md §9.2 offset 0) so
 /// a header-format change can't silently rot this decryption-free reader.
 const MYN_MAGIC: [u8; 4] = *protocol::blob::MAGIC;
-/// The next-major `NC05` CRDT note magic (`protocol.md` §10.5). A `.myn` file may
+/// The allocated v0.2 `NC05` CRDT note magic (`protocol.md` §10.7). A `.myn` file may
 /// hold EITHER family, and `NC05` reuses `blob.rs`'s `OFFSET_CONTENT_NONCE`
 /// verbatim, so the `content_nonce` sits at the identical header offset in both —
 /// the decryption-free staleness signal is magic-agnostic across the note
@@ -54,15 +54,12 @@ pub type NonceManifest = BTreeMap<String, [u8; MYN_CONTENT_NONCE_LEN]>;
 /// Both families share the §9.2 header layout, so the same offset reads the
 /// nonce for either — see [`NC05_MAGIC`] for why the reader must accept both.
 pub fn read_myn_content_nonce(header: &[u8]) -> Option<[u8; MYN_CONTENT_NONCE_LEN]> {
-    if header.len() < MYN_HEADER_PREFIX_FOR_NONCE {
-        return None;
-    }
-    if header[0..4] != MYN_MAGIC && header[0..4] != NC05_MAGIC {
-        return None;
-    }
-    let mut nonce = [0u8; MYN_CONTENT_NONCE_LEN];
-    nonce.copy_from_slice(&header[MYN_CONTENT_NONCE_OFFSET..MYN_HEADER_PREFIX_FOR_NONCE]);
-    Some(nonce)
+    crate::content_nonce::content_nonce_at(
+        header,
+        MYN_CONTENT_NONCE_OFFSET,
+        &MYN_MAGIC,
+        &[&NC05_MAGIC],
+    )
 }
 
 /// Build the on-disk staleness manifest (`note_id → content_nonce`) by

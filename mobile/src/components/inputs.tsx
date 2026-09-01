@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 
@@ -293,19 +293,61 @@ export function Switch({
 // ── Segmented control ────────────────────────────────────────────────────────
 // Presentational by default (gallery boards pass only `active`); pass `onChange`
 // to make each segment tappable (wired settings).
+//
+// **A wired one is a radiogroup, not four divs** (myne#508). The segments were
+// bare `div`s with an `onClick`: nothing announced them, nothing could focus
+// them, and no test could address one except by its localized text. That last
+// part is why the horizon picker's first tests were all source-text greps, and
+// a source-text grep cannot fail when the handler is deleted. The presentational
+// form keeps no roles, because a board that is not tappable should not tell a
+// screen reader it is.
+/** A presentational board, or a wired control. The two differ in more than one
+ *  field, so they are two shapes rather than one shape with optional halves.
+ *
+ *  **The name is required on the wired form** (myne#508). It was optional for
+ *  one review round, and because the wired form is the one that renders
+ *  `role="radiogroup"`, every existing caller gained a grouping role with
+ *  `aria-label={undefined}`: an announced group with no name, which is worse
+ *  than the unannounced divs it replaced. A union makes `tsc` name each site
+ *  instead of leaving it to whoever notices. */
+type SegmentedProps = {
+  options: string[];
+  active?: number;
+  style?: CSSProperties;
+  /** Segments derive `${testIdPrefix}-${optionValues[i] ?? i}`.
+   *
+   * A HYPHEN, and the separator is load-bearing rather than a style choice:
+   * `settings.reminders-horizon-picker-1` and `-7` are read by the reminders
+   * flow tier. myne-md/myne#609 built its own `Segmented` with a dot and its
+   * date-time flow test reads one, so the two spellings met at a merge; the
+   * hyphen wins because it has the live consumers. */
+  testIdPrefix?: string;
+  /** Stable per-option ids for the testid tail, so a spec does not have to
+   *  address a segment by its translated label. Defaults to the index. */
+  optionValues?: string[];
+} & (
+  | { onChange: (index: number) => void; ariaLabel: string }
+  | { onChange?: undefined; ariaLabel?: undefined }
+);
+
 export function Segmented({
   options,
   active = 0,
   onChange,
   style,
-}: {
-  options: string[];
-  active?: number;
-  onChange?: (index: number) => void;
-  style?: CSSProperties;
-}) {
+  ariaLabel,
+  testIdPrefix,
+  optionValues,
+}: SegmentedProps) {
+  const wired = onChange !== undefined;
+  // Held so an arrow key can move focus with the selection. Populated by the
+  // segments' own refs rather than by a query, so it cannot go stale against a
+  // re-render that changes the option set.
+  const segmentRefs = useRef<Record<number, HTMLDivElement>>({});
   return (
     <div
+      role={wired ? "radiogroup" : undefined}
+      aria-label={wired ? ariaLabel : undefined}
       style={{
         display: "flex",
         padding: 2,
@@ -319,11 +361,90 @@ export function Segmented({
       {options.map((o, i) => (
         <div
           key={o}
+          role={wired ? "radio" : undefined}
+          aria-checked={wired ? i === active : undefined}
+          // Roving tabindex: the GROUP is one tab stop, and the selected
+          // segment is the one it lands on. Giving every segment `tabIndex={0}`
+          // is what this had first, and it makes a four-option control four tab
+          // stops, which is the shape `role="radiogroup"` promises it is not.
+          // Announcing a role and then not honouring its keyboard model is
+          // worse than the unannounced divs this replaced.
+          // `active < 0 ? 0` is the no-selection fallback, and it is only for
+          // the tab stop. `resolveHorizonDays` clamps a stored 2, 4 or 6 into
+          // range rather than snapping it onto the offered set, so `active` is
+          // -1 and no segment is checked. Without the fallback every segment
+          // took `tabIndex={-1}`: an announced radiogroup with zero tab stops,
+          // which a pointer user never notices and a keyboard user cannot enter
+          // at all. The convention is that the first radio takes the tab stop
+          // when none is checked. `aria-checked` and `data-active` are
+          // deliberately NOT given the same fallback, so the readout stays
+          // honest about there being no selection.
+          tabIndex={wired ? (i === (active < 0 ? 0 : active) ? 0 : -1) : undefined}
+          // EVERY mounted segment, not only the active one. Recording only the
+          // active segment made the arrow handler's `segmentRefs.current[next]`
+          // a silent no-op by construction, since `next` is never the active
+          // index: React commits the state change after the handler returns, so
+          // the still-focused segment then flipped to `tabIndex={-1}` and
+          // `aria-checked="false"` while selection moved elsewhere. The next
+          // key press fired from that same stale element, recomputed the same
+          // `next`, and rewrote the value it had already written. One step of
+          // traversal per two presses, permanently, with assistive technology
+          // reporting focus on an unselected radio.
+          //
+          // The `null` cleanup call DELETES the entry rather than ignoring it,
+          // so the map cannot outlive a changed option set and hand `focus()` a
+          // detached node.
+          ref={
+            wired
+              ? (el) => {
+                  if (el === null) delete segmentRefs.current[i];
+                  else segmentRefs.current[i] = el;
+                }
+              : undefined
+          }
           onClick={onChange ? () => onChange(i) : undefined}
+          onKeyDown={
+            onChange
+              ? (e) => {
+                  // Enter and Space are what a radio answers to. Arrows are how
+                  // a radiogroup is traversed, and in a radiogroup they SELECT
+                  // as they move rather than only moving focus.
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onChange(i);
+                    return;
+                  }
+                  const delta =
+                    e.key === "ArrowRight" || e.key === "ArrowDown"
+                      ? 1
+                      : e.key === "ArrowLeft" || e.key === "ArrowUp"
+                        ? -1
+                        : 0;
+                  if (delta === 0) return;
+                  e.preventDefault();
+                  // Wraps, which is the radiogroup convention: the set is a
+                  // cycle rather than a list with ends to get stuck against.
+                  const next = (i + delta + options.length) % options.length;
+                  onChange(next);
+                  segmentRefs.current[next]?.focus();
+                }
+              : undefined
+          }
+          data-testid={testIdPrefix ? `${testIdPrefix}-${optionValues?.[i] ?? i}` : undefined}
+          data-active={wired && i === active ? "true" : undefined}
           style={{
             flex: 1,
             textAlign: "center",
-            padding: "7px 12px",
+            // 44px is what both platforms publish as the minimum, and padding
+            // alone does not reach it: 11px either side of a 14px label at the
+            // inherited 1.5 line-height measures 43px. `minHeight` states the
+            // target instead of computing it, so it cannot drift with a
+            // typography token.
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 12px",
             borderRadius: 6,
             fontSize: 14,
             fontWeight: 600,

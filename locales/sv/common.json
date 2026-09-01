@@ -48,7 +48,8 @@
       "unsupportedDetail": "Den klarade {{passes}} av {{attempts}} kontroller; {{required}} krävs.",
       "checking": "Kontrollerar modellen…",
       "checkingAt": "Kontrollerar modellen… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Den godkäntgränsen har ännu inte mätts över flera modeller, så den kan vara strängare eller mildare än den borde vara."
+      "unsupportedProvisional": "Den godkäntgränsen har ännu inte mätts över flera modeller, så den kan vara strängare eller mildare än den borde vara.",
+      "scopeNone": "ingen anteckning öppen, så det finns inget att arbeta med än"
     },
     "progress": {
       "working": "Arbetar",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} omfattning du angav",
       "grantsUser_other": "{{count}} omfattningar du angav",
       "grantsModel_one": "{{count}} som den bad om",
-      "grantsModel_other": "{{count}} som den bad om"
+      "grantsModel_other": "{{count}} som den bad om",
+      "cancelledBackground": "Körningen avbröts eftersom Myne gick till bakgrunden. Ingenting skrevs. Fråga igen när du vill."
     },
     "scope": {
       "title": "Inkludera {{folder}}?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Skapades inte: den mappen är undantagen från AI.",
         "createFailed": "Skapades inte: det gick inte att skriva den nya anteckningen. De andra ändringarna tillämpades ändå.",
         "excludedNow": "Kunde inte tillämpas: anteckningens mapp är nu undantagen från AI.",
-        "notProposed": "Kunde inte tillämpas: den ändringen ingår inte i den här körningens förslag."
+        "notProposed": "Kunde inte tillämpas: den ändringen ingår inte i den här körningens förslag.",
+        "noteMoved": "Kunde inte tillämpas: den ändringen skulle flytta anteckningen till en annan mapp.",
+        "appendEmpty": "Kunde inte tillämpas: det fanns inget att lägga till.",
+        "appendWouldWriteFrontmatter": "Kunde inte tillämpas: den texten skulle ha blivit anteckningens egenskapsblock."
       },
       "applyFailed": "Ändringarna kunde inte tillämpas.",
       "undo": "Ångra den här körningen",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} anteckningar lästa",
       "runSummaryOffDevice_one": "ungefär {{count}} tecken av dina anteckningar skickades till leverantören",
       "runSummaryOffDevice_other": "ungefär {{count}} tecken av dina anteckningar skickades till leverantören",
-      "runSummaryOnDevice": "inget lämnade den här enheten"
+      "runSummaryOnDevice": "inget lämnade den här enheten",
+      "appendFlag": "läggs till i slutet"
     },
     "undo": {
       "offer_one": "Den senaste körningen ändrade {{count}} anteckning.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} anteckning kunde inte återställas.",
       "failed_other": "{{count}} anteckningar kunde inte återställas.",
       "createdNotReverted_one": "{{count}} anteckning som körningen skapade lämnades kvar.",
-      "createdNotReverted_other": "{{count}} anteckningar som körningen skapade lämnades kvar."
+      "createdNotReverted_other": "{{count}} anteckningar som körningen skapade lämnades kvar.",
+      "sessionOnly": "Den här ångra-med-en-tryckning gäller tills du låser valvet eller stänger appen. Därefter återställer du anteckningar en i taget från en anteckningss versionshistorik.",
+      "sessionOnlyLink": "Öppna versionshistorik"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Fäll ut alla"
+      },
+      "openThisWeekNote": {
+        "label": "Öppna den här veckans anteckning"
+      },
+      "openThisMonthNote": {
+        "label": "Öppna den här månadens anteckning"
       }
     },
     "hotkeys": {
@@ -880,13 +894,15 @@
           "captureFailed": "Kunde inte starta inspelningen. Kontrollera mikrofonåtkomst i Systeminställningar.",
           "generic": "Kunde inte starta inspelningen.",
           "locked": "Lås upp ditt valv för att spela in en röstanteckning.",
-          "noInputDevice": "Ingen mikrofon hittades. Anslut en och försök igen."
+          "noInputDevice": "Ingen mikrofon hittades. Anslut en och försök igen.",
+          "unsupportedSampleRate": "Din mikrofon spelar in med en samplingsfrekvens som Myne inte kan transkribera. Välj en annan inenhet, eller ändra dess samplingsfrekvens i systemets ljudinställningar."
         },
         "stopError": {
           "captureFailed": "Inspelningen misslyckades. Kontrollera din mikrofon.",
           "emptyRecording": "Inget spelades in.",
           "generic": "Kunde inte spara inspelningen.",
-          "silentRecording": "Inspelningen var tyst och kasserades. Kontrollera din mikrofon."
+          "silentRecording": "Inspelningen var tyst och kasserades. Kontrollera din mikrofon.",
+          "unsupportedSampleRate": "Din mikrofon spelar in med en samplingsfrekvens som Myne inte kan transkribera. Ingenting sparades. Välj en annan inenhet, eller ändra dess samplingsfrekvens i systemets ljudinställningar."
         }
       },
       "widget": {
@@ -932,6 +948,7 @@
             "featureOff": "Tal till text är avstängt. Slå på det i Inställningar → Transkribering.",
             "modelLoadFailed": "Kunde inte läsa in tal-till-text-modellen. Om du har valt en egen modell i Inställningar → Utvecklare → AI, kontrollera dess filer; annars återställer en ominstallation av Myne den inbyggda.",
             "noModel": "Tal-till-text-modellen saknas. Att installera om Myne återställer den.",
+            "tooLong": "Den här inspelningen är för lång för att transkriberas. Ljudet finns kvar som bilaga, så du kan fortfarande spela upp det.",
             "vaultLocked": "Lås upp ditt valv för att transkribera."
           },
           "disabledReason": "Aktivera AI i Inställningar → Developer → AI för att transkribera.",
@@ -1164,10 +1181,6 @@
       "turnedIntoTemplate": "Gjord till mall",
       "convertedToNote": "Konverterad till anteckning",
       "versionHistory": "Versionshistorik",
-      "exportMarkdown": "Exportera som Markdown…",
-      "exportPdf": "Exportera som PDF…",
-      "exportHtml": "Exportera som HTML…",
-      "exportTxt": "Exportera som oformaterad text…",
       "trash": "Flytta till papperskorgen"
     },
     "codeBlock": {
@@ -1199,7 +1212,9 @@
       "replaceAllCount": "Ersätt alla ({{total}})",
       "replaceOne": "Ersätt",
       "replacePlaceholder": "Ersätt med",
-      "toggleReplace": "Växla ersätt"
+      "toggleReplace": "Växla ersätt",
+      "dateFallback": "Söker efter {{stored}}, den form som det här datumet lagras i.",
+      "replaceOffOnDateFallback": "Ersätt är avstängt så länge ett datum hittas via sin lagrade form, så att en ersättning inte kan göra datumet oläsligt."
     },
     "cover": {
       "add": "Lägg till omslag",
@@ -1225,7 +1240,8 @@
       "titlePlaceholder": "Namnlös"
     },
     "mermaid": {
-      "rendering": "Renderar diagram…"
+      "rendering": "Renderar diagram…",
+      "renderFailed": "Det här diagrammet kunde inte ritas: {{reason}}"
     },
     "slash": {
       "aiContinue": "Fortsätt skriva (AI)",
@@ -1534,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "Sök anteckningar eller kör ett kommando…",
       "noMatches": "Inga kommandon eller anteckningar matchar."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Dagens anteckning kunde inte öppnas.",
+        "weekly": "Den här veckans anteckning kunde inte öppnas.",
+        "monthly": "Den här månadens anteckning kunde inte öppnas."
+      }
     }
   },
   "export": {
@@ -2034,10 +2057,6 @@
       "duplicate": "Duplicera",
       "editFilterTitle": "Redigera filter",
       "emptyState": "Inga anteckningar ännu.",
-      "exportHtml": "Exportera som HTML…",
-      "exportMarkdown": "Exportera som Markdown…",
-      "exportPdf": "Exportera som PDF…",
-      "exportTxt": "Exportera som oformaterad text…",
       "favoritesHeading": "Favoriter",
       "icon": "Ikon…",
       "mergeAnyway": "Slå samman ändå",
@@ -2343,6 +2362,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportera…",
+      "txt": "Oformaterad text"
     }
   },
   "password": {
@@ -2775,20 +2801,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Tom (ingen mall)",
+      "folderSearchEmpty": "Inga mappar matchar.",
+      "folderSearchPlaceholder": "Sök mappar…",
+      "searchEmpty": "Inga mallar matchar.",
+      "searchPlaceholder": "Sök mallar…",
+      "untitledTemplate": "Namnlös mall",
+      "sectionDaily": "Dagliga anteckningar",
+      "sectionWeekly": "Veckovisa anteckningar",
+      "sectionMonthly": "Månatliga anteckningar",
+      "periodFolderLabel": "Mapp",
+      "periodFolderHelper": "Var nya {{period}} anteckningar sparas. Standard: {{default}}. Mappen behålls även när den är tom.",
+      "periodFormatLabel": "Titelformat",
+      "periodFormatHelperDaily": "Titeln på varje daglig anteckning. Stöder YYYY, MM, DD, gggg (ISO-veckoår), ww (ISO-veckonummer) och [text] för bokstavlig text. Standard: {{default}}.",
+      "periodFormatHelperWeekly": "Titeln på varje veckovis anteckning. Stöder gggg (ISO-veckoår), ww (ISO-veckonummer), YYYY, MM, DD och [text] för bokstavlig text. Standard: {{default}}.",
+      "periodFormatHelperMonthly": "Titeln på varje månatlig anteckning. Stöder YYYY, MM, gggg (ISO-veckoår), ww (ISO-veckonummer) och [text] för bokstavlig text. Standard: {{default}}.",
+      "periodTemplateLabel": "Mall",
+      "periodTemplateHelper": "Välj en mall som varje {{period}} anteckning börjar från, eller lämna tomt för en tom anteckning med datumet som titel.",
+      "collisionWarning": "{{first}} och {{second}} anteckningar leder till samma anteckning, eftersom de delar mapp och ger samma titel. Båda kommandona öppnar den.",
+      "weekStartNote": "Veckor börjar på måndag (ISO 8601), så de första dagarna i januari kan höra till förra årets sista vecka, och de sista dagarna i december till nästa års första.",
+      "periodFolderSaveError": "Mappen för {{period}} anteckningar kunde inte sparas. Försök igen.",
+      "periodFormatSaveError": "Titelformatet för {{period}} anteckningar kunde inte sparas. Försök igen.",
+      "periodTemplateSaveError": "Mallen för {{period}} anteckningar kunde inte sparas. Försök igen.",
+      "periodNameDaily": "dagliga",
+      "periodNameWeekly": "veckovisa",
+      "periodNameMonthly": "månatliga",
+      "periodFolderAriaLabel": "Mapp för {{period}} anteckningar",
+      "periodFormatAriaLabel": "Titelformat för {{period}} anteckningar",
+      "periodTemplateAriaLabel": "Mall för {{period}} anteckningar",
       "dateFormatHelper": "Titeln på varje dagsanteckning. Stöder YYYY, MM, DD. Standard är {{default}}.",
       "dateFormatLabel": "Datumformat för dagsanteckning",
       "dateFormatSaveError": "Kunde inte spara datumformatet. Försök igen.",
       "folderHelper": "Var nya dagsanteckningar placeras. Standard är {{default}}. Mappen behålls även när den är tom.",
       "folderLabel": "Mapp för dagsanteckningar",
       "folderSaveError": "Kunde inte spara dagsmappen. Försök igen.",
-      "folderSearchEmpty": "Inga mappar matchar.",
-      "folderSearchPlaceholder": "Sök mappar…",
-      "searchEmpty": "Inga mallar matchar.",
-      "searchPlaceholder": "Sök mallar…",
       "templateHelper": "Välj en mall att starta varje dagsanteckning från, eller lämna tomt för en tom anteckning med datumet som titel.",
       "templateLabel": "Mall för dagsanteckning",
-      "templateSaveError": "Kunde inte spara dagsmallen. Försök igen.",
-      "untitledTemplate": "Namnlös mall"
+      "templateSaveError": "Kunde inte spara dagsmallen. Försök igen."
     },
     "deleteVault": {
       "cancel": "Avbryt",
@@ -2949,7 +2997,8 @@
         "title": "Innan Myne skickar något till {{provider}}",
         "whatLabel": "Vad som lämnar din enhet",
         "whenLabel": "När det lämnar enheten",
-        "whoLabel": "Vem som tar emot det"
+        "whoLabel": "Vem som tar emot det",
+        "connectionLabel": "Hur det färdas"
       },
       "disclosureToggle": "Hur fungerar det här?",
       "enableHelper": "Kör en modell du tillhandahåller. Var den körs, och om dina anteckningar lämnar den här enheten, beror på leverantören du anger nedan. Experimentell, av som standard.",
@@ -2983,7 +3032,9 @@
         "refused": "Leverantören nekade anslutningen. Den kan ligga nere eller blockera det här nätverket.",
         "timeout": "Leverantören svarade inte i tid. Ingenting lämnades igång.",
         "unauthorized": "Leverantören avvisade din API-nyckel. Byt ut den: den kan vara felaktig, återkallad eller höra till ett annat konto.",
-        "unreachable": "Kunde inte nå leverantören. Kontrollera din nätverksanslutning."
+        "unreachable": "Kunde inte nå leverantören. Kontrollera din nätverksanslutning.",
+        "featureOff": "AI är avstängt på den här enheten. Ingenting skickades. Slå på det i Inställningar, under AI.",
+        "consentMissing": "Du har inte godkänt att skicka anteckningar till den här leverantören från den här enheten. Ingenting skickades. Välj leverantören igen i Inställningar, under AI, och läs vad som skickas."
       },
       "modelChoose": "Välj fil…",
       "modelEmbeddingLabel": "Sökmodell: semantisk sökning och frågor och svar",
@@ -3024,7 +3075,16 @@
       "recommendedFilesEmbedding": "Behöver model.safetensors + config.json + tokenizer.json i en och samma mapp.",
       "recommendedFilesGeneration": "Behöver .gguf-filen + tokenizer.json i samma mapp.",
       "recommendedFilesTranscription": "Behöver .gguf-filen för Whisper + config.json + tokenizer.json i samma mapp.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Använd AI på den här telefonen",
+      "mobileEnableHelper": "Av som standard. Ingen AI-modell i den här telefonen svarar på frågor eller läser dina anteckningar, så varje förfrågan går till en tjänst du namnger nedan, och dina anteckningar lämnar då enheten. Transkribering och text i bilder körs fortfarande här, på modeller som följer med Myne.",
+      "mobileKeyAdd": "Spara nyckel",
+      "mobileKeyReplace": "Byt nyckel",
+      "mobileRevokeHelper": "Tar bort leverantören, dess nyckel och den här telefonens godkännande tillsammans, och lämnar exakt det tillstånd som rådde innan något ställdes in. Andra enheter fortsätter fungera tills du tar bort det där också.",
+      "mobileApproveLabel": "Godkänn sändning på den här telefonen",
+      "mobileApproveHelper": "Leverantören och dess nyckel kom från en annan enhet. Ingenting skickas från den här telefonen förrän du läser vad som skickas och godkänner det här.",
+      "historyBudgetHelper": "Hur mycket av den senaste konversationen varje förfrågan bär med sig, i tecken. Lämna tomt för standardvärdet. Ett större tal låter AI:n följa längre konversationer och skickar mer av dem: hos en leverantör som inte finns på den här enheten innebär det mer av din text som lämnar den, vid varje steg i en körning.",
+      "historyBudgetLabel": "Konversation som skickas med varje förfrågan"
     },
     "network": {
       "disabledCue": "Synkroniseringen går inte längre via Tor. Nya anslutningar går direkt till synkservern.",
@@ -3057,6 +3117,9 @@
       "exactLabel": "Exakt tidpunkt",
       "exactOn": "På",
       "horizon": "Påminnelser är registrerade till och med {{date}}. Öppna Myne innan dess för att de ska fortsätta komma.",
+      "horizonLabel": "Schemalägg i förväg",
+      "horizonLabelHelper": "Påminnelser förbereds så här långt i förväg. Myne måste vara öppet och upplåst för att en påminnelse ska komma fram.",
+      "horizonInertHelper": "Sparat på den här enheten. Inget läser det ännu: den här versionen levererar inte uppgiftspåminnelser.",
       "label": "Uppgiftspåminnelser",
       "saveError": "Kunde inte spara inställningen. Försök igen.",
       "showTextAria": "Visa uppgiftstexten i aviseringen",
@@ -3337,12 +3400,14 @@
         "viewMode": "standardvisningsläge visningsläge direkt läsning källa förhandsgranskning view mode",
         "dateFormat": "datumformat datum dag månad år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat tid 24-timmars 12-timmars klocka am pm time format 24 hour 12 hour",
-        "timezone": "tidszon zon tz utc iana region idag timezone time zone"
+        "timezone": "tidszon zon tz utc iana region idag timezone time zone",
+        "periodicNotes": "periodiska anteckningar veckovis månatlig vecka månad mapp mall format",
+        "aiHistoryBudget": "konversation historik kontext minne budget tecken agent chatt förfrågan"
       }
     },
     "dateTime": {
       "dateLabel": "Datumformat",
-      "dateHelper": "Hur datum visas i uppgifter, sparade vyer och bilagor.",
+      "dateHelper": "Hur ett datum skrivs, överallt där Myne visar ett.",
       "dateSystem": "Följ språket",
       "timeLabel": "Tidsformat",
       "timeHelper": "Om tider visas med 24-timmarsklocka eller 12-timmarsklocka.",

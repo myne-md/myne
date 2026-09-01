@@ -19,9 +19,13 @@
 // the IPC path; only the production bundle over real IPC can be refused by it.
 //
 // WHY `window.close` IS THE PROBE. The default capability grants
-// `core:window:default` plus THREE explicit mutators — `allow-destroy`,
-// `allow-show`, `allow-start-dragging` — and deliberately does not grant
-// `allow-close`. That asymmetry is what makes this a test of the ACL rather
+// `core:window:default` plus TWO explicit mutators, `allow-destroy` and
+// `allow-start-dragging`, and deliberately does not grant `allow-close`.
+// (`allow-show` was a third until myne-md/myne#483 removed it: its one consumer,
+// the reveal after idle auto-lock, now asks the host for a fixed
+// protect/show/protect/focus sequence instead of driving the window itself. It
+// was also this scenario's positive control, which is why the control below is
+// now `is_visible`.) That asymmetry is what makes this a test of the ACL rather
 // than of the plugin's presence: the same plugin answers a granted sibling in
 // the same run. `src/platform/app-exit.ts` calls `destroy()` rather than
 // `close()` for exactly this reason, so the withheld permission is a live
@@ -60,7 +64,11 @@ const WITHHELD = "plugin:window|close";
 /** The granted one, and harmless against an already-visible window. Its job is
  *  to prove the plugin is registered and page-seat IPC reaches it, so a refusal
  *  of the sibling cannot be "the whole plugin is missing". */
-const GRANTED = "plugin:window|show";
+// A READ inside `core:window:default`, chosen over a mutator so the control
+// cannot itself change what the scenario is observing. It must stay a command
+// the default bundle grants: this is the half that proves a refusal below is
+// the ACL refusing rather than the plugin being absent.
+const GRANTED = "plugin:window|is_visible";
 
 describeE2E("acl1 the capability ACL refuses a withheld command (test-audit #42/#44)", () => {
   // Vault-count precondition: 1 (weak KDF).

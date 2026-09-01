@@ -39,6 +39,7 @@ pub mod notes;
 pub mod pdf_export;
 pub mod prefs;
 pub mod quick_unlock;
+pub mod screen_capture;
 pub mod secret_export;
 pub mod snapshots;
 pub mod sync;

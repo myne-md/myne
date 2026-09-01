@@ -13,11 +13,22 @@ import { describe, expect, it, vi } from "vitest";
 // adding one is a security decision here (CLAUDE.md), not a test convenience.
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { afterEach } from "vitest";
+// The capability seam is mocked rather than driven, because `has()` on the
+// desktop implementation is a constant: it answers true for everything, so the
+// filter's negative arm is unreachable from the real module and the one test
+// that matters could not be written against it.
+import * as capabilities from "../../../src/platform/capabilities";
+vi.mock("../../../src/platform/capabilities", async (orig) => ({
+  ...(await orig<typeof capabilities>()),
+  has: vi.fn(() => true),
+}));
+
 import { ImportSourcePicker } from "../../../src/notes/import/ImportSourcePicker";
 import {
   IMPORT_SOURCES,
   IMPORT_SOURCE_ORDER,
   allSourceKeywords,
+  availableSourceOrder,
 } from "../../../src/notes/import/sourceCatalog";
 
 afterEach(cleanup);
@@ -28,6 +39,9 @@ describe("import source catalog", () => {
       "csv",
       "evernote",
       "html",
+      // The sixth source (myne-md/myne#464): the only one whose format is
+      // Myne's own, and the only one that reads an ENCRYPTED source.
+      "myne",
       "notion",
       "obsidian",
     ]);
@@ -39,6 +53,9 @@ describe("import source catalog", () => {
     expect(IMPORT_SOURCES.obsidian.pick).toBe("directory");
     expect(IMPORT_SOURCES.notion.pick).toBe("directory");
     expect(IMPORT_SOURCES.html.pick).toBe("directory");
+    // Neither: the Myne source picks one of the user's other local vaults from
+    // the list the app already keeps, so there is no path to browse to.
+    expect(IMPORT_SOURCES.myne.pick).toBe("vault");
   });
 
   it("gives the single-file sources a native-dialog extension filter", () => {
@@ -51,6 +68,33 @@ describe("import source catalog", () => {
     for (const term of ["obsidian", "notion", "evernote", "html", "csv"]) {
       expect(kw).toContain(term);
     }
+  });
+
+  it("omits a source whose capability this platform lacks", () => {
+    // The filter, asserted as BEHAVIOUR rather than as a table lookup.
+    // Replacing `availableSourceOrder()`'s body with `IMPORT_SOURCE_ORDER`
+    // passed every other test in this file, which is what made the filter
+    // untested: the picker test reads the constant and the capability test
+    // reads the descriptor, and neither runs the function between them.
+    const has = vi.mocked(capabilities.has);
+    has.mockImplementation((c) => c !== "vaultImport");
+    expect(availableSourceOrder()).not.toContain("myne");
+    // Every other source is capability-free, so exactly one card leaves.
+    expect(availableSourceOrder()).toHaveLength(IMPORT_SOURCE_ORDER.length - 1);
+  });
+
+  it("offers it where the capability is present", () => {
+    // The other direction, without which the test above passes for a function
+    // that returns the empty list.
+    vi.mocked(capabilities.has).mockReturnValue(true);
+    expect(availableSourceOrder()).toEqual(IMPORT_SOURCE_ORDER);
+  });
+
+  it("keeps the keyword list in step with the filtered order", () => {
+    vi.mocked(capabilities.has).mockImplementation((c) => c !== "vaultImport");
+    expect(allSourceKeywords()).not.toContain("consolidate");
+    vi.mocked(capabilities.has).mockReturnValue(true);
+    expect(allSourceKeywords()).toContain("consolidate");
   });
 
   it("gives every source its own brand icon", () => {

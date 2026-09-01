@@ -48,7 +48,8 @@
       "unsupportedDetail": "{{attempts}} denetimden {{passes}} tanesini geçti; {{required}} tanesi gerekiyor.",
       "checking": "Model denetleniyor…",
       "checkingAt": "Model denetleniyor… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Bu geçme eşiği henüz modeller genelinde ölçülmedi, bu yüzden olması gerekenden katı veya gevşek olabilir."
+      "unsupportedProvisional": "Bu geçme eşiği henüz modeller genelinde ölçülmedi, bu yüzden olması gerekenden katı veya gevşek olabilir.",
+      "scopeNone": "açık not yok, dolayısıyla henüz üzerinde çalışılacak bir şey yok"
     },
     "progress": {
       "working": "Çalışıyor",
@@ -64,7 +65,8 @@
       "grantsUser_one": "sizin belirlediğiniz {{count}} kapsam",
       "grantsUser_other": "sizin belirlediğiniz {{count}} kapsam",
       "grantsModel_one": "istediği {{count}} kapsam",
-      "grantsModel_other": "istediği {{count}} kapsam"
+      "grantsModel_other": "istediği {{count}} kapsam",
+      "cancelledBackground": "Myne arka plana geçtiği için çalışma iptal edildi. Hiçbir şey yazılmadı. Hazır olduğunuzda tekrar sorun."
     },
     "scope": {
       "title": "{{folder}} dahil edilsin mi?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Oluşturulmadı: bu klasör yapay zekadan hariç tutulmuş.",
         "createFailed": "Oluşturulmadı: yeni not yazılamadı. Diğer değişiklikler yine de uygulandı.",
         "excludedNow": "Uygulanamadı: bu notun klasörü artık yapay zekadan hariç tutuluyor.",
-        "notProposed": "Uygulanamadı: bu değişiklik, bu çalıştırmanın önerisinin parçası değil."
+        "notProposed": "Uygulanamadı: bu değişiklik, bu çalıştırmanın önerisinin parçası değil.",
+        "noteMoved": "Uygulanamadı: bu değişiklik notu başka bir klasöre taşırdı.",
+        "appendEmpty": "Uygulanamadı: eklenecek bir şey yoktu.",
+        "appendWouldWriteFrontmatter": "Uygulanamadı: bu metin notun özellikler bloğuna dönüşürdü."
       },
       "applyFailed": "Değişiklikler uygulanamadı.",
       "undo": "Bu çalıştırmayı geri al",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} not okundu",
       "runSummaryOffDevice_one": "notlarınızın yaklaşık {{count}} karakteri sağlayıcıya gönderildi",
       "runSummaryOffDevice_other": "notlarınızın yaklaşık {{count}} karakteri sağlayıcıya gönderildi",
-      "runSummaryOnDevice": "hiçbir şey bu cihazdan çıkmadı"
+      "runSummaryOnDevice": "hiçbir şey bu cihazdan çıkmadı",
+      "appendFlag": "sona ekler"
     },
     "undo": {
       "offer_one": "Son çalıştırma {{count}} notu değiştirdi.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} not geri yüklenemedi.",
       "failed_other": "{{count}} not geri yüklenemedi.",
       "createdNotReverted_one": "Çalıştırmanın oluşturduğu {{count}} not yerinde bırakıldı.",
-      "createdNotReverted_other": "Çalıştırmanın oluşturduğu {{count}} not yerinde bırakıldı."
+      "createdNotReverted_other": "Çalıştırmanın oluşturduğu {{count}} not yerinde bırakıldı.",
+      "sessionOnly": "Bu tek dokunuşluk geri alma, kasayı kilitleyene ya da uygulamayı kapatana kadar geçerlidir. Sonrasında notları tek tek, bir notun sürüm geçmişinden geri yüklersiniz.",
+      "sessionOnlyLink": "Sürüm geçmişini aç"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Tümünü genişlet"
+      },
+      "openThisWeekNote": {
+        "label": "Bu haftanın notunu aç"
+      },
+      "openThisMonthNote": {
+        "label": "Bu ayın notunu aç"
       }
     },
     "hotkeys": {
@@ -880,13 +894,15 @@
           "captureFailed": "Kayıt başlatılamadı. Sistem Ayarları’ndan mikrofon erişimini kontrol edin.",
           "generic": "Kayıt başlatılamadı.",
           "locked": "Sesli not kaydetmek için kasanızın kilidini açın.",
-          "noInputDevice": "Mikrofon bulunamadı. Bir tane bağlayıp tekrar deneyin."
+          "noInputDevice": "Mikrofon bulunamadı. Bir tane bağlayıp tekrar deneyin.",
+          "unsupportedSampleRate": "Mikrofonunuz Myne’in yazıya dökemeyeceği bir örnekleme hızında kaydediyor. Başka bir giriş aygıtı seçin ya da sisteminizin ses ayarlarından örnekleme hızını değiştirin."
         },
         "stopError": {
           "captureFailed": "Kayıt başarısız oldu. Mikrofonunuzu kontrol edin.",
           "emptyRecording": "Hiçbir şey kaydedilmedi.",
           "generic": "Kayıt kaydedilemedi.",
-          "silentRecording": "Kayıt sessizdi ve silindi. Mikrofonunuzu kontrol edin."
+          "silentRecording": "Kayıt sessizdi ve silindi. Mikrofonunuzu kontrol edin.",
+          "unsupportedSampleRate": "Mikrofonunuz Myne’in yazıya dökemeyeceği bir örnekleme hızında kaydediyor. Hiçbir şey kaydedilmedi. Başka bir giriş aygıtı seçin ya da sisteminizin ses ayarlarından örnekleme hızını değiştirin."
         }
       },
       "widget": {
@@ -932,6 +948,7 @@
             "featureOff": "Konuşmadan metne kapalı. Ayarlar → Yazıya dökme bölümünden açın.",
             "modelLoadFailed": "Konuşmadan metne modeli yüklenemedi. Ayarlar → Geliştirici → Yapay Zeka bölümünde özel bir model belirlediyseniz dosyalarını kontrol edin; aksi hâlde Myne’i yeniden kurmak yerleşik modeli geri getirir.",
             "noModel": "Konuşmadan metne modeli eksik. Myne’i yeniden kurmak onu geri getirir.",
+            "tooLong": "Bu kayıt yazıya dökülemeyecek kadar uzun. Ses dosyası ekli kalır, dolayısıyla dinleyebilirsiniz.",
             "vaultLocked": "Yazıya dökmek için kasanızın kilidini açın."
           },
           "disabledReason": "Yazıya dökmek için Ayarlar → Developer → Yapay Zeka bölümünden yapay zekayı açın.",
@@ -1164,10 +1181,6 @@
       "turnedIntoTemplate": "Şablona dönüştürüldü",
       "convertedToNote": "Nota dönüştürüldü",
       "versionHistory": "Sürüm geçmişi",
-      "exportMarkdown": "Markdown olarak dışa aktar…",
-      "exportPdf": "PDF olarak dışa aktar…",
-      "exportHtml": "HTML olarak dışa aktar…",
-      "exportTxt": "Düz Metin olarak dışa aktar…",
       "trash": "Çöp Kutusu’na taşı"
     },
     "codeBlock": {
@@ -1199,7 +1212,9 @@
       "replaceAllCount": "Tümünü değiştir ({{total}})",
       "replaceOne": "Değiştir",
       "replacePlaceholder": "Şununla değiştir",
-      "toggleReplace": "Değiştirmeyi aç/kapat"
+      "toggleReplace": "Değiştirmeyi aç/kapat",
+      "dateFallback": "{{stored}} aranıyor; bu tarih bu biçimde saklanıyor.",
+      "replaceOffOnDateFallback": "Bir tarih saklandığı biçimle eşleştiği sürece Değiştir kapalıdır, böylece bir değiştirme tarihi okunamaz hâle getiremez."
     },
     "cover": {
       "add": "Kapak ekle",
@@ -1225,7 +1240,8 @@
       "titlePlaceholder": "Başlıksız"
     },
     "mermaid": {
-      "rendering": "Şema oluşturuluyor…"
+      "rendering": "Şema oluşturuluyor…",
+      "renderFailed": "Bu şema oluşturulamadı: {{reason}}"
     },
     "slash": {
       "aiContinue": "Yazmaya devam et (Yapay Zeka)",
@@ -1534,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "Notlarda ara veya bir komut çalıştır…",
       "noMatches": "Eşleşen komut veya not yok."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Bugünün notu açılamadı.",
+        "weekly": "Bu haftanın notu açılamadı.",
+        "monthly": "Bu ayın notu açılamadı."
+      }
     }
   },
   "export": {
@@ -2034,10 +2057,6 @@
       "duplicate": "Çoğalt",
       "editFilterTitle": "Filtreyi düzenle",
       "emptyState": "Henüz not yok.",
-      "exportHtml": "HTML olarak dışa aktar…",
-      "exportMarkdown": "Markdown olarak dışa aktar…",
-      "exportPdf": "PDF olarak dışa aktar…",
-      "exportTxt": "Düz Metin olarak dışa aktar…",
       "favoritesHeading": "Favoriler",
       "icon": "Simge…",
       "mergeAnyway": "Yine de birleştir",
@@ -2343,6 +2362,13 @@
     },
     "workspace": {
       "defaultSlotName": "Varsayılan"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Dışa aktar…",
+      "txt": "Düz metin"
     }
   },
   "password": {
@@ -2775,20 +2801,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Boş (şablon yok)",
+      "folderSearchEmpty": "Eşleşen klasör yok.",
+      "folderSearchPlaceholder": "Klasörlerde ara…",
+      "searchEmpty": "Eşleşen şablon yok.",
+      "searchPlaceholder": "Şablonlarda ara…",
+      "untitledTemplate": "Başlıksız şablon",
+      "sectionDaily": "Günlük notlar",
+      "sectionWeekly": "Haftalık notlar",
+      "sectionMonthly": "Aylık notlar",
+      "periodFolderLabel": "Klasör",
+      "periodFolderHelper": "Yeni {{period}} notların nereye kaydedileceği. Varsayılan: {{default}}. Klasör boş kalsa da korunur.",
+      "periodFormatLabel": "Başlık biçimi",
+      "periodFormatHelperDaily": "Her günlük notun başlığı. YYYY, MM, DD, gggg (ISO hafta yılı), ww (ISO hafta numarası) ve düz metin için [metin] desteklenir. Varsayılan: {{default}}.",
+      "periodFormatHelperWeekly": "Her haftalık notun başlığı. gggg (ISO hafta yılı), ww (ISO hafta numarası), YYYY, MM, DD ve düz metin için [metin] desteklenir. Varsayılan: {{default}}.",
+      "periodFormatHelperMonthly": "Her aylık notun başlığı. YYYY, MM, gggg (ISO hafta yılı), ww (ISO hafta numarası) ve düz metin için [metin] desteklenir. Varsayılan: {{default}}.",
+      "periodTemplateLabel": "Şablon",
+      "periodTemplateHelper": "Her {{period}} notun başlayacağı şablonu seçin ya da tarihle adlandırılmış boş bir not için boş bırakın.",
+      "collisionWarning": "{{first}} ve {{second}} notlar aynı nota denk geliyor, çünkü aynı klasörü paylaşıyor ve aynı başlığı üretiyorlar. İki komut da aynı notu açacak.",
+      "weekStartNote": "Haftalar pazartesi başlar (ISO 8601), bu yüzden ocak ayının ilk günleri önceki yılın son haftasına, aralık ayının son günleri de sonraki yılın ilk haftasına ait olabilir.",
+      "periodFolderSaveError": "{{period}} klasörü kaydedilemedi. Lütfen tekrar deneyin.",
+      "periodFormatSaveError": "{{period}} başlık biçimi kaydedilemedi. Lütfen tekrar deneyin.",
+      "periodTemplateSaveError": "{{period}} şablonu kaydedilemedi. Lütfen tekrar deneyin.",
+      "periodNameDaily": "günlük",
+      "periodNameWeekly": "haftalık",
+      "periodNameMonthly": "aylık",
+      "periodFolderAriaLabel": "{{period}} not klasörü",
+      "periodFormatAriaLabel": "{{period}} not başlık biçimi",
+      "periodTemplateAriaLabel": "{{period}} not şablonu",
       "dateFormatHelper": "Her günlük notun başlığı. YYYY, MM, DD destekler. Varsayılan: {{default}}.",
       "dateFormatLabel": "Günlük not tarih biçimi",
       "dateFormatSaveError": "Tarih biçimi kaydedilemedi. Lütfen tekrar deneyin.",
       "folderHelper": "Yeni günlük notların kaydedildiği yer. Varsayılan: {{default}}. Bu klasör boş olsa bile korunur.",
       "folderLabel": "Günlük not klasörü",
       "folderSaveError": "Günlük klasörü kaydedilemedi. Lütfen tekrar deneyin.",
-      "folderSearchEmpty": "Eşleşen klasör yok.",
-      "folderSearchPlaceholder": "Klasörlerde ara…",
-      "searchEmpty": "Eşleşen şablon yok.",
-      "searchPlaceholder": "Şablonlarda ara…",
       "templateHelper": "Her günlük nota başlanacak bir şablon seçin veya tarihle başlıklandırılmış boş bir not için boş bırakın.",
       "templateLabel": "Günlük not şablonu",
-      "templateSaveError": "Günlük şablonu kaydedilemedi. Lütfen tekrar deneyin.",
-      "untitledTemplate": "Başlıksız şablon"
+      "templateSaveError": "Günlük şablonu kaydedilemedi. Lütfen tekrar deneyin."
     },
     "deleteVault": {
       "cancel": "İptal",
@@ -2949,7 +2997,8 @@
         "title": "Myne, {{provider}} sağlayıcısına bir şey göndermeden önce",
         "whatLabel": "Cihazınızdan ne çıkıyor",
         "whenLabel": "Ne zaman çıkıyor",
-        "whoLabel": "Kim alıyor"
+        "whoLabel": "Kim alıyor",
+        "connectionLabel": "Nasıl iletiliyor"
       },
       "disclosureToggle": "Bu nasıl çalışır?",
       "enableHelper": "Sağladığınız bir modeli çalıştırır. Nerede çalıştığı ve notlarınızın bu cihazdan çıkıp çıkmadığı, aşağıda belirttiğiniz sağlayıcıya bağlıdır. Deneyseldir, varsayılan olarak kapalıdır.",
@@ -2983,7 +3032,9 @@
         "refused": "Sağlayıcı bağlantıyı reddetti. Kapalı olabilir ya da bu ağı engelliyor olabilir.",
         "timeout": "Sağlayıcı zamanında yanıt vermedi. Arkada çalışan bir şey kalmadı.",
         "unauthorized": "Sağlayıcı API anahtarınızı reddetti. Anahtarı değiştirin: yanlış, iptal edilmiş ya da başka bir hesaba ait olabilir.",
-        "unreachable": "Sağlayıcıya ulaşılamadı. Ağ bağlantınızı kontrol edin."
+        "unreachable": "Sağlayıcıya ulaşılamadı. Ağ bağlantınızı kontrol edin.",
+        "featureOff": "Bu cihazda yapay zekâ kapalı. Hiçbir şey gönderilmedi. Ayarlar'da Yapay Zekâ bölümünden açın.",
+        "consentMissing": "Bu cihazdan bu sağlayıcıya not gönderilmesini kabul etmediniz. Hiçbir şey gönderilmedi. Ayarlar'da Yapay Zekâ bölümünden sağlayıcıyı yeniden seçin ve neyin gönderileceğini okuyun."
       },
       "modelChoose": "Dosya seç…",
       "modelEmbeddingLabel": "Arama modeli: anlamsal arama ve Soru-Cevap",
@@ -3024,7 +3075,16 @@
       "recommendedFilesEmbedding": "Tek bir klasörde model.safetensors + config.json + tokenizer.json gerektirir.",
       "recommendedFilesGeneration": "Aynı klasörde .gguf dosyası + tokenizer.json gerektirir.",
       "recommendedFilesTranscription": "Aynı klasörde Whisper .gguf dosyası + config.json + tokenizer.json gerektirir.",
-      "title": "Yapay Zeka"
+      "title": "Yapay Zeka",
+      "mobileEnableLabel": "Bu telefonda yapay zekâyı kullan",
+      "mobileEnableHelper": "Varsayılan olarak kapalı. Bu telefondaki hiçbir yapay zekâ modeli soruları yanıtlamıyor ya da notlarınızı okumuyor, bu yüzden her istek aşağıda adını verdiğiniz hizmete gider ve notlarınız o anda bu cihazdan çıkar. Sesi yazıya dökme ve görsellerdeki metin yine burada, Myne ile gelen modellerle çalışır.",
+      "mobileKeyAdd": "Anahtarı kaydet",
+      "mobileKeyReplace": "Anahtarı değiştir",
+      "mobileRevokeHelper": "Sağlayıcıyı, anahtarını ve bu telefonun onayını birlikte kaldırır; tam olarak hiç kurulmamış hâline döner. Diğer cihazlar, oradan da kaldırana kadar çalışmayı sürdürür.",
+      "mobileApproveLabel": "Bu telefondan göndermeyi onayla",
+      "mobileApproveHelper": "Sağlayıcı ve anahtarı başka bir cihazdan geldi. Neyin gönderileceğini okuyup burada onaylayana kadar bu telefondan hiçbir şey gönderilmez.",
+      "historyBudgetHelper": "Her isteğin son konuşmadan ne kadarını taşıyacağı, karakter olarak. Varsayılan için boş bırakın. Daha büyük bir sayı yapay zekanın daha uzun konuşmaları izlemesini sağlar ve bunun daha fazlasını gönderir: bu cihazda olmayan bir sağlayıcıda bu, bir çalıştırmanın her adımında metninizin daha fazlasının cihazdan çıkması demektir.",
+      "historyBudgetLabel": "Her istekle gönderilen konuşma"
     },
     "network": {
       "disabledCue": "Eşitleme artık Tor üzerinden yönlendirilmiyor. Yeni bağlantılar doğrudan eşitleme sunucusuna gider.",
@@ -3057,6 +3117,9 @@
       "exactLabel": "Tam zamanlama",
       "exactOn": "Açık",
       "horizon": "Hatırlatıcılar {{date}} tarihine kadar kaydedildi. Gelmeye devam etmeleri için o tarihten önce Myne’i açın.",
+      "horizonLabel": "Önceden planla",
+      "horizonLabelHelper": "Hatırlatıcılar bu kadar önceden hazırlanır. Birinin gelmesi için Myne açık ve kilidi açılmış olmalı.",
+      "horizonInertHelper": "Bu cihazda saklandı. Henüz kimse okumuyor: bu sürüm görev hatırlatıcısı göndermiyor.",
       "label": "Görev hatırlatıcıları",
       "saveError": "O ayar kaydedilemedi. Tekrar deneyin.",
       "showTextAria": "Bildirimde görev metnini göster",
@@ -3337,12 +3400,14 @@
         "viewMode": "varsayılan görünüm modu canlı okuma kaynak önizleme view mode preview source",
         "dateFormat": "tarih biçimi gün ay yıl iso gg/aa aa/gg takvim date format dd/mm mm/dd",
         "timeFormat": "saat biçimi 24 saat 12 saat öğleden önce öğleden sonra am pm time format clock",
-        "timezone": "saat dilimi zaman dilimi tz utc iana bölge bugün timezone"
+        "timezone": "saat dilimi zaman dilimi tz utc iana bölge bugün timezone",
+        "periodicNotes": "periyodik notlar haftalık aylık hafta ay klasör şablon biçim",
+        "aiHistoryBudget": "konuşma geçmiş bağlam bellek bütçe karakter ajan sohbet istek"
       }
     },
     "dateTime": {
       "dateLabel": "Tarih biçimi",
-      "dateHelper": "Tarihlerin görevlerde, kaydedilmiş görünümlerde ve eklerde nasıl gösterileceği.",
+      "dateHelper": "Myne bir tarihi nerede gösterirse göstersin, o tarihin nasıl yazılacağı.",
       "dateSystem": "Dile göre",
       "timeLabel": "Saat biçimi",
       "timeHelper": "Saatlerin 24 saatlik mi yoksa 12 saatlik mi gösterileceği.",

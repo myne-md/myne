@@ -48,7 +48,8 @@
       "unsupportedDetail": "Es hat {{passes}} von {{attempts}} Prüfungen bestanden; {{required}} sind erforderlich.",
       "checking": "Modell wird geprüft…",
       "checkingAt": "Modell wird geprüft… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Diese Bestehensgrenze wurde noch nicht über verschiedene Modelle hinweg gemessen, sie kann also strenger oder lockerer sein als nötig."
+      "unsupportedProvisional": "Diese Bestehensgrenze wurde noch nicht über verschiedene Modelle hinweg gemessen, sie kann also strenger oder lockerer sein als nötig.",
+      "scopeNone": "keine Notiz geöffnet, also gibt es noch nichts zu bearbeiten"
     },
     "progress": {
       "working": "Arbeitet",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} von Ihnen gesetzter Umfang",
       "grantsUser_other": "{{count}} von Ihnen gesetzte Umfänge",
       "grantsModel_one": "{{count}} vom Agenten angefragt",
-      "grantsModel_other": "{{count}} vom Agenten angefragt"
+      "grantsModel_other": "{{count}} vom Agenten angefragt",
+      "cancelledBackground": "Der Lauf wurde abgebrochen, weil Myne in den Hintergrund gewechselt ist. Es wurde nichts geschrieben. Fragen Sie erneut, wenn Sie bereit sind."
     },
     "scope": {
       "title": "{{folder}} einbeziehen?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Nicht erstellt: Dieser Ordner ist von der KI ausgeschlossen.",
         "createFailed": "Nicht erstellt: Das Schreiben der neuen Notiz ist fehlgeschlagen. Die übrigen Änderungen wurden dennoch angewendet.",
         "excludedNow": "Konnte nicht angewendet werden: Der Ordner dieser Notiz ist jetzt von der KI ausgeschlossen.",
-        "notProposed": "Konnte nicht angewendet werden: Diese Änderung gehört nicht zum Vorschlag dieses Durchlaufs."
+        "notProposed": "Konnte nicht angewendet werden: Diese Änderung gehört nicht zum Vorschlag dieses Durchlaufs.",
+        "noteMoved": "Konnte nicht angewendet werden: Diese Änderung würde die Notiz in einen anderen Ordner verschieben.",
+        "appendEmpty": "Konnte nicht angewendet werden: Es gab nichts hinzuzufügen.",
+        "appendWouldWriteFrontmatter": "Konnte nicht angewendet werden: Dieser Text wäre zum Eigenschaftsblock der Notiz geworden."
       },
       "applyFailed": "Die Änderungen konnten nicht angewendet werden.",
       "undo": "Diesen Durchlauf rückgängig machen",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} Notizen gelesen",
       "runSummaryOffDevice_one": "etwa {{count}} Zeichen Ihrer Notizen wurde an den Anbieter gesendet",
       "runSummaryOffDevice_other": "etwa {{count}} Zeichen Ihrer Notizen wurden an den Anbieter gesendet",
-      "runSummaryOnDevice": "nichts hat dieses Gerät verlassen"
+      "runSummaryOnDevice": "nichts hat dieses Gerät verlassen",
+      "appendFlag": "wird am Ende angefügt"
     },
     "undo": {
       "offer_one": "Der letzte Durchlauf hat {{count}} Notiz geändert.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} Notiz konnte nicht wiederhergestellt werden.",
       "failed_other": "{{count}} Notizen konnten nicht wiederhergestellt werden.",
       "createdNotReverted_one": "{{count}} vom Durchlauf erstellte Notiz wurde beibehalten.",
-      "createdNotReverted_other": "{{count}} vom Durchlauf erstellte Notizen wurden beibehalten."
+      "createdNotReverted_other": "{{count}} vom Durchlauf erstellte Notizen wurden beibehalten.",
+      "sessionOnly": "Dieses Rückgängig mit einem Tippen gilt, bis Sie den Tresor sperren oder die App schließen. Danach stellen Sie Notizen einzeln über die Versionsgeschichte einer Notiz wieder her.",
+      "sessionOnlyLink": "Versionsgeschichte öffnen"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Alle ausklappen"
+      },
+      "openThisWeekNote": {
+        "label": "Notiz dieser Woche öffnen"
+      },
+      "openThisMonthNote": {
+        "label": "Notiz dieses Monats öffnen"
       }
     },
     "hotkeys": {
@@ -880,13 +894,15 @@
           "captureFailed": "Aufnahme konnte nicht gestartet werden. Prüfen Sie den Mikrofonzugriff in den Systemeinstellungen.",
           "generic": "Aufnahme konnte nicht gestartet werden.",
           "locked": "Entsperren Sie Ihren Tresor, um eine Sprachnotiz aufzunehmen.",
-          "noInputDevice": "Kein Mikrofon gefunden. Schließen Sie eines an und versuchen Sie es erneut."
+          "noInputDevice": "Kein Mikrofon gefunden. Schließen Sie eines an und versuchen Sie es erneut.",
+          "unsupportedSampleRate": "Ihr Mikrofon nimmt mit einer Abtastrate auf, die Myne nicht transkribieren kann. Wählen Sie ein anderes Eingabegerät, oder ändern Sie dessen Abtastrate in den Toneinstellungen des Systems."
         },
         "stopError": {
           "captureFailed": "Aufnahme fehlgeschlagen. Überprüfen Sie Ihr Mikrofon.",
           "emptyRecording": "Es wurde nichts aufgenommen.",
           "generic": "Die Aufnahme konnte nicht gespeichert werden.",
-          "silentRecording": "Die Aufnahme war stumm und wurde verworfen. Überprüfen Sie Ihr Mikrofon."
+          "silentRecording": "Die Aufnahme war stumm und wurde verworfen. Überprüfen Sie Ihr Mikrofon.",
+          "unsupportedSampleRate": "Ihr Mikrofon nimmt mit einer Abtastrate auf, die Myne nicht transkribieren kann. Es wurde nichts gespeichert. Wählen Sie ein anderes Eingabegerät, oder ändern Sie dessen Abtastrate in den Toneinstellungen des Systems."
         }
       },
       "widget": {
@@ -932,6 +948,7 @@
             "featureOff": "Sprache zu Text ist aus. Schalten Sie es unter Einstellungen → Transkription ein.",
             "modelLoadFailed": "Das Sprache-zu-Text-Modell konnte nicht geladen werden. Wenn Sie unter Einstellungen → Developer → KI ein eigenes Modell festgelegt haben, prüfen Sie dessen Dateien; andernfalls stellt eine Neuinstallation von Myne das integrierte wieder her.",
             "noModel": "Das Sprache-zu-Text-Modell fehlt. Eine Neuinstallation von Myne stellt es wieder her.",
+            "tooLong": "Diese Aufnahme ist zu lang für eine Transkription. Die Audiodatei bleibt angehängt, Sie können sie also weiterhin abspielen.",
             "vaultLocked": "Entsperren Sie Ihren Tresor, um zu transkribieren."
           },
           "disabledReason": "Aktivieren Sie die KI unter Einstellungen → Developer → KI, um zu transkribieren.",
@@ -1164,10 +1181,6 @@
       "turnedIntoTemplate": "In Vorlage umgewandelt",
       "convertedToNote": "In Notiz umgewandelt",
       "versionHistory": "Versionsverlauf",
-      "exportMarkdown": "Als Markdown exportieren…",
-      "exportPdf": "Als PDF exportieren…",
-      "exportHtml": "Als HTML exportieren…",
-      "exportTxt": "Als reinen Text exportieren…",
       "trash": "In den Papierkorb verschieben"
     },
     "codeBlock": {
@@ -1199,7 +1212,9 @@
       "replaceAllCount": "Alle ersetzen ({{total}})",
       "replaceOne": "Ersetzen",
       "replacePlaceholder": "Ersetzen durch",
-      "toggleReplace": "Ersetzen umschalten"
+      "toggleReplace": "Ersetzen umschalten",
+      "dateFallback": "Es wird nach {{stored}} gesucht, der Form, in der dieses Datum gespeichert ist.",
+      "replaceOffOnDateFallback": "Ersetzen ist deaktiviert, solange ein Datum über seine gespeicherte Form gefunden wird, damit eine Ersetzung das Datum nicht unlesbar macht."
     },
     "cover": {
       "add": "Titelbild hinzufügen",
@@ -1225,7 +1240,8 @@
       "titlePlaceholder": "Ohne Titel"
     },
     "mermaid": {
-      "rendering": "Diagramm wird gerendert…"
+      "rendering": "Diagramm wird gerendert…",
+      "renderFailed": "Dieses Diagramm konnte nicht dargestellt werden: {{reason}}"
     },
     "slash": {
       "aiContinue": "Weiterschreiben (KI)",
@@ -1534,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "Notizen durchsuchen oder Befehl ausführen…",
       "noMatches": "Keine passenden Befehle oder Notizen."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Die Notiz von heute konnte nicht geöffnet werden.",
+        "weekly": "Die Notiz dieser Woche konnte nicht geöffnet werden.",
+        "monthly": "Die Notiz dieses Monats konnte nicht geöffnet werden."
+      }
     }
   },
   "export": {
@@ -2034,10 +2057,6 @@
       "duplicate": "Duplizieren",
       "editFilterTitle": "Filter bearbeiten",
       "emptyState": "Noch keine Notizen.",
-      "exportHtml": "Als HTML exportieren…",
-      "exportMarkdown": "Als Markdown exportieren…",
-      "exportPdf": "Als PDF exportieren…",
-      "exportTxt": "Als reinen Text exportieren…",
       "favoritesHeading": "Favoriten",
       "icon": "Symbol…",
       "mergeAnyway": "Trotzdem zusammenführen",
@@ -2343,6 +2362,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportieren…",
+      "txt": "Nur Text"
     }
   },
   "password": {
@@ -2775,20 +2801,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Leer (keine Vorlage)",
+      "folderSearchEmpty": "Keine Ordner passen.",
+      "folderSearchPlaceholder": "Ordner durchsuchen…",
+      "searchEmpty": "Keine Vorlagen passen.",
+      "searchPlaceholder": "Vorlagen durchsuchen…",
+      "untitledTemplate": "Vorlage ohne Titel",
+      "sectionDaily": "Tägliche Notizen",
+      "sectionWeekly": "Wöchentliche Notizen",
+      "sectionMonthly": "Monatliche Notizen",
+      "periodFolderLabel": "Ordner",
+      "periodFolderHelper": "Wo neue {{period}} Notizen abgelegt werden. Standard: {{default}}. Der Ordner bleibt erhalten, auch wenn er leer ist.",
+      "periodFormatLabel": "Titelformat",
+      "periodFormatHelperDaily": "Der Titel jeder täglichen Notiz. Unterstützt YYYY, MM, DD, gggg (ISO-Wochenjahr), ww (ISO-Kalenderwoche) und [Text] für wörtlichen Text. Standard: {{default}}.",
+      "periodFormatHelperWeekly": "Der Titel jeder wöchentlichen Notiz. Unterstützt gggg (ISO-Wochenjahr), ww (ISO-Kalenderwoche), YYYY, MM, DD und [Text] für wörtlichen Text. Standard: {{default}}.",
+      "periodFormatHelperMonthly": "Der Titel jeder monatlichen Notiz. Unterstützt YYYY, MM, gggg (ISO-Wochenjahr), ww (ISO-Kalenderwoche) und [Text] für wörtlichen Text. Standard: {{default}}.",
+      "periodTemplateLabel": "Vorlage",
+      "periodTemplateHelper": "Wählen Sie eine Vorlage, mit der jede {{period}} Notiz beginnt, oder lassen Sie das Feld leer für eine leere Notiz mit dem Datum als Titel.",
+      "collisionWarning": "{{first}} und {{second}} Notizen führen zur selben Notiz, weil sie denselben Ordner teilen und denselben Titel erzeugen. Beide Befehle öffnen sie.",
+      "weekStartNote": "Wochen beginnen am Montag (ISO 8601), deshalb können die ersten Januartage zur letzten Woche des Vorjahres gehören und die letzten Dezembertage zur ersten Woche des Folgejahres.",
+      "periodFolderSaveError": "Der {{period}} Ordner konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      "periodFormatSaveError": "Das {{period}} Titelformat konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      "periodTemplateSaveError": "Die {{period}} Vorlage konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      "periodNameDaily": "tägliche",
+      "periodNameWeekly": "wöchentliche",
+      "periodNameMonthly": "monatliche",
+      "periodFolderAriaLabel": "Ordner für {{period}} Notizen",
+      "periodFormatAriaLabel": "Titelformat für {{period}} Notizen",
+      "periodTemplateAriaLabel": "Vorlage für {{period}} Notizen",
       "dateFormatHelper": "Der Titel jeder Tagesnotiz. Unterstützt YYYY, MM, DD. Standard ist {{default}}.",
       "dateFormatLabel": "Datumsformat der Tagesnotiz",
       "dateFormatSaveError": "Das Datumsformat konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
       "folderHelper": "Wo neue Tagesnotizen abgelegt werden. Standard ist {{default}}. Der Ordner bleibt erhalten, auch wenn er leer ist.",
       "folderLabel": "Ordner für Tagesnotizen",
       "folderSaveError": "Der Ordner für Tagesnotizen konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
-      "folderSearchEmpty": "Keine Ordner passen.",
-      "folderSearchPlaceholder": "Ordner durchsuchen…",
-      "searchEmpty": "Keine Vorlagen passen.",
-      "searchPlaceholder": "Vorlagen durchsuchen…",
       "templateHelper": "Wählen Sie eine Vorlage, mit der jede Tagesnotiz beginnt, oder lassen Sie das Feld leer für eine leere Notiz mit dem Datum als Titel.",
       "templateLabel": "Vorlage für Tagesnotizen",
-      "templateSaveError": "Die Vorlage für Tagesnotizen konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
-      "untitledTemplate": "Vorlage ohne Titel"
+      "templateSaveError": "Die Vorlage für Tagesnotizen konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
     },
     "deleteVault": {
       "cancel": "Abbrechen",
@@ -2949,7 +2997,8 @@
         "title": "Bevor Myne etwas an {{provider}} sendet",
         "whatLabel": "Was Ihr Gerät verlässt",
         "whenLabel": "Wann es das Gerät verlässt",
-        "whoLabel": "Wer es empfängt"
+        "whoLabel": "Wer es empfängt",
+        "connectionLabel": "Wie es übertragen wird"
       },
       "disclosureToggle": "Wie funktioniert das?",
       "enableHelper": "Führt ein von Ihnen bereitgestelltes Modell aus. Wo es läuft und ob Ihre Notizen dieses Gerät verlassen, hängt davon ab, welchen Anbieter Sie unten benennen. Experimentell, standardmäßig aus.",
@@ -2983,7 +3032,9 @@
         "refused": "Der Anbieter hat die Verbindung abgelehnt. Möglicherweise ist er ausgefallen oder blockiert dieses Netzwerk.",
         "timeout": "Der Anbieter hat nicht rechtzeitig geantwortet. Es läuft nichts weiter.",
         "unauthorized": "Der Anbieter hat Ihren API-Schlüssel zurückgewiesen. Ersetzen Sie ihn: Er könnte falsch, widerrufen oder für ein anderes Konto sein.",
-        "unreachable": "Der Anbieter ist nicht erreichbar. Prüfen Sie Ihre Netzwerkverbindung."
+        "unreachable": "Der Anbieter ist nicht erreichbar. Prüfen Sie Ihre Netzwerkverbindung.",
+        "featureOff": "KI ist auf diesem Gerät ausgeschaltet. Es wurde nichts gesendet. Schalten Sie sie in den Einstellungen unter KI ein.",
+        "consentMissing": "Sie haben nicht zugestimmt, Notizen von diesem Gerät an diesen Anbieter zu senden. Es wurde nichts gesendet. Wählen Sie den Anbieter in den Einstellungen unter KI erneut aus und lesen Sie, was gesendet wird."
       },
       "modelChoose": "Datei auswählen…",
       "modelEmbeddingLabel": "Suchmodell: semantische Suche & Q&A",
@@ -3024,7 +3075,16 @@
       "recommendedFilesEmbedding": "Benötigt model.safetensors + config.json + tokenizer.json in einem Ordner.",
       "recommendedFilesGeneration": "Benötigt die .gguf-Datei + tokenizer.json im selben Ordner.",
       "recommendedFilesTranscription": "Benötigt die Whisper-.gguf-Datei + config.json + tokenizer.json im selben Ordner.",
-      "title": "KI"
+      "title": "KI",
+      "mobileEnableLabel": "KI auf diesem Telefon nutzen",
+      "mobileEnableHelper": "Standardmäßig aus. Kein KI-Modell auf diesem Telefon beantwortet Fragen oder liest Ihre Notizen, also geht jede Anfrage an einen Dienst, den Sie unten benennen, und Ihre Notizen verlassen dabei dieses Gerät. Transkription und Bildtext laufen weiterhin hier, auf Modellen, die mit Myne ausgeliefert werden.",
+      "mobileKeyAdd": "Schlüssel speichern",
+      "mobileKeyReplace": "Schlüssel ersetzen",
+      "mobileRevokeHelper": "Entfernt den Anbieter, seinen Schlüssel und die Zustimmung dieses Telefons zusammen und stellt genau den Zustand her, als wäre nie etwas eingerichtet worden. Andere Geräte funktionieren weiter, bis Sie es dort ebenfalls entfernen.",
+      "mobileApproveLabel": "Senden auf diesem Telefon freigeben",
+      "mobileApproveHelper": "Der Anbieter und sein Schlüssel stammen von einem anderen Gerät. Von diesem Telefon wird nichts gesendet, bis Sie lesen, was gesendet wird, und es hier freigeben.",
+      "historyBudgetHelper": "Wie viel des jüngsten Gesprächs jede Anfrage mitführt, in Zeichen. Leer lassen für den Standardwert. Eine größere Zahl lässt die KI längeren Gesprächen folgen und sendet mehr davon: bei einem Anbieter, der nicht auf diesem Gerät läuft, verlässt damit bei jedem Schritt eines Laufs mehr Ihres Textes das Gerät.",
+      "historyBudgetLabel": "Mit jeder Anfrage übertragener Gesprächsverlauf"
     },
     "network": {
       "disabledCue": "Sync läuft nicht mehr über Tor. Neue Verbindungen gehen direkt zum Sync-Server.",
@@ -3057,6 +3117,9 @@
       "exactLabel": "Exakte Zeitpunkte",
       "exactOn": "An",
       "horizon": "Erinnerungen sind bis {{date}} registriert. Öffnen Sie Myne vorher, damit sie weiterlaufen.",
+      "horizonLabel": "Im Voraus planen",
+      "horizonLabelHelper": "Erinnerungen werden so weit im Voraus eingerichtet. Myne muss geöffnet und entsperrt sein, damit eine ankommt.",
+      "horizonInertHelper": "Auf diesem Gerät gespeichert. Noch liest es niemand: dieser Build liefert keine Aufgabenerinnerungen.",
       "label": "Aufgabenerinnerungen",
       "saveError": "Die Einstellung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
       "showTextAria": "Aufgabentext in der Benachrichtigung anzeigen",
@@ -3337,12 +3400,14 @@
         "viewMode": "standard ansichtsmodus ansicht live lesen quelltext vorschau",
         "dateFormat": "datumsformat datum format tag monat jahr iso dd/mm mm/dd kalender",
         "timeFormat": "zeitformat uhrzeit format 24 stunden 12 stunden uhr am pm",
-        "timezone": "zeitzone zeitzonen zone tz utc iana region heute"
+        "timezone": "zeitzone zeitzonen zone tz utc iana region heute",
+        "periodicNotes": "periodische Notizen wöchentlich monatlich Woche Monat Ordner Vorlage Format",
+        "aiHistoryBudget": "Gespräch Verlauf Kontext Gedächtnis Budget Zeichen Agent Chat Anfrage"
       }
     },
     "dateTime": {
       "dateLabel": "Datumsformat",
-      "dateHelper": "Wie Datumsangaben in Aufgaben, gespeicherten Ansichten und Anhängen angezeigt werden.",
+      "dateHelper": "Wie ein Datum geschrieben wird, überall dort, wo Myne eines anzeigt.",
       "dateSystem": "Der Sprache folgen",
       "timeLabel": "Zeitformat",
       "timeHelper": "Ob Uhrzeiten im 24-Stunden- oder im 12-Stunden-Format angezeigt werden.",
