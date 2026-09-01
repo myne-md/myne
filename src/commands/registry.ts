@@ -150,8 +150,31 @@ export type CommandContext = {
   onRenameNote: () => void;
   /** Move the selected note to the trash (soft delete, recoverable). */
   onTrashNote: () => void;
-  /** Permanently empty the trash. */
-  onEmptyTrash: () => void;
+  /**
+   * Whether THIS invocation was activated by a key rather than a pointer.
+   *
+   * Set per call by whoever runs the action (`CommandPalette` clones the context
+   * with it), so it is a fact about one activation rather than ambient state.
+   * Absent when nobody knows, which reads as "not a key".
+   *
+   * It exists for one consumer, `onEmptyTrash`, and the reason is below.
+   */
+  activatedByKey?: boolean;
+  /**
+   * Permanently empty the trash, taking whether the ACTIVATION was a key.
+   *
+   * It reaches `DeleteConfirmModal`'s `openedByKey`, which makes Enter wait for
+   * an Enter keyup before it will confirm. The dialog behind this action is one
+   * of the two that perform the cryptographic erase of
+   * `docs/decisions/storage/0105`, and it opens DURING the Enter keydown that
+   * selects the palette row, so the key that opened it may still be down.
+   *
+   * A constant `true` here was tried and is wrong in the other direction: a
+   * palette row that was CLICKED leaves no Enter to release, so the user's first
+   * Enter would be eaten on a dialog that has to answer the first press.
+   * `e2e/palette-empty-trash.e2e.ts` caught exactly that, three runs over.
+   */
+  onEmptyTrash: (viaKey: boolean) => void;
   /** Add/remove the selected note from favorites. */
   onToggleFavorite: () => void;
   /** Reveal a specific right-panel tab. */

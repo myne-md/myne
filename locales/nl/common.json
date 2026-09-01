@@ -1240,7 +1240,8 @@
       "titlePlaceholder": "Naamloos"
     },
     "mermaid": {
-      "rendering": "Diagram renderen…"
+      "rendering": "Diagram renderen…",
+      "renderFailed": "Dit diagram kon niet worden weergegeven: {{reason}}"
     },
     "slash": {
       "aiContinue": "Doorschrijven (AI)",

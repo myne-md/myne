@@ -13,6 +13,7 @@ import type { EditorView } from "@codemirror/view";
 import { emit, listen } from "../../platform/event";
 import { documentDir, join } from "../../platform/path";
 import {
+  Button,
   Screen,
   ScreenScroll,
   Icon,
@@ -223,6 +224,49 @@ const EDITOR_TEXT_PX: Record<string, number> = { sm: 13, md: 14, lg: 16, xl: 18 
  */
 const ignorePrefsWriteFailure = (): void => {};
 
+/**
+ * Shared chrome for the `Sheet`s below that ask a question and offer two
+ * buttons: purge a note, move a note to a folder, delete a folder.
+ *
+ * The first two had their own copies, identical except where one had drifted (a
+ * 13px body against a 14px one, with nothing choosing between them). Collapsed
+ * when the folder-delete sheet made it three (myne-md/myne#628), because a third
+ * copy is where a change to one of them quietly stops reaching the others.
+ *
+ * The BUTTONS are not here, and that is the point of the shape: mobile already
+ * has the primitive, and `UnlockFlow`'s delete-vault sheet is the same dialog
+ * built out of it. Keeping a private geometry beside it would have made a fourth
+ * answer to "how tall is the destructive button on a bottom sheet" (this file
+ * had 50/r8, `Button` has 52 and 48/r6, `AttachmentsSheet` has 48/r8). These
+ * three now use `Button`, so the design system reaches them.
+ */
+const SHEET_TITLE = {
+  fontSize: 17,
+  fontWeight: 600,
+  color: "var(--fg-1)",
+  textAlign: "center",
+} as const;
+const SHEET_BODY = {
+  marginTop: 8,
+  fontSize: 14,
+  lineHeight: 1.5,
+  color: "var(--fg-3)",
+  textAlign: "center",
+} as const;
+/**
+ * The same paragraph in full ink, for a sheet whose body IS the decision rather
+ * than reassurance about it: the folder delete names how many notes move, and
+ * that count is what the user is agreeing to. Two named constants rather than a
+ * spread with an inline colour, so the distinction is a choice a call site makes
+ * by name instead of a literal a reader has to interpret.
+ */
+const SHEET_LEAD = { ...SHEET_BODY, color: "var(--fg-1)" } as const;
+const SHEET_ACTIONS = {
+  marginTop: 18,
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+} as const;
 const DEV_SEED: string[] = [
   "# Threat model v2\n\nWe assume a powerful network adversary that can observe all traffic and compromise the relay. The vault key never leaves the device.",
   "# Weekly review — 2026-06-15\n\nShipped the sync conflict resolver. Next: mobile share sheet and editor polish.",
@@ -596,6 +640,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   const [moveInput, setMoveInput] = useState("");
   // Folder create + long-press actions (MYND-473 / MYND-480).
   const [folderActions, setFolderActions] = useState<{ path: string; name: string } | null>(null);
+  // Folder delete confirmation (myne-md/myne#628). The desktop has asked before
+  // moving a non-empty folder's subtree to Trash since MYND-133; mobile's danger
+  // row called the delete straight through, so the same action was one tap here
+  // and a dialog there. Carries the note count so the sheet can name what goes.
+  const [folderTrash, setFolderTrash] = useState<
+    { path: string; name: string; noteCount: number } | null
+  >(null);
   const [folderPrompt, setFolderPrompt] = useState<
     | { mode: "new" }
     | { mode: "subfolder"; parent: string }
@@ -1990,9 +2041,31 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     }
   }
 
-  /** Move a folder's whole subtree to Trash (folder long-press → Delete folder). */
-  async function trashFolderFromMenu(path: string) {
+  /** Folder long-press → Delete folder. Mirrors the desktop's
+   *  `deleteFolderAction` (myne-md/myne#628): a note-empty folder goes without a
+   *  prompt, a non-empty one asks first and names how many notes move.
+   *
+   *  The subtree is walked again at confirm time rather than reused from here,
+   *  because notes can move while the sheet is open and the set that goes should
+   *  be the live one. On the empty path there is no sheet and no elapsed time,
+   *  so that second walk is redundant; it is left in place because the
+   *  alternative is a second entry point into the delete with a
+   *  pre-computed list, which is how the two get to disagree. */
+  function requestFolderTrash(path: string, name: string) {
     setFolderActions(null);
+    const noteCount = notesInSubtree(folderOf, path).length;
+    if (noteCount === 0) {
+      void trashFolderFromMenu(path);
+      return;
+    }
+    setFolderTrash({ path, name, noteCount });
+  }
+
+  /** Move a folder's whole subtree to Trash. Reached only through
+   *  `requestFolderTrash`, which owns the actions sheet, so this closes only the
+   *  confirmation it was opened from. */
+  async function trashFolderFromMenu(path: string) {
+    setFolderTrash(null);
     const ids = notesInSubtree(folderOf, path);
     try {
       for (const id of ids) await trashNote(id);
@@ -3153,7 +3226,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             onRename={() => openFolderPrompt({ mode: "rename", path: folderActions.path })}
             onDecorate={() => openFolderDecoration(folderActions.path)}
             onArchive={() => void archiveFolderFromMenu(folderActions.path)}
-            onTrash={() => void trashFolderFromMenu(folderActions.path)}
+            onTrash={() => requestFolderTrash(folderActions.path, folderActions.name)}
             reorder={folderReorder(folderActions.path)}
           />
         )}
@@ -3189,7 +3262,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
           <Sheet onClose={() => setFolderPrompt(null)}>
             {() => (
               <>
-                <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>
+                <div style={SHEET_TITLE}>
                   {folderPrompt.mode === "rename"
                     ? t("attachments.library.menuRename")
                     : folderPrompt.mode === "subfolder"
@@ -3213,13 +3286,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                   style={{ marginTop: 14, width: "100%", height: 48, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--bg-1)", padding: "0 14px", fontFamily: "var(--font-sans)", fontSize: 16, color: "var(--fg-1)", outline: "none", boxSizing: "border-box" }}
                 />
                 <div style={{ marginTop: 16 }}>
-                  <button
+                  <Button
+                    variant="primary"
                     data-testid="notes.folder-prompt-submit"
                     onClick={() => void submitFolderPrompt()}
-                    style={{ width: "100%", height: 50, border: "none", borderRadius: 8, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
                   >
                     {folderPrompt.mode === "rename" ? t("attachments.library.menuRename") : t("notes.list.newFolder")}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -3312,11 +3385,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         // the wrapper are OVERRIDDEN by CM's own `var(--editor-*)` rules, so a
         // change never reached the editor. `maxWidth` stays off (full-width phone).
         <div
+          // `.m-scroll` rather than the four declarations it is (mobile.css):
+          // flex/min-height/overflow-y/overflow-x/-webkit-overflow-scrolling.
+          // The editor pane used to hand-roll three of them and leave the fourth
+          // out, and the missing one was `overflow-x`. CSS resolves `visible`
+          // to `auto` on one axis when the other is not `visible`, so the pane
+          // was a horizontal scroll container in its own right, outside
+          // `.cm-scroller` (myne-md/myne#630). Wearing the class means the next
+          // thing that class learns reaches the app's busiest scroll surface.
+          className="m-scroll"
           style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            WebkitOverflowScrolling: "touch",
             background: "var(--bg-1)",
             ...typographyStyle(prefs),
             maxWidth: undefined,
@@ -3525,49 +3603,67 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
           disappeared after a few seconds, pointing at a place the user had no
           reason to open. */}
       <ShareImportToast onOpenLibrary={() => setTab("files")} />
+      {/* Folder delete confirmation (myne-md/myne#628). Copy is the desktop
+          modal's, key for key, so the two clients promise the same thing about
+          where the notes go. Danger button first, matching the purge sheet
+          below and the desktop button row. */}
+      {folderTrash !== null && (
+        <Sheet onClose={() => setFolderTrash(null)}>
+          {(close) => (
+            <>
+              <div style={SHEET_TITLE}>{t("notes.list.deleteFolderTitle")}</div>
+              {/* Two tones, the same split the desktop twin uses. The count is
+                  the decision the user is making, so it carries full ink; the
+                  reassurance about Trash is the quieter body tone, which is
+                  where `DeleteConfirmModal` puts the identical string. */}
+              <div data-testid="notes.folder-delete-body" style={SHEET_LEAD}>
+                {t("notes.list.deleteFolderBody", {
+                  name: folderTrash.name,
+                  count: folderTrash.noteCount,
+                })}
+              </div>
+              <div style={{ ...SHEET_BODY, marginTop: 4 }}>
+                {t("notes.list.deleteFolderWarning")}
+              </div>
+              <div style={SHEET_ACTIONS}>
+                <Button
+                  variant="danger"
+                  data-testid="notes.folder-delete-confirm"
+                  onClick={() => void trashFolderFromMenu(folderTrash.path)}
+                >
+                  {t("notes.list.deleteFolderConfirm")}
+                </Button>
+                {/* `secondary`, not `ghost`: this Cancel sits under a filled
+                    `--danger` button, and a borderless label is a weak way out
+                    of a sheet that moves a whole subtree to the Trash. The
+                    hand-rolled button it replaced carried a border too. */}
+                <Button
+                  variant="secondary"
+                  data-testid="notes.folder-delete-cancel"
+                  onClick={close}
+                >
+                  {t("common.prompt.cancel")}
+                </Button>
+              </div>
+            </>
+          )}
+        </Sheet>
+      )}
       {purgeId != null && (
         <Sheet onClose={() => setPurgeId(null)}>
           {(close) => (
             <>
-          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>{t("notes.trash.purgeConfirmTitle")}</div>
-          <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.5, color: "var(--fg-3)", textAlign: "center" }}>
-            {t("editor.purge.body")}
-          </div>
-          <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-            <button
-              onClick={() => void confirmPurge()}
-              style={{
-                width: "100%",
-                height: 50,
-                border: "none",
-                borderRadius: 8,
-                background: "var(--danger)",
-                color: "#fff",
-                fontFamily: "var(--font-sans)",
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
+          <div style={SHEET_TITLE}>{t("notes.trash.purgeConfirmTitle")}</div>
+          <div style={SHEET_BODY}>{t("editor.purge.body")}</div>
+          <div style={SHEET_ACTIONS}>
+            <Button variant="danger" onClick={() => void confirmPurge()}>
               {t("notes.trash.purgeConfirmCta")}
-            </button>
-            <button
-              onClick={close}
-              style={{
-                width: "100%",
-                height: 50,
-                border: "1px solid var(--line-2)",
-                borderRadius: 8,
-                background: "transparent",
-                color: "var(--fg-1)",
-                fontFamily: "var(--font-sans)",
-                fontSize: 16,
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
+            </Button>
+            {/* `secondary` for the same reason as the folder-delete sheet: this
+                one is the permanent purge, so the way out reads as a button. */}
+            <Button variant="secondary" onClick={close}>
               {t("common.prompt.cancel")}
-            </button>
+            </Button>
           </div>
             </>
           )}
@@ -3578,10 +3674,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         <Sheet onClose={() => setMoveTarget(null)}>
           {(close) => (
             <>
-              <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>{t("editor.move.title")}</div>
-              <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)", textAlign: "center" }}>
-                {t("editor.move.body")}
-              </div>
+              <div style={SHEET_TITLE}>{t("editor.move.title")}</div>
+              <div style={SHEET_BODY}>{t("editor.move.body")}</div>
               <input
                 value={moveInput}
                 onChange={(e) => setMoveInput(e.target.value)}
@@ -3592,19 +3686,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
                 spellCheck={false}
                 style={{ marginTop: 14, width: "100%", height: 48, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--bg-1)", padding: "0 14px", fontFamily: "var(--font-mono)", fontSize: 16, color: "var(--fg-1)", outline: "none", boxSizing: "border-box" }}
               />
-              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <button
-                  onClick={() => void confirmMove()}
-                  style={{ width: "100%", height: 50, border: "none", borderRadius: 8, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
-                >
+              {/* 16 rather than the shared 18: the input above already carries
+                  its own top margin, so the usual gap reads as a wider one. */}
+              <div style={{ ...SHEET_ACTIONS, marginTop: 16 }}>
+                <Button variant="primary" onClick={() => void confirmMove()}>
                   {t("editor.move.confirm")}
-                </button>
-                <button
-                  onClick={close}
-                  style={{ width: "100%", height: 50, border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--fg-1)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 500, cursor: "pointer" }}
-                >
+                </Button>
+                <Button variant="ghost" onClick={close}>
                   {t("common.prompt.cancel")}
-                </button>
+                </Button>
               </div>
             </>
           )}

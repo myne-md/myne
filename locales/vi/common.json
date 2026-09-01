@@ -1240,7 +1240,8 @@
       "titlePlaceholder": "Không có tiêu đề"
     },
     "mermaid": {
-      "rendering": "Đang dựng sơ đồ…"
+      "rendering": "Đang dựng sơ đồ…",
+      "renderFailed": "Không thể hiển thị sơ đồ này: {{reason}}"
     },
     "slash": {
       "aiContinue": "Viết tiếp (AI)",

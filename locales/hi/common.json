@@ -1231,7 +1231,8 @@
       "titlePlaceholder": "बिना शीर्षक"
     },
     "mermaid": {
-      "rendering": "डायग्राम बन रहा है…"
+      "rendering": "डायग्राम बन रहा है…",
+      "renderFailed": "यह आरेख प्रस्तुत नहीं किया जा सका: {{reason}}"
     },
     "slash": {
       "aiContinue": "लिखना जारी रखें (AI)",

@@ -1240,7 +1240,8 @@
       "titlePlaceholder": "Başlıksız"
     },
     "mermaid": {
-      "rendering": "Şema oluşturuluyor…"
+      "rendering": "Şema oluşturuluyor…",
+      "renderFailed": "Bu şema oluşturulamadı: {{reason}}"
     },
     "slash": {
       "aiContinue": "Yazmaya devam et (Yapay Zeka)",

@@ -1427,7 +1427,8 @@
       "titlePlaceholder": "بدون عنوان"
     },
     "mermaid": {
-      "rendering": "جارٍ رسم المخطط…"
+      "rendering": "جارٍ رسم المخطط…",
+      "renderFailed": "تعذّر عرض هذا المخطط: {{reason}}"
     },
     "slash": {
       "aiContinue": "متابعة الكتابة (AI)",

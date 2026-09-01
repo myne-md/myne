@@ -1240,7 +1240,8 @@
       "titlePlaceholder": "Névtelen"
     },
     "mermaid": {
-      "rendering": "Diagram renderelése…"
+      "rendering": "Diagram renderelése…",
+      "renderFailed": "Ezt a diagramot nem sikerült megjeleníteni: {{reason}}"
     },
     "slash": {
       "aiContinue": "Írás folytatása (AI)",

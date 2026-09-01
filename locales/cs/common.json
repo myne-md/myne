@@ -1338,7 +1338,8 @@
       "titlePlaceholder": "Bez názvu"
     },
     "mermaid": {
-      "rendering": "Vykresluje se diagram…"
+      "rendering": "Vykresluje se diagram…",
+      "renderFailed": "Tento diagram se nepodařilo vykreslit: {{reason}}"
     },
     "slash": {
       "aiContinue": "Pokračovat v psaní (AI)",
