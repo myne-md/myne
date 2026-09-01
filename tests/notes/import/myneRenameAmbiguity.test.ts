@@ -42,6 +42,31 @@ describe("decideRenames", () => {
     expect(got.ambiguousLinks).toBe(2);
   });
 
+  it("counts a shared folded title's inbound links ONCE, however many notes collide", () => {
+    // The inflation this pins. `inboundLinks` is keyed by FOLDED TITLE, so two
+    // colliding notes that fold to the same string name the same inbound set;
+    // adding its size once per note counted every link twice, and three
+    // colliding notes counted them three times.
+    //
+    // It matters because `linksLeftUnresolved` is rendered as a summary row and
+    // written into the durable import report note, which
+    // `docs/decisions/storage/0544` calls the residual that must not be silent.
+    // The direction is fail-safe (over-reporting), which is exactly why nothing
+    // else would ever have caught it: the number stays plausible.
+    //
+    // Two notes in DIFFERENT folders, both colliding with the target, so both
+    // reach the ambiguous arm. The sibling case above has one collide and one
+    // not, which is why it could not see this.
+    const notes = [
+      { title: "Beta", folder: "A" },
+      { title: "beta", folder: "B" },
+    ];
+    const existing = new Set([noteIdentityKey("A", "Beta"), noteIdentityKey("B", "beta")]);
+    const got = decideRenames(notes, existing, links({ beta: ["n1", "n2", "n3"] }), "Src");
+    expect(got.renames.size).toBe(0);
+    expect(got.ambiguousLinks).toBe(3);
+  });
+
   it("treats a case-only difference as the same title, since the rewrite folds", () => {
     const notes = [
       { title: "Beta", folder: "A" },

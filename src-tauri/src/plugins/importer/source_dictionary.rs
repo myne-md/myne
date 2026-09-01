@@ -51,10 +51,30 @@ pub enum ImportSourceDictionaryError {
 }
 
 /// The source vault's added words, and nothing else.
-#[derive(Debug, Serialize)]
+///
+/// **No `Serialize` and no derived `Debug`**, both removed rather than never
+/// added: this is a source vault's decrypted private vocabulary, read out of
+/// the `MYD1` blob, and `src-tauri/CLAUDE.md`'s secret-handling DENY list
+/// covers note-derived plaintext. A derived `Debug` puts the words one
+/// `tracing::debug!("{words:?}")` away from a log line with nothing in the tree
+/// to catch it, and the `Serialize` was dead surface the moment
+/// `import_source_dictionary` was deliberately left unregistered in this same
+/// change: only `DictionaryCarry`, two counts, crosses IPC.
+///
+/// The manual `Debug` prints the COUNT, which is the thing a debug line about
+/// this type ever legitimately wants, and makes the words unreachable through
+/// the formatter rather than merely unprinted today.
 pub struct SourceDictionaryWords {
     /// The added-words set, NFC-normalized and sorted as the codec stores it.
     pub personal_words: Vec<String>,
+}
+
+impl core::fmt::Debug for SourceDictionaryWords {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SourceDictionaryWords")
+            .field("personal_words", &format_args!("<{} words>", self.personal_words.len()))
+            .finish()
+    }
 }
 
 /// Read the source vault's added dictionary words through its open import slot.
