@@ -82,7 +82,7 @@ describe("AttachmentImageWidget", () => {
   // where the overflow menu and the unreadable-segment marker live, so naming
   // the frame removed both from the accessibility tree on every embed.
   it("renders an inline <img src=attachment://id> + loading chip, naming the image not the frame", () => {
-    const dom = new AttachmentImageWidget(ID, "photo.png", emptyEmbedLayout(), []).toDOM(fakeView);
+    const dom = new AttachmentImageWidget(ID, "photo.png", emptyEmbedLayout(), [], false).toDOM(fakeView);
     expect(dom.className).toBe("cm-attachment-frame");
     expect(dom.getAttribute("role")).toBeNull();
     expect(dom.getAttribute("aria-label")).toBeNull();
@@ -96,7 +96,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("reveals the <img> and drops the loading chip on load", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []).toDOM(fakeView);
+    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), [], false).toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new Event("load"));
     expect(img.style.display).toBe("");
@@ -104,7 +104,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("drops the loading chip but keeps the <img> on error (native broken-image affordance)", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []).toDOM(fakeView);
+    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), [], false).toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new Event("error"));
     expect(dom.querySelector(".cm-attachment-progress")).toBeNull();
@@ -112,7 +112,7 @@ describe("AttachmentImageWidget", () => {
   });
 
   it("opens the lightbox with the decrypted source on image click", () => {
-    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []).toDOM(fakeView);
+    const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), [], false).toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(showAttachmentLightbox).toHaveBeenCalledWith({
@@ -122,11 +122,16 @@ describe("AttachmentImageWidget", () => {
     });
   });
 
-  it("eq() is identity over id + filename; ignoreEvent stays false (lets clicks through)", () => {
-    const w = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []);
-    expect(w.eq(new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), []))).toBe(true);
-    expect(w.eq(new AttachmentImageWidget(ID, "other.png", emptyEmbedLayout(), []))).toBe(false);
-    expect(w.eq(new AttachmentImageWidget("b".repeat(64), "p.png", emptyEmbedLayout(), []))).toBe(false);
+  it("eq() is identity over id + filename + block form; ignoreEvent stays false (lets clicks through)", () => {
+    const w = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), [], false);
+    expect(w.eq(new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), [], false))).toBe(true);
+    expect(w.eq(new AttachmentImageWidget(ID, "other.png", emptyEmbedLayout(), [], false))).toBe(false);
+    expect(w.eq(new AttachmentImageWidget("b".repeat(64), "p.png", emptyEmbedLayout(), [], false))).toBe(false);
+    // The block form is part of the identity because a source edit can move an
+    // embed between the two forms, and only the block one carries resize
+    // handles. Were it absent from eq(), CM would keep the old DOM and the
+    // handles would stay on an embed that is no longer a block (myne#604).
+    expect(w.eq(new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), [], true))).toBe(false);
     expect(w.ignoreEvent()).toBe(false);
   });
 });
@@ -601,7 +606,7 @@ describe("makeResolvedWidget (content-type router)", () => {
   // them required. They had defaults, and a default is what let four widgets
   // take the dropped-segment list and discard it while the tree stayed green.
   const resolved = (contentType: string) =>
-    makeResolvedWidget(row(contentType), emptyEmbedLayout(), []);
+    makeResolvedWidget(row(contentType), emptyEmbedLayout(), [], false);
 
   it("routes application/pdf → PDF widget", () => {
     expect(resolved("application/pdf")).toBeInstanceOf(AttachmentPdfWidget);

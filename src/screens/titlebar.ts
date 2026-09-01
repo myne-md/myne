@@ -37,6 +37,29 @@ export const TRAFFIC_LIGHT_GAP = 70;
 export const HAS_NATIVE_TITLE_BAR = true;
 
 /**
+ * Where a control in the title-bar row sits, and how tall it is.
+ *
+ * That row holds two families of control laid out by different means. The
+ * sidebar toggles, the back/forward nav and the note-actions "…" are floated
+ * into the editor's corners by `screens/Editor.tsx` (absolute, measured from
+ * the top). The tab strip's own `+` and overflow buttons are flex children of
+ * the 38px strip (`notes/components/TabStrip.tsx`). They end up side by side
+ * and have to read as one row.
+ *
+ * They did not. The strip's buttons were 28px tall and centred in the strip's
+ * CONTENT box, which begins below its top padding, so they landed two pixels
+ * lower than the floated ones: a visibly larger gap above the overflow caret
+ * than above the "…" immediately to its right (myne-md/myne#612).
+ *
+ * They live HERE rather than with either family, because a constant owned by
+ * one of two consumers is a constant the other one can have moved out from
+ * under it. Platform-invariant: this is alignment arithmetic, not a fact about
+ * the host, so the web build re-exports both unchanged.
+ */
+export const TITLE_BAR_CONTROL_TOP = 6;
+export const TITLE_BAR_CONTROL_HEIGHT = 26;
+
+/**
  * The window-drag attribute, as spreadable props.
  *
  * `data-tauri-drag-region` is intercepted by the Tauri host on every platform

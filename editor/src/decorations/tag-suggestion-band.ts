@@ -40,7 +40,7 @@ import {
 } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
-import { frontmatterBoundary } from "./frontmatter";
+import { frontmatterRenderEnd } from "./frontmatter";
 import { readingModeFacet } from "./cursor-aware";
 
 /**
@@ -88,19 +88,21 @@ export type TagSuggestionEventDetail = { tag: string };
  * a note that has none. Exported so a test can assert the anchor without
  * reaching into the decoration set.
  *
- * myne#287: this read `range.blockEnd` directly, and that is NOT the boundary
- * the block-replace decoration uses. `frontmatterBoundary` shrinks the replaced
- * range by one character when the block reaches the end of the document, so the
- * final empty line stays a live caret target — and a new note is exactly that
- * shape (`---\ntitle: …\n---\n`). The two therefore differed by one in the one
- * case that matters, and the band anchored AFTER the note's only body line:
- * Properties panel → empty body line → Suggested tags, with the caret above the
- * band. The frontmatter module's own docstring already declares that function
- * the single source both consumers derive from; this restores that rather than
- * adding an invariant.
+ * myne#287: this read `range.blockEnd` directly, and that is NOT where the
+ * block-replace decoration stops. It stops one character short whenever the
+ * block ends in a newline, so that the line below it is rendered at all, and in
+ * a brand-new note (`---\ntitle: …\n---\n`) that line is the note's only body
+ * line. The two therefore differed by one in the case that matters, and the band
+ * anchored AFTER that line: Properties panel, empty body line, Suggested tags,
+ * with the caret above the band.
+ *
+ * So the anchor is the block's RENDER end (`frontmatterRenderEnd`), not the
+ * caret floor (`frontmatterBoundary`). Both come from the frontmatter module,
+ * which owns the distinction; myne-md/myne#595 is where the two numbers stopped
+ * being one.
  */
 export function tagSuggestionBandAnchor(state: EditorState): number {
-  return frontmatterBoundary(state.doc) ?? 0;
+  return frontmatterRenderEnd(state.doc) ?? 0;
 }
 
 class TagSuggestionBandWidget extends WidgetType {

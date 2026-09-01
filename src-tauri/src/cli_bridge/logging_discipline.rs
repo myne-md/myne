@@ -193,11 +193,11 @@ fn open_limiter() -> SharedRateLimiter {
 fn serve(request: &[u8], lister: &dyn NoteLister, limiter: &SharedRateLimiter) -> Option<Vec<u8>> {
     let mut reader = Cursor::new(request.to_vec());
     let mut writer = Vec::new();
-    dispatch::serve_connection(&mut reader, &mut writer, lister, limiter);
+    dispatch::serve_connection(&mut reader, &mut writer, lister, limiter, None);
     if writer.is_empty() {
         return None;
     }
-    super::framing::read_frame(&mut Cursor::new(writer)).ok()
+    super::framing::read_frame_within(&mut Cursor::new(writer), None).ok()
 }
 
 #[test]

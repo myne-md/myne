@@ -380,8 +380,15 @@ pub fn serve_connection<R: Read, W: Write>(
     writer: &mut W,
     lister: &dyn NoteLister,
     limiter: &SharedRateLimiter,
+    // A wall-clock ceiling on reading the REQUEST, and on nothing else. The
+    // socket's `SO_RCVTIMEO` is per-syscall and so bounds a silent peer but not
+    // a dribbling one; see `framing::Budget`. Deliberately not a bound on what
+    // follows: dispatch decrypts every candidate note, so a ceiling spanning it
+    // would be a compute cap that kills a healthy `myne list` on a large vault.
+    // `None` in tests that read from a cursor, where there is no peer to pace.
+    read_budget: Option<framing::Budget>,
 ) {
-    let body = match framing::read_frame(reader) {
+    let body = match framing::read_frame_within(reader, read_budget) {
         Ok(b) => b,
         Err(e) => {
             tracing::debug!(stage = "cli_bridge_conn", frame_error = e.label());
@@ -829,8 +836,9 @@ mod tests {
     ) -> serde_json::Value {
         let mut reader = Cursor::new(framed(request_json));
         let mut writer = Vec::new();
-        serve_connection(&mut reader, &mut writer, lister, limiter);
-        let reply_body = framing::read_frame(&mut Cursor::new(writer)).expect("reply frame");
+        serve_connection(&mut reader, &mut writer, lister, limiter, None);
+        let reply_body =
+            framing::read_frame_within(&mut Cursor::new(writer), None).expect("reply frame");
         serde_json::from_slice(&reply_body).expect("reply is valid JSON")
     }
 
@@ -884,7 +892,7 @@ mod tests {
         let mut reader = Cursor::new(wire);
         let mut writer = Vec::new();
         let lister = FixedLister::list_only(|| ListOutcome::Io);
-        serve_connection(&mut reader, &mut writer, &lister, &open_limiter());
+        serve_connection(&mut reader, &mut writer, &lister, &open_limiter(), None);
         assert!(writer.is_empty(), "a truncated request must get no reply");
     }
 
@@ -983,7 +991,7 @@ mod tests {
             wire.extend_from_slice(b"short");
             let mut reader = Cursor::new(wire);
             let mut writer = Vec::new();
-            serve_connection(&mut reader, &mut writer, &lister, &limiter);
+            serve_connection(&mut reader, &mut writer, &lister, &limiter, None);
             assert!(writer.is_empty());
         }
         let reply = roundtrip_limited(br#"{"cmd":"list"}"#, &lister, &limiter);

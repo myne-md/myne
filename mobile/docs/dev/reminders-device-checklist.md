@@ -42,8 +42,9 @@ which arrives late or not at all is never trusted again.
 - [ ] **Tap while locked.** Lock the vault, tap a fired reminder. The app opens
       at the unlock screen; nothing about the task is visible before unlock.
 - [ ] **Settings.** Privacy → the reminder switch is on, the horizon line names a
-      date roughly a week out, and the precise-delivery row is **absent**
-      entirely (iOS has no such permission).
+      date matching the **Schedule ahead** choice, and the precise-delivery row is
+      **absent** entirely (iOS has no such permission, and it is gated off on
+      every build besides, per myne-md/myne#508).
 
 ## Android
 
@@ -64,9 +65,17 @@ which arrives late or not at all is never trusted again.
       only after being interrupted.
 - [ ] **Permission list is exactly three.** System settings shows notifications,
       alarms & reminders, and the two audio permissions — and nothing else.
-- [ ] **Precise delivery.** Privacy → "Exact timing / Allow" with the fallback
-      sentence beneath → tap → the platform screen opens → grant → return. The
-      row now reads **On** and the sentence is gone.
+- [ ] **Precise delivery. SUSPENDED (myne-md/myne#508).** The row is gated behind
+      `remindersReachTheOs()`, a hardcoded `false`, so it renders on no build and
+      this step cannot be performed. It returns as written when that predicate
+      flips: Privacy → "Exact timing / Allow" with the fallback sentence beneath
+      → tap → the platform screen opens → grant → return, and the row then reads
+      **On** with the sentence gone.
+- [ ] **Schedule ahead.** Privacy → the **Schedule ahead** picker offers 1, 3, 5
+      and 7 days, is one tab stop with the arrow keys moving both the selection
+      AND the focus, and the horizon line below it names a date that follows the
+      choice. Set it to 1 and confirm a reminder two days out stops being
+      registered.
 - [ ] **Granting upgrades an EXISTING reminder.** This is the row most likely to
       fail. Register a reminder *before* granting, then grant, then return to the
       app and wait for it: it must arrive **on the minute**. (That is the

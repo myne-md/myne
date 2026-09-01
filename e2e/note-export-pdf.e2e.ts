@@ -42,6 +42,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import {
   dismissImporterOffer,
+  openExportSubmenuItem,
   pageSeatInvoke,
   unlockToEditor,
 } from "./support/flows";
@@ -51,10 +52,6 @@ import {
   EXPORT_PDF_PLAIN_SENTENCE,
 } from "../src/lib/load-bearing-copy";
 
-const PDF_ITEM_SELECTOR = testIdSelector("notes.context-menu-item", {
-  "data-item-id": "export-pdf",
-});
-
 /** Right-click the sidebar row of `noteId` and wait for the PDF export
  *  context-menu item. Returns the item handle. */
 async function openPdfExportMenuItem(s: Session, noteId: string) {
@@ -62,7 +59,7 @@ async function openPdfExportMenuItem(s: Session, noteId: string) {
     testIdSelector("notes.row", { "data-note-id": noteId }),
   );
   await row.rightClick();
-  return s.waitForElement(PDF_ITEM_SELECTOR);
+  return openExportSubmenuItem(s, "export-pdf");
 }
 
 describeE2E("np1 pdf-embedding note raises the exclusion notice (MYND-255)", () => {

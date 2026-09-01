@@ -34,18 +34,24 @@ import {
 } from "./support/flows";
 import { testIdSelector } from "./support/webdriver";
 
-/** Every `data-action` the menu is contracted to offer for an ordinary note. */
+/** Every `data-action` the menu is contracted to offer for an ordinary note at
+ *  its TOP level. The four export formats are not here: they moved behind the
+ *  single `export` row's submenu (myne-md/myne#611), which is asserted
+ *  separately below because reaching them costs a hover. */
 const EXPECTED_ACTIONS = [
   "rename",
   "move",
   "duplicate",
   "version-history",
-  "export-markdown",
-  "export-pdf",
-  "export-html",
-  "export-txt",
+  "export",
   "trash",
 ];
+
+/** The formats the `export` row's submenu is contracted to offer. `export-pdf`
+ *  is deliberately absent: it is gated behind the `pdfExport` capability
+ *  (`src/notes/noteExportMenu.ts`), and asserting it here would pin a host
+ *  answer this scenario does not control. */
+const EXPECTED_EXPORT_FORMATS = ["export-markdown", "export-html", "export-txt"];
 
 describeE2E("na1 note-actions menu — open, list, run, gate (#233)", () => {
   it("lists the note actions, runs Version history, and hides off a note", async () => {
@@ -74,6 +80,23 @@ describeE2E("na1 note-actions menu — open, list, run, gate (#233)", () => {
         );
         for (const a of EXPECTED_ACTIONS) {
           expect(actions, `note-actions menu offers "${a}"`).toContain(a);
+        }
+        // The export formats are one level down. Hovering the parent row is what
+        // opens them, and the row commits nothing, so this cannot double-fire.
+        await (
+          await s.waitForElement(
+            testIdSelector("editor.note-actions-menu-item", {
+              "data-action": "export",
+            }),
+          )
+        ).click();
+        const formats = await Promise.all(
+          (await s.byTestIdAll("editor.note-actions-menu-item")).map((i) =>
+            i.attribute("data-action"),
+          ),
+        );
+        for (const f of EXPECTED_EXPORT_FORMATS) {
+          expect(formats, `export submenu offers "${f}"`).toContain(f);
         }
 
         // Run one real action end-to-end: Version history reveals the snapshots
