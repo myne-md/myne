@@ -35,6 +35,7 @@ const IDLE: FindBarState = {
   match: null,
   expanded: false,
   replace: "",
+  dateFallback: null,
 };
 
 let bar: FindBarView | null = null;
@@ -73,6 +74,7 @@ describe("find-bar view: render states", () => {
       match: { current: 3, total: 12 },
       expanded: false,
       replace: "",
+      dateFallback: null,
     });
     expect(status(bar).textContent).toBe("3/12");
     expect(status(bar).className).toContain("cm-find-bar-status--count");
@@ -90,6 +92,7 @@ describe("find-bar view: render states", () => {
       match: null,
       expanded: false,
       replace: "",
+      dateFallback: null,
     });
     expect(status(bar).textContent).toBe("No matches");
     expect(status(bar).className).toContain("cm-find-bar-status--nomatch");
@@ -109,6 +112,7 @@ describe("find-bar view: render states", () => {
       match: null,
       expanded: false,
       replace: "",
+      dateFallback: null,
     });
     expect(status(bar).textContent).toBe("");
     expect(status(bar).className).toContain("cm-find-bar-status--hidden");

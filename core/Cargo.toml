@@ -158,6 +158,15 @@ automerge = "0.10"
 tauri = { version = "2", features = [], optional = true }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-pki-types = "1"
+# The remote-AI arm's trust anchor (myne-md/myne#456, moved here with the arm
+# itself). A static Mozilla root bundle compiled into the binary, chosen over a
+# platform verifier because the destinations are a compiled-in table of known
+# provider hosts rather than the open web. It is optional and reached only
+# through the `remote-ai` feature, so an isolated `--no-default-features`
+# desktop build links none of it. Target-gated with its neighbours because
+# `rustls` with the `ring` provider has no wasm32 backend and a browser has no
+# raw TCP socket to put TLS on regardless.
+webpki-roots = { version = "1", optional = true }
 # `rt-multi-thread` is the wall on wasm: tokio emits a `compile_error!` there
 # ("Only features sync,macros,io-util,rt,time are supported"). A browser has one
 # thread per worker and no thread pool to spawn onto, so the wasm arm below
@@ -260,6 +269,48 @@ tauri-ipc = ["dep:tauri"]
 # while production builds never compile them. The crate's own unit tests reach
 # the module via `#[cfg(any(test, feature = "test-support"))]`.
 test-support = []
+
+# The inference seam and the remote-provider arm (`src/inference/`, myne-md/myne#456).
+# DEFAULT OFF, and that is the whole point rather than a convention: the desktop
+# auditable build is `cargo build -p myne-desktop --no-default-features`, which
+# drops `local-inference` and, until this move, every line of remote-provider
+# code with it, because that code lived inside the desktop plugin. `myne-core`
+# compiles unconditionally, so an ungated move would have put the remote arm
+# back into the audit build and widened the `--no-default-features` baseline
+# that `src-tauri/scripts/ai-no-network-check.sh`'s AI-delta check diffs
+# against. Nothing would have reported that.
+#
+# Both client crates turn it on: desktop through its own `local-inference`
+# feature (so the audit build still drops it transitively), mobile directly.
+#
+# `webpki-roots` rides here rather than in the unconditional dependency block
+# because it exists solely for this arm. It is a `const` bundle of certificate
+# DATA, not a networked crate, which is why it is deliberately absent from the
+# egress guard's denylist: it opens nothing and speaks no protocol. `rustls` and
+# `rustls-pki-types` are NOT listed: the sync transport already depends on them
+# unconditionally, and this arm builds its own `ClientConfig` against the static
+# root bundle rather than sharing sync's pinned-certificate verifier. Two
+# verifiers, no shared trust anchor, and this move merges nothing.
+remote-ai = ["dep:webpki-roots"]
+
+# The E2E build variant, moved here with `inference/engine.rs` (myne-md/myne#456)
+# because that file is where it is read. NEVER the shipped bundle.
+#
+# It exists as a feature rather than a runtime knob for the reason
+# `voice-capture-stub` states about itself: a build that cannot ship needs no
+# escape hatch, and two knobs would be two things to keep in sync. With it off,
+# `stub_fault()` has no environment read at all, so setting `MYNE_E2E_AI_FAULT`
+# on a shipped binary does nothing because the code that would read it does not
+# exist.
+#
+# Declaring it here is not bookkeeping. Without it, cargo's check-cfg reduces
+# every `#[cfg(feature = "local-inference-stub")]` in the moved file to the
+# `not(...)` arm, which is SAFE (it is the production arm) and therefore silent:
+# the desktop `--features local-inference-stub` build would keep compiling while
+# quietly losing its fault injection, and the tauri-driver scenarios that drive
+# an unavailable or failing backend would fail as if the feature were broken.
+# The desktop crate's own `local-inference-stub` chains to this one.
+local-inference-stub = ["remote-ai"]
 
 # The two fixture emitters import `test_support` / `double_buffer_fixtures`, so
 # they cannot compile unless `test-support` is on. Declared rather than left

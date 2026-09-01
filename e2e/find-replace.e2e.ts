@@ -28,9 +28,12 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  closeSettings,
   createNote,
   dismissImporterOffer,
   editorText,
+  editorSourceText,
+  openSettings,
   replaceFieldText,
   runPaletteAction,
   typeIntoEditor,
@@ -221,6 +224,88 @@ describeE2E("fr2 replace rewrites the canonical buffer under folded regions (MYN
         );
         // The fold state is untouched by replace-all (placeholders still present).
         expect((await s.findElements(FOLD_PLACEHOLDER)).length).toBeGreaterThan(0);
+      },
+    );
+  });
+});
+
+describeE2E("fr3 a date typed as it is displayed is found, and Replace is off (myne-md/myne#609)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  //
+  // The only lane that can answer this. The unit tests drive the bar directly
+  // with a display value pushed into the store; here the format comes from the
+  // real Settings panel, the chip renders it in the real WebView, and the find
+  // engine runs over the real document. What the user sees and what the engine
+  // reads are two different strings, and this is the scenario that proves the
+  // gap is bridged rather than merely coded for.
+  it("falls back to the stored form, says so, and refuses to replace on it", async () => {
+    let password = "";
+    await scenario(
+      "fr3-find-date-fallback",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Find Date Note");
+
+        await typeIntoEditor(s, "- [ ] pay the rent [due:: 2026-08-01]", {
+          landedText: "pay the rent",
+        });
+        await waitForSaved(s);
+
+        await openSettings(s, "editor");
+        await (await s.byTestId("settings.date-format-dmy")).click();
+        await closeSettings(s);
+
+        await openFind(s);
+        // The day-first form is on screen and is NOWHERE in the document.
+        await (await s.byTestId("find.input")).sendKeys("01/08/2026");
+
+        // The notice is ATTACHED for the panel's lifetime and toggled with
+        // `hidden`, because a live region has to exist before the text it must
+        // announce arrives. So the assertion is on visibility, not on presence.
+        await s.waitUntil(
+          async () => {
+            const rows = await s.byTestIdAll("find.date-fallback");
+            if (rows.length !== 1) return null;
+            if ((await rows[0]!.property<boolean | null>("hidden")) !== false) return null;
+            return (await rows[0]!.textContent()).includes("2026-08-01") ? true : null;
+          },
+          { label: "the bar names the stored form it searched instead" },
+        );
+
+        // Replace is unavailable, and the reason is somewhere the user can
+        // actually reach. This read the button's `title` first, which a browser
+        // never shows on a disabled control, so the scenario asserted the fix by
+        // reading an attribute nobody perceives. The reason lives in the visible
+        // notice above, and the button points at it with `aria-describedby`.
+        await (await s.byTestId("find.toggle-replace")).click();
+        await s.waitUntil(
+          async () => {
+            const btn = await s.byTestId("find.replace-all");
+            const disabled = await btn.property<boolean | null>("disabled");
+            const describedBy = await btn.attribute("aria-describedby");
+            if (disabled !== true || describedBy === null) return null;
+            const rows = await s.byTestIdAll("find.date-fallback");
+            if (rows.length !== 1) return null;
+            const id = await rows[0]!.attribute("id");
+            const text = await rows[0]!.textContent();
+            return describedBy === id && text.length > 0 ? true : null;
+          },
+          { label: "Replace all is disabled and points at the visible reason" },
+        );
+
+        // And the bytes are exactly what they were.
+        // SOURCE text, not the rendered text. The chip is a replace widget and
+        // since myne-md/myne#609 its label is the reader's chosen format, so the
+        // ISO date is no longer anywhere in the render. Reading it there was how
+        // this assertion used to pass, and it is what makes the property being
+        // asserted (the bytes did not move) worth asserting at all.
+        await s.waitUntil(
+          async () => ((await editorSourceText(s)).includes("[due:: 2026-08-01]") ? true : null),
+          { label: "the stored civil date is untouched" },
+        );
       },
     );
   });

@@ -17,9 +17,15 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { history, undo } from "@codemirror/commands";
-import { openSearchPanel, searchPanelOpen } from "@codemirror/search";
+import { getSearchQuery, openSearchPanel, searchPanelOpen } from "@codemirror/search";
 import { findExtension } from "../../src/editor/find/find-extension";
 import { setFindCaseSensitive } from "../../src/editor/find/find-session";
+import {
+  DEFAULT_DISPLAY,
+  formatCivilDate,
+  setDateTimeDisplay,
+  __resetDateTimeDisplayForTest,
+} from "@myne/editor/host/lib/datetimeFormat";
 
 beforeAll(() => {
   if (typeof Element.prototype.scrollIntoView !== "function") {
@@ -81,6 +87,23 @@ afterEach(() => {
   m = null;
   setFindCaseSensitive(false);
 });
+
+/** Is the date-fallback notice SHOWING?
+ *
+ *  Presence is no longer the signal: the row is attached for the panel's
+ *  lifetime and toggled with `hidden`, because a `role="status"` region that
+ *  enters the DOM already carrying its text is not reliably announced
+ *  (myne-md/myne#609, found in review). These tests asserted `toBeNull()` and
+ *  would have gone on passing against a row that was present and silent. */
+function fallbackShown(m: Mounted): boolean {
+  const row = byTestId(m, "find.date-fallback") as HTMLElement | null;
+  return row !== null && !row.hidden;
+}
+
+/** What the notice says while it is showing, or `""` while it is not. */
+function fallbackText(m: Mounted): string {
+  return fallbackShown(m) ? (byTestId(m, "find.date-fallback")?.textContent ?? "") : "";
+}
 
 describe("find+replace extension: toggle reveals the replace row", () => {
   it("the toggle in the docked panel expands the replace input", () => {
@@ -210,5 +233,160 @@ describe("find+replace extension: Escape with the replace row open", () => {
     expect(byTestId(m, "find.replace-input")).not.toBeNull();
     input(m).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(searchPanelOpen(m.view.state)).toBe(false);
+  });
+});
+
+describe("find+replace extension: the date fallback (myne-md/myne#609)", () => {
+  const DOC = "- [ ] pay the rent [due:: 2026-08-01]\n";
+
+  afterEach(() => {
+    __resetDateTimeDisplayForTest();
+  });
+
+  function withDayFirst(): void {
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "dmy" });
+  }
+
+  it("finds the stored date when the reader types the displayed one", () => {
+    withDayFirst();
+    m = mount(DOC, 0);
+    openSearchPanel(m.view);
+    // The chip shows this; the document does not contain it anywhere.
+    typeQuery(m, "01/08/2026");
+    expect(fallbackText(m)).toContain("2026-08-01");
+    expect(m.host.querySelector(".cm-find-bar-status")?.textContent).toBe("1/1");
+  });
+
+  it("turns Replace OFF while the fallback produced the matches", () => {
+    // The reason this gate exists, stated as the test's own scenario: the
+    // matched bytes are `2026-08-01`, so a replacement typed as `02/08/2026`
+    // would be written over them literally, `parseTaskInstant` would refuse the
+    // result, and the task would leave every dated view. Replace All does it to
+    // every task in the note at once.
+    withDayFirst();
+    m = mount(DOC, 0);
+    openSearchPanel(m.view);
+    typeQuery(m, "01/08/2026");
+    click(byTestId(m, "find.toggle-replace"));
+    expect((byTestId(m, "find.replace-one") as HTMLButtonElement).disabled).toBe(true);
+    expect((byTestId(m, "find.replace-all") as HTMLButtonElement).disabled).toBe(true);
+    // And it says why, rather than looking broken.
+    // The REASON, asserted where a user can actually reach it. This read
+    // `.title` first, which a browser never shows on a disabled control, so the
+    // assertion passed on an attribute nobody perceives.
+    expect(fallbackText(m)).not.toBe("");
+    expect((byTestId(m, "find.replace-all") as HTMLButtonElement).getAttribute("aria-describedby")).toBe(
+      (byTestId(m, "find.date-fallback") as HTMLElement).id,
+    );
+  });
+
+  it("refuses Enter in the replace field, not only the buttons", () => {
+    // The defect this pins, which three reviewers found and one reproduced: the
+    // gate was `disabled` on the two BUTTONS and nowhere else, while the replace
+    // INPUT is never disabled and its Enter handler is documented as "the
+    // primary one-handed flow". So the control read as closed and the path most
+    // people use was open. Pressing Enter turned `[due:: 2026-08-01]` into
+    // `[due:: 02/08/2026]`, which `parseTaskInstant` refuses, killing the field
+    // and syncing the rewrite everywhere, while `find.replace-all` cheerfully
+    // reported `disabled === true`.
+    withDayFirst();
+    m = mount(DOC, 0);
+    openSearchPanel(m.view);
+    typeQuery(m, "01/08/2026");
+    setReplacement(m, "02/08/2026");
+    // The fallback has to be live at the moment of the keypress: setting the
+    // replacement re-dispatches the typed query through `applyQuery`, which
+    // clears the fallback, and the debounced scan re-arms it.
+    vi.runAllTimers();
+    expect(fallbackShown(m)).toBe(true);
+
+    replaceInput(m).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    replaceInput(m).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    expect(m.view.state.doc.toString()).toBe(DOC);
+  });
+
+  it("leaves Replace ON for an ordinary search that happens to be under the same format", () => {
+    withDayFirst();
+    m = mount(DOC, 0);
+    openSearchPanel(m.view);
+    typeQuery(m, "rent");
+    click(byTestId(m, "find.toggle-replace"));
+    expect((byTestId(m, "find.replace-one") as HTMLButtonElement).disabled).toBe(false);
+    expect(fallbackShown(m)).toBe(false);
+  });
+
+  it("matches the literal text FIRST, so a date written in prose still wins", () => {
+    // The cost of running the fallback first would be silently losing this.
+    withDayFirst();
+    m = mount("I paid on 01/08/2026 and again later\n", 0);
+    openSearchPanel(m.view);
+    typeQuery(m, "01/08/2026");
+    expect(fallbackShown(m)).toBe(false);
+    expect(m.host.querySelector(".cm-find-bar-status")?.textContent).toBe("1/1");
+  });
+
+  it("clears the fallback when the query changes to something ordinary", () => {
+    withDayFirst();
+    m = mount(DOC, 0);
+    openSearchPanel(m.view);
+    typeQuery(m, "01/08/2026");
+    expect(fallbackShown(m)).toBe(true);
+    typeQuery(m, "rent");
+    expect(fallbackShown(m)).toBe(false);
+  });
+
+  it("keeps BOTH passes literal, so replacement never goes through regexp substitution", () => {
+    // The load-bearing assertion of this whole design. An alternation would need
+    // `literal: false`, and the engine then routes REPLACE through
+    // regular-expression substitution, where a replacement containing `$1`,
+    // `$&` or `` $` `` expands instead of being inserted. That expansion is a
+    // hazard this repository already records, and it is the reason the fallback
+    // is a second literal search rather than one cleverer query.
+    withDayFirst();
+    m = mount(DOC, 0);
+    openSearchPanel(m.view);
+
+    typeQuery(m, "rent");
+    const plain = getSearchQuery(m.view.state);
+    expect(plain.literal).toBe(true);
+    expect(plain.regexp).toBe(false);
+
+    typeQuery(m, "01/08/2026");
+    const fallen = getSearchQuery(m.view.state);
+    expect(fallen.search).toBe("2026-08-01");
+    expect(fallen.literal).toBe(true);
+    expect(fallen.regexp).toBe(false);
+  });
+
+  it("does not fall back on a string the printer never emits", () => {
+    // Titled "a format with no reverse reading" first, which stopped being true
+    // in the same review round: `dmmmy` IS read back, through the printer. The
+    // case still proves something worth pinning, just not what its name said,
+    // and it would have gone on passing if `dmmmy` support were deleted whole.
+    // What it pins is that a near miss is a miss: English `dmmmy` prints
+    // `Aug 1, 2026`, so `1 Aug 2026` is a date nobody's chip is showing and the
+    // second pass declines it rather than guessing.
+    setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "dmmmy" });
+    m = mount(DOC, 0);
+    openSearchPanel(m.view);
+    typeQuery(m, "1 Aug 2026");
+    expect(fallbackShown(m)).toBe(false);
+    expect(m.host.querySelector(".cm-find-bar-status")?.textContent).toBe("No matches");
+  });
+
+  it("DOES fall back on an Intl-printed date, which is the default preset", () => {
+    // The positive half the case above cannot carry, and the one that matters
+    // most: `system` is what a reader who never opened the setting is on, and
+    // the first version of this feature excluded it silently. The query is built
+    // from the printer rather than typed by hand, so it cannot drift from what
+    // the chip actually shows.
+    const display = { ...DEFAULT_DISPLAY, dateFormat: "system" as const };
+    setDateTimeDisplay(display);
+    m = mount(DOC, 0);
+    openSearchPanel(m.view);
+    typeQuery(m, formatCivilDate("2026-08-01", display));
+    expect(fallbackShown(m)).toBe(true);
+    expect(fallbackText(m)).toContain("2026-08-01");
   });
 });

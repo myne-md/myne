@@ -9,7 +9,6 @@
     "core:window:default",
     "core:window:allow-destroy",
     "core:window:allow-start-dragging",
-    "core:window:allow-show",
     "opener:default",
     {
       "identifier": "opener:allow-open-path",
@@ -42,6 +41,7 @@
     "workspace:default",
     "graph-layout:default",
     "vault-label:default",
+    "screen-capture:default",
     "spell:default",
     "clipper-pairing:default",
     "cli-bridge:default",

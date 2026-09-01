@@ -1,3 +1,4 @@
+import { providerLabelOf } from "@myne/copy";
 import { invoke } from "../platform/core";
 import type { AnsweredBy } from "../components/AnsweredByIndicator";
 
@@ -225,27 +226,12 @@ export function surfaceStateOf(
     : { kind: "unavailable", cause: status.cause };
 }
 
-/**
- * The proper noun a user reads for a stored provider wire name.
- *
- * The host stores `openrouter`; a person reads `OpenRouter`. Kept beside
- * `answeredByOf` because that function's whole contract is that the caller
- * supplies this — and because the mapping used to live privately in
- * `AiPanel.tsx`, which made the chat transcript unable to name the provider
- * without copying it. One table, two consumers.
- *
- * An unknown wire name returns itself rather than an empty string: a newer
- * build may have written one, and rendering the raw value tells the user more
- * than rendering nothing.
- */
-export function providerLabelOf(wire: string | null | undefined): string | undefined {
-  if (!wire) return undefined;
-  switch (wire) {
-    case "ollama-cloud":
-      return "Ollama Cloud";
-    case "openrouter":
-      return "OpenRouter";
-    default:
-      return wire;
-  }
-}
+// `providerLabelOf` moved to `@myne/copy` (myne-md/myne#456), and it is still
+// re-exported from here because `answeredByOf`'s whole contract is that the
+// caller supplies this: so this file stays the one place a reader looks for
+// "how do I name the active arm".
+//
+// It moved because it is a table of PROPER NOUNS, which is precisely the class
+// that package exists for: a brand name reads identically in every locale, and
+// a third client now needs it. One table, three consumers.
+export { providerLabelOf } from "@myne/copy";

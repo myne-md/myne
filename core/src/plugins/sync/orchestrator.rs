@@ -1332,6 +1332,33 @@ struct PrefsPhase {
     shared_hash: String,
 }
 
+/// The two fields an enrollment seed does NOT adopt.
+///
+/// Extracted so it has a name, a place for its argument and a test. Inline it
+/// was two assignments in the middle of a 300-line phase, and the review that
+/// found the spec still describing the old behaviour also found that nothing
+/// asserted the new one: the carve-out could have been deleted and every test in
+/// this crate would have stayed green.
+///
+/// **Why these two and not "device-local fields".** `ai_provider_consent` is
+/// device-local, and a device that inherited a consent it never gave would begin
+/// sending this vault's note text to a named remote provider with nobody at that
+/// device having seen the consent screen. `docs/spec/sync-protocol.md` §10.2.1
+/// and `docs/threat-model.md` TB13 both name this seed path as one of the two
+/// that had to close for the per-device claim to hold. `ai_enabled` goes with it
+/// because it is the other half of the same gate: inherited "AI is on", plus an
+/// inherited consent, plus the key (which still syncs), is a device fully
+/// configured to send before anyone has touched it.
+///
+/// **Withheld, not derived from the classification table.** A loop over the
+/// device-local fields would silently withhold the next field somebody
+/// classifies device-local for an unrelated reason, and withholding a field from
+/// a new device's seed is a decision rather than a consequence.
+fn withhold_from_enrollment_seed(seeded: &mut protocol::PrefsView) {
+    seeded.ai_provider_consent = None;
+    seeded.ai_enabled = false;
+}
+
 /// Pull-side `vault.prefs` reconciliation (MYND-478; `sync-protocol.md`
 /// §10.2.1). The `sync_catalog_phase` twin with one twist: the push gate is
 /// the **shared-subset hash**, not the blob nonce — a purely device-local
@@ -1375,7 +1402,14 @@ async fn sync_prefs_phase(
     // Enrollment wholesale seed (§10.2.1): a VIRGIN vault — no `vault.prefs`
     // on disk, the just-joined-device state (`sync_join_account` materializes
     // meta + notes but never a prefs blob) — adopts the server's blob
-    // VERBATIM, device-local fields included as starting defaults. This runs
+    // wholesale, device-local fields included as starting defaults, EXCEPT
+    // `ai_provider_consent` and `ai_enabled`, which are cleared and the blob
+    // re-encoded before the write (myne-md/myne#456). It said VERBATIM directly
+    // above the code that stopped doing that, which is the shape a comment is
+    // most expensive in. The carve-out is a security one: a device that
+    // inherited a consent it never gave would begin sending this vault's note
+    // text to a named remote provider with nobody at that device having seen the
+    // consent screen, and `threat-model.md` TB13 cites this path by name. This runs
     // on the first authed cycle (a pending device has no token at join time)
     // and exactly once: after the seed the file exists, so every later cycle
     // merges. A server blob that fails decode falls through to the general
@@ -1393,10 +1427,57 @@ async fn sync_prefs_phase(
             read_prefs_nonce,
             "prefs-seed",
         )? {
-            if let Ok(seeded) =
+            if let Ok(mut seeded) =
                 protocol::decode_prefs_blob(&prefs_key, account_number_hash, &remote_bytes)
             {
-                io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
+                // **The two AI fields are withheld from the seed, and they are
+                // the only device-local fields that are** (myne-md/myne#456).
+                //
+                // Adopting the rest verbatim is the recorded design and it is a
+                // good one: a new device inheriting your theme, your editor
+                // settings and your auto-lock timeout is a convenience nobody
+                // has to ask for. A CONSENT is not a convenience. Inheriting it
+                // means a device begins sending note plaintext to a third party
+                // with nobody at that device having seen the screen that says
+                // so, which is exactly what `docs/threat-model.md` TB13 names
+                // as the crossing condition.
+                //
+                // Reclassifying the field to `DeviceLocal` (entry 0559) was
+                // necessary and NOT sufficient: the classification is consumed
+                // by `merge_prefs`, and a just-joined device never merges. It
+                // has no local blob, so it takes this branch instead and the
+                // whole closure was inert on the one path it was built for. The
+                // `developer_mode` removal in entry 0558 rests on that closure,
+                // which makes this the compensating half of a pair.
+                //
+                // `ai_enabled` goes with it: it is the other half of the gate
+                // 0558's own module doc calls a pair, and a device that
+                // inherited "AI is on" plus an inherited consent plus the synced
+                // key is fully configured to send before anyone has touched it.
+                //
+                // Withheld, not defaulted from the classification table: this is
+                // a narrow, argued carve-out rather than a rule about
+                // device-local fields in general, and writing it as a loop over
+                // `CLASSIFICATION` would silently withhold the next field
+                // somebody classifies device-local for an unrelated reason.
+                withhold_from_enrollment_seed(&mut seeded);
+                // **The VERSIONED encoder, like every other write in this
+                // function.** The v0.1-only twin compiles, passes every test run
+                // against an unmigrated vault, and stamps the v0.1 magic
+                // unconditionally, so a v0.2 vault would quietly grow a v0.1
+                // prefs blob here. Every decoder is magic-detecting, so nothing
+                // downstream would ever report the hybrid, and enrollment is
+                // exactly the path a migrated vault reaches on a new device.
+                // Caught by scripts/check-version-routing.mjs, which exists for
+                // this failure and nothing else.
+                let seed_bytes = protocol::encode_prefs_blob_versioned(
+                    version,
+                    &prefs_key,
+                    account_number_hash,
+                    &seeded,
+                )
+                .map_err(|_| SyncCycleError::Io)?;
+                io.write(&path, &seed_bytes, crate::vault_io::WriteOpts::default())
                     .await
                     .map_err(|_| SyncCycleError::Io)?;
                 record_blob_baseline(state, &id_hex, &rec);
@@ -3736,6 +3817,42 @@ async fn sync_cycle_attempt(
 
 #[cfg(test)]
 mod tests {
+
+    /// The enrollment seed withholds the consent and the AI switch, and nothing
+    /// else.
+    ///
+    /// Both directions, because the first half alone passes against a function
+    /// that clears the whole view: what a seed is FOR is adopting the server's
+    /// preferences, so a carve-out that took more than its two fields would be a
+    /// different defect wearing this one's fix.
+    #[test]
+    fn the_enrollment_seed_withholds_exactly_two_fields() {
+        let mut seeded = protocol::PrefsView {
+            ai_provider_consent: Some("openrouter".into()),
+            ai_enabled: true,
+            ai_provider: Some("openrouter".into()),
+            daily_folder: Some("Daily/".into()),
+            ..Default::default()
+        };
+
+        withhold_from_enrollment_seed(&mut seeded);
+
+        assert_eq!(
+            seeded.ai_provider_consent, None,
+            "an inherited consent is a device sending before anyone at it saw the screen"
+        );
+        assert!(!seeded.ai_enabled, "the other half of the same gate");
+        assert_eq!(
+            seeded.ai_provider,
+            Some("openrouter".into()),
+            "the provider is adopted: naming one is not permission to send to it"
+        );
+        assert_eq!(
+            seeded.daily_folder,
+            Some("Daily/".into()),
+            "every other preference is adopted, which is what a seed is for"
+        );
+    }
     use super::*;
     use crate::plugins::notes::note_id::NoteId;
     use crate::plugins::sync::enroll::{self, EnrollPath};

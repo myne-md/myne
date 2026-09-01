@@ -48,7 +48,8 @@
       "unsupportedDetail": "它通过了 {{attempts}} 项检测中的 {{passes}} 项；需要 {{required}} 项。",
       "checking": "正在检测模型…",
       "checkingAt": "正在检测模型…（{{attempt}}/{{of}}）",
-      "unsupportedProvisional": "该通过标准尚未在各模型上测定过，因此可能偏严或偏松。"
+      "unsupportedProvisional": "该通过标准尚未在各模型上测定过，因此可能偏严或偏松。",
+      "scopeNone": "没有打开的笔记，所以暂时没有可处理的内容"
     },
     "progress": {
       "working": "处理中",
@@ -64,7 +65,8 @@
       "grantsUser_one": "你设定的 {{count}} 个范围",
       "grantsUser_other": "你设定的 {{count}} 个范围",
       "grantsModel_one": "它请求的 {{count}} 个",
-      "grantsModel_other": "它请求的 {{count}} 个"
+      "grantsModel_other": "它请求的 {{count}} 个",
+      "cancelledBackground": "因为 Myne 转入后台，此次运行已取消。没有写入任何内容。准备好后再问一次。"
     },
     "scope": {
       "title": "要包含 {{folder}} 吗？",
@@ -118,7 +120,10 @@
         "excludedFolder": "未创建：该文件夹已排除在 AI 之外。",
         "createFailed": "未创建：写入新笔记失败。其他更改仍已应用。",
         "excludedNow": "无法应用：该笔记所在的文件夹现已排除在 AI 之外。",
-        "notProposed": "无法应用：该更改不属于本次运行的提议。"
+        "notProposed": "无法应用：该更改不属于本次运行的提议。",
+        "noteMoved": "无法应用：该更改会把笔记移动到另一个文件夹。",
+        "appendEmpty": "无法应用：没有可添加的内容。",
+        "appendWouldWriteFrontmatter": "无法应用：该文本会变成笔记的属性块。"
       },
       "applyFailed": "无法应用这些更改。",
       "undo": "撤销本次运行",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "已读取 {{count}} 篇笔记",
       "runSummaryOffDevice_one": "你的笔记中约 {{count}} 个字符已发送给服务商",
       "runSummaryOffDevice_other": "你的笔记中约 {{count}} 个字符已发送给服务商",
-      "runSummaryOnDevice": "没有任何内容离开本设备"
+      "runSummaryOnDevice": "没有任何内容离开本设备",
+      "appendFlag": "追加到末尾"
     },
     "undo": {
       "offer_one": "上次运行更改了 {{count}} 篇笔记。",
@@ -148,7 +154,9 @@
       "failed_one": "有 {{count}} 篇笔记无法恢复。",
       "failed_other": "有 {{count}} 篇笔记无法恢复。",
       "createdNotReverted_one": "本次运行创建的 {{count}} 篇笔记已保留原样。",
-      "createdNotReverted_other": "本次运行创建的 {{count}} 篇笔记已保留原样。"
+      "createdNotReverted_other": "本次运行创建的 {{count}} 篇笔记已保留原样。",
+      "sessionOnly": "这个一键撤销在你锁定保险库或关闭应用之前有效。之后请从某条笔记的版本历史中逐条恢复。",
+      "sessionOnlyLink": "打开版本历史"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "全部展开"
+      },
+      "openThisWeekNote": {
+        "label": "打开本周笔记"
+      },
+      "openThisMonthNote": {
+        "label": "打开本月笔记"
       }
     },
     "hotkeys": {
@@ -880,13 +894,15 @@
           "captureFailed": "无法开始录音。请在“系统设置”中检查麦克风访问权限。",
           "generic": "无法开始录音。",
           "locked": "请先解锁保险库再录制语音笔记。",
-          "noInputDevice": "未找到麦克风。请连接一个后重试。"
+          "noInputDevice": "未找到麦克风。请连接一个后重试。",
+          "unsupportedSampleRate": "你的麦克风以 Myne 无法转写的采样率录音。请改用其他输入设备，或在系统声音设置中更改它的采样率。"
         },
         "stopError": {
           "captureFailed": "录音失败。请检查你的麦克风。",
           "emptyRecording": "未录制到任何内容。",
           "generic": "无法保存录音。",
-          "silentRecording": "录音无声，已被丢弃。请检查你的麦克风。"
+          "silentRecording": "录音无声，已被丢弃。请检查你的麦克风。",
+          "unsupportedSampleRate": "你的麦克风以 Myne 无法转写的采样率录音。没有保存任何内容。请改用其他输入设备，或在系统声音设置中更改它的采样率。"
         }
       },
       "widget": {
@@ -932,6 +948,7 @@
             "featureOff": "语音转文字已关闭。请在设置 → 转录 中开启。",
             "modelLoadFailed": "无法加载语音转文字模型。如果你在设置 → 开发者 → AI 中设置了自定义模型，请检查它的文件；否则重新安装 Myne 即可恢复内置模型。",
             "noModel": "缺少语音转文字模型。重新安装 Myne 即可恢复它。",
+            "tooLong": "这段录音太长，无法转写。音频仍作为附件保留，你依然可以播放。",
             "vaultLocked": "请解锁保险库后再进行转录。"
           },
           "disabledReason": "请在设置 → Developer → AI 中启用 AI 后再进行转录。",
@@ -1164,10 +1181,6 @@
       "turnedIntoTemplate": "已转为模板",
       "convertedToNote": "已转为笔记",
       "versionHistory": "版本历史",
-      "exportMarkdown": "导出为 Markdown…",
-      "exportPdf": "导出为 PDF…",
-      "exportHtml": "导出为 HTML…",
-      "exportTxt": "导出为纯文本…",
       "trash": "移至回收站"
     },
     "codeBlock": {
@@ -1199,7 +1212,9 @@
       "replaceAllCount": "全部替换（{{total}}）",
       "replaceOne": "替换",
       "replacePlaceholder": "替换为",
-      "toggleReplace": "切换替换"
+      "toggleReplace": "切换替换",
+      "dateFallback": "正在搜索 {{stored}}，这是该日期的存储形式。",
+      "replaceOffOnDateFallback": "当日期是以其存储形式匹配到的时候，替换会关闭，以免一次替换让该日期无法读取。"
     },
     "cover": {
       "add": "添加封面",
@@ -1225,7 +1240,8 @@
       "titlePlaceholder": "无标题"
     },
     "mermaid": {
-      "rendering": "正在渲染图表…"
+      "rendering": "正在渲染图表…",
+      "renderFailed": "无法渲染此图表：{{reason}}"
     },
     "slash": {
       "aiContinue": "继续写作（AI）",
@@ -1534,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "搜索笔记或运行命令…",
       "noMatches": "没有匹配的命令或笔记。"
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "无法打开今天的笔记。",
+        "weekly": "无法打开本周的笔记。",
+        "monthly": "无法打开本月的笔记。"
+      }
     }
   },
   "export": {
@@ -2034,10 +2057,6 @@
       "duplicate": "创建副本",
       "editFilterTitle": "编辑筛选器",
       "emptyState": "暂无笔记。",
-      "exportHtml": "导出为 HTML…",
-      "exportMarkdown": "导出为 Markdown…",
-      "exportPdf": "导出为 PDF…",
-      "exportTxt": "导出为纯文本…",
       "favoritesHeading": "收藏",
       "icon": "图标…",
       "mergeAnyway": "仍然合并",
@@ -2343,6 +2362,13 @@
     },
     "workspace": {
       "defaultSlotName": "默认"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "导出…",
+      "txt": "纯文本"
     }
   },
   "password": {
@@ -2775,20 +2801,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "空白（无模板）",
+      "folderSearchEmpty": "没有匹配的文件夹。",
+      "folderSearchPlaceholder": "搜索文件夹…",
+      "searchEmpty": "没有匹配的模板。",
+      "searchPlaceholder": "搜索模板…",
+      "untitledTemplate": "无标题模板",
+      "sectionDaily": "每日笔记",
+      "sectionWeekly": "每周笔记",
+      "sectionMonthly": "每月笔记",
+      "periodFolderLabel": "文件夹",
+      "periodFolderHelper": "新建{{period}}笔记的存放位置。默认值：{{default}}。即使为空，文件夹也会保留。",
+      "periodFormatLabel": "标题格式",
+      "periodFormatHelperDaily": "每篇每日笔记的标题。支持 YYYY、MM、DD、gggg（ISO 周年）、ww（ISO 周数），以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodFormatHelperWeekly": "每篇每周笔记的标题。支持 gggg（ISO 周年）、ww（ISO 周数）、YYYY、MM、DD，以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodFormatHelperMonthly": "每篇每月笔记的标题。支持 YYYY、MM、gggg（ISO 周年）、ww（ISO 周数），以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodTemplateLabel": "模板",
+      "periodTemplateHelper": "选择每篇{{period}}笔记的起始模板，或留空以创建以日期为标题的空白笔记。",
+      "collisionWarning": "{{first}}笔记和{{second}}笔记会指向同一篇笔记，因为它们共用文件夹并生成相同的标题。两个命令都会打开它。",
+      "weekStartNote": "每周从星期一开始（ISO 8601），因此一月初的几天可能属于上一年的最后一周，十二月末的几天可能属于下一年的第一周。",
+      "periodFolderSaveError": "无法保存{{period}}笔记的文件夹。请重试。",
+      "periodFormatSaveError": "无法保存{{period}}笔记的标题格式。请重试。",
+      "periodTemplateSaveError": "无法保存{{period}}笔记的模板。请重试。",
+      "periodNameDaily": "每日",
+      "periodNameWeekly": "每周",
+      "periodNameMonthly": "每月",
+      "periodFolderAriaLabel": "{{period}}笔记文件夹",
+      "periodFormatAriaLabel": "{{period}}笔记标题格式",
+      "periodTemplateAriaLabel": "{{period}}笔记模板",
       "dateFormatHelper": "每篇日记的标题。支持 YYYY、MM、DD。默认为 {{default}}。",
       "dateFormatLabel": "日记日期格式",
       "dateFormatSaveError": "无法保存日期格式。请重试。",
       "folderHelper": "新日记的存放位置。默认为 {{default}}。即使为空也会保留该文件夹。",
       "folderLabel": "日记文件夹",
       "folderSaveError": "无法保存日记文件夹。请重试。",
-      "folderSearchEmpty": "没有匹配的文件夹。",
-      "folderSearchPlaceholder": "搜索文件夹…",
-      "searchEmpty": "没有匹配的模板。",
-      "searchPlaceholder": "搜索模板…",
       "templateHelper": "选择一个用于创建每篇日记的模板，或留空以创建一篇以日期为标题的空白笔记。",
       "templateLabel": "日记模板",
-      "templateSaveError": "无法保存日记模板。请重试。",
-      "untitledTemplate": "无标题模板"
+      "templateSaveError": "无法保存日记模板。请重试。"
     },
     "deleteVault": {
       "cancel": "取消",
@@ -2949,7 +2997,8 @@
         "title": "在 Myne 向 {{provider}} 发送任何内容之前",
         "whatLabel": "哪些内容会离开你的设备",
         "whenLabel": "它在什么时候离开",
-        "whoLabel": "谁会收到它"
+        "whoLabel": "谁会收到它",
+        "connectionLabel": "如何传输"
       },
       "disclosureToggle": "这是如何运作的？",
       "enableHelper": "运行你提供的模型。它在哪里运行、你的笔记是否会离开此设备，都取决于你在下方指定的服务商。实验性功能，默认关闭。",
@@ -2983,7 +3032,9 @@
         "refused": "服务商拒绝了连接。它可能已停止运行，或屏蔽了此网络。",
         "timeout": "服务商未及时响应。没有留下任何仍在运行的任务。",
         "unauthorized": "服务商拒绝了你的 API 密钥。请更换它：它可能有误、已被吊销，或属于另一个账户。",
-        "unreachable": "无法连接到服务商。请检查你的网络连接。"
+        "unreachable": "无法连接到服务商。请检查你的网络连接。",
+        "featureOff": "此设备上的 AI 已关闭。没有发送任何内容。请在设置中的 AI 处打开。",
+        "consentMissing": "你尚未同意从此设备向该提供方发送笔记。没有发送任何内容。请在设置中的 AI 处重新选择提供方，并阅读将要发送的内容。"
       },
       "modelChoose": "选择文件…",
       "modelEmbeddingLabel": "搜索模型：语义搜索和问答",
@@ -3024,7 +3075,16 @@
       "recommendedFilesEmbedding": "需要 model.safetensors + config.json + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesGeneration": "需要 .gguf 文件 + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesTranscription": "需要 Whisper 的 .gguf 文件 + config.json + tokenizer.json 位于同一文件夹中。",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "在这部手机上使用 AI",
+      "mobileEnableHelper": "默认关闭。这台手机上没有任何 AI 模型会回答问题或读取你的笔记，所以每个请求都会发往你在下面指定的服务，你的笔记也会在那时离开本设备。转写和图片文字仍在本机运行，使用随 Myne 一起提供的模型。",
+      "mobileKeyAdd": "保存密钥",
+      "mobileKeyReplace": "更换密钥",
+      "mobileRevokeHelper": "同时移除提供方、其密钥和这部手机的许可，恢复到从未设置过的状态。其他设备会继续工作，直到你在那里也移除为止。",
+      "mobileApproveLabel": "允许从这部手机发送",
+      "mobileApproveHelper": "提供方及其密钥来自另一台设备。在你阅读将要发送的内容并在此允许之前，这部手机不会发送任何内容。",
+      "historyBudgetHelper": "每次请求携带多少最近对话内容，以字符计。留空则使用默认值。数值越大，AI 越能跟上较长的对话，同时也会发送更多内容：如果服务商不在本设备上，这意味着每一步运行都有更多你的文本离开设备。",
+      "historyBudgetLabel": "每次请求携带的对话"
     },
     "network": {
       "disabledCue": "同步不再通过 Tor 路由。新的连接会直接连往同步服务器。",
@@ -3057,6 +3117,9 @@
       "exactLabel": "精确时间",
       "exactOn": "已开启",
       "horizon": "提醒已注册至 {{date}}。请在那之前打开 Myne，以便继续收到提醒。",
+      "horizonLabel": "提前安排",
+      "horizonLabelHelper": "提醒会提前这么久设置好。Myne 需要处于打开且已解锁的状态，提醒才会送达。",
+      "horizonInertHelper": "已保存在此设备上。目前还没有任何功能读取它：此版本不发送任务提醒。",
       "label": "任务提醒",
       "saveError": "无法保存该设置。请重试。",
       "showTextAria": "在通知中显示任务文本",
@@ -3337,12 +3400,14 @@
         "viewMode": "默认视图 查看模式 实时 阅读 源代码 预览 default view mode live reading source",
         "dateFormat": "日期格式 日期 日 月 年 日历 date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "时间格式 时间 时钟 24小时制 12小时制 上午 下午 time format 24 hour 12 hour clock am pm",
-        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today"
+        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today",
+        "periodicNotes": "周期笔记 每周 每月 周 月 文件夹 模板 格式",
+        "aiHistoryBudget": "对话 历史 上下文 记忆 预算 字符 代理 聊天 请求"
       }
     },
     "dateTime": {
       "dateLabel": "日期格式",
-      "dateHelper": "任务、已保存的视图和附件中日期的显示方式。",
+      "dateHelper": "在 Myne 显示日期的每个位置，日期以何种方式书写。",
       "dateSystem": "跟随语言",
       "timeLabel": "时间格式",
       "timeHelper": "选择时间以 24 小时制还是 12 小时制显示。",

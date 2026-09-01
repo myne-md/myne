@@ -182,7 +182,8 @@ export function ViewEditorSheet({ initial, tags, folders, propertyKeys, viewOrde
                   t("notes.viewSettings.viewTypeTable"),
                 ]}
                 active={Math.max(0, VIEW_TYPES.indexOf(viewType))}
-                onChange={(i) => setViewType(VIEW_TYPES[i] ?? "list")}
+                onChange={(i: number) => setViewType(VIEW_TYPES[i] ?? "list")}
+                ariaLabel={t("notes.viewSettings.viewType")}
                 style={{ marginTop: 6 }}
               />
             </div>
@@ -226,7 +227,8 @@ export function ViewEditorSheet({ initial, tags, folders, propertyKeys, viewOrde
                       <Segmented
                         options={[t("notes.viewSettings.sortAsc"), t("notes.viewSettings.sortDesc")]}
                         active={sortDir === "asc" ? 0 : 1}
-                        onChange={(i) => setSortDir(i === 0 ? "asc" : "desc")}
+                        onChange={(i: number) => setSortDir(i === 0 ? "asc" : "desc")}
+                        ariaLabel={t("notes.viewSettings.sortDirection")}
                         style={{ flex: 1 }}
                       />
                     )}
@@ -266,7 +268,8 @@ export function ViewEditorSheet({ initial, tags, folders, propertyKeys, viewOrde
               <Segmented
                 options={[t("notes.tagBrowser.modeAll"), t("notes.tagBrowser.modeAny")]}
                 active={mode === "and" ? 0 : 1}
-                onChange={(i) => setMode(i === 0 ? "and" : "or")}
+                onChange={(i: number) => setMode(i === 0 ? "and" : "or")}
+                ariaLabel={t("notes.filterBuilder.match")}
                 style={{ flex: 1 }}
               />
             </div>

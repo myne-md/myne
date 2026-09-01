@@ -234,16 +234,61 @@ function moveLineBoundary(view: EditorView, forward: boolean, extend: boolean): 
 }
 
 /**
- * `@codemirror/commands`' `skipAtomic`, which is not exported. A boundary that
- * lands INSIDE an atomic range (a table widget, a task chip, a tag pill) must be
- * pushed to that range's edge, or the delete cuts a construct in half and leaves
- * unparseable source behind.
+ * Which edge of an atomic range a position is pushed to.
+ *
+ * `"forward"` / `"backward"` are the direction of travel, which is what a
+ * horizontal move or a delete has. `"nearer"` is for a move that arrives with no
+ * horizontal direction at all (a vertical one, landing on a column), where the
+ * closest edge is the least surprising answer.
  */
-function skipAtomic(view: EditorView, pos: number, forward: boolean): number {
-  for (const provider of view.state.facet(EditorView.atomicRanges)) {
-    provider(view).between(pos, pos, (from, to) => {
-      if (from < pos && to > pos) pos = forward ? to : from;
-    });
+export type AtomEdge = "forward" | "backward" | "nearer";
+
+/**
+ * `@codemirror/commands`' `skipAtomicRanges`, which is not exported. A position
+ * that lands INSIDE an atomic range (a table widget, a task chip, a tag pill)
+ * must be pushed to that range's edge, or a delete cuts a construct in half and
+ * leaves unparseable source behind, and a caret sits somewhere no arrow can
+ * leave.
+ *
+ * The providers are materialised ONCE and the loop runs over the sets, which is
+ * both what CodeMirror does and the only version that is cheap: two of the seven
+ * providers rebuild their RangeSet from a viewport tree-walk on every call, so
+ * re-invoking them per pass pays for that walk again.
+ *
+ * The loop exists because leaving one provider's range can land inside another's:
+ * seven providers register here and nothing makes them disjoint. It is bounded
+ * rather than `for(;;)` because a bound is better than trusting they never
+ * disagree.
+ *
+ * `"nearer"` COMMITS TO A DIRECTION after its first move, and that is the whole
+ * of why this terminates. Picking the nearer edge every pass oscillates on
+ * overlapping ranges: leaving [2, 8) forward lands at 8, which is inside
+ * [6, 12), whose nearer edge is 6, which is inside [2, 8) again, whose nearer
+ * edge is 8. The bound would stop that after five passes and return a position
+ * still inside a range, which is the one outcome this function exists to
+ * prevent. Once the first pass has chosen a side, every later pass pushes the
+ * same way, so the position moves monotonically out of the union. A position
+ * exactly on the shared edge of two ABUTTING ranges is left alone on purpose:
+ * `from < pos && to > pos` is strictly-inside, and the caret between two
+ * widgets is a legal place to be.
+ */
+export function skipAtoms(view: EditorView, pos: number, edge: AtomEdge): number {
+  const sets = view.state.facet(EditorView.atomicRanges).map((provider) => provider(view));
+  let committed: "forward" | "backward" | null =
+    edge === "nearer" ? null : edge;
+  for (let pass = 0; pass < 5; pass++) {
+    let moved = false;
+    for (const set of sets) {
+      set.between(pos, pos, (from, to) => {
+        if (from < pos && to > pos) {
+          const side = committed ?? (pos - from <= to - pos ? "backward" : "forward");
+          pos = side === "backward" ? from : to;
+          committed = side;
+          moved = true;
+        }
+      });
+    }
+    if (!moved) return pos;
   }
   return pos;
 }
@@ -291,16 +336,16 @@ export function deleteToLineBoundary(view: EditorView, forward: boolean): boolea
             : Math.max(0, range.head - 1);
       if (towards < from) {
         event = "delete.backward";
-        towards = skipAtomic(view, towards, false);
+        towards = skipAtoms(view, towards, "backward");
       } else if (towards > from) {
         event = "delete.forward";
-        towards = skipAtomic(view, towards, true);
+        towards = skipAtoms(view, towards, "forward");
       }
       from = Math.min(from, towards);
       to = Math.max(to, towards);
     } else {
-      from = skipAtomic(view, from, false);
-      to = skipAtomic(view, to, true);
+      from = skipAtoms(view, from, "backward");
+      to = skipAtoms(view, to, "forward");
     }
     return from === to
       ? { range }

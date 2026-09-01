@@ -43,14 +43,26 @@ export {
   buildRenderContext,
   extractTemplateBody,
   createNoteFromTemplate,
+  singleDay,
   createBlankNamedNote,
 } from "./newNoteFromTemplate";
 export {
-  resolveTodayNote,
+  resolvePeriodNote,
+  periodRange,
+  periodSettings,
   formatDailyDate,
+  isoWeek,
+  zonedNow,
+  PERIODS,
+  PERIOD_DEFAULTS,
   DEFAULT_DAILY_FOLDER,
   DEFAULT_DAILY_DATE_FORMAT,
   type DailyResolution,
+  type Period,
+  type PeriodRange,
+  type PeriodSettings,
+  type PeriodPrefs,
+  type PeriodResolution,
 } from "./dailyNote";
 export { moveNote, bulkMoveNotes } from "./moveNote";
 export type { BulkMoveResult } from "./moveNote";

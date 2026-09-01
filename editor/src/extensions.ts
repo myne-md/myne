@@ -34,7 +34,6 @@ import { indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import {
   deleteMarkupBackward,
-  insertNewlineContinueMarkupCommand,
   markdown,
   markdownLanguage,
 } from "@codemirror/lang-markdown";
@@ -57,12 +56,17 @@ import { TaskField } from "@myne/dialect/lezer/task-field";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { lineBoundaryKeymap } from "./line-boundary";
+import { lineVerticalExtension, lineVerticalKeymap } from "./line-vertical";
 import { taskRowSelection } from "./task-selection";
 import { viewModeExtension, type ViewMode } from "./view-mode";
 import { textDirectionExtension } from "./direction";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { noteSetExtension } from "./wikilink/note-set";
+import {
+  recentNotesExtension,
+  type RecentNotesSource,
+} from "./wikilink/recent-notes";
 import { drawingEmbedIoExtension } from "./drawing/embed-io";
 import { activeDrawingEmbedField } from "./decorations/drawing-embed";
 import { lineNumbersExtension } from "./line-numbers";
@@ -153,15 +157,20 @@ import { findExtension } from "./find/find-extension";
 import { spellDecorations } from "./decorations/spell";
 import { spellCorrectionMenu } from "./spell/correction-menu";
 import { buildMyneKeymap, collapseMultiSelection } from "./keymap";
+import { continueListMarkup } from "./list-continuation";
 import { vimExtension } from "./vim";
 import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
+import { ambientLabelRefresh } from "./decorations/plugin-factory";
 import { scrollSlackExtension } from "./scroll-slack";
 import { myneTheme } from "./theme";
 
 /**
  * The Enter / Backspace pair `markdown()` installs by default, rebuilt with
- * `nonTightLists: false` (myne-md/myne#562).
+ * `nonTightLists: false` (myne-md/myne#562) and, on Enter, with the two repairs
+ * that config cannot reach (`list-continuation.ts`, myne-md/myne#588 + #593:
+ * the list stays as tight as the user wrote it, and a task marker keeps the
+ * separator GFM requires).
  *
  * # What the default does
  *
@@ -196,7 +205,7 @@ import { myneTheme } from "./theme";
  */
 const markdownMarkupKeymap: Extension = Prec.high(
   keymap.of([
-    { key: "Enter", run: insertNewlineContinueMarkupCommand({ nonTightLists: false }) },
+    { key: "Enter", run: continueListMarkup },
     { key: "Backspace", run: deleteMarkupBackward },
   ]),
 );
@@ -226,6 +235,12 @@ export function myneExtensions(opts?: {
    *  from focus. Absent → `null`, which every consumer reads as "fall back to
    *  the focused note". */
   noteId?: string | null;
+  /** myne-md/myne#601: how to ask the host which notes were touched most
+   *  recently, newest first, for the `[[` picker's tiebreak. A SOURCE rather
+   *  than a snapshot, installed once here: the order has one owner on the host
+   *  side, and pushing snapshots in made it per view, so panes disagreed. See
+   *  `wikilink/recent-notes.ts`. Absent → the ranking is score alone. */
+  recentNotes?: RecentNotesSource;
 }): readonly Extension[] {
   const viewMode = opts?.viewMode ?? "live";
   const readOnly = opts?.readOnly ?? false;
@@ -290,8 +305,8 @@ export function myneExtensions(opts?: {
       ],
     }),
     // Replaces the keymap `markdown()` would have installed itself (declined
-    // above via `addKeymap: false`). Same two chords, same precedence; only
-    // `nonTightLists` differs. myne-md/myne#562.
+    // above via `addKeymap: false`). Same two chords, same precedence; Enter
+    // runs the repaired continuation (myne-md/myne#562, #588, #593).
     markdownMarkupKeymap,
     // A triple-click on a list row keeps the caret on that row (myne-md/myne#560).
     // Composed after the language so `listContentStart` has a parse tree to read.
@@ -325,6 +340,9 @@ export function myneExtensions(opts?: {
     // reconfigures it from `useResolverNotes()`). MUST precede the chip + hover
     // so the facet exists when they read it.
     noteSetExtension(),
+    // myne-md/myne#601: the recency order the `[[` picker breaks ties with,
+    // seeded empty (a host that tracks none leaves the ranking on score alone).
+    recentNotesExtension(opts?.recentNotes),
     // Inline drawing embeds (MYND-634): the host-injected note-CRUD IO seam +
     // the transient edit-in-place state. Mounted mode-INDEPENDENTLY (unlike the
     // drawing-embed decoration, which is inside the view-mode stack) so the IO
@@ -401,6 +419,13 @@ export function myneExtensions(opts?: {
       // than CodeMirror's raw coordinate probe against the editor's right edge,
       // which drops the caret a row in this app's centred column (myne#286).
       ...lineBoundaryKeymap,
+      // Before defaultKeymap for the same reason one layer up: `cursorLineUp` /
+      // `cursorLineDown` fall back to that SAME probe internally, where no
+      // keymap can reach it, and their pixel-x goal means two different columns
+      // on a 2em heading and the 14px line under it. These keep a character
+      // column instead (myne-md/myne#631). AFTER tableKeymap, so arrowing into a
+      // read-only table still wins.
+      ...lineVerticalKeymap,
       ...defaultKeymap,
       { key: "Mod-u", run: undoSelection, preventDefault: true },
     ]),
@@ -415,6 +440,8 @@ export function myneExtensions(opts?: {
     // the rebindable Compartment above) reads this facet.
     indentUnit.of("    "),
     EditorView.lineWrapping,
+    // The sticky character column the arrow bindings above read (myne#631).
+    lineVerticalExtension(),
     // Scroll slack below the last line (#375) so the tail of a long note can be
     // lifted off the bottom edge of the viewport. NOT CodeMirror's
     // `scrollPastEnd()` — see the module header for why that one is wrong here.
@@ -450,5 +477,19 @@ export function myneExtensions(opts?: {
     // editor's `data-focus-typewriter` ancestor gate is present (focusActive &&
     // pref). Keeps the active line vertically centered as the cursor moves.
     focusModeExtension(),
+    // Ambient-label refresh (myne-md/myne#609): turns a display-settings or
+    // language change into the rebuild signal the shared decoration gate reads.
+    // It decorates nothing.
+    //
+    // HERE rather than inside `myneDecorations()`, and the difference is real:
+    // that array lives in `viewModeDecorationsCompartment`, which `source` mode
+    // empties and every mode switch rebuilds. Mounted there, the subscription
+    // was destroyed and re-registered on each live/reading/source toggle and
+    // absent entirely in source mode, while its own comment claimed one mount
+    // per editor. No user-visible defect followed, since source mode draws no
+    // ambient label and a mode switch rebuilds everything anyway, but the
+    // lifetime did not match the claim and `view-mode.ts` describes that array
+    // as the decoration stack, which an extension that decorates nothing is not.
+    ambientLabelRefresh(),
   ];
 }

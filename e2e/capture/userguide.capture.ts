@@ -43,6 +43,7 @@ import {
   closeSettings,
   dismissImporterOffer,
   enableDeveloperModeInSettings,
+  openExportSubmenuItem,
   pageSeatInvoke,
   pasteIntoEditor,
   runPaletteAction,
@@ -840,6 +841,9 @@ runner(
         async () => {
           const row = await noteRowByTitle(s, "Welcome to Myne");
           await row.rightClick();
+          // The formats sit under one `Export…` row since myne-md/myne#611, so
+          // the screenshot has to open the submenu to show them at all.
+          await openExportSubmenuItem(s, "export-markdown");
           await s.waitForElement(
             testIdSelector("notes.context-menu-item", { "data-item-id": "export-markdown" }),
             { timeoutMs: 6000 },

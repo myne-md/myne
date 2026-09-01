@@ -136,6 +136,21 @@ const CLOCK_ALLOWED = new Map([
   // task 84 un-gated it, the guard stopped exempting it automatically (the
   // gated set is read from `mod.rs`, not hand-listed), and its entry above had
   // to be re-argued rather than inherited.
+  // The remote-provider arm (myne-md/myne#456). Both moved into `core/` in that
+  // change and are behind the default-off `remote-ai` feature, whose only
+  // enablers are the two native Tauri clients: desktop's `local-inference`
+  // implies it and mobile turns it on directly, while `web/wasm` takes the
+  // crate with `default-features = false`. So neither file is in a wasm build,
+  // and the readings are elapsed-time measurements (an idle deadline and a
+  // total-request deadline), which is what a monotonic clock is for.
+  //
+  // Listed rather than ported to `HostCtx::monotonic_millis()` because the
+  // `HostCtx` is not in scope at either site: `cancellable_io` wraps a
+  // `std::io::Read` and `provider_transport` owns a blocking TLS stream, and
+  // threading a host through both to satisfy a guard about a build they are
+  // never in would be the tail wagging the dog.
+  ["core/src/inference/cancellable_io.rs", "host-only: `remote-ai` is enabled only by the two native clients; elapsed-time deadline on a blocking read"],
+  ["core/src/inference/provider_transport.rs", "host-only: same feature chain; total-request deadline around a blocking TLS stream"],
   ["core/src/plugins/sync/rustls_transport.rs", "gated out of wasm32 entirely (mod.rs); host-only TLS"],
 ]);
 

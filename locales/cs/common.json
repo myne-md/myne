@@ -50,7 +50,8 @@
       "unsupportedDetail": "Prošel {{passes}} z {{attempts}} kontrol; potřeba je {{required}}.",
       "checking": "Kontroluje se model…",
       "checkingAt": "Kontroluje se model… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Tato hranice úspěšnosti zatím nebyla změřena napříč modely, takže může být přísnější nebo volnější, než by měla být."
+      "unsupportedProvisional": "Tato hranice úspěšnosti zatím nebyla změřena napříč modely, takže může být přísnější nebo volnější, než by měla být.",
+      "scopeNone": "není otevřená žádná poznámka, takže zatím není na čem pracovat"
     },
     "progress": {
       "working": "Pracuje",
@@ -72,7 +73,8 @@
       "grantsModel_one": "{{count}} na žádost AI",
       "grantsModel_few": "{{count}} na žádost AI",
       "grantsModel_many": "{{count}} na žádost AI",
-      "grantsModel_other": "{{count}} na žádost AI"
+      "grantsModel_other": "{{count}} na žádost AI",
+      "cancelledBackground": "Běh byl zrušen, protože Myne přešla na pozadí. Nic nebylo zapsáno. Zeptejte se znovu, až budete chtít."
     },
     "scope": {
       "title": "Zahrnout {{folder}}?",
@@ -142,7 +144,10 @@
         "excludedFolder": "Nevytvořeno: tato složka je vyloučena z AI.",
         "createFailed": "Nevytvořeno: zápis nové poznámky selhal. Ostatní změny byly přesto použity.",
         "excludedNow": "Nelze použít: složka této poznámky je nyní vyloučena z AI.",
-        "notProposed": "Nelze použít: tato změna není součástí návrhu tohoto běhu."
+        "notProposed": "Nelze použít: tato změna není součástí návrhu tohoto běhu.",
+        "noteMoved": "Nelze použít: tato změna by poznámku přesunula do jiné složky.",
+        "appendEmpty": "Nelze použít: nebylo co přidat.",
+        "appendWouldWriteFrontmatter": "Nelze použít: tento text by se stal blokem vlastností poznámky."
       },
       "applyFailed": "Změny se nepodařilo použít.",
       "undo": "Vrátit tento běh zpět",
@@ -171,7 +176,8 @@
       "runSummaryOffDevice_few": "poskytovateli byly odeslány asi {{count}} znaky z vašich poznámek",
       "runSummaryOffDevice_many": "poskytovateli bylo odesláno asi {{count}} znaku z vašich poznámek",
       "runSummaryOffDevice_other": "poskytovateli bylo odesláno asi {{count}} znaků z vašich poznámek",
-      "runSummaryOnDevice": "nic neopustilo toto zařízení"
+      "runSummaryOnDevice": "nic neopustilo toto zařízení",
+      "appendFlag": "přidá na konec"
     },
     "undo": {
       "offer_one": "Poslední běh změnil {{count}} poznámku.",
@@ -190,7 +196,9 @@
       "createdNotReverted_one": "{{count}} poznámka, kterou běh vytvořil, zůstala zachována.",
       "createdNotReverted_few": "{{count}} poznámky, které běh vytvořil, zůstaly zachovány.",
       "createdNotReverted_many": "{{count}} poznámky, kterou běh vytvořil, zůstalo zachováno.",
-      "createdNotReverted_other": "{{count}} poznámek, které běh vytvořil, zůstalo zachováno."
+      "createdNotReverted_other": "{{count}} poznámek, které běh vytvořil, zůstalo zachováno.",
+      "sessionOnly": "Toto vrácení jedním klepnutím platí, dokud nezamknete trezor nebo nezavřete aplikaci. Poté obnovujete poznámky po jedné z historie verzí poznámky.",
+      "sessionOnlyLink": "Otevřít historii verzí"
     }
   },
   "ai": {
@@ -721,6 +729,12 @@
       },
       "unfoldAll": {
         "label": "Rozbalit vše"
+      },
+      "openThisWeekNote": {
+        "label": "Otevřít poznámku tohoto týdne"
+      },
+      "openThisMonthNote": {
+        "label": "Otevřít poznámku tohoto měsíce"
       }
     },
     "hotkeys": {
@@ -954,13 +968,15 @@
           "captureFailed": "Nahrávání se nepodařilo spustit. Zkontrolujte přístup k mikrofonu v Nastavení systému.",
           "generic": "Nahrávání se nepodařilo spustit.",
           "locked": "Pro nahrání hlasové poznámky odemkněte trezor.",
-          "noInputDevice": "Nebyl nalezen žádný mikrofon. Připojte ho a zkuste to znovu."
+          "noInputDevice": "Nebyl nalezen žádný mikrofon. Připojte ho a zkuste to znovu.",
+          "unsupportedSampleRate": "Váš mikrofon nahrává vzorkovací frekvencí, kterou Myne neumí přepsat. Vyberte jiné vstupní zařízení nebo změňte jeho vzorkovací frekvenci v nastavení zvuku systému."
         },
         "stopError": {
           "captureFailed": "Nahrávání selhalo. Zkontrolujte mikrofon.",
           "emptyRecording": "Nic nebylo nahráno.",
           "generic": "Nahrávku se nepodařilo uložit.",
-          "silentRecording": "Nahrávka byla tichá a byla zahozena. Zkontrolujte mikrofon."
+          "silentRecording": "Nahrávka byla tichá a byla zahozena. Zkontrolujte mikrofon.",
+          "unsupportedSampleRate": "Váš mikrofon nahrává vzorkovací frekvencí, kterou Myne neumí přepsat. Nic nebylo uloženo. Vyberte jiné vstupní zařízení nebo změňte jeho vzorkovací frekvenci v nastavení zvuku systému."
         }
       },
       "widget": {
@@ -1006,6 +1022,7 @@
             "featureOff": "Převod řeči na text je vypnutý. Zapněte ho v Nastavení → Přepis.",
             "modelLoadFailed": "Model pro převod řeči na text se nepodařilo načíst. Pokud jste v Nastavení → Developer → AI nastavili vlastní model, zkontrolujte jeho soubory; jinak přeinstalování Myne obnoví ten vestavěný.",
             "noModel": "Model pro převod řeči na text chybí. Přeinstalování Myne ho obnoví.",
+            "tooLong": "Tato nahrávka je pro přepis příliš dlouhá. Zvuk zůstává přiložený, takže si jej můžete přehrát.",
             "vaultLocked": "Pro přepis odemkněte svůj trezor."
           },
           "disabledReason": "Pro přepis zapněte AI v Nastavení → Developer → AI.",
@@ -1262,10 +1279,6 @@
       "turnedIntoTemplate": "Změněno na šablonu",
       "convertedToNote": "Převedeno na poznámku",
       "versionHistory": "Historie verzí",
-      "exportMarkdown": "Exportovat jako Markdown…",
-      "exportPdf": "Exportovat jako PDF…",
-      "exportHtml": "Exportovat jako HTML…",
-      "exportTxt": "Exportovat jako prostý text…",
       "trash": "Přesunout do koše"
     },
     "codeBlock": {
@@ -1297,7 +1310,9 @@
       "replaceAllCount": "Nahradit vše ({{total}})",
       "replaceOne": "Nahradit",
       "replacePlaceholder": "Nahradit za",
-      "toggleReplace": "Přepnout nahrazování"
+      "toggleReplace": "Přepnout nahrazování",
+      "dateFallback": "Hledá se {{stored}}, tedy podoba, ve které je toto datum uloženo.",
+      "replaceOffOnDateFallback": "Nahrazování je vypnuté, dokud se datum shoduje ve své uložené podobě, aby náhrada datum neučinila nečitelným."
     },
     "cover": {
       "add": "Přidat obálku",
@@ -1323,7 +1338,8 @@
       "titlePlaceholder": "Bez názvu"
     },
     "mermaid": {
-      "rendering": "Vykresluje se diagram…"
+      "rendering": "Vykresluje se diagram…",
+      "renderFailed": "Tento diagram se nepodařilo vykreslit: {{reason}}"
     },
     "slash": {
       "aiContinue": "Pokračovat v psaní (AI)",
@@ -1650,6 +1666,13 @@
     "commandPalette": {
       "searchPlaceholder": "Hledat poznámky nebo spustit příkaz…",
       "noMatches": "Žádné odpovídající příkazy ani poznámky."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Dnešní poznámku se nepodařilo otevřít.",
+        "weekly": "Poznámku tohoto týdne se nepodařilo otevřít.",
+        "monthly": "Poznámku tohoto měsíce se nepodařilo otevřít."
+      }
     }
   },
   "export": {
@@ -2194,10 +2217,6 @@
       "duplicate": "Duplikovat",
       "editFilterTitle": "Upravit filtr",
       "emptyState": "Zatím žádné poznámky.",
-      "exportHtml": "Exportovat jako HTML…",
-      "exportMarkdown": "Exportovat jako Markdown…",
-      "exportPdf": "Exportovat jako PDF…",
-      "exportTxt": "Exportovat jako prostý text…",
       "favoritesHeading": "Oblíbené",
       "icon": "Ikona…",
       "mergeAnyway": "Přesto sloučit",
@@ -2523,6 +2542,13 @@
     },
     "workspace": {
       "defaultSlotName": "Výchozí"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportovat…",
+      "txt": "Prostý text"
     }
   },
   "password": {
@@ -2981,20 +3007,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Prázdná (bez šablony)",
+      "folderSearchEmpty": "Žádné složky neodpovídají.",
+      "folderSearchPlaceholder": "Hledat složky…",
+      "searchEmpty": "Žádné šablony neodpovídají.",
+      "searchPlaceholder": "Hledat šablony…",
+      "untitledTemplate": "Šablona bez názvu",
+      "sectionDaily": "Denní poznámky",
+      "sectionWeekly": "Týdenní poznámky",
+      "sectionMonthly": "Měsíční poznámky",
+      "periodFolderLabel": "Složka",
+      "periodFolderHelper": "Kam se ukládají nové {{period}} poznámky. Výchozí: {{default}}. Složka zůstane zachována, i když je prázdná.",
+      "periodFormatLabel": "Formát názvu",
+      "periodFormatHelperDaily": "Název každé denní poznámky. Podporuje YYYY, MM, DD, gggg (ISO rok týdne), ww (ISO číslo týdne) a [text] pro doslovný text. Výchozí: {{default}}.",
+      "periodFormatHelperWeekly": "Název každé týdenní poznámky. Podporuje gggg (ISO rok týdne), ww (ISO číslo týdne), YYYY, MM, DD a [text] pro doslovný text. Výchozí: {{default}}.",
+      "periodFormatHelperMonthly": "Název každé měsíční poznámky. Podporuje YYYY, MM, gggg (ISO rok týdne), ww (ISO číslo týdne) a [text] pro doslovný text. Výchozí: {{default}}.",
+      "periodTemplateLabel": "Šablona",
+      "periodTemplateHelper": "Vyberte šablonu, kterou začíná každá {{period}} poznámka, nebo nechte prázdné pro prázdnou poznámku s datem v názvu.",
+      "collisionWarning": "Poznámky {{first}} a {{second}} vedou ke stejné poznámce, protože sdílejí složku a vytvářejí stejný název. Otevřou ji oba příkazy.",
+      "weekStartNote": "Týdny začínají v pondělí (ISO 8601), takže první lednové dny mohou patřit do posledního týdne předchozího roku a poslední prosincové dny do prvního týdne roku následujícího.",
+      "periodFolderSaveError": "Složku pro {{period}} poznámky se nepodařilo uložit. Zkuste to prosím znovu.",
+      "periodFormatSaveError": "Formát názvu pro {{period}} poznámky se nepodařilo uložit. Zkuste to prosím znovu.",
+      "periodTemplateSaveError": "Šablonu pro {{period}} poznámky se nepodařilo uložit. Zkuste to prosím znovu.",
+      "periodNameDaily": "denní",
+      "periodNameWeekly": "týdenní",
+      "periodNameMonthly": "měsíční",
+      "periodFolderAriaLabel": "Složka {{period}} poznámek",
+      "periodFormatAriaLabel": "Formát názvu {{period}} poznámek",
+      "periodTemplateAriaLabel": "Šablona {{period}} poznámek",
       "dateFormatHelper": "Název každé denní poznámky. Podporuje YYYY, MM, DD. Výchozí hodnota je {{default}}.",
       "dateFormatLabel": "Formát data denní poznámky",
       "dateFormatSaveError": "Formát data se nepodařilo uložit. Zkuste to prosím znovu.",
       "folderHelper": "Kam se ukládají nové denní poznámky. Výchozí hodnota je {{default}}. Složka se zachová, i když je prázdná.",
       "folderLabel": "Složka denních poznámek",
       "folderSaveError": "Složku denních poznámek se nepodařilo uložit. Zkuste to prosím znovu.",
-      "folderSearchEmpty": "Žádné složky neodpovídají.",
-      "folderSearchPlaceholder": "Hledat složky…",
-      "searchEmpty": "Žádné šablony neodpovídají.",
-      "searchPlaceholder": "Hledat šablony…",
       "templateHelper": "Vyberte šablonu, ze které se má každá denní poznámka zakládat, nebo ponechte prázdné pro prázdnou poznámku pojmenovanou datem.",
       "templateLabel": "Šablona denní poznámky",
-      "templateSaveError": "Šablonu denní poznámky se nepodařilo uložit. Zkuste to prosím znovu.",
-      "untitledTemplate": "Šablona bez názvu"
+      "templateSaveError": "Šablonu denní poznámky se nepodařilo uložit. Zkuste to prosím znovu."
     },
     "deleteVault": {
       "cancel": "Zrušit",
@@ -3157,7 +3205,8 @@
         "title": "Než Myne cokoli odešle službě {{provider}}",
         "whatLabel": "Co opustí vaše zařízení",
         "whenLabel": "Kdy to zařízení opustí",
-        "whoLabel": "Kdo to dostane"
+        "whoLabel": "Kdo to dostane",
+        "connectionLabel": "Jak to putuje"
       },
       "disclosureToggle": "Jak to funguje?",
       "enableHelper": "Spouští model, který poskytnete. Kde běží a zda vaše poznámky opustí toto zařízení, obojí závisí na poskytovateli, kterého určíte níže. Experimentální, ve výchozím nastavení vypnuto.",
@@ -3191,7 +3240,9 @@
         "refused": "Poskytovatel odmítl spojení. Může být mimo provoz nebo blokovat tuto síť.",
         "timeout": "Poskytovatel neodpověděl včas. Nic dál neběží.",
         "unauthorized": "Poskytovatel odmítl váš klíč API. Nahraďte ho: může být chybný, zneplatněný nebo od jiného účtu.",
-        "unreachable": "Poskytovatel je nedostupný. Zkontrolujte síťové připojení."
+        "unreachable": "Poskytovatel je nedostupný. Zkontrolujte síťové připojení.",
+        "featureOff": "AI je na tomto zařízení vypnutá. Nic nebylo odesláno. Zapněte ji v Nastavení, v části AI.",
+        "consentMissing": "Nesouhlasili jste s odesíláním poznámek tomuto poskytovateli z tohoto zařízení. Nic nebylo odesláno. Vyberte poskytovatele znovu v Nastavení, v části AI, a přečtěte si, co se odešle."
       },
       "modelChoose": "Vybrat soubor…",
       "modelEmbeddingLabel": "Vyhledávací model: sémantické hledání a otázky a odpovědi",
@@ -3236,7 +3287,16 @@
       "recommendedFilesTranscription": "Vyžaduje soubor Whisper .gguf + config.json + tokenizer.json ve stejné složce.",
       "title": "AI",
       "providerModelCount_few": "K dispozici jsou {{count}} modely.",
-      "providerModelCount_many": "K dispozici je {{count}} modelu."
+      "providerModelCount_many": "K dispozici je {{count}} modelu.",
+      "mobileEnableLabel": "Používat AI na tomto telefonu",
+      "mobileEnableHelper": "Ve výchozím stavu vypnuto. Žádný model AI v tomto telefonu neodpovídá na otázky ani nečte vaše poznámky, takže každý požadavek jde do služby, kterou níže pojmenujete, a vaše poznámky tehdy opouštějí toto zařízení. Přepis řeči a text z obrázků běží dál zde, na modelech dodávaných s Myne.",
+      "mobileKeyAdd": "Uložit klíč",
+      "mobileKeyReplace": "Vyměnit klíč",
+      "mobileRevokeHelper": "Odebere poskytovatele, jeho klíč i souhlas tohoto telefonu naráz a zanechá přesně stav, jako by nikdy nic nastaveno nebylo. Ostatní zařízení fungují dál, dokud to neodeberete i tam.",
+      "mobileApproveLabel": "Povolit odesílání z tohoto telefonu",
+      "mobileApproveHelper": "Poskytovatel a jeho klíč pocházejí z jiného zařízení. Z tohoto telefonu se nic neodesílá, dokud si nepřečtete, co se odešle, a zde to nepovolíte.",
+      "historyBudgetHelper": "Kolik z nedávné konverzace nese každý požadavek, ve znacích. Prázdné pole znamená výchozí hodnotu. Vyšší číslo umožní AI sledovat delší konverzace a odesílá jich více: u poskytovatele, který není na tomto zařízení, to znamená více vašeho textu opouštějícího zařízení, v každém kroku běhu.",
+      "historyBudgetLabel": "Konverzace posílaná s každým požadavkem"
     },
     "network": {
       "disabledCue": "Synchronizace už se nesměruje přes Tor. Nová připojení jdou přímo na synchronizační server.",
@@ -3269,6 +3329,9 @@
       "exactLabel": "Přesné načasování",
       "exactOn": "Zapnuto",
       "horizon": "Připomínky jsou zaregistrovány do {{date}}. Otevřete Myne do té doby, aby chodily dál.",
+      "horizonLabel": "Plánovat dopředu",
+      "horizonLabelHelper": "Připomenutí se připravují s tímto předstihem. Aby dorazilo, musí být Myne spuštěné a odemčené.",
+      "horizonInertHelper": "Uloženo v tomto zařízení. Zatím to nikdo nečte: toto sestavení připomenutí úkolů nedoručuje.",
       "label": "Připomínky úkolů",
       "saveError": "Toto nastavení se nepodařilo uložit. Zkuste to znovu.",
       "showTextAria": "Zobrazit text úkolu v oznámení",
@@ -3557,12 +3620,14 @@
         "viewMode": "výchozí režim zobrazení živý náhled čtení zdroj view mode",
         "dateFormat": "formát data datum den měsíc rok iso dd/mm mm/dd kalendář date format",
         "timeFormat": "formát času čas 24hodinový 12hodinový hodiny dopoledne odpoledne am pm time format",
-        "timezone": "časové pásmo časová zóna tz utc iana oblast dnes timezone"
+        "timezone": "časové pásmo časová zóna tz utc iana oblast dnes timezone",
+        "periodicNotes": "periodické poznámky týdenní měsíční týden měsíc složka šablona formát",
+        "aiHistoryBudget": "konverzace historie kontext paměť rozpočet znaky agent chat požadavek"
       }
     },
     "dateTime": {
       "dateLabel": "Formát data",
-      "dateHelper": "Jak se datum zobrazuje v úkolech, uložených pohledech a přílohách.",
+      "dateHelper": "Jak se zapisuje datum všude, kde ho Myne zobrazuje.",
       "dateSystem": "Podle jazyka",
       "timeLabel": "Formát času",
       "timeHelper": "Zda se čas zobrazuje ve 24hodinovém, nebo 12hodinovém formátu.",
