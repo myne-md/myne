@@ -1162,10 +1162,6 @@
       "turnedIntoTemplate": "टेंप्लेट बना दिया गया",
       "convertedToNote": "नोट में बदल दिया गया",
       "versionHistory": "वर्शन इतिहास",
-      "exportMarkdown": "Markdown के रूप में एक्सपोर्ट करें…",
-      "exportPdf": "PDF के रूप में एक्सपोर्ट करें…",
-      "exportHtml": "HTML के रूप में एक्सपोर्ट करें…",
-      "exportTxt": "सादे टेक्स्ट के रूप में एक्सपोर्ट करें…",
       "trash": "ट्रैश में डालें"
     },
     "codeBlock": {
@@ -2029,10 +2025,6 @@
       "duplicate": "कॉपी बनाएं",
       "editFilterTitle": "फ़िल्टर बदलें",
       "emptyState": "अभी कोई नोट नहीं है।",
-      "exportHtml": "HTML के रूप में एक्सपोर्ट करें…",
-      "exportMarkdown": "Markdown के रूप में एक्सपोर्ट करें…",
-      "exportPdf": "PDF के रूप में एक्सपोर्ट करें…",
-      "exportTxt": "सादे टेक्स्ट के रूप में एक्सपोर्ट करें…",
       "favoritesHeading": "पसंदीदा",
       "icon": "आइकन…",
       "mergeAnyway": "फिर भी मिला दें",
@@ -2336,6 +2328,13 @@
     },
     "workspace": {
       "defaultSlotName": "डिफ़ॉल्ट"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "निर्यात…",
+      "txt": "सादा पाठ"
     }
   },
   "password": {

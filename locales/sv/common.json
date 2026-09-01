@@ -1171,10 +1171,6 @@
       "turnedIntoTemplate": "Gjord till mall",
       "convertedToNote": "Konverterad till anteckning",
       "versionHistory": "Versionshistorik",
-      "exportMarkdown": "Exportera som Markdown…",
-      "exportPdf": "Exportera som PDF…",
-      "exportHtml": "Exportera som HTML…",
-      "exportTxt": "Exportera som oformaterad text…",
       "trash": "Flytta till papperskorgen"
     },
     "codeBlock": {
@@ -2041,10 +2037,6 @@
       "duplicate": "Duplicera",
       "editFilterTitle": "Redigera filter",
       "emptyState": "Inga anteckningar ännu.",
-      "exportHtml": "Exportera som HTML…",
-      "exportMarkdown": "Exportera som Markdown…",
-      "exportPdf": "Exportera som PDF…",
-      "exportTxt": "Exportera som oformaterad text…",
       "favoritesHeading": "Favoriter",
       "icon": "Ikon…",
       "mergeAnyway": "Slå samman ändå",
@@ -2350,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportera…",
+      "txt": "Oformaterad text"
     }
   },
   "password": {

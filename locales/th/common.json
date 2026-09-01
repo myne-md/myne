@@ -1162,10 +1162,6 @@
       "turnedIntoTemplate": "เปลี่ยนเป็นเทมเพลตแล้ว",
       "convertedToNote": "แปลงเป็นโน้ตแล้ว",
       "versionHistory": "ประวัติเวอร์ชัน",
-      "exportMarkdown": "ส่งออกเป็น Markdown…",
-      "exportPdf": "ส่งออกเป็น PDF…",
-      "exportHtml": "ส่งออกเป็น HTML…",
-      "exportTxt": "ส่งออกเป็นข้อความล้วน…",
       "trash": "ย้ายไปถังขยะ"
     },
     "codeBlock": {
@@ -2029,10 +2025,6 @@
       "duplicate": "ทำสำเนา",
       "editFilterTitle": "แก้ไขตัวกรอง",
       "emptyState": "ยังไม่มีโน้ต",
-      "exportHtml": "ส่งออกเป็น HTML…",
-      "exportMarkdown": "ส่งออกเป็น Markdown…",
-      "exportPdf": "ส่งออกเป็น PDF…",
-      "exportTxt": "ส่งออกเป็นข้อความล้วน…",
       "favoritesHeading": "รายการโปรด",
       "icon": "ไอคอน…",
       "mergeAnyway": "รวมต่อไป",
@@ -2336,6 +2328,13 @@
     },
     "workspace": {
       "defaultSlotName": "ค่าเริ่มต้น"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "ส่งออก…",
+      "txt": "ข้อความธรรมดา"
     }
   },
   "password": {

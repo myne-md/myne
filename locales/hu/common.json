@@ -1171,10 +1171,6 @@
       "turnedIntoTemplate": "Sablonná alakítva",
       "convertedToNote": "Jegyzetté alakítva",
       "versionHistory": "Verzióelőzmények",
-      "exportMarkdown": "Exportálás Markdownként…",
-      "exportPdf": "Exportálás PDF-ként…",
-      "exportHtml": "Exportálás HTML-ként…",
-      "exportTxt": "Exportálás egyszerű szövegként…",
       "trash": "Kukába helyezés"
     },
     "codeBlock": {
@@ -2041,10 +2037,6 @@
       "duplicate": "Másolat",
       "editFilterTitle": "Szűrő szerkesztése",
       "emptyState": "Még nincs jegyzet.",
-      "exportHtml": "Exportálás HTML-ként…",
-      "exportMarkdown": "Exportálás Markdownként…",
-      "exportPdf": "Exportálás PDF-ként…",
-      "exportTxt": "Exportálás egyszerű szövegként…",
       "favoritesHeading": "Kedvencek",
       "icon": "Ikon…",
       "mergeAnyway": "Összevonás mindenképp",
@@ -2350,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "Alapértelmezett"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportálás…",
+      "txt": "Egyszerű szöveg"
     }
   },
   "password": {

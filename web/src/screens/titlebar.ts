@@ -30,7 +30,12 @@
 // system: a Mac browser IS a Mac, and it does NOT have overlay window controls.
 // Those are two different questions, and only one of them is a layout input.
 
-export { TITLEBAR_SLOT_ID } from "../../../src/screens/titlebar";
+export {
+  TITLEBAR_SLOT_ID,
+  // Alignment arithmetic for the title-bar row, identical on every host.
+  TITLE_BAR_CONTROL_TOP,
+  TITLE_BAR_CONTROL_HEIGHT,
+} from "../../../src/screens/titlebar";
 
 /** No window controls float over a page: the tab's chrome is above it. */
 export const HAS_OVERLAY_WINDOW_CONTROLS = false;

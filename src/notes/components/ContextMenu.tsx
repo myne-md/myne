@@ -22,6 +22,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { Icon } from "../../components/primitives/Icon";
 
 export type ContextMenuItem = {
   /** Stable id; used as React key and for test queries. */
@@ -49,7 +50,21 @@ export type ContextMenuItem = {
    * menu stays open and the user can flip several items in one pass.
    */
   closeOnSelect?: boolean;
-  /** Called when the item is selected. */
+  /**
+   * When present, the item opens a SUBMENU of these instead of acting, and its
+   * own `onSelect` is never called (pass a no-op).
+   *
+   * The submenu is another `ContextMenu`, so it inherits the viewport clamping,
+   * the keyboard cycle and the dismissal discipline rather than reimplementing
+   * three of them. One level is all any caller needs today; deeper nesting
+   * already works, because the child is the same component.
+   *
+   * Selecting a child runs the child's action and then closes THIS menu too. A
+   * format picked under "Export…" must not leave the parent standing over the
+   * save dialog it just opened.
+   */
+  children?: ContextMenuItem[];
+  /** Called when the item is selected. Ignored when `children` is present. */
   onSelect: () => void;
 };
 
@@ -65,6 +80,24 @@ export type ContextMenuProps = {
   searchable?: boolean;
   /** Placeholder for the filter box (only when `searchable`). */
   searchPlaceholder?: string;
+  /**
+   * Whether to move DOM focus into this menu on mount. Default `true`, which is
+   * what makes a menu opened by right-click or by Enter keyboard-operable from
+   * the start.
+   *
+   * A submenu opened by HOVER passes `false`: the pointer is driving, the user
+   * has not asked for focus, and taking it strands the keyboard cycle when the
+   * pointer moves on. Opened by CLICK it passes `true`, because then the user
+   * did ask.
+   */
+  autoFocus?: boolean;
+  /**
+   * Accessible name for the `role="menu"`. A submenu is given its parent row's
+   * label, which is how a screen reader says which menu the focus just entered.
+   * `NoteActionsMenu` names its submenu the same way; the two implementations
+   * had drifted apart on this, and on the chevron below.
+   */
+  label?: string;
 };
 
 const MENU_STYLE: CSSProperties = {
@@ -141,6 +174,8 @@ export function ContextMenu({
   onClose,
   searchable = false,
   searchPlaceholder,
+  autoFocus = true,
+  label,
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -149,6 +184,18 @@ export function ContextMenu({
     top: y,
   });
   const [hoverId, setHoverId] = useState<string | null>(null);
+  // The open submenu's parent id, plus where to put it. Deliberately NOT
+  // derived from `hoverId`: leaving the parent row is how the pointer REACHES
+  // the submenu, so a hover-derived one would unmount itself on the way. It
+  // closes when a different row is hovered, and with the menu.
+  const [submenu, setSubmenu] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    /** True when a click opened it, so the nested menu takes focus. Hover
+     *  leaves it false. */
+    focus: boolean;
+  } | null>(null);
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const visibleItems =
@@ -169,10 +216,47 @@ export function ContextMenu({
     setPosition({ left, top });
   }, [x, y]);
 
+  /**
+   * Dismiss whatever submenu is open, putting focus back where the user was.
+   *
+   * Every path that closes one goes through here. Hovering a sibling row used
+   * to call `setSubmenu(null)` directly, which skipped the restore that lived
+   * only in the child's `onClose`: a submenu opened by KEYBOARD holds focus, so
+   * unmounting it that way left `document.activeElement` on `<body>`, and this
+   * menu's arrow, Home and End handling is an `onKeyDown` on its own div, which
+   * therefore stopped receiving anything. Open with Enter, move the mouse, and
+   * the whole menu was keyboard-dead until it was dismissed.
+   *
+   * Focus is only taken back when the submenu HELD it. Restoring after a
+   * hover-open would move the caret for a gesture the user made with a pointer.
+   */
+  const closeSubmenu = useCallback(() => {
+    setSubmenu((open) => {
+      if (open !== null && open.focus) {
+        ref.current
+          ?.querySelector<HTMLButtonElement>(`[data-item-id="${open.id}"]`)
+          ?.focus();
+      }
+      return null;
+    });
+  }, []);
+
   // Esc + outside-click dismissal.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // One level per press. Both this menu and its nested submenu register
+        // their own document listener, so without this bail a single Escape ran
+        // both and dismissed the whole menu when the user meant to back out of
+        // the submenu. The comment on the submenu's `onClose` claimed the
+        // correct behaviour while the code did the other thing, and the test
+        // file's own header lists this as one of the three it exists to pin.
+        if (submenu !== null) {
+          // One level per press, and through the shared routine so the focus
+          // restore is not a property of which path happened to close it.
+          closeSubmenu();
+          return;
+        }
         e.preventDefault();
         onClose();
       }
@@ -188,12 +272,19 @@ export function ContextMenu({
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onMouseDown);
     };
-  }, [onClose]);
+  }, [onClose, submenu, closeSubmenu]);
 
   // A11y (review): a `role="menu"` must be keyboard-operable. Focus the first
   // item on open so arrow-key navigation (handled on the container below) has a
   // starting point; Enter/Space activate via the native <button> semantics.
   useEffect(() => {
+    // A submenu opened by HOVER must not take focus. It did, and the cost was
+    // the whole menu's keyboard operability: moving the pointer on to a sibling
+    // row unmounted the submenu, focus fell to `<body>`, and the arrow-key
+    // cycle (a handler on the menu div) then received nothing for the rest of
+    // the menu's life. In a searchable menu the same hover pulled focus out of
+    // the filter box mid-typing.
+    if (!autoFocus) return;
     if (searchable) {
       inputRef.current?.focus();
     } else {
@@ -201,10 +292,33 @@ export function ContextMenu({
         ?.querySelector<HTMLButtonElement>('[role^="menuitem"]')
         ?.focus();
     }
-  }, [searchable]);
+  }, [searchable, autoFocus]);
+
+  // Where a parent row's submenu goes. Off the MENU's right edge rather than
+  // the row's, so every submenu opens on the same vertical line whatever the
+  // label lengths; `y` is the row's own top, so the first child sits level with
+  // its parent. The nested menu clamps itself back into the viewport from there.
+  const submenuAnchor = useCallback(
+    (id: string, itemEl: HTMLElement, focus: boolean) => {
+      const menuRect = ref.current?.getBoundingClientRect();
+      const itemRect = itemEl.getBoundingClientRect();
+      return {
+        id,
+        x: (menuRect?.right ?? itemRect.right) + 2,
+        y: itemRect.top - 4,
+        focus,
+      };
+    },
+    [],
+  );
 
   const handleSelect = useCallback(
     (item: ContextMenuItem) => {
+      // A parent row acts by opening its submenu, which the pointer handlers do
+      // (they are the ones holding the geometry). It has no action of its own,
+      // and this is also the search box's Enter path, where the first match may
+      // well be a parent.
+      if (item.children !== undefined) return;
       item.onSelect();
       // A checkable toggle (closeOnSelect === false) keeps the menu open so
       // the user can flip several items in one pass; an action item dismisses.
@@ -218,12 +332,40 @@ export function ContextMenu({
       ref={ref}
       style={{ ...MENU_STYLE, left: position.left, top: position.top }}
       role="menu"
+      aria-label={label}
       onKeyDown={(e) => {
         const node = ref.current;
         if (node === null) return;
+        // A submenu is a nested `ContextMenu` rendered INSIDE this one, so that
+        // the outside-click check still counts it as part of this menu. Two
+        // consequences, and the guards below are one each.
+        //
+        // Its keydown handler runs first and then bubbles here, so without the
+        // bail one arrow press would move focus twice, once per menu. And its
+        // rows are descendants of this node, so without the filter they would
+        // join this menu's cycle.
+        //
+        // Both are scoped to a submenu OTHER than this instance's own subtree.
+        // They were not, and since this is the same component the child
+        // inherited them: every row it renders sits inside the `[data-submenu]`
+        // wrapper, so the child's own bail fired on its own rows and its filter
+        // stripped them, leaving `its.length === 0`. A click-opened submenu
+        // takes focus, so the user landed in a menu where ArrowDown, ArrowUp,
+        // Home and End all did nothing. Escape and Enter still worked, from a
+        // document listener and native button semantics, which is what made it
+        // easy to miss.
+        const ownWrapper = (el: Element | null): Element | null =>
+          el === null ? null : el.closest("[data-submenu]");
+        const isBelowANestedMenu = (el: Element | null): boolean => {
+          const wrapper = ownWrapper(el);
+          // A wrapper this node CONTAINS belongs to a submenu of ours. One that
+          // contains this node is our own, and its rows are ours to drive.
+          return wrapper !== null && node.contains(wrapper);
+        };
+        if (isBelowANestedMenu(e.target as HTMLElement)) return;
         const its = Array.from(
           node.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'),
-        );
+        ).filter((el) => !isBelowANestedMenu(el));
         if (its.length === 0) return;
         const cur = its.findIndex((el) => el === document.activeElement);
         let next: number;
@@ -280,28 +422,81 @@ export function ContextMenu({
             type="button"
             role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
             aria-checked={item.checked === undefined ? undefined : item.checked}
+            aria-haspopup={item.children === undefined ? undefined : "menu"}
+            aria-expanded={
+              item.children === undefined ? undefined : submenu?.id === item.id
+            }
             data-testid="notes.context-menu-item"
             data-item-id={item.id}
             data-checked={item.checked === undefined ? undefined : String(item.checked)}
             style={style}
-            onMouseEnter={() => setHoverId(item.id)}
+            onMouseEnter={(e) => {
+              setHoverId(item.id);
+              // Hovering ANY row settles the submenu question: a parent opens
+              // its own, and a plain row closes whatever was open. That is what
+              // dismisses it without needing a leave handler on the submenu.
+              if (item.children === undefined) {
+                closeSubmenu();
+              } else {
+                setSubmenu(submenuAnchor(item.id, e.currentTarget, false));
+              }
+            }}
             onMouseLeave={() => setHoverId((h) => (h === item.id ? null : h))}
-            onClick={() => handleSelect(item)}
+            onClick={(e) => {
+              if (item.children !== undefined) {
+                setSubmenu(submenuAnchor(item.id, e.currentTarget, true));
+                return;
+              }
+              handleSelect(item);
+            }}
           >
-            {item.checked === undefined ? (
+            {item.checked === undefined && item.children === undefined ? (
               item.label
             ) : (
               <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                <span
-                  aria-hidden="true"
-                  style={{ width: 12, flexShrink: 0, textAlign: "center" }}
-                >
-                  {item.checked ? "✓" : ""}
-                </span>
-                {item.label}
+                {item.checked !== undefined && (
+                  <span
+                    aria-hidden="true"
+                    style={{ width: 12, flexShrink: 0, textAlign: "center" }}
+                  >
+                    {item.checked ? "✓" : ""}
+                  </span>
+                )}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.children !== undefined && (
+                  <span aria-hidden="true" style={{ display: "flex" }}>
+                    <Icon name="chevron-right" size={12} />
+                  </span>
+                )}
               </span>
             )}
             </button>
+            {item.children !== undefined && submenu?.id === item.id && (
+              // Rendered INSIDE this menu on purpose: the outside-click handler
+              // asks `node.contains(target)`, so a submenu mounted anywhere else
+              // would read as an outside click and close its own parent the
+              // moment the pointer entered it. `data-submenu` is what the
+              // keyboard handler above keys off.
+              <div role="none" data-submenu="">
+                <ContextMenu
+                  x={submenu.x}
+                  y={submenu.y}
+                  // Esc or an outside click closes the SUBMENU only. Closing the
+                  // parent here would swallow the click that opened a sibling
+                  // row, because that click is "outside" the submenu too.
+                  autoFocus={submenu.focus}
+                  label={item.label}
+                  onClose={closeSubmenu}
+                  items={item.children.map((child) => ({
+                    ...child,
+                    onSelect: () => {
+                      child.onSelect();
+                      onClose();
+                    },
+                  }))}
+                />
+              </div>
+            )}
           </Fragment>
         );
       })}

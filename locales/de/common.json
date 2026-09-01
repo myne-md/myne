@@ -1171,10 +1171,6 @@
       "turnedIntoTemplate": "In Vorlage umgewandelt",
       "convertedToNote": "In Notiz umgewandelt",
       "versionHistory": "Versionsverlauf",
-      "exportMarkdown": "Als Markdown exportieren…",
-      "exportPdf": "Als PDF exportieren…",
-      "exportHtml": "Als HTML exportieren…",
-      "exportTxt": "Als reinen Text exportieren…",
       "trash": "In den Papierkorb verschieben"
     },
     "codeBlock": {
@@ -2041,10 +2037,6 @@
       "duplicate": "Duplizieren",
       "editFilterTitle": "Filter bearbeiten",
       "emptyState": "Noch keine Notizen.",
-      "exportHtml": "Als HTML exportieren…",
-      "exportMarkdown": "Als Markdown exportieren…",
-      "exportPdf": "Als PDF exportieren…",
-      "exportTxt": "Als reinen Text exportieren…",
       "favoritesHeading": "Favoriten",
       "icon": "Symbol…",
       "mergeAnyway": "Trotzdem zusammenführen",
@@ -2350,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportieren…",
+      "txt": "Nur Text"
     }
   },
   "password": {

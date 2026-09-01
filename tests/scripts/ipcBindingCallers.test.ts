@@ -276,11 +276,21 @@ function healthyFiles(): Record<string, string> {
     "src/notes/ai/chatStore.ts": `export function clearChat(): void {}\n`,
     "src/notes/ai/aiOutputStore.ts": `export function clearAiOutput(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
+    "src/notes/scrollMemory.ts": `export function resetScrollMemory(): void {}\n`,
+    "src/notes/recentNotes.ts": `export function resetRecentNotes(): void {}\n`,
+    "editor/src/attachments/decoded-aspect.ts": `export function resetDecodedAspects(): void {}\n`,
+    "editor/src/attachments/session-caches.ts": `export function resetPreviewCache(): void {}
+export function resetTranscripts(): void {}\n`,
     "src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   clearAgentForLock();
   clearChat();
   clearAiOutput();
   await invoke("plugin:vault_unlock|vault_lock");
+  resetScrollMemory();
+  resetRecentNotes();
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
 }
 `,
     "src/lib/vault-switch.ts": `export async function leaveActiveVault(deps: {
@@ -291,6 +301,11 @@ function healthyFiles(): Record<string, string> {
   clearAiOutput();
   resetSessionIgnored();
   await lockVault();
+  resetScrollMemory();
+  resetRecentNotes();
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
 }
 `,
     // Mobile (myne-md/myne#456). One choke point, and the background listener,
@@ -299,6 +314,9 @@ function healthyFiles(): Record<string, string> {
     "mobile/src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   endAgentRun("lock", "");
   await invoke("plugin:vault-unlock|lock");
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
 }
 `,
     "mobile/src/app/flows/EditorFlow.tsx": `const flushAll = () => {
@@ -462,8 +480,8 @@ describe("check-frontend-lock-teardown: the cross product", () => {
           // Ids, not function names. Both clients call their choke point
           // `lockVault`, so a name-keyed roster could not tell them apart and a
           // skip for one would silently excuse the other.
-          appliesTo: ["desktop:leaveActiveVault"],
-          skips: { "desktop:lockVault": "not needed" },
+          appliesTo: ["desktop-switch"],
+          skips: { "desktop-lock": "not needed" },
         },
       ],
     });
@@ -471,7 +489,7 @@ describe("check-frontend-lock-teardown: the cross product", () => {
     // short. The other three are reported too, since this cut-down roster gives
     // them no reason at all.
     expect(errors).toContain(
-      "resetSessionIgnored does not apply to desktop:lockVault and gives no reason",
+      "resetSessionIgnored does not apply to desktop-lock and gives no reason",
     );
   });
 });

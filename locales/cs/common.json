@@ -1269,10 +1269,6 @@
       "turnedIntoTemplate": "Změněno na šablonu",
       "convertedToNote": "Převedeno na poznámku",
       "versionHistory": "Historie verzí",
-      "exportMarkdown": "Exportovat jako Markdown…",
-      "exportPdf": "Exportovat jako PDF…",
-      "exportHtml": "Exportovat jako HTML…",
-      "exportTxt": "Exportovat jako prostý text…",
       "trash": "Přesunout do koše"
     },
     "codeBlock": {
@@ -2201,10 +2197,6 @@
       "duplicate": "Duplikovat",
       "editFilterTitle": "Upravit filtr",
       "emptyState": "Zatím žádné poznámky.",
-      "exportHtml": "Exportovat jako HTML…",
-      "exportMarkdown": "Exportovat jako Markdown…",
-      "exportPdf": "Exportovat jako PDF…",
-      "exportTxt": "Exportovat jako prostý text…",
       "favoritesHeading": "Oblíbené",
       "icon": "Ikona…",
       "mergeAnyway": "Přesto sloučit",
@@ -2530,6 +2522,13 @@
     },
     "workspace": {
       "defaultSlotName": "Výchozí"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportovat…",
+      "txt": "Prostý text"
     }
   },
   "password": {

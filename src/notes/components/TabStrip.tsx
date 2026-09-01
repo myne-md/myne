@@ -16,7 +16,11 @@
 // (`overflow-x: auto`) AND the `…` menu lists every open tab for direct
 // switching when the strip is too narrow to show them all.
 
-import { dragRegionProps } from "../../screens/titlebar";
+import {
+  dragRegionProps,
+  TITLE_BAR_CONTROL_HEIGHT,
+  TITLE_BAR_CONTROL_TOP,
+} from "../../screens/titlebar";
 import {
   useState,
   type ButtonHTMLAttributes,
@@ -42,6 +46,7 @@ import { ornamentRole } from "@myne/ornaments";
  *  starts below the strip and leaves the tabs interactive during a drag. */
 export const STRIP_HEIGHT = 38;
 
+
 /** Base strip layout. Per-pane: each pane owns its own strip atop its editor
  *  body. A `--line-1` bottom hairline runs the FULL strip width — the editor's
  *  top edge — continuously (the active tab sits on it, Obsidian-style; the
@@ -49,13 +54,17 @@ export const STRIP_HEIGHT = 38;
  *  room. Fixed height; fills the pane width. `paddingLeft`/`paddingRight` are
  *  overridden per-instance to clear the corner window controls (insets). */
 const STRIP_BASE_PADDING_LEFT = 6;
+/** Top inset that gives the tabs breathing room. Named rather than inlined
+ *  because the strip's own buttons offset against it to land on the title-bar
+ *  row's line (see {@link TITLE_BAR_CONTROL_TOP}). */
+const STRIP_PADDING_TOP = 5;
 const stripStyle: CSSProperties = {
   display: "flex",
   alignItems: "stretch",
   flexShrink: 0,
   gap: 2,
   paddingInlineStart: STRIP_BASE_PADDING_LEFT,
-  paddingTop: 5,
+  paddingTop: STRIP_PADDING_TOP,
   height: STRIP_HEIGHT,
   background: "var(--paper-2)",
   borderBottom: "1px solid var(--line-1)",
@@ -74,8 +83,10 @@ const scrollAreaStyle: CSSProperties = {
   overflowY: "hidden",
 };
 
-/** Height of the small strip buttons (+ / overflow), centered in the strip. */
-const STRIP_BUTTON_HEIGHT = 28;
+/** Height of the small strip buttons (+ / overflow). Matched to the floated
+ *  title-bar controls they sit beside, rather than centred in the strip, which
+ *  is what put them two pixels low. */
+const STRIP_BUTTON_HEIGHT = TITLE_BAR_CONTROL_HEIGHT;
 
 const TITLE_MAX = 160;
 
@@ -639,17 +650,24 @@ function StripButton({
       aria-label={label}
       title={label}
       onClick={onClick}
+      data-testid="editor.tab-strip-button"
       {...hoverSurface()}
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        alignSelf: "center",
+        // Pinned to the row's own line rather than centred in the strip. The
+        // strip's content box starts below its top padding, so centring here
+        // lands the button below the floated controls beside it.
+        alignSelf: "flex-start",
+        marginTop: TITLE_BAR_CONTROL_TOP - STRIP_PADDING_TOP,
         width: 28,
         height: STRIP_BUTTON_HEIGHT,
         flexShrink: 0,
         border: 0,
-        borderRadius: 8,
+        // Was a literal 8, off the radius scale entirely, which read as a
+        // rounder square than the "…" and the sidebar toggle next to it.
+        borderRadius: "var(--radius-1)",
         background: "transparent",
         color: "var(--fg-3)",
         cursor: "pointer",
