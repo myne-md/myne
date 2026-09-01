@@ -1237,6 +1237,7 @@
     },
     "find": {
       "close": "Cerrar búsqueda",
+      "dateFallback": "Buscando {{stored}}, la forma en la que se guarda esta fecha.",
       "matchCase": "Distinguir mayúsculas y minúsculas",
       "matchCount": "{{current}} de {{total}}",
       "nextMatch": "Coincidencia siguiente",
@@ -1245,6 +1246,7 @@
       "previousMatch": "Coincidencia anterior",
       "replaceAll": "Reemplazar todo",
       "replaceAllCount": "Reemplazar todo ({{total}})",
+      "replaceOffOnDateFallback": "Reemplazar está desactivado mientras una fecha coincide por su forma guardada, para que un reemplazo no pueda dejarla ilegible.",
       "replaceOne": "Reemplazar",
       "replacePlaceholder": "Reemplazar por",
       "toggleReplace": "Alternar reemplazo"
@@ -3457,7 +3459,7 @@
     },
     "dateTime": {
       "dateLabel": "Formato de fecha",
-      "dateHelper": "Cómo se muestran las fechas en las tareas, las vistas guardadas y los adjuntos.",
+      "dateHelper": "Cómo se escribe una fecha allí donde Myne muestre alguna.",
       "dateSystem": "Según el idioma",
       "timeLabel": "Formato de hora",
       "timeHelper": "Si las horas se muestran en formato de 24 o de 12 horas.",

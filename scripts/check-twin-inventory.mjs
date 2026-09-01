@@ -262,6 +262,22 @@ const CURATED_TWINS = [
       "anything.",
   },
   {
+    a: "src/hooks/useDateTimeDisplaySync.ts",
+    b: "mobile/src/lib/useDateTimeDisplaySync.ts",
+    what: "publishes the shared date/time display store, one adapter per client",
+    why:
+      "The two publishers into `editor/src/host/lib/datetimeFormat.ts`'s module-scope store. " +
+      "Cross-path (`src/hooks` against `mobile/src/lib`), so the sweep cannot pair them, and this " +
+      "is the exact module class myne-md/myne#609 was filed about: for as long as mobile had no " +
+      "adapter at all, there was one publisher and three readers and nothing said so. Not a copy: " +
+      "each reads its own client's prefs seam, and mobile additionally re-reads on the prefs nonce " +
+      "because its host mounts the adapter above the stage machine. What must stay in step is the " +
+      "PUBLISHED VALUE, `displayFromPrefs(prefs, language)`, and the language listener that " +
+      "republishes it, since a language switch does not re-render either mounting component. " +
+      "`check-datetime-display-publisher.mjs` holds the weaker property (each client tree has a " +
+      "publisher at all); a one-sided edit to what gets published is what this pair is for.",
+  },
+  {
     a: "src/notes/prefsNonce.ts",
     b: "mobile/src/lib/prefsNonce.ts",
     what: "is the same prefs-nonce mechanism, duplicated rather than shared",
@@ -697,6 +713,19 @@ const ROSTER = [
     destination: "@myne/editor",
     reason:
       "Shim against hand copy, same shape. Desktop is one line into @myne/editor/host/notes/localDateTime; mobile carries 34.",
+  },
+  {
+    a: "src/hooks/useDateTimeDisplaySync.ts",
+    b: "mobile/src/lib/useDateTimeDisplaySync.ts",
+    // `decision`, not `screen`. `screen` is an enumerated verdict meaning the
+    // rendered surface or the HOST, and an adapter that reads a prefs seam is
+    // neither; the spec holds that list to its definition rather than to its
+    // size, which is what caught this. The destination is settled all the same,
+    // so it is `per-client` rather than `undecided`.
+    verdict: "decision",
+    destination: "per-client",
+    reason:
+      "Per-client by construction, not by drift: each adapter reads its own client's prefs seam, and mobile additionally re-reads on the prefs nonce because its host mounts the adapter above the stage machine, so unlock is the event that makes prefs readable at all. What must not diverge is the VALUE published, displayFromPrefs(prefs, language), and the language listener that republishes it, since a language switch re-renders neither mounting component. check-datetime-display-publisher.mjs holds the weaker property that each client tree has a publisher at all; a one-sided edit to what gets published is what this pair is here for (myne-md/myne#609).",
   },
   {
     a: "src/notes/prefsNonce.ts",

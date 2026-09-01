@@ -1179,6 +1179,7 @@
     },
     "find": {
       "close": "Funga utafutaji",
+      "dateFallback": "Inatafuta {{stored}}, ndiyo hali ambayo tarehe hii huhifadhiwa.",
       "matchCase": "Linganisha herufi kubwa na ndogo",
       "matchCount": "{{current}} kati ya {{total}}",
       "nextMatch": "Tokeo linalofuata",
@@ -1187,6 +1188,7 @@
       "previousMatch": "Tokeo lililotangulia",
       "replaceAll": "Badilisha zote",
       "replaceAllCount": "Badilisha zote ({{total}})",
+      "replaceOffOnDateFallback": "Kubadilisha kumezimwa maadamu tarehe inapatikana kwa umbo lake lililohifadhiwa, ili ubadilishaji usiifanye tarehe isisomeke.",
       "replaceOne": "Badilisha",
       "replacePlaceholder": "Badilisha na",
       "toggleReplace": "Washa/zima ubadilishaji"
@@ -3319,7 +3321,7 @@
     },
     "dateTime": {
       "dateLabel": "Muundo wa tarehe",
-      "dateHelper": "Jinsi tarehe zinavyoonyeshwa katika kazi, mionekano iliyohifadhiwa na viambatisho.",
+      "dateHelper": "Jinsi tarehe inavyoandikwa kila mahali Myne inapoonyesha moja.",
       "dateSystem": "Fuata lugha",
       "timeLabel": "Muundo wa saa",
       "timeHelper": "Ikiwa saa zinaonyeshwa kwa mfumo wa saa 24 au saa 12.",

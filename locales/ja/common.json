@@ -1188,6 +1188,7 @@
     },
     "find": {
       "close": "検索を閉じる",
+      "dateFallback": "{{stored}} を検索しています。これはこの日付が保存されている形式です。",
       "matchCase": "大文字小文字を区別",
       "matchCount": "{{total}}件中{{current}}件目",
       "nextMatch": "次の一致",
@@ -1196,6 +1197,7 @@
       "previousMatch": "前の一致",
       "replaceAll": "すべて置換",
       "replaceAllCount": "すべて置換（{{total}}）",
+      "replaceOffOnDateFallback": "日付が保存形式で一致している間は置換を無効にしています。置換によって日付が読み取れなくなるのを防ぐためです。",
       "replaceOne": "置換",
       "replacePlaceholder": "置換後の文字列",
       "toggleReplace": "置換を切り替え"
@@ -3347,7 +3349,7 @@
     },
     "dateTime": {
       "dateLabel": "日付形式",
-      "dateHelper": "タスク、保存されたビュー、添付ファイルで日付をどのように表示するか。",
+      "dateHelper": "Myne が日付を表示するすべての場所で、日付をどう書くか。",
       "dateSystem": "言語に合わせる",
       "timeLabel": "時刻形式",
       "timeHelper": "時刻を24時間制で表示するか、12時間制で表示するか。",

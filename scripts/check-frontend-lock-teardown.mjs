@@ -80,6 +80,18 @@ export const LEAVING_PATHS = [
     fn: "leaveActiveVault",
     why: "Vault CHANGE specifically, which is a superset of a lock: it is the only path where the next thing opened is a different vault.",
   },
+  {
+    id: "desktop-delete",
+    file: "src/lib/vault-delete.ts",
+    fn: "deleteVault",
+    why: "The one desktop leaving path that reaches NEITHER of the two above, and the sharpest of the three: the vault it leaves no longer exists, so nothing will ever republish over what a store kept. Added by myne-md/myne#609 after a reviewer traced it; every store on this roster had been asserted on two paths and was resident after the third.",
+  },
+  {
+    id: "mobile-delete",
+    file: "mobile/src/lib/vault-delete.ts",
+    fn: "deleteVault",
+    why: "Mobile's delete, which bypasses `lockVault` exactly as desktop's bypasses both of its chokepoints. Worse here than on desktop: the stage leaves the editor without advancing the prefs nonce, so mobile's publisher never re-reads and the erased vault's values stay resident for the rest of the process.",
+  },
 ];
 
 /** The clear-on-leave call each module-scope vault-derived store exposes.
@@ -96,6 +108,18 @@ export const LEAVING_PATHS = [
  * A store that applies to fewer paths says which, and says why for each one it
  * skips. The reason is the load-bearing field: it is what a later reader checks
  * when the store's contents change. */
+/** Three skip reasons the roster states once, because each is the SAME fact
+ * about a whole class of stores and a hand-copy per entry is a second place to
+ * drift. Each is length-checked by `analyse` exactly as an inline reason is. */
+const SKIP_DESKTOP_ONLY =
+  "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on this client to clear. Verified by searching the mobile tree for the symbol rather than assumed from the path. Stated rather than left silent: the two mobile paths joined this roster in myne-md/myne#609, and a skip with no reason is exactly what this guard length-checks for.";
+
+const SKIP_ERASED =
+  "the vault is being ERASED, and this store describes that vault's CONTENT, which is going away with it. The display store is the one entry asserted on the delete paths instead, because what it holds describes the READER (their formats and their zone) and therefore outlives the vault.";
+
+const SKIP_NO_SPELL_LAYER =
+  "mobile compiles `editor/src` and therefore does hold this store, but it runs no spell layer: there is no `spell_enabled` surface and no dictionary plugin under `mobile/src`, so nothing on this client ever puts a word in the set. If a mobile spell surface lands, this skip is what should fail first.";
+
 export const TEARDOWN_CALLS = [
   {
     call: "clearAgentForLock",
@@ -109,9 +133,37 @@ export const TEARDOWN_CALLS = [
     // `lockVault` without anything noticing.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
-      "mobile-lock":
-        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+      "mobile-lock": SKIP_DESKTOP_ONLY,
+      "mobile-delete": SKIP_DESKTOP_ONLY,
+      "desktop-delete": SKIP_ERASED,
     },
+  },
+  {
+    call: "resetDateTimeDisplayForLock",
+    declaredIn: "editor/src/host/lib/datetimeFormat.ts",
+    holds:
+      "the reader's date format, time format and TIME ZONE, all derived from decrypted vault.prefs",
+    // Every leaving path, and the ONLY entry here that is asserted on the two
+    // delete paths. The zone is what puts it on the roster rather than the
+    // formats: it is a coarse-location datum that every other layer keeps per
+    // vault, and `dialect/src/taskFields.ts` keeps it out of note bytes for that
+    // reason. The store is module scope in a SHARED package, read by every
+    // surface that prints a date, and nothing in production returned it to
+    // defaults, so after one unlock the previous vault's zone stayed resident
+    // through a lock and into the next session until that vault's publisher
+    // happened to overwrite it (myne-md/myne#609, found by review).
+    //
+    // Asserted on the delete paths because what it holds describes the READER
+    // rather than the vault: erasing the vault erases the source of the value,
+    // never the value, and no publisher will ever overwrite it again.
+    appliesTo: [
+      "desktop-lock",
+      "desktop-switch",
+      "desktop-delete",
+      "mobile-lock",
+      "mobile-delete",
+    ],
+    skips: {},
   },
   {
     call: "clearChat",
@@ -127,8 +179,9 @@ export const TEARDOWN_CALLS = [
     // format" argument on this transcript being RAM-only and dropped on lock.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
-      "mobile-lock":
-        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+      "mobile-lock": SKIP_DESKTOP_ONLY,
+      "mobile-delete": SKIP_DESKTOP_ONLY,
+      "desktop-delete": SKIP_ERASED,
     },
   },
   {
@@ -148,8 +201,9 @@ export const TEARDOWN_CALLS = [
     // neither leaving path can speak for it.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
-      "mobile-lock":
-        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+      "mobile-lock": SKIP_DESKTOP_ONLY,
+      "mobile-delete": SKIP_DESKTOP_ONLY,
+      "desktop-delete": SKIP_ERASED,
     },
   },
   {
@@ -164,8 +218,9 @@ export const TEARDOWN_CALLS = [
     // callers, which is how it earned an entry rather than a comment.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
-      "mobile-lock":
-        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+      "mobile-lock": SKIP_DESKTOP_ONLY,
+      "mobile-delete": SKIP_DESKTOP_ONLY,
+      "desktop-delete": SKIP_ERASED,
     },
   },
   {
@@ -178,8 +233,9 @@ export const TEARDOWN_CALLS = [
     // that produced it (myne-md/myne#601).
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
-      "mobile-lock":
-        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+      "mobile-lock": SKIP_DESKTOP_ONLY,
+      "mobile-delete": SKIP_DESKTOP_ONLY,
+      "desktop-delete": SKIP_ERASED,
     },
   },
   {
@@ -197,7 +253,10 @@ export const TEARDOWN_CALLS = [
     // a re-unlock, which is the thing the cache exists to avoid and not the
     // thing it is worth keeping a locked vault's roster in memory for.
     appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
-    skips: {},
+    skips: {
+      "desktop-delete": SKIP_ERASED,
+      "mobile-delete": SKIP_ERASED,
+    },
   },
   {
     call: "resetPreviewCache",
@@ -212,7 +271,10 @@ export const TEARDOWN_CALLS = [
     // the cache so a read crossing a lock cannot resolve into the next
     // session's entries.
     appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
-    skips: {},
+    skips: {
+      "desktop-delete": SKIP_ERASED,
+      "mobile-delete": SKIP_ERASED,
+    },
   },
   {
     call: "resetTranscripts",
@@ -226,7 +288,10 @@ export const TEARDOWN_CALLS = [
     // "not widened" beyond A6/A7/A10, and carrying it into a DIFFERENT vault's
     // session is wider than that.
     appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
-    skips: {},
+    skips: {
+      "desktop-delete": SKIP_ERASED,
+      "mobile-delete": SKIP_ERASED,
+    },
   },
   {
     call: "resetSessionIgnored",
@@ -234,10 +299,11 @@ export const TEARDOWN_CALLS = [
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",
     appliesTo: ["desktop-switch"],
     skips: {
-      "mobile-lock":
-        "Mobile does not reach this store: the ignored-word set lives in the desktop editor's spell decoration and nothing under `mobile/src` imports it, so asserting the call there would demand a clear for something never populated. Checked by searching the mobile tree for the symbol.",
       "desktop-lock":
         "A plain lock does not change vault, and the ignore-this-session set is scoped to the session the user is still in. Clearing it at the lock choke point would discard a choice they made about the vault they are about to re-open. The store's own comment states the reason as a vault CHANGE, which is why this one is asserted on the switch path only.",
+      "mobile-lock": SKIP_NO_SPELL_LAYER,
+      "mobile-delete": SKIP_NO_SPELL_LAYER,
+      "desktop-delete": SKIP_ERASED,
     },
   },
 ];
@@ -304,6 +370,22 @@ export function bodyOf(src, at) {
 export function analyse({ files, leavingPaths, teardownCalls }) {
   const errors = [];
 
+  // Every leaving path carries a unique id, because the id is the key both
+  // `appliesTo` and `skips` are read by. A missing one turns every lookup on
+  // that path into `undefined` (so every store reports "gives no reason"), and
+  // a duplicated one lets two paths share a verdict without saying so.
+  const seenIds = new Set();
+  for (const path of leavingPaths) {
+    if (typeof path.id !== "string" || path.id.length === 0) {
+      errors.push(`${path.file}::${path.fn} has no id (the roster is keyed by id)`);
+      continue;
+    }
+    if (seenIds.has(path.id)) {
+      errors.push(`two leaving paths share the id ${path.id}`);
+    }
+    seenIds.add(path.id);
+  }
+
   // A roster that has outlived its subject is worse than no roster.
   for (const { call, declaredIn } of teardownCalls) {
     const src = files[declaredIn];
@@ -342,6 +424,18 @@ export function analyse({ files, leavingPaths, teardownCalls }) {
       errors.push(`${path.fn}'s extracted body in ${path.file} spans another function`);
       continue;
     }
+    // Keyed on the path's `id`, never on its `fn`. Two clients name their choke
+    // point `lockVault` and both name their delete `deleteVault`, so a bare
+    // name is the same conflation `check-ipc-binding-callers.mjs` was corrected
+    // for one guard over: with it, mobile's `lockVault` was required to call
+    // the DESKTOP-only stores, and a mobile skip could not be written at all
+    // (myne-md/myne#609, found when the mobile paths joined the roster).
+    //
+    // An `id` is hand-assigned, so it can drift from the file it labels in a
+    // way a derived `<file>::<fn>` key cannot. That is why `idErrors` below
+    // runs FIRST: a missing or duplicated id is what the drift looks like, and
+    // a duplicate is the shape that would silently answer one path's assertion
+    // with another path's roster row.
     for (const t of teardownCalls) {
       if (!t.appliesTo.includes(path.id)) {
         // A skip needs a stated reason, on the same rule the exemption list in
