@@ -89,7 +89,11 @@ test.describe("mobile date and time settings", () => {
     await page.goto("/");
     await openEditorPanel(page);
 
-    await page.getByTestId("settings.dateTime.time-segmented.24h").click();
+    // A HYPHEN before the value. `Segmented` derives its segment testids as
+    // `${testIdPrefix}-${value}`, which the reminders flow tier also reads
+    // (`settings.reminders-horizon-picker-1`). This read a dot until
+    // myne-md/myne#609 met develop's component at a merge.
+    await page.getByTestId("settings.dateTime.time-segmented-24h").click();
 
     await expect
       .poll(() => page.evaluate(() => (window as unknown as Win).__timeFormatWrites))
