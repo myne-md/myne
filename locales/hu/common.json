@@ -1188,6 +1188,7 @@
     },
     "find": {
       "close": "Keresés bezárása",
+      "dateFallback": "Keresés erre: {{stored}}, ebben a formában van tárolva ez a dátum.",
       "matchCase": "Kis- és nagybetű megkülönböztetése",
       "matchCount": "{{current}} / {{total}}",
       "nextMatch": "Következő találat",
@@ -1196,6 +1197,7 @@
       "previousMatch": "Előző találat",
       "replaceAll": "Mind cseréje",
       "replaceAllCount": "Mind cseréje ({{total}})",
+      "replaceOffOnDateFallback": "A csere ki van kapcsolva, amíg egy dátum a tárolt formájával található meg, hogy egy csere ne tehesse olvashatatlanná a dátumot.",
       "replaceOne": "Csere",
       "replacePlaceholder": "Csere erre",
       "toggleReplace": "Csere be-/kikapcsolása"
@@ -3347,7 +3349,7 @@
     },
     "dateTime": {
       "dateLabel": "Dátumformátum",
-      "dateHelper": "Hogyan jelennek meg a dátumok a feladatoknál, a mentett nézeteknél és a mellékleteknél.",
+      "dateHelper": "Hogyan írja ki a Myne a dátumot mindenütt, ahol megjelenít egyet.",
       "dateSystem": "Nyelv szerint",
       "timeLabel": "Időformátum",
       "timeHelper": "Az időpontok 24 órás vagy 12 órás formátumban jelenjenek-e meg.",

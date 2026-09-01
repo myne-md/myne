@@ -80,10 +80,53 @@ import { join, relative, resolve } from "node:path";
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
 const RECORD = join(ROOT, "scripts", "ipc-binding-callers.json");
 
-/** Trees whose modules may declare an IPC binding. */
-const BINDING_ROOTS = ["src/lib", "mobile/src/lib"];
-/** Trees a caller may live in. A test does not count. */
-const CALLER_ROOTS = ["src", "web/src", "mobile/src", "editor/src", "dialect/src"];
+/**
+ * Trees whose modules may declare an IPC binding, and for EACH, the trees a
+ * caller may live in. A test does not count.
+ *
+ * **Scoped per binding tree, and that is load-bearing** (found while wiring
+ * myne-md/myne#609). It was one flat `CALLER_ROOTS` list containing both `src`
+ * and `mobile/src`, and callers are matched by NAME, so a binding in
+ * `mobile/src/lib/*.ts` was satisfied by a same-named binding's caller in the
+ * DESKTOP tree. The twin modules are same-named by design, so the blind spot was
+ * as wide as the twin set.
+ *
+ * Measured, by flattening the roster back and reading what the guard then says:
+ * TWELVE recorded exemptions go stale, meaning twelve bindings the guard would
+ * have called live are dead in their own tree. Two of them are not cosmetic:
+ * `mobile/src/lib/vault-unlock.ts:reportUserActivity` is the auto-lock activity
+ * reporter and `:isVaultUnlocked` is the lock probe, and both look answered
+ * because desktop calls functions of those names.
+ *
+ * The first version of this comment claimed the measurement was the three prefs
+ * setters this issue added, which is WRONG and worth leaving here rather than
+ * quietly correcting, because it is the same class of error the guard exists to
+ * catch: `bindingsInSource` requires a literal `invoke("plugin:x|y")` inside the
+ * function body, and every prefs setter goes through `writePref`, so the guard
+ * never saw those three at all. A justification nobody re-measured described a
+ * detector path this file does not have.
+ *
+ * The shared packages appear under BOTH, deliberately: `editor/src` and
+ * `dialect/src` are compiled into every client, so a call from either is a real
+ * call for either binding tree. `web/src` belongs only to the desktop side,
+ * since it compiles the shared `src/` tree and nothing of mobile's.
+ */
+export const CALLER_ROOTS_FOR = Object.freeze({
+  "src/lib": ["src", "web/src", "editor/src", "dialect/src"],
+  "mobile/src/lib": ["mobile/src", "editor/src", "dialect/src"],
+});
+
+const BINDING_ROOTS = Object.keys(CALLER_ROOTS_FOR);
+
+/**
+ * What `--record` writes as an entry's reason, and what the ratchet REFUSES.
+ *
+ * One constant so the writer and the check cannot drift, which is how this went
+ * wrong: the string is 15 characters, the check required 12, and seven entries
+ * sat in the record carrying it. The record then claimed a reason for each of
+ * them, which is the exact state the reason requirement exists to prevent.
+ */
+export const PLACEHOLDER_REASON = "REASON REQUIRED";
 
 const IS_TEST = /(^|\/)(tests?|__tests__)\//;
 const TEST_FILE = /\.(test|spec)\.[jt]sx?$/;
@@ -146,6 +189,40 @@ export function withoutImports(text) {
     .replace(/^\s*import\s*["'][^"']+["'];?\s*$/gm, "");
 }
 
+/** The local names an importing file gave to each imported name.
+ *
+ * `{ importedName -> Set<localName> }`, for `import { a as b }` only.
+ *
+ * **Without this the guard calls a live binding dead**, and it did: mobile's
+ * `clipboardTransport.ts:writeText` is imported by `editor-host.ts` and
+ * `EditorFlow.tsx` as `import { writeText as clipboardWriteText }`, so the call
+ * sites read `clipboardWriteText(`. {@link withoutImports} then removes the one
+ * line connecting the two names, the `\bwriteText\b` probe matches nothing, and
+ * the binding is reported as having no caller. It was recorded as an exemption
+ * on exactly that evidence, which is a false statement in a record whose whole
+ * job is to be re-argued later.
+ *
+ * Narrow on purpose: `import * as ns` is not resolved, because a call through a
+ * namespace reads `ns.writeText(` and the plain word probe already matches it.
+ */
+export function importAliases(text) {
+  const out = new Map();
+  const re = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*["'][^"']+["']/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    for (const piece of m[1].split(",")) {
+      const parts = piece.trim().split(/\s+as\s+/);
+      if (parts.length !== 2) continue;
+      const imported = parts[0].replace(/^type\s+/, "").trim();
+      const local = parts[1].trim();
+      if (imported === "" || local === "" || imported === local) continue;
+      if (!out.has(imported)) out.set(imported, new Set());
+      out.get(imported).add(local);
+    }
+  }
+  return out;
+}
+
 /** The tree as `deadBindings` wants it.
  *
  * Both maps are keyed by the SAME relative path, because the `other === rel`
@@ -154,15 +231,24 @@ export function withoutImports(text) {
  * re-reading per binding is what turns a 1 s guard into a 40 s one on a tree
  * this size. */
 function readTree() {
-  const bindingFiles = BINDING_ROOTS.flatMap((r) => walk(join(ROOT, r)));
-  const callerFiles = [...new Set(CALLER_ROOTS.flatMap((r) => walk(join(ROOT, r))))].filter(
-    (f) => !IS_TEST.test(relative(ROOT, f)),
-  );
   const read = (fs) => new Map(fs.map((f) => [relative(ROOT, f), readFileSync(f, "utf8")]));
+  // One `{bindings, callers}` pair PER binding tree, so a mobile binding is
+  // never satisfied by a desktop caller of the same name. Merged back into one
+  // result afterwards, because the ratchet and the report are tree-agnostic.
+  const perTree = BINDING_ROOTS.map((bindingRoot) => {
+    const bindingFiles = walk(join(ROOT, bindingRoot));
+    const callerFiles = [
+      ...new Set(CALLER_ROOTS_FOR[bindingRoot].flatMap((r) => walk(join(ROOT, r)))),
+    ].filter((f) => !IS_TEST.test(relative(ROOT, f)));
+    return {
+      bindings: read(bindingFiles),
+      callers: read(callerFiles),
+      moduleCount: bindingFiles.length,
+    };
+  });
   return {
-    bindings: read(bindingFiles),
-    callers: read(callerFiles),
-    moduleCount: bindingFiles.length,
+    perTree,
+    moduleCount: perTree.reduce((n, t) => n + t.moduleCount, 0),
   };
 }
 
@@ -181,7 +267,10 @@ function readTree() {
 export function deadBindings({ bindings, callers }) {
   // Stripped ONCE, not per binding. Re-stripping inside the inner loop is what
   // turns a 1 s guard into a 40 s one, for the same reason the read is hoisted.
-  const stripped = [...callers].map(([k, v]) => [k, withoutImports(v)]);
+  // The alias map is read from the ORIGINAL text and the body from the stripped
+  // one, which is the whole point: the import line is what names the alias, and
+  // it is also the line that must not count as a call.
+  const stripped = [...callers].map(([k, v]) => [k, withoutImports(v), importAliases(v)]);
   const dead = [];
   let checked = 0;
   for (const [rel, src] of bindings) {
@@ -189,7 +278,7 @@ export function deadBindings({ bindings, callers }) {
       checked += 1;
       const word = new RegExp(`\\b${name}\\b`);
       let called = false;
-      for (const [other, text] of stripped) {
+      for (const [other, text, aliases] of stripped) {
         if (other === rel) continue;
         // A re-export moves the problem rather than solving it.
         if (new RegExp(`export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`).test(text)) continue;
@@ -197,12 +286,47 @@ export function deadBindings({ bindings, callers }) {
           called = true;
           break;
         }
+        // The same question asked under whatever local name this file bound the
+        // import to. See `importAliases`: without it an aliased import is
+        // indistinguishable from no import at all, because the line that carried
+        // both names has just been stripped.
+        const locals = aliases.get(name);
+        if (locals !== undefined) {
+          for (const local of locals) {
+            if (new RegExp(`\\b${local}\\b`).test(text)) {
+              called = true;
+              break;
+            }
+          }
+          if (called) break;
+        }
       }
       if (!called) dead.push(`${rel}:${name}`);
     }
   }
   dead.sort();
   return { dead, checked };
+}
+
+/** Run {@link deadBindings} once PER binding tree and merge the verdicts.
+ *
+ * This is the scoping, and it is a function rather than three lines inside
+ * `main()` because it was three lines inside `main()` and therefore had no test
+ * at all. What it buys is that a binding in `mobile/src/lib` is never answered
+ * by a same-named caller in the desktop tree: callers are matched by NAME, and
+ * the twin modules are same-named by design, so one flat world silently reports
+ * twelve dead mobile bindings as live (measured; see
+ * `scripts/ipc-binding-callers.json`).
+ *
+ * Merged back into one flat verdict afterwards, because the ratchet and the
+ * report are tree-agnostic and an entry names its own path already.
+ */
+export function deadBindingsAcrossTrees(perTree) {
+  const results = perTree.map((t) => deadBindings(t));
+  return {
+    dead: results.flatMap((r) => r.dead).sort(),
+    checked: results.reduce((n, r) => n + r.checked, 0),
+  };
 }
 
 /** The ratchet's verdict on a measured `dead` list against a recorded `exempt`.
@@ -216,7 +340,16 @@ export function ratchet(dead, exempt) {
   return {
     news: dead.filter((d) => !(d in exempt)),
     unreasoned: Object.entries(exempt)
-      .filter(([, why]) => typeof why !== "string" || why.trim().length < 12)
+      .filter(
+        ([, why]) =>
+          typeof why !== "string" ||
+          why.trim().length < 12 ||
+          // The `--record` placeholder is 15 characters, so it PASSED the length
+          // check and seven entries carried it for months: the record claimed a
+          // reason nobody had written, which is precisely the state the reason
+          // requirement exists to prevent. Rejected by name (myne-md/myne#609).
+          why.trim() === PLACEHOLDER_REASON,
+      )
       .map(([k]) => k),
     stale: Object.keys(exempt).filter((k) => !dead.includes(k)),
   };
@@ -234,30 +367,40 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
 
 function main() {
   const tree = readTree();
-  const { dead, checked } = deadBindings(tree);
+  // `deadBindings` still takes one flat world, which is the half worth testing
+  // and the shape every case in `tests/scripts/ipcBindingCallers.test.ts` drives.
+  // The scoping lives here, in the runner, so the decision function is unchanged.
+  const { dead, checked } = deadBindingsAcrossTrees(tree.perTree);
 
-  if (process.argv.includes("--record")) {
-    writeFileSync(
-      RECORD,
-      `${JSON.stringify(
-        {
-          $comment: [
-            "IPC bindings with no production caller. Each entry needs a REASON,",
-            "because an entry without one is indistinguishable from a defect",
-            "somebody recorded instead of fixing. Ratchet: may shrink, never grow.",
-          ],
-          exempt: Object.fromEntries(dead.map((d) => [d, "REASON REQUIRED"])),
-        },
-        null,
-        2,
-      )}\n`,
-    );
-    console.log(`ipc-binding-callers: recorded ${dead.length} exemption(s)`);
-    process.exit(0);
-  }
-
+  // Read before the `--record` branch, because that branch now MERGES into what
+  // is already recorded rather than replacing it.
   const record = existsSync(RECORD) ? JSON.parse(readFileSync(RECORD, "utf8")) : { exempt: {} };
   const exempt = record.exempt ?? {};
+
+  if (process.argv.includes("--record")) {
+    // MERGES, never overwrites. The first version rebuilt the whole file from
+    // the measurement, so running the command the failure message itself
+    // recommends ("Remove them with --record") replaced every hand-written
+    // reason with the placeholder and dropped the `$comment` explaining the
+    // record. The one legitimate use of --record, dropping an entry whose
+    // binding has acquired a caller, therefore destroyed the reasons for the
+    // eighteen entries it was not about. An entry keeps whatever reason it
+    // already had; only genuinely new ones get the placeholder, which the
+    // ratchet then refuses until somebody writes one.
+    const kept = Object.fromEntries(
+      dead.map((d) => [d, typeof exempt[d] === "string" ? exempt[d] : PLACEHOLDER_REASON]),
+    );
+    const dropped = Object.keys(exempt).filter((k) => !dead.includes(k));
+    writeFileSync(
+      RECORD,
+      `${JSON.stringify({ $comment: record.$comment ?? [], exempt: kept }, null, 2)}\n`,
+    );
+    console.log(
+      `ipc-binding-callers: recorded ${dead.length} exemption(s)` +
+        (dropped.length > 0 ? ` (dropped ${dropped.length}: ${dropped.join(", ")})` : ""),
+    );
+    process.exit(0);
+  }
 
   const { news, unreasoned, stale } = ratchet(dead, exempt);
 

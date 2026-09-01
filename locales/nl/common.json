@@ -1188,6 +1188,7 @@
     },
     "find": {
       "close": "Zoeken sluiten",
+      "dateFallback": "Er wordt gezocht naar {{stored}}, de vorm waarin deze datum is opgeslagen.",
       "matchCase": "Hoofdlettergevoelig",
       "matchCount": "{{current}} van {{total}}",
       "nextMatch": "Volgende overeenkomst",
@@ -1196,6 +1197,7 @@
       "previousMatch": "Vorige overeenkomst",
       "replaceAll": "Alles vervangen",
       "replaceAllCount": "Alles vervangen ({{total}})",
+      "replaceOffOnDateFallback": "Vervangen staat uit zolang een datum via de opgeslagen vorm wordt gevonden, zodat een vervanging de datum niet onleesbaar kan maken.",
       "replaceOne": "Vervangen",
       "replacePlaceholder": "Vervangen door",
       "toggleReplace": "Vervangen aan/uit"
@@ -3347,7 +3349,7 @@
     },
     "dateTime": {
       "dateLabel": "Datumnotatie",
-      "dateHelper": "Hoe datums worden getoond bij taken, opgeslagen weergaven en bijlagen.",
+      "dateHelper": "Hoe een datum wordt geschreven, overal waar Myne er een toont.",
       "dateSystem": "Volg de taal",
       "timeLabel": "Tijdnotatie",
       "timeHelper": "Of tijden worden getoond op een 24-uurs- of een 12-uursklok.",

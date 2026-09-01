@@ -179,7 +179,14 @@ describe("check-twin-inventory", () => {
     // clients' copies, which is the destination the entry itself named. A twin
     // that stops being a twin because the duplication was resolved leaves the
     // roster the same way a deleted file does.
-    expect(full.out).toContain("104 twin(s) discovered");
+    //
+    // Then 104 to 105: myne-md/myne#609 gave mobile a date/time display
+    // publisher, so `src/hooks/useDateTimeDisplaySync.ts` acquired a counterpart
+    // at `mobile/src/lib/useDateTimeDisplaySync.ts`. Cross-path, so it is
+    // curated rather than swept, and it is the exact module class that issue was
+    // filed about: for as long as there was one publisher and three readers,
+    // nothing in the tree said so.
+    expect(full.out).toContain("105 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -353,7 +360,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(104);
+    expect(ROSTER.length).toBe(105);
   });
 
   it("keeps `screen` narrow", () => {

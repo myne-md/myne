@@ -1188,6 +1188,7 @@
     },
     "find": {
       "close": "찾기 닫기",
+      "dateFallback": "{{stored}}을(를) 검색하고 있습니다. 이 날짜가 저장되는 형식입니다.",
       "matchCase": "대소문자 일치",
       "matchCount": "{{total}}개 중 {{current}}",
       "nextMatch": "다음 일치",
@@ -1196,6 +1197,7 @@
       "previousMatch": "이전 일치",
       "replaceAll": "모두 바꾸기",
       "replaceAllCount": "모두 바꾸기 ({{total}})",
+      "replaceOffOnDateFallback": "날짜가 저장 형식으로 일치하는 동안에는 바꾸기가 꺼집니다. 바꾸기로 인해 날짜를 읽을 수 없게 되는 것을 막기 위해서입니다.",
       "replaceOne": "바꾸기",
       "replacePlaceholder": "바꿀 내용",
       "toggleReplace": "바꾸기 전환"
@@ -3347,7 +3349,7 @@
     },
     "dateTime": {
       "dateLabel": "날짜 형식",
-      "dateHelper": "할 일, 저장된 뷰, 첨부 파일 전반에서 날짜를 표시하는 방식입니다.",
+      "dateHelper": "Myne가 날짜를 보여 주는 모든 곳에서 날짜를 어떻게 쓸지.",
       "dateSystem": "언어에 맞춤",
       "timeLabel": "시간 형식",
       "timeHelper": "시간을 24시간제로 표시할지 12시간제로 표시할지 정합니다.",

@@ -1307,6 +1307,30 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
 
   // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
   // emits `PREFS_SYNC_APPLIED_EVENT` (never for this device's own IPC writes).
+  // A vault is open, and this is the ONE place on mobile that is true (myne-md/myne#609).
+  //
+  // Announce it on the prefs nonce, because that nonce is how a root-mounted
+  // consumer learns prefs became readable. Before this, the only two bump sites
+  // were `writePref` and the sync bridge below, and neither fires on an unlock:
+  // `useDateTimeDisplaySync` mounts in `AppShell`, above the stage machine, so
+  // its first `prefsRead()` hit a locked slot, the rejection was swallowed, and
+  // nothing re-ran. The shared display store then held its defaults for the whole
+  // session, which is exactly the inert-on-mobile defect this feature was filed
+  // to fix, one layer over.
+  //
+  // Keyed on `vaultId` rather than mount, so a vault SWITCH re-announces too.
+  // Without that the store keeps the previous vault's format and zone until the
+  // next prefs write, and the zone is a coarse-location datum the multi-vault
+  // posture keeps per vault everywhere else.
+  //
+  // Here rather than in each unlock path: password, quick unlock, recovery,
+  // creation and vault switch all land on the `editor` stage, and this component
+  // renders for that stage alone. A bump per unlock path is the partial fix that
+  // works for whichever path its author was looking at.
+  useEffect(() => {
+    bumpPrefsNonce();
+  }, [vaultId]);
+
   // Bridge it into the prefs nonce so an incoming vault rename / shared-pref
   // change refreshes the header + settings live; the switcher's vault list
   // re-fetches on its next open (its RAM-cache label was refreshed core-side).

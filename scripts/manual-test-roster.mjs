@@ -4172,8 +4172,37 @@ export const ROSTER = Object.freeze([
       "src/lib/useDateTimeDisplay.ts",
       "src/notes/dailyNote.ts",
       "src/notes/taskFilters.ts",
+      // myne-md/myne#609 widened this setting's reach twice: to the in-note task
+      // chip on every client, and to mobile at all, which had read the shared
+      // display store while writing nothing into it.
+      "editor/src/decorations/task-chip.ts",
+      "editor/src/decorations/plugin-factory.ts",
+      "mobile/src/lib/useDateTimeDisplaySync.ts",
+      "mobile/src/app/flows/SettingsSheet.tsx",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
+    // EMPTY, deliberately, and it was briefly not.
+    //
+    // Three scenarios covering this surface are WRITTEN (`tc4`, `tc5` in
+    // `e2e/task-chips.e2e.ts`; `fr3` in `e2e/find-replace.e2e.ts`) and have
+    // never executed: the container run died in cargo on a full Docker VM.
+    // `automatedBy` is a claim that a machine covers this, and no machine has,
+    // so naming the files here would record automation nobody watched run, which
+    // is the class of error myne-md/myne#609 spent its review round removing.
+    //
+    // The scenario FLOOR is the other side of the same fact and is deliberately
+    // not symmetric: `scripts/e2e-scenario-floor.json` was raised to 306, which
+    // REQUIRES the three to execute rather than claiming they did, so the first
+    // run that skips them goes red. Requiring is honest; claiming is not. Fill
+    // this in when the run is green three times consecutively.
+    //
+    // One lane DOES cover part of this and is not `automatedBy` material,
+    // because this field names `e2e/` scenarios:
+    // `mobile/tests/flow-logic/settings/date-time.flow.ts` runs on every push
+    // and proves the three mobile rows are WIRED (a pick reaches its setter,
+    // and the zone field restores the stored value on both of its failure
+    // paths). What it cannot reach is a real prefs write arriving over sync,
+    // which is what the manual items below are for.
     automatedBy: [],
     manual: [
       {
@@ -4196,6 +4225,13 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 10,
         tier: "standard",
+      },
+      {
+        see: "On a phone, open Settings then Editor and confirm the three date-and-time rows are present. Set a date format there and confirm a task line's due chip inside an open note redraws in it without leaving the note. Then, against the same synced vault, choose a DIFFERENT date format on a computer and confirm the phone adopts it on the next sync with nothing set on the phone; and confirm the time-zone value set on the phone does NOT displace the one already set on the computer.",
+        whyNotAutomated: "No lane drives a phone's WebView: the container suite runs WebKitGTK on Linux, and mobile's Playwright tier drives its React tree against a mocked Tauri IPC, so neither can produce a real prefs write arriving over sync nor observe which side of the merge each field lands on.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "core",
       },
     ],
     exemptionReason: "",
