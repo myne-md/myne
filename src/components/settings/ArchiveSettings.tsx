@@ -22,7 +22,7 @@ import { SettingRow } from "./SettingRow";
 import {
   prefsRead,
   setArchiveDisabled,
-  setArchivedFolders,
+  mutateArchivedFolders,
 } from "../../lib/prefs";
 import { archivedRecords, useSelectedNote } from "../../notes/sidebarState";
 
@@ -64,10 +64,31 @@ export function ArchiveSettings() {
           throw new Error("bulk unarchive partially failed");
         }
         // Folder-archived subtrees (folder-archive) hide notes WITHOUT a per-note
-        // marker, so bulkUnarchive can't reach them — clear the whole
+        // marker, so bulkUnarchive can't reach them. Clear the whole
         // archived_folders set too, else a folder stays hidden with no entry
         // point once the archive UI is gone.
-        await setArchivedFolders([]);
+        //
+        // myne#613: clearing has to SAY what it removes. There is no "make this
+        // empty" verb, deliberately, because that verb is what let a caller
+        // erase entries it had never seen. Read the stored set here rather than
+        // trusting a local copy, and if that read fails the clear does not
+        // happen: the catch below rolls the toggle back, which is the honest
+        // outcome when we cannot know what we would be removing.
+        //
+        // The REACH of this clear grew inside myne#613 and the copy had to
+        // follow. `archived_folders` propagates removals now, so the clear
+        // reaches every device; before the removal clock a peer's clockless
+        // union restored it, which made the folder half effectively
+        // device-local while the note half above (`bulkUnarchiveWithSync`,
+        // which rewrites frontmatter) always propagated. So this change made
+        // the toggle coherent rather than making it destructive, and the
+        // helper string now says the scale out loud. Whether an action of this
+        // reach should also CONFIRM is a product decision about the whole
+        // toggle, note half included, and it is not this branch's to take.
+        const stored = (await prefsRead()).archived_folders;
+        if (stored.length > 0) {
+          await mutateArchivedFolders({ remove: stored });
+        }
       }
       await setArchiveDisabled(!next);
       setError(null);

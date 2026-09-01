@@ -19,10 +19,15 @@ const setSpellLanguages = vi.fn();
 const setActiveSpellLanguages = vi.fn();
 const setSpellConfig = vi.fn();
 
-vi.mock("../../src/lib/prefs", () => ({
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   prefsRead: (...a: unknown[]) => prefsRead(...a),
   setSpellEnabled: (...a: unknown[]) => setSpellEnabled(...a),
-  setSpellLanguages: (...a: unknown[]) => setSpellLanguages(...a),
+  mutateSpellLanguages: (...a: unknown[]) => setSpellLanguages(...a),
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 vi.mock("../../src/lib/spell", () => ({
   // Two bundled tags is enough to exercise the picker.
@@ -119,9 +124,17 @@ describe("SpellSettings — language selection", () => {
     });
     // The multi-select adds "de" to the existing ["en-US"].
     await waitFor(() => expect(setSpellLanguages).toHaveBeenCalled());
-    const lastCall = setSpellLanguages.mock.calls.at(-1)![0] as string[];
-    expect(lastCall).toContain("de");
-    expect(lastCall).toContain("en-US");
+    // The payload is a mutation, so the claim is "de was ADDED" rather than
+    // "the set is now these two". `en-US` is untouched and must therefore be in
+    // NEITHER half: a caller that mentioned it would be claiming something about
+    // an entry it did not change (myne-md/myne#613).
+    const lastCall = setSpellLanguages.mock.calls.at(-1)![0] as {
+      add: string[];
+      remove: string[];
+    };
+    expect(lastCall.add).toContain("de");
+    expect(lastCall.remove).toEqual([]);
+    expect(lastCall.add).not.toContain("en-US");
     expect(setActiveSpellLanguages).toHaveBeenCalled();
   });
 });

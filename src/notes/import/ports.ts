@@ -27,7 +27,7 @@ import { invoke } from "../../platform/core";
 import { noteCreate } from "../createNote";
 import { noteList } from "../listNotes";
 import { loadNoteBatch, type TitleRecord } from "../loadNoteBatch";
-import { prefsRead, setDeliberateFolders } from "../../lib/prefs";
+import { mutateDeliberateFolders } from "../../lib/prefs";
 import {
   buildExistingIdentitySet,
   hashBodyForIdentity,
@@ -108,21 +108,6 @@ export async function importSetHold(active: boolean): Promise<void> {
 
 // `joinPath` is imported from the seam, not redefined: the media index below is
 // keyed by the paths the WALK produced, so the two must agree byte-for-byte.
-
-/**
- * Union the importer's empty-dir folders with the vault's existing
- * `deliberate_folders` (pure; the Rust codec sorts + exact-dedups on write, so
- * order here is irrelevant). Without this the importer's write would replace —
- * not extend — the user's pre-existing deliberate folders (SYNC-4).
- */
-export function mergeDeliberateFolders(
-  existing: readonly string[],
-  add: readonly string[],
-): string[] {
-  const set = new Set<string>(existing);
-  for (const f of add) set.add(f);
-  return [...set];
-}
 
 /** Project the sidebar's `TitleRecord`s to the conflict module's `ExistingNote`
  *  identity shape (folder + title + lifecycle). `trashed`/`template` pass through
@@ -365,18 +350,20 @@ export function createImportPorts(root: string): ImportPorts {
   return {
     readDir: (absPath) => importReadDir(root, absPath),
     readFile: (absPath) => importReadFile(root, absPath),
-    createNote: (plaintext) => noteCreate(plaintext),
-    setDeliberateFolders: async (folders) => {
-      let existing: string[] = [];
-      try {
-        existing = (await prefsRead()).deliberate_folders;
-      } catch {
-        // Prefs read failure → fall back to writing just the importer's set
-        // (best-effort; the SYNC-4 empty-dir carrier is non-load-bearing).
-        existing = [];
-      }
-      await setDeliberateFolders(mergeDeliberateFolders(existing, folders));
-    },
+    // `null` because the importer is a BULK path: `engine.ts` collects every
+    // folder it created and issues ONE `setDeliberateFolders` at the end. A
+    // per-note registration here would re-encrypt the whole `vault.prefs` blob
+    // once per imported note (myne-md/myne#613).
+    createNote: (plaintext) => noteCreate(plaintext, null),
+    // myne#613: no read, and therefore no fallback. The importer says "add
+    // these"; the backend unions them into whatever is stored. Before the verbs
+    // existed this had to read the set, union locally and write the whole thing
+    // back, and its catch fell back to the EMPTY set on a read failure. That was
+    // harmless while the merge was a clockless union and became a broadcast
+    // delete of every registered folder the moment removals started
+    // propagating: the write claimed an absence it had never checked.
+    setDeliberateFolders: async (folders) =>
+      await mutateDeliberateFolders({ add: [...folders] }),
     setImportHold: (active) => importSetHold(active),
   };
 }

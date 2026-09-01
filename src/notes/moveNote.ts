@@ -26,6 +26,7 @@ import { normalizeFolderPath } from "../dialect/folderPath";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
 import { reindexNoteFromBody } from "./vaultIndices";
+import { mutateDeliberateFolders } from "../lib/prefs";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -40,6 +41,20 @@ export async function moveNote(
   noteId: string,
   folder: string | null,
 ): Promise<void> {
+  registerDestination([await moveNoteWithoutRegistering(noteId, folder)]);
+}
+
+/**
+ * The move itself, with no folder registration. Callers that move MANY notes use
+ * this and register once (see {@link registerDestination}).
+ *
+ * Returns the normalized destination, so the caller has the value to register
+ * without re-normalizing it.
+ */
+async function moveNoteWithoutRegistering(
+  noteId: string,
+  folder: string | null,
+): Promise<string | null> {
   const current = await noteRead(noteId);
   const norm = normalizeFolderPath(folder);
   const moved = patchFolderField(encoder.encode(current), norm);
@@ -49,6 +64,25 @@ export async function moveNote(
   // MYND-31: the folder changed → re-index (live, decrypt-free) so
   // collision-disambiguation tracks the new folder. Best-effort.
   void reindexNoteFromBody(noteId, next);
+  return norm;
+}
+
+/**
+ * myne-md/myne#613: register a destination folder, once.
+ *
+ * ADD only and fire-and-forget: it can never claim a removal, so a failure costs
+ * at most that the folder is not remembered yet. The folder a note LEFT is
+ * deliberately not touched, because leaving is not deleting.
+ *
+ * Split out of {@link moveNote} so a bulk move pays ONE prefs write rather than
+ * one per note. Each write re-encrypts the whole `vault.prefs` blob and bumps
+ * the nonce, so fifty notes into one folder was fifty re-encrypts of a blob that
+ * changes once.
+ */
+function registerDestination(folders: Array<string | null>): void {
+  const unique = [...new Set(folders.filter((f): f is string => f !== null))];
+  if (unique.length === 0) return;
+  void mutateDeliberateFolders({ add: unique }).catch(() => {});
 }
 
 /** Outcome of a {@link bulkMoveNotes} call — moved IDs + per-note failures. */
@@ -71,17 +105,25 @@ export async function bulkMoveNotes(
   folder: string | null,
 ): Promise<BulkMoveResult> {
   const settled = await Promise.allSettled(
-    noteIds.map((id) => moveNote(id, folder)),
+    noteIds.map((id) => moveNoteWithoutRegistering(id, folder)),
   );
   const moved: string[] = [];
   const failed: Array<{ noteId: string; error: unknown }> = [];
+  const destinations: Array<string | null> = [];
   settled.forEach((outcome, i) => {
     const noteId = noteIds[i] ?? "";
     if (outcome.status === "fulfilled") {
       moved.push(noteId);
+      destinations.push(outcome.value);
     } else {
       failed.push({ noteId, error: outcome.reason });
     }
   });
+  // ONE write for the whole operation, and only for the notes that actually
+  // landed: a bulk that failed entirely registers nothing (myne-md/myne#613
+  // task 5). The destinations come from the fulfilled moves rather than from
+  // the `folder` argument, so the registered path is the NORMALIZED one the
+  // note now carries, which is the identity the sidebar reads back.
+  registerDestination(destinations);
   return { moved, failed };
 }

@@ -18,6 +18,8 @@
 // narrow a caught rejection.
 
 import { invoke } from "../platform/core";
+import { normalizeFolderPath } from "../dialect/folderPath";
+import { mutateDeliberateFolders } from "./prefs";
 import { patchDeletedField } from "../dialect/surgery";
 import type { NoteCreateError } from "../types/note-create-error";
 import type { NoteReadError } from "../types/note-read-error";
@@ -34,14 +36,48 @@ export type {
 };
 
 /**
- * Encrypt + atomically write a new `.myn` note. Returns the canonical
- * lowercase-hyphenated 36-char `NoteId` string.
+ * Encrypt + atomically write a new `.myn` note, and register the folder it lands
+ * in. Returns the canonical lowercase-hyphenated 36-char `NoteId` string.
  *
- * Rejects with a {@link NoteCreateError}. Arg shape mirrors the desktop
+ * Rejects with a {@link NoteCreateError}. The IPC arg shape mirrors the desktop
  * `note_create` command exactly: `{ plaintext }` (NOT `{ body }`).
+ *
+ * **`folder` is required, and that is the fix rather than the signature**
+ * (myne-md/myne#613, review round 2). At-fill landed on this tree at TWO
+ * `EditorFlow` save paths instead of at the chokepoint, so five create paths
+ * that DO carry a folder registered nothing: the daily note (`daily.ts`, which
+ * patches `folder:` from the `daily_folder` pref), `createSibling` (which reads
+ * the source's folder and then dropped it, while desktop's `createDrawing.ts`
+ * twin WAS wired), the app-background flush (so whether the folder was
+ * remembered depended on whether the user pressed save or the app was
+ * backgrounded), `templates.ts` and `conflictCopy.ts`. The unlock back-fill does
+ * not cover them either: it walks LIVE notes, so a daily folder emptied by
+ * trashing every daily note stays gone.
+ *
+ * A defaulted argument would have left the next create path silently
+ * unregistered too, which is `CLAUDE.md`'s own "a default is the arm that never
+ * fires". Required means the compiler names every caller. Byte-parity with
+ * `src/notes/createNote.ts` is deliberate: `check-twin-drift.mjs` watches these
+ * two, and the whole reason this defect existed on one side only is that the
+ * signatures had diverged.
+ *
+ * Pass `null` for the vault root, and for a BULK caller that issues its own
+ * single registration afterwards: each prefs write re-encrypts the whole blob.
+ *
+ * The registration is fire-and-forget and ADD-only, so it can never claim a
+ * removal; the worst a failure costs is a folder not remembered yet, never the
+ * note. Class 2 per `ignorePrefsWriteFailure`.
  */
-export async function noteCreate(plaintext: string): Promise<string> {
-  return await invoke<string>("plugin:notes|note_create", { plaintext });
+export async function noteCreate(
+  plaintext: string,
+  folder: string | null,
+): Promise<string> {
+  const id = await invoke<string>("plugin:notes|note_create", { plaintext });
+  const norm = normalizeFolderPath(folder);
+  if (norm !== null) {
+    void mutateDeliberateFolders({ add: [norm] }).catch(() => {});
+  }
+  return id;
 }
 
 /**

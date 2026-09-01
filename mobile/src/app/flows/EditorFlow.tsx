@@ -49,7 +49,8 @@ import { usePrefs } from "../../lib/use-prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
 import { isRtl } from "../../lib/util";
-import { setFavorites, setArchivedFolders, setDeliberateFolders, setFolderIcons, setItemColors, setItemOrder, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
+import { setFavorites, mutateArchivedFolders, mutateDeliberateFolders, mutationFrom, prefsRead, registerDeliberateFolders, setFolderIcons, setItemColors, setItemOrder, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
+import { backfillDeliberateFolders } from "../../lib/folderBackfill";
 import { bumpPrefsNonce, withPrefsBatch } from "../../lib/prefsNonce";
 import { useHiddenHomeTiles } from "../../lib/home-tiles";
 import { searchNotes } from "../../lib/search-notes";
@@ -69,6 +70,7 @@ import {
   stampUpdated,
   readNoteFolder,
   moveNoteToFolder,
+  moveNoteToFolderWithoutRegistering,
   trashNote,
   restoreNote,
   archiveNote,
@@ -217,10 +219,35 @@ const EDITOR_TEXT_PX: Record<string, number> = { sm: 13, md: 14, lg: 16, xl: 18 
 
 /**
  * Rejection handler for the `void`-ed prefs writes below. It does nothing, and
- * that is the point: see the decoration-writer comment for why a failed prefs
- * write has nothing to revert here. Named rather than an inline `() => {}` so
- * every site reads as the same deliberate decision, and greppable so the
- * follow-up that surfaces these failures to the user has a work list.
+ * that is the point. Named rather than an inline `() => {}` so every site reads
+ * as the same deliberate decision, and greppable so a change that surfaces one
+ * of these failures has a work list.
+ *
+ * **myne-md/myne#613 walked that work list**, and the rule it settled on is the
+ * one every remaining site is measured against: report a failure when the user
+ * asked for the thing that failed, stay silent when the failure costs them
+ * something they did not ask for and cannot act on. The three classes:
+ *
+ *   1. **A self-healing or derived write**: the decoration fold-on-load
+ *      migration, and the decoration/favorites/item-order writers. Silent, and
+ *      the decoration-writer comment further down carries the full argument:
+ *      there is no optimistic local state to revert, a rejected `invoke` means
+ *      the backend wrote nothing, and the next render already shows disk truth.
+ *   2. **A write RIDING on an action that succeeded**: registering the folder
+ *      of a note the user just created or moved. The note landed, which is what
+ *      they asked for; the folder still works and loses only the promise to
+ *      outlive being emptied. Silent, because a notice here would report a
+ *      failure of something they did not ask for on top of a success.
+ *   3. **A write that IS the action**: creating a folder. Reported, through
+ *      `registerDeliberateFolders`, which retries once and then distinguishes a
+ *      full budget (actionable) from a persistent failure (not). That is the one
+ *      site this issue changed.
+ *
+ * `mutateArchivedFolders` sits in class 3 by that rule and is NOT changed here:
+ * archive is `archived_folders`, a different set with a different surface, and
+ * widening this issue into it would mean shipping its notice with no test and no
+ * design pass. It is the one knowingly-unpaid site, stated rather than left to
+ * be rediscovered.
  */
 const ignorePrefsWriteFailure = (): void => {};
 
@@ -468,7 +495,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       });
     } else if (editorText.trim() !== "" && !newNoteFlushedRef.current) {
       newNoteFlushedRef.current = true;
-      void noteCreate(stampUpdated(editorText)).catch(() => {
+      // The folder comes off the body being flushed, so a note backgrounded
+      // before its first save registers its folder exactly as a saved one does.
+      // It did not, which made the folder's survival depend on whether the user
+      // pressed save or the OS took the app away (myne#613 review round 2).
+      const flushed = stampUpdated(editorText);
+      void noteCreate(flushed, readNoteFolder(flushed) || null).catch(() => {
         newNoteFlushedRef.current = false;
       });
     }
@@ -1278,13 +1310,17 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     [applyOne, dropOne, devStore],
   );
 
-  const refreshAll = useCallback(async () => {
+  // Returns the bodies it loaded, or null when the load failed. The boot caller
+  // needs them to register the folders they prove (myne-md/myne#613 back-fill),
+  // and re-reading every note would be a whole extra decrypt pass over the vault.
+  const refreshAll = useCallback(async (): Promise<ReadonlyMap<string, string> | null> => {
     setLoading(true);
     setListError(null);
     try {
       const { entries, texts } = await loadEntries();
       setNotes(entries);
       setBodies(texts);
+      return texts;
     } catch (raw) {
       const e = raw as NoteListError;
       console.error("[notes] load failed:", raw);
@@ -1293,6 +1329,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
           ? ioBanner(e.detail.io_error_kind)
           : t("editor.flow.loadFailed"),
       );
+      return null;
     } finally {
       setLoading(false);
     }
@@ -1332,7 +1369,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         const folder = readNoteFolder(live.editorText) || null;
         const title = nextMobileDrawingTitle(live.notes, live.bodies);
         const body = new TextDecoder().decode(buildDrawingNoteBytes(title, folder));
-        const id = await noteCreate(body);
+        // `folder` is already in hand here and was dropped, while desktop's
+        // `createDrawing.ts` twin WAS wired, so the two clients disagreed about
+        // whether a drawing sibling's folder is remembered.
+        const id = await noteCreate(body, folder);
         // Splice the new drawing in so it enters the resolver note-set and the
         // just-inserted `![[Drawing N]]` resolves to it. The body is the one we
         // just wrote, so this needs no read.
@@ -1363,11 +1403,39 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   );
 
   // Boot: apply the persisted theme, (dev) seed an empty vault, then load.
+  //
+  // `booted` is the StrictMode double-invoke guard its desktop twin has
+  // (`src/screens/Editor.tsx`). Without it React 19 dev runs this twice, both
+  // runs read the pre-write `deliberate_folders`, and the second issues a
+  // duplicate ADD write: a second full `vault.prefs` re-encrypt on every dev
+  // unlock. `src/CLAUDE.md`: "Effects run twice; design with idempotency."
+  const booted = useRef(false);
   useEffect(() => {
+    if (booted.current) return;
+    booted.current = true;
     applyStoredTheme();
     void (async () => {
       if (HAS_TAURI) await maybeSeedTestData();
-      await refreshAll();
+      const loaded = await refreshAll();
+      // myne-md/myne#613: register the folders this vault's notes already prove,
+      // once per unlocked session. A vault created before at-fill has no
+      // registrations at all, so its oldest folders are the ones that still
+      // vanish when emptied.
+      //
+      // HERE and not in `refreshAll`, deliberately: this effect runs on mount,
+      // which is the unlock, while `refreshAll`'s other callers include the
+      // `sync://changed` listener. Backfilling on a pull would re-add a folder a
+      // peer had deleted, from notes whose deletions have not arrived yet.
+      //
+      // `prefsRead()` rather than the `usePrefs` cache: that cache still holds
+      // its defaults while its own read is in flight, and an empty
+      // `deliberate_folders` read as truth would make this write on every single
+      // unlock forever.
+      if (HAS_TAURI && loaded !== null) {
+        void prefsRead()
+          .then((p) => backfillDeliberateFolders(loaded.values(), p.deliberate_folders))
+          .catch(ignorePrefsWriteFailure);
+      }
     })();
   }, [refreshAll]);
 
@@ -1702,7 +1770,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       // feeds are updated from what we just wrote — no read, and nothing
       // proportional to the vault (myne-mobile#41).
       if (editing.id === null) {
-        const id = HAS_TAURI ? await noteCreate(stamped) : crypto.randomUUID();
+        const id = HAS_TAURI
+          ? await noteCreate(stamped, readNoteFolder(stamped) || null)
+          : crypto.randomUUID();
         if (!HAS_TAURI) devStore().set(id, stamped);
         applyOne(id, stamped);
       } else {
@@ -1758,11 +1828,21 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
    *  note first — an existing note through `openRelated`'s save-then-open, a
    *  brand-new non-empty note by creating it — so a row tap never silently
    *  discards typed text. */
+  /**
+   * myne-md/myne#613: register the folder a freshly-created note landed in.
+   *
+   * Mobile carries the folder inside the note body rather than as a create
+   * argument, so the registration reads it back off what was just written.
+   * ADD only and fire-and-forget: it can never claim a removal, so a failure
+   * costs at most that this folder is not remembered yet.
+   */
   async function openFromList(id: string) {
     if (isRegular && editing != null && editing.id === null && editorText.trim() !== "") {
       try {
         const stamped = stampUpdated(editorText);
-        const newId = HAS_TAURI ? await noteCreate(stamped) : crypto.randomUUID();
+        const newId = HAS_TAURI
+          ? await noteCreate(stamped, readNoteFolder(stamped) || null)
+          : crypto.randomUUID();
         if (!HAS_TAURI) devStore().set(newId, stamped);
         applyOne(newId, stamped);
       } catch {
@@ -1977,12 +2057,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     for (const [id, folder] of folderOf) {
       if (folder != null && folder.startsWith(oldPath)) {
         const dest = normalizeFolderPath(newPath + folder.slice(oldPath.length));
-        await moveNoteToFolder(id, dest);
+        // NOT `moveNoteToFolder`: that registers per call, which here would be
+        // one full `vault.prefs` re-encrypt and one nonce advance per note in
+        // the subtree, outside the `withPrefsBatch` below that exists to stop
+        // exactly that. The batch's own `mutationFrom` already states every
+        // re-rooted path, so the per-note writes were redundant as well as
+        // expensive (myne-md/myne#613 pr-review).
+        await moveNoteToFolderWithoutRegistering(id, dest);
         moved.push(id);
       }
     }
-    const reroot = (arr: readonly string[]) =>
-      arr.map((f) => (f.startsWith(oldPath) ? normalizeFolderPath(newPath + f.slice(oldPath.length)) ?? f : f));
     if (HAS_TAURI) {
       // One nonce NOTIFY for the whole rename, not one per setter. Each of
       // these four writes bumps inside `writePref`, and they await each other,
@@ -1990,9 +2074,28 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       // a rename cost up to four advances, each re-reading and re-decrypting
       // `vault.prefs` in every mounted `usePrefs`.
       await withPrefsBatch(async () => {
-        await setDeliberateFolders(reroot(prefs.deliberate_folders));
-        if (prefs.archived_folders.some((f) => f.startsWith(oldPath))) {
-          await setArchivedFolders(reroot(prefs.archived_folders));
+        // Stated as ONE prefix re-root, resolved by the core against the stored
+        // set, for the reason the delete above states: a delta over the
+        // `usePrefs` cache cannot mention an entry that cache has never seen, so
+        // an at-fill registration or a peer's entry was neither re-rooted nor
+        // removed and stayed under the OLD path, reappearing empty at the next
+        // unlock. It is also atomic, which a remove-plus-add pair is not: under
+        // the byte budget that pair can land its removals, stamp each as a
+        // deletion that propagates to every device, and refuse its additions.
+        //
+        // The `archived_folders` write lost its `some(startsWith)` guard on
+        // purpose. That guard read the same cache, so a `false` from it proved
+        // nothing: it can only under-report, which is the direction that skips a
+        // re-root that was needed. It costs one extra blob re-encrypt on a
+        // rename that archived nothing, inside the batch, on a rare user action.
+        const oldKey = folderKey(oldPath);
+        if (oldKey !== "") {
+          await mutateDeliberateFolders({
+            renamePrefix: [{ from: oldKey, to: newPath }],
+          });
+          await mutateArchivedFolders({
+            renamePrefix: [{ from: oldKey, to: newPath }],
+          });
         }
         // Decorations follow the folder (MYND-562): re-root item_colors +
         // folder_icons by folded prefix, exactly as desktop does on rename,
@@ -2025,7 +2128,20 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       const path = normalizeFolderPath(base + name);
       // A deliberate folder persists even while empty (the virtual-folder model).
       if (path != null && HAS_TAURI) {
-        await setDeliberateFolders([...prefs.deliberate_folders, path]).catch(ignorePrefsWriteFailure);
+        // Class 3 above: this write IS the action, so its failure is reported.
+        // A plain add, stated rather than derived from a snapshot.
+        //
+        // `registerDeliberateFolders` retries once before saying anything, so a
+        // disk hiccup costs the user nothing, and separates a full byte budget
+        // (which they can act on by deleting a folder) from a persistent write
+        // failure (which they cannot). The desktop twin is
+        // `useFolderManagement.ts`'s `addDeliberate`.
+        const outcome = await registerDeliberateFolders({ add: [path] });
+        if (outcome === "budget-full") {
+          setEditorError(t("notes.folderManagement.folderListFull"));
+        } else if (outcome === "failed") {
+          setEditorError(t("notes.folderManagement.folderNotRemembered"));
+        }
       }
     } catch {
       setEditorError(t("editor.flow.moveFailed"));
@@ -2037,7 +2153,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     setFolderActions(null);
     const canonical = normalizeFolderPath(path) ?? path;
     if (HAS_TAURI) {
-      await setArchivedFolders([...prefs.archived_folders, canonical]).catch(ignorePrefsWriteFailure);
+      // The knowingly-unpaid site named in `ignorePrefsWriteFailure`'s doc: this
+      // write IS the action, so by that rule it should report, and it does not.
+      // `archived_folders` is a different set with a different surface and
+      // widening myne-md/myne#613 into it would ship a notice with no test.
+      await mutateArchivedFolders({ add: [canonical] }).catch(ignorePrefsWriteFailure);
     }
   }
 
@@ -2071,7 +2191,22 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       for (const id of ids) await trashNote(id);
       if (HAS_TAURI) {
         const key = folderKey(path);
-        await setDeliberateFolders(prefs.deliberate_folders.filter((f) => !folderKey(f).startsWith(key)));
+        // The subtree is STATED and the core resolves it against what is
+        // actually stored (myne#613 review round 2). It used to filter
+        // `prefs.deliberate_folders`, which is the `usePrefs` cache: that cache
+        // starts at DEFAULT_PREFS and catches up only through a nonce-bump round
+        // trip, and this same change gave mobile two fire-and-forget
+        // registrations that write behind it. A delete inside that window stated
+        // `remove: []`, the registration survived on disk, and the folder came
+        // back EMPTY at the next unlock and on every device, because the
+        // surviving entry carries a newer add clock than the removal.
+        //
+        // `folderKey("")` is the empty string and an empty prefix is a prefix of
+        // everything, so the root is refused here rather than sent. The core
+        // ignores an empty prefix too; both, because this is a delete.
+        if (key !== "") {
+          await mutateDeliberateFolders({ removePrefix: [key] });
+        }
       }
     } catch {
       setEditorError(t("editor.flow.trashFailed"));
@@ -2094,7 +2229,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
    *  Prefs-only — no note bodies change. */
   async function restoreArchivedFolder(path: string) {
     const next = removeFolderFromArchive(prefs.archived_folders, path);
-    if (HAS_TAURI) await setArchivedFolders(next).catch(ignorePrefsWriteFailure);
+    if (HAS_TAURI)
+      await mutateArchivedFolders(
+        mutationFrom(prefs.archived_folders, next),
+      ).catch(ignorePrefsWriteFailure);
     if (archiveFolder !== null && folderKey(archiveFolder).startsWith(folderKey(path))) {
       setArchiveFolder(null);
     }
@@ -2107,7 +2245,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     try {
       for (const id of ids) await trashNote(id);
       const next = removeFolderFromArchive(prefs.archived_folders, path);
-      if (HAS_TAURI) await setArchivedFolders(next).catch(ignorePrefsWriteFailure);
+      if (HAS_TAURI)
+        await mutateArchivedFolders(
+          mutationFrom(prefs.archived_folders, next),
+        ).catch(ignorePrefsWriteFailure);
     } catch {
       setEditorError(t("editor.flow.trashFailed"));
     }

@@ -12,6 +12,7 @@
 // the UUIDv7 identity (never UI-supplied), so the drawing is rename-safe.
 
 import { buildDrawingNoteBytes } from "@myne/editor/drawing";
+import { normalizeFolderPath } from "../dialect/folderPath";
 import { noteCreate } from "./createNote";
 
 export { buildInitialDrawingBody, buildDrawingNoteBytes } from "@myne/editor/drawing";
@@ -28,5 +29,6 @@ export async function createDrawing(
   name?: string,
   folder?: string | null,
 ): Promise<string> {
-  return await noteCreate(decoder.decode(buildDrawingNoteBytes(name, folder)));
+  const norm = normalizeFolderPath(folder ?? null);
+  return await noteCreate(decoder.decode(buildDrawingNoteBytes(name, folder)), norm);
 }

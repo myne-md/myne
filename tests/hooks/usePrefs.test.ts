@@ -20,8 +20,10 @@ const setEditorContentWidth = vi.fn();
 const setEditorFontFamily = vi.fn();
 const setKeymapBinding = vi.fn();
 const setReminderHorizonDays = vi.fn();
+const mutateAiExcludedFolders = vi.fn();
+const mutateCliExcludedFolders = vi.fn();
 
-vi.mock("../../src/lib/prefs", () => ({
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   prefsRead: (...a: unknown[]) => prefsRead(...a),
   setScreenCaptureProtection: (...a: unknown[]) => setScreenCaptureProtection(...a),
   setAutoLockTimeout: (...a: unknown[]) => setAutoLockTimeout(...a),
@@ -32,6 +34,13 @@ vi.mock("../../src/lib/prefs", () => ({
   setEditorFontFamily: (...a: unknown[]) => setEditorFontFamily(...a),
   setKeymapBinding: (...a: unknown[]) => setKeymapBinding(...a),
   setReminderHorizonDays: (...a: unknown[]) => setReminderHorizonDays(...a),
+  mutateAiExcludedFolders: (...a: unknown[]) => mutateAiExcludedFolders(...a),
+  mutateCliExcludedFolders: (...a: unknown[]) => mutateCliExcludedFolders(...a),
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 
 import { usePrefs } from "../../src/hooks/usePrefs";
@@ -78,6 +87,9 @@ function view(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   prefsRead.mockReset().mockResolvedValue(view());
+  // Default: the write lands and the budget refuses nothing.
+  mutateAiExcludedFolders.mockReset().mockResolvedValue(0);
+  mutateCliExcludedFolders.mockReset().mockResolvedValue(0);
   for (const s of [
     setScreenCaptureProtection,
     setAutoLockTimeout,
@@ -335,5 +347,77 @@ describe("reload + cross-surface nonce subscription", () => {
     await waitFor(() =>
       expect(result.current.prefs.label).toBe("renamed-via-sibling"),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// myne-md/myne#613: the two EGRESS controls must not read as fail-open.
+//
+// `ai_excluded_folders` and `cli_excluded_folders` are named in
+// `docs/threat-model.md` A17 and promised absolutely by the shipped interface.
+// The setters patch the cache optimistically, so a budget refusal would leave
+// the user looking at a folder marked excluded from the AI or the CLI that is
+// not excluded on disk. Written after the guard was verified by BREAKING it:
+// swallowing the refusal count passed the whole suite, which is how it was found
+// to be untested.
+// ---------------------------------------------------------------------------
+
+describe.each([
+  ["ai", "ai_excluded_folders", () => mutateAiExcludedFolders] as const,
+  ["cli", "cli_excluded_folders", () => mutateCliExcludedFolders] as const,
+])("usePrefs: %s excluded folders", (which, field, binding) => {
+  const call = (
+    p: ReturnType<typeof usePrefs>,
+    mutation: { add: string[]; remove: string[] },
+    next: string[],
+  ) =>
+    which === "ai"
+      ? p.setAiExcludedFolders(mutation, next)
+      : p.setCliExcludedFolders(mutation, next);
+
+  /** The field under test, read off the typed view rather than through a cast:
+   *  `PrefsView` does not overlap `Record<string, unknown>`, so indexing it that
+   *  way needs a double assertion, which is three recorded type errors bought to
+   *  save one line. */
+  const held = (p: ReturnType<typeof usePrefs>): readonly string[] =>
+    which === "ai" ? p.prefs.ai_excluded_folders : p.prefs.cli_excluded_folders;
+
+  it("keeps the optimistic value when nothing was refused", async () => {
+    const { result } = renderHook(() => usePrefs());
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    await act(async () => {
+      await call(result.current, { add: ["Private/"], remove: [] }, ["Private/"]);
+    });
+    expect(held(result.current)).toEqual(["Private/"]);
+    expect(binding()).toHaveBeenCalledWith({ add: ["Private/"], remove: [] });
+  });
+
+  it("converges to disk truth and reports when the budget refused an addition", async () => {
+    const onError = vi.fn();
+    binding().mockResolvedValueOnce(1);
+    const { result } = renderHook(() => usePrefs(onError));
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    // Disk says the exclusion did NOT land.
+    prefsRead.mockResolvedValue(view({ [field]: [] }));
+    await act(async () => {
+      await call(result.current, { add: ["Private/"], remove: [] }, ["Private/"]);
+    });
+    // The cache must not go on claiming an exclusion that is not on disk. This
+    // is the assertion the injected defect (swallowing the count) fails.
+    expect(held(result.current)).toEqual([]);
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it("converges and reports when the write threw", async () => {
+    const onError = vi.fn();
+    binding().mockRejectedValueOnce(new Error("disk"));
+    const { result } = renderHook(() => usePrefs(onError));
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    prefsRead.mockResolvedValue(view({ [field]: [] }));
+    await act(async () => {
+      await call(result.current, { add: ["Private/"], remove: [] }, ["Private/"]);
+    });
+    expect(held(result.current)).toEqual([]);
+    expect(onError).toHaveBeenCalledTimes(1);
   });
 });

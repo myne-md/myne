@@ -5304,8 +5304,17 @@ export const ROSTER = Object.freeze([
       "src/notes/components/FolderGlyph.tsx",
       "src/notes/folderNote.ts",
       "src/notes/components/DecorationPopover.tsx",
+      "src/notes/folderBackfill.ts",
+      "mobile/src/lib/folderBackfill.ts",
     ],
-    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+    clients: [
+      "desktop-macos",
+      "desktop-linux",
+      "desktop-windows",
+      "web",
+      "ios",
+      "android",
+    ],
     automatedBy: [
       "e2e/notes.e2e.ts",
       "e2e/folder-notes.e2e.ts",
@@ -5314,8 +5323,16 @@ export const ROSTER = Object.freeze([
       "e2e/quick-picker-move-note.e2e.ts",
       "e2e/files-settings.e2e.ts",
       "e2e/drop-import.e2e.ts",
+      "e2e/empty-folder-persistence.e2e.ts",
     ],
     manual: [
+      {
+        see: "On an iPhone and on an Android phone in turn: create a folder, put one note in it, then move that note out to the vault root. Confirm the folder is STILL in the tree with a zero count. Delete the note entirely and confirm the folder is still there. Lock the vault, unlock it, and confirm the folder is still there. Then long-press the folder, delete it, unlock again, and confirm it did NOT come back.",
+        whyNotAutomated: "The registration and the once-per-unlock back-fill live in mobile/src, which is a different tree from the one e2e/empty-folder-persistence.e2e.ts drives, and neither mobile platform has an automated UI lane: mobile/tests/flow-logic runs Playwright against a mocked IPC layer in Chromium, so it exercises the flow logic and never the prefs blob a real unlock reads back from disk. The desktop side is covered by ef1 (back-fill), ef2 (explicit delete) and ef3 (at-fill through the sidebar); ef3 was added after a review found the first two seeding through the create IPC, which reaches neither desktop at-fill site, so the automation claim covered less than it read as covering.",
+        clients: ["ios", "android"],
+        estimateMin: 8,
+        tier: "core",
+      },
       {
         see: "Right-click a note row and a folder row on each host. Confirm Myne's own context menu appears and that the WebView's native menu (Inspect Element / Reload / Copy Image) does NOT appear behind it, beside it, or on a second right-click.",
         whyNotAutomated: "The native WebView context menu is an out-of-DOM host widget (a GTK menu on Linux, host-drawn on the others); a driver reading the DOM cannot tell whether it appeared, and WebKitGTK, WKWebView and WebView2 each suppress it differently.",

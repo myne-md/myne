@@ -57,6 +57,7 @@ import {
 } from "@myne/editor/cover-signal";
 import { CoverPicker, type CoverChoice } from "../components/attachments/CoverPicker";
 import { setNoteCover } from "../notes/setNoteCover";
+import { backfillDeliberateFolders } from "../notes/folderBackfill";
 import { COVER_FIELD_KEY } from "../dialect";
 import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { focusKindOf } from "../commands/scope";
@@ -3738,7 +3739,25 @@ function SidebarBootstrap() {
     void (async () => {
       try {
         const ids = await noteList();
-        await ctx.refreshAll(ids);
+        const records = await ctx.refreshAll(ids);
+        // myne-md/myne#613: register the folders this vault's notes already
+        // prove, once per unlocked session. A vault created before at-fill has
+        // no registrations at all, so its oldest folders are exactly the ones
+        // that still vanish when emptied.
+        //
+        // Here rather than inside `refreshAll` on purpose: this effect is
+        // `booted`-latched, so it is the unlock, while `refreshAll`'s six other
+        // callers include every sync pull. Backfilling on a pull would re-add a
+        // folder a peer had deleted, from notes whose deletions have not
+        // arrived yet. Fire-and-forget: it never blocks the sidebar and never
+        // fails the boot.
+        // `prefsRead()` rather than the `usePrefs` cache: at first render that
+        // cache still holds the defaults while its own read is in flight, and
+        // an empty `deliberate_folders` read as truth would make this send an
+        // ADD for every folder on every unlock, forever.
+        void prefsRead()
+          .then((p) => backfillDeliberateFolders(records, p.deliberate_folders))
+          .catch(() => {});
         const target = takeDeepLinkNoteId();
         if (target !== null && ids.includes(target)) ctx.select(target);
       } catch (e) {

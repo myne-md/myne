@@ -732,8 +732,14 @@ export type UseSelectedNoteReturn = {
   ) => Promise<BulkMoveResult>;
   /** Surgical refresh: re-fetch a single note's title slice. */
   refreshOne: (id: NoteId) => Promise<void>;
-  /** Initial-boot full refresh: load `note_list` + chunked title batch. */
-  refreshAll: (allIds: readonly NoteId[]) => Promise<void>;
+  /**
+   * Initial-boot full refresh: load `note_list` + chunked title batch.
+   *
+   * Returns the records it loaded. The boot caller needs them to register the
+   * folders they prove (myne-md/myne#613 back-fill) and a second
+   * `loadNoteBatch` would be a whole extra decrypt pass over the vault.
+   */
+  refreshAll: (allIds: readonly NoteId[]) => Promise<TitleRecord[]>;
 };
 
 const SidebarStateContext = createContext<UseSelectedNoteReturn | null>(null);
@@ -814,6 +820,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       // fire-and-forget so it never blocks the sidebar boot; the index is a
       // rebuildable cache.
       void hydrateVaultIndicesOnUnlock(records.map((r) => r.noteUuid));
+      return records;
     },
     [],
   );
@@ -927,6 +934,9 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
         }
       }
       const newId = await mint(target);
+      // No registration here any more (myne-md/myne#613 pr-review). `noteCreate`
+      // registers at the chokepoint every create path goes through, so doing it
+      // again would be a SECOND full `vault.prefs` re-encrypt for one note.
       // MYND-31: register the new note in the index (live).
       void reindexNote(newId);
       setState((prev) => {

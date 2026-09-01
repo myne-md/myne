@@ -49,7 +49,9 @@ export async function createTemplate(
   // State A/B compose to canonical `---\ntitle: <name>\ntemplate: true\n---\n\n<body>`.
   bytes = patchTitleField(bytes, name);
   bytes = patchTemplateField(bytes, TEMPLATE_FLAG_VALUE);
-  return await noteCreate(decoder.decode(bytes));
+  // A template note is filed nowhere: `createTemplate` writes `template: true`
+  // and no `folder:`, so there is no folder to register.
+  return await noteCreate(decoder.decode(bytes), null);
 }
 
 /**

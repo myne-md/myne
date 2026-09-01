@@ -55,6 +55,7 @@ export {
   readKindFromFmBody,
   readDoneFromFmBody,
   readTemplateFromFmBody,
+  readFolderFromFmBody,
   readTitleFromFmBody,
   readTrashedFromFmBody,
   DRAWING_KIND_VALUE,

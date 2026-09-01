@@ -303,7 +303,8 @@ export const RATCHET_BASELINE = Object.freeze({
  * @typedef {object} Ratchet
  * @property {string[]} gatedTiers           which tiers block a release today; may only grow
  * @property {string[]} gatedClients         which client surfaces those tiers block on; may only grow
- * @property {number}   totalMinutesCeiling  minutes of manual work in total; may only fall
+ * @property {number}   totalMinutesCeiling  minutes of manual work in total; `--record`
+ *                                           lowers it, a raise is an argued hand edit
  * @property {number}   gatedMinutes         minutes that block a release; may not fall by MORE than
  *                                           the ceiling does, which is what stops a core item being
  *                                           retiered out of the gate while the work stays in the roster
@@ -626,8 +627,11 @@ export function analyse(io) {
   // clients. Those are sets, set inclusion is exactly the invariant "the gate
   // widens" means, and it says nothing about how many minutes happen to sit
   // inside them. So `gatedTiers` and `gatedClients` may only GROW, and the
-  // paired ceiling on total manual minutes may only FALL. Together they still
-  // say what the pair always meant, and neither now argues against automation.
+  // paired ceiling on total manual minutes TRACKS the roster: `--record` lowers
+  // it, and raising it is an argued hand edit rather than a forbidden one,
+  // because a ceiling that could only fall would mean a genuinely new surface
+  // needing a human could never be gated. Together they still say what the pair
+  // always meant, and neither now argues against automation.
   //
   // The recorded sets live in the ratchet file so a narrowing edit is a diff a
   // reviewer sees, and `RATCHET_BASELINE` below is the committed floor they are
@@ -837,8 +841,10 @@ Not all of it does yet, and the difference is recorded rather than implied:
 The reason it starts smaller than the roster is arithmetic, not appetite. Making all of it blocking on
 day one produces a gate one maintainer cannot walk, and a gate nobody can walk gets bulk-overridden,
 which teaches the override to mean nothing. So the ratchet holds two numbers that only move one way:
-as automation debt is paid: the gate POLICY may only grow, the ceiling on total manual minutes may
-only fall, and a third recorded number keeps those two honest about the ROSTER rather than about the
+as automation debt is paid: the gate POLICY may only grow, and the ceiling on total manual minutes is
+lowered by \`--record\` and raised only by a hand edit that carries its argument, since a ceiling that
+could only fall would mean a genuinely new surface needing a human could never be gated. A third
+recorded number keeps those two honest about the ROSTER rather than about the
 ratchet file. Gating minutes may not fall by more than the ceiling does, so retiering a blocking item
 down to non-blocking, or dropping a gated client from an item, is refused: both take work out of the
 gate and leave it in the roster. Automating an item moves the two together by construction, so the
