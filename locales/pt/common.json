@@ -917,13 +917,15 @@
           "captureFailed": "Não foi possível iniciar a gravação. Verifique o acesso ao microfone nas Definições do Sistema.",
           "generic": "Não foi possível iniciar a gravação.",
           "locked": "Desbloqueie o cofre para gravar uma nota de voz.",
-          "noInputDevice": "Nenhum microfone encontrado. Ligue um e tente novamente."
+          "noInputDevice": "Nenhum microfone encontrado. Ligue um e tente novamente.",
+          "unsupportedSampleRate": "O seu microfone grava a uma taxa de amostragem que o Myne não consegue transcrever. Escolha outro dispositivo de entrada, ou altere a taxa de amostragem nas definições de som do sistema."
         },
         "stopError": {
           "captureFailed": "A gravação falhou. Verifique o microfone.",
           "emptyRecording": "Nada foi gravado.",
           "generic": "Não foi possível guardar a gravação.",
-          "silentRecording": "A gravação ficou silenciosa e foi descartada. Verifique o microfone."
+          "silentRecording": "A gravação ficou silenciosa e foi descartada. Verifique o microfone.",
+          "unsupportedSampleRate": "O seu microfone grava a uma taxa de amostragem que o Myne não consegue transcrever. Nada foi guardado. Escolha outro dispositivo de entrada, ou altere a taxa de amostragem nas definições de som do sistema."
         }
       },
       "widget": {
@@ -969,6 +971,7 @@
             "featureOff": "A voz para texto está desligada. Ligue-a em Definições → Transcrição.",
             "modelLoadFailed": "Não foi possível carregar o modelo de voz para texto. Se definiu um modelo personalizado em Definições → Programador → IA, verifique os respetivos ficheiros; caso contrário, reinstalar o Myne repõe o modelo incorporado.",
             "noModel": "Falta o modelo de voz para texto. Reinstalar o Myne repõe-no.",
+            "tooLong": "Esta gravação é demasiado longa para ser transcrita. O áudio continua anexado, por isso ainda pode reproduzi-lo.",
             "vaultLocked": "Desbloqueie o cofre para transcrever."
           },
           "disabledReason": "Ative a IA em Definições → Developer → IA para transcrever.",
@@ -1213,10 +1216,6 @@
       "turnedIntoTemplate": "Transformada em modelo",
       "convertedToNote": "Convertida em nota",
       "versionHistory": "Histórico de versões",
-      "exportMarkdown": "Exportar como Markdown…",
-      "exportPdf": "Exportar como PDF…",
-      "exportHtml": "Exportar como HTML…",
-      "exportTxt": "Exportar como Texto Simples…",
       "trash": "Mover para a Lixeira"
     },
     "codeBlock": {
@@ -2114,10 +2113,6 @@
       "duplicate": "Duplicar",
       "editFilterTitle": "Editar filtro",
       "emptyState": "Ainda não há notas.",
-      "exportHtml": "Exportar como HTML…",
-      "exportMarkdown": "Exportar como Markdown…",
-      "exportPdf": "Exportar como PDF…",
-      "exportTxt": "Exportar como Texto Simples…",
       "favoritesHeading": "Favoritos",
       "icon": "Ícone…",
       "mergeAnyway": "Fundir mesmo assim",
@@ -2433,6 +2428,13 @@
     },
     "workspace": {
       "defaultSlotName": "Predefinida"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportar…",
+      "txt": "Texto simples"
     }
   },
   "password": {
@@ -3163,6 +3165,9 @@
       "exactLabel": "Hora exata",
       "exactOn": "Ligado",
       "horizon": "Os lembretes estão registados até {{date}}. Abra o Myne antes disso para continuarem a chegar.",
+      "horizonLabel": "Agendar com antecedência",
+      "horizonLabelHelper": "Os lembretes são preparados com esta antecedência. O Myne tem de estar aberto e desbloqueado para que chegue um.",
+      "horizonInertHelper": "Guardado neste dispositivo. Ainda nada o lê: esta versão não entrega lembretes de tarefas.",
       "label": "Lembretes de tarefas",
       "saveError": "Não foi possível guardar essa definição. Tente novamente.",
       "showTextAria": "Mostrar o texto da tarefa na notificação",

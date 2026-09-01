@@ -12,7 +12,7 @@
 // the swap unchanged.
 
 import { useEffect, useRef, type CSSProperties } from "react";
-import { EditorState, type Extension } from "@codemirror/state";
+import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { diffDoc } from "./doc-diff";
 import {
@@ -24,6 +24,7 @@ import {
 import { reconfigureNoteId } from "./note-identity";
 import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
+import type { RecentNotesSource } from "./wikilink/recent-notes";
 import { reconfigureVaultHeadings } from "./wikilink/vault-headings";
 import type { VaultHeading } from "./wikilink/vault-headings";
 import { reconfigureVaultBlockAnchors } from "./wikilink/vault-block-anchors";
@@ -122,6 +123,17 @@ export type CMEditorProps = {
    *  compartment (re-mount-free) whenever it changes, so the wikilink chip's
    *  broken-link resolution + hover R1 stay live on the SYNC-5 nonce (WL-6). */
   noteSet?: readonly ResolverNote[];
+  /** myne-md/myne#601: how to ask which notes the reader has touched most
+   *  recently, newest first. Breaks ties in the `[[` picker's ranking, and owns
+   *  the order outright while the query is still empty.
+   *
+   *  A SOURCE rather than a snapshot, unlike `noteSet` beside it, and installed
+   *  once at mount rather than pushed into a compartment. The order has one
+   *  owner on the host side; pushing snapshots meant a full extension-tree
+   *  re-resolve per note activation per mounted view, to deliver a list nothing
+   *  reads until the picker opens, and it made the value per view, so panes
+   *  disagreed. Absent leaves the ranking on score alone. */
+  recentNotes?: RecentNotesSource;
   /** MYND-305: the vault-wide heading set the `[[##` autocomplete searches.
    *  Pushed into the editor's vault-headings compartment (re-mount-free) like
    *  `noteSet`. Optional — when absent, `[[##` simply finds nothing. */
@@ -254,7 +266,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, recentNotes, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -345,8 +357,8 @@ export function CMEditor(props: CMEditorProps) {
         onBlurRef.current?.();
       },
     });
-    const makeState = (doc: string): EditorState =>
-      EditorState.create({
+    const makeState = (doc: string): EditorState => {
+      const base = EditorState.create({
         doc,
         extensions: [
           ...myneExtensions({
@@ -356,6 +368,10 @@ export function CMEditor(props: CMEditorProps) {
             transcriptionEnabled: transcriptionEnabledRef.current,
             noteId: noteIdRef.current,
             keymapOverrides: keymapOverridesRef.current,
+            // Mount-read like `selectionToolbar` below, and for the same kind of
+            // reason: this is a function that answers on demand, so the value it
+            // returns stays current without the extension being rebuilt.
+            recentNotes,
             // Mount-read, ref-free on purpose (MYND-559): a host's formatting
             // surface is a platform constant, so every state this view ever
             // builds — mount or post-swap — carries the SAME choice.
@@ -366,6 +382,21 @@ export function CMEditor(props: CMEditorProps) {
           blurHandler,
         ],
       });
+      // Start the caret on the first BODY offset, not at 0 (myne-md/myne#595).
+      // `frontmatterSelectionGuard` enforces that floor on every transaction,
+      // but a state's INITIAL selection rides no transaction, so without this a
+      // note with frontmatter opens with the caret inside the Properties block,
+      // painted over the panel until the user moves it.
+      //
+      // Applying it as a transaction, rather than computing the offset and
+      // passing it to `create`, is the point rather than a detail: the floor is
+      // then measured against the document CodeMirror actually BUILT. Measuring
+      // the string instead is wrong by every `\r` CM drops from a CRLF note, and
+      // an offset past the end of the document does not degrade: `create`
+      // THROWS, so the editor never mounts and its pane sits on "Loading…"
+      // forever. Two shapes reach it, `---\ntitle: x\r\n---` among them.
+      return base.update({ selection: EditorSelection.cursor(0, 1) }).state;
+    };
 
     // Re-apply every compartment to its CURRENT prop value. `view.setState(...)`
     // resets compartments to the myneExtensions seed, so after a swap we push the
@@ -542,6 +573,10 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null || noteSet === undefined) return;
     view.dispatch({ effects: reconfigureNoteSet(noteSet) });
   }, [noteSet]);
+
+  // myne-md/myne#601 has NO effect here, deliberately: the recency tiebreak is a
+  // source installed once at mount, so there is nothing to push and no
+  // compartment to reconfigure. See the `recentNotes` prop's own comment.
 
   // MYND-305: push the vault-wide heading set into the view's compartment (same
   // re-mount-free pattern as the note-set) so the `[[##` picker searches it.

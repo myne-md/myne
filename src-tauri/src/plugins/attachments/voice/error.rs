@@ -25,6 +25,11 @@ pub enum VoiceRecordError {
     NoInputDevice,
     /// The capture device/stream failed for another reason.
     CaptureFailed,
+    /// The input device reports a sample rate this application's own decoder
+    /// would refuse, so recording at it would produce a clip that can never be
+    /// transcribed. Carried separately from `CaptureFailed` so the user is told
+    /// what is actually wrong, and so a bug report carries the rate.
+    UnsupportedSampleRate,
     /// Encrypting + storing the recorded WAV as an attachment failed.
     Import(AttachmentImportError),
     /// An unexpected internal failure (thread join, etc.).
@@ -36,6 +41,7 @@ impl From<RecordError> for VoiceRecordError {
         match e {
             RecordError::NoInputDevice => VoiceRecordError::NoInputDevice,
             RecordError::CaptureFailed => VoiceRecordError::CaptureFailed,
+            RecordError::UnsupportedSampleRate => VoiceRecordError::UnsupportedSampleRate,
         }
     }
 }

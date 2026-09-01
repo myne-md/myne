@@ -313,7 +313,7 @@ const WIKILINK_FOR_IDENTITY = /(!?)\[\[([^\]\n]*?)(\|[^\]\n]*)?\]\]/g;
  * untitled note containing an embed or a link to a renamed note hashed
  * differently on the two sides, dedup could not fire, and every re-import
  * created another copy and reported it as newly imported.
- * `decisions/storage/0544` states the dedup as a property; it was not one.
+ * `decisions/storage/0550` states the dedup as a property; it was not one.
  *
  * The projection blanks the link TARGET and keeps the alias. Both halves are
  * load-bearing. Blanking the target is what makes the projection invariant

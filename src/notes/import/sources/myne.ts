@@ -182,7 +182,7 @@ export interface MyneRewriteTally {
    * Wikilinks in the imported notes whose target did not come across.
    *
    * The residual of the linked-note rule, and the thing `conflict.ts` and
-   * `docs/decisions/storage/0544` both claimed was reported per link while
+   * `docs/decisions/storage/0550` both claimed was reported per link while
    * nothing computed it. A link is in this count when its folded target is not
    * the title of any note that crossed: the target was trashed, was a template,
    * was untitled (so it has no title to resolve BY), or would not decrypt.
@@ -255,7 +255,7 @@ export function decideRenames(
   // What it costs is the same thing the sibling `linksRetargeted` inflation
   // cost and was fixed for in this branch: `linksLeftUnresolved` is rendered as
   // a summary row and written into the durable import report note, which
-  // `docs/decisions/storage/0544` calls the residual that must not be silent. A
+  // `docs/decisions/storage/0550` calls the residual that must not be silent. A
   // durable note asserting a number that describes nothing is worse than no
   // number.
   const ambiguousTitles = new Set<string>();
@@ -554,7 +554,7 @@ export function createMyneSource(
           // reference to Beta was an embed did not make Beta "linked", the
           // rename rule did not fire, Beta took the skip arm, and the embed
           // silently rendered the TARGET's own Beta. That is verbatim the
-          // hazard `decisions/storage/0544` names, and `countUnresolved` reads
+          // hazard `decisions/storage/0550` names, and `countUnresolved` reads
           // the same set, so the report could not flag it either.
           //
           // A FOLDER target is skipped instead, and for a different reason:

@@ -37,6 +37,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import {
   dismissImporterOffer,
+  openExportSubmenuItem,
   pageSeatInvoke,
   unlockToEditor,
 } from "./support/flows";
@@ -68,7 +69,7 @@ async function openHtmlExportMenuItem(s: Session, noteId: string) {
     testIdSelector("notes.row", { "data-note-id": noteId }),
   );
   await row.rightClick();
-  return s.waitForElement(HTML_ITEM_SELECTOR);
+  return openExportSubmenuItem(s, "export-html");
 }
 
 describeE2E("hh1 no-attachments HTML export writes a standalone doc (MYND-340)", () => {

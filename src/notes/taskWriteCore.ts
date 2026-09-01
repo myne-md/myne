@@ -28,6 +28,7 @@ import {
   planNextOccurrence,
 } from "../dialect/taskRecurrence";
 import type { VaultTask } from "./taskIndex";
+import { TASK_LINE_RE } from "@myne/dialect/taskMarker";
 
 // Re-exported so a consumer needs only this module — `taskIndex.ts` itself is
 // Tauri- and React-coupled and must not be aliased into another client.
@@ -143,7 +144,11 @@ export function announceWrite(noteId: string): void {
  * `TaskRecord`'s own doc promises the uppercase marker survives untouched.
  */
 export function flipMarker(line: string, completed: boolean): string | null {
-  const match = /^(\s*[-*+]\s*)\[([ xX])\]/.exec(line);
+  // `TASK_LINE_RE` rather than a restated shape. The restated one accepted
+  // `- [ ]foo`, which the parser does not read as a task at all, so flipping a
+  // checkbox on such a line rewrote a character no reader treats as one
+  // (myne-md/myne#593).
+  const match = TASK_LINE_RE.exec(line);
   if (match === null) return null;
   const current = match[2]!;
   if ((current === "x" || current === "X") === completed) return line;
