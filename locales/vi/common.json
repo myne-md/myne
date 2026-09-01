@@ -1188,6 +1188,7 @@
     },
     "find": {
       "close": "Đóng tìm kiếm",
+      "dateFallback": "Đang tìm {{stored}}, dạng mà ngày này được lưu.",
       "matchCase": "Phân biệt chữ hoa/thường",
       "matchCount": "{{current}} trên {{total}}",
       "nextMatch": "Kết quả kế tiếp",
@@ -1196,6 +1197,7 @@
       "previousMatch": "Kết quả trước",
       "replaceAll": "Thay thế tất cả",
       "replaceAllCount": "Thay thế tất cả ({{total}})",
+      "replaceOffOnDateFallback": "Thay thế bị tắt trong khi một ngày được khớp bằng dạng lưu trữ của nó, để một lần thay thế không làm ngày đó không đọc được.",
       "replaceOne": "Thay thế",
       "replacePlaceholder": "Thay bằng",
       "toggleReplace": "Bật/tắt thay thế"
@@ -3347,7 +3349,7 @@
     },
     "dateTime": {
       "dateLabel": "Định dạng ngày",
-      "dateHelper": "Cách hiển thị ngày trong công việc, chế độ xem đã lưu và tệp đính kèm.",
+      "dateHelper": "Cách viết một ngày ở mọi nơi Myne hiển thị ngày.",
       "dateSystem": "Theo ngôn ngữ",
       "timeLabel": "Định dạng giờ",
       "timeHelper": "Giờ được hiển thị theo đồng hồ 24 giờ hay 12 giờ.",

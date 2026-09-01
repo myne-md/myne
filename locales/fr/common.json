@@ -1237,6 +1237,7 @@
     },
     "find": {
       "close": "Fermer la recherche",
+      "dateFallback": "Recherche de {{stored}}, la forme sous laquelle cette date est enregistrée.",
       "matchCase": "Respecter la casse",
       "matchCount": "{{current}} sur {{total}}",
       "nextMatch": "Résultat suivant",
@@ -1245,6 +1246,7 @@
       "previousMatch": "Résultat précédent",
       "replaceAll": "Tout remplacer",
       "replaceAllCount": "Tout remplacer ({{total}})",
+      "replaceOffOnDateFallback": "Le remplacement est désactivé tant qu'une date est trouvée par sa forme enregistrée, afin qu'un remplacement ne la rende pas illisible.",
       "replaceOne": "Remplacer",
       "replacePlaceholder": "Remplacer par",
       "toggleReplace": "Afficher le remplacement"
@@ -3457,7 +3459,7 @@
     },
     "dateTime": {
       "dateLabel": "Format de date",
-      "dateHelper": "Comment les dates sont affichées dans les tâches, les vues enregistrées et les pièces jointes.",
+      "dateHelper": "Comment une date est écrite, partout où Myne en affiche une.",
       "dateSystem": "Suivre la langue",
       "timeLabel": "Format d'heure",
       "timeHelper": "Détermine si les heures sont affichées au format 24 heures ou 12 heures.",

@@ -1237,6 +1237,7 @@
     },
     "find": {
       "close": "Fechar pesquisa",
+      "dateFallback": "A procurar {{stored}}, a forma em que esta data é guardada.",
       "matchCase": "Diferenciar maiúsculas",
       "matchCount": "{{current}} de {{total}}",
       "nextMatch": "Ocorrência seguinte",
@@ -1245,6 +1246,7 @@
       "previousMatch": "Ocorrência anterior",
       "replaceAll": "Substituir tudo",
       "replaceAllCount": "Substituir tudo ({{total}})",
+      "replaceOffOnDateFallback": "Substituir está desativado enquanto uma data for encontrada pela sua forma guardada, para que uma substituição não a torne ilegível.",
       "replaceOne": "Substituir",
       "replacePlaceholder": "Substituir por",
       "toggleReplace": "Alternar substituição"
@@ -3457,7 +3459,7 @@
     },
     "dateTime": {
       "dateLabel": "Formato de data",
-      "dateHelper": "Como as datas são mostradas nas tarefas, nas vistas guardadas e nos anexos.",
+      "dateHelper": "Como se escreve uma data em todos os sítios onde o Myne mostra uma.",
       "dateSystem": "Seguir o idioma",
       "timeLabel": "Formato de hora",
       "timeHelper": "Se as horas são mostradas no formato de 24 ou de 12 horas.",

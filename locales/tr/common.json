@@ -1188,6 +1188,7 @@
     },
     "find": {
       "close": "Aramayı kapat",
+      "dateFallback": "{{stored}} aranıyor; bu tarih bu biçimde saklanıyor.",
       "matchCase": "Büyük/küçük harf eşleştir",
       "matchCount": "{{total}} içinde {{current}}",
       "nextMatch": "Sonraki eşleşme",
@@ -1196,6 +1197,7 @@
       "previousMatch": "Önceki eşleşme",
       "replaceAll": "Tümünü değiştir",
       "replaceAllCount": "Tümünü değiştir ({{total}})",
+      "replaceOffOnDateFallback": "Bir tarih saklandığı biçimle eşleştiği sürece Değiştir kapalıdır, böylece bir değiştirme tarihi okunamaz hâle getiremez.",
       "replaceOne": "Değiştir",
       "replacePlaceholder": "Şununla değiştir",
       "toggleReplace": "Değiştirmeyi aç/kapat"
@@ -3347,7 +3349,7 @@
     },
     "dateTime": {
       "dateLabel": "Tarih biçimi",
-      "dateHelper": "Tarihlerin görevlerde, kaydedilmiş görünümlerde ve eklerde nasıl gösterileceği.",
+      "dateHelper": "Myne bir tarihi nerede gösterirse göstersin, o tarihin nasıl yazılacağı.",
       "dateSystem": "Dile göre",
       "timeLabel": "Saat biçimi",
       "timeHelper": "Saatlerin 24 saatlik mi yoksa 12 saatlik mi gösterileceği.",

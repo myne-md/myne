@@ -1598,9 +1598,66 @@ export async function replaceFieldText(
 
 /** Current CodeMirror document text (`textContent()` — the doc lives in
  *  nested .cm-line elements this driver's getText drops). Re-found per
- *  call: CM remounts across relock/reload. */
+ *  call: CM remounts across relock/reload.
+ *
+ *  **This is the RENDERED text, which is not always the stored text.** Every
+ *  replace widget substitutes its own label for the source it covers, so a
+ *  scenario asking "did the file keep its bytes" must use
+ *  {@link editorSourceText} instead. That distinction cost four scenarios in
+ *  myne-md/myne#609: the task chip used to print its stored value verbatim, so
+ *  reading a date off the render happened to work, and the moment the chip
+ *  started printing the reader's chosen format the same assertions started
+ *  timing out on text that was never gone from the document. */
 export async function editorText(session: Session): Promise<string> {
   return (await session.waitForElement(CM_CONTENT)).textContent();
+}
+
+/**
+ * The note's SOURCE text: the document as the file holds it, read in the one
+ * view mode where nothing decorates it.
+ *
+ * Switches the focused note tab to `source` through the production bottom-bar
+ * CTA, reads, then cycles back to the mode it started in so a later assertion
+ * in the same scenario sees the editor it expects.
+ *
+ * **Why the view mode rather than something cheaper.** Three cheaper routes
+ * were tried against the running app and none of them reveals a task chip:
+ * putting the caret on the chip's line (the chips render on the caret line,
+ * which `tc4` demonstrates by waiting for one there), opening the find panel
+ * (its reveal is scoped to chips overlapping a MATCH, so a line with no match
+ * keeps its chips), and reading a `data-` attribute (there is none carrying the
+ * value, and adding one would be a test hook in production DOM). Source mode is
+ * the app's own answer to "show me what is actually written".
+ */
+export async function editorSourceText(session: Session): Promise<string> {
+  const mode = async (): Promise<string> =>
+    (await (await session.byTestId("editor.view-mode-cta")).attribute("data-view-mode")) ?? "";
+
+  /** Click the CTA until `want` is current, waiting on each click to land.
+   *
+   *  The wait compares against the mode read immediately BEFORE that click, not
+   *  against the mode this function started in. Written the second way first,
+   *  where the second iteration's wait was already satisfied by the FIRST
+   *  click's effect and so confirmed nothing: a click that did not register
+   *  would have been read as one that did. */
+  const cycleTo = async (want: string): Promise<void> => {
+    // live -> reading -> source -> live, so at most two clicks reach any mode
+    // from any other. Three is the bound plus one, and a fourth would mean the
+    // CTA is not cycling, which the loop exit then reports as a stuck mode.
+    for (let i = 0; i < 3 && (await mode()) !== want; i += 1) {
+      const before = await mode();
+      await (await session.byTestId("editor.view-mode-cta")).click();
+      await session.waitUntil(async () => ((await mode()) !== before ? true : null), {
+        label: `the view mode advanced away from ${before}`,
+      });
+    }
+  };
+
+  const started = await mode();
+  await cycleTo("source");
+  const text = await editorText(session);
+  await cycleTo(started);
+  return text;
 }
 
 /**
