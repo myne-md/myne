@@ -16,6 +16,11 @@
 //! ONE plugin, all fourteen commands, a single deny-by-default
 //! `sync:default` capability entry (SYNC-15).
 
+// Agentic note editing over a remote provider (myne-md/myne#456). Registered
+// unconditionally, unlike desktop's, which sits behind the `local-inference`
+// feature: there is no local-inference feature on this client to gate it
+// behind, and the arm is either present or the feature does not exist here.
+pub mod agent;
 pub mod attachments;
 pub mod captures;
 pub mod export;

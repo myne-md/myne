@@ -29,7 +29,7 @@ import { DateTimeSettings } from "./DateTimeSettings";
 import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
 import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
-import { DailyNotesSettings } from "./DailyNotesSettings";
+import { PeriodicNotesSettings } from "./PeriodicNotesSettings";
 import { ArchiveSettings } from "./ArchiveSettings";
 import { ViewsSettings } from "./ViewsSettings";
 import { ReminderHorizonSettings, ReminderSettings } from "./ReminderSettings";
@@ -343,9 +343,6 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
       >
         {/* Spell-check configuration (MYND-267) — toggle + language picker. */}
         <SpellSettings />
-        {/* Daily-notes configuration (MYND-191) — folder / date-format /
-            template. */}
-        <DailyNotesSettings />
         {/* Task reminders (MYND-618) — note-authoring behaviour, which is why it
             belongs in this group rather than under Appearance. Device-local:
             whether THIS machine is interrupted is a property of the machine. */}
@@ -362,6 +359,14 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
           onChange={(days) => void setReminderHorizon(days)}
         />
       </SettingsSection>
+
+      {/* Periodic notes (MYND-191 daily, myne#177 weekly + monthly): folder /
+          title format / template, one section per period. Rendered at PANEL
+          level rather than inside Writing above: `SettingsSection` draws a rule
+          to the panel edge, so nesting three of them made the Reminder rows
+          that followed sit under the Monthly divider and read as monthly
+          settings. */}
+      <PeriodicNotesSettings />
 
       <SettingsSection
         title={t("settings.editor.sections.features")}

@@ -14,6 +14,7 @@ import {
   buildRenderContext,
   extractTemplateBody,
   createNoteFromTemplate,
+  singleDay,
 } from "../../src/notes/newNoteFromTemplate";
 
 beforeEach(() => invokeMock.mockReset());
@@ -39,7 +40,7 @@ const NOW = new Date(2026, 5, 7, 1, 0, 0);
 
 describe("buildRenderContext — host-side local formatting", () => {
   it("formats date / time / datetime in local time", () => {
-    const ctx = buildRenderContext(NOW, "My Note");
+    const ctx = buildRenderContext(NOW, "My Note", singleDay(NOW));
     expect(ctx.date).toBe("2026-06-07");
     expect(ctx.time).toBe("01:00");
     expect(ctx.datetime).toBe("2026-06-07 01:00");
@@ -48,7 +49,7 @@ describe("buildRenderContext — host-side local formatting", () => {
   it("keeps the local calendar day for an early-morning instant (no UTC off-by-one)", () => {
     // 01:00 local — in a positive UTC offset this is the previous UTC day, but
     // the local-formatted date must remain 2026-06-07.
-    expect(buildRenderContext(NOW, "x").date).toBe("2026-06-07");
+    expect(buildRenderContext(NOW, "x", singleDay(NOW)).date).toBe("2026-06-07");
   });
 });
 
@@ -69,7 +70,7 @@ describe("createNoteFromTemplate", () => {
 
   it("renders {{title}} + {{date}} once and writes the supplied name as title:", async () => {
     routeReadThenCreate(TEMPLATE);
-    const id = await createNoteFromTemplate("tmpl-1", "Standup", null, NOW);
+    const id = await createNoteFromTemplate("tmpl-1", "Standup", null, NOW, singleDay(NOW));
     expect(id).toBe("new-note-id");
     const body = lastCreateBody();
     expect(body).toContain("title: Standup");
@@ -78,13 +79,13 @@ describe("createNoteFromTemplate", () => {
 
   it("leaves an unknown token verbatim", async () => {
     routeReadThenCreate(TEMPLATE);
-    await createNoteFromTemplate("tmpl-1", "Standup", null, NOW);
+    await createNoteFromTemplate("tmpl-1", "Standup", null, NOW, singleDay(NOW));
     expect(lastCreateBody()).toContain("Attendees: {{project}}");
   });
 
   it("does NOT carry over the template flag or the template's own title", async () => {
     routeReadThenCreate(TEMPLATE);
-    await createNoteFromTemplate("tmpl-1", "Standup", null, NOW);
+    await createNoteFromTemplate("tmpl-1", "Standup", null, NOW, singleDay(NOW));
     const body = lastCreateBody();
     expect(body).not.toContain("template: true");
     expect(body).not.toContain("Meeting template");
@@ -92,19 +93,19 @@ describe("createNoteFromTemplate", () => {
 
   it("threads the folder so the note lands in the active create context", async () => {
     routeReadThenCreate(TEMPLATE);
-    await createNoteFromTemplate("tmpl-1", "Standup", "Journal/", NOW);
+    await createNoteFromTemplate("tmpl-1", "Standup", "Journal/", NOW, singleDay(NOW));
     expect(lastCreateBody()).toContain("folder: Journal/");
   });
 
   it("creates at the root (no folder field) when folder is null", async () => {
     routeReadThenCreate(TEMPLATE);
-    await createNoteFromTemplate("tmpl-1", "Standup", null, NOW);
+    await createNoteFromTemplate("tmpl-1", "Standup", null, NOW, singleDay(NOW));
     expect(lastCreateBody()).not.toContain("folder:");
   });
 
   it("goes through note_create only — never note_update", async () => {
     routeReadThenCreate(TEMPLATE);
-    await createNoteFromTemplate("tmpl-1", "Standup", null, NOW);
+    await createNoteFromTemplate("tmpl-1", "Standup", null, NOW, singleDay(NOW));
     const cmds = invokeMock.mock.calls.map(([c]) => c);
     expect(cmds).toContain("plugin:notes|note_create");
     expect(cmds).not.toContain("plugin:notes|note_update");
@@ -117,7 +118,7 @@ describe("createNoteFromTemplate", () => {
         : Promise.resolve("id"),
     );
     await expect(
-      createNoteFromTemplate("missing", "X", null, NOW),
+      createNoteFromTemplate("missing", "X", null, NOW, singleDay(NOW)),
     ).rejects.toMatchObject({ kind: "NoteNotFound" });
   });
 });

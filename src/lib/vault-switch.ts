@@ -32,6 +32,7 @@
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
+import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import { resetSessionIgnored } from "../editor/decorations/spell";
 import { resetScrollMemory } from "../notes/scrollMemory";
 import { resetRecentNotes } from "../notes/recentNotes";
@@ -146,6 +147,10 @@ export async function leaveActiveVault(deps: {
   // an unmount.
   resetPreviewCache();
   resetTranscripts();
+  // And the ambient date/time display store. Asserted on this path as well
+  // as on the lock, because a vault CHANGE is the case where the resident
+  // value is the PREVIOUS vault's zone and formats rather than this one's.
+  resetDateTimeDisplayForLock();
 }
 
 /**

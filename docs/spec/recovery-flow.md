@@ -74,9 +74,13 @@ This commitment is **narrow**: it covers the *generated* phrase displayed at vau
 
 The recovery flow MUST be reachable from the vault-unlock screen via an explicit affordance (e.g., a "Recover with phrase" link or button). The visual and interaction design of that affordance is specified by the vault-unlock-screen spec (B4a) and is out of scope here. No other entry points to recovery are defined for v0.1; adding one (command palette, settings menu, deep link) requires a new `decisions.md` entry.
 
+**A surface that accepts the phrase as a CREDENTIAL is not an entry point to recovery**, and the distinction is what keeps the sentence above true as the product grows. Recovery replaces a forgotten master password: it derives `recovery_wrap_key`, transitions the slot to `Slot::Recovering`, and is not finished until a new password is committed (§4). A credential surface derives a key and stops. Two exist today, and neither is reachable from this flow or leads into it: device enrolment (`sync_enroll`, which also accepts account number plus master password) and the SOURCE-vault credential of a vault import (`Slot::ImportSource`, myne-md/myne#464). Both are subject to §3.2 below, which is where the rules that DO travel are stated.
+
 ### 3.2 Phrase entry
 
 The recovery-entry screen MUST present a **24-cell grid** matching the visual idiom of §2.2 (numbered cells, monospace font, position indices 1–24 visible). The user types one BIP-39 word per cell.
+
+**These properties bind EVERY surface on which a user types the phrase, not only this one.** The rationale below is a privacy argument about what a screen leaks while it is being typed into, and that argument does not know which flow it is in: a typeahead over the BIP-39 list leaks the same bit per word on the device-enrolment form and on a vault import's source credential as it does here. Stating it as a property of the recovery screen alone is what let a second surface ship a single-line input, which is a `paste`-shaped affordance with no position indices and, on a platform with autofill, a phrase in a password manager's heuristics. A client that adds a phrase surface implements this section or does not add the surface.
 
 Normative properties:
 
@@ -87,6 +91,8 @@ Normative properties:
 - **Normalization at submit.** When the user clicks Submit, the client MUST apply `protocol.md` §7.4 normalization (NFKD + lowercase + trim, whitespace runs collapsed to single ASCII space) to produce the `phrase_normalized` byte string fed to Argon2id.
 
 > Rationale (privacy): even though the BIP-39 wordlist is public, surfacing wordlist membership through any UI affordance — typeahead, suggestion list, per-cell red border, "X words are not BIP-39" batched error — leaks a 1-bit-per-word membership signal to anyone observing the screen. This specification rejects that leak in either direction (positive or negative feedback). The cost is that users with a typo pay one Argon2id roundtrip per attempt with no in-product hint pointing at the wrong cell.
+
+> **Where the surfaces are, so the list can be checked rather than assumed.** Recovery (`src/screens/vault-recover/PhraseEntryStep.tsx`), device enrolment (`src/components/sync/EnrollPhraseCredential.tsx`) and the vault-import source credential (`src/notes/import/MyneVaultSetup.tsx`) each implement the grid separately, because the web client substitutes two of the three away by module path (`web/vite.config.ts`) and a shared component cannot be substituted for one caller and kept for another. One further consequence, recorded because it looks like duplication and is not: each carries its own `data-testid`, since `scripts/check-web-no-phrase.mjs` asserts the ABSENCE of one specific testid from the served bundle, and a shared testid would make three surfaces indistinguishable in the artefact.
 
 > **Open implementation question (B4b).** If the recovery-drill smoke test reveals the typo-cost-per-attempt is too punishing in practice, this rule MAY be revisited via a new `decisions.md` entry. Candidate softening: a single batched, non-cell-specific message ("phrase contains words not in the BIP-39 list — please re-check") shown only after a failed Argon2id+AEAD cycle, without per-cell highlighting.
 

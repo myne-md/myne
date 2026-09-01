@@ -126,6 +126,15 @@ function mapPhraseError(e: VaultRecoveryError): PhraseOutcome {
         kind: "banner-retry",
         banner: i18n.t("recover.errors.operationInProgress"),
       };
+    case "VaultOpenAsImportSource":
+      // A vault-import run holds this vault open as its read-only source
+      // (myne-md/myne#464). Distinct copy from `RecoveryInProgress` above,
+      // because what the user has to do about it is different: that one is a
+      // moment, this one lasts as long as their import does.
+      return {
+        kind: "banner-retry",
+        banner: i18n.t("recover.errors.openAsImportSource"),
+      };
     case "VaultRecoveryRequiresActiveSession":
       // Defensive — A8d cannot produce this variant in practice
       // (it's an A8f precondition). Treat as generic banner.

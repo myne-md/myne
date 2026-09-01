@@ -44,6 +44,15 @@ pub mod export_naming;
 /// by the `ai_excluded_folders` (SYNC-14) clamp in every place that applies it.
 pub mod folder_key;
 pub mod http;
+// The inference seam (myne-md/myne#456): the `Engine` trait, the backend
+// registry with its ambient-versus-remote refusal, and the remote-provider arm.
+// Behind the default-off `remote-ai` feature so the desktop auditable build
+// (`cargo build -p myne-desktop --no-default-features`) keeps containing no
+// remote-provider code, which it did while this tree lived inside the
+// feature-gated desktop plugin. See the module doc for why that gate is
+// load-bearing and what it does not protect.
+#[cfg(feature = "remote-ai")]
+pub mod inference;
 // The process-host seam (phase3-web-client task 79) — what a command core needs
 // from its host that is not already an ordinary Rust value. Sibling of `hooks`,
 // which is the same idea one axis over (lifecycle side effects).

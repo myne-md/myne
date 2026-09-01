@@ -48,7 +48,8 @@
       "unsupportedDetail": "검사 {{attempts}}개 중 {{passes}}개를 통과했습니다. {{required}}개가 필요합니다.",
       "checking": "모델을 확인하는 중…",
       "checkingAt": "모델을 확인하는 중… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "이 합격 기준은 아직 여러 모델에서 측정되지 않아 실제보다 엄격하거나 느슨할 수 있습니다."
+      "unsupportedProvisional": "이 합격 기준은 아직 여러 모델에서 측정되지 않아 실제보다 엄격하거나 느슨할 수 있습니다.",
+      "scopeNone": "열린 노트가 없어 아직 작업할 대상이 없습니다"
     },
     "progress": {
       "working": "작업 중",
@@ -64,7 +65,8 @@
       "grantsUser_one": "직접 설정한 범위 {{count}}개",
       "grantsUser_other": "직접 설정한 범위 {{count}}개",
       "grantsModel_one": "에이전트가 요청한 범위 {{count}}개",
-      "grantsModel_other": "에이전트가 요청한 범위 {{count}}개"
+      "grantsModel_other": "에이전트가 요청한 범위 {{count}}개",
+      "cancelledBackground": "Myne이 백그라운드로 전환되어 실행이 취소되었습니다. 아무것도 기록되지 않았습니다. 준비되면 다시 물어보세요."
     },
     "scope": {
       "title": "{{folder}}을(를) 포함할까요?",
@@ -118,7 +120,10 @@
         "excludedFolder": "생성되지 않았습니다: 해당 폴더는 AI에서 제외되어 있습니다.",
         "createFailed": "생성되지 않았습니다: 새 노트를 기록하지 못했습니다. 다른 변경 사항은 적용되었습니다.",
         "excludedNow": "적용할 수 없습니다: 해당 노트의 폴더가 이제 AI에서 제외되었습니다.",
-        "notProposed": "적용할 수 없습니다: 해당 변경은 이번 실행의 변경 제안에 포함되어 있지 않습니다."
+        "notProposed": "적용할 수 없습니다: 해당 변경은 이번 실행의 변경 제안에 포함되어 있지 않습니다.",
+        "noteMoved": "적용할 수 없습니다: 해당 변경은 노트를 다른 폴더로 옮기게 됩니다.",
+        "appendEmpty": "적용할 수 없습니다: 추가할 내용이 없었습니다.",
+        "appendWouldWriteFrontmatter": "적용할 수 없습니다: 해당 텍스트가 노트의 속성 블록이 되었을 것입니다."
       },
       "applyFailed": "변경 사항을 적용하지 못했습니다.",
       "undo": "이번 실행 되돌리기",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "노트 {{count}}개 읽음",
       "runSummaryOffDevice_one": "노트의 약 {{count}}자가 제공업체로 전송되었습니다",
       "runSummaryOffDevice_other": "노트의 약 {{count}}자가 제공업체로 전송되었습니다",
-      "runSummaryOnDevice": "아무것도 이 기기를 떠나지 않았습니다"
+      "runSummaryOnDevice": "아무것도 이 기기를 떠나지 않았습니다",
+      "appendFlag": "끝에 추가"
     },
     "undo": {
       "offer_one": "마지막 실행이 노트 {{count}}개를 변경했습니다.",
@@ -148,7 +154,9 @@
       "failed_one": "노트 {{count}}개를 복원하지 못했습니다.",
       "failed_other": "노트 {{count}}개를 복원하지 못했습니다.",
       "createdNotReverted_one": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다.",
-      "createdNotReverted_other": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다."
+      "createdNotReverted_other": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다.",
+      "sessionOnly": "이 한 번 탭 실행 취소는 보관함을 잠그거나 앱을 닫을 때까지 유효합니다. 그 이후에는 노트의 버전 기록에서 하나씩 복원하세요.",
+      "sessionOnlyLink": "버전 기록 열기"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "모두 펼치기"
+      },
+      "openThisWeekNote": {
+        "label": "이번 주 노트 열기"
+      },
+      "openThisMonthNote": {
+        "label": "이번 달 노트 열기"
       }
     },
     "hotkeys": {
@@ -1198,7 +1212,9 @@
       "replaceAllCount": "모두 바꾸기 ({{total}})",
       "replaceOne": "바꾸기",
       "replacePlaceholder": "바꿀 내용",
-      "toggleReplace": "바꾸기 전환"
+      "toggleReplace": "바꾸기 전환",
+      "dateFallback": "{{stored}}을(를) 검색하고 있습니다. 이 날짜가 저장되는 형식입니다.",
+      "replaceOffOnDateFallback": "날짜가 저장 형식으로 일치하는 동안에는 바꾸기가 꺼집니다. 바꾸기로 인해 날짜를 읽을 수 없게 되는 것을 막기 위해서입니다."
     },
     "cover": {
       "add": "표지 추가",
@@ -1533,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "노트를 검색하거나 명령을 실행하세요…",
       "noMatches": "일치하는 명령이나 노트가 없습니다."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "오늘 노트를 열지 못했습니다.",
+        "weekly": "이번 주 노트를 열지 못했습니다.",
+        "monthly": "이번 달 노트를 열지 못했습니다."
+      }
     }
   },
   "export": {
@@ -2777,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "빈 노트(템플릿 없음)",
+      "folderSearchEmpty": "일치하는 폴더가 없습니다.",
+      "folderSearchPlaceholder": "폴더 검색…",
+      "searchEmpty": "일치하는 템플릿이 없습니다.",
+      "searchPlaceholder": "템플릿 검색…",
+      "untitledTemplate": "제목 없는 템플릿",
+      "sectionDaily": "일간 노트",
+      "sectionWeekly": "주간 노트",
+      "sectionMonthly": "월간 노트",
+      "periodFolderLabel": "폴더",
+      "periodFolderHelper": "새 {{period}} 노트가 저장되는 위치입니다. 기본값: {{default}}. 폴더는 비어 있어도 유지됩니다.",
+      "periodFormatLabel": "제목 형식",
+      "periodFormatHelperDaily": "각 일간 노트의 제목입니다. YYYY, MM, DD, gggg(ISO 주 연도), ww(ISO 주 번호)와 문자를 그대로 넣는 [텍스트]를 지원합니다. 기본값: {{default}}.",
+      "periodFormatHelperWeekly": "각 주간 노트의 제목입니다. gggg(ISO 주 연도), ww(ISO 주 번호), YYYY, MM, DD와 문자를 그대로 넣는 [텍스트]를 지원합니다. 기본값: {{default}}.",
+      "periodFormatHelperMonthly": "각 월간 노트의 제목입니다. YYYY, MM, gggg(ISO 주 연도), ww(ISO 주 번호)와 문자를 그대로 넣는 [텍스트]를 지원합니다. 기본값: {{default}}.",
+      "periodTemplateLabel": "템플릿",
+      "periodTemplateHelper": "각 {{period}} 노트를 시작할 템플릿을 고르거나, 날짜를 제목으로 하는 빈 노트를 원하면 비워 두세요.",
+      "collisionWarning": "{{first}} 노트와 {{second}} 노트는 같은 노트가 됩니다. 폴더가 같고 제목도 같아지기 때문입니다. 두 명령 모두 그 노트를 엽니다.",
+      "weekStartNote": "주는 월요일에 시작합니다(ISO 8601). 그래서 1월의 첫 며칠은 전년도의 마지막 주에, 12월의 마지막 며칠은 다음 해의 첫 주에 속할 수 있습니다.",
+      "periodFolderSaveError": "{{period}} 폴더를 저장하지 못했습니다. 다시 시도해 주세요.",
+      "periodFormatSaveError": "{{period}} 제목 형식을 저장하지 못했습니다. 다시 시도해 주세요.",
+      "periodTemplateSaveError": "{{period}} 템플릿을 저장하지 못했습니다. 다시 시도해 주세요.",
+      "periodNameDaily": "일간",
+      "periodNameWeekly": "주간",
+      "periodNameMonthly": "월간",
+      "periodFolderAriaLabel": "{{period}} 노트 폴더",
+      "periodFormatAriaLabel": "{{period}} 노트 제목 형식",
+      "periodTemplateAriaLabel": "{{period}} 노트 템플릿",
       "dateFormatHelper": "각 일일 노트의 제목입니다. YYYY, MM, DD를 지원합니다. 기본값은 {{default}}입니다.",
       "dateFormatLabel": "일일 노트 날짜 형식",
       "dateFormatSaveError": "날짜 형식을 저장하지 못했습니다. 다시 시도하세요.",
       "folderHelper": "새 일일 노트가 저장되는 위치입니다. 기본값은 {{default}}이며, 비어 있어도 폴더는 유지됩니다.",
       "folderLabel": "일일 노트 폴더",
       "folderSaveError": "일일 노트 폴더를 저장하지 못했습니다. 다시 시도하세요.",
-      "folderSearchEmpty": "일치하는 폴더가 없습니다.",
-      "folderSearchPlaceholder": "폴더 검색…",
-      "searchEmpty": "일치하는 템플릿이 없습니다.",
-      "searchPlaceholder": "템플릿 검색…",
       "templateHelper": "각 일일 노트를 시작할 템플릿을 선택하거나, 날짜를 제목으로 한 빈 노트를 만들려면 비워 두세요.",
       "templateLabel": "일일 노트 템플릿",
-      "templateSaveError": "일일 노트 템플릿을 저장하지 못했습니다. 다시 시도하세요.",
-      "untitledTemplate": "제목 없는 템플릿"
+      "templateSaveError": "일일 노트 템플릿을 저장하지 못했습니다. 다시 시도하세요."
     },
     "deleteVault": {
       "cancel": "취소",
@@ -2951,7 +2996,8 @@
         "title": "Myne가 {{provider}}에 무언가를 보내기 전에",
         "whatLabel": "기기를 떠나는 것",
         "whenLabel": "언제 떠나는지",
-        "whoLabel": "누가 받는지"
+        "whoLabel": "누가 받는지",
+        "connectionLabel": "어떻게 전송되는지"
       },
       "disclosureToggle": "어떻게 작동하나요?",
       "enableHelper": "사용자가 제공한 모델을 실행합니다. 모델이 어디에서 실행되는지, 그리고 노트가 이 기기를 떠나는지는 아래에서 지정하는 제공업체에 따라 달라집니다. 실험적이며 기본적으로 꺼져 있습니다.",
@@ -2985,7 +3031,9 @@
         "refused": "제공업체가 연결을 거부했습니다. 서비스가 중단되었거나 이 네트워크를 차단하고 있을 수 있습니다.",
         "timeout": "제공업체가 제때 응답하지 않았습니다. 실행 중인 채로 남은 것은 없습니다.",
         "unauthorized": "제공업체가 API 키를 거부했습니다. 키를 교체하세요. 잘못되었거나, 취소되었거나, 다른 계정의 키일 수 있습니다.",
-        "unreachable": "제공업체에 연결하지 못했습니다. 네트워크 연결을 확인하세요."
+        "unreachable": "제공업체에 연결하지 못했습니다. 네트워크 연결을 확인하세요.",
+        "featureOff": "이 기기에서 AI가 꺼져 있습니다. 아무것도 전송되지 않았습니다. 설정의 AI에서 켜세요.",
+        "consentMissing": "이 기기에서 이 제공자에게 노트를 보내는 데 동의하지 않았습니다. 아무것도 전송되지 않았습니다. 설정의 AI에서 제공자를 다시 선택하고 무엇이 전송되는지 읽어보세요."
       },
       "modelChoose": "파일 선택…",
       "modelEmbeddingLabel": "검색 모델: 의미 기반 검색 및 Q&A",
@@ -3026,7 +3074,16 @@
       "recommendedFilesEmbedding": "한 폴더에 model.safetensors + config.json + tokenizer.json이 필요합니다.",
       "recommendedFilesGeneration": "같은 폴더에 .gguf 파일 + tokenizer.json이 필요합니다.",
       "recommendedFilesTranscription": "같은 폴더에 Whisper .gguf 파일 + config.json + tokenizer.json이 필요합니다.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "이 휴대폰에서 AI 사용",
+      "mobileEnableHelper": "기본값은 꺼짐. 이 휴대전화의 AI 모델이 질문에 답하거나 메모를 읽지 않으므로, 모든 요청은 아래에서 지정한 서비스로 가고 그때 메모가 이 기기를 떠납니다. 받아쓰기와 이미지 속 텍스트는 여기서 계속 실행되며, Myne과 함께 제공되는 모델을 사용합니다.",
+      "mobileKeyAdd": "키 저장",
+      "mobileKeyReplace": "키 교체",
+      "mobileRevokeHelper": "제공자, 그 키, 이 휴대폰의 승인을 함께 제거하여 설정한 적 없는 상태로 되돌립니다. 다른 기기는 거기서도 제거할 때까지 계속 작동합니다.",
+      "mobileApproveLabel": "이 휴대폰에서 전송 승인",
+      "mobileApproveHelper": "제공자와 그 키는 다른 기기에서 왔습니다. 무엇이 전송되는지 읽고 여기서 승인하기 전까지 이 휴대폰에서는 아무것도 전송되지 않습니다.",
+      "historyBudgetHelper": "각 요청이 최근 대화를 얼마나 포함할지, 문자 수로 지정합니다. 비워 두면 기본값이 적용됩니다. 값이 클수록 AI가 더 긴 대화를 따라갈 수 있지만 그만큼 더 많이 전송됩니다. 이 기기에 없는 제공자를 쓰는 경우, 실행의 매 단계마다 더 많은 텍스트가 기기 밖으로 나갑니다.",
+      "historyBudgetLabel": "요청마다 함께 보내는 대화"
     },
     "network": {
       "disabledCue": "동기화가 더 이상 Tor를 거치지 않습니다. 새 연결은 동기화 서버로 곧바로 연결됩니다.",
@@ -3342,12 +3399,14 @@
         "viewMode": "기본 보기 모드 실시간 읽기 소스 미리보기 view mode",
         "dateFormat": "날짜 형식 일 월 년 달력 iso dd/mm mm/dd date format calendar",
         "timeFormat": "시간 형식 24시간 12시간 시계 오전 오후 time format clock am pm",
-        "timezone": "시간대 표준시 지역 오늘 timezone time zone tz utc iana region"
+        "timezone": "시간대 표준시 지역 오늘 timezone time zone tz utc iana region",
+        "periodicNotes": "주기 노트 주간 월간 주 달 폴더 템플릿 형식",
+        "aiHistoryBudget": "대화 기록 문맥 기억 예산 문자 에이전트 채팅 요청"
       }
     },
     "dateTime": {
       "dateLabel": "날짜 형식",
-      "dateHelper": "할 일, 저장된 뷰, 첨부 파일 전반에서 날짜를 표시하는 방식입니다.",
+      "dateHelper": "Myne가 날짜를 보여 주는 모든 곳에서 날짜를 어떻게 쓸지.",
       "dateSystem": "언어에 맞춤",
       "timeLabel": "시간 형식",
       "timeHelper": "시간을 24시간제로 표시할지 12시간제로 표시할지 정합니다.",

@@ -96,7 +96,7 @@ const V = {
     "adapted",
     "Ships; import goes through the file-picker seam (`pickFiles` + `readPickedSmallText`) and export through the download seam (task 45). The import half only became true with #262 — this entry described the fix while the code still called `dialog.open`, a typed refusal in the browser, so a valid theme file was reported as invalid.",
   ],
-  "src/components/settings/DailyNotesSettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/PeriodicNotesSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/DefaultViewModeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/EditorPanel.tsx": [
     "adapted",
@@ -177,6 +177,14 @@ const V = {
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
+  "src/lib/agent-protocol.ts": [
+    "ported",
+    "The wire TYPES and the pure predicates over them, split out of `agent-run.ts` so mobile could share them. It has no host reach at all \u2014 type declarations, a marker table and four functions over their own arguments \u2014 so it compiles and runs in the browser exactly as written. It is unreachable there for the same reason its siblings are (`agent` is `Class::Unsupported` in web/wasm/src/capability.rs), but unreachable is not the same as adapted: nothing about this module changes shape on web, and marking it `adapted` would claim a divergence that does not exist.",
+  ],
+  "src/lib/agent-run-core.ts": [
+    "adapted",
+    "The agent plugin's IPC bindings as a FACTORY: `invoke` and `Channel` arrive as arguments because a shared module may not import either (`scripts/check-platform-seam.mjs`). Same verdict and same reason as `agent-run.ts`, which is its desktop caller: every command it wraps is refused on web, since `agent` is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope). The factory itself would construct on web; what it returns has nothing to talk to.",
+  ],
   "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused."],
   "src/lib/ai-model-store.ts": ["adapted", "Unreachable where `localAi` is absent: no AI surface mounts on web, so nothing reads the store."],
   "src/lib/ai-capability.ts": [
@@ -193,6 +201,25 @@ const V = {
     "`closeApp` was deleted in task 95; the fail-closed exit is the `app-exit` seam, whose web arm reloads the page.",
   ],
   "src/lib/attachments.ts": ["ported", "IPC bindings; the import path moved to the seam in task 67."],
+  "src/lib/import-source-vault.ts": [
+    "typed-unsupported",
+    "Vault import (myne-md/myne#464). Every binding here wraps an `importer:` " +
+      "command, and `web/wasm/src/capability.rs` classifies that whole plugin " +
+      "`Class::Unsupported`, so none of them can be dispatched in the browser. " +
+      "The placement is the reason: putting these under `vault-unlock:` or " +
+      "`attachments:` would have widened plugins the web client DOES dispatch. " +
+      "NOT `excluded`, and the correction is the finding: this module SHIPS. " +
+      "`ObsidianImportModal.tsx` imports it statically, `src/screens/Editor.tsx` " +
+      "imports and mounts that modal, and neither is in " +
+      "`web/vite.config.ts`'s `SUBSTITUTED_MODULES`, so the `plugin:importer|*` " +
+      "literals are in `web/dist`. The first version of this entry claimed " +
+      "absence AND omitted the marker string, so the absence half of this guard " +
+      "skipped it entirely: a false record that was unverifiable by " +
+      "construction. What IS absent is the setup step " +
+      "(`src/notes/import/MyneVaultSetup.tsx`, substituted), because it takes a " +
+      "recovery phrase; the bindings are merely unreachable, since the absent " +
+      "`vaultImport` capability keeps the source out of the picker.",
+  ],
   "src/lib/backup-errors.ts": [
     "excluded",
     "Backup error copy; leaves with the modules that produce those errors.",

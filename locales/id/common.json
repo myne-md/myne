@@ -48,7 +48,8 @@
       "unsupportedDetail": "Model lulus {{passes}} dari {{attempts}} pemeriksaan; {{required}} yang dibutuhkan.",
       "checking": "Memeriksa model…",
       "checkingAt": "Memeriksa model… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Batas kelulusan itu belum diukur pada berbagai model, jadi bisa lebih ketat atau lebih longgar dari seharusnya."
+      "unsupportedProvisional": "Batas kelulusan itu belum diukur pada berbagai model, jadi bisa lebih ketat atau lebih longgar dari seharusnya.",
+      "scopeNone": "tidak ada catatan yang terbuka, jadi belum ada yang bisa dikerjakan"
     },
     "progress": {
       "working": "Memproses…",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} cakupan yang Anda tetapkan",
       "grantsUser_other": "{{count}} cakupan yang Anda tetapkan",
       "grantsModel_one": "{{count}} yang diminta agen",
-      "grantsModel_other": "{{count}} yang diminta agen"
+      "grantsModel_other": "{{count}} yang diminta agen",
+      "cancelledBackground": "Proses dibatalkan karena Myne berpindah ke latar belakang. Tidak ada yang ditulis. Tanyakan lagi saat Anda siap."
     },
     "scope": {
       "title": "Sertakan {{folder}}?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Tidak dibuat: folder itu dikecualikan dari AI.",
         "createFailed": "Tidak dibuat: penulisan catatan baru gagal. Perubahan lain tetap diterapkan.",
         "excludedNow": "Tidak dapat diterapkan: folder catatan itu kini dikecualikan dari AI.",
-        "notProposed": "Tidak dapat diterapkan: perubahan itu bukan bagian dari usulan proses ini."
+        "notProposed": "Tidak dapat diterapkan: perubahan itu bukan bagian dari usulan proses ini.",
+        "noteMoved": "Tidak dapat diterapkan: perubahan itu akan memindahkan catatan ke folder lain.",
+        "appendEmpty": "Tidak dapat diterapkan: tidak ada yang bisa ditambahkan.",
+        "appendWouldWriteFrontmatter": "Tidak dapat diterapkan: teks itu akan menjadi blok properti catatan."
       },
       "applyFailed": "Perubahan tidak dapat diterapkan.",
       "undo": "Urungkan proses ini",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} catatan dibaca",
       "runSummaryOffDevice_one": "sekitar {{count}} karakter catatan Anda dikirim ke penyedia",
       "runSummaryOffDevice_other": "sekitar {{count}} karakter catatan Anda dikirim ke penyedia",
-      "runSummaryOnDevice": "tidak ada yang keluar dari perangkat ini"
+      "runSummaryOnDevice": "tidak ada yang keluar dari perangkat ini",
+      "appendFlag": "ditambahkan di akhir"
     },
     "undo": {
       "offer_one": "Proses terakhir mengubah {{count}} catatan.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} catatan tidak dapat dipulihkan.",
       "failed_other": "{{count}} catatan tidak dapat dipulihkan.",
       "createdNotReverted_one": "{{count}} catatan yang dibuat proses itu dibiarkan tetap ada.",
-      "createdNotReverted_other": "{{count}} catatan yang dibuat proses itu dibiarkan tetap ada."
+      "createdNotReverted_other": "{{count}} catatan yang dibuat proses itu dibiarkan tetap ada.",
+      "sessionOnly": "Pembatalan sekali ketuk ini berlaku sampai Anda mengunci brankas atau menutup aplikasi. Setelah itu, pulihkan catatan satu per satu dari riwayat versi sebuah catatan.",
+      "sessionOnlyLink": "Buka riwayat versi"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Buka semua lipatan"
+      },
+      "openThisWeekNote": {
+        "label": "Buka catatan minggu ini"
+      },
+      "openThisMonthNote": {
+        "label": "Buka catatan bulan ini"
       }
     },
     "hotkeys": {
@@ -1198,7 +1212,9 @@
       "replaceAllCount": "Ganti semua ({{total}})",
       "replaceOne": "Ganti",
       "replacePlaceholder": "Ganti dengan",
-      "toggleReplace": "Alihkan ganti"
+      "toggleReplace": "Alihkan ganti",
+      "dateFallback": "Mencari {{stored}}, bentuk penyimpanan tanggal ini.",
+      "replaceOffOnDateFallback": "Ganti dimatikan selama sebuah tanggal cocok lewat bentuk simpanannya, agar penggantian tidak membuat tanggal itu tak terbaca."
     },
     "cover": {
       "add": "Tambah sampul",
@@ -1533,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "Cari catatan atau jalankan perintah…",
       "noMatches": "Tidak ada perintah atau catatan yang cocok."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Catatan hari ini tidak dapat dibuka.",
+        "weekly": "Catatan minggu ini tidak dapat dibuka.",
+        "monthly": "Catatan bulan ini tidak dapat dibuka."
+      }
     }
   },
   "export": {
@@ -2777,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Kosong (tanpa templat)",
+      "folderSearchEmpty": "Tidak ada folder yang cocok.",
+      "folderSearchPlaceholder": "Cari folder…",
+      "searchEmpty": "Tidak ada templat yang cocok.",
+      "searchPlaceholder": "Cari templat…",
+      "untitledTemplate": "Templat tanpa judul",
+      "sectionDaily": "Catatan harian",
+      "sectionWeekly": "Catatan mingguan",
+      "sectionMonthly": "Catatan bulanan",
+      "periodFolderLabel": "Folder",
+      "periodFolderHelper": "Tempat catatan {{period}} baru disimpan. Bawaan: {{default}}. Folder tetap dipertahankan meski kosong.",
+      "periodFormatLabel": "Format judul",
+      "periodFormatHelperDaily": "Judul setiap catatan harian. Mendukung YYYY, MM, DD, gggg (tahun pekan ISO), ww (nomor pekan ISO), dan [teks] untuk teks harfiah. Bawaan: {{default}}.",
+      "periodFormatHelperWeekly": "Judul setiap catatan mingguan. Mendukung gggg (tahun pekan ISO), ww (nomor pekan ISO), YYYY, MM, DD, dan [teks] untuk teks harfiah. Bawaan: {{default}}.",
+      "periodFormatHelperMonthly": "Judul setiap catatan bulanan. Mendukung YYYY, MM, gggg (tahun pekan ISO), ww (nomor pekan ISO), dan [teks] untuk teks harfiah. Bawaan: {{default}}.",
+      "periodTemplateLabel": "Templat",
+      "periodTemplateHelper": "Pilih templat sebagai awal setiap catatan {{period}}, atau biarkan kosong untuk catatan kosong berjudul tanggal.",
+      "collisionWarning": "Catatan {{first}} dan {{second}} bermuara pada catatan yang sama, karena berbagi folder dan menghasilkan judul yang sama. Kedua perintah akan membukanya.",
+      "weekStartNote": "Pekan dimulai pada hari Senin (ISO 8601), sehingga hari-hari awal Januari bisa termasuk pekan terakhir tahun sebelumnya, dan hari-hari akhir Desember termasuk pekan pertama tahun berikutnya.",
+      "periodFolderSaveError": "Folder catatan {{period}} tidak dapat disimpan. Silakan coba lagi.",
+      "periodFormatSaveError": "Format judul catatan {{period}} tidak dapat disimpan. Silakan coba lagi.",
+      "periodTemplateSaveError": "Templat catatan {{period}} tidak dapat disimpan. Silakan coba lagi.",
+      "periodNameDaily": "harian",
+      "periodNameWeekly": "mingguan",
+      "periodNameMonthly": "bulanan",
+      "periodFolderAriaLabel": "Folder catatan {{period}}",
+      "periodFormatAriaLabel": "Format judul catatan {{period}}",
+      "periodTemplateAriaLabel": "Templat catatan {{period}}",
       "dateFormatHelper": "Judul setiap catatan harian. Mendukung YYYY, MM, DD. Default ke {{default}}.",
       "dateFormatLabel": "Format tanggal catatan harian",
       "dateFormatSaveError": "Tidak dapat menyimpan format tanggal. Silakan coba lagi.",
       "folderHelper": "Tempat catatan harian baru disimpan. Default ke {{default}}. Folder tetap dipertahankan meski kosong.",
       "folderLabel": "Folder catatan harian",
       "folderSaveError": "Tidak dapat menyimpan folder harian. Silakan coba lagi.",
-      "folderSearchEmpty": "Tidak ada folder yang cocok.",
-      "folderSearchPlaceholder": "Cari folder…",
-      "searchEmpty": "Tidak ada templat yang cocok.",
-      "searchPlaceholder": "Cari templat…",
       "templateHelper": "Pilih templat sebagai awalan setiap catatan harian, atau biarkan kosong untuk catatan kosong berjudul tanggal.",
       "templateLabel": "Templat catatan harian",
-      "templateSaveError": "Tidak dapat menyimpan templat harian. Silakan coba lagi.",
-      "untitledTemplate": "Templat tanpa judul"
+      "templateSaveError": "Tidak dapat menyimpan templat harian. Silakan coba lagi."
     },
     "deleteVault": {
       "cancel": "Batal",
@@ -2951,7 +2996,8 @@
         "title": "Sebelum Myne mengirim apa pun ke {{provider}}",
         "whatLabel": "Apa yang keluar dari perangkat Anda",
         "whenLabel": "Kapan itu keluar",
-        "whoLabel": "Siapa yang menerimanya"
+        "whoLabel": "Siapa yang menerimanya",
+        "connectionLabel": "Bagaimana ia dikirim"
       },
       "disclosureToggle": "Bagaimana ini bekerja?",
       "enableHelper": "Menjalankan model yang Anda sediakan. Di mana model itu berjalan, dan apakah catatan Anda keluar dari perangkat ini, bergantung pada penyedia yang Anda sebutkan di bawah. Eksperimental, mati secara bawaan.",
@@ -2985,7 +3031,9 @@
         "refused": "Penyedia menolak koneksi. Mungkin sedang mati atau memblokir jaringan ini.",
         "timeout": "Penyedia tidak menjawab tepat waktu. Tidak ada yang dibiarkan berjalan.",
         "unauthorized": "Penyedia menolak kunci API Anda. Gantilah: kunci itu mungkin salah, sudah dicabut, atau milik akun lain.",
-        "unreachable": "Tidak dapat menjangkau penyedia. Periksa koneksi jaringan Anda."
+        "unreachable": "Tidak dapat menjangkau penyedia. Periksa koneksi jaringan Anda.",
+        "featureOff": "AI dimatikan di perangkat ini. Tidak ada yang dikirim. Nyalakan di Pengaturan, bagian AI.",
+        "consentMissing": "Anda belum menyetujui pengiriman catatan ke penyedia ini dari perangkat ini. Tidak ada yang dikirim. Pilih kembali penyedia di Pengaturan, bagian AI, dan baca apa yang akan dikirim."
       },
       "modelChoose": "Pilih berkas…",
       "modelEmbeddingLabel": "Model pencarian: pencarian semantik & Tanya-Jawab",
@@ -3026,7 +3074,16 @@
       "recommendedFilesEmbedding": "Membutuhkan model.safetensors + config.json + tokenizer.json dalam satu folder.",
       "recommendedFilesGeneration": "Membutuhkan berkas .gguf + tokenizer.json dalam folder yang sama.",
       "recommendedFilesTranscription": "Membutuhkan berkas Whisper .gguf + config.json + tokenizer.json dalam folder yang sama.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Gunakan AI di ponsel ini",
+      "mobileEnableHelper": "Nonaktif secara bawaan. Tidak ada model AI di ponsel ini yang menjawab pertanyaan atau membaca catatan Anda, jadi setiap permintaan dikirim ke layanan yang Anda sebutkan di bawah, dan catatan Anda meninggalkan perangkat ini saat itu. Transkripsi dan teks gambar tetap berjalan di sini, pada model yang disertakan bersama Myne.",
+      "mobileKeyAdd": "Simpan kunci",
+      "mobileKeyReplace": "Ganti kunci",
+      "mobileRevokeHelper": "Menghapus penyedia, kuncinya, dan persetujuan ponsel ini sekaligus, meninggalkan keadaan persis seperti belum pernah disiapkan. Perangkat lain tetap bekerja sampai Anda menghapusnya di sana juga.",
+      "mobileApproveLabel": "Setujui pengiriman di ponsel ini",
+      "mobileApproveHelper": "Penyedia dan kuncinya berasal dari perangkat lain. Tidak ada yang dikirim dari ponsel ini sampai Anda membaca apa yang akan dikirim dan menyetujuinya di sini.",
+      "historyBudgetHelper": "Seberapa banyak percakapan terbaru yang dibawa setiap permintaan, dalam karakter. Kosongkan untuk nilai bawaan. Angka lebih besar membuat AI dapat mengikuti percakapan lebih panjang dan mengirim lebih banyak darinya: dengan penyedia yang tidak ada di perangkat ini, itu berarti lebih banyak teks Anda meninggalkannya, pada setiap langkah sebuah proses.",
+      "historyBudgetLabel": "Percakapan yang dibawa setiap permintaan"
     },
     "network": {
       "disabledCue": "Sinkronisasi tidak lagi dirutekan melalui Tor. Koneksi baru langsung menuju server sinkronisasi.",
@@ -3342,12 +3399,14 @@
         "viewMode": "mode tampilan bawaan langsung baca sumber pratinjau view mode",
         "dateFormat": "format tanggal hari bulan tahun iso dd/mm mm/dd kalender date format",
         "timeFormat": "format waktu 24 jam 12 jam am pm penunjuk waktu time format",
-        "timezone": "zona waktu tz utc iana wilayah hari ini timezone"
+        "timezone": "zona waktu tz utc iana wilayah hari ini timezone",
+        "periodicNotes": "catatan berkala mingguan bulanan pekan bulan folder templat format",
+        "aiHistoryBudget": "percakapan riwayat konteks memori anggaran karakter agen chat permintaan"
       }
     },
     "dateTime": {
       "dateLabel": "Format tanggal",
-      "dateHelper": "Bagaimana tanggal ditampilkan di tugas, tampilan tersimpan, dan lampiran.",
+      "dateHelper": "Bagaimana sebuah tanggal ditulis di mana pun Myne menampilkannya.",
       "dateSystem": "Ikuti bahasa",
       "timeLabel": "Format waktu",
       "timeHelper": "Apakah waktu ditampilkan dalam format 24 jam atau 12 jam.",
