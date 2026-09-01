@@ -48,7 +48,8 @@
       "unsupportedDetail": "Het slaagde voor {{passes}} van {{attempts}} controles; er zijn er {{required}} nodig.",
       "checking": "Model controleren…",
       "checkingAt": "Model controleren… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Die slaaggrens is nog niet over meerdere modellen gemeten, dus hij kan strenger of soepeler zijn dan zou moeten."
+      "unsupportedProvisional": "Die slaaggrens is nog niet over meerdere modellen gemeten, dus hij kan strenger of soepeler zijn dan zou moeten.",
+      "scopeNone": "geen notitie open, dus er is nog niets om aan te werken"
     },
     "progress": {
       "working": "Bezig",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} bereik dat je hebt ingesteld",
       "grantsUser_other": "{{count}} bereiken die je hebt ingesteld",
       "grantsModel_one": "{{count}} waar het om vroeg",
-      "grantsModel_other": "{{count}} waar het om vroeg"
+      "grantsModel_other": "{{count}} waar het om vroeg",
+      "cancelledBackground": "De uitvoering is geannuleerd omdat Myne naar de achtergrond ging. Er is niets weggeschreven. Vraag het opnieuw wanneer je wilt."
     },
     "scope": {
       "title": "{{folder}} meenemen?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Niet aangemaakt: die map is uitgesloten van AI.",
         "createFailed": "Niet aangemaakt: de nieuwe notitie schrijven is mislukt. De andere wijzigingen zijn wel toegepast.",
         "excludedNow": "Kon niet worden toegepast: de map van die notitie is nu uitgesloten van AI.",
-        "notProposed": "Kon niet worden toegepast: die wijziging hoort niet bij het voorstel van deze uitvoering."
+        "notProposed": "Kon niet worden toegepast: die wijziging hoort niet bij het voorstel van deze uitvoering.",
+        "noteMoved": "Kon niet worden toegepast: die wijziging zou de notitie naar een andere map verplaatsen.",
+        "appendEmpty": "Kon niet worden toegepast: er was niets toe te voegen.",
+        "appendWouldWriteFrontmatter": "Kon niet worden toegepast: die tekst zou het eigenschappenblok van de notitie zijn geworden."
       },
       "applyFailed": "De wijzigingen konden niet worden toegepast.",
       "undo": "Deze uitvoering ongedaan maken",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} notities gelezen",
       "runSummaryOffDevice_one": "ongeveer {{count}} teken van je notities is naar de provider verzonden",
       "runSummaryOffDevice_other": "ongeveer {{count}} tekens van je notities zijn naar de provider verzonden",
-      "runSummaryOnDevice": "niets heeft dit apparaat verlaten"
+      "runSummaryOnDevice": "niets heeft dit apparaat verlaten",
+      "appendFlag": "wordt aan het einde toegevoegd"
     },
     "undo": {
       "offer_one": "De laatste uitvoering heeft {{count}} notitie gewijzigd.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} notitie kon niet worden hersteld.",
       "failed_other": "{{count}} notities konden niet worden hersteld.",
       "createdNotReverted_one": "{{count}} notitie die de uitvoering heeft aangemaakt, is blijven staan.",
-      "createdNotReverted_other": "{{count}} notities die de uitvoering heeft aangemaakt, zijn blijven staan."
+      "createdNotReverted_other": "{{count}} notities die de uitvoering heeft aangemaakt, zijn blijven staan.",
+      "sessionOnly": "Dit ongedaan maken met één tik geldt totdat je de kluis vergrendelt of de app sluit. Daarna herstel je notities één voor één via de versiegeschiedenis van een notitie.",
+      "sessionOnlyLink": "Versiegeschiedenis openen"
     }
   },
   "ai": {
@@ -1204,7 +1212,9 @@
       "replaceAllCount": "Alles vervangen ({{total}})",
       "replaceOne": "Vervangen",
       "replacePlaceholder": "Vervangen door",
-      "toggleReplace": "Vervangen aan/uit"
+      "toggleReplace": "Vervangen aan/uit",
+      "dateFallback": "Er wordt gezocht naar {{stored}}, de vorm waarin deze datum is opgeslagen.",
+      "replaceOffOnDateFallback": "Vervangen staat uit zolang een datum via de opgeslagen vorm wordt gevonden, zodat een vervanging de datum niet onleesbaar kan maken."
     },
     "cover": {
       "add": "Omslag toevoegen",
@@ -2816,7 +2826,16 @@
       "periodNameMonthly": "maandelijkse",
       "periodFolderAriaLabel": "Map voor {{period}} notities",
       "periodFormatAriaLabel": "Titelopmaak voor {{period}} notities",
-      "periodTemplateAriaLabel": "Sjabloon voor {{period}} notities"
+      "periodTemplateAriaLabel": "Sjabloon voor {{period}} notities",
+      "dateFormatHelper": "De titel van elke dagelijkse notitie. Ondersteunt YYYY, MM, DD. Standaard {{default}}.",
+      "dateFormatLabel": "Datumindeling dagelijkse notitie",
+      "dateFormatSaveError": "De datumindeling kon niet worden opgeslagen. Probeer het opnieuw.",
+      "folderHelper": "Waar nieuwe dagelijkse notities worden geplaatst. Standaard {{default}}. De map blijft behouden, ook als die leeg is.",
+      "folderLabel": "Map voor dagelijkse notities",
+      "folderSaveError": "De dagelijkse map kon niet worden opgeslagen. Probeer het opnieuw.",
+      "templateHelper": "Kies een sjabloon om elke dagelijkse notitie mee te beginnen, of laat leeg voor een lege notitie met de datum als titel.",
+      "templateLabel": "Sjabloon voor dagelijkse notitie",
+      "templateSaveError": "Het dagelijkse sjabloon kon niet worden opgeslagen. Probeer het opnieuw."
     },
     "deleteVault": {
       "cancel": "Annuleren",
@@ -2977,7 +2996,8 @@
         "title": "Voordat Myne iets naar {{provider}} stuurt",
         "whatLabel": "Wat je apparaat verlaat",
         "whenLabel": "Wanneer het wordt verzonden",
-        "whoLabel": "Wie het ontvangt"
+        "whoLabel": "Wie het ontvangt",
+        "connectionLabel": "Hoe het reist"
       },
       "disclosureToggle": "Hoe werkt dit?",
       "enableHelper": "Draait een model dat je zelf aanlevert. Waar het draait, en of je notities dit apparaat verlaten, hangt allebei af van de provider die je hieronder aanwijst. Experimenteel, standaard uit.",
@@ -3011,7 +3031,9 @@
         "refused": "De provider heeft de verbinding geweigerd. Mogelijk ligt hij eruit of blokkeert hij dit netwerk.",
         "timeout": "De provider heeft niet op tijd geantwoord. Er is niets blijven draaien.",
         "unauthorized": "De provider heeft je API-sleutel afgewezen. Vervang hem: hij kan onjuist zijn, ingetrokken zijn of bij een ander account horen.",
-        "unreachable": "Kon de provider niet bereiken. Controleer je netwerkverbinding."
+        "unreachable": "Kon de provider niet bereiken. Controleer je netwerkverbinding.",
+        "featureOff": "AI staat uit op dit apparaat. Er is niets verzonden. Zet het aan bij Instellingen, onder AI.",
+        "consentMissing": "Je hebt er niet mee ingestemd om vanaf dit apparaat notities naar deze aanbieder te sturen. Er is niets verzonden. Kies de aanbieder opnieuw bij Instellingen, onder AI, en lees wat er verzonden wordt."
       },
       "modelChoose": "Bestand kiezen…",
       "modelEmbeddingLabel": "Zoekmodel: semantisch zoeken en vraag-en-antwoord",
@@ -3052,7 +3074,16 @@
       "recommendedFilesEmbedding": "Vereist model.safetensors + config.json + tokenizer.json in één map.",
       "recommendedFilesGeneration": "Vereist het .gguf-bestand + tokenizer.json in dezelfde map.",
       "recommendedFilesTranscription": "Vereist het .gguf-bestand van Whisper + config.json + tokenizer.json in dezelfde map.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "AI op deze telefoon gebruiken",
+      "mobileEnableHelper": "Standaard uit. Geen enkel AI-model op deze telefoon beantwoordt vragen of leest je notities, dus elk verzoek gaat naar een dienst die je hieronder noemt, en je notities verlaten dan dit apparaat. Transcriptie en tekst in afbeeldingen draaien hier nog steeds, op modellen die met Myne meekomen.",
+      "mobileKeyAdd": "Sleutel opslaan",
+      "mobileKeyReplace": "Sleutel vervangen",
+      "mobileRevokeHelper": "Verwijdert de aanbieder, de sleutel en de goedkeuring van deze telefoon in één keer, en laat precies de toestand achter alsof het nooit is ingesteld. Andere apparaten blijven werken totdat je het daar ook verwijdert.",
+      "mobileApproveLabel": "Verzenden op deze telefoon goedkeuren",
+      "mobileApproveHelper": "De aanbieder en de sleutel komen van een ander apparaat. Vanaf deze telefoon wordt niets verzonden totdat je leest wat er verzonden wordt en het hier goedkeurt.",
+      "historyBudgetHelper": "Hoeveel van het recente gesprek elk verzoek meeneemt, in tekens. Laat leeg voor de standaardwaarde. Een groter getal laat de AI langere gesprekken volgen en stuurt er meer van mee: bij een aanbieder die niet op dit apparaat draait, verlaat daarmee bij elke stap van een run meer van je tekst het apparaat.",
+      "historyBudgetLabel": "Gesprek dat bij elk verzoek wordt meegestuurd"
     },
     "network": {
       "disabledCue": "Synchronisatie loopt niet meer via Tor. Nieuwe verbindingen gaan rechtstreeks naar de synchronisatieserver.",
@@ -3369,12 +3400,13 @@
         "dateFormat": "datumnotatie datumindeling datum notatie dag maand jaar iso dd/mm mm/dd kalender date format",
         "timeFormat": "tijdnotatie tijd notatie 24-uurs 12-uurs klok am pm time format 24 hour 12 hour",
         "timezone": "tijdzone zone tz utc iana regio vandaag timezone time zone",
-        "periodicNotes": "periodieke notities wekelijks maandelijks week maand map sjabloon opmaak"
+        "periodicNotes": "periodieke notities wekelijks maandelijks week maand map sjabloon opmaak",
+        "aiHistoryBudget": "gesprek geschiedenis context geheugen budget tekens agent chat verzoek"
       }
     },
     "dateTime": {
       "dateLabel": "Datumnotatie",
-      "dateHelper": "Hoe datums worden getoond bij taken, opgeslagen weergaven en bijlagen.",
+      "dateHelper": "Hoe een datum wordt geschreven, overal waar Myne er een toont.",
       "dateSystem": "Volg de taal",
       "timeLabel": "Tijdnotatie",
       "timeHelper": "Of tijden worden getoond op een 24-uurs- of een 12-uursklok.",

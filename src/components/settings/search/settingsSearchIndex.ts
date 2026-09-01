@@ -674,6 +674,21 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     testid: "ai.auto-tag-toggle",
   },
   {
+    // myne-md/myne#617. Both gates, because they are independent and neither
+    // implies the other: `capability` drops it where there is no local-AI
+    // surface at all, `developerGated` drops it where the group is hidden.
+    // Search that found a setting the panel never rendered would scroll to
+    // nothing.
+    id: "ai.history-budget",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.historyBudgetLabel",
+    descriptionKey: "settings.ai.historyBudgetHelper",
+    keywordsKey: "settings.search.keywords.aiHistoryBudget",
+    testid: "ai.history-budget-input",
+  },
+  {
     id: "ai.models",
     capability: "localAi",
     developerGated: true,

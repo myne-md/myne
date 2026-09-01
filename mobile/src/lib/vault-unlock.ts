@@ -10,6 +10,7 @@ import {
   resetGraphLayoutOnLock,
 } from "./graph-layout-persist";
 import { flushWorkspaceNow, resetWorkspaceOnLock } from "./workspace-persist";
+import { endAgentRun } from "./agent-lifetime";
 // The attachment caches live in the SHARED editor package, and mobile compiles
 // it: `editor-host.ts` wires a real `attachments` host, so the same decoration
 // fills the same module-scope maps here that it does on desktop. Cleared from
@@ -20,6 +21,7 @@ import {
   resetPreviewCache,
   resetTranscripts,
 } from "@myne/editor/attachments/session-caches";
+import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -51,6 +53,16 @@ export async function isVaultUnlocked(): Promise<boolean> {
  */
 export async function lockVault(): Promise<void> {
   clearCustomTheme();
+  // **The agent run, first, and not best-effort in the way the flushes are.**
+  // Everything else on this path is a WRITE that would be nice to land; this is
+  // a DROP that must happen. `Proposal.edits` holds anchors and replacements
+  // copied verbatim out of note bodies, so a store that survives this call
+  // leaves note text resident in a locked vault's memory, and mixes two vaults
+  // when the lock is really a switch (every vault change on mobile comes
+  // through here). It is synchronous and cannot throw, so it runs before the
+  // first await rather than after: an await that rejects must not be able to
+  // skip it.
+  endAgentRun("lock", "");
   await flushGraphLayoutNow();
   resetGraphLayoutOnLock();
   await flushWorkspaceNow();
@@ -64,6 +76,16 @@ export async function lockVault(): Promise<void> {
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  // The ambient date/time DISPLAY store, which is module scope in
+  // `@myne/editor` and read by every surface that prints a date. It holds the
+  // reader's chosen formats and their TIME ZONE, all derived from decrypted
+  // `vault.prefs`, and nothing in production returned it to defaults: after one
+  // unlock it stayed resident through a lock and into the next vault's session
+  // until that vault's publisher happened to overwrite it. The zone is the
+  // reason this is on the leaving path rather than left to the next mount: it
+  // is a coarse-location datum kept per vault everywhere else, and
+  // `dialect/src/taskFields.ts` keeps it out of note bytes for that reason.
+  resetDateTimeDisplayForLock();
   await invoke<void>("plugin:vault-unlock|lock");
 }
 

@@ -79,7 +79,8 @@ const TAG_PROMPT_MAX_CHARS: usize = 8_000;
 /// user turn; this line is ours and is never attacker-influenceable.
 const TAG_SYSTEM_INSTRUCTION: &str =
     "You suggest short topical tags for a note. Reply with a lowercase, \
-     comma-separated list of tags and nothing else.";
+     comma-separated list of tags and nothing else. Write the tags in the \
+     same language as the note.";
 /// Deterministic sampling seed (reproducible generations).
 const SAMPLE_SEED: u64 = 299_792_458;
 /// Generation temperature (mild — coherent, lightly varied).

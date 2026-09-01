@@ -224,3 +224,53 @@ describe("the approve-all gate counts both verbs", () => {
     expect(hasApprovedWork(0, 0)).toBe(false);
   });
 });
+
+// **An append is not a removal, and flagging one would be a false statement to
+// the user at the moment they are deciding** (myne-md/myne#616).
+//
+// Appended text lands in the note's BODY, after its frontmatter block, so a
+// `trashed:` line inside it is prose rather than a marker. The host agrees, and
+// its agreement is what matters: `apply::tests::
+// an_append_cannot_hide_a_note_because_its_text_lands_in_the_body` reads the
+// resulting frontmatter and finds nothing. Without the append arm in
+// `editHidesNoteAs` the screen would put "moves this note to Trash" over a row
+// that does no such thing, AND route it out of the bulk approve for a reason
+// that is not true.
+//
+// The over-flagging licence the rest of this module relies on does not stretch
+// here: it argues for flagging when the outcome is UNCERTAIN, and this outcome
+// is known.
+describe("an append is never a removal", () => {
+  function appendEdit(text: string, noteId = "n1"): ProposedEdit {
+    return { noteId, kind: "append", anchor: "", replacement: text };
+  }
+
+  it("is not flagged for any marker, even when its text is exactly one", () => {
+    for (const [field, line] of Object.entries(MARKER_LINE)) {
+      const proposed = appendEdit(`---\n${line}\n---`);
+      expect(editHidesNoteAs(proposed), field).toBeNull();
+      expect(editHidesNote(proposed), field).toBe(false);
+    }
+  });
+
+  it("stays in the bulk-approvable pile", () => {
+    const { bulkApprovable, needsOwnAct } = splitForBulkApproval([
+      appendEdit(`---\n${MARKER_LINE.trashed}\n---`),
+    ]);
+    expect(needsOwnAct).toHaveLength(0);
+    expect(bulkApprovable).toHaveLength(1);
+  });
+
+  it("does not weaken the replace shape it shares a type with", () => {
+    // The direction that would make the arm above a hole: the same text as an
+    // anchored replacement is still caught.
+    const replaced = edit("body", `body\n${MARKER_LINE.trashed}`);
+    expect(editHidesNote(replaced)).toBe(true);
+  });
+
+  it("treats an edit with no kind field as the replace it always was", () => {
+    const legacy = edit("body", `body\n${MARKER_LINE.trashed}`);
+    expect(legacy.kind).toBeUndefined();
+    expect(editHidesNote(legacy)).toBe(true);
+  });
+});

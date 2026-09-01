@@ -180,6 +180,53 @@ export interface PrefsView {
    */
   attachment_compression_enabled: boolean;
   /**
+   * The AI beta opt-in for THIS device (myne-md/myne#456). Device-local, and
+   * after that issue removed `developer_mode` from the request-time gate it is
+   * the only device-local switch on the remote path besides the consent below,
+   * which is why that one became device-local in the same change.
+   */
+  ai_enabled: boolean;
+  /**
+   * The remote AI provider the user named, or `null`.
+   *
+   * Shared across devices (scalar LWW): naming a provider is a statement about
+   * where this vault's notes may be sent, which is a fact about the account
+   * rather than about this phone. Deliberately unlike {@link
+   * PrefsView.ai_enabled} beside it.
+   */
+  ai_provider: string | null;
+  /**
+   * **Which provider** the consent was given for, or `null`. A gate, not a
+   * display flag: the host's request path compares it to the active selection,
+   * so a UI that skipped the screen still cannot send.
+   *
+   * A name rather than a boolean because consent is per provider, so a stale
+   * approval for a different recipient is unusable rather than transferable.
+   *
+   * **Device-local** (myne-md/myne#456). The key still arrives by sync, so this
+   * phone may hold a credential it has not been permitted to use, and that is
+   * the intended shape: the credential is an account fact, the approval is a
+   * decision a person makes at a device.
+   */
+  ai_provider_consent: string | null;
+  /**
+   * **Which model** at {@link PrefsView.ai_provider} answers, or `null`.
+   *
+   * There is no default and no fallback: the value comes from the list the
+   * provider itself reports. `null` means *not chosen*, and the host refuses
+   * rather than substituting one, because on a metered API a default nobody
+   * chose is a bill nobody chose.
+   */
+  ai_provider_model: string | null;
+  /*
+   * There is deliberately NO `ai_provider_key` here, and the absence is the
+   * point. `prefs_read` serializes the whole host-side `PrefsView`, so a key in
+   * that struct would reach page context on every read, and from there a DOM
+   * snapshot or any script running in the page. The host marks it serde-skip
+   * and answers `aiProviderHasKey` instead: the UI learns *whether*, never
+   * *what*.
+   */
+  /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
    * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
    */
@@ -294,27 +341,6 @@ export interface PrefsView {
    */
   daily_date_format: string | null;
   /**
-   * Display timezone override (myne#279): an IANA zone identifier, or `null` ≡
-   * follow this device's own zone.
-   *
-   * **Device-local is a MERGE class, not an exclusion from the blob.** The
-   * value rides inside the encrypted `vault.prefs` like every other field, and
-   * enrolment adopts that blob wholesale as this device's starting defaults,
-   * device-local fields included (`sync-protocol.md` §10.2.1). What
-   * device-local buys is that no peer ever overwrites it afterwards. So a phone
-   * enrolled after a computer set an override starts out HOLDING that zone.
-   *
-   * Mobile therefore does not apply it (myne#177). It ships no control for the
-   * setting and displays nothing derived from it, so applying an inherited zone
-   * would change which note a period command opens and change nothing the user
-   * could see, explain or alter. The rule is that a client honours the override
-   * where it can also show and change it: desktop applies it, mobile and the
-   * CLI read the device clock, and the CLI says so on stderr. Declared on this
-   * type anyway because the shared codec serializes it and the round trip has
-   * to carry it.
-   */
-  timezone: string | null;
-  /**
    * Daily-notes folder path (MYND-191), canonical trailing-slash form — e.g.
    * `Daily/`. `null` ≡ the canonical default `Daily/`, applied host-side.
    * Designating a folder also registers it in `deliberate_folders`.
@@ -325,6 +351,22 @@ export interface PrefsView {
    * instantiate today's note from. `null` ≡ the "blank daily note" state.
    */
   daily_template: string | null;
+  /**
+   * Display date format (myne#279, reached mobile in myne-md/myne#609):
+   * `"system"` | `"iso"` | `"dmy"` | `"mdy"` | `"dmmmy"`. `null` ≡ `"system"`,
+   * which resolves against the app's OWN language rather than the OS locale.
+   *
+   * A free enum string on the wire (Rust `Option<String>`) with no codec-level
+   * validation, so a value written by a newer build decodes as unset rather than
+   * failing the blob; the client maps an unknown value to the default. Omitted
+   * from the encrypted blob when `null`. Non-load-bearing cosmetic. Canonical
+   * key slot: after `daily_template`, before `deliberate_folders`.
+   *
+   * **Shared, scalar-LWW.** It arrives by sync from whichever device set it,
+   * which is why this field existed on the wire for a while before this client
+   * could read it: the phone received the value and disregarded it.
+   */
+  date_format: string | null;
   /**
    * Periodic-notes settings (myne#177): one entry per `<period>.<setting>`
    * pair, e.g. `weekly.folder` → `Weekly/`, `monthly.format` → `YYYY-MM`. The
@@ -455,6 +497,41 @@ export interface PrefsView {
    * Rust `Option<ThemeChoice>` (null | "light" | "dark").
    */
   theme: ThemeChoice | null;
+  /**
+   * Display time format (myne#279, reached mobile in myne-md/myne#609):
+   * `"system"` | `"24h"` | `"12h"`. `null` ≡ `"system"`. Same free-enum-string
+   * discipline as {@link PrefsView.date_format}, and **shared** the same way, so
+   * it too arrives by sync. Canonical key slot: after `theme`, before
+   * `timezone`.
+   */
+  time_format: string | null;
+  /**
+   * Display timezone override (myne#279, reached mobile in myne-md/myne#609):
+   * an IANA zone identifier, or `null` ≡ this device's own zone.
+   *
+   * **Display only.** It decides what the app treats as "today" and how a real
+   * instant is printed. `dialect/src/taskFields.ts` keeps note times zone-free
+   * wall-clock and this does not walk that back: a reminder written as 09:00
+   * reads 09:00 on every device, and shifting it by an offset would invent an
+   * instant nobody wrote.
+   *
+   * Be exact about the reach, because the looser claim was written here first:
+   * it never enters a `.myn` file, so a note never records where its author
+   * was. It DOES live in the encrypted `vault.prefs` blob, which is pushed and
+   * pulled like every other prefs field; device-local is a MERGE classification
+   * (`PrefClass::DeviceLocal`, sync-protocol.md 10.2), meaning the local value
+   * survives the merge, and 10.2.1 has a newly enrolled device adopt it as a
+   * starting default.
+   *
+   * **Device-local**, deliberately unlike its two siblings above. The right zone
+   * is a property of where a given device IS, so a phone that travels and a
+   * computer that does not should not have to agree, and the merge is what
+   * enforces that: the local value always survives. So this is the one of the
+   * three that a computer's choice never overwrites on a phone, and therefore
+   * the one a phone most needs its own control for. Canonical key slot: after `time_format`, before
+   * `transcription_enabled`.
+   */
+  timezone: string | null;
   /**
    * Per-folder custom sidebar icon (MYND-185) — a map from a canonical
    * trailing-slash folder path to an icon name (the client's curated stroke-glyph
@@ -877,6 +954,37 @@ export async function setTheme(theme: ThemeChoice | null): Promise<void> {
 }
 
 /**
+ * Set (or clear) the display date format (myne#279). Pass
+ * `"system"`/`"iso"`/`"dmy"`/`"mdy"`/`"dmmmy"`, or `null` to clear to
+ * `"system"`. Shared: the choice syncs to every device on this vault.
+ */
+export async function setDateFormat(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_date_format", { value });
+}
+
+/**
+ * Set (or clear) the display time format (myne#279). Pass
+ * `"system"`/`"24h"`/`"12h"`, or `null` to clear to `"system"`. Shared, like
+ * {@link setDateFormat}.
+ */
+export async function setTimeFormat(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_time_format", { value });
+}
+
+/**
+ * Set (or clear) the DISPLAY timezone override (myne#279). Pass an IANA zone
+ * identifier, or `null` to follow this device's own zone.
+ *
+ * Display only: it never reaches a note. Device-local in the merge sense, so
+ * unlike the two above a computer's choice never overwrites it here, which is
+ * why a phone needs this control of its own. The value itself still rides the
+ * encrypted prefs blob like every other field.
+ */
+export async function setTimezone(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_timezone", { value });
+}
+
+/**
  * Persist the active custom-theme selection (custom-themes epic, MYND-297). Pass
  * a theme name to select a user-authored custom theme (takes precedence over the
  * built-in `theme`), or `null` to clear it (fall back to `theme`). The backend
@@ -1253,4 +1361,90 @@ export async function deleteSavedView(id: string): Promise<void> {
  */
 export async function setViewOrder(order: string[]): Promise<void> {
   await writePref("plugin:prefs|set_view_order", { order });
+}
+
+/* ---- AI (myne-md/myne#456) -------------------------------------------------
+ *
+ * Five writes and one read. The read is the odd one and it is the interesting
+ * one: the key must never cross into page context, so there is no getter for it
+ * anywhere and the UI decides between "Add key" and "Replace key" from a
+ * boolean.
+ */
+
+/**
+ * Turn the AI beta on or off for THIS device.
+ *
+ * Device-local, so switching it off here does not switch it off on a laptop
+ * that shares the vault. Since myne-md/myne#456 removed `developer_mode` from
+ * the request-time gate, this is the only device-local switch on the remote
+ * path besides the consent below.
+ */
+export async function setAiEnabled(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_ai_enabled", { enabled });
+}
+
+/**
+ * Name the remote provider, or pass `null` to clear it.
+ *
+ * Clearing also clears the consent and the key HOST-SIDE, and that pairing is
+ * why this is one call rather than three: a key for a provider nobody selected
+ * is a credential with no owner, and a surviving consent would silently
+ * pre-approve the next provider the user picks.
+ *
+ * A value outside the host's known set is refused rather than stored, so the
+ * promise rejects instead of leaving a selection the request path ignores.
+ */
+export async function setAiProvider(provider: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider", { provider });
+}
+
+/**
+ * Record (or withdraw) the consent for the named provider.
+ *
+ * **This is the persistence, not the enforcement.** The host re-reads it before
+ * every remote request, so calling it without having shown the screen buys a
+ * stored value and nothing else. The screen is what the user consented to; this
+ * is only where that fact is kept.
+ */
+export async function setAiProviderConsent(
+  grantedFor: string | null,
+): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_consent", { grantedFor });
+}
+
+/**
+ * Store the provider API key, or pass `null` to **revoke** it.
+ *
+ * One-way by design: the value goes in and never comes back out. There is no
+ * command that returns it and {@link PrefsView} carries no field for it.
+ *
+ * Revocation propagates to the account's other devices as an LWW write of
+ * `null`, which is what makes "revoke" mean more than "revoke here": and it is
+ * why the key stays shared while the consent does not.
+ */
+export async function setAiProviderKey(key: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_key", { key });
+}
+
+/**
+ * Choose which of the provider's models answers, or `null` to clear it.
+ *
+ * The candidate list comes from the provider itself, never from a constant in
+ * this tree: a pinned model tag rots faster than the release that pinned it.
+ */
+export async function setAiProviderModel(model: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_model", { model });
+}
+
+/**
+ * Whether a provider key is stored, without ever handing the key over.
+ *
+ * A boolean rather than the value, for the reason {@link PrefsView}'s comment
+ * gives: the key is serde-skipped host-side precisely so it cannot reach page
+ * context, and a getter here would be the door that reopens.
+ *
+ * Not a `writePref`, so no prefs-nonce bump: this reads.
+ */
+export async function aiProviderHasKey(): Promise<boolean> {
+  return await invoke<boolean>("plugin:prefs|ai_provider_has_key");
 }

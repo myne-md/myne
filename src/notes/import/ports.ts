@@ -28,7 +28,13 @@ import { noteCreate } from "../createNote";
 import { noteList } from "../listNotes";
 import { loadNoteBatch, type TitleRecord } from "../loadNoteBatch";
 import { prefsRead, setDeliberateFolders } from "../../lib/prefs";
-import { buildExistingIdentitySet, type ExistingNote, type DuplicatePolicy } from "./conflict";
+import {
+  buildExistingIdentitySet,
+  hashBodyForIdentity,
+  type ExistingNote,
+  type DuplicatePolicy,
+} from "./conflict";
+import { noteRead } from "../readNote";
 import {
   importFromSource,
   importVault,
@@ -132,12 +138,61 @@ export function titleRecordsToExistingNotes(
   }));
 }
 
+/** The untitled half, given a batch somebody else already paid for. */
+async function untitledIdentitiesFrom(
+  records: Awaited<ReturnType<typeof loadNoteBatch>>,
+): Promise<{ folder: string | null; bodyHash: string }[]> {
+  const untitled = records.filter(
+    (r) => r.title === null && r.trashed === null && !r.template,
+  );
+  const out: { folder: string | null; bodyHash: string }[] = [];
+  for (const record of untitled) {
+    try {
+      out.push({
+        folder: record.folder,
+        bodyHash: hashBodyForIdentity(await noteRead(record.noteUuid)),
+      });
+    } catch {
+      // A note that will not read cannot contribute an identity. Skipping it
+      // means at worst one duplicate on a re-import, where failing the whole
+      // import would mean none of the notes arrive at all.
+    }
+  }
+  return out;
+}
+
 /** Build the live-vault `(folder,title)` identity set from the authoritative
  *  note list (not the partial sidebar cache) for the SYNC-5 idempotent skip. */
 export async function loadExistingIdentity(): Promise<Set<string>> {
   const ids = await noteList();
   const records = await loadNoteBatch(ids);
   return buildExistingIdentitySet(titleRecordsToExistingNotes(records));
+}
+
+/**
+ * Both halves of the identity snapshot in ONE pass over the vault.
+ *
+ * A Myne import needs the titled set and the untitled body hashes, and calling
+ * the two loaders above did the walk twice: two `noteList()` calls and two
+ * `loadNoteBatch()` decrypts of every note in the target, concurrently, for a
+ * result that is a pure function of one read. On a vault of any size that is the
+ * single most expensive thing the import does before it has imported anything.
+ *
+ * The untitled half still costs one `noteRead` per untitled note, which the
+ * batch does not carry: `loadNoteBatch` returns titles and lifecycle flags, and
+ * the untitled key is a hash of the BODY. That read is unavoidable and is not
+ * what this shares.
+ */
+export async function loadIdentitySnapshot(): Promise<{
+  titled: Set<string>;
+  untitled: { folder: string | null; bodyHash: string }[];
+}> {
+  const ids = await noteList();
+  const records = await loadNoteBatch(ids);
+  return {
+    titled: buildExistingIdentitySet(titleRecordsToExistingNotes(records)),
+    untitled: await untitledIdentitiesFrom(records),
+  };
 }
 
 // ── the tree-backed arm (phase3-web-client task 71) ──────────────────────────
@@ -281,6 +336,31 @@ export function mediaImporterForTree(
 }
 
 /** Real ports bound to the picked vault `root`. */
+/**
+ * Ports for a source with NO external directory at all.
+ *
+ * The Myne vault source reads another vault through the host's own key slot, so
+ * it never touches the external-directory read seam. `readDir` / `readFile`
+ * therefore have nothing legitimate to return and throw rather than answering
+ * something plausible: a source that reached them would be reading a path it has
+ * no business reading, and a silent empty answer is how that becomes a bug
+ * nobody sees. `createNote`, `setDeliberateFolders` and `setImportHold` are the
+ * real ones, and they are the whole of what the engine needs here.
+ */
+export function createVaultOnlyPorts(): ImportPorts {
+  const refuse = (): never => {
+    throw new Error("this import source reads no external directory");
+  };
+  const real = createImportPorts("");
+  return {
+    readDir: refuse,
+    readFile: refuse,
+    createNote: real.createNote,
+    setDeliberateFolders: real.setDeliberateFolders,
+    setImportHold: real.setImportHold,
+  };
+}
+
 export function createImportPorts(root: string): ImportPorts {
   return {
     readDir: (absPath) => importReadDir(root, absPath),
@@ -425,7 +505,10 @@ const IMPORT_HOLD_RENEW_MS = 20_000;
  * import that FAILS because it could not defer a lock would be a new way to
  * lose an import.
  */
-async function withImportHold<T>(ports: ImportPorts, body: () => Promise<T>): Promise<T> {
+export async function withImportHold<T>(
+  ports: ImportPorts,
+  body: () => Promise<T>,
+): Promise<T> {
   const setHold = ports.setImportHold;
   if (setHold === undefined) return body();
 

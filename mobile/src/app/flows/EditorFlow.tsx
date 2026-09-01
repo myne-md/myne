@@ -78,14 +78,10 @@ import { deriveTree, subtreeCount, orderedChildren, childOrderIndex, reorderChil
 import type { Child, OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
 import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expand-store";
 import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
-import {
-  resolvePeriodNote,
-  periodSettings,
-  zonedNow,
-  createNoteFromTemplate,
-  createBlankNamedNote,
-  type Period,
-} from "../../lib/daily";
+import { endAgentRun } from "../../lib/agent-lifetime";
+import { resolvePeriodNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
+import { periodSettings, zonedNow } from "../../lib/daily";
+import type { Period } from "../../lib/daily";
 import { normalizeFolderPath, ancestorPaths, foldSegment, folderKey } from "../../dialect/folderPath";
 import {
   archivedFolderKeys,
@@ -132,7 +128,10 @@ import { GraphTab } from "./editor/chrome/GraphTab";
 import { NoteRow } from "./editor/chrome/NoteRow";
 import { FolderTreeRow } from "./editor/chrome/FolderTreeRow";
 import { ReadingBar } from "./editor/chrome/ReadingBar";
-import { TabBar } from "./editor/chrome/TabBar";
+import { TabBar, type WorkspaceTab } from "./editor/chrome/TabBar";
+import { defaultGrantFor } from "@myne/agent-protocol";
+
+import { AiChatFlow } from "./AiChatFlow";
 import { TaskSurface } from "../../components/TaskSurface";
 import { EMPTY_SCOPE, type TaskScope } from "@myne/task-scope";
 import { takeReminderLanding } from "../../lib/reminderLanding";
@@ -190,7 +189,7 @@ type Editing = { id: string | null };
 /** Left-to-right tab position — drives the slide direction of the page
  *  transition: moving to a higher-indexed tab enters from the right, a
  *  lower-indexed tab from the left (an iOS push/pop feel across the tab row). */
-const TAB_ORDER: Record<"notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates", number> = {
+const TAB_ORDER: Record<WorkspaceTab, number> = {
   notes: 0,
   // MYND-620: `tasks` is placed between notes and graph rather than appended,
   // because this record is what decides the push/pop slide direction — a tab
@@ -202,6 +201,10 @@ const TAB_ORDER: Record<"notes" | "tasks" | "note-tasks" | "search" | "graph" | 
   graph: 4,
   files: 5,
   templates: 6,
+  // Last, matching its position in the bar. The comment above is the reason
+  // this is not a free choice: a tab that sits last in the bar and earlier here
+  // slides in from the wrong side, and nothing but the eye reports that.
+  chat: 7,
 };
 
 /** Editor typography presets (mirror the desktop `editor-typography` prefs), so
@@ -263,7 +266,7 @@ function useIndexDeltaTracker(): IndexDeltaTracker {
 export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<"list" | "editor">("list");
-  const [tab, setTab] = useState<"notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates">("notes");
+  const [tab, setTab] = useState<WorkspaceTab>("notes");
   // Layout axis (SizeClassContext): compact = the phone's full-screen list ⇄
   // editor swap; medium/expanded ("regular") = persistent multi-pane split.
   // `view` stays the compact navigation intent; `editing` drives the detail
@@ -436,6 +439,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
     const flushAll = () => {
       flushRef.current();
       void flushWorkspaceNow();
+      // **Not a flush.** The other two here are writes racing an OS kill; this
+      // is a drop. The OS suspends a backgrounded WebView and may reclaim the
+      // process, so an in-flight run's reply can simply never arrive, leaving a
+      // screen that says "Working" forever over a provider that may still be
+      // charging for it. Cancel it, clear the note-derived plaintext, and leave
+      // a notice: the user is coming back to this screen and is owed a reason
+      // for it being empty.
+      endAgentRun("background", t("agent.progress.cancelledBackground"));
     };
     const onHidden = () => {
       if (document.visibilityState === "hidden") flushAll();
@@ -446,7 +457,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       document.removeEventListener("visibilitychange", onHidden);
       window.removeEventListener("pagehide", flushAll);
     };
-  }, []);
+  }, [t]);
 
   // Compact-only left-edge swipe-back: same semantics as the top-bar chevron
   // (autosave + return to the list), same busy guard. `saveNote` is a hoisted
@@ -470,6 +481,19 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
   // shared editor's `/record` slash all raise this).
   const [recordOpen, setRecordOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // **The note the AI tab runs over, which is NOT `editing`.** On a phone the
+  // editor REPLACES the list, so the bottom bar (and therefore the AI tab) is
+  // only reachable with no note on screen, and `exitEditor` clears `editing`.
+  // Deriving the default scope from `editing` alone therefore meant the tab
+  // ALWAYS had a null scope: Send was disabled on every phone and an agent run
+  // was unreachable. Found by the /simplify pass, after the same pass corrected
+  // the other half of this (the vault-wide fallback the host refuses).
+  //
+  // "The note you were just working in" is the honest mobile analogue of
+  // desktop's "the note open in a pane", which is what its composer uses. It is
+  // RAM only and lives as long as this component, so it goes with the vault: a
+  // lock or a switch unmounts `EditorFlow`.
+  const [lastNoteId, setLastNoteId] = useState<string | null>(null);
   // Editor side panel (mobile stand-in for the desktop side sheet): note
   // context + actions, sliding in from the right.
   const [rightPanel, setRightPanel] = useState(false);
@@ -1324,6 +1348,30 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
 
   // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
   // emits `PREFS_SYNC_APPLIED_EVENT` (never for this device's own IPC writes).
+  // A vault is open, and this is the ONE place on mobile that is true (myne-md/myne#609).
+  //
+  // Announce it on the prefs nonce, because that nonce is how a root-mounted
+  // consumer learns prefs became readable. Before this, the only two bump sites
+  // were `writePref` and the sync bridge below, and neither fires on an unlock:
+  // `useDateTimeDisplaySync` mounts in `AppShell`, above the stage machine, so
+  // its first `prefsRead()` hit a locked slot, the rejection was swallowed, and
+  // nothing re-ran. The shared display store then held its defaults for the whole
+  // session, which is exactly the inert-on-mobile defect this feature was filed
+  // to fix, one layer over.
+  //
+  // Keyed on `vaultId` rather than mount, so a vault SWITCH re-announces too.
+  // Without that the store keeps the previous vault's format and zone until the
+  // next prefs write, and the zone is a coarse-location datum the multi-vault
+  // posture keeps per vault everywhere else.
+  //
+  // Here rather than in each unlock path: password, quick unlock, recovery,
+  // creation and vault switch all land on the `editor` stage, and this component
+  // renders for that stage alone. A bump per unlock path is the partial fix that
+  // works for whichever path its author was looking at.
+  useEffect(() => {
+    bumpPrefsNonce();
+  }, [vaultId]);
+
   // Bridge it into the prefs nonce so an incoming vault rename / shared-pref
   // change refreshes the header + settings live; the switcher's vault list
   // re-fetches on its next open (its RAM-cache label was refreshed core-side).
@@ -1576,6 +1624,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       loadedTextRef.current = { id, text };
       setEditorText(text);
       setEditing({ id });
+      setLastNoteId(id);
       setView("editor");
     },
     [devStore],
@@ -2732,6 +2781,72 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         )}
 
         {tab === "graph" && <GraphTab model={graphModel} onOpen={(id) => void openFromList(id)} />}
+        {/* The AI destination (myne-md/myne#457). The scope is the open note
+            when there is one and the whole vault otherwise, which is the
+            default `docs/decisions/ai/0515` names; task 11 makes it something
+            the user sets and shows what it costs before the run starts. */}
+        {/* Gated on the pref as well as the tab. Turning the device opt-in off
+            drops the fifth bar column and the sidebar row, and without this the
+            body kept rendering underneath them: a destination navigation no
+            longer offers, with a Send that fires a request the host refuses. */}
+        {tab === "chat" && prefs.ai_enabled && (
+          <AiChatFlow
+            // The review lists note ids; these resolve them into what a person
+            // reads. Passed in rather than looked up inside the flow, so the
+            // flow keeps no second copy of the note table.
+            titleOf={(id) => deriveTitleSnippet(bodies.get(id) ?? "").title}
+            bodyOf={(id) => bodies.get(id) ?? null}
+            // An applied edit rewrote notes behind this screen, so they are
+            // re-read one at a time rather than through `refreshAll`, which
+            // re-decrypts the whole vault.
+            //
+            // **And the OPEN EDITOR'S buffer with them, which `refreshOne`
+            // does not touch.** On the regular size class the AI tab does not
+            // close the editor, so `editing` and `editorText` survive holding
+            // PRE-apply bytes; `editorUnchanged(id)` then reads true, and the
+            // next keystroke saves that stale buffer over the change the user
+            // just approved. `src/CLAUDE.md` states this as a rule ("the pane's
+            // next autosave writes that stale buffer back over the change"), the
+            // desktop screen discharges it with `reloadOpenNote`, and this file
+            // already carries the same pattern for `SnapshotsSheet.onRestored`.
+            // What is lost is an approved edit, and the run's own snapshot
+            // restores the text from BEFORE the apply, so nothing recovers it.
+            onNotesWritten={(ids) => {
+              for (const id of ids) void refreshOne(id);
+              const open = editing?.id;
+              if (open != null && ids.includes(open) && HAS_TAURI) {
+                void noteRead(open)
+                  .then((text) => {
+                    // The baseline moves with the buffer. Setting only the text
+                    // would leave `editorUnchanged` comparing against the old
+                    // bytes, so the very next save would write it back.
+                    loadedTextRef.current = { id: open, text };
+                    setEditorText(text);
+                  })
+                  .catch(() => {
+                    // A failed re-read must not leave a baseline claiming the
+                    // stale buffer is current. Dropping it makes the next save
+                    // a real write rather than a silent no-op.
+                    if (loadedTextRef.current?.id === open) loadedTextRef.current = null;
+                  });
+              }
+            }}
+            // The durable path the undo strip's copy names. Opening the note
+            // first is not incidental: the history sheet is per note and reads
+            // `editing.id`, so a route that only flipped `historyOpen` would
+            // render a sheet for whatever note happened to be open, or for
+            // none. Landing on the note also puts the user where a restore
+            // will be visible.
+            onOpenHistory={(noteId) => {
+              setTab("notes");
+              void openNote(noteId).then(() => setHistoryOpen(true));
+            }}
+            // One rule, shared with desktop. `editing.id` is null for a note
+            // that has never been saved, and a run over an id the vault does
+            // not hold is not a narrower scope, it is a broken one.
+            grant={defaultGrantFor(editing?.id ?? lastNoteId)}
+          />
+        )}
         {tab === "files" && <AttachmentsSheet variant="page" onClose={() => setTab("notes")} />}
         {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
             Files destination above — one component serving both a full-screen
@@ -2837,10 +2952,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
         {chrome.tabBar && (
           <TabBar
             active={tab}
+            ai={prefs.ai_enabled}
             onNotes={() => { setTab("notes"); setPanesRevealed(true); }}
             onTasks={() => setTab("tasks")}
             onGraph={() => setTab("graph")}
             onAttachments={() => setTab("files")}
+            onChat={() => setTab("chat")}
           />
         )}
       </>
@@ -3545,6 +3662,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
             onGraph={() => setTab("graph")}
             onFiles={() => setTab("files")}
             onTemplates={() => setTab("templates")}
+            {...(prefs.ai_enabled ? { onChat: () => setTab("chat") } : {})}
             onViews={() => setViewsOpen(true)}
             onTags={() => setTagBrowserOpen(true)}
             onArchive={() => { setTab("notes"); setListView("archive"); setActiveTag(null); setActiveViewId(null); }}
@@ -3590,10 +3708,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSw
       {sizeClass === "medium" && panesCollapsed && (
         <TabBar
           active={tab}
+          ai={prefs.ai_enabled}
           onNotes={() => { setTab("notes"); setPanesRevealed(true); }}
           onTasks={() => setTab("tasks")}
           onGraph={() => setTab("graph")}
           onAttachments={() => setTab("files")}
+          onChat={() => setTab("chat")}
         />
       )}
       {renderListOverlays()}

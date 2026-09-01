@@ -165,6 +165,7 @@ pub fn run() {
         // caller (the recovery screen's Paste); the argument for it, and what it
         // costs, are in its `permissions/default.toml`.
         .plugin(tauri_plugin_sensitive_clipboard::init())
+        .plugin(plugins::agent::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())

@@ -49,7 +49,8 @@
       "unsupportedDetail": "Il a réussi {{passes}} vérifications sur {{attempts}} ; il en faut {{required}}.",
       "checking": "Vérification du modèle…",
       "checkingAt": "Vérification du modèle… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Ce seuil de réussite n'a pas encore été mesuré sur l'ensemble des modèles ; il peut donc être plus strict ou plus permissif qu'il ne devrait."
+      "unsupportedProvisional": "Ce seuil de réussite n'a pas encore été mesuré sur l'ensemble des modèles ; il peut donc être plus strict ou plus permissif qu'il ne devrait.",
+      "scopeNone": "aucune note ouverte, il n'y a donc rien sur quoi travailler pour l'instant"
     },
     "progress": {
       "working": "En cours",
@@ -68,7 +69,8 @@
       "grantsUser_other": "{{count}} portées que vous avez définies",
       "grantsModel_one": "{{count}} demandée par l'IA",
       "grantsModel_many": "{{count}} demandées par l'IA",
-      "grantsModel_other": "{{count}} demandées par l'IA"
+      "grantsModel_other": "{{count}} demandées par l'IA",
+      "cancelledBackground": "L'exécution a été annulée parce que Myne est passée en arrière-plan. Rien n'a été écrit. Redemandez quand vous voulez."
     },
     "scope": {
       "title": "Inclure {{folder}} ?",
@@ -130,7 +132,10 @@
         "excludedFolder": "Non créée : ce dossier est exclu de l'IA.",
         "createFailed": "Non créée : l'écriture de la nouvelle note a échoué. Les autres modifications ont tout de même été appliquées.",
         "excludedNow": "Impossible à appliquer : le dossier de cette note est désormais exclu de l'IA.",
-        "notProposed": "Impossible à appliquer : cette modification ne fait pas partie de la proposition de cette exécution."
+        "notProposed": "Impossible à appliquer : cette modification ne fait pas partie de la proposition de cette exécution.",
+        "noteMoved": "Impossible à appliquer : cette modification déplacerait la note vers un autre dossier.",
+        "appendEmpty": "Impossible à appliquer : il n'y avait rien à ajouter.",
+        "appendWouldWriteFrontmatter": "Impossible à appliquer : ce texte serait devenu le bloc de propriétés de la note."
       },
       "applyFailed": "Les modifications n'ont pas pu être appliquées.",
       "undo": "Annuler cette exécution",
@@ -154,7 +159,8 @@
       "runSummaryOffDevice_one": "environ {{count}} caractère de vos notes a été envoyé au fournisseur",
       "runSummaryOffDevice_many": "environ {{count}} de caractères de vos notes ont été envoyés au fournisseur",
       "runSummaryOffDevice_other": "environ {{count}} caractères de vos notes ont été envoyés au fournisseur",
-      "runSummaryOnDevice": "rien n'a quitté cet appareil"
+      "runSummaryOnDevice": "rien n'a quitté cet appareil",
+      "appendFlag": "ajouté à la fin"
     },
     "undo": {
       "offer_one": "La dernière exécution a modifié {{count}} note.",
@@ -169,7 +175,9 @@
       "failed_other": "{{count}} notes n'ont pas pu être restaurées.",
       "createdNotReverted_one": "{{count}} note créée par l'exécution a été laissée en place.",
       "createdNotReverted_many": "{{count}} de notes créées par l'exécution ont été laissées en place.",
-      "createdNotReverted_other": "{{count}} notes créées par l'exécution ont été laissées en place."
+      "createdNotReverted_other": "{{count}} notes créées par l'exécution ont été laissées en place.",
+      "sessionOnly": "Cette annulation en un geste dure jusqu'à ce que vous verrouilliez le coffre ou fermiez l'application. Ensuite, restaurez les notes une par une depuis l'historique des versions d'une note.",
+      "sessionOnlyLink": "Ouvrir l'historique des versions"
     }
   },
   "ai": {
@@ -1253,7 +1261,9 @@
       "replaceAllCount": "Tout remplacer ({{total}})",
       "replaceOne": "Remplacer",
       "replacePlaceholder": "Remplacer par",
-      "toggleReplace": "Afficher le remplacement"
+      "toggleReplace": "Afficher le remplacement",
+      "dateFallback": "Recherche de {{stored}}, la forme sous laquelle cette date est enregistrée.",
+      "replaceOffOnDateFallback": "Le remplacement est désactivé tant qu'une date est trouvée par sa forme enregistrée, afin qu'un remplacement ne la rende pas illisible."
     },
     "cover": {
       "add": "Ajouter une couverture",
@@ -2919,7 +2929,16 @@
       "periodNameMonthly": "mensuelle",
       "periodFolderAriaLabel": "Dossier des notes {{period}}",
       "periodFormatAriaLabel": "Format du titre des notes {{period}}",
-      "periodTemplateAriaLabel": "Modèle des notes {{period}}"
+      "periodTemplateAriaLabel": "Modèle des notes {{period}}",
+      "dateFormatHelper": "Le titre de chaque note quotidienne. Prend en charge YYYY, MM, DD. Par défaut : {{default}}.",
+      "dateFormatLabel": "Format de date des notes quotidiennes",
+      "dateFormatSaveError": "Impossible d'enregistrer le format de date. Veuillez réessayer.",
+      "folderHelper": "Où sont classées les nouvelles notes quotidiennes. Par défaut : {{default}}. Le dossier est conservé même lorsqu'il est vide.",
+      "folderLabel": "Dossier des notes quotidiennes",
+      "folderSaveError": "Impossible d'enregistrer le dossier quotidien. Veuillez réessayer.",
+      "templateHelper": "Choisissez un modèle à partir duquel démarrer chaque note quotidienne, ou laissez vide pour une note vide intitulée avec la date.",
+      "templateLabel": "Modèle des notes quotidiennes",
+      "templateSaveError": "Impossible d'enregistrer le modèle quotidien. Veuillez réessayer."
     },
     "deleteVault": {
       "cancel": "Annuler",
@@ -3081,7 +3100,8 @@
         "title": "Avant que Myne n'envoie quoi que ce soit à {{provider}}",
         "whatLabel": "Ce qui quitte votre appareil",
         "whenLabel": "Quand cela quitte votre appareil",
-        "whoLabel": "Qui le reçoit"
+        "whoLabel": "Qui le reçoit",
+        "connectionLabel": "Comment cela circule"
       },
       "disclosureToggle": "Comment ça marche ?",
       "enableHelper": "Exécute un modèle que vous fournissez. L'endroit où il s'exécute, et le fait que vos notes quittent ou non cet appareil, dépendent du fournisseur que vous indiquez ci-dessous. Expérimental, désactivé par défaut.",
@@ -3115,7 +3135,9 @@
         "refused": "Le fournisseur a refusé la connexion. Il est peut-être hors service ou bloque ce réseau.",
         "timeout": "Le fournisseur n'a pas répondu à temps. Rien n'est resté en cours d'exécution.",
         "unauthorized": "Le fournisseur a rejeté votre clé API. Remplacez-la : elle est peut-être erronée, révoquée, ou liée à un autre compte.",
-        "unreachable": "Impossible de joindre le fournisseur. Vérifiez votre connexion réseau."
+        "unreachable": "Impossible de joindre le fournisseur. Vérifiez votre connexion réseau.",
+        "featureOff": "L'IA est désactivée sur cet appareil. Rien n'a été envoyé. Activez-la dans Réglages, section IA.",
+        "consentMissing": "Vous n'avez pas accepté d'envoyer des notes à ce fournisseur depuis cet appareil. Rien n'a été envoyé. Choisissez à nouveau le fournisseur dans Réglages, section IA, et lisez ce qui sera envoyé."
       },
       "modelChoose": "Choisir un fichier…",
       "modelEmbeddingLabel": "Modèle de recherche : recherche sémantique et questions-réponses",
@@ -3158,7 +3180,16 @@
       "recommendedFilesGeneration": "Nécessite le fichier .gguf + tokenizer.json dans le même dossier.",
       "recommendedFilesTranscription": "Nécessite le fichier .gguf Whisper + config.json + tokenizer.json dans le même dossier.",
       "title": "IA",
-      "providerModelCount_many": "{{count}} de modèles disponibles."
+      "providerModelCount_many": "{{count}} de modèles disponibles.",
+      "mobileEnableLabel": "Utiliser l'IA sur ce téléphone",
+      "mobileEnableHelper": "Désactivé par défaut. Aucun modèle d'IA sur ce téléphone ne répond aux questions ni ne lit vos notes, donc chaque requête part vers un service que vous nommez ci-dessous, et vos notes quittent alors cet appareil. La transcription et le texte des images continuent de s'exécuter ici, sur des modèles fournis avec Myne.",
+      "mobileKeyAdd": "Enregistrer la clé",
+      "mobileKeyReplace": "Remplacer la clé",
+      "mobileRevokeHelper": "Supprime le fournisseur, sa clé et l'accord de ce téléphone en une fois, rétablissant exactement l'état d'avant toute configuration. Les autres appareils continuent de fonctionner tant que vous ne les supprimez pas là aussi.",
+      "mobileApproveLabel": "Autoriser l'envoi depuis ce téléphone",
+      "mobileApproveHelper": "Le fournisseur et sa clé viennent d'un autre appareil. Rien n'est envoyé depuis ce téléphone tant que vous n'avez pas lu ce qui sera envoyé et donné votre accord ici.",
+      "historyBudgetHelper": "Quelle part de la conversation récente chaque requête emporte, en caractères. Laissez vide pour la valeur par défaut. Un nombre plus grand permet à l'IA de suivre des conversations plus longues et en envoie davantage : avec un fournisseur qui n'est pas sur cet appareil, cela fait plus de votre texte qui le quitte, à chaque étape d'une exécution.",
+      "historyBudgetLabel": "Conversation envoyée avec chaque requête"
     },
     "network": {
       "disabledCue": "La synchronisation ne passe plus par Tor. Les nouvelles connexions vont directement au serveur de synchronisation.",
@@ -3479,12 +3510,13 @@
         "dateFormat": "format de date jour mois année iso jj/mm mm/jj calendrier date format",
         "timeFormat": "format d'heure 24 heures 12 heures horloge am pm time format",
         "timezone": "fuseau horaire zone tz utc iana région aujourd'hui timezone",
-        "periodicNotes": "notes périodiques hebdomadaire mensuel semaine mois dossier modèle format"
+        "periodicNotes": "notes périodiques hebdomadaire mensuel semaine mois dossier modèle format",
+        "aiHistoryBudget": "conversation historique contexte mémoire budget caractères agent chat requête"
       }
     },
     "dateTime": {
       "dateLabel": "Format de date",
-      "dateHelper": "Comment les dates sont affichées dans les tâches, les vues enregistrées et les pièces jointes.",
+      "dateHelper": "Comment une date est écrite, partout où Myne en affiche une.",
       "dateSystem": "Suivre la langue",
       "timeLabel": "Format d'heure",
       "timeHelper": "Détermine si les heures sont affichées au format 24 heures ou 12 heures.",

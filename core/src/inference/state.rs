@@ -22,9 +22,12 @@ use super::error::EngineError;
 pub struct PrefsSnapshot {
     /// The preferences the selection reads.
     pub prefs: protocol::PrefsView,
-    /// Carried alongside so the gate's signature keeps stating the SYNC-18
-    /// requirement instead of reading it silently.
-    pub developer_mode: bool,
+    // A `developer_mode: bool` rode here until myne-md/myne#456, carried purely
+    // so the gate's signature stated SYNC-18 out loud. The gate stopped taking
+    // it when per-provider consent replaced it, and the field went with it in
+    // the same change rather than being left as a value nothing decides on:
+    // a snapshot that still carried it would read, to the next person, as
+    // though the selection still weighed it.
     /// **The vault these preferences were read from** (myne-md/myne#437).
     ///
     /// Without it the cell is a process-global authorization with no owner, and
@@ -36,7 +39,7 @@ pub struct PrefsSnapshot {
     ///
     /// `None` means the reader could not name a vault, which resolves the same
     /// way a mismatch does: the local arm.
-    pub vault_id: Option<myne_core::vault_id::VaultId>,
+    pub vault_id: Option<crate::vault_id::VaultId>,
 }
 
 /// How the seam obtains those facts. Async because `vault.prefs` is encrypted
@@ -49,7 +52,7 @@ pub struct PrefsSnapshot {
 pub type PrefsCell = Arc<RwLock<Option<PrefsSnapshot>>>;
 
 /// A synchronous read of the currently-unlocked vault id.
-pub type ActiveVaultReader = Arc<dyn Fn() -> Option<myne_core::vault_id::VaultId> + Send + Sync>;
+pub type ActiveVaultReader = Arc<dyn Fn() -> Option<crate::vault_id::VaultId> + Send + Sync>;
 
 pub type PrefsReader =
     Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Option<PrefsSnapshot>> + Send>> + Send + Sync>;
@@ -319,11 +322,21 @@ impl LocalInferenceState {
     /// `RemoteEngine`'s "there is no field here that could go stale" true: it
     /// reads whatever the last [`Self::refresh`] wrote, not a value captured
     /// when it was built.
-    /// `#[cfg(test)]` rather than an `allow(dead_code)`: production builds the
-    /// cell in `init` and hands it to BOTH the remote backend and
+    /// Test-only rather than an `allow(dead_code)`: production builds the cell
+    /// in `init` and hands it to BOTH the remote backend and
     /// [`Self::with_snapshot_cell`], so it never needs to ask the state for one.
     /// A bare allow would let this rot into a second way of reaching the cell.
-    #[cfg(test)]
+    ///
+    /// The gate is `any(test, feature = "test-support")` rather than the bare
+    /// `#[cfg(test)]` it carried while this file lived in the desktop crate
+    /// (myne-md/myne#456). `#[cfg(test)]` is per-CRATE, so after the move it was
+    /// true only while testing `myne-core`, and the desktop plugin's own tests
+    /// that build a remote-selecting fixture lost their way to the cell. Widened
+    /// to the crate's established mechanism for exactly this, which the desktop
+    /// crate already opts into through its `myne-core` dev-dependency. The
+    /// property the comment above cares about is unchanged: no production build
+    /// of any client reaches this.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn snapshot_cell(&self) -> PrefsCell {
         Arc::clone(&self.snapshot)
     }
@@ -331,7 +344,8 @@ impl LocalInferenceState {
     /// Which backend answers **right now**.
     ///
     /// The remote arm is selected only when the preferences authorize it — all
-    /// five of task 9's preconditions, evaluated by the same
+    /// FOUR of the gate's preconditions (the beta flag, a recognized provider,
+    /// a consent naming that same provider, and a stored key), evaluated by the same
     /// [`authorize_remote`](super::provider_gate::authorize_remote) the request
     /// path uses, plus a chosen model without which there is nothing to ask
     /// (SYNC-24). Any of them missing resolves to the local arm, so an
@@ -364,8 +378,7 @@ impl LocalInferenceState {
             (Some(active), Some(read_from)) if active == read_from => {}
             _ => return self.local,
         }
-        if super::provider_gate::authorize_remote(&snapshot.prefs, snapshot.developer_mode).is_err()
-        {
+        if super::provider_gate::authorize_remote(&snapshot.prefs).is_err() {
             return self.local;
         }
         // A provider with no model chosen cannot be asked anything. Selecting it
@@ -556,10 +569,71 @@ impl LocalInferenceState {
     }
 }
 
+/// The local arm of a client that has no on-device inference.
+///
+/// **Mobile has one of these and desktop does not** (myne-md/myne#456). The
+/// backend registry needs a non-remote arm to fall back to: the
+/// ambient-versus-remote refusal is written as "an ambient request is served by
+/// the first non-remote backend", and a registry with no such backend has
+/// nowhere to send one. On a phone, running Candle is out of scope by decision,
+/// so the honest answer to "what serves an ambient request here" is *nothing
+/// does*.
+///
+/// It answers [`EngineError::NoModel`], which is what the trait's own defaults
+/// answer for a capability a backend does not have. That matters more than it
+/// looks: the alternative of registering `StubEngine` would have a phone
+/// FABRICATING answers to ambient requests, and the alternative of registering
+/// the remote engine as the local arm would route them off-device, which is the
+/// exact thing the refusal exists to stop.
+pub struct NoLocalEngine;
+
+impl Engine for NoLocalEngine {
+    fn infer(&self, _prompt: &str) -> Result<String, EngineError> {
+        Err(EngineError::NoModel)
+    }
+
+    fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
+        Err(EngineError::NoModel)
+    }
+}
+
+/// The remote arm, as a registered backend.
+///
+/// **Registration is not selection.** This is always in the registry: it costs
+/// nothing to carry, it opens no socket by existing, and it cannot be reached
+/// unless the selection finds all four of the gate's preconditions plus a chosen
+/// model in the preferences. Building it lazily on the first authorized request
+/// would mean the registry did not describe what the app can do, which is the
+/// one thing a registry is for, and the capability report reads that registry.
+///
+/// It reads the SAME snapshot cell the selection consults, so the engine and the
+/// seam cannot disagree about what the preferences say.
+///
+/// Not `.serializing_compute()`: the work happens on someone else's hardware,
+/// and holding a local compute lock across an internet round trip would block
+/// local inference on a network wait.
+///
+/// Shared by both Tauri clients since myne-md/myne#456. It was desktop's, and
+/// nothing in it is desktop-specific.
+pub fn remote_backend(cell: PrefsCell, cancelled: super::cancellable_io::CancelledFn) -> Backend {
+    Backend::new(
+        "remote",
+        BackendClass::Remote,
+        Arc::new(super::provider_registry::RemoteEngine::new(
+            Box::new(move || {
+                cell.read()
+                    .ok()
+                    .and_then(|s| s.as_ref().map(|s| s.prefs.clone()))
+            }),
+            cancelled,
+        )),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugins::local_inference::error::EngineError;
+    use crate::inference::error::EngineError;
 
     /// A minimal engine that is distinguishable from `StubEngine` by output, so
     /// `new()` can be told apart from `default()` through the trait alone —
@@ -1077,19 +1151,18 @@ mod selection_proof {
     }
 
     /// The vault `wired()` claims to be unlocked, and the one `snap()` stamps.
-    fn test_vault() -> myne_core::vault_id::VaultId {
-        myne_core::vault_id::VaultId::parse("018f0000-0000-7000-8000-000000000001").expect("id")
+    fn test_vault() -> crate::vault_id::VaultId {
+        crate::vault_id::VaultId::parse("018f0000-0000-7000-8000-000000000001").expect("id")
     }
 
     /// A second, DIFFERENT vault — the cross-vault case.
-    fn other_vault() -> myne_core::vault_id::VaultId {
-        myne_core::vault_id::VaultId::parse("018f0000-0000-7000-8000-000000000002").expect("id")
+    fn other_vault() -> crate::vault_id::VaultId {
+        crate::vault_id::VaultId::parse("018f0000-0000-7000-8000-000000000002").expect("id")
     }
 
-    fn snap(prefs: PrefsView, developer_mode: bool) -> PrefsSnapshot {
+    fn snap(prefs: PrefsView) -> PrefsSnapshot {
         PrefsSnapshot {
             prefs,
-            developer_mode,
             vault_id: Some(test_vault()),
         }
     }
@@ -1101,9 +1174,8 @@ mod selection_proof {
     fn configured() -> PrefsView {
         PrefsView {
             ai_enabled: true,
-            developer_mode: true,
             ai_provider: Some("openrouter".into()),
-            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter@device".into()),
             ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
             ai_provider_model: Some("some/model".into()),
             ..PrefsView::default()
@@ -1118,57 +1190,41 @@ mod selection_proof {
 
         let unconfigured: Vec<(&str, Option<PrefsSnapshot>)> = vec![
             ("vault locked — no snapshot at all", None),
-            ("nothing configured", Some(snap(PrefsView::default(), true))),
-            ("developer mode off", Some(snap(configured(), false))),
+            ("nothing configured", Some(snap(PrefsView::default()))),
             (
                 "AI beta off",
-                Some(snap(
-                    PrefsView {
-                        ai_enabled: false,
-                        ..configured()
-                    },
-                    true,
-                )),
+                Some(snap(PrefsView {
+                    ai_enabled: false,
+                    ..configured()
+                })),
             ),
             (
                 "no provider named",
-                Some(snap(
-                    PrefsView {
-                        ai_provider: None,
-                        ..configured()
-                    },
-                    true,
-                )),
+                Some(snap(PrefsView {
+                    ai_provider: None,
+                    ..configured()
+                })),
             ),
             (
                 "consent for a DIFFERENT provider",
-                Some(snap(
-                    PrefsView {
-                        ai_provider_consent: Some("ollama-cloud".into()),
-                        ..configured()
-                    },
-                    true,
-                )),
+                Some(snap(PrefsView {
+                    ai_provider_consent: Some("ollama-cloud@device".into()),
+                    ..configured()
+                })),
             ),
             (
                 "no key",
-                Some(snap(
-                    PrefsView {
-                        ai_provider_key: None,
-                        ..configured()
-                    },
-                    true,
-                )),
+                Some(snap(PrefsView {
+                    ai_provider_key: None,
+                    ..configured()
+                })),
             ),
             (
                 "no model chosen (SYNC-24 ships no default)",
-                Some(snap(
-                    PrefsView {
-                        ai_provider_model: None,
-                        ..configured()
-                    },
-                    true,
-                )),
+                Some(snap(PrefsView {
+                    ai_provider_model: None,
+                    ..configured()
+                })),
             ),
         ];
 
@@ -1191,7 +1247,7 @@ mod selection_proof {
 
         // The control arm. Without it every zero above is compatible with a
         // remote arm that could never be reached under any configuration.
-        put(&state, Some(snap(configured(), true)));
+        put(&state, Some(snap(configured())));
         assert_eq!(state.active_class(), BackendClass::Remote);
         assert_eq!(state.active_id(), "remote");
         let answer = state
@@ -1245,7 +1301,7 @@ mod selection_proof {
 
         // A provider IS active — without this the local arm would be the active
         // one and the assertion would hold for the wrong reason.
-        put(&state, Some(snap(configured(), true)));
+        put(&state, Some(snap(configured())));
         assert_eq!(state.active_class(), BackendClass::Remote);
 
         state.invalidate_all_models();
@@ -1278,7 +1334,7 @@ mod selection_proof {
 
         // The control arm FIRST: without it every refusal below is compatible
         // with a remote arm that could never be selected under any conditions.
-        put(&state, Some(snap(configured(), true)));
+        put(&state, Some(snap(configured())));
         assert_eq!(
             state.active_class(),
             BackendClass::Remote,
@@ -1290,7 +1346,6 @@ mod selection_proof {
             &state,
             Some(PrefsSnapshot {
                 prefs: configured(),
-                developer_mode: true,
                 vault_id: Some(other_vault()),
             }),
         );
@@ -1305,7 +1360,6 @@ mod selection_proof {
             &state,
             Some(PrefsSnapshot {
                 prefs: configured(),
-                developer_mode: true,
                 vault_id: None,
             }),
         );
@@ -1321,7 +1375,7 @@ mod selection_proof {
     #[test]
     fn invalidate_drops_the_cached_authorization() {
         let state = wired(1);
-        put(&state, Some(snap(configured(), true)));
+        put(&state, Some(snap(configured())));
         assert_eq!(state.active_class(), BackendClass::Remote);
 
         state.invalidate();
@@ -1340,7 +1394,7 @@ mod selection_proof {
     fn ambient_and_embedding_fall_back_to_the_local_arm_rather_than_failing() {
         let (port, accepts) = counting_listener();
         let state = wired(port);
-        put(&state, Some(snap(configured(), true)));
+        put(&state, Some(snap(configured())));
         assert_eq!(state.active_class(), BackendClass::Remote);
 
         let ghost = state
@@ -1371,21 +1425,18 @@ mod selection_proof {
     fn revoking_mid_session_routes_the_next_request_locally() {
         let (port, accepts) = counting_listener();
         let state = wired(port);
-        put(&state, Some(snap(configured(), true)));
+        put(&state, Some(snap(configured())));
         assert_eq!(state.active_class(), BackendClass::Remote);
 
         put(
             &state,
-            Some(snap(
-                PrefsView {
-                    ai_provider_key: None,
-                    ai_provider_consent: None,
-                    ai_provider: None,
-                    ai_provider_model: None,
-                    ..configured()
-                },
-                true,
-            )),
+            Some(snap(PrefsView {
+                ai_provider_key: None,
+                ai_provider_consent: None,
+                ai_provider: None,
+                ai_provider_model: None,
+                ..configured()
+            })),
         );
         assert_eq!(state.active_class(), BackendClass::InProcessLocal);
         let answer = state

@@ -11,6 +11,7 @@
 
 import { invoke } from "../platform/core";
 import { bumpPrefsNonce } from "../notes/prefsNonce";
+import { blockSeedingOfExistingTurns } from "../notes/ai/chatStore";
 
 /**
  * Editor three-pane layout — sidebar widths (px) + collapsed flags (MYND-137).
@@ -308,6 +309,10 @@ export interface PrefsView {
    * defaulted to `[]`. Non-load-bearing.
    */
   ai_excluded_folders: string[];
+  /** Characters of chat history an agent run may be seeded with. `null` means
+   *  unset, and the host applies its own default. Clamped at the write, so the
+   *  stored value can be lower than the one sent. */
+  chat_history_budget: number | null;
   /**
    * Developer mode toggle (`developer-mode` feature, MYND-593). `false` ≡ off
    * (the default). Serialized from Rust `bool`; omitted from the encrypted
@@ -374,8 +379,12 @@ export interface PrefsView {
    * names the recipient, so the request path compares this to the active
    * selection instead of trusting that some setter cleared a flag.
    *
-   * Account-scoped: it syncs, so a newly enrolled device inherits it and sends
-   * without re-asking (`threat-model.md` §5, ledger SYNC-22).
+   * **Device-local since myne-md/myne#456**, and it was account-scoped until
+   * then. The old behaviour is what SYNC-22 recorded as an accepted residual:
+   * a newly enrolled device inherited the selection, the consent AND the key,
+   * and sent without anyone at that device seeing the screen. It stops here
+   * now: the key still syncs, so a phone can hold it, and it still sends
+   * nothing until somebody approves on that phone (`threat-model.md` §5).
    */
   ai_provider_consent: string | null;
   /**
@@ -495,10 +504,18 @@ export interface PrefsView {
    * the host's own zone.
    *
    * **Display only.** It decides what the app treats as "today" and how a stored
-   * wall-clock value is printed; it never enters a `.myn` file, a blob, or the
-   * sync wire — `dialect/src/taskFields.ts` keeps note times zone-free, and this
-   * does not walk that back. Filed device-local by `prefs_classification`, since
-   * the right zone is a property of where the device is. Canonical key slot:
+   * wall-clock value is printed. It never enters a `.myn` file, so a note never
+   * records where its author was: `dialect/src/taskFields.ts` keeps note times
+   * zone-free and this does not walk that back.
+   *
+   * It DOES live in the encrypted `vault.prefs` blob, which is pushed and pulled
+   * like every other prefs field. Corrected by myne-md/myne#609, which found
+   * this comment claiming "never enters a blob or the sync wire" and then found
+   * the same sentence in eight more places, the normative spec and a published
+   * user-guide article among them. Filed
+   * device-local by `prefs_classification`, and that is a MERGE classification:
+   * the local value survives the sync-protocol.md 10.2 merge, and 10.2.1 has a
+   * newly enrolled device adopt it as a starting default. Canonical key slot:
    * after `time_format`, before `transcription_enabled`.
    */
   timezone: string | null;
@@ -843,8 +860,35 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
  *
  * A value outside the host's known set is **refused**, not stored, so the
  * promise rejects rather than leaving a selection the request path ignores.
+ *
+ * **Changing the provider cuts the chat-history seed, the same way changing
+ * `ai_excluded_folders` does (myne-md/myne#617 review).** Since #617 an agent
+ * run is seeded with the visible transcript, so without this a conversation
+ * held entirely on-device is re-sent in full to a provider the user configured
+ * afterwards. The consent screen enumerates what leaves the device and does not
+ * name the conversation so far, so the seed would cross a boundary under a
+ * consent that never mentioned it.
+ *
+ * **Cut on every change, including clearing to `null`.** Clearing sends future
+ * runs to a local model runtime, which `threat-model.md` TB12 is a trust
+ * boundary in its own right (a separately distributed daemon on the same
+ * machine), so "clearing is free" is not true, only cheaper. One rule is
+ * learnable and two are not, which is the argument `docs/decisions/ai/0553`
+ * already makes about the seed itself.
+ *
+ * **The cut lives here rather than in `usePrefs`**, unlike the exclusion one,
+ * because this binding is the single point every provider change passes
+ * through: `AiPanel` calls it from three places (clear, re-select an already
+ * consented provider, and accept consent), and a cut in the caller would be
+ * three chances to miss one. `vault-switch.ts` reaches into stores from this
+ * layer for the same reason.
+ *
+ * It fires BEFORE the write, and before any await: a failed persist does not
+ * withdraw the intent, and the other order leaves a window in which a run could
+ * seed the turns this is protecting.
  */
 export async function setAiProvider(provider: string | null): Promise<void> {
+  blockSeedingOfExistingTurns();
   await writePref("plugin:prefs|set_ai_provider", { provider });
 }
 
@@ -951,13 +995,44 @@ export async function setDeveloperMode(enabled: boolean): Promise<void> {
 }
 
 /**
+ * Persist `chat_history_budget`: how many characters of visible chat history
+ * an agent run may be seeded with (myne-md/myne#617). `null` clears the
+ * override and returns the run to the host's own default.
+ *
+ * **The value is CLAMPED host-side, and this wrapper deliberately does not
+ * clamp it.** The bound is what limits how much of the user's plaintext one run
+ * can send to a provider, multiplied by the loop's iteration ceiling, so it has
+ * to hold for every path that reaches the command rather than for the one that
+ * happened to render a control. A second clamp here would read as the control
+ * and hide the day the real one stopped working.
+ */
+export async function setChatHistoryBudget(budget: number | null): Promise<void> {
+  await writePref("plugin:prefs|set_chat_history_budget", { budget });
+}
+
+/**
  * Persist the full `ai_excluded_folders` set (local-ai epic, ai-ux-surface
  * MYND-408, SYNC-14) — folders the AI never reads/indexes. Same canonical set
  * encoding as `deliberate_folders` (the Rust codec NFC-sorts + exact-dedups).
  * The caller passes the entire desired set; a rejected promise means the disk
  * write failed and the caller's optimistic UI must revert.
+ *
+ * **The seed cut lives here, beside the one in [`setAiProvider`], rather than in
+ * `usePrefs`.** This binding is the single point every exclusion write passes
+ * through, and the two controls bound the same thing, so splitting them across
+ * two layers meant a reader had to find both to know the rule. It fires BEFORE
+ * the write and before any await: the user has stated an intent about what may
+ * reach a provider, and a failed disk write does not withdraw it.
+ *
+ * It is not the only trigger, and the other one is the reason this control needs
+ * two. `ai_excluded_folders` is classified `Shared(SetUnion)`, so it also
+ * arrives by SYNC MERGE, where no setter on this machine runs at all;
+ * `chatStore.observeEgressControls` catches that by watching the value on every
+ * prefs read. This one catches the stated intent, including when the write
+ * fails; that one catches the arrival, whatever route it took.
  */
 export async function setAiExcludedFolders(folders: string[]): Promise<void> {
+  blockSeedingOfExistingTurns();
   await writePref("plugin:prefs|set_ai_excluded_folders", { folders });
 }
 
@@ -1551,9 +1626,13 @@ export async function setTimeFormat(value: string | null): Promise<void> {
 }
 
 /**
- * Set (or clear) the DISPLAY timezone override (myne#279) — pass an IANA zone
- * identifier, or `null` to follow the host's own zone. Display only: it never
- * reaches a note, a blob or the sync wire.
+ * Set (or clear) the DISPLAY timezone override (myne#279). Pass an IANA zone
+ * identifier, or `null` to follow the host's own zone.
+ *
+ * Display only: it never reaches a note, so a note never records where its
+ * author was. It DOES ride the encrypted `vault.prefs` blob; device-local is a
+ * MERGE classification, not a transmission one. The long form is on
+ * `PrefsView.timezone` above.
  */
 export async function setTimezone(value: string | null): Promise<void> {
   await writePref("plugin:prefs|set_timezone", { value });

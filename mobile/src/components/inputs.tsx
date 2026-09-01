@@ -314,7 +314,13 @@ type SegmentedProps = {
   options: string[];
   active?: number;
   style?: CSSProperties;
-  /** Segments derive `${testIdPrefix}-${optionValues[i] ?? i}`. */
+  /** Segments derive `${testIdPrefix}-${optionValues[i] ?? i}`.
+   *
+   * A HYPHEN, and the separator is load-bearing rather than a style choice:
+   * `settings.reminders-horizon-picker-1` and `-7` are read by the reminders
+   * flow tier. myne-md/myne#609 built its own `Segmented` with a dot and its
+   * date-time flow test reads one, so the two spellings met at a merge; the
+   * hyphen wins because it has the live consumers. */
   testIdPrefix?: string;
   /** Stable per-option ids for the testid tail, so a spec does not have to
    *  address a segment by its translated label. Defaults to the index. */

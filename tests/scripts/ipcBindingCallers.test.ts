@@ -95,6 +95,132 @@ await agentStart(task);`,
     expect(dead).toEqual(["src/lib/agent-run.ts:agentCapability"]);
   });
 
+  it("counts a caller that RENAMED the import", () => {
+    // `withoutImports` strips the import line so a mention in it cannot count as
+    // a call, and that is also the only place the two names appear together. The
+    // remaining text says `probe(...)` and never says `agentCapability`, so a
+    // binding four call sites reach was reported dead. A FALSE POSITIVE on a
+    // ratchet is the dangerous direction: the fix a reader reaches for is an
+    // exemption, and an exemption on live code turns the record from a list of
+    // defects into a list of names somebody once argued about.
+    const { dead } = deadBindings({
+      bindings: new Map([["src/lib/agent-run.ts", BINDING]]),
+      callers: new Map([
+        ["src/lib/agent-run.ts", BINDING],
+        [
+          "src/notes/agent/Composer.tsx",
+          `import { agentCapability as probe, agentStart } from "../../lib/agent-run";
+const v = await probe();
+await agentStart(task);`,
+        ],
+      ]),
+    });
+    expect(dead).toEqual([]);
+  });
+
+  it("still refuses a renamed import that is never called", () => {
+    // The direction that turns the fix above into a hole. Resolving the alias
+    // must not resurrect the rule the guard already learned once: an import is
+    // not a caller, whatever local name it is given.
+    const { dead } = deadBindings({
+      bindings: new Map([["src/lib/agent-run.ts", BINDING]]),
+      callers: new Map([
+        ["src/lib/agent-run.ts", BINDING],
+        [
+          "src/notes/agent/Composer.tsx",
+          `import { agentCapability as probe, agentStart } from "../../lib/agent-run";
+await agentStart(task);`,
+        ],
+      ]),
+    });
+    expect(dead).toEqual(["src/lib/agent-run.ts:agentCapability"]);
+  });
+
+  it("counts a binding reached through one exported function in its own file", () => {
+    // `mobile/src/lib/workspace-persist.ts` declares `workspaceRead`, calls it
+    // from `ensureWorkspaceHydrated` twenty lines down, and exports that
+    // instead. The binding is reached on every unlock. The guard's header
+    // records the same-file shape as MEASURED not to occur in the binding
+    // layer, and that measurement was taken before the caller search was scoped
+    // per client, so it only ever read the desktop tree.
+    const src = `${BINDING}
+export async function hydrate(): Promise<void> {
+  await agentCapability();
+}
+`;
+    const { dead } = deadBindings({
+      bindings: new Map([["src/lib/agent-run.ts", src]]),
+      callers: new Map([
+        ["src/lib/agent-run.ts", src],
+        ["src/notes/agent/Composer.tsx", `await hydrate();\nawait agentStart(task);`],
+      ]),
+    });
+    expect(dead).toEqual([]);
+  });
+
+  it("refuses the hop when the intermediary is itself dead", () => {
+    // What stops the hop being a hole. Two dead functions inside one file must
+    // not carry each other into liveness, which is also why the hop is ONE and
+    // not a chain the guard follows arbitrarily far.
+    const src = `${BINDING}
+export async function hydrate(): Promise<void> {
+  await agentCapability();
+}
+`;
+    const { dead } = deadBindings({
+      bindings: new Map([["src/lib/agent-run.ts", src]]),
+      callers: new Map([
+        ["src/lib/agent-run.ts", src],
+        ["src/notes/agent/Composer.tsx", `await agentStart(task);`],
+      ]),
+    });
+    expect(dead).toEqual(["src/lib/agent-run.ts:agentCapability"]);
+  });
+
+  it("does not let a MENTION inside the declaring file stand in for a call", () => {
+    // The hop looks for `name(`, not for the name. A doc comment naming the
+    // binding inside a live exported function is not a call site, and treating
+    // it as one would make every binding a comment away from liveness.
+    const src = `${BINDING}
+export async function hydrate(): Promise<void> {
+  // agentCapability is what this WOULD call.
+  return;
+}
+`;
+    const { dead } = deadBindings({
+      bindings: new Map([["src/lib/agent-run.ts", src]]),
+      callers: new Map([
+        ["src/lib/agent-run.ts", src],
+        ["src/notes/agent/Composer.tsx", `await hydrate();\nawait agentStart(task);`],
+      ]),
+    });
+    expect(dead).toEqual(["src/lib/agent-run.ts:agentCapability"]);
+  });
+
+  it("does not let one client's caller answer for the other client's binding", () => {
+    // Both Tauri clients name their bindings identically, so a flat search over
+    // every caller root let desktop's caller satisfy mobile's binding and the
+    // other way round: the same "each was the other's caller" defect the
+    // re-export fix closed one level down. It survived two earlier fixes to this
+    // guard in the same change.
+    const { dead } = deadBindings({
+      bindings: new Map([
+        ["src/lib/agent-run.ts", BINDING],
+        ["mobile/src/lib/agent-run.ts", BINDING],
+      ]),
+      callers: new Map([
+        ["src/lib/agent-run.ts", BINDING],
+        ["mobile/src/lib/agent-run.ts", BINDING],
+        [
+          "src/notes/agent/Composer.tsx",
+          `const v = await agentCapability();\nawait agentStart(task);`,
+        ],
+        ["mobile/src/app/flows/EditorFlow.tsx", `await agentStart(task);`],
+      ]),
+    });
+    expect(dead).toEqual(["mobile/src/lib/agent-run.ts:agentCapability"]);
+  });
+
   it("does not let a module call ITSELF into liveness", () => {
     // The identity check is keyed on the map key, so a key mismatch between the
     // two maps (absolute against relative) would silently make every binding
@@ -150,42 +276,37 @@ function healthyFiles(): Record<string, string> {
     "src/notes/ai/chatStore.ts": `export function clearChat(): void {}\n`,
     "src/notes/ai/aiOutputStore.ts": `export function clearAiOutput(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
+    "editor/src/host/lib/datetimeFormat.ts": `export function resetDateTimeDisplayForLock(): void {}\n`,
+    // The two DELETE paths. Only the display store is asserted on them: what it
+    // holds describes the READER, so erasing the vault erases the source of the
+    // value and never the value. Every other store skips them with a stated
+    // reason, which is why these bodies carry one call each.
+    "src/lib/vault-delete.ts": `export async function deleteVault(vaultId: string): Promise<void> {
+  resetDateTimeDisplayForLock();
+  await invoke("plugin:vault-unlock|vault_delete");
+}
+`,
+    "mobile/src/lib/vault-delete.ts": `export async function deleteVault(vaultId?: string): Promise<void> {
+  resetDateTimeDisplayForLock();
+  await invoke("plugin:vault-unlock|vault_delete");
+}
+`,
     "src/notes/scrollMemory.ts": `export function resetScrollMemory(): void {}\n`,
     "src/notes/recentNotes.ts": `export function resetRecentNotes(): void {}\n`,
-    // The aspect store is a LEAF module rather than living in `widgets.ts`:
-    // the teardown paths import it, and `src/App.tsx` imports those eagerly, so
-    // declaring it beside the widgets dragged the whole attachment subtree into
-    // the app's eager bundle graph (myne-md/myne#604 follow-up).
     "editor/src/attachments/decoded-aspect.ts": `export function resetDecodedAspects(): void {}\n`,
-    // Leaf modules for the same reason: these hold DECRYPTED attachment
-    // content (cached previews, completed voice-note transcripts), the
-    // teardown paths clear them, and reaching into `widgets.ts` or
-    // `transcript.ts` to do that would put the whole attachment subtree back
-    // into the eager bundle graph.
     "editor/src/attachments/session-caches.ts": `export function resetPreviewCache(): void {}
 export function resetTranscripts(): void {}\n`,
     "src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   clearAgentForLock();
   clearChat();
   clearAiOutput();
+  await invoke("plugin:vault_unlock|vault_lock");
   resetScrollMemory();
   resetRecentNotes();
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
-  await invoke("plugin:vault_unlock|vault_lock");
-}
-`,
-    // Mobile's own lock choke point (its Lock button, its idle auto-lock and its
-    // vault switch all funnel here). It compiles the SAME `@myne/editor`
-    // attachment modules as desktop, so the three shared stores apply to it;
-    // the desktop-only stores under `src/notes/` do not, and the roster answers
-    // that with a stated skip rather than silence.
-    "mobile/src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
-  resetDecodedAspects();
-  resetPreviewCache();
-  resetTranscripts();
-  await invoke("plugin:vault-unlock|lock");
+  resetDateTimeDisplayForLock();
 }
 `,
     "src/lib/vault-switch.ts": `export async function leaveActiveVault(deps: {
@@ -195,12 +316,33 @@ export function resetTranscripts(): void {}\n`,
   clearChat();
   clearAiOutput();
   resetSessionIgnored();
+  await lockVault();
   resetScrollMemory();
   resetRecentNotes();
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
-  await lockVault();
+  resetDateTimeDisplayForLock();
+}
+`,
+    // Mobile (myne-md/myne#456). One choke point, and the background listener,
+    // both reaching the agent teardown through the wrapper that also cancels
+    // the host-side run.
+    "mobile/src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
+  endAgentRun("lock", "");
+  await invoke("plugin:vault-unlock|lock");
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
+  resetDateTimeDisplayForLock();
+}
+`,
+    "mobile/src/app/flows/EditorFlow.tsx": `const flushAll = () => {
+  endAgentRun("background", notice);
+};
+`,
+    "mobile/src/lib/agent-lifetime.ts": `export function endAgentRun(): void {
+  clearAgentForLock();
 }
 `,
   };
@@ -344,52 +486,6 @@ describe("check-frontend-lock-teardown: the cross product", () => {
     expect(errors[1]).toContain("leaveActiveVault does not call clearChat()");
   });
 
-  it("names the two session stores that shipped with reset functions nobody called", () => {
-    // `resetScrollMemory` (myne-md/myne#600) and `resetRecentNotes` (#601) were
-    // both written, exported, and wired to nothing: `check-unwired.mjs` cannot
-    // see them, because it asks whether a MODULE has an importer and both
-    // modules have several, for their other exports. Asserted on both paths, so
-    // dropping either call on either path is named on its own.
-    const files = healthyFiles();
-    for (const f of ["src/lib/vault-unlock.ts", "src/lib/vault-switch.ts"]) {
-      files[f] = files[f]
-        .replace("  resetScrollMemory();\n", "")
-        .replace("  resetRecentNotes();\n", "");
-    }
-    const errors = run(files);
-    expect(errors).toHaveLength(4);
-    expect(errors.some((e) => e.includes("lockVault does not call resetScrollMemory()"))).toBe(true);
-    expect(errors.some((e) => e.includes("lockVault does not call resetRecentNotes()"))).toBe(true);
-    expect(
-      errors.some((e) => e.includes("leaveActiveVault does not call resetScrollMemory()")),
-    ).toBe(true);
-    expect(
-      errors.some((e) => e.includes("leaveActiveVault does not call resetRecentNotes()")),
-    ).toBe(true);
-  });
-
-  it("names each attachment store this branch put on the roster, on each path", () => {
-    // The three entries the aspect/preview/transcript work added. The two above
-    // had an injection case and these did not, which is the shape the root
-    // CLAUDE.md calls out by name: a guard whose new rows rest on the generic
-    // cross-product being right rather than on anything having watched them
-    // fire. Two of the three hold DECRYPTED note content (up to 24 cached file
-    // previews, and the text of every completed voice-note transcription), so
-    // they are the half of the roster where a silent miss costs the most.
-    const calls = ["resetDecodedAspects", "resetPreviewCache", "resetTranscripts"];
-    const paths = ["src/lib/vault-unlock.ts", "src/lib/vault-switch.ts"];
-    for (const call of calls) {
-      for (const path of paths) {
-        const files = healthyFiles();
-        files[path] = files[path].replace(`  ${call}();\n`, "");
-        const errors = run(files);
-        const leaving = path.endsWith("vault-unlock.ts") ? "lockVault" : "leaveActiveVault";
-        expect(errors, `${call} dropped from ${leaving}`).toHaveLength(1);
-        expect(errors[0]).toContain(`${leaving} does not call ${call}()`);
-      }
-    }
-  });
-
   it("rejects a skip that gives no reason", () => {
     const errors = analyse({
       files: healthyFiles(),
@@ -399,17 +495,19 @@ describe("check-frontend-lock-teardown: the cross product", () => {
           call: "resetSessionIgnored",
           declaredIn: "editor/src/decorations/spell.ts",
           holds: "the session's ignored-word set",
-          // Keyed on the path's ID, not its function name: two leaving paths
-          // are both called `lockVault` (desktop's and mobile's), so a name
-          // would skip one of them by accident.
+          // Ids, not function names. Both clients call their choke point
+          // `lockVault`, so a name-keyed roster could not tell them apart and a
+          // skip for one would silently excuse the other.
           appliesTo: ["desktop-switch"],
-          skips: { "desktop-lock": "not needed", "mobile-lock": "not needed" },
+          skips: { "desktop-lock": "not needed" },
         },
       ],
     });
-    expect(errors).toEqual([
+    // Only the desktop lock path is reported: it is the one whose reason is too
+    // short. The other three are reported too, since this cut-down roster gives
+    // them no reason at all.
+    expect(errors).toContain(
       "resetSessionIgnored does not apply to desktop-lock and gives no reason",
-      "resetSessionIgnored does not apply to mobile-lock and gives no reason",
-    ]);
+    );
   });
 });

@@ -3,11 +3,21 @@
 # this as an `InlinedPlugin`. Capability files reference these as
 # `importer:default` (or `importer:allow-<cmd>`).
 #
-# These two commands are the ONLY path by which the WebView reads an external
-# (Obsidian vault) directory. No `fs:allow-read-text-file` / `fs:read-dir` /
-# read `fs:scope` is granted — the narrow, path-validating seam replaces it
-# (least-privilege, TB6). Adding a command here without a matching `build.rs`
-# `InlinedPlugin::commands` entry is a security regression.
+# TWO KINDS OF COMMAND LIVE HERE, and this comment used to describe only the
+# first. `import_read_dir` and `import_read_file` are the ONLY path by which the
+# WebView reads an external (Obsidian vault) directory. No
+# `fs:allow-read-text-file` / `fs:read-dir` / read `fs:scope` is granted — the
+# narrow, path-validating seam replaces it (least-privilege, TB6). Those two
+# touch no vault crypto.
+#
+# The `import_source_*` commands (myne-md/myne#464) do. They open a SECOND local
+# vault read-only through a non-Unlocked slot, run Argon2id, open AEAD blobs and
+# write re-sealed attachments into the target. Their descriptions below carry
+# the per-command detail; the point of saying it here is that "the importer
+# plugin touches no vault crypto" is no longer a true sentence to reason from.
+#
+# Adding a command here without a matching `build.rs` `InlinedPlugin::commands`
+# entry is a security regression.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -17,7 +27,18 @@ permissions = [
     "allow-import-read-dir",
     "allow-import-read-file",
     "allow-import-set-hold",
+    "allow-import-source-open",
+    "allow-import-source-close",
+    "allow-import-source-list-notes",
+    "allow-import-source-read-note",
+    "allow-import-source-reseal-attachment",
+    "allow-import-source-merge-dictionary",
 ]
+
+[[permission]]
+identifier = "allow-import-source-merge-dictionary"
+description = "Allow invoking importer:import_source_merge_dictionary (read the SOURCE vault's ADDED dictionary words through its open import slot and union them into the TARGET vault's personal dictionary, in one call and one persist). The vault-wide IGNORE set is not carried and there is no parameter that would carry it: an ignore decision is vault-scoped, so importing another vault's would silently change spell-check on target notes the import never touched. Refuses when the target's own dictionary has not been read this session, rather than overwriting it with a set built from the source alone. Returns how many words were NEW, which a per-word loop could not report."
+commands.allow = ["import_source_merge_dictionary"]
 
 [[permission]]
 identifier = "allow-import-read-dir"
@@ -33,3 +54,29 @@ commands.allow = ["import_read_file"]
 identifier = "allow-import-set-hold"
 description = "Allow invoking importer:import_set_hold (take or drop a 60-second renewable lease that DEFERS the idle auto-lock while an import is running). It does not touch the idle clock, so idle keeps accumulating and the vault locks as soon as the lease lapses — an import postpones the lock, it cannot cancel one."
 commands.allow = ["import_set_hold"]
+
+[[permission]]
+identifier = "allow-import-source-open"
+description = "Allow invoking importer:import_source_open (derive a SOURCE vault's keys from its master password or recovery phrase into a read-only, non-Unlocked slot for the length of a vault import). It is not an unlock: editor commands match Slot::Unlocked and reject this variant at compile time, SYNC-1's at-most-one-Unlocked invariant is untouched, the derivation takes the shared capacity-1 auth permit so the Argon2id peak stays at one, and the slot is dropped by an explicit close, by a TTL that is independent of the importer's auto-lock hold, or by vault teardown."
+commands.allow = ["import_source_open"]
+
+[[permission]]
+identifier = "allow-import-source-close"
+description = "Allow invoking importer:import_source_close (drop a source vault's read-only key slot and zeroize it). Idempotent, so the frontend calls it on every exit path without tracking whether one is open."
+commands.allow = ["import_source_close"]
+
+[[permission]]
+identifier = "allow-import-source-list-notes"
+description = "Allow invoking importer:import_source_list_notes (list a source vault's note ids during a vault import). Ids only, no decryption, and gated on an open import slot for that vault so a caller cannot enumerate an arbitrary vault's notes by guessing a VaultId."
+commands.allow = ["import_source_list_notes"]
+
+[[permission]]
+identifier = "allow-import-source-read-note"
+description = "Allow invoking importer:import_source_read_note (decrypt ONE note from a source vault and return its plaintext markdown). Gated on an open import slot for that vault; branches on the NC05 magic before the MY01 decode so a migrated source reads through the CRDT bridge; one note's body at a time, never written to disk."
+commands.allow = ["import_source_read_note"]
+
+[[permission]]
+identifier = "allow-import-source-reseal-attachment"
+description = "Allow invoking importer:import_source_reseal_attachment (decrypt ONE attachment from a source vault and re-seal it under the target vault's keys). Runs entirely host-side, so the decrypted file never crosses IPC. Copies filename and created_at from the source catalog row; keeps the MIME allowlist re-sniff so a type the allowlist has since narrowed away is a reported rejection rather than a silent drop; skips ingest re-compression because the bytes are already a Myne vault's canonical bytes. The target id falls out of the target vault's own root_key-keyed HMAC, so dedup against what the target already holds is automatic."
+commands.allow = ["import_source_reseal_attachment"]
+
