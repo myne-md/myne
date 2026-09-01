@@ -417,7 +417,7 @@ impl RemoteProvider {
         // excerpts, up to 6000 characters of decrypted plaintext, which is why
         // it is held under `Zeroizing`. Myne was therefore asking OpenRouter to
         // RETAIN the user's note text as a cache prefix, which is precisely the
-        // request `design-notes/ai/0543` argues it does not make.
+        // request `design-notes/ai/0555` argues it does not make.
         //
         // The test that was supposed to bound this asserted a property about
         // turn ROLE ("no user or assistant turn carries a marker") and the
@@ -1279,7 +1279,7 @@ mod tests {
     /// `rag::assemble_grounding_system` fills it with retrieved note excerpts,
     /// up to 6000 characters of decrypted plaintext. So Myne was asking
     /// OpenRouter to retain the user's note text as a cache prefix, which is the
-    /// one request `design-notes/ai/0543` argues it does not make.
+    /// one request `design-notes/ai/0555` argues it does not make.
     ///
     /// The test that was meant to bound it asserted "no USER or ASSISTANT turn
     /// carries a marker" and passed on the defect, because the note content was

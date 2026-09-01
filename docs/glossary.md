@@ -110,7 +110,7 @@ Used in: `decisions.md` 2026-08-16
 
 ### **agentic note editing** &nbsp; 📦 *Product*
 
-The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Three verbs, edit a note body, append to a note body and create a note (the [append verb](#append-verb) was added by myne-md/myne#616); deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. **Moving a note is the exception, and it is refused rather than merely visible**: the [folder lock](#folder-lock) compares the note's folder before and after every agent write and rejects any that changes it, under both approval labels, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0542`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
+The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Three verbs, edit a note body, append to a note body and create a note (the [append verb](#append-verb) was added by myne-md/myne#616); deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. **Moving a note is the exception, and it is refused rather than merely visible**: the [folder lock](#folder-lock) compares the note's folder before and after every agent write and rejects any that changes it, under both approval labels, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0554`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -134,7 +134,7 @@ The third verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#61
 
 Two rules keep it from becoming a frontmatter writer, and both are about the RESULT rather than the input. The text is positioned after the note's frontmatter block rather than at the end of the raw file, so in a note that has one, appended text can never be the first line. And an append that would give the note a frontmatter block it did not have is refused outright, which closes the case positioning alone does not: a note whose body merely BEGINS with `---` has an opener nothing closed, and an ordinary `---` separator in the appended text would close it and turn the user's own first lines into frontmatter.
 
-Used in: `decisions/ai/0542`
+Used in: `decisions/ai/0554`
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -211,7 +211,7 @@ A [`vault.attachments`](#vaultattachments) entry whose optional `deleted_at` fie
 
 ### **attachment embed** &nbsp; 📦 *Product* *(Myne-divergent: yes; no Obsidian counterpart)*
 
-The Myne form for embedding an encrypted [attachment](#attachment) in a note, `spec/wikilink.md` §2 **form 12**: `![[att:<attachment-id-hex>|filename]]`, historically called **form C**. The `att:` scheme prefix routes resolution to the `vault.attachments` catalog rather than the note index, and the remainder must be a 64-character lowercase-hex [attachment-id](#attachment-id); a prefix with an invalid id is not an attachment embed and degrades to an ordinary embed chip rather than erroring. It renders as an ATOMIC widget with no source-lift, so the caret never enters it and the `att:` target is never exposed as editable text: a user cannot hand-write or hand-edit one inside Myne, and every authoring affordance emits it instead. What it renders as is a serve-time decision (inline image, PDF reader, audio or video player, file card, or a tombstone for an id the catalog cannot resolve), not an ingest gate. It may carry [embed layout segments](#embed-layout-segment). On an attachments-included export it is rewritten to a plain wikilink embed naming the exported file, carrying its layout segments in Obsidian’s own spelling where one exists, so it never reaches Obsidian in this form.
+The Myne form for embedding an encrypted [attachment](#attachment) in a note, `spec/wikilink.md` §2 **form 12**: `![[att:<attachment-id-hex>|filename]]`, historically called **form C**. The `att:` scheme prefix routes resolution to the `vault.attachments` catalog rather than the note index, and the remainder must be a 64-character lowercase-hex [attachment-id](#attachment-id); a prefix with an invalid id is not an attachment embed and degrades to an ordinary embed chip rather than erroring. It renders as an ATOMIC widget with no source-lift, so the caret never enters it and the `att:` target is never exposed as editable text: a user cannot hand-write or hand-edit one inside Myne, and every authoring affordance emits it instead. What it renders as is a serve-time decision (inline image, PDF reader, audio or video player, file card, or a tombstone for an id the catalog cannot resolve), not an ingest gate. **Where** it renders is a second serve-time decision with the same shape: an embed alone on its line, whitespace aside, is drawn as a whole-line BLOCK, and one sharing a line with prose stays inline. Every insert path Myne owns writes it onto a line of its own, so the block is the form a user meets; an embed already written mid-line, by an import or by hand, is never moved (myne-md/myne#604). It may carry [embed layout segments](#embed-layout-segment), which the block form can also author by drag. On an attachments-included export it is rewritten to a plain wikilink embed naming the exported file, carrying its layout segments in Obsidian’s own spelling where one exists, so it never reaches Obsidian in this form.
 
 Used in: `spec/wikilink.md` §2 form 12, §2.1, §5.1; `spec/markdown-dialect.md` §6
 
@@ -927,7 +927,7 @@ The host-side rule that no [agent run](#agent-run) write may change which [folde
 
 The reason it is a refusal rather than a line in the diff: the folder is what `ai_excluded_folders` is keyed on, so a move is the one edit that can change which notes a LATER run may read. A user approving a diff is judging the text in front of them, not re-deriving an exclusion set from it. It covers `folder:` and nothing else, deliberately, because a blanket frontmatter lock would silently withdraw the agent's ability to archive.
 
-Used in: `decisions/ai/0542`, `threat-model.md` §7
+Used in: `decisions/ai/0554`, `threat-model.md` §7
 
 ### **folder note** &nbsp; 📦 *Product*
 
@@ -1032,7 +1032,7 @@ Used in: `threat-model.md` §1 (A10 discussion)
 
 ### **embed layout segment** &nbsp; 📦 *Product* *(Myne-divergent: yes; keyed segments, and `align=` has no Obsidian counterpart)*
 
-An author's size, alignment or alt-text choice for one embedded attachment, written as an extra **keyed** segment on the form-C [attachment embed](#attachment-embed) (`![[att:<id>|photo.png|w=300|align=center|alt=A sunset]]`; `spec/wikilink.md` §2 form 12 / §5.1, myne#409). The closed vocabulary is `w` (`1..8192` px or `1..100%`), `h` (`1..8192` px), `align` (`left`/`center`/`right`) and `alt` (free text). Three rules bind: **segment 1 is always the filename**, and from segment 2 on an unkeyed segment rejoins it with its `|` (an attachment filename may itself contain a pipe, so a positional reading would corrupt notes already on disk); **`alt=` is terminal**, swallowing the rest of the embed so alt prose may contain pipes, with an authored-EMPTY `alt=` meaning a deliberately decorative image; and an unreadable segment is **dropped without rewriting the note's bytes**, reported to the author when a known key carried a bad value and passed over silently when the key itself is unknown (an unknown key is a newer client's choice read by an older one, not an error the reader can act on). A width is a **maximum intent**: render clamps it to the editor's content column, which is itself a user preference. Segments are authored only through the embed's overflow menu, never typed, because the embed is atomic and never source-lifts. On an attachments-included export a pixel `w` becomes Obsidian's own `|300` / `|300x200` spelling and the rest travels through; `align` is a Myne extension Obsidian has no core syntax for.
+An author's size, alignment or alt-text choice for one embedded attachment, written as an extra **keyed** segment on the form-C [attachment embed](#attachment-embed) (`![[att:<id>|photo.png|w=300|align=center|alt=A sunset]]`; `spec/wikilink.md` §2 form 12 / §5.1, myne#409). The closed vocabulary is `w` (`1..8192` px or `1..100%`), `h` (`1..8192` px), `align` (`left`/`center`/`right`) and `alt` (free text). Three rules bind: **segment 1 is always the filename**, and from segment 2 on an unkeyed segment rejoins it with its `|` (an attachment filename may itself contain a pipe, so a positional reading would corrupt notes already on disk); **`alt=` is terminal**, swallowing the rest of the embed so alt prose may contain pipes, with an authored-EMPTY `alt=` meaning a deliberately decorative image; and an unreadable segment is **dropped without rewriting the note's bytes**, reported to the author when a known key carried a bad value and passed over silently when the key itself is unknown (an unknown key is a newer client's choice read by an older one, not an error the reader can act on). A width is a **maximum intent**: render clamps it to the editor's content column, which is itself a user preference. Segments are never typed, because the embed is atomic and never source-lifts. There are two authoring paths, both of which write through the same one function: the embed's overflow menu (the size presets, a custom size prompt, the alignment and alt rows), and dragging the resize handles on a [block-drawn](#attachment-embed) embed, which writes `w=` from the right edge and `w=` plus `h=` from the corner grip (myne-md/myne#604). On an attachments-included export a pixel `w` becomes Obsidian's own `|300` / `|300x200` spelling and the rest travels through; `align` is a Myne extension Obsidian has no core syntax for.
 
 Used in: `spec/wikilink.md` §2, §5.1; `spec/markdown-dialect.md` §6, §7; `decisions.md` 2026-08-15
 
@@ -1116,11 +1116,15 @@ Used in: `self-host-policy.md` §3, `decisions.md` 2026-06-20 (MYND-438)
 
 ### **inline status mark** &nbsp; 📦 *Product*
 
-A glyph that sits **inside a text run** to say what a surface owes: the trailing slot of a sidebar note row, the bottom bar beside the save readout. It is a distinct class from an **icon**, which names a thing, and `docs/design/README.md` carves three of the icon rules out for it rather than bending them: it is 7 to 8px rather than 16 and up, it is coloured by MEANING (`--accent` while work is in flight, `--fg-3` while it is merely outstanding) rather than by `currentColor`, and it is drawn as a three-sided border ring rather than from the Lucide set, because at that size no Lucide pair distinguishes a filled dot from a hollow one and the GAP is what carries "incomplete" while the glyph stands still.
+A named icon that sits **inside a text run** to say what a surface owes: the trailing slot of a sidebar note row, the bottom bar beside the save readout. It is a distinct class from an ordinary **icon**, which names a thing, and `docs/design/README.md` carves two of the icon rules out for it rather than bending them: it is drawn at 12px rather than 16 and up, because at 16 in a row's trailing slot it reads as a badge attached to the note rather than as a mark on it; and it is coloured by MEANING (`--accent` while work is in flight, `--fg-3` while it is merely outstanding) rather than by `currentColor`.
 
-The class exists so a second member argues for itself against the same rules rather than re-deciding them. Today it has exactly one: [sync arc](#sync-arc). A mark is never a live region. It has no text content, so `role="status"` on it announces nothing, and the surface renders a persistently-mounted visually-hidden region beside it instead.
+The class used to carve out a third rule, hand-drawn geometry at 7 to 8px, on the argument that no Lucide pair distinguishes a filled dot from a hollow one at that size. The premise held and the conclusion did not: what shipped under it was a three-quarter ring that read as a stalled spinner, and then a solid triangle that read as a bullet point down a column of rows. The answer to "no glyph is legible at 7px" is not a cleverer glyph but a larger one (myne-md/myne#603).
 
-Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`
+Two rules govern which mark is which. **One shape per fact**: two facts may not share a glyph, which is the report that created this class in the first place. **Motion is a state, never a shape**: rotation is shown only for work that ends, and two states are never told apart by rotation alone, since a distinction visible only to someone watching the screen is not a distinction.
+
+A mark is never a live region. It has no text content, so `role="status"` on it announces nothing, and the surface renders a persistently-mounted visually-hidden region beside it instead.
+
+Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx` (`StatusMark`)
 
 ### **inline tag** &nbsp; 📦 *Product*
 
@@ -1404,7 +1408,7 @@ Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **conversational AI chat** &nbsp; 📦 *Product*
 
-The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history to the ASK model; a run's task was addressed to a different loop, under a scope this call knows nothing about. The reverse direction is not symmetric and changed on 2026-08-30: an [agent run](#agent-run) IS seeded with the visible transcript, under a [chat history budget](#chat-history-budget), so a follow-up can refer to the answer before it (`decisions/ai/0541`). History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
+The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history to the ASK model; a run's task was addressed to a different loop, under a scope this call knows nothing about. The reverse direction is not symmetric and changed on 2026-08-30: an [agent run](#agent-run) IS seeded with the visible transcript, under a [chat history budget](#chat-history-budget), so a follow-up can refer to the answer before it (`decisions/ai/0553`). History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
 
 ### **streaming token channel** &nbsp; 📋 *Protocol*
 
@@ -1418,7 +1422,7 @@ A character count rather than a turn count, deliberately: the request is re-sent
 
 Its canonical key sorts after `auto_lock_seconds`, which is a format requirement and not a naming preference: see `protocol.md` §9.5.2 on why a new prefs key inside the prefix-matched run silently blinds every field behind it in an older client.
 
-Used in: `decisions/ai/0541`, `protocol.md` §9.5.2, `threat-model.md` TB12, TB13, §7
+Used in: `decisions/ai/0553`, `protocol.md` §9.5.2, `threat-model.md` TB12, TB13, §7
 
 ### **chat citation** &nbsp; 📦 *Product*
 
@@ -1782,7 +1786,7 @@ The `cache_control` field Myne attaches to the SYSTEM turn of an OpenRouter requ
 
 **A posture change rather than a boundary change.** A17 puts the provider operator's retention outside anything this threat model constrains, so the same bytes reach the same party either way. What is new is that Myne is now ASKING for retention rather than merely accepting whatever happens, and that is the part a reader deciding whether to trust the feature would want on the record. Ollama receives no marker: it serves the model directly and models no prefix cache.
 
-Used in: `decisions/ai/0543`, `threat-model.md` TB13
+Used in: `decisions/ai/0555`, `threat-model.md` TB13
 
 ### **proposed edit** &nbsp; 📦 *Product*
 
@@ -2085,6 +2089,22 @@ The one assertion suite that pins the behaviour of the [platform seam](#platform
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
 
+### **save readout** &nbsp; 📦 *Product*
+
+The bottom-bar line that says what the current window owes the open note (myne-md/myne#566, reshaped by myne-md/myne#603). Five states, each with its own glyph, so the state is readable without reading the words:
+
+- **`Saved · N min ago`**: a solid dot. Settled, nothing owed.
+- **`Editing…`**: `circle-dashed`, still. Written and not yet saved: autosave is armed. The state a whole writing session is spent in, which is why it does not move.
+- **`Saving…`**: `loader-circle`, turning, in `--accent`. A disk write, which ends.
+- **`Resolving edit conflict…`**: the same turning `loader-circle`. A conflict copy is being written; it also ends.
+- **`Save failed · Retry`**: a cross, in `--warning`, with a retry control.
+
+It carried a **sixth, unrelated** fact until #603: whether the note had reached the server. That was drawn with the same glyph as `Editing…`, a pixel to its right, so the readout showed two identical grey marks meaning two different things. Sync debt is its own axis and has its own icon, the [unsynced mark](#unsynced-mark).
+
+Three of the five are [inline status marks](#inline-status-mark); `Saved` and `Save failed` are not, because neither is a degree of progress.
+
+Used in: `src/components/Spinner.tsx`, `src/notes/components/SaveStatus.tsx`
+
 ### **search index** &nbsp; 📦 *Product*
 
 Myne's full-text search over note content (MYND-29). A custom in-memory **BM25 inverted index** (AND-of-terms with a last-term prefix match for type-ahead, plus a title-boost) built from decrypted note plaintext while the vault is unlocked, queried in RAM, and persisted as the encrypted `vault.search` blob. Index-side, each note's language is detected (whatlang, EN/TR/DE) and single-stemmed (the raw token is always indexed too); query-side, terms are multi-stemmed across all supported languages (the query is too short to detect a language) — a deliberate index/query asymmetry. The index is **plaintext-derived RAM**, as sensitive as the open notes: zeroized on lock (`threat-model.md` A6), and never the source of truth (the `.myn` files are). Engine choice sits behind a swappable trait; the MYND-29 benchmark (`decisions.md` 2026-05-31) selected the custom engine over tantivy on the budget table. See also [search-index-key](#search-index-key), [fall-to-rebuild](#fall-to-rebuild).
@@ -2348,17 +2368,9 @@ Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships m
 
 Used in: `threat-model.md` §1 (A8), §7
 
-### **sync arc** &nbsp; 📦 *Product*
+### **sync arc** &nbsp; 📦 *Product* *(retired 2026-08-29; see decisions.md)*
 
-The three-state glyph that says whether Myne owes the note anything (myne-md/myne#566). One shape vocabulary in two places: beside the save readout in the bottom bar, and trailing an unsynced row in the sidebar.
-
-- **solid dot**: settled. Nothing is owed.
-- **static arc**: outstanding, and nothing is moving on it. An edit waiting on a device that is offline is this, and so is text waiting on the autosave debounce.
-- **rotating arc**: in flight, and bounded. A disk write, a push. Never a state a user can sit in, because `docs/design/README.md` bans looping animation and a calm product does not spin at someone while they write.
-
-The gap in the ring is what carries "incomplete" while the arc stands still, which is what a 6px filled dot and a 6px hollow one could not do: at that size they are the same glyph. Two independent facts drive it and are deliberately not merged. Whether the marker is SHOWN comes from the note's own sync debt, and whether it TURNS comes from whether the device is moving bytes this second. Rotating on the first alone would claim work is in flight whenever a laptop is shut.
-
-Used in: `src/components/Spinner.tsx`, `src/notes/components/SaveStatus.tsx`, `src/notes/components/NoteRow.tsx`
+*Retired by myne-md/myne#603. It named one glyph doing two jobs: what the current window owed a note, and whether that note had reached the server. Drawn as a three-quarter ring at 7 to 8px, it did neither legibly, and on the `Editing…` readout it drew both facts as two identical marks a pixel apart. The two facts now have their own names and their own icons, the [save readout](#save-readout) and the [unsynced mark](#unsynced-mark). Preserved for audit trail.*
 
 ### **sync cursor** &nbsp; 📋 *Protocol*
 
@@ -2449,7 +2461,7 @@ Used in: `spec/markdown-dialect.md` §3.9.4; `decisions.md` 2026-07-28; MYND-617
 
 ### **task reminder** &nbsp; 📦 *Product*
 
-A nudge at a chosen moment for a [line-task](#line-task) carrying a [`remind`](#remind) field (MYND-618). Delivered in **two layers**: an in-app layer while Myne is open, and — on platforms that hold such registrations — an OS **pre-registration** layer so one can fire while Myne is closed.
+A nudge at a chosen moment for a [line-task](#line-task) carrying a [`remind`](#remind) field (MYND-618). Delivered in **two layers**: an in-app layer while Myne is open and unlocked, and, on platforms that hold such registrations, an OS **pre-registration** layer so one can fire while Myne is closed. **The second layer ships on no client today** (myne-md/myne#508): the desktop has no OS adapter, and mobile's registration pass has no production caller. Everything below describes it because both are one wiring change away, not because either performs it now.
 
 **Locking does not cancel the registered set**, which is an explicit departure from the rule that every plaintext surface is torn down on every lock path, recorded in `decisions.md` 2026-07-28. The rule protects vault *content*; what the platform holds here is a timestamp and a content-free string. It is also barely a choice: the default auto-lock is five minutes with no off switch, so cancelling on lock would end reminders five minutes after the user stops typing.
 
@@ -2459,11 +2471,13 @@ Used in: `threat-model.md` §7; `decisions.md` 2026-07-28; MYND-618
 
 ### **registration horizon** &nbsp; 📦 *Product*
 
-How far ahead a device hands pending [task reminders](#task-reminder) to its operating system. Device-local and user-adjustable; Myne's default is seven days.
+How far ahead a device hands pending [task reminders](#task-reminder) to its operating system. Device-local and user-adjustable; Myne's default is seven days, and it is also the longest a client offers.
 
 ***A privacy bound before a resource one.*** Pending reminder **times** leave the AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7), so a shorter horizon exposes less. Its consequence is **stated rather than discovered**: reminders stop if Myne is not opened within the horizon, because registration can only happen inside an unlocked session — so the UI shows the date through which reminders are currently registered.
 
-Used in: `spec/protocol.md` §9.5.2; `threat-model.md` §7; `decisions.md` 2026-07-28
+**It bounds the in-app tier too, which is the only tier that ships today** (myne-md/myne#508). Where no operating system holds the registration, the horizon is the window the *running app* arms timers within: the same set, decided by the same `targetReminders` cutoff, delivered by the app rather than the platform. So it is a delivery bound on a client that holds no OS registration and a privacy bound on one that does, and only the second tier renders the "registered through \<date\>" line. That distinction is why the offered horizons are all **shorter** than the default rather than longer: the privacy reading is the one a user is entitled to act on, and widening the window is a `threat-model.md` §7 change rather than a preference.
+
+Used in: `spec/protocol.md` §9.5.2; `threat-model.md` §7; `decisions.md` 2026-07-28, 2026-08-29
 
 ### **reminder registration** &nbsp; 📦 *Product*
 
@@ -2471,7 +2485,7 @@ One [task reminder](#task-reminder) as the operating system holds it: an **opaqu
 
 ***The identifier is opaque on purpose, and that is a Myne-divergent choice.*** The client's own key for a reminder names where the task lives, which is the right key for reconciling a set and the wrong thing to hand a platform: a registration is written into the operating system's own persistence — and on Android into a pending intent — where a note identifier would be correlatable metadata outside the AEAD envelope. So what crosses is random bytes minted per registration, and the mapping back to a task is held **in memory only**. The cost is accepted rather than hidden: a new session cannot name the previous one's registrations, so it clears and re-registers them.
 
-**Who holds the set differs by platform.** iOS keeps it entirely in OS-owned storage. Android exposes no way to enumerate an app's alarms, so the client also keeps a device-local `{identifier → instant}` record — same content as the OS would hold, different holder, and it is what makes a registration survive the reboot that drops every alarm.
+**Who holds the set differs by platform**, on the client that will hold one: no shipping build registers with an operating system today (see [task reminder](#task-reminder), myne-md/myne#508), so the set is empty everywhere and what follows describes the shape it takes when a pass fills it. iOS keeps it entirely in OS-owned storage. Android exposes no way to enumerate an app's alarms, so the client also keeps a device-local `{identifier → instant}` record — same content as the OS would hold, different holder, and it is what makes a registration survive the reboot that drops every alarm.
 
 Used in: `threat-model.md` §7; `decisions.md` 2026-07-29; MYND-619
 
@@ -2647,9 +2661,9 @@ Used in: `decisions.md` 2026-08-06; `spec/protocol.md` §9.21
 
 The `provider.sort = throughput` field on every OpenRouter request (myne-md/myne#620), including ordinary chat as well as [agent runs](#agent-run). OpenRouter is a broker that forwards to model vendors, so "who receives this" is a set Myne can bound only at its first hop; the `provider` object is the one surface Myne has over the second hop, and this is Myne starting to use it.
 
-**The criterion expressed is speed, and no data-handling term is expressed. That is a choice rather than an absence.** The broker's routing object does carry one, `data_collection`, which routes only to vendors that do not store or train on prompts, alongside `only` and `ignore` for explicit vendor pinning. Myne adopted the field about speed and declined that one. Whether to set `data_collection: deny` is an open product decision recorded in `decisions/ai/0543`: it narrows the recipient set on the axis this project cares about most, and it narrows it enough that a given model may have no qualifying vendor, which turns a privacy default into a feature that intermittently fails. What it buys is measured (a run served at 9 to 22 tokens per second where 150 would have been 63 seconds instead of 792); what it costs is that the set of possible recipients is now influenced by Myne rather than left to the broker's default.
+**The criterion expressed is speed, and no data-handling term is expressed. That is a choice rather than an absence.** The broker's routing object does carry one, `data_collection`, which routes only to vendors that do not store or train on prompts, alongside `only` and `ignore` for explicit vendor pinning. Myne adopted the field about speed and declined that one. Whether to set `data_collection: deny` is an open product decision recorded in `decisions/ai/0555`: it narrows the recipient set on the axis this project cares about most, and it narrows it enough that a given model may have no qualifying vendor, which turns a privacy default into a feature that intermittently fails. What it buys is measured (a run served at 9 to 22 tokens per second where 150 would have been 63 seconds instead of 792); what it costs is that the set of possible recipients is now influenced by Myne rather than left to the broker's default.
 
-Used in: `decisions/ai/0543`, `threat-model.md` TB13
+Used in: `decisions/ai/0555`, `threat-model.md` TB13
 
 ### **threat model** &nbsp; ⚠️ *Threat*
 
@@ -2714,6 +2728,16 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-17 (MYND-348)
 ### **unused attachment** &nbsp; 📋 *Protocol*
 
 An [attachment](#attachment) referenced by **zero live notes** — either orphaned (its referencing note(s) deleted) or never inserted (imported into the library but not yet embedded). It stays in the [`vault.attachments`](#vaultattachments) catalog and visible in the library (Myne is library-first; `protocol.md` §9.10 keeps metadata after note deletion); it is **never** auto-deleted. The only thing that removes it is the explicit user-triggered "Clean unused attachments" sweep, which recomputes the zero-reference set authoritatively (scanning every note, fail-closed) and cryptographically erases the confirmed set. Distinct from a [stray attachment file](#stray-attachment-file) (catalog-less crash remnant). (MYND-171; `decisions.md` 2026-06-13)
+
+### **unsynced mark** &nbsp; 📦 *Product*
+
+The [inline status mark](#inline-status-mark) that says a note's current bytes have not reached the server: `cloud-off`, a cloud with a corner-to-corner slash, at the trailing edge of a sidebar note row and after the [save readout](#save-readout) in the bottom bar (myne-md/myne#603).
+
+It **depicts the sentence**, and after three attempts that is the whole of the lesson. It was a hollow 6px ring, which at that size is the same glyph as a dot. It became the save readout's own three-quarter arc, which put two identical grey marks a pixel apart on the `Editing…` readout meaning two different things. It became a solid 8px triangle, which was at least distinct and depicted nothing, so down a column of sidebar rows it read as a bullet point. Each of the three was hand-drawn geometry small enough to be unlearnable; the fix was a named icon at a size where an icon works.
+
+It **never moves and is never `--accent`**, unlike the readout's own marks. There is no bounded in-flight variant of it to express: a note can sit unsynced for a week on a machine that is shut, so motion and the accent colour both stay with the save readout, where the work ends.
+
+Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`, `src/notes/components/NoteRow.tsx`, `src/notes/components/SaveStatus.tsx`
 
 ### **UUIDv4** &nbsp; 📋 *Protocol*
 

@@ -75,8 +75,11 @@ describe("insertEmbedsForOutcomes", () => {
       { ok: true, attachment: imported(ID_B, "b.png") },
     ];
     insertEmbedsForOutcomes(view, outcomes, 1);
+    // Each embed on a line of its own, including the first (myne-md/myne#604):
+    // the cursor sits after `X`, so the insert breaks the line rather than
+    // leaving the embed inside that prose.
     expect(view.state.doc.toString()).toBe(
-      `X![[att:${ID_A}|a.png]]\n![[att:${ID_B}|b.png]]`,
+      `X\n![[att:${ID_A}|a.png]]\n![[att:${ID_B}|b.png]]`,
     );
     view.destroy();
   });

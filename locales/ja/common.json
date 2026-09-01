@@ -884,13 +884,15 @@
           "captureFailed": "録音を開始できませんでした。システム設定でマイクへのアクセスを確認してください。",
           "generic": "録音を開始できませんでした。",
           "locked": "ボイスノートを録音するには保管庫のロックを解除してください。",
-          "noInputDevice": "マイクが見つかりません。接続してからもう一度お試しください。"
+          "noInputDevice": "マイクが見つかりません。接続してからもう一度お試しください。",
+          "unsupportedSampleRate": "マイクの録音サンプルレートは Myne が文字起こしできない値です。別の入力デバイスを選ぶか、システムのサウンド設定でサンプルレートを変更してください。"
         },
         "stopError": {
           "captureFailed": "録音に失敗しました。マイクを確認してください。",
           "emptyRecording": "何も録音されませんでした。",
           "generic": "録音を保存できませんでした。",
-          "silentRecording": "録音は無音だったため破棄されました。マイクを確認してください。"
+          "silentRecording": "録音は無音だったため破棄されました。マイクを確認してください。",
+          "unsupportedSampleRate": "マイクの録音サンプルレートは Myne が文字起こしできない値です。何も保存されませんでした。別の入力デバイスを選ぶか、システムのサウンド設定でサンプルレートを変更してください。"
         }
       },
       "widget": {
@@ -936,6 +938,7 @@
             "featureOff": "文字起こしはオフです。設定 → 文字起こし でオンにしてください。",
             "modelLoadFailed": "文字起こしモデルを読み込めませんでした。設定 → 開発者 → AI でカスタムモデルを指定している場合は、そのファイルを確認してください。指定していない場合は、Myneを再インストールすると組み込みのモデルが復元されます。",
             "noModel": "文字起こしモデルが見つかりません。Myneを再インストールすると復元されます。",
+            "tooLong": "この録音は文字起こしするには長すぎます。音声は添付されたままなので、再生はできます。",
             "vaultLocked": "文字起こしするには保管庫のロックを解除してください。"
           },
           "disabledReason": "文字起こしするには 設定 → Developer → AI でAIを有効にしてください。",
@@ -1168,10 +1171,6 @@
       "turnedIntoTemplate": "テンプレートにしました",
       "convertedToNote": "ノートに変換しました",
       "versionHistory": "バージョン履歴",
-      "exportMarkdown": "Markdownとしてエクスポート…",
-      "exportPdf": "PDFとしてエクスポート…",
-      "exportHtml": "HTMLとしてエクスポート…",
-      "exportTxt": "プレーンテキストとしてエクスポート…",
       "trash": "ゴミ箱に移動"
     },
     "codeBlock": {
@@ -2038,10 +2037,6 @@
       "duplicate": "複製",
       "editFilterTitle": "フィルタを編集",
       "emptyState": "ノートはまだありません。",
-      "exportHtml": "HTMLとしてエクスポート…",
-      "exportMarkdown": "Markdownとしてエクスポート…",
-      "exportPdf": "PDFとしてエクスポート…",
-      "exportTxt": "プレーンテキストとしてエクスポート…",
       "favoritesHeading": "お気に入り",
       "icon": "アイコン…",
       "mergeAnyway": "そのまま統合",
@@ -2347,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "デフォルト"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "書き出し…",
+      "txt": "プレーンテキスト"
     }
   },
   "password": {
@@ -3063,6 +3065,9 @@
       "exactLabel": "正確な時刻",
       "exactOn": "オン",
       "horizon": "リマインダーは{{date}}まで登録されています。それまでにMyneを開くと、以降も通知が続きます。",
+      "horizonLabel": "事前にスケジュール",
+      "horizonLabelHelper": "リマインダーはこの日数だけ前に用意されます。届くには Myne が開いていてロック解除されている必要があります。",
+      "horizonInertHelper": "この端末に保存されました。まだ何も読み取っていません。このビルドはタスクリマインダーを配信しません。",
       "label": "タスクのリマインダー",
       "saveError": "設定を保存できませんでした。もう一度お試しください。",
       "showTextAria": "通知にタスクの本文を表示",

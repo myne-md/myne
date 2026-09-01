@@ -19,6 +19,7 @@ import type { ByteRange } from "./types";
 import { parser } from "./lezer/parser";
 import type { PreservedTaskField, TaskFields, TaskInstant } from "./taskFields";
 import type { LineTask } from "./visitors/lineTasks";
+import { TASK_LINE_RE } from "./taskMarker";
 
 /** A byte range to replace and the text to replace it with. */
 export type TaskLineEdit = { range: ByteRange; text: string };
@@ -105,12 +106,38 @@ function stripFieldSpans(line: string, ranges: readonly ByteRange[]): string {
 }
 
 /**
- * The list-marker + checkbox prefix of a task line. Shared by `taskDescription`
- * (which strips it) and `isTaskLine` (which only tests for it), so the two
- * cannot disagree about what counts as a task line — a second regex would drift
- * the first time the marker grammar moved.
+ * The list-marker + checkbox prefix of a task line, plus the run of whitespace
+ * `taskDescription` strips before the description starts. Shared by
+ * `taskDescription` and `isTaskLine`, so the two cannot disagree about what
+ * counts as a task line.
+ *
+ * Built FROM `TASK_LINE_RE` rather than restated. The restated version was lax:
+ * `\\s*` after the checkbox accepts zero whitespace, so `- [ ]foo` passed here
+ * while `@lezer/markdown`'s GFM `TaskList` leaf, which requires the separator,
+ * does not see a task at all. A field written to such a line lands on something
+ * no reader parses as a task (myne-md/myne#593).
  */
-const TASK_LINE_MARKER = /^\s*[-*+]\s*\[[ xX]\]\s*/;
+const TASK_LINE_MARKER = new RegExp(`${TASK_LINE_RE.source}[ \\t]*`);
+
+/**
+ * The same marker for STRIPPING it, where the separator is optional.
+ *
+ * Two different questions, and one shape cannot answer both. Deciding whether a
+ * line IS a task requires the separator, because the parser requires it.
+ * REMOVING the marker runs over text `stripFieldSpans` has already trimmed, so
+ * on a line whose description is empty or was nothing but fields the separator
+ * is gone by the time this runs, and a required one simply fails to match.
+ *
+ * That is not hypothetical: with the required form, `taskDescription("- [ ]
+ * @due(2026-01-01)")` returned the literal `"- [ ]"` instead of `""`, and every
+ * fields-only and every empty task rendered that string in the Tasks panel and
+ * in every `task-query` block, in place of the untitled placeholder. `/due` on a
+ * blank line auto-converts to `- [ ] ` and writes the field, so it is one
+ * documented keystroke away.
+ */
+const TASK_LINE_MARKER_STRIP = new RegExp(
+  `^(\\s*[-*+][ \\t]+)\\[([ xX])\\][ \\t]*`,
+);
 
 /**
  * Whether `line` is a line-task: a list marker followed by a `[ ]` / `[x]`
@@ -139,8 +166,40 @@ export function isTaskLine(line: string): boolean {
  */
 export function taskDescription(line: string, tree?: Tree): string {
   return stripFieldSpans(line, fieldRanges(line, tree))
-    .replace(TASK_LINE_MARKER, "")
+    .replace(TASK_LINE_MARKER_STRIP, "")
     .trim();
+}
+
+/**
+ * Put back the separator the parser requires after `[ ]`, when stripping left a
+ * line that is nothing but its marker.
+ *
+ * `stripFieldSpans` ends by right-trimming, so clearing the last field from a
+ * description-less task takes `- [ ] @due(2026-01-01)` to `- [ ]`. That line has
+ * no separator, so `@lezer/markdown`'s GFM `TaskList` leaf does not see a task
+ * at all and the checkbox disappears.
+ *
+ * Before the marker shapes were consolidated, both repair paths still accepted
+ * it: `isTaskLine` and `flipMarker` each ended in `\s*`, which matches nothing.
+ * They are now built on `TASK_LINE_RE` with its required-separator lookahead, so
+ * the line this writer produced was one that no other writer in the tree could
+ * flip or rewrite: a persisted task silently became prose the task machinery
+ * would not touch again. The bytes were intact, so it was never data loss, and
+ * that is exactly what made it quiet.
+ *
+ * The reachable path is one keystroke: `/due` on a blank line auto-converts to
+ * `- [ ] ` and writes the field, and clearing that field again is the trigger.
+ *
+ * Restoring the space rather than refusing the write is the right half to fix.
+ * The user asked for the field to go; the separator is the parser's requirement,
+ * not their content.
+ */
+function restoreTaskSeparator(rewritten: string): string {
+  const marker = TASK_LINE_MARKER_STRIP.exec(rewritten);
+  if (marker === null) return rewritten;
+  // Already carries the separator, or has a description after it.
+  if (rewritten.length > marker[0].length) return rewritten;
+  return `${rewritten} `;
 }
 
 /**
@@ -168,8 +227,9 @@ export function planTaskFieldWrite(
   // `taskDescription`, which differs only in also dropping the list marker.
   const description = stripFieldSpans(line, ranges);
 
-  const rewritten =
-    serialized === "" ? description : `${description}${description === "" ? "" : " "}${serialized}`;
+  const rewritten = restoreTaskSeparator(
+    serialized === "" ? description : `${description}${description === "" ? "" : " "}${serialized}`,
+  );
 
   if (rewritten === line) return null;
 

@@ -884,13 +884,15 @@
           "captureFailed": "无法开始录音。请在“系统设置”中检查麦克风访问权限。",
           "generic": "无法开始录音。",
           "locked": "请先解锁保险库再录制语音笔记。",
-          "noInputDevice": "未找到麦克风。请连接一个后重试。"
+          "noInputDevice": "未找到麦克风。请连接一个后重试。",
+          "unsupportedSampleRate": "你的麦克风以 Myne 无法转写的采样率录音。请改用其他输入设备，或在系统声音设置中更改它的采样率。"
         },
         "stopError": {
           "captureFailed": "录音失败。请检查你的麦克风。",
           "emptyRecording": "未录制到任何内容。",
           "generic": "无法保存录音。",
-          "silentRecording": "录音无声，已被丢弃。请检查你的麦克风。"
+          "silentRecording": "录音无声，已被丢弃。请检查你的麦克风。",
+          "unsupportedSampleRate": "你的麦克风以 Myne 无法转写的采样率录音。没有保存任何内容。请改用其他输入设备，或在系统声音设置中更改它的采样率。"
         }
       },
       "widget": {
@@ -936,6 +938,7 @@
             "featureOff": "语音转文字已关闭。请在设置 → 转录 中开启。",
             "modelLoadFailed": "无法加载语音转文字模型。如果你在设置 → 开发者 → AI 中设置了自定义模型，请检查它的文件；否则重新安装 Myne 即可恢复内置模型。",
             "noModel": "缺少语音转文字模型。重新安装 Myne 即可恢复它。",
+            "tooLong": "这段录音太长，无法转写。音频仍作为附件保留，你依然可以播放。",
             "vaultLocked": "请解锁保险库后再进行转录。"
           },
           "disabledReason": "请在设置 → Developer → AI 中启用 AI 后再进行转录。",
@@ -1168,10 +1171,6 @@
       "turnedIntoTemplate": "已转为模板",
       "convertedToNote": "已转为笔记",
       "versionHistory": "版本历史",
-      "exportMarkdown": "导出为 Markdown…",
-      "exportPdf": "导出为 PDF…",
-      "exportHtml": "导出为 HTML…",
-      "exportTxt": "导出为纯文本…",
       "trash": "移至回收站"
     },
     "codeBlock": {
@@ -2038,10 +2037,6 @@
       "duplicate": "创建副本",
       "editFilterTitle": "编辑筛选器",
       "emptyState": "暂无笔记。",
-      "exportHtml": "导出为 HTML…",
-      "exportMarkdown": "导出为 Markdown…",
-      "exportPdf": "导出为 PDF…",
-      "exportTxt": "导出为纯文本…",
       "favoritesHeading": "收藏",
       "icon": "图标…",
       "mergeAnyway": "仍然合并",
@@ -2347,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "默认"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "导出…",
+      "txt": "纯文本"
     }
   },
   "password": {
@@ -3063,6 +3065,9 @@
       "exactLabel": "精确时间",
       "exactOn": "已开启",
       "horizon": "提醒已注册至 {{date}}。请在那之前打开 Myne，以便继续收到提醒。",
+      "horizonLabel": "提前安排",
+      "horizonLabelHelper": "提醒会提前这么久设置好。Myne 需要处于打开且已解锁的状态，提醒才会送达。",
+      "horizonInertHelper": "已保存在此设备上。目前还没有任何功能读取它：此版本不发送任务提醒。",
       "label": "任务提醒",
       "saveError": "无法保存该设置。请重试。",
       "showTextAria": "在通知中显示任务文本",

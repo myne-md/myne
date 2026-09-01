@@ -618,10 +618,11 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
       <Segmented
         options={[t("sync.enroll.passwordLabel"), t("sync.enroll.recoveryPhraseLabel")]}
         active={MODE_VALUES.indexOf(mode)}
-        onChange={(i) => {
+        onChange={(i: number) => {
           clearOutcome();
           setMode(MODE_VALUES[i]);
         }}
+        ariaLabel={t("sync.enroll.signInWith")}
       />
 
       {mode === "password" ? (

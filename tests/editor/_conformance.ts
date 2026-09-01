@@ -10,6 +10,8 @@
 //
 // Test files that import this MUST declare `// @vitest-environment jsdom`.
 
+import { forceParsing } from "@codemirror/language";
+import { PARSE_BUDGET_MS } from "./_parse-budget";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { myneExtensions } from "../../src/editor/extensions";
@@ -54,6 +56,59 @@ export interface Mounted {
   readonly host: HTMLElement;
 }
 
+/** Parse the WHOLE document before the mount is handed back, and FAIL BY NAME
+ *  if that did not happen.
+ *
+ *  `mount` used to force no parse at all. An `EditorView`'s parsing is driven by
+ *  a `ViewPlugin` that schedules work asynchronously, so the tree a mount hands
+ *  back is whatever that background parser had reached when the constructor
+ *  returned, and nothing guarantees that is the whole document. Every decoration
+ *  in this editor is built from that tree, which makes a partial parse
+ *  indistinguishable from a missing decoration: the assertion fails naming a
+ *  node the parser had not reached, with a message about the decoration and
+ *  nothing about the parse.
+ *
+ *  Under `vitest run` the machine is shared with every other worker, so this is
+ *  load-dependent rather than deterministic: `table-in-blockquote.test.ts`
+ *  failed once in eight consecutive full-suite runs here, and passes every
+ *  isolated run. That is the shape that reads as a broken test rather than as a
+ *  missing parse.
+ *
+ *  An independent measurement from the editor-bugs branch (myne-md/myne#626),
+ *  which found this helper's missing parse separately and is preserved here
+ *  because it is the wider sample: roughly one full-suite run in three, moving
+ *  between files rather than settling on one, seen in `list-render`'s nested
+ *  ring and `taskLineEditing`'s second Enter, and always passing when the file
+ *  is run alone. Only the OBSERVATION is carried over. That branch also
+ *  attributed the cause to the time budget, which the paragraph below refutes by
+ *  measurement.
+ *
+ *  Note what is NOT the cause, because the obvious reading is wrong and
+ *  `_parse-budget.ts` records the measurement that refutes it: the budget is not
+ *  reached at these document sizes. Setting it to 0 leaves these tests passing,
+ *  since `ParseContext.work` advances a chunk before consulting its deadline and
+ *  a small document finishes inside that chunk. Forcing the parse at all is the
+ *  fix; the budget is only a runaway guard for a large document.
+ *
+ *  The throw is the other half, and it is the half that holds at every document
+ *  size. `forceParsing` REPORTS whether it finished, and that result used to be
+ *  discarded, so a test could proceed on a partial tree with nothing saying so.
+ *  Throwing turns "this decoration is missing" into "the parse did not
+ *  complete". Verified in both directions: a mounted 40 000-item list under a
+ *  0 ms budget reaches this throw, and the small documents in this tree do
+ *  not. */
+export function forceCompleteParse(view: EditorView): void {
+  const upto = view.state.doc.length;
+  if (!forceParsing(view, upto, PARSE_BUDGET_MS)) {
+    throw new Error(
+      `conformance mount: the syntax parse did not reach ${upto} within ` +
+        `${PARSE_BUDGET_MS} ms, so the tree is PARTIAL and every tree-derived ` +
+        `decoration below is unreliable. The decoration is not necessarily ` +
+        `missing: the parser had not reached it.`,
+    );
+  }
+}
+
 /** Mount the full Myne editor over `doc`, cursor parked at `selectionPos`
  *  (default: end of doc — outside every construct, so cursor-aware decorations
  *  render rather than reveal). */
@@ -69,6 +124,7 @@ export function mount(doc: string, selectionPos?: number): Mounted {
     }),
     parent: host,
   });
+  forceCompleteParse(view);
   view.requestMeasure();
   return { view, host };
 }
