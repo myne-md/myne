@@ -11780,6 +11780,165 @@ mod tests {
         .expect("write vault-prefs field-clocks vectors dump");
     }
 
+    /// Generator for the `chat_history_budget` `vault-prefs` cases
+    /// (myne-md/myne#617, the agent chat-history seed budget).
+    ///
+    /// Writes `/tmp/myne_vault_prefs_chat_history_budget_vectors.json`, a JSON
+    /// array fragment spliced by hand into the companion repo's existing
+    /// `cases` array.
+    ///
+    /// **Why the field needs a vector at all**, since it is one optional
+    /// integer: `vault.prefs` is canonical JSON, so key ORDER is part of the
+    /// bytes, and this field's slot is the load-bearing half of its own design.
+    /// It sorts between `bar_items_order` (`b`) and `cli_enabled` (`cl`), which
+    /// puts it in the region `find_top_level_marker` scans forward through;
+    /// named `agent_history_budget` it would have landed inside the
+    /// prefix-matched run that ends at `auto_lock_seconds`, where an
+    /// unrecognised key blinds every field behind it in a client that predates
+    /// it (`docs/spec/protocol.md` §9.5.2, schema-evolution paragraph). A port
+    /// that emits the right value in the wrong slot produces a blob this crate
+    /// cannot decode, and until these cases existed no vector said so: the
+    /// companion repo carried a schema property with the claim written in prose
+    /// and nothing behind it.
+    ///
+    /// **Both canonical NEIGHBOURS are present in the fixture**, which is what
+    /// makes this a slot pin rather than a value pin. The blob carries
+    /// `bar_items_order` and `cli_enabled` either side of it.
+    ///
+    /// The value is 3000, deliberately not the host's 12000 ceiling: the
+    /// ceiling is a host policy applied in the SETTER and is not a property of
+    /// the format, so pinning it here would put a second copy of a host
+    /// constant in another repository, where drift is silent. What the vectors
+    /// pin is the bare-decimal integer encoding, the canonical slot, and the
+    /// omitted-when-unset rule (every other case in the family carries no
+    /// `chat_history_budget` key at all and stays byte-identical to its
+    /// pre-feature self).
+    ///
+    /// Nonce `0xF8` — the next free entry in this family's registry
+    /// (0x77..0xF7 taken).
+    ///
+    /// `cargo test -p protocol --lib emit_chat_history_budget_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_chat_history_budget_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce_chb: [u8; AEAD_NONCE_LEN] = [0xF8; AEAD_NONCE_LEN];
+        let prefs_chb = PrefsView {
+            bar_items_order: alloc::vec![
+                String::from("view-mode"),
+                String::from("tags"),
+                String::from("graph"),
+            ],
+            chat_history_budget: Some(3000),
+            cli_enabled: true,
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs_chb);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"bar_items_order":["view-mode","tags","graph"],"chat_history_budget":3000,"cli_enabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin bar_items_order (b) < chat_history_budget (ch) < cli_enabled (cl), and the budget as a bare decimal integer",
+        );
+        let blob_chb = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_chb, &nonce_chb)
+            .expect("encode chat-history-budget");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_chb).expect("decode");
+        assert_eq!(
+            decoded, prefs_chb,
+            "chat-history-budget blob must round-trip exactly"
+        );
+
+        // The omit-when-unset half, asserted rather than described: the same
+        // view with the field back to `None` must encode to bytes carrying no
+        // `chat_history_budget` key at all, so a vault that never overrode the
+        // host default stays byte-identical to its pre-feature self.
+        let prefs_unset = PrefsView {
+            chat_history_budget: None,
+            ..prefs_chb.clone()
+        };
+        let canonical_unset = canonical_json_encode(&prefs_unset);
+        assert_eq!(
+            canonical_unset.as_slice(),
+            br#"{"bar_items_order":["view-mode","tags","graph"],"cli_enabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "an unset budget must be omitted entirely, not encoded as 0",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-chat-history-budget
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-chat-history-budget\",\n");
+        dump.push_str("      \"description\": \"The agent chat-history seed budget (myne-md/myne#617). An optional unsigned integer encoded as a BARE DECIMAL, pinned between both of its canonical neighbours: bar_items_order (b) < chat_history_budget (ch) < cli_enabled (cl). That slot is the load-bearing half of the field's design -- it sits in the region a decoder scans forward through, so an older client steps over it, whereas a name sorting before auto_lock_seconds would have landed in the prefix-matched run where an unknown key blinds every field behind it (protocol.md 9.5.2 schema evolution). The value 3000 is deliberately not the host's clamp ceiling: that ceiling is applied in the SETTER and is host policy rather than format, so no vector pins it. Unset is OMITTED ENTIRELY rather than encoded as 0, which every other case in this family demonstrates by carrying no such key and staying byte-identical to its pre-feature self. Same vault-A inputs as the sibling cases; prefs_nonce=0xF8x24. Generated by emit_chat_history_budget_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_chb)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_chb)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-chat-history-budget
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-chat-history-budget\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-chat-history-budget: the blob decodes back to a PrefsView carrying chat_history_budget=3000 between bar_items_order and cli_enabled under the same root_key + account_number_hash. A decoder that does not know the field (pre-myne#617) tolerates it per the 9.5.2 forward-compat rule and treats the budget as ABSENT rather than as 0 -- absent means the host applies its own default, which is a third state distinct from 'seed nothing'. That distinction is why this case exists beside the encrypt one: a port that maps a missing key to 0 decodes this blob correctly and its own default-carrying blob incorrectly.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_chb)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"bar_items_order\": [\"view-mode\", \"tags\", \"graph\"],\n");
+        dump.push_str("        \"chat_history_budget\": 3000,\n");
+        dump.push_str("        \"cli_enabled\": true\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_chat_history_budget_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs chat-history-budget vectors dump");
+    }
+
     /// Generator for the display-formatting quartet's `vault-prefs` cases —
     /// `auto_tag_enabled`, `date_format`, `time_format`, `timezone`.
     ///
