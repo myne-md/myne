@@ -1342,7 +1342,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Each client's implementation of the two seams `myne-core`'s agent loop asks for, 222 lines against 117. The desktop one bridges to a local Candle engine and desktop's own search index; mobile's bridges to `NoLocalEngine` plus the remote provider registry. The gap is the whole of what #456 is about, so treating them as one answer would be classifying the seam as drift. Desktop's extra 105 lines are the local-inference arm and the capability-probe test that moved here with it.",
+      "Each client's implementation of the two seams `myne-core`'s agent loop asks for, 226 lines against 117. The desktop one bridges to a local Candle engine and desktop's own search index; mobile's bridges to `NoLocalEngine` plus the remote provider registry. The gap is the whole of what #456 is about, so treating them as one answer would be classifying the seam as drift. Desktop's extra 105 lines are the local-inference arm and the capability-probe test that moved here with it.",
   },
   {
     a: "core/src/inference/state.rs",

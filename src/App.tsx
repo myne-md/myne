@@ -23,6 +23,7 @@ import {
   type VaultId,
 } from "./lib/stage";
 import { PairingDialog } from "./components/PairingDialog";
+import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
 import { Toaster } from "./components/toast/Toaster";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
 import { has } from "./platform/capabilities";
@@ -724,6 +725,27 @@ function App() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      {/* The escape hatch from screen-capture protection (myne-md/myne#482).
+          FIRST in DOM order, deliberately: it is a skip link, off-screen until
+          focused, so being first is what puts it one Tab from a cold launch and
+          one Shift+Tab from the autofocused password field on `Unlock`. On
+          Windows the protection genuinely works, which is what leaves a
+          remote-desktop or magnifier user looking at a black rectangle with the
+          account number, the recovery-phrase ceremony and the device-join QR
+          behind it.
+
+          Mounted once and WITHOUT a stage predicate. The first revision used
+          `stage.name !== "editor"`, reasoning that after unlock the Privacy
+          panel carries the same control. That is false on the three screens
+          `Editor.tsx` returns before `EditorChrome` (`DeviceRevoked`,
+          `StorageLost`, `FailClosedError`), none of which mounts
+          `SettingsModal`, and the last of which renders with the vault LOCKED
+          and protection forced back on. A predicate kept in step with a screen
+          roster nobody enumerates is the failure `useRevealAfterIdleLock` was
+          consolidated to fix; unconditional costs one invisible tab stop on the
+          editor. Renders nothing where the capability is absent (web has no
+          capture affinity to lose). */}
+      <ScreenCaptureEscape />
       {/* macOS overlay-mode title bar — `tauri.conf.json` sets
           `titleBarStyle: "Overlay"` so the webview extends under the
           traffic-light area. Non-editor stages get this plain 38px window-drag
