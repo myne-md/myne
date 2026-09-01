@@ -47,8 +47,32 @@ describe("vault-creation / unlock command wrappers", () => {
 describe("notes command wrappers", () => {
   it("noteCreate → plugin:notes|note_create { plaintext }", async () => {
     invoke.mockResolvedValueOnce("note-id");
-    await noteCreate("hello");
+    await noteCreate("hello", null);
     expect(invoke).toHaveBeenCalledWith("plugin:notes|note_create", { plaintext: "hello" });
+  });
+
+  it("noteCreate registers the folder it filed the note into (myne#613)", async () => {
+    // The at-fill chokepoint. It landed at two `EditorFlow` save paths instead
+    // of here, so the daily note, the drawing sibling, the app-background
+    // flush, a template and a conflict copy all filed notes into folders and
+    // registered none of them. The registration is fire-and-forget, so this
+    // waits for the queued microtasks rather than for the create.
+    invoke.mockResolvedValueOnce("note-id");
+    await noteCreate("hello", "Work/Projects");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(invoke).toHaveBeenCalledWith("plugin:prefs|set_deliberate_folders", {
+      mutation: { add: ["Work/Projects/"] },
+    });
+  });
+
+  it("a root note registers nothing", async () => {
+    invoke.mockResolvedValueOnce("note-id");
+    await noteCreate("hello", null);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(invoke).not.toHaveBeenCalledWith(
+      "plugin:prefs|set_deliberate_folders",
+      expect.anything(),
+    );
   });
 
   it("noteRead → plugin:notes|note_read { noteId }", async () => {

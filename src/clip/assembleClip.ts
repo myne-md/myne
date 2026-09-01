@@ -307,7 +307,14 @@ async function loadDefaultResolverNotes(): Promise<readonly ResolverNote[]> {
  */
 export function defaultClipAssemblyDeps(): ClipAssemblyDeps {
   return {
-    noteCreate: (plaintext) => noteCreate(plaintext),
+    // `null`, and that is a decision rather than an omission (myne-md/myne#613).
+    // A clipped note is filed at the vault root: `buildClipPlaintext` writes no
+    // `folder:`, so there is no folder for the create to register. Decision 0541
+    // names the clipper as one of the routes a foldered note can arrive by; that
+    // is about a note the clipper's own frontmatter could carry, and today it
+    // carries none. If clipping ever gains a destination folder, this argument is
+    // where it has to be threaded, and the compiler will not let it be forgotten.
+    noteCreate: (plaintext) => noteCreate(plaintext, null),
     // Real task-3 port: `attachment_import { kind: "bytes" }` via the shipped
     // `importOne` (which re-sniffs MIME, enforces the 64 MiB per-image cap, and
     // content-addresses). `importOne` already folds any reject into a typed

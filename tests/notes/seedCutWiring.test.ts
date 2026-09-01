@@ -25,7 +25,7 @@ vi.mock("../../src/platform/core", () => ({
   invoke: (...a: unknown[]) => writePref(...a),
 }));
 
-import { setAiProvider, setAiExcludedFolders } from "../../src/lib/prefs";
+import { setAiProvider, mutateAiExcludedFolders } from "../../src/lib/prefs";
 import {
   __resetChatForTest,
   getChat,
@@ -72,14 +72,16 @@ describe("the seed cut is wired to the setters, not only implemented", () => {
     // was: the two controls bound the same thing, so a reader had to find both
     // to know the rule. Both are in the binding now.
     const id = existingTurnId();
-    await setAiExcludedFolders(["Private/"]);
+    await mutateAiExcludedFolders({ add: ["Private/"], remove: [] });
     expect(isSeedable(id)).toBe(false);
   });
 
   it("cuts on the exclusion set even when the write fails", async () => {
     const id = existingTurnId();
     writePref.mockRejectedValueOnce(new Error("disk"));
-    await expect(setAiExcludedFolders(["Private/"])).rejects.toThrow();
+    await expect(
+      mutateAiExcludedFolders({ add: ["Private/"], remove: [] }),
+    ).rejects.toThrow();
     expect(isSeedable(id)).toBe(false);
   });
 });

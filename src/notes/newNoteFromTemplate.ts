@@ -164,5 +164,5 @@ export async function createNoteFromBody(
   if (normalizedFolder !== null) {
     bytes = patchFolderField(bytes, normalizedFolder);
   }
-  return await noteCreate(decoder.decode(bytes));
+  return await noteCreate(decoder.decode(bytes), normalizedFolder);
 }

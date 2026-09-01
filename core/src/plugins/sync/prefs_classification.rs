@@ -13,8 +13,59 @@
 pub enum SharedDiscipline {
     /// Newer field clock wins the whole scalar value.
     ScalarLww,
-    /// Sorted, de-duplicated union of both sides; clockless.
-    SetUnion,
+    /// Sorted, de-duplicated union of both sides, with a **per-entry removal
+    /// clock** (myne#613): an entry present on one side only is kept unless the
+    /// absent side's `<field>/<entry>` clock is strictly greater, in which case
+    /// that side deleted it. The union alone was clockless, which made a removal
+    /// unexpressible: the peer's copy came straight back within two rounds.
+    /// Exactly the myne#296 rule the per-key maps carry, one shape over.
+    ///
+    /// `folded` selects the entry identity, and the two are not interchangeable.
+    /// `true` for the four folder sets, whose entries fold through `folderKey`
+    /// (NFC + case-fold, `markdown-dialect.md` §3.6.2) so `personal/` and
+    /// `PERSONAL/` are one entry. `false` for `spell_languages`, whose entries
+    /// are case-sensitive language codes: folding them would merge `de-DE` into
+    /// `de-de`. The flag lives here rather than beside the merge call so the
+    /// classification table stays the single place that knows, which is what
+    /// lets the stamper and the merge agree on a clock key by construction.
+    /// `removals_propagate` decides whether a removal may be INHERITED from a
+    /// peer, and it is a security property for two of the five fields rather
+    /// than a preference about merge shape.
+    ///
+    /// `true` for the organisational sets (`deliberate_folders`,
+    /// `archived_folders`, `spell_languages`): the user deleted a folder or a
+    /// language and expects it gone everywhere, which is what myne#613 is for.
+    ///
+    /// `false` for `ai_excluded_folders` and `cli_excluded_folders`, which are
+    /// EGRESS CONTROLS and not preferences. `threat-model.md` A17 rests its
+    /// remote-provider mitigation on the first ("`ai_excluded_folders` remains
+    /// the content-scoped control"), and the shipped UI promises both
+    /// absolutely ("Notes in these folders are never read or indexed by AI";
+    /// "Folders the terminal never sees"). Their union was monotone by design:
+    /// an exclusion present on ANY device survived every merge, so the merge
+    /// could only ever fail closed.
+    ///
+    /// A removal clock breaks exactly that. Removal then races on a wall clock,
+    /// and a device whose clock is skewed forward can unexclude a folder in a
+    /// way no correctly-clocked device can undo, because the re-add stamps the
+    /// SMALLER clock. §10.2's "a skewed winner is repaired by the next genuine
+    /// edit" is true for a preference and false for a control whose whole job is
+    /// to stay on.
+    ///
+    /// **What monotone costs, stated because the first version of this comment
+    /// got it wrong.** It said "unexcluding still works; it is a local act that
+    /// does not travel". It is not local: the single-sided arm restores the
+    /// peer's copy unconditionally, so on a synced vault an exclusion cannot be
+    /// removed on ANY device once a second device holds it. Removing one means
+    /// removing it everywhere, or adding an explicit un-exclude path that says
+    /// so. That is the pre-myne#613 behaviour rather than a regression, and it
+    /// is the fail-closed side of the trade, but it is a product limitation and
+    /// belongs in the issue rather than in a comment claiming the feature
+    /// works.
+    SetUnion {
+        folded: bool,
+        removals_propagate: bool,
+    },
     /// The whole ordered list is replaced by the newer side; one clock per list.
     SequenceLww,
     /// The whole array/map value is replaced by the newer side; one clock.
@@ -51,7 +102,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("ai_enabled", PrefClass::DeviceLocal),
     (
         "ai_excluded_folders",
-        PrefClass::Shared(SharedDiscipline::SetUnion),
+        // An EGRESS CONTROL, so its union stays monotone: a removal is a
+        // local act and is never inherited from a peer. See the variant's
+        // doc for why a removal clock would be fail-OPEN here.
+        PrefClass::Shared(SharedDiscipline::SetUnion {
+            folded: true,
+            removals_propagate: false,
+        }),
     ),
     // Shared, and a deliberate divergence from its nearest neighbour above:
     // `ai_enabled` is DeviceLocal because "should THIS machine spend its CPU
@@ -133,7 +190,10 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ),
     (
         "archived_folders",
-        PrefClass::Shared(SharedDiscipline::SetUnion),
+        PrefClass::Shared(SharedDiscipline::SetUnion {
+            folded: true,
+            removals_propagate: true,
+        }),
     ),
     // Shared (ingest-image-compression, MYND-478 §10.2 row): a deliberate
     // divergence from the neighboring compute-budget cluster just below
@@ -171,7 +231,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("cli_enabled", PrefClass::DeviceLocal),
     (
         "cli_excluded_folders",
-        PrefClass::Shared(SharedDiscipline::SetUnion),
+        // An EGRESS CONTROL, so its union stays monotone: a removal is a
+        // local act and is never inherited from a peer. See the variant's
+        // doc for why a removal clock would be fail-OPEN here.
+        PrefClass::Shared(SharedDiscipline::SetUnion {
+            folded: true,
+            removals_propagate: false,
+        }),
     ),
     ("cli_rate_limit_disabled", PrefClass::DeviceLocal),
     (
@@ -200,7 +266,10 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ),
     (
         "deliberate_folders",
-        PrefClass::Shared(SharedDiscipline::SetUnion),
+        PrefClass::Shared(SharedDiscipline::SetUnion {
+            folded: true,
+            removals_propagate: true,
+        }),
     ),
     // developer-mode (MYND-593): gates a device-local model-path override, so
     // a synced flag would read "on" on a device with no override behind it —
@@ -295,9 +364,18 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
     ("spell_enabled", PrefClass::DeviceLocal),
+    // The one set field that is NOT folded. Its entries are BCP-47 language
+    // codes, not folder paths: folding would collapse `de-DE` into `de-de` and
+    // silently drop one of two legitimately distinct entries. §10.2 has always
+    // said so in prose ("language codes, case-sensitive"); myne#613 moved the
+    // distinction into the table so the merge and the stamper derive the clock
+    // key from one place instead of each deciding for themselves.
     (
         "spell_languages",
-        PrefClass::Shared(SharedDiscipline::SetUnion),
+        PrefClass::Shared(SharedDiscipline::SetUnion {
+            folded: false,
+            removals_propagate: true,
+        }),
     ),
     ("startup_open", PrefClass::DeviceLocal),
     ("startup_open_note", PrefClass::DeviceLocal),
@@ -610,10 +688,28 @@ mod tests {
             classify("view_order"),
             Some(PrefClass::Shared(SharedDiscipline::SequenceLww))
         );
-        // Privacy-load-bearing exclusion list syncs vault-wide.
+        // Privacy-load-bearing exclusion list syncs vault-wide, and is MONOTONE:
+        // a removal is a local act and is never inherited from a peer. That is
+        // the property `threat-model.md` A17 rests its remote-provider mitigation
+        // on, so it is pinned here rather than left to the merge site.
         assert_eq!(
             classify("ai_excluded_folders"),
-            Some(PrefClass::Shared(SharedDiscipline::SetUnion))
+            Some(PrefClass::Shared(SharedDiscipline::SetUnion {
+                folded: true,
+                removals_propagate: false
+            }))
+        );
+        // The folded/raw split is the one thing about a set field that a caller
+        // cannot guess, so it is pinned here rather than left to the merge site.
+        // A folder set folds; language codes do not, and swapping the two is a
+        // silent data loss in one direction (`de-DE` merged into `de-de`) and a
+        // silent duplicate in the other (`personal/` beside `PERSONAL/`).
+        assert_eq!(
+            classify("spell_languages"),
+            Some(PrefClass::Shared(SharedDiscipline::SetUnion {
+                folded: false,
+                removals_propagate: true
+            }))
         );
         // The clock map is metadata, never merged as a preference.
         assert_eq!(classify("field_clocks"), Some(PrefClass::MergeMetadata));

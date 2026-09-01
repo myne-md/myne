@@ -1215,7 +1215,7 @@ mod tests {
                 &vault_dir,
                 &state,
                 &(std::sync::Arc::new(crate::hooks::NoopHooks) as crate::hooks::Hooks),
-                vec!["Empty/Nested/".to_string(), "Projects/".to_string()],
+                crate::plugins::prefs::set_mutation::SetMutation::adding_all(vec!["Empty/Nested/".to_string(), "Projects/".to_string()]),
             &crate::vault_io::StdVaultIo, &crate::host::NoopHost,)
             .await
             .expect("deliberate folders write");
@@ -1692,7 +1692,7 @@ mod tests {
                 &vault_dir,
                 &state,
                 &(std::sync::Arc::new(crate::hooks::NoopHooks) as crate::hooks::Hooks),
-                vec!["A/Empty/".to_string(), "C/Empty/".to_string()],
+                crate::plugins::prefs::set_mutation::SetMutation::adding_all(vec!["A/Empty/".to_string(), "C/Empty/".to_string()]),
             &crate::vault_io::StdVaultIo, &crate::host::NoopHost,)
             .await
             .expect("deliberate folders write");

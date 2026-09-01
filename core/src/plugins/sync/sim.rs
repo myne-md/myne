@@ -917,6 +917,72 @@ fn decoration_prefs_converge_per_key_across_case_variants() {
     }
 }
 
+/// A folder deleted while a third device was offline stays deleted when it
+/// rejoins (myne-md/myne#613).
+///
+/// This is the scenario the unit tests cannot reach. They merge two views once;
+/// the defect needs three replicas and two rounds. Before the removal clock was
+/// carried across a round in which both merging sides had already dropped the
+/// entry, this returned the folder: the two online devices converged, their next
+/// merge discarded the tombstone as an orphan, and the rejoining device then met
+/// a peer with no clock at all and won with its own original add clock.
+///
+/// The assertion is on all three devices rather than on the rejoining one,
+/// because the failure propagates: once the offline device wins, the entry is
+/// back everywhere.
+#[test]
+fn a_folder_deleted_while_a_device_was_offline_stays_deleted() {
+    let (_guard, url) = server_or_skip!("deliberate_removal_613");
+    let acct = Account::new(0x61);
+    let devices = enroll_devices(&acct, &url, 3);
+    let prefs_key = derive_subkey(&acct.root_key, SubkeyRole::PrefsKey);
+
+    let write_prefs = |d: &Device, view: &protocol::PrefsView| {
+        let bytes = protocol::encode_prefs_blob(&prefs_key, &acct.account_hash, view).unwrap();
+        std::fs::write(d.vault_dir.join("vault.prefs"), &bytes).unwrap();
+    };
+    let read_prefs = |d: &Device| -> protocol::PrefsView {
+        let bytes = std::fs::read(d.vault_dir.join("vault.prefs")).unwrap();
+        protocol::decode_prefs_blob(&prefs_key, &acct.account_hash, &bytes).unwrap()
+    };
+
+    // All three know about `Projects/`, registered at t=100.
+    let mut held = protocol::PrefsView {
+        deliberate_folders: vec![String::from("Projects/")],
+        ..protocol::PrefsView::default()
+    };
+    held.field_clocks
+        .insert(String::from("deliberate_folders/projects/"), 100);
+    for d in &devices {
+        write_prefs(d, &held);
+    }
+
+    // The first two delete it at t=300. The third is offline and writes nothing,
+    // so it keeps the entry under its original add clock.
+    let mut deleted = protocol::PrefsView::default();
+    deleted
+        .field_clocks
+        .insert(String::from("deliberate_folders/projects/"), 300);
+    write_prefs(&devices[0], &deleted);
+    write_prefs(&devices[1], &deleted);
+
+    // Slice rather than clone: `Device` is not `Clone` and does not need to be.
+    quiesce(&devices[..2], 8);
+
+    // Now everyone, including the device that was out for the deletion.
+    quiesce(&devices, 8);
+
+    for d in &devices {
+        let v = read_prefs(d);
+        assert!(
+            v.deliberate_folders.is_empty(),
+            "device {}: a folder deleted while this device was offline must not \
+             come back when it rejoins",
+            d.label
+        );
+    }
+}
+
 /// The CORRECT deletion path (`deleteNoteRouted`) converges: both devices end
 /// with the `deleted:`-marked version. This is the control proving the harness
 /// distinguishes the good path from the buggy `empty_trash` one below.

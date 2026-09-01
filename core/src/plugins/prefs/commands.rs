@@ -12,6 +12,7 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use super::error::{PrefsReadError, PrefsWriteError};
+use super::set_mutation::{apply_set_mutation, SetMutation};
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
@@ -347,7 +348,7 @@ async fn update_prefs_with_dir(
 
     // MYND-478 (sync-protocol.md §10.2): stamp the LWW field clock of every
     // SHARED field this write changed — centrally, so no setter can forget.
-    // Device-local and set-union fields are never stamped; a wall-clock
+    // Device-local fields are never stamped; set-union fields are stamped PER ENTRY, for adds and removals alike, except the two monotone egress sets (`ai_excluded_folders`, `cli_excluded_folders`), which stamp nothing at all (myne-md/myne#613); a wall-clock
     // failure degrades to clock 0 (the legacy value) rather than blocking the
     // write.
     // Host clock (task 14 — the TODO this replaces was recorded in task 12).
@@ -363,12 +364,35 @@ async fn update_prefs_with_dir(
     let now_ms = host.now_unix_millis();
     crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(&before, &mut prefs, now_ms);
 
+    // myne#613: the last-resort cap guard, AFTER stamping, because stamping is
+    // the step that grows the blob. `apply_set_mutation`'s budget already keeps
+    // an ordinary write well inside the cap, including the tombstones a future
+    // removal will mint, so on every vault this feature created this sheds
+    // nothing and costs one length measurement.
+    //
+    // It is here for the vault that arrives OVER that budget anyway: one merged
+    // from a peer, or one whose set fields predate the budget entirely. On those
+    // a removal can still push the plaintext past the cap, and a removal is the
+    // one operation that must never be refused, since deleting is the only
+    // remedy the budget-full notice offers. Shedding the oldest tombstone is the
+    // recoverable loss; a `PrefsEncodeFailed` on a delete is not.
+    let shed = crate::plugins::prefs::set_mutation::shed_retained_clocks(&mut prefs);
+    if shed > 0 {
+        tracing::warn!(
+            stage = "prefs",
+            event = "retained_clocks_shed",
+            count = shed,
+            "the prefs blob was over the plaintext cap; shed the oldest removal clocks to keep it writable"
+        );
+    }
+
     // MYND-517: did this write change the SHARED subset? Compared via
     // `shared_subset_hash` — the §10.2.1 push gate's own discriminator — so
     // the bump below fires exactly when the sync phase would see a dirty
     // prefs blob: shared LWW edits (via their stamped clock), set-union edits
-    // (clockless, via the value itself), and `device_names` key changes all
-    // register; a device-local-only or no-op write never does.
+    // (via the value itself, and since myne#613 via their per-entry clocks too
+    // on the three fields that propagate removals), and `device_names` key
+    // changes all register; a device-local-only or no-op write never does.
     let shared_changed = shared_subset_hash(&prefs) != shared_subset_hash(&before);
 
     let blob_bytes =
@@ -1920,12 +1944,12 @@ pub async fn set_spell_languages_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    languages: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_spell_languages_with_dir(&dir, state, hooks, languages, io, host).await
+    set_spell_languages_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -1936,13 +1960,13 @@ pub async fn set_spell_languages<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    languages: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_spell_languages_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        languages,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -1953,25 +1977,37 @@ pub(crate) async fn set_spell_languages_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    languages: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = languages.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.spell_languages = languages;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "spell_languages", &mutation);
         },
         io,
         host,
     )
     .await?;
 
-    tracing::info!(event = "prefs_written", field = "spell_languages", count);
-    Ok(())
+    tracing::info!(
+        event = "prefs_written",
+        field = "spell_languages",
+        added,
+        removed,
+        refused,
+    );
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for ONE command's keymap override (hotkeys
@@ -2062,21 +2098,27 @@ pub(crate) async fn set_keymap_binding_with_dir(
 /// the virtual-folder model). Read-modify-write under the per-plugin
 /// write mutex. **No native side-effect** (unlike
 /// `set_screen_capture_protection`) — purely a disk commit, so the
-/// disk-then-native ordering rule does not apply here. The caller passes
-/// the full desired set; v0.1 single-device writes it verbatim
-/// (union + add-wins is a Phase 2 sync-merge concern, not a v0.1
-/// write-API concern). Folded-identity dedup is the caller's job; the
-/// codec only sorts + exact-dedups for canonical byte-stability.
+/// disk-then-native ordering rule does not apply here.
+///
+/// The caller passes a [`SetMutation`], never a whole set. That is the myne#613
+/// fix rather than a refactor: a whole-set write from a stale view reads to
+/// `stamp_changed_shared_fields` as an intentional deletion of every entry the
+/// view never saw, so a lost update became a distributed delete. The mutation is
+/// applied to the CURRENT stored set, inside this write's mutex, which is what
+/// makes the stamper's `before \ after` diff sound.
+///
+/// Folded-identity dedup is the caller's job for the DISPLAY form; the identity
+/// a removal matches on is taken from the field's own classification row.
 pub async fn set_deliberate_folders_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_deliberate_folders_with_dir(&dir, state, hooks, folders, io, host).await
+    set_deliberate_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2087,13 +2129,13 @@ pub async fn set_deliberate_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    folders: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_deliberate_folders_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        folders,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -2104,17 +2146,23 @@ pub async fn set_deliberate_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = folders.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.deliberate_folders = folders;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "deliberate_folders", &mutation);
         },
         io,
         host,
@@ -2123,8 +2171,14 @@ pub async fn set_deliberate_folders_with_dir(
 
     // Folder COUNT only — never the paths (folder structure is AS3
     // Sensitive; see ../../CLAUDE.md "Secret-handling logging discipline").
-    tracing::info!(event = "prefs_written", field = "deliberate_folders", count,);
-    Ok(())
+    tracing::info!(
+        event = "prefs_written",
+        field = "deliberate_folders",
+        added,
+        removed,
+        refused,
+    );
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for the `archived_folders` set (folder-archive)
@@ -2132,20 +2186,22 @@ pub async fn set_deliberate_folders_with_dir(
 /// sidebar/tree while the notes stay resolvable). Read-modify-write under the
 /// per-plugin write mutex. **No native side-effect** (a pure disk commit, same
 /// shape as [`set_deliberate_folders`] — unlike `set_ai_excluded_folders` there
-/// is no AI runtime to reconcile). The caller passes the full desired set; v0.1
-/// single-device writes it verbatim (union + add-wins is a Phase 2 sync-merge
-/// concern). Folded-identity dedup is the caller's job; the codec only sorts +
-/// exact-dedups for canonical byte-stability.
+/// is no AI runtime to reconcile).
+///
+/// Takes a [`SetMutation`] rather than a whole set, for the reason spelled out
+/// on [`set_deliberate_folders_from_host`]. `archived_folders` propagates
+/// removals, so a removal here stamps a clock and reaches every device: clearing
+/// this set is a vault-wide act, not a device-local one.
 pub async fn set_archived_folders_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_archived_folders_with_dir(&dir, state, hooks, folders, io, host).await
+    set_archived_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2156,13 +2212,13 @@ pub async fn set_archived_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    folders: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_archived_folders_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        folders,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -2173,17 +2229,23 @@ pub async fn set_archived_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = folders.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.archived_folders = folders;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "archived_folders", &mutation);
         },
         io,
         host,
@@ -2192,8 +2254,14 @@ pub async fn set_archived_folders_with_dir(
 
     // Folder COUNT only — never the paths (folder structure is AS3
     // Sensitive; see the `set_deliberate_folders` note + ../../CLAUDE.md).
-    tracing::info!(event = "prefs_written", field = "archived_folders", count,);
-    Ok(())
+    tracing::info!(
+        event = "prefs_written",
+        field = "archived_folders",
+        added,
+        removed,
+        refused,
+    );
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for the `ai_enabled` AI opt-in toggle (local-ai
@@ -2562,20 +2630,20 @@ pub async fn set_ai_excluded_folders_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     // Disk-side commit FIRST, under the mutex.
-    set_ai_excluded_folders_with_dir(&dir, state, hooks, folders, io, host).await?;
+    let refused = set_ai_excluded_folders_with_dir(&dir, state, hooks, mutation, io, host).await?;
     // Reflect the new exclusion set into the AI runtime SECOND: purge any
     // now-excluded note from the resident store + persisted blob (SYNC-14).
     // Read back the authoritative policy (opt-in may be off).
     if let Ok(view) = prefs_read_with_dir(&dir, state, io).await {
         hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
     }
-    Ok(())
+    Ok(refused)
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2586,13 +2654,13 @@ pub async fn set_ai_excluded_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    folders: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_ai_excluded_folders_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        folders,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -2603,17 +2671,23 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = folders.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.ai_excluded_folders = folders;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "ai_excluded_folders", &mutation);
         },
         io,
         host,
@@ -2625,9 +2699,11 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
     tracing::info!(
         event = "prefs_written",
         field = "ai_excluded_folders",
-        count
+        added,
+        removed,
+        refused,
     );
-    Ok(())
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for the `cli_enabled` CLI terminal-access door
@@ -2703,12 +2779,12 @@ pub async fn set_cli_excluded_folders_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_cli_excluded_folders_with_dir(&dir, state, hooks, folders, io, host).await
+    set_cli_excluded_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2719,13 +2795,13 @@ pub async fn set_cli_excluded_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    folders: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_cli_excluded_folders_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        folders,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -2736,17 +2812,23 @@ pub(crate) async fn set_cli_excluded_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = folders.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.cli_excluded_folders = folders;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "cli_excluded_folders", &mutation);
         },
         io,
         host,
@@ -2758,9 +2840,11 @@ pub(crate) async fn set_cli_excluded_folders_with_dir(
     tracing::info!(
         event = "prefs_written",
         field = "cli_excluded_folders",
-        count
+        added,
+        removed,
+        refused,
     );
-    Ok(())
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for the `cli_rate_limit_disabled` toggle
@@ -5716,7 +5800,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                vec!["en".into()],
+                SetMutation::adding_all(vec!["en".into()]),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6605,7 +6689,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Projects/"]),
+                SetMutation::adding_all(alloc_vec(["Projects/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6677,7 +6761,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Projects/Myne/", "Archive/2025/"]),
+                SetMutation::adding_all(alloc_vec(["Projects/Myne/", "Archive/2025/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6700,7 +6784,13 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                SetMutation {
+                    add: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove: vec!["Projects/Myne/".to_string(), "Archive/2025/".to_string()],
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6724,7 +6814,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Projects/"]),
+                SetMutation::adding_all(alloc_vec(["Projects/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6742,7 +6832,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Projects/Myne/", "Archive/2025/"]),
+                SetMutation::adding_all(alloc_vec(["Projects/Myne/", "Archive/2025/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6765,7 +6855,13 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                SetMutation {
+                    add: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove: vec!["Projects/Myne/".to_string(), "Archive/2025/".to_string()],
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6807,7 +6903,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Private/", "Archive/2025/"]),
+                SetMutation::adding_all(alloc_vec(["Private/", "Archive/2025/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6841,7 +6937,13 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                SetMutation {
+                    add: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove: vec!["Private/".to_string(), "Archive/2025/".to_string()],
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -7034,7 +7136,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Secret/"]),
+                SetMutation::adding_all(alloc_vec(["Secret/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -7089,7 +7191,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Private/", "Archive/2025/"]),
+                SetMutation::adding_all(alloc_vec(["Private/", "Archive/2025/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -7136,7 +7238,13 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                SetMutation {
+                    add: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove: vec!["Private/".to_string(), "Archive/2025/".to_string()],
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -8338,7 +8446,11 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                vec!["tr".to_string(), "en-US".to_string(), "tr".to_string()],
+                SetMutation::adding_all(vec![
+                    "tr".to_string(),
+                    "en-US".to_string(),
+                    "tr".to_string(),
+                ]),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )

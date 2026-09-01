@@ -3,6 +3,7 @@
 // byte-exact frontmatter surgery ported from `src/dialect/surgery.ts`, so a note
 // trashed/archived on mobile reads identically on desktop (sync-compatible).
 
+import { mutateDeliberateFolders } from "./prefs";
 import {
   patchTrashedField,
   patchArchivedField,
@@ -90,9 +91,36 @@ export function readNoteFolder(text: string): string | null {
 /** Move a note to a folder (null = root). Bumps `updated:` — a move IS a content
  *  modification (matches desktop moveNote, unlike trash/archive). */
 export async function moveNoteToFolder(id: string, folder: string | null): Promise<void> {
-  const withFolder = patchFolderField(enc.encode(await noteRead(id)), normalizeFolderPath(folder));
+  const norm = await moveNoteToFolderWithoutRegistering(id, folder);
+  // myne-md/myne#613: the destination folder is registered the first time a note
+  // lands in it, so moving the note back out later leaves the folder standing.
+  // The desktop twin is `src/notes/moveNote.ts`; registration sites are
+  // per-client, which is why this is not inherited from the shared tree.
+  if (norm !== null) {
+    void mutateDeliberateFolders({ add: [norm] }).catch(() => {});
+  }
+}
+
+/**
+ * The move itself, with no folder registration. Returns the normalized
+ * destination so a caller can register ONCE for many moves.
+ *
+ * For the folder rename, which re-roots every note in a subtree: registering per
+ * note there cost one full `vault.prefs` re-encrypt and one nonce advance per
+ * note, landing outside the `withPrefsBatch` that exists to stop exactly that,
+ * and every one of them was redundant because the rename's own mutation already
+ * states the re-rooted set. Desktop's twin is `moveNoteWithoutRegistering`
+ * (`src/notes/moveNote.ts`).
+ */
+export async function moveNoteToFolderWithoutRegistering(
+  id: string,
+  folder: string | null,
+): Promise<string | null> {
+  const norm = normalizeFolderPath(folder);
+  const withFolder = patchFolderField(enc.encode(await noteRead(id)), norm);
   const bumped = patchUpdatedField(withFolder, new Date().toISOString());
   await noteUpdate(id, dec.decode(bumped));
+  return norm;
 }
 
 export interface NoteFlags {

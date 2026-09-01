@@ -703,13 +703,18 @@ export async function prefsRead(): Promise<PrefsView> {
  * argument carrying its reason: a visible choice in review rather than an
  * invisible omission.
  */
-async function writePref(
+async function writePref<T = void>(
   command: string,
   args: Record<string, unknown>,
   opts: { bump?: boolean } = {},
-): Promise<void> {
-  await invoke<void>(command, args);
+): Promise<T> {
+  // Generic since myne-md/myne#613: the five set-union mutators return how many
+  // additions the reserved byte budget refused, which is what makes a refusal
+  // reportable instead of silent. Every other write ignores the result and gets
+  // the `void` default. Twin: `src/lib/prefs.ts`.
+  const out = await invoke<T>(command, args);
   if (opts.bump !== false) bumpPrefsNonce();
+  return out;
 }
 
 /**
@@ -778,6 +783,77 @@ export async function setReminderHorizonDays(days: number | null): Promise<void>
 }
 
 /**
+ * What a caller did to a `vault.prefs` set field: entries it added, entries it
+ * removed (myne-md/myne#613).
+ *
+ * There is deliberately no "make the set equal this list" form. The backend used
+ * to receive a whole set and derive the removals by diffing it against the
+ * stored one, so a caller holding a view that predated a peer's addition claimed
+ * a deletion it never made, and the merge then applied it on every device.
+ */
+export interface SetMutation {
+  /** Entries to add. Already present is a no-op, not an error. */
+  add?: string[];
+  /** Entries to remove, matched by the field's own identity. */
+  remove?: string[];
+  /**
+   * Subtrees to remove: every STORED entry at or under one of these folded
+   * prefixes, whether or not this caller has ever seen it.
+   *
+   * `remove` cannot express a folder deletion honestly, because the caller's
+   * list is the `usePrefs` cache: it starts at `DEFAULT_PREFS` and catches up
+   * only through a nonce-bump round trip, and myne#613 gave this tree
+   * fire-and-forget at-fill registrations that write behind it. A delete inside
+   * that window states no removal for the just-registered entry, which then
+   * survives on disk carrying a newer add clock than the removal, so the folder
+   * comes back empty on every device.
+   *
+   * An entry that folds to the empty string is ignored by the core rather than
+   * treated as the root. Pass nothing for a no-op, never a sentinel.
+   */
+  /**
+   * Entries to add ONLY where no removal of them is on record: absent from the
+   * stored set AND carrying a removal clock.
+   *
+   * For a REPAIR rather than a user act. The unlock back-fill registers folders
+   * that LIVE notes prove exist, and that is a state a peer's deletion has not
+   * reached yet, because notes and prefs travel separately. With a plain `add`
+   * the repair is stamped `now_ms`, beats the peer's removal clock, and puts the
+   * folder back on every device permanently with nobody having asked for it.
+   *
+   * A genuine user act still wins, because at-fill uses `add`.
+   */
+  addUnlessRemoved?: string[];
+  removePrefix?: string[];
+  /**
+   * Subtrees to re-root: every STORED entry at or under `from` is rewritten with
+   * `to` in place of that prefix. One verb, so a rename cannot half-apply under
+   * the byte budget and become a synchronised delete.
+   */
+  renamePrefix?: { from: string; to: string }[];
+}
+
+/**
+ * The mutation a caller performed, derived from ITS OWN before and after.
+ *
+ * The distinction from the defect is the two sides: both are the caller's own
+ * values, so an entry the caller never saw is in neither and is never claimed.
+ * Kept byte-identical to `src/lib/prefs.ts::mutationFrom`; the two trees keep
+ * separate prefs modules because each has its own `writePref` chokepoint.
+ */
+export function mutationFrom(
+  before: readonly string[],
+  after: readonly string[],
+): SetMutation {
+  const had = new Set(before);
+  const has = new Set(after);
+  return {
+    add: after.filter((e) => !had.has(e)),
+    remove: before.filter((e) => !has.has(e)),
+  };
+}
+
+/**
  * Persist the full deliberate_folders set (the carrier for empty /
  * deliberately-created folders, MYND-144). The caller passes the entire
  * desired set; v0.1 single-device writes it verbatim. Folded-identity dedup
@@ -786,8 +862,58 @@ export async function setReminderHorizonDays(days: number | null): Promise<void>
  * rejected promise means the disk write failed and the caller's optimistic UI
  * must revert.
  */
-export async function setDeliberateFolders(folders: string[]): Promise<void> {
-  await writePref("plugin:prefs|set_deliberate_folders", { folders });
+export async function mutateDeliberateFolders(
+  mutation: SetMutation,
+): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_deliberate_folders", { mutation });
+}
+
+/**
+ * What a deliberate-folders registration ended up doing (myne-md/myne#613).
+ *
+ * Three outcomes rather than a boolean, because the two failures need opposite
+ * user treatment and collapsing them produces a notice that is wrong for one of
+ * them. `budget-full` is actionable (delete a folder) and permanent until the
+ * user acts; `failed` is not actionable and is usually transient.
+ */
+export type DeliberateWriteOutcome = "ok" | "budget-full" | "failed";
+
+/** How long to wait before the single retry below. */
+const DELIBERATE_RETRY_MS = 300;
+
+/**
+ * Register folders, retrying ONCE on a transient failure, and classify the
+ * result for a surface that shows a notice.
+ *
+ * The split is on whether the user can do anything:
+ *
+ *   - A thrown write is retried after {@link DELIBERATE_RETRY_MS}, because there
+ *     is nothing for the user to do about a disk hiccup and a notice they
+ *     cannot act on trains them to dismiss notices. Only a SECOND failure is
+ *     reported.
+ *   - A budget refusal is reported immediately and is NOT retried: the reserve
+ *     is full, the next attempt refuses identically, and the remedy (delete a
+ *     folder) is the user's.
+ *
+ * One retry, not a backoff loop. The caller is a click, the surface is already
+ * showing the folder optimistically, and a second failure 300 ms later is
+ * evidence enough that this is not a hiccup. A longer schedule would leave a
+ * folder on screen for seconds that is not going to land.
+ */
+export async function registerDeliberateFolders(
+  mutation: SetMutation,
+): Promise<DeliberateWriteOutcome> {
+  try {
+    return (await mutateDeliberateFolders(mutation)) > 0 ? "budget-full" : "ok";
+  } catch {
+    // Transient, probably. Give it one more go before saying anything.
+  }
+  await new Promise((r) => setTimeout(r, DELIBERATE_RETRY_MS));
+  try {
+    return (await mutateDeliberateFolders(mutation)) > 0 ? "budget-full" : "ok";
+  } catch {
+    return "failed";
+  }
 }
 
 /**
@@ -798,8 +924,10 @@ export async function setDeliberateFolders(folders: string[]): Promise<void> {
  * caller's responsibility. No native side-effect; a rejected promise means the
  * disk write failed and the caller's optimistic UI must revert.
  */
-export async function setArchivedFolders(folders: string[]): Promise<void> {
-  await writePref("plugin:prefs|set_archived_folders", { folders });
+export async function mutateArchivedFolders(
+  mutation: SetMutation,
+): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_archived_folders", { mutation });
 }
 
 /**
@@ -1180,8 +1308,10 @@ export async function setSpellEnabled(enabled: boolean): Promise<void> {
  * applies the {OS-locale ∪ en-US} default at read time). Disk-first, no native
  * side-effect; a rejected promise means the disk write failed.
  */
-export async function setSpellLanguages(languages: string[]): Promise<void> {
-  await writePref("plugin:prefs|set_spell_languages", { languages });
+export async function mutateSpellLanguages(
+  mutation: SetMutation,
+): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_spell_languages", { mutation });
 }
 
 /**

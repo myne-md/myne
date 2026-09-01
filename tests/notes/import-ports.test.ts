@@ -9,7 +9,6 @@
 import { describe, it, expect } from "vitest";
 import {
   mediaCandidatePaths,
-  mergeDeliberateFolders,
   titleRecordsToExistingNotes,
 } from "../../src/notes/import/ports";
 import {
@@ -64,24 +63,6 @@ describe("mediaCandidatePaths", () => {
       "/v/A.PNG",
       "/v/attach/A.PNG",
     ]);
-  });
-});
-
-describe("mergeDeliberateFolders", () => {
-  it("unions + dedups existing with the importer's set", () => {
-    expect([...mergeDeliberateFolders(["A/", "B/"], ["B/", "C/"])].sort()).toEqual([
-      "A/",
-      "B/",
-      "C/",
-    ]);
-  });
-
-  it("preserves the existing set when nothing is added", () => {
-    expect(mergeDeliberateFolders(["A/"], [])).toEqual(["A/"]);
-  });
-
-  it("returns the added set when there is no existing", () => {
-    expect(mergeDeliberateFolders([], ["X/"])).toEqual(["X/"]);
   });
 });
 

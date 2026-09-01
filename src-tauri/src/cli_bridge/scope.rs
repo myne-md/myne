@@ -457,7 +457,9 @@ mod tests {
                 &host,
                 &state,
                 &noop_hooks(),
-                vec!["Private/".to_string()],
+                myne_core::plugins::prefs::set_mutation::SetMutation::adding_all(vec![
+                    "Private/".to_string()
+                ]),
                 &myne_core::vault_io::StdVaultIo,
             )
             .await
@@ -495,7 +497,9 @@ mod tests {
                 &host,
                 &state,
                 &noop_hooks(),
-                vec!["Caf\u{00E9}/".to_string()],
+                myne_core::plugins::prefs::set_mutation::SetMutation::adding_all(vec![
+                    "Caf\u{00E9}/".to_string(),
+                ]),
                 &myne_core::vault_io::StdVaultIo,
             )
             .await
@@ -576,7 +580,9 @@ mod tests {
                 &host,
                 &state,
                 &noop_hooks(),
-                vec!["Private/".to_string()],
+                myne_core::plugins::prefs::set_mutation::SetMutation::adding_all(vec![
+                    "Private/".to_string()
+                ]),
                 &myne_core::vault_io::StdVaultIo,
             )
             .await
@@ -661,7 +667,9 @@ mod tests {
                 &host,
                 &state,
                 &noop_hooks(),
-                vec!["Private/".to_string()],
+                myne_core::plugins::prefs::set_mutation::SetMutation::adding_all(vec![
+                    "Private/".to_string()
+                ]),
                 &myne_core::vault_io::StdVaultIo,
             )
             .await
@@ -714,7 +722,9 @@ mod tests {
                 &host,
                 &state,
                 &noop_hooks(),
-                vec!["Private/".to_string()],
+                myne_core::plugins::prefs::set_mutation::SetMutation::adding_all(vec![
+                    "Private/".to_string()
+                ]),
                 &myne_core::vault_io::StdVaultIo,
             )
             .await
@@ -761,7 +771,9 @@ mod tests {
                 &host,
                 &state,
                 &noop_hooks(),
-                vec!["Private/".to_string()],
+                myne_core::plugins::prefs::set_mutation::SetMutation::adding_all(vec![
+                    "Private/".to_string()
+                ]),
                 &myne_core::vault_io::StdVaultIo,
             )
             .await

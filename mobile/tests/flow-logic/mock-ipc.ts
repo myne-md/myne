@@ -678,14 +678,104 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         toolbarHidden = [...new Set(items)].sort();
         return null;
       },
-      // Whole-set setter (MYND-560): record the write AND mutate the store, so
-      // the created empty folder is present on the nonce-bumped re-read.
+      // Add/remove verbs since myne-md/myne#613 (MYND-560 shipped this as a
+      // whole-set setter). APPLY the mutation to the store rather than
+      // replacing it, so the created empty folder is present on the
+      // nonce-bumped re-read and a peer's entry the client never saw survives.
+      //
+      // The recorded array holds the MUTATIONS, not the resulting sets: a
+      // resulting-set recording cannot tell "added X" from "replaced the set
+      // with X", which is the exact distinction this issue turns on.
       "plugin:prefs|set_deliberate_folders": (args) => {
-        const folders = (args.folders ?? []) as string[];
-        const w = window as unknown as { __deliberateFolderWrites?: string[][] };
-        (w.__deliberateFolderWrites ??= []).push([...folders]);
-        deliberateFolders = [...folders];
-        return null;
+        const mutation = (args.mutation ?? {}) as {
+          add?: string[];
+          remove?: string[];
+          addUnlessRemoved?: string[];
+          removePrefix?: string[];
+          renamePrefix?: Array<{ from: string; to: string }>;
+        };
+        // `addUnlessRemoved` is applied here as an ordinary add, and that is a
+        // STATED limitation rather than an oversight: this store holds no
+        // `field_clocks`, so it cannot express "absent and carrying a removal
+        // clock" at all. Dropping the verb instead would be worse in the
+        // direction that matters, since the back-fill would silently do nothing
+        // and the lane would go green over a client that registered no folders.
+        // The tombstone half is owned by
+        // `a_repair_does_not_resurrect_an_entry_whose_removal_is_on_record` in
+        // `core/src/plugins/prefs/set_mutation.rs`.
+        const add = [...(mutation.add ?? []), ...(mutation.addUnlessRemoved ?? [])];
+        const remove = mutation.remove ?? [];
+        const removePrefix = mutation.removePrefix ?? [];
+        const renamePrefix = mutation.renamePrefix ?? [];
+        const w = window as unknown as {
+          __deliberateFolderWrites?: Array<{
+            add: string[];
+            addUnlessRemoved: string[];
+            remove: string[];
+            removePrefix: string[];
+            renamePrefix: Array<{ from: string; to: string }>;
+          }>;
+        };
+        (w.__deliberateFolderWrites ??= []).push({
+          add: [...(mutation.add ?? [])],
+          addUnlessRemoved: [...(mutation.addUnlessRemoved ?? [])],
+          remove: [...remove],
+          removePrefix: [...removePrefix],
+          renamePrefix: renamePrefix.map((r) => ({ ...r })),
+        });
+        // REMOVALS FIRST, then additions, and the identity is the canonical
+        // folder key rather than `toLowerCase()`. Both match
+        // `apply_set_mutation`, and both were wrong here in a way the core has a
+        // named test for: removing after adding makes `{remove:[X], add:[X]}`
+        // end with X absent, where the core ends with it present because that is
+        // what "replace this entry" means; and a bare lowercase misses a stored
+        // `Projects/` when the caller removes `Projects`, which the core matches.
+        // This is mobile's only automated lane, so a mock with its own rules is
+        // a lane that passes while the client is wrong.
+        // Inlined rather than imported: this handler is serialized into the
+        // PAGE, so a module-scope binding is not in scope at call time and
+        // `folderKey` was `undefined` here, which is what the two folder flow
+        // specs failed on. Mirrors `myne_core::folder_key::canonical_folder`:
+        // NFC, lowercase, empty segments dropped, one trailing slash.
+        const key = (f: string) => {
+          const segs = f.normalize("NFC").toLowerCase().split("/").filter(Boolean);
+          return segs.length === 0 ? "" : `${segs.join("/")}/`;
+        };
+        const gone = new Set(remove.map(key));
+        let kept = deliberateFolders.filter((f) => !gone.has(key(f)));
+        // The two PREFIX verbs, in the core's order: every removing verb before
+        // any addition. An entry that folds to the empty string is ignored
+        // rather than treated as the root, because an empty prefix is a prefix
+        // of everything and the no-op case would be the destructive one.
+        const prefixes = removePrefix.map(key).filter((p) => p !== "");
+        if (prefixes.length > 0) {
+          kept = kept.filter((f) => !prefixes.some((p) => key(f).startsWith(p)));
+        }
+        const renames = renamePrefix
+          .map((r) => ({ from: key(r.from), to: r.to }))
+          .filter((r) => r.from !== "");
+        if (renames.length > 0) {
+          const rerooted: string[] = [];
+          for (const f of kept) {
+            const id = key(f);
+            const hit = renames.find((r) => id.startsWith(r.from));
+            if (!hit) {
+              rerooted.push(f);
+              continue;
+            }
+            const tail = id.slice(hit.from.length);
+            const to = hit.to.endsWith("/") || hit.to === "" ? hit.to : `${hit.to}/`;
+            rerooted.push(`${to}${tail}`);
+          }
+          kept = rerooted.filter(
+            (f, i) => rerooted.findIndex((g) => key(g) === key(f)) === i,
+          );
+        }
+        for (const a of add) {
+          if (!kept.some((f) => key(f) === key(a))) kept.push(a);
+        }
+        deliberateFolders = kept;
+        return 0; // additions refused for byte budget: none, in a mock
       },
       // Whole-list favorites setter (MYND-597): record the write AND mutate the
       // store, so un-favoriting from the strip's long-press sheet returns the

@@ -36,6 +36,7 @@ function recordingSink(): ImportSink & { created: string[]; folders: string[][] 
     },
     async setDeliberateFolders(f) {
       folders.push([...f]);
+      return 0; // nothing refused for budget (myne-md/myne#613)
     },
   };
 }
@@ -196,7 +197,9 @@ describe("Obsidian source — behaviour-preserving extraction", () => {
       async createNote() {
         return "id";
       },
-      async setDeliberateFolders() {},
+      async setDeliberateFolders() {
+        return 0; // nothing refused for budget (myne-md/myne#613)
+      },
     };
     return ports;
   }

@@ -28,8 +28,13 @@ vi.mock("../../src/notes/noteWriteBatch", () => ({
 vi.mock("../../src/notes/vaultIndices", () => ({
   reindexNoteFromBody: (...a: unknown[]) => reindexMock(...a),
 }));
-vi.mock("../../src/lib/prefs", () => ({
-  setDeliberateFolders: (...a: unknown[]) => setDeliberateFoldersMock(...a),
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
+  mutateDeliberateFolders: (...a: unknown[]) => setDeliberateFoldersMock(...a),
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 
 import {
@@ -216,7 +221,17 @@ describe("renameFolder — async apply (transactional)", () => {
     expect(writeBatchMock).toHaveBeenCalledTimes(1);
     const batch = writeBatchMock.mock.calls[0]![0] as Array<{ noteId: string; plaintext: string }>;
     expect(batch.map((e) => e.noteId).sort()).toEqual(["n1", "ref"]);
-    expect(setDeliberateFoldersMock).toHaveBeenCalledWith(["Work/"]);
+    // A rename states the SUBTREE once and the core re-roots whatever is
+    // stored under it. It used to send a remove-plus-add pair derived from the
+    // caller's own set, which could mention neither an entry an at-fill writer
+    // had just put on disk nor one a peer had landed: those stayed under the OLD
+    // path and reappeared empty at the next unlock (myne-md/myne#613 review).
+    // One verb is also atomic, where the pair could land its removals, stamp
+    // each as a propagating deletion, and have its additions refused by the byte
+    // budget.
+    expect(setDeliberateFoldersMock).toHaveBeenCalledWith({
+      renamePrefix: [{ from: "projects/", to: "Work/" }],
+    });
     // Moved note re-indexed; the pure inbound-only note is not a move.
     expect(reindexMock).toHaveBeenCalledWith("n1", expect.stringContaining("folder: Work/"));
   });
@@ -331,7 +346,9 @@ describe("renameFolder — async apply (transactional)", () => {
     expect(result.failed).toEqual([]);
     expect(result.moved.sort()).toEqual(["n", "ref"]);
     // The two writes the recovery pass will NOT redo happen anyway.
-    expect(setDeliberateFoldersMock).toHaveBeenCalledWith(["Q/"]);
+    expect(setDeliberateFoldersMock).toHaveBeenCalledWith({
+      renamePrefix: [{ from: "p/", to: "Q/" }],
+    });
     expect(reindexMock).toHaveBeenCalledWith("n", expect.stringContaining("folder: Q/"));
   });
 

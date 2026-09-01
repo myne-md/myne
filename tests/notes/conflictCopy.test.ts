@@ -33,10 +33,15 @@ vi.mock("../../src/notes/deleteNote", () => ({
   noteDelete: mocks.deleteNoteRouted,
   tombstoneNote: vi.fn(),
 }));
-vi.mock("../../src/lib/prefs", () => ({
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   prefsRead: mocks.prefsRead,
   setFavorites: mocks.setFavorites,
   setItemOrder: mocks.setItemOrder,
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 
 const UUID = "0a1b2c3d4e5f60718293a4b5c6d7e8f9";

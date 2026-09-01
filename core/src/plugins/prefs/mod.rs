@@ -17,6 +17,7 @@
 pub mod commands;
 pub mod error;
 pub mod folder_scope;
+pub mod set_mutation;
 
 // Re-exports for cross-plugin consumers (e.g., vault_unlock's
 // `apply_persisted_prefs` post-pipeline hook).

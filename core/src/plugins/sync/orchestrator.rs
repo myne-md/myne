@@ -1526,7 +1526,21 @@ async fn sync_prefs_phase(
         let remote_view =
             protocol::decode_prefs_blob(&prefs_key, account_number_hash, &remote_bytes)
                 .unwrap_or_default();
-        let merged = merge_prefs(&local_view, &remote_view);
+        let mut merged = merge_prefs(&local_view, &remote_view);
+        // myne#613: the merge is deliberately unbounded, because a budget
+        // applied DURING it makes refusal order-dependent and breaks
+        // `merge(a,b) == merge(b,a)`. So the bound is applied to its RESULT,
+        // where the input is the same set on both devices and the shedding
+        // order is total, which is what keeps both devices at the same bytes.
+        //
+        // Without it, two peers each just inside the local write budget merge to
+        // roughly twice the cap (61,415 bytes each, 122,756 together, measured),
+        // `encode_prefs_blob_versioned` below returns `Err`, and the
+        // `map_err(|_| SyncCycleError::Io)?` on it used to abort the WHOLE cycle
+        // before the notes phase, every cycle, with no way out: the local
+        // deletions that would shrink the blob could never reach the peer.
+        crate::plugins::prefs::set_mutation::shed_retained_clocks(&mut merged);
+        let merged = merged;
         let applied_remote = merged != local_view;
         let merged_hash = shared_subset_hash(&merged);
         let remote_hash = shared_subset_hash(&remote_view);
@@ -2731,7 +2745,21 @@ async fn sync_cycle_attempt(
         .all_metas
         .iter()
         .find(|m| m.id == prefs_id && m.attachment_id.is_none());
-    let prefs_phase = sync_prefs_phase(
+    // myne#613: the prefs phase may FAIL without taking the cycle with it.
+    //
+    // `vault.prefs` is settings; the notes phase below is the user's data. This
+    // used to be `.await?`, so any prefs-side `SyncCycleError` aborted
+    // `sync_cycle_attempt` before the themes phase, the notes phase and the push
+    // batch. The reachable case was an over-cap merged blob, which is now
+    // bounded (`shed_retained_clocks`), but the ordering was wrong on its own
+    // terms: a settings blob that cannot be written is a reason to skip settings
+    // for a cycle, never a reason to stop syncing notes. The bound above closes
+    // the growth path anybody has found; this closes the class.
+    //
+    // Skipping leaves `dirty: false`, so nothing here moves the push-gate
+    // baseline: `set_prefs_gate_baseline` runs only when the prefs blob really
+    // landed in the push batch, so the next cycle retries from the same base.
+    let prefs_phase = match sync_prefs_phase(
         io,
         transport,
         token,
@@ -2743,7 +2771,23 @@ async fn sync_cycle_attempt(
         remote_prefs_rec,
         version,
     )
-    .await?;
+    .await
+    {
+        Ok(phase) => phase,
+        Err(err) => {
+            tracing::warn!(
+                stage = "prefs",
+                event = "phase_skipped",
+                error = ?err,
+                "the prefs phase failed; syncing notes anyway and retrying prefs next cycle"
+            );
+            PrefsPhase {
+                dirty: false,
+                applied_remote: false,
+                shared_hash: String::new(),
+            }
+        }
+    };
 
     // --- themes phase (MYND-486) — unconditional, every cycle ---
     // Like the catalog + prefs singletons, `vault.themes` is never

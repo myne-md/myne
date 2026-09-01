@@ -141,6 +141,14 @@ export interface ImportResult {
    *  importer, or if nothing compressed. */
   compression: CompressionTally;
   emptyFoldersPreserved: number;
+  /**
+   * Folders the import created that the reserved byte budget could not register
+   * (myne-md/myne#613). Zero in every ordinary case. Non-zero means those
+   * folders behave as they did before this feature: they exist while they hold
+   * notes and vanish when the last one leaves, so the user is told rather than
+   * discovering it weeks later.
+   */
+  foldersNotPreserved: number;
   /** Remaining (un-ingested) `.md` count if cancelled mid-walk; `null` if completed. */
   cancelled: number | null;
   /** Total `.md` files discovered (the N in "Importing X of N"). */
@@ -332,18 +340,42 @@ export async function importFromSource(
     options.onProgress?.(i + 1, total);
   }
 
-  // ----- SYNC-4: one deliberate-folders write for empty source dirs -----
+  // ----- one deliberate-folders write for the whole import -----
   // Guarded like the import-report write in `ports.ts`: this runs AFTER every
   // note has landed, so failing the whole import here would report failure for
-  // an import that fully succeeded. Preserving empty folders is fidelity, not
+  // an import that fully succeeded. Preserving the folder tree is fidelity, not
   // content.
-  const deliberate = collectDeliberateImportFolders(allDirs, noteFolders);
-  let emptyFoldersPreserved = deliberate.length;
+  //
+  // myne-md/myne#613 widened WHAT is registered. It used to be only the source
+  // dirs that arrived EMPTY, because a folder holding notes was proved by those
+  // notes and needed no record. Under at-fill a folder is registered the first
+  // time it holds a note, so the importer registers every folder it created.
+  // Special-casing it the other way was considered and rejected: it would leave
+  // this issue's own defect in place for imported vaults, which are the largest.
+  //
+  // ONE write, not one per folder: each re-encrypts the whole `vault.prefs`.
+  const emptyDirs = collectDeliberateImportFolders(allDirs, noteFolders);
+  const withNotes = [...new Set(noteFolders.filter((f): f is string => f !== null))];
+  const deliberate = [...new Set([...emptyDirs, ...withNotes])];
+  let emptyFoldersPreserved = emptyDirs.length;
+  let foldersNotPreserved = 0;
   if (deliberate.length > 0) {
     try {
-      await sink.setDeliberateFolders(deliberate);
+      foldersNotPreserved = await sink.setDeliberateFolders(deliberate);
+      // The refusal count is over the WHOLE registration and does not say which
+      // entries it dropped, so subtracting it from the empty-dir count is a
+      // LOWER bound rather than a measurement: exact when nothing was refused,
+      // which is every ordinary import, and never overstating otherwise. The
+      // report shows `foldersNotPreserved` beside it, which is the number the
+      // user acts on.
+      emptyFoldersPreserved = Math.max(0, emptyDirs.length - foldersNotPreserved);
     } catch {
       emptyFoldersPreserved = 0;
+      // The folders THIS import created, not the whole union: `deliberate` also
+      // holds folders the vault already had, and those are unaffected by a
+      // failed write. Reporting the union told the user that folders which will
+      // not vanish are about to (myne-md/myne#613 pr-review).
+      foldersNotPreserved = emptyDirs.length + withNotes.length;
     }
   }
 
@@ -359,6 +391,7 @@ export async function importFromSource(
     media,
     compression,
     emptyFoldersPreserved,
+    foldersNotPreserved,
     cancelled,
     total,
     lossyNotes,

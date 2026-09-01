@@ -211,16 +211,26 @@ describe("check-twin-inventory", () => {
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    expect(full.out).toContain("110 twin(s) discovered");
+    expect(full.out).toContain("112 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("110 twin(s) discovered");
+    expect(full.out).toContain("112 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
+    // Then 104 to 106: myne-md/myne#613 added two CROSS-PATH pairs, the two
+    // `folderBackfill.ts` back-fills and `src/notes/moveNote.ts` against
+    // `mobile/src/lib/note-organize.ts`. Neither is findable by the path sweep,
+    // and the second is where the review found mobile issuing one prefs write
+    // per note in a folder rename while desktop batched: an unrostered pair is
+    // how that stayed green.
+    expect(full.out).toContain("112 twin(s) discovered");
+    //
+    // Then to 112 when the two met at a merge: neither branch could see the
+    // other's pairs, and all of them are real.
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -394,7 +404,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(110);
+    expect(ROSTER.length).toBe(112);
   });
 
   it("keeps `screen` narrow", () => {
