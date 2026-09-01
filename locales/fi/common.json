@@ -884,13 +884,15 @@
           "captureFailed": "Tallennusta ei voitu aloittaa. Tarkista mikrofonin käyttöoikeus järjestelmäasetuksista.",
           "generic": "Tallennusta ei voitu aloittaa.",
           "locked": "Avaa holvi tallentaaksesi ääniviestin.",
-          "noInputDevice": "Mikrofonia ei löytynyt. Liitä mikrofoni ja yritä uudelleen."
+          "noInputDevice": "Mikrofonia ei löytynyt. Liitä mikrofoni ja yritä uudelleen.",
+          "unsupportedSampleRate": "Mikrofonisi tallentaa näytteenottotaajuudella, jota Myne ei voi litteroida. Valitse toinen syöttölaite tai muuta sen näytteenottotaajuutta järjestelmän ääniasetuksissa."
         },
         "stopError": {
           "captureFailed": "Tallennus epäonnistui. Tarkista mikrofonisi.",
           "emptyRecording": "Mitään ei tallennettu.",
           "generic": "Tallennusta ei voitu tallentaa.",
-          "silentRecording": "Tallennus oli äänetön ja hylättiin. Tarkista mikrofonisi."
+          "silentRecording": "Tallennus oli äänetön ja hylättiin. Tarkista mikrofonisi.",
+          "unsupportedSampleRate": "Mikrofonisi tallentaa näytteenottotaajuudella, jota Myne ei voi litteroida. Mitään ei tallennettu. Valitse toinen syöttölaite tai muuta sen näytteenottotaajuutta järjestelmän ääniasetuksissa."
         }
       },
       "widget": {
@@ -936,6 +938,7 @@
             "featureOff": "Puheesta tekstiksi on pois päältä. Ota se käyttöön kohdasta Asetukset → Litterointi.",
             "modelLoadFailed": "Puheentunnistusmallia ei voitu ladata. Jos asetit oman mallin kohdassa Asetukset → Kehittäjä → Tekoäly, tarkista sen tiedostot; muussa tapauksessa Mynen uudelleenasennus palauttaa sisäänrakennetun mallin.",
             "noModel": "Puheentunnistusmalli puuttuu. Mynen uudelleenasennus palauttaa sen.",
+            "tooLong": "Tämä tallenne on liian pitkä litteroitavaksi. Ääni pysyy liitteenä, joten voit toistaa sen.",
             "vaultLocked": "Avaa holvi litteroidaksesi."
           },
           "disabledReason": "Litterointi vaatii tekoälyn — ota se käyttöön kohdasta Asetukset → Developer → Tekoäly.",
@@ -1168,10 +1171,6 @@
       "turnedIntoTemplate": "Muutettu malliksi",
       "convertedToNote": "Muunnettu muistiinpanoksi",
       "versionHistory": "Versiohistoria",
-      "exportMarkdown": "Vie Markdown-muodossa…",
-      "exportPdf": "Vie PDF-muodossa…",
-      "exportHtml": "Vie HTML-muodossa…",
-      "exportTxt": "Vie pelkkänä tekstinä…",
       "trash": "Siirrä roskakoriin"
     },
     "codeBlock": {
@@ -2038,10 +2037,6 @@
       "duplicate": "Kahdenna",
       "editFilterTitle": "Muokkaa suodatinta",
       "emptyState": "Ei vielä muistiinpanoja.",
-      "exportHtml": "Vie HTML-muodossa…",
-      "exportMarkdown": "Vie Markdown-muodossa…",
-      "exportPdf": "Vie PDF-muodossa…",
-      "exportTxt": "Vie pelkkänä tekstinä…",
       "favoritesHeading": "Suosikit",
       "icon": "Kuvake…",
       "mergeAnyway": "Yhdistä silti",
@@ -2347,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "Oletus"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Vie…",
+      "txt": "Pelkkä teksti"
     }
   },
   "password": {
@@ -3063,6 +3065,9 @@
       "exactLabel": "Tarkka ajoitus",
       "exactOn": "Päällä",
       "horizon": "Muistutukset on rekisteröity {{date}} asti. Avaa Myne ennen sitä, jotta ne jatkuvat.",
+      "horizonLabel": "Ajoita etukäteen",
+      "horizonLabelHelper": "Muistutukset valmistellaan näin paljon etukäteen. Mynen on oltava auki ja lukitus avattuna, jotta muistutus saapuu.",
+      "horizonInertHelper": "Tallennettu tälle laitteelle. Mikään ei vielä lue sitä: tämä versio ei toimita tehtävämuistutuksia.",
       "label": "Tehtävämuistutukset",
       "saveError": "Asetusta ei voitu tallentaa. Yritä uudelleen.",
       "showTextAria": "Näytä tehtävän teksti ilmoituksessa",

@@ -1,4 +1,5 @@
 pub use myne_core::atomic_write;
+pub mod audio_rate;
 mod auto_lock;
 mod backup_container;
 mod backup_schedule;

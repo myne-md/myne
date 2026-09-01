@@ -164,7 +164,7 @@ struct Session {
     /// (`chatStore::blockSeedingOfExistingTurns`). Without this the frontend's
     /// cut covered future runs only, while a run PAUSED for a scope approval
     /// went on re-sending the pre-change conversation on every remaining leg,
-    /// and `docs/decisions/ai/0541` cited SYNC-14 for a bound half of which did
+    /// and `docs/decisions/ai/0553` cited SYNC-14 for a bound half of which did
     /// not exist.
     ///
     /// The provider is in the snapshot for the reason `lib/prefs.ts` gives for

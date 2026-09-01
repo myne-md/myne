@@ -878,13 +878,15 @@
           "captureFailed": "Imeshindwa kuanza kurekodi. Kagua ruhusa ya maikrofoni katika Mipangilio ya Mfumo.",
           "generic": "Imeshindwa kuanza kurekodi.",
           "locked": "Fungua kasha lako ili kurekodi dokezo la sauti.",
-          "noInputDevice": "Hakuna maikrofoni iliyopatikana. Unganisha moja kisha ujaribu tena."
+          "noInputDevice": "Hakuna maikrofoni iliyopatikana. Unganisha moja kisha ujaribu tena.",
+          "unsupportedSampleRate": "Maikrofoni yako inarekodi kwa kiwango ambacho Myne haiwezi kunukuu. Chagua kifaa kingine cha kuingiza sauti, au ubadilishe kiwango chake cha sampuli katika mipangilio ya sauti ya mfumo."
         },
         "stopError": {
           "captureFailed": "Urekodi umeshindikana. Kagua maikrofoni yako.",
           "emptyRecording": "Hakuna kilichorekodiwa.",
           "generic": "Imeshindwa kuhifadhi urekodi.",
-          "silentRecording": "Urekodi ulikuwa kimya na umetupwa. Kagua maikrofoni yako."
+          "silentRecording": "Urekodi ulikuwa kimya na umetupwa. Kagua maikrofoni yako.",
+          "unsupportedSampleRate": "Maikrofoni yako inarekodi kwa kiwango ambacho Myne haiwezi kunukuu. Hakuna kilichohifadhiwa. Chagua kifaa kingine cha kuingiza sauti, au ubadilishe kiwango chake cha sampuli katika mipangilio ya sauti ya mfumo."
         }
       },
       "widget": {
@@ -930,6 +932,7 @@
             "featureOff": "Ubadilishaji wa sauti kuwa maandishi umezimwa. Uwashe katika Mipangilio → Unukuzi.",
             "modelLoadFailed": "Imeshindwa kupakia modeli ya kubadilisha sauti kuwa maandishi. Ikiwa umeweka modeli maalum katika Mipangilio → Msanidi → AI, kagua mafaili yake; vinginevyo kusakinisha Myne upya kunarejesha ile iliyojengwa ndani.",
             "noModel": "Modeli ya kubadilisha sauti kuwa maandishi haipo. Kusakinisha Myne upya kunairejesha.",
+            "tooLong": "Rekodi hii ni ndefu mno kunukuliwa. Sauti inabaki imeambatishwa, hivyo bado unaweza kuicheza.",
             "vaultLocked": "Fungua kasha lako ili kunukuu."
           },
           "failed": "Unukuzi umeshindikana. Tafadhali jaribu tena.",
@@ -1159,10 +1162,6 @@
       "turnedIntoTemplate": "Limegeuzwa kuwa kiolezo",
       "convertedToNote": "Limegeuzwa kuwa dokezo",
       "versionHistory": "Historia ya matoleo",
-      "exportMarkdown": "Hamisha kama Markdown…",
-      "exportPdf": "Hamisha kama PDF…",
-      "exportHtml": "Hamisha kama HTML…",
-      "exportTxt": "Hamisha kama maandishi wazi…",
       "trash": "Peleka kwenye tupio"
     },
     "codeBlock": {
@@ -2026,10 +2025,6 @@
       "duplicate": "Nakili",
       "editFilterTitle": "Hariri kichujio",
       "emptyState": "Bado hakuna madokezo.",
-      "exportHtml": "Hamisha kama HTML…",
-      "exportMarkdown": "Hamisha kama Markdown…",
-      "exportPdf": "Hamisha kama PDF…",
-      "exportTxt": "Hamisha kama maandishi wazi…",
       "favoritesHeading": "Vipendwa",
       "icon": "Aikoni…",
       "mergeAnyway": "Unganisha hata hivyo",
@@ -2333,6 +2328,13 @@
     },
     "workspace": {
       "defaultSlotName": "Chaguomsingi"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Hamisha…",
+      "txt": "Maandishi sahili"
     }
   },
   "password": {
@@ -3043,6 +3045,9 @@
       "exactLabel": "Muda kamili",
       "exactOn": "Imewashwa",
       "horizon": "Vikumbusho vimesajiliwa hadi {{date}}. Fungua Myne kabla ya hapo ili viendelee kufika.",
+      "horizonLabel": "Ratibu mapema",
+      "horizonLabelHelper": "Vikumbusho huandaliwa mapema kiasi hiki. Myne lazima iwe wazi na imefunguliwa ili kikumbusho kifike.",
+      "horizonInertHelper": "Imehifadhiwa kwenye kifaa hiki. Bado hakuna kinachoisoma: toleo hili halitumi vikumbusho vya kazi.",
       "label": "Vikumbusho vya kazi",
       "saveError": "Imeshindwa kuhifadhi mpangilio huo. Jaribu tena.",
       "showTextAria": "Onyesha maandishi ya kazi kwenye arifa",

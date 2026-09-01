@@ -79,20 +79,18 @@ export type ProviderErrorCause =
   | "failed";
 
 /**
- * Two spellings reach this seam and only one table describes them.
+ * A serialized `EngineError` tag, in either spelling, reduced to one.
  *
  * Tauri serializes a unit variant as its identifier (`NoCredential`) while the
- * `kind()` helper emits snake_case (`no_credential`), and a table mapping only
- * one of them silently reports the catch-all for the other. Writing both rows by
- * hand made that failure a transcription error away, twice per cause: the
- * previous form was 22 hand-written entries for 11 causes, and adding a cause
- * meant remembering to add two.
+ * `kind()` helper emits snake_case (`no_credential`), so both reach every seam
+ * that reads one, and a table mapping only one of them silently reports its
+ * catch-all for the other. Normalizing first is what lets a table hold one row
+ * per cause instead of two.
  *
- * So the tag is normalized to snake_case first, and the table below holds only
- * the causes whose name is NOT the normalized tag. Today that is exactly one,
- * `RemoteBarred`, which is the only row a reader has any reason to look at.
+ * Exported, so `normalizeTranscribeError` uses this rather than a second copy;
+ * the rationale for each table's own shape lives with that table.
  */
-function snakeCase(tag: string): string {
+export function snakeCase(tag: string): string {
   return tag.replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase();
 }
 
@@ -101,6 +99,10 @@ function snakeCase(tag: string): string {
 // truthy function and be returned as a cause, and the key lookup below would
 // then render nothing where an error sentence belongs. Not reachable from the
 // closed Rust enum, and one word to close.
+// Only the causes whose name is NOT the normalized tag; today exactly one,
+// `RemoteBarred`, which is the only row a reader has any reason to look at.
+// Writing both spellings by hand instead was 22 entries for 11 causes, and
+// adding a cause meant remembering to add two.
 const PROVIDER_CAUSE_RENAMES = new Map<string, ProviderErrorCause>([["remote_barred", "barred"]]);
 
 const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([

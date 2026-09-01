@@ -2717,7 +2717,7 @@ mod tests {
     /// governs the scope-approval pause. Neither covers a run that is executing,
     /// and that is up to 24 iterations, measured at 12m49s on a remote provider.
     /// Until this the seed was fixed for the whole of it while
-    /// `docs/decisions/ai/0541` and `threat-model.md` TB13 both cited SYNC-14 as
+    /// `docs/decisions/ai/0553` and `threat-model.md` TB13 both cited SYNC-14 as
     /// the bound.
     ///
     /// Asserted on what reaches the REQUEST, since that is the value that leaves

@@ -884,13 +884,15 @@
           "captureFailed": "Không thể bắt đầu ghi âm. Hãy kiểm tra quyền truy cập micrô trong Cài đặt hệ thống.",
           "generic": "Không thể bắt đầu ghi âm.",
           "locked": "Hãy mở khóa kho để ghi âm ghi chú giọng nói.",
-          "noInputDevice": "Không tìm thấy micrô. Hãy kết nối một micrô rồi thử lại."
+          "noInputDevice": "Không tìm thấy micrô. Hãy kết nối một micrô rồi thử lại.",
+          "unsupportedSampleRate": "Micrô của bạn ghi ở tần số lấy mẫu mà Myne không thể chuyển thành văn bản. Hãy chọn thiết bị đầu vào khác, hoặc đổi tần số lấy mẫu trong cài đặt âm thanh của hệ thống."
         },
         "stopError": {
           "captureFailed": "Ghi âm thất bại. Hãy kiểm tra micrô của bạn.",
           "emptyRecording": "Không có gì được ghi âm.",
           "generic": "Không thể lưu bản ghi âm.",
-          "silentRecording": "Bản ghi âm im lặng nên đã bị loại bỏ. Hãy kiểm tra micrô của bạn."
+          "silentRecording": "Bản ghi âm im lặng nên đã bị loại bỏ. Hãy kiểm tra micrô của bạn.",
+          "unsupportedSampleRate": "Micrô của bạn ghi ở tần số lấy mẫu mà Myne không thể chuyển thành văn bản. Không có gì được lưu. Hãy chọn thiết bị đầu vào khác, hoặc đổi tần số lấy mẫu trong cài đặt âm thanh của hệ thống."
         }
       },
       "widget": {
@@ -936,6 +938,7 @@
             "featureOff": "Chuyển giọng nói thành văn bản đang tắt. Hãy bật nó trong Cài đặt → Chép lời.",
             "modelLoadFailed": "Không thể tải mô hình chuyển giọng nói thành văn bản. Nếu bạn đã đặt một mô hình tùy chỉnh trong Cài đặt → Nhà phát triển → AI, hãy kiểm tra các tệp của nó; nếu không, cài đặt lại Myne sẽ khôi phục mô hình tích hợp sẵn.",
             "noModel": "Thiếu mô hình chuyển giọng nói thành văn bản. Cài đặt lại Myne sẽ khôi phục nó.",
+            "tooLong": "Bản ghi này quá dài để chuyển thành văn bản. Tệp âm thanh vẫn được đính kèm, nên bạn vẫn có thể phát lại.",
             "vaultLocked": "Hãy mở khóa kho của bạn để chép lời."
           },
           "disabledReason": "Bật AI trong Cài đặt → Developer → AI để chép lời.",
@@ -1168,10 +1171,6 @@
       "turnedIntoTemplate": "Đã biến thành mẫu",
       "convertedToNote": "Đã chuyển thành ghi chú",
       "versionHistory": "Lịch sử phiên bản",
-      "exportMarkdown": "Xuất dạng Markdown…",
-      "exportPdf": "Xuất dạng PDF…",
-      "exportHtml": "Xuất dạng HTML…",
-      "exportTxt": "Xuất dạng văn bản thuần…",
       "trash": "Chuyển vào Thùng rác"
     },
     "codeBlock": {
@@ -2038,10 +2037,6 @@
       "duplicate": "Nhân bản",
       "editFilterTitle": "Chỉnh sửa bộ lọc",
       "emptyState": "Chưa có ghi chú nào.",
-      "exportHtml": "Xuất dạng HTML…",
-      "exportMarkdown": "Xuất dạng Markdown…",
-      "exportPdf": "Xuất dạng PDF…",
-      "exportTxt": "Xuất dạng văn bản thuần…",
       "favoritesHeading": "Yêu thích",
       "icon": "Biểu tượng…",
       "mergeAnyway": "Vẫn hợp nhất",
@@ -2347,6 +2342,13 @@
     },
     "workspace": {
       "defaultSlotName": "Mặc định"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Xuất…",
+      "txt": "Văn bản thuần"
     }
   },
   "password": {
@@ -3063,6 +3065,9 @@
       "exactLabel": "Thời điểm chính xác",
       "exactOn": "Bật",
       "horizon": "Nhắc nhở đã được đăng ký đến hết {{date}}. Hãy mở Myne trước lúc đó để chúng tiếp tục.",
+      "horizonLabel": "Lên lịch trước",
+      "horizonLabelHelper": "Lời nhắc được chuẩn bị trước khoảng này. Myne phải đang mở và đã mở khóa thì lời nhắc mới đến.",
+      "horizonInertHelper": "Đã lưu trên thiết bị này. Chưa có gì đọc nó: bản dựng này không gửi lời nhắc công việc.",
       "label": "Nhắc nhở công việc",
       "saveError": "Không thể lưu cài đặt đó. Hãy thử lại.",
       "showTextAria": "Hiện nội dung công việc trong thông báo",

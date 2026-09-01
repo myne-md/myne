@@ -921,13 +921,15 @@
           "captureFailed": "Impossible de démarrer l'enregistrement. Vérifiez l'accès au microphone dans les Réglages système.",
           "generic": "Impossible de démarrer l'enregistrement.",
           "locked": "Déverrouillez votre coffre-fort pour enregistrer une note vocale.",
-          "noInputDevice": "Aucun microphone détecté. Connectez-en un et réessayez."
+          "noInputDevice": "Aucun microphone détecté. Connectez-en un et réessayez.",
+          "unsupportedSampleRate": "Votre microphone enregistre à une fréquence d'échantillonnage que Myne ne peut pas transcrire. Choisissez un autre périphérique d'entrée, ou modifiez sa fréquence d'échantillonnage dans les réglages son du système."
         },
         "stopError": {
           "captureFailed": "L'enregistrement a échoué. Vérifiez votre microphone.",
           "emptyRecording": "Rien n'a été enregistré.",
           "generic": "Impossible d'enregistrer la note vocale.",
-          "silentRecording": "L'enregistrement était silencieux et a été supprimé. Vérifiez votre microphone."
+          "silentRecording": "L'enregistrement était silencieux et a été supprimé. Vérifiez votre microphone.",
+          "unsupportedSampleRate": "Votre microphone enregistre à une fréquence d'échantillonnage que Myne ne peut pas transcrire. Rien n'a été enregistré. Choisissez un autre périphérique d'entrée, ou modifiez sa fréquence d'échantillonnage dans les réglages son du système."
         }
       },
       "widget": {
@@ -973,6 +975,7 @@
             "featureOff": "La reconnaissance vocale est désactivée. Activez-la dans Paramètres → Transcription.",
             "modelLoadFailed": "Impossible de charger le modèle de reconnaissance vocale. Si vous avez défini un modèle personnalisé dans Paramètres → Développeur → IA, vérifiez ses fichiers ; sinon, réinstaller Myne rétablit le modèle intégré.",
             "noModel": "Le modèle de reconnaissance vocale est manquant. Réinstaller Myne le rétablit.",
+            "tooLong": "Cet enregistrement est trop long pour être transcrit. L'audio reste joint, vous pouvez donc toujours l'écouter.",
             "vaultLocked": "Déverrouillez votre coffre-fort pour transcrire."
           },
           "disabledReason": "Activez l'IA dans Paramètres → Developer → IA pour transcrire.",
@@ -1217,10 +1220,6 @@
       "turnedIntoTemplate": "Transformée en modèle",
       "convertedToNote": "Convertie en note",
       "versionHistory": "Historique des versions",
-      "exportMarkdown": "Exporter en Markdown…",
-      "exportPdf": "Exporter en PDF…",
-      "exportHtml": "Exporter en HTML…",
-      "exportTxt": "Exporter en texte brut…",
       "trash": "Déplacer vers la corbeille"
     },
     "codeBlock": {
@@ -2118,10 +2117,6 @@
       "duplicate": "Dupliquer",
       "editFilterTitle": "Modifier le filtre",
       "emptyState": "Aucune note pour l'instant.",
-      "exportHtml": "Exporter en HTML…",
-      "exportMarkdown": "Exporter en Markdown…",
-      "exportPdf": "Exporter en PDF…",
-      "exportTxt": "Exporter en texte brut…",
       "favoritesHeading": "Favoris",
       "icon": "Icône…",
       "mergeAnyway": "Fusionner quand même",
@@ -2437,6 +2432,13 @@
     },
     "workspace": {
       "defaultSlotName": "Par défaut"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exporter…",
+      "txt": "Texte brut"
     }
   },
   "password": {
@@ -3169,6 +3171,9 @@
       "exactLabel": "Horaire exact",
       "exactOn": "Activé",
       "horizon": "Les rappels sont enregistrés jusqu'au {{date}}. Ouvrez Myne avant cette date pour qu'ils continuent.",
+      "horizonLabel": "Planifier à l'avance",
+      "horizonLabelHelper": "Les rappels sont préparés avec cette avance. Myne doit être ouvert et déverrouillé pour qu'un rappel arrive.",
+      "horizonInertHelper": "Enregistré sur cet appareil. Rien ne le lit encore : cette version ne délivre pas de rappels de tâches.",
       "label": "Rappels de tâches",
       "saveError": "Impossible d'enregistrer ce réglage. Réessayez.",
       "showTextAria": "Afficher le texte de la tâche dans la notification",

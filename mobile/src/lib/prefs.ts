@@ -641,6 +641,13 @@ export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
  * Set how many days ahead this device registers reminders with the OS, or
  * `null` to fall back to the built-in horizon (MYND-618/619).
  *
+ * **No mobile build hands a reminder to an operating system yet** (myne#508):
+ * `reminderPass.ts` has no production caller, which `remindersReachTheOs()` in
+ * `./reminders.ts` states and the settings screen gates its OS claims on. The
+ * sentence below is therefore the reading this preference takes on from the
+ * change that gives that pass a caller, not a description of today. The value
+ * is written and persisted regardless, device-locally.
+ *
  * Shorter is more private, not merely cheaper: pending reminder times leave the
  * AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7).
  */

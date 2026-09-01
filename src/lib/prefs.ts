@@ -845,7 +845,7 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
  * runs to a local model runtime, which `threat-model.md` TB12 is a trust
  * boundary in its own right (a separately distributed daemon on the same
  * machine), so "clearing is free" is not true, only cheaper. One rule is
- * learnable and two are not, which is the argument `docs/decisions/ai/0541`
+ * learnable and two are not, which is the argument `docs/decisions/ai/0553`
  * already makes about the seed itself.
  *
  * **The cut lives here rather than in `usePrefs`**, unlike the exclusion one,
