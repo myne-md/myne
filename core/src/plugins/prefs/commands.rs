@@ -1258,15 +1258,13 @@ pub async fn set_ai_provider_consent_from_host(
             return Err(PrefsWriteError::InvalidValue);
         }
     }
-    // Stored device-scoped. `granted_for` is validated against
-    // `KNOWN_AI_PROVIDERS` above, so `from_wire` cannot fail here; the
-    // `ok_or` is the fail-closed arm rather than a real branch.
-    let stored = match granted_for.as_deref() {
-        Some(name) => Some(
-            protocol::prefs::device_scoped_consent(name),
-        ),
-        None => None,
-    };
+    // Stored device-scoped, which is the form `provider_gate` requires: a bare
+    // wire name is refused there, so writing one here would record a consent
+    // that never opens the gate. `granted_for` is validated against
+    // `KNOWN_AI_PROVIDERS` above, so the name reaching the grammar is known.
+    let stored = granted_for
+        .as_deref()
+        .map(protocol::prefs::device_scoped_consent);
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     let present = granted_for.is_some();

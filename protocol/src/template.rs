@@ -517,7 +517,7 @@ mod tests {
         emit_render(
             &mut dump,
             "render-all-five-tokens",
-            "All five registry tokens in one template, one pass. The ctx is a local instant near a UTC day boundary (01:00 local in a +03:00 offset = 22:00 the PREVIOUS day in UTC) — the engine emits the host-injected LOCAL day, proving no engine-side UTC conversion.",
+            "The five v1 registry tokens in one template, one pass. The registry is SEVEN since myne-md/myne#177 and no case renders all of them: the two period tokens carry a period whose bounds are deliberately far from `{{date}}`, which is what the dedicated period case pins, so folding them in here would cost that contrast. The ctx is a local instant near a UTC day boundary (01:00 local in a +03:00 offset = 22:00 the PREVIOUS day in UTC) — the engine emits the host-injected LOCAL day, proving no engine-side UTC conversion.",
             "# {{title}} — {{weekday}} {{date}} {{time}} ({{datetime}})",
             &base,
             "# My Note — Sunday 2026-06-07 01:00 (2026-06-07 01:00)",

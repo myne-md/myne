@@ -33,6 +33,10 @@ test.describe("compact fallback on a tablet screen", () => {
     // Back pops to the list (empty new note is discarded, not persisted).
     await page.getByTestId("editor.back").click();
     await expect(page.getByTestId("workspace.app-header")).toBeVisible();
-    await expect(page.getByText("No notes yet")).toBeVisible();
+    // No note row: the empty new note was discarded. Not the "No notes yet"
+    // placeholder, which an empty vault no longer shows once a deliberate
+    // folder exists (myne-md/myne#613, and `folders/empty-folders.flow.ts`
+    // forbids that short-circuit outright).
+    await expect(page.getByTestId("notes.row")).toHaveCount(0);
   });
 });
