@@ -48,7 +48,8 @@
       "unsupportedDetail": "Den bestod {{passes}} af {{attempts}} tjek; der kræves {{required}}.",
       "checking": "Tjekker modellen…",
       "checkingAt": "Tjekker modellen… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Den beståelsesgrænse er endnu ikke målt på tværs af modeller, så den kan være strengere eller mere lempelig, end den bør være."
+      "unsupportedProvisional": "Den beståelsesgrænse er endnu ikke målt på tværs af modeller, så den kan være strengere eller mere lempelig, end den bør være.",
+      "scopeNone": "ingen note åben, så der er endnu ikke noget at arbejde med"
     },
     "progress": {
       "working": "Arbejder",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} omfang, du har angivet",
       "grantsUser_other": "{{count}} omfang, du har angivet",
       "grantsModel_one": "{{count}} den bad om",
-      "grantsModel_other": "{{count}} omfang, den bad om"
+      "grantsModel_other": "{{count}} omfang, den bad om",
+      "cancelledBackground": "Kørslen blev annulleret, fordi Myne gik i baggrunden. Der blev ikke skrevet noget. Spørg igen, når du er klar."
     },
     "scope": {
       "title": "Inkludér {{folder}}?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Ikke oprettet: den mappe er udelukket fra AI.",
         "createFailed": "Ikke oprettet: den nye note kunne ikke skrives. De øvrige ændringer blev stadig anvendt.",
         "excludedNow": "Kunne ikke anvendes: notens mappe er nu udelukket fra AI.",
-        "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag."
+        "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag.",
+        "noteMoved": "Kunne ikke anvendes: den ændring ville flytte noten til en anden mappe.",
+        "appendEmpty": "Kunne ikke anvendes: der var intet at tilføje.",
+        "appendWouldWriteFrontmatter": "Kunne ikke anvendes: den tekst ville være blevet notens egenskabsblok."
       },
       "applyFailed": "Ændringerne kunne ikke anvendes.",
       "undo": "Fortryd denne kørsel",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} noter læst",
       "runSummaryOffDevice_one": "omkring {{count}} tegn fra dine noter blev sendt til udbyderen",
       "runSummaryOffDevice_other": "omkring {{count}} tegn fra dine noter blev sendt til udbyderen",
-      "runSummaryOnDevice": "intet forlod denne enhed"
+      "runSummaryOnDevice": "intet forlod denne enhed",
+      "appendFlag": "tilføjes til slutningen"
     },
     "undo": {
       "offer_one": "Den seneste kørsel ændrede {{count}} note.",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}} note kunne ikke gendannes.",
       "failed_other": "{{count}} noter kunne ikke gendannes.",
       "createdNotReverted_one": "{{count}} note, som kørslen oprettede, blev efterladt.",
-      "createdNotReverted_other": "{{count}} noter, som kørslen oprettede, blev efterladt."
+      "createdNotReverted_other": "{{count}} noter, som kørslen oprettede, blev efterladt.",
+      "sessionOnly": "Denne fortryd-med-ét-tryk gælder, indtil du låser boksen eller lukker appen. Derefter gendanner du noter én ad gangen fra en notes versionshistorik.",
+      "sessionOnlyLink": "Åbn versionshistorik"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Fold alt ud"
+      },
+      "openThisWeekNote": {
+        "label": "Åbn denne uges note"
+      },
+      "openThisMonthNote": {
+        "label": "Åbn denne måneds note"
       }
     },
     "hotkeys": {
@@ -880,13 +894,15 @@
           "captureFailed": "Kunne ikke starte optagelsen. Tjek mikrofonadgang i Systemindstillinger.",
           "generic": "Kunne ikke starte optagelsen.",
           "locked": "Lås din boks op for at optage en talenote.",
-          "noInputDevice": "Ingen mikrofon fundet. Tilslut en, og prøv igen."
+          "noInputDevice": "Ingen mikrofon fundet. Tilslut en, og prøv igen.",
+          "unsupportedSampleRate": "Din mikrofon optager med en samplefrekvens, Myne ikke kan transskribere. Vælg en anden inputenhed, eller ændr dens samplefrekvens i systemets lydindstillinger."
         },
         "stopError": {
           "captureFailed": "Optagelsen mislykkedes. Tjek din mikrofon.",
           "emptyRecording": "Intet blev optaget.",
           "generic": "Kunne ikke gemme optagelsen.",
-          "silentRecording": "Optagelsen var tavs og blev kasseret. Tjek din mikrofon."
+          "silentRecording": "Optagelsen var tavs og blev kasseret. Tjek din mikrofon.",
+          "unsupportedSampleRate": "Din mikrofon optager med en samplefrekvens, Myne ikke kan transskribere. Intet blev gemt. Vælg en anden inputenhed, eller ændr dens samplefrekvens i systemets lydindstillinger."
         }
       },
       "widget": {
@@ -932,6 +948,7 @@
             "featureOff": "Tale-til-tekst er slået fra. Slå det til under Indstillinger → Transskription.",
             "modelLoadFailed": "Kunne ikke indlæse tale-til-tekst-modellen. Hvis du har valgt din egen model under Indstillinger → Developer → AI, så tjek dens filer; ellers gendanner en geninstallation af Myne den indbyggede.",
             "noModel": "Tale-til-tekst-modellen mangler. En geninstallation af Myne gendanner den.",
+            "tooLong": "Denne optagelse er for lang til at blive transskriberet. Lyden forbliver vedhæftet, så du kan stadig afspille den.",
             "vaultLocked": "Lås din boks op for at transskribere."
           },
           "disabledReason": "Aktivér AI under Indstillinger → Developer → AI for at transskribere.",
@@ -1164,10 +1181,6 @@
       "turnedIntoTemplate": "Gjort til skabelon",
       "convertedToNote": "Konverteret til note",
       "versionHistory": "Versionshistorik",
-      "exportMarkdown": "Eksportér som Markdown…",
-      "exportPdf": "Eksportér som PDF…",
-      "exportHtml": "Eksportér som HTML…",
-      "exportTxt": "Eksportér som almindelig tekst…",
       "trash": "Flyt til papirkurv"
     },
     "codeBlock": {
@@ -1199,7 +1212,9 @@
       "replaceAllCount": "Erstat alle ({{total}})",
       "replaceOne": "Erstat",
       "replacePlaceholder": "Erstat med",
-      "toggleReplace": "Slå erstat til/fra"
+      "toggleReplace": "Slå erstat til/fra",
+      "dateFallback": "Søger efter {{stored}}, den form denne dato er gemt i.",
+      "replaceOffOnDateFallback": "Erstat er slået fra, mens en dato findes i sin gemte form, så en erstatning ikke kan gøre datoen ulæselig."
     },
     "cover": {
       "add": "Tilføj omslag",
@@ -1535,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "Søg i noter eller kør en kommando…",
       "noMatches": "Ingen kommandoer eller noter matcher."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Dagens note kunne ikke åbnes.",
+        "weekly": "Denne uges note kunne ikke åbnes.",
+        "monthly": "Denne måneds note kunne ikke åbnes."
+      }
     }
   },
   "export": {
@@ -2035,10 +2057,6 @@
       "duplicate": "Dublér",
       "editFilterTitle": "Redigér filter",
       "emptyState": "Ingen noter endnu.",
-      "exportHtml": "Eksportér som HTML…",
-      "exportMarkdown": "Eksportér som Markdown…",
-      "exportPdf": "Eksportér som PDF…",
-      "exportTxt": "Eksportér som almindelig tekst…",
       "favoritesHeading": "Favoritter",
       "icon": "Ikon…",
       "mergeAnyway": "Flet alligevel",
@@ -2344,6 +2362,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Eksportér…",
+      "txt": "Almindelig tekst"
     }
   },
   "password": {
@@ -2776,20 +2801,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Tom (ingen skabelon)",
+      "folderSearchEmpty": "Ingen mapper matcher.",
+      "folderSearchPlaceholder": "Søg i mapper…",
+      "searchEmpty": "Ingen skabeloner matcher.",
+      "searchPlaceholder": "Søg i skabeloner…",
+      "untitledTemplate": "Skabelon uden titel",
+      "sectionDaily": "Daglige noter",
+      "sectionWeekly": "Ugentlige noter",
+      "sectionMonthly": "Månedlige noter",
+      "periodFolderLabel": "Mappe",
+      "periodFolderHelper": "Hvor nye {{period}} noter gemmes. Standard: {{default}}. Mappen bevares, også når den er tom.",
+      "periodFormatLabel": "Titelformat",
+      "periodFormatHelperDaily": "Titlen på hver daglig note. Understøtter YYYY, MM, DD, gggg (ISO-ugeår), ww (ISO-ugenummer) og [tekst] til bogstavelig tekst. Standard: {{default}}.",
+      "periodFormatHelperWeekly": "Titlen på hver ugentlig note. Understøtter gggg (ISO-ugeår), ww (ISO-ugenummer), YYYY, MM, DD og [tekst] til bogstavelig tekst. Standard: {{default}}.",
+      "periodFormatHelperMonthly": "Titlen på hver månedlig note. Understøtter YYYY, MM, gggg (ISO-ugeår), ww (ISO-ugenummer) og [tekst] til bogstavelig tekst. Standard: {{default}}.",
+      "periodTemplateLabel": "Skabelon",
+      "periodTemplateHelper": "Vælg en skabelon, som hver {{period}} note starter fra, eller lad feltet stå tomt for en tom note med datoen som titel.",
+      "collisionWarning": "{{first}} og {{second}} noter fører til den samme note, fordi de deler mappe og giver samme titel. Begge kommandoer åbner den.",
+      "weekStartNote": "Uger begynder om mandagen (ISO 8601), så de første dage i januar kan høre til sidste uge i det foregående år, og de sidste dage i december til første uge i det følgende.",
+      "periodFolderSaveError": "Mappen til {{period}} noter kunne ikke gemmes. Prøv igen.",
+      "periodFormatSaveError": "Titelformatet til {{period}} noter kunne ikke gemmes. Prøv igen.",
+      "periodTemplateSaveError": "Skabelonen til {{period}} noter kunne ikke gemmes. Prøv igen.",
+      "periodNameDaily": "daglige",
+      "periodNameWeekly": "ugentlige",
+      "periodNameMonthly": "månedlige",
+      "periodFolderAriaLabel": "Mappe til {{period}} noter",
+      "periodFormatAriaLabel": "Titelformat til {{period}} noter",
+      "periodTemplateAriaLabel": "Skabelon til {{period}} noter",
       "dateFormatHelper": "Titlen på hver daglig note. Understøtter ÅÅÅÅ, MM, DD. Standard er {{default}}.",
       "dateFormatLabel": "Datoformat for daglige noter",
       "dateFormatSaveError": "Kunne ikke gemme datoformatet. Prøv igen.",
       "folderHelper": "Hvor nye daglige noter placeres. Standard er {{default}}. Mappen beholdes, også når den er tom.",
       "folderLabel": "Mappe til daglige noter",
       "folderSaveError": "Kunne ikke gemme den daglige mappe. Prøv igen.",
-      "folderSearchEmpty": "Ingen mapper matcher.",
-      "folderSearchPlaceholder": "Søg i mapper…",
-      "searchEmpty": "Ingen skabeloner matcher.",
-      "searchPlaceholder": "Søg i skabeloner…",
       "templateHelper": "Vælg en skabelon, som hver daglig note skal starte fra, eller lad være tom for en tom note med datoen som titel.",
       "templateLabel": "Skabelon til daglige noter",
-      "templateSaveError": "Kunne ikke gemme den daglige skabelon. Prøv igen.",
-      "untitledTemplate": "Skabelon uden titel"
+      "templateSaveError": "Kunne ikke gemme den daglige skabelon. Prøv igen."
     },
     "deleteVault": {
       "cancel": "Annullér",
@@ -2950,7 +2997,8 @@
         "title": "Før Myne sender noget til {{provider}}",
         "whatLabel": "Hvad der forlader din enhed",
         "whenLabel": "Hvornår det sendes",
-        "whoLabel": "Hvem der modtager det"
+        "whoLabel": "Hvem der modtager det",
+        "connectionLabel": "Hvordan det rejser"
       },
       "disclosureToggle": "Hvordan fungerer det?",
       "enableHelper": "Kører en model, du selv leverer. Hvor den kører, og om dine noter forlader denne enhed, afhænger begge dele af den udbyder, du angiver nedenfor. Eksperimentel, slået fra som standard.",
@@ -2984,7 +3032,9 @@
         "refused": "Udbyderen afviste forbindelsen. Den er måske nede eller blokerer dette netværk.",
         "timeout": "Udbyderen svarede ikke i tide. Intet blev efterladt kørende.",
         "unauthorized": "Udbyderen afviste din API-nøgle. Udskift den: den kan være forkert, tilbagekaldt eller høre til en anden konto.",
-        "unreachable": "Kunne ikke nå udbyderen. Tjek din netværksforbindelse."
+        "unreachable": "Kunne ikke nå udbyderen. Tjek din netværksforbindelse.",
+        "featureOff": "AI er slået fra på denne enhed. Der blev ikke sendt noget. Slå det til under Indstillinger, i AI.",
+        "consentMissing": "Du har ikke accepteret at sende noter til denne udbyder fra denne enhed. Der blev ikke sendt noget. Vælg udbyderen igen under Indstillinger, i AI, og læs, hvad der sendes."
       },
       "modelChoose": "Vælg fil…",
       "modelEmbeddingLabel": "Søgemodel: semantisk søgning og spørgsmål/svar",
@@ -3025,7 +3075,16 @@
       "recommendedFilesEmbedding": "Kræver model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Kræver .gguf-filen + tokenizer.json i samme mappe.",
       "recommendedFilesTranscription": "Kræver Whisper .gguf-filen + config.json + tokenizer.json i samme mappe.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Brug AI på denne telefon",
+      "mobileEnableHelper": "Slået fra som standard. Ingen AI-model på denne telefon besvarer spørgsmål eller læser dine noter, så hver forespørgsel går til en tjeneste, du navngiver nedenfor, og dine noter forlader enheden når den gør. Transskription og tekst i billeder kører stadig her, på modeller der følger med Myne.",
+      "mobileKeyAdd": "Gem nøgle",
+      "mobileKeyReplace": "Udskift nøgle",
+      "mobileRevokeHelper": "Fjerner udbyderen, dens nøgle og denne telefons godkendelse på én gang og efterlader præcis den tilstand, hvor der aldrig var sat noget op. Andre enheder fungerer videre, indtil du også fjerner det der.",
+      "mobileApproveLabel": "Godkend afsendelse på denne telefon",
+      "mobileApproveHelper": "Udbyderen og dens nøgle kom fra en anden enhed. Der sendes intet fra denne telefon, før du læser, hvad der sendes, og godkender det her.",
+      "historyBudgetHelper": "Hvor meget af den seneste samtale hver forespørgsel bærer, i tegn. Lad feltet stå tomt for standardværdien. Et større tal lader AI'en følge længere samtaler og sender mere af dem: hos en udbyder, der ikke er på denne enhed, betyder det mere af din tekst, der forlader den, ved hvert trin i en kørsel.",
+      "historyBudgetLabel": "Samtale der sendes med hver forespørgsel"
     },
     "network": {
       "disabledCue": "Synkronisering sendes ikke længere gennem Tor. Nye forbindelser går direkte til synkroniseringsserveren.",
@@ -3058,6 +3117,9 @@
       "exactLabel": "Præcis timing",
       "exactOn": "Til",
       "horizon": "Påmindelser er registreret til og med {{date}}. Åbn Myne inden da for at holde dem i gang.",
+      "horizonLabel": "Planlæg forud",
+      "horizonLabelHelper": "Påmindelser klargøres så lang tid i forvejen. Myne skal være åben og låst op, for at en påmindelse kan komme frem.",
+      "horizonInertHelper": "Gemt på denne enhed. Intet læser den endnu: denne version leverer ikke opgavepåmindelser.",
       "label": "Opgavepåmindelser",
       "saveError": "Kunne ikke gemme indstillingen. Prøv igen.",
       "showTextAria": "Vis opgavens tekst i notifikationen",
@@ -3338,12 +3400,14 @@
         "viewMode": "standardvisning visningstilstand live læsning kilde forhåndsvisning view mode",
         "dateFormat": "datoformat dato dag måned år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat klokkeslæt 24 timer 12 timer ur am pm time format",
-        "timezone": "tidszone zone tz utc iana region i dag timezone"
+        "timezone": "tidszone zone tz utc iana region i dag timezone",
+        "periodicNotes": "periodiske noter ugentlig månedlig uge måned mappe skabelon format",
+        "aiHistoryBudget": "samtale historik kontekst hukommelse budget tegn agent chat forespørgsel"
       }
     },
     "dateTime": {
       "dateLabel": "Datoformat",
-      "dateHelper": "Hvordan datoer vises i opgaver, gemte visninger og vedhæftede filer.",
+      "dateHelper": "Hvordan en dato skrives, overalt hvor Myne viser en.",
       "dateSystem": "Følg sproget",
       "timeLabel": "Tidsformat",
       "timeHelper": "Om klokkeslæt vises på et 24-timers eller 12-timers ur.",

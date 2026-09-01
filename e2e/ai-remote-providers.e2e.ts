@@ -157,7 +157,7 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
             async () => (await s.byTestIdAll("ai-consent.screen")).at(0) ?? null,
             { label: "the consent dialog", timeoutMs: 15_000 },
           );
-          // All four disclosures are on screen BEFORE the accepting action —
+          // All SEVEN disclosures are on screen BEFORE the accepting action:
           // and the accepting action exists nowhere else, so there is no route
           // that skips them.
           for (const id of [
@@ -167,6 +167,10 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
             "ai-consent.cannot-verify",
             "ai-consent.revoke",
             "ai-consent.scope",
+            // How it travels (myne-md/myne#456). The clause is new and the
+            // roster is what keeps it on the screen: a disclosure that can be
+            // dropped without a test failing is a disclosure that gets dropped.
+            "ai-consent.connection",
           ]) {
             const el = await s.byTestId(id);
             expect((await el.textContent())?.length ?? 0).toBeGreaterThan(20);

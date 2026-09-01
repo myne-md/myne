@@ -50,12 +50,21 @@ tauri-build = { version = "2", features = [] }
 # model-invariant text recognizer whose weights are hash-pinned in
 # `resources/models/ocr/README.md`.
 default = ["local-inference"]
-local-inference = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
+# `myne-core/remote-ai` rides on this feature rather than being enabled
+# unconditionally, and that is what keeps the auditable build honest after the
+# inference seam moved out of this crate (myne-md/myne#456). `myne-core` is a
+# plain path dependency and compiles whatever features are asked of it, so
+# enabling `remote-ai` at the dependency line would have put the remote-provider
+# arm into `--no-default-features` for the first time, silently, while every
+# gate stayed green. Chained here, dropping `local-inference` still drops the
+# whole AI path exactly as `docs/decisions/ai/0337` and `threat-model.md` say it
+# does.
+local-inference = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers", "myne-core/remote-ai"]
 # E2E-only build variant: keeps `local-inference` but swaps the Candle engine for
 # the deterministic `StubEngine` at compile time, so the tauri-driver flow-suite
 # gets stable AI output without a model file in the repo. NEVER the shipped
 # bundle (the production build uses the real Candle engine). See `docs/dev/e2e.md`.
-local-inference-stub = ["local-inference"]
+local-inference-stub = ["local-inference", "myne-core/local-inference-stub"]
 # E2E-only build variant for voice capture (myne#389 item D). Swaps the
 # microphone for a deterministic 440 Hz tone at COMPILE time, so the
 # tauri-driver flow-suite can drive record→save→reopen→playback on a headless
@@ -197,24 +206,23 @@ base64 = "0.22"
 # (decisions.md 2026-07-07) — they are now inherited transitively via the
 # `myne-core` path dependency, not declared here.
 
-# The remote-AI-provider TLS arm (myne#415, ledger SYNC-23). `rustls` and
-# `rustls-pki-types` are declared here explicitly rather than leaned on
-# transitively: this crate now *names* their types in its own public shape, and
-# an implicit transitive dependency is one `myne-core` refactor away from
-# silently disappearing.
+# NOTE: the remote-AI-provider TLS arm (myne#415, ledger SYNC-23) moved to
+# `myne-core` with the inference-seam extraction (myne-md/myne#456), so `rustls`,
+# `rustls-pki-types` and `webpki-roots` are no longer declared here. This crate
+# no longer names any of their types: the transport, its `ClientConfig` and its
+# static root store all live in `core/src/inference/provider_transport.rs` now.
 #
-# `webpki-roots` is a **static Mozilla root bundle compiled into the binary** —
-# data, not a platform-integration surface. It is a security decision with a
-# ledger row in `docs/dependency-policy.md`, and it is NOT free: a revoked CA
-# stays trusted until Myne ships an update, and roots the user's own machine
-# trusts (corporate MITM, private CAs) are ignored. Both are acceptable ONLY
-# because this path talks to a small closed set of compiled-in provider hosts
-# rather than the open web. It is chosen over `rustls-platform-verifier` for
-# identical behaviour on every machine, which is what the reproducible-build
-# commitment wants.
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-rustls-pki-types = "1"
-webpki-roots = "1"
+# `webpki-roots` in particular went WITH the arm rather than staying behind,
+# because it exists for nothing else. It is a static Mozilla root bundle
+# compiled into the binary, data rather than a platform-integration surface, and
+# it is not free: a revoked CA stays trusted until Myne ships an update, and
+# roots the user's own machine trusts (corporate MITM, private CAs) are ignored.
+# Both are acceptable ONLY because this path talks to a small closed set of
+# compiled-in provider hosts rather than the open web, and it is chosen over
+# `rustls-platform-verifier` for identical behaviour on every machine, which is
+# what the reproducible-build commitment wants. That reasoning and its
+# `docs/dependency-policy.md` ledger row now live beside the dependency, in
+# `core/Cargo.toml`'s `remote-ai` feature.
 
 # PDF export per-page footer stamping (MYND-255 hotfix, owner-requested):
 # post-processes the captured PDF to draw the document title (bottom-left)

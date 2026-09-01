@@ -52,6 +52,20 @@ export const myneTheme = EditorView.theme({
     // surface — clicking there reaches the editor (and lands the caret on the
     // last line, MYND-162 feedback) instead of being dead space.
     minHeight: "100%",
+    // The list metrics, declared ONCE and read from both sides of the DOM.
+    //
+    // `decorations/list.ts` builds each list line's hanging indent out of these
+    // (MYND-626, myne-md/myne#594): the marker's own width plus one step per
+    // nesting level, with the source's leading whitespace hidden so the column is
+    // exact rather than measured in `ch` against a space that is not `ch` wide.
+    // They live here rather than as JS constants mirroring the rules below,
+    // because that mirror only had to be right to LOOK right until #594 made the
+    // indent arithmetic depend on it, after which editing `.cm-task-checkbox`'s
+    // `margin-right` would have silently misaligned every wrapped task row. A
+    // custom theme can move them for the same reason.
+    "--cm-list-marker-bullet": "1.4ch", // `.cm-list-bullet` 1ch + 0.4ch margin
+    "--cm-list-marker-task": "22px", // `.cm-task-checkbox` 16px + 6px margin
+    "--cm-list-indent-step": "1.5em", // one level of nesting
   },
   "&.cm-focused": {
     outline: "none",
@@ -244,20 +258,14 @@ export const myneTheme = EditorView.theme({
   ".cm-list-number": {
     color: "var(--fg-3, #6b6a64)",
   },
-  // Hanging indent. The `+ 6px` keeps the MARKER aligned with the body text
-  // column (CM's default `.cm-line` left padding is 6px) instead of hanging it at
-  // the line's hard left edge — at x≈0 the top-level •/* /+ markers fell 6px into
-  // the gutter and read as "no marker at all".
+  // `.cm-list-item-line` carries no metrics of its own: `decorations/list.ts`
+  // styles every line it marks, inline and per line, from the custom properties
+  // declared above. The class stays as the "this is a list line" hook.
   //
-  // The depth itself is now MEASURED per line and delivered as an inline style
-  // by `decorations/list.ts::hangingIndentCh` (MYND-626) — a fixed value cannot
-  // serve a bullet widget, an ordered marker and a nested item at once. These
-  // are the fallback metrics for a line the decoration has not styled (and they
-  // keep the rule from being empty); the inline style wins wherever it applies.
-  ".cm-list-item-line": {
-    textIndent: "-1.4ch",
-    paddingLeft: "calc(1.4ch + 6px)",
-  },
+  // The `+ 6px` that decoration adds is CM's default `.cm-line` left padding: it
+  // keeps the MARKER aligned with the body text column instead of hanging it at
+  // the line's hard left edge: at x≈0 the top-level •/*/+ markers fell 6px into
+  // the gutter and read as "no marker at all".
 
   // Inline typography — highlight / sub / sup from inline-typography.ts
   // (MYND-156). `.cm-highlight` is the SYNC-6 shared class reused by
@@ -798,6 +806,15 @@ export const myneTheme = EditorView.theme({
   ".cm-blockquote": {
     color: "var(--fg-2)",
     fontStyle: "italic",
+    // The quote's own inset, as a RULE rather than as part of the inline style
+    // `blockquote.ts` writes. Two line decorations on one line concatenate their
+    // `style` attributes, and two `padding-left` declarations do not compose, so
+    // a quoted LIST item lost the list's hanging indent to whichever extension
+    // was registered later. A stylesheet rule loses to an inline style, so the
+    // list's own `padding-left` (which already folds `--cm-line-lead` in) wins
+    // on a list line, and this applies on every other quoted line. See
+    // `blockquoteBarStyle`.
+    paddingLeft: "var(--cm-line-lead, 0px)",
   },
   // Definition lists — line classes from definition-list.ts (MYND-152). Term
   // reads as a label; definition rows indent under it with the `:` hidden.
@@ -1255,34 +1272,37 @@ export const myneTheme = EditorView.theme({
   },
 
   // Wikilink chip widget from wikilink/chip-widget.ts.
+  //
+  // A link reads as TEXT, not as a box (myne-md/myne#601). It was a filled,
+  // bordered pill in its own sans face at its own size: a foreign object in the
+  // middle of a sentence, which is what "I cannot tell that I made a backlink"
+  // meant: the shape said "widget", and only the shape said anything. Accent
+  // colour on the note's own type says "this is a link to another note" with the
+  // vocabulary every other document uses, and it leaves the line's rhythm alone.
+  //
+  // The box also cost two things the text form does not: an inline-block inherits
+  // the list hanging indent's negative `text-indent` (hence the reset that used
+  // to be needed here), and a padded, bordered box on one line makes CM6's height
+  // map uneven, which is the scrolling jitter the vertical-margin comment below
+  // was reverted for.
   ".cm-wikilink-chip": {
-    display: "inline-block",
-    padding: "2px 8px",
-    // Horizontal margin only. A VERTICAL margin here makes any line holding a
-    // chip taller than its neighbours, which gives CM6's height map variable
-    // line heights and destabilises scrolling on long docs (jitter/jumping) —
-    // reverted. Own-line chip spacing needs a height-stable approach instead.
-    margin: "0 1px",
-    borderRadius: "var(--radius-2, 6px)",
-    backgroundColor: "var(--paper-2, #f3f1eb)",
-    border: "1px solid var(--line-1, #d8d5cc)",
-    color: "var(--fg-1)",
-    fontWeight: "var(--weight-medium)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "13px",
+    color: "var(--accent, #2c4a7a)",
+    // Underlined only under the pointer: an always-underlined run of links turns
+    // a paragraph into a ladder, and the colour already carries the meaning.
+    textDecoration: "none",
     cursor: "pointer",
-    verticalAlign: "baseline",
-    // `text-indent` is inherited and applies to an inline-block's own first
-    // line. Inside a `.cm-list-item-line` (which sets a negative `text-indent`
-    // for its hanging indent) the chip would otherwise shift its label ~1.5em
-    // left, escaping the pill. Reset it so the label stays centered in the box.
-    textIndent: "0",
+    // Horizontal margin only. A VERTICAL margin makes any line holding a chip
+    // taller than its neighbours, which gives CM6's height map variable line
+    // heights and destabilises scrolling on long docs (jitter/jumping).
+    margin: "0",
   },
   ".cm-wikilink-chip:hover": {
-    backgroundColor: "var(--paper-3, #ece9e2)",
+    textDecoration: "underline",
+    textUnderlineOffset: "2px",
   },
+  // An `![[embed]]` is a transclusion rather than a link, and italic is what
+  // says so now that the base form carries no box to tint (myne-md/myne#601).
   ".cm-wikilink-chip-embed": {
-    backgroundColor: "var(--paper-3, #ece9e2)",
     fontStyle: "italic",
   },
   // MYND-634: a drawing embed is visually its own thing, not a link to prose.
@@ -1444,12 +1464,23 @@ export const myneTheme = EditorView.theme({
     padding: "8px",
   },
   // §5.3 broken-link styling (MYND-37/83): a wikilink whose target matches no
-  // note — faded foreground, italic, no underline. Same chip surface as the
-  // default (background/border/radius unchanged) so only the text reads "dead".
+  // note. It carries no accent and a dotted underline, so it reads as a link
+  // that does not lead anywhere rather than as one that does.
+  //
+  // The distinction is load-bearing, not decorative (myne-md/myne#601): clicking
+  // a broken chip is DELIBERATELY inert (its target does not exist), so if the
+  // two look alike, a link that was never going to work is indistinguishable
+  // from one that is broken in the app. That is what "clicking a backlink does
+  // not go to the note" looks like from the outside.
   ".cm-wikilink-chip-broken": {
     color: "var(--fg-3)",
     fontStyle: "italic",
-    textDecoration: "none",
+    textDecoration: "underline dotted var(--fg-3)",
+    textUnderlineOffset: "2px",
+    cursor: "default",
+  },
+  ".cm-wikilink-chip-broken:hover": {
+    textDecoration: "underline dotted var(--fg-3)",
   },
   // Inline #tag chip (tag-system #3 / MYND-45) — derived from the single TS-5
   // tag-pill token (`src/notes/tagPillToken.ts`) so the editor chip and the
@@ -1655,6 +1686,56 @@ export const myneTheme = EditorView.theme({
     maxWidth: "100%",
     height: "auto",
     borderRadius: "4px",
+  },
+  // Drag-to-resize handles (myne-md/myne#604), on the whole-line block form
+  // only. Hidden until the frame is hovered or a drag is in flight, because a
+  // permanent chrome on every image is the ambient decoration the design canon
+  // keeps out of a writing surface. `--accent` while dragging is the accent
+  // rule's "the one thing actually happening" arm, same as the save readout's.
+  ".cm-attachment-resize": {
+    position: "absolute",
+    opacity: "0",
+    background: "var(--fg-3)",
+    borderRadius: "999px",
+    transition: "opacity 120ms ease",
+    // Above the image so the pointer lands on the handle rather than on the
+    // lightbox click target underneath it.
+    zIndex: "2",
+  },
+  ".cm-attachment-frame:hover .cm-attachment-resize, .cm-attachment-resizing .cm-attachment-resize":
+    {
+      opacity: "0.7",
+    },
+  ".cm-attachment-resizing .cm-attachment-resize": {
+    background: "var(--accent)",
+    opacity: "1",
+  },
+  // Right edge: a vertical bar centred on the image's own height, inset so it
+  // reads as sitting ON the image rather than floating beside it.
+  ".cm-attachment-resize-e": {
+    top: "50%",
+    right: "4px",
+    width: "4px",
+    height: "36px",
+    transform: "translateY(-50%)",
+    cursor: "ew-resize",
+  },
+  // Bottom-right corner: the square grip, which is where a pointer goes first.
+  ".cm-attachment-resize-se": {
+    right: "4px",
+    bottom: "4px",
+    width: "10px",
+    height: "10px",
+    borderRadius: "3px",
+    cursor: "nwse-resize",
+  },
+  // While a drag is in flight nothing else on the page should be selecting text
+  // or showing a zoom cursor: the gesture owns the pointer until release.
+  ".cm-attachment-resizing": {
+    userSelect: "none",
+  },
+  ".cm-attachment-resizing .cm-attachment-img": {
+    cursor: "ew-resize",
   },
   // Embed alignment (myne#409). The default frame is `inline-flex`, which sits
   // in the line box and which no margin can centre. An ALIGNED frame becomes

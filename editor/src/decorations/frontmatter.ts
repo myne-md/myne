@@ -601,32 +601,71 @@ class PropertiesWidget extends WidgetType {
 }
 
 /**
- * The last document offset the frontmatter Properties block occupies — i.e. the
- * FIRST offset a caret/selection is allowed to reach. `null` when the doc has no
- * frontmatter. Both the block-replace decoration and the selection guard derive
- * their boundary from this one function so they cannot disagree.
+ * The FIRST offset a caret or selection is allowed to reach: the start of the
+ * first body line. `null` when the doc has no frontmatter.
  *
- * A note that is ONLY frontmatter (the block reaches the end of the doc) would
- * otherwise have its closing `---\n` line break consumed by the block-replace
- * decoration — that swallows the empty body line below it, so there is NO
- * editable line and the user can't click to start writing (the
- * frontmatter-only-note bug). Stop one char short of that trailing newline,
- * leaving the final empty line as a live caret target. (The no-trailing-newline
- * variant `---\n…\n---` has no line to expose; `emptyBodyClickHandler` creates
- * one on demand.)
+ * The selection guard clamps to this, and it is the only authority on where the
+ * caret may go. What the block-replace decoration COVERS is a different number
+ * and lives in `renderEnd` below. The two used to be one, and collapsing them
+ * is what made a blank first body line unrenderable (myne-md/myne#595).
+ *
+ * That includes the frontmatter-only note (`---\n…\n---\n`), whose body is the
+ * single empty line at the very end: the floor is that line's offset, which is
+ * the document's length, and `renderEnd` leaves the line itself alive to hold
+ * the caret. (The no-trailing-newline variant `---\n…\n---` has no such line;
+ * `emptyBodyClickHandler` creates one on demand.)
  */
 export function frontmatterBoundary(doc: Text): number | null {
   const range = cachedLocateFrontmatter(doc);
-  if (range === null) return null;
-  let blockEnd = range.blockEnd;
-  if (
-    blockEnd === doc.length &&
-    doc.length > 0 &&
-    doc.sliceString(doc.length - 1, doc.length) === "\n"
-  ) {
-    blockEnd -= 1;
-  }
-  return blockEnd;
+  return range === null ? null : range.blockEnd;
+}
+
+/**
+ * Where the block-replace decoration STOPS, which is one character short of the
+ * caret floor whenever the block ends in a newline (myne-md/myne#595).
+ *
+ * Those are two different jobs and they need two different numbers. The floor
+ * (`frontmatterBoundary`) is the first offset a caret may occupy: the start of
+ * the first body line. The replace has to stop before the newline that ENDS the
+ * closing `---`, because a block decoration that runs all the way to the next
+ * line's start swallows that line when it is EMPTY: it is not rendered at all,
+ * there is no `.cm-line` for it in the DOM, and `coordsAtPos` therefore has
+ * nothing on that line to measure. `drawSelection` falls back to the nearest box
+ * that exists, the Properties block itself, and paints the caret as a full-height
+ * bar at its edge. That is the reported symptom, and it is why forcing the
+ * forward association did not settle it: forward from a line that was never
+ * rendered is still nothing.
+ *
+ * Measured, on `---\ntitle: x\n---\n\n# Heading\n`:
+ *
+ *   replace [0,17) -> 2 lines: "# Heading", ""      (the blank line is gone)
+ *   replace [0,16) -> 3 lines: "", "# Heading", ""  (it is there)
+ *
+ * and on the same note WITHOUT the blank line both ranges render identically, so
+ * the shorter range costs nothing where it is not needed.
+ *
+ * The newline test is load-bearing: a block with no trailing newline (`---\n…\n---`
+ * at the very end of a note) would otherwise have its last `-` left outside the
+ * widget and painted as a stray line of source.
+ */
+function renderEnd(doc: Text, blockEnd: number): number {
+  return doc.sliceString(blockEnd - 1, blockEnd) === "\n"
+    ? blockEnd - 1
+    : blockEnd;
+}
+
+/**
+ * Where the Properties block STOPS on screen: the offset anything that has to
+ * sit immediately after the panel anchors to (the suggested-tags band, myne#287).
+ *
+ * Not the caret floor: that is one character further on, and anchoring a block
+ * widget there puts it after the note's first body line instead of against the
+ * panel. In a brand-new note, whose only body line is empty, that difference is
+ * the whole of what #287 reported. `null` when the doc has no frontmatter.
+ */
+export function frontmatterRenderEnd(doc: Text): number | null {
+  const range = cachedLocateFrontmatter(doc);
+  return range === null ? null : renderEnd(doc, range.blockEnd);
 }
 
 function buildFrontmatterDecorations(state: EditorState): DecorationSet {
@@ -634,13 +673,12 @@ function buildFrontmatterDecorations(state: EditorState): DecorationSet {
   const range = cachedLocateFrontmatter(doc);
   if (range === null) return Decoration.none;
   const props = parseProperties(doc.toString(), range);
-  const blockEnd = frontmatterBoundary(doc) ?? range.blockEnd;
   const coverShown = coverIsOnScreen(doc, state.field(catalogField, false) ?? null);
   const decorations: Array<Range<Decoration>> = [
     Decoration.replace({
       widget: new PropertiesWidget(props, coverShown),
       block: true,
-    }).range(range.blockStart, blockEnd),
+    }).range(range.blockStart, renderEnd(doc, range.blockEnd)),
   ];
   const builder = new RangeSetBuilder<Decoration>();
   for (const d of decorations) builder.add(d.from, d.to, d.value);
@@ -648,20 +686,24 @@ function buildFrontmatterDecorations(state: EditorState): DecorationSet {
 }
 
 /**
- * Mirror the block-replace range into a PLAIN-replace range set for
- * `EditorView.atomicRanges` (MYND-608). The frontmatter field already re-tracks
- * the range on every doc change, so we derive from it rather than re-walking the
- * document; it holds at most one range, so no syntax-tree cache is needed (unlike
- * the table/attachment widgets). Re-emitted as a plain `Decoration.replace({})`
- * because the `block: true` layout role is irrelevant to atomicity — the three
- * sibling widgets register the same plain shape.
+ * The frontmatter span registered with `EditorView.atomicRanges` (MYND-608).
+ *
+ * It runs to the caret FLOOR, not to where the block-replace decoration stops.
+ * The two differ by the newline that ends the closing `---` (see `renderEnd`),
+ * and atomicity belongs with the floor: they are the same contract, "the caret
+ * may not go here", stated to CM's motion commands and to the selection guard
+ * respectively. Deriving it from the decoration instead would leave that newline
+ * outside the atomic span, so an ArrowLeft could aim at it and be bounced back
+ * by the guard, so a keypress does nothing rather than stepping out.
+ *
+ * Emitted as a plain `Decoration.replace({})`: the `block: true` layout role is
+ * irrelevant to atomicity, and the three sibling widgets register the same shape.
  */
-function frontmatterAtomicRanges(set: DecorationSet): DecorationSet {
+function frontmatterAtomicRanges(state: EditorState): DecorationSet {
+  const range = cachedLocateFrontmatter(state.doc);
   const builder = new RangeSetBuilder<Decoration>();
-  const iter = set.iter();
-  while (iter.value !== null) {
-    builder.add(iter.from, iter.to, Decoration.replace({}));
-    iter.next();
+  if (range !== null) {
+    builder.add(range.blockStart, range.blockEnd, Decoration.replace({}));
   }
   return builder.finish();
 }
@@ -694,9 +736,7 @@ const frontmatterField = StateField.define<DecorationSet>({
       // treat the Properties block as one indivisible unit, exactly like the
       // attachment/wikilink/table widgets. Editing rides only through the
       // widget's own inputs (`ignoreEvent()` returns true).
-      EditorView.atomicRanges.of((view) =>
-        frontmatterAtomicRanges(view.state.field(field)),
-      ),
+      EditorView.atomicRanges.of((view) => frontmatterAtomicRanges(view.state)),
     ];
   },
 });
@@ -795,17 +835,33 @@ function frontmatterSelectionGuard(): Extension {
     const ranges = tr.selection.ranges.map((r) => {
       const anchor = r.anchor < boundary ? boundary : r.anchor;
       const head = r.head < boundary ? boundary : r.head;
-      if (anchor === r.anchor && head === r.head) return r;
-      changed = true;
       // The boundary sits immediately AFTER the block widget. A caret there must
       // associate FORWARD (assoc = 1) so CM renders it at the start of the body
-      // line. With the default backward association `coordsAtPos` resolves the
-      // position to the block's trailing edge, drawing a full-height caret at the
-      // block's right side — which reads as "the caret is in the Properties
-      // panel" even though the offset is already the first body offset.
-      return anchor === head
-        ? EditorSelection.cursor(head, 1)
-        : EditorSelection.range(anchor, head);
+      // line. With a backward association `coordsAtPos` resolves the position to
+      // the block's trailing edge, drawing a full-height caret at the block's
+      // right side, which reads as "the caret is in the Properties panel" even
+      // though the offset is already the first body offset.
+      //
+      // This runs for EVERY caret that ends up on the boundary, not only for one
+      // the clamp above moved (myne-md/myne#595). A caret can arrive there in
+      // bounds and with `assoc = -1`, so one ArrowRight or ArrowDown out of the
+      // block does exactly that, and so does Backspace back to the start of the
+      // first body line, and inside the `changed` branch the repair never saw
+      // any of them. The offset was right and the paint was wrong, which is why
+      // it survived a suite that asserts on `head`.
+      const next =
+        anchor === head
+          ? EditorSelection.cursor(head, head === boundary ? 1 : r.assoc)
+          : EditorSelection.range(anchor, head);
+      if (
+        next.anchor === r.anchor &&
+        next.head === r.head &&
+        next.assoc === r.assoc
+      ) {
+        return r;
+      }
+      changed = true;
+      return next;
     });
     if (!changed) return tr;
     return [

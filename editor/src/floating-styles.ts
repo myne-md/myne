@@ -35,8 +35,15 @@ const CSS = `
   border-radius: var(--radius-1, 3px);
   cursor: pointer;
 }
+/* The keyboard's position in the list, and it has to be legible in EVERY theme
+   (myne-md/myne#601). This was one step up the surface ramp from the menu's own
+   background: a clear step in the light theme, and on AMOLED the difference
+   between #000000 and #0c0c0b, which is invisible on a screen. Arrowing through
+   the list then moved a highlight nobody could see, so the picker read as
+   mouse-only. The accent tint carries it on its own; a leading accent bar was
+   tried alongside and read as a notch cut out of the row. */
 .cm-slash-menu-row-selected {
-  background-color: var(--paper-2, #f3f1eb);
+  background-color: var(--accent-soft, #e8edf5);
 }
 .cm-slash-menu-icon {
   display: inline-flex;
@@ -729,6 +736,19 @@ const CSS = `
   align-items: center;
   gap: var(--space-2);
   width: 100%;
+}
+/* The date-fallback notice (myne-md/myne#609): a quiet line of prose, not a row
+   of controls, so it overrides the flex row it inherits from. Muted like the
+   "No matches" status rather than coloured as a warning, because nothing went wrong,
+   the bar is saying which text produced the matches. It sits between the find
+   row and the replace row, which puts it directly above the Replace buttons it
+   explains being disabled. */
+.cm-find-bar-fallback-row {
+  display: block;
+  color: var(--fg-3, #6b6a64);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  padding-left: 2px;
 }
 /* The replace row's leading glyph sits in the same lead column as the find
    row's search icon (the toggle is the first element on the find row; the

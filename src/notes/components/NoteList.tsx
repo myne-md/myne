@@ -50,15 +50,8 @@ import {
   normalizeFolderPath,
 } from "../../dialect/folderPath";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
-import {
-  noteExportOptions,
-  runNoteExportFlow,
-  runNoteHtmlExportFlow,
-  runNotePdfExportFlow,
-  runNoteTxtExportFlow,
-  type NoteExportUiHooks,
-} from "../exportFlow";
-import { has as hasCapability } from "../../platform/capabilities";
+import type { NoteExportUiHooks } from "../exportFlow";
+import { noteExportEntries } from "../noteExportMenu";
 import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
@@ -2265,70 +2258,28 @@ function PopulatedList({
       {
         // Per-note plaintext egress (MYND-116) — live tree note rows only;
         // Trash / Templates surfaces deliberately don't carry it.
-        id: "export-markdown",
+        //
+        // ONE row with a submenu, where there used to be one row per format.
+        // Four of them ran down the middle of a menu that has ten entries, and
+        // the same four were spelled out again in the editor's "…" menu. The
+        // formats come from `noteExportEntries` now, which is also where the
+        // `pdfExport` capability gate moved. The gate used to live here and
+        // only here, so the other menu offered PDF on hosts that cannot make
+        // one.
+        id: "export",
         group: "export",
-        label: t("notes.list.exportMarkdown"),
-        onSelect: () =>
-          void runNoteExportFlow(
-            noteExportOptions(
-              menu.id,
-              ctx.cache.get(menu.id)?.title ?? null,
-              exportHooks,
-            ),
-          ),
-      },
-      // The PDF item is OMITTED where `pdfExport` is absent (task 48), matching
-      // the palette, which drops the same action through `ACTION_CAPABILITY`.
-      // Two render sites, one answer — a menu that offered it while the palette
-      // did not would be the "unreachable by menu, still reachable elsewhere"
-      // gap task 27 exists to close, pointing the other way.
-      ...(hasCapability("pdfExport")
-        ? [
-      {
-        // Sibling PDF egress (MYND-255) — same export group, same shared-
-        // flow discipline (runNotePdfExportFlow is the palette's flow too).
-        id: "export-pdf",
-        group: "export",
-        label: t("notes.list.exportPdf"),
-        onSelect: () =>
-          void runNotePdfExportFlow(
-            noteExportOptions(
-              menu.id,
-              ctx.cache.get(menu.id)?.title ?? null,
-              exportHooks,
-            ),
-          ),
-      },
-          ]
-        : []),
-      {
-        // Sibling HTML egress (MYND-340) — same export group, same shared-
-        // flow discipline (runNoteHtmlExportFlow is the palette's flow too).
-        id: "export-html",
-        group: "export",
-        label: t("notes.list.exportHtml"),
-        onSelect: () =>
-          void runNoteHtmlExportFlow(
-            noteExportOptions(
-              menu.id,
-              ctx.cache.get(menu.id)?.title ?? null,
-              exportHooks,
-            ),
-          ),
-      },
-      {
-        // Sibling plain-text egress (MYND-340).
-        id: "export-txt",
-        group: "export",
-        label: t("notes.list.exportTxt"),
-        onSelect: () =>
-          void runNoteTxtExportFlow(
-            noteExportOptions(
-              menu.id,
-              ctx.cache.get(menu.id)?.title ?? null,
-              exportHooks,
-            ),
-          ),
+        label: t("notes.export.submenuLabel"),
+        // Never called: a row with `children` opens them instead of acting.
+        onSelect: () => {},
+        children: noteExportEntries(
+          menu.id,
+          ctx.cache.get(menu.id)?.title ?? null,
+          exportHooks,
+        ).map((entry) => ({
+          id: entry.id,
+          label: t(entry.labelKey),
+          onSelect: entry.run,
+        })),
       },
       // Archive (MYND-331): pull the note out of the working set into the
       // indefinite-retention Archive section. Near Delete, but not destructive.

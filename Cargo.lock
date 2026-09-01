@@ -4762,6 +4762,7 @@ dependencies = [
  "tracing-test",
  "unicode-normalization",
  "uuid",
+ "webpki-roots",
  "whatlang",
  "windows-sys 0.60.2",
  "zeroize",
@@ -4792,8 +4793,6 @@ dependencies = [
  "protocol",
  "qrcode",
  "quick-xml 0.37.5",
- "rustls",
- "rustls-pki-types",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -4817,7 +4816,6 @@ dependencies = [
  "unicode-normalization",
  "uuid",
  "webkit2gtk",
- "webpki-roots",
  "webview2-com",
  "windows 0.61.3",
  "windows-sys 0.60.2",
@@ -4830,6 +4828,7 @@ dependencies = [
 name = "myne-mobile"
 version = "0.6.0"
 dependencies = [
+ "async-trait",
  "block2",
  "candle-core",
  "candle-nn",

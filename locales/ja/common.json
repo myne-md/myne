@@ -48,7 +48,8 @@
       "unsupportedDetail": "{{attempts}}回のチェック中{{passes}}回合格しました。必要なのは{{required}}回です。",
       "checking": "モデルを確認しています…",
       "checkingAt": "モデルを確認しています…（{{attempt}}/{{of}}）",
-      "unsupportedProvisional": "この合格基準はまだ複数のモデルで測定されていないため、本来より厳しすぎたり緩すぎたりする可能性があります。"
+      "unsupportedProvisional": "この合格基準はまだ複数のモデルで測定されていないため、本来より厳しすぎたり緩すぎたりする可能性があります。",
+      "scopeNone": "開いているノートがないため、まだ作業する対象がありません"
     },
     "progress": {
       "working": "処理中",
@@ -64,7 +65,8 @@
       "grantsUser_one": "あなたが設定した範囲{{count}}件",
       "grantsUser_other": "あなたが設定した範囲{{count}}件",
       "grantsModel_one": "要求された{{count}}件",
-      "grantsModel_other": "要求された{{count}}件"
+      "grantsModel_other": "要求された{{count}}件",
+      "cancelledBackground": "Myne がバックグラウンドに移ったため、実行は取り消されました。何も書き込まれていません。準備ができたらもう一度お尋ねください。"
     },
     "scope": {
       "title": "{{folder}}を含めますか？",
@@ -118,7 +120,10 @@
         "excludedFolder": "作成されませんでした: そのフォルダはAIの対象から除外されています。",
         "createFailed": "作成されませんでした: 新しいノートの書き込みに失敗しました。他の変更は適用されています。",
         "excludedNow": "適用できませんでした: そのノートのフォルダは現在AIの対象から除外されています。",
-        "notProposed": "適用できませんでした: その変更はこの実行の提案に含まれていません。"
+        "notProposed": "適用できませんでした: その変更はこの実行の提案に含まれていません。",
+        "noteMoved": "適用できませんでした: その変更はノートを別のフォルダへ移動させます。",
+        "appendEmpty": "適用できませんでした: 追加するものがありませんでした。",
+        "appendWouldWriteFrontmatter": "適用できませんでした: そのテキストはノートのプロパティブロックになってしまいます。"
       },
       "applyFailed": "変更を適用できませんでした。",
       "undo": "この実行を元に戻す",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "読み取ったノート{{count}}件",
       "runSummaryOffDevice_one": "ノートの約{{count}}文字がプロバイダーに送信されました",
       "runSummaryOffDevice_other": "ノートの約{{count}}文字がプロバイダーに送信されました",
-      "runSummaryOnDevice": "このデバイスの外には何も出ていません"
+      "runSummaryOnDevice": "このデバイスの外には何も出ていません",
+      "appendFlag": "末尾に追加"
     },
     "undo": {
       "offer_one": "前回の実行で{{count}}件のノートが変更されました。",
@@ -148,7 +154,9 @@
       "failed_one": "{{count}}件のノートを復元できませんでした。",
       "failed_other": "{{count}}件のノートを復元できませんでした。",
       "createdNotReverted_one": "この実行が作成した{{count}}件のノートはそのまま残されています。",
-      "createdNotReverted_other": "この実行が作成した{{count}}件のノートはそのまま残されています。"
+      "createdNotReverted_other": "この実行が作成した{{count}}件のノートはそのまま残されています。",
+      "sessionOnly": "このワンタップの取り消しは、保管庫をロックするかアプリを閉じるまで有効です。その後はノートのバージョン履歴から一件ずつ復元してください。",
+      "sessionOnlyLink": "バージョン履歴を開く"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "すべて展開"
+      },
+      "openThisWeekNote": {
+        "label": "今週のノートを開く"
+      },
+      "openThisMonthNote": {
+        "label": "今月のノートを開く"
       }
     },
     "hotkeys": {
@@ -880,13 +894,15 @@
           "captureFailed": "録音を開始できませんでした。システム設定でマイクへのアクセスを確認してください。",
           "generic": "録音を開始できませんでした。",
           "locked": "ボイスノートを録音するには保管庫のロックを解除してください。",
-          "noInputDevice": "マイクが見つかりません。接続してからもう一度お試しください。"
+          "noInputDevice": "マイクが見つかりません。接続してからもう一度お試しください。",
+          "unsupportedSampleRate": "マイクの録音サンプルレートは Myne が文字起こしできない値です。別の入力デバイスを選ぶか、システムのサウンド設定でサンプルレートを変更してください。"
         },
         "stopError": {
           "captureFailed": "録音に失敗しました。マイクを確認してください。",
           "emptyRecording": "何も録音されませんでした。",
           "generic": "録音を保存できませんでした。",
-          "silentRecording": "録音は無音だったため破棄されました。マイクを確認してください。"
+          "silentRecording": "録音は無音だったため破棄されました。マイクを確認してください。",
+          "unsupportedSampleRate": "マイクの録音サンプルレートは Myne が文字起こしできない値です。何も保存されませんでした。別の入力デバイスを選ぶか、システムのサウンド設定でサンプルレートを変更してください。"
         }
       },
       "widget": {
@@ -932,6 +948,7 @@
             "featureOff": "文字起こしはオフです。設定 → 文字起こし でオンにしてください。",
             "modelLoadFailed": "文字起こしモデルを読み込めませんでした。設定 → 開発者 → AI でカスタムモデルを指定している場合は、そのファイルを確認してください。指定していない場合は、Myneを再インストールすると組み込みのモデルが復元されます。",
             "noModel": "文字起こしモデルが見つかりません。Myneを再インストールすると復元されます。",
+            "tooLong": "この録音は文字起こしするには長すぎます。音声は添付されたままなので、再生はできます。",
             "vaultLocked": "文字起こしするには保管庫のロックを解除してください。"
           },
           "disabledReason": "文字起こしするには 設定 → Developer → AI でAIを有効にしてください。",
@@ -1164,10 +1181,6 @@
       "turnedIntoTemplate": "テンプレートにしました",
       "convertedToNote": "ノートに変換しました",
       "versionHistory": "バージョン履歴",
-      "exportMarkdown": "Markdownとしてエクスポート…",
-      "exportPdf": "PDFとしてエクスポート…",
-      "exportHtml": "HTMLとしてエクスポート…",
-      "exportTxt": "プレーンテキストとしてエクスポート…",
       "trash": "ゴミ箱に移動"
     },
     "codeBlock": {
@@ -1199,7 +1212,9 @@
       "replaceAllCount": "すべて置換（{{total}}）",
       "replaceOne": "置換",
       "replacePlaceholder": "置換後の文字列",
-      "toggleReplace": "置換を切り替え"
+      "toggleReplace": "置換を切り替え",
+      "dateFallback": "{{stored}} を検索しています。これはこの日付が保存されている形式です。",
+      "replaceOffOnDateFallback": "日付が保存形式で一致している間は置換を無効にしています。置換によって日付が読み取れなくなるのを防ぐためです。"
     },
     "cover": {
       "add": "カバーを追加",
@@ -1535,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "ノートを検索、またはコマンドを実行…",
       "noMatches": "一致するコマンドやノートはありません。"
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "今日のノートを開けませんでした。",
+        "weekly": "今週のノートを開けませんでした。",
+        "monthly": "今月のノートを開けませんでした。"
+      }
     }
   },
   "export": {
@@ -2035,10 +2057,6 @@
       "duplicate": "複製",
       "editFilterTitle": "フィルタを編集",
       "emptyState": "ノートはまだありません。",
-      "exportHtml": "HTMLとしてエクスポート…",
-      "exportMarkdown": "Markdownとしてエクスポート…",
-      "exportPdf": "PDFとしてエクスポート…",
-      "exportTxt": "プレーンテキストとしてエクスポート…",
       "favoritesHeading": "お気に入り",
       "icon": "アイコン…",
       "mergeAnyway": "そのまま統合",
@@ -2344,6 +2362,13 @@
     },
     "workspace": {
       "defaultSlotName": "デフォルト"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "書き出し…",
+      "txt": "プレーンテキスト"
     }
   },
   "password": {
@@ -2776,20 +2801,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "空白（テンプレートなし）",
+      "folderSearchEmpty": "一致するフォルダはありません。",
+      "folderSearchPlaceholder": "フォルダを検索…",
+      "searchEmpty": "一致するテンプレートはありません。",
+      "searchPlaceholder": "テンプレートを検索…",
+      "untitledTemplate": "無題のテンプレート",
+      "sectionDaily": "デイリーノート",
+      "sectionWeekly": "ウィークリーノート",
+      "sectionMonthly": "マンスリーノート",
+      "periodFolderLabel": "フォルダー",
+      "periodFolderHelper": "新しい{{period}}ノートの保存先。既定値は {{default}} です。空になってもフォルダーは残ります。",
+      "periodFormatLabel": "タイトル書式",
+      "periodFormatHelperDaily": "デイリーノートのタイトル。YYYY、MM、DD、gggg（ISO 週年）、ww（ISO 週番号）と、そのままの文字を表す [テキスト] が使えます。既定値は {{default}} です。",
+      "periodFormatHelperWeekly": "ウィークリーノートのタイトル。gggg（ISO 週年）、ww（ISO 週番号）、YYYY、MM、DD と、そのままの文字を表す [テキスト] が使えます。既定値は {{default}} です。",
+      "periodFormatHelperMonthly": "マンスリーノートのタイトル。YYYY、MM、gggg（ISO 週年）、ww（ISO 週番号）と、そのままの文字を表す [テキスト] が使えます。既定値は {{default}} です。",
+      "periodTemplateLabel": "テンプレート",
+      "periodTemplateHelper": "{{period}}ノートの下敷きにするテンプレートを選ぶか、日付をタイトルにした空のノートにする場合は空欄のままにします。",
+      "collisionWarning": "{{first}}ノートと{{second}}ノートは同じノートになります。フォルダーが同じで、同じタイトルになるためです。どちらのコマンドもそのノートを開きます。",
+      "weekStartNote": "週は月曜始まりです（ISO 8601）。そのため 1 月の初めの数日が前年の最終週に、12 月の終わりの数日が翌年の第 1 週に入ることがあります。",
+      "periodFolderSaveError": "{{period}}ノートのフォルダーを保存できませんでした。もう一度お試しください。",
+      "periodFormatSaveError": "{{period}}ノートのタイトル書式を保存できませんでした。もう一度お試しください。",
+      "periodTemplateSaveError": "{{period}}ノートのテンプレートを保存できませんでした。もう一度お試しください。",
+      "periodNameDaily": "デイリー",
+      "periodNameWeekly": "ウィークリー",
+      "periodNameMonthly": "マンスリー",
+      "periodFolderAriaLabel": "{{period}}ノートのフォルダー",
+      "periodFormatAriaLabel": "{{period}}ノートのタイトル書式",
+      "periodTemplateAriaLabel": "{{period}}ノートのテンプレート",
       "dateFormatHelper": "各デイリーノートのタイトル。YYYY、MM、DDに対応します。デフォルトは{{default}}です。",
       "dateFormatLabel": "デイリーノートの日付形式",
       "dateFormatSaveError": "日付形式を保存できませんでした。もう一度お試しください。",
       "folderHelper": "新しいデイリーノートが保存される場所。デフォルトは{{default}}です。フォルダは空でも保持されます。",
       "folderLabel": "デイリーノートのフォルダ",
       "folderSaveError": "デイリーノートのフォルダを保存できませんでした。もう一度お試しください。",
-      "folderSearchEmpty": "一致するフォルダはありません。",
-      "folderSearchPlaceholder": "フォルダを検索…",
-      "searchEmpty": "一致するテンプレートはありません。",
-      "searchPlaceholder": "テンプレートを検索…",
       "templateHelper": "各デイリーノートの起点にするテンプレートを選ぶか、空白のままにして日付をタイトルにした空のノートを作成します。",
       "templateLabel": "デイリーノートのテンプレート",
-      "templateSaveError": "デイリーノートのテンプレートを保存できませんでした。もう一度お試しください。",
-      "untitledTemplate": "無題のテンプレート"
+      "templateSaveError": "デイリーノートのテンプレートを保存できませんでした。もう一度お試しください。"
     },
     "deleteVault": {
       "cancel": "キャンセル",
@@ -2950,7 +2997,8 @@
         "title": "Myneが{{provider}}に何かを送信する前に",
         "whatLabel": "デバイスから出ていくもの",
         "whenLabel": "いつ出ていくか",
-        "whoLabel": "受け取る相手"
+        "whoLabel": "受け取る相手",
+        "connectionLabel": "どのように送られるか"
       },
       "disclosureToggle": "これはどのように機能しますか？",
       "enableHelper": "あなたが用意したモデルを実行します。どこで実行されるか、そしてノートがこのデバイスの外に出るかどうかは、下で指定するプロバイダーによって決まります。実験的機能で、デフォルトはオフです。",
@@ -2984,7 +3032,9 @@
         "refused": "プロバイダーが接続を拒否しました。停止しているか、このネットワークをブロックしている可能性があります。",
         "timeout": "プロバイダーから時間内に応答がありませんでした。実行されたまま残っているものはありません。",
         "unauthorized": "プロバイダーがAPIキーを拒否しました。キーを入れ替えてください：間違っているか、失効しているか、別のアカウントのものである可能性があります。",
-        "unreachable": "プロバイダーに接続できませんでした。ネットワーク接続を確認してください。"
+        "unreachable": "プロバイダーに接続できませんでした。ネットワーク接続を確認してください。",
+        "featureOff": "この端末では AI がオフです。何も送信されていません。設定の「AI」でオンにしてください。",
+        "consentMissing": "この端末からこの提供者にノートを送ることに同意していません。何も送信されていません。設定の「AI」で提供者をもう一度選び、何が送られるかをお読みください。"
       },
       "modelChoose": "ファイルを選択…",
       "modelEmbeddingLabel": "検索モデル：セマンティック検索とQ&A",
@@ -3025,7 +3075,16 @@
       "recommendedFilesEmbedding": "model.safetensors + config.json + tokenizer.json が1つのフォルダに必要です。",
       "recommendedFilesGeneration": ".gguf ファイル + tokenizer.json が同じフォルダに必要です。",
       "recommendedFilesTranscription": "Whisperの .gguf ファイル + config.json + tokenizer.json が同じフォルダに必要です。",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "この端末で AI を使う",
+      "mobileEnableHelper": "既定でオフ。この端末上の AI モデルが質問に答えたりノートを読んだりすることはないため、すべての要求は下で指定したサービスに送られ、そのときノートはこの端末を離れます。文字起こしと画像内テキストは引き続きこの端末で、Myne に同梱されたモデルで動きます。",
+      "mobileKeyAdd": "キーを保存",
+      "mobileKeyReplace": "キーを差し替え",
+      "mobileRevokeHelper": "提供者、そのキー、この端末の承認をまとめて削除し、設定前とまったく同じ状態に戻します。他の端末は、そちらでも削除するまで動作を続けます。",
+      "mobileApproveLabel": "この端末からの送信を許可",
+      "mobileApproveHelper": "提供者とそのキーは別の端末から届いたものです。何が送られるかをお読みになり、ここで許可されるまで、この端末からは何も送信されません。",
+      "historyBudgetHelper": "各リクエストが直近の会話をどれだけ含めるか、文字数で指定します。空欄で既定値になります。大きい値ほど AI は長い会話を追えますが、その分多くを送信します。この端末にないプロバイダーでは、実行の各ステップでより多くのテキストが端末の外に出ることになります。",
+      "historyBudgetLabel": "リクエストごとに送る会話"
     },
     "network": {
       "disabledCue": "同期はTor経由ではなくなりました。新しい接続は同期サーバーに直接つながります。",
@@ -3058,6 +3117,9 @@
       "exactLabel": "正確な時刻",
       "exactOn": "オン",
       "horizon": "リマインダーは{{date}}まで登録されています。それまでにMyneを開くと、以降も通知が続きます。",
+      "horizonLabel": "事前にスケジュール",
+      "horizonLabelHelper": "リマインダーはこの日数だけ前に用意されます。届くには Myne が開いていてロック解除されている必要があります。",
+      "horizonInertHelper": "この端末に保存されました。まだ何も読み取っていません。このビルドはタスクリマインダーを配信しません。",
       "label": "タスクのリマインダー",
       "saveError": "設定を保存できませんでした。もう一度お試しください。",
       "showTextAria": "通知にタスクの本文を表示",
@@ -3338,12 +3400,14 @@
         "viewMode": "表示モード デフォルト ライブ 読み取り ソース プレビュー default view mode live reading source preview",
         "dateFormat": "日付形式 日付 表示形式 日 月 年 カレンダー date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "時刻形式 時刻 表示形式 24時間 12時間 時計 午前 午後 time format 24 hour 12 hour clock am pm",
-        "timezone": "タイムゾーン 時間帯 地域 今日 timezone time zone tz utc iana region today"
+        "timezone": "タイムゾーン 時間帯 地域 今日 timezone time zone tz utc iana region today",
+        "periodicNotes": "定期ノート ウィークリー マンスリー 週 月 フォルダー テンプレート 書式",
+        "aiHistoryBudget": "会話 履歴 コンテキスト 記憶 上限 文字数 エージェント チャット リクエスト"
       }
     },
     "dateTime": {
       "dateLabel": "日付形式",
-      "dateHelper": "タスク、保存されたビュー、添付ファイルで日付をどのように表示するか。",
+      "dateHelper": "Myne が日付を表示するすべての場所で、日付をどう書くか。",
       "dateSystem": "言語に合わせる",
       "timeLabel": "時刻形式",
       "timeHelper": "時刻を24時間制で表示するか、12時間制で表示するか。",

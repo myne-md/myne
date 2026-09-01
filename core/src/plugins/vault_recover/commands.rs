@@ -191,6 +191,14 @@ pub(crate) async fn recover_with_phrase_with_path(
             );
             return Err(VaultRecoveryError::RecoveryAlreadyInProgress);
         }
+        SlotKind::ImportSource => {
+            tracing::error!(
+                stage = "slot_check",
+                error_kind = "VaultOpenAsImportSource",
+                "recovery attempt rejected: slot is an open vault-import source"
+            );
+            return Err(VaultRecoveryError::VaultOpenAsImportSource);
+        }
     }
 
     // (2) Acquire the shared auth permit (Semaphore capacity 1).
@@ -505,7 +513,10 @@ pub(crate) async fn complete_recovery_with_path(
     // (1) Slot peek — must be Recovering.
     match state.slot_kind(vault_id).await {
         SlotKind::Recovering => {}
-        SlotKind::Empty | SlotKind::Unlocked => {
+        // An import source slot joins the reject arm: `complete_recovery`
+        // requires a Recovering slot for THIS vault, and a read context over
+        // the same id is not one.
+        SlotKind::Empty | SlotKind::Unlocked | SlotKind::ImportSource => {
             tracing::error!(
                 stage = "slot_check",
                 error_kind = "VaultRecoveryRequiresActiveSession",
@@ -878,7 +889,7 @@ pub async fn resolve_vault_by_account_number<R: Runtime>(
 /// `ProtocolError` precede AEAD verification or arise from structural
 /// `vault.meta` corruption; both surface as `InvalidVaultMeta`, leaking
 /// no phrase-conditional information.
-fn derive_root_key_from_phrase(
+pub(crate) fn derive_root_key_from_phrase(
     version: protocol::MetaVersion,
     phrase: &str,
     meta: &VaultMeta,
@@ -967,7 +978,7 @@ fn phrase_or_meta(e: protocol::ProtocolError) -> VaultRecoveryError {
 /// distinguishing items_key wrap failure leaks nothing about
 /// credential validity (`decisions.md` 2026-05-02 unlock-error
 /// discipline applies here in parallel).
-fn derive_items_key(
+pub(crate) fn derive_items_key(
     version: protocol::MetaVersion,
     root_key: &[u8; AEAD_KEY_LEN],
     meta: &VaultMeta,

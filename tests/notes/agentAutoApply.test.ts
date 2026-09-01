@@ -91,10 +91,36 @@ beforeEach(() => {
 
 afterEach(() => clearAgentForLock());
 
+describe("the seed is captured before the turn is appended", () => {
+  // The one ordering the whole seed depends on, and nothing pinned it: swap the
+  // two lines in `startAgentRun` and every other test in this tree stays green,
+  // because the sibling suites assert `expect.any(Array)` for this argument,
+  // which passes whether the array is empty, correct, or carries the task
+  // twice. On a remote provider carrying the task twice is duplicate egress,
+  // and seeding the empty assistant turn beside it puts a blank model message
+  // in the prompt.
+  it("sends the earlier conversation and not the task being sent", async () => {
+    agentStart.mockResolvedValue(stepResult([]));
+    await startAgentRun("first question", { kind: "notes", value: ["n1"] }, COPY, "en");
+    agentStart.mockReset();
+    agentStart.mockResolvedValue(stepResult([]));
+
+    await startAgentRun("second question", { kind: "notes", value: ["n1"] }, COPY, "en");
+
+    const history = agentStart.mock.calls[0]?.[3] as { text: string }[];
+    const text = history.map((t) => t.text).join("\n");
+    expect(text).toContain("first question");
+    expect(text).not.toContain("second question");
+    // And no empty turn rides along: `sendAgentTurn` pushes an empty agent turn
+    // beside the task, so seeding after it would seed that too.
+    expect(history.every((t) => t.text.trim().length > 0)).toBe(true);
+  });
+});
+
 describe("automatic apply", () => {
   it("does nothing when the mode is off", async () => {
     agentStart.mockResolvedValue(stepResult([ORDINARY]));
-    await startAgentRun("tidy this", { kind: "notes", value: ["n1"] }, COPY);
+    await startAgentRun("tidy this", { kind: "notes", value: ["n1"] }, COPY, "en");
     expect(agentApply).not.toHaveBeenCalled();
     // The proposal is still there, which is what makes the review screen open.
     expect(getAgent().proposal.edits).toHaveLength(1);
@@ -104,7 +130,7 @@ describe("automatic apply", () => {
     setAutoApply(true);
     agentStart.mockResolvedValue(stepResult([ORDINARY]));
     const written = vi.fn();
-    await startAgentRun("tidy this", { kind: "notes", value: ["n1"] }, COPY, written);
+    await startAgentRun("tidy this", { kind: "notes", value: ["n1"] }, COPY, "en", written);
 
     expect(agentApply).toHaveBeenCalledTimes(1);
     const [runId, edits, newNotes, approval] = agentApply.mock.calls[0] as [
@@ -125,7 +151,7 @@ describe("automatic apply", () => {
   it("does not offer a removal-class edit to the automatic apply", async () => {
     setAutoApply(true);
     agentStart.mockResolvedValue(stepResult([ORDINARY, REMOVING]));
-    await startAgentRun("tidy these", { kind: "folder", value: "Notes" }, COPY);
+    await startAgentRun("tidy these", { kind: "folder", value: "Notes" }, COPY, "en");
 
     const [, edits] = agentApply.mock.calls[0] as [string, ProposedEdit[]];
     expect(edits).toEqual([ORDINARY]);
@@ -136,7 +162,7 @@ describe("automatic apply", () => {
     setAutoApply(true);
     agentStart.mockResolvedValue(stepResult([ORDINARY]));
     agentApply.mockRejectedValue(new Error("no"));
-    await startAgentRun("tidy this", { kind: "notes", value: ["n1"] }, COPY);
+    await startAgentRun("tidy this", { kind: "notes", value: ["n1"] }, COPY, "en");
 
     // The flag is cleared whatever happened, so a failed automatic apply
     // degrades to the manual path rather than hiding the proposal forever.

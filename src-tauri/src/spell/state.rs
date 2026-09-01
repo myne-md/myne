@@ -123,6 +123,95 @@ impl SpellState {
         Some(snapshot)
     }
 
+    /// Merge a whole word list into the personal set in ONE lock acquisition,
+    /// returning the snapshot to persist and how many words were genuinely NEW.
+    ///
+    /// Exists for the vault import (myne-md/myne#464), and both halves of the
+    /// signature are the reason.
+    ///
+    /// The COUNT: `add_personal` cannot report newness (it pushes and lets the
+    /// encoder dedup), so a caller looping over it could only count its own
+    /// calls. The import report then told the user it had brought 500 words
+    /// across when the two vaults shared 480 of them. Folded comparison, the
+    /// same `foldSegment`-shaped rule the lookup layer uses, because "Myne" and
+    /// "myne" are not two words to a user.
+    ///
+    /// The BATCH: the per-word command persists the whole `vault.dictionary`
+    /// blob, so carrying 500 words meant 500 AEAD seals and 500 fsyncs, in
+    /// sequence, each behind its own IPC round trip. One merge, one persist.
+    /// PLAN the merge without applying it: returns the snapshot that would
+    /// result and how many words are new, leaving the live state untouched.
+    ///
+    /// Split from [`Self::commit_personal`] because the previous single call
+    /// mutated `rt.data` and the engine and THEN returned the snapshot for the
+    /// caller to persist. When the persist failed, the import command returned
+    /// `Io`, `carrySourceDictionary`'s catch reported `unreadable: true`, and
+    /// the report note told the user the source dictionary could not be read so
+    /// no words came across, while the source vault's private vocabulary was
+    /// already in the target's live spell state and would be written to
+    /// `vault.dictionary` and SYNCED by the next unrelated
+    /// `add_to_personal_dictionary`. That is the one non-additive, synced write
+    /// in the whole import flow, and the user was told the opposite of what
+    /// happened. It also defeated the ignore-set boundary: words nobody
+    /// consented to import became permanent on the next dictionary edit.
+    ///
+    /// Plan, persist, then commit. A failed persist now changes nothing, which
+    /// is what makes `myneDictionary.ts`'s "either the whole union landed or
+    /// none of it did" true of the in-memory half as well as the on-disk one.
+    pub fn plan_personal_merge(&self, words: &[String]) -> Option<(PersonalDictionaryData, usize)> {
+        let rt = self.inner.lock().ok()?;
+        let mut planned = rt.data.clone();
+        let mut present: std::collections::HashSet<String> = rt
+            .data
+            .personal_words
+            .iter()
+            .map(|w| w.to_lowercase())
+            .collect();
+        let mut added = 0usize;
+        for word in words {
+            if !present.insert(word.to_lowercase()) {
+                continue;
+            }
+            planned.add_personal(word);
+            added += 1;
+        }
+        Some((planned, added))
+    }
+
+    /// APPLY a snapshot planned by [`Self::plan_personal_merge`], after it has
+    /// been persisted. Separate so a failed persist leaves the live state as it
+    /// was; see that function for what the combined form cost.
+    pub fn commit_personal(&self, snapshot: &PersonalDictionaryData) -> Option<()> {
+        let mut rt = self.inner.lock().ok()?;
+        rt.data = snapshot.clone();
+        rt.engine
+            .set_personal_words(snapshot.personal_words.iter().cloned());
+        Some(())
+    }
+
+    #[cfg(test)]
+    pub fn merge_personal(&self, words: &[String]) -> Option<(PersonalDictionaryData, usize)> {
+        let mut rt = self.inner.lock().ok()?;
+        let mut present: std::collections::HashSet<String> = rt
+            .data
+            .personal_words
+            .iter()
+            .map(|w| w.to_lowercase())
+            .collect();
+        let mut added = 0usize;
+        for word in words {
+            if !present.insert(word.to_lowercase()) {
+                continue;
+            }
+            rt.data.add_personal(word);
+            added += 1;
+        }
+        let snapshot = rt.data.clone();
+        rt.engine
+            .set_personal_words(snapshot.personal_words.iter().cloned());
+        Some((snapshot, added))
+    }
+
     /// Add an ignore word; returns the updated canonical data to persist.
     pub fn add_ignore(&self, word: &str) -> Option<PersonalDictionaryData> {
         let mut rt = self.inner.lock().ok()?;
@@ -171,6 +260,36 @@ mod tests {
         let s = SpellState::default();
         s.load_language("en-US", EN_AFF, EN_DIC).expect("load");
         s
+    }
+
+    /// Planning must not touch the live state, which is the whole point of the
+    /// split: the import command persists BETWEEN the plan and the commit, and
+    /// a failed persist has to leave the target vault exactly as it was.
+    ///
+    /// Before the split, `merge_personal` mutated `rt.data` and the engine and
+    /// then handed back the snapshot to persist. A persist failure returned
+    /// `Io`, the frontend reported the source dictionary as unreadable, and the
+    /// user was told nothing came across while the words were already live and
+    /// would be written to `vault.dictionary` and SYNCED by the next unrelated
+    /// dictionary edit.
+    #[test]
+    fn planning_a_merge_leaves_the_live_state_untouched() {
+        let s = loaded();
+        let words = langs(&["Alpha", "Beta"]);
+
+        let (planned, added) = s.plan_personal_merge(&words).expect("plan");
+        assert_eq!(added, 2);
+        assert_eq!(planned.personal_words, vec!["Alpha", "Beta"]);
+
+        // The live state has NOT moved: neither the persisted data nor the
+        // engine that decides whether a word is misspelled.
+        assert!(s.snapshot_data().personal_words.is_empty());
+        assert!(s.check_batch(&langs(&["Alpha"]), &langs(&["en-US"]))[0].misspelled);
+
+        // Only the commit applies it, and it applies BOTH halves.
+        s.commit_personal(&planned).expect("commit");
+        assert_eq!(s.snapshot_data().personal_words, vec!["Alpha", "Beta"]);
+        assert!(!s.check_batch(&langs(&["Alpha"]), &langs(&["en-US"]))[0].misspelled);
     }
 
     #[test]

@@ -12,7 +12,7 @@
 // the destructive `var(--warning)` fill.
 //
 // The KEYBOARD contract those stories originally specified was reversed by
-// myne-md/myne#628; `docs/decisions/ui/0541` is the record and the effect below
+// myne-md/myne#628; `docs/decisions/ui/0564` is the record and the effect below
 // carries the reasoning. In one line: focus starts on the destructive button and
 // Enter follows the focus ring, so the ring always names what Enter does.
 // Escape, the backdrop and Tab-to-Cancel are the ways out.
@@ -311,7 +311,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   // "unreadable" now means unreadable inside THIS dialog, where the trap has
   // already placed focus on the confirm button unless a caller asked otherwise.
   //
-  // `docs/decisions/ui/0541` records the reversal, including what it costs on
+  // `docs/decisions/ui/0564` records the reversal, including what it costs on
   // the cryptographic-erase paths.
   const answerRef = useRef({ onCancel, onConfirm });
   useEffect(() => {

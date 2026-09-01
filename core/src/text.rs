@@ -92,6 +92,30 @@ pub fn fold_diacritics(s: &str) -> String {
         .collect()
 }
 
+/// The largest byte index at or below `at` that is a character boundary.
+///
+/// Slicing a `&str` on an index that is not a boundary panics, so any code
+/// truncating user text to a byte budget needs this first. Hand-rolled because
+/// `str::floor_char_boundary` is still unstable.
+///
+/// Lives here rather than beside its first caller because it is a property of
+/// `str` rather than of any one feature, and the tree already had the same
+/// `while !is_char_boundary` walk written inline in two places
+/// (`plugins::attachments::extract_types`, `plugins::attachments::text_cache`).
+/// Those are not converted here, since they are outside the change that added
+/// this, but they are where the third and fourth copies would otherwise have
+/// gone.
+pub fn floor_char_boundary(s: &str, at: usize) -> usize {
+    if at >= s.len() {
+        return s.len();
+    }
+    let mut i = at;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,5 +203,28 @@ mod tests {
         assert_eq!(turkish_lower("ISIRGAN"), "ısırgan");
         // The bug this avoids: default Unicode lowercasing maps I → i.
         assert_ne!(turkish_lower("I"), "I".to_lowercase());
+    }
+
+    #[test]
+    fn floor_char_boundary_never_splits_a_character() {
+        // Every char is 4 bytes, so any index not a multiple of 4 is inside one.
+        let s = "🙂🙂🙂";
+        for at in 0..=s.len() {
+            let cut = floor_char_boundary(s, at);
+            assert!(s.is_char_boundary(cut), "at={at} gave {cut}");
+            assert!(cut <= at);
+            // And it is the LARGEST such index, not merely a safe one: a
+            // helper that always returned 0 would satisfy everything above.
+            assert!(
+                cut + 4 > at || cut == s.len(),
+                "at={at} gave {cut}, too low"
+            );
+        }
+    }
+
+    #[test]
+    fn floor_char_boundary_clamps_past_the_end() {
+        assert_eq!(floor_char_boundary("abc", 99), 3);
+        assert_eq!(floor_char_boundary("", 5), 0);
     }
 }

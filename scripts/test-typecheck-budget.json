@@ -22,7 +22,6 @@
     "tests/commands/workspaceHotkeysModalGate.test.tsx": 1,
     "tests/components/accountPanel.test.tsx": 1,
     "tests/components/AiPanel.test.tsx": 4,
-    "tests/components/settingsModal.test.tsx": 1,
     "tests/dialect/_genDialectVectors.test.ts": 1,
     "tests/dialect/_helpers.ts": 2,
     "tests/dialect/civilDate.test.ts": 3,
@@ -31,13 +30,12 @@
     "tests/editor/attachment-lightbox-pdf.test.ts": 7,
     "tests/editor/attachment-pdf-reader.test.ts": 1,
     "tests/editor/attachment-pdf-render.test.ts": 1,
-    "tests/editor/attachment-transcript.test.tsx": 5,
+    "tests/editor/attachment-transcript.test.tsx": 4,
     "tests/editor/image-url-chip.test.tsx": 3,
     "tests/editor/keymap.test.ts": 1,
     "tests/editor/math-render.test.ts": 3,
     "tests/editor/mermaid-render.test.ts": 3,
     "tests/editor/render-perf.test.ts": 3,
-    "tests/editor/taskChip.test.ts": 2,
     "tests/editor/taskRecurrence.test.ts": 2,
     "tests/editor/vim-substitute.test.ts": 1,
     "tests/editor/voice-record-controller.test.ts": 2,
@@ -87,5 +85,5 @@
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 213
+  "total": 211
 }

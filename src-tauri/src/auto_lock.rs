@@ -58,6 +58,23 @@ pub const MIN_AUTO_LOCK_SECS: u32 = 30;
 // Compile-time invariants on the placeholder constants: a future edit that
 // inverts the bounds or moves DEFAULT outside [MIN, CEILING] fails the BUILD
 // (not just a test) and keeps the `clamp` min<=max contract sound.
+/// How long a vault-import SOURCE slot may hold a second vault's key material
+/// before the tick above reclaims it (myne-md/myne#464).
+///
+/// Deliberately generous relative to the auto-lock default, because it is not
+/// an idle timeout: an import of a large vault legitimately runs for a long
+/// time with the machine untouched, which is exactly why `import_set_hold`
+/// exists. This is the CEILING on an import that stopped making progress, not
+/// an expected duration, and the frontend closes the slot explicitly on every
+/// exit path long before it matters.
+///
+/// It must stay independent of the import hold. Deriving it from the auto-lock
+/// timeout, or gating the sweep on the hold, would hand the second vault's
+/// key material the same deferral the target vault's lock gets, and the whole
+/// reason this constant exists is that the target's reclaimer is switched off
+/// during an import.
+const IMPORT_SOURCE_TTL: core::time::Duration = core::time::Duration::from_secs(30 * 60);
+
 const _: () = assert!(MIN_AUTO_LOCK_SECS > 0);
 const _: () = assert!(MIN_AUTO_LOCK_SECS <= AUTO_LOCK_CEILING_SECS);
 const _: () = assert!(DEFAULT_AUTO_LOCK_SECS >= MIN_AUTO_LOCK_SECS);
@@ -217,10 +234,17 @@ fn machine_idle() -> Option<Duration> {
 // ---- authoritative idle-lock timer (MYND-121, stories 1/5/6/7) --------
 
 /// Poll interval for the idle-lock timer. A few seconds is ample — the
-/// per-tick check is two lock-free reads + a cheap slot peek; the lock
+/// per-tick check is two lock-free reads, a cheap slot peek, and one SHARED
+/// -lock probe for an expired vault-import source (myne-md/myne#464); the lock
 /// fires within one interval of the deadline. (A `sleep_until(deadline)`
 /// refinement is possible later; the periodic poll is simpler and its
 /// wakeup cost is negligible.)
+///
+/// The import probe is deliberately a read acquisition. It runs on every tick
+/// for the life of the process, so opening it with `write()` would have put
+/// roughly seventeen thousand exclusive acquisitions a day on the one lock
+/// every note read, note write and attachment ingest contends on, on a machine
+/// that never imports anything.
 const IDLE_POLL: Duration = Duration::from_secs(5);
 
 /// Bounded grace between "deadline reached" and the irreversible zeroize,
@@ -272,6 +296,33 @@ async fn idle_lock_tick<R: Runtime>(app: &AppHandle<R>) {
     //
     // TRANSITIONAL (sub-feature 6 — multi-vault auto-lock): operate on the
     // single active (`Unlocked`, else `Recovering`) entry (SYNC-1).
+    // The import-source TTL sweep runs FIRST and unconditionally, before the
+    // active-slot dispatch, and both properties are the point (myne-md/myne#464).
+    //
+    // Unconditionally, because a source vault's key material has to be
+    // reclaimed whatever the target vault is doing — including while the
+    // target is locked, which is the state an abandoned import leaves behind.
+    //
+    // First, because this is the one reclaimer left running during an import.
+    // `import_set_hold` DEFERS the idle lock below for the length of a run, so
+    // during exactly the window when TWO vaults' keys are resident, the timer
+    // that would otherwise drop one of them is switched off. The sweep is not
+    // subject to that hold: it reads the import slot's own `opened_at` against
+    // its own TTL, so a hung or abandoned import cannot hold a second vault's
+    // keys open indefinitely. That bound is what `threat-model.md` A6 states.
+    // `take_import_source_if_expired` probes under the READ lock and takes the
+    // write lock only when there is something to drop, so the common case (no
+    // import has ever run) costs one shared acquisition rather than an exclusive
+    // one. That matters at this call site specifically: it fires every five
+    // seconds for the life of the process, on the one lock every note read,
+    // note write and attachment ingest contends on.
+    myne_core::plugins::vault_unlock::import_source::sweep_expired(
+        state.inner(),
+        IMPORT_SOURCE_TTL,
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+    )
+    .await;
+
     let active_kind = match state.active_vault_or_recovering_for_probe().await {
         Some(id) => state.slot_kind(id).await,
         None => SlotKind::Empty,
@@ -280,6 +331,12 @@ async fn idle_lock_tick<R: Runtime>(app: &AppHandle<R>) {
         SlotKind::Unlocked => lock_unlocked_if_idle(app, state.inner()).await,
         SlotKind::Recovering => bail_recovering_if_expired(app, state.inner()).await,
         SlotKind::Empty => {}
+        // Unreachable through this resolver rather than merely unhandled:
+        // `active_vault_or_recovering_for_probe` resolves an `Unlocked` entry
+        // else a `Recovering` one, and deliberately does not see an import
+        // source (a vault opened for READING is not the vault this process is
+        // working on). The sweep above is where an import slot is acted on.
+        SlotKind::ImportSource => {}
     }
 }
 
@@ -340,6 +397,16 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
             reason = "idle_timeout",
             "auto-lock on idle dropped the Unlocked slot; Zeroizing fields wipe on Drop"
         );
+        // A vault-import SOURCE slot is dropped here too, not only on the
+        // manual lock (myne-md/myne#464). `threat-model.md` A6 states the
+        // lock-path drop as one of the two bounds on the window in which two
+        // vaults' keys are resident, and omitting it here made that sentence
+        // false on the ONE path A6's rating actually rests on: a renderer
+        // that dies mid-import lets `import_set_hold` lapse within 60 s, the
+        // next tick locks the target, and the source's keys would otherwise
+        // sit for the remainder of the 30-minute TTL on a device the user is
+        // looking at as locked.
+        myne_core::plugins::vault_unlock::import_source::close_all(state).await;
         // Canonical teardown order (decisions 2026-05-30, leg-split): hide
         // (2a, BEFORE zeroize — renderer-independent cover) → zeroize (leg 1)
         // → reapply screen-capture → reload (2b, AFTER zeroize). The window
