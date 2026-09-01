@@ -20,7 +20,7 @@
 //! those were considered and declined (`docs/decisions/ai/` entry for
 //! myne-md/myne#529). Do not repurpose it as one without reopening that.
 
-use super::edit::ProposedEdit;
+use super::edit::{EditKind, ProposedEdit};
 use super::engine::{AgentEngine, Content, Message, Role, AGENT_REQUEST_CLASS};
 use super::error::AgentError;
 use super::prompt::{
@@ -316,6 +316,22 @@ pub struct LoopDeps<'a> {
     /// review the read half did not, which left a tightened control governing
     /// writes and not reads.
     pub exclusions: &'a dyn ExclusionSource,
+    /// The user's interface language, as a BCP-47 tag, or `None`.
+    ///
+    /// Threaded through the loop rather than read here because this crate has no
+    /// access to it: the chosen language lives in the WebView's `localStorage`
+    /// (`src/i18n/index.ts`), not in `vault.prefs`, so the client supplies it.
+    /// `prompt::system_instructions` shape-checks it before it reaches the
+    /// system message.
+    pub language: Option<&'a str>,
+    /// The visible chat history this run was seeded with, already budgeted and
+    /// wrapped by `super::history::seed_messages`.
+    ///
+    /// Prepared by the caller rather than here for the same reason `records` is:
+    /// this loop must not re-derive what the run started with. It is also where
+    /// the character budget is applied, which is host policy and belongs at the
+    /// command boundary, not in the loop.
+    pub history: &'a [Message],
 }
 
 /// Run the loop until it stops.
@@ -329,6 +345,7 @@ pub async fn drive(
     task: &str,
     transcript: &mut Vec<Message>,
     deps: &LoopDeps<'_>,
+    read_ids: &mut BTreeSet<String>,
 ) -> Result<LoopOutcome, AgentError> {
     // Target note, once for this module: `myne_core::agent`, not the `myne::…`
     // product target the desktop crate uses for `myne::ai`. `tracing-test`
@@ -336,7 +353,7 @@ pub async fn drive(
     // invisible to the tests that assert these lines carry no note content —
     // and an untested DENY-list claim is the kind this repo does not make.
     // `RUST_LOG=myne_core=debug` turns them on.
-    let outcome = drive_inner(runs, run_id, task, transcript, deps).await;
+    let outcome = drive_inner(runs, run_id, task, transcript, deps, read_ids).await;
     match &outcome {
         Ok(o) => tracing::debug!(
             target: "myne_core::agent",
@@ -372,6 +389,7 @@ async fn drive_inner(
     task: &str,
     transcript: &mut Vec<Message>,
     deps: &LoopDeps<'_>,
+    read_ids: &mut BTreeSet<String>,
 ) -> Result<LoopOutcome, AgentError> {
     let mut proposal = Proposal::default();
     let mut iterations = 0usize;
@@ -383,11 +401,45 @@ async fn drive_inner(
     // which makes "the seed read it and the model asked anyway" the ordinary
     // case rather than an odd one. The set is the dedup; `notes_read` stays the
     // reported figure so the ten return sites are untouched.
-    let mut read_ids: BTreeSet<String> = BTreeSet::new();
+    //
+    // **Owned by the CALLER, for the same reason the transcript is.** A run
+    // resumed after a scope approval re-enters through `step`, which writes the
+    // transcript back but used to hand this set in fresh, so leg two believed it
+    // had read nothing while leg one's bodies were still sitting in the
+    // transcript above it. The guard then let a re-read through and pushed a
+    // second copy of a body already in the prompt, on the longest transcripts
+    // there are, which is exactly where the saving is worth most. A required
+    // parameter rather than one defaulted here: a default is evaluated at the
+    // call, so the site that forgets to thread it is the site running
+    // unguarded, which `CLAUDE.md` records as its own class of bug.
     // Stays `None` until some request reports that it went off-device, which is
     // what keeps "nothing was transmitted" and "a transmission carried nothing"
     // separable at the surface.
     let mut chars_off_device: Option<usize> = None;
+    // **The seed, held as a local so it can be dropped MID-RUN.**
+    //
+    // SYNC-14 carries no in-flight carve-out: an exclusion added while a run is
+    // open takes effect at once, which is why the read tools re-ask on every
+    // call and `apply.rs` re-reads at the write. A run is up to 24 iterations
+    // and was measured at 12m49s, so "while the run is open" is a real window,
+    // and until this the seed was fixed for the whole of it: the host's cut
+    // fired on the scope-approval pause and nowhere else, so a user excluding a
+    // folder DURING a run kept having the pre-change conversation re-sent on
+    // every remaining iteration.
+    //
+    // A drop rather than a filter, the same reasoning as everywhere else in
+    // this feature: a turn carries text and no note provenance, so there is
+    // nothing to select out of it. The exclusion set at entry is the baseline;
+    // any change to it, in either direction, stops the seed.
+    let mut seed: &[Message] = deps.history;
+    let seed_baseline = if seed.is_empty() {
+        // Nothing to protect, so nothing to pay for. This is the ordinary case
+        // (a first message in a conversation) and it keeps the per-iteration
+        // read off the path that does not need it.
+        None
+    } else {
+        Some(deps.exclusions.excluded_now().await?)
+    };
     // **What this run has already asked for**, one signature per tool call, so
     // a repeat can be told from a first ask. A model looping on `list_scope`
     // learns nothing new on the second call and the loop has no way to notice
@@ -425,7 +477,7 @@ async fn drive_inner(
     // corrected. A model that asks anyway gets the answer, cheaply and
     // host-side, exactly as before.
     if transcript.is_empty() {
-        transcript.push(opening_scope(runs, run_id, deps, &mut notes_read, &mut read_ids).await?);
+        transcript.push(opening_scope(runs, run_id, deps, &mut notes_read, read_ids).await?);
     }
 
     loop {
@@ -448,7 +500,15 @@ async fn drive_inner(
             });
         }
 
-        let request = build_request(task, transcript);
+        // Re-asked per iteration rather than per run, for the reason above. The
+        // cost is one prefs read on an iteration that is about to make a model
+        // call, which the read tools already pay per call.
+        if let Some(baseline) = seed_baseline.as_ref() {
+            if !seed.is_empty() && deps.exclusions.excluded_now().await? != *baseline {
+                seed = &[];
+            }
+        }
+        let request = build_request(task, transcript, deps.language, seed);
         // The class is the constant, passed here, in the loop's own code. It is
         // never read from a payload and never varies per iteration.
         let completion = deps.engine.complete(AGENT_REQUEST_CLASS, &request).await?;
@@ -456,6 +516,7 @@ async fn drive_inner(
         if let Some(n) = completion.chars_off_device {
             chars_off_device = Some(chars_off_device.unwrap_or(0) + n);
         }
+        let truncated = completion.truncated;
         let reply = completion.reply;
         // Parse before the reply moves into the transcript, so the reply is not
         // cloned just to be borrowed.
@@ -513,10 +574,25 @@ async fn drive_inner(
             // most barren turn there is, and it was the one turn that never
             // reached the counter. `actions` is empty, so the loop below runs
             // zero times and the fall-through costs nothing.
+            //
+            // **A cut-off reply gets a different sentence, and the difference
+            // is not politeness.** The token ceiling this loop now asks for
+            // (`AGENT_MAX_OUTPUT_TOKENS`) makes a long answer come back stopped
+            // mid-token, which is broken JSON and parses to zero actions. Told
+            // "no valid action found", a model goes looking for a format error
+            // it did not make, and usually answers at the same length again, so
+            // all three barren strikes go the same way and the run ends with a
+            // stall verdict naming the wrong cause. The provider said which it
+            // was; passing that through is the whole fix.
             transcript.push(Message {
                 role: Role::User,
                 content: vec![Content::Trusted(
-                    "No valid action found. Reply with one JSON action per line.".into(),
+                    if truncated {
+                        "Your reply was cut off before it finished. Answer more briefly: fewer actions per reply, and shorter text in each."
+                    } else {
+                        "No valid action found. Reply with one JSON action per line."
+                    }
+                    .into(),
                 )],
             });
         }
@@ -595,6 +671,60 @@ async fn drive_inner(
                     // twice is as barren as reading the same note twice.
                     let fresh = asked.insert(format!("read_note:{note_id}"));
                     productive |= fresh;
+                    // **A repeat read costs nothing, because it sends nothing**
+                    // (myne-md/myne#619). The body is already in this
+                    // transcript, and `build_request` re-sends the whole
+                    // transcript on every iteration, so a second copy rides
+                    // along on every remaining one, up to the 24-iteration
+                    // ceiling. That is provider tokens on any backend and
+                    // off-device characters on the remote arm.
+                    //
+                    // The pointer is returned INSTEAD of the body rather than
+                    // by rewriting the earlier entry: the transcript stays
+                    // append-only, so nothing the model has already read
+                    // changes underneath it.
+                    //
+                    // Deliberately BEFORE the read: the whole saving is not
+                    // performing it. The scope and exclusion checks it would
+                    // have run are not skipped in any meaningful sense, since
+                    // the first read passed them and its answer is what is being
+                    // pointed at. `apply.rs` re-checks both at the write
+                    // boundary, which is where a mid-run change has to be
+                    // caught anyway.
+                    //
+                    // One message rather than this plus `repeat_notice()`: the
+                    // two would say the same thing twice, and this one is the
+                    // more useful half, since it names where the answer already
+                    // is instead of only that the call was a repeat.
+                    //
+                    // **Keyed on `read_ids` ALONE, and the `!fresh` this used to
+                    // carry made it miss the commonest scope there is.**
+                    // `opening_scope` reads the body for a single-note scope and
+                    // records the id, but registers no `asked` entry, on purpose:
+                    // a seed is information rather than a call, and counting it
+                    // would make the model's first genuine `read_note` a repeat
+                    // and cost it a barren strike. So on that scope the first
+                    // `read_note` is `fresh`, and a guard requiring `!fresh`
+                    // stood down for exactly the shape "Working on: This note"
+                    // produces, which is the default. Everywhere else
+                    // `read_ids.contains` already implies `!fresh`, because the
+                    // `asked.insert` above runs before the read that populates
+                    // it, so the term bought nothing where it was not harmful.
+                    //
+                    // `productive |= fresh` above is untouched, so a first call
+                    // that lands here still counts as progress and the run
+                    // cannot stall on it.
+                    if read_ids.contains(&note_id) {
+                        transcript.push(tool_result(
+                            "You have already read that note in this run, and its text is \
+                             above in this conversation. Use what is there: reading it again \
+                             returns nothing new. Propose an edit, or finish and say what you \
+                             found."
+                                .to_string(),
+                            None,
+                        ));
+                        continue;
+                    }
                     match read_note(runs, run_id, &note_id, deps.reader, deps.exclusions).await {
                         Ok(body) => {
                             if read_ids.insert(note_id.clone()) {
@@ -863,6 +993,7 @@ async fn drive_inner(
                     productive = true;
                     proposal.edits.push(ProposedEdit {
                         note_id,
+                        kind: EditKind::Replace,
                         anchor,
                         replacement,
                     });
@@ -886,6 +1017,52 @@ async fn drive_inner(
                         role: Role::User,
                         content: vec![Content::Trusted(
                             "Edit recorded. Propose another, or finish.".into(),
+                        )],
+                    });
+                }
+                AgentAction::AppendToNote { note_id, text } => {
+                    // The same scope check the edit arm makes, and for the same
+                    // reason: catching it here means the model is told and can
+                    // correct itself, rather than the user seeing a proposal
+                    // that was always going to be refused.
+                    //
+                    // Deliberately NOT sharing the edit arm's long id-correction
+                    // message. That one talks the model out of asking for a
+                    // wider scope after a copy error, which is a lesson it has
+                    // already been taught by the time it reaches here, and
+                    // reproducing it would be a second copy to keep in step.
+                    if !runs.contains(run_id, &note_id)? {
+                        productive |= asked.insert(format!("append_refused:{note_id}"));
+                        transcript.push(Message {
+                            role: Role::User,
+                            content: vec![
+                                Content::Trusted("Note ".into()),
+                                Content::note(note_id.clone()),
+                                Content::Trusted(
+                                    " is not one of the notes in your scope, so that append was \
+                                     discarded. Copy an id from your scope exactly, or use \
+                                     request_scope if the note you need is genuinely not among them."
+                                        .into(),
+                                ),
+                            ],
+                        });
+                        continue;
+                    }
+                    productive = true;
+                    proposal.edits.push(ProposedEdit {
+                        note_id,
+                        kind: EditKind::Append,
+                        // An append has nothing to anchor to. Empty rather than
+                        // absent because the field is shared with the replace
+                        // shape, and `apply_edit` routes on the kind rather than
+                        // on whether this happens to be populated.
+                        anchor: String::new(),
+                        replacement: text,
+                    });
+                    transcript.push(Message {
+                        role: Role::User,
+                        content: vec![Content::Trusted(
+                            "Append recorded. Propose another change, or finish.".into(),
                         )],
                     });
                 }
@@ -987,6 +1164,11 @@ mod tests {
         /// When set, refuse a remote-class engine an ambient request, which is
         /// the seam contract the host implements for real.
         remote: bool,
+        /// When set, every reply is reported as CUT OFF at the token ceiling,
+        /// which is what the host does when the provider says `finish_reason:
+        /// "length"`. A flag on the engine rather than per reply, because the
+        /// case under test is a model that keeps answering past the ceiling.
+        truncated: bool,
     }
 
     impl ScriptEngine {
@@ -995,12 +1177,63 @@ mod tests {
                 replies: Mutex::new(replies.iter().rev().map(|s| s.to_string()).collect()),
                 seen_classes: Mutex::new(Vec::new()),
                 remote: false,
+                truncated: false,
             }
         }
         fn remote(replies: &[&str]) -> Self {
             let mut e = Self::new(replies);
             e.remote = true;
             e
+        }
+        fn truncating(replies: &[&str]) -> Self {
+            let mut e = Self::new(replies);
+            e.truncated = true;
+            e
+        }
+    }
+
+    /// Records what each request actually carried, which `ScriptEngine` cannot:
+    /// that one answers by script and drops the request on the floor, so a test
+    /// about what LEAVES the device has nothing to read.
+    #[derive(Default)]
+    struct RecordingEngine {
+        requests: Mutex<Vec<String>>,
+        /// Set once the FIRST request has been recorded, so a test can make the
+        /// world change between two iterations at a point it controls.
+        flip_after_first: Option<std::sync::Arc<core::sync::atomic::AtomicBool>>,
+    }
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl AgentEngine for RecordingEngine {
+        async fn complete(
+            &self,
+            _class: AgentRequestClass,
+            r: &AgentRequest,
+        ) -> Result<AgentCompletion, AgentError> {
+            let rendered: String = r
+                .messages
+                .iter()
+                .flat_map(|m| m.content.iter())
+                .map(|c| c.text().to_string())
+                .collect::<Vec<_>>()
+                .join("\n");
+            let mut seen = self.requests.lock().unwrap();
+            seen.push(rendered);
+            if seen.len() == 1 {
+                if let Some(flag) = self.flip_after_first.as_ref() {
+                    flag.store(true, core::sync::atomic::Ordering::SeqCst);
+                }
+            }
+            drop(seen);
+            // Unparseable, so every iteration is barren and the run ends on the
+            // barren counter rather than on a scripted `finish`. Three
+            // iterations is exactly what this test needs and no more.
+            Ok(AgentCompletion {
+                reply: "not an action".to_string(),
+                truncated: false,
+                chars_off_device: None,
+            })
         }
     }
 
@@ -1037,6 +1270,7 @@ mod tests {
                 reply: self.replies.lock().unwrap().pop().unwrap_or_else(|| {
                     r#"{"action":"finish","summary":"out of script"}"#.to_string()
                 }),
+                truncated: self.truncated,
                 chars_off_device,
             })
         }
@@ -1116,6 +1350,8 @@ mod tests {
             searcher: &Searcher,
             records: recs,
             exclusions: &*NO_EXCL,
+            language: None,
+            history: &[],
         }
     }
 
@@ -1139,6 +1375,8 @@ mod tests {
             searcher: &NoHits,
             records: recs,
             exclusions: &*NO_EXCL,
+            language: None,
+            history: &[],
         }
     }
 
@@ -1192,6 +1430,163 @@ mod tests {
     // driven, and `list_scope` reads that same set back. These pin that the
     // opening message answers both, and the bound on how far that goes.
 
+    // ---- a repeat read returns a pointer, not a second body ------------
+
+    /// **The saving is measurable in the transcript, so that is where it is
+    /// asserted** (myne-md/myne#619). `build_request` re-sends the whole
+    /// transcript on every iteration, so a second copy of a body rides along on
+    /// every remaining one, up to the 24-iteration ceiling.
+    ///
+    /// Two notes in scope, because a single-note scope is opened WITH its body
+    /// and the model is told not to read it, which would make the first read
+    /// itself the repeat and muddy what is being measured.
+    #[test]
+    fn a_second_read_of_the_same_note_returns_no_body() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records_ab();
+        let mut t = Vec::new();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+
+        let bodies = t
+            .iter()
+            .filter(|m| {
+                m.content
+                    .iter()
+                    .any(|c| matches!(c, Content::UntrustedNote(_)))
+            })
+            .filter(|m| m.content.iter().any(|c| c.text().contains("body-a")))
+            .count();
+        assert_eq!(
+            bodies, 1,
+            "the body of `a` must appear exactly once in the transcript, not twice"
+        );
+
+        let pointed = t.iter().any(|m| {
+            m.content
+                .iter()
+                .any(|c| c.text().contains("already read that note"))
+        });
+        assert!(pointed, "and the repeat is answered rather than ignored");
+    }
+
+    /// **The single-note scope, which the first version of this guard missed.**
+    ///
+    /// `opening_scope` reads the body and records the id, but deliberately
+    /// registers no `asked` entry, so the model's first `read_note` on that
+    /// scope is `fresh`. A guard requiring `!fresh` therefore stood down for the
+    /// default shape ("Working on: This note") and the body went into the
+    /// transcript a second time, riding every remaining iteration, which is
+    /// precisely the cost this change exists to remove.
+    ///
+    /// Asserted by COUNTING the body in the transcript rather than by reading
+    /// the guard's condition: the condition is what was wrong, so a test shaped
+    /// like it would have agreed with the defect.
+    #[test]
+    fn a_single_note_scope_does_not_send_its_body_twice_when_the_model_reads_it() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+
+        let bodies = t
+            .iter()
+            .filter(|m| m.content.iter().any(|c| c.text().contains("body-a")))
+            .count();
+        assert_eq!(
+            bodies, 1,
+            "the opening message already carried the body; the model's read must not add a second copy"
+        );
+        assert_eq!(
+            out.notes_read, 1,
+            "and the note is still counted once, not zero and not twice"
+        );
+    }
+
+    /// The direction that would make the saving a bug: a DIFFERENT note still
+    /// gets its body. Without this, "return no body on a repeat" could be
+    /// implemented as "return no body after the first read of anything".
+    #[test]
+    fn a_read_of_a_different_note_still_returns_its_body() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"read_note","note_id":"b"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records_ab();
+        let mut t = Vec::new();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+
+        for id in ["body-a", "body-b"] {
+            assert!(
+                t.iter()
+                    .any(|m| m.content.iter().any(|c| c.text().contains(id))),
+                "{id} must be in the transcript"
+            );
+        }
+    }
+
+    /// `notes_read` counts NOTES, not calls, and the pointer path must not
+    /// change that: the run-cost line the user reads is derived from it.
+    #[test]
+    fn a_repeat_read_does_not_change_the_notes_read_count() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"ok"}"#,
+        ]);
+        let recs = records_ab();
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert_eq!(out.notes_read, 1);
+    }
+
     #[test]
     fn the_opening_message_carries_the_scope() {
         let runs = AgentRunState::default();
@@ -1199,7 +1594,15 @@ mod tests {
         let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         let opening = seed(&t);
         assert_eq!(opening.role, Role::User);
@@ -1219,7 +1622,15 @@ mod tests {
         let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         // `Reader` answers "body-a" for any id.
         assert_eq!(seed(&t).content[1].text(), "body-a");
@@ -1240,7 +1651,15 @@ mod tests {
         let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
         let recs = records_ab();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         let payload = seed(&t).content[1].text();
         assert!(payload.contains('a') && payload.contains('b'), "both ids");
@@ -1255,7 +1674,15 @@ mod tests {
         let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(seed(&t).content.len(), 1, "no payload span at all");
         assert!(seed(&t).content[0].text().contains("empty"));
     }
@@ -1271,7 +1698,15 @@ mod tests {
         let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"ok"}"#]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         let after_first = t.iter().filter(|m| m.role == Role::User).count();
 
         // The second leg, driven onto the SAME transcript, as a resume does.
@@ -1281,7 +1716,15 @@ mod tests {
             r#"{"action":"list_scope"}"#,
             r#"{"action":"finish","summary":"ok"}"#,
         ]);
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine2, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine2, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         let opening_messages = t
             .iter()
             .filter(|m| m.role == Role::User && m.content[0].text().contains("Your scope"))
@@ -1306,7 +1749,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(out.notes_read, 1);
     }
 
@@ -1334,7 +1785,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         let prose = tool_prose(&t, 0);
         assert!(
@@ -1369,7 +1828,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         let spans = tool_spans(&t, 0);
         assert_eq!(spans.len(), 1, "no payload span at all, not an empty one");
@@ -1379,15 +1846,28 @@ mod tests {
 
     #[test]
     fn read_note_names_itself_and_states_the_length() {
+        // **Two notes in scope, deliberately.** A single-note scope is opened
+        // WITH its body, so the id is already in `read_ids` and the model's
+        // `read_note` is answered with a pointer rather than a second copy
+        // (myne-md/myne#619). This test is about the FRAMING of a real read, so
+        // it needs a scope where one still happens.
         let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a"]));
+        runs.start("r".into(), ids(&["a", "b"]));
         let engine = ScriptEngine::new(&[
             r#"{"action":"read_note","note_id":"a"}"#,
             r#"{"action":"finish","summary":"ok"}"#,
         ]);
-        let recs = records();
+        let recs = records_ab();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         let spans = tool_spans(&t, 0);
         assert_eq!(spans.len(), 2);
@@ -1408,7 +1888,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         let prose = tool_prose(&t, 0);
         assert!(prose.contains("search_scope") && prose.contains('1'));
         // Ids are host-minted, so there is no untrusted payload here at all.
@@ -1427,6 +1915,7 @@ mod tests {
             "task",
             &mut t2,
             &deps_no_hits(&engine2, &recs),
+            &mut BTreeSet::new(),
         ))
         .unwrap();
         assert!(
@@ -1445,7 +1934,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         let prose = tool_prose(&t, 0);
         assert!(prose.contains("search_vault") && prose.contains('1'));
     }
@@ -1466,7 +1963,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         let said: Vec<String> = t
             .iter()
@@ -1491,8 +1996,11 @@ mod tests {
         // empty" and "the model looped on a good answer" were indistinguishable
         // from the trail, and telling them apart took arithmetic on
         // `chars_off_device`.
+        // Two notes for the same reason `read_note_names_itself_and_states_the_length`
+        // needs them: a single-note scope answers `read_note` with a pointer and
+        // logs no `body_chars`, so the read this asserts on would never happen.
         let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a"]));
+        runs.start("r".into(), ids(&["a", "b"]));
         let engine = ScriptEngine::new(&[
             r#"{"action":"list_scope"}"#,
             r#"{"action":"read_note","note_id":"a"}"#,
@@ -1500,11 +2008,19 @@ mod tests {
             r#"{"action":"search_vault","query":"q"}"#,
             r#"{"action":"finish","summary":"ok"}"#,
         ]);
-        let recs = records();
+        let recs = records_ab();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
-        assert!(logs_contain("event=\"tool\" verb=\"list_scope\" entries=1"));
+        assert!(logs_contain("event=\"tool\" verb=\"list_scope\" entries=2"));
         assert!(logs_contain(
             "event=\"tool\" verb=\"read_note\" body_chars=6"
         ));
@@ -1536,7 +2052,15 @@ mod tests {
         .into_iter()
         .collect();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         // The title really did reach the transcript, or the assertion below
         // would pass for having tested nothing.
@@ -1570,6 +2094,7 @@ mod tests {
             "task",
             &mut transcript,
             &deps(&engine, &recs),
+            &mut BTreeSet::new(),
         ))
         .unwrap();
         assert_eq!(out.end, LoopEnd::Finished);
@@ -1610,7 +2135,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(out.proposal.edits.len(), 1);
         assert_eq!(out.proposal.summary, "done");
     }
@@ -1625,7 +2158,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert!(out.proposal.edits.is_empty());
     }
 
@@ -1645,7 +2186,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(out.proposal.edits.len(), 1);
 
         // The turn after the accepted edit is the model's own reply, then the
@@ -1683,7 +2232,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert!(out.proposal.edits.is_empty(), "the mistyped id is refused");
 
         let told = t
@@ -1716,7 +2273,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(
             out.end,
             LoopEnd::AwaitingScope {
@@ -1736,7 +2301,15 @@ mod tests {
         let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":"never"}"#]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(out.end, LoopEnd::Cancelled);
         assert_eq!(out.iterations, 0, "cancelled before any model call");
     }
@@ -1751,7 +2324,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert!(
             t.iter().any(|m| m.content.iter().any(|c| matches!(
                 c,
@@ -1771,7 +2352,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(out.end, LoopEnd::Finished);
         assert_eq!(out.iterations, 2);
     }
@@ -1786,6 +2375,7 @@ mod tests {
             replies: Mutex::new(vec![]),
             seen_classes: Mutex::new(Vec::new()),
             remote: false,
+            truncated: false,
         };
         // Empty script means the stub's fallback "finish" fires, so drive a
         // never-finishing engine explicitly.
@@ -1812,6 +2402,7 @@ mod tests {
                 *turn += 1;
                 Ok(AgentCompletion {
                     reply: format!(r#"{{"action":"search_scope","query":"q{turn}"}}"#),
+                    truncated: false,
                     chars_off_device: None,
                 })
             }
@@ -1826,9 +2417,11 @@ mod tests {
             reader: &Reader,
             searcher: &Searcher,
             records: &recs,
+            language: None,
+            history: &[],
         };
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &d)).unwrap();
+        let out = block_on(drive(&runs, "r", "task", &mut t, &d, &mut BTreeSet::new())).unwrap();
         assert_eq!(out.end, LoopEnd::ExhaustedIterations);
         assert_eq!(out.iterations, MAX_ITERATIONS);
         drop(engine);
@@ -1850,7 +2443,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
 
         // The reply that parsed into nothing says so in counts.
         assert!(logs_contain("event=\"reply\""));
@@ -1886,7 +2487,15 @@ mod tests {
         let engine = ScriptEngine::new(&[r#"{"action":"finish","summary":""}"#]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert!(logs_contain("summary_chars=0"));
     }
 
@@ -1916,6 +2525,7 @@ mod tests {
             "TASKMARKER",
             &mut t,
             &deps(&engine, &recs),
+            &mut BTreeSet::new(),
         ))
         .unwrap();
 
@@ -1946,9 +2556,241 @@ mod tests {
         let engine = ScriptEngine::new(&["no", "still no", "nor now"]);
         let recs = records();
         let mut t = Vec::new();
-        block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert!(logs_contain("event=\"run_stopped\" end=\"stalled\""));
         assert!(logs_contain("barren_streak=3"));
+    }
+
+    /// The failure mode the token ceiling itself introduced.
+    ///
+    /// A reply stopped at `AGENT_MAX_OUTPUT_TOKENS` is broken JSON, so it
+    /// parses to zero actions and lands in the same arm as a model that cannot
+    /// hold the format. Those are different problems and want different
+    /// sentences: told "no valid action found", a model looks for a format
+    /// error it did not make and answers at the same length again, so all three
+    /// barren strikes go the same way and the run stalls naming the wrong
+    /// cause.
+    ///
+    /// Asserted on the TRANSCRIPT rather than on the verdict, because the
+    /// verdict is the same either way and what this fix changes is what the
+    /// model was told in between.
+    #[test]
+    fn a_cut_off_reply_is_told_so_rather_than_told_it_broke_the_format() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        // What a reply stopped mid-token actually looks like.
+        let engine = ScriptEngine::truncating(&[r#"{"action":"propose_edit","note_id":"a","anc"#]);
+        let recs = records();
+        let mut t = Vec::new();
+        let _ = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        let said: String = t
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .map(|c| c.text().to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            said.contains("cut off"),
+            "the model must be told its reply was cut off: {said}"
+        );
+        assert!(
+            !said.contains("No valid action found"),
+            "and must not be told it broke the format, which it did not: {said}"
+        );
+    }
+
+    /// The other direction, so the arm above cannot be satisfied by always
+    /// saying "cut off". Same broken reply, provider reporting a normal stop.
+    #[test]
+    fn an_unparseable_reply_that_was_not_cut_off_still_gets_the_format_message() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[r#"{"action":"propose_edit","note_id":"a","anc"#]);
+        let recs = records();
+        let mut t = Vec::new();
+        let _ = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        let said: String = t
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .map(|c| c.text().to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            said.contains("No valid action found"),
+            "an ordinary malformed reply keeps the format message: {said}"
+        );
+        assert!(
+            !said.contains("cut off"),
+            "and must not be told it was truncated when the provider said otherwise: {said}"
+        );
+    }
+
+    /// The repeat-read pointer across a RESUMED leg, which is the case the
+    /// single-leg tests cannot reach.
+    ///
+    /// A run paused for a scope approval comes back through `step`, which
+    /// restores the transcript. The read set used to be created fresh inside the
+    /// loop, so leg two believed it had read nothing while leg one's bodies were
+    /// still in the transcript above it: the guard let the re-read through and
+    /// pushed a second copy of a body already in the prompt, which then rode
+    /// every remaining iteration. Modelled here by driving twice with the SAME
+    /// transcript and the SAME set, which is exactly what `step` does.
+    #[test]
+    fn a_resumed_leg_does_not_re_read_a_note_the_first_leg_already_read() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let recs = records();
+        let mut t = Vec::new();
+        let mut read = BTreeSet::new();
+
+        let leg1 = ScriptEngine::new(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"leg one"}"#,
+        ]);
+        let _ = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&leg1, &recs),
+            &mut read,
+        ))
+        .unwrap();
+        let after_leg1 = t.len();
+        assert!(read.contains("a"), "leg one recorded the read");
+
+        let leg2 = ScriptEngine::new(&[
+            r#"{"action":"read_note","note_id":"a"}"#,
+            r#"{"action":"finish","summary":"leg two"}"#,
+        ]);
+        let _ = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&leg2, &recs),
+            &mut read,
+        ))
+        .unwrap();
+
+        let prose: String = t[after_leg1..]
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .map(|c| c.text().to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            prose.contains("already read that note"),
+            "leg two must be pointed at the copy above it: {prose}"
+        );
+    }
+
+    /// **An exclusion change DURING a run stops the seed from that iteration
+    /// on**, which is SYNC-14's no-in-flight-carve-out applied to the one
+    /// component that cannot be filtered.
+    ///
+    /// The frontend cut governs runs that have not started and the host cut
+    /// governs the scope-approval pause. Neither covers a run that is executing,
+    /// and that is up to 24 iterations, measured at 12m49s on a remote provider.
+    /// Until this the seed was fixed for the whole of it while
+    /// `docs/decisions/ai/0553` and `threat-model.md` TB13 both cited SYNC-14 as
+    /// the bound.
+    ///
+    /// Asserted on what reaches the REQUEST, since that is the value that leaves
+    /// the device.
+    #[test]
+    fn an_exclusion_change_mid_run_stops_the_seed_from_that_iteration_on() {
+        use core::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        // The switch a USER flips, shared with the engine so the change lands
+        // between two iterations rather than after a call count nobody can
+        // predict: `opening_scope` asks before the loop, so a counter would
+        // make this test depend on how many times the loop happens to ask.
+        let excluded_yet = Arc::new(AtomicBool::new(false));
+
+        struct ChangesMidRun(Arc<AtomicBool>);
+        #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+        #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+        impl ExclusionSource for ChangesMidRun {
+            async fn excluded_now(&self) -> Result<Vec<String>, AgentError> {
+                Ok(if self.0.load(Ordering::SeqCst) {
+                    vec!["Private/".to_string()]
+                } else {
+                    Vec::new()
+                })
+            }
+        }
+
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let recs = records();
+        let seeded = [Message {
+            role: Role::User,
+            content: vec![Content::note("an earlier question about the list")],
+        }];
+        let engine = RecordingEngine {
+            requests: Mutex::new(Vec::new()),
+            // Flip the exclusion set once the first request has been recorded,
+            // which is the user acting mid-run.
+            flip_after_first: Some(Arc::clone(&excluded_yet)),
+        };
+        let excl = ChangesMidRun(Arc::clone(&excluded_yet));
+        let deps = LoopDeps {
+            engine: &engine,
+            reader: &Reader,
+            searcher: &Searcher,
+            records: &recs,
+            exclusions: &excl,
+            language: None,
+            history: &seeded,
+        };
+        let mut t = Vec::new();
+        let _ = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps,
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+
+        let seen = engine.requests.lock().unwrap();
+        assert!(seen.len() >= 2, "the run must reach a second iteration");
+        assert!(
+            seen[0].contains("an earlier question about the list"),
+            "the first iteration carries the seed, or this proves nothing"
+        );
+        assert!(
+            !seen[seen.len() - 1].contains("an earlier question about the list"),
+            "after the exclusion set moved, the seed must be gone: {:?}",
+            seen[seen.len() - 1]
+        );
     }
 
     #[test]
@@ -1967,7 +2809,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(
             out.end,
             LoopEnd::Stalled {
@@ -1996,7 +2846,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(
             out.end,
             LoopEnd::Stalled {
@@ -2025,7 +2883,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(out.end, LoopEnd::Finished);
         assert_eq!(out.iterations, 6);
         assert_eq!(out.notes_read, 1);
@@ -2041,7 +2907,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(out.notes_read, 1);
         assert_eq!(out.iterations, 2);
         // A local run transmitted nothing, and the summary must be able to say
@@ -2060,7 +2934,15 @@ mod tests {
         ]);
         let recs = records();
         let mut t = Vec::new();
-        let out = block_on(drive(&runs, "r", "task", &mut t, &deps(&engine, &recs))).unwrap();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "task",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(out.iterations, 2);
         let total = out
             .chars_off_device
@@ -2075,7 +2957,15 @@ mod tests {
         let single = ScriptEngine::remote(&[r#"{"action":"finish","summary":"ok"}"#]);
         let runs2 = AgentRunState::default();
         runs2.start("r".into(), ids(&["a"]));
-        let one = block_on(drive(&runs2, "r", "task", &mut t2, &deps(&single, &recs))).unwrap();
+        let one = block_on(drive(
+            &runs2,
+            "r",
+            "task",
+            &mut t2,
+            &deps(&single, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
         assert_eq!(one.iterations, 1);
         assert!(
             total > one.chars_off_device.unwrap(),
@@ -2104,6 +2994,7 @@ mod tests {
             "task",
             &mut with_read,
             &deps(&read_engine, &recs),
+            &mut BTreeSet::new(),
         ))
         .unwrap();
 
@@ -2120,6 +3011,7 @@ mod tests {
             "task",
             &mut without,
             &deps(&list_engine, &recs),
+            &mut BTreeSet::new(),
         ))
         .unwrap();
 

@@ -79,6 +79,7 @@ import {
   hoverSurface,
   HOVER_TRANSITION,
 } from "../primitives/hoverSurface";
+import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
 import { SettingRow } from "./SettingRow";
 import {
   BLOCK_STYLE,
@@ -322,7 +323,7 @@ function ModelRoleBlock(props: {
 
 export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const { t } = useTranslation();
-  const { prefs, setAiEnabled, setAiExcludedFolders, setAutoTagEnabled } =
+  const { prefs, setAiEnabled, setAiExcludedFolders, setAutoTagEnabled, setChatHistoryBudget } =
     usePrefs(onShowToast);
 
   const [disclosureOpen, setDisclosureOpen] = useState(false);
@@ -341,6 +342,25 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const [excludedDraft, setExcludedDraft] = useState<string>(
     prefs.ai_excluded_folders.join("\n"),
   );
+  // Local edit buffer for the history-budget input. Empty string is the unset
+  // state, which is a real third value rather than a zero: zero means "seed
+  // nothing", which is the pre-#617 behaviour and a legitimate choice.
+  const [historyBudgetDraft, setHistoryBudgetDraft] = useState<string>(
+    prefs.chat_history_budget === null ? "" : String(prefs.chat_history_budget),
+  );
+  // **Re-synced from `prefs`, which is what makes the clamp visible.** The host
+  // stores a lower number than the one typed when it exceeds the ceiling, and
+  // `usePrefs` re-reads after a successful write; without this the input kept
+  // showing 99999 while 12000 was what a run would use, so the one thing the
+  // clamp-at-the-write design needs from the UI was the thing it did not do.
+  //
+  // Cannot clobber typing: `prefs` changes only on a write, and the write is
+  // what this effect is reporting.
+  useEffect(() => {
+    setHistoryBudgetDraft(
+      prefs.chat_history_budget === null ? "" : String(prefs.chat_history_budget),
+    );
+  }, [prefs.chat_history_budget]);
   // The endpoint edit buffer. Starts empty and STAYS empty until the host says
   // otherwise — the placeholder is the only place the conventional address
   // appears (see `ENDPOINT_PLACEHOLDER`).
@@ -818,6 +838,84 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           </p>
         )}
       </SettingRow>
+
+      {/* How much of the visible conversation an agent run is seeded with
+          (myne-md/myne#617).
+
+          **A bound, presented as one.** The number is multiplied by the loop's
+          iteration ceiling and, on a remote provider, by characters that leave
+          the device, so the helper says what it costs rather than what it
+          enables. The host CLAMPS it at the write, which is why this input does
+          not: a bound enforced in the control is a bound the next caller does
+          not inherit, and `usePrefs` re-reads after a successful write so the
+          number shown is the number that stuck rather than the one typed.
+
+          Empty means unset, and unset means the host's own default. That is a
+          real third state, not a zero: zero would mean "seed nothing", which is
+          the pre-#617 behaviour and a legitimate thing to want. */}
+      <SettingRow
+        anchorId="ai.history-budget"
+        label={t("settings.ai.historyBudgetLabel")}
+        helper={t("settings.ai.historyBudgetHelper")}
+        control={(helperId) => (
+          <Input
+            id="ai-history-budget"
+            type="number"
+            // `SettingRow` renders its label as a `span`, not a `label
+            // htmlFor`, so the `id` binds to nothing and the control would be
+            // announced as an unnamed spin button carrying a long helper
+            // sentence. Every other `SettingRow`-hosted control in this tree
+            // supplies its own name for the same reason.
+            aria-label={t("settings.ai.historyBudgetLabel")}
+            // Gated like every other control in this panel. The budget bounds
+            // what an agent run sends, and with AI off there is no run, so an
+            // editable field here would be the one row that says otherwise.
+            disabled={!aiEnabled}
+            min={0}
+            max={CHAT_HISTORY_BUDGET_MAX}
+            value={historyBudgetDraft}
+            onChange={(e) => setHistoryBudgetDraft(e.target.value)}
+            onBlur={(e) => {
+              // **`badInput` before the empty check, and that order is the
+              // whole fix.** For `type="number"` the value IDL attribute
+              // returns "" whenever the control holds something it cannot
+              // parse, so "abc", "1e" and "--5" all arrive here as the empty
+              // string and used to take the clear-the-override branch. A user
+              // who select-alls, mistypes and tabs away had their bound reset
+              // to the host default with no feedback, which is the opposite of
+              // what the comment two lines down promises.
+              if (e.target.validity.badInput) {
+                setHistoryBudgetDraft(
+                  prefs.chat_history_budget === null
+                    ? ""
+                    : String(prefs.chat_history_budget),
+                );
+                return;
+              }
+              const raw = historyBudgetDraft.trim();
+              if (raw === "") {
+                void setChatHistoryBudget(null);
+                return;
+              }
+              const parsed = Number.parseInt(raw, 10);
+              if (!Number.isFinite(parsed) || parsed < 0) {
+                // Reject rather than coerce: silently turning nonsense into a
+                // number would store a bound the user did not choose. Restoring
+                // the shown value is the effect above's job, so this only has to
+                // avoid writing.
+                setHistoryBudgetDraft(
+                  prefs.chat_history_budget === null ? "" : String(prefs.chat_history_budget),
+                );
+                return;
+              }
+              void setChatHistoryBudget(parsed);
+            }}
+            aria-describedby={helperId}
+            data-testid="ai.history-budget-input"
+            style={{ width: "8ch" }}
+          />
+        )}
+      />
 
       {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended
           links open in the user's browser; the pickers take the downloaded

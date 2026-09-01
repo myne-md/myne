@@ -130,6 +130,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
     ("bar_items_order", PrefClass::DeviceLocal),
+    // A bound on how much this machine sends to a provider, so it belongs to
+    // this machine: the same reasoning `ai_enabled` gets one line down. A laptop
+    // on a metered connection and a desktop on a fast one legitimately disagree,
+    // and a value that synced would let one device widen the other's off-device
+    // volume without anyone at that device choosing it (TB13's consent is
+    // per-account, which is exactly why the VOLUME should not be).
+    ("chat_history_budget", PrefClass::DeviceLocal),
     ("cli_enabled", PrefClass::DeviceLocal),
     (
         "cli_excluded_folders",
@@ -328,6 +335,7 @@ mod tests {
             auto_lock_seconds: _,
             auto_tag_enabled: _,
             bar_items_order: _,
+            chat_history_budget: _,
             cli_enabled: _,
             cli_excluded_folders: _,
             cli_rate_limit_disabled: _,
@@ -405,6 +413,7 @@ mod tests {
             "auto_lock_seconds",
             "auto_tag_enabled",
             "bar_items_order",
+            "chat_history_budget",
             "cli_enabled",
             "cli_excluded_folders",
             "cli_rate_limit_disabled",

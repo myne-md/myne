@@ -130,13 +130,17 @@
         "excludedFolder": "Não criada: essa pasta está excluída da IA.",
         "createFailed": "Não criada: falhou a escrita da nova nota. As restantes alterações foram aplicadas.",
         "excludedNow": "Não foi possível aplicar: a pasta dessa nota está agora excluída da IA.",
-        "notProposed": "Não foi possível aplicar: essa alteração não faz parte da proposta desta execução."
+        "notProposed": "Não foi possível aplicar: essa alteração não faz parte da proposta desta execução.",
+        "noteMoved": "Não foi possível aplicar: essa alteração moveria a nota para outra pasta.",
+        "appendEmpty": "Não foi possível aplicar: não havia nada para adicionar.",
+        "appendWouldWriteFrontmatter": "Não foi possível aplicar: esse texto teria se tornado o bloco de propriedades da nota."
       },
       "applyFailed": "Não foi possível aplicar as alterações.",
       "undo": "Anular esta execução",
       "undoFailed": "Não foi possível anular a execução.",
       "undoReport": "{{reverted}} notas restauradas. {{kept}} notas criadas pela execução foram mantidas.",
       "alreadyApplied": "Aplicada",
+      "appendFlag": "adiciona ao final",
       "untitledNote": "Nota sem título",
       "vaultRoot": "Raiz do cofre",
       "newNotesHeading_one": "{{count}} nota nova",
@@ -3134,7 +3138,9 @@
       "recommendedFilesGeneration": "Precisa do ficheiro .gguf + tokenizer.json na mesma pasta.",
       "recommendedFilesTranscription": "Precisa do ficheiro .gguf do Whisper + config.json + tokenizer.json na mesma pasta.",
       "title": "IA",
-      "providerModelCount_many": "{{count}} modelos disponíveis."
+      "providerModelCount_many": "{{count}} modelos disponíveis.",
+      "historyBudgetHelper": "Quanto da conversa recente cada pedido leva, em caracteres. Deixe vazio para o valor predefinido. Um número maior permite que a IA acompanhe conversas mais longas e envia mais delas: com um fornecedor que não está neste dispositivo, isso é mais do seu texto a sair dele, em cada passo de uma execução.",
+      "historyBudgetLabel": "Conversa enviada em cada pedido"
     },
     "network": {
       "disabledCue": "A sincronização já não é encaminhada através do Tor. As novas ligações vão diretamente para o servidor de sincronização.",
@@ -3454,7 +3460,8 @@
         "viewMode": "modo de visualização vista predefinido ao vivo leitura origem pré-visualização preview",
         "dateFormat": "formato de data dia mês ano iso dd/mm mm/dd calendário date format",
         "timeFormat": "formato de hora 24 horas 12 horas relógio am pm time format",
-        "timezone": "fuso horário zona horária tz utc iana região hoje timezone"
+        "timezone": "fuso horário zona horária tz utc iana região hoje timezone",
+        "aiHistoryBudget": "conversa histórico contexto memória orçamento caracteres agente chat pedido"
       }
     },
     "dateTime": {

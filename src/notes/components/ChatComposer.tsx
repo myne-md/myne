@@ -104,7 +104,10 @@ export function ChatComposer({
   folders,
   onNotesWritten,
 }: ChatComposerProps) {
-  const { t } = useTranslation();
+  // `i18n` for its `language`, which the agent run sends to the host: the
+  // chosen language lives in this side's localStorage, so the backend has no
+  // way to read it, and without it a run answers a Turkish question in English.
+  const { t, i18n } = useTranslation();
   // Whether the scope picker is expanded. Collapsed by default: the scope shows
   // as text with a control to change it, so the ordinary run reads as one line.
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -261,6 +264,7 @@ export function ChatComposer({
           autoApplyFailed: t("agent.composer.autoApplyFailed"),
           providerRejected: t("agent.composer.providerRejected"),
         },
+        i18n.language || null,
         onNotesWritten,
       );
     } finally {

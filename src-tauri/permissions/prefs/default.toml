@@ -58,6 +58,7 @@ permissions = [
   "allow-set-attachment-ocr-enabled",
   "allow-set-attachment-compression-enabled",
   "allow-set-ai-excluded-folders",
+  "allow-set-chat-history-budget",
   "allow-set-developer-mode",
   "allow-set-editor-default-view-mode",
   "allow-set-editor-focus-dim-inactive",
@@ -577,6 +578,16 @@ commands.allow = ["ai_provider_has_key"]
 identifier = "allow-set-developer-mode"
 description = "Allow invoking prefs:set_developer_mode (Slot::Unlocked-gated setter for the developer_mode toggle, MYND-593; atomic-writes vault.prefs with no native side-effect; defaults to false, so it is emitted on disk only when true)."
 commands.allow = ["set_developer_mode"]
+
+# myne-md/myne#617: how many characters of visible chat history an agent run
+# may be seeded with. Same main-window-only invariant as the other allow-set-*
+# permissions. The command CLAMPS the value at the write rather than trusting
+# it, because this number bounds how much plaintext one run sends to a provider
+# and TB13 records that no other per-run volume cap exists.
+[[permission]]
+identifier = "allow-set-chat-history-budget"
+description = "Allow invoking prefs:set_chat_history_budget (Slot::Unlocked-gated setter for the agent chat-history seed budget, myne-md/myne#617; atomic-writes vault.prefs with no native side-effect; clamped host-side to MAX_HISTORY_BUDGET; omitted on disk when unset)."
+commands.allow = ["set_chat_history_budget"]
 
 # myne-cli epic (MYND-490; cli-thin-client task 2): three write setters for the
 # CLI terminal-access door prefs (docs/decisions.md "CLI terminal access is a

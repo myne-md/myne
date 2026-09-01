@@ -16,6 +16,7 @@
 // simply ceases to exist.
 
 import { Channel, invoke } from "../platform/core";
+import type { HistoryTurn } from "../notes/ai/chatHistory";
 
 /** What the user approved as a scope. Mirrors the Rust `ScopeGrant`.
  *
@@ -26,13 +27,49 @@ export type ScopeGrant =
   | { kind: "notes"; value: string[] }
   | { kind: "folder"; value: string };
 
-/** One anchored edit the model proposed. Mirrors the Rust `ProposedEdit`. */
+/** Which shape of write an edit is. Mirrors the Rust `EditKind`.
+ *
+ *  A discriminator on the one edit type rather than a second list on the
+ *  proposal, so the bulk-approval split, the applied-row bookkeeping and the
+ *  review screen all cover an append by construction rather than by a second
+ *  wiring nobody would notice was missing. */
+export type EditKind = "replace" | "append";
+
+/** The largest chat-history seed budget the host will store, in characters.
+ *
+ *  **The Rust constant is the authority**, not this one: the clamp lives at the
+ *  write (`core/src/plugins/agent/history.rs::MAX_HISTORY_BUDGET`), and this
+ *  copy exists only so the settings input can render a `max` attribute. A UI
+ *  that agreed with the host by accident rather than by construction is a shape
+ *  this repo keeps finding, so `tests/lib/chatHistoryBudget.test.ts` reads the
+ *  Rust file and fails when the two drift.
+ *
+ *  Deliberately NOT used to reject a value before sending: the host clamps, and
+ *  a second clamp here would read as the control and hide the day the real one
+ *  stopped working. */
+export const CHAT_HISTORY_BUDGET_MAX = 12_000;
+
+/** One edit the model proposed. Mirrors the Rust `ProposedEdit`. */
 export interface ProposedEdit {
   noteId: string;
+  /** Replace or append. Optional on the wire for the same reason the Rust field
+   *  carries `#[serde(default)]`: a payload written before the append verb
+   *  existed is the replace it always was. */
+  kind?: EditKind;
   /** Text the model copied out of the note, verbatim. It must occur exactly
-   *  once or the edit is refused; there is no fuzzy matching anywhere. */
+   *  once or the edit is refused; there is no fuzzy matching anywhere. Empty
+   *  for an append, which has nothing to anchor to. */
   anchor: string;
   replacement: string;
+}
+
+/** Whether an edit appends rather than replaces.
+ *
+ *  A helper rather than a bare comparison because the field is optional on the
+ *  wire, so `edit.kind === "append"` is the only correct test and
+ *  `edit.kind !== "replace"` is a bug waiting for an absent field. */
+export function isAppend(edit: ProposedEdit): boolean {
+  return edit.kind === "append";
 }
 
 /** A note the model proposed creating. Mirrors the Rust `ProposedNote`. */
@@ -132,7 +169,22 @@ export type EditRejection =
   /** The edit is not one the host recorded the model proposing. Reported rather
    *  than dropped, so a row the user pressed Apply on never silently does
    *  nothing. */
-  | "notProposed";
+  | "notProposed"
+  /** The edit would move the note to a different folder. Refused under EVERY
+   *  approval label, unlike `removalNeedsOwnAct`, because `folder:` is what the
+   *  AI-excluded-folder control is keyed on: the clamp reads it before the
+   *  batch runs, so an edit rewriting that line would relocate a note past a
+   *  control that had already made its decision. */
+  | "noteMoved"
+  /** An append carried nothing to append. Its own reason rather than
+   *  `anchorEmpty`, which would describe a rule an append does not have. */
+  | "appendEmpty"
+  /** An append into a note with neither frontmatter nor body would have
+   *  authored a frontmatter block. Appended text normally lands after the
+   *  block, which makes that impossible; an entirely empty note is the one case
+   *  positioning cannot cover, and it is refused rather than silently
+   *  rewritten. */
+  | "appendWouldWriteFrontmatter";
 
 export interface RefusedEdit {
   noteId: string;
@@ -190,6 +242,25 @@ export interface ProbeVerdict {
 export async function agentStart(
   task: string,
   grant: ScopeGrant,
+  /** The user's interface language, as a BCP-47 tag.
+   *
+   *  Sent because the host cannot read it: the chosen language lives in this
+   *  side's `localStorage` (`src/i18n/index.ts`), not in `vault.prefs`. The host
+   *  shape-checks it and drops anything that is not a tag, so this is not a
+   *  channel into the system message.
+   *
+   *  A required parameter rather than an optional one, so a future call site
+   *  cannot quietly omit it and reintroduce the English-answer defect. Pass
+   *  `null` deliberately when there is genuinely no language to report. */
+  language: string | null,
+  /** The visible chat turns, oldest first.
+   *
+   *  Sent whole: the character budget is the HOST's, applied in
+   *  `core/src/plugins/agent/history.rs`, because what reaches the model is
+   *  policy and a caller that pre-trimmed would be deciding it. The IPC hop is
+   *  in-process; the cost that matters is what crosses TB13, and that is
+   *  bounded on the other side. */
+  history: readonly HistoryTurn[],
   /** Called with the run's view as soon as the host has created it, which is
    *  long before this promise resolves.
    *
@@ -204,6 +275,8 @@ export async function agentStart(
   return await invoke<AgentStepResult>("plugin:agent|agent_start", {
     task,
     grant,
+    language,
+    history,
     onOpen: channel,
   });
 }
@@ -399,6 +472,19 @@ export function editHidesNote(edit: ProposedEdit): boolean {
  *  at once is pathological and already refused; naming the first is better than
  *  naming none. */
 export function editHidesNoteAs(edit: ProposedEdit): HidingField | null {
+  // **An append cannot hide a note, so flagging one is a false statement.**
+  // Appended text lands in the BODY, after the note's frontmatter block, so a
+  // `trashed:` line inside it is prose rather than a marker. The host agrees:
+  // its own check reads the resulting frontmatter and correctly sees nothing,
+  // which `apply::tests::an_append_cannot_hide_a_note_because_its_text_lands_in_the_body`
+  // pins. Without this arm the screen would put "moves this note to Trash" over
+  // a row that does no such thing, and route it out of the bulk approve for a
+  // reason that is not true.
+  //
+  // The over-flagging licence the rest of this function relies on does not
+  // stretch this far: it is an argument for flagging when the OUTCOME is
+  // uncertain, and here the outcome is known.
+  if (isAppend(edit)) return null;
   const hit = HIDING_MARKERS.find(
     (marker) => marker.test(edit.replacement) && !marker.test(edit.anchor),
   );

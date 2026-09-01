@@ -118,13 +118,17 @@
         "excludedFolder": "बनाया नहीं गया: वह फ़ोल्डर AI से बाहर रखा गया है।",
         "createFailed": "बनाया नहीं गया: नया नोट लिखा नहीं जा सका। बाकी बदलाव फिर भी लागू हो गए।",
         "excludedNow": "लागू नहीं हो सका: उस नोट का फ़ोल्डर अब AI से बाहर रखा गया है।",
-        "notProposed": "लागू नहीं हो सका: वह बदलाव इस रन के प्रस्ताव का हिस्सा नहीं है।"
+        "notProposed": "लागू नहीं हो सका: वह बदलाव इस रन के प्रस्ताव का हिस्सा नहीं है।",
+        "noteMoved": "लागू नहीं हो सका: वह बदलाव नोट को दूसरे फ़ोल्डर में ले जाता।",
+        "appendEmpty": "लागू नहीं हो सका: जोड़ने के लिए कुछ नहीं था।",
+        "appendWouldWriteFrontmatter": "लागू नहीं हो सका: वह टेक्स्ट नोट का प्रॉपर्टीज़ ब्लॉक बन जाता।"
       },
       "applyFailed": "बदलाव लागू नहीं हो सके।",
       "undo": "इस रन को पूर्ववत करें",
       "undoFailed": "रन पूर्ववत नहीं किया जा सका।",
       "undoReport": "{{reverted}} नोट वापस लाए गए। रन ने जो {{kept}} नोट बनाए थे, वे जहाँ थे वहीं रहे।",
       "alreadyApplied": "लागू हो गया",
+      "appendFlag": "अंत में जोड़ता है",
       "untitledNote": "बिना शीर्षक नोट",
       "vaultRoot": "वॉल्ट रूट",
       "newNotesHeading_one": "{{count}} नया नोट",
@@ -3008,7 +3012,9 @@
       "recommendedFilesEmbedding": "एक ही फ़ोल्डर में model.safetensors + config.json + tokenizer.json चाहिए।",
       "recommendedFilesGeneration": "एक ही फ़ोल्डर में .gguf फ़ाइल + tokenizer.json चाहिए।",
       "recommendedFilesTranscription": "एक ही फ़ोल्डर में Whisper .gguf फ़ाइल + config.json + tokenizer.json चाहिए।",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "हर अनुरोध हाल की बातचीत का कितना हिस्सा ले जाता है, अक्षरों में। डिफ़ॉल्ट के लिए खाली छोड़ें। बड़ी संख्या AI को लंबी बातचीत समझने देती है और उसका ज़्यादा हिस्सा भेजती है: ऐसे प्रोवाइडर के साथ जो इस डिवाइस पर नहीं है, इसका मतलब है रन के हर चरण में आपका ज़्यादा टेक्स्ट डिवाइस से बाहर जाना।",
+      "historyBudgetLabel": "हर अनुरोध के साथ भेजी जाने वाली बातचीत"
     },
     "network": {
       "disabledCue": "सिंक अब Tor से होकर नहीं जाता। नए कनेक्शन सीधे सिंक सर्वर तक जाते हैं।",
@@ -3316,7 +3322,8 @@
         "viewMode": "डिफ़ॉल्ट व्यू मोड लाइव रीडिंग सोर्स प्रीव्यू",
         "dateFormat": "तारीख़ फ़ॉर्मैट दिन महीना साल iso dd/mm mm/dd कैलेंडर",
         "timeFormat": "समय फ़ॉर्मैट 24 घंटे 12 घंटे घड़ी am pm",
-        "timezone": "टाइम ज़ोन समय क्षेत्र tz utc iana इलाक़ा आज timezone time zone"
+        "timezone": "टाइम ज़ोन समय क्षेत्र tz utc iana इलाक़ा आज timezone time zone",
+        "aiHistoryBudget": "बातचीत इतिहास संदर्भ स्मृति बजट अक्षर एजेंट चैट अनुरोध"
       }
     },
     "dateTime": {

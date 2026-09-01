@@ -17,6 +17,11 @@
 //         composer's own strip, and the note goes back to what it was.
 //   ag5: a model-requested scope expansion renders the four facts the approval
 //         needs, and approving it resumes the same run.
+//   ag7: an append writes into a note with NO body, which the anchored verb
+//         could not do at all: an anchor is text copied out of the note, and an
+//         empty note has none. Asserted on the note's text afterwards, since a
+//         build that proposed the append and failed to apply it would pass an
+//         assertion about the review row.
 //   ag6: ONE composer answers a question and then runs an edit, into one
 //         transcript (myne-md/myne#533). The only scenario here that would catch
 //         a regression re-adding the second composer: every other one drives
@@ -605,6 +610,65 @@ aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
         expect(kinds).toEqual(["agent", "agent", "agent", "agent"]);
         expect((await s.byTestIdAll("ai.transcript")).length).toBe(1);
         await s.waitForElement(testIdSelector("ai.agent-summary"), { timeoutMs: 15_000 });
+      },
+    );
+  });
+});
+
+aiDescribe("ag7 an append writes into a note with no body", () => {
+  // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
+  //
+  // **The reported case, end to end** (myne-md/myne#616). Before the append
+  // verb, this was structurally impossible rather than merely unreliable: the
+  // only write verb for an existing note was an anchored edit, an anchor has to
+  // be text copied out of the note, and an empty note has none. A user asking
+  // the agent to write a list into an empty note got "the note is empty" back
+  // and no explanation of why that was an answer rather than a task.
+  //
+  // The assertion is on the note's TEXT afterwards, not on the review screen
+  // rendering a row: a build that proposed the append and failed to apply it
+  // would pass a row assertion. `data-kind` is checked as well, because the
+  // diff renders identically for both shapes (an append diffs an empty anchor
+  // against the new text, so every line reads as an addition, which is exactly
+  // what it is) and that attribute is the only thing distinguishing them.
+  it("proposes an append and lands it in the empty note", async () => {
+    let password = "";
+    await scenario(
+      "ag7-agent-append",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "ag7notealfa7k2m9qx4w8e5rj0gg");
+        // No `typeIntoEditor` here, deliberately: the empty body IS the case.
+        await waitForSaved(s);
+        await enableAi(s);
+        await openComposer(s);
+        // "append" is what routes the stub to its append branch, and it is also
+        // what a user would type. The two coincide on purpose: a scenario that
+        // stops asking for the thing stops getting it.
+        await startRun(s, "append the list to this note");
+
+        const rows = await s.byTestIdAll("agentReview.edit");
+        expect(rows.length).toBeGreaterThan(0);
+        const kinds = await Promise.all(rows.map((el) => el.attribute("data-kind")));
+        expect(kinds).toContain("append");
+        // And the flag a PERSON reads, which `data-kind` does not stand in for:
+        // the attribute tells this scenario the two verbs apart, and the flag is
+        // the only thing telling the user approving that the write is unanchored
+        // and lands after the frontmatter. A visible control no test reads is one
+        // refactor from disappearing silently.
+        expect(await s.exists(testIdSelector("agentReview.appendFlag"))).toBe(true);
+
+        await (await s.byTestId("agentReview.approveAll")).click();
+        await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 20_000 });
+        await waitForSaved(s);
+
+        // The note carries the appended text. This is the assertion the whole
+        // verb exists for, and the one no unit test can make: it proves the
+        // proposal survived the review screen, the apply and the write.
+        expect(await editorText(s)).toContain("appended by the stub");
       },
     );
   });

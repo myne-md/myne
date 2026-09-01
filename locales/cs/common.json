@@ -142,13 +142,17 @@
         "excludedFolder": "Nevytvořeno: tato složka je vyloučena z AI.",
         "createFailed": "Nevytvořeno: zápis nové poznámky selhal. Ostatní změny byly přesto použity.",
         "excludedNow": "Nelze použít: složka této poznámky je nyní vyloučena z AI.",
-        "notProposed": "Nelze použít: tato změna není součástí návrhu tohoto běhu."
+        "notProposed": "Nelze použít: tato změna není součástí návrhu tohoto běhu.",
+        "noteMoved": "Nelze použít: tato změna by poznámku přesunula do jiné složky.",
+        "appendEmpty": "Nelze použít: nebylo co přidat.",
+        "appendWouldWriteFrontmatter": "Nelze použít: tento text by se stal blokem vlastností poznámky."
       },
       "applyFailed": "Změny se nepodařilo použít.",
       "undo": "Vrátit tento běh zpět",
       "undoFailed": "Běh se nepodařilo vrátit zpět.",
       "undoReport": "{{reverted}} poznámek obnoveno. {{kept}} poznámek, které běh vytvořil, zůstalo na místě.",
       "alreadyApplied": "Použito",
+      "appendFlag": "přidá na konec",
       "untitledNote": "Poznámka bez názvu",
       "vaultRoot": "Kořen trezoru",
       "newNotesHeading_one": "{{count}} nová poznámka",
@@ -3240,7 +3244,9 @@
       "recommendedFilesTranscription": "Vyžaduje soubor Whisper .gguf + config.json + tokenizer.json ve stejné složce.",
       "title": "AI",
       "providerModelCount_few": "K dispozici jsou {{count}} modely.",
-      "providerModelCount_many": "K dispozici je {{count}} modelu."
+      "providerModelCount_many": "K dispozici je {{count}} modelu.",
+      "historyBudgetHelper": "Kolik z nedávné konverzace nese každý požadavek, ve znacích. Prázdné pole znamená výchozí hodnotu. Vyšší číslo umožní AI sledovat delší konverzace a odesílá jich více: u poskytovatele, který není na tomto zařízení, to znamená více vašeho textu opouštějícího zařízení, v každém kroku běhu.",
+      "historyBudgetLabel": "Konverzace posílaná s každým požadavkem"
     },
     "network": {
       "disabledCue": "Synchronizace už se nesměruje přes Tor. Nová připojení jdou přímo na synchronizační server.",
@@ -3564,7 +3570,8 @@
         "viewMode": "výchozí režim zobrazení živý náhled čtení zdroj view mode",
         "dateFormat": "formát data datum den měsíc rok iso dd/mm mm/dd kalendář date format",
         "timeFormat": "formát času čas 24hodinový 12hodinový hodiny dopoledne odpoledne am pm time format",
-        "timezone": "časové pásmo časová zóna tz utc iana oblast dnes timezone"
+        "timezone": "časové pásmo časová zóna tz utc iana oblast dnes timezone",
+        "aiHistoryBudget": "konverzace historie kontext paměť rozpočet znaky agent chat požadavek"
       }
     },
     "dateTime": {

@@ -118,13 +118,17 @@
         "excludedFolder": "Halikutengenezwa: folda hiyo imetengwa na AI.",
         "createFailed": "Halikutengenezwa: kuandika dokezo jipya kumeshindikana. Mabadiliko mengine bado yametumika.",
         "excludedNow": "Hayakuweza kutumika: folda ya dokezo hilo sasa imetengwa na AI.",
-        "notProposed": "Hayakuweza kutumika: badiliko hilo si sehemu ya pendekezo la uendeshaji huu."
+        "notProposed": "Hayakuweza kutumika: badiliko hilo si sehemu ya pendekezo la uendeshaji huu.",
+        "noteMoved": "Hayakuweza kutumika: mabadiliko hayo yangehamisha dokezo kwenye folda nyingine.",
+        "appendEmpty": "Hayakuweza kutumika: hakukuwa na kitu cha kuongeza.",
+        "appendWouldWriteFrontmatter": "Hayakuweza kutumika: maandishi hayo yangekuwa kizuizi cha sifa za dokezo."
       },
       "applyFailed": "Mabadiliko hayakuweza kutumika.",
       "undo": "Tendua uendeshaji huu",
       "undoFailed": "Uendeshaji haukuweza kutenduliwa.",
       "undoReport": "Madokezo {{reverted}} yamerejeshwa. Madokezo {{kept}} yaliyotengenezwa na uendeshaji yameachwa yalipo.",
       "alreadyApplied": "Yametumika",
+      "appendFlag": "huongeza mwishoni",
       "untitledNote": "Dokezo lisilo na kichwa",
       "vaultRoot": "Mzizi wa kasha",
       "newNotesHeading_one": "dokezo jipya {{count}}",
@@ -3008,7 +3012,9 @@
       "recommendedFilesEmbedding": "Inahitaji model.safetensors + config.json + tokenizer.json katika folda moja.",
       "recommendedFilesGeneration": "Inahitaji faili la .gguf + tokenizer.json katika folda ile ile.",
       "recommendedFilesTranscription": "Inahitaji faili la Whisper la .gguf + config.json + tokenizer.json katika folda ile ile.",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "Ni kiasi gani cha mazungumzo ya hivi karibuni ambacho kila ombi hubeba, kwa herufi. Acha wazi kutumia thamani chaguo-msingi. Namba kubwa humruhusu AI kufuatilia mazungumzo marefu zaidi na hutuma zaidi kati yake: kwa mtoa huduma asiye kwenye kifaa hiki, hiyo ni maandishi yako zaidi yanayoondoka kwenye kifaa, katika kila hatua ya utekelezaji.",
+      "historyBudgetLabel": "Mazungumzo yanayotumwa na kila ombi"
     },
     "network": {
       "disabledCue": "Usawazishaji hausafirishwi tena kupitia Tor. Miunganisho mipya huenda moja kwa moja kwenye seva ya usawazishaji.",
@@ -3316,7 +3322,8 @@
         "viewMode": "hali chaguomsingi ya mwonekano moja kwa moja kusoma chanzo hakikisho",
         "dateFormat": "muundo wa tarehe siku mwezi mwaka iso dd/mm mm/dd kalenda",
         "timeFormat": "muundo wa saa am pm saa 24 saa 12 muda",
-        "timezone": "eneo la saa ukanda wa saa tz utc iana kanda leo"
+        "timezone": "eneo la saa ukanda wa saa tz utc iana kanda leo",
+        "aiHistoryBudget": "mazungumzo historia muktadha kumbukumbu bajeti herufi wakala gumzo ombi"
       }
     },
     "dateTime": {
