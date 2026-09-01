@@ -263,6 +263,17 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
     ("paired_extensions", PrefClass::DeviceLocal),
+    // myne#177: shared, and per-key rather than whole-value for the reason the
+    // decoration maps are (MYND-562). The keys are `<period>.<setting>`, so a
+    // folder set on one device and a template set on another, to the same
+    // period in the same round, race on `periodic_notes/weekly.folder` and
+    // `periodic_notes/weekly.template` separately and both survive. Shared
+    // rather than device-local because where a weekly note is filed is a vault
+    // convention, the `daily_folder` class, not a property of the machine.
+    (
+        "periodic_notes",
+        PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
+    ),
     ("reminder_horizon_days", PrefClass::DeviceLocal),
     ("reminders_enabled", PrefClass::DeviceLocal),
     ("right_panel_active_tab", PrefClass::DeviceLocal),
@@ -406,6 +417,7 @@ mod tests {
             new_note_location: _,
             new_note_location_folder: _,
             paired_extensions: _,
+            periodic_notes: _,
             right_panel_active_tab: _,
             right_panel_hidden_tabs: _,
             right_panel_tab_order: _,
@@ -484,6 +496,7 @@ mod tests {
             "new_note_location",
             "new_note_location_folder",
             "paired_extensions",
+            "periodic_notes",
             "reminder_horizon_days",
             "reminders_enabled",
             "right_panel_active_tab",

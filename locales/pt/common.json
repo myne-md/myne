@@ -699,6 +699,12 @@
       },
       "unfoldAll": {
         "label": "Desdobrar tudo"
+      },
+      "openThisWeekNote": {
+        "label": "Abrir a nota desta semana"
+      },
+      "openThisMonthNote": {
+        "label": "Abrir a nota deste mês"
       }
     },
     "hotkeys": {
@@ -1601,6 +1607,13 @@
     "commandPalette": {
       "searchPlaceholder": "Pesquisar notas ou executar um comando…",
       "noMatches": "Nenhum comando ou nota corresponde."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Não foi possível abrir a nota de hoje.",
+        "weekly": "Não foi possível abrir a nota desta semana.",
+        "monthly": "Não foi possível abrir a nota deste mês."
+      }
     }
   },
   "export": {
@@ -2890,20 +2903,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Em branco (sem modelo)",
+      "folderSearchEmpty": "Nenhuma pasta corresponde.",
+      "folderSearchPlaceholder": "Pesquisar pastas…",
+      "searchEmpty": "Nenhum modelo corresponde.",
+      "searchPlaceholder": "Pesquisar modelos…",
+      "untitledTemplate": "Modelo sem título",
+      "sectionDaily": "Notas diárias",
+      "sectionWeekly": "Notas semanais",
+      "sectionMonthly": "Notas mensais",
+      "periodFolderLabel": "Pasta",
+      "periodFolderHelper": "Onde as novas notas {{period}} são guardadas. Predefinição: {{default}}. A pasta mantém-se mesmo vazia.",
+      "periodFormatLabel": "Formato do título",
+      "periodFormatHelperDaily": "O título de cada nota diária. Suporta YYYY, MM, DD, gggg (ano ISO da semana), ww (número da semana ISO) e [texto] para texto literal. Predefinição: {{default}}.",
+      "periodFormatHelperWeekly": "O título de cada nota semanal. Suporta gggg (ano ISO da semana), ww (número da semana ISO), YYYY, MM, DD e [texto] para texto literal. Predefinição: {{default}}.",
+      "periodFormatHelperMonthly": "O título de cada nota mensal. Suporta YYYY, MM, gggg (ano ISO da semana), ww (número da semana ISO) e [texto] para texto literal. Predefinição: {{default}}.",
+      "periodTemplateLabel": "Modelo",
+      "periodTemplateHelper": "Escolha um modelo para iniciar cada nota {{period}}, ou deixe em branco para uma nota vazia com a data como título.",
+      "collisionWarning": "As notas {{first}} e {{second}} levam à mesma nota, porque partilham uma pasta e produzem o mesmo título. Ambos os comandos irão abri-la.",
+      "weekStartNote": "As semanas começam à segunda-feira (ISO 8601), por isso os primeiros dias de janeiro podem pertencer à última semana do ano anterior, e os últimos dias de dezembro à primeira semana do ano seguinte.",
+      "periodFolderSaveError": "Não foi possível guardar a pasta {{period}}. Tente novamente.",
+      "periodFormatSaveError": "Não foi possível guardar o formato do título {{period}}. Tente novamente.",
+      "periodTemplateSaveError": "Não foi possível guardar o modelo {{period}}. Tente novamente.",
+      "periodNameDaily": "diária",
+      "periodNameWeekly": "semanal",
+      "periodNameMonthly": "mensal",
+      "periodFolderAriaLabel": "Pasta das notas {{period}}",
+      "periodFormatAriaLabel": "Formato do título das notas {{period}}",
+      "periodTemplateAriaLabel": "Modelo das notas {{period}}",
       "dateFormatHelper": "O título de cada nota diária. Suporta YYYY, MM, DD. Predefinição: {{default}}.",
       "dateFormatLabel": "Formato de data da nota diária",
       "dateFormatSaveError": "Não foi possível guardar o formato de data. Tente novamente.",
       "folderHelper": "Onde as novas notas diárias são guardadas. Predefinição: {{default}}. A pasta é mantida mesmo quando vazia.",
       "folderLabel": "Pasta das notas diárias",
       "folderSaveError": "Não foi possível guardar a pasta diária. Tente novamente.",
-      "folderSearchEmpty": "Nenhuma pasta corresponde.",
-      "folderSearchPlaceholder": "Pesquisar pastas…",
-      "searchEmpty": "Nenhum modelo corresponde.",
-      "searchPlaceholder": "Pesquisar modelos…",
       "templateHelper": "Escolha um modelo a partir do qual iniciar cada nota diária, ou deixe em branco para uma nota vazia com a data por título.",
       "templateLabel": "Modelo da nota diária",
-      "templateSaveError": "Não foi possível guardar o modelo diário. Tente novamente.",
-      "untitledTemplate": "Modelo sem título"
+      "templateSaveError": "Não foi possível guardar o modelo diário. Tente novamente."
     },
     "deleteVault": {
       "cancel": "Cancelar",
@@ -3475,6 +3510,7 @@
         "dateFormat": "formato de data dia mês ano iso dd/mm mm/dd calendário date format",
         "timeFormat": "formato de hora 24 horas 12 horas relógio am pm time format",
         "timezone": "fuso horário zona horária tz utc iana região hoje timezone",
+        "periodicNotes": "notas periódicas semanal mensal semana mês pasta modelo formato",
         "aiHistoryBudget": "conversa histórico contexto memória orçamento caracteres agente chat pedido"
       }
     },

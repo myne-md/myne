@@ -699,6 +699,12 @@
       },
       "unfoldAll": {
         "label": "Depliază tot"
+      },
+      "openThisWeekNote": {
+        "label": "Deschide nota din această săptămână"
+      },
+      "openThisMonthNote": {
+        "label": "Deschide nota din această lună"
       }
     },
     "hotkeys": {
@@ -1601,6 +1607,13 @@
     "commandPalette": {
       "searchPlaceholder": "Caută note sau execută o comandă…",
       "noMatches": "Nicio comandă sau notă potrivită."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Nu s-a putut deschide nota de azi.",
+        "weekly": "Nu s-a putut deschide nota din această săptămână.",
+        "monthly": "Nu s-a putut deschide nota din această lună."
+      }
     }
   },
   "export": {
@@ -2890,20 +2903,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Gol (fără șablon)",
+      "folderSearchEmpty": "Niciun folder nu corespunde.",
+      "folderSearchPlaceholder": "Caută foldere…",
+      "searchEmpty": "Niciun șablon nu corespunde.",
+      "searchPlaceholder": "Caută șabloane…",
+      "untitledTemplate": "Șablon fără titlu",
+      "sectionDaily": "Note zilnice",
+      "sectionWeekly": "Note săptămânale",
+      "sectionMonthly": "Note lunare",
+      "periodFolderLabel": "Dosar",
+      "periodFolderHelper": "Unde ajung notele {{period}} noi. Implicit: {{default}}. Dosarul se păstrează chiar și gol.",
+      "periodFormatLabel": "Formatul titlului",
+      "periodFormatHelperDaily": "Titlul fiecărei note zilnice. Acceptă YYYY, MM, DD, gggg (anul ISO al săptămânii), ww (numărul săptămânii ISO) și [text] pentru text literal. Implicit: {{default}}.",
+      "periodFormatHelperWeekly": "Titlul fiecărei note săptămânale. Acceptă gggg (anul ISO al săptămânii), ww (numărul săptămânii ISO), YYYY, MM, DD și [text] pentru text literal. Implicit: {{default}}.",
+      "periodFormatHelperMonthly": "Titlul fiecărei note lunare. Acceptă YYYY, MM, gggg (anul ISO al săptămânii), ww (numărul săptămânii ISO) și [text] pentru text literal. Implicit: {{default}}.",
+      "periodTemplateLabel": "Șablon",
+      "periodTemplateHelper": "Alege un șablon cu care începe fiecare notă {{period}}, sau lasă gol pentru o notă goală intitulată cu data.",
+      "collisionWarning": "Notele {{first}} și {{second}} duc la aceeași notă, pentru că împart un dosar și produc același titlu. Ambele comenzi o vor deschide.",
+      "weekStartNote": "Săptămânile încep luni (ISO 8601), așa că primele zile din ianuarie pot aparține ultimei săptămâni a anului precedent, iar ultimele zile din decembrie primei săptămâni a anului următor.",
+      "periodFolderSaveError": "Nu s-a putut salva dosarul {{period}}. Încearcă din nou.",
+      "periodFormatSaveError": "Nu s-a putut salva formatul titlului {{period}}. Încearcă din nou.",
+      "periodTemplateSaveError": "Nu s-a putut salva șablonul {{period}}. Încearcă din nou.",
+      "periodNameDaily": "zilnice",
+      "periodNameWeekly": "săptămânale",
+      "periodNameMonthly": "lunare",
+      "periodFolderAriaLabel": "Dosarul notelor {{period}}",
+      "periodFormatAriaLabel": "Formatul titlului notelor {{period}}",
+      "periodTemplateAriaLabel": "Șablonul notelor {{period}}",
       "dateFormatHelper": "Titlul fiecărei note zilnice. Acceptă YYYY, MM, DD. Implicit este {{default}}.",
       "dateFormatLabel": "Formatul datei pentru nota zilnică",
       "dateFormatSaveError": "Formatul datei nu a putut fi salvat. Te rugăm să încerci din nou.",
       "folderHelper": "Unde sunt salvate notele zilnice noi. Implicit este {{default}}. Folderul este păstrat chiar și când e gol.",
       "folderLabel": "Folderul notelor zilnice",
       "folderSaveError": "Folderul zilnic nu a putut fi salvat. Te rugăm să încerci din nou.",
-      "folderSearchEmpty": "Niciun folder nu corespunde.",
-      "folderSearchPlaceholder": "Caută foldere…",
-      "searchEmpty": "Niciun șablon nu corespunde.",
-      "searchPlaceholder": "Caută șabloane…",
       "templateHelper": "Alege un șablon de la care să pornească fiecare notă zilnică sau lasă gol pentru o notă goală cu titlul format din dată.",
       "templateLabel": "Șablon pentru nota zilnică",
-      "templateSaveError": "Șablonul zilnic nu a putut fi salvat. Te rugăm să încerci din nou.",
-      "untitledTemplate": "Șablon fără titlu"
+      "templateSaveError": "Șablonul zilnic nu a putut fi salvat. Te rugăm să încerci din nou."
     },
     "deleteVault": {
       "cancel": "Anulează",
@@ -3475,6 +3510,7 @@
         "dateFormat": "format dată zi lună an iso dd/mm mm/dd calendar date format",
         "timeFormat": "format oră 24 de ore 12 ore ceas am pm time format",
         "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone",
+        "periodicNotes": "note periodice săptămânal lunar săptămână lună dosar șablon format",
         "aiHistoryBudget": "conversație istoric context memorie buget caractere agent chat cerere"
       }
     },

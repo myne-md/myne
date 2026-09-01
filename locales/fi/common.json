@@ -669,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Laajenna kaikki"
+      },
+      "openThisWeekNote": {
+        "label": "Avaa tämän viikon muistiinpano"
+      },
+      "openThisMonthNote": {
+        "label": "Avaa tämän kuukauden muistiinpano"
       }
     },
     "hotkeys": {
@@ -1543,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "Hae muistiinpanoja tai suorita komento…",
       "noMatches": "Ei osuvia komentoja tai muistiinpanoja."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Tämän päivän muistiinpanoa ei voitu avata.",
+        "weekly": "Tämän viikon muistiinpanoa ei voitu avata.",
+        "monthly": "Tämän kuukauden muistiinpanoa ei voitu avata."
+      }
     }
   },
   "export": {
@@ -2787,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Tyhjä (ei mallia)",
+      "folderSearchEmpty": "Yksikään kansio ei vastaa hakua.",
+      "folderSearchPlaceholder": "Etsi kansioita…",
+      "searchEmpty": "Yksikään malli ei vastaa hakua.",
+      "searchPlaceholder": "Etsi malleja…",
+      "untitledTemplate": "Nimetön malli",
+      "sectionDaily": "Päivittäiset muistiinpanot",
+      "sectionWeekly": "Viikoittaiset muistiinpanot",
+      "sectionMonthly": "Kuukausittaiset muistiinpanot",
+      "periodFolderLabel": "Kansio",
+      "periodFolderHelper": "Mihin uudet {{period}} muistiinpanot tallennetaan. Oletus: {{default}}. Kansio säilyy, vaikka se olisi tyhjä.",
+      "periodFormatLabel": "Otsikon muoto",
+      "periodFormatHelperDaily": "Jokaisen päivittäisen muistiinpanon otsikko. Tukee muotoja YYYY, MM, DD, gggg (ISO-viikkovuosi), ww (ISO-viikkonumero) ja [teksti] kirjaimelliselle tekstille. Oletus: {{default}}.",
+      "periodFormatHelperWeekly": "Jokaisen viikoittaisen muistiinpanon otsikko. Tukee muotoja gggg (ISO-viikkovuosi), ww (ISO-viikkonumero), YYYY, MM, DD ja [teksti] kirjaimelliselle tekstille. Oletus: {{default}}.",
+      "periodFormatHelperMonthly": "Jokaisen kuukausittaisen muistiinpanon otsikko. Tukee muotoja YYYY, MM, gggg (ISO-viikkovuosi), ww (ISO-viikkonumero) ja [teksti] kirjaimelliselle tekstille. Oletus: {{default}}.",
+      "periodTemplateLabel": "Malli",
+      "periodTemplateHelper": "Valitse malli, josta jokainen {{period}} muistiinpano alkaa, tai jätä tyhjäksi, jolloin luodaan tyhjä muistiinpano päivämäärällä otsikoituna.",
+      "collisionWarning": "Muistiinpanot {{first}} ja {{second}} päätyvät samaan muistiinpanoon, koska ne jakavat kansion ja tuottavat saman otsikon. Molemmat komennot avaavat sen.",
+      "weekStartNote": "Viikot alkavat maanantaista (ISO 8601), joten tammikuun ensimmäiset päivät voivat kuulua edellisen vuoden viimeiseen viikkoon ja joulukuun viimeiset päivät seuraavan vuoden ensimmäiseen.",
+      "periodFolderSaveError": "Kansiota {{period}} muistiinpanoille ei voitu tallentaa. Yritä uudelleen.",
+      "periodFormatSaveError": "Otsikon muotoa {{period}} muistiinpanoille ei voitu tallentaa. Yritä uudelleen.",
+      "periodTemplateSaveError": "Mallia {{period}} muistiinpanoille ei voitu tallentaa. Yritä uudelleen.",
+      "periodNameDaily": "päivittäiset",
+      "periodNameWeekly": "viikoittaiset",
+      "periodNameMonthly": "kuukausittaiset",
+      "periodFolderAriaLabel": "{{period}} muistiinpanojen kansio",
+      "periodFormatAriaLabel": "{{period}} muistiinpanojen otsikkomuoto",
+      "periodTemplateAriaLabel": "{{period}} muistiinpanojen malli",
       "dateFormatHelper": "Kunkin päivämuistiinpanon otsikko. Tukee muotoja YYYY, MM, DD. Oletus on {{default}}.",
       "dateFormatLabel": "Päivämuistiinpanon päivämäärämuoto",
       "dateFormatSaveError": "Päivämäärämuotoa ei voitu tallentaa. Yritä uudelleen.",
       "folderHelper": "Mihin uudet päivämuistiinpanot tallennetaan. Oletus on {{default}}. Kansio säilytetään silloinkin, kun se on tyhjä.",
       "folderLabel": "Päivämuistiinpanojen kansio",
       "folderSaveError": "Päivämuistiinpanojen kansiota ei voitu tallentaa. Yritä uudelleen.",
-      "folderSearchEmpty": "Yksikään kansio ei vastaa hakua.",
-      "folderSearchPlaceholder": "Etsi kansioita…",
-      "searchEmpty": "Yksikään malli ei vastaa hakua.",
-      "searchPlaceholder": "Etsi malleja…",
       "templateHelper": "Valitse malli, josta kukin päivämuistiinpano aloitetaan, tai jätä tyhjäksi, jolloin saat tyhjän muistiinpanon, jonka otsikkona on päivämäärä.",
       "templateLabel": "Päivämuistiinpanon malli",
-      "templateSaveError": "Päivämuistiinpanon mallia ei voitu tallentaa. Yritä uudelleen.",
-      "untitledTemplate": "Nimetön malli"
+      "templateSaveError": "Päivämuistiinpanon mallia ei voitu tallentaa. Yritä uudelleen."
     },
     "deleteVault": {
       "cancel": "Peruuta",
@@ -3365,6 +3400,7 @@
         "dateFormat": "päivämäärämuoto päivämäärä päivä kuukausi vuosi iso dd/mm mm/dd kalenteri date format",
         "timeFormat": "kellonajan muoto kellonaika 24 tunnin 12 tunnin kello ap ip time format am pm",
         "timezone": "aikavyöhyke vyöhyke tz utc iana alue tänään timezone time zone",
+        "periodicNotes": "jaksottaiset muistiinpanot viikoittainen kuukausittainen viikko kuukausi kansio malli muoto",
         "aiHistoryBudget": "keskustelu historia konteksti muisti budjetti merkit agentti chat pyyntö"
       }
     },

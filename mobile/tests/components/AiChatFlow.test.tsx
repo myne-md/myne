@@ -13,6 +13,7 @@
 // here re-tests its arithmetic. What is asserted is that this surface drives it
 // in the right ORDER and reads back what it wrote.
 
+import i18n from "@myne/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
@@ -109,6 +110,14 @@ describe("AiChatFlow", () => {
     expect(agentStart).toHaveBeenCalledWith(
       "which notes mention the migration?",
       { kind: "folder", value: "" },
+      // The interface language and the chat-history seed, which develop's
+      // myne-md/myne#618 and #617 made REQUIRED arguments. Asserted rather
+      // than skipped: the whole point of checking the whole call is that a new
+      // argument cannot be added without someone deciding it should be, and
+      // the empty history is a claim about this flow (its turns live in
+      // component state, so there is nothing to seed) rather than an oversight.
+      "en",
+      [],
       expect.any(Function),
       expect.any(Function),
     );
@@ -121,7 +130,16 @@ describe("AiChatFlow", () => {
     let report: (p: RunProgress) => void = () => {};
     let settle: (r: ReturnType<typeof finished>) => void = () => {};
     agentStart.mockImplementation(
-      (_task: string, _grant: unknown, _onOpen: unknown, onProgress: (p: RunProgress) => void) => {
+      (
+        _task: string,
+        _grant: unknown,
+        // The language and the chat-history seed sit between the grant and the
+        // callbacks since myne-md/myne#618 and #617 made them required.
+        _language: unknown,
+        _history: unknown,
+        _onOpen: unknown,
+        onProgress: (p: RunProgress) => void,
+      ) => {
         report = onProgress;
         return new Promise((resolve) => {
           settle = resolve;
@@ -168,6 +186,8 @@ describe("AiChatFlow", () => {
       (
         _task: string,
         _grant: unknown,
+        _language: unknown,
+        _history: unknown,
         onOpen: (v: AgentRunView) => void,
         onProgress: (p: RunProgress) => void,
       ) => {
@@ -252,9 +272,12 @@ describe("AiChatFlow", () => {
 
       await waitFor(() => expect(screen.getByTestId("ai.turn-error")).toBeTruthy());
       const text = screen.getByTestId("ai.turn-error").textContent ?? "";
-      // `t()` returns the key in this harness, which is what makes this the
-      // strong assertion: it pins WHICH sentence, not merely that one appears.
-      expect(text).toContain(key);
+      // Asserted against the RESOLVED sentence for this cause's key, which is
+      // the same lookup the component makes and still pins WHICH sentence
+      // rather than merely that one appeared. It read `toContain(key)` while
+      // the harness returned keys verbatim; the catalogs resolve now, so that
+      // form would have passed on any sentence at all.
+      expect(text).toContain(i18n.t(`settings.ai.providerError.${key}`));
       // And no two states share one. A set, because "five messages" is the
       // requirement and five hits on the same catch-all would satisfy a
       // per-case check.

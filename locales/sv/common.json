@@ -669,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Fäll ut alla"
+      },
+      "openThisWeekNote": {
+        "label": "Öppna den här veckans anteckning"
+      },
+      "openThisMonthNote": {
+        "label": "Öppna den här månadens anteckning"
       }
     },
     "hotkeys": {
@@ -1543,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "Sök anteckningar eller kör ett kommando…",
       "noMatches": "Inga kommandon eller anteckningar matchar."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Dagens anteckning kunde inte öppnas.",
+        "weekly": "Den här veckans anteckning kunde inte öppnas.",
+        "monthly": "Den här månadens anteckning kunde inte öppnas."
+      }
     }
   },
   "export": {
@@ -2787,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Tom (ingen mall)",
+      "folderSearchEmpty": "Inga mappar matchar.",
+      "folderSearchPlaceholder": "Sök mappar…",
+      "searchEmpty": "Inga mallar matchar.",
+      "searchPlaceholder": "Sök mallar…",
+      "untitledTemplate": "Namnlös mall",
+      "sectionDaily": "Dagliga anteckningar",
+      "sectionWeekly": "Veckovisa anteckningar",
+      "sectionMonthly": "Månatliga anteckningar",
+      "periodFolderLabel": "Mapp",
+      "periodFolderHelper": "Var nya {{period}} anteckningar sparas. Standard: {{default}}. Mappen behålls även när den är tom.",
+      "periodFormatLabel": "Titelformat",
+      "periodFormatHelperDaily": "Titeln på varje daglig anteckning. Stöder YYYY, MM, DD, gggg (ISO-veckoår), ww (ISO-veckonummer) och [text] för bokstavlig text. Standard: {{default}}.",
+      "periodFormatHelperWeekly": "Titeln på varje veckovis anteckning. Stöder gggg (ISO-veckoår), ww (ISO-veckonummer), YYYY, MM, DD och [text] för bokstavlig text. Standard: {{default}}.",
+      "periodFormatHelperMonthly": "Titeln på varje månatlig anteckning. Stöder YYYY, MM, gggg (ISO-veckoår), ww (ISO-veckonummer) och [text] för bokstavlig text. Standard: {{default}}.",
+      "periodTemplateLabel": "Mall",
+      "periodTemplateHelper": "Välj en mall som varje {{period}} anteckning börjar från, eller lämna tomt för en tom anteckning med datumet som titel.",
+      "collisionWarning": "{{first}} och {{second}} anteckningar leder till samma anteckning, eftersom de delar mapp och ger samma titel. Båda kommandona öppnar den.",
+      "weekStartNote": "Veckor börjar på måndag (ISO 8601), så de första dagarna i januari kan höra till förra årets sista vecka, och de sista dagarna i december till nästa års första.",
+      "periodFolderSaveError": "Mappen för {{period}} anteckningar kunde inte sparas. Försök igen.",
+      "periodFormatSaveError": "Titelformatet för {{period}} anteckningar kunde inte sparas. Försök igen.",
+      "periodTemplateSaveError": "Mallen för {{period}} anteckningar kunde inte sparas. Försök igen.",
+      "periodNameDaily": "dagliga",
+      "periodNameWeekly": "veckovisa",
+      "periodNameMonthly": "månatliga",
+      "periodFolderAriaLabel": "Mapp för {{period}} anteckningar",
+      "periodFormatAriaLabel": "Titelformat för {{period}} anteckningar",
+      "periodTemplateAriaLabel": "Mall för {{period}} anteckningar",
       "dateFormatHelper": "Titeln på varje dagsanteckning. Stöder YYYY, MM, DD. Standard är {{default}}.",
       "dateFormatLabel": "Datumformat för dagsanteckning",
       "dateFormatSaveError": "Kunde inte spara datumformatet. Försök igen.",
       "folderHelper": "Var nya dagsanteckningar placeras. Standard är {{default}}. Mappen behålls även när den är tom.",
       "folderLabel": "Mapp för dagsanteckningar",
       "folderSaveError": "Kunde inte spara dagsmappen. Försök igen.",
-      "folderSearchEmpty": "Inga mappar matchar.",
-      "folderSearchPlaceholder": "Sök mappar…",
-      "searchEmpty": "Inga mallar matchar.",
-      "searchPlaceholder": "Sök mallar…",
       "templateHelper": "Välj en mall att starta varje dagsanteckning från, eller lämna tomt för en tom anteckning med datumet som titel.",
       "templateLabel": "Mall för dagsanteckning",
-      "templateSaveError": "Kunde inte spara dagsmallen. Försök igen.",
-      "untitledTemplate": "Namnlös mall"
+      "templateSaveError": "Kunde inte spara dagsmallen. Försök igen."
     },
     "deleteVault": {
       "cancel": "Avbryt",
@@ -3365,6 +3400,7 @@
         "dateFormat": "datumformat datum dag månad år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat tid 24-timmars 12-timmars klocka am pm time format 24 hour 12 hour",
         "timezone": "tidszon zon tz utc iana region idag timezone time zone",
+        "periodicNotes": "periodiska anteckningar veckovis månatlig vecka månad mapp mall format",
         "aiHistoryBudget": "konversation historik kontext minne budget tecken agent chatt förfrågan"
       }
     },

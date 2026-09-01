@@ -321,6 +321,39 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10341,
-  "gatedMinutes": 3793
+  "$raise-2026-09-01-periodic": [
+    "CEILING RAISED 9822 -> 9942 (+120) by myne-md/myne#177, and the argument the",
+    "ratchet's own rule asks for. It is ONE new manual item, 20 minutes on six",
+    "clients, on settings.block.datetime-display, and it exists because this",
+    "change created a cross-client divergence that no lane in this repository can",
+    "observe:",
+    "",
+    "  +20  the timezone override's period identity, on six clients. The desktop",
+    "       applies the `timezone` override and mobile and the CLI read the device",
+    "       clock, which decisions/storage/0556 states as an accepted cost: on a",
+    "       Sunday evening a user can hold TWO weekly notes for one period, both",
+    "       real, both synced, and nothing reconciles them. An accepted cost",
+    "       nobody verifies is an unverified cost. A scenario cannot hold a",
+    "       desktop and a phone on one vault at one instant (every automated lane",
+    "       here is a single Linux container against WebKitGTK), the CLI half",
+    "       needs a real terminal with a redirect to prove the advisory is on",
+    "       stderr rather than stdout, and the condition itself needs the wall",
+    "       clock inside the one window where an ISO week boundary and a calendar",
+    "       day boundary disagree.",
+    "",
+    "It displaces no automation. The same change ADDED an E2E scenario for the",
+    "period commands rather than a manual item, which is the direction this",
+    "ratchet exists to encourage; what is left here is the part that scenario",
+    "cannot reach, because it runs on one client."
+  ],
+  "$raise-2026-09-01-merge": [
+    "CEILING 9822 -> 9962, the SUM of the two raises rather than a third one.",
+    "myne-md/myne#177 took it 9822 -> 9942 (+120) and myne-md/myne#508 took it",
+    "9822 -> 9842 (+20), both against the same base, so the merged ceiling is",
+    "9822 + 120 + 20. The two cover disjoint roster entries (the timezone",
+    "override divergence against the reminder-horizon picker), so neither",
+    "absorbs the other, and each keeps its own argument above."
+  ],
+  "totalMinutesCeiling": 10461,
+  "gatedMinutes": 3773
 }

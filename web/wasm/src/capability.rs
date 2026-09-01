@@ -136,6 +136,7 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_daily_date_format",
     "plugin:prefs|set_daily_folder",
     "plugin:prefs|set_daily_template",
+    "plugin:prefs|set_periodic_note_setting",
     "plugin:prefs|set_new_note_location",
     "plugin:prefs|set_editor_text_size",
     "plugin:prefs|set_editor_line_spacing",

@@ -613,6 +613,12 @@
       "openTodayNote": {
         "label": "Open today's note"
       },
+      "openThisWeekNote": {
+        "label": "Open this week's note"
+      },
+      "openThisMonthNote": {
+        "label": "Open this month's note"
+      },
       "randomNote": {
         "label": "Open random note"
       },
@@ -1532,6 +1538,13 @@
     "commandPalette": {
       "searchPlaceholder": "Search notes or run a command…",
       "noMatches": "No commands or notes match."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Could not open today's note.",
+        "weekly": "Could not open this week's note.",
+        "monthly": "Could not open this month's note."
+      }
     }
   },
   "export": {
@@ -2812,20 +2825,33 @@
     },
     "dailyNotes": {
       "blankTemplate": "Blank (no template)",
-      "dateFormatHelper": "The title of each daily note. Supports YYYY, MM, DD. Defaults to {{default}}.",
-      "dateFormatLabel": "Daily note date format",
-      "dateFormatSaveError": "Couldn't save the date format. Please try again.",
-      "folderHelper": "Where new daily notes are filed. Defaults to {{default}}. The folder is kept even when empty.",
-      "folderLabel": "Daily note folder",
-      "folderSaveError": "Couldn't save the daily folder. Please try again.",
       "folderSearchEmpty": "No folders match.",
       "folderSearchPlaceholder": "Search folders…",
       "searchEmpty": "No templates match.",
       "searchPlaceholder": "Search templates…",
-      "templateHelper": "Pick a template to start each daily note from, or leave blank for an empty note titled with the date.",
-      "templateLabel": "Daily note template",
-      "templateSaveError": "Couldn't save the daily template. Please try again.",
-      "untitledTemplate": "Untitled template"
+      "untitledTemplate": "Untitled template",
+      "sectionDaily": "Daily notes",
+      "sectionWeekly": "Weekly notes",
+      "sectionMonthly": "Monthly notes",
+      "periodFolderLabel": "Folder",
+      "periodFolderHelper": "Where new {{period}} notes are filed. Defaults to {{default}}. The folder is kept even when empty.",
+      "periodFormatLabel": "Title format",
+      "periodFormatHelperDaily": "The title of each daily note. Supports YYYY, MM, DD, gggg (ISO week-year), ww (ISO week number), and [text] for literal text. Defaults to {{default}}.",
+      "periodFormatHelperWeekly": "The title of each weekly note. Supports gggg (ISO week-year), ww (ISO week number), YYYY, MM, DD, and [text] for literal text. Defaults to {{default}}.",
+      "periodFormatHelperMonthly": "The title of each monthly note. Supports YYYY, MM, gggg (ISO week-year), ww (ISO week number), and [text] for literal text. Defaults to {{default}}.",
+      "periodTemplateLabel": "Template",
+      "periodTemplateHelper": "Pick a template to start each {{period}} note from, or leave blank for an empty note titled with the date.",
+      "collisionWarning": "{{first}} and {{second}} notes resolve to the same note, because they share a folder and produce the same title. Both commands will open it.",
+      "weekStartNote": "Weeks start on Monday (ISO 8601), so the first days of January can belong to the previous year's last week, and the last days of December to the next year's first.",
+      "periodFolderSaveError": "Couldn't save the {{period}} folder. Please try again.",
+      "periodFormatSaveError": "Couldn't save the {{period}} title format. Please try again.",
+      "periodTemplateSaveError": "Couldn't save the {{period}} template. Please try again.",
+      "periodNameDaily": "daily",
+      "periodNameWeekly": "weekly",
+      "periodNameMonthly": "monthly",
+      "periodFolderAriaLabel": "{{period}} note folder",
+      "periodFormatAriaLabel": "{{period}} note title format",
+      "periodTemplateAriaLabel": "{{period}} note template"
     },
     "deleteVault": {
       "cancel": "Cancel",
@@ -3382,7 +3408,8 @@
         "viewMode": "default view mode live reading source preview",
         "dateFormat": "date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "time format 24 hour 12 hour clock am pm",
-        "timezone": "timezone time zone tz utc iana region today"
+        "timezone": "timezone time zone tz utc iana region today",
+        "periodicNotes": "periodic notes weekly monthly week month folder template format"
       }
     },
     "dateTime": {
@@ -3395,7 +3422,7 @@
       "time24": "24-hour",
       "time12": "12-hour",
       "zoneLabel": "Time zone",
-      "zoneHelper": "Which zone decides what counts as today. Leave empty to follow this device. Times you write in a note are never changed; 09:00 stays 09:00 everywhere.",
+      "zoneHelper": "Which zone decides what counts as today, and so which note your daily, weekly and monthly notes open. Leave empty to follow this device. The choice settles per device: no other device overwrites it, so an override can put this device on a different day from your others. Times you write in a note are never changed; 09:00 stays 09:00 everywhere.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne doesn't know that time zone. Use a name like Europe/Berlin.",
       "errorSave": "Couldn't save that setting."

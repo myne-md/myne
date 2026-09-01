@@ -4207,14 +4207,16 @@ export const ROSTER = Object.freeze([
   },
   {
     id: "settings.block.daily-notes",
-    title: "Daily notes: folder, date format, template",
+    title: "Periodic notes: folder, title format, template, for each of daily, weekly and monthly",
     paths: [
-      "src/components/settings/DailyNotesSettings.tsx",
+      "src/components/settings/PeriodicNotesSettings.tsx",
+      "src/notes/dailyNote.ts",
       "src/notes/listFolderPaths.ts",
       "src/notes/templates.ts",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/periodic-notes.e2e.ts",
       "e2e/templates.e2e.ts",
       "e2e/files-settings.e2e.ts",
       "e2e/slash-datetime.e2e.ts",
@@ -4247,7 +4249,12 @@ export const ROSTER = Object.freeze([
       "mobile/src/lib/useDateTimeDisplaySync.ts",
       "mobile/src/app/flows/SettingsSheet.tsx",
     ],
-    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
+    // `cli` joined the client set with the periodic-notes item below, and it is
+    // not decoration: the CLI is a THIRD reader of the `timezone` override's
+    // consequence, and it reads the device clock rather than the override
+    // (`decisions/storage/0556`). An entry whose client list omits it produces a
+    // plan that never schedules the one observation covering the divergence.
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android", "cli"],
     // EMPTY, deliberately, and it was briefly not.
     //
     // Three scenarios covering this surface are WRITTEN (`tc4`, `tc5` in
@@ -4298,6 +4305,13 @@ export const ROSTER = Object.freeze([
         whyNotAutomated: "No lane drives a phone's WebView: the container suite runs WebKitGTK on Linux, and mobile's Playwright tier drives its React tree against a mocked Tauri IPC, so neither can produce a real prefs write arriving over sync nor observe which side of the merge each field lands on.",
         clients: ["ios", "android"],
         estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "Set a `timezone` override on the DESKTOP that sits in a different calendar day from the device's own clock (e.g. device on Europe/Berlin, override on Pacific/Auckland), on a Sunday evening in Berlin. Open the weekly note on the desktop and then on the phone, and confirm the two titles differ by a whole ISO week and that the vault now holds TWO weekly notes for that period, both synced, with nothing reconciling them. Then run `myne weekly` and confirm it opens the phone's note, and that the device-clock advisory appears on stderr and NOT on stdout (`myne weekly > out.md` leaves out.md free of it).",
+        whyNotAutomated: "The divergence is between three clients running at once: desktop applies the override, mobile and the CLI read the device clock (`decisions/storage/0556`, which states the two-notes outcome as an accepted cost). Every automated lane in this repo is one Linux container against WebKitGTK, so no scenario can hold a desktop and a phone on the same vault at the same instant, and the CLI stream split needs a real terminal with a redirect. The Sunday-evening condition also requires the wall clock to be inside the one window where an ISO week boundary and a calendar-day boundary disagree.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android", "cli"],
+        estimateMin: 20,
         tier: "core",
       },
     ],

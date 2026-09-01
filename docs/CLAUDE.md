@@ -122,4 +122,5 @@ Cross-reference is **one-way**: a runbook (AGPL) points to the policy doc (CC-BY
 ## Gotchas
 
 - `glossary.md` references are case-sensitive matches in some downstream tools — keep entry titles stable.
+- **`glossary.md` is A-to-Z, and a hyphen sorts BEFORE a letter**, so `per-vault namespace` precedes `period anchor`. The trap is inserting by scanning for the first heading in FILE order that sorts after the new term: entries whose titles differ only by a hyphen or a space break that scan, and myne-md/myne#177's first attempt landed a new entry six hundred lines early, next to `full-reconcile`. Read the neighbours back after inserting rather than trusting the insert.
 - The decisions log keeps growing; adding an entry never breaks anything, but **never renumber or reorder existing ones**, even to fix a date typo. Write a new entry that says "2026-04-26 entry has wrong date, actual was 2026-04-27" and leave the original alone.
