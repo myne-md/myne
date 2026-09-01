@@ -279,6 +279,12 @@ export function ScreenCaptureEscape() {
             }
           />
 
+        </div>
+
+          {/* A SIBLING of the scroll region, not a child of it, matching
+              `AiProviderConsent`. Nested inside, the actions scrolled away with
+              the body on a short viewport, which is the one place a modal must
+              not put its only way out. */}
           <div style={ACTIONS_STYLE}>
             {savedForNextLaunch ? (
               // One control, and it is the cancel testid rather than a third
@@ -314,7 +320,6 @@ export function ScreenCaptureEscape() {
               </>
             )}
           </div>
-        </div>
       </ModalShell>
     </>
   );

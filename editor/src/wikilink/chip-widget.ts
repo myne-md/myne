@@ -44,6 +44,7 @@ import {
   resolveChipParts,
 } from "./resolve-chip";
 import { pickerActiveFromField } from "./picker";
+import { enclosingWikilink } from "./hover";
 import { hasAnchor, type WikilinkAnchor } from "./anchor";
 import { isCursorLine, readingModeFacet } from "../decorations/cursor-aware";
 import i18n from "@myne/editor/i18n";
@@ -309,7 +310,13 @@ function cachedWikilinkAtomicRanges(view: EditorView) {
   return finished;
 }
 
+/** How far a press may travel and still count as a click rather than a drag. */
+const DRAG_SLOP_PX = 3;
+
 export function wikilinkChipExtensions(): readonly Extension[] {
+  // The chip position captured by the press in flight, consumed by the click
+  // that follows it. Per extension instance, i.e. per editor.
+  let pressed: { pos: number; x: number; y: number } | null = null;
   return [
     ViewPlugin.fromClass(
       class {
@@ -364,39 +371,105 @@ export function wikilinkChipExtensions(): readonly Extension[] {
     // Click-to-navigate: clicking a RESOLVED chip resolves its target and emits
     // a `myne-open-wikilink` DOM event (CMEditor relays it to its `onOpenWikilink`
     // prop → the workspace opens the note). Broken chips do nothing (their target
-    // doesn't exist). `click` (not `mousedown`) so drag-selection over the chip
-    // still works (§5.2).
+    // doesn't exist).
+    //
+    // The position is taken at `mousedown` and acted on at `mouseup`, and that
+    // is the whole of the click half of myne-md/myne#601. MEASURED in a real
+    // browser, pressing a rendered chip:
+    //
+    //   mousedown  target = cm-wikilink-chip
+    //   mouseup    target = cm-line          (the chip is gone)
+    //   click      never fires, not even on `document`
+    //
+    // The press moves the selection onto the link, which lifts the chip back to
+    // its raw `[[…]]` source, so the element the press landed on is REMOVED from
+    // the document before the button comes up, and a click is only synthesised
+    // for a press and release that share a target. There is no click to listen
+    // for, which is why a handler on `click` navigated from an already-raw link
+    // and did nothing at all from a chip, and why a DOUBLE click worked: its
+    // second press lands on text that is already raw.
+    //
+    // Coordinates cannot stand in for the element either: the raw form is
+    // several times wider than the chip, so the line reflows under the pointer
+    // and the same point names a different part of the document. The press's own
+    // position is the only anchor that survives, so it is what gets recorded.
+    //
+    // Drag-select over a link (§5.2) is preserved by the release: a pointer that
+    // travelled more than `DRAG_SLOP_PX` between down and up was making a
+    // selection, and the recorded position is dropped.
     EditorView.domEventHandlers({
-      click(event, view) {
-        const target = event.target as HTMLElement | null;
-        const chipEl = target?.closest?.(".cm-wikilink-chip") as HTMLElement | null;
-        if (chipEl === null || chipEl.classList.contains("cm-wikilink-chip-broken")) {
+      mousedown(event, view) {
+        pressed = null;
+        if (event.button !== 0) return false;
+        // A modified press is somebody else's gesture, so it records nothing and
+        // navigates nowhere. Shift-click extends a selection, and on a chip that
+        // is the only way to select across one; ctrl or cmd click is the
+        // platform's open-elsewhere chord, which this editor does not implement,
+        // so honouring it as a plain navigation answers a request for a new
+        // window by replacing the note in the current one. Alt is CodeMirror's
+        // own rectangular-selection modifier. Each of these used to navigate.
+        if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
           return false;
         }
-        const pos = view.posAtDOM(chipEl);
-        let noteUuid: string | null = null;
+        const target = event.target as HTMLElement | null;
+        const chipEl = target?.closest?.(".cm-wikilink-chip") as HTMLElement | null;
+        // ONLY a press that starts on a rendered chip is a navigation. A press
+        // on the raw `[[…]]` source is CodeMirror's, and it has to stay
+        // CodeMirror's: the raw form exists so the target can be edited, and
+        // taking that press would leave no way to put the caret inside a link
+        // with the mouse at all. The first version of this recorded any press
+        // whose coordinates landed inside a Wikilink node, which read as
+        // consistent and quietly removed the only gesture for editing one.
+        if (chipEl === null) return false;
+        // A broken chip records nothing either: its target does not exist, so
+        // pressing it is deliberately inert.
+        if (chipEl.classList.contains("cm-wikilink-chip-broken")) return false;
+        // The chip's own position, read while the chip is still in the document.
+        // Coordinates cannot stand in for it: the press reveals the raw source,
+        // which is several times wider, so the line reflows under the pointer
+        // and the same point names a different part of the document by the time
+        // the button comes up.
+        pressed = {
+          pos: view.posAtDOM(chipEl),
+          x: event.clientX,
+          y: event.clientY,
+        };
+        return false; // record only, never preempt CM's own selection
+      },
+      mouseup(event, view) {
+        const press = pressed;
+        pressed = null;
+        if (press === null || event.button !== 0) return false;
+        if (
+          Math.abs(event.clientX - press.x) > DRAG_SLOP_PX ||
+          Math.abs(event.clientY - press.y) > DRAG_SLOP_PX
+        ) {
+          return false; // the press became a drag: a selection, not a navigation
+        }
+        // Which wikilink the press was on, resolved the way `hover.ts` resolves
+        // the same question, by climbing to the enclosing node from BOTH sides.
+        // A range walk over `[pos, pos + 1)` was the version here before, and it
+        // answers nothing when the position lands on the node's own edge, which
+        // `posAtDOM` of a replace widget routinely returns.
+        const tree = syntaxTree(view.state);
+        const wl =
+          enclosingWikilink(tree.resolveInner(press.pos, -1)) ??
+          enclosingWikilink(tree.resolveInner(press.pos, 1));
+        if (wl === null) return false;
+        const parts = parseWikilinkParts(view.state, wl.from, wl.to);
+        const res = resolveChipParts(parts, readNoteSet(view.state));
+        if (res === null || res.status !== "resolved") return false;
+        const noteUuid = res.noteUuid;
         // SYNC-5: carry the GENERIC anchor (`#heading` / imported `^block-id`)
         // alongside the resolved note so the open chain can scroll to it after
         // the body loads (MYND-305). Not a wikilink-specific side channel — the
         // `anchor` shape is reusable by any open-API caller.
-        let anchor: WikilinkAnchor | null = null;
-        syntaxTree(view.state).iterate({
-          from: pos,
-          to: pos + 1,
-          enter: (node) => {
-            if (node.name !== "Wikilink") return undefined;
-            const parts = parseWikilinkParts(view.state, node.from, node.to);
-            const res = resolveChipParts(parts, readNoteSet(view.state));
-            if (res !== null && res.status === "resolved") {
-              noteUuid = res.noteUuid;
-              if (hasAnchor({ heading: parts.heading, blockId: parts.blockId })) {
-                anchor = { heading: parts.heading, blockId: parts.blockId };
-              }
-            }
-            return false;
-          },
-        });
-        if (noteUuid === null) return false;
+        const anchor: WikilinkAnchor | null = hasAnchor({
+          heading: parts.heading,
+          blockId: parts.blockId,
+        })
+          ? { heading: parts.heading, blockId: parts.blockId }
+          : null;
         view.dom.dispatchEvent(
           new CustomEvent("myne-open-wikilink", {
             detail: { noteUuid, anchor },

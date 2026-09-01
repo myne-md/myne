@@ -31,6 +31,7 @@ import {
 } from "@codemirror/view";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 import { revealsRange } from "./cursor-aware";
+import { listLabelStart } from "./list";
 import { completeRecurringTask, uncompleteRecurringTask } from "./task-recurrence";
 
 class TaskCheckboxWidget extends WidgetType {
@@ -147,6 +148,11 @@ function buildTaskListDecorations(view: EditorView): DecorationSet {
         // checkbox so the rendered line reads as just [checkbox] label, not
         // "- [checkbox] label". Indentation (leading whitespace) is preserved.
         const line = view.state.doc.lineAt(node.from);
+        // Where the label begins, asked once for the two decorations that need
+        // it: the separator this file swallows, and the strike over a completed
+        // item's text. `list.ts` owns the answer because its hanging indent is
+        // measured against the same column (myne-md/myne#594).
+        const labelStart = listLabelStart(line, node.to);
         const before = view.state.doc.sliceString(line.from, node.from);
         const bullet = before.match(/^(\s*)[-*+]\s+$/);
         const bulletStart =
@@ -173,15 +179,26 @@ function buildTaskListDecorations(view: EditorView): DecorationSet {
               widget: new TaskCheckboxWidget(checked, node.from),
             }).range(node.from, node.to),
           );
+          // Swallow the separator between `[ ]` and the label too, exactly as
+          // the bullet disc swallows its own (`list.ts`): the gap to the label
+          // is then the checkbox's `margin-right` and nothing else, a width the
+          // theme states rather than one the font decides. `list.ts` measures
+          // the line's hanging indent against that same width, so every source
+          // space left painted here is a space its wrapped rows fall short by
+          // (myne-md/myne#594).
+          //
+          // Never on an item with NO label: that separator is then the only
+          // text on the line, and a line made of nothing but widgets has
+          // nowhere for a typed character to land (myne-md/myne#598).
+          if (labelStart > node.to && labelStart < line.to) {
+            decorations.push(Decoration.replace({}).range(node.to, labelStart));
+          }
         }
         // Strike + mute the label text of a completed item so done items
         // visibly recede (MYND-142). Starts at the first non-space AFTER the
         // marker — so the strike line doesn't run through the gap into the
         // checkbox — and spans to end-of-line; skipped for empty todos.
         if (checked) {
-          const line = view.state.doc.lineAt(node.to);
-          const gap = view.state.doc.sliceString(node.to, line.to).match(/^\s+/);
-          const labelStart = node.to + (gap ? gap[0].length : 0);
           if (line.to > labelStart) {
             decorations.push(
               Decoration.mark({ class: "cm-task-done-label" }).range(

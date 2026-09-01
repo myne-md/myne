@@ -63,11 +63,19 @@ const ROOT = resolve(new URL("..", import.meta.url).pathname);
  * cannot speak for. */
 export const LEAVING_PATHS = [
   {
+    id: "desktop-lock",
     file: "src/lib/vault-unlock.ts",
     fn: "lockVault",
     why: "The frontend lock choke point. Every path that ends a vault session calls it: the Lock button, the vault switch, the StorageLost takeover and the invalid-state fail-closed CTA.",
   },
   {
+    id: "mobile-lock",
+    file: "mobile/src/lib/vault-unlock.ts",
+    fn: "lockVault",
+    why: "Mobile's own lock choke point: its Lock button, its idle auto-lock and its vault switch all funnel here (`mobile/src/lib/vault-switch.ts` routes through it). It was outside this roster while mobile compiles the SAME `@myne/editor` attachment code and wires a real `attachments` host, so the shared caches filled on mobile and nothing cleared them. That is the twin-drift shape myne#454 already cost this project once, on the Rust side of the same question.",
+  },
+  {
+    id: "desktop-switch",
     file: "src/lib/vault-switch.ts",
     fn: "leaveActiveVault",
     why: "Vault CHANGE specifically, which is a superset of a lock: it is the only path where the next thing opened is a different vault.",
@@ -99,8 +107,11 @@ export const TEARDOWN_CALLS = [
     // ones. Also asserted on the switch, because that path is reached through
     // `leaveActiveVault` and a later refactor could stop routing it through
     // `lockVault` without anything noticing.
-    appliesTo: ["lockVault", "leaveActiveVault"],
-    skips: {},
+    appliesTo: ["desktop-lock", "desktop-switch"],
+    skips: {
+      "mobile-lock":
+        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+    },
   },
   {
     call: "clearChat",
@@ -114,8 +125,11 @@ export const TEARDOWN_CALLS = [
     // into the next session, and nothing would say so.
     // `docs/decisions/ai/0276` rests its "no new at-rest magic byte, KEK or
     // format" argument on this transcript being RAM-only and dropped on lock.
-    appliesTo: ["lockVault", "leaveActiveVault"],
-    skips: {},
+    appliesTo: ["desktop-lock", "desktop-switch"],
+    skips: {
+      "mobile-lock":
+        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+    },
   },
   {
     call: "clearAiOutput",
@@ -132,16 +146,97 @@ export const TEARDOWN_CALLS = [
     // The note-SWITCH call in the Editor stays where it is. That one is about a
     // different event (note A's summary must not be insertable into note B) and
     // neither leaving path can speak for it.
-    appliesTo: ["lockVault", "leaveActiveVault"],
+    appliesTo: ["desktop-lock", "desktop-switch"],
+    skips: {
+      "mobile-lock":
+        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+    },
+  },
+  {
+    call: "resetScrollMemory",
+    declaredIn: "src/notes/scrollMemory.ts",
+    holds: "the per-note scroll positions: which notes this vault has and how far into each one the user had read",
+    // Every leaving path. Weaker than the four above (it holds no note text,
+    // only note ids and offsets) and on the roster for the reason the roster
+    // exists: it is a module-scope map, no leaving path reloads the WebView,
+    // and the decision behind myne-md/myne#600 is memory that lasts the
+    // SESSION, which a lock ends. Its own reset function shipped with zero
+    // callers, which is how it earned an entry rather than a comment.
+    appliesTo: ["desktop-lock", "desktop-switch"],
+    skips: {
+      "mobile-lock":
+        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+    },
+  },
+  {
+    call: "resetRecentNotes",
+    declaredIn: "src/notes/recentNotes.ts",
+    holds: "the wikilink picker's recency order: the ids of the notes this vault opened, most recent first",
+    // Every leaving path, same category and same shape as the scroll map above.
+    // The next vault's ids do not collide with these, so nothing would be
+    // mis-RANKED; what the call is for is the list not outliving the session
+    // that produced it (myne-md/myne#601).
+    appliesTo: ["desktop-lock", "desktop-switch"],
+    skips: {
+      "mobile-lock":
+        "Mobile has its own tree and does not import this store: it lives under `src/notes/` (or the desktop editor's own decorations) and nothing under `mobile/src` reaches it, so asserting the call there would demand a clear for something that is never populated. Verified by searching the mobile tree for the symbol rather than assumed from the path.",
+    },
+  },
+  {
+    call: "resetDecodedAspects",
+    declaredIn: "editor/src/attachments/decoded-aspect.ts",
+    holds: "the decoded shape of every image this vault has rendered, keyed by attachment id",
+    // Every leaving path. It shipped in review with NO production caller and a
+    // comment arguing it off this roster, on the grounds that an aspect ratio is
+    // neither note content nor a vault's shape. The second half was wrong, and
+    // the two entries above are what refute it: the scroll map holds note ids
+    // and two numbers, the recency order holds note ids alone, and both are here
+    // because they are a live record of what the vault contains. An
+    // attachment-id key whose value is derived from decrypted content is that,
+    // in the same sense. The cost of clearing it is one first-paint settle after
+    // a re-unlock, which is the thing the cache exists to avoid and not the
+    // thing it is worth keeping a locked vault's roster in memory for.
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
+    skips: {},
+  },
+  {
+    call: "resetPreviewCache",
+    declaredIn: "editor/src/attachments/session-caches.ts",
+    holds: "up to 24 decrypted attachment previews, each capped at the host's 2 MiB read cap, plus the reads still in flight for them",
+    // Every leaving path, and this one holds the decrypted CONTENT rather than a
+    // shape derived from it, so it is the stronger case of the entry above. It
+    // sat unlisted while `resetDecodedAspects` was argued onto the roster from
+    // the same file, which is the false-exhaustiveness shape the root CLAUDE.md
+    // records for the `itemsKey-wrap` row: a roster that reads complete while
+    // the larger store beside it is missing. The in-flight map is cleared with
+    // the cache so a read crossing a lock cannot resolve into the next
+    // session's entries.
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
+    skips: {},
+  },
+  {
+    call: "resetTranscripts",
+    declaredIn: "editor/src/attachments/session-caches.ts",
+    holds: "the text of every completed voice-note transcription this session produced",
+    // Every leaving path. Its own comment used to argue it off this roster by
+    // asserting the module unloads on lock, and that premise is false: a JS
+    // module never unloads, the idle auto-lock path reloads the WebView but the
+    // manual Lock button and the vault switch do not. `docs/threat-model.md`
+    // AS7 classes this surface as AS1-class in-RAM plaintext whose exposure is
+    // "not widened" beyond A6/A7/A10, and carrying it into a DIFFERENT vault's
+    // session is wider than that.
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
     skips: {},
   },
   {
     call: "resetSessionIgnored",
     declaredIn: "editor/src/decorations/spell.ts",
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",
-    appliesTo: ["leaveActiveVault"],
+    appliesTo: ["desktop-switch"],
     skips: {
-      lockVault:
+      "mobile-lock":
+        "Mobile does not reach this store: the ignored-word set lives in the desktop editor's spell decoration and nothing under `mobile/src` imports it, so asserting the call there would demand a clear for something never populated. Checked by searching the mobile tree for the symbol.",
+      "desktop-lock":
         "A plain lock does not change vault, and the ignore-this-session set is scoped to the session the user is still in. Clearing it at the lock choke point would discard a choice they made about the vault they are about to re-open. The store's own comment states the reason as a vault CHANGE, which is why this one is asserted on the switch path only.",
     },
   },
@@ -248,13 +343,13 @@ export function analyse({ files, leavingPaths, teardownCalls }) {
       continue;
     }
     for (const t of teardownCalls) {
-      if (!t.appliesTo.includes(path.fn)) {
+      if (!t.appliesTo.includes(path.id)) {
         // A skip needs a stated reason, on the same rule the exemption list in
         // the sibling guard follows: a silent absence is indistinguishable from
         // an oversight.
-        const why = t.skips?.[path.fn];
+        const why = t.skips?.[path.id];
         if (typeof why !== "string" || why.trim().length < 20) {
-          errors.push(`${t.call} does not apply to ${path.fn} and gives no reason`);
+          errors.push(`${t.call} does not apply to ${path.id} and gives no reason`);
         }
         continue;
       }

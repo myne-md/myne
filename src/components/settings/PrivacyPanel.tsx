@@ -406,8 +406,22 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   // comment above says this row exists to prevent, and it is the same
   // fail-towards-protection direction `protection_disabled_at_rest` takes on the
   // Rust side, inverted. So an unread override supersedes too.
-  const overrideUnknown = override === null;
-  const superseded = override?.effective ?? true;
+  //
+  // **Gated on the capability, which is what keeps the per-vault switch alive on
+  // the web client** (myne-md/myne#482, found by review). The hook returns
+  // early on a client with no capture affinity to suppress, so `override` is
+  // `null` there PERMANENTLY, not transiently: nothing will ever publish. Read
+  // as "unknown" that made `superseded` true forever, so the switch this same
+  // diff rosters in `check-web-surfaces.mjs` and indexes in
+  // `settingsSearchIndex.ts` was inert on web with a sentence about a control
+  // that client does not have.
+  //
+  // The distinction is between "the override could not be read" (fail towards
+  // protection, above) and "no override exists on this client" (not applicable,
+  // so it supersedes nothing). Only the first is unknown.
+  const overrideApplies = has("screenCaptureProtection");
+  const overrideUnknown = overrideApplies && override === null;
+  const superseded = overrideApplies ? (override?.effective ?? true) : false;
   // The switch goes inert on `effective`, which is the union, but the SENTENCE
   // cannot: the two ways to be superseded have different ways back. When only
   // the process flag holds, the row below reads OFF, so pointing the user at

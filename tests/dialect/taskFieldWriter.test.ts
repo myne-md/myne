@@ -195,3 +195,30 @@ describe("unsupported fields survive a write to a different field", () => {
     expect(out).toContain("[priority:: low]");
   });
 });
+
+describe("clearing the last field leaves a line the parser still reads as a task", () => {
+  // myne-md/myne#593's marker consolidation made both repair paths
+  // (`isTaskLine`, `flipMarker`) require the GFM separator after `[ ]`. This
+  // writer could still EMIT a line without one: `stripFieldSpans` right-trims,
+  // so clearing the last field from a description-less task produced `- [ ]`,
+  // which no reader parses as a task and no writer could then flip or rewrite.
+  // The bytes stayed intact, which is what made it quiet: a persisted task
+  // silently became prose the task machinery would not touch again.
+  const EMPTY = { preserved: [], malformed: [] };
+
+  it("keeps the separator when nothing but the marker would remain", () => {
+    expect(applyPlan("- [ ] [due:: 2026-08-01]", EMPTY)).toBe("- [ ] ");
+  });
+
+  it("and the result still reads as a task, which is the whole point", () => {
+    expect(isTaskLine(applyPlan("- [x] [due:: 2026-08-01]", EMPTY))).toBe(true);
+  });
+
+  it("does not add a separator to a line that already has a description", () => {
+    // The restoration is for the marker-only case alone; a normal clear must
+    // not gain a trailing space it did not have.
+    expect(applyPlan("- [ ] call the plumber [due:: 2026-08-01]", EMPTY)).toBe(
+      "- [ ] call the plumber",
+    );
+  });
+});
