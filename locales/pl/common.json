@@ -144,7 +144,10 @@
         "excludedFolder": "Nie utworzono: ten folder jest wykluczony z AI.",
         "createFailed": "Nie utworzono: zapis nowej notatki nie powiódł się. Pozostałe zmiany zostały zastosowane.",
         "excludedNow": "Nie można zastosować: folder tej notatki jest teraz wykluczony z AI.",
-        "notProposed": "Nie można zastosować: ta zmiana nie należy do propozycji tego przebiegu."
+        "notProposed": "Nie można zastosować: ta zmiana nie należy do propozycji tego przebiegu.",
+        "noteMoved": "Nie można zastosować: ta zmiana przeniosłaby notatkę do innego folderu.",
+        "appendEmpty": "Nie można zastosować: nie było czego dodać.",
+        "appendWouldWriteFrontmatter": "Nie można zastosować: ten tekst stałby się blokiem właściwości notatki."
       },
       "applyFailed": "Nie udało się zastosować zmian.",
       "undo": "Cofnij ten przebieg",
@@ -173,7 +176,8 @@
       "runSummaryOffDevice_few": "do dostawcy wysłano około {{count}} znaki Twoich notatek",
       "runSummaryOffDevice_many": "do dostawcy wysłano około {{count}} znaków Twoich notatek",
       "runSummaryOffDevice_other": "do dostawcy wysłano około {{count}} znaku Twoich notatek",
-      "runSummaryOnDevice": "nic nie opuściło tego urządzenia"
+      "runSummaryOnDevice": "nic nie opuściło tego urządzenia",
+      "appendFlag": "dodaje na końcu"
     },
     "undo": {
       "offer_one": "Ostatni przebieg zmienił {{count}} notatkę.",
@@ -1300,7 +1304,9 @@
       "replaceAllCount": "Zamień wszystko ({{total}})",
       "replaceOne": "Zamień",
       "replacePlaceholder": "Zamień na",
-      "toggleReplace": "Przełącz zamianę"
+      "toggleReplace": "Przełącz zamianę",
+      "dateFallback": "Trwa wyszukiwanie {{stored}}, czyli postaci, w jakiej ta data jest zapisana.",
+      "replaceOffOnDateFallback": "Zamiana jest wyłączona, dopóki data jest znajdowana przez swoją zapisaną postać, żeby zamiana nie uczyniła jej nieczytelną."
     },
     "cover": {
       "add": "Dodaj okładkę",
@@ -3252,7 +3258,9 @@
       "mobileKeyReplace": "Zmień klucz",
       "mobileRevokeHelper": "Usuwa razem dostawcę, jego klucz i zgodę tego telefonu, pozostawiając dokładnie stan sprzed jakiejkolwiek konfiguracji. Inne urządzenia działają dalej, dopóki nie usuniesz tego również tam.",
       "mobileApproveLabel": "Zezwól na wysyłanie z tego telefonu",
-      "mobileApproveHelper": "Dostawca i jego klucz pochodzą z innego urządzenia. Z tego telefonu nic nie jest wysyłane, dopóki nie przeczytasz, co zostanie wysłane, i nie zezwolisz na to tutaj."
+      "mobileApproveHelper": "Dostawca i jego klucz pochodzą z innego urządzenia. Z tego telefonu nic nie jest wysyłane, dopóki nie przeczytasz, co zostanie wysłane, i nie zezwolisz na to tutaj.",
+      "historyBudgetHelper": "Ile ostatniej rozmowy niesie każde żądanie, w znakach. Pozostaw puste, aby użyć wartości domyślnej. Większa liczba pozwala AI śledzić dłuższe rozmowy i wysyła ich więcej: u dostawcy, który nie działa na tym urządzeniu, oznacza to więcej twojego tekstu opuszczającego je, na każdym kroku uruchomienia.",
+      "historyBudgetLabel": "Rozmowa wysyłana z każdym żądaniem"
     },
     "network": {
       "disabledCue": "Synchronizacja nie jest już kierowana przez Tor. Nowe połączenia idą prosto do serwera synchronizacji.",
@@ -3576,12 +3584,13 @@
         "viewMode": "domyślny tryb widoku na żywo czytanie źródło podgląd view mode",
         "dateFormat": "format daty dzień miesiąc rok iso dd mm kalendarz date format",
         "timeFormat": "format godziny czas zegar 24 12 godzinny am pm time format clock",
-        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone"
+        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone",
+        "aiHistoryBudget": "rozmowa historia kontekst pamięć budżet znaki agent czat żądanie"
       }
     },
     "dateTime": {
       "dateLabel": "Format daty",
-      "dateHelper": "Jak daty są pokazywane w zadaniach, zapisanych widokach i załącznikach.",
+      "dateHelper": "Jak zapisywana jest data wszędzie tam, gdzie Myne ją pokazuje.",
       "dateSystem": "Zgodnie z językiem",
       "timeLabel": "Format godziny",
       "timeHelper": "Czy godziny są pokazywane w formacie 24- czy 12-godzinnym.",

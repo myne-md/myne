@@ -201,6 +201,25 @@ const V = {
     "`closeApp` was deleted in task 95; the fail-closed exit is the `app-exit` seam, whose web arm reloads the page.",
   ],
   "src/lib/attachments.ts": ["ported", "IPC bindings; the import path moved to the seam in task 67."],
+  "src/lib/import-source-vault.ts": [
+    "typed-unsupported",
+    "Vault import (myne-md/myne#464). Every binding here wraps an `importer:` " +
+      "command, and `web/wasm/src/capability.rs` classifies that whole plugin " +
+      "`Class::Unsupported`, so none of them can be dispatched in the browser. " +
+      "The placement is the reason: putting these under `vault-unlock:` or " +
+      "`attachments:` would have widened plugins the web client DOES dispatch. " +
+      "NOT `excluded`, and the correction is the finding: this module SHIPS. " +
+      "`ObsidianImportModal.tsx` imports it statically, `src/screens/Editor.tsx` " +
+      "imports and mounts that modal, and neither is in " +
+      "`web/vite.config.ts`'s `SUBSTITUTED_MODULES`, so the `plugin:importer|*` " +
+      "literals are in `web/dist`. The first version of this entry claimed " +
+      "absence AND omitted the marker string, so the absence half of this guard " +
+      "skipped it entirely: a false record that was unverifiable by " +
+      "construction. What IS absent is the setup step " +
+      "(`src/notes/import/MyneVaultSetup.tsx`, substituted), because it takes a " +
+      "recovery phrase; the bindings are merely unreachable, since the absent " +
+      "`vaultImport` capability keeps the source out of the picker.",
+  ],
   "src/lib/backup-errors.ts": [
     "excluded",
     "Backup error copy; leaves with the modules that produce those errors.",

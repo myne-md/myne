@@ -120,7 +120,10 @@
         "excludedFolder": "Tidak dibuat: folder itu dikecualikan dari AI.",
         "createFailed": "Tidak dibuat: penulisan catatan baru gagal. Perubahan lain tetap diterapkan.",
         "excludedNow": "Tidak dapat diterapkan: folder catatan itu kini dikecualikan dari AI.",
-        "notProposed": "Tidak dapat diterapkan: perubahan itu bukan bagian dari usulan proses ini."
+        "notProposed": "Tidak dapat diterapkan: perubahan itu bukan bagian dari usulan proses ini.",
+        "noteMoved": "Tidak dapat diterapkan: perubahan itu akan memindahkan catatan ke folder lain.",
+        "appendEmpty": "Tidak dapat diterapkan: tidak ada yang bisa ditambahkan.",
+        "appendWouldWriteFrontmatter": "Tidak dapat diterapkan: teks itu akan menjadi blok properti catatan."
       },
       "applyFailed": "Perubahan tidak dapat diterapkan.",
       "undo": "Urungkan proses ini",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} catatan dibaca",
       "runSummaryOffDevice_one": "sekitar {{count}} karakter catatan Anda dikirim ke penyedia",
       "runSummaryOffDevice_other": "sekitar {{count}} karakter catatan Anda dikirim ke penyedia",
-      "runSummaryOnDevice": "tidak ada yang keluar dari perangkat ini"
+      "runSummaryOnDevice": "tidak ada yang keluar dari perangkat ini",
+      "appendFlag": "ditambahkan di akhir"
     },
     "undo": {
       "offer_one": "Proses terakhir mengubah {{count}} catatan.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "Ganti semua ({{total}})",
       "replaceOne": "Ganti",
       "replacePlaceholder": "Ganti dengan",
-      "toggleReplace": "Alihkan ganti"
+      "toggleReplace": "Alihkan ganti",
+      "dateFallback": "Mencari {{stored}}, bentuk penyimpanan tanggal ini.",
+      "replaceOffOnDateFallback": "Ganti dimatikan selama sebuah tanggal cocok lewat bentuk simpanannya, agar penggantian tidak membuat tanggal itu tak terbaca."
     },
     "cover": {
       "add": "Tambah sampul",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "Ganti kunci",
       "mobileRevokeHelper": "Menghapus penyedia, kuncinya, dan persetujuan ponsel ini sekaligus, meninggalkan keadaan persis seperti belum pernah disiapkan. Perangkat lain tetap bekerja sampai Anda menghapusnya di sana juga.",
       "mobileApproveLabel": "Setujui pengiriman di ponsel ini",
-      "mobileApproveHelper": "Penyedia dan kuncinya berasal dari perangkat lain. Tidak ada yang dikirim dari ponsel ini sampai Anda membaca apa yang akan dikirim dan menyetujuinya di sini."
+      "mobileApproveHelper": "Penyedia dan kuncinya berasal dari perangkat lain. Tidak ada yang dikirim dari ponsel ini sampai Anda membaca apa yang akan dikirim dan menyetujuinya di sini.",
+      "historyBudgetHelper": "Seberapa banyak percakapan terbaru yang dibawa setiap permintaan, dalam karakter. Kosongkan untuk nilai bawaan. Angka lebih besar membuat AI dapat mengikuti percakapan lebih panjang dan mengirim lebih banyak darinya: dengan penyedia yang tidak ada di perangkat ini, itu berarti lebih banyak teks Anda meninggalkannya, pada setiap langkah sebuah proses.",
+      "historyBudgetLabel": "Percakapan yang dibawa setiap permintaan"
     },
     "network": {
       "disabledCue": "Sinkronisasi tidak lagi dirutekan melalui Tor. Koneksi baru langsung menuju server sinkronisasi.",
@@ -3356,12 +3364,13 @@
         "viewMode": "mode tampilan bawaan langsung baca sumber pratinjau view mode",
         "dateFormat": "format tanggal hari bulan tahun iso dd/mm mm/dd kalender date format",
         "timeFormat": "format waktu 24 jam 12 jam am pm penunjuk waktu time format",
-        "timezone": "zona waktu tz utc iana wilayah hari ini timezone"
+        "timezone": "zona waktu tz utc iana wilayah hari ini timezone",
+        "aiHistoryBudget": "percakapan riwayat konteks memori anggaran karakter agen chat permintaan"
       }
     },
     "dateTime": {
       "dateLabel": "Format tanggal",
-      "dateHelper": "Bagaimana tanggal ditampilkan di tugas, tampilan tersimpan, dan lampiran.",
+      "dateHelper": "Bagaimana sebuah tanggal ditulis di mana pun Myne menampilkannya.",
       "dateSystem": "Ikuti bahasa",
       "timeLabel": "Format waktu",
       "timeHelper": "Apakah waktu ditampilkan dalam format 24 jam atau 12 jam.",

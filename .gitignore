@@ -33,16 +33,17 @@ coverage/
 /tauri
 /myne@*
 
-# Companion repos. Each carries its own .git and is tracked by GitHub separately
-# under myne-md.
+# Companion repos cloned by workspace/setup.sh as nested directories.
+# Each carries its own .git and is tracked by GitHub separately under myne-md.
 #
-# NO TRAILING SLASH, and that is the whole point of this comment. In the shared
-# checkout `workspace/setup.sh` clones each as a nested DIRECTORY, which a
-# `path/` pattern matches. In a worktree they are SYMLINKS to the shared
-# checkout's copy, which it does not: a directory-only pattern leaves three
-# untracked entries whose target is an absolute path on one machine, and the
-# next `git add -A` commits them. Since `CLAUDE.md` makes a worktree the normal
-# place to work, that is the common case rather than the exotic one.
+# NO TRAILING SLASH, and that is the fix rather than the style. A trailing slash
+# matches a DIRECTORY only, and inside a worktree these are SYMLINKS to the
+# shared checkout, which is what the documented worktree workflow produces. So
+# every one of them was untracked-and-not-ignored in every worktree, and a
+# `git add -A` before a commit would have put eight machine-specific absolute
+# paths into a pull request. Without the slash the pattern matches either
+# (myne-md/myne#609, found by review; the mitigation before this was a line in a
+# progress log asking somebody to remember).
 /myne-test-vectors
 /myne-server
 /myne-web

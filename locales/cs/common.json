@@ -144,7 +144,10 @@
         "excludedFolder": "Nevytvořeno: tato složka je vyloučena z AI.",
         "createFailed": "Nevytvořeno: zápis nové poznámky selhal. Ostatní změny byly přesto použity.",
         "excludedNow": "Nelze použít: složka této poznámky je nyní vyloučena z AI.",
-        "notProposed": "Nelze použít: tato změna není součástí návrhu tohoto běhu."
+        "notProposed": "Nelze použít: tato změna není součástí návrhu tohoto běhu.",
+        "noteMoved": "Nelze použít: tato změna by poznámku přesunula do jiné složky.",
+        "appendEmpty": "Nelze použít: nebylo co přidat.",
+        "appendWouldWriteFrontmatter": "Nelze použít: tento text by se stal blokem vlastností poznámky."
       },
       "applyFailed": "Změny se nepodařilo použít.",
       "undo": "Vrátit tento běh zpět",
@@ -173,7 +176,8 @@
       "runSummaryOffDevice_few": "poskytovateli byly odeslány asi {{count}} znaky z vašich poznámek",
       "runSummaryOffDevice_many": "poskytovateli bylo odesláno asi {{count}} znaku z vašich poznámek",
       "runSummaryOffDevice_other": "poskytovateli bylo odesláno asi {{count}} znaků z vašich poznámek",
-      "runSummaryOnDevice": "nic neopustilo toto zařízení"
+      "runSummaryOnDevice": "nic neopustilo toto zařízení",
+      "appendFlag": "přidá na konec"
     },
     "undo": {
       "offer_one": "Poslední běh změnil {{count}} poznámku.",
@@ -1300,7 +1304,9 @@
       "replaceAllCount": "Nahradit vše ({{total}})",
       "replaceOne": "Nahradit",
       "replacePlaceholder": "Nahradit za",
-      "toggleReplace": "Přepnout nahrazování"
+      "toggleReplace": "Přepnout nahrazování",
+      "dateFallback": "Hledá se {{stored}}, tedy podoba, ve které je toto datum uloženo.",
+      "replaceOffOnDateFallback": "Nahrazování je vypnuté, dokud se datum shoduje ve své uložené podobě, aby náhrada datum neučinila nečitelným."
     },
     "cover": {
       "add": "Přidat obálku",
@@ -3252,7 +3258,9 @@
       "mobileKeyReplace": "Vyměnit klíč",
       "mobileRevokeHelper": "Odebere poskytovatele, jeho klíč i souhlas tohoto telefonu naráz a zanechá přesně stav, jako by nikdy nic nastaveno nebylo. Ostatní zařízení fungují dál, dokud to neodeberete i tam.",
       "mobileApproveLabel": "Povolit odesílání z tohoto telefonu",
-      "mobileApproveHelper": "Poskytovatel a jeho klíč pocházejí z jiného zařízení. Z tohoto telefonu se nic neodesílá, dokud si nepřečtete, co se odešle, a zde to nepovolíte."
+      "mobileApproveHelper": "Poskytovatel a jeho klíč pocházejí z jiného zařízení. Z tohoto telefonu se nic neodesílá, dokud si nepřečtete, co se odešle, a zde to nepovolíte.",
+      "historyBudgetHelper": "Kolik z nedávné konverzace nese každý požadavek, ve znacích. Prázdné pole znamená výchozí hodnotu. Vyšší číslo umožní AI sledovat delší konverzace a odesílá jich více: u poskytovatele, který není na tomto zařízení, to znamená více vašeho textu opouštějícího zařízení, v každém kroku běhu.",
+      "historyBudgetLabel": "Konverzace posílaná s každým požadavkem"
     },
     "network": {
       "disabledCue": "Synchronizace už se nesměruje přes Tor. Nová připojení jdou přímo na synchronizační server.",
@@ -3576,12 +3584,13 @@
         "viewMode": "výchozí režim zobrazení živý náhled čtení zdroj view mode",
         "dateFormat": "formát data datum den měsíc rok iso dd/mm mm/dd kalendář date format",
         "timeFormat": "formát času čas 24hodinový 12hodinový hodiny dopoledne odpoledne am pm time format",
-        "timezone": "časové pásmo časová zóna tz utc iana oblast dnes timezone"
+        "timezone": "časové pásmo časová zóna tz utc iana oblast dnes timezone",
+        "aiHistoryBudget": "konverzace historie kontext paměť rozpočet znaky agent chat požadavek"
       }
     },
     "dateTime": {
       "dateLabel": "Formát data",
-      "dateHelper": "Jak se datum zobrazuje v úkolech, uložených pohledech a přílohách.",
+      "dateHelper": "Jak se zapisuje datum všude, kde ho Myne zobrazuje.",
       "dateSystem": "Podle jazyka",
       "timeLabel": "Formát času",
       "timeHelper": "Zda se čas zobrazuje ve 24hodinovém, nebo 12hodinovém formátu.",

@@ -120,7 +120,10 @@
         "excludedFolder": "Nem jött létre: az a mappa ki van zárva az AI elől.",
         "createFailed": "Nem jött létre: az új jegyzet mentése nem sikerült. A többi módosítás így is alkalmazva lett.",
         "excludedNow": "Nem sikerült alkalmazni: annak a jegyzetnek a mappája már ki van zárva az AI elől.",
-        "notProposed": "Nem sikerült alkalmazni: az a módosítás nem része a futtatás javaslatának."
+        "notProposed": "Nem sikerült alkalmazni: az a módosítás nem része a futtatás javaslatának.",
+        "noteMoved": "Nem sikerült alkalmazni: ez a módosítás másik mappába helyezné a jegyzetet.",
+        "appendEmpty": "Nem sikerült alkalmazni: nem volt mit hozzáadni.",
+        "appendWouldWriteFrontmatter": "Nem sikerült alkalmazni: ez a szöveg a jegyzet tulajdonságblokkjává vált volna."
       },
       "applyFailed": "A módosításokat nem sikerült alkalmazni.",
       "undo": "A futtatás visszavonása",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} jegyzet elolvasva",
       "runSummaryOffDevice_one": "a jegyzeteidből körülbelül {{count}} karakter lett elküldve a szolgáltatónak",
       "runSummaryOffDevice_other": "a jegyzeteidből körülbelül {{count}} karakter lett elküldve a szolgáltatónak",
-      "runSummaryOnDevice": "semmi sem hagyta el ezt az eszközt"
+      "runSummaryOnDevice": "semmi sem hagyta el ezt az eszközt",
+      "appendFlag": "a végére kerül"
     },
     "undo": {
       "offer_one": "Az utolsó futtatás {{count}} jegyzetet módosított.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "Mind cseréje ({{total}})",
       "replaceOne": "Csere",
       "replacePlaceholder": "Csere erre",
-      "toggleReplace": "Csere be-/kikapcsolása"
+      "toggleReplace": "Csere be-/kikapcsolása",
+      "dateFallback": "Keresés erre: {{stored}}, ebben a formában van tárolva ez a dátum.",
+      "replaceOffOnDateFallback": "A csere ki van kapcsolva, amíg egy dátum a tárolt formájával található meg, hogy egy csere ne tehesse olvashatatlanná a dátumot."
     },
     "cover": {
       "add": "Borító hozzáadása",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "Kulcs cseréje",
       "mobileRevokeHelper": "Egyszerre távolítja el a szolgáltatót, a kulcsát és ennek a telefonnak a jóváhagyását, pontosan azt az állapotot hagyva, mintha soha nem lett volna beállítva. A többi eszköz addig működik tovább, amíg ott is el nem távolítod.",
       "mobileApproveLabel": "Küldés jóváhagyása ezen a telefonon",
-      "mobileApproveHelper": "A szolgáltató és a kulcsa egy másik eszközről érkezett. Erről a telefonról semmi nem megy el, amíg el nem olvasod, mi kerül elküldésre, és itt jóvá nem hagyod."
+      "mobileApproveHelper": "A szolgáltató és a kulcsa egy másik eszközről érkezett. Erről a telefonról semmi nem megy el, amíg el nem olvasod, mi kerül elküldésre, és itt jóvá nem hagyod.",
+      "historyBudgetHelper": "Mennyit visz magával a legutóbbi beszélgetésből minden kérés, karakterben. Hagyd üresen az alapértelmezéshez. A nagyobb szám hosszabb beszélgetéseket enged követni az AI-nak, és többet küld el belőlük: olyan szolgáltatónál, amely nem ezen az eszközön fut, ez több szöveged távozását jelenti, a futás minden lépésénél.",
+      "historyBudgetLabel": "Minden kéréssel elküldött beszélgetés"
     },
     "network": {
       "disabledCue": "A szinkronizálás már nem a Toron keresztül megy. Az új kapcsolatok közvetlenül a szinkronszerverhez csatlakoznak.",
@@ -3356,12 +3364,13 @@
         "viewMode": "alapértelmezett nézetmód élő olvasás forrás előnézet view mode",
         "dateFormat": "dátumformátum dátum formátum nap hónap év iso dd/mm mm/dd naptár date format calendar",
         "timeFormat": "időformátum idő formátum 24 órás 12 órás óra de du am pm time format clock",
-        "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today"
+        "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today",
+        "aiHistoryBudget": "beszélgetés előzmények kontextus memória keret karakterek ügynök chat kérés"
       }
     },
     "dateTime": {
       "dateLabel": "Dátumformátum",
-      "dateHelper": "Hogyan jelennek meg a dátumok a feladatoknál, a mentett nézeteknél és a mellékleteknél.",
+      "dateHelper": "Hogyan írja ki a Myne a dátumot mindenütt, ahol megjelenít egyet.",
       "dateSystem": "Nyelv szerint",
       "timeLabel": "Időformátum",
       "timeHelper": "Az időpontok 24 órás vagy 12 órás formátumban jelenjenek-e meg.",

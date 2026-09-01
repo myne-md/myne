@@ -111,8 +111,17 @@ export function joinPath(root: string, rel: string): string {
 }
 
 /** Which source produced an import run. Used for reporting + UI copy; source
- *  names are nominative only and are never productized as Myne feature names. */
-export type ImportSourceId = "obsidian" | "notion" | "evernote" | "html" | "csv";
+ *  names are nominative only and are never productized as Myne feature names.
+ *
+ *  RE-EXPORTED from the catalog rather than declared here. This file used to
+ *  carry its own copy of the union, and the two were structurally identical
+ *  until a sixth source was added to one of them: `tsc` then reported the
+ *  catalog's `ImportSourceId` as not assignable to the seam's, naming two types
+ *  with the same name from two files. Nothing else would have caught the drift,
+ *  because five-of-five agreement is what the copies had for as long as they
+ *  existed. `sourceCatalog.ts` imports nothing, so this direction cannot cycle. */
+export type { ImportSourceId };
+import type { ImportSourceId } from "./sourceCatalog";
 
 /**
  * One discovered item, WITHOUT its content. `relPath` is the source-relative path
@@ -178,8 +187,100 @@ export interface LoadedItem {
  * A source of importable notes. `plan()` enumerates cheaply; `load()` is called
  * serially, once per item, by the engine's ingest loop.
  */
+/**
+ * A source's own answer to "is this note a duplicate, and what does its body
+ * need before it lands".
+ *
+ * Optional, and absent for every path-based source: their notes come from
+ * outside Myne, so the engine's `decideImport` is the whole story and the body
+ * needs nothing beyond the mapping transforms.
+ *
+ * It exists for the Myne vault source (myne-md/myne#464), whose two extra rules
+ * cannot live in the engine without making the engine source-aware. The engine
+ * stays one loop; the source-specific judgement moves behind this seam.
+ */
+export interface ImportSourcePolicy {
+  /**
+   * Take over the duplicate decision for one note.
+   *
+   * Returning a `renamedTitle` means "create it, but under this name". The
+   * engine applies the rename to the body and keys the identity set on the new
+   * title, so a re-import sees it and skips.
+   */
+  decide(candidate: {
+    /**
+     * The item's `relPath`, exactly as `plan()` produced it.
+     *
+     * The seam's only exact key. A source cannot identify its own note from the
+     * title here: the engine's `readTimeTitle` is derived, and for a source with
+     * `titleFromFilename: false` an untitled note's derived title is its
+     * filename, which matches no note's real name at all.
+     */
+    relPath: string;
+    folder: string | null;
+    markdown: string;
+    /**
+     * The engine's LIVE identity set: the target's snapshot plus every note
+     * created so far in THIS run.
+     *
+     * Handed over rather than kept private because a source that takes over the
+     * decision takes over the whole decision, and a source consulting only the
+     * pre-run snapshot cannot see a note the run itself just created. Two
+     * source notes whose titles fold to the same key would then both be
+     * created, producing exactly the title ambiguity a rename rule exists to
+     * prevent, inside one import.
+     */
+    seen: ReadonlySet<string>;
+  }): { kind: "create"; renamedTitle: string | null } | { kind: "skip" };
+
+  /**
+   * Last pass over the body before it is written, once the note is known to be
+   * created and its final title is known.
+   *
+   * Async because a source may have to reach the host here: the Myne source
+   * re-seals each referenced attachment into the target vault and needs the id
+   * that produced before it can rewrite the embed.
+   */
+  finalize(
+    markdown: string,
+    ctx: {
+      /**
+       * The same `relPath` `decide` was given for this item.
+       *
+       * Passed rather than remembered. An earlier shape had `decide` stash the
+       * item in a closure variable that `finalize` then read, which made the
+       * seam's real contract "call these two strictly alternating, never
+       * concurrently" without saying so anywhere or enforcing it. Any engine
+       * change that batched or prefetched would have re-sealed the previous
+       * note's attachments into this note's body, and a wrong attachment id
+       * renders as a tombstone rather than an error, so nothing would have
+       * failed loudly.
+       */
+      relPath: string;
+      renamedTitle: string | null;
+    },
+  ): Promise<string>;
+}
+
 export interface ImportSource {
   readonly id: ImportSourceId;
+  /**
+   * The source's own duplicate + body-rewrite rules, when it has any. Absent
+   * for every source whose notes come from outside Myne.
+   */
+  readonly policy?: ImportSourcePolicy;
+  /**
+   * Does this source's filename carry the note's NAME?
+   *
+   * `true` (the default when omitted) for every path-based source: Obsidian,
+   * Notion, HTML and CSV all take a note's name from its file, which is why
+   * `mapImportedFile` injects it into the Myne-managed `title:` field.
+   *
+   * `false` for the Myne vault source, whose filenames are note UUIDs.
+   * Injecting one there would title the note `019…` hex instead of leaving it
+   * Untitled, and Untitled is what the source actually says.
+   */
+  readonly titleFromFilename?: boolean;
   plan(): Promise<ImportPlan>;
   load(ref: ImportItemRef): Promise<LoadedItem>;
 }

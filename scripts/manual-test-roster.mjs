@@ -153,6 +153,20 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
+        see: "With the app language set to Turkish (Settings > Appearance), open a note and ask the agent something in Turkish. Confirm the answer comes back in Turkish, and that a proposed edit's replacement text is Turkish too rather than English. Repeat with the app in English but the question typed in Turkish: the answer must follow the question, not the interface. Then switch the app to a right-to-left language and confirm the answer renders in the correct direction inside the chat bubble.",
+        whyNotAutomated: "Every AI scenario runs StubEngine, which returns a fixed script and produces no natural language at all, so a test asserting a language would be asserting the fixture. The host-side half is pinned by cargo (the tag reaches the system message, and eight hostile shapes are dropped), but whether a real model honours the instruction is model behaviour, and the right-to-left case is a WebKitGTK bidirectional-layout question that only appears once the text is laid out in the bubble's own box.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+      {
+        see: "With a REMOTE provider configured (OpenRouter, any model), run a single-note agent task and time it end to end against the 12m49s baseline recorded in myne-md/myne#597. Cross-reference the provider's activity dashboard: confirm the run was routed to a fast endpoint rather than the cheapest, that no single iteration spent thousands of output tokens on one line, and that the cost per iteration drops after the first (which is the prompt cache being read). Confirm the run completes at all: the system turn's content is now an array rather than a string, and a provider that rejects that shape would fail every request.",
+        whyNotAutomated: "Needs a real provider, a real key and real money. The repo's tests pin the SHAPE of the request body and can say nothing about routing, billing or whether a given model behind the broker honours a cache marker; nothing in CI is allowed to make a third-party request at all.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 15,
+        tier: "core",
+      },
+      {
         see: "With an agent review screen open holding proposed replacements copied out of note bodies, close the laptop lid (or sleep the machine), wait a minute and wake it. Confirm the vault is locked and the review screen is gone rather than still showing note text. Repeat with the OS screen lock, and on macOS/Windows with fast user switching to a second account and back.",
         whyNotAutomated: "auto-lock.e2e.ts proves only the in-process idle timer; sleep/wake, OS screen lock and fast user switching are OS session events the container cannot raise, so whether keys and the proposal survive a suspend has never been observed.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
@@ -2693,6 +2707,53 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "import.myne-vault",
+    title: "Import notes from another Myne vault",
+    paths: [
+      "src/notes/import/sources/myne.ts",
+      "src/notes/import/sources/myneRewrite.ts",
+      "src/notes/import/sources/myneDictionary.ts",
+      "src/notes/import/myneRun.ts",
+      "src/notes/import/MyneVaultSetup.tsx",
+      "src/lib/import-source-vault.ts",
+      "core/src/plugins/vault_unlock/import_source.rs",
+      "src-tauri/src/plugins/importer/source_dictionary.rs",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/import-myne-vault.e2e.ts"],
+    manual: [
+      {
+        see: "Start an import from another vault, then walk away and leave the machine idle past the auto-lock timeout while the import is still running. Confirm the vault does not lock mid-import, and that once the import finishes the very next idle tick locks it. Then start another import and abandon it at the credential step for longer than the source-slot TTL; confirm the source vault's session has ended (the flow reports the session closed rather than continuing to read notes).",
+        whyNotAutomated: "The interaction under test is between two timers measured in real minutes: the idle auto-lock that import_set_hold defers, and the 30-minute source-slot TTL that is deliberately independent of it. A scenario lives for seconds and would have to fake both clocks, which is exactly the coupling the design was worried about and so exactly the thing a faked clock would stop proving.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 45,
+        tier: "core",
+      },
+      {
+        see: "Import from a vault whose password you have forgotten, using its 24-word recovery phrase instead. Confirm the notes arrive, and then confirm the SOURCE vault still opens with its original password afterwards: the phrase path must grant a read without committing a new password to that vault.",
+        whyNotAutomated: "The property is an absence in a vault the scenario has finished with: that vault.meta was not rewritten. Asserting it means unlocking the source afterwards with its original credential, which needs a second full Argon2id derivation and a vault the harness has already torn down.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 12,
+        tier: "core",
+      },
+      {
+        see: "Import a source vault holding several hundred notes and a few hundred megabytes of attachments while watching Activity Monitor or Task Manager. Confirm memory does not climb past roughly 2 GB (the design holds one note body and one attachment in RAM at a time), the window stays responsive, and the run finishes rather than being killed.",
+        whyNotAutomated: "Memory ceiling and sustained responsiveness are host measurements the harness makes no observation of, and the seeded fixture is six notes and two small attachments by design.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 25,
+        tier: "standard",
+      },
+      {
+        see: "Import a vault whose notes use words you had added to that vault's dictionary, and which also has words in its vault-wide ignore set. Confirm the added words no longer show as misspelled in the imported notes, and that a word which was only IGNORED in the source is still flagged here.",
+        whyNotAutomated: "The fixture generator cannot seal a vault.dictionary without keeping a second copy of the postcard payload that lives in src-tauri/src/spell/dictionary.rs, so the E2E fixture deliberately writes none; the unit tiers cover the union and the exclusion, but whether a squiggle appears under a word in the running editor is a rendering question neither answers.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "input.keybindings",
     title: "Keyboard shortcuts, rebinding and reserved chords",
     paths: [
@@ -4178,8 +4239,37 @@ export const ROSTER = Object.freeze([
       "src/lib/useDateTimeDisplay.ts",
       "src/notes/dailyNote.ts",
       "src/notes/taskFilters.ts",
+      // myne-md/myne#609 widened this setting's reach twice: to the in-note task
+      // chip on every client, and to mobile at all, which had read the shared
+      // display store while writing nothing into it.
+      "editor/src/decorations/task-chip.ts",
+      "editor/src/decorations/plugin-factory.ts",
+      "mobile/src/lib/useDateTimeDisplaySync.ts",
+      "mobile/src/app/flows/SettingsSheet.tsx",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
+    // EMPTY, deliberately, and it was briefly not.
+    //
+    // Three scenarios covering this surface are WRITTEN (`tc4`, `tc5` in
+    // `e2e/task-chips.e2e.ts`; `fr3` in `e2e/find-replace.e2e.ts`) and have
+    // never executed: the container run died in cargo on a full Docker VM.
+    // `automatedBy` is a claim that a machine covers this, and no machine has,
+    // so naming the files here would record automation nobody watched run, which
+    // is the class of error myne-md/myne#609 spent its review round removing.
+    //
+    // The scenario FLOOR is the other side of the same fact and is deliberately
+    // not symmetric: `scripts/e2e-scenario-floor.json` was raised to 306, which
+    // REQUIRES the three to execute rather than claiming they did, so the first
+    // run that skips them goes red. Requiring is honest; claiming is not. Fill
+    // this in when the run is green three times consecutively.
+    //
+    // One lane DOES cover part of this and is not `automatedBy` material,
+    // because this field names `e2e/` scenarios:
+    // `mobile/tests/flow-logic/settings/date-time.flow.ts` runs on every push
+    // and proves the three mobile rows are WIRED (a pick reaches its setter,
+    // and the zone field restores the stored value on both of its failure
+    // paths). What it cannot reach is a real prefs write arriving over sync,
+    // which is what the manual items below are for.
     automatedBy: [],
     manual: [
       {
@@ -4202,6 +4292,13 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 10,
         tier: "standard",
+      },
+      {
+        see: "On a phone, open Settings then Editor and confirm the three date-and-time rows are present. Set a date format there and confirm a task line's due chip inside an open note redraws in it without leaving the note. Then, against the same synced vault, choose a DIFFERENT date format on a computer and confirm the phone adopts it on the next sync with nothing set on the phone; and confirm the time-zone value set on the phone does NOT displace the one already set on the computer.",
+        whyNotAutomated: "No lane drives a phone's WebView: the container suite runs WebKitGTK on Linux, and mobile's Playwright tier drives its React tree against a mocked Tauri IPC, so neither can produce a real prefs write arriving over sync nor observe which side of the merge each field lands on.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "core",
       },
     ],
     exemptionReason: "",

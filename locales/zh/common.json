@@ -120,7 +120,10 @@
         "excludedFolder": "未创建：该文件夹已排除在 AI 之外。",
         "createFailed": "未创建：写入新笔记失败。其他更改仍已应用。",
         "excludedNow": "无法应用：该笔记所在的文件夹现已排除在 AI 之外。",
-        "notProposed": "无法应用：该更改不属于本次运行的提议。"
+        "notProposed": "无法应用：该更改不属于本次运行的提议。",
+        "noteMoved": "无法应用：该更改会把笔记移动到另一个文件夹。",
+        "appendEmpty": "无法应用：没有可添加的内容。",
+        "appendWouldWriteFrontmatter": "无法应用：该文本会变成笔记的属性块。"
       },
       "applyFailed": "无法应用这些更改。",
       "undo": "撤销本次运行",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "已读取 {{count}} 篇笔记",
       "runSummaryOffDevice_one": "你的笔记中约 {{count}} 个字符已发送给服务商",
       "runSummaryOffDevice_other": "你的笔记中约 {{count}} 个字符已发送给服务商",
-      "runSummaryOnDevice": "没有任何内容离开本设备"
+      "runSummaryOnDevice": "没有任何内容离开本设备",
+      "appendFlag": "追加到末尾"
     },
     "undo": {
       "offer_one": "上次运行更改了 {{count}} 篇笔记。",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "全部替换（{{total}}）",
       "replaceOne": "替换",
       "replacePlaceholder": "替换为",
-      "toggleReplace": "切换替换"
+      "toggleReplace": "切换替换",
+      "dateFallback": "正在搜索 {{stored}}，这是该日期的存储形式。",
+      "replaceOffOnDateFallback": "当日期是以其存储形式匹配到的时候，替换会关闭，以免一次替换让该日期无法读取。"
     },
     "cover": {
       "add": "添加封面",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "更换密钥",
       "mobileRevokeHelper": "同时移除提供方、其密钥和这部手机的许可，恢复到从未设置过的状态。其他设备会继续工作，直到你在那里也移除为止。",
       "mobileApproveLabel": "允许从这部手机发送",
-      "mobileApproveHelper": "提供方及其密钥来自另一台设备。在你阅读将要发送的内容并在此允许之前，这部手机不会发送任何内容。"
+      "mobileApproveHelper": "提供方及其密钥来自另一台设备。在你阅读将要发送的内容并在此允许之前，这部手机不会发送任何内容。",
+      "historyBudgetHelper": "每次请求携带多少最近对话内容，以字符计。留空则使用默认值。数值越大，AI 越能跟上较长的对话，同时也会发送更多内容：如果服务商不在本设备上，这意味着每一步运行都有更多你的文本离开设备。",
+      "historyBudgetLabel": "每次请求携带的对话"
     },
     "network": {
       "disabledCue": "同步不再通过 Tor 路由。新的连接会直接连往同步服务器。",
@@ -3356,12 +3364,13 @@
         "viewMode": "默认视图 查看模式 实时 阅读 源代码 预览 default view mode live reading source",
         "dateFormat": "日期格式 日期 日 月 年 日历 date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "时间格式 时间 时钟 24小时制 12小时制 上午 下午 time format 24 hour 12 hour clock am pm",
-        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today"
+        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today",
+        "aiHistoryBudget": "对话 历史 上下文 记忆 预算 字符 代理 聊天 请求"
       }
     },
     "dateTime": {
       "dateLabel": "日期格式",
-      "dateHelper": "任务、已保存的视图和附件中日期的显示方式。",
+      "dateHelper": "在 Myne 显示日期的每个位置，日期以何种方式书写。",
       "dateSystem": "跟随语言",
       "timeLabel": "时间格式",
       "timeHelper": "选择时间以 24 小时制还是 12 小时制显示。",

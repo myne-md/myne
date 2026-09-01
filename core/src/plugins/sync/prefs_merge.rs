@@ -444,6 +444,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         item_order,
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
+        // Device-local for the reason the classification table gives: a bound
+        // on how much THIS machine sends to a provider. The local value always
+        // survives the merge.
+        chat_history_budget: local.chat_history_budget,
         ai_enabled: local.ai_enabled,
         // myne-md/myne#456: moved out of the scalar-LWW group above. Approving a
         // provider is a decision a person makes AT a device, not a fact about

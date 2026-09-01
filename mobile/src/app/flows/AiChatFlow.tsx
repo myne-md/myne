@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "@myne/i18n";
 
 import { providerLabelOf } from "@myne/copy";
 import { normalizeProviderError, providerErrorKey } from "@myne/engine-error";
@@ -311,6 +312,19 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
       const result = await agentStart(
         task,
         grant,
+        // The interface language, which the host cannot read for itself: the
+        // choice lives in this side's storage rather than in `vault.prefs`
+        // (myne-md/myne#618). Required rather than optional so a call site
+        // cannot quietly omit it and put the model back on English answers.
+        i18n.language ?? null,
+        // No chat history on mobile YET (myne-md/myne#617). The seed is the
+        // VISIBLE transcript, and this flow keeps its turns in component state
+        // rather than in a module store the way the desktop chat does, so there
+        // is nothing here to read that the desktop's `visibleHistory` reads.
+        // An empty array is the honest value: a run with no prior turns to
+        // refer to. Stated rather than left as a bare `[]`, because the day
+        // this flow grows a store the omission would otherwise be invisible.
+        [],
         // The run becomes addressable here, long before the promise resolves.
         // Without it Stop has no id for the whole first leg.
         (view) => void openRun(view, epoch),

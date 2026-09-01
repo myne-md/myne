@@ -120,7 +120,10 @@
         "excludedFolder": "Ikke opprettet: den mappen er utelatt fra AI.",
         "createFailed": "Ikke opprettet: skrivingen av det nye notatet mislyktes. De andre endringene ble likevel brukt.",
         "excludedNow": "Kunne ikke brukes: mappen til det notatet er nå utelatt fra AI.",
-        "notProposed": "Kunne ikke brukes: den endringen er ikke en del av forslaget fra denne kjøringen."
+        "notProposed": "Kunne ikke brukes: den endringen er ikke en del av forslaget fra denne kjøringen.",
+        "noteMoved": "Kunne ikke brukes: den endringen ville flytte notatet til en annen mappe.",
+        "appendEmpty": "Kunne ikke brukes: det var ingenting å legge til.",
+        "appendWouldWriteFrontmatter": "Kunne ikke brukes: den teksten ville ha blitt notatets egenskapsblokk."
       },
       "applyFailed": "Endringene kunne ikke brukes.",
       "undo": "Angre denne kjøringen",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} notater lest",
       "runSummaryOffDevice_one": "omtrent {{count}} tegn fra notatene dine ble sendt til leverandøren",
       "runSummaryOffDevice_other": "omtrent {{count}} tegn fra notatene dine ble sendt til leverandøren",
-      "runSummaryOnDevice": "ingenting forlot denne enheten"
+      "runSummaryOnDevice": "ingenting forlot denne enheten",
+      "appendFlag": "legges til på slutten"
     },
     "undo": {
       "offer_one": "Den siste kjøringen endret {{count}} notat.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "Erstatt alle ({{total}})",
       "replaceOne": "Erstatt",
       "replacePlaceholder": "Erstatt med",
-      "toggleReplace": "Slå erstatt av/på"
+      "toggleReplace": "Slå erstatt av/på",
+      "dateFallback": "Søker etter {{stored}}, formen denne datoen er lagret i.",
+      "replaceOffOnDateFallback": "Erstatt er av så lenge en dato treffer via den lagrede formen sin, slik at en erstatning ikke kan gjøre datoen uleselig."
     },
     "cover": {
       "add": "Legg til omslag",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "Bytt nøkkel",
       "mobileRevokeHelper": "Fjerner leverandøren, nøkkelen og denne telefonens godkjenning samlet, og etterlater nøyaktig tilstanden fra før noe var satt opp. Andre enheter fortsetter å virke til du fjerner det der også.",
       "mobileApproveLabel": "Godkjenn sending på denne telefonen",
-      "mobileApproveHelper": "Leverandøren og nøkkelen kom fra en annen enhet. Ingenting sendes fra denne telefonen før du leser hva som sendes og godkjenner det her."
+      "mobileApproveHelper": "Leverandøren og nøkkelen kom fra en annen enhet. Ingenting sendes fra denne telefonen før du leser hva som sendes og godkjenner det her.",
+      "historyBudgetHelper": "Hvor mye av den nylige samtalen hver forespørsel tar med seg, i tegn. La feltet stå tomt for standardverdien. Et større tall lar KI-en følge lengre samtaler og sender mer av dem: hos en leverandør som ikke er på denne enheten betyr det mer av teksten din som forlater den, ved hvert steg i en kjøring.",
+      "historyBudgetLabel": "Samtale som sendes med hver forespørsel"
     },
     "network": {
       "disabledCue": "Synkronisering rutes ikke lenger gjennom Tor. Nye tilkoblinger går rett til synkroniseringsserveren.",
@@ -3356,12 +3364,13 @@
         "viewMode": "standard visningsmodus live lesing kilde forhåndsvisning view mode",
         "dateFormat": "datoformat dato format dag måned år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat klokkeslett 24 timer 12 timer klokke am pm time format",
-        "timezone": "tidssone sone tz utc iana region i dag timezone time zone"
+        "timezone": "tidssone sone tz utc iana region i dag timezone time zone",
+        "aiHistoryBudget": "samtale historikk kontekst hukommelse budsjett tegn agent chat forespørsel"
       }
     },
     "dateTime": {
       "dateLabel": "Datoformat",
-      "dateHelper": "Hvordan datoer vises i oppgaver, lagrede visninger og vedlegg.",
+      "dateHelper": "Hvordan en dato skrives, overalt der Myne viser en.",
       "dateSystem": "Følg språket",
       "timeLabel": "Tidsformat",
       "timeHelper": "Om klokkeslett vises på 24-timersklokke eller 12-timersklokke.",

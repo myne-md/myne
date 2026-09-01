@@ -51,6 +51,11 @@ export const DEFAULT_PREFS: PrefsView = {
   daily_date_format: null,
   daily_folder: null,
   daily_template: null,
+  // `null` is the real default for all three (myne#279): it means "no explicit
+  // choice", which resolves to the app's own language and this device's zone,
+  // and is omitted from the encrypted blob so a vault that never chose stays
+  // byte-identical to a pre-feature one.
+  date_format: null,
   favorites: [],
   item_order: {},
   editor_layout: null,
@@ -64,6 +69,8 @@ export const DEFAULT_PREFS: PrefsView = {
   editor_line_numbers: null,
   archive_disabled: null,
   theme: null,
+  time_format: null,
+  timezone: null,
   folder_icons: {},
   device_names: {},
   hidden_bar_items: [],

@@ -206,7 +206,12 @@ describe("check-twin-inventory", () => {
     // `agent-run-core.ts`, and the pair is recorded rather than waved through
     // as trivial precisely because it is the place a client could quietly stop
     // delegating and start retyping a command name.
-    expect(full.out).toContain("108 twin(s) discovered");
+    //
+    // Then 108 to 109 when this branch met myne-md/myne#622 at a merge:
+    // `core/src/plugins/agent/history.rs` arrived from develop while the agent
+    // command surface had already moved into `myne-core` here, so the pair the
+    // sweep sees is new to the merged tree rather than to either branch.
+    expect(full.out).toContain("109 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -380,7 +385,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(108);
+    expect(ROSTER.length).toBe(109);
   });
 
   it("keeps `screen` narrow", () => {

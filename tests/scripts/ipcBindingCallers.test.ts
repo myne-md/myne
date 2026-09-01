@@ -276,6 +276,21 @@ function healthyFiles(): Record<string, string> {
     "src/notes/ai/chatStore.ts": `export function clearChat(): void {}\n`,
     "src/notes/ai/aiOutputStore.ts": `export function clearAiOutput(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
+    "editor/src/host/lib/datetimeFormat.ts": `export function resetDateTimeDisplayForLock(): void {}\n`,
+    // The two DELETE paths. Only the display store is asserted on them: what it
+    // holds describes the READER, so erasing the vault erases the source of the
+    // value and never the value. Every other store skips them with a stated
+    // reason, which is why these bodies carry one call each.
+    "src/lib/vault-delete.ts": `export async function deleteVault(vaultId: string): Promise<void> {
+  resetDateTimeDisplayForLock();
+  await invoke("plugin:vault-unlock|vault_delete");
+}
+`,
+    "mobile/src/lib/vault-delete.ts": `export async function deleteVault(vaultId?: string): Promise<void> {
+  resetDateTimeDisplayForLock();
+  await invoke("plugin:vault-unlock|vault_delete");
+}
+`,
     "src/notes/scrollMemory.ts": `export function resetScrollMemory(): void {}\n`,
     "src/notes/recentNotes.ts": `export function resetRecentNotes(): void {}\n`,
     "editor/src/attachments/decoded-aspect.ts": `export function resetDecodedAspects(): void {}\n`,
@@ -291,6 +306,7 @@ export function resetTranscripts(): void {}\n`,
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  resetDateTimeDisplayForLock();
 }
 `,
     "src/lib/vault-switch.ts": `export async function leaveActiveVault(deps: {
@@ -306,6 +322,7 @@ export function resetTranscripts(): void {}\n`,
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  resetDateTimeDisplayForLock();
 }
 `,
     // Mobile (myne-md/myne#456). One choke point, and the background listener,
@@ -317,6 +334,7 @@ export function resetTranscripts(): void {}\n`,
   resetDecodedAspects();
   resetPreviewCache();
   resetTranscripts();
+  resetDateTimeDisplayForLock();
 }
 `,
     "mobile/src/app/flows/EditorFlow.tsx": `const flushAll = () => {

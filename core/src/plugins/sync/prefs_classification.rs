@@ -161,6 +161,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
     ("bar_items_order", PrefClass::DeviceLocal),
+    // A bound on how much this machine sends to a provider, so it belongs to
+    // this machine: the same reasoning `ai_enabled` gets one line down. A laptop
+    // on a metered connection and a desktop on a fast one legitimately disagree,
+    // and a value that synced would let one device widen the other's off-device
+    // volume without anyone at that device choosing it (TB13's consent is
+    // per-account, which is exactly why the VOLUME should not be).
+    ("chat_history_budget", PrefClass::DeviceLocal),
     ("cli_enabled", PrefClass::DeviceLocal),
     (
         "cli_excluded_folders",
@@ -296,8 +303,15 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     // should not have to agree — which is the `theme` argument, not the
     // `daily_date_format` one. And an IANA zone is a coarse geolocation datum:
     // `dialect/src/taskFields.ts` keeps it out of note bytes for exactly that
-    // reason, so putting it on the sync wire would give back at the prefs layer
-    // what the note layer refuses to leak.
+    // reason, and this classification keeps a travelling phone's zone from being
+    // overwritten by a stationary desktop's.
+    //
+    // What it does NOT do, because this comment claimed otherwise until
+    // myne-md/myne#609 and four other sites were citing it: keep the zone off
+    // the wire. The whole `vault.prefs` blob is pushed and pulled verbatim,
+    // device-local fields included, and `sync-protocol.md` 10.2.1 has a newly
+    // enrolled device adopt them as starting defaults. This enum decides the
+    // MERGE, and nothing else. `prefs_merge.rs` next door already had it right.
     ("timezone", PrefClass::DeviceLocal),
     // MYND-592. **Shared**, for the same reason as `show_task_marker` above and
     // deliberately unlike `ai_enabled` (DeviceLocal): that flag is device-local
@@ -352,6 +366,7 @@ mod tests {
             auto_lock_seconds: _,
             auto_tag_enabled: _,
             bar_items_order: _,
+            chat_history_budget: _,
             cli_enabled: _,
             cli_excluded_folders: _,
             cli_rate_limit_disabled: _,
@@ -429,6 +444,7 @@ mod tests {
             "auto_lock_seconds",
             "auto_tag_enabled",
             "bar_items_order",
+            "chat_history_budget",
             "cli_enabled",
             "cli_excluded_folders",
             "cli_rate_limit_disabled",

@@ -13,6 +13,7 @@ import { lockVault } from "../lib/vault-unlock";
 import { endAgentRun } from "../lib/agent-lifetime";
 import { HAS_TAURI } from "../lib/app-window";
 import { clearCustomTheme, paintSelectedCustomTheme } from "../lib/customTheme";
+import { useDateTimeDisplaySync } from "../lib/useDateTimeDisplaySync";
 
 import { WelcomeFlow } from "./flows/WelcomeFlow";
 import { JoinFlow } from "./flows/JoinFlow";
@@ -51,6 +52,13 @@ type JoinEntry = keyof typeof JOIN_SUCCESS;
  * design gallery is a separate dev route (see App.tsx).
  */
 export function AppShell() {
+  // Publish the date/time display settings into the shared store every
+  // formatting surface reads (myne-md/myne#609). At the ROOT, and for the same
+  // reason `ToastHost` is: `StageSwitch` returns early in several places, so a
+  // hook mounted inside it would stop publishing on the stages that return
+  // first, and a store that stops being written is indistinguishable from one
+  // nobody ever wrote. That was the shape of the original defect.
+  useDateTimeDisplaySync();
   return (
     <>
       <StageSwitch />

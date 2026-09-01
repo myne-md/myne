@@ -120,7 +120,10 @@
         "excludedFolder": "Oluşturulmadı: bu klasör yapay zekadan hariç tutulmuş.",
         "createFailed": "Oluşturulmadı: yeni not yazılamadı. Diğer değişiklikler yine de uygulandı.",
         "excludedNow": "Uygulanamadı: bu notun klasörü artık yapay zekadan hariç tutuluyor.",
-        "notProposed": "Uygulanamadı: bu değişiklik, bu çalıştırmanın önerisinin parçası değil."
+        "notProposed": "Uygulanamadı: bu değişiklik, bu çalıştırmanın önerisinin parçası değil.",
+        "noteMoved": "Uygulanamadı: bu değişiklik notu başka bir klasöre taşırdı.",
+        "appendEmpty": "Uygulanamadı: eklenecek bir şey yoktu.",
+        "appendWouldWriteFrontmatter": "Uygulanamadı: bu metin notun özellikler bloğuna dönüşürdü."
       },
       "applyFailed": "Değişiklikler uygulanamadı.",
       "undo": "Bu çalıştırmayı geri al",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} not okundu",
       "runSummaryOffDevice_one": "notlarınızın yaklaşık {{count}} karakteri sağlayıcıya gönderildi",
       "runSummaryOffDevice_other": "notlarınızın yaklaşık {{count}} karakteri sağlayıcıya gönderildi",
-      "runSummaryOnDevice": "hiçbir şey bu cihazdan çıkmadı"
+      "runSummaryOnDevice": "hiçbir şey bu cihazdan çıkmadı",
+      "appendFlag": "sona ekler"
     },
     "undo": {
       "offer_one": "Son çalıştırma {{count}} notu değiştirdi.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "Tümünü değiştir ({{total}})",
       "replaceOne": "Değiştir",
       "replacePlaceholder": "Şununla değiştir",
-      "toggleReplace": "Değiştirmeyi aç/kapat"
+      "toggleReplace": "Değiştirmeyi aç/kapat",
+      "dateFallback": "{{stored}} aranıyor; bu tarih bu biçimde saklanıyor.",
+      "replaceOffOnDateFallback": "Bir tarih saklandığı biçimle eşleştiği sürece Değiştir kapalıdır, böylece bir değiştirme tarihi okunamaz hâle getiremez."
     },
     "cover": {
       "add": "Kapak ekle",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "Anahtarı değiştir",
       "mobileRevokeHelper": "Sağlayıcıyı, anahtarını ve bu telefonun onayını birlikte kaldırır; tam olarak hiç kurulmamış hâline döner. Diğer cihazlar, oradan da kaldırana kadar çalışmayı sürdürür.",
       "mobileApproveLabel": "Bu telefondan göndermeyi onayla",
-      "mobileApproveHelper": "Sağlayıcı ve anahtarı başka bir cihazdan geldi. Neyin gönderileceğini okuyup burada onaylayana kadar bu telefondan hiçbir şey gönderilmez."
+      "mobileApproveHelper": "Sağlayıcı ve anahtarı başka bir cihazdan geldi. Neyin gönderileceğini okuyup burada onaylayana kadar bu telefondan hiçbir şey gönderilmez.",
+      "historyBudgetHelper": "Her isteğin son konuşmadan ne kadarını taşıyacağı, karakter olarak. Varsayılan için boş bırakın. Daha büyük bir sayı yapay zekanın daha uzun konuşmaları izlemesini sağlar ve bunun daha fazlasını gönderir: bu cihazda olmayan bir sağlayıcıda bu, bir çalıştırmanın her adımında metninizin daha fazlasının cihazdan çıkması demektir.",
+      "historyBudgetLabel": "Her istekle gönderilen konuşma"
     },
     "network": {
       "disabledCue": "Eşitleme artık Tor üzerinden yönlendirilmiyor. Yeni bağlantılar doğrudan eşitleme sunucusuna gider.",
@@ -3356,12 +3364,13 @@
         "viewMode": "varsayılan görünüm modu canlı okuma kaynak önizleme view mode preview source",
         "dateFormat": "tarih biçimi gün ay yıl iso gg/aa aa/gg takvim date format dd/mm mm/dd",
         "timeFormat": "saat biçimi 24 saat 12 saat öğleden önce öğleden sonra am pm time format clock",
-        "timezone": "saat dilimi zaman dilimi tz utc iana bölge bugün timezone"
+        "timezone": "saat dilimi zaman dilimi tz utc iana bölge bugün timezone",
+        "aiHistoryBudget": "konuşma geçmiş bağlam bellek bütçe karakter ajan sohbet istek"
       }
     },
     "dateTime": {
       "dateLabel": "Tarih biçimi",
-      "dateHelper": "Tarihlerin görevlerde, kaydedilmiş görünümlerde ve eklerde nasıl gösterileceği.",
+      "dateHelper": "Myne bir tarihi nerede gösterirse göstersin, o tarihin nasıl yazılacağı.",
       "dateSystem": "Dile göre",
       "timeLabel": "Saat biçimi",
       "timeHelper": "Saatlerin 24 saatlik mi yoksa 12 saatlik mi gösterileceği.",

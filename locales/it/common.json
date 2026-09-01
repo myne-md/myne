@@ -132,7 +132,10 @@
         "excludedFolder": "Non creata: quella cartella è esclusa dall'AI.",
         "createFailed": "Non creata: la scrittura della nuova nota non è riuscita. Le altre modifiche sono state comunque applicate.",
         "excludedNow": "Impossibile applicare: la cartella di quella nota è ora esclusa dall'AI.",
-        "notProposed": "Impossibile applicare: quella modifica non fa parte della proposta di questa esecuzione."
+        "notProposed": "Impossibile applicare: quella modifica non fa parte della proposta di questa esecuzione.",
+        "noteMoved": "Impossibile applicare: quella modifica sposterebbe la nota in un'altra cartella.",
+        "appendEmpty": "Impossibile applicare: non c'era nulla da aggiungere.",
+        "appendWouldWriteFrontmatter": "Impossibile applicare: quel testo sarebbe diventato il blocco delle proprietà della nota."
       },
       "applyFailed": "Non è stato possibile applicare le modifiche.",
       "undo": "Annulla questa esecuzione",
@@ -156,7 +159,8 @@
       "runSummaryOffDevice_one": "circa {{count}} carattere delle tue note è stato inviato al provider",
       "runSummaryOffDevice_many": "circa {{count}} caratteri delle tue note sono stati inviati al provider",
       "runSummaryOffDevice_other": "circa {{count}} caratteri delle tue note sono stati inviati al provider",
-      "runSummaryOnDevice": "nulla ha lasciato questo dispositivo"
+      "runSummaryOnDevice": "nulla ha lasciato questo dispositivo",
+      "appendFlag": "aggiunge alla fine"
     },
     "undo": {
       "offer_one": "L'ultima esecuzione ha modificato {{count}} nota.",
@@ -1251,7 +1255,9 @@
       "replaceAllCount": "Sostituisci tutto ({{total}})",
       "replaceOne": "Sostituisci",
       "replacePlaceholder": "Sostituisci con",
-      "toggleReplace": "Attiva/disattiva sostituzione"
+      "toggleReplace": "Attiva/disattiva sostituzione",
+      "dateFallback": "Ricerca di {{stored}}, la forma in cui questa data è salvata.",
+      "replaceOffOnDateFallback": "La sostituzione è disattivata finché una data viene trovata tramite la sua forma salvata, così una sostituzione non può renderla illeggibile."
     },
     "cover": {
       "add": "Aggiungi copertina",
@@ -3146,7 +3152,9 @@
       "mobileKeyReplace": "Sostituisci chiave",
       "mobileRevokeHelper": "Rimuove insieme il fornitore, la sua chiave e l'approvazione di questo telefono, lasciando esattamente lo stato di non averlo mai configurato. Gli altri dispositivi continuano a funzionare finché non lo rimuovi anche lì.",
       "mobileApproveLabel": "Approva l'invio su questo telefono",
-      "mobileApproveHelper": "Il fornitore e la sua chiave provengono da un altro dispositivo. Da questo telefono non viene inviato nulla finché non leggi cosa verrà inviato e lo approvi qui."
+      "mobileApproveHelper": "Il fornitore e la sua chiave provengono da un altro dispositivo. Da questo telefono non viene inviato nulla finché non leggi cosa verrà inviato e lo approvi qui.",
+      "historyBudgetHelper": "Quanta parte della conversazione recente porta ogni richiesta, in caratteri. Lascia vuoto per il valore predefinito. Un numero maggiore permette all'IA di seguire conversazioni più lunghe e ne invia di più: con un provider che non è su questo dispositivo, significa più tuo testo che lo lascia, a ogni passo di un'esecuzione.",
+      "historyBudgetLabel": "Conversazione inviata a ogni richiesta"
     },
     "network": {
       "disabledCue": "La sincronizzazione non passa più attraverso Tor. Le nuove connessioni vanno direttamente al server di sincronizzazione.",
@@ -3466,12 +3474,13 @@
         "viewMode": "modalità visualizzazione predefinita live lettura sorgente anteprima view mode",
         "dateFormat": "formato data giorno mese anno iso gg/mm mm/gg dd/mm calendario date format calendar",
         "timeFormat": "formato ora orario 24 ore 12 ore orologio am pm time format clock",
-        "timezone": "fuso orario fusi tz utc iana regione oggi timezone time zone"
+        "timezone": "fuso orario fusi tz utc iana regione oggi timezone time zone",
+        "aiHistoryBudget": "conversazione cronologia contesto memoria budget caratteri agente chat richiesta"
       }
     },
     "dateTime": {
       "dateLabel": "Formato data",
-      "dateHelper": "Come vengono mostrate le date nelle attività, nelle viste salvate e negli allegati.",
+      "dateHelper": "Come viene scritta una data, ovunque Myne ne mostri una.",
       "dateSystem": "Segui la lingua",
       "timeLabel": "Formato ora",
       "timeHelper": "Se gli orari vengono mostrati nel formato a 24 ore o a 12 ore.",
