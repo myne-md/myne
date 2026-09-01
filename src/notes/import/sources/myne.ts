@@ -246,7 +246,22 @@ export function decideRenames(
   }
 
   const renames = new Map<string, string>();
-  let ambiguousLinks = 0;
+  // Ambiguous folded TITLES, not ambiguous notes, and the distinction is the
+  // whole bug. `inboundLinks` is keyed by folded title, so two colliding notes
+  // that fold to the same string name the same inbound set: adding its size
+  // once per note counted every one of those links twice, and three colliding
+  // notes counted them three times.
+  //
+  // What it costs is the same thing the sibling `linksRetargeted` inflation
+  // cost and was fixed for in this branch: `linksLeftUnresolved` is rendered as
+  // a summary row and written into the durable import report note, which
+  // `design-notes/storage/0544` calls the residual that must not be silent. A
+  // durable note asserting a number that describes nothing is worse than no
+  // number.
+  const ambiguousTitles = new Set<string>();
+  // The other unresolved arm, kept apart because it is counted per NOTE rather
+  // than per title: see its own comment below.
+  let unrenamableLinks = 0;
   for (const note of notes) {
     if (note.title === null) continue;
     const folded = foldSegment(note.title);
@@ -254,7 +269,7 @@ export function decideRenames(
     const inbound = inboundLinks.get(folded)?.size ?? 0;
     if (inbound === 0) continue;
     if ((foldedCount.get(folded) ?? 0) > 1) {
-      ambiguousLinks += inbound;
+      ambiguousTitles.add(folded);
       continue;
     }
     // The label is legal for THIS title, or there is no rename to make.
@@ -273,10 +288,17 @@ export function decideRenames(
     // key already present, and it landed on the note with the LONGEST title.
     const renamed = renamedTitleFor(note.title, importLabel);
     if (renamed === note.title) {
-      ambiguousLinks += inbound;
+      // Not deduplicated, and it does not need to be: this arm is reached only
+      // when `foldedCount` is 1, so exactly one note carries this folded title
+      // and its inbound set is counted exactly once.
+      unrenamableLinks += inbound;
       continue;
     }
     renames.set(note.title, renamed);
+  }
+  let ambiguousLinks = unrenamableLinks;
+  for (const folded of ambiguousTitles) {
+    ambiguousLinks += inboundLinks.get(folded)?.size ?? 0;
   }
   return { renames, ambiguousLinks };
 }

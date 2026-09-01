@@ -116,6 +116,19 @@ pub async fn open(
     // Belt and braces with the unconditional `close_all` in `unlock_from_host`:
     // this refuses the state and that one clears it. Either alone leaves a
     // path, and the review that found this named both.
+    //
+    // WHAT THIS PAIR DOES NOT CLOSE, stated because the sentence above reads
+    // stronger than it is. This check reads a SPECIFIC `active_vault_id()`, and
+    // the write guard inside `set_import_source` asserts only that SOME vault
+    // is unlocked. The two are not the same claim: the derivation below spends
+    // a `read_meta` and a 256 MiB Argon2id between them holding no lock, so a
+    // target that changed underneath in that window satisfies the write guard.
+    // What actually closes it is the capacity-1 auth permit, which is held
+    // across the whole derivation and which `unlock_with_path` `try_acquire`s,
+    // so no unlock can land inside the window at all. That is a discipline in a
+    // different module rather than a property of these two lines, and it is
+    // named here so a later change to the permit does not silently take this
+    // guarantee with it.
     let active = state.active_vault_id().await;
     if active.is_none() {
         tracing::error!(
