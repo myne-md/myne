@@ -65,6 +65,20 @@ pub enum VaultRecoveryError {
     #[error("recovery in progress")]
     RecoveryInProgress,
 
+    /// A vault-import run is holding THIS vault open as a read-only source
+    /// (myne-md/myne#464). The slot map is keyed by `VaultId`, so a recovery
+    /// would have to evict a key context the import is actively reading
+    /// through.
+    ///
+    /// Distinct from [`Self::RecoveryInProgress`] for the same reason its
+    /// unlock-side twin is distinct from `UnlockInProgress`: that variant is
+    /// documented as not user-facing because the frontend disables Submit for
+    /// its whole window, and this state has no such window. The user reaches it
+    /// deliberately and resolves it themselves, by finishing or cancelling the
+    /// import or waiting for the import slot's TTL.
+    #[error("vault is open as a vault-import source")]
+    VaultOpenAsImportSource,
+
     /// The vault is already unlocked (`Slot::Unlocked`). Returned by
     /// the slot-peek guard when a recovery attempt arrives with a
     /// fully-unlocked vault.
@@ -284,6 +298,7 @@ mod tests {
                 VaultRecoveryError::JoinFailure => {}
                 VaultRecoveryError::RecoveryAbortedByLock => {}
                 VaultRecoveryError::WeakNewPassword => {}
+                VaultRecoveryError::VaultOpenAsImportSource => {}
             }
         }
         assert_closed(&VaultRecoveryError::VaultNotFound);

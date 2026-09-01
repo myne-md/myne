@@ -237,6 +237,21 @@ const SHIM_REASON =
 
 const CURATED_TWINS = [
   {
+    a: "src/notes/dailyNote.ts",
+    b: "mobile/src/lib/daily.ts",
+    what: "hand-mirrors the whole period resolver: isoWeek, formatDailyDate, zonedNow, PERIODS, PERIOD_DEFAULTS, periodRange, periodSettings, resolvePeriodNote",
+    why:
+      "Two different paths, so the path sweep cannot pair them and `check-twin-drift.mjs` " +
+      "inherits the blindness through `NAMED_TWINS`. Six doc comments across the two files say " +
+      "one mirrors the other `exactly`, and until myne-md/myne#177 nothing measured that. What a " +
+      "one-sided edit costs is stated by the files themselves: a period note is matched by " +
+      "folder plus title and nothing else, so a `PERIOD_DEFAULTS` or escape-grammar divergence " +
+      "files one week under two titles and the same vault ends up with two notes for it. The " +
+      "BEHAVIOURAL half is pinned separately and better, by `core/src/plugins/notes/" +
+      "period-title-cases.json`, which both trees and the Rust implementation run against; this " +
+      "entry is what makes a one-sided EDIT visible.",
+  },
+  {
     a: "src/App.tsx",
     b: "mobile/src/app/AppShell.tsx",
     what: "carries the twin boot probe, reprobe, Stage switch and dispatch",
@@ -260,6 +275,22 @@ const CURATED_TWINS = [
       "fix. Line counts are meaningless for this pair: it is a behavioural " +
       "counterpart, not a copy, so only the semantic comparison of the shared predicates says " +
       "anything.",
+  },
+  {
+    a: "src/hooks/useDateTimeDisplaySync.ts",
+    b: "mobile/src/lib/useDateTimeDisplaySync.ts",
+    what: "publishes the shared date/time display store, one adapter per client",
+    why:
+      "The two publishers into `editor/src/host/lib/datetimeFormat.ts`'s module-scope store. " +
+      "Cross-path (`src/hooks` against `mobile/src/lib`), so the sweep cannot pair them, and this " +
+      "is the exact module class myne-md/myne#609 was filed about: for as long as mobile had no " +
+      "adapter at all, there was one publisher and three readers and nothing said so. Not a copy: " +
+      "each reads its own client's prefs seam, and mobile additionally re-reads on the prefs nonce " +
+      "because its host mounts the adapter above the stage machine. What must stay in step is the " +
+      "PUBLISHED VALUE, `displayFromPrefs(prefs, language)`, and the language listener that " +
+      "republishes it, since a language switch does not re-render either mounting component. " +
+      "`check-datetime-display-publisher.mjs` holds the weaker property (each client tree has a " +
+      "publisher at all); a one-sided edit to what gets published is what this pair is for.",
   },
   {
     a: "src/notes/prefsNonce.ts",
@@ -311,6 +342,39 @@ const CURATED_TWINS = [
       "separate 62-line copy at a different path. The shared source is `dialect/src/welcomeNote.ts` " +
       "at 37 lines, so the copy is not even a stale duplicate of it. This is the English-only " +
       "welcomeNote named in `check-twin-drift.mjs`'s own header.",
+  },
+  {
+    a: "core/src/inference/engine.rs",
+    b: "mobile/src-tauri/src/plugins/local_inference/engine.rs",
+    what: "is the shared engine trait against mobile's surviving copy of it",
+    why:
+      "Cross-path since myne-md/myne#456 moved the desktop side into `myne-core`, so the sweep " +
+      "cannot see it and only a curated entry keeps it in the denominator. The pair is not a " +
+      "desktop-against-mobile comparison any more: `a` is the shared answer both clients are " +
+      "supposed to reach, and `b` is a copy mobile still declares `mod engine;` for. That is the " +
+      "class this record exists to name, and losing the pair at the moment the shared side landed " +
+      "would have read as the duplication being resolved.",
+  },
+  {
+    a: "core/src/inference/error.rs",
+    b: "mobile/src-tauri/src/plugins/local_inference/error.rs",
+    what: "is the shared engine-error enum against mobile's subset of it",
+    why:
+      "Same move, same reason as `engine.rs` above. Worth its own entry rather than a mention " +
+      "inside that one because this file has a second reader: `tests/lib/engineErrorTaxonomy.test.ts` " +
+      "reads `a` by an exact path and fails by NAME when it moves, which is how the move was " +
+      "caught. Nothing reads `b` that way.",
+  },
+  {
+    a: "core/src/inference/state.rs",
+    b: "mobile/src-tauri/src/plugins/local_inference/state.rs",
+    what: "is the shared inference state machine against an unrelated file of the same name",
+    why:
+      "The pair worth keeping precisely because the two files are NOT versions of each other: " +
+      "1466 lines of chat and embedding session state against 40 lines of transcription wiring " +
+      "that happens to share a basename inside the same plugin directory. Recorded so a future " +
+      "reader who greps `state.rs` in the inference area is told which one is which, rather than " +
+      "assuming the small one is a trimmed copy of the large one.",
   },
 ];
 
@@ -697,6 +761,27 @@ const ROSTER = [
     destination: "@myne/editor",
     reason:
       "Shim against hand copy, same shape. Desktop is one line into @myne/editor/host/notes/localDateTime; mobile carries 34.",
+  },
+  {
+    a: "src/hooks/useDateTimeDisplaySync.ts",
+    b: "mobile/src/lib/useDateTimeDisplaySync.ts",
+    // `decision`, not `screen`. `screen` is an enumerated verdict meaning the
+    // rendered surface or the HOST, and an adapter that reads a prefs seam is
+    // neither; the spec holds that list to its definition rather than to its
+    // size, which is what caught this. The destination is settled all the same,
+    // so it is `per-client` rather than `undecided`.
+    verdict: "decision",
+    destination: "per-client",
+    reason:
+      "Per-client by construction, not by drift: each adapter reads its own client's prefs seam, and mobile additionally re-reads on the prefs nonce because its host mounts the adapter above the stage machine, so unlock is the event that makes prefs readable at all. What must not diverge is the VALUE published, displayFromPrefs(prefs, language), and the language listener that republishes it, since a language switch re-renders neither mounting component. check-datetime-display-publisher.mjs holds the weaker property that each client tree has a publisher at all; a one-sided edit to what gets published is what this pair is here for (myne-md/myne#609).",
+  },
+  {
+    a: "src/notes/dailyNote.ts",
+    b: "mobile/src/lib/daily.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "Real code with two homes, at two different paths, so the path sweep cannot see it and check-twin-drift.mjs inherits that blindness. Six doc comments across the two files claim one mirrors the other exactly and nothing measured it. What a one-sided edit costs is stated by the files themselves: a period note is matched by folder plus title and nothing else, so a PERIOD_DEFAULTS or escape-grammar divergence files one week under two titles and one vault ends up with two notes for it. The behavioural half is pinned separately and better, by core/src/plugins/notes/period-title-cases.json, which both TypeScript trees and the Rust implementation run against; this entry exists so a one-sided EDIT is visible too. myne-md/myne#177.",
   },
   {
     a: "src/notes/prefsNonce.ts",
@@ -1169,7 +1254,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "The WAV reader and resampler, and the file myne-md/myne#485 lives in: desktop clamps `sample_rate` to 4_000..=384_000 and caps `resample_linear` with MAX_PCM_SAMPLES, mobile has neither. Imports only `serde::Serialize`, so extracting it to `myne-core` adds no crate to any dependency closure.",
+      "The WAV reader and resampler, and the file myne-md/myne#485 (mobile) and myne-md/myne#510 (desktop) both live in. The divergence those two closed was real and cost a fix twice: mobile shipped without the rate clamp, then desktop kept a picked 8-hour ceiling that the attachment cap and the 4x clamp put permanently out of reach, so it refused nothing while its own test asserted around the branch. Both now derive `MAX_PCM_SAMPLES` from `protocol::MAX_ATTACHMENT_LEN`, bound the decode inside `parse_wav`, and check above the identity fast-path. Imports only `serde::Serialize` and `protocol::MAX_ATTACHMENT_LEN`, both already in `core/Cargo.toml`, so extracting it to `myne-core` adds no crate to any dependency closure, and myne-md/myne#510 converged their BEHAVIOUR without converging their text: both now derive the ceiling the same way, bound the decode in the same place and check above the same fast-path. The figures an earlier version of this reason carried were wrong and are replaced with measured ones. `diff` over the two files reports 443 differing lines; stripping comments and blank lines and diffing what is left reports 135. Neither is the 146-lines-nearly-all-prose figure nor the nine-differing-executable-lines figure this reason used to claim. What IS true and is the part that matters for an extraction: desktop carries two `const _: () = assert!` blocks tying its ceiling to the voice recorder's duplicated copy, and mobile carries neither because it has no cpal recorder to tie to. This guard reports it in the byte-different bucket, which is the honest flag. Extracting to `myne-core` is therefore a merge of two comment sets plus a decision about where those two desktop-only assertions live, not a byte-for-byte move. An earlier version of this reason claimed semantic identity, which was true for one review round and stopped being true inside the same branch. Tracked with its sibling `whisper.rs` under myne-md/myne#479; this row cited no issue at all until then, which is how a free extraction ends up with no owner.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/model_store.rs",
@@ -1180,12 +1265,12 @@ const ROSTER = [
       "Model resolution and integrity checking, 1019 lines against 766. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
   },
   {
-    a: "src-tauri/src/plugins/local_inference/engine.rs",
+    a: "core/src/inference/engine.rs",
     b: "mobile/src-tauri/src/plugins/local_inference/engine.rs",
     verdict: "decision",
-    destination: "undecided",
+    destination: "myne-core",
     reason:
-      "The engine trait and its shared implementation. Mobile narrows it rather than omitting it: `transcribe` is real, `infer` and `embed` return `NotReady`, measured. The contract is one answer even where a client declines part of it.",
+      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 1969 lines against 389 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/engine_candle.rs",
@@ -1204,12 +1289,12 @@ const ROSTER = [
       "Cancellation plumbing for a long-running inference. Both clients run cancellable transcription, so how a cancel is observed is one answer.",
   },
   {
-    a: "src-tauri/src/plugins/local_inference/error.rs",
+    a: "core/src/inference/error.rs",
     b: "mobile/src-tauri/src/plugins/local_inference/error.rs",
     verdict: "decision",
-    destination: "undecided",
+    destination: "myne-core",
     reason:
-      "The engine error enum. Mobile's is a subset of desktop's, which is the same drift class as the `src/types/*-error.ts` mirrors one layer up.",
+      "The engine error enum, 268 lines against 129. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/commands.rs",
@@ -1225,15 +1310,47 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Plugin registration for a surface mobile ships a two-command slice of. 1096 lines against 112, and mobile's is independently written rather than a trimmed copy.",
+      "Plugin registration for a surface mobile ships a two-command slice of. 1081 lines against 112, and mobile's is independently written rather than a trimmed copy.",
   },
   {
-    a: "src-tauri/src/plugins/local_inference/state.rs",
-    b: "mobile/src-tauri/src/plugins/local_inference/state.rs",
+    a: "src/lib/agent-run.ts",
+    b: "mobile/src/lib/agent-run.ts",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "Each client's SEAM INJECTION for the agent's IPC bindings, and nothing else: 29 lines against 40, of which the difference is one import specifier and the comment explaining it. The bindings themselves, their command names and their argument shapes, live in `src/lib/agent-run-core.ts` and are consumed by both, which is what myne-md/myne#456 built rather than letting mobile retype them. `delegated` is the right verdict even though the shared half is not in `myne-core`: this record's `destination` vocabulary is about where a shared answer LIVES, and for a TypeScript module that place is a shared package, which is what `@myne/agent-run-core` aliases to. What could not be delegated is exactly the two names `invoke` and `Channel`, because `scripts/check-platform-seam.mjs` requires each guarded root to reach them through its own directory. The pair stays in the record rather than being dropped as trivial, since it is where a client could quietly stop delegating.",
+  },
+  {
+    a: "src-tauri/src/plugins/agent/mod.rs",
+    b: "mobile/src-tauri/src/plugins/agent/mod.rs",
     verdict: "absent",
     destination: "undecided",
     reason:
-      "The inference state machine, 1416 lines against 40. It exists for chat and embedding sessions, which mobile does not ship at all, so mobile's 40 lines are wiring for the transcription path rather than a reduced version of the same thing.",
+      "Plugin registration for the agent surface, new on mobile in myne-md/myne#456, 337 lines against 366. `absent` rather than `decision` because what these two files hold is each host's own wiring: the `tauri::plugin::Builder`, the `generate_handler!` roster and the state each client manages. The shared answer they both call is already in `myne-core` (`plugins/agent/host_commands.rs`), which is why the two are close in size while sharing no logic. Neither is a copy of the other: mobile registers nine commands against desktop's eight, and the ninth (`agent_list_provider_models`) exists because mobile has no local model to fall back on.",
+  },
+  {
+    a: "src-tauri/src/plugins/agent/commands.rs",
+    b: "mobile/src-tauri/src/plugins/agent/commands.rs",
+    verdict: "absent",
+    destination: "undecided",
+    reason:
+      "The `#[tauri::command]` layer, 516 lines against 338, and the pair is the three-layer command shape working rather than drift. myne-md/myne#456 reduced desktop's side from 1442 lines to thin wrappers by moving the body into `myne-core`; mobile's was written against that same core from the start. The /simplify pass then took two more: `agent_apply` and `agent_undo` were still retyped verbatim on both sides, and the undo retype had silently DROPPED the myne-md/myne#531 fix that puts failed restore points back, so a partial undo failure consumed the record permanently on mobile. Both moved to `host_commands::{apply_from_host, undo_from_host}`. What is left on each side is argument marshalling and the client's own two seams (its engine and its scope searcher), which are BY DEFINITION per-client. Measured rather than assumed: neither file carries a security rule, a precondition or a refusal of its own.",
+  },
+  {
+    a: "src-tauri/src/plugins/agent/adapters.rs",
+    b: "mobile/src-tauri/src/plugins/agent/adapters.rs",
+    verdict: "absent",
+    destination: "undecided",
+    reason:
+      "Each client's implementation of the two seams `myne-core`'s agent loop asks for, 226 lines against 117. The desktop one bridges to a local Candle engine and desktop's own search index; mobile's bridges to `NoLocalEngine` plus the remote provider registry. The gap is the whole of what #456 is about, so treating them as one answer would be classifying the seam as drift. Desktop's extra 105 lines are the local-inference arm and the capability-probe test that moved here with it.",
+  },
+  {
+    a: "core/src/inference/state.rs",
+    b: "mobile/src-tauri/src/plugins/local_inference/state.rs",
+    verdict: "decision",
+    destination: "myne-core",
+    reason:
+      "The inference state machine, 1467 lines against 40. Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
   },
 ];
 

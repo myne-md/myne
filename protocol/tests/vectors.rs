@@ -657,6 +657,92 @@ fn phrase_normalize_vectors() {
     }
 }
 
+/// Two `encrypt` cases sharing `(root_key, account_number_hash, prefs_nonce)`
+/// seal different plaintexts under the same key and nonce, so their ciphertexts
+/// share XChaCha20 keystream. Nothing is exposed here (the key is a fixed public
+/// test value), but these are the bytes an independent implementation copies
+/// from, and the family's nonce "registry" was prose that nothing checked.
+///
+/// A RATCHET, not a gate on the whole family. Three pairs already collided
+/// before anyone looked; re-minting a published case changes bytes other ports
+/// pin against, which belongs in its own change. So those three are named below
+/// and the list may shrink and never grow. A fourth collision fails here.
+fn assert_distinct_prefs_nonces(cases: &[serde_json::Value]) {
+    /// The three pairs that already collided, keyed by the LATER case's id. Each
+    /// entry is debt: remove it when that case is re-minted onto a free nonce.
+    ///
+    /// **Removing an entry is a PAIRED change across two repositories, and
+    /// nothing enforces the ordering.** The re-mint happens in
+    /// `myne-test-vectors` (a new nonce, a new blob, a new `expected_*_hex`) and
+    /// the deletion happens here, so doing either alone turns this test red:
+    /// delete first and the collision is still in the companion's cases; re-mint
+    /// first and this list names a collision that no longer exists, which the
+    /// stale-entry half of this check refuses. Stated because the whole point of
+    /// the ratchet is that whoever pays the debt down is a later reader, and a
+    /// later reader has no other way to learn that the two edits belong
+    /// together.
+    const KNOWN_COLLISIONS: &[(&str, &str)] = &[
+        (
+            "vault-prefs/v0.1/encrypt-ai-provider",
+            "collides with encrypt-last-backup-at (nonce f1..)",
+        ),
+        (
+            "vault-prefs/v0.1/encrypt-keymap",
+            "collides with encrypt-editor-line-numbers (nonce f4..)",
+        ),
+        (
+            "vault-prefs/v0.1/encrypt-device-names",
+            "collides with encrypt-right-panel-tabs (nonce f6..)",
+        ),
+    ];
+
+    let mut seen: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    let mut excused: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    for case in cases {
+        if case["case_kind"].as_str() != Some("encrypt") {
+            continue;
+        }
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let (Some(root), Some(hash), Some(nonce)) = (
+            case["input_root_key_hex"].as_str(),
+            case["input_account_number_hash_hex"].as_str(),
+            case["input_prefs_nonce_hex"].as_str(),
+        ) else {
+            continue;
+        };
+        let key = format!("{root}|{hash}|{nonce}");
+        if let Some(first) = seen.get(&key) {
+            let excuse = KNOWN_COLLISIONS.iter().find(|(name, _)| *name == id);
+            match excuse {
+                Some((_, reason)) => {
+                    excused.insert(id);
+                    eprintln!(
+                        "[vault-prefs] known nonce collision, not yet re-minted: {id} ({reason})"
+                    );
+                }
+                None => panic!(
+                    "[vault-prefs] {id} reuses (root_key, account_number_hash, prefs_nonce) \
+                     already used by {first}. Two plaintexts sealed under one key and nonce \
+                     share keystream. Mint this case on a free nonce."
+                ),
+            }
+        } else {
+            seen.insert(key, id.to_string());
+        }
+    }
+    // The other direction: an entry whose case has been re-minted (or removed)
+    // is stale, and a stale exemption is how a ratchet stops ratcheting.
+    for (name, _) in KNOWN_COLLISIONS {
+        assert!(
+            excused.contains(name),
+            "[vault-prefs] KNOWN_COLLISIONS still lists {name}, which no longer collides. \
+             Remove the entry: the list may shrink, never grow."
+        );
+    }
+}
+
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_prefs_vectors() {
@@ -702,6 +788,7 @@ fn vault_prefs_vectors() {
     let cases = doc["cases"].as_array().expect("cases must be a JSON array");
     assert!(!cases.is_empty(), "vault-prefs must have at least one case");
     assert_unique_vector_ids("vault-prefs", cases);
+    assert_distinct_prefs_nonces(cases);
 
     let mut seen_kinds: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
     let mut seen_parse_errors: std::collections::BTreeSet<String> =
@@ -5987,12 +6074,34 @@ fn note_template_vectors() {
                 // RenderContext carries no serde derives (deliberate — the
                 // engine is `#![no_std]` and host-injected); construct it
                 // field-by-field from the five pinned hex fields.
+                // The two period fields (myne#177) are OPTIONAL here: every
+                // case minted before they existed carries neither and uses
+                // neither token, so defaulting them keeps those cases exact.
+                // A case that DOES use a period token must pin it, or the
+                // vector would be asserting against an empty string this
+                // runner invented rather than against published bytes.
+                let optional_utf8 = |key: &str| -> Option<String> {
+                    case.get(key).map(|_| utf8_field(case, id, key))
+                };
+                let period_start = optional_utf8("input_ctx_period_start_utf8_hex");
+                let period_end = optional_utf8("input_ctx_period_end_utf8_hex");
+                for (token, pinned) in [
+                    ("{{period_start}}", period_start.is_some()),
+                    ("{{period_end}}", period_end.is_some()),
+                ] {
+                    assert!(
+                        !template.contains(token) || pinned,
+                        "[{id}] uses {token} but pins no value for it"
+                    );
+                }
                 let ctx = RenderContext {
                     title: utf8_field(case, id, "input_ctx_title_utf8_hex"),
                     date: utf8_field(case, id, "input_ctx_date_utf8_hex"),
                     time: utf8_field(case, id, "input_ctx_time_utf8_hex"),
                     datetime: utf8_field(case, id, "input_ctx_datetime_utf8_hex"),
                     weekday: utf8_field(case, id, "input_ctx_weekday_utf8_hex"),
+                    period_start: period_start.unwrap_or_default(),
+                    period_end: period_end.unwrap_or_default(),
                 };
                 let expected = hex_decode(field(case, id, "expected_output_utf8_hex"));
 

@@ -61,8 +61,17 @@ export function truncateToContext(text: string, budget: number): TruncateResult 
 
 /** The fixed instruction prepended to the note text. Assembled in RAM at call
  *  time and never stored (SYNC-8 — no persisted prompt artifact). */
+/** **The language line is anchored on the NOTE, not on the user's language,
+ *  and that is the difference from the agent's rule (myne-md/myne#618).** The
+ *  agent is told the user's language explicitly, from prefs, because it has a
+ *  user turn to carry it. A summarize pass has no user text at all: the only
+ *  thing in the prompt is the note, so "the user's language" is a phrase the
+ *  model has no way to resolve, and the note is the one anchor that is actually
+ *  present. Without any line a small model answers in English whatever it was
+ *  given, which is the same defect #618 fixed one surface over. */
 export const SUMMARIZE_INSTRUCTION =
-  "Summarize the following note concisely, in a few sentences:\n\n";
+  "Summarize the following note concisely, in a few sentences. " +
+  "Write the summary in the same language as the note.\n\n";
 
 /** Context budget (code points) for a summarize pass — a token proxy until the
  *  model tokenizer + pinned context land (SYNC-7/13). Over-budget input is

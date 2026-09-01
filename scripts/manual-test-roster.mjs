@@ -131,8 +131,13 @@ export const ROSTER = Object.freeze([
       "src-tauri/src/plugins/agent/",
       "src-tauri/src/plugins/local_inference/",
       "src-tauri/src/auto_lock.rs",
+      "mobile/src/app/flows/AiScopeSheet.tsx",
+      "mobile/src/app/flows/AiReviewFlow.tsx",
+      "mobile/src/app/flows/AiUndoStrip.tsx",
+      "src/notes/agent/useUndoLastRun.ts",
+      "mobile/src-tauri/src/plugins/agent/",
     ],
-    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
     automatedBy: [
       "e2e/agent-run.e2e.ts",
       "e2e/ai-chat.e2e.ts",
@@ -148,10 +153,45 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
+        see: "With the app language set to Turkish (Settings > Appearance), open a note and ask the agent something in Turkish. Confirm the answer comes back in Turkish, and that a proposed edit's replacement text is Turkish too rather than English. Repeat with the app in English but the question typed in Turkish: the answer must follow the question, not the interface. Then switch the app to a right-to-left language and confirm the answer renders in the correct direction inside the chat bubble.",
+        whyNotAutomated: "Every AI scenario runs StubEngine, which returns a fixed script and produces no natural language at all, so a test asserting a language would be asserting the fixture. The host-side half is pinned by cargo (the tag reaches the system message, and eight hostile shapes are dropped), but whether a real model honours the instruction is model behaviour, and the right-to-left case is a WebKitGTK bidirectional-layout question that only appears once the text is laid out in the bubble's own box.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+      {
+        see: "With a REMOTE provider configured (OpenRouter, any model), run a single-note agent task and time it end to end against the 12m49s baseline recorded in myne-md/myne#597. Cross-reference the provider's activity dashboard: confirm the run was routed to a fast endpoint rather than the cheapest, that no single iteration spent thousands of output tokens on one line, and that the cost per iteration drops after the first (which is the prompt cache being read). Confirm the run completes at all: the system turn's content is now an array rather than a string, and a provider that rejects that shape would fail every request.",
+        whyNotAutomated: "Needs a real provider, a real key and real money. The repo's tests pin the SHAPE of the request body and can say nothing about routing, billing or whether a given model behind the broker honours a cache marker; nothing in CI is allowed to make a third-party request at all.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 15,
+        tier: "core",
+      },
+      {
         see: "With an agent review screen open holding proposed replacements copied out of note bodies, close the laptop lid (or sleep the machine), wait a minute and wake it. Confirm the vault is locked and the review screen is gone rather than still showing note text. Repeat with the OS screen lock, and on macOS/Windows with fast user switching to a second account and back.",
         whyNotAutomated: "auto-lock.e2e.ts proves only the in-process idle timer; sleep/wake, OS screen lock and fast user switching are OS session events the container cannot raise, so whether keys and the proposal survive a suspend has never been observed.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 12,
+        tier: "core",
+      },
+      {
+        see: "On a real phone with a remote provider configured, open the AI tab and read the scope strip BEFORE typing anything: it must state how many notes the run may change, how many the AI-excluded control removed, and that they are sent to the named provider and leave the device. Confirm all three are readable without scrolling and without the on-screen keyboard covering them, then tap the field to raise the keyboard and confirm the send control and at least the egress line are still visible. Now start a run that will ask to widen (a task naming a folder outside the scope will do) and read the sheet the same way: the grant line, the run's NEW TOTAL, the exclusions, the egress line and the model's stated reason. Confirm Decline sits at the bottom edge, tap it, and confirm the run ENDS rather than continuing narrower. Repeat and Allow, and confirm the run resumes and the cost figures keep moving rather than freezing at the widening.",
+        whyNotAutomated: "The failure this looks for is a fact pushed off-screen, and on a phone the thing that pushes it is the software keyboard, whose height is decided by the OS, the active input method and the user's own keyboard settings. No lane raises one: jsdom computes no layout, and the Playwright flow tier drives Chromium in a fixed viewport with no keyboard at all. That every fact is PRESENT is asserted in mobile/tests/components/AiScopeSheet.test.tsx, so this item is only for whether a person can actually read them at the moment they must decide.",
+        clients: ["ios", "android"],
+        estimateMin: 12,
+        tier: "core",
+      },
+      {
+        see: "On a DISPOSABLE vault, run an agent edit that touches four or five notes and reach the review screen on a real phone. Read one note's diff and answer one question honestly: could you tell what this change does to the note, or did you tap Apply because reading it was worse than trusting it? Check a diff of a long paragraph and one of a bulleted list. Then, on ANDROID, press the hardware back button at the top level and confirm the proposal is still there; press it inside an open diff and confirm it returns to the list rather than leaving. On IOS do the same with the edge-swipe from the left. Repeat the top-level back three times in a row. Finally apply and confirm every note listed actually changed.",
+        whyNotAutomated: "Two halves, and each is out of reach for its own reason. Whether a diff is READABLE at 390px is a judgement about a person's comprehension, and the honest pass condition is written above as a question to answer rather than an assertion. And the back gesture is a real OS gesture: the Android hardware button and the iOS edge-swipe are system events no lane raises, and the flow tier drives Chromium in a desktop browser with neither. That the screen CLAIMS a history entry, and claims a replacement after each pop, is asserted in mobile/tests/components/AiReviewFlow.test.tsx, which is the mechanism; whether the OS then behaves as expected on a real device is not something jsdom can speak for.",
+        clients: ["ios", "android"],
+        estimateMin: 14,
+        tier: "core",
+      },
+      {
+        see: "On a DISPOSABLE vault, apply an agent run on a real phone and confirm the one-tap undo appears, then use it and confirm every note it names is actually back to its earlier text. Read the sentence under the offer and confirm it says the undo lasts only until you lock or close the app, and that it points at a note's version history; follow that pointer and confirm it lands on a note the run wrote, with the run's snapshot present in the list. Then apply a SECOND run, switch to another app and leave the phone alone for long enough that the OS reclaims Myne (lock the screen and wait, or open several heavy apps), come back, and confirm the one-tap undo is GONE while the snapshots for those notes are still there. Repeat the disappearance check by locking the vault instead.",
+        whyNotAutomated: "The disappearance is the point, and what makes it happen is the OS deciding to reclaim a backgrounded process, which is a memory-pressure judgement about a real device that no simulator, container or flow tier reproduces. The record is deliberately not persisted: it holds verbatim note plaintext and writing it to disk would reverse the argument design-notes/ai/0515 rests on, and snapshot metadata records no origin so it cannot be rebuilt afterwards either. So what a person is checking is that the offer really is gone AND the durable path really is populated, on the same device, in that order.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
         tier: "core",
       },
     ],
@@ -166,11 +206,16 @@ export const ROSTER = Object.freeze([
       "src/notes/ai/chatStore.ts",
       "src/notes/ai/aiToChat.ts",
       "src/lib/agent-run.ts",
+      "src/lib/agent-run-core.ts",
+      "src/lib/agent-protocol.ts",
+      "src/notes/agent/agentStore.ts",
       "src/notes/ai/runAskToStore.ts",
       "src/notes/components/AiHydrationProbe.tsx",
       "src-tauri/src/plugins/local_inference/",
+      "mobile/src/app/flows/AiChatFlow.tsx",
+      "mobile/src/lib/agent-run.ts",
     ],
-    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
     automatedBy: [
       "e2e/ai-chat.e2e.ts",
       "e2e/ai-summarize.e2e.ts",
@@ -201,6 +246,20 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 8,
         tier: "core",
+      },
+      {
+        see: "On a real phone, with a real remote provider configured and a DISPOSABLE vault, ask one question that takes long enough to watch (a folder of a dozen notes will do). While it is still running, read the cost line under the answer area and confirm all three figures are moving: requests, notes read, and characters sent off the device. Then press Stop mid-run and confirm the figures STAY on screen showing what the cancelled run already cost. Now repeat, and this time switch to another app for two minutes and come back. Whatever state the run is in, the figures for what it already spent must still be there. A screen that shows nothing after any of these three is the failure: the reply that would have carried the totals is never coming, so the live line is the only disclosure that run will ever make.",
+        whyNotAutomated: "The half a driver cannot reach is the phone leaving the FOREGROUND. iOS and Android suspend or kill a backgrounded app on their own schedule, under their own memory pressure, and that decision is what decides whether the reply ever arrives; no simulator, no Playwright flow tier and no container reaches it. The other half, that the figures advance mid-run at all, is asserted in mobile/tests/components/AiChatFlow.test.tsx against a held-open reply, so this item is here for the part that is a property of a real device rather than of the code.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "On a real phone with AI on, open the AI tab and confirm the bottom bar shows five columns with no label crossing into its neighbour. Do it in a locale whose labels are long: `fi` renders \"Muistiinpanot\" for Notes and `tr` renders \"Yapay Zeka\" for this tab. Then turn AI off in Settings and confirm the bar returns to four columns with no gap where the fifth was. On a landscape tablet confirm there is no bottom bar at all and the AI destination is in the sidebar instead.",
+        whyNotAutomated: "Text width at 10px in a given locale is a property of the WebView's font stack on that OS version; jsdom computes no layout, the flow tier runs Chromium rather than WKWebView or Android WebView, and what is actually being judged is whether a truncated label is still readable, which is a person looking at it.",
+        clients: ["ios", "android"],
+        estimateMin: 6,
+        tier: "standard",
       },
     ],
     exemptionReason: "",
@@ -476,8 +535,15 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "On Android 12 or newer, open the reminders sheet and use the exact-alarm block: it must take you to the system \"Alarms & reminders\" screen for Myne, and after granting it the block must stop asking. Revoke the permission from system settings and confirm the block reappears rather than the app silently registering inexact alarms.",
-        whyNotAutomated: "SCHEDULE_EXACT_ALARM is granted on a system settings screen outside the app and whether the app's intent actually lands there is unobservable from any tier, and a wrong action reads as a button that does nothing.",
+        see: "Open Settings, Privacy, and find the **Schedule ahead** picker. Confirm it offers 1, 3, 5 and 7 days and that the horizon line under it names a date matching the choice. Tab to it once and confirm the whole group is ONE tab stop, then press the arrow keys: each press must move the selection AND the visible focus ring together, one step per press, and wrap at the ends. Then set it to 1, give a task a reminder two days out, and confirm it is not registered until the day before it is due. On a phone, do the same and confirm the value set on the computer arrived.",
+        whyNotAutomated: "The keyboard model is asserted at the flow tier on both clients, and the arithmetic has unit coverage; what no tier reaches is whether the focus ring MOVES where the tabindex says it does, which is a paint the container cannot judge and which is exactly what was wrong when this control shipped its first accessible version. The cross-device half needs two enrolled devices and a sync round.",
+        clients: ["desktop-macos", "desktop-linux", "android", "ios"],
+        estimateMin: 5,
+        tier: "standard",
+      },
+      {
+        see: "SUSPENDED (myne-md/myne#508): the block this drives is gated behind `remindersReachTheOs()`, a hardcoded `false`, so it renders on no build. When that predicate flips, perform it as written. On Android 12 or newer, open the reminders sheet and use the exact-alarm block: it must take you to the system \"Alarms & reminders\" screen for Myne, and after granting it the block must stop asking. Revoke the permission from system settings and confirm the block reappears rather than the app silently registering inexact alarms.",
+        whyNotAutomated: "SUSPENDED, myne-md/myne#508: not performable on any build. `remindersReachTheOs()` is a hardcoded `false`, and this branch gates `ExactAlarmBlock` behind it, so the surface this item drives does not render. It returns unchanged with the wiring change that flips that predicate. Recorded rather than deleted, because the procedure is right and only its reachability moved, and left in place rather than silently kept live, because a tester at a release gate would otherwise either fail an item that cannot be performed or override it, and an override that means nothing is what the ratchet exists to prevent. `check-manual-test-roster.mjs` compares file denominators rather than claim reachability, so nothing else would have said so. When it returns: SCHEDULE_EXACT_ALARM is granted on a system settings screen outside the app and whether the app's intent actually lands there is unobservable from any tier, and a wrong action reads as a button that does nothing.",
         clients: ["android"],
         estimateMin: 4,
         tier: "standard",
@@ -735,6 +801,9 @@ export const ROSTER = Object.freeze([
       "e2e/attachments-library.e2e.ts",
       "e2e/attachment-cleanup.e2e.ts",
       "e2e/attachment-zoom.e2e.ts",
+      // myne-md/myne#604: an embed alone on its line draws as a block and
+      // carries drag-to-resize handles.
+      "e2e/embed-resize.e2e.ts",
       "e2e/attachment-text-preview.e2e.ts",
       "e2e/generic-file-attachment.e2e.ts",
       "e2e/video-attachment.e2e.ts",
@@ -1155,7 +1224,7 @@ export const ROSTER = Object.freeze([
       "e2e/cli-thin-client.e2e.ts",
     ],
     manual: [],
-    exemptionReason: "All four candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). The stalled-peer deadline and its watchdog fallback are already cargo-tested in src-tauri/src/cli_bridge/socket.rs (the watchdog exists precisely so the macOS AF_UNIX difference is not load-bearing), the 0600 mode is asserted by bind_listener_sets_owner_only_0600_perms, the over-cap socket path is constructible in a test rather than designed out of the run, and the lock-during-flight teardown is one step past cli3.",
+    exemptionReason: "All four candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues): the 0600 mode is asserted by bind_listener_sets_owner_only_0600_perms, the over-cap socket path is constructible in a test rather than designed out of the run, and the lock-during-flight teardown is one step past cli3. The fourth, the stalled-peer deadline and its watchdog fallback, is cargo-tested in src-tauri/src/cli_bridge/socket.rs. myne-md/myne#642 falsified the old wording of that last clause, which said the watchdog exists precisely so the macOS AF_UNIX difference is not load-bearing: the accepted stream inherited O_NONBLOCK on macOS, so the socket deadline was dead code there and the deadline test passed in 0.00 s whatever the deadline was. That fix briefly carried a macOS-only manual item on the ground that reproducing the regression needs a BSD-family kernel. It does not, and the item is withdrawn: serve_connection is private, the test module in the same file already calls private items, so the_fix_holds_on_a_stream_that_arrives_non_blocking SETS the flag itself and fails on every Unix including the Linux container every gate runs in. A reason that names a real mechanism and is simply wrong about it is one the guard's phrase denylist cannot catch, which is why it is written out here.",
   },
   {
     id: "cli.write-new",
@@ -1625,6 +1694,8 @@ export const ROSTER = Object.freeze([
       "e2e/heading-list-folding.e2e.ts",
       "e2e/right-panel-active-tab.e2e.ts",
       "e2e/wikilink-deep-links.e2e.ts",
+      // myne-md/myne#601: one press on a rendered chip opens its note.
+      "e2e/wikilink-chip-click.e2e.ts",
       "e2e/find-replace.e2e.ts",
       "e2e/links-tab.e2e.ts",
     ],
@@ -1698,6 +1769,7 @@ export const ROSTER = Object.freeze([
       "e2e/saved-views-table-list.e2e.ts",
       "e2e/saved-views-cards.e2e.ts",
       "e2e/tag-suggestion-band.e2e.ts",
+      "e2e/editor-no-hscroll.e2e.ts",
     ],
     manual: [
       {
@@ -1732,6 +1804,7 @@ export const ROSTER = Object.freeze([
       "e2e/reading-source-modes.e2e.ts",
       "e2e/rtl-layout.e2e.ts",
       "e2e/a11y-axe.e2e.ts",
+      "e2e/editor-vertical-caret.e2e.ts",
     ],
     manual: [
       {
@@ -1787,7 +1860,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Open a note with a ```mermaid flowchart of at least six nodes including one long node label, plus a sequence diagram. On each client confirm no node label overflows its box, no two edge labels overlap, the diagram fits the note width without clipping at the right edge, and the whole card is legible against the editor background in both light and dark themes. On a phone, confirm it is legible at the narrow width rather than shrunk to unreadable.",
+        see: "Open a note with a ```mermaid flowchart of at least six nodes including one long node label, plus a sequence diagram, and make one of them wider than the note column. On each client confirm no node label overflows its box, no two edge labels overlap, a diagram wider than the note scrolls inside its own card rather than shrinking or dragging the note sideways, and the whole card is legible against the editor background in light, dark and AMOLED. On a phone, confirm it is legible at the narrow width rather than shrunk to unreadable.",
         whyNotAutomated: "Mermaid lays out by measuring text with getBBox against the live engine's font metrics, which differ between WebKitGTK, WKWebView, Android WebView and WebView2; render-mermaid.ts states in its own header that jsdom cannot run the render, and there is no Mermaid scenario in any E2E lane.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
         estimateMin: 6,
@@ -2636,6 +2709,53 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "import.myne-vault",
+    title: "Import notes from another Myne vault",
+    paths: [
+      "src/notes/import/sources/myne.ts",
+      "src/notes/import/sources/myneRewrite.ts",
+      "src/notes/import/sources/myneDictionary.ts",
+      "src/notes/import/myneRun.ts",
+      "src/notes/import/MyneVaultSetup.tsx",
+      "src/lib/import-source-vault.ts",
+      "core/src/plugins/vault_unlock/import_source.rs",
+      "src-tauri/src/plugins/importer/source_dictionary.rs",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/import-myne-vault.e2e.ts"],
+    manual: [
+      {
+        see: "Start an import from another vault, then walk away and leave the machine idle past the auto-lock timeout while the import is still running. Confirm the vault does not lock mid-import, and that once the import finishes the very next idle tick locks it. Then start another import and abandon it at the credential step for longer than the source-slot TTL; confirm the source vault's session has ended (the flow reports the session closed rather than continuing to read notes).",
+        whyNotAutomated: "The interaction under test is between two timers measured in real minutes: the idle auto-lock that import_set_hold defers, and the 30-minute source-slot TTL that is deliberately independent of it. A scenario lives for seconds and would have to fake both clocks, which is exactly the coupling the design was worried about and so exactly the thing a faked clock would stop proving.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 45,
+        tier: "core",
+      },
+      {
+        see: "Import from a vault whose password you have forgotten, using its 24-word recovery phrase instead. Confirm the notes arrive, and then confirm the SOURCE vault still opens with its original password afterwards: the phrase path must grant a read without committing a new password to that vault.",
+        whyNotAutomated: "The property is an absence in a vault the scenario has finished with: that vault.meta was not rewritten. Asserting it means unlocking the source afterwards with its original credential, which needs a second full Argon2id derivation and a vault the harness has already torn down.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 12,
+        tier: "core",
+      },
+      {
+        see: "Import a source vault holding several hundred notes and a few hundred megabytes of attachments while watching Activity Monitor or Task Manager. Confirm memory does not climb past roughly 2 GB (the design holds one note body and one attachment in RAM at a time), the window stays responsive, and the run finishes rather than being killed.",
+        whyNotAutomated: "Memory ceiling and sustained responsiveness are host measurements the harness makes no observation of, and the seeded fixture is six notes and two small attachments by design.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 25,
+        tier: "standard",
+      },
+      {
+        see: "Import a vault whose notes use words you had added to that vault's dictionary, and which also has words in its vault-wide ignore set. Confirm the added words no longer show as misspelled in the imported notes, and that a word which was only IGNORED in the source is still flagged here.",
+        whyNotAutomated: "The fixture generator cannot seal a vault.dictionary without keeping a second copy of the postcard payload that lives in src-tauri/src/spell/dictionary.rs, so the E2E fixture deliberately writes none; the unit tiers cover the union and the exclusion, but whether a squiggle appears under a word in the running editor is a rendering question neither answers.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "input.keybindings",
     title: "Keyboard shortcuts, rebinding and reserved chords",
     paths: [
@@ -3180,8 +3300,8 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "On a DISPOSABLE vault seeded with synthetic notes, never a working one, and on an account whose FIRST device already has a remote provider configured and its consent accepted, enrol a SECOND device and, before touching any AI setting there, run one AI action on it with a network capture. docs/threat-model.md §7 states the invariant at ACCOUNT scope and names this exact residual: the provider selection, its key and the consent record are vault content and therefore sync, so the second device inherits them and begins sending without anyone at that device having seen the consent screen. Confirm that is what happens and no more: the second device sends to the same provider host and no other, its settings screen shows the inherited provider and the consent as already granted so the person holding it can SEE what was approved for them, and turning the provider off on either device stops both. It FAILS if the second device sends before that state is visible anywhere in its own UI, which would make the residual undiscoverable rather than merely unasked.",
-        whyNotAutomated: "Two enrolled devices on one account with a real remote provider on the far end, which no lane has: the suite runs one client per scenario, its remote providers are a fake, and provider_transport.rs pins a compiled-in root bundle and host table so no fake can occupy the real path. Nothing automated has ever observed what a second device does with an inherited provider.",
+        see: "On a DISPOSABLE vault seeded with synthetic notes, never a working one, and on an account whose FIRST device already has a remote provider configured and its consent accepted, enrol a SECOND device (a phone is the realistic case) and, before touching any AI setting there, attempt one AI action on it with a network capture running. This item used to instruct the tester to CONFIRM the opposite outcome, and that was correct until myne-md/myne#456 made `ai_provider_consent` device-local. Confirm the remedy actually holds on the wire, which is the only place it can be checked: the second device sends NOTHING to the provider until its own consent screen has been shown and accepted there. The capture is what makes this a real observation rather than a UI reading, because a client that showed the screen and sent anyway would look identical on screen. Then accept on the second device and confirm it sends to the same provider host and no other. Confirm the settings screen on the second device shows the provider and the model as already configured (those DO sync) while the consent reads as not yet granted, so the person holding it can see that the credential arrived and the permission did not. Finally turn the provider off on either device and confirm both stop. It FAILS if any byte reaches the provider from the second device before somebody accepted on it, and it FAILS if the second device presents the inherited key as though it had also inherited the permission.",
+        whyNotAutomated: "Two enrolled devices on one account with a real remote provider on the far end, which no lane has: the suite runs one client per scenario, its remote providers are a fake, and provider_transport.rs pins a compiled-in root bundle and host table so no fake can occupy the real path. The half that a unit test genuinely cannot reach is the absence of a packet from a device nobody has touched, which needs a second enrolled device and a capture on the same network.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
         estimateMin: 30,
         tier: "core",
@@ -3627,8 +3747,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "Register a reminder BEFORE granting the exact-alarm permission, then grant it in Settings → Privacy → Exact timing, return to the app, and wait for the reminder. Confirm it arrives on the minute rather than late. This is the onResume re-arm, and without it the already-registered alarm silently stays on the approximate tier.",
-        whyNotAutomated: "The upgrade path runs entirely inside AlarmManager across an app lifecycle transition and a system permission screen; nothing in this repo builds the Kotlin, and the failure is a reminder that arrives at the wrong time, which no in-app state reports.",
+        see: "SUSPENDED (myne-md/myne#508): reaching the permission screen from the app needs the exact-alarm block, which is gated behind `remindersReachTheOs()`, a hardcoded `false`. When that predicate flips, perform it as written. Register a reminder BEFORE granting the exact-alarm permission, then grant it in Settings → Privacy → Exact timing, return to the app, and wait for the reminder. Confirm it arrives on the minute rather than late. This is the onResume re-arm, and without it the already-registered alarm silently stays on the approximate tier.",
+        whyNotAutomated: "SUSPENDED, myne-md/myne#508: not performable on any build. `remindersReachTheOs()` is a hardcoded `false`, and this branch gates `ExactAlarmBlock` behind it, so the surface this item drives does not render. It returns unchanged with the wiring change that flips that predicate. Recorded rather than deleted, because the procedure is right and only its reachability moved, and left in place rather than silently kept live, because a tester at a release gate would otherwise either fail an item that cannot be performed or override it, and an override that means nothing is what the ratchet exists to prevent. `check-manual-test-roster.mjs` compares file denominators rather than claim reachability, so nothing else would have said so. When it returns: the upgrade path runs entirely inside AlarmManager across an app lifecycle transition and a system permission screen; nothing in this repo builds the Kotlin, and the failure is a reminder that arrives at the wrong time, which no in-app state reports.",
         clients: ["android"],
         estimateMin: 12,
         tier: "standard",
@@ -3992,13 +4112,21 @@ export const ROSTER = Object.freeze([
       "src/components/settings/AiProviderConsent.tsx",
       "src/lib/engine-error.ts",
       "src/lib/prefs.ts",
-      "src-tauri/src/plugins/local_inference/provider_gate.rs",
-      "src-tauri/src/plugins/local_inference/provider_transport.rs",
-      "src-tauri/src/plugins/local_inference/provider_registry.rs",
+      "core/src/inference/provider_gate.rs",
+      "core/src/inference/provider_transport.rs",
+      "core/src/inference/provider_registry.rs",
       "src-tauri/src/plugins/local_inference/endpoint_config.rs",
-      "src/lib/load-bearing-copy.ts",
+      "copy/src/index.ts",
+      "mobile/src/components/AiConsentScreen.tsx",
+      "mobile/src/lib/prefs.ts",
     ],
-    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    clients: [
+      "desktop-macos",
+      "desktop-linux",
+      "desktop-windows",
+      "ios",
+      "android",
+    ],
     automatedBy: [
       "e2e/ai-remote-providers.e2e.ts",
       "e2e/ai-ux-surface.e2e.ts",
@@ -4008,9 +4136,9 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Find a reader who has not read this repository. Open Settings → AI, start selecting a remote provider so the consent dialog appears, and let them read it once at their own pace. Close it, take the screen away, and ask three open questions without prompting or paraphrasing the copy back at them: \"what leaves this device?\", \"where does it go?\", \"what does Myne promise about it afterwards?\". PASS requires all three of these restated in their own words, unaided: (a) the TEXT OF THE NOTES involved in each request leaves the device (and, if they mention agent runs, that a run also sends the titles and identifiers of every note in the approved scope before it has read any of them); (b) it goes to the SPECIFIC PROVIDER named in the dialog, which Myne does not run; (c) Myne CANNOT SEE OR CONTROL what that provider keeps, how long it keeps it, or whether it passes the request on to someone else. Two of three is a FAIL. It is also a FAIL, at three of three, if they say anything implying Myne's encryption still covers the text once it has left. Write that sentence down verbatim, because it names the clause that needs rewriting. Only AFTER they have answered, read CONSENT_WHAT_LEAVES, consentToWhom and consentCannotVerify in src/lib/load-bearing-copy.ts to check their recall against the source, then read the whole AI panel yourself and confirm nothing on it implies a protection over the sent text that does not exist.",
-        whyNotAutomated: "The object being measured is a human reader's recall, which exists only in a person and has no representation a driver can query. e2e/ai-remote-providers.e2e.ts pins that the disclosure literals are PRESENT, which is a string comparison and stays green over copy that nobody understands; presence is not the property this gate exists for, because this dialog is the reversal of a stated anti-feature and is the only thing standing between a user and their notes leaving the device.",
-        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        see: "Find a reader who has not read this repository. Open Settings → AI, start selecting a remote provider so the consent dialog appears, and let them read it once at their own pace. Close it, take the screen away, and ask three open questions without prompting or paraphrasing the copy back at them: \"what leaves this device?\", \"where does it go?\", \"what does Myne promise about it afterwards?\". PASS requires all three of these restated in their own words, unaided: (a) the TEXT OF THE NOTES involved in each request leaves the device (and, if they mention agent runs, that a run also sends the titles and identifiers of every note in the approved scope before it has read any of them); (b) it goes to the SPECIFIC PROVIDER named in the dialog, which Myne does not run; (c) Myne CANNOT SEE OR CONTROL what that provider keeps, how long it keeps it, or whether it passes the request on to someone else. Two of three is a FAIL. It is also a FAIL, at three of three, if they say anything implying Myne's encryption still covers the text once it has left. Write that sentence down verbatim, because it names the clause that needs rewriting. Only AFTER they have answered, read CONSENT_WHAT_LEAVES, consentToWhom and consentCannotVerify in copy/src/index.ts to check their recall against the source, then read the whole AI panel yourself and confirm nothing on it implies a protection over the sent text that does not exist.",
+        whyNotAutomated: "The object being measured is a human reader's recall, which exists only in a person and has no representation a driver can query. e2e/ai-remote-providers.e2e.ts pins that the disclosure literals are PRESENT, which is a string comparison and stays green over copy that nobody understands; presence is not the property this gate exists for, because this dialog is the reversal of a stated anti-feature and is the only thing standing between a user and their notes leaving the device. On ios and android there is no scenario at all: the clauses are the same strings by construction (@myne/copy), and what differs is that seven of them do not fit on a phone, so a clause the reader never scrolled to is a clause they did not read, and only a person can be observed not scrolling.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
         estimateMin: 12,
         tier: "core",
       },
@@ -4081,14 +4209,16 @@ export const ROSTER = Object.freeze([
   },
   {
     id: "settings.block.daily-notes",
-    title: "Daily notes: folder, date format, template",
+    title: "Periodic notes: folder, title format, template, for each of daily, weekly and monthly",
     paths: [
-      "src/components/settings/DailyNotesSettings.tsx",
+      "src/components/settings/PeriodicNotesSettings.tsx",
+      "src/notes/dailyNote.ts",
       "src/notes/listFolderPaths.ts",
       "src/notes/templates.ts",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/periodic-notes.e2e.ts",
       "e2e/templates.e2e.ts",
       "e2e/files-settings.e2e.ts",
       "e2e/slash-datetime.e2e.ts",
@@ -4113,8 +4243,42 @@ export const ROSTER = Object.freeze([
       "src/lib/useDateTimeDisplay.ts",
       "src/notes/dailyNote.ts",
       "src/notes/taskFilters.ts",
+      // myne-md/myne#609 widened this setting's reach twice: to the in-note task
+      // chip on every client, and to mobile at all, which had read the shared
+      // display store while writing nothing into it.
+      "editor/src/decorations/task-chip.ts",
+      "editor/src/decorations/plugin-factory.ts",
+      "mobile/src/lib/useDateTimeDisplaySync.ts",
+      "mobile/src/app/flows/SettingsSheet.tsx",
     ],
-    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
+    // `cli` joined the client set with the periodic-notes item below, and it is
+    // not decoration: the CLI is a THIRD reader of the `timezone` override's
+    // consequence, and it reads the device clock rather than the override
+    // (`decisions/storage/0556`). An entry whose client list omits it produces a
+    // plan that never schedules the one observation covering the divergence.
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android", "cli"],
+    // EMPTY, deliberately, and it was briefly not.
+    //
+    // Three scenarios covering this surface are WRITTEN (`tc4`, `tc5` in
+    // `e2e/task-chips.e2e.ts`; `fr3` in `e2e/find-replace.e2e.ts`) and have
+    // never executed: the container run died in cargo on a full Docker VM.
+    // `automatedBy` is a claim that a machine covers this, and no machine has,
+    // so naming the files here would record automation nobody watched run, which
+    // is the class of error myne-md/myne#609 spent its review round removing.
+    //
+    // The scenario FLOOR is the other side of the same fact and is deliberately
+    // not symmetric: `scripts/e2e-scenario-floor.json` was raised to 306, which
+    // REQUIRES the three to execute rather than claiming they did, so the first
+    // run that skips them goes red. Requiring is honest; claiming is not. Fill
+    // this in when the run is green three times consecutively.
+    //
+    // One lane DOES cover part of this and is not `automatedBy` material,
+    // because this field names `e2e/` scenarios:
+    // `mobile/tests/flow-logic/settings/date-time.flow.ts` runs on every push
+    // and proves the three mobile rows are WIRED (a pick reaches its setter,
+    // and the zone field restores the stored value on both of its failure
+    // paths). What it cannot reach is a real prefs write arriving over sync,
+    // which is what the manual items below are for.
     automatedBy: [],
     manual: [
       {
@@ -4137,6 +4301,20 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 10,
         tier: "standard",
+      },
+      {
+        see: "On a phone, open Settings then Editor and confirm the three date-and-time rows are present. Set a date format there and confirm a task line's due chip inside an open note redraws in it without leaving the note. Then, against the same synced vault, choose a DIFFERENT date format on a computer and confirm the phone adopts it on the next sync with nothing set on the phone; and confirm the time-zone value set on the phone does NOT displace the one already set on the computer.",
+        whyNotAutomated: "No lane drives a phone's WebView: the container suite runs WebKitGTK on Linux, and mobile's Playwright tier drives its React tree against a mocked Tauri IPC, so neither can produce a real prefs write arriving over sync nor observe which side of the merge each field lands on.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "Set a `timezone` override on the DESKTOP that sits in a different calendar day from the device's own clock (e.g. device on Europe/Berlin, override on Pacific/Auckland), on a Sunday evening in Berlin. Open the weekly note on the desktop and then on the phone, and confirm the two titles differ by a whole ISO week and that the vault now holds TWO weekly notes for that period, both synced, with nothing reconciling them. Then run `myne weekly` and confirm it opens the phone's note, and that the device-clock advisory appears on stderr and NOT on stdout (`myne weekly > out.md` leaves out.md free of it).",
+        whyNotAutomated: "The divergence is between three clients running at once: desktop applies the override, mobile and the CLI read the device clock (`decisions/storage/0556`, which states the two-notes outcome as an accepted cost). Every automated lane in this repo is one Linux container against WebKitGTK, so no scenario can hold a desktop and a phone on the same vault at the same instant, and the CLI stream split needs a real terminal with a redirect. The Sunday-evening condition also requires the wall clock to be inside the one window where an ISO week boundary and a calendar-day boundary disagree.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android", "cli"],
+        estimateMin: 20,
+        tier: "core",
       },
     ],
     exemptionReason: "",
@@ -4530,6 +4708,39 @@ export const ROSTER = Object.freeze([
         whyNotAutomated: "SetWindowDisplayAffinity is a DWM compositor request that some capture tools bypass, the tao Windows arm discards the API's return BOOL so a silent degrade is invisible to the process itself, and there is no Windows anywhere in CI.",
         clients: ["desktop-windows"],
         estimateMin: 14,
+        tier: "core",
+      },
+      {
+        see: "myne-md/myne#483's own acceptance, which no lane can run: on Windows 10 build 19041 or later, with the vault UNLOCKED and protection on, call GetWindowDisplayAffinity on the Myne main window and record the value. Let idle auto-lock fire (or lock manually), which hides the window; bring it back through each of the four re-show paths in turn (relaunch into the single-instance callback, the macOS dock arm's Windows equivalent where one exists, a clipper pair request, and the unlock screen's own reveal) and read the affinity back after each. WDA_EXCLUDEFROMCAPTURE after every one is the pass. Then take a screenshot on each path and confirm it comes back blank. If the affinity is intact on all four WITHOUT the fix as well, record that negative result on the issue so the next person does not re-investigate tauri-apps/tauri#14189.",
+        whyNotAutomated: "design-notes/security/0378 records that the native side is not E2E-observable: set_content_protected is window state WebDriver cannot read, and the tao Windows arm discards SetWindowDisplayAffinity's return BOOL so the process cannot read it back either without a windows-sys dependency that design-notes/clients/0133 deliberately does not take. There is no Windows anywhere in CI, and the tauri-driver harness runs on Linux where the call is a compile-time no-op.",
+        clients: ["desktop-windows"],
+        estimateMin: 18,
+        tier: "core",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
+    id: "settings.block.screen-capture-override",
+    title: "The pre-unlock escape hatch from screen-capture protection",
+    paths: [
+      "src/components/ScreenCaptureEscape.tsx",
+      "src/components/settings/PrivacyPanel.tsx",
+      "src/lib/screen-capture-override.ts",
+      "core/src/screen_capture_override.rs",
+      "src-tauri/src/plugins/screen_capture/",
+      "src-tauri/src/screen_capture.rs",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: [
+      "e2e/screen-capture-override.e2e.ts",
+    ],
+    manual: [
+      {
+        see: "On Windows 10 build 19041 or later, join the machine over Chrome Remote Desktop or AnyDesk from a second device so the Myne window shows as a black rectangle to the remote viewer. WITHOUT touching the local keyboard, confirm the remote operator can still reach the escape: press Tab once from a cold launch, confirm a screen reader announces the control (or that it becomes visible on focus), take it, confirm the dialog, and confirm the window becomes visible to the remote viewer. Then quit, relaunch, and confirm it is STILL visible: an escape that lapses at the next launch is not one. Repeat the whole thing with a magnifier (ZoomText or Windows Magnifier) instead of remote desktop. Finally, relaunch with --disable-screen-capture-protection and confirm the Privacy row reports the flag rather than offering to turn protection back on.",
+        whyNotAutomated: "Whether the window actually clears is a property of SetWindowDisplayAffinity under a live DWM composition, which the tao Windows arm cannot report (it discards the API return BOOL) and which no driver can read back. design-notes/security/0378 records that the native side is not E2E-observable. There is no Windows anywhere in CI, and the harness runs on Linux, where the call is a compile-time no-op. The automated scenarios prove the file, the consent gate and the keyboard reachability; this proves the black rectangle goes away.",
+        clients: ["desktop-windows"],
+        estimateMin: 16,
         tier: "core",
       },
     ],
@@ -6746,6 +6957,9 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
       "e2e/workspace-state.e2e.ts",
+      // myne-md/myne#600: a note keeps its reading position across a note
+      // switch (sm1) and across a pane split (sm2).
+      "e2e/scroll-memory.e2e.ts",
       "e2e/tab-modes.e2e.ts",
       "e2e/tab-switch-flush.e2e.ts",
       "e2e/navigation.e2e.ts",

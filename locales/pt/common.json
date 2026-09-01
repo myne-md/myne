@@ -49,7 +49,8 @@
       "unsupportedDetail": "Passou {{passes}} de {{attempts}} verificações; são necessárias {{required}}.",
       "checking": "A verificar o modelo…",
       "checkingAt": "A verificar o modelo… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Este limiar de aprovação ainda não foi medido em vários modelos, por isso pode ser mais rígido ou mais permissivo do que devia."
+      "unsupportedProvisional": "Este limiar de aprovação ainda não foi medido em vários modelos, por isso pode ser mais rígido ou mais permissivo do que devia.",
+      "scopeNone": "nenhuma nota aberta, por isso ainda não há nada para trabalhar"
     },
     "progress": {
       "working": "A trabalhar",
@@ -68,7 +69,8 @@
       "grantsUser_other": "{{count}} âmbitos definidos por si",
       "grantsModel_one": "{{count}} que ele pediu",
       "grantsModel_many": "{{count}} que ele pediu",
-      "grantsModel_other": "{{count}} que ele pediu"
+      "grantsModel_other": "{{count}} que ele pediu",
+      "cancelledBackground": "A execução foi cancelada porque o Myne passou para segundo plano. Nada foi escrito. Pergunte de novo quando quiser."
     },
     "scope": {
       "title": "Incluir {{folder}}?",
@@ -130,7 +132,10 @@
         "excludedFolder": "Não criada: essa pasta está excluída da IA.",
         "createFailed": "Não criada: falhou a escrita da nova nota. As restantes alterações foram aplicadas.",
         "excludedNow": "Não foi possível aplicar: a pasta dessa nota está agora excluída da IA.",
-        "notProposed": "Não foi possível aplicar: essa alteração não faz parte da proposta desta execução."
+        "notProposed": "Não foi possível aplicar: essa alteração não faz parte da proposta desta execução.",
+        "noteMoved": "Não foi possível aplicar: essa alteração moveria a nota para outra pasta.",
+        "appendEmpty": "Não foi possível aplicar: não havia nada para adicionar.",
+        "appendWouldWriteFrontmatter": "Não foi possível aplicar: esse texto teria se tornado o bloco de propriedades da nota."
       },
       "applyFailed": "Não foi possível aplicar as alterações.",
       "undo": "Anular esta execução",
@@ -154,7 +159,8 @@
       "runSummaryOffDevice_one": "cerca de {{count}} caráter das suas notas foi enviado para o fornecedor",
       "runSummaryOffDevice_many": "cerca de {{count}} carateres das suas notas foram enviados para o fornecedor",
       "runSummaryOffDevice_other": "cerca de {{count}} carateres das suas notas foram enviados para o fornecedor",
-      "runSummaryOnDevice": "nada saiu deste dispositivo"
+      "runSummaryOnDevice": "nada saiu deste dispositivo",
+      "appendFlag": "adiciona ao final"
     },
     "undo": {
       "offer_one": "A última execução alterou {{count}} nota.",
@@ -169,7 +175,9 @@
       "failed_other": "Não foi possível restaurar {{count}} notas.",
       "createdNotReverted_one": "{{count}} nota criada pela execução foi mantida.",
       "createdNotReverted_many": "{{count}} notas criadas pela execução foram mantidas.",
-      "createdNotReverted_other": "{{count}} notas criadas pela execução foram mantidas."
+      "createdNotReverted_other": "{{count}} notas criadas pela execução foram mantidas.",
+      "sessionOnly": "Esta anulação com um toque dura até bloquear o cofre ou fechar a aplicação. Depois disso, restaure notas uma a uma a partir do histórico de versões de cada nota.",
+      "sessionOnlyLink": "Abrir histórico de versões"
     }
   },
   "ai": {
@@ -691,6 +699,12 @@
       },
       "unfoldAll": {
         "label": "Desdobrar tudo"
+      },
+      "openThisWeekNote": {
+        "label": "Abrir a nota desta semana"
+      },
+      "openThisMonthNote": {
+        "label": "Abrir a nota deste mês"
       }
     },
     "hotkeys": {
@@ -917,13 +931,15 @@
           "captureFailed": "Não foi possível iniciar a gravação. Verifique o acesso ao microfone nas Definições do Sistema.",
           "generic": "Não foi possível iniciar a gravação.",
           "locked": "Desbloqueie o cofre para gravar uma nota de voz.",
-          "noInputDevice": "Nenhum microfone encontrado. Ligue um e tente novamente."
+          "noInputDevice": "Nenhum microfone encontrado. Ligue um e tente novamente.",
+          "unsupportedSampleRate": "O seu microfone grava a uma taxa de amostragem que o Myne não consegue transcrever. Escolha outro dispositivo de entrada, ou altere a taxa de amostragem nas definições de som do sistema."
         },
         "stopError": {
           "captureFailed": "A gravação falhou. Verifique o microfone.",
           "emptyRecording": "Nada foi gravado.",
           "generic": "Não foi possível guardar a gravação.",
-          "silentRecording": "A gravação ficou silenciosa e foi descartada. Verifique o microfone."
+          "silentRecording": "A gravação ficou silenciosa e foi descartada. Verifique o microfone.",
+          "unsupportedSampleRate": "O seu microfone grava a uma taxa de amostragem que o Myne não consegue transcrever. Nada foi guardado. Escolha outro dispositivo de entrada, ou altere a taxa de amostragem nas definições de som do sistema."
         }
       },
       "widget": {
@@ -969,6 +985,7 @@
             "featureOff": "A voz para texto está desligada. Ligue-a em Definições → Transcrição.",
             "modelLoadFailed": "Não foi possível carregar o modelo de voz para texto. Se definiu um modelo personalizado em Definições → Programador → IA, verifique os respetivos ficheiros; caso contrário, reinstalar o Myne repõe o modelo incorporado.",
             "noModel": "Falta o modelo de voz para texto. Reinstalar o Myne repõe-no.",
+            "tooLong": "Esta gravação é demasiado longa para ser transcrita. O áudio continua anexado, por isso ainda pode reproduzi-lo.",
             "vaultLocked": "Desbloqueie o cofre para transcrever."
           },
           "disabledReason": "Ative a IA em Definições → Developer → IA para transcrever.",
@@ -1213,10 +1230,6 @@
       "turnedIntoTemplate": "Transformada em modelo",
       "convertedToNote": "Convertida em nota",
       "versionHistory": "Histórico de versões",
-      "exportMarkdown": "Exportar como Markdown…",
-      "exportPdf": "Exportar como PDF…",
-      "exportHtml": "Exportar como HTML…",
-      "exportTxt": "Exportar como Texto Simples…",
       "trash": "Mover para a Lixeira"
     },
     "codeBlock": {
@@ -1248,7 +1261,9 @@
       "replaceAllCount": "Substituir tudo ({{total}})",
       "replaceOne": "Substituir",
       "replacePlaceholder": "Substituir por",
-      "toggleReplace": "Alternar substituição"
+      "toggleReplace": "Alternar substituição",
+      "dateFallback": "A procurar {{stored}}, a forma em que esta data é guardada.",
+      "replaceOffOnDateFallback": "Substituir está desativado enquanto uma data for encontrada pela sua forma guardada, para que uma substituição não a torne ilegível."
     },
     "cover": {
       "add": "Adicionar capa",
@@ -1274,7 +1289,8 @@
       "titlePlaceholder": "Sem título"
     },
     "mermaid": {
-      "rendering": "A processar diagrama…"
+      "rendering": "A processar diagrama…",
+      "renderFailed": "Não foi possível renderizar este diagrama: {{reason}}"
     },
     "slash": {
       "aiContinue": "Continuar a escrever (IA)",
@@ -1592,6 +1608,13 @@
     "commandPalette": {
       "searchPlaceholder": "Pesquisar notas ou executar um comando…",
       "noMatches": "Nenhum comando ou nota corresponde."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Não foi possível abrir a nota de hoje.",
+        "weekly": "Não foi possível abrir a nota desta semana.",
+        "monthly": "Não foi possível abrir a nota deste mês."
+      }
     }
   },
   "export": {
@@ -2114,10 +2137,6 @@
       "duplicate": "Duplicar",
       "editFilterTitle": "Editar filtro",
       "emptyState": "Ainda não há notas.",
-      "exportHtml": "Exportar como HTML…",
-      "exportMarkdown": "Exportar como Markdown…",
-      "exportPdf": "Exportar como PDF…",
-      "exportTxt": "Exportar como Texto Simples…",
       "favoritesHeading": "Favoritos",
       "icon": "Ícone…",
       "mergeAnyway": "Fundir mesmo assim",
@@ -2433,6 +2452,13 @@
     },
     "workspace": {
       "defaultSlotName": "Predefinida"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportar…",
+      "txt": "Texto simples"
     }
   },
   "password": {
@@ -2878,20 +2904,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Em branco (sem modelo)",
+      "folderSearchEmpty": "Nenhuma pasta corresponde.",
+      "folderSearchPlaceholder": "Pesquisar pastas…",
+      "searchEmpty": "Nenhum modelo corresponde.",
+      "searchPlaceholder": "Pesquisar modelos…",
+      "untitledTemplate": "Modelo sem título",
+      "sectionDaily": "Notas diárias",
+      "sectionWeekly": "Notas semanais",
+      "sectionMonthly": "Notas mensais",
+      "periodFolderLabel": "Pasta",
+      "periodFolderHelper": "Onde as novas notas {{period}} são guardadas. Predefinição: {{default}}. A pasta mantém-se mesmo vazia.",
+      "periodFormatLabel": "Formato do título",
+      "periodFormatHelperDaily": "O título de cada nota diária. Suporta YYYY, MM, DD, gggg (ano ISO da semana), ww (número da semana ISO) e [texto] para texto literal. Predefinição: {{default}}.",
+      "periodFormatHelperWeekly": "O título de cada nota semanal. Suporta gggg (ano ISO da semana), ww (número da semana ISO), YYYY, MM, DD e [texto] para texto literal. Predefinição: {{default}}.",
+      "periodFormatHelperMonthly": "O título de cada nota mensal. Suporta YYYY, MM, gggg (ano ISO da semana), ww (número da semana ISO) e [texto] para texto literal. Predefinição: {{default}}.",
+      "periodTemplateLabel": "Modelo",
+      "periodTemplateHelper": "Escolha um modelo para iniciar cada nota {{period}}, ou deixe em branco para uma nota vazia com a data como título.",
+      "collisionWarning": "As notas {{first}} e {{second}} levam à mesma nota, porque partilham uma pasta e produzem o mesmo título. Ambos os comandos irão abri-la.",
+      "weekStartNote": "As semanas começam à segunda-feira (ISO 8601), por isso os primeiros dias de janeiro podem pertencer à última semana do ano anterior, e os últimos dias de dezembro à primeira semana do ano seguinte.",
+      "periodFolderSaveError": "Não foi possível guardar a pasta {{period}}. Tente novamente.",
+      "periodFormatSaveError": "Não foi possível guardar o formato do título {{period}}. Tente novamente.",
+      "periodTemplateSaveError": "Não foi possível guardar o modelo {{period}}. Tente novamente.",
+      "periodNameDaily": "diária",
+      "periodNameWeekly": "semanal",
+      "periodNameMonthly": "mensal",
+      "periodFolderAriaLabel": "Pasta das notas {{period}}",
+      "periodFormatAriaLabel": "Formato do título das notas {{period}}",
+      "periodTemplateAriaLabel": "Modelo das notas {{period}}",
       "dateFormatHelper": "O título de cada nota diária. Suporta YYYY, MM, DD. Predefinição: {{default}}.",
       "dateFormatLabel": "Formato de data da nota diária",
       "dateFormatSaveError": "Não foi possível guardar o formato de data. Tente novamente.",
       "folderHelper": "Onde as novas notas diárias são guardadas. Predefinição: {{default}}. A pasta é mantida mesmo quando vazia.",
       "folderLabel": "Pasta das notas diárias",
       "folderSaveError": "Não foi possível guardar a pasta diária. Tente novamente.",
-      "folderSearchEmpty": "Nenhuma pasta corresponde.",
-      "folderSearchPlaceholder": "Pesquisar pastas…",
-      "searchEmpty": "Nenhum modelo corresponde.",
-      "searchPlaceholder": "Pesquisar modelos…",
       "templateHelper": "Escolha um modelo a partir do qual iniciar cada nota diária, ou deixe em branco para uma nota vazia com a data por título.",
       "templateLabel": "Modelo da nota diária",
-      "templateSaveError": "Não foi possível guardar o modelo diário. Tente novamente.",
-      "untitledTemplate": "Modelo sem título"
+      "templateSaveError": "Não foi possível guardar o modelo diário. Tente novamente."
     },
     "deleteVault": {
       "cancel": "Cancelar",
@@ -3053,7 +3101,8 @@
         "title": "Antes de o Myne enviar seja o que for para {{provider}}",
         "whatLabel": "O que sai do seu dispositivo",
         "whenLabel": "Quando sai",
-        "whoLabel": "Quem o recebe"
+        "whoLabel": "Quem o recebe",
+        "connectionLabel": "Como viaja"
       },
       "disclosureToggle": "Como funciona?",
       "enableHelper": "Executa um modelo fornecido por si. Onde é executado, e se as suas notas saem deste dispositivo, depende do fornecedor que indicar abaixo. Experimental, desativado por predefinição.",
@@ -3087,7 +3136,9 @@
         "refused": "O fornecedor recusou a ligação. Pode estar indisponível ou a bloquear esta rede.",
         "timeout": "O fornecedor não respondeu a tempo. Não ficou nada a decorrer.",
         "unauthorized": "O fornecedor rejeitou a sua chave de API. Substitua-a: pode estar errada, revogada ou pertencer a outra conta.",
-        "unreachable": "Não foi possível contactar o fornecedor. Verifique a sua ligação de rede."
+        "unreachable": "Não foi possível contactar o fornecedor. Verifique a sua ligação de rede.",
+        "featureOff": "A IA está desligada neste dispositivo. Nada foi enviado. Ligue-a nas Definições, em IA.",
+        "consentMissing": "Não concordou em enviar notas para este fornecedor a partir deste dispositivo. Nada foi enviado. Escolha o fornecedor novamente nas Definições, em IA, e leia o que será enviado."
       },
       "modelChoose": "Escolher ficheiro…",
       "modelEmbeddingLabel": "Modelo de pesquisa: pesquisa semântica e perguntas e respostas",
@@ -3130,7 +3181,16 @@
       "recommendedFilesGeneration": "Precisa do ficheiro .gguf + tokenizer.json na mesma pasta.",
       "recommendedFilesTranscription": "Precisa do ficheiro .gguf do Whisper + config.json + tokenizer.json na mesma pasta.",
       "title": "IA",
-      "providerModelCount_many": "{{count}} modelos disponíveis."
+      "providerModelCount_many": "{{count}} modelos disponíveis.",
+      "mobileEnableLabel": "Usar IA neste telemóvel",
+      "mobileEnableHelper": "Desativado por predefinição. Nenhum modelo de IA neste telemóvel responde a perguntas nem lê as suas notas, por isso cada pedido vai para um serviço que indicar abaixo, e as suas notas saem deste dispositivo nesse momento. A transcrição e o texto de imagens continuam a correr aqui, em modelos que vêm com o Myne.",
+      "mobileKeyAdd": "Guardar chave",
+      "mobileKeyReplace": "Substituir chave",
+      "mobileRevokeHelper": "Remove o fornecedor, a sua chave e a aprovação deste telemóvel em conjunto, deixando exatamente o estado de nunca ter sido configurado. Os outros dispositivos continuam a funcionar até os remover lá também.",
+      "mobileApproveLabel": "Aprovar o envio neste telemóvel",
+      "mobileApproveHelper": "O fornecedor e a sua chave vieram de outro dispositivo. Nada é enviado a partir deste telemóvel até ler o que será enviado e aprovar aqui.",
+      "historyBudgetHelper": "Quanto da conversa recente cada pedido leva, em caracteres. Deixe vazio para o valor predefinido. Um número maior permite que a IA acompanhe conversas mais longas e envia mais delas: com um fornecedor que não está neste dispositivo, isso é mais do seu texto a sair dele, em cada passo de uma execução.",
+      "historyBudgetLabel": "Conversa enviada em cada pedido"
     },
     "network": {
       "disabledCue": "A sincronização já não é encaminhada através do Tor. As novas ligações vão diretamente para o servidor de sincronização.",
@@ -3163,6 +3223,9 @@
       "exactLabel": "Hora exata",
       "exactOn": "Ligado",
       "horizon": "Os lembretes estão registados até {{date}}. Abra o Myne antes disso para continuarem a chegar.",
+      "horizonLabel": "Agendar com antecedência",
+      "horizonLabelHelper": "Os lembretes são preparados com esta antecedência. O Myne tem de estar aberto e desbloqueado para que chegue um.",
+      "horizonInertHelper": "Guardado neste dispositivo. Ainda nada o lê: esta versão não entrega lembretes de tarefas.",
       "label": "Lembretes de tarefas",
       "saveError": "Não foi possível guardar essa definição. Tente novamente.",
       "showTextAria": "Mostrar o texto da tarefa na notificação",
@@ -3447,12 +3510,14 @@
         "viewMode": "modo de visualização vista predefinido ao vivo leitura origem pré-visualização preview",
         "dateFormat": "formato de data dia mês ano iso dd/mm mm/dd calendário date format",
         "timeFormat": "formato de hora 24 horas 12 horas relógio am pm time format",
-        "timezone": "fuso horário zona horária tz utc iana região hoje timezone"
+        "timezone": "fuso horário zona horária tz utc iana região hoje timezone",
+        "periodicNotes": "notas periódicas semanal mensal semana mês pasta modelo formato",
+        "aiHistoryBudget": "conversa histórico contexto memória orçamento caracteres agente chat pedido"
       }
     },
     "dateTime": {
       "dateLabel": "Formato de data",
-      "dateHelper": "Como as datas são mostradas nas tarefas, nas vistas guardadas e nos anexos.",
+      "dateHelper": "Como se escreve uma data em todos os sítios onde o Myne mostra uma.",
       "dateSystem": "Seguir o idioma",
       "timeLabel": "Formato de hora",
       "timeHelper": "Se as horas são mostradas no formato de 24 ou de 12 horas.",

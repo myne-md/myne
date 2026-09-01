@@ -174,6 +174,38 @@ export type Capability =
    */
   | "hostDirectoryRead"
   /**
+   * Importing notes from ANOTHER LOCAL MYNE VAULT (myne-md/myne#464).
+   *
+   * Named for the second vault, not for the import, and the distinction is the
+   * same one `hostDirectoryRead` makes two entries down: markdown import ships
+   * on every client. What does not is the ability to hold a SECOND vault's keys
+   * while the first is unlocked, which is what this feature is.
+   *
+   * **Absent on web, on two independent grounds, and either alone is enough.**
+   * A browser origin holds exactly ONE container under a constant vault id
+   * (`phase3-web-client` task 85), so there is no second vault to import FROM
+   * and the source list would be permanently empty. And the `importer:` plugin
+   * is classified `Class::Unsupported` wholesale by the wasm dispatcher, so
+   * every command behind the flow refuses.
+   *
+   * A capability rather than an empty list, because an empty list is a dead
+   * affordance: the card would sit in the picker, the setup step would render,
+   * and the user would reach a credential field for a vault that cannot exist.
+   * `decisions.md` 2026-07-26 makes omission the normative answer to exactly
+   * that shape.
+   *
+   * It also carries a SECOND consequence that the runtime flag alone cannot
+   * deliver, so the module is substituted as well (`web/vite.config.ts`): the
+   * setup step accepts a 24-word recovery phrase, and `threat-model.md` A18 is
+   * about ROUTINE phrase prompts in a browser teaching a user that typing 24
+   * words into a page is normal. `decisions.md` 2026-08-15 bounds this client
+   * to asking for the phrase in exactly one situation, a recovery the user
+   * started themselves, and an import is not that situation. A hidden branch
+   * would leave the field in the artefact, one devtools breakpoint away, which
+   * is the reason `scripts/check-web-no-phrase.mjs` exists at all.
+   */
+  | "vaultImport"
+  /**
    * Searching the TEXT INSIDE attachments — a PDF's or DOCX's contents, not its
    * filename.
    *
@@ -305,6 +337,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   vaultRepair: true,
   localOnlyVault: true,
   hostDirectoryRead: true,
+  vaultImport: true,
   attachmentTextSearch: true,
   imageCompression: true,
   cliAccess: true,

@@ -1,7 +1,9 @@
 // Flow-logic: Settings → Privacy → Task reminders (MYND-619 tasks 6, 8, 11).
 // Headless Chromium + mock IPC — NOT end-to-end. It proves the three settings
-// surfaces behave: the per-device switch persists, the horizon line states a
-// date, and the precise-delivery affordance appears exactly when it applies.
+// surfaces behave: the per-device switch persists, the horizon picker reaches
+// the device-local setter, and the precise-delivery affordance appears exactly
+// when it applies. The horizon LINE is asserted ABSENT (myne#508): it claims an
+// OS registration, and nothing on this client performs one yet.
 //
 // **What this tier cannot touch, and no harness can:** whether the operating
 // system actually fires a registration while Myne is closed, whether it survives
@@ -11,7 +13,6 @@
 // the checklist look redundant.
 
 import { test, expect } from "@playwright/test";
-import { horizonEndDate } from "@myne/reminder-schedule";
 import { installMockIpc } from "../mock-ipc";
 
 /** Settings → Privacy, where the reminder block lives (a block, not a rail entry). */
@@ -35,7 +36,7 @@ test.describe("mobile task-reminder settings", () => {
     // An absent preference reads as ENABLED — reading it as off would silently
     // disable reminders on every existing vault.
     await expect(row.getByRole("switch")).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByTestId("settings.reminders-horizon")).toBeVisible();
+    await expect(page.getByTestId("settings.reminders-horizon-picker")).toBeVisible();
 
     await row.getByRole("switch").click();
 
@@ -45,53 +46,198 @@ test.describe("mobile task-reminder settings", () => {
       .toEqual([false]);
     // …and the surfaces that only make sense while reminders are on are gone:
     // there is no horizon to state and no delivery precision to caveat.
-    await expect(page.getByTestId("settings.reminders-horizon")).toHaveCount(0);
+    await expect(page.getByTestId("settings.reminders-horizon-picker")).toHaveCount(0);
     await expect(page.getByTestId("settings.reminder-exact-row")).toHaveCount(0);
   });
 
-  test("the horizon line states a date, not a day count", async ({ page }) => {
+  test("the horizon line is not shown while nothing here registers with an OS", async ({
+    page,
+  }) => {
+    // myne#508. "Reminders are registered through <date>" says an operating
+    // system is holding these, and on this client nothing is: the pass that
+    // would register them (`mobile/src/lib/reminderPass.ts`) has no production
+    // caller, which `scripts/check-unwired.mjs` records. The sentence rendered
+    // unconditionally, in 32 locales, and its own date was the only thing the
+    // horizon control moved.
+    //
+    // `remindersReachTheOs()` is the predicate, and it flips on the change that
+    // gives the pass a caller. This assertion flips with it.
     await installMockIpc(page, { prefs: { reminder_horizon_days: 7 } });
     await page.goto("/");
     await openPrivacy(page);
 
-    const line = page.getByTestId("settings.reminders-horizon");
-    await expect(line).toBeVisible();
+    await expect(page.getByTestId("settings.reminders-horizon-picker")).toBeVisible();
+    await expect(page.getByTestId("settings.reminders-horizon")).toHaveCount(0);
 
-    // "through <date>" is checkable against a calendar; "7 days" makes the reader
-    // do the arithmetic and get it wrong.
-    //
-    // The calendar DAY is read from the page, because a browser running in a
-    // different timezone than the runner is exactly the shift this line's local
-    // arithmetic exists to survive. The ARITHMETIC comes from the one shared
-    // derivation rather than a copy: a hand-rolled `today + N` here is what this
-    // assertion used to say, which is the very formula #52 replaced with
-    // `today + (N - 1)` after desktop and mobile told the same vault two
-    // different dates. Re-deriving it locally is how the two drifted apart, so
-    // this spec does not get its own second opinion either.
-    const [year, month, day] = await page.evaluate(() => {
-      const now = new Date();
-      return [now.getFullYear(), now.getMonth(), now.getDate()] as [number, number, number];
-    });
-    await expect(line).toContainText(horizonEndDate(new Date(year, month, day), 7));
+    // And the row says which of the two it is. A bare label over four day
+    // counts would leave a user acting on the horizon's documented privacy
+    // reading with no bound in force and no way to know it.
+    await expect(page.getByTestId("settings.reminders-horizon-helper")).toHaveText(
+      "Saved on this device. Nothing reads it yet: this build does not deliver task reminders.",
+    );
   });
 
-  test("the precise-delivery affordance appears only where the permission exists", async ({
-    page,
-  }) => {
-    // The iOS / no-such-permission case: a row saying "not applicable" would be a
-    // caveat about a limitation the user's phone does not have.
-    await installMockIpc(page, { exactAlarm: "not-applicable" });
+  test("choosing a horizon reaches the device-local setter", async ({ page }) => {
+    // The half myne#508 was actually about. `setReminderHorizonDays` had a Rust
+    // core, an ACL row, its three-site registration and its own tests, and no
+    // caller anywhere in `mobile/src`, so the horizon rendered and could never
+    // be set. The first version of this fix was covered only by source-text
+    // greps, which cannot fail when the handler is deleted: mobile's `Segmented`
+    // takes `onChange` as optional and degrades silently to a presentational
+    // control, so a dropped handler is pixel-identical and `tsc` accepts it.
+    await installMockIpc(page, { prefs: { reminder_horizon_days: 7 } });
     await page.goto("/");
     await openPrivacy(page);
 
-    await expect(page.getByTestId("settings.reminders-row")).toBeVisible();
-    await expect(page.getByTestId("settings.reminder-exact-row")).toHaveCount(0);
-    await expect(page.getByTestId("settings.reminder-exact-helper")).toHaveCount(0);
+    // The default's segment is the selected one for a vault holding 7.
+    await expect(page.getByTestId("settings.reminders-horizon-picker-7")).toHaveAttribute(
+      "data-active",
+      "true",
+    );
+
+    // The shortest offered horizon, which is the direction the issue asked for:
+    // the preference is a privacy bound before a resource one, so what a user
+    // wants from it is to TIGHTEN it.
+    await page.getByTestId("settings.reminders-horizon-picker-1").click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __reminderHorizonWrites?: (number | null)[] })
+              .__reminderHorizonWrites,
+        ),
+      )
+      .toEqual([1]);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-1")).toHaveAttribute(
+      "data-active",
+      "true",
+    );  });
+
+  test("a horizon segment can be set from the keyboard", async ({ page }) => {
+    // The `onKeyDown` block is the half a pointer test never reaches. Its own
+    // comment says that without it the control is unreachable to a keyboard and
+    // to every assistive technology that drives one, and deleting it left every
+    // suite green: the pointer path, the roles and the source greps all pass.
+    await installMockIpc(page, { prefs: { reminder_horizon_days: 7 } });
+    await page.goto("/");
+    await openPrivacy(page);
+
+    await page.getByTestId("settings.reminders-horizon-picker-3").focus();
+    await page.keyboard.press("Enter");
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __reminderHorizonWrites?: (number | null)[] })
+              .__reminderHorizonWrites,
+        ),
+      )
+      .toEqual([3]);
   });
 
-  test("approximate delivery states the fallback and offers the platform screen", async ({
-    page,
-  }) => {
+  test("the horizon control is one tab stop, traversed with arrows", async ({ page }) => {
+    // Announcing `role="radiogroup"` is a promise about the keyboard model, and
+    // the first version of this control kept none of it: every segment carried
+    // `tabIndex={0}`, so a four-option control was four tab stops and arrows did
+    // nothing. A role whose contract is not honoured is worse than the
+    // unannounced divs it replaced, because assistive technology now tells the
+    // user something untrue about how to drive it.
+    await installMockIpc(page, { prefs: { reminder_horizon_days: 7 } });
+    await page.goto("/");
+    await openPrivacy(page);
+
+    const group = page.getByTestId("settings.reminders-horizon-picker");
+    // Roving tabindex: exactly one segment is reachable by Tab, and it is the
+    // selected one.
+    await expect(group.locator('[role="radio"][tabindex="0"]')).toHaveCount(1);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-7")).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+
+    // In a radiogroup an arrow SELECTS as it moves, so the write lands without
+    // a second keystroke. 7 is the last of [1, 3, 5, 7], so one step right
+    // wraps to the first.
+    await page.getByTestId("settings.reminders-horizon-picker-7").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __reminderHorizonWrites?: (number | null)[] })
+              .__reminderHorizonWrites,
+        ),
+      )
+      .toEqual([1]);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-1")).toHaveAttribute(
+      "data-active",
+      "true",
+    );
+
+
+    // **The focus half, which this case is named for and did not assert.**
+    // Everything above is the WRITE path, which the preceding case already
+    // covers, so the test passed with `segmentRefs.current[next]?.focus()`
+    // deleted outright AND under the defect that was actually shipping: the ref
+    // map recorded only the ACTIVE segment, so `focus()` on a non-active index
+    // was a no-op by construction, and focus sat one step behind selection
+    // permanently.
+    //
+    // Two assertions, because either alone still passes under that defect.
+    // Focus must have MOVED to the newly selected segment, and the tab stop
+    // must have moved with it, so exactly one segment remains reachable by Tab.
+    await expect(page.getByTestId("settings.reminders-horizon-picker-1")).toBeFocused();
+    await expect(group.locator('[role="radio"][tabindex="0"]')).toHaveCount(1);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-1")).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+
+    // A SECOND press, which is what separates "focus lands once" from "focus
+    // tracks selection". Under the shipped defect the second press fired from
+    // the stale element, recomputed the same target and rewrote the same value,
+    // so the write list stayed at [1] rather than growing.
+    await page.keyboard.press("ArrowRight");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __reminderHorizonWrites?: (number | null)[] })
+              .__reminderHorizonWrites,
+        ),
+      )
+      .toEqual([1, 3]);
+    await expect(page.getByTestId("settings.reminders-horizon-picker-3")).toBeFocused();
+  });
+
+  test("the horizon control is a radiogroup, not four unannounced divs", async ({ page }) => {
+    // It ships on a phone, where the segments were `div`s with an `onClick`: no
+    // role, no focus, no key handler, and no way for a spec to address one
+    // except by its translated label. That last part is why this file had no
+    // horizon-tap case for the first round of myne#508.
+    await installMockIpc(page, { prefs: { reminder_horizon_days: 7 } });
+    await page.goto("/");
+    await openPrivacy(page);
+
+    const group = page.getByTestId("settings.reminders-horizon-picker").getByRole("radiogroup");
+    await expect(group).toBeVisible();
+    await expect(group.getByRole("radio")).toHaveCount(4);
+  });
+
+  test("the precise-delivery affordance is absent while nothing registers", async ({ page }) => {
+    // myne#508 gated `ExactAlarmBlock` on `remindersReachTheOs()`, the same
+    // predicate as the horizon line. It offers to make delivery precise, and
+    // asks Android for the exact-alarm special access to do it, for a pass that
+    // has no production caller: nothing is scheduled, so there is no
+    // imprecision to fix. Requesting a permission Google requires a Play
+    // Console declaration for, to improve a delivery that does not happen, is
+    // the shape a store review is meant to catch.
+    //
+    // Seeded with `approximate`, which is the case that USED to render the row
+    // and its fallback sentence, so this fails the moment the gate is dropped
+    // rather than passing on a platform that would have hidden it anyway.
     await installMockIpc(page, {
       exactAlarm: "approximate",
       exactAlarmAfterRequest: "exact",
@@ -99,29 +245,17 @@ test.describe("mobile task-reminder settings", () => {
     await page.goto("/");
     await openPrivacy(page);
 
-    // The fallback is STATED, verbatim, rather than left for a late reminder to
-    // teach. Asserted as the full literal — a substring match would pass a
-    // future softening of the sentence.
-    await expect(page.getByTestId("settings.reminder-exact-helper")).toHaveText(
-      "Android batches wake-ups to save battery, so reminders arrive around the time you set rather than exactly on it. Allowing exact timing removes the delay.",
-    );
-
-    // Nothing is requested until the user asks — the app never opens the screen
-    // on its own, and there is no one-shot prompt to spend.
-    expect(
-      await page.evaluate(() => (window as unknown as { __exactAlarmRequests?: number }).__exactAlarmRequests),
-    ).toBeUndefined();
-
-    await page.getByTestId("settings.reminder-exact-allow").click();
-
-    expect(
-      await page.evaluate(() => (window as unknown as { __exactAlarmRequests?: number }).__exactAlarmRequests),
-    ).toBe(1);
-
-    // On return the state is re-read: the row stops offering something the user
-    // has already done, and the caveat is withdrawn.
-    await expect(page.getByTestId("settings.reminder-exact-value")).toHaveText("On");
-    await expect(page.getByTestId("settings.reminder-exact-allow")).toHaveCount(0);
+    await expect(page.getByTestId("settings.reminders-row")).toBeVisible();
+    await expect(page.getByTestId("settings.reminder-exact-row")).toHaveCount(0);
     await expect(page.getByTestId("settings.reminder-exact-helper")).toHaveCount(0);
+
+    // And nothing was asked of the platform on the way past. The app never
+    // opens that screen on its own, and with the block gated there is no button
+    // that could.
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __exactAlarmRequests?: number }).__exactAlarmRequests,
+      ),
+    ).toBeUndefined();
   });
 });

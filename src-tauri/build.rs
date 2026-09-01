@@ -180,6 +180,7 @@ fn main() {
                 // permissions/prefs/default.toml is what actually wires this
                 // one — see the `prefs_read` siblings above for the same
                 // belt-and-suspenders pattern).
+                "set_chat_history_budget",
                 "set_developer_mode",
             ]),
         )
@@ -368,7 +369,21 @@ fn main() {
             // without a matching `commands.allow` entry is a security
             // regression (the InlinedPlugin mirror is load-bearing per the
             // `vault-creation` note above).
-            tauri_build::InlinedPlugin::new().commands(&["import_read_dir", "import_read_file"]),
+            tauri_build::InlinedPlugin::new().commands(&[
+                "import_read_dir",
+                "import_read_file",
+                // Vault import (myne-md/myne#464). Registered in this
+                // namespace on purpose: the web dispatcher classifies the whole
+                // `importer` plugin `Class::Unsupported`, so putting the source
+                // key-slot and its close here costs the web and mobile clients
+                // no command surface and needs no `capability.rs` row.
+                "import_source_open",
+                "import_source_close",
+                "import_source_list_notes",
+                "import_source_read_note",
+                "import_source_reseal_attachment",
+                "import_source_merge_dictionary",
+            ]),
         )
         .plugin(
             "pdf-export",
@@ -432,6 +447,24 @@ fn main() {
                 "hide_vault_names",
                 "set_hide_vault_names",
                 "vault_label_keychain_status",
+            ]),
+        )
+        .plugin(
+            "screen-capture",
+            // myne-md/myne#482 + #483: the device-local escape hatch from
+            // screen-capture protection. `screen_capture_override_get` (read)
+            // + `screen_capture_override_set` (write, and the write turns a
+            // defence-in-depth control off device-wide). Plus
+            // `screen_capture_show_protected`, the WebView's door to the one
+            // host-side re-show sequence (which replaced its own `window.show()`). Same InlinedPlugin
+            // discipline as the plugins above; without a matching
+            // `commands.allow` entry in
+            // `permissions/screen-capture/default.toml` the ACL resolver never
+            // authorizes the `plugin:screen-capture|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "screen_capture_override_get",
+                "screen_capture_override_set",
+                "screen_capture_show_protected",
             ]),
         )
         .plugin(

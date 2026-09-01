@@ -68,6 +68,13 @@ const ALLOWED = new Map([
   ],
 
   // ── host-only: gated out of the wasm build, so `std::fs` is correct ────────
+  // The agent's Tauri-host adapters (myne-md/myne#456). Carries a
+  // module-level `#![cfg(all(feature = "tauri-ipc", not(target_arch =
+  // "wasm32")))]`, so the `std::fs::read` inside it never reaches a wasm build.
+  // It is on this list because it MOVED into `core/` in that change, not
+  // because it started reading the disk: it did the same thing in `src-tauri/`,
+  // where this guard does not look.
+  ["core/src/plugins/agent/host_adapters.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/captures/commands.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/captures/queue.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/export/commands.rs", "host-only (cfg tauri-ipc + not wasm32)"],

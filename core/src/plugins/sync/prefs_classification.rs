@@ -57,24 +57,55 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     // `ai_enabled` is DeviceLocal because "should THIS machine spend its CPU
     // on inference" is a property of the machine. Naming a REMOTE provider is
     // not — it is a statement about where this vault's notes may be sent, and
-    // a vault whose owner said "OpenRouter" has said it about the vault. The
-    // three rows below therefore travel together, and the cost of that is
-    // recorded rather than hidden: a newly enrolled device inherits the
-    // selection, the consent and the key, and begins sending without anyone at
-    // that device seeing the consent screen (ledger SYNC-22;
-    // `threat-model.md` §5 states the same in the normative text).
+    // a vault whose owner said "OpenRouter" has said it about the vault.
+    //
+    // **Three of the four rows below travel together; the consent does not,
+    // since myne-md/myne#456.** This comment used to say all three did, and
+    // record the cost as a residual: a newly enrolled device inherited the
+    // selection, the consent AND the key, and began sending without anyone at
+    // that device seeing the consent screen (ledger SYNC-22; `threat-model.md`
+    // §5 stated the same normatively). That residual is closed rather than
+    // still being carried, see the `ai_provider_consent` row. What a newly
+    // enrolled device inherits now is a selection, a model and a credential,
+    // and none of those is permission to use them.
     (
         "ai_provider",
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
-    // Shared with the selection it approves — splitting them would produce the
-    // worst state of the four: a device that inherited a provider and a key but
-    // not the consent would be configured and silently refused, with no screen
-    // anywhere to fix it.
-    (
-        "ai_provider_consent",
-        PrefClass::Shared(SharedDiscipline::ScalarLww),
-    ),
+    // DeviceLocal since myne-md/myne#456, and it was `Shared(ScalarLww)` until
+    // then. This is the one field in the AI cluster that does NOT travel, and
+    // the split is the whole point rather than an inconsistency.
+    //
+    // **What the old reasoning was, and why it expired.** It read: splitting
+    // consent from the selection it approves "would produce the worst state of
+    // the four: a device that inherited a provider and a key but not the
+    // consent would be configured and silently refused, with no screen anywhere
+    // to fix it." That was true and it is no longer, because the missing screen
+    // is what myne-md/myne#456 builds. Mobile ships a consent surface in the
+    // same change; desktop already had one. A device in that state is now one
+    // tap from resolving it, so the argument for carrying the approval across
+    // devices lost the thing it rested on.
+    //
+    // **What this closes.** SYNC-22, stated normatively in `threat-model.md`
+    // §5: a newly enrolled device inherited the selection, the consent AND the
+    // key, and began sending without anyone at that device seeing the consent
+    // screen. It was harmless only while no mobile code read those fields, and
+    // writing that code is what made it real. Approving on a laptop is now an
+    // approval by that laptop, not by every device the account will ever hold.
+    //
+    // **The key deliberately still syncs** (see the entry below), so a phone
+    // holds a credential it may not use. That is the intended shape: the
+    // credential is an account fact and rotating it must reach every device,
+    // while the approval is a decision a person makes at a device. The gate is
+    // an equality against the active provider, so a phone with the key and no
+    // local consent refuses with `ConsentMissing`: "you have not agreed to send
+    // this": rather than with a missing-credential error it cannot act on.
+    //
+    // It is also the ONLY device-local control left on the remote path besides
+    // `ai_enabled`, because myne-md/myne#456 removed `developer_mode` from the
+    // gate. Those two changes are a pair and neither is defensible alone: one
+    // switch by itself would be thinner than what was there before.
+    ("ai_provider_consent", PrefClass::DeviceLocal),
     // Shared (SYNC-15). Last-writer-wins is right for a credential in a way it
     // is not for a set: rotating the key on one device MUST replace it
     // everywhere, and a union or a merge of two key values is not a thing that
@@ -130,6 +161,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
     ("bar_items_order", PrefClass::DeviceLocal),
+    // A bound on how much this machine sends to a provider, so it belongs to
+    // this machine: the same reasoning `ai_enabled` gets one line down. A laptop
+    // on a metered connection and a desktop on a fast one legitimately disagree,
+    // and a value that synced would let one device widen the other's off-device
+    // volume without anyone at that device choosing it (TB13's consent is
+    // per-account, which is exactly why the VOLUME should not be).
+    ("chat_history_budget", PrefClass::DeviceLocal),
     ("cli_enabled", PrefClass::DeviceLocal),
     (
         "cli_excluded_folders",
@@ -225,6 +263,17 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
     ("paired_extensions", PrefClass::DeviceLocal),
+    // myne#177: shared, and per-key rather than whole-value for the reason the
+    // decoration maps are (MYND-562). The keys are `<period>.<setting>`, so a
+    // folder set on one device and a template set on another, to the same
+    // period in the same round, race on `periodic_notes/weekly.folder` and
+    // `periodic_notes/weekly.template` separately and both survive. Shared
+    // rather than device-local because where a weekly note is filed is a vault
+    // convention, the `daily_folder` class, not a property of the machine.
+    (
+        "periodic_notes",
+        PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
+    ),
     ("reminder_horizon_days", PrefClass::DeviceLocal),
     ("reminders_enabled", PrefClass::DeviceLocal),
     ("right_panel_active_tab", PrefClass::DeviceLocal),
@@ -265,8 +314,15 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     // should not have to agree — which is the `theme` argument, not the
     // `daily_date_format` one. And an IANA zone is a coarse geolocation datum:
     // `dialect/src/taskFields.ts` keeps it out of note bytes for exactly that
-    // reason, so putting it on the sync wire would give back at the prefs layer
-    // what the note layer refuses to leak.
+    // reason, and this classification keeps a travelling phone's zone from being
+    // overwritten by a stationary desktop's.
+    //
+    // What it does NOT do, because this comment claimed otherwise until
+    // myne-md/myne#609 and four other sites were citing it: keep the zone off
+    // the wire. The whole `vault.prefs` blob is pushed and pulled verbatim,
+    // device-local fields included, and `sync-protocol.md` 10.2.1 has a newly
+    // enrolled device adopt them as starting defaults. This enum decides the
+    // MERGE, and nothing else. `prefs_merge.rs` next door already had it right.
     ("timezone", PrefClass::DeviceLocal),
     // MYND-592. **Shared**, for the same reason as `show_task_marker` above and
     // deliberately unlike `ai_enabled` (DeviceLocal): that flag is device-local
@@ -321,6 +377,7 @@ mod tests {
             auto_lock_seconds: _,
             auto_tag_enabled: _,
             bar_items_order: _,
+            chat_history_budget: _,
             cli_enabled: _,
             cli_excluded_folders: _,
             cli_rate_limit_disabled: _,
@@ -360,6 +417,7 @@ mod tests {
             new_note_location: _,
             new_note_location_folder: _,
             paired_extensions: _,
+            periodic_notes: _,
             right_panel_active_tab: _,
             right_panel_hidden_tabs: _,
             right_panel_tab_order: _,
@@ -398,6 +456,7 @@ mod tests {
             "auto_lock_seconds",
             "auto_tag_enabled",
             "bar_items_order",
+            "chat_history_budget",
             "cli_enabled",
             "cli_excluded_folders",
             "cli_rate_limit_disabled",
@@ -437,6 +496,7 @@ mod tests {
             "new_note_location",
             "new_note_location_folder",
             "paired_extensions",
+            "periodic_notes",
             "reminder_horizon_days",
             "reminders_enabled",
             "right_panel_active_tab",
@@ -490,6 +550,31 @@ mod tests {
         // synced under the original posture, both are device-local now.
         assert_eq!(classify("hidden_bar_items"), Some(PrefClass::DeviceLocal));
         assert_eq!(classify("active_workspace"), Some(PrefClass::DeviceLocal));
+        // The third (myne-md/myne#456): `ai_provider_consent` was
+        // `Shared(ScalarLww)` and is device-local now. Asserted with its
+        // siblings held FIXED beside it, because the property is the SPLIT
+        // rather than the one field's class: a change that made the whole AI
+        // cluster device-local would satisfy the first assertion alone while
+        // breaking revocation, since a revoked key has to reach every device.
+        assert_eq!(
+            classify("ai_provider_consent"),
+            Some(PrefClass::DeviceLocal)
+        );
+        assert_eq!(
+            classify("ai_provider"),
+            Some(PrefClass::Shared(SharedDiscipline::ScalarLww))
+        );
+        assert_eq!(
+            classify("ai_provider_key"),
+            Some(PrefClass::Shared(SharedDiscipline::ScalarLww))
+        );
+        assert_eq!(
+            classify("ai_provider_model"),
+            Some(PrefClass::Shared(SharedDiscipline::ScalarLww))
+        );
+        // `ai_enabled` was already device-local and is the other half of the
+        // pair myne-md/myne#456 rests on, once `developer_mode` left the gate.
+        assert_eq!(classify("ai_enabled"), Some(PrefClass::DeviceLocal));
         // And the fields the feature exists for stay shared.
         assert_eq!(
             classify("label"),

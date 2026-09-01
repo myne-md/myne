@@ -49,7 +49,8 @@
       "unsupportedDetail": "A trecut {{passes}} din {{attempts}} verificări; sunt necesare {{required}}.",
       "checking": "Se verifică modelul…",
       "checkingAt": "Se verifică modelul… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Acel prag de trecere nu a fost încă măsurat pe mai multe modele, așa că poate fi mai strict sau mai permisiv decât ar trebui."
+      "unsupportedProvisional": "Acel prag de trecere nu a fost încă măsurat pe mai multe modele, așa că poate fi mai strict sau mai permisiv decât ar trebui.",
+      "scopeNone": "nicio notiță deschisă, deci încă nu este nimic de lucrat"
     },
     "progress": {
       "working": "Se lucrează",
@@ -68,7 +69,8 @@
       "grantsUser_other": "{{count}} de domenii stabilite de tine",
       "grantsModel_one": "{{count}} cerut de agent",
       "grantsModel_few": "{{count}} cerute de agent",
-      "grantsModel_other": "{{count}} cerute de agent"
+      "grantsModel_other": "{{count}} cerute de agent",
+      "cancelledBackground": "Rularea a fost anulată pentru că Myne a trecut în fundal. Nu s-a scris nimic. Întreabă din nou când vrei."
     },
     "scope": {
       "title": "Incluzi {{folder}}?",
@@ -130,7 +132,10 @@
         "excludedFolder": "Necreată: acel folder este exclus din AI.",
         "createFailed": "Necreată: scrierea notei noi a eșuat. Celelalte modificări au fost totuși aplicate.",
         "excludedNow": "Nu a putut fi aplicată: folderul acelei note este acum exclus din AI.",
-        "notProposed": "Nu a putut fi aplicată: acea modificare nu face parte din propunerea acestei rulări."
+        "notProposed": "Nu a putut fi aplicată: acea modificare nu face parte din propunerea acestei rulări.",
+        "noteMoved": "Nu a putut fi aplicată: acea modificare ar muta nota în alt folder.",
+        "appendEmpty": "Nu a putut fi aplicată: nu era nimic de adăugat.",
+        "appendWouldWriteFrontmatter": "Nu a putut fi aplicată: acel text ar fi devenit blocul de proprietăți al notei."
       },
       "applyFailed": "Modificările nu au putut fi aplicate.",
       "undo": "Anulează această rulare",
@@ -154,7 +159,8 @@
       "runSummaryOffDevice_one": "aproximativ {{count}} caracter din notele tale a fost trimis către furnizor",
       "runSummaryOffDevice_few": "aproximativ {{count}} caractere din notele tale au fost trimise către furnizor",
       "runSummaryOffDevice_other": "aproximativ {{count}} de caractere din notele tale au fost trimise către furnizor",
-      "runSummaryOnDevice": "nimic nu a părăsit acest dispozitiv"
+      "runSummaryOnDevice": "nimic nu a părăsit acest dispozitiv",
+      "appendFlag": "adaugă la final"
     },
     "undo": {
       "offer_one": "Ultima rulare a modificat {{count}} notă.",
@@ -169,7 +175,9 @@
       "failed_other": "{{count}} de note nu au putut fi restaurate.",
       "createdNotReverted_one": "{{count}} notă creată de rulare a fost lăsată pe loc.",
       "createdNotReverted_few": "{{count}} note create de rulare au fost lăsate pe loc.",
-      "createdNotReverted_other": "{{count}} de note create de rulare au fost lăsate pe loc."
+      "createdNotReverted_other": "{{count}} de note create de rulare au fost lăsate pe loc.",
+      "sessionOnly": "Această anulare dintr-o atingere durează până blochezi seiful sau închizi aplicația. După aceea, restaurezi notițele una câte una din istoricul versiunilor unei notițe.",
+      "sessionOnlyLink": "Deschide istoricul versiunilor"
     }
   },
   "ai": {
@@ -691,6 +699,12 @@
       },
       "unfoldAll": {
         "label": "Depliază tot"
+      },
+      "openThisWeekNote": {
+        "label": "Deschide nota din această săptămână"
+      },
+      "openThisMonthNote": {
+        "label": "Deschide nota din această lună"
       }
     },
     "hotkeys": {
@@ -917,13 +931,15 @@
           "captureFailed": "Înregistrarea nu a putut începe. Verifică accesul la microfon în Setări sistem.",
           "generic": "Înregistrarea nu a putut începe.",
           "locked": "Deblochează seiful pentru a înregistra o notă vocală.",
-          "noInputDevice": "Niciun microfon găsit. Conectează unul și încearcă din nou."
+          "noInputDevice": "Niciun microfon găsit. Conectează unul și încearcă din nou.",
+          "unsupportedSampleRate": "Microfonul înregistrează la o rată de eșantionare pe care Myne nu o poate transcrie. Alege alt dispozitiv de intrare sau schimbă-i rata de eșantionare din setările de sunet ale sistemului."
         },
         "stopError": {
           "captureFailed": "Înregistrarea a eșuat. Verifică microfonul.",
           "emptyRecording": "Nu s-a înregistrat nimic.",
           "generic": "Înregistrarea nu a putut fi salvată.",
-          "silentRecording": "Înregistrarea a fost silențioasă și a fost eliminată. Verifică microfonul."
+          "silentRecording": "Înregistrarea a fost silențioasă și a fost eliminată. Verifică microfonul.",
+          "unsupportedSampleRate": "Microfonul înregistrează la o rată de eșantionare pe care Myne nu o poate transcrie. Nu s-a salvat nimic. Alege alt dispozitiv de intrare sau schimbă-i rata de eșantionare din setările de sunet ale sistemului."
         }
       },
       "widget": {
@@ -969,6 +985,7 @@
             "featureOff": "Funcția vorbire în text este dezactivată. Activeaz-o din Setări → Transcriere.",
             "modelLoadFailed": "Modelul de transcriere nu a putut fi încărcat. Dacă ai setat un model personalizat din Setări → Developer → AI, verifică-i fișierele; altfel, reinstalarea aplicației Myne îl restaurează pe cel integrat.",
             "noModel": "Modelul de transcriere lipsește. Reinstalarea aplicației Myne îl restaurează.",
+            "tooLong": "Această înregistrare este prea lungă pentru a fi transcrisă. Sunetul rămâne atașat, așa că îl poți reda.",
             "vaultLocked": "Deblochează-ți seiful pentru a transcrie."
           },
           "disabledReason": "Activează AI din Setări → Developer → AI pentru a transcrie.",
@@ -1213,10 +1230,6 @@
       "turnedIntoTemplate": "Transformată în șablon",
       "convertedToNote": "Convertită în notă",
       "versionHistory": "Istoricul versiunilor",
-      "exportMarkdown": "Exportă ca Markdown…",
-      "exportPdf": "Exportă ca PDF…",
-      "exportHtml": "Exportă ca HTML…",
-      "exportTxt": "Exportă ca text simplu…",
       "trash": "Mută în Coș"
     },
     "codeBlock": {
@@ -1248,7 +1261,9 @@
       "replaceAllCount": "Înlocuiește tot ({{total}})",
       "replaceOne": "Înlocuiește",
       "replacePlaceholder": "Înlocuiește cu",
-      "toggleReplace": "Comută înlocuirea"
+      "toggleReplace": "Comută înlocuirea",
+      "dateFallback": "Se caută {{stored}}, forma în care este stocată această dată.",
+      "replaceOffOnDateFallback": "Înlocuirea este dezactivată cât timp o dată este găsită prin forma ei stocată, ca o înlocuire să nu o facă imposibil de citit."
     },
     "cover": {
       "add": "Adaugă copertă",
@@ -1274,7 +1289,8 @@
       "titlePlaceholder": "Fără titlu"
     },
     "mermaid": {
-      "rendering": "Se generează diagrama…"
+      "rendering": "Se generează diagrama…",
+      "renderFailed": "Această diagramă nu a putut fi randată: {{reason}}"
     },
     "slash": {
       "aiContinue": "Continuă scrierea (AI)",
@@ -1592,6 +1608,13 @@
     "commandPalette": {
       "searchPlaceholder": "Caută note sau execută o comandă…",
       "noMatches": "Nicio comandă sau notă potrivită."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Nu s-a putut deschide nota de azi.",
+        "weekly": "Nu s-a putut deschide nota din această săptămână.",
+        "monthly": "Nu s-a putut deschide nota din această lună."
+      }
     }
   },
   "export": {
@@ -2114,10 +2137,6 @@
       "duplicate": "Duplică",
       "editFilterTitle": "Editează filtrul",
       "emptyState": "Nicio notă încă.",
-      "exportHtml": "Exportă ca HTML…",
-      "exportMarkdown": "Exportă ca Markdown…",
-      "exportPdf": "Exportă ca PDF…",
-      "exportTxt": "Exportă ca text simplu…",
       "favoritesHeading": "Favorite",
       "icon": "Pictogramă…",
       "mergeAnyway": "Îmbină oricum",
@@ -2433,6 +2452,13 @@
     },
     "workspace": {
       "defaultSlotName": "Implicit"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportă…",
+      "txt": "Text simplu"
     }
   },
   "password": {
@@ -2878,20 +2904,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Gol (fără șablon)",
+      "folderSearchEmpty": "Niciun folder nu corespunde.",
+      "folderSearchPlaceholder": "Caută foldere…",
+      "searchEmpty": "Niciun șablon nu corespunde.",
+      "searchPlaceholder": "Caută șabloane…",
+      "untitledTemplate": "Șablon fără titlu",
+      "sectionDaily": "Note zilnice",
+      "sectionWeekly": "Note săptămânale",
+      "sectionMonthly": "Note lunare",
+      "periodFolderLabel": "Dosar",
+      "periodFolderHelper": "Unde ajung notele {{period}} noi. Implicit: {{default}}. Dosarul se păstrează chiar și gol.",
+      "periodFormatLabel": "Formatul titlului",
+      "periodFormatHelperDaily": "Titlul fiecărei note zilnice. Acceptă YYYY, MM, DD, gggg (anul ISO al săptămânii), ww (numărul săptămânii ISO) și [text] pentru text literal. Implicit: {{default}}.",
+      "periodFormatHelperWeekly": "Titlul fiecărei note săptămânale. Acceptă gggg (anul ISO al săptămânii), ww (numărul săptămânii ISO), YYYY, MM, DD și [text] pentru text literal. Implicit: {{default}}.",
+      "periodFormatHelperMonthly": "Titlul fiecărei note lunare. Acceptă YYYY, MM, gggg (anul ISO al săptămânii), ww (numărul săptămânii ISO) și [text] pentru text literal. Implicit: {{default}}.",
+      "periodTemplateLabel": "Șablon",
+      "periodTemplateHelper": "Alege un șablon cu care începe fiecare notă {{period}}, sau lasă gol pentru o notă goală intitulată cu data.",
+      "collisionWarning": "Notele {{first}} și {{second}} duc la aceeași notă, pentru că împart un dosar și produc același titlu. Ambele comenzi o vor deschide.",
+      "weekStartNote": "Săptămânile încep luni (ISO 8601), așa că primele zile din ianuarie pot aparține ultimei săptămâni a anului precedent, iar ultimele zile din decembrie primei săptămâni a anului următor.",
+      "periodFolderSaveError": "Nu s-a putut salva dosarul {{period}}. Încearcă din nou.",
+      "periodFormatSaveError": "Nu s-a putut salva formatul titlului {{period}}. Încearcă din nou.",
+      "periodTemplateSaveError": "Nu s-a putut salva șablonul {{period}}. Încearcă din nou.",
+      "periodNameDaily": "zilnice",
+      "periodNameWeekly": "săptămânale",
+      "periodNameMonthly": "lunare",
+      "periodFolderAriaLabel": "Dosarul notelor {{period}}",
+      "periodFormatAriaLabel": "Formatul titlului notelor {{period}}",
+      "periodTemplateAriaLabel": "Șablonul notelor {{period}}",
       "dateFormatHelper": "Titlul fiecărei note zilnice. Acceptă YYYY, MM, DD. Implicit este {{default}}.",
       "dateFormatLabel": "Formatul datei pentru nota zilnică",
       "dateFormatSaveError": "Formatul datei nu a putut fi salvat. Te rugăm să încerci din nou.",
       "folderHelper": "Unde sunt salvate notele zilnice noi. Implicit este {{default}}. Folderul este păstrat chiar și când e gol.",
       "folderLabel": "Folderul notelor zilnice",
       "folderSaveError": "Folderul zilnic nu a putut fi salvat. Te rugăm să încerci din nou.",
-      "folderSearchEmpty": "Niciun folder nu corespunde.",
-      "folderSearchPlaceholder": "Caută foldere…",
-      "searchEmpty": "Niciun șablon nu corespunde.",
-      "searchPlaceholder": "Caută șabloane…",
       "templateHelper": "Alege un șablon de la care să pornească fiecare notă zilnică sau lasă gol pentru o notă goală cu titlul format din dată.",
       "templateLabel": "Șablon pentru nota zilnică",
-      "templateSaveError": "Șablonul zilnic nu a putut fi salvat. Te rugăm să încerci din nou.",
-      "untitledTemplate": "Șablon fără titlu"
+      "templateSaveError": "Șablonul zilnic nu a putut fi salvat. Te rugăm să încerci din nou."
     },
     "deleteVault": {
       "cancel": "Anulează",
@@ -3053,7 +3101,8 @@
         "title": "Înainte ca Myne să trimită ceva către {{provider}}",
         "whatLabel": "Ce părăsește dispozitivul tău",
         "whenLabel": "Când pleacă",
-        "whoLabel": "Cine le primește"
+        "whoLabel": "Cine le primește",
+        "connectionLabel": "Cum călătorește"
       },
       "disclosureToggle": "Cum funcționează?",
       "enableHelper": "Rulează un model furnizat de tine. Unde rulează și dacă notele tale părăsesc acest dispozitiv depind amândouă de furnizorul pe care îl indici mai jos. Experimental, dezactivat implicit.",
@@ -3087,7 +3136,9 @@
         "refused": "Furnizorul a refuzat conexiunea. Este posibil să fie oprit sau să blocheze această rețea.",
         "timeout": "Furnizorul nu a răspuns la timp. Nu a rămas nimic în execuție.",
         "unauthorized": "Furnizorul ți-a respins cheia API. Înlocuiește-o: poate fi greșită, revocată sau pentru un alt cont.",
-        "unreachable": "Furnizorul nu a putut fi accesat. Verifică-ți conexiunea la rețea."
+        "unreachable": "Furnizorul nu a putut fi accesat. Verifică-ți conexiunea la rețea.",
+        "featureOff": "IA este oprită pe acest dispozitiv. Nu s-a trimis nimic. Pornește-o în Setări, la IA.",
+        "consentMissing": "Nu ai fost de acord să trimiți notițe către acest furnizor de pe acest dispozitiv. Nu s-a trimis nimic. Alege furnizorul din nou în Setări, la IA, și citește ce se va trimite."
       },
       "modelChoose": "Alege fișierul…",
       "modelEmbeddingLabel": "Model de căutare: căutare semantică și întrebări-răspunsuri",
@@ -3130,7 +3181,16 @@
       "recommendedFilesGeneration": "Necesită fișierul .gguf + tokenizer.json în același dosar.",
       "recommendedFilesTranscription": "Necesită fișierul Whisper .gguf + config.json + tokenizer.json în același dosar.",
       "title": "AI",
-      "providerModelCount_few": "{{count}} modele disponibile."
+      "providerModelCount_few": "{{count}} modele disponibile.",
+      "mobileEnableLabel": "Folosește IA pe acest telefon",
+      "mobileEnableHelper": "Dezactivat implicit. Niciun model AI de pe acest telefon nu răspunde la întrebări și nu îți citește notițele, deci fiecare cerere merge către un serviciu pe care îl numești mai jos, iar notițele tale părăsesc atunci acest dispozitiv. Transcrierea și textul din imagini rulează în continuare aici, pe modele livrate cu Myne.",
+      "mobileKeyAdd": "Salvează cheia",
+      "mobileKeyReplace": "Înlocuiește cheia",
+      "mobileRevokeHelper": "Elimină împreună furnizorul, cheia lui și aprobarea acestui telefon, lăsând exact starea de dinaintea oricărei configurări. Celelalte dispozitive funcționează mai departe până le elimini și acolo.",
+      "mobileApproveLabel": "Aprobă trimiterea de pe acest telefon",
+      "mobileApproveHelper": "Furnizorul și cheia lui au venit de pe alt dispozitiv. Nu se trimite nimic de pe acest telefon până nu citești ce se va trimite și nu aprobi aici.",
+      "historyBudgetHelper": "Cât din conversația recentă duce cu sine fiecare cerere, în caractere. Lasă gol pentru valoarea implicită. Un număr mai mare permite AI-ului să urmărească conversații mai lungi și trimite mai mult din ele: la un furnizor care nu se află pe acest dispozitiv, înseamnă mai mult din textul tău părăsindu-l, la fiecare pas al unei rulări.",
+      "historyBudgetLabel": "Conversația trimisă cu fiecare cerere"
     },
     "network": {
       "disabledCue": "Sincronizarea nu mai este rutată prin Tor. Conexiunile noi merg direct la serverul de sincronizare.",
@@ -3163,6 +3223,9 @@
       "exactLabel": "Moment exact",
       "exactOn": "Activat",
       "horizon": "Mementourile sunt înregistrate până la {{date}}. Deschide Myne înainte de acea dată pentru ca ele să continue.",
+      "horizonLabel": "Programează din timp",
+      "horizonLabelHelper": "Mementourile sunt pregătite cu acest avans. Myne trebuie să fie deschis și deblocat ca un memento să ajungă.",
+      "horizonInertHelper": "Salvat pe acest dispozitiv. Nimic nu îl citește încă: această versiune nu livrează mementouri pentru sarcini.",
       "label": "Mementouri pentru sarcini",
       "saveError": "Acea setare nu a putut fi salvată. Încearcă din nou.",
       "showTextAria": "Arată textul sarcinii în notificare",
@@ -3447,12 +3510,14 @@
         "viewMode": "mod de vizualizare implicit live citire sursă previzualizare",
         "dateFormat": "format dată zi lună an iso dd/mm mm/dd calendar date format",
         "timeFormat": "format oră 24 de ore 12 ore ceas am pm time format",
-        "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone"
+        "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone",
+        "periodicNotes": "note periodice săptămânal lunar săptămână lună dosar șablon format",
+        "aiHistoryBudget": "conversație istoric context memorie buget caractere agent chat cerere"
       }
     },
     "dateTime": {
       "dateLabel": "Formatul datei",
-      "dateHelper": "Cum sunt afișate datele în sarcini, vizualizări salvate și atașamente.",
+      "dateHelper": "Cum este scrisă o dată oriunde Myne afișează una.",
       "dateSystem": "În funcție de limbă",
       "timeLabel": "Formatul orei",
       "timeHelper": "Dacă orele sunt afișate pe un ceas de 24 de ore sau de 12 ore.",

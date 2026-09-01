@@ -17,7 +17,7 @@ import {
   bindingsInSource,
   withoutImports,
 } from "../../scripts/check-ipc-binding-callers.mjs";
-import { bodyOf } from "../../scripts/check-frontend-lock-teardown.mjs";
+import { analyse, bodyOf } from "../../scripts/check-frontend-lock-teardown.mjs";
 import {
   imageTags,
   lockedVersion,
@@ -123,6 +123,154 @@ describe("check-frontend-lock-teardown", () => {
   it("keeps nested braces inside the body", () => {
     const src = `export function lockVault() {\n  if (x) {\n    clearAgentForLock();\n  }\n}\n`;
     expect(bodyOf(src, src.indexOf("lockVault"))).toContain("clearAgentForLock");
+  });
+
+  // ---- the two-hop `via` rule (myne-md/myne#456) ---------------------------
+  //
+  // A path may reach a teardown through a named wrapper, and the guard then has
+  // to check BOTH hops. Accepting the wrapper without the second hop would let
+  // an EMPTY function satisfy this guard, which is the exact shape
+  // `check-lock-teardown.mjs` exists to catch on the Rust side.
+
+  const PATHS = [
+    { id: "c:lock", file: "client/lock.ts", fn: "lockVault", why: "the choke point" },
+  ];
+  const WRAPPER = "client/lifetime.ts";
+  const CALLS = [
+    {
+      call: "clearAgentForLock",
+      declaredIn: "shared/store.ts",
+      holds: "note-derived plaintext",
+      appliesTo: ["c:lock"],
+      skips: {},
+      via: { "c:lock": { fn: "endAgentRun", file: WRAPPER } },
+    },
+  ];
+
+  it("accepts a path that calls the declared wrapper", () => {
+    const errors = analyse({
+      files: {
+        "client/lock.ts": "export function lockVault() {\n  endAgentRun('lock');\n}\n",
+        [WRAPPER]: "export function endAgentRun() {\n  clearAgentForLock();\n}\n",
+        "shared/store.ts": "export function clearAgentForLock() {}\n",
+      },
+      leavingPaths: PATHS,
+      teardownCalls: CALLS,
+    });
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects a path that calls neither the wrapper nor the teardown", () => {
+    const errors = analyse({
+      files: {
+        "client/lock.ts": "export function lockVault() {\n  dropKeys();\n}\n",
+        [WRAPPER]: "export function endAgentRun() {\n  clearAgentForLock();\n}\n",
+        "shared/store.ts": "export function clearAgentForLock() {}\n",
+      },
+      leavingPaths: PATHS,
+      teardownCalls: CALLS,
+    });
+    expect(errors.join("\n")).toContain("does not call endAgentRun()");
+  });
+
+  it("rejects an empty wrapper even when a SIBLING in the same file clears", () => {
+    // The defect the second hop was written for, surviving the second hop.
+    // Hop two used to grep the whole wrapper FILE, so any other function in it
+    // that called the teardown satisfied the check and the empty wrapper the
+    // path actually calls passed. It held in the tree only because the real
+    // `mobile/src/lib/agent-lifetime.ts` contained one function, which is an
+    // accident of file size rather than a property. Found by the /simplify
+    // altitude pass on myne-md/myne#456, which injected exactly this.
+    const errors = analyse({
+      files: {
+        "client/lock.ts": "export function lockVault() {\n  endAgentRun('lock');\n}\n",
+        [WRAPPER]:
+          "export function endAgentRun() {}\n" +
+          "export function somethingElse() {\n  clearAgentForLock();\n}\n",
+        "shared/store.ts": "export function clearAgentForLock() {}\n",
+      },
+      leavingPaths: PATHS,
+      teardownCalls: CALLS,
+    });
+    expect(errors.join("\n")).toContain("never calls clearAgentForLock()");
+  });
+
+  it("reads a wrapper whose return type is a plain identifier", () => {
+    // `bodyOf`'s rule was "the brace after `)` or `>`", which a
+    // `: Promise<void> {` satisfies and a `: void {` does not: the scan walked
+    // past the real body and returned the first INNER block whose brace
+    // followed a `)`. Silent, and it reported the live wrapper as empty.
+    const errors = analyse({
+      files: {
+        "client/lock.ts": "export function lockVault() {\n  endAgentRun('lock');\n}\n",
+        [WRAPPER]:
+          "export function endAgentRun(reason: Reason, notice: string): void {\n" +
+          "  clearAgentForLock();\n" +
+          "  if (reason === 'background') report(notice);\n" +
+          "}\n",
+        "shared/store.ts": "export function clearAgentForLock() {}\n",
+      },
+      leavingPaths: PATHS,
+      teardownCalls: CALLS,
+    });
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects an EMPTY wrapper, which is the whole point of the second hop", () => {
+    // Hop one passes: the path calls the wrapper. Without hop two the guard
+    // would report ok over a teardown that tears nothing down.
+    const errors = analyse({
+      files: {
+        "client/lock.ts": "export function lockVault() {\n  endAgentRun('lock');\n}\n",
+        [WRAPPER]: "export function endAgentRun() {}\n",
+        "shared/store.ts": "export function clearAgentForLock() {}\n",
+      },
+      leavingPaths: PATHS,
+      teardownCalls: CALLS,
+    });
+    expect(errors.join("\n")).toContain("never calls clearAgentForLock()");
+  });
+
+  it("fails by name when a via entry points at a file that is gone", () => {
+    const errors = analyse({
+      files: {
+        "client/lock.ts": "export function lockVault() {\n  endAgentRun('lock');\n}\n",
+        "shared/store.ts": "export function clearAgentForLock() {}\n",
+      },
+      leavingPaths: PATHS,
+      teardownCalls: CALLS,
+    });
+    expect(errors.join("\n")).toContain("via entry for c:lock is stale");
+  });
+
+  it("keys on id, not on function name, so two clients' lockVault differ", () => {
+    // Both clients call their choke point `lockVault`. Keyed on the name, one
+    // roster entry would silently mean both and a skip for one would excuse the
+    // other. Here the SECOND path is not in `appliesTo` and carries a reason,
+    // so a name-keyed guard would report it as applying and fail.
+    const errors = analyse({
+      files: {
+        "a/lock.ts": "export function lockVault() {\n  clearAgentForLock();\n}\n",
+        "b/lock.ts": "export function lockVault() {\n  dropKeys();\n}\n",
+        "shared/store.ts": "export function clearAgentForLock() {}\n",
+      },
+      leavingPaths: [
+        { id: "a:lock", file: "a/lock.ts", fn: "lockVault", why: "client A" },
+        { id: "b:lock", file: "b/lock.ts", fn: "lockVault", why: "client B" },
+      ],
+      teardownCalls: [
+        {
+          call: "clearAgentForLock",
+          declaredIn: "shared/store.ts",
+          holds: "note-derived plaintext",
+          appliesTo: ["a:lock"],
+          skips: {
+            "b:lock": "Client B does not ship the surface that writes to this store at all.",
+          },
+        },
+      ],
+    });
+    expect(errors).toEqual([]);
   });
 });
 

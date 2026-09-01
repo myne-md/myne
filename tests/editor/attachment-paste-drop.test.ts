@@ -83,7 +83,11 @@ afterEach(() => {
 });
 
 describe("insertEmbedsForOutcomes", () => {
-  it("inserts one form-C embed per success, newline-joined in order, in one undo step", () => {
+  it("inserts one form-C embed per success, each on a line of its own, in one undo step", () => {
+    // The leading newline is myne-md/myne#604: an embed goes on a line of its
+    // own, because that is the form the renderer draws as a block and the form
+    // that does not have its DOM rebuilt by typing beside it. This used to read
+    // `seed![[att:…]]`, which put the first embed inside the prose it followed.
     const view = mount("seed");
     const before = view.state.doc.length;
     insertEmbedsForOutcomes(
@@ -96,7 +100,7 @@ describe("insertEmbedsForOutcomes", () => {
       before,
     );
     expect(view.state.doc.toString()).toBe(
-      `seed![[att:${ID_A}|one.png]]\n![[att:${ID_B}|two.png]]`,
+      `seed\n![[att:${ID_A}|one.png]]\n![[att:${ID_B}|two.png]]`,
     );
     view.destroy();
   });
@@ -112,7 +116,11 @@ describe("insertEmbedsForOutcomes", () => {
     const view = mount("ab");
     // insertAt is past the end; it must clamp, never throw an out-of-range pos.
     insertEmbedsForOutcomes(view, [{ ok: true, attachment: imported(ID_A, "x.png") }], 999);
-    expect(view.state.doc.toString()).toBe(`ab![[att:${ID_A}|x.png]]`);
+    // The newline is the own-line rule (myne-md/myne#604) applying to the
+    // CLAMPED position, which is what makes it worth asserting here: the clamp
+    // and the placement have to compose, and a clamp that ran after the
+    // placement would break the line at the wrong offset.
+    expect(view.state.doc.toString()).toBe(`ab\n![[att:${ID_A}|x.png]]`);
     view.destroy();
   });
 });

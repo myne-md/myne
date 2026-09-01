@@ -33,34 +33,36 @@ describe("rankNotes (§6.1)", () => {
   ];
 
   it("empty query returns every titled note", () => {
-    const rows = noteRows(rankNotes("", notes));
+    const rows = noteRows(rankNotes("", notes, []));
     expect(rows.map((r) => r.note.noteUuid).sort()).toEqual(["a", "b", "c"]);
   });
 
   it("matches by title", () => {
-    const rows = noteRows(rankNotes("week", notes));
+    const rows = noteRows(rankNotes("week", notes, []));
     expect(rows.map((r) => r.note.title)).toContain("Weekly Review");
   });
 
   it("matches by path (folder segment)", () => {
-    const rows = noteRows(rankNotes("projects", notes));
+    const rows = noteRows(rankNotes("projects", notes, []));
     expect(rows.map((r) => r.note.title)).toContain("Weekly Review");
   });
 
   it("carries the derived path on each row", () => {
-    const rows = noteRows(rankNotes("wednesday", notes));
+    const rows = noteRows(rankNotes("wednesday", notes, []));
     expect(rows[0]?.path).toBe("notes/2025/Wednesday.md");
   });
 
   it("excludes titleless notes", () => {
     expect(
-      noteRows(rankNotes("", notes)).some((r) => r.note.noteUuid === "d"),
+      noteRows(rankNotes("", notes, [])).some((r) => r.note.noteUuid === "d"),
     ).toBe(false);
   });
 
   it("caps the result", () => {
     const many = Array.from({ length: 120 }, (_, i) => note(`n${i}`, `Note ${i}`, null));
-    expect(rankNotes("note", many, 50)).toHaveLength(50);
+    // The third argument is the recency order (myne-md/myne#601); the cap moved
+    // one place along with it.
+    expect(rankNotes("note", many, [], 50)).toHaveLength(50);
   });
 });
 
@@ -72,7 +74,7 @@ describe("rankNotes folder-target candidates (MYND-370)", () => {
   ];
 
   it("offers each implied folder (ancestor-expanded, trailing-slash form)", () => {
-    const paths = folderRows(rankNotes("", notes))
+    const paths = folderRows(rankNotes("", notes, []))
       .map((r) => r.path)
       .sort();
     expect(paths).toEqual(["Projects/", "notes/", "notes/2025/"]);
@@ -83,22 +85,22 @@ describe("rankNotes folder-target candidates (MYND-370)", () => {
       note("a", "One", "Projects/"),
       note("b", "Two", "projects/"), // same folded folder, different case
     ];
-    const paths = folderRows(rankNotes("", dup)).map((r) => r.path);
+    const paths = folderRows(rankNotes("", dup, [])).map((r) => r.path);
     expect(paths).toHaveLength(1);
   });
 
   it("filters folders by the query like notes", () => {
-    const rows = rankNotes("projects", notes);
+    const rows = rankNotes("projects", notes, []);
     expect(folderRows(rows).map((r) => r.path)).toContain("Projects/");
   });
 
   it("a matching filter still surfaces notes alongside folders", () => {
-    const rows = rankNotes("week", notes);
+    const rows = rankNotes("week", notes, []);
     // Note "Weekly Review" matches; no folder is named "week", so notes-only here.
     expect(noteRows(rows).map((r) => r.note.title)).toContain("Weekly Review");
   });
 
   it("contributes no folder for root-only note-sets", () => {
-    expect(folderRows(rankNotes("", [note("c", "Welcome", null)]))).toHaveLength(0);
+    expect(folderRows(rankNotes("", [note("c", "Welcome", null)], []))).toHaveLength(0);
   });
 });

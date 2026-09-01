@@ -150,6 +150,9 @@ describe("Command palette action registry", () => {
       "pane.focus-prev",
       "pane.split-down",
       "pane.split-right",
+      // myne#177: the weekly and monthly siblings of daily.open-today.
+      "periodic.open-this-month",
+      "periodic.open-this-week",
       "snapshots.open",
       "tab.close",
       "tab.next",
@@ -718,5 +721,26 @@ describe("Command palette action run() side effects", () => {
         sidebarCommands[handler] = undefined;
       }
     }
+  });
+});
+
+describe("app.toggle-screen-capture visibility", () => {
+  // The two callers of `screenCaptureOverrideIsActive` had contradicting rules
+  // on the identical state (myne-md/myne#482, found by review). `PrivacyPanel`
+  // renders its switch inert on an UNREAD override, because a failed read left
+  // as "no override" makes a control live on a device whose window may be
+  // capturable; this predicate answered `false`, so `Cmd+K` offered the toggle
+  // in exactly that state and the palette reopened the door the panel closed.
+  //
+  // Both directions are asserted, because the fix has a cost and the cost is a
+  // second way to be wrong: answering `true` unconditionally for an unread
+  // override would hide the action FOREVER on a client that has no override to
+  // read, since nothing there ever publishes.
+  it("is hidden while the override has not been read on a client that has one", async () => {
+    const { resetScreenCaptureOverrideForTest, screenCaptureOverrideIsActive } = await import(
+      "../../src/hooks/useScreenCaptureOverride"
+    );
+    resetScreenCaptureOverrideForTest();
+    expect(screenCaptureOverrideIsActive()).toBe(true);
   });
 });

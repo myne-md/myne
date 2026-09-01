@@ -351,7 +351,7 @@ describe("the roster: every export that writes vault.prefs bumps the nonce", () 
     // before its `invoke` leaves the loop through `writes.length === 0` and
     // silently stops being tested. This number is measured, and it is also the
     // guard against the read-then-write exclusion the mock above fixed.
-    expect(covered.length).toBeGreaterThanOrEqual(68);
+    expect(covered.length).toBeGreaterThanOrEqual(69);
     expect(covered).toContain("toggleFavoriteOnDisk");
     // Two names pinned rather than left to the count, because these two toggles
     // are the ones a user reads as a privacy promise, so a surface showing the
