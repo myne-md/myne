@@ -954,13 +954,15 @@
           "captureFailed": "Nie udało się rozpocząć nagrywania. Sprawdź dostęp do mikrofonu w Ustawieniach systemowych.",
           "generic": "Nie udało się rozpocząć nagrywania.",
           "locked": "Odblokuj skarbiec, aby nagrać notatkę głosową.",
-          "noInputDevice": "Nie znaleziono mikrofonu. Podłącz go i spróbuj ponownie."
+          "noInputDevice": "Nie znaleziono mikrofonu. Podłącz go i spróbuj ponownie.",
+          "unsupportedSampleRate": "Twój mikrofon nagrywa z częstotliwością próbkowania, której Myne nie potrafi transkrybować. Wybierz inne urządzenie wejściowe albo zmień jego częstotliwość próbkowania w ustawieniach dźwięku systemu."
         },
         "stopError": {
           "captureFailed": "Nagrywanie nie powiodło się. Sprawdź mikrofon.",
           "emptyRecording": "Nic nie zostało nagrane.",
           "generic": "Nie udało się zapisać nagrania.",
-          "silentRecording": "Nagranie było ciche i zostało odrzucone. Sprawdź mikrofon."
+          "silentRecording": "Nagranie było ciche i zostało odrzucone. Sprawdź mikrofon.",
+          "unsupportedSampleRate": "Twój mikrofon nagrywa z częstotliwością próbkowania, której Myne nie potrafi transkrybować. Nic nie zostało zapisane. Wybierz inne urządzenie wejściowe albo zmień jego częstotliwość próbkowania w ustawieniach dźwięku systemu."
         }
       },
       "widget": {
@@ -1006,6 +1008,7 @@
             "featureOff": "Zamiana mowy na tekst jest wyłączona. Włącz ją w Ustawienia → Transkrypcja.",
             "modelLoadFailed": "Nie udało się załadować modelu zamiany mowy na tekst. Jeśli ustawiono własny model w Ustawienia → Deweloper → AI, sprawdź jego pliki; w przeciwnym razie ponowna instalacja Myne przywróci wbudowany.",
             "noModel": "Brakuje modelu zamiany mowy na tekst. Ponowna instalacja Myne go przywraca.",
+            "tooLong": "To nagranie jest zbyt długie, aby je transkrybować. Dźwięk pozostaje w załączniku, więc nadal możesz go odtworzyć.",
             "vaultLocked": "Odblokuj skarbiec, aby transkrybować."
           },
           "disabledReason": "Włącz AI w Ustawienia → Developer → AI, aby transkrybować.",
@@ -1262,10 +1265,6 @@
       "turnedIntoTemplate": "Zamieniono w szablon",
       "convertedToNote": "Przekonwertowano na notatkę",
       "versionHistory": "Historia wersji",
-      "exportMarkdown": "Eksportuj jako Markdown…",
-      "exportPdf": "Eksportuj jako PDF…",
-      "exportHtml": "Eksportuj jako HTML…",
-      "exportTxt": "Eksportuj jako zwykły tekst…",
       "trash": "Przenieś do kosza"
     },
     "codeBlock": {
@@ -2196,10 +2195,6 @@
       "duplicate": "Duplikuj",
       "editFilterTitle": "Edytuj filtr",
       "emptyState": "Brak notatek.",
-      "exportHtml": "Eksportuj jako HTML…",
-      "exportMarkdown": "Eksportuj jako Markdown…",
-      "exportPdf": "Eksportuj jako PDF…",
-      "exportTxt": "Eksportuj jako zwykły tekst…",
       "favoritesHeading": "Ulubione",
       "icon": "Ikona…",
       "mergeAnyway": "Scal mimo to",
@@ -2525,6 +2520,13 @@
     },
     "workspace": {
       "defaultSlotName": "Domyślny"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Eksportuj…",
+      "txt": "Zwykły tekst"
     }
   },
   "password": {
@@ -3271,6 +3273,9 @@
       "exactLabel": "Dokładny czas",
       "exactOn": "Włączone",
       "horizon": "Przypomnienia są zarejestrowane do {{date}}. Otwórz Myne przed tą datą, aby nadal przychodziły.",
+      "horizonLabel": "Planuj z wyprzedzeniem",
+      "horizonLabelHelper": "Przypomnienia są przygotowywane z takim wyprzedzeniem. Myne musi być otwarty i odblokowany, aby przypomnienie dotarło.",
+      "horizonInertHelper": "Zapisano na tym urządzeniu. Nic tego jeszcze nie odczytuje: ta wersja nie dostarcza przypomnień o zadaniach.",
       "label": "Przypomnienia o zadaniach",
       "saveError": "Nie udało się zapisać tego ustawienia. Spróbuj ponownie.",
       "showTextAria": "Pokazuj treść zadania w powiadomieniu",

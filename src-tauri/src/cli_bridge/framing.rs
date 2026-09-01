@@ -79,7 +79,11 @@ enum PrefixRead {
 
 /// Read exactly `buf.len()` bytes, or report a clean EOF (zero bytes
 /// consumed) vs a truncated read (some bytes consumed, then EOF).
-fn read_exact_or_eof<R: Read>(reader: &mut R, buf: &mut [u8]) -> Result<PrefixRead, FrameError> {
+fn read_exact_or_eof<R: Read>(
+    reader: &mut R,
+    buf: &mut [u8],
+    budget: Option<Budget>,
+) -> Result<PrefixRead, FrameError> {
     let mut total = 0;
     while total < buf.len() {
         match reader.read(&mut buf[total..]) {
@@ -96,6 +100,11 @@ fn read_exact_or_eof<R: Read>(reader: &mut R, buf: &mut [u8]) -> Result<PrefixRe
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(io_err(e)),
         }
+        if budget.is_some_and(Budget::spent) {
+            return Err(FrameError::Io(crate::io_failure_kind::from_io_error_kind(
+                std::io::ErrorKind::TimedOut,
+            )));
+        }
     }
     Ok(PrefixRead::Full)
 }
@@ -103,9 +112,18 @@ fn read_exact_or_eof<R: Read>(reader: &mut R, buf: &mut [u8]) -> Result<PrefixRe
 /// Read as many bytes as the stream offers (up to `buf.len()`), stopping at
 /// a clean EOF without treating it as an error — the caller compares the
 /// count read against the declared length to detect truncation.
-fn read_up_to<R: Read>(reader: &mut R, buf: &mut [u8]) -> Result<usize, FrameError> {
+fn read_up_to<R: Read>(
+    reader: &mut R,
+    buf: &mut [u8],
+    budget: Option<Budget>,
+) -> Result<usize, FrameError> {
     let mut total = 0;
     while total < buf.len() {
+        if budget.is_some_and(Budget::spent) {
+            return Err(FrameError::Io(crate::io_failure_kind::from_io_error_kind(
+                std::io::ErrorKind::TimedOut,
+            )));
+        }
         match reader.read(&mut buf[total..]) {
             Ok(0) => break,
             Ok(n) => total += n,
@@ -116,15 +134,63 @@ fn read_up_to<R: Read>(reader: &mut R, buf: &mut [u8]) -> Result<usize, FrameErr
     Ok(total)
 }
 
+/// A wall-clock ceiling on ONE frame read, checked between syscalls.
+///
+/// **Why the socket's own `SO_RCVTIMEO` is not this.** That option is a
+/// PER-SYSCALL bound: it resets every time a read returns data. The loops in
+/// this module read until the buffer fills, so a peer that sends one byte every
+/// 9 s never trips a 10 s `SO_RCVTIMEO` and holds its handler thread for as long
+/// as it likes. The rate limiter cannot charge such a peer anything either,
+/// because it is checked after the frame is read. Sixteen of them reach the
+/// command socket's in-flight cap and the door stops answering.
+///
+/// **Scoped to the READ, deliberately.** An earlier attempt at the same property
+/// armed the socket module's watchdog on every connection, which put a hard
+/// wall-clock bound from accept over the whole exchange INCLUDING dispatch. That
+/// is a compute cap on a request that decrypts every candidate note, so a
+/// healthy `myne list` on a large vault would be killed mid-flight and the CLI
+/// would report a generic IO failure. The peer's pace is the thing that needs
+/// bounding; the vault's size is not.
+#[derive(Clone, Copy)]
+pub struct Budget {
+    started: std::time::Instant,
+    limit: std::time::Duration,
+}
+
+impl Budget {
+    pub fn new(limit: std::time::Duration) -> Self {
+        Self {
+            started: std::time::Instant::now(),
+            limit,
+        }
+    }
+
+    fn spent(self) -> bool {
+        self.started.elapsed() >= self.limit
+    }
+}
+
 /// Read one length-prefixed frame from `reader`, returning the raw body
 /// bytes (content-agnostic — task 4 owns interpreting them).
 ///
 /// Never panics on adversarial or malformed input: a declared length over
 /// [`MAX_FRAME_BODY`] is rejected before any body allocation; a truncated
 /// prefix or body is a typed error, never an `unwrap`/`expect`/index panic.
-pub fn read_frame<R: Read>(reader: &mut R) -> Result<Vec<u8>, FrameError> {
+/// The budget is a REQUIRED argument rather than an `Option` with a default,
+/// because a default here is the shape `CLAUDE.md` records under "a guard
+/// parameter with a default value is an opt-in guard": the arm that never fires
+/// is the one a new call site silently takes, and the one call site that matters
+/// is the socket. Every caller states whether its reader has a peer to pace.
+/// `None` is correct for a `Cursor`, which cannot stall.
+///
+/// See [`Budget`] for why the socket's own `SO_RCVTIMEO` is not this, and why
+/// the ceiling stops at the read rather than spanning the whole exchange.
+pub fn read_frame_within<R: Read>(
+    reader: &mut R,
+    budget: Option<Budget>,
+) -> Result<Vec<u8>, FrameError> {
     let mut prefix = [0u8; LENGTH_PREFIX_BYTES];
-    match read_exact_or_eof(reader, &mut prefix)? {
+    match read_exact_or_eof(reader, &mut prefix, budget)? {
         PrefixRead::Eof => return Err(FrameError::Eof),
         PrefixRead::Full => {}
     }
@@ -136,7 +202,7 @@ pub fn read_frame<R: Read>(reader: &mut R) -> Result<Vec<u8>, FrameError> {
         });
     }
     let mut body = vec![0u8; declared_len];
-    let read_len = read_up_to(reader, &mut body)?;
+    let read_len = read_up_to(reader, &mut body, budget)?;
     if read_len != declared_len {
         return Err(FrameError::Truncated {
             declared_len,
@@ -167,6 +233,68 @@ pub fn write_frame<W: Write>(writer: &mut W, body: &[u8]) -> Result<(), FrameErr
 
 #[cfg(test)]
 mod tests {
+    /// A peer that hands over one byte at a time, slowly, without ever closing.
+    ///
+    /// The exact shape `Budget` exists for: every `read` returns data, so the
+    /// socket's own `SO_RCVTIMEO` never fires, and the loop would otherwise run
+    /// for as long as the peer keeps dribbling.
+    struct Dribble {
+        remaining: usize,
+        per_read: std::time::Duration,
+    }
+
+    impl Read for Dribble {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.remaining == 0 || buf.is_empty() {
+                return Ok(0);
+            }
+            std::thread::sleep(self.per_read);
+            self.remaining -= 1;
+            buf[0] = 0;
+            Ok(1)
+        }
+    }
+
+    #[test]
+    fn a_dribbling_peer_is_cut_off_by_the_read_budget() {
+        // 40 ms of budget against a peer offering one byte every 10 ms into a
+        // four-byte length prefix. Without the budget this returns only when the
+        // peer decides to stop.
+        let mut peer = Dribble {
+            remaining: 4096,
+            per_read: std::time::Duration::from_millis(10),
+        };
+        let budget = Budget::new(std::time::Duration::from_millis(40));
+        let started = std::time::Instant::now();
+        let out = read_frame_within(&mut peer, Some(budget));
+        let took = started.elapsed();
+
+        assert!(
+            matches!(out, Err(FrameError::Io(_))),
+            "a spent budget must end the read as an IO failure, got {out:?}"
+        );
+        // A liveness ceiling rather than a bound under test: it only distinguishes
+        // "the budget ended it" from "the peer did".
+        assert!(
+            took < std::time::Duration::from_secs(5),
+            "the read ran for {took:?}, so the budget did not end it"
+        );
+    }
+
+    #[test]
+    fn no_budget_means_no_ceiling_and_the_same_peer_runs_on() {
+        // The other direction, so the test above cannot pass because the reader
+        // errors for some unrelated reason. The same peer with `None` gets
+        // through its prefix and is bounded only by what it sends.
+        let mut peer = Dribble {
+            remaining: 4,
+            per_read: std::time::Duration::from_millis(1),
+        };
+        // Four bytes of zero prefix, then EOF: a declared length of 0 and an
+        // empty body, which is a legal frame.
+        assert_eq!(read_frame_within(&mut peer, None), Ok(Vec::new()));
+    }
+
     use super::*;
     use std::io::Cursor;
 
@@ -181,7 +309,7 @@ mod tests {
         let mut buf = Vec::new();
         write_frame(&mut buf, b"hello").unwrap();
         let mut cur = Cursor::new(buf);
-        assert_eq!(read_frame(&mut cur).unwrap(), b"hello");
+        assert_eq!(read_frame_within(&mut cur, None).unwrap(), b"hello");
     }
 
     #[test]
@@ -189,19 +317,19 @@ mod tests {
         let mut buf = Vec::new();
         write_frame(&mut buf, b"").unwrap();
         let mut cur = Cursor::new(buf);
-        assert_eq!(read_frame(&mut cur).unwrap(), Vec::<u8>::new());
+        assert_eq!(read_frame_within(&mut cur, None).unwrap(), Vec::<u8>::new());
     }
 
     #[test]
     fn clean_eof_at_a_frame_boundary_is_reported_not_panicked() {
         let mut cur = Cursor::new(Vec::<u8>::new());
-        assert_eq!(read_frame(&mut cur), Err(FrameError::Eof));
+        assert_eq!(read_frame_within(&mut cur, None), Err(FrameError::Eof));
     }
 
     #[test]
     fn truncated_prefix_is_reported_not_panicked() {
         let mut cur = Cursor::new(vec![1u8, 2]); // 2 of 4 prefix bytes
-        match read_frame(&mut cur) {
+        match read_frame_within(&mut cur, None) {
             Err(FrameError::Truncated { .. }) => {}
             other => panic!("expected Truncated, got {other:?}"),
         }
@@ -212,7 +340,7 @@ mod tests {
         let mut wire = (100u32).to_le_bytes().to_vec(); // declares 100 bytes
         wire.extend_from_slice(b"only three"); // far fewer than declared
         let mut cur = Cursor::new(wire);
-        match read_frame(&mut cur) {
+        match read_frame_within(&mut cur, None) {
             Err(FrameError::Truncated {
                 declared_len: 100,
                 read_len: 10,
@@ -230,7 +358,7 @@ mod tests {
         let wire = declared.to_le_bytes().to_vec(); // prefix only, no body
         let mut cur = Cursor::new(wire);
         assert_eq!(
-            read_frame(&mut cur),
+            read_frame_within(&mut cur, None),
             Err(FrameError::Oversized {
                 declared_len: MAX_FRAME_BODY + 1,
                 cap: MAX_FRAME_BODY,
@@ -265,7 +393,7 @@ mod tests {
         ];
         for case in cases {
             let mut cur = Cursor::new(case);
-            let _ = read_frame(&mut cur); // must return, never panic
+            let _ = read_frame_within(&mut cur, None); // must return, never panic
         }
     }
 }

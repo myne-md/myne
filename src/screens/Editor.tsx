@@ -72,6 +72,7 @@ import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
 import { RemoteMergeHint } from "../components/sync/RemoteMergeHint";
 import { Icon } from "../components/primitives/Icon";
+import { PanelToggleGlyph } from "../components/primitives/PanelToggleGlyph";
 import { Tooltip } from "../components/primitives/Tooltip";
 import {
   hoverSurface,
@@ -132,6 +133,10 @@ import {
   type ExportToast,
   type NoteExportUiHooks,
 } from "../notes/exportFlow";
+import {
+  noteExportFormats,
+  type NoteExportFormat,
+} from "../notes/noteExportMenu";
 import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
 import { ExportEgressNotice } from "../components/export/ExportEgressNotice";
 import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
@@ -212,6 +217,8 @@ import {
 } from "../notes/components/ContextMenu";
 import {
   HAS_OVERLAY_WINDOW_CONTROLS,
+  TITLE_BAR_CONTROL_HEIGHT,
+  TITLE_BAR_CONTROL_TOP,
   TRAFFIC_LIGHT_GAP,
   dragRegionProps,
 } from "./titlebar";
@@ -1031,6 +1038,7 @@ function EditorChrome({
     enabled: barPrefs.reminders_enabled,
     tasks: reminderTasks,
     notifier: reminderNotifier,
+    horizonDays: barPrefs.reminder_horizon_days,
   });
   // `barMenu` holds the open menu's anchor coords + which mode it is in: a
   // plain `{x, y}` opens the bar-wide visibility checklist (right-click on
@@ -2001,7 +2009,7 @@ function EditorChrome({
         data-editor-chrome
         style={{
           position: "absolute",
-          top: 6,
+          top: TITLE_BAR_CONTROL_TOP,
           left: leftToggleX,
           zIndex: 30,
           display: "flex",
@@ -2037,7 +2045,7 @@ function EditorChrome({
         <div
           style={{
             position: "absolute",
-            top: 6,
+            top: TITLE_BAR_CONTROL_TOP,
             right: RIGHT_TOGGLE_X,
             zIndex: 30,
           }}
@@ -2563,7 +2571,7 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
   alignSelf: "center",
   alignItems: "center",
   justifyContent: "center",
-  height: 26,
+  height: TITLE_BAR_CONTROL_HEIGHT,
   flexShrink: 0,
   border: 0,
   borderRadius: "var(--radius-1)",
@@ -2651,14 +2659,6 @@ function TitleBarToggle({
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const icon =
-    side === "left"
-      ? collapsed
-        ? "panel-left"
-        : "panel-left-close"
-      : collapsed
-        ? "panel-right"
-        : "panel-right-close";
   const label =
     side === "left"
       ? collapsed
@@ -2685,7 +2685,7 @@ function TitleBarToggle({
         opacity: disabled ? 0.4 : 1,
       }}
     >
-      <Icon name={icon} size={16} />
+      <PanelToggleGlyph side={side} collapsed={collapsed} />
     </button>
   );
 }
@@ -3469,6 +3469,18 @@ function CommandPaletteHost({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNoteId]);
 
+  // The palette's four export handlers, keyed by the shared format id, so the
+  // "…" menu's submenu stays a projection of `noteExportFormats()` instead of a
+  // third copy of the list. `?.()` rather than a bare reference because
+  // `CommandContext` declares several of its callbacks optional, and a submenu
+  // row owes a handler either way.
+  const exportHandlerByFormat: Record<NoteExportFormat["id"], () => void> = {
+    "export-markdown": () => commandCtx.onExportNoteMarkdown?.(),
+    "export-pdf": () => commandCtx.onExportNotePdf?.(),
+    "export-html": () => commandCtx.onExportNoteHtml?.(),
+    "export-txt": () => commandCtx.onExportNoteTxt?.(),
+  };
+
   const noteActionItems: NoteActionMenuItem[] = [
     {
       kind: "action",
@@ -3527,31 +3539,27 @@ function CommandPaletteHost({
     { kind: "divider" },
     {
       kind: "action",
-      action: "export-markdown",
+      action: "export",
       icon: "download",
-      label: t("editor.noteActions.exportMarkdown"),
-      onSelect: commandCtx.onExportNoteMarkdown,
-    },
-    {
-      kind: "action",
-      action: "export-pdf",
-      icon: "download",
-      label: t("editor.noteActions.exportPdf"),
-      onSelect: commandCtx.onExportNotePdf,
-    },
-    {
-      kind: "action",
-      action: "export-html",
-      icon: "download",
-      label: t("editor.noteActions.exportHtml"),
-      onSelect: commandCtx.onExportNoteHtml,
-    },
-    {
-      kind: "action",
-      action: "export-txt",
-      icon: "download",
-      label: t("editor.noteActions.exportTxt"),
-      onSelect: commandCtx.onExportNoteTxt,
+      // ONE row with a submenu, where there used to be one row per format. Four
+      // of them made up a third of this menu, and the sidebar row's menu
+      // carried the same four again. The list itself now comes from
+      // `noteExportFormats()`, shared with that menu, including the
+      // `pdfExport` gate, which used to be on the sidebar side only, so this
+      // menu was the one still offering PDF on a host that cannot make one.
+      label: t("notes.export.submenuLabel"),
+      // Never called: a row with `children` opens them instead of acting.
+      onSelect: () => {},
+      children: noteExportFormats().map((format) => ({
+        action: format.id,
+        label: t(format.labelKey),
+        // Still the palette's own handlers, so this stays a second SURFACE onto
+        // one IPC path rather than a second path, the rule this menu's header
+        // states. They also close the palette, which the direct-flow runner in
+        // `noteExportEntries` has no business doing, and that is the whole
+        // reason the shared module stops at the format list here.
+        onSelect: exportHandlerByFormat[format.id],
+      })),
     },
     { kind: "divider" },
     {
@@ -3577,7 +3585,7 @@ function CommandPaletteHost({
         <div
           style={{
             position: "absolute",
-            top: 6,
+            top: TITLE_BAR_CONTROL_TOP,
             // Sits just left of the right-sidebar toggle (at RIGHT_TOGGLE_X),
             // one cluster gap between them, so the two read as one group.
             right: RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + TITLE_BAR_CLUSTER_GAP,

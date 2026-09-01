@@ -10,6 +10,16 @@ import {
   resetGraphLayoutOnLock,
 } from "./graph-layout-persist";
 import { flushWorkspaceNow, resetWorkspaceOnLock } from "./workspace-persist";
+// The attachment caches live in the SHARED editor package, and mobile compiles
+// it: `editor-host.ts` wires a real `attachments` host, so the same decoration
+// fills the same module-scope maps here that it does on desktop. Cleared from
+// leaf modules rather than from `widgets.ts` so this import cannot drag the
+// attachment-widget subtree into the eager bundle graph.
+import { resetDecodedAspects } from "@myne/editor/attachments/decoded-aspect";
+import {
+  resetPreviewCache,
+  resetTranscripts,
+} from "@myne/editor/attachments/session-caches";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 
 /** Read-only probe of the `UnlockedVault` slot. */
@@ -46,6 +56,15 @@ export async function lockVault(): Promise<void> {
   resetGraphLayoutOnLock();
   await flushWorkspaceNow();
   resetWorkspaceOnLock();
+  // Everything the shared editor caches from decrypted attachment content:
+  // the decoded image shapes, up to 24 file previews, and any completed
+  // transcripts. `resetTranscripts` clears a store mobile does not populate
+  // today (no `transcribe` host member is wired), and it is called anyway
+  // because whether a shared store is populated is a wiring detail that can
+  // change without anyone revisiting this function.
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
   // The ambient date/time DISPLAY store, which is module scope in
   // `@myne/editor` and read by every surface that prints a date. It holds the
   // reader's chosen formats and their TIME ZONE, all derived from decrypted

@@ -113,13 +113,17 @@ describe("absent when idle", () => {
 });
 
 describe("anchor", () => {
-  it("sits on the frontmatter/body boundary, not inside the block", () => {
-    // `bodyStart`/`bodyEnd` name the YAML block's own interior; the boundary
-    // between frontmatter and the NOTE body is `blockEnd`.
+  it("sits where the block stops rendering, not inside the block", () => {
+    // `bodyStart`/`bodyEnd` name the YAML block's own interior. The band anchors
+    // where the Properties widget ENDS, which is the closing `---`'s own end:
+    // the newline after it is outside the widget so that the line below is
+    // rendered at all (myne-md/myne#595). Anchoring one character later, on the
+    // caret floor, would put the band under the first body line instead of
+    // against the panel (myne#287, whose own case is two tests below).
     const { view, host } = mount();
     const at = tagSuggestionBandAnchor(view.state);
-    expect(at).toBe(FM_DOC.indexOf("---\n\n") + "---\n".length);
-    expect(view.state.doc.sliceString(0, at)).toBe("---\ntitle: Notes\n---\n");
+    expect(at).toBe(FM_DOC.indexOf("---\n\n") + "---".length);
+    expect(view.state.doc.sliceString(0, at)).toBe("---\ntitle: Notes\n---");
     teardown(view, host);
   });
 

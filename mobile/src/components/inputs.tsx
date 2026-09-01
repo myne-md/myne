@@ -1,5 +1,4 @@
-import { useRef } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 
@@ -294,61 +293,55 @@ export function Switch({
 // ── Segmented control ────────────────────────────────────────────────────────
 // Presentational by default (gallery boards pass only `active`); pass `onChange`
 // to make each segment tappable (wired settings).
+//
+// **A wired one is a radiogroup, not four divs** (myne#508). The segments were
+// bare `div`s with an `onClick`: nothing announced them, nothing could focus
+// them, and no test could address one except by its localized text. That last
+// part is why the horizon picker's first tests were all source-text greps, and
+// a source-text grep cannot fail when the handler is deleted. The presentational
+// form keeps no roles, because a board that is not tappable should not tell a
+// screen reader it is.
+/** A presentational board, or a wired control. The two differ in more than one
+ *  field, so they are two shapes rather than one shape with optional halves.
+ *
+ *  **The name is required on the wired form** (myne#508). It was optional for
+ *  one review round, and because the wired form is the one that renders
+ *  `role="radiogroup"`, every existing caller gained a grouping role with
+ *  `aria-label={undefined}`: an announced group with no name, which is worse
+ *  than the unannounced divs it replaced. A union makes `tsc` name each site
+ *  instead of leaving it to whoever notices. */
+type SegmentedProps = {
+  options: string[];
+  active?: number;
+  style?: CSSProperties;
+  /** Segments derive `${testIdPrefix}-${optionValues[i] ?? i}`. */
+  testIdPrefix?: string;
+  /** Stable per-option ids for the testid tail, so a spec does not have to
+   *  address a segment by its translated label. Defaults to the index. */
+  optionValues?: string[];
+} & (
+  | { onChange: (index: number) => void; ariaLabel: string }
+  | { onChange?: undefined; ariaLabel?: undefined }
+);
+
 export function Segmented({
   options,
   active = 0,
   onChange,
   style,
-  label,
-  testId,
-  optionIds,
-}: {
-  options: string[];
-  active?: number;
-  onChange?: (index: number) => void;
-  style?: CSSProperties;
-  /** Accessible name for the group. A segmented control with none is a row of
-   *  words to a screen reader, with nothing saying what the choice is about. */
-  label?: string;
-  /** Testid for the group; each segment gets `<testId>.<optionId or index>`.
-   *  Added with myne-md/myne#609, whose date and time rows were the first
-   *  settings block in this sheet to ship with none while twelve siblings had
-   *  them. */
-  testId?: string;
-  optionIds?: readonly string[];
-}) {
-  // `radiogroup` plus `radio`, which is what this IS: one choice out of a small
-  // closed set. Before myne-md/myne#609 every segment was a bare `div` with an
-  // `onClick`, so the control had no role, could not be reached by keyboard at
-  // all, and announced nothing about which option was current. That is a
-  // pre-existing gap rather than one this issue introduced, fixed here because
-  // the issue added two more dependents to it.
-  const pick = (i: number) => (): void => onChange?.(i);
-  // ARROW KEYS, and they are not decoration. The roving `tabIndex` below makes
-  // only the SELECTED segment focusable, which is the standard radiogroup
-  // pattern and is unusable without them: Tab reaches the current choice, Enter
-  // re-picks the choice already made, and no key reaches any other. The first
-  // version shipped the roles and the roving index and no arrow handler, so the
-  // control announced itself as an operable radiogroup while being inoperable,
-  // which is worse than the un-roled `div` it replaced (myne-md/myne#609, found
-  // in review). Wrapping is what a radiogroup does; `dir` is not consulted
-  // because the visual order follows the DOM order under `flex` either way.
-  const ref = useRef<HTMLDivElement | null>(null);
-  const move = (i: number, delta: number) => (): void => {
-    if (onChange === undefined || options.length === 0) return;
-    const next = (i + delta + options.length) % options.length;
-    onChange(next);
-    // Focus follows selection, which is what makes the next arrow key continue
-    // from where the reader is rather than from where they started.
-    const el = ref.current?.children[next];
-    if (el instanceof HTMLElement) el.focus();
-  };
+  ariaLabel,
+  testIdPrefix,
+  optionValues,
+}: SegmentedProps) {
+  const wired = onChange !== undefined;
+  // Held so an arrow key can move focus with the selection. Populated by the
+  // segments' own refs rather than by a query, so it cannot go stale against a
+  // re-render that changes the option set.
+  const segmentRefs = useRef<Record<number, HTMLDivElement>>({});
   return (
     <div
-      ref={ref}
-      role="radiogroup"
-      aria-label={label}
-      data-testid={testId}
+      role={wired ? "radiogroup" : undefined}
+      aria-label={wired ? ariaLabel : undefined}
       style={{
         display: "flex",
         padding: 2,
@@ -362,38 +355,90 @@ export function Segmented({
       {options.map((o, i) => (
         <div
           key={o}
-          role="radio"
-          aria-checked={i === active}
-          tabIndex={onChange ? (i === active ? 0 : -1) : undefined}
-          data-testid={testId === undefined ? undefined : `${testId}.${optionIds?.[i] ?? i}`}
-          onClick={onChange ? pick(i) : undefined}
-          onKeyDown={
-            onChange
-              ? (e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onChange(i);
-                  } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-                    e.preventDefault();
-                    move(i, 1)();
-                  } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-                    e.preventDefault();
-                    move(i, -1)();
-                  }
+          role={wired ? "radio" : undefined}
+          aria-checked={wired ? i === active : undefined}
+          // Roving tabindex: the GROUP is one tab stop, and the selected
+          // segment is the one it lands on. Giving every segment `tabIndex={0}`
+          // is what this had first, and it makes a four-option control four tab
+          // stops, which is the shape `role="radiogroup"` promises it is not.
+          // Announcing a role and then not honouring its keyboard model is
+          // worse than the unannounced divs this replaced.
+          // `active < 0 ? 0` is the no-selection fallback, and it is only for
+          // the tab stop. `resolveHorizonDays` clamps a stored 2, 4 or 6 into
+          // range rather than snapping it onto the offered set, so `active` is
+          // -1 and no segment is checked. Without the fallback every segment
+          // took `tabIndex={-1}`: an announced radiogroup with zero tab stops,
+          // which a pointer user never notices and a keyboard user cannot enter
+          // at all. The convention is that the first radio takes the tab stop
+          // when none is checked. `aria-checked` and `data-active` are
+          // deliberately NOT given the same fallback, so the readout stays
+          // honest about there being no selection.
+          tabIndex={wired ? (i === (active < 0 ? 0 : active) ? 0 : -1) : undefined}
+          // EVERY mounted segment, not only the active one. Recording only the
+          // active segment made the arrow handler's `segmentRefs.current[next]`
+          // a silent no-op by construction, since `next` is never the active
+          // index: React commits the state change after the handler returns, so
+          // the still-focused segment then flipped to `tabIndex={-1}` and
+          // `aria-checked="false"` while selection moved elsewhere. The next
+          // key press fired from that same stale element, recomputed the same
+          // `next`, and rewrote the value it had already written. One step of
+          // traversal per two presses, permanently, with assistive technology
+          // reporting focus on an unselected radio.
+          //
+          // The `null` cleanup call DELETES the entry rather than ignoring it,
+          // so the map cannot outlive a changed option set and hand `focus()` a
+          // detached node.
+          ref={
+            wired
+              ? (el) => {
+                  if (el === null) delete segmentRefs.current[i];
+                  else segmentRefs.current[i] = el;
                 }
               : undefined
           }
+          onClick={onChange ? () => onChange(i) : undefined}
+          onKeyDown={
+            onChange
+              ? (e) => {
+                  // Enter and Space are what a radio answers to. Arrows are how
+                  // a radiogroup is traversed, and in a radiogroup they SELECT
+                  // as they move rather than only moving focus.
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onChange(i);
+                    return;
+                  }
+                  const delta =
+                    e.key === "ArrowRight" || e.key === "ArrowDown"
+                      ? 1
+                      : e.key === "ArrowLeft" || e.key === "ArrowUp"
+                        ? -1
+                        : 0;
+                  if (delta === 0) return;
+                  e.preventDefault();
+                  // Wraps, which is the radiogroup convention: the set is a
+                  // cycle rather than a list with ends to get stuck against.
+                  const next = (i + delta + options.length) % options.length;
+                  onChange(next);
+                  segmentRefs.current[next]?.focus();
+                }
+              : undefined
+          }
+          data-testid={testIdPrefix ? `${testIdPrefix}-${optionValues?.[i] ?? i}` : undefined}
+          data-active={wired && i === active ? "true" : undefined}
           style={{
             flex: 1,
-            // Without it a long label refuses to shrink below its content and
-            // pushes the row past the card. Five options at 358 px is where that
-            // starts to matter, which is why it arrives with #609.
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
             textAlign: "center",
-            padding: "7px 12px",
+            // 44px is what both platforms publish as the minimum, and padding
+            // alone does not reach it: 11px either side of a 14px label at the
+            // inherited 1.5 line-height measures 43px. `minHeight` states the
+            // target instead of computing it, so it cannot drift with a
+            // typography token.
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 12px",
             borderRadius: 6,
             fontSize: 14,
             fontWeight: 600,

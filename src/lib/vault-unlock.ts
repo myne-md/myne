@@ -11,6 +11,13 @@ import { resetTaskIndexCache } from "../notes/taskIndex";
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
+import { resetScrollMemory } from "../notes/scrollMemory";
+import { resetRecentNotes } from "../notes/recentNotes";
+import { resetDecodedAspects } from "../editor/attachments/decoded-aspect";
+import {
+  resetPreviewCache,
+  resetTranscripts,
+} from "../editor/attachments/session-caches";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 
 /** Read-only probe of the `UnlockedVault` slot. */
@@ -108,6 +115,30 @@ export async function lockVault(): Promise<void> {
   // state that outlives the slot. (The idle auto-lock path reloads the WebView,
   // which clears this for free — the manual Lock button does not.)
   teardownStep("resetTaskIndexCache", () => resetTaskIndexCache());
+  // The per-note scroll positions (myne-md/myne#600). Module scope, keyed by
+  // note id, and the decision behind it is session-scoped memory: the session
+  // ends here. Nothing in it is note text, but it is a live map of which notes
+  // this vault has and how far into each one the user had read, which is the
+  // same category of vault-derived RAM as the caches above.
+  teardownStep("resetScrollMemory", () => resetScrollMemory());
+  // The wikilink picker's recency order (myne-md/myne#601), same leg and same
+  // reason: a module-scope list of the note ids this vault opened, which would
+  // otherwise rank the NEXT session's picker from the previous one's history.
+  teardownStep("resetRecentNotes", () => resetRecentNotes());
+  // The decoded image shapes (myne-md/myne#604), same leg and same reason one
+  // step further out: the key is an attachment id and the value comes from
+  // decrypted content, so the map enumerates every attachment this vault has
+  // rendered. Keeping it across a lock would trade that for one first-paint
+  // settle on the re-unlock.
+  teardownStep("resetDecodedAspects", () => resetDecodedAspects());
+  // The two stores that hold decrypted attachment CONTENT rather than a shape
+  // derived from it: up to 24 file previews (each capped at the host's 2 MiB
+  // read cap) and the text of every completed voice-note transcription. The
+  // transcript store carried a comment claiming the module unloads on lock,
+  // which is what kept it off this path; a JS module never unloads, and this
+  // button does not reload the WebView.
+  teardownStep("resetPreviewCache", () => resetPreviewCache());
+  teardownStep("resetTranscripts", () => resetTranscripts());
   // The ambient date/time DISPLAY store, which is module scope in
   // `@myne/editor` and read by every surface that prints a date. It holds the
   // reader's chosen formats and their TIME ZONE, all derived from decrypted

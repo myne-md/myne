@@ -168,11 +168,49 @@ function healthyFiles(): Record<string, string> {
     "src/notes/ai/chatStore.ts": `export function clearChat(): void {}\n`,
     "src/notes/ai/aiOutputStore.ts": `export function clearAiOutput(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
+    "src/notes/scrollMemory.ts": `export function resetScrollMemory(): void {}\n`,
+    "src/notes/recentNotes.ts": `export function resetRecentNotes(): void {}\n`,
+    // The aspect store is a LEAF module rather than living in `widgets.ts`:
+    // the teardown paths import it, and `src/App.tsx` imports those eagerly, so
+    // declaring it beside the widgets dragged the whole attachment subtree into
+    // the app's eager bundle graph (myne-md/myne#604 follow-up).
+    "editor/src/attachments/decoded-aspect.ts": `export function resetDecodedAspects(): void {}\n`,
+    // Leaf modules for the same reason: these hold DECRYPTED attachment
+    // content (cached previews, completed voice-note transcripts), the
+    // teardown paths clear them, and reaching into `widgets.ts` or
+    // `transcript.ts` to do that would put the whole attachment subtree back
+    // into the eager bundle graph.
+    "editor/src/attachments/session-caches.ts": `export function resetPreviewCache(): void {}
+export function resetTranscripts(): void {}\n`,
+    // The ambient date/time DISPLAY store, module scope in `@myne/editor` and
+    // read by every surface that prints a date. It holds the reader's formats
+    // and their TIME ZONE, all derived from decrypted `vault.prefs`
+    // (myne-md/myne#609).
+    "editor/src/host/lib/datetimeFormat.ts": `export function resetDateTimeDisplayForLock(): void {}\n`,
     "src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   clearAgentForLock();
   clearChat();
   clearAiOutput();
+  resetScrollMemory();
+  resetRecentNotes();
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
+  resetDateTimeDisplayForLock();
   await invoke("plugin:vault_unlock|vault_lock");
+}
+`,
+    // Mobile's own lock choke point (its Lock button, its idle auto-lock and its
+    // vault switch all funnel here). It compiles the SAME `@myne/editor`
+    // attachment modules as desktop, so the three shared stores apply to it;
+    // the desktop-only stores under `src/notes/` do not, and the roster answers
+    // that with a stated skip rather than silence.
+    "mobile/src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
+  resetDateTimeDisplayForLock();
+  await invoke("plugin:vault-unlock|lock");
 }
 `,
     "src/lib/vault-switch.ts": `export async function leaveActiveVault(deps: {
@@ -182,38 +220,44 @@ function healthyFiles(): Record<string, string> {
   clearChat();
   clearAiOutput();
   resetSessionIgnored();
+  resetScrollMemory();
+  resetRecentNotes();
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
+  resetDateTimeDisplayForLock();
   await lockVault();
 }
 `,
   };
 }
 
-/** The two desktop leaving paths these cases drive.
+/** The three leaving paths these cases drive: both clients' locks and the
+ *  desktop switch.
  *
- *  A SUBSET of the real `LEAVING_PATHS`, taken by file+fn rather than inherited
- *  whole, because myne-md/myne#609 added mobile's two paths to the roster and
- *  keyed matching by `<file>::<fn>`. Inheriting the whole roster would make every
- *  case here also assert the mobile and delete paths, which the synthetic file
- *  set does not contain, so the cases would fail for a reason that has nothing to
- *  do with the rule under test. */
-const CASE_PATHS = LEAVING_PATHS.filter(
-  (p: { file: string }) =>
-    p.file === "src/lib/vault-unlock.ts" || p.file === "src/lib/vault-switch.ts",
-);
+ *  A SUBSET of the real `LEAVING_PATHS`, taken by ID, because myne-md/myne#609
+ *  added the two DELETE paths to the roster and the synthetic file set below
+ *  declares no `vault-delete.ts`. Inheriting the whole roster would make every
+ *  case here also assert those two, so the cases would fail for a reason that
+ *  has nothing to do with the rule under test. Taken by id rather than by file
+ *  because id is what `analyse` keys `appliesTo` and `skips` on, so a filter on
+ *  anything else is a second naming scheme that can disagree with the first. */
+const CASE_IDS = ["desktop-lock", "mobile-lock", "desktop-switch"];
 
-/** The four teardown calls the synthetic file set declares, with their skips
- *  narrowed to the two paths above for the same reason. */
-const CASE_CALLS = TEARDOWN_CALLS.filter((t: { call: string }) =>
-  ["clearAgentForLock", "clearChat", "clearAiOutput", "resetSessionIgnored"].includes(t.call),
+const CASE_PATHS = LEAVING_PATHS.filter((p: { id: string }) => CASE_IDS.includes(p.id));
+
+/** The teardown calls the synthetic file set declares, with their verdicts
+ *  narrowed to the three paths above for the same reason. Derived from the file
+ *  set rather than hand-listed: a hand list is a second copy of the fixture and
+ *  goes stale the moment a store joins the roster, which is exactly what
+ *  `resetDateTimeDisplayForLock` did. */
+const CASE_CALLS = TEARDOWN_CALLS.filter(
+  (t: { declaredIn: string }) => healthyFiles()[t.declaredIn] !== undefined,
 ).map((t) => ({
   ...t,
-  appliesTo: t.appliesTo.filter(
-    (k) => k.startsWith("src/lib/vault-unlock.ts") || k.startsWith("src/lib/vault-switch.ts"),
-  ),
+  appliesTo: t.appliesTo.filter((k) => CASE_IDS.includes(k)),
   skips: Object.fromEntries(
-    Object.entries(t.skips ?? {}).filter(
-      ([k]) => k.startsWith("src/lib/vault-unlock.ts") || k.startsWith("src/lib/vault-switch.ts"),
-    ),
+    Object.entries(t.skips ?? {}).filter(([k]) => CASE_IDS.includes(k)),
   ),
 }));
 
@@ -453,6 +497,52 @@ describe("check-frontend-lock-teardown: the cross product", () => {
     expect(errors[1]).toContain("leaveActiveVault does not call clearChat()");
   });
 
+  it("names the two session stores that shipped with reset functions nobody called", () => {
+    // `resetScrollMemory` (myne-md/myne#600) and `resetRecentNotes` (#601) were
+    // both written, exported, and wired to nothing: `check-unwired.mjs` cannot
+    // see them, because it asks whether a MODULE has an importer and both
+    // modules have several, for their other exports. Asserted on both paths, so
+    // dropping either call on either path is named on its own.
+    const files = healthyFiles();
+    for (const f of ["src/lib/vault-unlock.ts", "src/lib/vault-switch.ts"]) {
+      files[f] = files[f]
+        .replace("  resetScrollMemory();\n", "")
+        .replace("  resetRecentNotes();\n", "");
+    }
+    const errors = run(files);
+    expect(errors).toHaveLength(4);
+    expect(errors.some((e) => e.includes("lockVault does not call resetScrollMemory()"))).toBe(true);
+    expect(errors.some((e) => e.includes("lockVault does not call resetRecentNotes()"))).toBe(true);
+    expect(
+      errors.some((e) => e.includes("leaveActiveVault does not call resetScrollMemory()")),
+    ).toBe(true);
+    expect(
+      errors.some((e) => e.includes("leaveActiveVault does not call resetRecentNotes()")),
+    ).toBe(true);
+  });
+
+  it("names each attachment store this branch put on the roster, on each path", () => {
+    // The three entries the aspect/preview/transcript work added. The two above
+    // had an injection case and these did not, which is the shape the root
+    // CLAUDE.md calls out by name: a guard whose new rows rest on the generic
+    // cross-product being right rather than on anything having watched them
+    // fire. Two of the three hold DECRYPTED note content (up to 24 cached file
+    // previews, and the text of every completed voice-note transcription), so
+    // they are the half of the roster where a silent miss costs the most.
+    const calls = ["resetDecodedAspects", "resetPreviewCache", "resetTranscripts"];
+    const paths = ["src/lib/vault-unlock.ts", "src/lib/vault-switch.ts"];
+    for (const call of calls) {
+      for (const path of paths) {
+        const files = healthyFiles();
+        files[path] = files[path].replace(`  ${call}();\n`, "");
+        const errors = run(files);
+        const leaving = path.endsWith("vault-unlock.ts") ? "lockVault" : "leaveActiveVault";
+        expect(errors, `${call} dropped from ${leaving}`).toHaveLength(1);
+        expect(errors[0]).toContain(`${leaving} does not call ${call}()`);
+      }
+    }
+  });
+
   it("rejects a skip that gives no reason", () => {
     const errors = analyse({
       files: healthyFiles(),
@@ -462,13 +552,17 @@ describe("check-frontend-lock-teardown: the cross product", () => {
           call: "resetSessionIgnored",
           declaredIn: "editor/src/decorations/spell.ts",
           holds: "the session's ignored-word set",
-          appliesTo: ["src/lib/vault-switch.ts::leaveActiveVault"],
-          skips: { "src/lib/vault-unlock.ts::lockVault": "not needed" },
+          // Keyed on the path's ID, not its function name: two leaving paths
+          // are both called `lockVault` (desktop's and mobile's), so a name
+          // would skip one of them by accident.
+          appliesTo: ["desktop-switch"],
+          skips: { "desktop-lock": "not needed", "mobile-lock": "not needed" },
         },
       ],
     });
     expect(errors).toEqual([
-      "resetSessionIgnored does not apply to lockVault and gives no reason",
+      "resetSessionIgnored does not apply to desktop-lock and gives no reason",
+      "resetSessionIgnored does not apply to mobile-lock and gives no reason",
     ]);
   });
 });

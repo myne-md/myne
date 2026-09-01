@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
 import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
+import { remindersReachTheOs } from "../../lib/reminders";
 import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
 import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
@@ -55,6 +56,7 @@ import {
   setEditorToolbarHidden,
   setCustomTheme,
   type PrefsView,
+  setReminderHorizonDays,
   setRemindersEnabled,
   setDateFormat,
   setTimeFormat,
@@ -345,10 +347,10 @@ function SegmentBlock<T extends string | number>({
       <Segmented
         options={labels}
         active={active}
-        onChange={(i) => onPick(options[i])}
-        label={label}
-        testId={testId}
-        optionIds={options.map(String)}
+        onChange={(i: number) => onPick(options[i])}
+        ariaLabel={label}
+        testIdPrefix={testId}
+        optionValues={options.map(String)}
       />
     </div>
   );
@@ -2063,8 +2065,18 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               onEnabledChange={(next) =>
                 writeDraftPref("reminders_enabled", next, () => setRemindersEnabled(next))
               }
+              onHorizonChange={(next) =>
+                writeDraftPref("reminder_horizon_days", next, () => setReminderHorizonDays(next))
+              }
             />
-            {eff.reminders_enabled && <ExactAlarmBlock />}
+            {/* Gated on the same predicate as the horizon line (myne#508).
+                It offers to make delivery precise, and asks Android for the
+                exact-alarm special access to do it, for a pass that has no
+                caller: nothing is scheduled, so there is no imprecision to fix
+                and no reason to request a permission Google requires a Play
+                Console declaration for. One predicate gates every claim this
+                screen makes about an operating system delivering anything. */}
+            {eff.reminders_enabled && remindersReachTheOs() && <ExactAlarmBlock />}
           </div>
         )}
 
