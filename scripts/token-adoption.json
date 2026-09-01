@@ -87,13 +87,13 @@
   "editor/src/host/notes/taskChipToken.ts": 1,
   "editor/src/mermaid/render-mermaid.ts": 19,
   "editor/src/task-surfaces.css": 11,
-  "editor/src/theme.ts": 3,
+  "editor/src/theme.ts": 1,
   "editor/src/toolbar/plugin.ts": 3,
   "web/src/UnsupportedEnvironment.tsx": 3,
   "web/src/VaultOpenElsewhere.tsx": 1,
   "mobile/src/app/flows/AttachmentsSheet.tsx": 50,
   "mobile/src/app/flows/CreateVaultFlow.tsx": 66,
-  "mobile/src/app/flows/EditorFlow.tsx": 111,
+  "mobile/src/app/flows/EditorFlow.tsx": 89,
   "mobile/src/app/flows/JoinFlow.tsx": 39,
   "mobile/src/app/flows/PickerFlow.tsx": 17,
   "mobile/src/app/flows/RecordingSheet.tsx": 13,
@@ -176,6 +176,5 @@
   "mobile/src/screens/system/index.tsx": 102,
   "mobile/src/screens/unlock/index.tsx": 74,
   "mobile/src/screens/workspace/index.tsx": 86,
-  "mobile/src/styles/mobile.css": 7,
-  "mobile/src/styles/tokens.css": 105
+  "mobile/src/styles/mobile.css": 7
 }

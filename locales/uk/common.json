@@ -1338,7 +1338,8 @@
       "titlePlaceholder": "Без назви"
     },
     "mermaid": {
-      "rendering": "Відтворення діаграми…"
+      "rendering": "Відтворення діаграми…",
+      "renderFailed": "Не вдалося відобразити цю діаграму: {{reason}}"
     },
     "slash": {
       "aiContinue": "Продовжити писати (ШІ)",

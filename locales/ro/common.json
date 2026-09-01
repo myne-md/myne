@@ -1289,7 +1289,8 @@
       "titlePlaceholder": "Fără titlu"
     },
     "mermaid": {
-      "rendering": "Se generează diagrama…"
+      "rendering": "Se generează diagrama…",
+      "renderFailed": "Această diagramă nu a putut fi randată: {{reason}}"
     },
     "slash": {
       "aiContinue": "Continuă scrierea (AI)",

@@ -497,7 +497,7 @@ const moveNoteAction = notesAction("note.move", "commands.actions.moveNote.label
 const emptyTrashAction = notesAction(
   "trash.empty",
   "commands.actions.emptyTrash.label",
-  (c) => c.onEmptyTrash(),
+  (c) => c.onEmptyTrash(c.activatedByKey === true),
   false,
 );
 

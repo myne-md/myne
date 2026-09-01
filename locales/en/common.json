@@ -1229,7 +1229,8 @@
       "titlePlaceholder": "Untitled"
     },
     "mermaid": {
-      "rendering": "Rendering diagram…"
+      "rendering": "Rendering diagram…",
+      "renderFailed": "This diagram could not be rendered: {{reason}}"
     },
     "slash": {
       "aiContinue": "Continue writing (AI)",

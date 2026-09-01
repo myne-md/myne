@@ -1289,7 +1289,8 @@
       "titlePlaceholder": "Senza titolo"
     },
     "mermaid": {
-      "rendering": "Rendering del diagramma…"
+      "rendering": "Rendering del diagramma…",
+      "renderFailed": "Non è stato possibile visualizzare questo diagramma: {{reason}}"
     },
     "slash": {
       "aiContinue": "Continua a scrivere (AI)",

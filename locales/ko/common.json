@@ -1240,7 +1240,8 @@
       "titlePlaceholder": "제목 없음"
     },
     "mermaid": {
-      "rendering": "다이어그램을 렌더링하는 중…"
+      "rendering": "다이어그램을 렌더링하는 중…",
+      "renderFailed": "이 다이어그램을 그릴 수 없습니다: {{reason}}"
     },
     "slash": {
       "aiContinue": "이어서 쓰기 (AI)",

@@ -608,13 +608,23 @@ export function CommandPalette({
     onClose();
   }, [onClose]);
 
+  /**
+   * `viaKey` is threaded rather than assumed, and it reaches exactly one action.
+   *
+   * `trash.empty` opens a dialog whose Enter destroys note keys, and it opens
+   * DURING the Enter keydown that selected this row, so the key may still be
+   * down when the dialog's own listener starts. The dialog refuses Enter until a
+   * keyup when it is told a key opened it. Telling it unconditionally is wrong
+   * the other way: a row that was clicked leaves no key to release, so the first
+   * Enter would be eaten on a dialog that has to answer the first press.
+   */
   const runRow = useCallback(
-    async (row: Row) => {
+    async (row: Row, viaKey: boolean) => {
       if (row.kind === "action") {
         if (row.visibility === "disabled") return;
         close();
         try {
-          await row.action.run(ctx);
+          await row.action.run({ ...ctx, activatedByKey: viaKey });
         } catch {
           /* action failure surfaces via the action's own UX (toast / banner) */
         }
@@ -690,7 +700,7 @@ export function CommandPalette({
         // remaining window); then act on the current selection.
         flushNoteSearch();
         const row = rows[selectedIndex];
-        if (row !== undefined) void runRow(row);
+        if (row !== undefined) void runRow(row, true);
         return;
       }
     },
@@ -825,7 +835,7 @@ function renderRow(
   row: Row,
   index: number,
   selected: boolean,
-  runRow: (row: Row) => void | Promise<void>,
+  runRow: (row: Row, viaKey: boolean) => void | Promise<void>,
   t: (key: string) => string,
   snippet?: MatchSnippet,
 ) {
@@ -864,7 +874,7 @@ function renderRow(
       data-note-id={row.kind === "note" ? row.id : undefined}
       onMouseDown={(e) => {
         e.preventDefault();
-        if (!isDisabled) void runRow(row);
+        if (!isDisabled) void runRow(row, false);
       }}
     >
       {row.kind === "action" ? (

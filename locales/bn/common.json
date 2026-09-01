@@ -1231,7 +1231,8 @@
       "titlePlaceholder": "শিরোনামহীন"
     },
     "mermaid": {
-      "rendering": "ডায়াগ্রাম আঁকা হচ্ছে…"
+      "rendering": "ডায়াগ্রাম আঁকা হচ্ছে…",
+      "renderFailed": "এই ডায়াগ্রামটি রেন্ডার করা যায়নি: {{reason}}"
     },
     "slash": {
       "aiContinue": "লেখা চালিয়ে যান (AI)",

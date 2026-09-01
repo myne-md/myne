@@ -27,6 +27,24 @@ export const myneTheme = EditorView.theme({
   ".cm-scroller": {
     fontFamily: "inherit",
     lineHeight: "inherit",
+    // The floor for "the editor never scrolls sideways" (myne-md/myne#630).
+    //
+    // `EditorView.lineWrapping` is mounted, so TEXT already wraps; what used to
+    // scroll was a widget that would not shrink. CodeMirror's base theme gives
+    // `.cm-scroller` `overflow-x: auto` and `.cm-content` `flex-shrink: 0` with
+    // the flex default `min-width: auto`, so one unshrinkable descendant floors
+    // the content width and turns the whole note into a horizontal scroller,
+    // which is what the frontmatter Properties grid and the fixed-width
+    // attachment widgets were doing. Those are fixed at their own rules; this
+    // is the guarantee that the NEXT one cannot reintroduce the swipe.
+    //
+    // Nothing legitimately wide is lost, because every wide construct in the
+    // editor already scrolls inside its own box: `.cm-table-scroll` /
+    // `.cm-table-editable`, `.cm-mermaid-card`, `.cm-math-block`,
+    // `.cm-code-quote-card`. A new one owes the same containment, and this rule
+    // is what makes forgetting it visible (clipped) rather than silent (the
+    // whole page drifts sideways).
+    overflowX: "hidden",
   },
   ".cm-content": {
     caretColor: "var(--accent, #2c4a7a)",
@@ -521,6 +539,13 @@ export const myneTheme = EditorView.theme({
     fontSize: "11px",
     letterSpacing: "0.02em",
   },
+  // `min-width: 0` and `max-width: 100%`, for the same reason the Properties
+  // grid gained them (myne-md/myne#630): an `inline-flex` item in a wrapping
+  // flex container has the flex default `min-width: auto`, so it floors at its
+  // own min-content width and a long tag name would widen `.cm-content` past the
+  // scroller. With the `.cm-scroller { overflow-x: hidden }` floor now in place
+  // that shows up as a clip rather than a sideways swipe, which is the failure
+  // the floor's own comment says it converts silence into.
   ".cm-tag-suggestion-chip": {
     display: "inline-flex",
     alignItems: "center",
@@ -529,7 +554,10 @@ export const myneTheme = EditorView.theme({
     border: "1px solid var(--line-1, #d8d5cc)",
     borderRadius: "var(--radius-1, 4px)",
     background: "transparent",
+    minWidth: 0,
+    maxWidth: "100%",
   },
+  ".cm-tag-suggestion-chip > *": { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" },
   ".cm-tag-suggestion-chip-new": { borderStyle: "dashed" },
   ".cm-tag-suggestion-accept": {
     background: "none",
@@ -571,6 +599,26 @@ export const myneTheme = EditorView.theme({
   // the dark editor its edge labels were unreadable). The outer `.cm-mermaid` is a
   // transparent, measured spacer (padding, not margin — see note above); the inner
   // `.cm-mermaid-card` carries the light surface.
+  //
+  // "Fixed-light" is what the paragraph above has always claimed and what the ink
+  // below has always been; the SURFACE had drifted to `var(--paper)`, which is
+  // theme-aware, so in the dark and AMOLED themes the card was dark under ink
+  // pinned at `#1a1a17` (myne-md/myne#629). `--diagram-surface` is the same
+  // value in every theme block by construction. See its comment in tokens.css.
+  //
+  // `inline-block` + `max-width: 100%` + `overflow-x: auto` is the "scroll
+  // inside the widget, never the editor" pattern `.cm-table-scroll` uses further
+  // down, and it is load-bearing here now that the SVG carries a real pixel
+  // width (`useMaxWidth: false`, render-mermaid.ts): a wide diagram must scroll
+  // in this box rather than widen `.cm-content` and make the whole editor scroll
+  // sideways (myne-md/myne#630).
+  //
+  // NOT `contain: inline-size`, which `.cm-table-editable` does use. That
+  // property means "size the inline axis as if the box were empty", which is
+  // right for a block box filling its column and catastrophic for a shrink-to-fit
+  // one: an `inline-block` with no width would collapse to nothing. The card
+  // wants to be exactly as wide as its diagram, capped at the column, which is
+  // what `max-width` alone gives.
   ".cm-mermaid": {
     display: "block",
     textAlign: "center",
@@ -579,12 +627,13 @@ export const myneTheme = EditorView.theme({
   ".cm-mermaid-card": {
     display: "inline-block",
     maxWidth: "100%",
+    boxSizing: "border-box",
     overflowX: "auto",
-    backgroundColor: "var(--paper)",
+    backgroundColor: "var(--diagram-surface)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
     padding: "16px",
-    color: "#1a1a17",
+    color: "var(--diagram-ink)",
   },
   ".cm-mermaid-fallback .cm-mermaid-card": {
     display: "block",
@@ -594,8 +643,25 @@ export const myneTheme = EditorView.theme({
     textAlign: "left",
     fontFamily: "var(--font-mono)",
     fontSize: "0.9em",
-    color: "#1a1a17",
+    color: "var(--diagram-ink)",
     overflowX: "auto",
+  },
+  // The render failure's own reason, under the monospace fallback. Before
+  // myne-md/myne#629 the `error` string was discarded outright: a diagram that
+  // failed to parse showed its source and said nothing about why, so a typo in a
+  // node id and a mermaid version that does not know the diagram type looked
+  // identical.
+  ".cm-mermaid-error": {
+    margin: "8px 0 0",
+    textAlign: "left",
+    fontFamily: "var(--font-sans)",
+    fontSize: "0.85em",
+    // `--diagram-danger`, NOT `--danger`. The latter is theme-aware (it remaps
+    // to a pale `--_danger-dark` for dark and AMOLED), and this line sits on the
+    // deliberately non-theme-aware `--diagram-surface`, so the theme token would
+    // put pale salmon on near-white at roughly 2.5:1. That is the exact drift
+    // #629 is about, one element over: the surface fixed and the ink moving.
+    color: "var(--diagram-danger)",
   },
 
   // Line-number gutter (editor-line-numbers / MYND-314) — opt-in, off by default.
@@ -1700,8 +1766,14 @@ export const myneTheme = EditorView.theme({
   // on the surface). The scroller IS the IntersectionObserver root.
   ".cm-attachment-pdf-scroller": {
     display: "block",
-    maxWidth: "320px",
-    width: "320px",
+    // 320px is the INTENDED width, not a floor: `width: 320px` alone overflowed
+    // a phone (myne-md/myne#630), whose usable text column is around 338px
+    // before this box's own siblings, and there is no viewport at which a reader
+    // wider than its column is the right answer. `min()` keeps the intent and
+    // lets it shrink; `box-sizing` keeps the border inside the budget.
+    width: "min(320px, 100%)",
+    maxWidth: "100%",
+    boxSizing: "border-box",
     maxHeight: "min(70vh, 520px)",
     overflowY: "auto",
     borderRadius: "4px",
@@ -2050,8 +2122,13 @@ export const myneTheme = EditorView.theme({
     display: "inline-flex",
     flexDirection: "column",
     gap: "6px",
-    width: "360px",
-    maxWidth: "360px",
+    // Same shape as the PDF scroller above (myne-md/myne#630): 360px is the
+    // intended width, and a phone's text column is narrower than that, so the
+    // player has to be allowed to shrink instead of widening `.cm-content` and
+    // making the whole note scroll sideways.
+    width: "min(360px, 100%)",
+    maxWidth: "100%",
+    boxSizing: "border-box",
     padding: "10px 12px",
     backgroundColor: "var(--bg-2, #f4f4f2)",
     border: "1px solid var(--line-1, #e3e2dd)",

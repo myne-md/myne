@@ -1240,7 +1240,8 @@
       "titlePlaceholder": "无标题"
     },
     "mermaid": {
-      "rendering": "正在渲染图表…"
+      "rendering": "正在渲染图表…",
+      "renderFailed": "无法渲染此图表：{{reason}}"
     },
     "slash": {
       "aiContinue": "继续写作（AI）",

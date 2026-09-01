@@ -2789,7 +2789,6 @@ function PopulatedList({
       )}
       {confirmKeyboardDelete !== null && (
         <DeleteConfirmModal
-          initialFocus="confirm"
           title={t("notes.list.trashConfirmTitle")}
           noteTitle={
             confirmKeyboardDelete.kind === "single"

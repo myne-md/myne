@@ -132,3 +132,21 @@ export function vaultIconWrites(page: Page): Promise<(string | null)[]> {
     () => (window as unknown as { __vaultIconWrites?: (string | null)[] }).__vaultIconWrites ?? [],
   );
 }
+
+/** Every `plaintext` body written through `plugin:notes|note_update`. The
+ *  soft-delete mutations go through this command rather than `note_delete`, so a
+ *  trash or archive is proven by the frontmatter stamp in the payload here, not
+ *  by an absence somewhere else. */
+export function noteUpdates(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () => (window as unknown as { __noteUpdates?: string[] }).__noteUpdates ?? [],
+  );
+}
+
+/** Every note id passed to `plugin:notes|note_delete`, the HARD delete. Usually
+ *  asserted empty: it is what separates a soft-trash from a destruction. */
+export function noteDeletes(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () => (window as unknown as { __noteDeletes?: string[] }).__noteDeletes ?? [],
+  );
+}
