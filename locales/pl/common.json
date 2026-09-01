@@ -50,7 +50,8 @@
       "unsupportedDetail": "Zaliczył {{passes}} z {{attempts}} sprawdzeń; wymagana liczba to {{required}}.",
       "checking": "Sprawdzanie modelu…",
       "checkingAt": "Sprawdzanie modelu… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Ten próg zaliczenia nie został jeszcze zmierzony na różnych modelach, więc może być bardziej lub mniej wymagający, niż powinien."
+      "unsupportedProvisional": "Ten próg zaliczenia nie został jeszcze zmierzony na różnych modelach, więc może być bardziej lub mniej wymagający, niż powinien.",
+      "scopeNone": "brak otwartej notatki, więc nie ma jeszcze nad czym pracować"
     },
     "progress": {
       "working": "Pracuje",
@@ -72,7 +73,8 @@
       "grantsModel_one": "{{count}} zakres na prośbę agenta",
       "grantsModel_few": "{{count}} zakresy na prośbę agenta",
       "grantsModel_many": "{{count}} zakresów na prośbę agenta",
-      "grantsModel_other": "{{count}} zakresu na prośbę agenta"
+      "grantsModel_other": "{{count}} zakresu na prośbę agenta",
+      "cancelledBackground": "Przebieg został anulowany, ponieważ Myne przeszła w tło. Nic nie zostało zapisane. Zapytaj ponownie, kiedy zechcesz."
     },
     "scope": {
       "title": "Uwzględnić {{folder}}?",
@@ -152,7 +154,6 @@
       "undoFailed": "Nie udało się cofnąć przebiegu.",
       "undoReport": "Przywrócone notatki: {{reverted}}. Pozostawione notatki utworzone przez ten przebieg: {{kept}}.",
       "alreadyApplied": "Zastosowano",
-      "appendFlag": "dodaje na końcu",
       "untitledNote": "Notatka bez tytułu",
       "vaultRoot": "Katalog główny skarbca",
       "newNotesHeading_one": "{{count}} nowa notatka",
@@ -175,7 +176,8 @@
       "runSummaryOffDevice_few": "do dostawcy wysłano około {{count}} znaki Twoich notatek",
       "runSummaryOffDevice_many": "do dostawcy wysłano około {{count}} znaków Twoich notatek",
       "runSummaryOffDevice_other": "do dostawcy wysłano około {{count}} znaku Twoich notatek",
-      "runSummaryOnDevice": "nic nie opuściło tego urządzenia"
+      "runSummaryOnDevice": "nic nie opuściło tego urządzenia",
+      "appendFlag": "dodaje na końcu"
     },
     "undo": {
       "offer_one": "Ostatni przebieg zmienił {{count}} notatkę.",
@@ -194,7 +196,9 @@
       "createdNotReverted_one": "{{count}} notatka utworzona przez przebieg pozostała na miejscu.",
       "createdNotReverted_few": "{{count}} notatki utworzone przez przebieg pozostały na miejscu.",
       "createdNotReverted_many": "{{count}} notatek utworzonych przez przebieg pozostało na miejscu.",
-      "createdNotReverted_other": "{{count}} notatki utworzonej przez przebieg pozostało na miejscu."
+      "createdNotReverted_other": "{{count}} notatki utworzonej przez przebieg pozostało na miejscu.",
+      "sessionOnly": "To cofnięcie jednym dotknięciem działa, dopóki nie zablokujesz sejfu lub nie zamkniesz aplikacji. Potem przywracasz notatki pojedynczo z historii wersji notatki.",
+      "sessionOnlyLink": "Otwórz historię wersji"
     }
   },
   "ai": {
@@ -1290,7 +1294,6 @@
     },
     "find": {
       "close": "Zamknij wyszukiwanie",
-      "dateFallback": "Trwa wyszukiwanie {{stored}}, czyli postaci, w jakiej ta data jest zapisana.",
       "matchCase": "Uwzględnij wielkość liter",
       "matchCount": "{{current}} z {{total}}",
       "nextMatch": "Następne dopasowanie",
@@ -1299,10 +1302,11 @@
       "previousMatch": "Poprzednie dopasowanie",
       "replaceAll": "Zamień wszystko",
       "replaceAllCount": "Zamień wszystko ({{total}})",
-      "replaceOffOnDateFallback": "Zamiana jest wyłączona, dopóki data jest znajdowana przez swoją zapisaną postać, żeby zamiana nie uczyniła jej nieczytelną.",
       "replaceOne": "Zamień",
       "replacePlaceholder": "Zamień na",
-      "toggleReplace": "Przełącz zamianę"
+      "toggleReplace": "Przełącz zamianę",
+      "dateFallback": "Trwa wyszukiwanie {{stored}}, czyli postaci, w jakiej ta data jest zapisana.",
+      "replaceOffOnDateFallback": "Zamiana jest wyłączona, dopóki data jest znajdowana przez swoją zapisaną postać, żeby zamiana nie uczyniła jej nieczytelną."
     },
     "cover": {
       "add": "Dodaj okładkę",
@@ -3165,7 +3169,8 @@
         "title": "Zanim Myne cokolwiek wyśle do {{provider}}",
         "whatLabel": "Co opuszcza Twoje urządzenie",
         "whenLabel": "Kiedy opuszcza urządzenie",
-        "whoLabel": "Kto to otrzymuje"
+        "whoLabel": "Kto to otrzymuje",
+        "connectionLabel": "Jak to podróżuje"
       },
       "disclosureToggle": "Jak to działa?",
       "enableHelper": "Uruchamia dostarczony przez Ciebie model. To, gdzie działa i czy Twoje notatki opuszczają to urządzenie, zależy od dostawcy, którego wskażesz poniżej. Eksperymentalne, domyślnie wyłączone.",
@@ -3199,7 +3204,9 @@
         "refused": "Dostawca odmówił połączenia. Może być niedostępny albo blokować tę sieć.",
         "timeout": "Dostawca nie odpowiedział na czas. Nic nie działa już w tle.",
         "unauthorized": "Dostawca odrzucił Twój klucz API. Zastąp go: może być błędny, unieważniony albo należeć do innego konta.",
-        "unreachable": "Nie udało się połączyć z dostawcą. Sprawdź połączenie sieciowe."
+        "unreachable": "Nie udało się połączyć z dostawcą. Sprawdź połączenie sieciowe.",
+        "featureOff": "SI jest wyłączona na tym urządzeniu. Nic nie zostało wysłane. Włącz ją w Ustawieniach, w sekcji SI.",
+        "consentMissing": "Nie wyraziłeś zgody na wysyłanie notatek do tego dostawcy z tego urządzenia. Nic nie zostało wysłane. Wybierz dostawcę ponownie w Ustawieniach, w sekcji SI, i przeczytaj, co zostanie wysłane."
       },
       "modelChoose": "Wybierz plik…",
       "modelEmbeddingLabel": "Model wyszukiwania: wyszukiwanie semantyczne i pytania/odpowiedzi",
@@ -3245,6 +3252,13 @@
       "title": "AI",
       "providerModelCount_few": "Dostępne {{count}} modele.",
       "providerModelCount_many": "Dostępnych {{count}} modeli.",
+      "mobileEnableLabel": "Używaj SI na tym telefonie",
+      "mobileEnableHelper": "Domyślnie wyłączone. Żaden model AI w tym telefonie nie odpowiada na pytania ani nie czyta Twoich notatek, więc każde żądanie trafia do usługi wskazanej poniżej, a Twoje notatki wtedy opuszczają to urządzenie. Transkrypcja i tekst ze zdjęć nadal działają tutaj, na modelach dostarczanych z Myne.",
+      "mobileKeyAdd": "Zapisz klucz",
+      "mobileKeyReplace": "Zmień klucz",
+      "mobileRevokeHelper": "Usuwa razem dostawcę, jego klucz i zgodę tego telefonu, pozostawiając dokładnie stan sprzed jakiejkolwiek konfiguracji. Inne urządzenia działają dalej, dopóki nie usuniesz tego również tam.",
+      "mobileApproveLabel": "Zezwól na wysyłanie z tego telefonu",
+      "mobileApproveHelper": "Dostawca i jego klucz pochodzą z innego urządzenia. Z tego telefonu nic nie jest wysyłane, dopóki nie przeczytasz, co zostanie wysłane, i nie zezwolisz na to tutaj.",
       "historyBudgetHelper": "Ile ostatniej rozmowy niesie każde żądanie, w znakach. Pozostaw puste, aby użyć wartości domyślnej. Większa liczba pozwala AI śledzić dłuższe rozmowy i wysyła ich więcej: u dostawcy, który nie działa na tym urządzeniu, oznacza to więcej twojego tekstu opuszczającego je, na każdym kroku uruchomienia.",
       "historyBudgetLabel": "Rozmowa wysyłana z każdym żądaniem"
     },

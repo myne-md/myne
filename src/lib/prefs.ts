@@ -379,8 +379,12 @@ export interface PrefsView {
    * names the recipient, so the request path compares this to the active
    * selection instead of trusting that some setter cleared a flag.
    *
-   * Account-scoped: it syncs, so a newly enrolled device inherits it and sends
-   * without re-asking (`threat-model.md` §5, ledger SYNC-22).
+   * **Device-local since myne-md/myne#456**, and it was account-scoped until
+   * then. The old behaviour is what SYNC-22 recorded as an accepted residual:
+   * a newly enrolled device inherited the selection, the consent AND the key,
+   * and sent without anyone at that device seeing the screen. It stops here
+   * now: the key still syncs, so a phone can hold it, and it still sends
+   * nothing until somebody approves on that phone (`threat-model.md` §5).
    */
   ai_provider_consent: string | null;
   /**

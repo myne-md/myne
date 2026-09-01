@@ -48,7 +48,8 @@
       "unsupportedDetail": "Den besto {{passes}} av {{attempts}} kontroller; {{required}} kreves.",
       "checking": "Sjekker modellen…",
       "checkingAt": "Sjekker modellen… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Den beståttgrensen er ennå ikke målt på tvers av modeller, så den kan være strengere eller mildere enn den bør være."
+      "unsupportedProvisional": "Den beståttgrensen er ennå ikke målt på tvers av modeller, så den kan være strengere eller mildere enn den bør være.",
+      "scopeNone": "ingen notat åpent, så det er ingenting å jobbe med ennå"
     },
     "progress": {
       "working": "Arbeider",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} omfang du satte",
       "grantsUser_other": "{{count}} omfang du satte",
       "grantsModel_one": "{{count}} den ba om",
-      "grantsModel_other": "{{count}} den ba om"
+      "grantsModel_other": "{{count}} den ba om",
+      "cancelledBackground": "Kjøringen ble avbrutt fordi Myne gikk i bakgrunnen. Ingenting ble skrevet. Spør igjen når du vil."
     },
     "scope": {
       "title": "Inkludere {{folder}}?",
@@ -128,7 +130,6 @@
       "undoFailed": "Kjøringen kunne ikke angres.",
       "undoReport": "{{reverted}} notater gjenopprettet. {{kept}} notater som kjøringen opprettet ble stående.",
       "alreadyApplied": "Brukt",
-      "appendFlag": "legges til på slutten",
       "untitledNote": "Notat uten tittel",
       "vaultRoot": "Hvelvrot",
       "newNotesHeading_one": "{{count}} nytt notat",
@@ -141,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} notater lest",
       "runSummaryOffDevice_one": "omtrent {{count}} tegn fra notatene dine ble sendt til leverandøren",
       "runSummaryOffDevice_other": "omtrent {{count}} tegn fra notatene dine ble sendt til leverandøren",
-      "runSummaryOnDevice": "ingenting forlot denne enheten"
+      "runSummaryOnDevice": "ingenting forlot denne enheten",
+      "appendFlag": "legges til på slutten"
     },
     "undo": {
       "offer_one": "Den siste kjøringen endret {{count}} notat.",
@@ -152,7 +154,9 @@
       "failed_one": "{{count}} notat kunne ikke gjenopprettes.",
       "failed_other": "{{count}} notater kunne ikke gjenopprettes.",
       "createdNotReverted_one": "{{count}} notat som kjøringen opprettet ble stående.",
-      "createdNotReverted_other": "{{count}} notater som kjøringen opprettet ble stående."
+      "createdNotReverted_other": "{{count}} notater som kjøringen opprettet ble stående.",
+      "sessionOnly": "Denne angre-med-ett-trykk varer til du låser hvelvet eller lukker appen. Etter det gjenoppretter du notater ett om gangen fra et notats versjonshistorikk.",
+      "sessionOnlyLink": "Åpne versjonshistorikk"
     }
   },
   "ai": {
@@ -1192,7 +1196,6 @@
     },
     "find": {
       "close": "Lukk søk",
-      "dateFallback": "Søker etter {{stored}}, formen denne datoen er lagret i.",
       "matchCase": "Skill mellom store og små bokstaver",
       "matchCount": "{{current}} av {{total}}",
       "nextMatch": "Neste treff",
@@ -1201,10 +1204,11 @@
       "previousMatch": "Forrige treff",
       "replaceAll": "Erstatt alle",
       "replaceAllCount": "Erstatt alle ({{total}})",
-      "replaceOffOnDateFallback": "Erstatt er av så lenge en dato treffer via den lagrede formen sin, slik at en erstatning ikke kan gjøre datoen uleselig.",
       "replaceOne": "Erstatt",
       "replacePlaceholder": "Erstatt med",
-      "toggleReplace": "Slå erstatt av/på"
+      "toggleReplace": "Slå erstatt av/på",
+      "dateFallback": "Søker etter {{stored}}, formen denne datoen er lagret i.",
+      "replaceOffOnDateFallback": "Erstatt er av så lenge en dato treffer via den lagrede formen sin, slik at en erstatning ikke kan gjøre datoen uleselig."
     },
     "cover": {
       "add": "Legg til omslag",
@@ -2957,7 +2961,8 @@
         "title": "Før Myne sender noe til {{provider}}",
         "whatLabel": "Hva som forlater enheten din",
         "whenLabel": "Når det forlater den",
-        "whoLabel": "Hvem som mottar det"
+        "whoLabel": "Hvem som mottar det",
+        "connectionLabel": "Hvordan det reiser"
       },
       "disclosureToggle": "Hvordan fungerer dette?",
       "enableHelper": "Kjører en modell du oppgir. Hvor den kjører, og om notatene dine forlater denne enheten, avhenger begge deler av leverandøren du oppgir nedenfor. Eksperimentell, av som standard.",
@@ -2991,7 +2996,9 @@
         "refused": "Leverandøren avviste tilkoblingen. Den kan være nede eller blokkere dette nettverket.",
         "timeout": "Leverandøren svarte ikke i tide. Ingenting ble stående og kjøre.",
         "unauthorized": "Leverandøren avviste API-nøkkelen din. Bytt den ut: den kan være feil, tilbakekalt eller for en annen konto.",
-        "unreachable": "Kunne ikke nå leverandøren. Sjekk nettverkstilkoblingen din."
+        "unreachable": "Kunne ikke nå leverandøren. Sjekk nettverkstilkoblingen din.",
+        "featureOff": "KI er slått av på denne enheten. Ingenting ble sendt. Slå det på under Innstillinger, i KI.",
+        "consentMissing": "Du har ikke samtykket til å sende notater til denne leverandøren fra denne enheten. Ingenting ble sendt. Velg leverandøren på nytt under Innstillinger, i KI, og les hva som sendes."
       },
       "modelChoose": "Velg fil…",
       "modelEmbeddingLabel": "Søkemodell: semantisk søk og spørsmål og svar",
@@ -3033,6 +3040,13 @@
       "recommendedFilesGeneration": "Trenger .gguf-filen + tokenizer.json i samme mappe.",
       "recommendedFilesTranscription": "Trenger .gguf-filen fra Whisper + config.json + tokenizer.json i samme mappe.",
       "title": "AI",
+      "mobileEnableLabel": "Bruk KI på denne telefonen",
+      "mobileEnableHelper": "Av som standard. Ingen KI-modell på denne telefonen svarer på spørsmål eller leser notatene dine, så hver forespørsel går til en tjeneste du navngir nedenfor, og notatene dine forlater enheten da. Transkripsjon og tekst i bilder kjører fortsatt her, på modeller som følger med Myne.",
+      "mobileKeyAdd": "Lagre nøkkel",
+      "mobileKeyReplace": "Bytt nøkkel",
+      "mobileRevokeHelper": "Fjerner leverandøren, nøkkelen og denne telefonens godkjenning samlet, og etterlater nøyaktig tilstanden fra før noe var satt opp. Andre enheter fortsetter å virke til du fjerner det der også.",
+      "mobileApproveLabel": "Godkjenn sending på denne telefonen",
+      "mobileApproveHelper": "Leverandøren og nøkkelen kom fra en annen enhet. Ingenting sendes fra denne telefonen før du leser hva som sendes og godkjenner det her.",
       "historyBudgetHelper": "Hvor mye av den nylige samtalen hver forespørsel tar med seg, i tegn. La feltet stå tomt for standardverdien. Et større tall lar KI-en følge lengre samtaler og sender mer av dem: hos en leverandør som ikke er på denne enheten betyr det mer av teksten din som forlater den, ved hvert steg i en kjøring.",
       "historyBudgetLabel": "Samtale som sendes med hver forespørsel"
     },

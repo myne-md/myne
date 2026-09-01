@@ -34,6 +34,7 @@ import { RunCostLine } from "../notes/agent/components/RunCostLine";
 import { Button } from "../components/primitives/Button";
 import { changedLineCount, diffWithSegments } from "../dialect";
 import {
+  removalFlagLabel,
   agentApply,
   agentUndo,
   editHidesNoteAs,
@@ -60,33 +61,6 @@ import {
   useAgent,
 } from "../notes/agent/agentStore";
 
-/** What approving this removal on its own will do, in the user's words.
- *
- *  **A `switch` over literal keys rather than a template key**, and that is not
- *  style. `scripts/check-i18n.mjs` scans static `t("…")` literals by design (an
- *  expression-aware scanner is a scanner with a bypass), so
- *  ``t(`agent.review.removalFlag.${field}`)`` would put five user-facing
- *  sentences outside every check in this repository — the exact hole
- *  `tests/lib/editRejectionMirror.test.ts` had to be written to close for the
- *  refusal strings. Written this way, a missing key is a `check-i18n` failure
- *  in `pre-commit`.
- *
- *  Exhaustive over `HidingField`, so a sixth marker fails to typecheck here
- *  rather than rendering an empty flag beside a destructive button. */
-function removalFlagLabel(field: HidingField, t: (key: string) => string): string {
-  switch (field) {
-    case "trashed":
-      return t("agent.review.removalFlag.trashed");
-    case "deleted":
-      return t("agent.review.removalFlag.deleted");
-    case "archived":
-      return t("agent.review.removalFlag.archived");
-    case "template":
-      return t("agent.review.removalFlag.template");
-    case "conflict":
-      return t("agent.review.removalFlag.conflict");
-  }
-}
 
 /** A deletion this large gets a visual flag.
  *

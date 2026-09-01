@@ -48,7 +48,8 @@
       "unsupportedDetail": "검사 {{attempts}}개 중 {{passes}}개를 통과했습니다. {{required}}개가 필요합니다.",
       "checking": "모델을 확인하는 중…",
       "checkingAt": "모델을 확인하는 중… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "이 합격 기준은 아직 여러 모델에서 측정되지 않아 실제보다 엄격하거나 느슨할 수 있습니다."
+      "unsupportedProvisional": "이 합격 기준은 아직 여러 모델에서 측정되지 않아 실제보다 엄격하거나 느슨할 수 있습니다.",
+      "scopeNone": "열린 노트가 없어 아직 작업할 대상이 없습니다"
     },
     "progress": {
       "working": "작업 중",
@@ -64,7 +65,8 @@
       "grantsUser_one": "직접 설정한 범위 {{count}}개",
       "grantsUser_other": "직접 설정한 범위 {{count}}개",
       "grantsModel_one": "에이전트가 요청한 범위 {{count}}개",
-      "grantsModel_other": "에이전트가 요청한 범위 {{count}}개"
+      "grantsModel_other": "에이전트가 요청한 범위 {{count}}개",
+      "cancelledBackground": "Myne이 백그라운드로 전환되어 실행이 취소되었습니다. 아무것도 기록되지 않았습니다. 준비되면 다시 물어보세요."
     },
     "scope": {
       "title": "{{folder}}을(를) 포함할까요?",
@@ -128,7 +130,6 @@
       "undoFailed": "실행을 되돌리지 못했습니다.",
       "undoReport": "노트 {{reverted}}개가 복원되었습니다. 실행이 만든 노트 {{kept}}개는 그대로 남았습니다.",
       "alreadyApplied": "적용됨",
-      "appendFlag": "끝에 추가",
       "untitledNote": "제목 없는 노트",
       "vaultRoot": "보관함 루트",
       "newNotesHeading_one": "새 노트 {{count}}개",
@@ -141,7 +142,8 @@
       "runSummaryNotes_other": "노트 {{count}}개 읽음",
       "runSummaryOffDevice_one": "노트의 약 {{count}}자가 제공업체로 전송되었습니다",
       "runSummaryOffDevice_other": "노트의 약 {{count}}자가 제공업체로 전송되었습니다",
-      "runSummaryOnDevice": "아무것도 이 기기를 떠나지 않았습니다"
+      "runSummaryOnDevice": "아무것도 이 기기를 떠나지 않았습니다",
+      "appendFlag": "끝에 추가"
     },
     "undo": {
       "offer_one": "마지막 실행이 노트 {{count}}개를 변경했습니다.",
@@ -152,7 +154,9 @@
       "failed_one": "노트 {{count}}개를 복원하지 못했습니다.",
       "failed_other": "노트 {{count}}개를 복원하지 못했습니다.",
       "createdNotReverted_one": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다.",
-      "createdNotReverted_other": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다."
+      "createdNotReverted_other": "실행이 생성한 노트 {{count}}개는 그대로 남았습니다.",
+      "sessionOnly": "이 한 번 탭 실행 취소는 보관함을 잠그거나 앱을 닫을 때까지 유효합니다. 그 이후에는 노트의 버전 기록에서 하나씩 복원하세요.",
+      "sessionOnlyLink": "버전 기록 열기"
     }
   },
   "ai": {
@@ -1192,7 +1196,6 @@
     },
     "find": {
       "close": "찾기 닫기",
-      "dateFallback": "{{stored}}을(를) 검색하고 있습니다. 이 날짜가 저장되는 형식입니다.",
       "matchCase": "대소문자 일치",
       "matchCount": "{{total}}개 중 {{current}}",
       "nextMatch": "다음 일치",
@@ -1201,10 +1204,11 @@
       "previousMatch": "이전 일치",
       "replaceAll": "모두 바꾸기",
       "replaceAllCount": "모두 바꾸기 ({{total}})",
-      "replaceOffOnDateFallback": "날짜가 저장 형식으로 일치하는 동안에는 바꾸기가 꺼집니다. 바꾸기로 인해 날짜를 읽을 수 없게 되는 것을 막기 위해서입니다.",
       "replaceOne": "바꾸기",
       "replacePlaceholder": "바꿀 내용",
-      "toggleReplace": "바꾸기 전환"
+      "toggleReplace": "바꾸기 전환",
+      "dateFallback": "{{stored}}을(를) 검색하고 있습니다. 이 날짜가 저장되는 형식입니다.",
+      "replaceOffOnDateFallback": "날짜가 저장 형식으로 일치하는 동안에는 바꾸기가 꺼집니다. 바꾸기로 인해 날짜를 읽을 수 없게 되는 것을 막기 위해서입니다."
     },
     "cover": {
       "add": "표지 추가",
@@ -2957,7 +2961,8 @@
         "title": "Myne가 {{provider}}에 무언가를 보내기 전에",
         "whatLabel": "기기를 떠나는 것",
         "whenLabel": "언제 떠나는지",
-        "whoLabel": "누가 받는지"
+        "whoLabel": "누가 받는지",
+        "connectionLabel": "어떻게 전송되는지"
       },
       "disclosureToggle": "어떻게 작동하나요?",
       "enableHelper": "사용자가 제공한 모델을 실행합니다. 모델이 어디에서 실행되는지, 그리고 노트가 이 기기를 떠나는지는 아래에서 지정하는 제공업체에 따라 달라집니다. 실험적이며 기본적으로 꺼져 있습니다.",
@@ -2991,7 +2996,9 @@
         "refused": "제공업체가 연결을 거부했습니다. 서비스가 중단되었거나 이 네트워크를 차단하고 있을 수 있습니다.",
         "timeout": "제공업체가 제때 응답하지 않았습니다. 실행 중인 채로 남은 것은 없습니다.",
         "unauthorized": "제공업체가 API 키를 거부했습니다. 키를 교체하세요. 잘못되었거나, 취소되었거나, 다른 계정의 키일 수 있습니다.",
-        "unreachable": "제공업체에 연결하지 못했습니다. 네트워크 연결을 확인하세요."
+        "unreachable": "제공업체에 연결하지 못했습니다. 네트워크 연결을 확인하세요.",
+        "featureOff": "이 기기에서 AI가 꺼져 있습니다. 아무것도 전송되지 않았습니다. 설정의 AI에서 켜세요.",
+        "consentMissing": "이 기기에서 이 제공자에게 노트를 보내는 데 동의하지 않았습니다. 아무것도 전송되지 않았습니다. 설정의 AI에서 제공자를 다시 선택하고 무엇이 전송되는지 읽어보세요."
       },
       "modelChoose": "파일 선택…",
       "modelEmbeddingLabel": "검색 모델: 의미 기반 검색 및 Q&A",
@@ -3033,6 +3040,13 @@
       "recommendedFilesGeneration": "같은 폴더에 .gguf 파일 + tokenizer.json이 필요합니다.",
       "recommendedFilesTranscription": "같은 폴더에 Whisper .gguf 파일 + config.json + tokenizer.json이 필요합니다.",
       "title": "AI",
+      "mobileEnableLabel": "이 휴대폰에서 AI 사용",
+      "mobileEnableHelper": "기본값은 꺼짐. 이 휴대전화의 AI 모델이 질문에 답하거나 메모를 읽지 않으므로, 모든 요청은 아래에서 지정한 서비스로 가고 그때 메모가 이 기기를 떠납니다. 받아쓰기와 이미지 속 텍스트는 여기서 계속 실행되며, Myne과 함께 제공되는 모델을 사용합니다.",
+      "mobileKeyAdd": "키 저장",
+      "mobileKeyReplace": "키 교체",
+      "mobileRevokeHelper": "제공자, 그 키, 이 휴대폰의 승인을 함께 제거하여 설정한 적 없는 상태로 되돌립니다. 다른 기기는 거기서도 제거할 때까지 계속 작동합니다.",
+      "mobileApproveLabel": "이 휴대폰에서 전송 승인",
+      "mobileApproveHelper": "제공자와 그 키는 다른 기기에서 왔습니다. 무엇이 전송되는지 읽고 여기서 승인하기 전까지 이 휴대폰에서는 아무것도 전송되지 않습니다.",
       "historyBudgetHelper": "각 요청이 최근 대화를 얼마나 포함할지, 문자 수로 지정합니다. 비워 두면 기본값이 적용됩니다. 값이 클수록 AI가 더 긴 대화를 따라갈 수 있지만 그만큼 더 많이 전송됩니다. 이 기기에 없는 제공자를 쓰는 경우, 실행의 매 단계마다 더 많은 텍스트가 기기 밖으로 나갑니다.",
       "historyBudgetLabel": "요청마다 함께 보내는 대화"
     },

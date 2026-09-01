@@ -52,11 +52,21 @@ function rustVariants(): string[] {
   );
 }
 
-/** The members of the `EditRejection` union in the TS mirror. */
+/** The members of the `EditRejection` union in the TS mirror.
+ *
+ *  `agent-protocol.ts`, not `agent-run.ts`, since myne-md/myne#456 split the
+ *  wire types out so the mobile client could share them instead of retyping
+ *  them. The move made this test fail by NAME rather than silently: the path is
+ *  a constant and the union either parses out of it or throws, which is why the
+ *  regex is anchored to one file instead of globbed over `src/lib`. A glob
+ *  would have found the re-export in `agent-run.ts` and compared the Rust enum
+ *  against nothing. */
+const TS_MIRROR = "src/lib/agent-protocol.ts";
+
 function tsUnion(): string[] {
-  const src = readFileSync(join(REPO, "src/lib/agent-run.ts"), "utf8");
+  const src = readFileSync(join(REPO, TS_MIRROR), "utf8");
   const body = /export type EditRejection =([\s\S]*?);\n/.exec(src);
-  if (body === null) throw new Error("EditRejection union not found in src/lib/agent-run.ts");
+  if (body === null) throw new Error(`EditRejection union not found in ${TS_MIRROR}`);
   return [...body[1].matchAll(/"([a-zA-Z0-9]+)"/g)].map((m) => m[1]);
 }
 

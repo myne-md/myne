@@ -50,7 +50,8 @@
       "unsupportedDetail": "Prošel {{passes}} z {{attempts}} kontrol; potřeba je {{required}}.",
       "checking": "Kontroluje se model…",
       "checkingAt": "Kontroluje se model… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Tato hranice úspěšnosti zatím nebyla změřena napříč modely, takže může být přísnější nebo volnější, než by měla být."
+      "unsupportedProvisional": "Tato hranice úspěšnosti zatím nebyla změřena napříč modely, takže může být přísnější nebo volnější, než by měla být.",
+      "scopeNone": "není otevřená žádná poznámka, takže zatím není na čem pracovat"
     },
     "progress": {
       "working": "Pracuje",
@@ -72,7 +73,8 @@
       "grantsModel_one": "{{count}} na žádost AI",
       "grantsModel_few": "{{count}} na žádost AI",
       "grantsModel_many": "{{count}} na žádost AI",
-      "grantsModel_other": "{{count}} na žádost AI"
+      "grantsModel_other": "{{count}} na žádost AI",
+      "cancelledBackground": "Běh byl zrušen, protože Myne přešla na pozadí. Nic nebylo zapsáno. Zeptejte se znovu, až budete chtít."
     },
     "scope": {
       "title": "Zahrnout {{folder}}?",
@@ -152,7 +154,6 @@
       "undoFailed": "Běh se nepodařilo vrátit zpět.",
       "undoReport": "{{reverted}} poznámek obnoveno. {{kept}} poznámek, které běh vytvořil, zůstalo na místě.",
       "alreadyApplied": "Použito",
-      "appendFlag": "přidá na konec",
       "untitledNote": "Poznámka bez názvu",
       "vaultRoot": "Kořen trezoru",
       "newNotesHeading_one": "{{count}} nová poznámka",
@@ -175,7 +176,8 @@
       "runSummaryOffDevice_few": "poskytovateli byly odeslány asi {{count}} znaky z vašich poznámek",
       "runSummaryOffDevice_many": "poskytovateli bylo odesláno asi {{count}} znaku z vašich poznámek",
       "runSummaryOffDevice_other": "poskytovateli bylo odesláno asi {{count}} znaků z vašich poznámek",
-      "runSummaryOnDevice": "nic neopustilo toto zařízení"
+      "runSummaryOnDevice": "nic neopustilo toto zařízení",
+      "appendFlag": "přidá na konec"
     },
     "undo": {
       "offer_one": "Poslední běh změnil {{count}} poznámku.",
@@ -194,7 +196,9 @@
       "createdNotReverted_one": "{{count}} poznámka, kterou běh vytvořil, zůstala zachována.",
       "createdNotReverted_few": "{{count}} poznámky, které běh vytvořil, zůstaly zachovány.",
       "createdNotReverted_many": "{{count}} poznámky, kterou běh vytvořil, zůstalo zachováno.",
-      "createdNotReverted_other": "{{count}} poznámek, které běh vytvořil, zůstalo zachováno."
+      "createdNotReverted_other": "{{count}} poznámek, které běh vytvořil, zůstalo zachováno.",
+      "sessionOnly": "Toto vrácení jedním klepnutím platí, dokud nezamknete trezor nebo nezavřete aplikaci. Poté obnovujete poznámky po jedné z historie verzí poznámky.",
+      "sessionOnlyLink": "Otevřít historii verzí"
     }
   },
   "ai": {
@@ -1290,7 +1294,6 @@
     },
     "find": {
       "close": "Zavřít hledání",
-      "dateFallback": "Hledá se {{stored}}, tedy podoba, ve které je toto datum uloženo.",
       "matchCase": "Rozlišovat velikost písmen",
       "matchCount": "{{current}} z {{total}}",
       "nextMatch": "Další shoda",
@@ -1299,10 +1302,11 @@
       "previousMatch": "Předchozí shoda",
       "replaceAll": "Nahradit vše",
       "replaceAllCount": "Nahradit vše ({{total}})",
-      "replaceOffOnDateFallback": "Nahrazování je vypnuté, dokud se datum shoduje ve své uložené podobě, aby náhrada datum neučinila nečitelným.",
       "replaceOne": "Nahradit",
       "replacePlaceholder": "Nahradit za",
-      "toggleReplace": "Přepnout nahrazování"
+      "toggleReplace": "Přepnout nahrazování",
+      "dateFallback": "Hledá se {{stored}}, tedy podoba, ve které je toto datum uloženo.",
+      "replaceOffOnDateFallback": "Nahrazování je vypnuté, dokud se datum shoduje ve své uložené podobě, aby náhrada datum neučinila nečitelným."
     },
     "cover": {
       "add": "Přidat obálku",
@@ -3165,7 +3169,8 @@
         "title": "Než Myne cokoli odešle službě {{provider}}",
         "whatLabel": "Co opustí vaše zařízení",
         "whenLabel": "Kdy to zařízení opustí",
-        "whoLabel": "Kdo to dostane"
+        "whoLabel": "Kdo to dostane",
+        "connectionLabel": "Jak to putuje"
       },
       "disclosureToggle": "Jak to funguje?",
       "enableHelper": "Spouští model, který poskytnete. Kde běží a zda vaše poznámky opustí toto zařízení, obojí závisí na poskytovateli, kterého určíte níže. Experimentální, ve výchozím nastavení vypnuto.",
@@ -3199,7 +3204,9 @@
         "refused": "Poskytovatel odmítl spojení. Může být mimo provoz nebo blokovat tuto síť.",
         "timeout": "Poskytovatel neodpověděl včas. Nic dál neběží.",
         "unauthorized": "Poskytovatel odmítl váš klíč API. Nahraďte ho: může být chybný, zneplatněný nebo od jiného účtu.",
-        "unreachable": "Poskytovatel je nedostupný. Zkontrolujte síťové připojení."
+        "unreachable": "Poskytovatel je nedostupný. Zkontrolujte síťové připojení.",
+        "featureOff": "AI je na tomto zařízení vypnutá. Nic nebylo odesláno. Zapněte ji v Nastavení, v části AI.",
+        "consentMissing": "Nesouhlasili jste s odesíláním poznámek tomuto poskytovateli z tohoto zařízení. Nic nebylo odesláno. Vyberte poskytovatele znovu v Nastavení, v části AI, a přečtěte si, co se odešle."
       },
       "modelChoose": "Vybrat soubor…",
       "modelEmbeddingLabel": "Vyhledávací model: sémantické hledání a otázky a odpovědi",
@@ -3245,6 +3252,13 @@
       "title": "AI",
       "providerModelCount_few": "K dispozici jsou {{count}} modely.",
       "providerModelCount_many": "K dispozici je {{count}} modelu.",
+      "mobileEnableLabel": "Používat AI na tomto telefonu",
+      "mobileEnableHelper": "Ve výchozím stavu vypnuto. Žádný model AI v tomto telefonu neodpovídá na otázky ani nečte vaše poznámky, takže každý požadavek jde do služby, kterou níže pojmenujete, a vaše poznámky tehdy opouštějí toto zařízení. Přepis řeči a text z obrázků běží dál zde, na modelech dodávaných s Myne.",
+      "mobileKeyAdd": "Uložit klíč",
+      "mobileKeyReplace": "Vyměnit klíč",
+      "mobileRevokeHelper": "Odebere poskytovatele, jeho klíč i souhlas tohoto telefonu naráz a zanechá přesně stav, jako by nikdy nic nastaveno nebylo. Ostatní zařízení fungují dál, dokud to neodeberete i tam.",
+      "mobileApproveLabel": "Povolit odesílání z tohoto telefonu",
+      "mobileApproveHelper": "Poskytovatel a jeho klíč pocházejí z jiného zařízení. Z tohoto telefonu se nic neodesílá, dokud si nepřečtete, co se odešle, a zde to nepovolíte.",
       "historyBudgetHelper": "Kolik z nedávné konverzace nese každý požadavek, ve znacích. Prázdné pole znamená výchozí hodnotu. Vyšší číslo umožní AI sledovat delší konverzace a odesílá jich více: u poskytovatele, který není na tomto zařízení, to znamená více vašeho textu opouštějícího zařízení, v každém kroku běhu.",
       "historyBudgetLabel": "Konverzace posílaná s každým požadavkem"
     },

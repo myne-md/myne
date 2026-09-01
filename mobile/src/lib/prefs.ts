@@ -180,6 +180,53 @@ export interface PrefsView {
    */
   attachment_compression_enabled: boolean;
   /**
+   * The AI beta opt-in for THIS device (myne-md/myne#456). Device-local, and
+   * after that issue removed `developer_mode` from the request-time gate it is
+   * the only device-local switch on the remote path besides the consent below,
+   * which is why that one became device-local in the same change.
+   */
+  ai_enabled: boolean;
+  /**
+   * The remote AI provider the user named, or `null`.
+   *
+   * Shared across devices (scalar LWW): naming a provider is a statement about
+   * where this vault's notes may be sent, which is a fact about the account
+   * rather than about this phone. Deliberately unlike {@link
+   * PrefsView.ai_enabled} beside it.
+   */
+  ai_provider: string | null;
+  /**
+   * **Which provider** the consent was given for, or `null`. A gate, not a
+   * display flag: the host's request path compares it to the active selection,
+   * so a UI that skipped the screen still cannot send.
+   *
+   * A name rather than a boolean because consent is per provider, so a stale
+   * approval for a different recipient is unusable rather than transferable.
+   *
+   * **Device-local** (myne-md/myne#456). The key still arrives by sync, so this
+   * phone may hold a credential it has not been permitted to use, and that is
+   * the intended shape: the credential is an account fact, the approval is a
+   * decision a person makes at a device.
+   */
+  ai_provider_consent: string | null;
+  /**
+   * **Which model** at {@link PrefsView.ai_provider} answers, or `null`.
+   *
+   * There is no default and no fallback: the value comes from the list the
+   * provider itself reports. `null` means *not chosen*, and the host refuses
+   * rather than substituting one, because on a metered API a default nobody
+   * chose is a bill nobody chose.
+   */
+  ai_provider_model: string | null;
+  /*
+   * There is deliberately NO `ai_provider_key` here, and the absence is the
+   * point. `prefs_read` serializes the whole host-side `PrefsView`, so a key in
+   * that struct would reach page context on every read, and from there a DOM
+   * snapshot or any script running in the page. The host marks it serde-skip
+   * and answers `aiProviderHasKey` instead: the UI learns *whether*, never
+   * *what*.
+   */
+  /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
    * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
    */
@@ -1290,4 +1337,90 @@ export async function deleteSavedView(id: string): Promise<void> {
  */
 export async function setViewOrder(order: string[]): Promise<void> {
   await writePref("plugin:prefs|set_view_order", { order });
+}
+
+/* ---- AI (myne-md/myne#456) -------------------------------------------------
+ *
+ * Five writes and one read. The read is the odd one and it is the interesting
+ * one: the key must never cross into page context, so there is no getter for it
+ * anywhere and the UI decides between "Add key" and "Replace key" from a
+ * boolean.
+ */
+
+/**
+ * Turn the AI beta on or off for THIS device.
+ *
+ * Device-local, so switching it off here does not switch it off on a laptop
+ * that shares the vault. Since myne-md/myne#456 removed `developer_mode` from
+ * the request-time gate, this is the only device-local switch on the remote
+ * path besides the consent below.
+ */
+export async function setAiEnabled(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_ai_enabled", { enabled });
+}
+
+/**
+ * Name the remote provider, or pass `null` to clear it.
+ *
+ * Clearing also clears the consent and the key HOST-SIDE, and that pairing is
+ * why this is one call rather than three: a key for a provider nobody selected
+ * is a credential with no owner, and a surviving consent would silently
+ * pre-approve the next provider the user picks.
+ *
+ * A value outside the host's known set is refused rather than stored, so the
+ * promise rejects instead of leaving a selection the request path ignores.
+ */
+export async function setAiProvider(provider: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider", { provider });
+}
+
+/**
+ * Record (or withdraw) the consent for the named provider.
+ *
+ * **This is the persistence, not the enforcement.** The host re-reads it before
+ * every remote request, so calling it without having shown the screen buys a
+ * stored value and nothing else. The screen is what the user consented to; this
+ * is only where that fact is kept.
+ */
+export async function setAiProviderConsent(
+  grantedFor: string | null,
+): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_consent", { grantedFor });
+}
+
+/**
+ * Store the provider API key, or pass `null` to **revoke** it.
+ *
+ * One-way by design: the value goes in and never comes back out. There is no
+ * command that returns it and {@link PrefsView} carries no field for it.
+ *
+ * Revocation propagates to the account's other devices as an LWW write of
+ * `null`, which is what makes "revoke" mean more than "revoke here": and it is
+ * why the key stays shared while the consent does not.
+ */
+export async function setAiProviderKey(key: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_key", { key });
+}
+
+/**
+ * Choose which of the provider's models answers, or `null` to clear it.
+ *
+ * The candidate list comes from the provider itself, never from a constant in
+ * this tree: a pinned model tag rots faster than the release that pinned it.
+ */
+export async function setAiProviderModel(model: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_ai_provider_model", { model });
+}
+
+/**
+ * Whether a provider key is stored, without ever handing the key over.
+ *
+ * A boolean rather than the value, for the reason {@link PrefsView}'s comment
+ * gives: the key is serde-skipped host-side precisely so it cannot reach page
+ * context, and a getter here would be the door that reopens.
+ *
+ * Not a `writePref`, so no prefs-nonce bump: this reads.
+ */
+export async function aiProviderHasKey(): Promise<boolean> {
+  return await invoke<boolean>("plugin:prefs|ai_provider_has_key");
 }

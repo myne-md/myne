@@ -40,3 +40,6 @@ export {
   HideVaultNamesBlock,
   type HideVaultNamesBlockProps,
 } from "./HideVaultNamesBlock";
+// The per-provider consent screen (myne-md/myne#456). Its clauses come from
+// `@myne/copy` verbatim, so they are byte-identical to the desktop screen's.
+export { AiConsentScreen } from "./AiConsentScreen";

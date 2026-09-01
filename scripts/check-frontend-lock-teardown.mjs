@@ -92,6 +92,12 @@ export const LEAVING_PATHS = [
     fn: "deleteVault",
     why: "Mobile's delete, which bypasses `lockVault` exactly as desktop's bypasses both of its chokepoints. Worse here than on desktop: the stage leaves the editor without advancing the prefs nonce, so mobile's publisher never re-reads and the erased vault's values stay resident for the rest of the process.",
   },
+  {
+    id: "mobile-background",
+    file: "mobile/src/app/flows/EditorFlow.tsx",
+    fn: "flushAll",
+    why: "Backgrounding, which desktop has no analogue of. This is the ONE listener pair for that moment (`visibilitychange` -> hidden, plus `pagehide`), named so a second registration cannot become a second way to get it wrong.",
+  },
 ];
 
 /** The clear-on-leave call each module-scope vault-derived store exposes.
@@ -131,11 +137,21 @@ export const TEARDOWN_CALLS = [
     // ones. Also asserted on the switch, because that path is reached through
     // `leaveActiveVault` and a later refactor could stop routing it through
     // `lockVault` without anything noticing.
-    appliesTo: ["desktop-lock", "desktop-switch"],
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock", "mobile-background"],
     skips: {
-      "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
+    },
+    // Both mobile paths reach it through ONE wrapper, which also cancels the
+    // host-side run, so the guard checks both hops rather than demanding a
+    // literal call in `flushAll`. develop's roster had this store as
+    // DESKTOP-only, which was true there and stopped being true when
+    // myne-md/myne#456 shipped the agent on mobile: the module is the same one
+    // on both clients, so the plaintext at risk is not an analogue of
+    // desktop's, it IS desktop's.
+    via: {
+      "mobile-lock": { fn: "endAgentRun", file: "mobile/src/lib/agent-lifetime.ts" },
+      "mobile-background": { fn: "endAgentRun", file: "mobile/src/lib/agent-lifetime.ts" },
     },
   },
   {
@@ -163,7 +179,10 @@ export const TEARDOWN_CALLS = [
       "mobile-lock",
       "mobile-delete",
     ],
-    skips: {},
+    skips: {
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-decrypt on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
+    },
   },
   {
     call: "clearChat",
@@ -182,6 +201,8 @@ export const TEARDOWN_CALLS = [
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
+      "mobile-background":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on either mobile path to clear.",
     },
   },
   {
@@ -204,6 +225,8 @@ export const TEARDOWN_CALLS = [
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
+      "mobile-background":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on either mobile path to clear.",
     },
   },
   {
@@ -221,6 +244,8 @@ export const TEARDOWN_CALLS = [
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
+      "mobile-background":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on either mobile path to clear.",
     },
   },
   {
@@ -236,6 +261,8 @@ export const TEARDOWN_CALLS = [
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
       "desktop-delete": SKIP_ERASED,
+      "mobile-background":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on either mobile path to clear.",
     },
   },
   {
@@ -256,6 +283,8 @@ export const TEARDOWN_CALLS = [
     skips: {
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-decrypt on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
     },
   },
   {
@@ -274,6 +303,8 @@ export const TEARDOWN_CALLS = [
     skips: {
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-decrypt on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
     },
   },
   {
@@ -291,6 +322,8 @@ export const TEARDOWN_CALLS = [
     skips: {
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-decrypt on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
     },
   },
   {
@@ -304,6 +337,8 @@ export const TEARDOWN_CALLS = [
       "mobile-lock": SKIP_NO_SPELL_LAYER,
       "mobile-delete": SKIP_NO_SPELL_LAYER,
       "desktop-delete": SKIP_ERASED,
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-decrypt on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
     },
   },
 ];
@@ -334,7 +369,40 @@ export function bodyOf(src, at) {
   // declaration is `useCallback`'s own, so its match is the END of the whole
   // call and the brace found after it belongs to a later function.
   let bStart = -1;
-  for (let k = src.indexOf("{", at); k >= 0; k = src.indexOf("{", k + 1)) {
+  // A `function` DECLARATION gets its body by walking its own parameter list to
+  // the close paren and taking the next `{`. The heuristic below cannot do it:
+  // `function f(): void {` has an identifier before the brace, not `)` or `>`,
+  // so the scan walked past the real body and took the first `{` inside it,
+  // which for `mobile/src/lib/agent-lifetime.ts::endAgentRun` was a
+  // `.catch(() => {` arrow. The extracted "body" was that catch block, and the
+  // teardown call four lines below it was invisible.
+  //
+  // Found the moment the `via` wrappers entered the file set (myne-md/myne#456
+  // merge): hop two had never executed, because `rosterFiles` did not load the
+  // wrapper, so the guard had reported ok about a check it was not running.
+  //
+  // Only for the `function` form. The arrow form (`const x = useCallback(async
+  // () => {`) is exactly the case this cannot handle, and the header records
+  // why: the first `(` after such a declaration is `useCallback`'s own.
+  const decl = /^\s*(?:export\s+)?(?:async\s+)?function\b/.exec(src.slice(at, at + 40));
+  if (decl) {
+    const pOpen = src.indexOf("(", at);
+    if (pOpen >= 0) {
+      let depth = 0;
+      for (let k = pOpen; k < src.length; k += 1) {
+        if (src[k] === "(") depth += 1;
+        else if (src[k] === ")") {
+          depth -= 1;
+          if (depth === 0) {
+            const b = src.indexOf("{", k);
+            if (b >= 0) bStart = b;
+            break;
+          }
+        }
+      }
+    }
+  }
+  for (let k = bStart < 0 ? src.indexOf("{", at) : -1; k >= 0; k = src.indexOf("{", k + 1)) {
     let b = k - 1;
     while (b >= 0 && /\s/.test(src[b])) b -= 1;
     if (b >= 0 && (src[b] === ")" || src[b] === ">")) {
@@ -447,13 +515,53 @@ export function analyse({ files, leavingPaths, teardownCalls }) {
         }
         continue;
       }
-      if (!new RegExp(`\\b${t.call}\\s*\\(`).test(body)) {
+      const hop = t.via?.[path.id];
+      const expected = hop?.fn ?? t.call;
+      if (!new RegExp(`\\b${expected}\\s*\\(`).test(body)) {
         errors.push(
-          `${path.file}::${path.fn} does not call ${t.call}()\n` +
+          `${path.file}::${path.fn} does not call ${expected}()\n` +
             `  That path ends a vault session (${path.why})\n` +
             `  and ${t.call} drops ${t.holds}.\n` +
             `  Module-scope state survives an unmount, and neither a lock nor a switch reloads the WebView.`,
         );
+        continue;
+      }
+      // Hop two, and it is the half that stops an EMPTY wrapper passing. A
+      // wrapper the path calls but that clears nothing satisfies hop one and is
+      // exactly the defect `check-lock-teardown.mjs` was written for.
+      if (hop !== undefined) {
+        const wrapperSrc = files[hop.file];
+        if (wrapperSrc === undefined) {
+          errors.push(`${hop.file} does not exist (via entry for ${path.id} is stale)`);
+          continue;
+        }
+        // **Scoped to the WRAPPER'S OWN BODY, not to its file**, and the
+        // difference is the whole of what hop two buys. A file-wide grep passes
+        // the moment any sibling in that file calls the teardown, so an EMPTY
+        // wrapper beside a live one satisfies it: exactly the defect this hop
+        // was added to catch, surviving the hop. The real
+        // `mobile/src/lib/agent-lifetime.ts` held one function, so the property
+        // held by accident of file size rather than by the check. Found by the
+        // /simplify altitude pass on myne-md/myne#456 and confirmed by
+        // injection.
+        const at = wrapperSrc.search(
+          new RegExp(
+            `(?:export\\s+)?(?:async\\s+)?(?:function\\s+${hop.fn}\\b|const\\s+${hop.fn}\\s*=)`,
+          ),
+        );
+        if (at < 0) {
+          errors.push(`${hop.file} no longer declares ${hop.fn} (via entry for ${path.id} is stale)`);
+          continue;
+        }
+        const wrapperBody = bodyOf(wrapperSrc, at);
+        if (wrapperBody === null) {
+          errors.push(`could not extract ${hop.fn}'s body in ${hop.file}`);
+        } else if (!new RegExp(`\\b${t.call}\\s*\\(`).test(wrapperBody)) {
+          errors.push(
+            `${hop.file} declares ${hop.fn}, which ${path.id} relies on, but never calls ${t.call}()\n` +
+              `  A wrapper that clears nothing satisfies the call site and drops none of ${t.holds}.`,
+          );
+        }
       }
     }
   }
@@ -466,6 +574,10 @@ function rosterFiles() {
   for (const rel of [
     ...TEARDOWN_CALLS.map((t) => t.declaredIn),
     ...LEAVING_PATHS.map((p) => p.file),
+    // The `via` wrappers too, or hop two reports every one of them missing:
+    // the file set is the guard's whole world, and a wrapper it cannot read is
+    // indistinguishable from one that is not there.
+    ...TEARDOWN_CALLS.flatMap((t) => Object.values(t.via ?? {}).map((h) => h.file)),
   ]) {
     const p = join(ROOT, rel);
     if (existsSync(p)) files[rel] = readFileSync(p, "utf8");

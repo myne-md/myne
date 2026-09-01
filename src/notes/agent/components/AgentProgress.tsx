@@ -30,8 +30,15 @@ import {
   providerLabelOf,
 } from "../../../lib/ai-capability";
 import { usePrefs } from "../../../hooks/usePrefs";
-import { currentRunEpoch, failRun, resumeRun, useAgent } from "../agentStore";
+import {
+  currentRunEpoch,
+  failRun,
+  reportRunProgress,
+  resumeRun,
+  useAgent,
+} from "../agentStore";
 import { settleRunIntoChat } from "../../ai/agentToChat";
+import { RunCostLine } from "./RunCostLine";
 import { ScopeExpansionDialog, type ProviderArm } from "./ScopeExpansionDialog";
 
 /** How a stopped run is described, given the tag its loop ended on.
@@ -175,10 +182,20 @@ export function AgentProgress() {
             // Captured before the await, so a vault lock during the approval
             // invalidates the reply rather than being raced by it.
             const epoch = currentRunEpoch();
-            void agentApproveScope(runId, {
-              kind: "folder",
-              value: awaiting.folder,
-            })
+            void agentApproveScope(
+              runId,
+              {
+                kind: "folder",
+                value: awaiting.folder,
+              },
+              // The approved leg reports its cost too (myne-md/myne#456), or
+              // the figures would freeze the moment a run widened its scope:
+              // which is precisely when a user most wants to see them moving,
+              // because widening is what makes a run expensive.
+              (progress) => {
+                reportRunProgress(progress, epoch);
+              },
+            )
               // The transcript half comes with the settle rather than after it:
               // this is the SECOND place a step settles, and a mirror written
               // only at the start site would leave an approved expansion's
@@ -252,6 +269,32 @@ export function AgentProgress() {
         {t("agent.progress.grantsModel", { count: view.modelGrants })}
         {")"}
       </span>
+
+      {/* **The run's cost, WHILE it runs** (myne-md/myne#456).
+       *
+       *  `design-notes/ai/0515` rests the remote arm's lack of a volume bound
+       *  on this disclosure: "the residual is disclosed rather than capped: a
+       *  finished run reports the requests it made, the notes it read, and how
+       *  much text left the device". Rendering it only on a FINISHED turn is
+       *  what that entry said and it is not enough, because a run that does not
+       *  finish has still spent its requests. On mobile that case is ordinary
+       *  rather than exotic: a run dies with the foreground, so locking the
+       *  vault or pocketing the phone mid-run leaves a user who paid for four
+       *  provider round-trips and was told about none of them.
+       *
+       *  The figures need no new plumbing. The store already accumulates them
+       *  per settled step, so this is the same three numbers the finished turn
+       *  reports, read one step earlier, the same COMPONENT, too, so the two
+       *  cannot word the control differently.
+       *
+       *  Deliberately not gated on `running`: a cancelled or failed run keeps
+       *  its figures on screen, which is the case this exists for. */}
+      <RunCostLine
+        testId="agentProgress.runCost"
+        iterations={agent.iterations}
+        notesRead={agent.notesRead}
+        charsOffDevice={agent.charsOffDevice}
+      />
 
       <span style={{ flex: 1 }} />
 

@@ -58,6 +58,37 @@ export default defineConfig({
       { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },
       { find: /^@myne\/task-write$/, replacement: sib("../src/notes/taskWriteCore.ts") },
       { find: /^@myne\/note-completion$/, replacement: sib("../src/notes/completeNoteCore.ts") },
+      // The agent's wire types and its RAM-only run store (myne-md/myne#456).
+      // Both are safe to alias out of `../src/`, and for the same reason the
+      // task-* block above is: neither reaches a host. `agent-protocol.ts` was
+      // SPLIT out of `agent-run.ts` precisely so this alias could exist, since
+      // that file opens IPC channels through DESKTOP's platform seam and a
+      // mobile client importing it would be reaching through the wrong
+      // boundary. `agentStore.ts` imports only React and the protocol module,
+      // so mobile shares the whole 755-line state machine, the epoch guards,
+      // the rejection sets, the apply/undo bookkeeping, rather than retyping
+      // rules that already exist.
+      { find: /^@myne\/agent-protocol$/, replacement: sib("../src/lib/agent-protocol.ts") },
+      { find: /^@myne\/agent-store$/, replacement: sib("../src/notes/agent/agentStore.ts") },
+      { find: /^@myne\/agent-run-core$/, replacement: sib("../src/lib/agent-run-core.ts") },
+      // The three-figure cost line, shared rather than re-worded. Its own module
+      // comment is the reason: `design-notes/ai/0515` records this sentence as
+      // the compensating control for the remote arm having no volume bound, and
+      // "a control that is worded in two places is a control that is worded
+      // differently in two places". Its only imports are React and i18next.
+      { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
+      // The last-run undo's LOGIC, shared rather than retyped. Its own header is
+      // the argument: it carries three recorded defect fixes, each invisible
+      // until it happens to a user, and it imports neither client's bindings:
+      // they arrive as arguments, exactly as `agent-run-core` takes a seam.
+      { find: /^@myne\/undo-last-run$/, replacement: sib("../src/notes/agent/useUndoLastRun.ts") },
+      // The `EngineError` cause taxonomy. Zero imports, so it is pure by
+      // construction, and it is the ONE reader of that wire shape: a second
+      // hand-written table is how a Rust variant a client has never heard of
+      // falls into the catch-all and four situations render one sentence.
+      // `tests/lib/engineErrorTaxonomy.test.ts` parses the Rust enum and holds
+      // this file to it, so the alias buys mobile that drift lock too.
+      { find: /^@myne\/engine-error$/, replacement: sib("../src/lib/engine-error.ts") },
       { find: /^@myne\/decorations$/, replacement: sib("../src/notes/decorations.ts") },
       { find: /^@myne\/decorations\/folderIcons$/, replacement: sib("../src/notes/folderIcons.ts") },
     ],

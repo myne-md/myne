@@ -1421,7 +1421,7 @@ mod agent_script_tests {
     //! nothing usable.
 
     use super::*;
-    use myne_core::plugins::agent::prompt::{parse_actions, system_instructions, AgentAction};
+    use crate::plugins::agent::prompt::{parse_actions, system_instructions, AgentAction};
 
     fn turn(role: ChatRole, content: &str) -> ChatMessage {
         ChatMessage {
@@ -1457,11 +1457,11 @@ mod agent_script_tests {
     /// grader accepts it.
     #[test]
     fn the_stub_passes_the_capability_probe_it_is_asked() {
-        use myne_core::plugins::agent::engine::{
+        use crate::plugins::agent::engine::{
             AgentCompletion, AgentEngine, AgentRequest, AgentRequestClass,
         };
-        use myne_core::plugins::agent::error::AgentError;
-        use myne_core::plugins::agent::probe::{run_probe, AttemptVerdict, ProbeThreshold};
+        use crate::plugins::agent::error::AgentError;
+        use crate::plugins::agent::probe::{run_probe, AttemptVerdict, ProbeThreshold};
 
         /// The stub behind the agent seam, mapped by the REAL `chat_shape` the
         /// desktop adapter uses. A second mapping written here would let this
@@ -1476,7 +1476,7 @@ mod agent_script_tests {
                 request: &AgentRequest,
             ) -> Result<AgentCompletion, AgentError> {
                 let (system, messages) =
-                    crate::plugins::agent::adapters::chat_shape(request, &|s: &str| s.to_string());
+                    crate::inference::agent_adapter::chat_shape(request, &|s: &str| s.to_string());
                 let mut sink = |_: &str| ControlFlow::Continue(());
                 let reply = StubEngine
                     .chat_streaming(&system, &messages, &mut sink)
@@ -1489,7 +1489,7 @@ mod agent_script_tests {
             }
         }
 
-        let verdict = myne_core::test_support::block_on(run_probe(
+        let verdict = crate::test_support::block_on(run_probe(
             &StubBehindTheSeam,
             ProbeThreshold {
                 attempts: 3,
@@ -1803,9 +1803,9 @@ mod agent_script_tests {
             // Checked through the real placer and the real detector rather than
             // by reading the string, so the claim is about what applying the
             // edit DOES.
-            let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+            let placed = crate::plugins::agent::edit::place(body, anchor, replacement)
                 .expect("the anchor must place");
-            if myne_core::plugins::agent::hide::edit_hides_note(body, &placed) {
+            if crate::plugins::agent::hide::edit_hides_note(body, &placed) {
                 trashing += 1;
             } else {
                 ordinary += 1;
@@ -1925,7 +1925,7 @@ mod agent_script_tests {
             1,
             "anchor {anchor:?} must place exactly once"
         );
-        let placed = myne_core::plugins::agent::edit::place(body, anchor, replacement)
+        let placed = crate::plugins::agent::edit::place(body, anchor, replacement)
             .expect("the stub's anchor must place in a frontmattered note");
         assert_ne!(placed, body);
         // And the frontmatter is intact, so the edit is a body edit rather than
@@ -1962,7 +1962,7 @@ mod agent_script_tests {
                 !anchor.starts_with("title:"),
                 "an anchor may not be a managed frontmatter field: {anchor:?}"
             );
-            myne_core::plugins::agent::edit::place(body, anchor, replacement)
+            crate::plugins::agent::edit::place(body, anchor, replacement)
                 .unwrap_or_else(|e| panic!("anchor {anchor:?} must place: {e:?}"));
         }
     }
