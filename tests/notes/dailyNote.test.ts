@@ -2,7 +2,7 @@
 // today" resolver. Pure function; all clock input is the injected `now`.
 
 import { describe, it, expect } from "vitest";
-import { buildRenderContext } from "../../src/notes/newNoteFromTemplate";
+import { buildRenderContext, singleDay } from "../../src/notes/newNoteFromTemplate";
 import {
   formatDailyDate,
   isoWeek,
@@ -129,7 +129,7 @@ describe("zonedNow", () => {
     for (const zone of ["Europe/Berlin", "America/New_York"]) {
       const now = zonedNow(EVENING_IN_NEW_YORK, zone);
       const title = formatDailyDate(now, "YYYY-MM-DD");
-      expect(buildRenderContext(now, title).date).toBe(title);
+      expect(buildRenderContext(now, title, singleDay(now)).date).toBe(title);
     }
   });
 
