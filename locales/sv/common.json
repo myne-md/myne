@@ -1188,6 +1188,7 @@
     },
     "find": {
       "close": "Stäng sökning",
+      "dateFallback": "Söker efter {{stored}}, den form som det här datumet lagras i.",
       "matchCase": "Matcha skiftläge",
       "matchCount": "{{current}} av {{total}}",
       "nextMatch": "Nästa träff",
@@ -1196,6 +1197,7 @@
       "previousMatch": "Föregående träff",
       "replaceAll": "Ersätt alla",
       "replaceAllCount": "Ersätt alla ({{total}})",
+      "replaceOffOnDateFallback": "Ersätt är avstängt så länge ett datum hittas via sin lagrade form, så att en ersättning inte kan göra datumet oläsligt.",
       "replaceOne": "Ersätt",
       "replacePlaceholder": "Ersätt med",
       "toggleReplace": "Växla ersätt"
@@ -3347,7 +3349,7 @@
     },
     "dateTime": {
       "dateLabel": "Datumformat",
-      "dateHelper": "Hur datum visas i uppgifter, sparade vyer och bilagor.",
+      "dateHelper": "Hur ett datum skrivs, överallt där Myne visar ett.",
       "dateSystem": "Följ språket",
       "timeLabel": "Tidsformat",
       "timeHelper": "Om tider visas med 24-timmarsklocka eller 12-timmarsklocka.",

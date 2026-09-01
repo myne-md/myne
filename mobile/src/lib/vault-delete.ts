@@ -36,6 +36,7 @@
 // MYND-108-bis.
 
 import { invoke } from "../platform/core";
+import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import type { VaultDeleteError } from "../types/vault-delete-error";
 
 export type {
@@ -202,5 +203,12 @@ export async function deleteVault(vaultId?: string): Promise<void> {
   // malformed one) falls back to the active (sole `Unlocked`) vault — the
   // SYNC-1 vault the in-vault danger-zone delete is driven from — which keeps
   // the pre-multi-vault single-vault callers working unchanged.
+  // The ambient date/time DISPLAY store, on the one leaving path that does not
+  // go through `lockVault`. It is module scope in `@myne/editor` and holds the
+  // formats and TIME ZONE derived from the prefs of the vault being ERASED, and
+  // this path leaves the editor without advancing the prefs nonce, so nothing
+  // republishes and the deleted vault's values stay resident for the rest of the
+  // process (myne-md/myne#609, found in review).
+  resetDateTimeDisplayForLock();
   await invoke<void>("plugin:vault-delete|vault_delete", { vaultId });
 }

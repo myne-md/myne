@@ -479,10 +479,18 @@ export interface PrefsView {
    * the host's own zone.
    *
    * **Display only.** It decides what the app treats as "today" and how a stored
-   * wall-clock value is printed; it never enters a `.myn` file, a blob, or the
-   * sync wire — `dialect/src/taskFields.ts` keeps note times zone-free, and this
-   * does not walk that back. Filed device-local by `prefs_classification`, since
-   * the right zone is a property of where the device is. Canonical key slot:
+   * wall-clock value is printed. It never enters a `.myn` file, so a note never
+   * records where its author was: `dialect/src/taskFields.ts` keeps note times
+   * zone-free and this does not walk that back.
+   *
+   * It DOES live in the encrypted `vault.prefs` blob, which is pushed and pulled
+   * like every other prefs field. Corrected by myne-md/myne#609, which found
+   * this comment claiming "never enters a blob or the sync wire" and then found
+   * the same sentence in eight more places, the normative spec and a published
+   * user-guide article among them. Filed
+   * device-local by `prefs_classification`, and that is a MERGE classification:
+   * the local value survives the sync-protocol.md 10.2 merge, and 10.2.1 has a
+   * newly enrolled device adopt it as a starting default. Canonical key slot:
    * after `time_format`, before `transcription_enabled`.
    */
   timezone: string | null;
@@ -1506,9 +1514,13 @@ export async function setTimeFormat(value: string | null): Promise<void> {
 }
 
 /**
- * Set (or clear) the DISPLAY timezone override (myne#279) — pass an IANA zone
- * identifier, or `null` to follow the host's own zone. Display only: it never
- * reaches a note, a blob or the sync wire.
+ * Set (or clear) the DISPLAY timezone override (myne#279). Pass an IANA zone
+ * identifier, or `null` to follow the host's own zone.
+ *
+ * Display only: it never reaches a note, so a note never records where its
+ * author was. It DOES ride the encrypted `vault.prefs` blob; device-local is a
+ * MERGE classification, not a transmission one. The long form is on
+ * `PrefsView.timezone` above.
  */
 export async function setTimezone(value: string | null): Promise<void> {
   await writePref("plugin:prefs|set_timezone", { value });

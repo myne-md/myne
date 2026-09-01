@@ -35,17 +35,26 @@ coverage/
 
 # Companion repos cloned by workspace/setup.sh as nested directories.
 # Each carries its own .git and is tracked by GitHub separately under myne-md.
-/myne-test-vectors/
-/myne-server/
-/myne-web/
-/myne-website/
-/myne-ops/
-/myne-agents/
-/myne-clipper/
-/myne-themes/
-/myne-branding/
-/myne-range/
-/homebrew-tap/
+#
+# NO TRAILING SLASH, and that is the fix rather than the style. A trailing slash
+# matches a DIRECTORY only, and inside a worktree these are SYMLINKS to the
+# shared checkout, which is what the documented worktree workflow produces. So
+# every one of them was untracked-and-not-ignored in every worktree, and a
+# `git add -A` before a commit would have put eight machine-specific absolute
+# paths into a pull request. Without the slash the pattern matches either
+# (myne-md/myne#609, found by review; the mitigation before this was a line in a
+# progress log asking somebody to remember).
+/myne-test-vectors
+/myne-server
+/myne-web
+/myne-website
+/myne-ops
+/myne-agents
+/myne-clipper
+/myne-themes
+/myne-branding
+/myne-range
+/homebrew-tap
 
 # Vite dep-optimization cache (regenerated each build).
 .vite/

@@ -1179,6 +1179,7 @@
     },
     "find": {
       "close": "खोज बंद करें",
+      "dateFallback": "{{stored}} खोजा जा रहा है, यह तारीख इसी रूप में संग्रहीत है।",
       "matchCase": "केस मिलाएं",
       "matchCount": "{{total}} में से {{current}}",
       "nextMatch": "अगला मिलान",
@@ -1187,6 +1188,7 @@
       "previousMatch": "पिछला मिलान",
       "replaceAll": "सब बदलें",
       "replaceAllCount": "सब बदलें ({{total}})",
+      "replaceOffOnDateFallback": "जब तक कोई तारीख अपने संग्रहीत रूप से मिल रही है, बदलना बंद है, ताकि कोई बदलाव तारीख को अपठनीय न बना दे।",
       "replaceOne": "बदलें",
       "replacePlaceholder": "इससे बदलें",
       "toggleReplace": "बदलने का विकल्प टॉगल करें"
@@ -3319,7 +3321,7 @@
     },
     "dateTime": {
       "dateLabel": "तारीख़ का फ़ॉर्मैट",
-      "dateHelper": "टास्क, सेव किए गए व्यू और अटैचमेंट में तारीख़ें कैसे दिखें।",
+      "dateHelper": "Myne जहाँ भी तारीख दिखाता है, वह कैसे लिखी जाएगी।",
       "dateSystem": "भाषा के अनुसार",
       "timeLabel": "समय का फ़ॉर्मैट",
       "timeHelper": "समय 24 घंटे की घड़ी में दिखे या 12 घंटे की।",

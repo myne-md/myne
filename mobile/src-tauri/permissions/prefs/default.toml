@@ -35,6 +35,9 @@ permissions = [
   "allow-set-daily-date-format",
   "allow-set-daily-folder",
   "allow-set-daily-template",
+  "allow-set-date-format",
+  "allow-set-time-format",
+  "allow-set-timezone",
   "allow-set-new-note-location",
   "allow-set-startup-open",
   "allow-set-editor-text-size",
@@ -193,6 +196,47 @@ commands.allow = ["set_daily_folder"]
 identifier = "allow-set-daily-template"
 description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_daily_template"]
+
+# Display date & time (myne#279, wired to mobile by myne-md/myne#609). The
+# command bodies live in the SHARED myne-core prefs core and the desktop has
+# registered all three since myne#279; this plugin only wires the ACL. Must stay
+# in lockstep with the `generate_handler!` list in `../../src/plugins/prefs/mod.rs`
+# or the ACL resolver fails closed, which is the same discipline the
+# ingest-image-compression and device-naming entries carry.
+#
+# `protocol.md` §9.5.2 is normative on all three: closed-enum strings stored
+# without codec-level validation, omitted entirely when unset, non-load-bearing
+# (AS-low, no protective-envelope clamp), no new magic, no new SubkeyRole, no new
+# AAD role, zero new crypto. `date_format` and `time_format` are shared scalar-
+# LWW; `timezone` is device-local and DISPLAY-ONLY, deciding what counts as
+# "today" and how a real instant prints.
+#
+# Be exact about what device-local means here, because the looser reading was
+# written into nine places across this repository before myne-md/myne#609
+# corrected it, and the first sweep found only five of them: the number below
+# is what `git grep "sync wire"` returns, not what a session remembered
+# visiting. It is a MERGE classification, not a transmission one:
+# `PrefClass::DeviceLocal` in `core/src/plugins/sync/prefs_classification.rs` is
+# what makes the local value survive the sync-protocol.md §10.2 merge. The zone
+# still lives in the `MYP1` vault.prefs blob this very command writes, that blob
+# is pushed and pulled verbatim like every other prefs field, and §10.2.1 has a
+# newly enrolled device adopt it wholesale as a starting default. What is true
+# without qualification is narrower and is the part that matters: the zone never
+# enters a .myn file, so a note never records where its author was.
+[[permission]]
+identifier = "allow-set-date-format"
+description = "Allow invoking prefs:set_date_format (Slot::Unlocked-gated setter for the date_format display preference: system/iso/dmy/mdy/dmmmy, Option<String> where None clears to the system default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_date_format"]
+
+[[permission]]
+identifier = "allow-set-time-format"
+description = "Allow invoking prefs:set_time_format (Slot::Unlocked-gated setter for the time_format display preference: system/24h/12h, Option<String> where None clears to the system default; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_time_format"]
+
+[[permission]]
+identifier = "allow-set-timezone"
+description = "Allow invoking prefs:set_timezone (Slot::Unlocked-gated setter for the timezone DISPLAY override: an IANA zone identifier, Option<String> where None clears to the host's own zone; atomic-writes vault.prefs with no native side-effect and never writes a zone into note bytes)."
+commands.allow = ["set_timezone"]
 
 # MYND-462 "Files" settings panel: two write setters for the new-note default
 # location pair + the startup-open pair. Both inherit the same main-window-only

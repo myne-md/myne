@@ -305,6 +305,22 @@ export interface PrefsView {
    */
   daily_template: string | null;
   /**
+   * Display date format (myne#279, reached mobile in myne-md/myne#609):
+   * `"system"` | `"iso"` | `"dmy"` | `"mdy"` | `"dmmmy"`. `null` ≡ `"system"`,
+   * which resolves against the app's OWN language rather than the OS locale.
+   *
+   * A free enum string on the wire (Rust `Option<String>`) with no codec-level
+   * validation, so a value written by a newer build decodes as unset rather than
+   * failing the blob; the client maps an unknown value to the default. Omitted
+   * from the encrypted blob when `null`. Non-load-bearing cosmetic. Canonical
+   * key slot: after `daily_template`, before `deliberate_folders`.
+   *
+   * **Shared, scalar-LWW.** It arrives by sync from whichever device set it,
+   * which is why this field existed on the wire for a while before this client
+   * could read it: the phone received the value and disregarded it.
+   */
+  date_format: string | null;
+  /**
    * Favorited notes — an ordered list of note UUIDs surfaced in the sidebar's
    * Favorites section, in display order (MYND-183). A sequence: the backend
    * preserves element order verbatim. UUIDs only (folders are not favoritable).
@@ -410,6 +426,41 @@ export interface PrefsView {
    * Rust `Option<ThemeChoice>` (null | "light" | "dark").
    */
   theme: ThemeChoice | null;
+  /**
+   * Display time format (myne#279, reached mobile in myne-md/myne#609):
+   * `"system"` | `"24h"` | `"12h"`. `null` ≡ `"system"`. Same free-enum-string
+   * discipline as {@link PrefsView.date_format}, and **shared** the same way, so
+   * it too arrives by sync. Canonical key slot: after `theme`, before
+   * `timezone`.
+   */
+  time_format: string | null;
+  /**
+   * Display timezone override (myne#279, reached mobile in myne-md/myne#609):
+   * an IANA zone identifier, or `null` ≡ this device's own zone.
+   *
+   * **Display only.** It decides what the app treats as "today" and how a real
+   * instant is printed. `dialect/src/taskFields.ts` keeps note times zone-free
+   * wall-clock and this does not walk that back: a reminder written as 09:00
+   * reads 09:00 on every device, and shifting it by an offset would invent an
+   * instant nobody wrote.
+   *
+   * Be exact about the reach, because the looser claim was written here first:
+   * it never enters a `.myn` file, so a note never records where its author
+   * was. It DOES live in the encrypted `vault.prefs` blob, which is pushed and
+   * pulled like every other prefs field; device-local is a MERGE classification
+   * (`PrefClass::DeviceLocal`, sync-protocol.md 10.2), meaning the local value
+   * survives the merge, and 10.2.1 has a newly enrolled device adopt it as a
+   * starting default.
+   *
+   * **Device-local**, deliberately unlike its two siblings above. The right zone
+   * is a property of where a given device IS, so a phone that travels and a
+   * computer that does not should not have to agree, and the merge is what
+   * enforces that: the local value always survives. So this is the one of the
+   * three that a computer's choice never overwrites on a phone, and therefore
+   * the one a phone most needs its own control for. Canonical key slot: after `time_format`, before
+   * `transcription_enabled`.
+   */
+  timezone: string | null;
   /**
    * Per-folder custom sidebar icon (MYND-185) — a map from a canonical
    * trailing-slash folder path to an icon name (the client's curated stroke-glyph
@@ -829,6 +880,37 @@ export async function setEditorLayout(layout: EditorLayout): Promise<void> {
  */
 export async function setTheme(theme: ThemeChoice | null): Promise<void> {
   await writePref("plugin:prefs|set_theme", { theme });
+}
+
+/**
+ * Set (or clear) the display date format (myne#279). Pass
+ * `"system"`/`"iso"`/`"dmy"`/`"mdy"`/`"dmmmy"`, or `null` to clear to
+ * `"system"`. Shared: the choice syncs to every device on this vault.
+ */
+export async function setDateFormat(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_date_format", { value });
+}
+
+/**
+ * Set (or clear) the display time format (myne#279). Pass
+ * `"system"`/`"24h"`/`"12h"`, or `null` to clear to `"system"`. Shared, like
+ * {@link setDateFormat}.
+ */
+export async function setTimeFormat(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_time_format", { value });
+}
+
+/**
+ * Set (or clear) the DISPLAY timezone override (myne#279). Pass an IANA zone
+ * identifier, or `null` to follow this device's own zone.
+ *
+ * Display only: it never reaches a note. Device-local in the merge sense, so
+ * unlike the two above a computer's choice never overwrites it here, which is
+ * why a phone needs this control of its own. The value itself still rides the
+ * encrypted prefs blob like every other field.
+ */
+export async function setTimezone(value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_timezone", { value });
 }
 
 /**
