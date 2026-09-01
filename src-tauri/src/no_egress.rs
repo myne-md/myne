@@ -301,12 +301,16 @@ pub const GRANTED_CORE_NAMESPACES: &[(&str, &str)] = &[
     ),
     (
         "core:window",
-        "`src/platform/window.ts` re-exports `getCurrentWindow`; the three \
+        "`src/platform/window.ts` re-exports `getCurrentWindow`; the two \
          named `core:window:allow-*` entries beside the sub-default cover \
-         `destroy` (app-exit + editor close-intercept), `show` (reveal after \
-         idle lock) and `start_dragging`, which Tauri's own injected \
-         `drag.js` invokes for `data-tauri-drag-region` — the one consumer \
-         that exists in no source file in this repo.",
+         `destroy` (app-exit + editor close-intercept) and `start_dragging`, \
+         which Tauri's own injected `drag.js` invokes for \
+         `data-tauri-drag-region`, the one consumer that exists in no source \
+         file in this repo. `show` was a third until myne-md/myne#483: its one \
+         consumer, the reveal after idle lock, now asks the host for a fixed \
+         protect/show/protect/focus sequence \
+         (`plugin:screen-capture|screen_capture_show_protected`) instead of \
+         driving the window itself, so the raw grant went with it.",
     ),
 ];
 

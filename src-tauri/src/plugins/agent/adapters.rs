@@ -184,6 +184,10 @@ mod tests {
                     .chat_streaming(&system, &messages, &mut sink)
                     .map_err(|_| AgentError::ReadFailed)?;
                 Ok(AgentCompletion {
+                    // `false`, and it is a claim rather than a placeholder: this
+                    // stub imposes no ceiling, so nothing here can cut a reply
+                    // off. The field arrived with myne-md/myne#617.
+                    truncated: false,
                     reply,
                     chars_off_device: None,
                 })

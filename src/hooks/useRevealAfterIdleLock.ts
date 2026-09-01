@@ -1,5 +1,5 @@
 // Re-show the window after an idle auto-lock hid it (MYND-121, extended by
-// MYND-628).
+// MYND-628 and by myne-md/myne#483).
 //
 // Idle auto-lock's canonical teardown (`decisions.md` 2026-05-30, leg-split) is
 // hide (leg 2a) → zeroize (leg 1) → re-apply screen-capture → WebView reload
@@ -30,13 +30,29 @@
 // `welcome` is deliberately NOT in that set: it is only reachable with zero
 // vaults on disk, and you cannot idle-lock a vault you do not have.
 //
-// Permission: `core:window:allow-show`, granted in
-// `src-tauri/capabilities/default.json`. Note it is the ONLY window permission
-// this may use — `unminimize` is NOT granted, and calling it here would be
-// rejected by the Tauri 2 deny-by-default ACL and take `show()` down with it.
+// **The show is only half of it, and the half it was missing is why it moved
+// host-side (myne-md/myne#483).** The teardown's re-apply runs at step 3, while
+// the window is HIDDEN, and the Windows capture affinity is reported not to
+// survive a hide/show cycle (tauri-apps/tauri#14189; the same defect Electron
+// fixed in electron/electron#45868). So this is the FOURTH re-show site in the
+// app, and the one that matters most: the screen it reveals carries the account
+// number. An earlier revision kept `getCurrentWindow().show()` here and called a
+// separate re-assert after it, which is the same two-independent-calls shape the
+// other three sites had. An ordering held by a comment. It now asks the host
+// for the one sequence all four share (`screen_capture::show_protected`), so the
+// ordering is a property of the code rather than of this comment.
+//
+// Permission: `screen-capture:allow-screen-capture-show-protected`. That grant
+// REPLACED `core:window:allow-show`, which was dropped from
+// `src-tauri/capabilities/default.json` in the same change because this hook was
+// its only consumer in the tree. The trade is in the right direction: a raw
+// window operation page context could aim anywhere, for one fixed
+// protect/show/protect/focus sequence it cannot parameterise. `unminimize` is
+// inside that sequence and remains unreachable as a standalone grant.
 
 import { useEffect } from "react";
-import { getCurrentWindow } from "../platform/window";
+import { showWindowProtected } from "../lib/screen-capture-override";
+import { has } from "../platform/capabilities";
 
 /**
  * Reveal the window once a locked surface has mounted.
@@ -44,20 +60,29 @@ import { getCurrentWindow } from "../platform/window";
  * Idempotent on a normal boot — `screen_capture::init` has already shown the
  * window, so this is a no-op there.
  *
- * On the web client the seam refuses `window.show` outright, and the `catch`
- * below is the correct handler for it: a page has no hidden window, because web
- * auto-lock re-renders the locked surface in the same tab rather than taking one
- * away. The refusal is typed (`web/src/platform/window.ts`) rather than a silent
- * no-op so a later caller cannot read success into it.
+ * On the web client this returns before asking anything. A page has no hidden
+ * window (web auto-lock re-renders the locked surface in the same tab rather
+ * than taking one away) and no capture affinity to lose, so the capability is
+ * absent and the guard below is what keeps a guaranteed-refused Worker round
+ * trip off every locked mount.
  */
 export function useRevealAfterIdleLock(): void {
   useEffect(() => {
+    // Where there is no window to reveal there is nothing to ask for. Without
+    // this, every locked-surface mount on web made a Worker round trip to be
+    // told `Unsupported`, for an answer the capability set already had.
+    if (!has("screenCaptureProtection")) return;
     void (async () => {
       try {
-        await getCurrentWindow().show();
-      } catch {
-        // Not inside Tauri, or no main window to reveal. Nothing actionable:
-        // the window simply stays as it was, which is the pre-MYND-121 state.
+        await showWindowProtected();
+      } catch (e) {
+        // Reported rather than swallowed. This is the only thing that brings
+        // the window back after idle auto-lock hid it, and its failure mode is
+        // an app that looks frozen in the dock with no log line saying why.
+        // A wrong or missing `screen-capture:allow-screen-capture-show-protected`
+        // grant lands exactly here, and the ACL has no test that would catch it
+        // for us.
+        console.warn("reveal-after-idle-lock: the host refused the re-show", e);
       }
     })();
   }, []);

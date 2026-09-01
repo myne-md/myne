@@ -31,6 +31,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import type { Feedback } from "../lib/clipboard";
+import { VISUALLY_HIDDEN } from "./primitives/visuallyHidden";
 
 /**
  * How long the momentary half lasts: the button's own label swap.
@@ -168,16 +169,12 @@ export function ActionStatus({
       style={
         visuallyHidden
           ? {
-              // Announced, not drawn. Not `display: none` and not
-              // `visibility: hidden`: both remove the element from the
-              // accessibility tree, which would make the live region announce
-              // nothing and turn this into decoration.
+              // Announced, not drawn. The technique and the reason it is not
+              // `display: none` live in `primitives/visuallyHidden.ts`, shared
+              // with the pre-unlock screen-capture escape, which needs the same
+              // property for the opposite kind of element.
               position: "absolute",
-              width: 1,
-              height: 1,
-              overflow: "hidden",
-              clipPath: "inset(50%)",
-              whiteSpace: "nowrap",
+              ...VISUALLY_HIDDEN,
             }
           : {
               fontSize: "var(--text-sm)",

@@ -61,7 +61,15 @@ const CAPABILITY_BACKING = {
   // OS-level idle detection; the pref itself is a normal synced field, so there
   // is deliberately no refused command behind this one.
   osIdleAutoLock: [],
-  screenCaptureProtection: ["plugin:prefs|set_screen_capture_protection"],
+  // The `vault.prefs` setter AND the whole `screen-capture` plugin
+  // (myne-md/myne#482 + #483). The plugin is named wholesale rather than
+  // per command because all three of its commands presuppose a capture
+  // affinity a page does not have: two read and write the device-local
+  // override of it, and the third re-asserts it after a re-show.
+  screenCaptureProtection: [
+    "plugin:prefs|set_screen_capture_protection",
+    "screen-capture",
+  ],
   // The whole plugin (owner decision, 2026-07-27 / task 72): repair scans a
   // vault DIRECTORY for orphan artefacts, which exists because a desktop
   // directory is writable by other software. An OPFS container has one writer.

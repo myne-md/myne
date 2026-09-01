@@ -188,7 +188,7 @@ mod tests {
         let prefs = protocol::PrefsView {
             ai_enabled: true,
             ai_provider: Some("openrouter".into()),
-            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter@device".into()),
             ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".to_string())),
             ai_provider_model: Some("a/model".into()),
             ..Default::default()

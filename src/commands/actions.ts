@@ -41,6 +41,7 @@ import {
   type ThemeChoice,
 } from "../lib/prefs";
 import { applyTheme } from "../lib/theme";
+import { screenCaptureOverrideIsActive } from "../hooks/useScreenCaptureOverride";
 import i18n from "../i18n";
 
 /** Next element after `current` (or `fallback` when unset) in a cyclic list. */
@@ -249,7 +250,15 @@ const toggleScreenCaptureAction: CommandAction = {
   get category() {
     return i18n.t("commands.actions.category.app");
   },
-  visibility: editorOnly,
+  // Hidden while the device-local override is on (myne-md/myne#482), the same
+  // state that renders the Privacy switch inert. Without this the palette
+  // reopens the door the panel just closed: the write lands in `vault.prefs`,
+  // reports success, and `screen_capture::resolve` turns it into `false` at the
+  // native call, so the user is told protection changed over a window that did
+  // not. Hidden rather than disabled because the palette has nowhere to put the
+  // helper sentence the panel uses to explain it.
+  visibility: (ctx) =>
+    screenCaptureOverrideIsActive() ? "hidden" : editorOnly(ctx),
   run: (ctx) => {
     void setScreenCaptureProtection(!ctx.prefs.screen_capture_protection);
   },
