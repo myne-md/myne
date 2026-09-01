@@ -12555,9 +12555,41 @@ mod tests {
         let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
         let nonce: [u8; AEAD_NONCE_LEN] = [0xF2; AEAD_NONCE_LEN];
 
-        // Deliberately inserted in a NON-sorted order and across two periods:
-        // the canonical encoder must emit them lexicographically, which is the
-        // property a port building the map in insertion order would fail.
+        // FOUR properties in one fixture, and three of them were unpinned when
+        // this generator first shipped.
+        //
+        // 1. The lexicographic key order INSIDE the map. The entries go in in a
+        //    deliberately non-sorted order across two periods, so a port that
+        //    emits insertion order produces different bytes. (`BTreeMap::from`
+        //    sorts on construction, so this is a statement about what the
+        //    ENCODER must do with an arbitrary source order rather than about
+        //    this literal; the assertion below is what holds it.)
+        //
+        // 2. The field's CANONICAL SLOT, and this is the correction. The first
+        //    version's description claimed to pin "after paired_extensions,
+        //    before reminder_horizon_days" over a blob containing neither: the
+        //    field had no left neighbour at all and its right neighbour was
+        //    `screen_capture_protection`. `vectors/vault-prefs/schema.md` states
+        //    the invariant that every field is pinned beside BOTH of its
+        //    canonical neighbours, because `vault.prefs` is canonical JSON and
+        //    key order is part of the bytes, so a case that pins a value alone
+        //    cannot notice a wrong slot. Both neighbours are present now.
+        //
+        // 3. An UNRECOGNISED period key, `quarterly.folder`. The field's own
+        //    schema text says a decoder MUST re-encode an entry whose period it
+        //    does not recognise, which is what makes a fourth period free, and
+        //    no case anywhere contained one. The corpus carried an actively
+        //    misleading precedent instead: `decrypt-unknown-field-tolerated`
+        //    pins an unknown TOP-LEVEL field being DROPPED from the re-encode,
+        //    which is the opposite of what this map requires.
+        //
+        // 4. NFC normalisation, fed in DECOMPOSED form. Every string in the
+        //    first fixture was pure ASCII, so the NFC claim in the same sentence
+        //    was unpinned too. `Wöchentlich/` is written here as `o` + U+0308
+        //    COMBINING DIAERESIS; the encoder must emit U+00F6, so the expected
+        //    bytes differ from the input literal and a port that skips the fold
+        //    fails on the blob rather than on a comparison it might not make.
+        //    `encrypt-labeled` uses exactly this device for `label`.
         let prefs = PrefsView {
             periodic_notes: BTreeMap::from([
                 (
@@ -12565,33 +12597,125 @@ mod tests {
                     String::from("0190a000-0000-7000-8000-000000000009"),
                 ),
                 (String::from("monthly.folder"), String::from("Monthly/")),
-                (String::from("weekly.folder"), String::from("Weekly/")),
+                // NFD on input: `o` + U+0308, folded to U+00F6 on encode.
+                (String::from("weekly.folder"), String::from("Wo\u{308}chentlich/")),
                 (String::from("monthly.format"), String::from("YYYY-MM")),
                 (String::from("weekly.format"), String::from("gggg-[W]ww")),
+                // A period no build in this tree knows. It must survive the
+                // round trip verbatim rather than being dropped.
+                (String::from("quarterly.folder"), String::from("Quarterly/")),
             ]),
+            // The two canonical NEIGHBOURS, so the slot is pinned rather than
+            // only the value: `paired_extensions` (p) < `periodic_notes` (pe)
+            // < `reminder_horizon_days` (r).
+            paired_extensions: alloc::vec![crate::paired_extension::PairedExtension {
+                extension_id: String::from("clipper@myne.md"),
+                paired_at: Some(1_765_432_000),
+                revoked: false,
+                token_value: String::from("9c1fb7a4"),
+            }],
+            reminder_horizon_days: Some(7),
             ..PrefsView::default()
         };
         let canonical = canonical_json_encode(&prefs);
         assert_eq!(
             core::str::from_utf8(&canonical).expect("utf8"),
             concat!(
-                r#"{"periodic_notes":{"monthly.folder":"Monthly/","monthly.format":"YYYY-MM","#,
-                r#""weekly.folder":"Weekly/","weekly.format":"gggg-[W]ww","#,
+                r#"{"paired_extensions":[{"extension_id":"clipper@myne.md","paired_at":1765432000,"#,
+                r#""revoked":false,"token_value":"9c1fb7a4"}],"#,
+                r#""periodic_notes":{"monthly.folder":"Monthly/","monthly.format":"YYYY-MM","#,
+                // PRECOMPOSED here (U+00F6) against the DECOMPOSED input above
+                // (`o` + U+0308). That difference is the NFC pin: if the encoder
+                // skipped the fold this literal would not match.
+                "\"quarterly.folder\":\"Quarterly/\",\"weekly.folder\":\"W\u{f6}chentlich/\",",
+                r#""weekly.format":"gggg-[W]ww","#,
                 r#""weekly.template":"0190a000-0000-7000-8000-000000000009"},"#,
-                r#""screen_capture_protection":true}"#
+                r#""reminder_horizon_days":7,"screen_capture_protection":true}"#
             ),
-            "keys must be emitted lexicographically, and the field must sort where the spec says",
+            "four things at once: the field sorts between paired_extensions (p) and \
+             reminder_horizon_days (r), its keys are emitted lexicographically, an \
+             unrecognised period survives verbatim, and the NFD input is folded to NFC \
+             (the literal above carries U+00F6, the input carried o + U+0308)",
         );
 
         let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
             .expect("encode periodic_notes");
         let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
-        assert_eq!(decoded, prefs, "round trip must be exact");
+
+        // NOT `assert_eq!(decoded, prefs)`, and the difference is the NFC pin
+        // rather than a weaker assertion. The encoder normalises, so the decoded
+        // view carries `W` + U+00F6 where the source view carried `o` + U+0308:
+        // a round trip through this format is exact in BYTES and idempotent in
+        // VALUES, and it is not the identity on a decomposed input. Comparing
+        // against the source would have forced the fixture back to ASCII, which
+        // is how the NFC claim went unpinned in the first place.
+        let expected_decoded = PrefsView {
+            periodic_notes: {
+                let mut m = prefs.periodic_notes.clone();
+                m.insert(
+                    String::from("weekly.folder"),
+                    String::from("W\u{f6}chentlich/"),
+                );
+                m
+            },
+            ..prefs.clone()
+        };
+        assert_eq!(
+            decoded, expected_decoded,
+            "round trip must be exact, with the decomposed input folded to NFC",
+        );
+        // And it is a FIXED POINT: re-encoding what came back reproduces the
+        // same bytes, which is the property a port needs and the one an
+        // idempotence claim actually rests on.
+        assert_eq!(
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &decoded, &nonce)
+                .expect("re-encode"),
+            blob,
+            "the decoded view must re-encode to the same bytes",
+        );
+
+        // THE INPUT THE ENCRYPT CASE SHIPS IS THE DECOMPOSED ONE, and that is
+        // the whole NFC pin rather than a detail.
+        //
+        // The runner parses `input_plaintext_canonical_utf8_hex` into a
+        // `PrefsView`, RE-ENCODES it and compares against
+        // `expected_prefs_blob_hex`. Ship the canonical (precomposed) bytes as
+        // the input and `nfc()` is the identity on them, so a port that skips
+        // the fold entirely produces the expected blob and passes. Measured, not
+        // assumed: deleting the `.nfc()` from `push_canonical_string_map` left
+        // this case green until the input became decomposed.
+        //
+        // `encrypt-labeled` has the same shape and the same gap: its description
+        // says the label "is supplied in NFD in the generator source", which is
+        // true of the generator's `#[cfg(test)]` assertion and not of anything a
+        // PORT can run. This case is the one that closes it, and the field name
+        // is not a contradiction: the field is the ENCODER'S INPUT, and the
+        // encoder is what canonicalises.
+        let decomposed_plaintext: Vec<u8> = {
+            let text = core::str::from_utf8(&canonical).expect("utf8");
+            text.replace("W\u{f6}chentlich/", "Wo\u{308}chentlich/")
+                .into_bytes()
+        };
+        assert_ne!(
+            decomposed_plaintext, canonical,
+            "the substitution must actually have happened, or this case pins nothing",
+        );
+        assert_eq!(
+            encode_prefs_blob_raw(
+                &prefs_key_a,
+                &account_hash_a,
+                &serde_json::from_slice::<PrefsView>(&decomposed_plaintext).expect("parse"),
+                &nonce,
+            )
+            .expect("encode from decomposed"),
+            blob,
+            "a decomposed input must encode to the SAME bytes as the precomposed one",
+        );
 
         let mut dump = alloc::string::String::new();
         dump.push_str("    {\n");
         dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-periodic-notes\",\n");
-        dump.push_str("      \"description\": \"myne#177 periodic-notes settings: a string map keyed <period>.<setting> holding the weekly and monthly equivalents of the three daily_* fields. Pins two things a port can get wrong independently: the field's canonical position (after paired_extensions, before reminder_horizon_days) and the lexicographic key order INSIDE the map. The source map is built in a deliberately unsorted order across two periods, so an implementation that emits insertion order produces different bytes. Daily is NOT in this map by design and keeps its three top-level fields.\",\n");
+        dump.push_str("      \"description\": \"myne#177 periodic-notes settings: a string map keyed <period>.<setting> holding the weekly equivalents of the three daily_* fields plus the two monthly ones. Pins FOUR things a port can get wrong independently. (1) The field's canonical position, and BOTH neighbours are in this blob rather than named in prose: paired_extensions (p) < periodic_notes (pe) < reminder_horizon_days (r). An earlier version of this case named those two neighbours and contained neither, so it pinned a value alone and could not have noticed a wrong slot. (2) The lexicographic key order INSIDE the map, whose source is built in a deliberately unsorted order, so an implementation emitting insertion order produces different bytes. (3) An UNRECOGNISED period: quarterly.folder is a period no build in the reference tree knows, and it must be re-encoded verbatim, which is what makes a fourth period free without a format change. (4) NFC: weekly.folder is fed in DECOMPOSED form (o + U+0308) and these bytes carry the PRECOMPOSED U+00F6, so a port that skips the fold fails on the blob. Daily is NOT in this map by design and keeps its three top-level fields.\",\n");
         dump.push_str("      \"case_kind\": \"encrypt\",\n");
         dump.push_str(&alloc::format!(
             "      \"input_root_key_hex\": \"{}\",\n",
@@ -12603,7 +12727,7 @@ mod tests {
         ));
         dump.push_str(&alloc::format!(
             "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
-            hex_lower(&canonical)
+            hex_lower(&decomposed_plaintext)
         ));
         dump.push_str(&alloc::format!(
             "      \"input_prefs_nonce_hex\": \"{}\",\n",
@@ -12620,7 +12744,7 @@ mod tests {
         dump.push_str("    },\n");
         dump.push_str("    {\n");
         dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-periodic-notes\",\n");
-        dump.push_str("      \"description\": \"Round trip with encrypt-periodic-notes: the blob decodes back to the same five entries, and a decoder that dropped or reordered a key fails here rather than silently losing a period's settings.\",\n");
+        dump.push_str("      \"description\": \"Round trip with encrypt-periodic-notes: the blob decodes back to the same six entries, and a decoder that dropped or reordered a key fails here rather than silently losing a period's settings. TWO round-trip properties beyond that. quarterly.folder is a period NO build knows, and it must come back verbatim, because the format's forward-compat rule for this map is re-encode-what-you-do-not-recognise, which is the OPPOSITE of decrypt-unknown-field-tolerated one case over: an unknown TOP-LEVEL field is dropped from the re-encode, an unknown period key inside this map is not. And weekly.folder went in DECOMPOSED (o + U+0308) and comes back PRECOMPOSED (U+00F6), so the round trip is exact in bytes and idempotent in values without being the identity on a decomposed input; a port that skips the NFC fold produces different blob bytes rather than a comparison it might not make.\",\n");
         dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
         dump.push_str(&alloc::format!(
             "      \"input_blob_hex\": \"{}\",\n",
@@ -12640,13 +12764,16 @@ mod tests {
         ));
         dump.push_str("      \"expected_prefs_view\": {\n");
         dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"paired_extensions\": [{ \"extension_id\": \"clipper@myne.md\", \"paired_at\": 1765432000, \"revoked\": false, \"token_value\": \"9c1fb7a4\" }],\n");
         dump.push_str("        \"periodic_notes\": {\n");
         dump.push_str("          \"monthly.folder\": \"Monthly/\",\n");
         dump.push_str("          \"monthly.format\": \"YYYY-MM\",\n");
-        dump.push_str("          \"weekly.folder\": \"Weekly/\",\n");
+        dump.push_str("          \"quarterly.folder\": \"Quarterly/\",\n");
+        dump.push_str("          \"weekly.folder\": \"W\u{f6}chentlich/\",\n");
         dump.push_str("          \"weekly.format\": \"gggg-[W]ww\",\n");
         dump.push_str("          \"weekly.template\": \"0190a000-0000-7000-8000-000000000009\"\n");
-        dump.push_str("        }\n");
+        dump.push_str("        },\n");
+        dump.push_str("        \"reminder_horizon_days\": 7\n");
         dump.push_str("      }\n");
         dump.push_str("    }\n");
 
