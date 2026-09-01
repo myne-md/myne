@@ -38,6 +38,7 @@ use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Runtime, State};
 
+use myne_core::plugins::agent::history::{seed_messages, HistoryTurn, DEFAULT_HISTORY_BUDGET};
 use crate::plugins::agent::adapters::{EngineAdapter, SearchAdapter};
 use crate::plugins::local_inference::state::LocalInferenceState;
 use crate::plugins::local_inference::vector_store::LocalInferenceVectorState;
@@ -48,6 +49,16 @@ pub async fn agent_start<R: Runtime>(
     app: AppHandle<R>,
     task: String,
     grant: ScopeGrant,
+    // The user's interface language, as a BCP-47 tag. Supplied by the WebView
+    // because that is where it lives: the chosen language is in `localStorage`
+    // (`src/i18n/index.ts`), not in `vault.prefs`, so the host cannot read it.
+    // Shape-checked before it reaches the system message; see
+    // `prompt::system_instructions`, which drops anything that is not a tag.
+    language: Option<String>,
+    // The visible chat turns, oldest first, as the client reports them. The
+    // BUDGET is applied here rather than by the caller: what reaches the model
+    // is host policy, and a WebView that pre-trimmed would be deciding it.
+    history: Vec<HistoryTurn>,
     on_open: Channel<AgentRunView>,
     // The run's cost as it accrues (myne-md/myne#456). A second channel rather
     // than a variant on `on_open`, because the two say different things at

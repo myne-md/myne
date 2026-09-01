@@ -31,7 +31,7 @@
 //
 // The refusal stays, for three reasons in order of weight.
 //
-// It is the only thing that makes the invariant a construction. `0541` and
+// It is the only thing that makes the invariant a construction. `0542` and
 // `docs/threat-model.md` § 7 both state "no clip a Myne client records is
 // refused by a Myne decoder" as something the code holds rather than something
 // the format guarantees. The LENGTH clamp in `capture.rs` holds one half of it;

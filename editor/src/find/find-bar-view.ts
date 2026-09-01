@@ -42,7 +42,27 @@ export interface FindBarState {
   expanded: boolean;
   /** Current replacement text (the replace input value). */
   replace: string;
+  /**
+   * The STORED form actually being searched, when the typed text found nothing
+   * and was read back as a date (myne-md/myne#609). `null` on every ordinary
+   * search, which is nearly all of them.
+   *
+   * It drives two things, and the second is not cosmetic. The bar says which
+   * text produced the matches, because a search that silently looks for
+   * something other than what was typed is a result nobody can explain. And
+   * Replace is turned OFF while it is set: the matched bytes are the stored
+   * `YYYY-MM-DD`, so a replacement typed in the reader's own format would be
+   * written over them literally, `parseTaskInstant` would refuse the result, and
+   * the task would drop out of every dated view. Replace All does that to every
+   * task in the note at once.
+   */
+  dateFallback: string | null;
 }
+
+/** The id `aria-describedby` on the two Replace buttons points at, so the
+ *  reason they are disabled is part of their accessible description rather
+ *  than a `title` a disabled control never shows. */
+const FALLBACK_ROW_ID = "cm-find-bar-date-fallback";
 
 export interface FindBarHandlers {
   onQueryChange(query: string): void;
@@ -201,6 +221,27 @@ export function createFindBarView(
     live,
   );
 
+  // Date-fallback notice (myne-md/myne#609). Built once, attached only while a
+  // fallback is live, so the ordinary bar is exactly what it was. It says which
+  // text produced the matches, because after myne#609 a chip prints the reader's
+  // format while the document holds the stored one, so typing what is on screen
+  // finds nothing until the second pass runs. A silent second pass would leave
+  // the user with a result they cannot account for.
+  const fallbackRow = document.createElement("div");
+  fallbackRow.className = "cm-find-bar-row cm-find-bar-fallback-row";
+  fallbackRow.setAttribute("data-testid", "find.date-fallback");
+  fallbackRow.id = FALLBACK_ROW_ID;
+  // `status`, so the notice is ANNOUNCED rather than merely rendered. Without
+  // it a screen-reader user hears the match count, arrives at a Replace button
+  // that is disabled, and is never told the search ran against a different
+  // string. Being told is the entire job of this row, so for that user the row
+  // was doing nothing at all. `polite` because it lands mid-typing and must not
+  // interrupt what the reader is composing.
+  fallbackRow.setAttribute("role", "status");
+  fallbackRow.setAttribute("aria-live", "polite");
+  // Attached once and hidden, never inserted on demand. See the update below.
+  fallbackRow.hidden = true;
+
   // Replace row (MYND-302). Built once and attached/detached from `dom` on the
   // expand toggle — the leading replace glyph lines up under the toggle column,
   // the replace input mirrors the find input, and the two action buttons sit on
@@ -241,6 +282,12 @@ export function createFindBarView(
   replaceRow.append(replaceLead, replaceInput, replaceOneBtn, replaceAllBtn);
 
   dom.append(findRow);
+  // Attached here, once. The notice is a live region, so it must be present
+  // before the text that must be announced arrives; the update below only
+  // rewrites its text and toggles `hidden`. It sits between the find row and
+  // the replace row, so the explanation for the disabled Replace buttons is
+  // directly above them.
+  dom.append(fallbackRow);
 
   function render(state: FindBarState): void {
     if (input.value !== state.query) input.value = state.query;
@@ -275,6 +322,26 @@ export function createFindBarView(
     prevBtn.disabled = !hasMatches;
     nextBtn.disabled = !hasMatches;
 
+    // The date-fallback notice, and the row order it implies: the notice sits
+    // between the find row and the replace row, so the explanation for the
+    // disabled buttons is directly above them.
+    //
+    // The row is ATTACHED for the panel's lifetime and toggled with `hidden`,
+    // rather than inserted and removed. A live region that enters the document
+    // already carrying its text is not reliably announced: the announcement
+    // comes from a mutation INSIDE a region that was already present, which is
+    // why the match count one screen up is a persistent node whose text is
+    // rewritten. Built the other way first, so the row that exists to tell a
+    // screen-reader user why Replace is off told them nothing at all.
+    const onFallback = state.dateFallback !== null;
+    const fallbackText = onFallback
+      ? i18n.t("editor.find.dateFallback", { stored: state.dateFallback })
+      : "";
+    // Same guard as the status line: re-assigning identical text re-fires the
+    // announcement on every cursor move.
+    if (fallbackRow.textContent !== fallbackText) fallbackRow.textContent = fallbackText;
+    fallbackRow.hidden = !onFallback;
+
     // Replace row (MYND-302). Attach/detach on the expand toggle so the DOM
     // reflects the state exactly (no hidden-but-present row), and reflect the
     // disclosure on the toggle itself.
@@ -290,9 +357,24 @@ export function createFindBarView(
         ? i18n.t("editor.find.replaceAllCount", { total: state.match!.total })
         : i18n.t("editor.find.replaceAll");
 
-      // Replace acts on the current/all matches — only meaningful with live hits.
-      replaceOneBtn.disabled = !hasMatches;
-      replaceAllBtn.disabled = !hasMatches;
+      // Replace acts on the current/all matches, so it is only meaningful with live
+      // hits, and OFF entirely while the matches came from the date fallback.
+      // The matched bytes are then the stored `YYYY-MM-DD`, so a replacement
+      // written in the reader's own format lands on them literally and the field
+      // stops parsing. It costs the user nothing: opening this panel reveals the
+      // chips as raw text, so the correct string to type is already on screen.
+      const canReplace = hasMatches && !onFallback;
+      replaceOneBtn.disabled = !canReplace;
+      replaceAllBtn.disabled = !canReplace;
+      // The REASON is carried by the visible notice above and by
+      // `aria-describedby`, not by a `title`. A browser dispatches no hover
+      // events to a disabled control, so a `title` there never appears; it was
+      // written that way first, and the E2E scenario then asserted the fix by
+      // reading an attribute no user can reach.
+      for (const btn of [replaceOneBtn, replaceAllBtn]) {
+        if (onFallback) btn.setAttribute("aria-describedby", FALLBACK_ROW_ID);
+        else btn.removeAttribute("aria-describedby");
+      }
     } else if (replaceRow.parentNode !== null) {
       replaceRow.remove();
     }

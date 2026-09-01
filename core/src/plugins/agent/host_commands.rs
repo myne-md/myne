@@ -137,6 +137,32 @@ pub fn probe_threshold() -> ProbeThreshold {
 #[derive(Default)]
 struct Session {
     task: String,
+    /// The user's interface language, as the WebView reported it at start.
+    ///
+    /// Held on the session rather than passed per step, because a run resumed
+    /// after a scope approval goes through the same `step` and would otherwise
+    /// lose the instruction halfway through: the model would answer the first
+    /// half of a run in the user's language and the second half in English.
+    /// `prompt::system_instructions` shape-checks it; nothing here trusts it.
+    language: Option<String>,
+    /// The visible chat history this run was seeded with, already budgeted.
+    ///
+    /// Held rather than re-derived per step for the reason `language` is: a run
+    /// resumed after a scope approval goes through the same `step`, and losing
+    /// the seed halfway through would leave the model answering the second half
+    /// of a conversation it can no longer see the first half of.
+    history: Vec<Message>,
+    /// Which notes this run has already read, across every leg.
+    ///
+    /// Held here rather than re-created per `step` for the reason the transcript
+    /// is held: a run resumed after a scope approval re-enters the loop, and the
+    /// transcript comes back with leg one's note bodies still in it. A fresh set
+    /// would tell leg two it had read nothing, so the repeat-read pointer
+    /// (myne-md/myne#619) would let a re-read through and push a second copy of
+    /// a body already sitting above it, which then rides every remaining
+    /// iteration up to the 24-iteration ceiling. A multi-leg run has the longest
+    /// transcript there is, which is exactly where that costs most.
+    read_ids: std::collections::BTreeSet<String>,
     transcript: Vec<Message>,
     proposal: Proposal,
     /// Whether a `step` is inside its model call for this run.
@@ -618,7 +644,7 @@ pub async fn step<R: Runtime>(
     // Claimed under the SAME lock the take happens under, so there is no window
     // between deciding to proceed and emptying the session. Released in the
     // write-back below, on every exit from this function.
-    let (task, mut transcript, mut proposal) = {
+    let (task, language, history, mut read_ids, mut transcript, mut proposal) = {
         let mut table = sessions
             .sessions
             .lock()
@@ -630,6 +656,9 @@ pub async fn step<R: Runtime>(
         s.in_flight = true;
         (
             s.task.clone(),
+            s.language.clone(),
+            s.history.clone(),
+            std::mem::take(&mut s.read_ids),
             std::mem::take(&mut s.transcript),
             std::mem::take(&mut s.proposal),
         )
@@ -673,6 +702,8 @@ pub async fn step<R: Runtime>(
         searcher,
         records: &records,
         exclusions: &exclusions,
+        language: language.as_deref(),
+        history: &history,
         on_progress: &report,
     };
 
@@ -687,7 +718,7 @@ pub async fn step<R: Runtime>(
     // disagreed and the reachable one was the lossy one. Any transient engine
     // error had the same effect on a paused-for-scope run, whose resume depends
     // on the transcript that vanished.
-    let driven = drive(&runs, &run_id, &task, &mut transcript, &deps).await;
+    let driven = drive(&runs, &run_id, &task, &mut transcript, &deps, &mut read_ids).await;
     let outcome: LoopOutcome = match driven {
         Ok(o) => o,
         Err(e) => {

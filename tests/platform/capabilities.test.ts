@@ -72,6 +72,17 @@ describe("capability descriptor", () => {
       "vaultMigration",
       "backup",
       "nativeSaveAs",
+      // `decisions/clients/0551`, myne-md/myne#464. Absent on two independent
+      // grounds, and either alone would be enough. A browser origin holds ONE
+      // container under a constant vault id, so there is no second vault to
+      // import FROM and the source list would be permanently empty. And the
+      // setup step accepts a 24-word recovery phrase, which is the ROUTINE
+      // phrase prompt `phraseEnrolment` two entries down exists to keep out of
+      // this client: `decisions.md` 2026-08-15 bounds web to asking for the
+      // phrase in exactly one situation, a recovery the user started
+      // themselves. The module is substituted as well as gated, for the reason
+      // `check-web-no-phrase.mjs` was written.
+      "vaultImport",
       // `decisions.md` 2026-08-15, and the reason it is a SECOND capability
       // rather than a branch of `phraseRecovery`: one flag used to gate two
       // unrelated things, the recovery screen and the enrolment form's

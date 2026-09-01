@@ -39,11 +39,11 @@ use zeroize::Zeroizing;
 /// `vault_meta_bytes_hash` (`SHA-256(read bytes)`) which becomes the
 /// `Slot::Unlocked` CAS anchor for `vault_change_password`'s in-place
 /// rewrite per `decisions.md` 2026-05-06 entry.
-struct DerivedKeys {
-    root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
-    items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
-    items_key_id: [u8; 16],
-    vault_meta_bytes_hash: [u8; 32],
+pub(crate) struct DerivedKeys {
+    pub(crate) root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    pub(crate) items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    pub(crate) items_key_id: [u8; 16],
+    pub(crate) vault_meta_bytes_hash: [u8; 32],
 }
 
 /// Resolve `<app_data_dir>/vault/vault.meta` for the running app.
@@ -181,6 +181,29 @@ pub async fn unlock_from_host(
     // a same-id re-unlock from `Empty` carries no stale global index). Reuses
     // the EXACT existing teardown calls from the lock path — not a second wipe
     // path.
+    // The import sources go FIRST, and OUTSIDE the switch branch below.
+    //
+    // Ordering, first: `reseal_attachment` resolves its destination from the
+    // ACTIVE vault, so a slot that survived into the new session would re-seal
+    // the old source's attachment plaintext into a vault the user never named
+    // as an import target (myne-md/myne#464).
+    //
+    // Placement, and this is the correction. It used to sit inside
+    // `is_vault_switch(active_before, target_id)`, which is FALSE when
+    // `active_before` is `None`: nothing was unlocked, so nothing is being
+    // switched away from. But `open()` does not require an unlocked target, so
+    // an import slot can exist while no vault is open, and on that path the
+    // branch never ran. The slot then survived into the first unlock, which is
+    // precisely the state the ordering comment above says must not happen, with
+    // only the 30-minute TTL bounding it. `threat-model.md` A6 as amended by
+    // this feature bounds the second vault's residency as "no longer than the
+    // target vault's own session"; a slot that PREDATES the session is not
+    // bounded by that sentence at all.
+    //
+    // Unconditional is also simply cheaper to reason about: on every other path
+    // there is no import source and this is one read-lock probe that finds an
+    // empty map.
+    super::import_source::close_all(state).await;
     if is_vault_switch(active_before, target_id) {
         hooks.zeroize_search_index();
         // MYND-262/266: drop the prior vault's spell engine + personal/ignore
@@ -650,6 +673,14 @@ pub async fn unlock_with_path(
             );
             return Err(VaultUnlockError::VaultRecoveryInProgress);
         }
+        SlotKind::ImportSource => {
+            tracing::error!(
+                stage = "slot_check",
+                error_kind = "VaultOpenAsImportSource",
+                "unlock attempt rejected: slot is an open vault-import source"
+            );
+            return Err(VaultUnlockError::VaultOpenAsImportSource);
+        }
     }
 
     // (2) Acquire the auth permit (Semaphore capacity 1). Reject,
@@ -1078,6 +1109,16 @@ pub async fn lock_from_host(
 
     lock_with_state(state).await?;
 
+    // A vault-import SOURCE slot has no reason to outlive the session that
+    // opened it (myne-md/myne#464). Dropped on the same path as the target
+    // vault's own keys, and immediately after them, because the guarantee A6
+    // rests on is "locking the vault takes the keys out of RAM" and a second
+    // vault's keys left resident past a lock is that guarantee being false for
+    // a vault the user never saw a lock button for. The TTL sweep in
+    // `auto_lock.rs` is the OTHER reclaimer, for the case where the target is
+    // never locked at all; neither substitutes for the other.
+    super::import_source::close_all(state).await;
+
     // ---- MYND-29 Task 8: wipe the plaintext-derived search index --------
     //
     // On the SAME lock path as the slot drop, immediately after the keys
@@ -1293,6 +1334,7 @@ pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), Vau
         Slot::Empty => "empty",
         Slot::Recovering { .. } => "recovering",
         Slot::Unlocked(_) => "unlocked",
+        Slot::ImportSource { .. } => "import_source",
     };
     tracing::info!(
         event = "vault_locked",
@@ -1925,7 +1967,7 @@ pub fn report_user_activity<R: Runtime>(state: State<'_, VaultRuntimeState>, app
 /// an assumption into a value the caller holds, which is what makes promoting
 /// the staged copy safe: it is promoted because it opened, not because a server
 /// offered it.
-async fn derive_keys_from_meta_candidate(
+pub(crate) async fn derive_keys_from_meta_candidate(
     host: &dyn HostCtx,
     meta_preview: &protocol::VaultMeta,
     bytes: Vec<u8>,
@@ -2768,6 +2810,7 @@ mod tests {
                     item_order: Default::default(),
                     keymap: Default::default(),
                     active_workspace: None,
+                    chat_history_budget: None,
                     archive_disabled: None,
                     archived_folders: Vec::new(),
                     editor_layout: None,
@@ -2941,6 +2984,7 @@ mod tests {
                 item_order: Default::default(),
                 keymap: Default::default(),
                 active_workspace: None,
+                chat_history_budget: None,
                 archive_disabled: None,
                 archived_folders: Vec::new(),
                 editor_layout: None,

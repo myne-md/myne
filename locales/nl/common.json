@@ -120,7 +120,10 @@
         "excludedFolder": "Niet aangemaakt: die map is uitgesloten van AI.",
         "createFailed": "Niet aangemaakt: de nieuwe notitie schrijven is mislukt. De andere wijzigingen zijn wel toegepast.",
         "excludedNow": "Kon niet worden toegepast: de map van die notitie is nu uitgesloten van AI.",
-        "notProposed": "Kon niet worden toegepast: die wijziging hoort niet bij het voorstel van deze uitvoering."
+        "notProposed": "Kon niet worden toegepast: die wijziging hoort niet bij het voorstel van deze uitvoering.",
+        "noteMoved": "Kon niet worden toegepast: die wijziging zou de notitie naar een andere map verplaatsen.",
+        "appendEmpty": "Kon niet worden toegepast: er was niets toe te voegen.",
+        "appendWouldWriteFrontmatter": "Kon niet worden toegepast: die tekst zou het eigenschappenblok van de notitie zijn geworden."
       },
       "applyFailed": "De wijzigingen konden niet worden toegepast.",
       "undo": "Deze uitvoering ongedaan maken",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} notities gelezen",
       "runSummaryOffDevice_one": "ongeveer {{count}} teken van je notities is naar de provider verzonden",
       "runSummaryOffDevice_other": "ongeveer {{count}} tekens van je notities zijn naar de provider verzonden",
-      "runSummaryOnDevice": "niets heeft dit apparaat verlaten"
+      "runSummaryOnDevice": "niets heeft dit apparaat verlaten",
+      "appendFlag": "wordt aan het einde toegevoegd"
     },
     "undo": {
       "offer_one": "De laatste uitvoering heeft {{count}} notitie gewijzigd.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "Alles vervangen ({{total}})",
       "replaceOne": "Vervangen",
       "replacePlaceholder": "Vervangen door",
-      "toggleReplace": "Vervangen aan/uit"
+      "toggleReplace": "Vervangen aan/uit",
+      "dateFallback": "Er wordt gezocht naar {{stored}}, de vorm waarin deze datum is opgeslagen.",
+      "replaceOffOnDateFallback": "Vervangen staat uit zolang een datum via de opgeslagen vorm wordt gevonden, zodat een vervanging de datum niet onleesbaar kan maken."
     },
     "cover": {
       "add": "Omslag toevoegen",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "Sleutel vervangen",
       "mobileRevokeHelper": "Verwijdert de aanbieder, de sleutel en de goedkeuring van deze telefoon in één keer, en laat precies de toestand achter alsof het nooit is ingesteld. Andere apparaten blijven werken totdat je het daar ook verwijdert.",
       "mobileApproveLabel": "Verzenden op deze telefoon goedkeuren",
-      "mobileApproveHelper": "De aanbieder en de sleutel komen van een ander apparaat. Vanaf deze telefoon wordt niets verzonden totdat je leest wat er verzonden wordt en het hier goedkeurt."
+      "mobileApproveHelper": "De aanbieder en de sleutel komen van een ander apparaat. Vanaf deze telefoon wordt niets verzonden totdat je leest wat er verzonden wordt en het hier goedkeurt.",
+      "historyBudgetHelper": "Hoeveel van het recente gesprek elk verzoek meeneemt, in tekens. Laat leeg voor de standaardwaarde. Een groter getal laat de AI langere gesprekken volgen en stuurt er meer van mee: bij een aanbieder die niet op dit apparaat draait, verlaat daarmee bij elke stap van een run meer van je tekst het apparaat.",
+      "historyBudgetLabel": "Gesprek dat bij elk verzoek wordt meegestuurd"
     },
     "network": {
       "disabledCue": "Synchronisatie loopt niet meer via Tor. Nieuwe verbindingen gaan rechtstreeks naar de synchronisatieserver.",
@@ -3356,12 +3364,13 @@
         "viewMode": "standaardweergavemodus weergave modus live lezen bron voorbeeld view mode source reading preview",
         "dateFormat": "datumnotatie datumindeling datum notatie dag maand jaar iso dd/mm mm/dd kalender date format",
         "timeFormat": "tijdnotatie tijd notatie 24-uurs 12-uurs klok am pm time format 24 hour 12 hour",
-        "timezone": "tijdzone zone tz utc iana regio vandaag timezone time zone"
+        "timezone": "tijdzone zone tz utc iana regio vandaag timezone time zone",
+        "aiHistoryBudget": "gesprek geschiedenis context geheugen budget tekens agent chat verzoek"
       }
     },
     "dateTime": {
       "dateLabel": "Datumnotatie",
-      "dateHelper": "Hoe datums worden getoond bij taken, opgeslagen weergaven en bijlagen.",
+      "dateHelper": "Hoe een datum wordt geschreven, overal waar Myne er een toont.",
       "dateSystem": "Volg de taal",
       "timeLabel": "Tijdnotatie",
       "timeHelper": "Of tijden worden getoond op een 24-uurs- of een 12-uursklok.",

@@ -120,7 +120,10 @@
         "excludedFolder": "생성되지 않았습니다: 해당 폴더는 AI에서 제외되어 있습니다.",
         "createFailed": "생성되지 않았습니다: 새 노트를 기록하지 못했습니다. 다른 변경 사항은 적용되었습니다.",
         "excludedNow": "적용할 수 없습니다: 해당 노트의 폴더가 이제 AI에서 제외되었습니다.",
-        "notProposed": "적용할 수 없습니다: 해당 변경은 이번 실행의 변경 제안에 포함되어 있지 않습니다."
+        "notProposed": "적용할 수 없습니다: 해당 변경은 이번 실행의 변경 제안에 포함되어 있지 않습니다.",
+        "noteMoved": "적용할 수 없습니다: 해당 변경은 노트를 다른 폴더로 옮기게 됩니다.",
+        "appendEmpty": "적용할 수 없습니다: 추가할 내용이 없었습니다.",
+        "appendWouldWriteFrontmatter": "적용할 수 없습니다: 해당 텍스트가 노트의 속성 블록이 되었을 것입니다."
       },
       "applyFailed": "변경 사항을 적용하지 못했습니다.",
       "undo": "이번 실행 되돌리기",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "노트 {{count}}개 읽음",
       "runSummaryOffDevice_one": "노트의 약 {{count}}자가 제공업체로 전송되었습니다",
       "runSummaryOffDevice_other": "노트의 약 {{count}}자가 제공업체로 전송되었습니다",
-      "runSummaryOnDevice": "아무것도 이 기기를 떠나지 않았습니다"
+      "runSummaryOnDevice": "아무것도 이 기기를 떠나지 않았습니다",
+      "appendFlag": "끝에 추가"
     },
     "undo": {
       "offer_one": "마지막 실행이 노트 {{count}}개를 변경했습니다.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "모두 바꾸기 ({{total}})",
       "replaceOne": "바꾸기",
       "replacePlaceholder": "바꿀 내용",
-      "toggleReplace": "바꾸기 전환"
+      "toggleReplace": "바꾸기 전환",
+      "dateFallback": "{{stored}}을(를) 검색하고 있습니다. 이 날짜가 저장되는 형식입니다.",
+      "replaceOffOnDateFallback": "날짜가 저장 형식으로 일치하는 동안에는 바꾸기가 꺼집니다. 바꾸기로 인해 날짜를 읽을 수 없게 되는 것을 막기 위해서입니다."
     },
     "cover": {
       "add": "표지 추가",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "키 교체",
       "mobileRevokeHelper": "제공자, 그 키, 이 휴대폰의 승인을 함께 제거하여 설정한 적 없는 상태로 되돌립니다. 다른 기기는 거기서도 제거할 때까지 계속 작동합니다.",
       "mobileApproveLabel": "이 휴대폰에서 전송 승인",
-      "mobileApproveHelper": "제공자와 그 키는 다른 기기에서 왔습니다. 무엇이 전송되는지 읽고 여기서 승인하기 전까지 이 휴대폰에서는 아무것도 전송되지 않습니다."
+      "mobileApproveHelper": "제공자와 그 키는 다른 기기에서 왔습니다. 무엇이 전송되는지 읽고 여기서 승인하기 전까지 이 휴대폰에서는 아무것도 전송되지 않습니다.",
+      "historyBudgetHelper": "각 요청이 최근 대화를 얼마나 포함할지, 문자 수로 지정합니다. 비워 두면 기본값이 적용됩니다. 값이 클수록 AI가 더 긴 대화를 따라갈 수 있지만 그만큼 더 많이 전송됩니다. 이 기기에 없는 제공자를 쓰는 경우, 실행의 매 단계마다 더 많은 텍스트가 기기 밖으로 나갑니다.",
+      "historyBudgetLabel": "요청마다 함께 보내는 대화"
     },
     "network": {
       "disabledCue": "동기화가 더 이상 Tor를 거치지 않습니다. 새 연결은 동기화 서버로 곧바로 연결됩니다.",
@@ -3356,12 +3364,13 @@
         "viewMode": "기본 보기 모드 실시간 읽기 소스 미리보기 view mode",
         "dateFormat": "날짜 형식 일 월 년 달력 iso dd/mm mm/dd date format calendar",
         "timeFormat": "시간 형식 24시간 12시간 시계 오전 오후 time format clock am pm",
-        "timezone": "시간대 표준시 지역 오늘 timezone time zone tz utc iana region"
+        "timezone": "시간대 표준시 지역 오늘 timezone time zone tz utc iana region",
+        "aiHistoryBudget": "대화 기록 문맥 기억 예산 문자 에이전트 채팅 요청"
       }
     },
     "dateTime": {
       "dateLabel": "날짜 형식",
-      "dateHelper": "할 일, 저장된 뷰, 첨부 파일 전반에서 날짜를 표시하는 방식입니다.",
+      "dateHelper": "Myne가 날짜를 보여 주는 모든 곳에서 날짜를 어떻게 쓸지.",
       "dateSystem": "언어에 맞춤",
       "timeLabel": "시간 형식",
       "timeHelper": "시간을 24시간제로 표시할지 12시간제로 표시할지 정합니다.",

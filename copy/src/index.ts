@@ -284,9 +284,18 @@ export const CONSENT_HOW_TO_REVOKE =
  *  plaintext provider key and note-derived text in app memory.
  *
  *  Bounded by `threat-model.md` A7. A later slice may say LESS than this,
- *  never more. */
+ *  never more.
+ *
+ *  **The em dash stays.** `reference/writing-rules.md` governs the prose this
+ *  repository AUTHORS, and this is a SHIPPED string whose exact bytes
+ *  `tests/lib/aiTrustCopy.test.ts` pins: the test's own comment says no
+ *  provider setting changes this residual, so the sentence must not drift.
+ *  Recomposing it during the move to this package would have been a copy
+ *  change wearing a punctuation fix, which is the thing that test exists to
+ *  catch, and it did. */
 export const AI_TRUST_A7_RESIDUAL =
-  "Like the rest of Myne, this does not protect against malware already running on your device: such software can read app memory.";
+  // eslint-disable-next-line no-irregular-whitespace
+  "Like the rest of Myne, this does not protect against malware already running on your device \u2014 such software can read app memory.";
 
 export const CONSENT_DEVICE_SUFFIX = "@device";
 

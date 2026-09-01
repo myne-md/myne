@@ -132,7 +132,10 @@
         "excludedFolder": "No se creó: esa carpeta está excluida de la IA.",
         "createFailed": "No se creó: falló la escritura de la nota nueva. Los demás cambios sí se aplicaron.",
         "excludedNow": "No se pudo aplicar: la carpeta de esa nota ahora está excluida de la IA.",
-        "notProposed": "No se pudo aplicar: ese cambio no forma parte de la propuesta de esta ejecución."
+        "notProposed": "No se pudo aplicar: ese cambio no forma parte de la propuesta de esta ejecución.",
+        "noteMoved": "No se pudo aplicar: ese cambio movería la nota a otra carpeta.",
+        "appendEmpty": "No se pudo aplicar: no había nada que añadir.",
+        "appendWouldWriteFrontmatter": "No se pudo aplicar: ese texto se habría convertido en el bloque de propiedades de la nota."
       },
       "applyFailed": "No se pudieron aplicar los cambios.",
       "undo": "Deshacer esta ejecución",
@@ -156,7 +159,8 @@
       "runSummaryOffDevice_one": "se envió al proveedor aproximadamente {{count}} carácter de tus notas",
       "runSummaryOffDevice_many": "se enviaron al proveedor aproximadamente {{count}} caracteres de tus notas",
       "runSummaryOffDevice_other": "se enviaron al proveedor aproximadamente {{count}} caracteres de tus notas",
-      "runSummaryOnDevice": "nada salió de este dispositivo"
+      "runSummaryOnDevice": "nada salió de este dispositivo",
+      "appendFlag": "se añade al final"
     },
     "undo": {
       "offer_one": "La última ejecución cambió {{count}} nota.",
@@ -1251,7 +1255,9 @@
       "replaceAllCount": "Reemplazar todo ({{total}})",
       "replaceOne": "Reemplazar",
       "replacePlaceholder": "Reemplazar por",
-      "toggleReplace": "Alternar reemplazo"
+      "toggleReplace": "Alternar reemplazo",
+      "dateFallback": "Buscando {{stored}}, la forma en la que se guarda esta fecha.",
+      "replaceOffOnDateFallback": "Reemplazar está desactivado mientras una fecha coincide por su forma guardada, para que un reemplazo no pueda dejarla ilegible."
     },
     "cover": {
       "add": "Añadir portada",
@@ -3146,7 +3152,9 @@
       "mobileKeyReplace": "Reemplazar clave",
       "mobileRevokeHelper": "Elimina el proveedor, su clave y la aprobación de este teléfono a la vez, dejando exactamente el estado de no haberlo configurado nunca. Otros dispositivos siguen funcionando hasta que también lo elimines allí.",
       "mobileApproveLabel": "Aprobar el envío en este teléfono",
-      "mobileApproveHelper": "El proveedor y su clave vinieron de otro dispositivo. No se envía nada desde este teléfono hasta que leas qué se enviará y lo apruebes aquí."
+      "mobileApproveHelper": "El proveedor y su clave vinieron de otro dispositivo. No se envía nada desde este teléfono hasta que leas qué se enviará y lo apruebes aquí.",
+      "historyBudgetHelper": "Cuánto de la conversación reciente lleva cada solicitud, en caracteres. Déjalo vacío para el valor predeterminado. Un número mayor permite que la IA siga conversaciones más largas y envía más de ellas: con un proveedor que no está en este dispositivo, eso es más texto tuyo saliendo de él, en cada paso de una ejecución.",
+      "historyBudgetLabel": "Conversación enviada en cada solicitud"
     },
     "network": {
       "disabledCue": "La sincronización ya no se enruta a través de Tor. Las conexiones nuevas van directamente al servidor de sincronización.",
@@ -3466,12 +3474,13 @@
         "viewMode": "modo de vista predeterminado en vivo lectura fuente vista previa",
         "dateFormat": "formato de fecha día mes año iso dd/mm mm/dd calendario",
         "timeFormat": "formato de hora 24 horas 12 horas reloj am pm",
-        "timezone": "zona horaria huso horario timezone tz utc iana región hoy"
+        "timezone": "zona horaria huso horario timezone tz utc iana región hoy",
+        "aiHistoryBudget": "conversación historial contexto memoria presupuesto caracteres agente chat solicitud"
       }
     },
     "dateTime": {
       "dateLabel": "Formato de fecha",
-      "dateHelper": "Cómo se muestran las fechas en las tareas, las vistas guardadas y los adjuntos.",
+      "dateHelper": "Cómo se escribe una fecha allí donde Myne muestre alguna.",
       "dateSystem": "Según el idioma",
       "timeLabel": "Formato de hora",
       "timeHelper": "Si las horas se muestran en formato de 24 o de 12 horas.",

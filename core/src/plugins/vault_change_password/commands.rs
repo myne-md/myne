@@ -91,6 +91,16 @@ pub async fn change_password_from_host(
         Err(VaultChangePasswordError::InvalidVaultMeta)
             | Err(VaultChangePasswordError::VaultMetaChangedExternally)
     ) {
+        // myne-md/myne#464: drop every `Slot::ImportSource` on the same path.
+        // A source vault's `root_key` and `items_key` are a SECOND vault's key
+        // material held in RAM, so they belong on every list that answers
+        // "what must not outlive this vault leaving". `threat-model.md` A6's
+        // amendment for this feature bounds the window as "the length of the
+        // import, and no longer than the target vault's own session", and a
+        // teardown site that skips this call is precisely where that sentence
+        // stops being true. `close_all` rather than a keyed drop: whichever
+        // vault just went away, an import across it cannot continue.
+        crate::plugins::vault_unlock::import_source::close_all(state).await;
         hooks.zeroize_search_index();
         // MYND-262/266: wipe the spell engine + personal/ignore sets (each add
         // already persisted, so nothing to flush — only RAM to zeroize).

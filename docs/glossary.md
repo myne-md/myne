@@ -110,7 +110,7 @@ Used in: `decisions.md` 2026-08-16
 
 ### **agentic note editing** &nbsp; 📦 *Product*
 
-The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Two verbs, edit a note body and create a note; deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, move, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` or `folder:` line is a rename or a move by the same mechanism trashing is. What bounds those is that each appears in the diff the user approves. Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
+The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Three verbs, edit a note body, append to a note body and create a note (the [append verb](#append-verb) was added by myne-md/myne#616); deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. **Moving a note is the exception, and it is refused rather than merely visible**: the [folder lock](#folder-lock) compares the note's folder before and after every agent write and rejects any that changes it, under both approval labels, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0554`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -127,6 +127,14 @@ Used in: `decisions.md` 2026-08-19
 Kept rather than deleted because the retired names outlived the controls in three places at once: `ai.composer-mode-edit` was driven by every scenario in `e2e/agent-run.e2e.ts` for months after it stopped rendering, which killed that whole suite invisibly, and two comments in `ChatComposer.tsx` still described Edit-mode-only blocks (`decisions.md` 2026-08-28 entry 0538, myne-md/myne#596).
 
 Used in: `decisions.md` 2026-08-19, 2026-08-22 entry 0524, 2026-08-28 entry 0538
+
+### **append verb** &nbsp; 📦 *Product*
+
+The third verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#616): it adds text at the end of a note's body rather than replacing an [edit anchor](#edit-anchor). It exists because there was no way to write into an EMPTY note. An empty anchor is refused, so "add this list to the open note" failed for a structural reason no message explained, and the model answered by asking the user for the list it had just written. Appending to a long note was possible but expensive, since the model had to reproduce the whole tail verbatim as an anchor.
+
+Two rules keep it from becoming a frontmatter writer, and both are about the RESULT rather than the input. The text is positioned after the note's frontmatter block rather than at the end of the raw file, so in a note that has one, appended text can never be the first line. And an append that would give the note a frontmatter block it did not have is refused outright, which closes the case positioning alone does not: a note whose body merely BEGINS with `---` has an opener nothing closed, and an ordinary `---` separator in the appended text would close it and turn the user's own first lines into frontmatter.
+
+Used in: `decisions/ai/0554`
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -913,6 +921,14 @@ A *virtual* organizational container for notes, shown as a nested tree in the si
 
 Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2, `spec/protocol.md` §9.1, §9.5.2; `decisions.md` 2026-05-29
 
+### **folder lock** &nbsp; 📦 *Product*
+
+The host-side rule that no [agent run](#agent-run) write may change which [folder](#folder) a note is in (myne-md/myne#616). It compares the note's `folder:` frontmatter value before and after the write is composed and refuses any write that changes it, under BOTH approval labels, and it is re-derived host-side rather than read from the IPC payload.
+
+The reason it is a refusal rather than a line in the diff: the folder is what `ai_excluded_folders` is keyed on, so a move is the one edit that can change which notes a LATER run may read. A user approving a diff is judging the text in front of them, not re-deriving an exclusion set from it. It covers `folder:` and nothing else, deliberately, because a blanket frontmatter lock would silently withdraw the agent's ability to archive.
+
+Used in: `decisions/ai/0554`, `threat-model.md` §7
+
 ### **folder note** &nbsp; 📦 *Product*
 
 A note designated the **index note** of its [folder](#folder) via the value-strict `folder_index: true` frontmatter flag — the sixth [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field) (`spec/markdown-dialect.md` §3.6.1). The note indexes whichever folder its own `folder:` names; the binding is the boolean alone and carries **no path**, so a folder rename rewrites `folder:` and the binding follows for free (rename drift is structurally impossible). A folder has **exactly one** folder note. It is **hidden from the sidebar folder tree** — no separate row, no pin, no badge — and is opened (or lazily created on first activation) by **double-clicking the folder**; the undesignate inverse lives on the folder's context menu ("Remove folder note"). The hiding is **sidebar-tree-only**: unlike a [note template](#note-template) or a trashed note (hidden everywhere), a folder note stays a fully real, enumerable note in **search, saved views, backlinks, the graph**, and [`[[<folder>/]]`](#folder-target-wikilink) resolution — it is content the user reads, not a hidden skeleton (decisions.md 2026-06-27, supersedes the original "fully visible, pinned, badged" behaviour). Value-strict exactly like `template:`: only the canonical unquoted `true` designates it; `1` / `yes` / `"true"` / absence leave the note ordinary. Owned by the folder-note designate / undesignate actions (`src/notes/folderNote.ts`) only — never written by body autosave; surgery via `patchFolderIndexField`, read via `readFolderIndexFromFmBody`. If two in-folder notes both carry the flag (legacy / imported data only — the UI now prevents a second designation), a deterministic winner is chosen (smallest `note_uuid`) and the rest stay visible, flagged for the user to resolve. Rides the existing `.myn` AEAD envelope — no new magic byte, no AAD / version bump, no on-disk-layout change (within v0.1; forward-incompatible-by-design with a later major version). See also [folder](#folder), [folder-target wikilink](#folder-target-wikilink), [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field). (MYND-370)
@@ -1074,7 +1090,9 @@ Two limits are honest, measured properties rather than bugs. **Turkish diacritic
 
 The editor's Cmd/Ctrl+F find bar (MYND-175): a **literal, single-document** search over the one open note's decrypted CodeMirror doc text — exact substring, case-fold toggle, no regex — with all-match highlighting, next/prev navigation (Enter / Shift+Enter, wrapping), and a live "k/N" count. Built on the `@codemirror/search` engine with a Myne-token *docked* panel (not the stock widget); the WebView's native Cmd/Ctrl+F is suppressed app-wide. **Deliberately distinct from the [search index](#search-index)**: that is the stemmed, BM25-ranked, Rust-side *cross-note* surface ("which notes relate to this term"); in-note find is the unranked literal *locate* tool ("exactly where in the note I'm reading"). The count is a read-only projection over the engine's match set (never a filter); matches inside folded tables/code are counted and un-fold on navigation, while a frontmatter match is counted but not raw-revealed (always-on Properties widget). The query + match cache are **WebView-only, never persisted**, released on the lock-time reload — best-effort (V8 strings can't be zeroized; AS1-dominated), **not** "zeroize-on-lock" (which is the Rust-side index). See also [search index](#search-index) (`decisions.md` 2026-05-31).
 
-Used in: `decisions.md` 2026-05-31
+**Two literal passes since myne-md/myne#609, not one.** A task chip prints its `due` and `remind` dates in the reader's chosen date format while the document holds `YYYY-MM-DD`, and CodeMirror's search reads the document rather than the DOM, so a reader typing what is on screen found nothing. When the typed query matches nothing AND reads back as a date under that reader's own format, the bar runs a SECOND literal search for the stored form and says in the bar which text produced the matches. Literal FIRST, so a date written as ordinary prose still matches as itself; the second pass gets a turn only when the first found nothing. Still **no regex**, and that is the load-bearing half rather than a detail: an alternation would need `literal: false`, which routes REPLACE through regular-expression substitution and its dollar-sequence expansion. **Replace is disabled while the fallback produced the matches**, because the matched bytes are the stored form and a replacement typed in the reader's format would leave a value `parseTaskInstant` refuses, dropping the task out of every dated view. The gate is a predicate at the decision point, consulted by the buttons AND by the replace field's Enter handler; a version that disabled only the buttons left the keyboard path open (`decisions.md` 2026-08-29).
+
+Used in: `decisions.md` 2026-05-31, `decisions.md` 2026-08-29
 
 ### **in-transit encryption** &nbsp; 🏗️ *Construction*
 
@@ -1392,11 +1410,21 @@ Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **conversational AI chat** &nbsp; 📦 *Product*
 
-The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history; a run's task was addressed to a different loop, under a scope this call knows nothing about. History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
+The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history to the ASK model; a run's task was addressed to a different loop, under a scope this call knows nothing about. The reverse direction is not symmetric and changed on 2026-08-30: an [agent run](#agent-run) IS seeded with the visible transcript, under a [chat history budget](#chat-history-budget), so a follow-up can refer to the answer before it (`decisions/ai/0553`). History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
 
 ### **streaming token channel** &nbsp; 📋 *Protocol*
 
 The IPC mechanism that streams a [local-inference](#local-inference) generation's tokens to the WebView as they are produced: a `tauri::ipc::Channel<String>` opened by the `chat_stream` command, each decoded token forwarded through a publish-guarded callback (checked against the shared cancel flag before every send, so a vault-lock mid-stream never emits into a torn-down transcript). It is the SYNC-7 "supersede" the local-ai ledger anticipated — streaming was deferred in the spike and added here for the [conversational AI chat](#conversational-ai-chat) surface. Each token is AS1-class plaintext (never logged, DENY-list). See `decisions.md` 2026-07-04.
+
+### **chat history budget** &nbsp; 📦 *Product*
+
+How many CHARACTERS of the visible [conversational AI chat](#conversational-ai-chat) transcript an [agent run](#agent-run) may be seeded with (myne-md/myne#617). Stored as `chat_history_budget` on `PrefsView`, device-local and never synced, because a bound on how much THIS machine sends to a provider is a property of that machine. Default 3000, clamped at the write to 12000.
+
+A character count rather than a turn count, deliberately: the request is re-sent on every one of up to 24 iterations, so the number is multiplied by the iteration count and, on a remote provider, by characters that leave the device. Three long answers and three short ones are the same turn count and a very different cost. Oldest turns are dropped first, and a turn that alone exceeds the budget is truncated and marked rather than dropped, with a matching system-prompt instruction that a shortened earlier message must never be treated as complete.
+
+Its canonical key sorts after `auto_lock_seconds`, which is a format requirement and not a naming preference: see `protocol.md` §9.5.2 on why a new prefs key inside the prefix-matched run silently blinds every field behind it in an older client.
+
+Used in: `decisions/ai/0553`, `protocol.md` §9.5.2, `threat-model.md` TB12, TB13, §7
 
 ### **chat citation** &nbsp; 📦 *Product*
 
@@ -1754,9 +1782,17 @@ The one-time MAC algorithm by Daniel J. Bernstein, used as the authenticator ins
 
 Used in: `spec/protocol.md` §5.1
 
+### **prompt-cache marker** &nbsp; 📋 *Protocol*
+
+The `cache_control` field Myne attaches to the SYSTEM turn of an OpenRouter request (myne-md/myne#620), asking the provider to cache that prefix. The system turn is the one span byte-identical across every iteration of a run, which is what makes it worth caching; no other turn carries one, and a test pins that, because a marker on a user or assistant turn would be asking the provider to retain note content as a cache prefix.
+
+**A posture change rather than a boundary change.** A17 puts the provider operator's retention outside anything this threat model constrains, so the same bytes reach the same party either way. What is new is that Myne is now ASKING for retention rather than merely accepting whatever happens, and that is the part a reader deciding whether to trust the feature would want on the record. Ollama receives no marker: it serves the model directly and models no prefix cache.
+
+Used in: `decisions/ai/0555`, `threat-model.md` TB13
+
 ### **proposed edit** &nbsp; 📦 *Product*
 
-One anchored change an [agent run](#agent-run) suggests to a note body: an [edit anchor](#edit-anchor) plus the text that replaces it. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
+One change an [agent run](#agent-run) suggests to a note body. It comes in two kinds. A REPLACE carries an [edit anchor](#edit-anchor) plus the text that replaces it. An APPEND carries no anchor at all, because there is nothing to anchor to: it adds text at the end of the body, which is the only shape that can write into an empty note (see [append verb](#append-verb)). One kind field on one list, rather than a second list, so every check that already runs over proposed edits keeps running over both by construction. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -1915,6 +1951,12 @@ Used in: `decisions.md` 2026-07-13
 The intermediate variant of the [`Slot`] enum representing a vault that has successfully completed phrase-based recovery (`vault_recover_with_phrase`) but has not yet committed a new master password (`vault_complete_recovery`). Carries `root_key`, `items_key`, `items_key_id`, and `recovered_at: Instant` in `Zeroizing` wrappers — both keys are derived eagerly during the recovery step so the entire credential chain is verified before the slot transitions. Editor commands cannot pattern-match `Slot::Recovering` and are therefore structurally denied access during this window per `recovery-flow.md` §4.1's non-dismissible chained step. The only legal transitions out are `Slot::Recovering → Slot::Unlocked` (via `vault_complete_recovery` success) or `Slot::Recovering → Slot::Empty` (via `vault_lock` — the §4.3 within-session bail case).
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
+
+### **ImportSource** (slot state) &nbsp; 📦 *Product*
+
+The read-only variant of the [`Slot`] enum, holding a second vault's keys for the length of a [vault import](#vault-import) (myne-md/myne#464). Carries `root_key`, `items_key`, `items_key_id` in `Zeroizing` wrappers plus `opened_at`, exactly as **Recovering** does, and for the same reason: the whole credential chain is verified when the slot is created rather than at first use. It is NOT an unlock and has no transition into one: every editor command matches `Slot::Unlocked` and so rejects it at compile time, and the only ways out are the import ending, the [target vault](#target-vault) locking or switching, and an independent 30-minute TTL swept by the idle timer. It does not count against the one-`Unlocked` invariant, because it is not an `Unlocked` entry: two vaults' keys can be resident at once, which is the one thing about this feature the threat model had to be amended for (`threat-model.md` A6).
+
+Used in: `threat-model.md` A6, `decisions.md` 2026-08-30 "A vault opened for READING is a slot, not an unlock"
 
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
@@ -2266,13 +2308,13 @@ Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **Slot** &nbsp; 📦 *Product*
 
-The three-state enum that holds a vault's auth state inside `VaultRuntimeState`'s `RwLock<HashMap<VaultId, Slot>>` — one entry per vault, keyed by [VaultId](#vaultid) (an absent key IS the `Empty` case; no `Empty` entries are stored). Variants: `Slot::Empty` (no vault open), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access). Editor commands match only `Slot::Unlocked(uv) => ...`; the `Slot::Recovering` and `Slot::Empty` variants are structurally rejected at compile time (per entry). The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Multi-vault made the storage a `HashMap<VaultId, Slot>` (the singleton→map type-swap landed 2026-06-09) under the **≤1-`Unlocked` invariant**: at most one entry is ever `Unlocked` — the **active vault** is that sole `Unlocked` entry (no separate pointer), and unlocking a second vault first locks the current one. `auth_permits` stays a single global capacity-1 semaphore (one Argon2id auth op in flight client-wide, never per-vault). The per-entry lifecycle reasoning carries forward unchanged.
+The four-state enum that holds a vault's auth state inside `VaultRuntimeState`'s `RwLock<HashMap<VaultId, Slot>>` — one entry per vault, keyed by [VaultId](#vaultid) (an absent key IS the `Empty` case; no `Empty` entries are stored). Variants: `Slot::Empty` (no vault open), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access), `Slot::ImportSource { ... }` (a second vault opened read-only as the source of a [vault import](#vault-import), myne-md/myne#464). Editor commands match only `Slot::Unlocked(uv) => ...`; the other three variants are structurally rejected at compile time (per entry). The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Multi-vault made the storage a `HashMap<VaultId, Slot>` (the singleton→map type-swap landed 2026-06-09) under the **≤1-`Unlocked` invariant**: at most one entry is ever `Unlocked` — the **active vault** is that sole `Unlocked` entry (no separate pointer), and unlocking a second vault first locks the current one. An `ImportSource` entry does not count against it and never promotes into it: a second vault's keys can be resident, and they still cannot open an editor. `auth_permits` stays a single global capacity-1 semaphore (one Argon2id auth op in flight client-wide, never per-vault). The per-entry lifecycle reasoning carries forward unchanged.
 
-Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization", 2026-06-09 "Runtime multi-slot core"
+Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization", 2026-06-09 "Runtime multi-slot core", 2026-08-30 "A vault opened for READING is a slot, not an unlock"
 
 ### **SlotKind** &nbsp; 📋 *Protocol*
 
-The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_slot_kind` command (**not** by [vault_status](#vault_status), which probes `vault.meta` on disk). Three variants: `Empty | Recovering | Unlocked`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of three bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_slot_kind` round-trip would be paranoia).
+The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_slot_kind` command (**not** by [vault_status](#vault_status), which probes `vault.meta` on disk). Four variants: `Empty | Recovering | Unlocked | ImportSource`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of four bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`, `"ImportSource"`. `ImportSource` is reachable only when the caller passes an explicit `VaultId`, which the import picker does; the active-vault probe resolves an `Unlocked` entry else a `Recovering` one and deliberately never sees an import source. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_slot_kind` round-trip would be paranoia).
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
@@ -2379,6 +2421,14 @@ Used in: VaultIndices (MYND-31), `spec/markdown-dialect.md` §3.7
 The editor surface [auto-tag](#auto-tag) renders into (MYND-651): a CodeMirror block widget anchored at the frontmatter/body boundary, hosting the suggested tags as chips — solid for a tag the vault already has, dashed `+` for one the model coined. One tap accepts (the tag is written into the note's frontmatter `tags:`, not injected as an inline `#tag`); dismiss drops it from the band. **Absent / zero-length when there is nothing to suggest**, so an idle note is never shifted — the byte-stability and shared-listener discipline are inherited from the [tag chip](#tag-chip) decoration cluster's installer. Inert where no inference engine exists (web, and mobile until MYND-653), so it is never a dead affordance.
 
 Used in: MYND-651, `decisions.md` 2026-07-31
+
+### **Source vault** &nbsp; 📦 *Product*
+
+*(Aliases: import source vault. Myne-divergent: yes — the term only exists because Myne can import from its own format.)*
+
+In a **vault import**, the vault notes are read FROM. Always another local vault on the same device, never the one currently unlocked, and never modified by the import: it is read through a dedicated read-only key slot (`Slot::ImportSource`) that holds its `root_key` and `items_key` for the length of the run and is zeroized when the run ends, when the target vault locks, or when an independent TTL expires. Contrast **target vault**.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
 
 ### **Spell check** &nbsp; 📦 *Product*
 
@@ -2571,6 +2621,14 @@ The verdict for a twin whose shared answer already lives in `myne-core` or a `@m
 
 Used in: `scripts/check-twin-inventory.mjs`, `core/CLAUDE.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
 
+### **Target vault** &nbsp; 📦 *Product*
+
+*(Aliases: none. Myne-divergent: yes — see source vault.)*
+
+In a **vault import**, the vault notes are written INTO: the one that is unlocked, the one whose keys seal every arriving note and re-sealed attachment, and the only one the import changes. Contrast **source vault**.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
+
 ### **Tauri** &nbsp; 🛠️ *Tooling*
 
 A Rust-based framework for building cross-platform desktop applications with web-technology UIs. Myne's Phase 1 desktop-client framework (`decisions.md` Deferred #5 resolution). Supersedes the prior Electron baseline. Advantages: small TCB, ~10 MB binary vs ~150 MB Electron, ~40 MB idle RAM vs ~250 MB, achievable reproducible builds, structural memory hygiene via Rust's `zeroize`/`secrecy`/`subtle` crates, smaller updater attack surface.
@@ -2622,6 +2680,14 @@ The vocabulary is also not the readability gate: the WCAG floors apply to the co
 Distinguish it from the **value-shape allowlist**, which is a security control over what a value may *look like* and is deliberately narrow (`threat-model.md` "Custom-theme CSS-value surface"). The vocabulary says which keys mean something; the allowlist says which values may exist at all. Widening the first has never required widening the second.
 
 Used in: `decisions.md` 2026-08-06; `spec/protocol.md` §9.21
+
+### **throughput routing preference** &nbsp; 📋 *Protocol*
+
+The `provider.sort = throughput` field on every OpenRouter request (myne-md/myne#620), including ordinary chat as well as [agent runs](#agent-run). OpenRouter is a broker that forwards to model vendors, so "who receives this" is a set Myne can bound only at its first hop; the `provider` object is the one surface Myne has over the second hop, and this is Myne starting to use it.
+
+**The criterion expressed is speed, and no data-handling term is expressed. That is a choice rather than an absence.** The broker's routing object does carry one, `data_collection`, which routes only to vendors that do not store or train on prompts, alongside `only` and `ignore` for explicit vendor pinning. Myne adopted the field about speed and declined that one. Whether to set `data_collection: deny` is an open product decision recorded in `decisions/ai/0555`: it narrows the recipient set on the axis this project cares about most, and it narrows it enough that a given model may have no qualifying vendor, which turns a privacy default into a feature that intermittently fails. What it buys is measured (a run served at 9 to 22 tokens per second where 150 would have been 63 seconds instead of 792); what it costs is that the set of possible recipients is now influenced by Myne rather than left to the broker's default.
+
+Used in: `decisions/ai/0555`, `threat-model.md` TB13
 
 ### **threat model** &nbsp; ⚠️ *Threat*
 
@@ -2714,6 +2780,22 @@ Used in: `spec/protocol.md` §9.1
 The first Myne protocol specification (`spec/protocol.md`). Covers Phase 1 at-rest encryption only. Sync, multi-device, sharing, and post-quantum primitives are out of scope; they appear in a later major version.
 
 Used in: `spec/protocol.md` (titled v0.1)
+
+### **Vault import** &nbsp; 📦 *Product*
+
+*(Aliases: Myne vault import. Myne-divergent: yes.)*
+
+Bringing notes from one Myne vault into another, as the first entry in the import-source picker. It ADDS notes to the open vault, which is what distinguishes it from **restore backup**: a restore PLACES a whole vault and never decrypts a note, where an import decrypts each note under the **source vault**'s keys and re-seals it under the **target vault**'s. Notes, folders, tags, the links between imported notes, the attachments those notes reference, and the source's added dictionary words cross. Version history, trashed notes, templates, unreferenced attachments, prefs, themes, workspace layout, the search index, the device roster and sync enrolment do not.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
+
+### **Import label** &nbsp; 📦 *Product*
+
+*(Aliases: none. Myne-divergent: yes.)*
+
+The name a user gives one **vault import**, prefilled from the **source vault**'s own name. It does two jobs. It is the suffix a colliding note is renamed with (`Project` becomes `Project (Eski laptop)`), which is what lets an imported wikilink be pointed at the note that came with it rather than at the target's own note of that name. And because it is stable rather than a counter, re-running the same import under the same label re-derives the same renamed title, finds it already present, and skips: the label is what makes a repeat import idempotent, and changing it is what makes it not.
+
+Used in: `spec/markdown-dialect.md` §6
 
 ### **VaultId** &nbsp; 🗝️ *Key/identifier*
 

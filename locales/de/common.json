@@ -120,7 +120,10 @@
         "excludedFolder": "Nicht erstellt: Dieser Ordner ist von der KI ausgeschlossen.",
         "createFailed": "Nicht erstellt: Das Schreiben der neuen Notiz ist fehlgeschlagen. Die übrigen Änderungen wurden dennoch angewendet.",
         "excludedNow": "Konnte nicht angewendet werden: Der Ordner dieser Notiz ist jetzt von der KI ausgeschlossen.",
-        "notProposed": "Konnte nicht angewendet werden: Diese Änderung gehört nicht zum Vorschlag dieses Durchlaufs."
+        "notProposed": "Konnte nicht angewendet werden: Diese Änderung gehört nicht zum Vorschlag dieses Durchlaufs.",
+        "noteMoved": "Konnte nicht angewendet werden: Diese Änderung würde die Notiz in einen anderen Ordner verschieben.",
+        "appendEmpty": "Konnte nicht angewendet werden: Es gab nichts hinzuzufügen.",
+        "appendWouldWriteFrontmatter": "Konnte nicht angewendet werden: Dieser Text wäre zum Eigenschaftsblock der Notiz geworden."
       },
       "applyFailed": "Die Änderungen konnten nicht angewendet werden.",
       "undo": "Diesen Durchlauf rückgängig machen",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} Notizen gelesen",
       "runSummaryOffDevice_one": "etwa {{count}} Zeichen Ihrer Notizen wurde an den Anbieter gesendet",
       "runSummaryOffDevice_other": "etwa {{count}} Zeichen Ihrer Notizen wurden an den Anbieter gesendet",
-      "runSummaryOnDevice": "nichts hat dieses Gerät verlassen"
+      "runSummaryOnDevice": "nichts hat dieses Gerät verlassen",
+      "appendFlag": "wird am Ende angefügt"
     },
     "undo": {
       "offer_one": "Der letzte Durchlauf hat {{count}} Notiz geändert.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "Alle ersetzen ({{total}})",
       "replaceOne": "Ersetzen",
       "replacePlaceholder": "Ersetzen durch",
-      "toggleReplace": "Ersetzen umschalten"
+      "toggleReplace": "Ersetzen umschalten",
+      "dateFallback": "Es wird nach {{stored}} gesucht, der Form, in der dieses Datum gespeichert ist.",
+      "replaceOffOnDateFallback": "Ersetzen ist deaktiviert, solange ein Datum über seine gespeicherte Form gefunden wird, damit eine Ersetzung das Datum nicht unlesbar macht."
     },
     "cover": {
       "add": "Titelbild hinzufügen",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "Schlüssel ersetzen",
       "mobileRevokeHelper": "Entfernt den Anbieter, seinen Schlüssel und die Zustimmung dieses Telefons zusammen und stellt genau den Zustand her, als wäre nie etwas eingerichtet worden. Andere Geräte funktionieren weiter, bis Sie es dort ebenfalls entfernen.",
       "mobileApproveLabel": "Senden auf diesem Telefon freigeben",
-      "mobileApproveHelper": "Der Anbieter und sein Schlüssel stammen von einem anderen Gerät. Von diesem Telefon wird nichts gesendet, bis Sie lesen, was gesendet wird, und es hier freigeben."
+      "mobileApproveHelper": "Der Anbieter und sein Schlüssel stammen von einem anderen Gerät. Von diesem Telefon wird nichts gesendet, bis Sie lesen, was gesendet wird, und es hier freigeben.",
+      "historyBudgetHelper": "Wie viel des jüngsten Gesprächs jede Anfrage mitführt, in Zeichen. Leer lassen für den Standardwert. Eine größere Zahl lässt die KI längeren Gesprächen folgen und sendet mehr davon: bei einem Anbieter, der nicht auf diesem Gerät läuft, verlässt damit bei jedem Schritt eines Laufs mehr Ihres Textes das Gerät.",
+      "historyBudgetLabel": "Mit jeder Anfrage übertragener Gesprächsverlauf"
     },
     "network": {
       "disabledCue": "Sync läuft nicht mehr über Tor. Neue Verbindungen gehen direkt zum Sync-Server.",
@@ -3356,12 +3364,13 @@
         "viewMode": "standard ansichtsmodus ansicht live lesen quelltext vorschau",
         "dateFormat": "datumsformat datum format tag monat jahr iso dd/mm mm/dd kalender",
         "timeFormat": "zeitformat uhrzeit format 24 stunden 12 stunden uhr am pm",
-        "timezone": "zeitzone zeitzonen zone tz utc iana region heute"
+        "timezone": "zeitzone zeitzonen zone tz utc iana region heute",
+        "aiHistoryBudget": "Gespräch Verlauf Kontext Gedächtnis Budget Zeichen Agent Chat Anfrage"
       }
     },
     "dateTime": {
       "dateLabel": "Datumsformat",
-      "dateHelper": "Wie Datumsangaben in Aufgaben, gespeicherten Ansichten und Anhängen angezeigt werden.",
+      "dateHelper": "Wie ein Datum geschrieben wird, überall dort, wo Myne eines anzeigt.",
       "dateSystem": "Der Sprache folgen",
       "timeLabel": "Zeitformat",
       "timeHelper": "Ob Uhrzeiten im 24-Stunden- oder im 12-Stunden-Format angezeigt werden.",

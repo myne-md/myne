@@ -120,7 +120,10 @@
         "excludedFolder": "Ikke oprettet: den mappe er udelukket fra AI.",
         "createFailed": "Ikke oprettet: den nye note kunne ikke skrives. De øvrige ændringer blev stadig anvendt.",
         "excludedNow": "Kunne ikke anvendes: notens mappe er nu udelukket fra AI.",
-        "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag."
+        "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag.",
+        "noteMoved": "Kunne ikke anvendes: den ændring ville flytte noten til en anden mappe.",
+        "appendEmpty": "Kunne ikke anvendes: der var intet at tilføje.",
+        "appendWouldWriteFrontmatter": "Kunne ikke anvendes: den tekst ville være blevet notens egenskabsblok."
       },
       "applyFailed": "Ændringerne kunne ikke anvendes.",
       "undo": "Fortryd denne kørsel",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "{{count}} noter læst",
       "runSummaryOffDevice_one": "omkring {{count}} tegn fra dine noter blev sendt til udbyderen",
       "runSummaryOffDevice_other": "omkring {{count}} tegn fra dine noter blev sendt til udbyderen",
-      "runSummaryOnDevice": "intet forlod denne enhed"
+      "runSummaryOnDevice": "intet forlod denne enhed",
+      "appendFlag": "tilføjes til slutningen"
     },
     "undo": {
       "offer_one": "Den seneste kørsel ændrede {{count}} note.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "Erstat alle ({{total}})",
       "replaceOne": "Erstat",
       "replacePlaceholder": "Erstat med",
-      "toggleReplace": "Slå erstat til/fra"
+      "toggleReplace": "Slå erstat til/fra",
+      "dateFallback": "Søger efter {{stored}}, den form denne dato er gemt i.",
+      "replaceOffOnDateFallback": "Erstat er slået fra, mens en dato findes i sin gemte form, så en erstatning ikke kan gøre datoen ulæselig."
     },
     "cover": {
       "add": "Tilføj omslag",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "Udskift nøgle",
       "mobileRevokeHelper": "Fjerner udbyderen, dens nøgle og denne telefons godkendelse på én gang og efterlader præcis den tilstand, hvor der aldrig var sat noget op. Andre enheder fungerer videre, indtil du også fjerner det der.",
       "mobileApproveLabel": "Godkend afsendelse på denne telefon",
-      "mobileApproveHelper": "Udbyderen og dens nøgle kom fra en anden enhed. Der sendes intet fra denne telefon, før du læser, hvad der sendes, og godkender det her."
+      "mobileApproveHelper": "Udbyderen og dens nøgle kom fra en anden enhed. Der sendes intet fra denne telefon, før du læser, hvad der sendes, og godkender det her.",
+      "historyBudgetHelper": "Hvor meget af den seneste samtale hver forespørgsel bærer, i tegn. Lad feltet stå tomt for standardværdien. Et større tal lader AI'en følge længere samtaler og sender mere af dem: hos en udbyder, der ikke er på denne enhed, betyder det mere af din tekst, der forlader den, ved hvert trin i en kørsel.",
+      "historyBudgetLabel": "Samtale der sendes med hver forespørgsel"
     },
     "network": {
       "disabledCue": "Synkronisering sendes ikke længere gennem Tor. Nye forbindelser går direkte til synkroniseringsserveren.",
@@ -3356,12 +3364,13 @@
         "viewMode": "standardvisning visningstilstand live læsning kilde forhåndsvisning view mode",
         "dateFormat": "datoformat dato dag måned år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat klokkeslæt 24 timer 12 timer ur am pm time format",
-        "timezone": "tidszone zone tz utc iana region i dag timezone"
+        "timezone": "tidszone zone tz utc iana region i dag timezone",
+        "aiHistoryBudget": "samtale historik kontekst hukommelse budget tegn agent chat forespørgsel"
       }
     },
     "dateTime": {
       "dateLabel": "Datoformat",
-      "dateHelper": "Hvordan datoer vises i opgaver, gemte visninger og vedhæftede filer.",
+      "dateHelper": "Hvordan en dato skrives, overalt hvor Myne viser en.",
       "dateSystem": "Følg sproget",
       "timeLabel": "Tidsformat",
       "timeHelper": "Om klokkeslæt vises på et 24-timers eller 12-timers ur.",

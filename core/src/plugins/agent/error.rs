@@ -95,6 +95,38 @@ pub enum EditRejection {
     /// also puts a sentence in front of the user that would be false for the
     /// other four.
     RemovalNeedsOwnAct,
+    /// The edit would move the note to a different folder.
+    ///
+    /// `folder:` is what the `ai_excluded_folders` clamp reads, and the clamp
+    /// runs against the note as it was BEFORE the batch. So without this, an
+    /// anchored edit spanning that line could move a note into an
+    /// excluded folder with no control seeing it: the clamp had already run and
+    /// the removal roster does not carry the field.
+    ///
+    /// Distinct from [`Self::RemovalNeedsOwnAct`], which covers the five
+    /// working-set markers and only inside a bulk approval. This one refuses
+    /// under every approval label, because there is no act a user can take that
+    /// makes an agent-chosen folder move correct.
+    ///
+    /// Deliberately narrower than "the frontmatter changed": `title:` and note
+    /// properties are fields the agent legitimately edits.
+    /// [`super::frontmatter::edit_moves_note`] carries that argument.
+    NoteMoved,
+    /// An append carried nothing to append.
+    ///
+    /// Its own reason rather than [`Self::AnchorEmpty`], which would be a false
+    /// sentence: an append has no anchor by design, so telling the user there
+    /// was "no text to match" describes a rule that does not apply to it.
+    AppendEmpty,
+    /// An append into a note with neither a frontmatter block nor a body would
+    /// have authored one.
+    ///
+    /// Appended text normally lands after the frontmatter block, which makes it
+    /// structurally impossible for it to be the first line. That positioning has
+    /// nothing to work with when the note is entirely empty, so the one
+    /// remaining case is refused rather than silently rewritten: mangling the
+    /// model's text would leave the user approving something nobody wrote.
+    AppendWouldWriteFrontmatter,
 }
 
 /// The agent plugin's failure surface.

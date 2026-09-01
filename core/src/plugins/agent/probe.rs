@@ -112,7 +112,7 @@ pub fn probe_request() -> AgentRequest {
         messages: vec![
             Message {
                 role: Role::System,
-                content: vec![Content::Trusted(system_instructions())],
+                content: vec![Content::Trusted(system_instructions(None))],
             },
             Message {
                 role: Role::User,
@@ -295,6 +295,7 @@ mod tests {
             _r: &AgentRequest,
         ) -> Result<AgentCompletion, AgentError> {
             Ok(AgentCompletion {
+                truncated: false,
                 reply: self
                     .0
                     .lock()

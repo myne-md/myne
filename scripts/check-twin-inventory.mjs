@@ -262,6 +262,22 @@ const CURATED_TWINS = [
       "anything.",
   },
   {
+    a: "src/hooks/useDateTimeDisplaySync.ts",
+    b: "mobile/src/lib/useDateTimeDisplaySync.ts",
+    what: "publishes the shared date/time display store, one adapter per client",
+    why:
+      "The two publishers into `editor/src/host/lib/datetimeFormat.ts`'s module-scope store. " +
+      "Cross-path (`src/hooks` against `mobile/src/lib`), so the sweep cannot pair them, and this " +
+      "is the exact module class myne-md/myne#609 was filed about: for as long as mobile had no " +
+      "adapter at all, there was one publisher and three readers and nothing said so. Not a copy: " +
+      "each reads its own client's prefs seam, and mobile additionally re-reads on the prefs nonce " +
+      "because its host mounts the adapter above the stage machine. What must stay in step is the " +
+      "PUBLISHED VALUE, `displayFromPrefs(prefs, language)`, and the language listener that " +
+      "republishes it, since a language switch does not re-render either mounting component. " +
+      "`check-datetime-display-publisher.mjs` holds the weaker property (each client tree has a " +
+      "publisher at all); a one-sided edit to what gets published is what this pair is for.",
+  },
+  {
     a: "src/notes/prefsNonce.ts",
     b: "mobile/src/lib/prefsNonce.ts",
     what: "is the same prefs-nonce mechanism, duplicated rather than shared",
@@ -730,6 +746,19 @@ const ROSTER = [
     destination: "@myne/editor",
     reason:
       "Shim against hand copy, same shape. Desktop is one line into @myne/editor/host/notes/localDateTime; mobile carries 34.",
+  },
+  {
+    a: "src/hooks/useDateTimeDisplaySync.ts",
+    b: "mobile/src/lib/useDateTimeDisplaySync.ts",
+    // `decision`, not `screen`. `screen` is an enumerated verdict meaning the
+    // rendered surface or the HOST, and an adapter that reads a prefs seam is
+    // neither; the spec holds that list to its definition rather than to its
+    // size, which is what caught this. The destination is settled all the same,
+    // so it is `per-client` rather than `undecided`.
+    verdict: "decision",
+    destination: "per-client",
+    reason:
+      "Per-client by construction, not by drift: each adapter reads its own client's prefs seam, and mobile additionally re-reads on the prefs nonce because its host mounts the adapter above the stage machine, so unlock is the event that makes prefs readable at all. What must not diverge is the VALUE published, displayFromPrefs(prefs, language), and the language listener that republishes it, since a language switch re-renders neither mounting component. check-datetime-display-publisher.mjs holds the weaker property that each client tree has a publisher at all; a one-sided edit to what gets published is what this pair is here for (myne-md/myne#609).",
   },
   {
     a: "src/notes/prefsNonce.ts",
@@ -1218,7 +1247,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 1803 lines against 389 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
+      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 1969 lines against 389 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/engine_candle.rs",
@@ -1282,7 +1311,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "The `#[tauri::command]` layer, 505 lines against 338, and the pair is the three-layer command shape working rather than drift. myne-md/myne#456 reduced desktop's side from 1442 lines to thin wrappers by moving the body into `myne-core`; mobile's was written against that same core from the start. The /simplify pass then took two more: `agent_apply` and `agent_undo` were still retyped verbatim on both sides, and the undo retype had silently DROPPED the myne-md/myne#531 fix that puts failed restore points back, so a partial undo failure consumed the record permanently on mobile. Both moved to `host_commands::{apply_from_host, undo_from_host}`. What is left on each side is argument marshalling and the client's own two seams (its engine and its scope searcher), which are BY DEFINITION per-client. Measured rather than assumed: neither file carries a security rule, a precondition or a refusal of its own.",
+      "The `#[tauri::command]` layer, 516 lines against 338, and the pair is the three-layer command shape working rather than drift. myne-md/myne#456 reduced desktop's side from 1442 lines to thin wrappers by moving the body into `myne-core`; mobile's was written against that same core from the start. The /simplify pass then took two more: `agent_apply` and `agent_undo` were still retyped verbatim on both sides, and the undo retype had silently DROPPED the myne-md/myne#531 fix that puts failed restore points back, so a partial undo failure consumed the record permanently on mobile. Both moved to `host_commands::{apply_from_host, undo_from_host}`. What is left on each side is argument marshalling and the client's own two seams (its engine and its scope searcher), which are BY DEFINITION per-client. Measured rather than assumed: neither file carries a security rule, a precondition or a refusal of its own.",
   },
   {
     a: "src-tauri/src/plugins/agent/adapters.rs",

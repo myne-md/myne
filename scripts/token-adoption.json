@@ -99,7 +99,7 @@
   "mobile/src/app/flows/RecordingSheet.tsx": 13,
   "mobile/src/app/flows/RecoverFlow.tsx": 34,
   "mobile/src/app/flows/RestoreBackupFlow.tsx": 9,
-  "mobile/src/app/flows/SettingsSheet.tsx": 111,
+  "mobile/src/app/flows/SettingsSheet.tsx": 103,
   "mobile/src/app/flows/SnapshotsSheet.tsx": 18,
   "mobile/src/app/flows/TemplatesSheet.tsx": 23,
   "mobile/src/app/flows/UnlockFlow.tsx": 39,

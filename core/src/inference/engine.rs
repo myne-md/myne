@@ -74,6 +74,44 @@ fn flatten_chat_to_prompt(system: &str, messages: &[ChatMessage]) -> String {
     s
 }
 
+/// One agent reply, plus whether the provider says it was cut off.
+///
+/// The bool exists because the token ceiling this branch introduced creates a
+/// failure mode it also has to answer for: a reply stopped at the ceiling is
+/// usually broken JSON, so it parses to zero actions, and the loop's generic
+/// "No valid action found" tells the model to fix a format error it did not
+/// make while a barren strike is spent. Carrying the reason up is what lets the
+/// loop say the true thing instead.
+#[derive(Clone)]
+pub struct AgentReply {
+    /// What the model said, as far as it got.
+    pub text: String,
+    /// True only when the provider itself reported a length stop. Never
+    /// inferred from the text: a reply can be short because the answer was
+    /// short, and guessing would tell a model that answered correctly to answer
+    /// more briefly.
+    pub truncated: bool,
+}
+
+/// Prints a shape, for the reason [`AgentCompletion`]'s hand-written `Debug`
+/// does one crate over: `text` is the raw model reply, which carries the anchors
+/// and replacements the model copied verbatim out of decrypted note bodies, and
+/// a derived `Debug` puts that wherever a `{:?}` happens to be, including a
+/// panic message or an `assert_eq!` diff, without anyone deciding to put it
+/// there. Nothing formats one today, so this closes a trap rather than a leak,
+/// which is the cheapest moment to close one.
+impl std::fmt::Debug for AgentReply {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentReply")
+            .field(
+                "text",
+                &format_args!("<{} chars>", self.text.chars().count()),
+            )
+            .field("truncated", &self.truncated)
+            .finish()
+    }
+}
+
 /// On-device inference surface (SYNC-7): a blocking `infer(prompt) -> result`
 /// and `embed(text) -> vector`. No streaming (SYNC-7). Implementors must be
 /// `Send + Sync` so a single engine instance can back concurrent commands
@@ -149,6 +187,31 @@ pub trait Engine: Send + Sync {
         _cancelled: &CancelledFn,
     ) -> Result<String, EngineError> {
         self.chat_streaming(system, messages, on_token)
+    }
+
+    /// The agent loop's request, which may carry a generation ceiling.
+    ///
+    /// **A separate method rather than a parameter on the arm above**, so that
+    /// "this request is the agent's" is visible at the call site rather than
+    /// inferred from an argument, and so that an engine with no ceiling to
+    /// impose inherits the default and changes nothing. Only `RemoteEngine`
+    /// overrides it: a local model's ceiling is the machine's, and the stub has
+    /// no generation to bound.
+    fn chat_agent_cancellable(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
+        cancelled: &CancelledFn,
+    ) -> Result<AgentReply, EngineError> {
+        // `truncated: false` is a claim, not a placeholder: this arm imposes no
+        // ceiling, so nothing here can cut a reply off. An engine that grows one
+        // owes this method an override rather than a `false` it inherited.
+        self.chat_streaming_cancellable(system, messages, on_token, cancelled)
+            .map(|text| AgentReply {
+                text,
+                truncated: false,
+            })
     }
 
     /// Embedding vector for `text`. Real models return a fixed dimensionality
@@ -764,6 +827,28 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
         ));
     }
 
+    // An append, which is the only verb that can write into an EMPTY note.
+    //
+    // **Checked before the general read_note branch, and it has to be.** That
+    // branch derives its anchors from the body with `unique_body_lines`, so on a
+    // note with no body it finds none and returns `None`: the stub falls silent
+    // and the scenario times out on a review screen that was never coming. An
+    // append needs nothing from the body, which is the property under test.
+    //
+    // Keyed off the task text like its two siblings above, so the scenario asks
+    // for what it needs in the sentence a user would type.
+    if task.contains("append") && last_assistant.contains("\"action\":\"read_note\"") {
+        let id = last_assistant
+            .split("\"note_id\":\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())?;
+        return Some(format!(
+            "{{\"action\":\"append_to_note\",\"note_id\":\"{id}\",\
+             \"text\":\"appended by the stub\"}}\n\
+             {{\"action\":\"finish\",\"summary\":\"stub append run\"}}"
+        ));
+    }
+
     // Step 3: the previous turn asked to read a note, so this user turn is the
     // body. Checked before step 2 so each check stays a simple containment.
     if last_assistant.contains("\"action\":\"read_note\"") {
@@ -1349,8 +1434,89 @@ mod agent_script_tests {
     fn ask(messages: &[ChatMessage]) -> String {
         let mut sink = |_: &str| ControlFlow::Continue(());
         StubEngine
-            .chat_streaming(&system_instructions(), messages, &mut sink)
+            .chat_streaming(&system_instructions(None), messages, &mut sink)
             .expect("the stub answers")
+    }
+
+    /// The regression that motivated the whole module: echoing the prompt back
+    /// parses as EVERY example action, ending at `finish`, so a run that used
+    /// the echo produced an empty proposal on iteration one.
+    /// The stub must PASS the capability probe, driven through the real
+    /// `run_probe` and the real grader.
+    ///
+    /// This is the test the composer's gate made necessary and its absence made
+    /// expensive: wiring `agentCapability()` into the composer (which is what
+    /// makes the anchored format's right to refuse a near-miss mean anything)
+    /// disabled Send until the probe passes, and the stub answered the probe
+    /// with `list_scope` because `probe_request` carries the same system
+    /// instructions a run does. Every agent E2E scenario went red on a button
+    /// that never enabled, one container build later.
+    ///
+    /// Asserted through `run_probe` rather than by inspecting the reply, because
+    /// the reply being well-formed is not the claim. The claim is that the
+    /// grader accepts it.
+    #[test]
+    fn the_stub_passes_the_capability_probe_it_is_asked() {
+        use crate::plugins::agent::engine::{
+            AgentCompletion, AgentEngine, AgentRequest, AgentRequestClass,
+        };
+        use crate::plugins::agent::error::AgentError;
+        use crate::plugins::agent::probe::{run_probe, AttemptVerdict, ProbeThreshold};
+
+        /// The stub behind the agent seam, mapped by the REAL `chat_shape` the
+        /// desktop adapter uses. A second mapping written here would let this
+        /// test pass while the shipped one was wrong, which is the whole shape
+        /// this suite exists to catch.
+        struct StubBehindTheSeam;
+        #[async_trait::async_trait]
+        impl AgentEngine for StubBehindTheSeam {
+            async fn complete(
+                &self,
+                _class: AgentRequestClass,
+                request: &AgentRequest,
+            ) -> Result<AgentCompletion, AgentError> {
+                let (system, messages) =
+                    crate::inference::agent_adapter::chat_shape(request, &|s: &str| s.to_string());
+                let mut sink = |_: &str| ControlFlow::Continue(());
+                let reply = StubEngine
+                    .chat_streaming(&system, &messages, &mut sink)
+                    .map_err(|_| AgentError::ReadFailed)?;
+                Ok(AgentCompletion {
+                    truncated: false,
+                    reply,
+                    chars_off_device: None,
+                })
+            }
+        }
+
+        let verdict = crate::test_support::block_on(run_probe(
+            &StubBehindTheSeam,
+            ProbeThreshold {
+                attempts: 3,
+                required: 2,
+                provisional: false,
+            },
+            // This test is about the stub clearing the bar, not about progress.
+            &|_| {},
+        ))
+        .expect("the probe runs");
+        assert!(
+            verdict.passed,
+            "the stub must be a backend Myne would offer agent mode on: {verdict:?}"
+        );
+        // **Every attempt that RAN was clean**, which is what this was always
+        // about; it used to say `passes == 3` and the number was a coincidence
+        // of the probe running every attempt regardless. Since the early exit
+        // (myne-md/myne#575) the bar of 2 settles it at 2, so asserting 3 would
+        // be asserting that the saving does not happen.
+        assert!(
+            verdict
+                .attempts
+                .iter()
+                .all(|a| *a == AttemptVerdict::Passed),
+            "the stub must not miss a single attempt it was asked: {verdict:?}"
+        );
+        assert_eq!(verdict.passes as usize, verdict.attempts.len());
     }
 
     /// The host frames every tool result with prose BEFORE the payload
@@ -1546,7 +1712,7 @@ mod agent_script_tests {
 
     #[test]
     fn the_plain_echo_could_never_have_driven_a_run() {
-        let echo = format!("stub-infer: {}", system_instructions());
+        let echo = format!("stub-infer: {}", system_instructions(None));
         let actions = parse_actions(&echo);
         assert!(
             actions.len() > 1,
@@ -1579,7 +1745,7 @@ mod agent_script_tests {
     #[test]
     fn infer_is_a_pure_echo_again() {
         // The agent no longer reaches `infer`, so it carries no agent branch.
-        let out = StubEngine.infer(&system_instructions()).unwrap();
+        let out = StubEngine.infer(&system_instructions(None)).unwrap();
         assert!(out.starts_with("stub-infer: "), "got: {}", &out[..40]);
     }
 

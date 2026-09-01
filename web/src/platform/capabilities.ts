@@ -62,6 +62,11 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // from the user's own directory pick, which needs no confinement because a
   // page is only ever handed what the user chose.
   "hostDirectoryRead",
+  // One container per origin under a constant vault id, so there is no
+  // second vault to import FROM, and `importer:` is `Class::Unsupported`
+  // wholesale. Substituted as well as gated, because the setup step takes a
+  // recovery phrase and A18 is about routine phrase prompts in a page.
+  "vaultImport",
   // Task 90. The extractors are `src-tauri/`-side, and `MYE1` is device-local
   // and NEVER synced (`protocol.md` §9.15), so a browser can neither run an
   // extraction nor inherit one. Absent rather than degraded: `read_extracted`

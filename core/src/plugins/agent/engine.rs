@@ -187,6 +187,7 @@ impl std::fmt::Debug for AgentCompletion {
                 "reply",
                 &format_args!("<{} chars>", self.reply.chars().count()),
             )
+            .field("truncated", &self.truncated)
             .field("chars_off_device", &self.chars_off_device)
             .finish()
     }
@@ -196,6 +197,24 @@ impl std::fmt::Debug for AgentCompletion {
 pub struct AgentCompletion {
     /// What the model said.
     pub reply: String,
+    /// Whether the provider reported that this reply was CUT OFF at the token
+    /// ceiling rather than finished.
+    ///
+    /// The ceiling and this flag arrived together (myne-md/myne#597), and that
+    /// is the argument for the flag existing: a reply stopped mid-token is
+    /// usually broken JSON, so it parses to zero actions, and without this the
+    /// loop tells the model "No valid action found" and spends a barren strike
+    /// on a format error the model did not make. Three of those end the run
+    /// with a stall verdict that names the wrong cause.
+    ///
+    /// **Only the host can fill this in honestly**, for the same reason as
+    /// `chars_off_device` below: the provider's stop reason is on the wire, and
+    /// core never sees it. Inferring it here from the reply text would be a
+    /// guess, and the guess is costly in one direction: telling a model that
+    /// answered correctly to answer more briefly teaches it to truncate itself.
+    /// A host with no ceiling to impose reports `false`, which is a claim
+    /// rather than a default.
+    pub truncated: bool,
     /// Characters that LEFT THE DEVICE for this one request.
     ///
     /// `None` on a local backend, and that is deliberately not `Some(0)`: one

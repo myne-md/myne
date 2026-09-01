@@ -25,6 +25,7 @@
 // model's proposed replacements are the user's own plaintext. None of it is
 // logged here, and none of it survives a vault lock.
 
+import type { HistoryTurn } from "../notes/ai/chatHistory";
 import type {
   AgentApplyResult,
   AgentRunView,
@@ -61,6 +62,32 @@ export function makeAgentRun({ invoke, Channel }: AgentHost) {
   async function agentStart(
     task: string,
     grant: ScopeGrant,
+    /** The user's interface language, as a BCP-47 tag.
+     *
+     *  Sent because the host cannot read it: the chosen language lives in this
+     *  side's `localStorage` (`src/i18n/index.ts`), not in `vault.prefs`. The host
+     *  shape-checks it and drops anything that is not a tag, so this is not a
+     *  channel into the system message.
+     *
+     *  A required parameter rather than an optional one, so a future call site
+     *  cannot quietly omit it and reintroduce the English-answer defect. Pass
+     *  `null` deliberately when there is genuinely no language to report. */
+    language: string | null,
+    /** The visible chat turns, oldest first.
+     *
+     *  Sent whole: the character budget is the HOST's, applied in
+     *  `core/src/plugins/agent/history.rs`, because what reaches the model is
+     *  policy and a caller that pre-trimmed would be deciding it. The IPC hop is
+     *  in-process; the cost that matters is what crosses TB13, and that is
+     *  bounded on the other side. */
+    history: readonly HistoryTurn[],
+    /** Called with the run's view as soon as the host has created it, which is
+     *  long before this promise resolves.
+     *
+     *  A run's first leg used to be unaddressable: this call returns only when
+     *  the loop has stopped, and its reply was the only thing that ever carried a
+     *  run id, so for minutes the surface had a `running` run with no id, no
+     *  scope total and no Stop (myne-md/myne#544). */
     /** Called with the run's view as soon as the host has created it, which is
      *  long before this promise resolves.
      *
@@ -86,6 +113,8 @@ export function makeAgentRun({ invoke, Channel }: AgentHost) {
     return await invoke<AgentStepResult>("plugin:agent|agent_start", {
       task,
       grant,
+      language,
+      history,
       onOpen: channel,
       onProgress: progress,
     });

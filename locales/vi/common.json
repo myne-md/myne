@@ -120,7 +120,10 @@
         "excludedFolder": "Chưa tạo: thư mục đó bị loại trừ khỏi AI.",
         "createFailed": "Chưa tạo: không ghi được ghi chú mới. Các thay đổi khác vẫn được áp dụng.",
         "excludedNow": "Không thể áp dụng: thư mục của ghi chú đó hiện bị loại trừ khỏi AI.",
-        "notProposed": "Không thể áp dụng: thay đổi đó không nằm trong đề xuất của lượt chạy này."
+        "notProposed": "Không thể áp dụng: thay đổi đó không nằm trong đề xuất của lượt chạy này.",
+        "noteMoved": "Không thể áp dụng: thay đổi đó sẽ chuyển ghi chú sang thư mục khác.",
+        "appendEmpty": "Không thể áp dụng: không có gì để thêm.",
+        "appendWouldWriteFrontmatter": "Không thể áp dụng: văn bản đó sẽ trở thành khối thuộc tính của ghi chú."
       },
       "applyFailed": "Không thể áp dụng các thay đổi.",
       "undo": "Hoàn tác lượt chạy này",
@@ -139,7 +142,8 @@
       "runSummaryNotes_other": "đã đọc {{count}} ghi chú",
       "runSummaryOffDevice_one": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
       "runSummaryOffDevice_other": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
-      "runSummaryOnDevice": "không có gì rời khỏi thiết bị này"
+      "runSummaryOnDevice": "không có gì rời khỏi thiết bị này",
+      "appendFlag": "thêm vào cuối"
     },
     "undo": {
       "offer_one": "Lượt chạy vừa rồi đã thay đổi {{count}} ghi chú.",
@@ -1202,7 +1206,9 @@
       "replaceAllCount": "Thay thế tất cả ({{total}})",
       "replaceOne": "Thay thế",
       "replacePlaceholder": "Thay bằng",
-      "toggleReplace": "Bật/tắt thay thế"
+      "toggleReplace": "Bật/tắt thay thế",
+      "dateFallback": "Đang tìm {{stored}}, dạng mà ngày này được lưu.",
+      "replaceOffOnDateFallback": "Thay thế bị tắt trong khi một ngày được khớp bằng dạng lưu trữ của nó, để một lần thay thế không làm ngày đó không đọc được."
     },
     "cover": {
       "add": "Thêm ảnh bìa",
@@ -3040,7 +3046,9 @@
       "mobileKeyReplace": "Thay khóa",
       "mobileRevokeHelper": "Gỡ nhà cung cấp, khóa của nó và sự chấp thuận của điện thoại này cùng lúc, để lại đúng trạng thái như chưa từng thiết lập. Các thiết bị khác vẫn hoạt động cho đến khi bạn gỡ ở đó nữa.",
       "mobileApproveLabel": "Cho phép gửi từ điện thoại này",
-      "mobileApproveHelper": "Nhà cung cấp và khóa của nó đến từ một thiết bị khác. Không có gì được gửi từ điện thoại này cho đến khi bạn đọc những gì sẽ được gửi và cho phép tại đây."
+      "mobileApproveHelper": "Nhà cung cấp và khóa của nó đến từ một thiết bị khác. Không có gì được gửi từ điện thoại này cho đến khi bạn đọc những gì sẽ được gửi và cho phép tại đây.",
+      "historyBudgetHelper": "Mỗi yêu cầu mang theo bao nhiêu phần của cuộc trò chuyện gần đây, tính bằng ký tự. Để trống để dùng giá trị mặc định. Số lớn hơn cho phép AI theo dõi những cuộc trò chuyện dài hơn và gửi đi nhiều hơn: với nhà cung cấp không nằm trên thiết bị này, đó là nhiều văn bản của bạn rời khỏi thiết bị hơn, ở mỗi bước của một lần chạy.",
+      "historyBudgetLabel": "Cuộc trò chuyện gửi kèm mỗi yêu cầu"
     },
     "network": {
       "disabledCue": "Đồng bộ không còn đi qua Tor. Các kết nối mới đi thẳng tới máy chủ đồng bộ.",
@@ -3356,12 +3364,13 @@
         "viewMode": "chế độ xem mặc định trực tiếp đọc nguồn xem trước view mode",
         "dateFormat": "định dạng ngày ngày tháng năm lịch date format iso dd/mm mm/dd calendar",
         "timeFormat": "định dạng giờ 24 giờ 12 giờ đồng hồ sáng chiều time format clock am pm",
-        "timezone": "múi giờ vùng hôm nay timezone time zone tz utc iana region today"
+        "timezone": "múi giờ vùng hôm nay timezone time zone tz utc iana region today",
+        "aiHistoryBudget": "trò chuyện lịch sử ngữ cảnh bộ nhớ hạn mức ký tự tác nhân chat yêu cầu"
       }
     },
     "dateTime": {
       "dateLabel": "Định dạng ngày",
-      "dateHelper": "Cách hiển thị ngày trong công việc, chế độ xem đã lưu và tệp đính kèm.",
+      "dateHelper": "Cách viết một ngày ở mọi nơi Myne hiển thị ngày.",
       "dateSystem": "Theo ngôn ngữ",
       "timeLabel": "Định dạng giờ",
       "timeHelper": "Giờ được hiển thị theo đồng hồ 24 giờ hay 12 giờ.",

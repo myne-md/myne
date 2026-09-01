@@ -132,7 +132,10 @@
         "excludedFolder": "Necreată: acel folder este exclus din AI.",
         "createFailed": "Necreată: scrierea notei noi a eșuat. Celelalte modificări au fost totuși aplicate.",
         "excludedNow": "Nu a putut fi aplicată: folderul acelei note este acum exclus din AI.",
-        "notProposed": "Nu a putut fi aplicată: acea modificare nu face parte din propunerea acestei rulări."
+        "notProposed": "Nu a putut fi aplicată: acea modificare nu face parte din propunerea acestei rulări.",
+        "noteMoved": "Nu a putut fi aplicată: acea modificare ar muta nota în alt folder.",
+        "appendEmpty": "Nu a putut fi aplicată: nu era nimic de adăugat.",
+        "appendWouldWriteFrontmatter": "Nu a putut fi aplicată: acel text ar fi devenit blocul de proprietăți al notei."
       },
       "applyFailed": "Modificările nu au putut fi aplicate.",
       "undo": "Anulează această rulare",
@@ -156,7 +159,8 @@
       "runSummaryOffDevice_one": "aproximativ {{count}} caracter din notele tale a fost trimis către furnizor",
       "runSummaryOffDevice_few": "aproximativ {{count}} caractere din notele tale au fost trimise către furnizor",
       "runSummaryOffDevice_other": "aproximativ {{count}} de caractere din notele tale au fost trimise către furnizor",
-      "runSummaryOnDevice": "nimic nu a părăsit acest dispozitiv"
+      "runSummaryOnDevice": "nimic nu a părăsit acest dispozitiv",
+      "appendFlag": "adaugă la final"
     },
     "undo": {
       "offer_one": "Ultima rulare a modificat {{count}} notă.",
@@ -1251,7 +1255,9 @@
       "replaceAllCount": "Înlocuiește tot ({{total}})",
       "replaceOne": "Înlocuiește",
       "replacePlaceholder": "Înlocuiește cu",
-      "toggleReplace": "Comută înlocuirea"
+      "toggleReplace": "Comută înlocuirea",
+      "dateFallback": "Se caută {{stored}}, forma în care este stocată această dată.",
+      "replaceOffOnDateFallback": "Înlocuirea este dezactivată cât timp o dată este găsită prin forma ei stocată, ca o înlocuire să nu o facă imposibil de citit."
     },
     "cover": {
       "add": "Adaugă copertă",
@@ -3146,7 +3152,9 @@
       "mobileKeyReplace": "Înlocuiește cheia",
       "mobileRevokeHelper": "Elimină împreună furnizorul, cheia lui și aprobarea acestui telefon, lăsând exact starea de dinaintea oricărei configurări. Celelalte dispozitive funcționează mai departe până le elimini și acolo.",
       "mobileApproveLabel": "Aprobă trimiterea de pe acest telefon",
-      "mobileApproveHelper": "Furnizorul și cheia lui au venit de pe alt dispozitiv. Nu se trimite nimic de pe acest telefon până nu citești ce se va trimite și nu aprobi aici."
+      "mobileApproveHelper": "Furnizorul și cheia lui au venit de pe alt dispozitiv. Nu se trimite nimic de pe acest telefon până nu citești ce se va trimite și nu aprobi aici.",
+      "historyBudgetHelper": "Cât din conversația recentă duce cu sine fiecare cerere, în caractere. Lasă gol pentru valoarea implicită. Un număr mai mare permite AI-ului să urmărească conversații mai lungi și trimite mai mult din ele: la un furnizor care nu se află pe acest dispozitiv, înseamnă mai mult din textul tău părăsindu-l, la fiecare pas al unei rulări.",
+      "historyBudgetLabel": "Conversația trimisă cu fiecare cerere"
     },
     "network": {
       "disabledCue": "Sincronizarea nu mai este rutată prin Tor. Conexiunile noi merg direct la serverul de sincronizare.",
@@ -3466,12 +3474,13 @@
         "viewMode": "mod de vizualizare implicit live citire sursă previzualizare",
         "dateFormat": "format dată zi lună an iso dd/mm mm/dd calendar date format",
         "timeFormat": "format oră 24 de ore 12 ore ceas am pm time format",
-        "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone"
+        "timezone": "fus orar zonă de timp tz utc iana regiune astăzi timezone",
+        "aiHistoryBudget": "conversație istoric context memorie buget caractere agent chat cerere"
       }
     },
     "dateTime": {
       "dateLabel": "Formatul datei",
-      "dateHelper": "Cum sunt afișate datele în sarcini, vizualizări salvate și atașamente.",
+      "dateHelper": "Cum este scrisă o dată oriunde Myne afișează una.",
       "dateSystem": "În funcție de limbă",
       "timeLabel": "Formatul orei",
       "timeHelper": "Dacă orele sunt afișate pe un ceas de 24 de ore sau de 12 ore.",
