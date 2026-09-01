@@ -11,6 +11,7 @@
 
 import { invoke } from "../platform/core";
 import { bumpPrefsNonce } from "../notes/prefsNonce";
+import { blockSeedingOfExistingTurns } from "../notes/ai/chatStore";
 
 /**
  * Editor three-pane layout — sidebar widths (px) + collapsed flags (MYND-137).
@@ -308,6 +309,10 @@ export interface PrefsView {
    * defaulted to `[]`. Non-load-bearing.
    */
   ai_excluded_folders: string[];
+  /** Characters of chat history an agent run may be seeded with. `null` means
+   *  unset, and the host applies its own default. Clamped at the write, so the
+   *  stored value can be lower than the one sent. */
+  chat_history_budget: number | null;
   /**
    * Developer mode toggle (`developer-mode` feature, MYND-593). `false` ≡ off
    * (the default). Serialized from Rust `bool`; omitted from the encrypted
@@ -835,8 +840,35 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
  *
  * A value outside the host's known set is **refused**, not stored, so the
  * promise rejects rather than leaving a selection the request path ignores.
+ *
+ * **Changing the provider cuts the chat-history seed, the same way changing
+ * `ai_excluded_folders` does (myne-md/myne#617 review).** Since #617 an agent
+ * run is seeded with the visible transcript, so without this a conversation
+ * held entirely on-device is re-sent in full to a provider the user configured
+ * afterwards. The consent screen enumerates what leaves the device and does not
+ * name the conversation so far, so the seed would cross a boundary under a
+ * consent that never mentioned it.
+ *
+ * **Cut on every change, including clearing to `null`.** Clearing sends future
+ * runs to a local model runtime, which `threat-model.md` TB12 is a trust
+ * boundary in its own right (a separately distributed daemon on the same
+ * machine), so "clearing is free" is not true, only cheaper. One rule is
+ * learnable and two are not, which is the argument `design-notes/ai/0553`
+ * already makes about the seed itself.
+ *
+ * **The cut lives here rather than in `usePrefs`**, unlike the exclusion one,
+ * because this binding is the single point every provider change passes
+ * through: `AiPanel` calls it from three places (clear, re-select an already
+ * consented provider, and accept consent), and a cut in the caller would be
+ * three chances to miss one. `vault-switch.ts` reaches into stores from this
+ * layer for the same reason.
+ *
+ * It fires BEFORE the write, and before any await: a failed persist does not
+ * withdraw the intent, and the other order leaves a window in which a run could
+ * seed the turns this is protecting.
  */
 export async function setAiProvider(provider: string | null): Promise<void> {
+  blockSeedingOfExistingTurns();
   await writePref("plugin:prefs|set_ai_provider", { provider });
 }
 
@@ -943,13 +975,44 @@ export async function setDeveloperMode(enabled: boolean): Promise<void> {
 }
 
 /**
+ * Persist `chat_history_budget`: how many characters of visible chat history
+ * an agent run may be seeded with (myne-md/myne#617). `null` clears the
+ * override and returns the run to the host's own default.
+ *
+ * **The value is CLAMPED host-side, and this wrapper deliberately does not
+ * clamp it.** The bound is what limits how much of the user's plaintext one run
+ * can send to a provider, multiplied by the loop's iteration ceiling, so it has
+ * to hold for every path that reaches the command rather than for the one that
+ * happened to render a control. A second clamp here would read as the control
+ * and hide the day the real one stopped working.
+ */
+export async function setChatHistoryBudget(budget: number | null): Promise<void> {
+  await writePref("plugin:prefs|set_chat_history_budget", { budget });
+}
+
+/**
  * Persist the full `ai_excluded_folders` set (local-ai epic, ai-ux-surface
  * MYND-408, SYNC-14) — folders the AI never reads/indexes. Same canonical set
  * encoding as `deliberate_folders` (the Rust codec NFC-sorts + exact-dedups).
  * The caller passes the entire desired set; a rejected promise means the disk
  * write failed and the caller's optimistic UI must revert.
+ *
+ * **The seed cut lives here, beside the one in [`setAiProvider`], rather than in
+ * `usePrefs`.** This binding is the single point every exclusion write passes
+ * through, and the two controls bound the same thing, so splitting them across
+ * two layers meant a reader had to find both to know the rule. It fires BEFORE
+ * the write and before any await: the user has stated an intent about what may
+ * reach a provider, and a failed disk write does not withdraw it.
+ *
+ * It is not the only trigger, and the other one is the reason this control needs
+ * two. `ai_excluded_folders` is classified `Shared(SetUnion)`, so it also
+ * arrives by SYNC MERGE, where no setter on this machine runs at all;
+ * `chatStore.observeEgressControls` catches that by watching the value on every
+ * prefs read. This one catches the stated intent, including when the write
+ * fails; that one catches the arrival, whatever route it took.
  */
 export async function setAiExcludedFolders(folders: string[]): Promise<void> {
+  blockSeedingOfExistingTurns();
   await writePref("plugin:prefs|set_ai_excluded_folders", { folders });
 }
 

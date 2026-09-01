@@ -982,6 +982,54 @@ pub struct PrefsView {
     #[serde(default)]
     pub bar_items_order: Vec<String>,
 
+    /// How many characters of visible chat history an agent run may be seeded
+    /// with (myne-md/myne#617). `None` means the host applies its own default.
+    ///
+    /// **A bound rather than a feature toggle.** `build_request` re-sends every
+    /// message on every iteration, up to the loop's 24-iteration ceiling, so
+    /// this number is multiplied by the iteration count, and on the remote arm
+    /// it is multiplied into characters that leave the device. TB13 and
+    /// `design-notes/ai/0515` both record that no per-run volume cap exists
+    /// anywhere else, which is why the host clamps it.
+    ///
+    /// **The clamp is WRITE-side, which is a weaker class than
+    /// `auto_lock_seconds`, and saying otherwise would overstate it.** That
+    /// field resolves `clamp(...)` in code at every read, so a replayed or
+    /// tampered `vault.prefs` can only make auto-lock stricter no matter who
+    /// wrote it. This one is clamped in its setter, so the bound holds while
+    /// every writer clamps: a property of today's call sites rather than of the
+    /// value. Nothing reachable exploits the difference (the blob is AEAD-sealed
+    /// and AAD-bound, so a replay can only restore a previously-clamped value),
+    /// and the read path deliberately does not re-clamp so a second copy of the
+    /// ceiling cannot drift from the real one. A second writer, on the mobile
+    /// port or anywhere else, is the case that would make this matter, and it is
+    /// the reason the distinction is written down rather than glossed.
+    ///
+    /// Additive on `MYP1` and omitted entirely when unset, so a vault that
+    /// never touched it is byte-identical to a pre-feature `vault.prefs` (the
+    /// `archive_disabled` precedent class). Canonical key
+    /// `chat_history_budget`, which sorts after `bar_items_order` (`b` < `c`)
+    /// before `cli_enabled` (`ch` < `cl`).
+    ///
+    /// **That position is the load-bearing part of the name, not a preference.**
+    /// The decoder locates every field up to and including `auto_lock_seconds`
+    /// by `strip_prefix`, so an unknown key inside that run is not skipped: it
+    /// sits in front of the next marker and every prefix-chained field behind it
+    /// misses and takes its default. A field named for its consumer
+    /// (`agent_history_budget`) sorted into exactly that run, and an already
+    /// shipped client reading a blob that carried it would have decoded
+    /// SUCCESSFULLY while silently losing `auto_lock_seconds`,
+    /// `ai_excluded_folders` and the `Zeroizing`-wrapped `ai_provider_key`, then
+    /// persisted that loss on its next read-modify-write. Successfully is the
+    /// bad part: `update_prefs_with_dir` refuses to write over a read that
+    /// ERRORED, and this degrades without erroring. Named for what is budgeted
+    /// instead, the key lands in the cursor-scanned region, where
+    /// `find_top_level_marker` scans forward and an unknown key between two
+    /// known ones is skipped. `docs/spec/protocol.md` §9.5.2's forward-compat
+    /// clause is only true of that region, and an additive field belongs there.
+    #[serde(default)]
+    pub chat_history_budget: Option<u32>,
+
     /// CLI terminal-access door toggle (myne-cli epic, MYND-490; `cli-thin-client`
     /// task 2). `false` ≡ the door is closed (the default) — the local socket the
     /// `myne` CLI dials is never created regardless of unlock state. **Omitted
@@ -1362,6 +1410,7 @@ impl Default for PrefsView {
         Self {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -1725,6 +1774,21 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if !prefs.bar_items_order.is_empty() {
         out.extend_from_slice(b"\"bar_items_order\":");
         push_ordered_string_array(&mut out, &prefs.bar_items_order);
+        out.push(b',');
+    }
+
+    // chat_history_budget (canonical key 'chat_history_budget', after
+    // bar_items_order ['b' < 'c'], before cli_enabled ['ch' < 'cl']). How many
+    // characters of chat history an agent run may be seeded with
+    // (myne-md/myne#617). Deliberately in the CURSOR-scanned region rather than
+    // the strip_prefix run: an unknown key inside that run blinds every field
+    // behind it in an older client, which is silent rather than an error. See
+    // the field's own doc on PrefsView. Omitted entirely when None so a vault
+    // that never set it is byte-identical to a pre-feature vault.prefs
+    // (preserves existing KAT vectors).
+    if let Some(budget) = prefs.chat_history_budget {
+        out.extend_from_slice(b"\"chat_history_budget\":");
+        push_json_uint(&mut out, budget);
         out.push(b',');
     }
 
@@ -2570,12 +2634,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     };
 
     // ---- ai_enabled (optional, after active_workspace — SYNC-12) ----
-    // Canonical key order active_workspace < ai_enabled < ai_excluded_folders <
-    // archive_disabled, so when present this bool is a literal PREFIX of the
-    // post-active_workspace bytes (strip_prefix, not find_subslice — a later
-    // folder name containing an `"ai_enabled":`-looking substring cannot fool
-    // it). Emitted only as `true` by the encoder; `false` is tolerated for
-    // robustness. Absent → false (the default). MUST be followed by `,`.
+    // Canonical key order active_workspace < ai_enabled < ai_excluded_folders
+    // < archive_disabled, so when present this bool is a literal PREFIX of the
+    // post-active_workspace bytes (strip_prefix, not
+    // find_subslice — a later folder name containing an `"ai_enabled":`-looking
+    // substring cannot fool it). Emitted only as `true` by the encoder; `false`
+    // is tolerated for robustness. Absent → false (the default). MUST be
+    // followed by `,`.
     let ai_enabled_marker = b"\"ai_enabled\":";
     let (ai_enabled, post_ai_enabled) = match post_active.strip_prefix(ai_enabled_marker) {
         Some(after) => {
@@ -2816,6 +2881,16 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // preserved verbatim (sort/dedup is encode-side and this field is a
     // sequence, so neither happens). Present-but-malformed → PlaintextParseFailed.
     let bar_items_order = parse_optional_array_field(rest, &mut cursor, b"\"bar_items_order\":")?;
+    // chat_history_budget (canonical key 'chat_history_budget', after
+    // bar_items_order ['b' < 'c'], before cli_enabled ['ch' < 'cl']). How many
+    // characters of chat history an agent run may be seeded with
+    // (myne-md/myne#617). Located from the same monotonic cursor as its
+    // neighbours, which is what makes it tolerable to a client that has never
+    // heard of it: `find_top_level_marker` scans FORWARD, so an unknown key
+    // between two known ones is stepped over rather than left blocking the next
+    // marker. Absent → None (the default).
+    let chat_history_budget =
+        parse_optional_uint_field(rest, &mut cursor, b"\"chat_history_budget\":")?;
     // cli_enabled (canonical key 'cli_enabled' — after bar_items_order ['b' <
     // 'c'], before cli_excluded_folders ['cli_en' < 'cli_ex']). CLI
     // terminal-access door toggle (myne-cli epic, MYND-490). Parsed from the
@@ -3100,6 +3175,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         folder_icons,
         hidden_bar_items,
         bar_items_order,
+        chat_history_budget,
         cli_enabled,
         cli_excluded_folders,
         cli_rate_limit_disabled,
@@ -3338,6 +3414,38 @@ fn parse_optional_bool_field(
             let val_start = *cursor + rel_idx + marker.len();
             let (val, after) =
                 parse_json_bool(&rest[val_start..]).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            if after.first() != Some(&b',') {
+                return Err(PrefsBlobError::PlaintextParseFailed);
+            }
+            *cursor = rest.len() - after.len();
+            Ok(Some(val))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Parse an OPTIONAL canonical JSON unsigned-integer field whose key marker is
+/// `marker`, searching `rest` from `*cursor` onward. The `u32` sibling of
+/// [`parse_optional_bool_field`], with the same monotonic-cursor canonical
+/// key-order discipline: on a hit it advances `*cursor` past the value's
+/// trailing `,` and returns `Some`, on a miss it returns `None` and leaves
+/// `*cursor` where it was.
+///
+/// The trailing `,` is REQUIRED rather than optional, exactly as in the bool
+/// sibling: `screen_capture_protection` is mandatory and canonically last, so a
+/// further field always follows, and a value that runs to `}` is malformed. A
+/// trailing `.` (a float, FORBIDDEN per `docs/spec/protocol.md` §9.5.2)
+/// therefore rejects here rather than truncating.
+fn parse_optional_uint_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Option<u32>, PrefsBlobError> {
+    match find_top_level_marker(rest, *cursor, marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (val, consumed) = parse_json_uint(&rest[val_start..])?;
+            let after = &rest[val_start + consumed..];
             if after.first() != Some(&b',') {
                 return Err(PrefsBlobError::PlaintextParseFailed);
             }
@@ -4107,6 +4215,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -4186,6 +4295,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -4582,6 +4692,7 @@ mod tests {
                 transcription_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
@@ -4663,6 +4774,7 @@ mod tests {
                 transcription_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
@@ -5464,6 +5576,7 @@ mod tests {
     fn cli_and_develop_prefs_fields_round_trip_together() {
         let original = PrefsView {
             bar_items_order: alloc::vec![alloc::string::String::from("view-mode")], // cli_enabled's left neighbour
+            chat_history_budget: None,
             cli_enabled: true,
             cli_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
             cli_rate_limit_disabled: Some(true),
@@ -6129,6 +6242,70 @@ mod tests {
     }
 
     #[test]
+    fn chat_history_budget_round_trips_alongside_its_neighbours() {
+        // The whole prefix-chained run plus both cursor-region neighbours in one
+        // blob. The defect this pins is not hypothetical: the field first
+        // shipped as `agent_history_budget`, which sorts INSIDE the
+        // strip_prefix run, and its `ai_enabled` arm rewound to the cursor from
+        // before the budget was consumed, so with the budget set and AI off
+        // every prefix-chained field behind it decoded to its default:
+        // `auto_lock_seconds`, `ai_excluded_folders` and the `Zeroizing`
+        // provider key among them. `ai_enabled: false` is therefore the arm
+        // that matters and it is asserted below in both states.
+        for ai_enabled in [true, false] {
+            let original = PrefsView {
+                active_workspace: Some(alloc::string::String::from("ws-1")),
+                ai_enabled,
+                ai_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
+                ai_provider_key: Some(Zeroizing::new(alloc::string::String::from("sk-secret"))),
+                archive_disabled: Some(true),
+                auto_lock_seconds: Some(300),
+                bar_items_order: alloc::vec![alloc::string::String::from("graph")],
+                chat_history_budget: Some(3000),
+                cli_enabled: true,
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode");
+            assert_eq!(decoded, original, "ai_enabled = {ai_enabled}");
+        }
+    }
+
+    #[test]
+    fn an_unknown_key_in_the_cursor_region_does_not_blind_the_fields_behind_it() {
+        // The forward-compatibility property §9.5.2 states, and the reason
+        // `chat_history_budget` is named to sort where it does. An older client
+        // meets a key it has never heard of; in the cursor-scanned region
+        // `find_top_level_marker` steps over it, so everything behind it still
+        // decodes. Injected here rather than asserted in prose, because the
+        // failure is silent: the blob decodes SUCCESSFULLY minus the fields it
+        // lost, and `update_prefs_with_dir` only refuses to write over a read
+        // that ERRORED.
+        let original = PrefsView {
+            auto_lock_seconds: Some(300),
+            bar_items_order: alloc::vec![alloc::string::String::from("graph")],
+            cli_enabled: true,
+            custom_theme: Some(alloc::string::String::from("midnight")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let text = core::str::from_utf8(&encoded).expect("utf8");
+        // A future field, canonically between bar_items_order and cli_enabled.
+        let injected = text.replace(
+            "\"cli_enabled\"",
+            "\"chat_history_budget_v2\":7,\"cli_enabled\"",
+        );
+        assert_ne!(injected, text, "the injection point moved");
+        let decoded = canonical_json_decode(injected.as_bytes()).expect("decode");
+        assert!(decoded.cli_enabled);
+        assert_eq!(
+            decoded.custom_theme,
+            Some(alloc::string::String::from("midnight"))
+        );
+        assert_eq!(decoded.auto_lock_seconds, Some(300));
+    }
+
+    #[test]
     fn archive_disabled_round_trips_alongside_neighbors() {
         // Exercise the strip_prefix decode path with both canonical neighbors
         // present, so a regression in the post_active → post_archive threading
@@ -6417,6 +6594,7 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
@@ -6440,6 +6618,7 @@ mod tests {
     fn encode_emits_theme_after_all_other_fields() {
         // Full field-mix: a < d < e < f < i < s < t. theme sits last.
         let prefs = PrefsView {
+            chat_history_budget: None,
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
@@ -6908,6 +7087,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -6993,6 +7173,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7081,6 +7262,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7164,6 +7346,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7307,6 +7490,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7415,6 +7599,7 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7509,6 +7694,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7673,6 +7859,7 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7781,6 +7968,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7882,6 +8070,7 @@ mod tests {
         let prefs = PrefsView {
             auto_lock_seconds: Some(300),
             bar_items_order: alloc::vec!["graph".into(), "tags".into()],
+            chat_history_budget: None,
             custom_theme: Some("midnight".into()),
             ..PrefsView::default()
         };
@@ -8119,6 +8308,7 @@ mod tests {
     fn encode_emits_auto_lock_seconds_first_in_canonical_order() {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
+            chat_history_budget: None,
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
@@ -8210,6 +8400,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8295,6 +8486,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8448,6 +8640,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8575,6 +8768,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8898,6 +9092,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8985,6 +9180,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -9333,6 +9529,7 @@ mod tests {
                 transcription_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
@@ -9413,6 +9610,7 @@ mod tests {
                 transcription_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
@@ -9493,6 +9691,8 @@ mod tests {
         // the set-vs-sequence array discipline for each. `canonical_json_encode`
         // self-validates the key order + discipline at mint (round-trip below).
         let prefs_populated = PrefsView {
+            // A populated value, so this vector exercises the encoder arm as
+            // well as the field's presence (myne-md/myne#617).
             // inverse-default bools (default true → emitted only when false)
             attachment_compression_enabled: false,
             attachment_ocr_enabled: false,
@@ -9514,6 +9714,7 @@ mod tests {
                 alloc::string::String::from("tags"),
                 alloc::string::String::from("graph"),
             ],
+            chat_history_budget: Some(3000),
             // set array (sorted + deduped)
             cli_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
             cli_rate_limit_disabled: Some(true),
@@ -11586,6 +11787,165 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write vault-prefs field-clocks vectors dump");
+    }
+
+    /// Generator for the `chat_history_budget` `vault-prefs` cases
+    /// (myne-md/myne#617, the agent chat-history seed budget).
+    ///
+    /// Writes `/tmp/myne_vault_prefs_chat_history_budget_vectors.json`, a JSON
+    /// array fragment spliced by hand into the companion repo's existing
+    /// `cases` array.
+    ///
+    /// **Why the field needs a vector at all**, since it is one optional
+    /// integer: `vault.prefs` is canonical JSON, so key ORDER is part of the
+    /// bytes, and this field's slot is the load-bearing half of its own design.
+    /// It sorts between `bar_items_order` (`b`) and `cli_enabled` (`cl`), which
+    /// puts it in the region `find_top_level_marker` scans forward through;
+    /// named `agent_history_budget` it would have landed inside the
+    /// prefix-matched run that ends at `auto_lock_seconds`, where an
+    /// unrecognised key blinds every field behind it in a client that predates
+    /// it (`docs/spec/protocol.md` §9.5.2, schema-evolution paragraph). A port
+    /// that emits the right value in the wrong slot produces a blob this crate
+    /// cannot decode, and until these cases existed no vector said so: the
+    /// companion repo carried a schema property with the claim written in prose
+    /// and nothing behind it.
+    ///
+    /// **Both canonical NEIGHBOURS are present in the fixture**, which is what
+    /// makes this a slot pin rather than a value pin. The blob carries
+    /// `bar_items_order` and `cli_enabled` either side of it.
+    ///
+    /// The value is 3000, deliberately not the host's 12000 ceiling: the
+    /// ceiling is a host policy applied in the SETTER and is not a property of
+    /// the format, so pinning it here would put a second copy of a host
+    /// constant in another repository, where drift is silent. What the vectors
+    /// pin is the bare-decimal integer encoding, the canonical slot, and the
+    /// omitted-when-unset rule (every other case in the family carries no
+    /// `chat_history_budget` key at all and stays byte-identical to its
+    /// pre-feature self).
+    ///
+    /// Nonce `0xF8` — the next free entry in this family's registry
+    /// (0x77..0xF7 taken).
+    ///
+    /// `cargo test -p protocol --lib emit_chat_history_budget_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_chat_history_budget_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce_chb: [u8; AEAD_NONCE_LEN] = [0xF8; AEAD_NONCE_LEN];
+        let prefs_chb = PrefsView {
+            bar_items_order: alloc::vec![
+                String::from("view-mode"),
+                String::from("tags"),
+                String::from("graph"),
+            ],
+            chat_history_budget: Some(3000),
+            cli_enabled: true,
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs_chb);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"bar_items_order":["view-mode","tags","graph"],"chat_history_budget":3000,"cli_enabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin bar_items_order (b) < chat_history_budget (ch) < cli_enabled (cl), and the budget as a bare decimal integer",
+        );
+        let blob_chb = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_chb, &nonce_chb)
+            .expect("encode chat-history-budget");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_chb).expect("decode");
+        assert_eq!(
+            decoded, prefs_chb,
+            "chat-history-budget blob must round-trip exactly"
+        );
+
+        // The omit-when-unset half, asserted rather than described: the same
+        // view with the field back to `None` must encode to bytes carrying no
+        // `chat_history_budget` key at all, so a vault that never overrode the
+        // host default stays byte-identical to its pre-feature self.
+        let prefs_unset = PrefsView {
+            chat_history_budget: None,
+            ..prefs_chb.clone()
+        };
+        let canonical_unset = canonical_json_encode(&prefs_unset);
+        assert_eq!(
+            canonical_unset.as_slice(),
+            br#"{"bar_items_order":["view-mode","tags","graph"],"cli_enabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "an unset budget must be omitted entirely, not encoded as 0",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-chat-history-budget
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-chat-history-budget\",\n");
+        dump.push_str("      \"description\": \"The agent chat-history seed budget (myne-md/myne#617). An optional unsigned integer encoded as a BARE DECIMAL, pinned between both of its canonical neighbours: bar_items_order (b) < chat_history_budget (ch) < cli_enabled (cl). That slot is the load-bearing half of the field's design -- it sits in the region a decoder scans forward through, so an older client steps over it, whereas a name sorting before auto_lock_seconds would have landed in the prefix-matched run where an unknown key blinds every field behind it (protocol.md 9.5.2 schema evolution). The value 3000 is deliberately not the host's clamp ceiling: that ceiling is applied in the SETTER and is host policy rather than format, so no vector pins it. Unset is OMITTED ENTIRELY rather than encoded as 0, which every other case in this family demonstrates by carrying no such key and staying byte-identical to its pre-feature self. Same vault-A inputs as the sibling cases; prefs_nonce=0xF8x24. Generated by emit_chat_history_budget_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_chb)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_chb)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-chat-history-budget
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-chat-history-budget\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-chat-history-budget: the blob decodes back to a PrefsView carrying chat_history_budget=3000 between bar_items_order and cli_enabled under the same root_key + account_number_hash. A decoder that does not know the field (pre-myne#617) tolerates it per the 9.5.2 forward-compat rule and treats the budget as ABSENT rather than as 0 -- absent means the host applies its own default, which is a third state distinct from 'seed nothing'. That distinction is why this case exists beside the encrypt one: a port that maps a missing key to 0 decodes this blob correctly and its own default-carrying blob incorrectly.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_chb)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"bar_items_order\": [\"view-mode\", \"tags\", \"graph\"],\n");
+        dump.push_str("        \"chat_history_budget\": 3000,\n");
+        dump.push_str("        \"cli_enabled\": true\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_chat_history_budget_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs chat-history-budget vectors dump");
     }
 
     /// Generator for the display-formatting quartet's `vault-prefs` cases —

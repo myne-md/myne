@@ -118,13 +118,17 @@
         "excludedFolder": "Nem jött létre: az a mappa ki van zárva az AI elől.",
         "createFailed": "Nem jött létre: az új jegyzet mentése nem sikerült. A többi módosítás így is alkalmazva lett.",
         "excludedNow": "Nem sikerült alkalmazni: annak a jegyzetnek a mappája már ki van zárva az AI elől.",
-        "notProposed": "Nem sikerült alkalmazni: az a módosítás nem része a futtatás javaslatának."
+        "notProposed": "Nem sikerült alkalmazni: az a módosítás nem része a futtatás javaslatának.",
+        "noteMoved": "Nem sikerült alkalmazni: ez a módosítás másik mappába helyezné a jegyzetet.",
+        "appendEmpty": "Nem sikerült alkalmazni: nem volt mit hozzáadni.",
+        "appendWouldWriteFrontmatter": "Nem sikerült alkalmazni: ez a szöveg a jegyzet tulajdonságblokkjává vált volna."
       },
       "applyFailed": "A módosításokat nem sikerült alkalmazni.",
       "undo": "A futtatás visszavonása",
       "undoFailed": "A futtatást nem sikerült visszavonni.",
       "undoReport": "{{reverted}} jegyzet visszaállítva. A futtatás által létrehozott {{kept}} jegyzet a helyén maradt.",
       "alreadyApplied": "Alkalmazva",
+      "appendFlag": "a végére kerül",
       "untitledNote": "Névtelen jegyzet",
       "vaultRoot": "Széf gyökere",
       "newNotesHeading_one": "{{count}} új jegyzet",
@@ -3028,7 +3032,9 @@
       "recommendedFilesEmbedding": "Szükséges a model.safetensors + config.json + tokenizer.json egy mappában.",
       "recommendedFilesGeneration": "Szükséges a .gguf fájl + tokenizer.json ugyanabban a mappában.",
       "recommendedFilesTranscription": "Szükséges a Whisper .gguf fájl + config.json + tokenizer.json ugyanabban a mappában.",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "Mennyit visz magával a legutóbbi beszélgetésből minden kérés, karakterben. Hagyd üresen az alapértelmezéshez. A nagyobb szám hosszabb beszélgetéseket enged követni az AI-nak, és többet küld el belőlük: olyan szolgáltatónál, amely nem ezen az eszközön fut, ez több szöveged távozását jelenti, a futás minden lépésénél.",
+      "historyBudgetLabel": "Minden kéréssel elküldött beszélgetés"
     },
     "network": {
       "disabledCue": "A szinkronizálás már nem a Toron keresztül megy. Az új kapcsolatok közvetlenül a szinkronszerverhez csatlakoznak.",
@@ -3344,7 +3350,8 @@
         "viewMode": "alapértelmezett nézetmód élő olvasás forrás előnézet view mode",
         "dateFormat": "dátumformátum dátum formátum nap hónap év iso dd/mm mm/dd naptár date format calendar",
         "timeFormat": "időformátum idő formátum 24 órás 12 órás óra de du am pm time format clock",
-        "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today"
+        "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today",
+        "aiHistoryBudget": "beszélgetés előzmények kontextus memória keret karakterek ügynök chat kérés"
       }
     },
     "dateTime": {

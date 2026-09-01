@@ -271,6 +271,31 @@
     "scenarios able to stop executing under a green `e2e-floor`, which is the one",
     "thing this file exists to catch."
   ],
+  "$comment-2026-08-30": [
+    "Raised 303 -> 304 for myne-md/myne#622. `e2e/agent-run.e2e.ts` gains ONE",
+    "scenario, ag7: an append into a note with no body, which the anchored verb",
+    "could not do at all. It sits inside the same `aiDescribe` as ag1 through",
+    "ag6, so it executes wherever they do, which is where CI sets MYNE_E2E_AI=1",
+    "and builds with `local-inference-stub`.",
+    "",
+    "This is arithmetic on the CI-measured base, not a fresh measurement, and it",
+    "is the same shape the #529 entry above records: +1 file-local scenario, +1",
+    "floor. Locally the whole file passes in the container",
+    "(scripts/e2e-ai-buildrun.sh agent-run -> 7 passed), which is what says the",
+    "new scenario executes rather than self-skipping; it is NOT a claim about",
+    "the other 297.",
+    "",
+    "`stable_max_failures` stays 0."
+  ],
+  "$comment-2026-09-01-merge": [
+    "FLOOR 303 -> 308, the SUM of the two raises above rather than a third one.",
+    "This branch took 303 -> 304 and develop took 303 -> 307, both against the",
+    "same base, so the merged floor is 303 + 1 + 4. Each raise keeps its own",
+    "measurement, unedited: a floor is a claim about scenarios that EXECUTED, and",
+    "a summed number with one run behind it would be the arithmetic-instead-of-",
+    "measurement this file refuses. Nothing new was measured here and nothing",
+    "needed to be: the two raises name disjoint scenario files."
+  ],
   "stable": 311,
   "stable_max_failures": 0
 }

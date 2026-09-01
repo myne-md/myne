@@ -26,13 +26,13 @@
 //! mechanically reversible rewrite. An agent edit is neither, so the snapshot is
 //! added **here**, at this call site, rather than by changing that path.
 
-use super::edit::{place, ProposedEdit};
+use super::edit::{apply_edit, ProposedEdit};
 use super::error::{AgentError, EditRejection};
+use super::frontmatter::{edit_moves_note, folder_of};
 use super::hide::edit_hides_note;
 use super::prompt::ProposedNote;
 use super::run::AgentRunState;
 use crate::folder_key::{canonical_excluded, folder_matches_excluded};
-use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use zeroize::Zeroizing;
@@ -266,14 +266,12 @@ pub async fn apply_approved(
     let mut excluded_note: BTreeSet<String> = BTreeSet::new();
     for id in bodies.keys() {
         let body = &bodies[id];
-        // `fm_folder` reads a FRONTMATTER BLOCK, not a whole note, so the body
-        // has to be sliced first. Passing the whole body found nothing and the
-        // clamp silently allowed every edit; the test that asserts an excluded
-        // note is refused is what caught it. `trash.rs` slices the same way.
-        let folder = extract_title_slices(body.as_bytes())
-            .frontmatter_bytes
-            .and_then(fm_folder)
-            .unwrap_or_default();
+        // `folder_of` slices the frontmatter BLOCK out first, which is what
+        // `fm_folder` expects: passing a whole note found nothing and the clamp
+        // silently allowed every edit, and the test asserting an excluded note
+        // is refused is what caught it. That failure is why the read has one
+        // caller now rather than three copies.
+        let folder = folder_of(body);
         if folder_matches_excluded(&folder, &excluded_now) {
             excluded_note.insert(id.clone());
         }
@@ -311,8 +309,27 @@ pub async fn apply_approved(
         let Some(body) = bodies.get(&edit.note_id) else {
             continue; // already refused above as unreadable
         };
-        match place(body, &edit.anchor, &edit.replacement) {
+        match apply_edit(body, edit) {
             Ok(next) => {
+                // The folder lock, and it runs BEFORE the removal carve-out
+                // because it is the stricter of the two: it refuses under every
+                // approval label, where that one refuses only inside a bulk.
+                // Checked on the RESULT for the same reason the carve-out is.
+                //
+                // What it closes: the SYNC-14 clamp twenty lines up read
+                // `folder:` off the note as it stands BEFORE this loop, and
+                // nothing re-read it afterwards. An anchored edit spanning that
+                // line could therefore move a note into an excluded
+                // folder with no control seeing it, and the removal roster does
+                // not carry the field.
+                if edit_moves_note(body, &next) {
+                    outcome.refused.push(RefusedEdit {
+                        note_id: edit.note_id.clone(),
+                        index: *index,
+                        reason: EditRejection::NoteMoved,
+                    });
+                    continue;
+                }
                 // The carve-out, checked on the RESULT rather than on the edit's
                 // text: whether a note ends up out of the working set is a fact
                 // about the note after the edit, and reading it here means the
@@ -448,6 +465,7 @@ fn frontmatter_safe(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plugins::agent::edit::EditKind;
     use crate::test_support::block_on;
     use std::collections::BTreeSet;
     use std::sync::Mutex;
@@ -459,8 +477,18 @@ mod tests {
     fn edit(note: &str, anchor: &str, replacement: &str) -> ProposedEdit {
         ProposedEdit {
             note_id: note.into(),
+            kind: EditKind::Replace,
             anchor: anchor.into(),
             replacement: replacement.into(),
+        }
+    }
+
+    fn append_edit(note: &str, text: &str) -> ProposedEdit {
+        ProposedEdit {
+            note_id: note.into(),
+            kind: EditKind::Append,
+            anchor: String::new(),
+            replacement: text.into(),
         }
     }
 
@@ -860,6 +888,231 @@ mod tests {
         .unwrap();
         assert_eq!(out.applied, 2);
     }
+
+    // ---- the append verb, through the whole apply path ------------------
+
+    /// The reported case, end to end at this layer: a note with nothing in its
+    /// body, and a request to write into it. Before the verb existed this was
+    /// structurally impossible, since an anchored edit needs text to anchor to.
+    #[test]
+    fn an_append_into_an_empty_note_lands_on_disk() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[("a", "---\ntitle: T\n---\n")], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[append_edit("a", "the list")],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 1);
+        assert!(out.refused.is_empty());
+        assert_eq!(disk.read_back("a"), "---\ntitle: T\n---\nthe list\n");
+    }
+
+    /// An append inherits every check the replace shape gets, which is the
+    /// entire argument for putting it on `ProposedEdit` rather than in a list of
+    /// its own. Scope first.
+    #[test]
+    fn an_append_outside_the_scope_is_refused_like_any_other_edit() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[("a", &note_with("title: T"))], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[append_edit("b", "text")],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 0);
+        assert_eq!(out.refused[0].reason, EditRejection::OutOfScope);
+    }
+
+    /// **An append cannot hide a note, and the positioning is why.** Text that
+    /// looks exactly like a `trashed:` frontmatter block lands in the BODY,
+    /// after the note's real block, so it is prose rather than a marker: the
+    /// removal carve-out reads the frontmatter and correctly sees nothing.
+    ///
+    /// Asserted rather than assumed, because "the check did not fire" and "the
+    /// check could not see it" look identical from the outside, and the second
+    /// is the one this verb has to be true. The disk read-back is what
+    /// distinguishes them: the note is still live afterwards.
+    #[test]
+    fn an_append_cannot_hide_a_note_because_its_text_lands_in_the_body() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let before = "---\ntitle: T\n---\n";
+        let disk = Disk::with(&[("a", before)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[append_edit("a", &format!("---\ntrashed: {TRASH_TS}\n---"))],
+            &[],
+            &[],
+            Approval::Bulk,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 1, "it is ordinary body text, so it applies");
+        let after = disk.read_back("a");
+        assert!(
+            after.starts_with("---\ntitle: T\n---\n"),
+            "the note's own frontmatter is still the first block: {after:?}"
+        );
+        assert!(
+            !crate::plugins::agent::hide::edit_hides_note(before, &after),
+            "and the result is still a live note, which is the property that matters"
+        );
+    }
+
+    /// The hostile spelling of the test above, and the one that used to get
+    /// through: a note with NO frontmatter whose body merely BEGINS with
+    /// `---`. Nothing had closed that opener, so appended text carrying an
+    /// ordinary `---` separator closed it and the user's own first lines became
+    /// a frontmatter block, `trashed:` among them. Asserted on the DISK, since
+    /// a host that reported the refusal and wrote anyway would satisfy a
+    /// return-value assertion.
+    #[test]
+    fn an_append_may_not_close_an_opener_the_note_body_merely_starts_with() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let before = "---\nmy shopping list\nmilk\n";
+        let disk = Disk::with(&[("a", before)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[append_edit(
+                "a",
+                &format!("## Summary\n\ntrashed: {TRASH_TS}\n\n---\n\ndone"),
+            )],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 0, "the append is refused, not mangled");
+        assert_eq!(
+            disk.read_back("a"),
+            before,
+            "and the note on disk is untouched"
+        );
+    }
+
+    // ---- the folder lock -----------------------------------------------
+
+    /// Asserted on the DISK, for the reason the removal tests one screen down
+    /// give: a host that reported the refusal and wrote anyway would pass a
+    /// return-value assertion.
+    ///
+    /// Under BOTH approval labels, which is the difference from the removal
+    /// carve-out. That one is a bulk-only rule because approving a removal on
+    /// its own act is a legitimate thing for a user to do; there is no act that
+    /// makes an agent-chosen folder move correct, because the folder is what
+    /// `ai_excluded_folders` is keyed on.
+    #[test]
+    fn an_edit_that_moves_the_note_to_another_folder_is_refused_under_every_label() {
+        for approval in [Approval::Bulk, Approval::Individual] {
+            let runs = AgentRunState::default();
+            runs.start("r".into(), ids(&["a"]));
+            let before = note_with("title: T\nfolder: Work");
+            let disk = Disk::with(&[("a", &before)], true);
+            let out = block_on(apply_approved(
+                &runs,
+                "r",
+                &[edit("a", "folder: Work", "folder: Secrets")],
+                &[],
+                &[],
+                approval,
+                &disk,
+                &disk,
+                &disk,
+            ))
+            .unwrap();
+            assert_eq!(out.applied, 0, "{approval:?}");
+            assert_eq!(out.refused.len(), 1, "{approval:?}");
+            assert_eq!(
+                out.refused[0].reason,
+                EditRejection::NoteMoved,
+                "{approval:?}"
+            );
+            assert_eq!(
+                disk.read_back("a"),
+                before,
+                "{approval:?}: the note must be byte-identical"
+            );
+        }
+    }
+
+    /// The other direction, and the one that actually widens what the model can
+    /// read: moving a note OUT of an excluded folder would hand its plaintext to
+    /// the next run's tools.
+    #[test]
+    fn an_edit_that_moves_a_note_out_of_a_folder_is_refused_too() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let before = note_with("title: T\nfolder: Private");
+        let disk = Disk::with(&[("a", &before)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[edit("a", "folder: Private\n", "")],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 0);
+        assert_eq!(out.refused[0].reason, EditRejection::NoteMoved);
+        assert_eq!(disk.read_back("a"), before);
+    }
+
+    /// The lock must not swallow the edits it was never about. An ordinary body
+    /// edit and a retitle both still apply, which is what keeps this a bug fix
+    /// rather than a withdrawal of the agent's job.
+    #[test]
+    fn the_folder_lock_does_not_refuse_an_ordinary_edit_or_a_retitle() {
+        for (anchor, replacement) in [("body", "body rewritten"), ("title: T", "title: T2")] {
+            let runs = AgentRunState::default();
+            runs.start("r".into(), ids(&["a"]));
+            let disk = Disk::with(&[("a", &note_with("title: T\nfolder: Work"))], true);
+            let out = block_on(apply_approved(
+                &runs,
+                "r",
+                &[edit("a", anchor, replacement)],
+                &[],
+                &[],
+                Approval::Individual,
+                &disk,
+                &disk,
+                &disk,
+            ))
+            .unwrap();
+            assert_eq!(out.applied, 1, "{anchor}");
+            assert!(out.refused.is_empty(), "{anchor}");
+        }
+    }
+
+    // ---- the removal carve-out -----------------------------------------
 
     /// **Every marker, not only `trashed:`.** The shipped carve-out read one
     /// field, and a `deleted:` edit — which hides the note from Trash as well as

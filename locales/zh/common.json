@@ -118,13 +118,17 @@
         "excludedFolder": "未创建：该文件夹已排除在 AI 之外。",
         "createFailed": "未创建：写入新笔记失败。其他更改仍已应用。",
         "excludedNow": "无法应用：该笔记所在的文件夹现已排除在 AI 之外。",
-        "notProposed": "无法应用：该更改不属于本次运行的提议。"
+        "notProposed": "无法应用：该更改不属于本次运行的提议。",
+        "noteMoved": "无法应用：该更改会把笔记移动到另一个文件夹。",
+        "appendEmpty": "无法应用：没有可添加的内容。",
+        "appendWouldWriteFrontmatter": "无法应用：该文本会变成笔记的属性块。"
       },
       "applyFailed": "无法应用这些更改。",
       "undo": "撤销本次运行",
       "undoFailed": "无法撤销本次运行。",
       "undoReport": "已恢复 {{reverted}} 篇笔记。本次运行创建的 {{kept}} 篇笔记予以保留。",
       "alreadyApplied": "已应用",
+      "appendFlag": "追加到末尾",
       "untitledNote": "无标题笔记",
       "vaultRoot": "保险库根目录",
       "newNotesHeading_one": "{{count}} 篇新笔记",
@@ -3028,7 +3032,9 @@
       "recommendedFilesEmbedding": "需要 model.safetensors + config.json + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesGeneration": "需要 .gguf 文件 + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesTranscription": "需要 Whisper 的 .gguf 文件 + config.json + tokenizer.json 位于同一文件夹中。",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "每次请求携带多少最近对话内容，以字符计。留空则使用默认值。数值越大，AI 越能跟上较长的对话，同时也会发送更多内容：如果服务商不在本设备上，这意味着每一步运行都有更多你的文本离开设备。",
+      "historyBudgetLabel": "每次请求携带的对话"
     },
     "network": {
       "disabledCue": "同步不再通过 Tor 路由。新的连接会直接连往同步服务器。",
@@ -3344,7 +3350,8 @@
         "viewMode": "默认视图 查看模式 实时 阅读 源代码 预览 default view mode live reading source",
         "dateFormat": "日期格式 日期 日 月 年 日历 date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "时间格式 时间 时钟 24小时制 12小时制 上午 下午 time format 24 hour 12 hour clock am pm",
-        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today"
+        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today",
+        "aiHistoryBudget": "对话 历史 上下文 记忆 预算 字符 代理 聊天 请求"
       }
     },
     "dateTime": {

@@ -93,7 +93,11 @@ export function buildTagPrompt(
       : "";
   return (
     `Suggest up to ${MAX_TAG_SUGGESTIONS} topical tags for the note below, ` +
-    "as a lowercase comma-separated list, no # prefix, no explanation.\n\n" +
+    "as a lowercase comma-separated list, no # prefix, no explanation. " +
+    // Same anchor and same reason as SUMMARIZE_INSTRUCTION (myne-md/myne#618):
+    // the note is the only language signal in this prompt, and the existing-tag
+    // hint below reinforces it with the vault's own convention.
+    "Write the tags in the same language as the note.\n\n" +
     hint +
     "Note:\n\n" +
     body

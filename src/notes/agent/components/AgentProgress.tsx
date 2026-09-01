@@ -201,14 +201,40 @@ export function AgentProgress() {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "var(--space-3)",
+        // One step tighter than before: `--space-3` was spacing three separate
+        // items, and these now read as one sentence with a separator in it.
+        gap: "var(--space-2)",
         padding: "var(--space-2) var(--space-3)",
         background: "var(--bg-1)",
         borderBottom: "1px solid var(--line-1)",
         color: "var(--fg-2)",
       }}
     >
-      <span data-testid="agentProgress.status">{status}</span>
+      {/* **Three catalog strings, one sentence** (myne-md/myne#621). They used
+          to sit side by side with nothing between them, rendering as "Finished
+          can change 1 note 1 scope you set, 0 it asked for", three facts with
+          no boundary, of which the middle one is load-bearing.
+
+          Fixed with punctuation and hierarchy rather than by merging the keys:
+          a merged key would drop all 32 catalogs and write i18n-coverage debt
+          for a legibility fix, and the words were never the problem. The
+          separator and the parentheses live here because they are marks, not
+          copy, the same reason the `", "` between the two grant counts already
+          did.
+
+          The hierarchy is the design canon's own: the outcome reads at
+          `--fg-1`, the scope total keeps the strip's `--fg-2`, and the grant
+          breakdown drops to `--fg-3`, which `docs/design/README.md` uses for
+          exactly this kind of caption. That is what makes the scope total the
+          thing the eye lands on, which is the point: it is documented as the
+          only bound on scope accumulation across repeated approvals. */}
+      <span data-testid="agentProgress.status" style={{ color: "var(--fg-1)" }}>
+        {status}
+      </span>
+
+      <span aria-hidden="true" style={{ color: "var(--fg-3)" }}>
+        &middot;
+      </span>
 
       {/* Continuously visible, by design. See the module note. */}
       <span data-testid="agentProgress.scopeTotal">
@@ -216,11 +242,15 @@ export function AgentProgress() {
       </span>
 
       {/* How the scope got that big, split by who asked. A run whose model-grant
-          count is climbing is the shape the no-cap decision leaves visible. */}
-      <span data-testid="agentProgress.grants">
+          count is climbing is the shape the no-cap decision leaves visible.
+          Parenthesised because it qualifies the total beside it rather than
+          standing as a third independent fact. */}
+      <span data-testid="agentProgress.grants" style={{ color: "var(--fg-3)" }}>
+        {"("}
         {t("agent.progress.grantsUser", { count: view.userGrants })}
         {", "}
         {t("agent.progress.grantsModel", { count: view.modelGrants })}
+        {")"}
       </span>
 
       <span style={{ flex: 1 }} />

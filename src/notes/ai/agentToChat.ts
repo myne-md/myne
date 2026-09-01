@@ -54,7 +54,8 @@ import {
   settleApply,
   settleStep,
 } from "../agent/agentStore";
-import { failAgentTurn, sendAgentTurn, settleAgentTurn } from "./chatStore";
+import { visibleHistory } from "./chatHistory";
+import { failAgentTurn, getChat, sendAgentTurn, settleAgentTurn } from "./chatStore";
 
 /** The already-localized strings the run's turns render.
  *
@@ -130,17 +131,31 @@ export async function startAgentRun(
   task: string,
   grant: ScopeGrant,
   copy: AgentRunCopy,
+  /** The user's interface language, as a BCP-47 tag, or `null`.
+   *
+   *  A separate parameter rather than a field on `AgentRunCopy`, even though
+   *  both come from the same `useTranslation()` call: that type is documented as
+   *  "the already-localized strings the run's turns render", and a language tag
+   *  is not one of those. Widening it would make the name false for the sake of
+   *  one fewer argument. */
+  language: string | null,
   /** Called with the ids of notes an automatic apply wrote, so the open pane
    *  re-reads them. Absent when the caller has nothing to tell. */
   onNotesWritten?: (noteIds: readonly string[]) => void,
 ): Promise<void> {
+  // **Captured BEFORE the turn is appended**, which is the ordering that makes
+  // this the conversation so far rather than the conversation including the
+  // message being sent. `sendAgentTurn` pushes the user's task and an empty
+  // agent turn; seeding after it would send the task twice, once as history and
+  // once as the task itself, and seed an empty assistant turn with it.
+  const history = visibleHistory(getChat().turns);
   sendAgentTurn(task, copy.scopeLabel);
   beginRun();
   // Captured BEFORE the await, so a vault lock during the call invalidates what
   // comes back rather than being raced by it.
   const epoch = currentRunEpoch();
   try {
-    const result = await agentStart(task, grant, (view) => {
+    const result = await agentStart(task, grant, language, history, (view) => {
       // The run has an id now, minutes before this call resolves. Same epoch
       // as the settle below, so a run the user let go of mid-flight cannot
       // mount a progress strip for itself behind them.

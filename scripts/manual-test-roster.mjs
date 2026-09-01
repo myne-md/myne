@@ -148,6 +148,20 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
+        see: "With the app language set to Turkish (Settings > Appearance), open a note and ask the agent something in Turkish. Confirm the answer comes back in Turkish, and that a proposed edit's replacement text is Turkish too rather than English. Repeat with the app in English but the question typed in Turkish: the answer must follow the question, not the interface. Then switch the app to a right-to-left language and confirm the answer renders in the correct direction inside the chat bubble.",
+        whyNotAutomated: "Every AI scenario runs StubEngine, which returns a fixed script and produces no natural language at all, so a test asserting a language would be asserting the fixture. The host-side half is pinned by cargo (the tag reaches the system message, and eight hostile shapes are dropped), but whether a real model honours the instruction is model behaviour, and the right-to-left case is a WebKitGTK bidirectional-layout question that only appears once the text is laid out in the bubble's own box.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+      {
+        see: "With a REMOTE provider configured (OpenRouter, any model), run a single-note agent task and time it end to end against the 12m49s baseline recorded in myne-md/myne#597. Cross-reference the provider's activity dashboard: confirm the run was routed to a fast endpoint rather than the cheapest, that no single iteration spent thousands of output tokens on one line, and that the cost per iteration drops after the first (which is the prompt cache being read). Confirm the run completes at all: the system turn's content is now an array rather than a string, and a provider that rejects that shape would fail every request.",
+        whyNotAutomated: "Needs a real provider, a real key and real money. The repo's tests pin the SHAPE of the request body and can say nothing about routing, billing or whether a given model behind the broker honours a cache marker; nothing in CI is allowed to make a third-party request at all.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 15,
+        tier: "core",
+      },
+      {
         see: "With an agent review screen open holding proposed replacements copied out of note bodies, close the laptop lid (or sleep the machine), wait a minute and wake it. Confirm the vault is locked and the review screen is gone rather than still showing note text. Repeat with the OS screen lock, and on macOS/Windows with fast user switching to a second account and back.",
         whyNotAutomated: "auto-lock.e2e.ts proves only the in-process idle timer; sleep/wake, OS screen lock and fast user switching are OS session events the container cannot raise, so whether keys and the proposal survive a suspend has never been observed.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],

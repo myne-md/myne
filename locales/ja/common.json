@@ -118,13 +118,17 @@
         "excludedFolder": "作成されませんでした: そのフォルダはAIの対象から除外されています。",
         "createFailed": "作成されませんでした: 新しいノートの書き込みに失敗しました。他の変更は適用されています。",
         "excludedNow": "適用できませんでした: そのノートのフォルダは現在AIの対象から除外されています。",
-        "notProposed": "適用できませんでした: その変更はこの実行の提案に含まれていません。"
+        "notProposed": "適用できませんでした: その変更はこの実行の提案に含まれていません。",
+        "noteMoved": "適用できませんでした: その変更はノートを別のフォルダへ移動させます。",
+        "appendEmpty": "適用できませんでした: 追加するものがありませんでした。",
+        "appendWouldWriteFrontmatter": "適用できませんでした: そのテキストはノートのプロパティブロックになってしまいます。"
       },
       "applyFailed": "変更を適用できませんでした。",
       "undo": "この実行を元に戻す",
       "undoFailed": "この実行を元に戻せませんでした。",
       "undoReport": "{{reverted}}件のノートを復元しました。この実行が作成した{{kept}}件のノートはそのまま残されています。",
       "alreadyApplied": "適用済み",
+      "appendFlag": "末尾に追加",
       "untitledNote": "無題のノート",
       "vaultRoot": "保管庫のルート",
       "newNotesHeading_one": "新規ノート{{count}}件",
@@ -3028,7 +3032,9 @@
       "recommendedFilesEmbedding": "model.safetensors + config.json + tokenizer.json が1つのフォルダに必要です。",
       "recommendedFilesGeneration": ".gguf ファイル + tokenizer.json が同じフォルダに必要です。",
       "recommendedFilesTranscription": "Whisperの .gguf ファイル + config.json + tokenizer.json が同じフォルダに必要です。",
-      "title": "AI"
+      "title": "AI",
+      "historyBudgetHelper": "各リクエストが直近の会話をどれだけ含めるか、文字数で指定します。空欄で既定値になります。大きい値ほど AI は長い会話を追えますが、その分多くを送信します。この端末にないプロバイダーでは、実行の各ステップでより多くのテキストが端末の外に出ることになります。",
+      "historyBudgetLabel": "リクエストごとに送る会話"
     },
     "network": {
       "disabledCue": "同期はTor経由ではなくなりました。新しい接続は同期サーバーに直接つながります。",
@@ -3344,7 +3350,8 @@
         "viewMode": "表示モード デフォルト ライブ 読み取り ソース プレビュー default view mode live reading source preview",
         "dateFormat": "日付形式 日付 表示形式 日 月 年 カレンダー date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "時刻形式 時刻 表示形式 24時間 12時間 時計 午前 午後 time format 24 hour 12 hour clock am pm",
-        "timezone": "タイムゾーン 時間帯 地域 今日 timezone time zone tz utc iana region today"
+        "timezone": "タイムゾーン 時間帯 地域 今日 timezone time zone tz utc iana region today",
+        "aiHistoryBudget": "会話 履歴 コンテキスト 記憶 上限 文字数 エージェント チャット リクエスト"
       }
     },
     "dateTime": {

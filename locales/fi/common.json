@@ -118,13 +118,17 @@
         "excludedFolder": "Ei luotu: tuo kansio on rajattu pois tekoälyltä.",
         "createFailed": "Ei luotu: uuden muistiinpanon kirjoittaminen epäonnistui. Muut muutokset otettiin silti käyttöön.",
         "excludedNow": "Ei voitu ottaa käyttöön: tuon muistiinpanon kansio on nyt rajattu pois tekoälyltä.",
-        "notProposed": "Ei voitu ottaa käyttöön: tuo muutos ei kuulu tämän ajon ehdotukseen."
+        "notProposed": "Ei voitu ottaa käyttöön: tuo muutos ei kuulu tämän ajon ehdotukseen.",
+        "noteMoved": "Ei voitu ottaa käyttöön: tuo muutos siirtäisi muistiinpanon toiseen kansioon.",
+        "appendEmpty": "Ei voitu ottaa käyttöön: ei ollut mitään lisättävää.",
+        "appendWouldWriteFrontmatter": "Ei voitu ottaa käyttöön: tuosta tekstistä olisi tullut muistiinpanon ominaisuuslohko."
       },
       "applyFailed": "Muutoksia ei voitu ottaa käyttöön.",
       "undo": "Kumoa tämä ajo",
       "undoFailed": "Ajoa ei voitu kumota.",
       "undoReport": "{{reverted}} muistiinpanoa palautettiin. {{kept}} ajon luomaa muistiinpanoa jätettiin paikalleen.",
       "alreadyApplied": "Otettu käyttöön",
+      "appendFlag": "lisätään loppuun",
       "untitledNote": "Nimetön muistiinpano",
       "vaultRoot": "Holvin juuri",
       "newNotesHeading_one": "{{count}} uusi muistiinpano",
@@ -3028,7 +3032,9 @@
       "recommendedFilesEmbedding": "Tarvitsee tiedostot model.safetensors + config.json + tokenizer.json samassa kansiossa.",
       "recommendedFilesGeneration": "Tarvitsee .gguf-tiedoston + tokenizer.json samassa kansiossa.",
       "recommendedFilesTranscription": "Tarvitsee Whisperin .gguf-tiedoston + config.json + tokenizer.json samassa kansiossa.",
-      "title": "Tekoäly"
+      "title": "Tekoäly",
+      "historyBudgetHelper": "Kuinka paljon viimeaikaisesta keskustelusta jokainen pyyntö kuljettaa, merkkeinä. Jätä tyhjäksi käyttääksesi oletusarvoa. Suurempi luku antaa tekoälyn seurata pidempiä keskusteluja ja lähettää niitä enemmän: jos palveluntarjoaja ei ole tällä laitteella, sitä enemmän tekstiäsi poistuu laitteelta ajon jokaisella askeleella.",
+      "historyBudgetLabel": "Jokaisen pyynnön mukana lähetettävä keskustelu"
     },
     "network": {
       "disabledCue": "Synkronointia ei enää reititetä Torin kautta. Uudet yhteydet menevät suoraan synkronointipalvelimelle.",
@@ -3344,7 +3350,8 @@
         "viewMode": "oletusnäkymätila näkymä reaaliaikainen lukeminen lähde esikatselu view mode",
         "dateFormat": "päivämäärämuoto päivämäärä päivä kuukausi vuosi iso dd/mm mm/dd kalenteri date format",
         "timeFormat": "kellonajan muoto kellonaika 24 tunnin 12 tunnin kello ap ip time format am pm",
-        "timezone": "aikavyöhyke vyöhyke tz utc iana alue tänään timezone time zone"
+        "timezone": "aikavyöhyke vyöhyke tz utc iana alue tänään timezone time zone",
+        "aiHistoryBudget": "keskustelu historia konteksti muisti budjetti merkit agentti chat pyyntö"
       }
     },
     "dateTime": {

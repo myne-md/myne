@@ -142,13 +142,17 @@
         "excludedFolder": "Nie utworzono: ten folder jest wykluczony z AI.",
         "createFailed": "Nie utworzono: zapis nowej notatki nie powiódł się. Pozostałe zmiany zostały zastosowane.",
         "excludedNow": "Nie można zastosować: folder tej notatki jest teraz wykluczony z AI.",
-        "notProposed": "Nie można zastosować: ta zmiana nie należy do propozycji tego przebiegu."
+        "notProposed": "Nie można zastosować: ta zmiana nie należy do propozycji tego przebiegu.",
+        "noteMoved": "Nie można zastosować: ta zmiana przeniosłaby notatkę do innego folderu.",
+        "appendEmpty": "Nie można zastosować: nie było czego dodać.",
+        "appendWouldWriteFrontmatter": "Nie można zastosować: ten tekst stałby się blokiem właściwości notatki."
       },
       "applyFailed": "Nie udało się zastosować zmian.",
       "undo": "Cofnij ten przebieg",
       "undoFailed": "Nie udało się cofnąć przebiegu.",
       "undoReport": "Przywrócone notatki: {{reverted}}. Pozostawione notatki utworzone przez ten przebieg: {{kept}}.",
       "alreadyApplied": "Zastosowano",
+      "appendFlag": "dodaje na końcu",
       "untitledNote": "Notatka bez tytułu",
       "vaultRoot": "Katalog główny skarbca",
       "newNotesHeading_one": "{{count}} nowa notatka",
@@ -3240,7 +3244,9 @@
       "recommendedFilesTranscription": "Wymaga pliku Whisper .gguf + config.json + tokenizer.json w tym samym folderze.",
       "title": "AI",
       "providerModelCount_few": "Dostępne {{count}} modele.",
-      "providerModelCount_many": "Dostępnych {{count}} modeli."
+      "providerModelCount_many": "Dostępnych {{count}} modeli.",
+      "historyBudgetHelper": "Ile ostatniej rozmowy niesie każde żądanie, w znakach. Pozostaw puste, aby użyć wartości domyślnej. Większa liczba pozwala AI śledzić dłuższe rozmowy i wysyła ich więcej: u dostawcy, który nie działa na tym urządzeniu, oznacza to więcej twojego tekstu opuszczającego je, na każdym kroku uruchomienia.",
+      "historyBudgetLabel": "Rozmowa wysyłana z każdym żądaniem"
     },
     "network": {
       "disabledCue": "Synchronizacja nie jest już kierowana przez Tor. Nowe połączenia idą prosto do serwera synchronizacji.",
@@ -3564,7 +3570,8 @@
         "viewMode": "domyślny tryb widoku na żywo czytanie źródło podgląd view mode",
         "dateFormat": "format daty dzień miesiąc rok iso dd mm kalendarz date format",
         "timeFormat": "format godziny czas zegar 24 12 godzinny am pm time format clock",
-        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone"
+        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone",
+        "aiHistoryBudget": "rozmowa historia kontekst pamięć budżet znaki agent czat żądanie"
       }
     },
     "dateTime": {

@@ -1,11 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! The three tools an agent run may call, and nothing else.
+//! The four tools an agent run may call, and nothing else.
 //!
-//! Three is a ceiling rather than a starting point. Every tool is a surface an
-//! instruction embedded in a note the model read can aim at, so the count is a
-//! security decision: list the scope by title, read one note in full, search the
-//! scope. A fourth tool is a change to that decision, not an addition to this
-//! file.
+//! The count is a ceiling rather than a starting point. Every tool is a surface
+//! an instruction embedded in a note the model read can aim at, so the number is
+//! a security decision: list the scope by title, read one note in full, search
+//! the scope, and search the whole vault. A fifth tool is a change to that
+//! decision, not an addition to this file.
+//!
+//! **The fourth was such a change, and this line was not updated with it.** The
+//! header said "three" for as long as `search_vault` had existed, which is the
+//! failure mode a stated count has: it stops describing the file and nothing
+//! reports it. `search_vault` is the one tool that reaches outside the approved
+//! scope, and it is bounded rather than open: in-scope matches come back as ids
+//! to read, everything else as a folder name and a count, never an id and never
+//! a title. See its own doc for why that split is the security boundary rather
+//! than a rendering choice.
 //!
 //! **The clamp is inseparable from the operation, on purpose.** None of these
 //! functions is a check a caller performs before doing the real thing; each one
@@ -20,10 +29,10 @@
 //! available: "'the caller behaved' is not a property of a seam".
 
 use super::error::AgentError;
+use super::frontmatter::folder_of;
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
 use crate::folder_key::{canonical_excluded, folder_matches_excluded};
-use crate::plugins::notes::title_extract::{extract_title_slices, fm_folder};
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -160,10 +169,7 @@ pub async fn read_note(
     // dropped without ever reaching the transcript.
     let body = Zeroizing::new(reader.read_body(note_id).await?);
     let excluded = excluded_now(exclusions).await?;
-    let folder = extract_title_slices(body.as_bytes())
-        .frontmatter_bytes
-        .and_then(fm_folder)
-        .unwrap_or_default();
+    let folder = folder_of(&body);
     if folder_matches_excluded(&folder, &excluded) {
         return Err(AgentError::ExcludedNow);
     }

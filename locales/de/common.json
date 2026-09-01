@@ -118,13 +118,17 @@
         "excludedFolder": "Nicht erstellt: Dieser Ordner ist von der KI ausgeschlossen.",
         "createFailed": "Nicht erstellt: Das Schreiben der neuen Notiz ist fehlgeschlagen. Die übrigen Änderungen wurden dennoch angewendet.",
         "excludedNow": "Konnte nicht angewendet werden: Der Ordner dieser Notiz ist jetzt von der KI ausgeschlossen.",
-        "notProposed": "Konnte nicht angewendet werden: Diese Änderung gehört nicht zum Vorschlag dieses Durchlaufs."
+        "notProposed": "Konnte nicht angewendet werden: Diese Änderung gehört nicht zum Vorschlag dieses Durchlaufs.",
+        "noteMoved": "Konnte nicht angewendet werden: Diese Änderung würde die Notiz in einen anderen Ordner verschieben.",
+        "appendEmpty": "Konnte nicht angewendet werden: Es gab nichts hinzuzufügen.",
+        "appendWouldWriteFrontmatter": "Konnte nicht angewendet werden: Dieser Text wäre zum Eigenschaftsblock der Notiz geworden."
       },
       "applyFailed": "Die Änderungen konnten nicht angewendet werden.",
       "undo": "Diesen Durchlauf rückgängig machen",
       "undoFailed": "Der Durchlauf konnte nicht rückgängig gemacht werden.",
       "undoReport": "{{reverted}} Notizen wiederhergestellt. {{kept}} vom Durchlauf erstellte Notizen wurden belassen.",
       "alreadyApplied": "Angewendet",
+      "appendFlag": "wird am Ende angefügt",
       "untitledNote": "Notiz ohne Titel",
       "vaultRoot": "Tresorwurzel",
       "newNotesHeading_one": "{{count}} neue Notiz",
@@ -3028,7 +3032,9 @@
       "recommendedFilesEmbedding": "Benötigt model.safetensors + config.json + tokenizer.json in einem Ordner.",
       "recommendedFilesGeneration": "Benötigt die .gguf-Datei + tokenizer.json im selben Ordner.",
       "recommendedFilesTranscription": "Benötigt die Whisper-.gguf-Datei + config.json + tokenizer.json im selben Ordner.",
-      "title": "KI"
+      "title": "KI",
+      "historyBudgetHelper": "Wie viel des jüngsten Gesprächs jede Anfrage mitführt, in Zeichen. Leer lassen für den Standardwert. Eine größere Zahl lässt die KI längeren Gesprächen folgen und sendet mehr davon: bei einem Anbieter, der nicht auf diesem Gerät läuft, verlässt damit bei jedem Schritt eines Laufs mehr Ihres Textes das Gerät.",
+      "historyBudgetLabel": "Mit jeder Anfrage übertragener Gesprächsverlauf"
     },
     "network": {
       "disabledCue": "Sync läuft nicht mehr über Tor. Neue Verbindungen gehen direkt zum Sync-Server.",
@@ -3344,7 +3350,8 @@
         "viewMode": "standard ansichtsmodus ansicht live lesen quelltext vorschau",
         "dateFormat": "datumsformat datum format tag monat jahr iso dd/mm mm/dd kalender",
         "timeFormat": "zeitformat uhrzeit format 24 stunden 12 stunden uhr am pm",
-        "timezone": "zeitzone zeitzonen zone tz utc iana region heute"
+        "timezone": "zeitzone zeitzonen zone tz utc iana region heute",
+        "aiHistoryBudget": "Gespräch Verlauf Kontext Gedächtnis Budget Zeichen Agent Chat Anfrage"
       }
     },
     "dateTime": {

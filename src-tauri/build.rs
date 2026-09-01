@@ -180,6 +180,7 @@ fn main() {
                 // permissions/prefs/default.toml is what actually wires this
                 // one — see the `prefs_read` siblings above for the same
                 // belt-and-suspenders pattern).
+                "set_chat_history_budget",
                 "set_developer_mode",
             ]),
         )
