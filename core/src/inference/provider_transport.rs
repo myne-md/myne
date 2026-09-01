@@ -6,7 +6,7 @@
 //! rather than rules a reader has to remember.
 //!
 //! **1. No new HTTP client.** The wire framing is
-//! `myne_core::http::codec`, the first-party HTTP/1.1 codec promoted out of the
+//! `crate::http::codec`, the first-party HTTP/1.1 codec promoted out of the
 //! sync plugin. `docs/dependency-policy.md` fast-rejects "adding an HTTP client
 //! when one already exists in the tree", and an HTTP crate is the one thing
 //! that genuinely trips the AI denylist gate.
@@ -58,8 +58,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::cancellable_io::{CancellableStream, CancelledFn, POLL_INTERVAL};
-use myne_core::http::codec::{build_http_request_ext, read_http_response};
-use myne_core::http::HttpMethod;
+use crate::http::codec::{build_http_request_ext, read_http_response};
+use crate::http::HttpMethod;
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 
@@ -549,7 +549,7 @@ mod tests {
     /// assertion passes even when two cases return the same thing.
     #[test]
     fn five_provider_outcomes_map_to_five_distinct_causes() {
-        use crate::plugins::local_inference::error::EngineError;
+        use crate::inference::error::EngineError;
 
         // (what happened, the transport cause, the engine cause the UI sees)
         let table: &[(&str, ProviderTransportError, EngineError)] = &[
@@ -703,7 +703,7 @@ mod tests {
     /// destination or a destination nothing can select.
     #[test]
     fn the_host_table_and_the_accepted_provider_names_agree() {
-        use myne_core::plugins::prefs::commands::KNOWN_AI_PROVIDERS;
+        use crate::plugins::prefs::commands::KNOWN_AI_PROVIDERS;
         let mut known: Vec<&str> = KNOWN_AI_PROVIDERS.to_vec();
         let mut hosted: Vec<&str> = PROVIDER_HOSTS.iter().map(|(n, _)| *n).collect();
         known.sort_unstable();

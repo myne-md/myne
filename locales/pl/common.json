@@ -50,7 +50,8 @@
       "unsupportedDetail": "Zaliczył {{passes}} z {{attempts}} sprawdzeń; wymagana liczba to {{required}}.",
       "checking": "Sprawdzanie modelu…",
       "checkingAt": "Sprawdzanie modelu… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Ten próg zaliczenia nie został jeszcze zmierzony na różnych modelach, więc może być bardziej lub mniej wymagający, niż powinien."
+      "unsupportedProvisional": "Ten próg zaliczenia nie został jeszcze zmierzony na różnych modelach, więc może być bardziej lub mniej wymagający, niż powinien.",
+      "scopeNone": "brak otwartej notatki, więc nie ma jeszcze nad czym pracować"
     },
     "progress": {
       "working": "Pracuje",
@@ -72,7 +73,8 @@
       "grantsModel_one": "{{count}} zakres na prośbę agenta",
       "grantsModel_few": "{{count}} zakresy na prośbę agenta",
       "grantsModel_many": "{{count}} zakresów na prośbę agenta",
-      "grantsModel_other": "{{count}} zakresu na prośbę agenta"
+      "grantsModel_other": "{{count}} zakresu na prośbę agenta",
+      "cancelledBackground": "Przebieg został anulowany, ponieważ Myne przeszła w tło. Nic nie zostało zapisane. Zapytaj ponownie, kiedy zechcesz."
     },
     "scope": {
       "title": "Uwzględnić {{folder}}?",
@@ -142,7 +144,10 @@
         "excludedFolder": "Nie utworzono: ten folder jest wykluczony z AI.",
         "createFailed": "Nie utworzono: zapis nowej notatki nie powiódł się. Pozostałe zmiany zostały zastosowane.",
         "excludedNow": "Nie można zastosować: folder tej notatki jest teraz wykluczony z AI.",
-        "notProposed": "Nie można zastosować: ta zmiana nie należy do propozycji tego przebiegu."
+        "notProposed": "Nie można zastosować: ta zmiana nie należy do propozycji tego przebiegu.",
+        "noteMoved": "Nie można zastosować: ta zmiana przeniosłaby notatkę do innego folderu.",
+        "appendEmpty": "Nie można zastosować: nie było czego dodać.",
+        "appendWouldWriteFrontmatter": "Nie można zastosować: ten tekst stałby się blokiem właściwości notatki."
       },
       "applyFailed": "Nie udało się zastosować zmian.",
       "undo": "Cofnij ten przebieg",
@@ -171,7 +176,8 @@
       "runSummaryOffDevice_few": "do dostawcy wysłano około {{count}} znaki Twoich notatek",
       "runSummaryOffDevice_many": "do dostawcy wysłano około {{count}} znaków Twoich notatek",
       "runSummaryOffDevice_other": "do dostawcy wysłano około {{count}} znaku Twoich notatek",
-      "runSummaryOnDevice": "nic nie opuściło tego urządzenia"
+      "runSummaryOnDevice": "nic nie opuściło tego urządzenia",
+      "appendFlag": "dodaje na końcu"
     },
     "undo": {
       "offer_one": "Ostatni przebieg zmienił {{count}} notatkę.",
@@ -190,7 +196,9 @@
       "createdNotReverted_one": "{{count}} notatka utworzona przez przebieg pozostała na miejscu.",
       "createdNotReverted_few": "{{count}} notatki utworzone przez przebieg pozostały na miejscu.",
       "createdNotReverted_many": "{{count}} notatek utworzonych przez przebieg pozostało na miejscu.",
-      "createdNotReverted_other": "{{count}} notatki utworzonej przez przebieg pozostało na miejscu."
+      "createdNotReverted_other": "{{count}} notatki utworzonej przez przebieg pozostało na miejscu.",
+      "sessionOnly": "To cofnięcie jednym dotknięciem działa, dopóki nie zablokujesz sejfu lub nie zamkniesz aplikacji. Potem przywracasz notatki pojedynczo z historii wersji notatki.",
+      "sessionOnlyLink": "Otwórz historię wersji"
     }
   },
   "ai": {
@@ -721,6 +729,12 @@
       },
       "unfoldAll": {
         "label": "Rozwiń wszystko"
+      },
+      "openThisWeekNote": {
+        "label": "Otwórz notatkę z tego tygodnia"
+      },
+      "openThisMonthNote": {
+        "label": "Otwórz notatkę z tego miesiąca"
       }
     },
     "hotkeys": {
@@ -1296,7 +1310,9 @@
       "replaceAllCount": "Zamień wszystko ({{total}})",
       "replaceOne": "Zamień",
       "replacePlaceholder": "Zamień na",
-      "toggleReplace": "Przełącz zamianę"
+      "toggleReplace": "Przełącz zamianę",
+      "dateFallback": "Trwa wyszukiwanie {{stored}}, czyli postaci, w jakiej ta data jest zapisana.",
+      "replaceOffOnDateFallback": "Zamiana jest wyłączona, dopóki data jest znajdowana przez swoją zapisaną postać, żeby zamiana nie uczyniła jej nieczytelną."
     },
     "cover": {
       "add": "Dodaj okładkę",
@@ -1649,6 +1665,13 @@
     "commandPalette": {
       "searchPlaceholder": "Szukaj notatek lub uruchom polecenie…",
       "noMatches": "Brak pasujących poleceń lub notatek."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Nie udało się otworzyć dzisiejszej notatki.",
+        "weekly": "Nie udało się otworzyć notatki z tego tygodnia.",
+        "monthly": "Nie udało się otworzyć notatki z tego miesiąca."
+      }
     }
   },
   "export": {
@@ -2983,20 +3006,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Pusty (bez szablonu)",
+      "folderSearchEmpty": "Brak pasujących folderów.",
+      "folderSearchPlaceholder": "Szukaj folderów…",
+      "searchEmpty": "Brak pasujących szablonów.",
+      "searchPlaceholder": "Szukaj szablonów…",
+      "untitledTemplate": "Szablon bez tytułu",
+      "sectionDaily": "Notatki dzienne",
+      "sectionWeekly": "Notatki tygodniowe",
+      "sectionMonthly": "Notatki miesięczne",
+      "periodFolderLabel": "Folder",
+      "periodFolderHelper": "Gdzie trafiają nowe notatki {{period}}. Domyślnie: {{default}}. Folder zostaje zachowany, nawet gdy jest pusty.",
+      "periodFormatLabel": "Format tytułu",
+      "periodFormatHelperDaily": "Tytuł każdej notatki dziennej. Obsługuje YYYY, MM, DD, gggg (rok tygodniowy ISO), ww (numer tygodnia ISO) oraz [tekst] dla tekstu dosłownego. Domyślnie: {{default}}.",
+      "periodFormatHelperWeekly": "Tytuł każdej notatki tygodniowej. Obsługuje gggg (rok tygodniowy ISO), ww (numer tygodnia ISO), YYYY, MM, DD oraz [tekst] dla tekstu dosłownego. Domyślnie: {{default}}.",
+      "periodFormatHelperMonthly": "Tytuł każdej notatki miesięcznej. Obsługuje YYYY, MM, gggg (rok tygodniowy ISO), ww (numer tygodnia ISO) oraz [tekst] dla tekstu dosłownego. Domyślnie: {{default}}.",
+      "periodTemplateLabel": "Szablon",
+      "periodTemplateHelper": "Wybierz szablon, od którego zaczyna się każda notatka {{period}}, albo zostaw puste, by utworzyć pustą notatkę z datą w tytule.",
+      "collisionWarning": "Notatki {{first}} i {{second}} prowadzą do tej samej notatki, ponieważ dzielą folder i dają ten sam tytuł. Obie komendy ją otworzą.",
+      "weekStartNote": "Tygodnie zaczynają się w poniedziałek (ISO 8601), więc pierwsze dni stycznia mogą należeć do ostatniego tygodnia poprzedniego roku, a ostatnie dni grudnia do pierwszego tygodnia następnego.",
+      "periodFolderSaveError": "Nie udało się zapisać folderu {{period}}. Spróbuj ponownie.",
+      "periodFormatSaveError": "Nie udało się zapisać formatu tytułu {{period}}. Spróbuj ponownie.",
+      "periodTemplateSaveError": "Nie udało się zapisać szablonu {{period}}. Spróbuj ponownie.",
+      "periodNameDaily": "dzienne",
+      "periodNameWeekly": "tygodniowe",
+      "periodNameMonthly": "miesięczne",
+      "periodFolderAriaLabel": "Folder notatek {{period}}",
+      "periodFormatAriaLabel": "Format tytułu notatek {{period}}",
+      "periodTemplateAriaLabel": "Szablon notatek {{period}}",
       "dateFormatHelper": "Tytuł każdej notatki dziennej. Obsługuje YYYY, MM, DD. Domyślnie {{default}}.",
       "dateFormatLabel": "Format daty notatki dziennej",
       "dateFormatSaveError": "Nie udało się zapisać formatu daty. Spróbuj ponownie.",
       "folderHelper": "Gdzie są zapisywane nowe notatki dzienne. Domyślnie {{default}}. Folder jest zachowywany, nawet gdy jest pusty.",
       "folderLabel": "Folder notatek dziennych",
       "folderSaveError": "Nie udało się zapisać folderu notatek dziennych. Spróbuj ponownie.",
-      "folderSearchEmpty": "Brak pasujących folderów.",
-      "folderSearchPlaceholder": "Szukaj folderów…",
-      "searchEmpty": "Brak pasujących szablonów.",
-      "searchPlaceholder": "Szukaj szablonów…",
       "templateHelper": "Wybierz szablon, od którego zacznie się każda notatka dzienna, lub pozostaw puste, aby utworzyć pustą notatkę z tytułem w postaci daty.",
       "templateLabel": "Szablon notatki dziennej",
-      "templateSaveError": "Nie udało się zapisać szablonu notatki dziennej. Spróbuj ponownie.",
-      "untitledTemplate": "Szablon bez tytułu"
+      "templateSaveError": "Nie udało się zapisać szablonu notatki dziennej. Spróbuj ponownie."
     },
     "deleteVault": {
       "cancel": "Anuluj",
@@ -3159,7 +3204,8 @@
         "title": "Zanim Myne cokolwiek wyśle do {{provider}}",
         "whatLabel": "Co opuszcza Twoje urządzenie",
         "whenLabel": "Kiedy opuszcza urządzenie",
-        "whoLabel": "Kto to otrzymuje"
+        "whoLabel": "Kto to otrzymuje",
+        "connectionLabel": "Jak to podróżuje"
       },
       "disclosureToggle": "Jak to działa?",
       "enableHelper": "Uruchamia dostarczony przez Ciebie model. To, gdzie działa i czy Twoje notatki opuszczają to urządzenie, zależy od dostawcy, którego wskażesz poniżej. Eksperymentalne, domyślnie wyłączone.",
@@ -3193,7 +3239,9 @@
         "refused": "Dostawca odmówił połączenia. Może być niedostępny albo blokować tę sieć.",
         "timeout": "Dostawca nie odpowiedział na czas. Nic nie działa już w tle.",
         "unauthorized": "Dostawca odrzucił Twój klucz API. Zastąp go: może być błędny, unieważniony albo należeć do innego konta.",
-        "unreachable": "Nie udało się połączyć z dostawcą. Sprawdź połączenie sieciowe."
+        "unreachable": "Nie udało się połączyć z dostawcą. Sprawdź połączenie sieciowe.",
+        "featureOff": "SI jest wyłączona na tym urządzeniu. Nic nie zostało wysłane. Włącz ją w Ustawieniach, w sekcji SI.",
+        "consentMissing": "Nie wyraziłeś zgody na wysyłanie notatek do tego dostawcy z tego urządzenia. Nic nie zostało wysłane. Wybierz dostawcę ponownie w Ustawieniach, w sekcji SI, i przeczytaj, co zostanie wysłane."
       },
       "modelChoose": "Wybierz plik…",
       "modelEmbeddingLabel": "Model wyszukiwania: wyszukiwanie semantyczne i pytania/odpowiedzi",
@@ -3238,7 +3286,16 @@
       "recommendedFilesTranscription": "Wymaga pliku Whisper .gguf + config.json + tokenizer.json w tym samym folderze.",
       "title": "AI",
       "providerModelCount_few": "Dostępne {{count}} modele.",
-      "providerModelCount_many": "Dostępnych {{count}} modeli."
+      "providerModelCount_many": "Dostępnych {{count}} modeli.",
+      "mobileEnableLabel": "Używaj SI na tym telefonie",
+      "mobileEnableHelper": "Domyślnie wyłączone. Żaden model AI w tym telefonie nie odpowiada na pytania ani nie czyta Twoich notatek, więc każde żądanie trafia do usługi wskazanej poniżej, a Twoje notatki wtedy opuszczają to urządzenie. Transkrypcja i tekst ze zdjęć nadal działają tutaj, na modelach dostarczanych z Myne.",
+      "mobileKeyAdd": "Zapisz klucz",
+      "mobileKeyReplace": "Zmień klucz",
+      "mobileRevokeHelper": "Usuwa razem dostawcę, jego klucz i zgodę tego telefonu, pozostawiając dokładnie stan sprzed jakiejkolwiek konfiguracji. Inne urządzenia działają dalej, dopóki nie usuniesz tego również tam.",
+      "mobileApproveLabel": "Zezwól na wysyłanie z tego telefonu",
+      "mobileApproveHelper": "Dostawca i jego klucz pochodzą z innego urządzenia. Z tego telefonu nic nie jest wysyłane, dopóki nie przeczytasz, co zostanie wysłane, i nie zezwolisz na to tutaj.",
+      "historyBudgetHelper": "Ile ostatniej rozmowy niesie każde żądanie, w znakach. Pozostaw puste, aby użyć wartości domyślnej. Większa liczba pozwala AI śledzić dłuższe rozmowy i wysyła ich więcej: u dostawcy, który nie działa na tym urządzeniu, oznacza to więcej twojego tekstu opuszczającego je, na każdym kroku uruchomienia.",
+      "historyBudgetLabel": "Rozmowa wysyłana z każdym żądaniem"
     },
     "network": {
       "disabledCue": "Synchronizacja nie jest już kierowana przez Tor. Nowe połączenia idą prosto do serwera synchronizacji.",
@@ -3562,12 +3619,14 @@
         "viewMode": "domyślny tryb widoku na żywo czytanie źródło podgląd view mode",
         "dateFormat": "format daty dzień miesiąc rok iso dd mm kalendarz date format",
         "timeFormat": "format godziny czas zegar 24 12 godzinny am pm time format clock",
-        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone"
+        "timezone": "strefa czasowa strefy czasu tz utc iana region dzisiaj timezone time zone",
+        "periodicNotes": "notatki okresowe tygodniowe miesięczne tydzień miesiąc folder szablon format",
+        "aiHistoryBudget": "rozmowa historia kontekst pamięć budżet znaki agent czat żądanie"
       }
     },
     "dateTime": {
       "dateLabel": "Format daty",
-      "dateHelper": "Jak daty są pokazywane w zadaniach, zapisanych widokach i załącznikach.",
+      "dateHelper": "Jak zapisywana jest data wszędzie tam, gdzie Myne ją pokazuje.",
       "dateSystem": "Zgodnie z językiem",
       "timeLabel": "Format godziny",
       "timeHelper": "Czy godziny są pokazywane w formacie 24- czy 12-godzinnym.",

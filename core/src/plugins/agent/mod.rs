@@ -14,10 +14,19 @@
 //! host implements, not on the host's plugin. A change here that wants to reach
 //! into `local_inference` has gone wrong.
 //!
-//! **What this module deliberately cannot do.** It has two verbs, edit a note
-//! body and create a note, and no third. Deletion is not among them because it
-//! does not need to be: every way Myne takes a note out of the working set is a
-//! frontmatter field, so doing it is a body edit and is reversible. That is
+//! **What this module deliberately cannot do.** It has three verbs, all of them
+//! writes to a note's body or a new note: replace anchored text, append to the
+//! end, and create a note. Deletion is not among them because it does not need
+//! to be: every way Myne takes a note out of the working set is a frontmatter
+//! field, so doing it is a body edit and is reversible.
+//!
+//! **And one thing the verbs may not do, added with the third**
+//! (myne-md/myne#616): no write may change which folder a note is in. `folder:`
+//! is what the `ai_excluded_folders` clamp reads, and the clamp runs before the
+//! batch, so an edit rewriting that line would relocate a note past a control
+//! that had already decided. [`frontmatter`] is the predicate; unlike the
+//! removal carve-out it refuses under every approval label, because no user act
+//! makes an agent-chosen folder move correct. That is
 //! also why [`hide`] exists: those edits look like any other at the diff layer,
 //! and an approve-all must not carry one. Note move, note rename, folder
 //! operations and attachment operations are all absent. Rename in particular is
@@ -36,7 +45,27 @@ pub mod apply;
 pub mod edit;
 pub mod engine;
 pub mod error;
+pub mod frontmatter;
 pub mod hide;
+pub mod history;
+/// The host-generic half of the agent command surface: the session table, the
+/// guards, the scope source, and `step`. Both Tauri clients call into it and
+/// supply only their own engine and searcher; see the module doc for the split.
+/// The Tauri-host adapters an agent run needs: reading a note, taking its
+/// restore point, writing the approved batch.
+///
+/// **Here rather than in `crate::inference`, and that placement is
+/// load-bearing.** It shipped there for one review round and broke the audit
+/// build outright: `cargo check -p myne-desktop --no-default-features` failed
+/// with `cannot find inference in crate`, because this plugin compiles
+/// unconditionally while `crate::inference` is behind the default-off
+/// `remote-ai` feature. The file has no remote-provider content at all, its
+/// imports are this plugin, the notes command cores, `TauriHost`, the snapshot
+/// store and `StdVaultIo`: so the gate it sat behind was buying nothing and
+/// costing the one build that gate exists to protect.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+pub mod host_adapters;
+pub mod host_commands;
 pub mod probe;
 pub mod prompt;
 pub mod run;

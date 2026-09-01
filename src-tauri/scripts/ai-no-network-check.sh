@@ -32,12 +32,20 @@
 #
 #   (1) sync — unchanged, and unchanged in its gating;
 #   (2) the AI REMOTE PROVIDER arm
-#       (`src/plugins/local_inference/provider_transport.rs`), gated by a
+#       (`core/src/inference/provider_transport.rs`, moved out of the desktop
+#       plugin by myne-md/myne#456), gated by a
 #       user-named provider PLUS a recorded per-provider consent PLUS a stored
-#       key PLUS `ai_enabled` PLUS `developer_mode` — five preconditions
-#       re-read host-side at request time, every one of which defaults to off
-#       (`provider_gate.rs`). With none named, the arm is UNREACHABLE, which
-#       an accept-counting probe with a control arm proves rather than asserts
+#       key PLUS `ai_enabled`, FOUR preconditions re-read host-side at request
+#       time, every one of which defaults to off (`provider_gate.rs`). It was
+#       five until myne-md/myne#456 dropped `developer_mode`: per-provider
+#       consent names the recipient and is compared for equality, which is a
+#       sharper marker of leaving the vouched path than a global switch that
+#       also governs CLI access and the Vim keymap. `ai_enabled` is now the only
+#       device-local switch here, and the compensating control landed in the
+#       same change, `ai_provider_consent` became `DeviceLocal`, so a synced
+#       key cannot make a device a sending device without somebody agreeing on
+#       that device. With none named, the arm is UNREACHABLE, which an
+#       accept-counting probe with a control arm proves rather than asserts
 #       (`provider_gate.rs::default_off_proof`).
 #
 # So the honest reading of the allowlist is no longer "these crates have
@@ -56,7 +64,7 @@
 # are those three; the AI delta adds zero networked crate. Re-measured
 # 2026-08-09 with the remote arm in the tree: still those three.)
 #
-# FOUR checks run, and checks 1-2 prove LESS than their names suggest:
+# FIVE checks run, and checks 1-2 prove LESS than their names suggest:
 #   1. ABSOLUTE — scan the shipped (default, AI-on) closure; fail on any
 #      denylisted crate that is NOT in the SYNC_TLS_ALLOW allowlist. If sync
 #      ever swaps its TLS crate, this fails on purpose and forces a conscious
@@ -82,6 +90,10 @@
 #      carries the property checks 1-2 cannot express. Full rationale sits at
 #      its own section below, next to the code. It lands with an EMPTY
 #      allowlist, before any provider code exists.
+#   5. THE REMOTE ARM IS STILL GATED (myne-md/myne#456), the arm moved into
+#      `myne-core`, which compiles unconditionally, so what keeps it out of the
+#      auditable build is now a feature CHAIN rather than the file's location.
+#      Asserts both directions of that chain. Full rationale next to the code.
 #
 # NOTE on the `--no-default-features` build (MYND-441): it is no longer
 # "ML-free". It drops the generation model, the embedding model and ASR, and it
@@ -108,8 +120,8 @@ FEATURE="local-inference"
 # — the shared TLS transport stack. These are transport primitives (no HTTP
 # client, no model download). They are reachable from TWO paths, not one: the
 # Phase-2 sync transport (CSP `connect-src` + Tauri sync capabilities) and, as
-# of myne#415, the AI remote-provider arm (five host-side preconditions, all
-# defaulting to off). The header above spells both out; the short version is
+# of myne#415, the AI remote-provider arm (four host-side preconditions since
+# myne-md/myne#456, all defaulting to off). The header above spells both out; the short version is
 # that "not an AI dependency" stopped being true on 2026-08-09 and the list did
 # not grow to accommodate that — the RATIONALE changed, which is the honest
 # edit. Keep this list minimal: a new entry is a deliberate TB9 decision.
@@ -237,6 +249,50 @@ for crate in $OCR_CRATES; do
   fi
 done
 
+# ── Check 5: THE REMOTE ARM IS STILL GATED (myne-md/myne#456). ────────────
+#    The remote-provider arm moved out of this crate and into `myne-core`,
+#    which (unlike the desktop plugin it left) compiles unconditionally. The
+#    property that survived that move is a chain: the desktop `local-inference`
+#    feature turns on `myne-core/remote-ai`, and nothing else does. Break any
+#    link (enable `remote-ai` at the dependency line, drop the `#[cfg]` on the
+#    module, make the feature default-on in `myne-core`) and the auditable
+#    `--no-default-features` build silently starts carrying provider-transport
+#    code for the first time.
+#
+#    `webpki-roots` is the tell, and it is a tight one rather than a proxy that
+#    could drift: it is optional and reached ONLY through `remote-ai`, and
+#    `provider_transport.rs` names `webpki_roots::TLS_SERVER_ROOTS` directly, so
+#    the crate and the code cannot enter the graph separately. If the arm
+#    compiles, this crate is in the closure; if it does not, it is not.
+#
+#    Asserted in BOTH directions on purpose. "Absent from the baseline" alone
+#    passes on a tree where the arm has been deleted outright, and "present in
+#    the shipped tree" alone passes on a tree where the gate has been removed.
+#    Neither half is the property; the pair is.
+echo "== the remote-AI arm is gated out of the --no-default-features build =="
+REMOTE_ARM_TELL="webpki-roots"
+tell_on=0; tell_off=0
+printf '%s\n' "$on"  | grep -qx "$REMOTE_ARM_TELL" && tell_on=1
+printf '%s\n' "$off" | grep -qx "$REMOTE_ARM_TELL" && tell_off=1
+if [ "$tell_on" -eq 1 ] && [ "$tell_off" -eq 0 ]; then
+  echo "  ✓ $REMOTE_ARM_TELL is in the shipped tree and absent from the audit build"
+elif [ "$tell_off" -eq 1 ]; then
+  echo "  ✗ $REMOTE_ARM_TELL is in the --no-default-features closure:"
+  echo "    the remote-provider arm now compiles into the AI-free auditable"
+  echo "    build, which it never did while it lived in this crate. Check that"
+  echo "    'myne-core/remote-ai' rides on the 'local-inference' feature rather"
+  echo "    than on the myne-core dependency line, and that 'remote-ai' is not"
+  echo "    in myne-core's default feature set."
+  violation=1
+else
+  echo "  ✗ $REMOTE_ARM_TELL is missing from the SHIPPED tree:"
+  echo "    the remote-provider arm is not being built at all. Either the"
+  echo "    'local-inference' feature stopped implying 'myne-core/remote-ai',"
+  echo "    or the arm was removed. This check reports a missing input as a"
+  echo "    failure rather than passing on a tree it could not measure."
+  violation=1
+fi
+
 # ── Check 4: AI-PATH EGRESS CALL SITES — the ratchet that carries the property
 #    checks 1–2 cannot express (`decisions.md` 2026-08-09). ─────────────────
 #
@@ -288,7 +344,20 @@ echo "== AI-path egress call sites (ratchet) =="
 # No socket exists on either today, so adding them starts their allowlist empty
 # exactly as #414 landed this check: a later shortcut in `EngineAdapter` would
 # add no crate, pass checks 1 and 2, and have to argue for its own entry here.
-AI_EGRESS_ROOTS="src-tauri/src/plugins/local_inference src-tauri/src/plugins/agent core/src/plugins/agent"
+# `core/src/inference` joined the roots when the inference seam and the remote
+# arm moved out of the desktop plugin (myne-md/myne#456). The move alone would
+# have taken the whole remote transport OUT of this scan while every record
+# below still named its old path, so the roots and the four records are edited
+# in the same commit as the move. The other direction is what makes that
+# reliable: a recorded site whose file no longer exists fails below, so a move
+# that forgets this line cannot report ok.
+# The last entry is the SECOND client that ships the remote arm
+# (myne-md/myne#456). It lands with zero matches, which is the point: the entry
+# has to exist before the first socket, not after one. `mobile/src-tauri/Cargo.toml`
+# enables `myne-core/remote-ai` directly, so that tree compiles
+# `provider_transport.rs`, and a call site added there would otherwise add no
+# crate, pass checks 1 and 2, and never be opened by check 4.
+AI_EGRESS_ROOTS="src-tauri/src/plugins/local_inference src-tauri/src/plugins/agent core/src/plugins/agent core/src/inference mobile/src-tauri/src/plugins/agent"
 
 # One record per line: <repo-relative-path>|<exact count>|<reason>
 #
@@ -298,9 +367,9 @@ AI_EGRESS_ROOTS="src-tauri/src/plugins/local_inference src-tauri/src/plugins/age
 # again. A guard added after the thing it watches cannot do that.
 AI_EGRESS_SITES=$(cat <<'EOF'
 src-tauri/src/plugins/local_inference/engine_ollama.rs|9|The local model-runtime arm (#189). Loopback-only BY CONSTRUCTION rather than by a check written at the socket: the host and port it connects to can only have come from `endpoint_config::validate`, which resolves through myne-core's single `is_loopback` predicate — a literal match against `127.0.0.1` / `localhost` / `::1`, never a resolved address, which is what closes the DNS-rebind hole a free-form URL field would open. There is therefore no source IP to expose and nothing for Tor mode to route around, the same argument `no_bypass.rs`'s `http_transport.rs` entry makes about the sync loopback transport. The count is 9, not 1, and it counts LINES because the guard is a grep: 2 production calls (`to_socket_addrs`, needed because `connect_timeout` takes a resolved address, and `connect_timeout` itself), 6 `TcpListener::bind` fake servers in the test module (one per timing scenario), and 1 COMMENT line that happens to name `connect_timeout`. That comment is counted on purpose — see the strictness note below; it is also why the arithmetic here reads 2+6+1 rather than 2+6. The count moved 3 -> 8 when the deadlines landed and 8 -> 9 at b36dc7d2 (#445), which added a seventh fake server for the cancel-one-request test and left this number behind; the drift sat undetected for days because CI was not running on push at all. An exact count rather than a boolean is the whole reason this was catchable. This guard does not strip `#[cfg(test)]` — it is a shell script, not a Rust parser — and that is left deliberately strict: a socket parked in a test-only block that production can still reach would otherwise be invisible here.
-src-tauri/src/plugins/local_inference/provider_gate.rs|2|TEST FIXTURES ONLY — the gate itself opens nothing; it returns a decision. The two matches are a `TcpListener::bind` and a `TcpStream::connect` inside `default_off_proof`, the accept-counting probe for the invariant this whole slice rests on: with no provider named, SEVEN distinct unconfigured states each open ZERO sockets. The probe must be able to open one — that is the CONTROL ARM, and without it the seven zeros would be compatible with a probe that could never see anything (`rustls_transport.rs`: "the probe must be able to see a direct connection, or the zero above proves nothing"). Recording the fixture is the price of a probe that measures rather than asserts.
-src-tauri/src/plugins/local_inference/state.rs|5|TEST FIXTURES ONLY — the seam itself opens nothing. `state.rs` is the SYNC-14/SYNC-16 bar, and its two matches are a `TcpListener::bind` and a `TcpStream::connect` inside `remote_bar_proof`: a counting listener plus a deliberately-connecting fake engine, which together prove that an ambient request against a Remote-class backend reaches the network ZERO times. The probe has to be able to open a socket, or its zero would prove nothing — that is the point of the control arm, and it is why this file appears here at all. This guard does not strip `#[cfg(test)]`, deliberately; recording the fixture is the cost of a probe that can actually see a connection. Moved 2 -> 5 in task 18, when the selection became prefs-driven and a second probe was needed: `selection_proof` registers a Remote-class arm that CONNECTS when reached and drives the wired seam (`engine_for` / `embedding_engine`) across eight unconfigured states, asserting zero accepts, then one in the control arm. Its three matches are that module's `TcpListener::bind` and two `TcpStream::connect` (one in the fake engine's `infer`, one in its `embed` — the embed fixture connects on purpose, because a fake that refused would make "embedding opened no socket" true of the fake rather than of the seam). Production in this file remains ZERO: the bar and the selection both return an `Arc<dyn Engine>` and neither touches a socket.
-src-tauri/src/plugins/local_inference/provider_transport.rs|8|The REMOTE provider arm (myne#415). TWO callers now reach it, both user-initiated and both through the same five-precondition gate: a completion (`RemoteEngine::chat_streaming`) and the model listing the chooser populates from (`commands::list_provider_models`, task 17 / SYNC-24). The listing fetches model NAMES and no weights, so it stays on the permitted side of the pull-or-download line `decisions.md` 2026-08-09 draws; it is recorded here rather than waved past because an authenticated listing call still tells the provider this account exists. The count below does not move for it — it opens no socket of its own, it borrows this module's one `connect`. This is the entry the ratchet was landed empty to force an argument for, and the argument is not "loopback, so it is fine" — this socket leaves the device, carrying note plaintext, which is the whole of what `decisions.md` 2026-08-09 superseded the old no-egress claim to permit. What bounds it is not the check at the socket but the SHAPE of the type: `TcpStream::connect_timeout` is reachable only from `ProviderTransport::connect`, which takes a `ProviderHost` — a struct with a PRIVATE `&'static str` field, minted only by `ProviderHost::resolve` against the compiled-in `PROVIDER_HOSTS` table. There is no constructor taking caller-supplied text, so a tampered `vault.prefs`, a compromised WebView, or a careless future caller can select AMONG the hosts this build ships and cannot invent one. TLS verification is the stock rustls chain+hostname check against the static `webpki-roots` bundle, with no `.dangerous()` and no custom verifier anywhere in the module — asserted by `there_is_no_verification_bypass_in_this_module`, which reads production lines with comments stripped, because this file's own doc comment says the words. The count is 8, not 1. Production contributes 2 — `to_socket_addrs` (needed because `connect_timeout` takes a resolved address) and `connect_timeout` itself. The other 6 are test fixtures: 3 `TcpListener::bind` and 3 `TcpStream::connect` across the untrusted-certificate arm, the never-responding-provider deadline test and the pre-first-byte cancel test. It moved 4 -> 8 when task 6's deadline and cancel landed, and this ratchet is what noticed — an exact count rather than a boolean is the whole reason it could. As with the loopback entry, `#[cfg(test)]` is NOT stripped, deliberately.
+core/src/inference/provider_gate.rs|2|TEST FIXTURES ONLY (the gate itself opens nothing; it returns a decision. The two matches are a `TcpListener::bind` and a `TcpStream::connect` inside `default_off_proof`, the accept-counting probe for the invariant this whole slice rests on: with no provider named, SIX distinct unconfigured states each open ZERO sockets. Six rather than seven since myne-md/myne#456 removed `developer_mode` from the precondition set; the row went with the precondition rather than being converted, because with the flag unread it would have been the fully-configured state asserting zero sockets, which is what the control arm proves the opposite of. The probe must be able to open one) that is the CONTROL ARM, and without it the six zeros would be compatible with a probe that could never see anything (`rustls_transport.rs`: "the probe must be able to see a direct connection, or the zero above proves nothing"). Recording the fixture is the price of a probe that measures rather than asserts.
+core/src/inference/state.rs|5|TEST FIXTURES ONLY (the seam itself opens nothing. `state.rs` is the SYNC-14/SYNC-16 bar, and its two matches are a `TcpListener::bind` and a `TcpStream::connect` inside `remote_bar_proof`: a counting listener plus a deliberately-connecting fake engine, which together prove that an ambient request against a Remote-class backend reaches the network ZERO times. The probe has to be able to open a socket, or its zero would prove nothing) that is the point of the control arm, and it is why this file appears here at all. This guard does not strip `#[cfg(test)]`, deliberately; recording the fixture is the cost of a probe that can actually see a connection. Moved 2 -> 5 in task 18, when the selection became prefs-driven and a second probe was needed: `selection_proof` registers a Remote-class arm that CONNECTS when reached and drives the wired seam (`engine_for` / `embedding_engine`) across eight unconfigured states, asserting zero accepts, then one in the control arm. Its three matches are that module's `TcpListener::bind` and two `TcpStream::connect` (one in the fake engine's `infer`, one in its `embed`: the embed fixture connects on purpose, because a fake that refused would make "embedding opened no socket" true of the fake rather than of the seam). Production in this file remains ZERO: the bar and the selection both return an `Arc<dyn Engine>` and neither touches a socket.
+core/src/inference/provider_transport.rs|8|The REMOTE provider arm (myne#415). TWO callers now reach it, both user-initiated and both through the same four-precondition gate: a completion (`RemoteEngine::chat_streaming`) and the model listing the chooser populates from (`commands::list_provider_models`, task 17 / SYNC-24). The listing fetches model NAMES and no weights, so it stays on the permitted side of the pull-or-download line `decisions.md` 2026-08-09 draws; it is recorded here rather than waved past because an authenticated listing call still tells the provider this account exists. The count below does not move for it (it opens no socket of its own, it borrows this module's one `connect`). This is the entry the ratchet was landed empty to force an argument for, and the argument is not "loopback, so it is fine": this socket leaves the device, carrying note plaintext, which is the whole of what `decisions.md` 2026-08-09 superseded the old no-egress claim to permit. What bounds it is not the check at the socket but the SHAPE of the type: `TcpStream::connect_timeout` is reachable only from `ProviderTransport::connect`, which takes a `ProviderHost` (a struct with a PRIVATE `&'static str` field, minted only by `ProviderHost::resolve` against the compiled-in `PROVIDER_HOSTS` table). There is no constructor taking caller-supplied text, so a tampered `vault.prefs`, a compromised WebView, or a careless future caller can select AMONG the hosts this build ships and cannot invent one. TLS verification is the stock rustls chain+hostname check against the static `webpki-roots` bundle, with no `.dangerous()` and no custom verifier anywhere in the module, asserted by `there_is_no_verification_bypass_in_this_module`, which reads production lines with comments stripped, because this file's own doc comment says the words. The count is 8, not 1. Production contributes 2: `to_socket_addrs` (needed because `connect_timeout` takes a resolved address) and `connect_timeout` itself. The other 6 are test fixtures: 3 `TcpListener::bind` and 3 `TcpStream::connect` across the untrusted-certificate arm, the never-responding-provider deadline test and the pre-first-byte cancel test. It moved 4 -> 8 when task 6's deadline and cancel landed, and this ratchet is what noticed: an exact count rather than a boolean is the whole reason it could. As with the loopback entry, `#[cfg(test)]` is NOT stripped, deliberately.
 EOF
 )
 

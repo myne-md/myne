@@ -54,6 +54,13 @@ const RENDERS_NOTHING = new Set([
   // a native save dialog and an OS file-manager reveal, neither of which this
   // client has. Renders `null`, so there is nothing for a testid to name.
   join("web", "src", "screens", "vault-creation", "ReadyLocalArtefacts.tsx"),
+  // The vault-import setup step (myne-md/myne#464). It renders nothing because
+  // it THROWS: `vaultImport` is absent here, so `availableSourceOrder()` never
+  // offers the card and the component is unreachable. A stub that returned
+  // `null` instead would swallow a routing bug that made it reachable, which is
+  // the one thing this substitution must not do, since the real module takes a
+  // 24-word recovery phrase.
+  join("web", "src", "notes", "import", "MyneVaultSetup.tsx"),
   join("web", "src", "main.tsx"), // the entry point; mounts, renders no markup of its own
 ]);
 

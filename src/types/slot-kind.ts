@@ -57,4 +57,19 @@
  * (the IPC contract pins `Slot::Unlocked` as the success
  * postcondition).
  */
-export type SlotKind = "Empty" | "Recovering" | "Unlocked";
+export type SlotKind =
+  | "Empty"
+  | "Recovering"
+  | "Unlocked"
+  /**
+   * A vault opened READ-ONLY as the source of a vault import
+   * (myne-md/myne#464). Not an unlock and never promotes to one: every
+   * editor command matches `Slot::Unlocked` and rejects this variant at
+   * compile time on the Rust side.
+   *
+   * Reachable from `vault_slot_kind(vaultId)` whenever the caller passes
+   * an explicit id, which the import picker does. It is NOT reachable
+   * from the active-vault probe, which resolves an `Unlocked` entry else
+   * a `Recovering` one and deliberately does not see an import source.
+   */
+  | "ImportSource";

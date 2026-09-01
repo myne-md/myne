@@ -33,6 +33,14 @@ export type RenderContext = {
   time: string;
   datetime: string;
   weekday: string;
+  /**
+   * The first day of the period being instantiated, pre-formatted by the host
+   * (myne#177). Defined for every period: for a daily note it is today, so a
+   * template never renders an empty token depending on where it was used.
+   */
+  periodStart: string;
+  /** The last day of that period, inclusive. Equals `periodStart` for daily. */
+  periodEnd: string;
 };
 
 /**
@@ -47,13 +55,22 @@ const REGISTRY: ReadonlyArray<[string, (ctx: RenderContext) => string]> = [
   ["title", (c) => c.title],
   ["datetime", (c) => c.datetime],
   ["weekday", (c) => c.weekday],
+  // myne#177. `{{date}}` deliberately keeps meaning TODAY in every context.
+  // A template is an ordinary note and the same file can be both a weekly
+  // template and something instantiated by hand, so a token whose meaning
+  // depended on the call site would make one file say two things. These two
+  // name the period explicitly instead.
+  ["period_start", (c) => c.periodStart],
+  ["period_end", (c) => c.periodEnd],
 ];
 
 /**
  * The supported token names, sourced from the one {@link REGISTRY}. The
  * template-management UI reads its `{{` autocomplete vocabulary from here so the
  * menu can never drift from what {@link renderTemplate} actually substitutes.
- * v1: `["date", "time", "title", "datetime", "weekday"]`.
+ * The enumeration that used to sit here was a second copy of the registry, and
+ * it was false the moment myne#177 appended two names to it. Read
+ * {@link REGISTRY}, which is four lines up.
  */
 export const SUPPORTED_TOKENS: readonly string[] = REGISTRY.map(([name]) => name);
 

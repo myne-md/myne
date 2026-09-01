@@ -361,7 +361,16 @@ pub async fn attachment_import_with_dir(
     state: &VaultRuntimeState,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
-    attachment_import_with_dir_ext(io, host, vault_dir, state, source, None, no_op_extract).await
+    attachment_import_with_dir_ext(
+        io,
+        host,
+        vault_dir,
+        state,
+        source,
+        IngestPolicy::fresh(),
+        no_op_extract,
+    )
+    .await
 }
 
 /// No-op text extractor: reports every input as `Unsupported`, so the eager
@@ -375,6 +384,68 @@ fn no_op_extract(_content_type: &str, _filename: &str, _bytes: &[u8]) -> Extract
     )
 }
 
+/// Whether the ingest path may re-encode an eligible image on the way in.
+///
+/// An enum rather than a `bool` because a bare `true`/`false` at a call site
+/// says nothing about WHY, and the two reasons are not symmetric. The ordinary
+/// paste / drop / file-pick path is [`Self::Apply`]: the bytes are arriving from
+/// outside the vault for the first time and the compression preference is the
+/// user's answer about them. [`Self::SkipAlreadyCanonical`] exists for exactly
+/// one caller, the vault-import re-seal (myne-md/myne#464), where the bytes are
+/// already a Myne vault's stored bytes and have been through this gate once
+/// under their own vault's preference. Re-encoding them there is generation
+/// loss on a copy the user did not ask to have re-processed.
+///
+/// It disables a lossy TRANSFORM and nothing else. The MIME allowlist re-sniff,
+/// the 64 MiB cap and every AEAD step are unaffected by it, which is the
+/// distinction that makes this parameter acceptable where a flag switching off
+/// the sniff would not be.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IngestCompression {
+    /// Honour `attachment_compression_enabled` and compress an eligible image.
+    Apply,
+    /// Store the bytes verbatim. The caller is copying bytes that are already
+    /// canonical inside some Myne vault.
+    SkipAlreadyCanonical,
+}
+
+/// The two ingest knobs that are not the bytes themselves, bundled.
+///
+/// Bundled rather than passed as two more parameters because they belong to one
+/// question: what this caller knows about where the bytes came from. The
+/// ordinary paste / drop / file-pick path knows nothing (they are new, stamp
+/// now, honour the compression preference); the vault-import re-seal knows both
+/// (they carry their own creation time, and they are already some Myne vault's
+/// canonical bytes). Keeping them together is what stops a future caller from
+/// answering one and forgetting the other.
+#[derive(Debug, Clone, Copy)]
+pub struct IngestPolicy {
+    /// Override for the fresh entry's `created_at` (UNIX seconds). `None` stamps
+    /// the current time, the ordinary path. A caller re-materializing a file
+    /// with its own original timestamp (a backup restore, a vault import)
+    /// passes `Some`, which also governs the unused-cleanup grace window
+    /// (`UNUSED_CLEANUP_GRACE_SECS`): a restored file whose original creation
+    /// predates the window is not withheld as "recently added". Ignored on a
+    /// dedup hit, where the existing entry's `created_at` wins, and ignored
+    /// again when the import REVIVES a tombstone: the revival's whole
+    /// correctness rests on its timestamp postdating the tombstone's
+    /// `deleted_at`, so a historical one would lose the merge and the file
+    /// would be deleted again on the next sync.
+    pub created_at_override: Option<u64>,
+    pub compression: IngestCompression,
+}
+
+impl IngestPolicy {
+    /// Bytes arriving from outside any vault for the first time: stamp now,
+    /// honour the user's compression preference.
+    pub fn fresh() -> Self {
+        Self {
+            created_at_override: None,
+            compression: IngestCompression::Apply,
+        }
+    }
+}
+
 /// Testable core of [`attachment_import`], with the text-extraction *producer*
 /// injected as `extract` so this module (in `myne-core`) never depends on the
 /// desktop-only `lopdf`/`zip`/`quick-xml` extractor. Desktop passes its real
@@ -386,14 +457,7 @@ pub async fn attachment_import_with_dir_ext<F>(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     source: ImportSource,
-    // Optional override for the fresh entry's `created_at` (UNIX seconds). `None`
-    // stamps the current time — the ordinary paste/drop/import path. A caller
-    // that is re-materializing a file with its own original timestamp (a backup
-    // restore / migration import) passes `Some`, which also governs the
-    // unused-cleanup grace window (`UNUSED_CLEANUP_GRACE_SECS`): a restored file
-    // whose original creation predates the window is not withheld as "recently
-    // added". Ignored on a dedup hit (the existing entry's `created_at` wins).
-    created_at_override: Option<u64>,
+    policy: IngestPolicy,
     extract: F,
 ) -> Result<ImportedAttachment, AttachmentImportError>
 where
@@ -495,7 +559,8 @@ where
     // trusted; `Absent` genuinely means "never changed the default", which is
     // an answer, and is the normal state of every vault that has not opened
     // Settings.
-    let compress_this = compress::is_eligible(content_type)
+    let compress_this = policy.compression == IngestCompression::Apply
+        && compress::is_eligible(content_type)
         && matches!(
             crate::plugins::prefs::commands::prefs_read_with_dir_reporting_origin(
                 vault_dir, state, io,
@@ -601,6 +666,13 @@ where
     // treated as absent: re-importing the same file is the deliberate re-add
     // of `sync-protocol.md` §11.4 rule 4 — the fresh live entry's `created_at`
     // postdates the tombstone's `deleted_at`, so the revival wins the merge.
+    //
+    // That last clause is a PRECONDITION, not a description, and step (9) below
+    // is where it is kept.
+    let reviving_tombstone = catalog
+        .entries
+        .get(&id_hex)
+        .is_some_and(|e| e.is_tombstone());
     if let Some(existing) = catalog.entries.get(&id_hex).filter(|e| !e.is_tombstone()) {
         tracing::debug!(stage = "dedup", outcome = "hit");
         return Ok(ImportedAttachment {
@@ -634,7 +706,30 @@ where
         })
         .unwrap_or_else(|| auto_filename(content_type));
     let size = file_bytes.len() as u64;
-    let created_at = created_at_override.unwrap_or_else(|| host.now_unix_secs());
+    // NOW when this is a revival, whatever the caller asked for, and the
+    // override otherwise.
+    //
+    // The dedup filter above treats a tombstone as absent, and the comment
+    // there rests that on the revival winning the merge because its
+    // `created_at` postdates the tombstone's `deleted_at`. A caller supplying a
+    // HISTORICAL timestamp breaks exactly that, and one does: the vault-import
+    // re-seal (myne-md/myne#464) passes the SOURCE catalog row's `created_at`,
+    // which can predate the target's deletion by any amount. The revival then
+    // loses the merge, the attachment is re-deleted on the next sync
+    // convergence, and the imported note's embed points at a tombstoned id.
+    //
+    // Overriding here rather than asking every caller to notice is deliberate:
+    // the caller cannot see the target's catalog, so "is this a revival" is not
+    // a question it is able to answer. The cost is one restored file showing
+    // today's date instead of its original, on a path where the alternative is
+    // the file disappearing again.
+    let created_at = if reviving_tombstone {
+        host.now_unix_secs()
+    } else {
+        policy
+            .created_at_override
+            .unwrap_or_else(|| host.now_unix_secs())
+    };
 
     // (10) Encode the MYA1 blob on a blocking thread (random key + nonces
     //      from getrandom; AEAD seal under items_key → attachment_key).
@@ -2594,7 +2689,10 @@ mod tests {
             vault_dir,
             state,
             source,
-            created_at_override,
+            super::IngestPolicy {
+                created_at_override,
+                compression: super::IngestCompression::Apply,
+            },
             extract,
         )
         .await

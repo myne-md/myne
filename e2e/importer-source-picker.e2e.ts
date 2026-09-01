@@ -11,7 +11,7 @@
 // choosing a path is reachable only through the OS-native file/folder dialog, which
 // WebDriver cannot drive — so the engine itself stays covered by the read-seam suite
 // plus the Vitest adapter suites, and this scenario stops where the native dialog
-// begins. What it pins is the part that regressed silently before: that all five
+// begins. What it pins is the part that regressed silently before: that all six
 // sources are reachable from one entry point, each with its fidelity disclosure
 // shown BEFORE the user commits.
 
@@ -21,7 +21,17 @@ import { seedVault } from "./support/fixtures";
 import { dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
-const SOURCES = ["obsidian", "notion", "evernote", "html", "csv"] as const;
+const SOURCES = [
+  // The sixth source (myne-md/myne#464) is first in the picker, not by
+  // seniority: it is the only one whose format is Myne's own, and a user with
+  // two vaults looking for how to combine them has nowhere else to look.
+  "myne",
+  "obsidian",
+  "notion",
+  "evernote",
+  "html",
+  "csv",
+] as const;
 
 /** Wait until the modal reports `phase`. The modal element persists across phases —
  *  only `data-phase` changes — so `waitForElement` returns immediately and a single
@@ -43,7 +53,7 @@ async function waitForPhase(
 
 describeE2E("isp1 import source picker reaches every adapter (MYND-586)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("opens one flow from Settings and offers all five sources with disclosure", async () => {
+  it("opens one flow from Settings and offers all six sources with disclosure", async () => {
     let password = "";
     await scenario(
       "isp1-source-picker",
@@ -76,7 +86,7 @@ describeE2E("isp1 import source picker reaches every adapter (MYND-586)", () => 
 
         // Choosing a source advances to that source's setup step and records which
         // adapter the flow will run — the assertion that this is genuinely one
-        // flow parameterized by source, not five flows.
+        // flow parameterized by source, not six flows.
         await (
           await s.waitForElement(
             testIdSelector("import.source-row", { "data-source": "evernote" }),

@@ -108,8 +108,12 @@ import {
   noteList,
   loadNoteBatch,
   createNoteFromTemplate,
+  singleDay,
   createBlankNamedNote,
-  resolveTodayNote,
+  resolvePeriodNote,
+  periodSettings,
+  zonedNow,
+  type Period,
   convertNoteToTemplate,
   convertTemplateToNote,
 } from "../notes";
@@ -2263,7 +2267,11 @@ function EditorChrome({
         onCreateFromTemplate={(templateId, name) => {
           // Location-agnostic: lands at the root, where the header new-note
           // button's blank note would land (folder = null).
-          void createNoteFromTemplate(templateId, name, null)
+          // `singleDay(now)`: a note made by hand belongs to the day it was
+          // made on, so both period tokens render as today. Said explicitly
+          // because the parameter is required now, which is what stops a
+          // future weekly path from silently inheriting this meaning.
+          void createNoteFromTemplate(templateId, name, null, new Date(), singleDay(new Date()))
             .then((id) => ctx.open(id as NoteId))
             .catch(() => {
               /* creation failure surfaces via sidebar UX */
@@ -2782,6 +2790,15 @@ type CommandPaletteHostProps = {
   setToast: Dispatch<SetStateAction<EditorToast | null>>;
 };
 
+// One period-note failure string per period. Spelled out as literals rather
+// than built from the period name, because a template-built key is invisible to
+// `check-i18n.mjs` and would go missing from the catalog silently.
+const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
+  daily: "editor.periodicNotes.openFailed.daily",
+  weekly: "editor.periodicNotes.openFailed.weekly",
+  monthly: "editor.periodicNotes.openFailed.monthly",
+};
+
 function CommandPaletteHost({
   open,
   onClose,
@@ -2893,45 +2910,64 @@ function CommandPaletteHost({
   useEffect(() => {
     clearAiOutput();
   }, [ctx.selectedId]);
-  // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
-  // set (authoritative note_list + loadNoteBatch, not the partial sidebar cache).
-  // Found → open; not found → create (from the daily template if set, else a
-  // blank note titled today's date, the eager-title specialization of #5) in the
-  // daily folder, then open. Past days are reached via the ordinary sidebar
-  // folder — no calendar.
-  const onOpenTodayNote = useCallback(async () => {
-    try {
-      const prefs = await prefsRead();
-      const ids = await noteList();
-      const notes = await loadNoteBatch(ids);
-      const res = resolveTodayNote(
-        new Date(),
-        prefs.daily_date_format,
-        prefs.daily_folder,
-        notes,
-      );
-      let id: NoteId;
-      if (res.kind === "open") {
-        id = res.id;
-      } else if (prefs.daily_template) {
-        // Daily template set → instantiate from it (date as eager title).
-        id = (await createNoteFromTemplate(
-          prefs.daily_template,
-          res.dateTitle,
-          res.folder,
-        )) as NoteId;
-      } else {
-        // No daily template → a blank note titled with the date.
-        id = (await createBlankNamedNote(res.dateTitle, res.folder)) as NoteId;
+  // Open this period's note (MYND-191 daily, myne#177 weekly + monthly): one
+  // entry point for all three, error handling included. Idempotent
+  // open-or-create over the FULL note set (authoritative note_list +
+  // loadNoteBatch, not the partial sidebar cache). Found → open; not found →
+  // create, from that period's template if it has one and otherwise a blank
+  // note titled with the period, in that period's folder, then open. Past
+  // periods are reached through the ordinary sidebar folder, no calendar.
+  //
+  // Daily is not special here: `periodSettings` is where the prefs asymmetry
+  // lives (daily reads three flat fields, the others read the map), and a
+  // second wrapper for it would put that knowledge in a second place.
+  const onOpenPeriodNote = useCallback(
+    async (period: Period) => {
+      try {
+        const prefs = await prefsRead();
+        const ids = await noteList();
+        const notes = await loadNoteBatch(ids);
+        const settings = periodSettings(prefs, period);
+        // ONE instant, read once, in the DISPLAY timezone (myne#177). It
+        // anchors the period AND renders the template's `{{date}}`/`{{time}}`:
+        // the date the app shows, the date it files under and the date the body
+        // carries all have to be the same date, and with a `timezone` override
+        // set none of the three agreed.
+        const now = zonedNow(new Date(), prefs.timezone);
+        const res = resolvePeriodNote(now, period, settings, notes);
+        let id: NoteId;
+        if (res.kind === "open") {
+          id = res.id;
+        } else if (settings.template) {
+          // Template set → instantiate from it (the period title as eager
+          // title, the period's own bounds behind
+          // {{period_start}}/{{period_end}}).
+          id = (await createNoteFromTemplate(
+            settings.template,
+            res.dateTitle,
+            res.folder,
+            now,
+            { start: res.range.start, end: res.range.end },
+          )) as NoteId;
+        } else {
+          // No template → a blank note titled with the period.
+          id = (await createBlankNamedNote(res.dateTitle, res.folder)) as NoteId;
+        }
+        await ctx.open(id);
+      } catch (err) {
+        // The user is TOLD. A DEV-only console.warn is an empty catch in a
+        // production build, which makes the palette command a silent no-op:
+        // seven awaits run behind this, any of which can fail, and the mobile
+        // twin of this function has always surfaced it.
+        setToast({ message: t(PERIOD_OPEN_FAILED_KEY[period]), variant: "error" });
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn(`[Editor] open the ${period} note failed:`, err);
+        }
       }
-      await ctx.open(id);
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.warn("[Editor] open today's note failed:", err);
-      }
-    }
-  }, [ctx]);
+    },
+    [ctx, setToast, t],
+  );
   // "Open random note" (MYND-323): serendipitous review. Picks uniformly from the
   // live, non-template notes (mirrors sidebar visibility — trashed/templates are
   // excluded). With ≥2 eligible notes the current one is dropped so the pick
@@ -3201,7 +3237,7 @@ function CommandPaletteHost({
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
-      onOpenTodayNote,
+      onOpenPeriodNote,
       onOpenRandomNote,
       onOpenAttachments,
       onOpenSnapshots,
@@ -3262,7 +3298,7 @@ function CommandPaletteHost({
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
-      onOpenTodayNote,
+      onOpenPeriodNote,
       onOpenRandomNote,
       onOpenAttachments,
       onOpenSnapshots,

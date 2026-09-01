@@ -20,7 +20,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import {
   IMPORT_SOURCES,
-  IMPORT_SOURCE_ORDER,
+  availableSourceOrder,
   type ImportSourceId,
 } from "./sourceCatalog";
 
@@ -99,7 +99,7 @@ export function ImportSourcePicker({ onPick, onCancel }: ImportSourcePickerProps
         <p style={INTRO}>{t("notes.import.picker.intro")}</p>
 
         <div style={GRID} role="list">
-          {IMPORT_SOURCE_ORDER.map((id) => {
+          {availableSourceOrder().map((id) => {
             const spec = IMPORT_SOURCES[id];
             const active = hovered === id;
             return (

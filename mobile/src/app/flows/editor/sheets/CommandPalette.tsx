@@ -136,7 +136,7 @@ export function CommandPalette({
             <>
               <div style={sectionLabel}>{t("commandPalette.sectionCommands")}</div>
               {cmdMatches.map((c) => (
-                <button key={c.id} onClick={() => { requestClose(); c.run(); }} style={rowStyle}>
+                <button key={c.id} data-testid="palette.command" data-command-id={c.id} onClick={() => { requestClose(); c.run(); }} style={rowStyle}>
                   <span style={{ flex: "none", display: "flex", color: "var(--fg-2)" }}>{c.icon}</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
                   {c.hint && <span style={{ flex: "none", fontSize: 12, color: "var(--fg-3)" }}>{c.hint}</span>}

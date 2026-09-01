@@ -36,7 +36,6 @@
     "tests/editor/math-render.test.ts": 3,
     "tests/editor/mermaid-render.test.ts": 3,
     "tests/editor/render-perf.test.ts": 3,
-    "tests/editor/taskChip.test.ts": 2,
     "tests/editor/taskRecurrence.test.ts": 2,
     "tests/editor/vim-substitute.test.ts": 1,
     "tests/editor/voice-record-controller.test.ts": 2,

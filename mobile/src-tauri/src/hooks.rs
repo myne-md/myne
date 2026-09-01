@@ -43,6 +43,13 @@
 //! stay in RAM and bleed into the next vault to unlock. `scripts/check-lock-
 //! teardown.mjs` is the machine half of that rule.
 //!
+//! The eighth is [`agent_teardown_on_lock`](MobileHooks::agent_teardown_on_lock)
+//! (myne-md/myne#456), and it belongs to the same family as the three above for
+//! the same reason: this client now holds the agent's run table and its session
+//! transcript, so an empty body would be a lock that does not lock. On this
+//! client it is also the ORDINARY path rather than an exceptional one, because
+//! a run dies with the foreground here by decision.
+//!
 //! Every other hook stays a no-op until its subsystem lands on mobile (see
 //! `mobile/CLAUDE.md`) — `zeroize_spell`, `abort_active_recording`,
 //! `pdf_export_teardown_on_lock` and `clear_staged_descriptor` are empty
@@ -164,7 +171,26 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     }
     fn abort_active_recording(&self) {}
     fn pdf_export_teardown_on_lock(&self) {}
-    fn agent_teardown_on_lock(&self) {}
+    /// **Not empty since myne-md/myne#456**, and the empty version is worth
+    /// naming because it is what `scripts/check-lock-teardown.mjs` exists to
+    /// refuse: this client now HOLDS both tables, so an empty body here is not
+    /// "the subsystem is not here", it is a lock that does not lock.
+    ///
+    /// A run holds a note-id set derived from decrypted plaintext, a transcript
+    /// containing whole note bodies, and a proposal of anchors and replacements
+    /// copied verbatim out of them. `myne-core` calls this at every slot-drop
+    /// site, manual lock, idle auto-lock, the vault-SWITCH branch of unlock,
+    /// `vault_delete`, the change-password force-relock: so the body is all
+    /// this client owes.
+    ///
+    /// The vault-switch site is the one that makes it urgent rather than
+    /// hygienic: without this, vault A's proposal is still in memory while
+    /// vault B is open. And on this client it is also the ORDINARY path, not an
+    /// exceptional one: a run dies with the foreground here by decision, so
+    /// locking or pocketing the phone is how most runs end.
+    fn agent_teardown_on_lock(&self) {
+        crate::plugins::agent::teardown_on_lock(&self.app);
+    }
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, enabled: bool, site: &'static str) {
         // Native screen-capture protection lives in `crate::screen_guard`,

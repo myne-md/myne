@@ -1205,12 +1205,19 @@ pub(crate) async fn set_ai_provider_with_dir(
     Ok(())
 }
 
-/// `Slot::Unlocked`-gated setter for the one-time remote-provider consent
-/// (myne#415, SYNC-22).
+/// `Slot::Unlocked`-gated setter for the remote-provider consent
+/// (myne#415, SYNC-22; device-local since myne-md/myne#456).
 ///
 /// **A gate, not a display flag.** The request path checks it, so a client
-/// whose UI never showed the screen still cannot send. It is account-scoped —
-/// it syncs, so a newly enrolled device inherits it (`threat-model.md` §5).
+/// whose UI never showed the screen still cannot send.
+///
+/// **The caller hands a PROVIDER NAME and this function stores the
+/// device-scoped token.** The suffix is added here rather than by the caller so
+/// there is one writer of the stored spelling: the gate compares for equality,
+/// and a second spelling would be a silent refusal rather than an error anybody
+/// sees. `provider_gate::CONSENT_DEVICE_SUFFIX` carries the whole argument for
+/// why the token exists; in one line, a legacy bare-name value is what both
+/// silently-re-routed populations hold, and the gate must not accept it.
 pub async fn set_ai_provider_consent_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -1227,6 +1234,15 @@ pub async fn set_ai_provider_consent_from_host(
             return Err(PrefsWriteError::InvalidValue);
         }
     }
+    // Stored device-scoped. `granted_for` is validated against
+    // `KNOWN_AI_PROVIDERS` above, so `from_wire` cannot fail here; the
+    // `ok_or` is the fail-closed arm rather than a real branch.
+    let stored = match granted_for.as_deref() {
+        Some(name) => Some(
+            protocol::prefs::device_scoped_consent(name),
+        ),
+        None => None,
+    };
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     let present = granted_for.is_some();
@@ -1235,7 +1251,7 @@ pub async fn set_ai_provider_consent_from_host(
         state,
         hooks,
         |prefs| {
-            prefs.ai_provider_consent = granted_for.clone();
+            prefs.ai_provider_consent = stored.clone();
         },
         io,
         host,
@@ -2316,6 +2332,88 @@ pub(crate) async fn set_attachment_ocr_enabled_with_dir(
         event = "prefs_written",
         field = "attachment_ocr_enabled",
         enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for `chat_history_budget` (myne-md/myne#617):
+/// how many characters of visible chat history an agent run may be seeded with.
+///
+/// **The clamp is HERE, at the write, and that placement is the control.**
+/// `MAX_HISTORY_BUDGET` bounds how much of the user's plaintext one run can
+/// send to a provider, multiplied by the loop's iteration ceiling, and TB13
+/// records that no other per-run volume cap exists. A bound applied in the
+/// settings input instead would be a host-side rule whose trigger came from the
+/// caller, which is the exact shape `apply.rs` already learned about itself: one
+/// field away from off. Any path that reaches this command gets the same
+/// ceiling, including one that never rendered a control.
+///
+/// `None` clears the override and returns the host to its own default.
+pub async fn set_chat_history_budget_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    budget: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_chat_history_budget_with_dir(&dir, state, hooks, budget, io, host).await
+}
+
+/// IPC wrapper. Delegates; this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_chat_history_budget<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    budget: Option<u32>,
+) -> Result<(), PrefsWriteError> {
+    set_chat_history_budget_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        budget,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_chat_history_budget`].
+pub(crate) async fn set_chat_history_budget_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    budget: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let clamped = budget.map(|b| b.min(crate::plugins::agent::history::MAX_HISTORY_BUDGET as u32));
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.chat_history_budget = clamped;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // The VALUE is a bound the user chose, not content, so it is safe to log
+    // and useful when a run's cost is being read back.
+    //
+    // `value = clamped`, matching `set_reminder_horizon_days` rather than
+    // inventing a field name, and carrying the `Option` rather than flattening
+    // it: `unwrap_or(0)` made "unset" and an explicit zero log identically, and
+    // zero is a real distinct choice here ("seed nothing") rather than an
+    // absence.
+    tracing::info!(
+        event = "prefs_written",
+        field = "chat_history_budget",
+        value = ?clamped
     );
     Ok(())
 }
@@ -3782,6 +3880,142 @@ pub(crate) async fn set_daily_template_with_dir(
     Ok(())
 }
 
+/// The three settings a period carries, mirroring what `daily_folder` /
+/// `daily_date_format` / `daily_template` carry for the daily period. The key
+/// written into `periodic_notes` is `<period>.<setting>` (myne#177).
+const PERIOD_SETTINGS: [&str; 3] = ["folder", "format", "template"];
+
+/// Slot::Unlocked-gated setter for one `periodic_notes` entry (myne#177),
+/// keyed `<period>.<setting>`, e.g. `weekly` + `folder`. `Some(value)` sets it,
+/// `None` removes the key, which the Phase 2 merge represents as a stamped
+/// absence rather than as "this device never had it". Read-modify-write under
+/// the write mutex; disk-first; non-load-bearing.
+///
+/// Two host-side validations, because the codec deliberately performs none. The
+/// **setting** must be one of [`PERIOD_SETTINGS`], so a typo cannot write a key
+/// nothing will ever read. The **period** must be a non-empty run of ASCII
+/// lowercase letters, which keeps the `<period>.<setting>` grammar unambiguous:
+/// a period containing a dot would produce a key that parses two ways. The
+/// period is deliberately NOT checked against a closed list, because a build that
+/// ships a fourth period writes `quarterly.folder` with no codec, spec or
+/// vector change, and an older build decodes that entry and ignores it.
+///
+/// `daily` is accepted by the grammar but is not where the daily period lives:
+/// daily keeps its three top-level fields, and writing `daily.folder` here
+/// would create a second home for one setting. The caller owns that; the UI
+/// routes daily to `set_daily_folder` and friends.
+pub async fn set_periodic_note_setting_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    period: String,
+    setting: String,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_periodic_note_setting_with_dir(&dir, state, hooks, period, setting, value, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_periodic_note_setting<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    period: String,
+    setting: String,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_periodic_note_setting_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        period,
+        setting,
+        value,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_periodic_note_setting`].
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn set_periodic_note_setting_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    period: String,
+    setting: String,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    if !PERIOD_SETTINGS.contains(&setting.as_str()) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    if period.is_empty() || !period.chars().all(|c| c.is_ascii_lowercase()) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    // Daily is refused HERE, not merely avoided by the caller. Daily keeps its
+    // three flat top-level fields, and `daily_match::period_settings` returns
+    // early for it and never reads this map, so a `daily.folder` entry would
+    // write, sync and be read by nothing: a second home for one setting, which
+    // is the exact shape the no-migration decision exists to prevent. It was
+    // reachable, and only `PeriodicNotesSettings.tsx`'s `period === "daily"`
+    // branch kept it from happening.
+    if period == "daily" {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    let key = format!("{period}.{setting}");
+    let cleared = value.is_none();
+
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            match value {
+                Some(v) => {
+                    prefs.periodic_notes.insert(key.clone(), v.clone());
+                    // A period folder is registered as a deliberate folder for
+                    // the same reason the daily one is (MYND-144): the folder
+                    // has no notes in it until the first period note is
+                    // created, and without this it would not appear in the
+                    // sidebar, so the setting would look like it did nothing.
+                    if setting == "folder" && !prefs.deliberate_folders.contains(&v) {
+                        prefs.deliberate_folders.push(v);
+                    }
+                }
+                None => {
+                    prefs.periodic_notes.remove(&key);
+                }
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // Field + which entry + set/cleared. The SETTING is a closed vocabulary
+    // this function just validated against `PERIOD_SETTINGS`; the PERIOD is a
+    // bounded-charset grammar token (a non-empty run of ASCII lowercase, daily
+    // excluded) rather than a closed list, deliberately, so a build shipping a
+    // fourth period needs no change here. Neither is user text, and the VALUE
+    // (a folder path, AS3 Sensitive) is never logged. See
+    // src-tauri/CLAUDE.md "Secret-handling logging discipline".
+    tracing::info!(
+        event = "prefs_written",
+        field = "periodic_notes",
+        entry = %key,
+        cleared
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the new-note default-location pair (MYND-462,
 /// "Files" settings panel) — `new_note_location` (the mode: root/current/specific) +
 /// `new_note_location_folder` (the target folder when mode == "specific"). Set
@@ -4124,8 +4358,15 @@ pub async fn set_time_format<R: Runtime>(
 /// — an IANA zone identifier, or `None` to clear to the `system` default.
 ///
 /// **Display only.** It decides what the app treats as "today" and how a stored
-/// wall-clock value is printed; it never enters a `.myn` file, a blob, or the
-/// sync wire (`prefs_classification` files it DeviceLocal for that reason).
+/// wall-clock value is printed; it never enters a `.myn` file, so a note never
+/// records where its author was.
+///
+/// It DOES enter a blob, and this comment said otherwise until myne-md/myne#609:
+/// the body below writes the zone into `vault.prefs`, which the sync layer
+/// pushes and pulls verbatim. `PrefClass::DeviceLocal` is a MERGE
+/// classification (`docs/spec/sync-protocol.md` 10.2) meaning the local value
+/// survives the merge, not a statement that the value stays on the device, and
+/// 10.2.1 has a newly enrolled device adopt it as a starting default.
 pub async fn set_timezone_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -5305,6 +5546,164 @@ mod tests {
         });
     }
 
+    // periodic_notes setter (myne#177).
+
+    #[test]
+    fn set_periodic_note_setting_writes_the_composed_key_and_registers_the_folder() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "weekly".into(),
+                "folder".into(),
+                Some("Weekly/".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set weekly folder");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("weekly.folder")
+                    .map(String::as_str),
+                Some("Weekly/")
+            );
+            // The daily folder's discipline (MYND-144): without this the folder
+            // is invisible in the sidebar until the first note lands in it, so
+            // the setting looks like it did nothing.
+            assert!(prefs.deliberate_folders.iter().any(|f| f == "Weekly/"));
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_clears_by_removing_the_key() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            for (setting, value) in [("folder", "Weekly/"), ("template", "0190a000-tmpl")] {
+                set_periodic_note_setting_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    "weekly".into(),
+                    setting.into(),
+                    Some(value.into()),
+                    &io,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect("set");
+            }
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "weekly".into(),
+                "template".into(),
+                None,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear template");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(!prefs.periodic_notes.contains_key("weekly.template"));
+            // Clearing one setting must not disturb the period's others.
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("weekly.folder")
+                    .map(String::as_str),
+                Some("Weekly/")
+            );
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_refuses_an_unknown_setting_or_a_dotted_period() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            for (period, setting) in [
+                ("weekly", "colour"),       // not one of the three
+                ("weekly.extra", "folder"), // a dot makes the key ambiguous
+                ("", "folder"),             // empty period
+                ("Weekly", "folder"),       // not a bare lowercase word
+                // Daily keeps its three flat fields; an entry here would write,
+                // sync and be read by nothing, which is a second home for one
+                // setting.
+                ("daily", "folder"),
+                ("daily", "format"),
+                ("daily", "template"),
+            ] {
+                let err = set_periodic_note_setting_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    period.into(),
+                    setting.into(),
+                    Some("x".into()),
+                    &io,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect_err("must refuse");
+                assert!(
+                    matches!(err, PrefsWriteError::InvalidValue),
+                    "{period}.{setting}"
+                );
+            }
+            // Refusing means writing nothing, not writing something odd.
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(prefs.periodic_notes.is_empty());
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_accepts_a_period_this_build_has_no_ui_for() {
+        // The period is validated as a GRAMMAR, not against a closed list. That
+        // is what makes a fourth period a client-side change with no codec,
+        // spec or vector edit behind it.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "quarterly".into(),
+                "folder".into(),
+                Some("Quarterly/".into()),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set quarterly folder");
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("quarterly.folder")
+                    .map(String::as_str),
+                Some("Quarterly/")
+            );
+        });
+    }
+
     #[test]
     fn set_union_pref_edit_bumps_the_sync_push_window() {
         // MYND-517: set-union fields are SHARED but clockless (never stamped
@@ -6013,6 +6412,7 @@ mod tests {
                     item_order: Default::default(),
                     keymap: Default::default(),
                     active_workspace: None,
+                    chat_history_budget: None,
                     archive_disabled: None,
                     archived_folders: Vec::new(),
                     editor_layout: None,
@@ -6030,6 +6430,7 @@ mod tests {
                     new_note_location: None,
                     new_note_location_folder: None,
                     paired_extensions: Vec::new(),
+                    periodic_notes: Default::default(),
                     right_panel_active_tab: None,
                     right_panel_hidden_tabs: Vec::new(),
                     right_panel_tab_order: Vec::new(),
@@ -6455,6 +6856,88 @@ mod tests {
     }
 
     // ---- Developer mode setter (developer-mode, MYND-593) -------------
+
+    /// **The clamp is the control, so it is asserted through the COMMAND, not
+    /// through a helper** (myne-md/myne#617). This number bounds how much of the
+    /// user's plaintext one agent run sends to a provider, multiplied by the
+    /// loop's iteration ceiling, and TB13 records that no other per-run volume
+    /// cap exists. A test that called a clamping function directly would prove
+    /// the function clamps and say nothing about whether the write path uses it,
+    /// which is exactly the gap between a host-side rule and a host-side rule
+    /// whose trigger came from the caller.
+    #[test]
+    fn chat_history_budget_is_clamped_at_the_write_not_in_the_ui() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x53).await;
+            let io = crate::vault_io::StdVaultIo;
+            let max = crate::plugins::agent::history::MAX_HISTORY_BUDGET as u32;
+
+            // Unset by default: the host applies its own, and the field is
+            // omitted from the blob entirely.
+            let base = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(base.chat_history_budget, None);
+
+            // A value over the ceiling is STORED at the ceiling. Read back from
+            // disk rather than trusted from the return value: a host that
+            // reported success and wrote the raw number would pass a
+            // return-value assertion.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(max + 50_000),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let over = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(
+                over.chat_history_budget,
+                Some(max),
+                "an over-ceiling budget must be stored at the ceiling, not as sent"
+            );
+
+            // An ordinary value survives unchanged, which is the direction that
+            // would make the clamp a bug rather than a bound.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(1_500),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let ordinary = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(ordinary.chat_history_budget, Some(1_500));
+
+            // And `None` clears the override rather than storing a zero: unset
+            // and "seed nothing" are different states, and only one of them is
+            // the default.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                None,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(cleared.chat_history_budget, None);
+        });
+    }
 
     #[test]
     fn developer_mode_persist_and_reload_round_trip() {

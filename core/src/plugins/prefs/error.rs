@@ -119,9 +119,12 @@ pub enum PrefsWriteError {
     #[error("prefs blob encode failed")]
     PrefsEncodeFailed,
 
-    /// The write carried a value outside the closed set this build accepts —
-    /// today, an AI provider name that is not in `KNOWN_AI_PROVIDERS`
-    /// (myne#415).
+    /// The write carried a value outside the closed set this build accepts.
+    /// Two writers raise it: an AI provider name that is not in
+    /// `KNOWN_AI_PROVIDERS` (myne#415), and a `periodic_notes` entry whose
+    /// setting is not one of `folder` / `format` / `template` or whose period
+    /// is not a bare lowercase word (myne#177: a period carrying a dot would
+    /// make the `<period>.<setting>` key parse two ways).
     ///
     /// Refusing rather than storing matters here: a stored value the code
     /// cannot honour would be a selection the user can see and the request

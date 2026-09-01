@@ -120,6 +120,19 @@ pre-commit:
       # prefs write", which a new file elsewhere can break.
       run: node scripts/check-prefs-nonce.mjs
 
+    datetime-display-publisher:
+      # myne-md/myne#609: the shared date/time display store had exactly ONE
+      # publisher in the whole tree while three clients read it. The mobile
+      # client rendered the desktop's task panel, so it consumed the store from
+      # the day it moved in-repo and wrote nothing into it, leaving the store at
+      # its defaults for the life of the process. `date_format` is Shared
+      # scalar-LWW, so a format chosen on a computer synced to the phone, which
+      # held it and printed something else. Nothing reported it: it type-checks,
+      # every lint passes, the store has a sane default and the wrong output is a
+      # plausible date. Whole-tree rather than glob-scoped, because the rule is
+      # about a tree as a whole and a new file anywhere can start consuming.
+      run: node scripts/check-datetime-display-publisher.mjs
+
     clipboard-feedback:
       # myne-md/myne#390 + myne-md/myne#455: eleven clipboard call sites across
       # three trees in four feedback patterns, two of them reporting nothing on

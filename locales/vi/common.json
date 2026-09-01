@@ -48,7 +48,8 @@
       "unsupportedDetail": "Nó đạt {{passes}} trên {{attempts}} lần kiểm tra; cần {{required}}.",
       "checking": "Đang kiểm tra mô hình…",
       "checkingAt": "Đang kiểm tra mô hình… ({{attempt}}/{{of}})",
-      "unsupportedProvisional": "Ngưỡng đạt đó chưa được đo trên nhiều mô hình, nên nó có thể chặt hơn hoặc lỏng hơn mức đáng có."
+      "unsupportedProvisional": "Ngưỡng đạt đó chưa được đo trên nhiều mô hình, nên nó có thể chặt hơn hoặc lỏng hơn mức đáng có.",
+      "scopeNone": "không có ghi chú nào đang mở, nên chưa có gì để làm việc"
     },
     "progress": {
       "working": "Đang chạy",
@@ -64,7 +65,8 @@
       "grantsUser_one": "{{count}} phạm vi bạn đặt",
       "grantsUser_other": "{{count}} phạm vi bạn đặt",
       "grantsModel_one": "{{count}} do nó yêu cầu",
-      "grantsModel_other": "{{count}} do nó yêu cầu"
+      "grantsModel_other": "{{count}} do nó yêu cầu",
+      "cancelledBackground": "Lượt chạy đã bị hủy vì Myne chuyển sang chạy nền. Không có gì được ghi. Hãy hỏi lại khi bạn sẵn sàng."
     },
     "scope": {
       "title": "Bao gồm {{folder}}?",
@@ -118,7 +120,10 @@
         "excludedFolder": "Chưa tạo: thư mục đó bị loại trừ khỏi AI.",
         "createFailed": "Chưa tạo: không ghi được ghi chú mới. Các thay đổi khác vẫn được áp dụng.",
         "excludedNow": "Không thể áp dụng: thư mục của ghi chú đó hiện bị loại trừ khỏi AI.",
-        "notProposed": "Không thể áp dụng: thay đổi đó không nằm trong đề xuất của lượt chạy này."
+        "notProposed": "Không thể áp dụng: thay đổi đó không nằm trong đề xuất của lượt chạy này.",
+        "noteMoved": "Không thể áp dụng: thay đổi đó sẽ chuyển ghi chú sang thư mục khác.",
+        "appendEmpty": "Không thể áp dụng: không có gì để thêm.",
+        "appendWouldWriteFrontmatter": "Không thể áp dụng: văn bản đó sẽ trở thành khối thuộc tính của ghi chú."
       },
       "applyFailed": "Không thể áp dụng các thay đổi.",
       "undo": "Hoàn tác lượt chạy này",
@@ -137,7 +142,8 @@
       "runSummaryNotes_other": "đã đọc {{count}} ghi chú",
       "runSummaryOffDevice_one": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
       "runSummaryOffDevice_other": "khoảng {{count}} ký tự trong ghi chú của bạn đã được gửi tới nhà cung cấp",
-      "runSummaryOnDevice": "không có gì rời khỏi thiết bị này"
+      "runSummaryOnDevice": "không có gì rời khỏi thiết bị này",
+      "appendFlag": "thêm vào cuối"
     },
     "undo": {
       "offer_one": "Lượt chạy vừa rồi đã thay đổi {{count}} ghi chú.",
@@ -148,7 +154,9 @@
       "failed_one": "Không thể khôi phục {{count}} ghi chú.",
       "failed_other": "Không thể khôi phục {{count}} ghi chú.",
       "createdNotReverted_one": "{{count}} ghi chú do lượt chạy tạo ra vẫn được giữ nguyên.",
-      "createdNotReverted_other": "{{count}} ghi chú do lượt chạy tạo ra vẫn được giữ nguyên."
+      "createdNotReverted_other": "{{count}} ghi chú do lượt chạy tạo ra vẫn được giữ nguyên.",
+      "sessionOnly": "Thao tác hoàn tác một chạm này có hiệu lực đến khi bạn khóa két hoặc đóng ứng dụng. Sau đó, hãy khôi phục từng ghi chú một từ lịch sử phiên bản của ghi chú.",
+      "sessionOnlyLink": "Mở lịch sử phiên bản"
     }
   },
   "ai": {
@@ -661,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Mở rộng tất cả"
+      },
+      "openThisWeekNote": {
+        "label": "Mở ghi chú tuần này"
+      },
+      "openThisMonthNote": {
+        "label": "Mở ghi chú tháng này"
       }
     },
     "hotkeys": {
@@ -1198,7 +1212,9 @@
       "replaceAllCount": "Thay thế tất cả ({{total}})",
       "replaceOne": "Thay thế",
       "replacePlaceholder": "Thay bằng",
-      "toggleReplace": "Bật/tắt thay thế"
+      "toggleReplace": "Bật/tắt thay thế",
+      "dateFallback": "Đang tìm {{stored}}, dạng mà ngày này được lưu.",
+      "replaceOffOnDateFallback": "Thay thế bị tắt trong khi một ngày được khớp bằng dạng lưu trữ của nó, để một lần thay thế không làm ngày đó không đọc được."
     },
     "cover": {
       "add": "Thêm ảnh bìa",
@@ -1533,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "Tìm ghi chú hoặc chạy một lệnh…",
       "noMatches": "Không có lệnh hoặc ghi chú nào phù hợp."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Không mở được ghi chú hôm nay.",
+        "weekly": "Không mở được ghi chú tuần này.",
+        "monthly": "Không mở được ghi chú tháng này."
+      }
     }
   },
   "export": {
@@ -2777,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Trống (không có mẫu)",
+      "folderSearchEmpty": "Không có thư mục nào khớp.",
+      "folderSearchPlaceholder": "Tìm thư mục…",
+      "searchEmpty": "Không có mẫu nào khớp.",
+      "searchPlaceholder": "Tìm mẫu…",
+      "untitledTemplate": "Mẫu không có tiêu đề",
+      "sectionDaily": "Ghi chú hằng ngày",
+      "sectionWeekly": "Ghi chú hằng tuần",
+      "sectionMonthly": "Ghi chú hằng tháng",
+      "periodFolderLabel": "Thư mục",
+      "periodFolderHelper": "Nơi lưu ghi chú {{period}} mới. Mặc định: {{default}}. Thư mục vẫn được giữ lại kể cả khi trống.",
+      "periodFormatLabel": "Định dạng tiêu đề",
+      "periodFormatHelperDaily": "Tiêu đề của mỗi ghi chú hằng ngày. Hỗ trợ YYYY, MM, DD, gggg (năm tuần ISO), ww (số tuần ISO) và [văn bản] cho văn bản nguyên văn. Mặc định: {{default}}.",
+      "periodFormatHelperWeekly": "Tiêu đề của mỗi ghi chú hằng tuần. Hỗ trợ gggg (năm tuần ISO), ww (số tuần ISO), YYYY, MM, DD và [văn bản] cho văn bản nguyên văn. Mặc định: {{default}}.",
+      "periodFormatHelperMonthly": "Tiêu đề của mỗi ghi chú hằng tháng. Hỗ trợ YYYY, MM, gggg (năm tuần ISO), ww (số tuần ISO) và [văn bản] cho văn bản nguyên văn. Mặc định: {{default}}.",
+      "periodTemplateLabel": "Mẫu",
+      "periodTemplateHelper": "Chọn mẫu để mỗi ghi chú {{period}} bắt đầu từ đó, hoặc để trống để tạo ghi chú rỗng lấy ngày làm tiêu đề.",
+      "collisionWarning": "Ghi chú {{first}} và {{second}} dẫn đến cùng một ghi chú, vì chúng dùng chung thư mục và tạo ra cùng tiêu đề. Cả hai lệnh đều sẽ mở nó.",
+      "weekStartNote": "Tuần bắt đầu vào thứ Hai (ISO 8601), nên những ngày đầu tháng Một có thể thuộc tuần cuối của năm trước, và những ngày cuối tháng Mười Hai thuộc tuần đầu của năm sau.",
+      "periodFolderSaveError": "Không lưu được thư mục ghi chú {{period}}. Vui lòng thử lại.",
+      "periodFormatSaveError": "Không lưu được định dạng tiêu đề ghi chú {{period}}. Vui lòng thử lại.",
+      "periodTemplateSaveError": "Không lưu được mẫu ghi chú {{period}}. Vui lòng thử lại.",
+      "periodNameDaily": "hằng ngày",
+      "periodNameWeekly": "hằng tuần",
+      "periodNameMonthly": "hằng tháng",
+      "periodFolderAriaLabel": "Thư mục ghi chú {{period}}",
+      "periodFormatAriaLabel": "Định dạng tiêu đề ghi chú {{period}}",
+      "periodTemplateAriaLabel": "Mẫu ghi chú {{period}}",
       "dateFormatHelper": "Tiêu đề của mỗi ghi chú hằng ngày. Hỗ trợ YYYY, MM, DD. Mặc định là {{default}}.",
       "dateFormatLabel": "Định dạng ngày của ghi chú hằng ngày",
       "dateFormatSaveError": "Không thể lưu định dạng ngày. Vui lòng thử lại.",
       "folderHelper": "Nơi lưu các ghi chú hằng ngày mới. Mặc định là {{default}}. Thư mục được giữ lại ngay cả khi trống.",
       "folderLabel": "Thư mục ghi chú hằng ngày",
       "folderSaveError": "Không thể lưu thư mục hằng ngày. Vui lòng thử lại.",
-      "folderSearchEmpty": "Không có thư mục nào khớp.",
-      "folderSearchPlaceholder": "Tìm thư mục…",
-      "searchEmpty": "Không có mẫu nào khớp.",
-      "searchPlaceholder": "Tìm mẫu…",
       "templateHelper": "Chọn một mẫu để khởi tạo mỗi ghi chú hằng ngày, hoặc để trống để có một ghi chú trống lấy ngày làm tiêu đề.",
       "templateLabel": "Mẫu ghi chú hằng ngày",
-      "templateSaveError": "Không thể lưu mẫu hằng ngày. Vui lòng thử lại.",
-      "untitledTemplate": "Mẫu không có tiêu đề"
+      "templateSaveError": "Không thể lưu mẫu hằng ngày. Vui lòng thử lại."
     },
     "deleteVault": {
       "cancel": "Hủy",
@@ -2951,7 +2996,8 @@
         "title": "Trước khi Myne gửi bất cứ thứ gì tới {{provider}}",
         "whatLabel": "Những gì rời khỏi thiết bị của bạn",
         "whenLabel": "Khi nào nó rời đi",
-        "whoLabel": "Ai nhận được nó"
+        "whoLabel": "Ai nhận được nó",
+        "connectionLabel": "Cách nó được truyền đi"
       },
       "disclosureToggle": "Cách này hoạt động thế nào?",
       "enableHelper": "Chạy một mô hình do bạn cung cấp. Việc nó chạy ở đâu, và ghi chú của bạn có rời khỏi thiết bị này hay không, đều phụ thuộc vào nhà cung cấp mà bạn khai báo bên dưới. Thử nghiệm, tắt theo mặc định.",
@@ -2985,7 +3031,9 @@
         "refused": "Nhà cung cấp đã từ chối kết nối. Có thể dịch vụ đang ngừng hoạt động hoặc đang chặn mạng này.",
         "timeout": "Nhà cung cấp không trả lời kịp. Không còn gì đang chạy dở.",
         "unauthorized": "Nhà cung cấp đã từ chối khóa API của bạn. Hãy thay khóa khác: có thể khóa sai, đã bị thu hồi, hoặc thuộc về một tài khoản khác.",
-        "unreachable": "Không thể kết nối tới nhà cung cấp. Hãy kiểm tra kết nối mạng của bạn."
+        "unreachable": "Không thể kết nối tới nhà cung cấp. Hãy kiểm tra kết nối mạng của bạn.",
+        "featureOff": "AI đang tắt trên thiết bị này. Không có gì được gửi. Hãy bật trong Cài đặt, mục AI.",
+        "consentMissing": "Bạn chưa đồng ý gửi ghi chú tới nhà cung cấp này từ thiết bị này. Không có gì được gửi. Hãy chọn lại nhà cung cấp trong Cài đặt, mục AI, và đọc những gì sẽ được gửi."
       },
       "modelChoose": "Chọn tệp…",
       "modelEmbeddingLabel": "Mô hình tìm kiếm: tìm kiếm ngữ nghĩa & Hỏi đáp",
@@ -3026,7 +3074,16 @@
       "recommendedFilesEmbedding": "Cần model.safetensors + config.json + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesGeneration": "Cần tệp .gguf + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesTranscription": "Cần tệp .gguf của Whisper + config.json + tokenizer.json trong cùng một thư mục.",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "Dùng AI trên điện thoại này",
+      "mobileEnableHelper": "Tắt theo mặc định. Không có mô hình AI nào trên điện thoại này trả lời câu hỏi hay đọc ghi chú của bạn, nên mọi yêu cầu đều đi tới dịch vụ bạn nêu bên dưới, và khi đó ghi chú của bạn rời khỏi thiết bị này. Chuyển giọng nói thành văn bản và văn bản trong ảnh vẫn chạy ở đây, trên các mô hình đi kèm Myne.",
+      "mobileKeyAdd": "Lưu khóa",
+      "mobileKeyReplace": "Thay khóa",
+      "mobileRevokeHelper": "Gỡ nhà cung cấp, khóa của nó và sự chấp thuận của điện thoại này cùng lúc, để lại đúng trạng thái như chưa từng thiết lập. Các thiết bị khác vẫn hoạt động cho đến khi bạn gỡ ở đó nữa.",
+      "mobileApproveLabel": "Cho phép gửi từ điện thoại này",
+      "mobileApproveHelper": "Nhà cung cấp và khóa của nó đến từ một thiết bị khác. Không có gì được gửi từ điện thoại này cho đến khi bạn đọc những gì sẽ được gửi và cho phép tại đây.",
+      "historyBudgetHelper": "Mỗi yêu cầu mang theo bao nhiêu phần của cuộc trò chuyện gần đây, tính bằng ký tự. Để trống để dùng giá trị mặc định. Số lớn hơn cho phép AI theo dõi những cuộc trò chuyện dài hơn và gửi đi nhiều hơn: với nhà cung cấp không nằm trên thiết bị này, đó là nhiều văn bản của bạn rời khỏi thiết bị hơn, ở mỗi bước của một lần chạy.",
+      "historyBudgetLabel": "Cuộc trò chuyện gửi kèm mỗi yêu cầu"
     },
     "network": {
       "disabledCue": "Đồng bộ không còn đi qua Tor. Các kết nối mới đi thẳng tới máy chủ đồng bộ.",
@@ -3342,12 +3399,14 @@
         "viewMode": "chế độ xem mặc định trực tiếp đọc nguồn xem trước view mode",
         "dateFormat": "định dạng ngày ngày tháng năm lịch date format iso dd/mm mm/dd calendar",
         "timeFormat": "định dạng giờ 24 giờ 12 giờ đồng hồ sáng chiều time format clock am pm",
-        "timezone": "múi giờ vùng hôm nay timezone time zone tz utc iana region today"
+        "timezone": "múi giờ vùng hôm nay timezone time zone tz utc iana region today",
+        "periodicNotes": "ghi chú định kỳ hằng tuần hằng tháng tuần tháng thư mục mẫu định dạng",
+        "aiHistoryBudget": "trò chuyện lịch sử ngữ cảnh bộ nhớ hạn mức ký tự tác nhân chat yêu cầu"
       }
     },
     "dateTime": {
       "dateLabel": "Định dạng ngày",
-      "dateHelper": "Cách hiển thị ngày trong công việc, chế độ xem đã lưu và tệp đính kèm.",
+      "dateHelper": "Cách viết một ngày ở mọi nơi Myne hiển thị ngày.",
       "dateSystem": "Theo ngôn ngữ",
       "timeLabel": "Định dạng giờ",
       "timeHelper": "Giờ được hiển thị theo đồng hồ 24 giờ hay 12 giờ.",

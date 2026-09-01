@@ -730,7 +730,39 @@ const openTodayNoteAction: CommandAction = {
   // reached via the ordinary Daily/ sidebar folder (no calendar, no date-picker).
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
-    ctx.onOpenTodayNote();
+    ctx.onOpenPeriodNote("daily");
+  },
+};
+
+const openThisWeekNoteAction: CommandAction = {
+  id: "periodic.open-this-week",
+  get label() {
+    return i18n.t("commands.actions.openThisWeekNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  // The weekly sibling of `daily.open-today` (myne#177), and deliberately the
+  // same shape: palette-only, no built-in hotkey, and past weeks reached
+  // through the ordinary sidebar folder. There is no previous/next command and
+  // no picker. That is the anti-calendar line daily already drew.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onOpenPeriodNote("weekly");
+  },
+};
+
+const openThisMonthNoteAction: CommandAction = {
+  id: "periodic.open-this-month",
+  get label() {
+    return i18n.t("commands.actions.openThisMonthNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onOpenPeriodNote("monthly");
   },
 };
 
@@ -1414,6 +1446,8 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   deleteWorkspaceAction,
   newNoteFromTemplateAction,
   openTodayNoteAction,
+  openThisWeekNoteAction,
+  openThisMonthNoteAction,
   randomNoteAction,
   manageTemplatesAction,
   openAttachmentsAction,

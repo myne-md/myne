@@ -150,6 +150,9 @@ describe("Command palette action registry", () => {
       "pane.focus-prev",
       "pane.split-down",
       "pane.split-right",
+      // myne#177: the weekly and monthly siblings of daily.open-today.
+      "periodic.open-this-month",
+      "periodic.open-this-week",
       "snapshots.open",
       "tab.close",
       "tab.next",
