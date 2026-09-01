@@ -2396,6 +2396,78 @@ fn push_ordered_string_array(out: &mut Vec<u8>, items: &[String]) {
     out.push(b']');
 }
 
+/// The suffix marking an `ai_provider_consent` recorded **on the reading
+/// device, under the device-local classification**, rather than inherited.
+///
+/// **Why the value carries its own classification** (myne-md/myne#456, found by
+/// review). Two populations hold a consent that no longer means what the gate
+/// reads it to mean, and neither can be told apart from a fresh one by the
+/// value alone:
+///
+/// * A desktop install that named a provider, consented, stored a key and then
+///   turned Developer mode OFF. Under the previous build `developer_mode` was a
+///   request-time precondition AND the backend selection consulted it, so that
+///   configuration was answered by the in-process local arm and nothing left
+///   the device. With the precondition gone the identical preferences authorize
+///   the REMOTE arm, so note plaintext begins crossing TB13 on upgrade with no
+///   user act and no notice.
+/// * A device enrolled BEFORE the reclassification, which inherited the value
+///   under the old SHARED class. The prefs merge keeps the local value always,
+///   so no merge will ever revise it, while `threat-model.md` TB13,
+///   `sync-protocol.md` 10.2 and `CONSENT_DEVICE_SCOPE` in `@myne/copy` all now
+///   state device scope without qualification.
+///
+/// **One token rather than a migration.** A one-time clear needs somewhere to
+/// record that it ran, which is a new field or a new device-local blob; making
+/// the value carry its classification makes the field its own marker. A legacy
+/// value fails the gate, the surface shows the consent screen, the user agrees,
+/// and the scoped value is written. Fail-closed for both populations,
+/// self-extinguishing, and no new format family.
+///
+/// `@` cannot appear in a provider wire name (`openrouter`, `ollama-cloud`), so
+/// the split is unambiguous and a legacy value is RECOGNISABLE rather than
+/// merely unequal, which is what lets a surface say "you agreed once, under a
+/// build with a second gate" instead of "you never agreed".
+pub const CONSENT_DEVICE_SUFFIX: &str = "@device";
+
+/// The stored value for a consent recorded on this device for `provider_wire`.
+///
+/// Every writer goes through this rather than formatting the string, so a
+/// second spelling cannot appear: the gate compares for equality and a mismatch
+/// is a silent refusal rather than an error anybody sees.
+pub fn device_scoped_consent(provider_wire: &str) -> alloc::string::String {
+    let mut out = alloc::string::String::with_capacity(
+        provider_wire.len() + CONSENT_DEVICE_SUFFIX.len(),
+    );
+    out.push_str(provider_wire);
+    out.push_str(CONSENT_DEVICE_SUFFIX);
+    out
+}
+
+/// Whether `stored` is a consent recorded on THIS device for `provider_wire`.
+///
+/// A legacy bare-wire-name value is deliberately not accepted; that is the fix
+/// rather than an oversight, and [`CONSENT_DEVICE_SUFFIX`] carries the reason.
+pub fn consent_is_device_scoped(stored: Option<&str>, provider_wire: &str) -> bool {
+    match stored {
+        Some(v) => match v.strip_suffix(CONSENT_DEVICE_SUFFIX) {
+            Some(name) => name == provider_wire,
+            None => false,
+        },
+        None => false,
+    }
+}
+
+/// Whether `stored` is a LEGACY consent for `provider_wire`: the bare wire
+/// name, recorded before the reclassification.
+///
+/// Separated from "no consent at all" so a surface can say the true thing. The
+/// user did agree once, to this same provider, under a build where a second
+/// host-side precondition also had to hold.
+pub fn consent_is_legacy(stored: Option<&str>, provider_wire: &str) -> bool {
+    stored == Some(provider_wire)
+}
+
 /// Append a canonical JSON object of string→integer members (surrounding
 /// `{` / `}`, comma-joined `"key":123` members) for the `field_clocks` LWW
 /// clock map (MYND-478). Keys are NFC-normalized and emitted in lexicographic

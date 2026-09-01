@@ -1438,16 +1438,16 @@ async fn sync_prefs_phase(
                 // so, which is exactly what `docs/threat-model.md` TB13 names
                 // as the crossing condition.
                 //
-                // Reclassifying the field to `DeviceLocal` (entry 0547) was
+                // Reclassifying the field to `DeviceLocal` (entry 0559) was
                 // necessary and NOT sufficient: the classification is consumed
                 // by `merge_prefs`, and a just-joined device never merges. It
                 // has no local blob, so it takes this branch instead and the
                 // whole closure was inert on the one path it was built for. The
-                // `developer_mode` removal in entry 0546 rests on that closure,
+                // `developer_mode` removal in entry 0558 rests on that closure,
                 // which makes this the compensating half of a pair.
                 //
                 // `ai_enabled` goes with it: it is the other half of the gate
-                // 0546's own module doc calls a pair, and a device that
+                // 0558's own module doc calls a pair, and a device that
                 // inherited "AI is on" plus an inherited consent plus the synced
                 // key is fully configured to send before anyone has touched it.
                 //

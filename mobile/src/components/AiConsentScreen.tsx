@@ -31,6 +31,7 @@ import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  AI_TRUST_A7_RESIDUAL,
   CONSENT_DEVICE_SCOPE,
   CONSENT_DIRECT_CONNECTION,
   CONSENT_HOW_TO_REVOKE,
@@ -191,6 +192,18 @@ export function AiConsentScreen({
           body={CONSENT_DIRECT_CONNECTION}
           testId="ai-consent.connection"
         />
+
+        {/* The A7 residual, the eighth element the desktop screen has always
+            rendered and this one omitted (myne-md/myne#456, found by review).
+            It applies to a phone in full, and this same change is the evidence:
+            it fixed a lock teardown because the mobile process holds the
+            plaintext provider key and note-derived text in app memory. It was
+            missing because the sentence lived in `src/lib/load-bearing-copy.ts`,
+            which mobile does not compile; it is in `@myne/copy` now, so the
+            byte-identity this file's header claims by construction is one. */}
+        <p data-testid="ai-consent.residual" style={CLAUSE_BODY}>
+          {AI_TRUST_A7_RESIDUAL}
+        </p>
       </div>
 
       <div

@@ -60,6 +60,17 @@ pub fn agent_error_of(e: EngineError) -> AgentError {
         EngineError::RemoteBarred | EngineError::NoModel | EngineError::LocalModelMissing => {
             AgentError::EditFormatUnsupported
         }
+        // The four GATE refusals keep their cause. Collapsing them into
+        // `ProviderFailed` is what left `AiChatFlow`'s `GATE_REFUSALS` branch
+        // unable to fire (myne-md/myne#456): the phone that inherited a provider
+        // and a key and has no local consent was told the backend failed, which
+        // names no fix, instead of the consent sentence, which names the only
+        // one. `kind()` is bounded and content-free, so carrying it costs no
+        // disclosure.
+        EngineError::ConsentMissing
+        | EngineError::FeatureOff
+        | EngineError::NoCredential
+        | EngineError::NotReady => AgentError::GateRefused { cause: e.kind() },
         // A 400 is the provider declining the REQUEST, which is Myne's to fix
         // rather than the user's (myne-md/myne#547).
         EngineError::RequestRejected => AgentError::ProviderRejected,

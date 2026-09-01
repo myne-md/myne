@@ -26,6 +26,7 @@
 // constants VERBATIM (never i18n'd, E2E-pinned by literal equality); it makes
 // no absolute-privacy claim past the threat model (A7/A13 acknowledged).
 
+import { consentIsDeviceScoped } from "@myne/copy";
 import {
   useEffect,
   useState,
@@ -621,7 +622,12 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       setKeyDraft("");
       return;
     }
-    if (prefs.ai_provider_consent === wire) {
+    // `consentIsDeviceScoped`, not an equality against the provider name. A
+    // legacy bare-name value is what a desktop install that turned Developer
+    // mode off holds, and an equality would read it as current and skip the
+    // consent screen, which is the upgrade that starts sending note text with
+    // no user act (myne-md/myne#456).
+    if (consentIsDeviceScoped(prefs.ai_provider_consent, wire)) {
       // Already consented to this exact provider — switching back does not
       // re-ask, because the recipient is one they have already agreed to.
       void setAiProvider(wire);

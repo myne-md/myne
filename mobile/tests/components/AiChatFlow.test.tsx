@@ -224,12 +224,24 @@ describe("AiChatFlow", () => {
     // it. They were ONE Rust variant until myne-md/myne#456, which is how a
     // user who had never seen the consent screen was told "this kind of request
     // never goes to a provider".
-    const cases: [string, string][] = [
-      ["FeatureOff", "featureOff"],
-      ["NotReady", "notReady"],
-      ["ConsentMissing", "consentMissing"],
-      ["NoCredential", "noCredential"],
-      ["Unreachable", "unreachable"],
+    //
+    // **The rejection shapes here are the ones the commands ACTUALLY produce**,
+    // which they were not until myne-md/myne#456's third round. These tests
+    // mocked bare strings like `"ConsentMissing"`, a wire shape mobile's agent
+    // commands cannot emit: they reject with `AgentError`, which is
+    // `#[serde(tag = "kind", content = "detail")]`. So the suite asserted a
+    // contract that did not exist, and passed, while `AiChatFlow`'s
+    // `GATE_REFUSALS` branch could not fire against the real one. The four gate
+    // refusals now arrive as `AgentError::GateRefused` carrying the refusing
+    // gate's own kind; the transport failure still arrives as an
+    // `EngineError`-shaped object, because it is not a gate.
+    const gate = (cause: string) => ({ kind: "GateRefused", detail: { cause } });
+    const cases: [unknown, string][] = [
+      [gate("feature_off"), "featureOff"],
+      [gate("not_ready"), "notReady"],
+      [gate("consent_missing"), "consentMissing"],
+      [gate("no_credential"), "noCredential"],
+      [{ kind: "Unreachable" }, "unreachable"],
     ];
     const seen = new Set<string>();
     for (const [variant, key] of cases) {

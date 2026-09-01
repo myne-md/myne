@@ -228,13 +228,36 @@ describe("the per-provider consent screen", () => {
     expect(setAiProviderConsent).not.toHaveBeenCalled();
   });
 
-  it("does not re-ask for a provider already consented to", async () => {
-    consentFor = "openrouter";
+  it("does not re-ask for a provider already consented to ON THIS DEVICE", async () => {
+    consentFor = "openrouter@device";
     render(<AiPanel />);
     fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
     await waitFor(() => expect(setAiProvider).toHaveBeenCalledWith("openrouter"));
-    // No screen: the recipient is one they have already agreed to.
+    // No screen: the recipient is one they have already agreed to, here.
     expect(screen.queryByTestId("ai-consent.screen")).toBeNull();
+  });
+
+  it("DOES ask again for a LEGACY consent, the bare provider name", async () => {
+    // The Critical this token exists for (myne-md/myne#456, found by review).
+    // A desktop install that named a provider, consented, stored a key and then
+    // turned Developer mode OFF was answered by the LOCAL arm for as long as
+    // `developer_mode` was a request-time precondition. Dropping that
+    // precondition re-points the identical preferences at the remote provider,
+    // so note plaintext starts crossing TB13 on upgrade with no user act and no
+    // notice. A device enrolled before the reclassification holds the same
+    // value, inherited under the old SHARED class, and no merge will revise it.
+    //
+    // The screen is how the user is ASKED rather than blocked, so this asserts
+    // the screen appears and that no provider write happened first.
+    //
+    // Reverting `consentIsDeviceScoped` to an equality against the provider
+    // name makes this fail.
+    consentFor = "openrouter";
+    render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    const screenEl = await screen.findByTestId("ai-consent.screen");
+    expect(screenEl.textContent).toContain("OpenRouter");
+    expect(setAiProvider).not.toHaveBeenCalled();
   });
 
   it("DOES ask again when switching to a different provider", async () => {

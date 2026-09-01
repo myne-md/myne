@@ -167,10 +167,42 @@ const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
  * on an unknown error is strictly worse than one that says "it did not work".
  */
 export function normalizeProviderError(raw: unknown): ProviderErrorCause {
+  // `AgentError::GateRefused` carries the refusing gate's own kind in
+  // `detail.cause`, and the tag alone (`gate_refused`) is in no cause set, so
+  // reading the tag would fall through to `"failed"` here.
+  //
+  // **That fall-through is the defect this unwrap exists for**
+  // (myne-md/myne#456, found by review). Mobile's agent commands reject with
+  // `AgentError`, whose `agent_error_of` collapsed every gate refusal into
+  // `ProviderFailed`, so `AiChatFlow`'s `GATE_REFUSALS` branch could not fire:
+  // the phone that inherited a provider and a key and holds no local consent
+  // was told "That did not work", which names no fix, rather than the consent
+  // sentence, which names the only one. Deleting that branch would have changed
+  // nothing observable.
+  const cause = gateRefusalCause(raw);
+  if (cause) return cause;
   const tag = snakeCase(engineErrorTag(raw));
   const renamed = PROVIDER_CAUSE_RENAMES.get(tag);
   if (renamed) return renamed;
   return PROVIDER_CAUSES.has(tag) ? (tag as ProviderErrorCause) : "failed";
+}
+
+/** The gate cause inside an `AgentError::GateRefused`, or `null`.
+ *
+ *  Returns `null` rather than `"failed"` for anything else, so the caller keeps
+ *  its existing fall-through and this stays a narrowing rather than a second
+ *  answer. An unrecognised cause inside a `GateRefused` also returns `null`: a
+ *  newer host may name a gate this build does not know, and guessing at it is
+ *  how a surface tells a user to fix the wrong thing. */
+function gateRefusalCause(raw: unknown): ProviderErrorCause | null {
+  if (snakeCase(engineErrorTag(raw)) !== "gate_refused") return null;
+  if (raw === null || typeof raw !== "object" || !("detail" in raw)) return null;
+  const detail = (raw as { detail: unknown }).detail;
+  if (detail === null || typeof detail !== "object" || !("cause" in detail)) return null;
+  const cause = snakeCase(String((detail as { cause: unknown }).cause));
+  const renamed = PROVIDER_CAUSE_RENAMES.get(cause);
+  if (renamed) return renamed;
+  return PROVIDER_CAUSES.has(cause) ? (cause as ProviderErrorCause) : null;
 }
 
 /**

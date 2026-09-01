@@ -387,8 +387,15 @@ export const AI_TRUST_INVARIANT =
  * wording — malware already on the device can read app memory, and no provider
  * setting changes that.
  */
-export const AI_TRUST_A7_RESIDUAL =
-  "Like the rest of Myne, this does not protect against malware already running on your device — such software can read app memory.";
+/** Re-exported from `@myne/copy`, where it moved in myne-md/myne#456.
+ *
+ *  It stayed here while every other consent clause was already shared, which is
+ *  precisely why the mobile consent screen rendered seven clauses against the
+ *  desktop's eight: mobile compiles `@myne/copy` and does not compile this file.
+ *  Re-exported rather than deleted so the existing desktop call sites and
+ *  `aiTrustFull` keep their import path. */
+import { AI_TRUST_A7_RESIDUAL as A7_RESIDUAL } from "@myne/copy";
+export { AI_TRUST_A7_RESIDUAL } from "@myne/copy";
 
 /**
  * The state headline.
@@ -436,7 +443,7 @@ export function aiTrustDetail(state: AiTrustState): string {
  * The panel renders the invariant separately, above the headline.
  */
 export function aiTrustDisclosure(state: AiTrustState): string {
-  return `${aiTrustDetail(state)} ${AI_TRUST_A7_RESIDUAL}`;
+  return `${aiTrustDetail(state)} ${A7_RESIDUAL}`;
 }
 
 // The one-time per-provider consent screen (ai-remote-providers myne#415
