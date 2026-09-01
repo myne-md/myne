@@ -1918,6 +1918,12 @@ The intermediate variant of the [`Slot`] enum representing a vault that has succ
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **ImportSource** (slot state) &nbsp; 📦 *Product*
+
+The read-only variant of the [`Slot`] enum, holding a second vault's keys for the length of a [vault import](#vault-import) (myne-md/myne#464). Carries `root_key`, `items_key`, `items_key_id` in `Zeroizing` wrappers plus `opened_at`, exactly as **Recovering** does, and for the same reason: the whole credential chain is verified when the slot is created rather than at first use. It is NOT an unlock and has no transition into one: every editor command matches `Slot::Unlocked` and so rejects it at compile time, and the only ways out are the import ending, the [target vault](#target-vault) locking or switching, and an independent 30-minute TTL swept by the idle timer. It does not count against the one-`Unlocked` invariant, because it is not an `Unlocked` entry: two vaults' keys can be resident at once, which is the one thing about this feature the threat model had to be amended for (`threat-model.md` A6).
+
+Used in: `threat-model.md` A6, `decisions.md` 2026-08-30 "A vault opened for READING is a slot, not an unlock"
+
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
 The 24-word BIP-39-encoded representation of 256 bits of secret entropy plus an 8-bit checksum, used as Myne's secondary credential for vault unlock. Generated at vault creation from OS CSPRNG output, presented to the user with a forced-confirmation flow before vault creation completes (`spec/protocol.md` §7.2; full UX in `spec/recovery-flow.md` §2). The phrase string, after NFKD normalization, is fed directly to Argon2id with `salt_recovery` to derive `recovery_wrap_key`. **Myne does not use BIP-39's standard PBKDF2-HMAC-SHA512 derivation** — that step is replaced by Argon2id with the same parameters as the password path. The phrase is never sent to any server. If the user loses both the phrase and the master password, the vault is permanently unrecoverable; this is a hard architectural commitment.
@@ -2268,13 +2274,13 @@ Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **Slot** &nbsp; 📦 *Product*
 
-The three-state enum that holds a vault's auth state inside `VaultRuntimeState`'s `RwLock<HashMap<VaultId, Slot>>` — one entry per vault, keyed by [VaultId](#vaultid) (an absent key IS the `Empty` case; no `Empty` entries are stored). Variants: `Slot::Empty` (no vault open), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access). Editor commands match only `Slot::Unlocked(uv) => ...`; the `Slot::Recovering` and `Slot::Empty` variants are structurally rejected at compile time (per entry). The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Multi-vault made the storage a `HashMap<VaultId, Slot>` (the singleton→map type-swap landed 2026-06-09) under the **≤1-`Unlocked` invariant**: at most one entry is ever `Unlocked` — the **active vault** is that sole `Unlocked` entry (no separate pointer), and unlocking a second vault first locks the current one. `auth_permits` stays a single global capacity-1 semaphore (one Argon2id auth op in flight client-wide, never per-vault). The per-entry lifecycle reasoning carries forward unchanged.
+The four-state enum that holds a vault's auth state inside `VaultRuntimeState`'s `RwLock<HashMap<VaultId, Slot>>` — one entry per vault, keyed by [VaultId](#vaultid) (an absent key IS the `Empty` case; no `Empty` entries are stored). Variants: `Slot::Empty` (no vault open), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access), `Slot::ImportSource { ... }` (a second vault opened read-only as the source of a [vault import](#vault-import), myne-md/myne#464). Editor commands match only `Slot::Unlocked(uv) => ...`; the other three variants are structurally rejected at compile time (per entry). The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Multi-vault made the storage a `HashMap<VaultId, Slot>` (the singleton→map type-swap landed 2026-06-09) under the **≤1-`Unlocked` invariant**: at most one entry is ever `Unlocked` — the **active vault** is that sole `Unlocked` entry (no separate pointer), and unlocking a second vault first locks the current one. An `ImportSource` entry does not count against it and never promotes into it: a second vault's keys can be resident, and they still cannot open an editor. `auth_permits` stays a single global capacity-1 semaphore (one Argon2id auth op in flight client-wide, never per-vault). The per-entry lifecycle reasoning carries forward unchanged.
 
-Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization", 2026-06-09 "Runtime multi-slot core"
+Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization", 2026-06-09 "Runtime multi-slot core", 2026-08-30 "A vault opened for READING is a slot, not an unlock"
 
 ### **SlotKind** &nbsp; 📋 *Protocol*
 
-The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_slot_kind` command (**not** by [vault_status](#vault_status), which probes `vault.meta` on disk). Three variants: `Empty | Recovering | Unlocked`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of three bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_slot_kind` round-trip would be paranoia).
+The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_slot_kind` command (**not** by [vault_status](#vault_status), which probes `vault.meta` on disk). Four variants: `Empty | Recovering | Unlocked | ImportSource`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of four bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`, `"ImportSource"`. `ImportSource` is reachable only when the caller passes an explicit `VaultId`, which the import picker does; the active-vault probe resolves an `Unlocked` entry else a `Recovering` one and deliberately never sees an import source. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_slot_kind` round-trip would be paranoia).
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
@@ -2381,6 +2387,14 @@ Used in: VaultIndices (MYND-31), `spec/markdown-dialect.md` §3.7
 The editor surface [auto-tag](#auto-tag) renders into (MYND-651): a CodeMirror block widget anchored at the frontmatter/body boundary, hosting the suggested tags as chips — solid for a tag the vault already has, dashed `+` for one the model coined. One tap accepts (the tag is written into the note's frontmatter `tags:`, not injected as an inline `#tag`); dismiss drops it from the band. **Absent / zero-length when there is nothing to suggest**, so an idle note is never shifted — the byte-stability and shared-listener discipline are inherited from the [tag chip](#tag-chip) decoration cluster's installer. Inert where no inference engine exists (web, and mobile until MYND-653), so it is never a dead affordance.
 
 Used in: MYND-651, `decisions.md` 2026-07-31
+
+### **Source vault** &nbsp; 📦 *Product*
+
+*(Aliases: import source vault. Myne-divergent: yes — the term only exists because Myne can import from its own format.)*
+
+In a **vault import**, the vault notes are read FROM. Always another local vault on the same device, never the one currently unlocked, and never modified by the import: it is read through a dedicated read-only key slot (`Slot::ImportSource`) that holds its `root_key` and `items_key` for the length of the run and is zeroized when the run ends, when the target vault locks, or when an independent TTL expires. Contrast **target vault**.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
 
 ### **Spell check** &nbsp; 📦 *Product*
 
@@ -2573,6 +2587,14 @@ The verdict for a twin whose shared answer already lives in `myne-core` or a `@m
 
 Used in: `scripts/check-twin-inventory.mjs`, `core/CLAUDE.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
 
+### **Target vault** &nbsp; 📦 *Product*
+
+*(Aliases: none. Myne-divergent: yes — see source vault.)*
+
+In a **vault import**, the vault notes are written INTO: the one that is unlocked, the one whose keys seal every arriving note and re-sealed attachment, and the only one the import changes. Contrast **source vault**.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
+
 ### **Tauri** &nbsp; 🛠️ *Tooling*
 
 A Rust-based framework for building cross-platform desktop applications with web-technology UIs. Myne's Phase 1 desktop-client framework (`decisions.md` Deferred #5 resolution). Supersedes the prior Electron baseline. Advantages: small TCB, ~10 MB binary vs ~150 MB Electron, ~40 MB idle RAM vs ~250 MB, achievable reproducible builds, structural memory hygiene via Rust's `zeroize`/`secrecy`/`subtle` crates, smaller updater attack surface.
@@ -2716,6 +2738,22 @@ Used in: `spec/protocol.md` §9.1
 The first Myne protocol specification (`spec/protocol.md`). Covers Phase 1 at-rest encryption only. Sync, multi-device, sharing, and post-quantum primitives are out of scope; they appear in a later major version.
 
 Used in: `spec/protocol.md` (titled v0.1)
+
+### **Vault import** &nbsp; 📦 *Product*
+
+*(Aliases: Myne vault import. Myne-divergent: yes.)*
+
+Bringing notes from one Myne vault into another, as the first entry in the import-source picker. It ADDS notes to the open vault, which is what distinguishes it from **restore backup**: a restore PLACES a whole vault and never decrypts a note, where an import decrypts each note under the **source vault**'s keys and re-seals it under the **target vault**'s. Notes, folders, tags, the links between imported notes, the attachments those notes reference, and the source's added dictionary words cross. Version history, trashed notes, templates, unreferenced attachments, prefs, themes, workspace layout, the search index, the device roster and sync enrolment do not.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
+
+### **Import label** &nbsp; 📦 *Product*
+
+*(Aliases: none. Myne-divergent: yes.)*
+
+The name a user gives one **vault import**, prefilled from the **source vault**'s own name. It does two jobs. It is the suffix a colliding note is renamed with (`Project` becomes `Project (Eski laptop)`), which is what lets an imported wikilink be pointed at the note that came with it rather than at the target's own note of that name. And because it is stable rather than a counter, re-running the same import under the same label re-derives the same renamed title, finds it already present, and skips: the label is what makes a repeat import idempotent, and changing it is what makes it not.
+
+Used in: `spec/markdown-dialect.md` §6
 
 ### **VaultId** &nbsp; 🗝️ *Key/identifier*
 
