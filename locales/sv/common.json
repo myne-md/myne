@@ -880,13 +880,15 @@
           "captureFailed": "Kunde inte starta inspelningen. Kontrollera mikrofonåtkomst i Systeminställningar.",
           "generic": "Kunde inte starta inspelningen.",
           "locked": "Lås upp ditt valv för att spela in en röstanteckning.",
-          "noInputDevice": "Ingen mikrofon hittades. Anslut en och försök igen."
+          "noInputDevice": "Ingen mikrofon hittades. Anslut en och försök igen.",
+          "unsupportedSampleRate": "Din mikrofon spelar in med en samplingsfrekvens som Myne inte kan transkribera. Välj en annan inenhet, eller ändra dess samplingsfrekvens i systemets ljudinställningar."
         },
         "stopError": {
           "captureFailed": "Inspelningen misslyckades. Kontrollera din mikrofon.",
           "emptyRecording": "Inget spelades in.",
           "generic": "Kunde inte spara inspelningen.",
-          "silentRecording": "Inspelningen var tyst och kasserades. Kontrollera din mikrofon."
+          "silentRecording": "Inspelningen var tyst och kasserades. Kontrollera din mikrofon.",
+          "unsupportedSampleRate": "Din mikrofon spelar in med en samplingsfrekvens som Myne inte kan transkribera. Ingenting sparades. Välj en annan inenhet, eller ändra dess samplingsfrekvens i systemets ljudinställningar."
         }
       },
       "widget": {
@@ -932,6 +934,7 @@
             "featureOff": "Tal till text är avstängt. Slå på det i Inställningar → Transkribering.",
             "modelLoadFailed": "Kunde inte läsa in tal-till-text-modellen. Om du har valt en egen modell i Inställningar → Utvecklare → AI, kontrollera dess filer; annars återställer en ominstallation av Myne den inbyggda.",
             "noModel": "Tal-till-text-modellen saknas. Att installera om Myne återställer den.",
+            "tooLong": "Den här inspelningen är för lång för att transkriberas. Ljudet finns kvar som bilaga, så du kan fortfarande spela upp det.",
             "vaultLocked": "Lås upp ditt valv för att transkribera."
           },
           "disabledReason": "Aktivera AI i Inställningar → Developer → AI för att transkribera.",
@@ -1164,10 +1167,6 @@
       "turnedIntoTemplate": "Gjord till mall",
       "convertedToNote": "Konverterad till anteckning",
       "versionHistory": "Versionshistorik",
-      "exportMarkdown": "Exportera som Markdown…",
-      "exportPdf": "Exportera som PDF…",
-      "exportHtml": "Exportera som HTML…",
-      "exportTxt": "Exportera som oformaterad text…",
       "trash": "Flytta till papperskorgen"
     },
     "codeBlock": {
@@ -2034,10 +2033,6 @@
       "duplicate": "Duplicera",
       "editFilterTitle": "Redigera filter",
       "emptyState": "Inga anteckningar ännu.",
-      "exportHtml": "Exportera som HTML…",
-      "exportMarkdown": "Exportera som Markdown…",
-      "exportPdf": "Exportera som PDF…",
-      "exportTxt": "Exportera som oformaterad text…",
       "favoritesHeading": "Favoriter",
       "icon": "Ikon…",
       "mergeAnyway": "Slå samman ändå",
@@ -2343,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportera…",
+      "txt": "Oformaterad text"
     }
   },
   "password": {
@@ -3057,6 +3059,9 @@
       "exactLabel": "Exakt tidpunkt",
       "exactOn": "På",
       "horizon": "Påminnelser är registrerade till och med {{date}}. Öppna Myne innan dess för att de ska fortsätta komma.",
+      "horizonLabel": "Schemalägg i förväg",
+      "horizonLabelHelper": "Påminnelser förbereds så här långt i förväg. Myne måste vara öppet och upplåst för att en påminnelse ska komma fram.",
+      "horizonInertHelper": "Sparat på den här enheten. Inget läser det ännu: den här versionen levererar inte uppgiftspåminnelser.",
       "label": "Uppgiftspåminnelser",
       "saveError": "Kunde inte spara inställningen. Försök igen.",
       "showTextAria": "Visa uppgiftstexten i aviseringen",

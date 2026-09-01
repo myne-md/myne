@@ -118,11 +118,33 @@ function readOnce(): void {
  * `vault.prefs` setter with no guard at all, so `Cmd+K` wrote the preference,
  * reported success, and `resolve()` turned it into `false` at the native call.
  *
- * Answers `false` before the first read lands, which is the same direction the
- * two surfaces render: an unread override is not an override.
+ * **Answers `true` for an UNREAD override, which is the opposite of what it
+ * used to answer and the same direction the panel takes** (myne-md/myne#482,
+ * found by review). The two callers had contradicting rules on the identical
+ * state: `PrivacyPanel` renders its switch inert on an unread override, because
+ * treating a failed read as "no override" makes a control live on a device
+ * whose window may be capturable; this predicate answered `false`, so
+ * `Cmd+K` offered the toggle in exactly that state. One of the two had to be
+ * wrong, and it is the one that fails towards LESS protection.
+ *
+ * The cost of the direction is bounded and worth stating: on a client where the
+ * override exists but has not been read yet, the palette action is briefly
+ * hidden. That is a hidden action, against a written preference that silently
+ * does not take effect. `protection_disabled_at_rest` takes the same direction
+ * on the Rust side.
+ *
+ * The capability IS consulted for the unread case. A client with no override at
+ * all never publishes, so `shared` stays `null` there permanently, and answering
+ * `true` would hide the palette action forever on a client that has nothing to
+ * suppress. An override that CANNOT be read is not the same state as one that
+ * has not been read YET, which is the same distinction `PrivacyPanel` draws.
  */
 export function screenCaptureOverrideIsActive(): boolean {
-  return shared?.effective ?? false;
+  if (shared !== null) return shared.effective;
+  // No read has landed. On a client that has the capability this is "unknown",
+  // which fails towards protection; on one that does not, no read is coming and
+  // there is nothing to suppress.
+  return has("screenCaptureProtection");
 }
 
 /** Test seam: drop the shared cell so each spec starts from a cold process. */

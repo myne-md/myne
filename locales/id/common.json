@@ -880,13 +880,15 @@
           "captureFailed": "Tidak dapat memulai rekaman. Periksa akses mikrofon di Pengaturan Sistem.",
           "generic": "Tidak dapat memulai rekaman.",
           "locked": "Buka kunci brankas Anda untuk merekam catatan suara.",
-          "noInputDevice": "Tidak ada mikrofon ditemukan. Hubungkan satu lalu coba lagi."
+          "noInputDevice": "Tidak ada mikrofon ditemukan. Hubungkan satu lalu coba lagi.",
+          "unsupportedSampleRate": "Mikrofon Anda merekam pada laju sampel yang tidak bisa ditranskripsi Myne. Pilih perangkat masukan lain, atau ubah laju sampelnya di pengaturan suara sistem."
         },
         "stopError": {
           "captureFailed": "Rekaman gagal. Periksa mikrofon Anda.",
           "emptyRecording": "Tidak ada yang terekam.",
           "generic": "Tidak dapat menyimpan rekaman.",
-          "silentRecording": "Rekaman senyap dan dibuang. Periksa mikrofon Anda."
+          "silentRecording": "Rekaman senyap dan dibuang. Periksa mikrofon Anda.",
+          "unsupportedSampleRate": "Mikrofon Anda merekam pada laju sampel yang tidak bisa ditranskripsi Myne. Tidak ada yang disimpan. Pilih perangkat masukan lain, atau ubah laju sampelnya di pengaturan suara sistem."
         }
       },
       "widget": {
@@ -932,6 +934,7 @@
             "featureOff": "Ucapan-ke-teks mati. Nyalakan di Pengaturan → Transkripsi.",
             "modelLoadFailed": "Tidak dapat memuat model ucapan-ke-teks. Jika Anda menyetel model kustom di Pengaturan → Developer → AI, periksa berkasnya; jika tidak, memasang ulang Myne akan memulihkan model bawaannya.",
             "noModel": "Model ucapan-ke-teks tidak ada. Memasang ulang Myne akan memulihkannya.",
+            "tooLong": "Rekaman ini terlalu panjang untuk ditranskripsi. Audionya tetap terlampir, jadi Anda masih bisa memutarnya.",
             "vaultLocked": "Buka kunci brankas Anda untuk mentranskripsikan."
           },
           "disabledReason": "Aktifkan AI di Pengaturan → Developer → AI untuk mentranskripsikan.",
@@ -1164,10 +1167,6 @@
       "turnedIntoTemplate": "Dijadikan templat",
       "convertedToNote": "Diubah menjadi catatan",
       "versionHistory": "Riwayat versi",
-      "exportMarkdown": "Ekspor sebagai Markdown…",
-      "exportPdf": "Ekspor sebagai PDF…",
-      "exportHtml": "Ekspor sebagai HTML…",
-      "exportTxt": "Ekspor sebagai Teks Biasa…",
       "trash": "Pindahkan ke Sampah"
     },
     "codeBlock": {
@@ -2034,10 +2033,6 @@
       "duplicate": "Duplikat",
       "editFilterTitle": "Sunting filter",
       "emptyState": "Belum ada catatan.",
-      "exportHtml": "Ekspor sebagai HTML…",
-      "exportMarkdown": "Ekspor sebagai Markdown…",
-      "exportPdf": "Ekspor sebagai PDF…",
-      "exportTxt": "Ekspor sebagai Teks Biasa…",
       "favoritesHeading": "Favorit",
       "icon": "Ikon…",
       "mergeAnyway": "Tetap gabung",
@@ -2343,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "Default"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Ekspor…",
+      "txt": "Teks biasa"
     }
   },
   "password": {
@@ -3057,6 +3059,9 @@
       "exactLabel": "Waktu presisi",
       "exactOn": "Aktif",
       "horizon": "Pengingat terdaftar sampai {{date}}. Buka Myne sebelum itu agar pengingat terus berdatangan.",
+      "horizonLabel": "Jadwalkan lebih awal",
+      "horizonLabelHelper": "Pengingat disiapkan sejauh ini di muka. Myne harus terbuka dan tidak terkunci agar pengingat sampai.",
+      "horizonInertHelper": "Disimpan di perangkat ini. Belum ada yang membacanya: versi ini tidak mengirimkan pengingat tugas.",
       "label": "Pengingat tugas",
       "saveError": "Tidak dapat menyimpan pengaturan itu. Coba lagi.",
       "showTextAria": "Tampilkan teks tugas di notifikasi",

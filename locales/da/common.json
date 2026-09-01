@@ -880,13 +880,15 @@
           "captureFailed": "Kunne ikke starte optagelsen. Tjek mikrofonadgang i Systemindstillinger.",
           "generic": "Kunne ikke starte optagelsen.",
           "locked": "Lås din boks op for at optage en talenote.",
-          "noInputDevice": "Ingen mikrofon fundet. Tilslut en, og prøv igen."
+          "noInputDevice": "Ingen mikrofon fundet. Tilslut en, og prøv igen.",
+          "unsupportedSampleRate": "Din mikrofon optager med en samplefrekvens, Myne ikke kan transskribere. Vælg en anden inputenhed, eller ændr dens samplefrekvens i systemets lydindstillinger."
         },
         "stopError": {
           "captureFailed": "Optagelsen mislykkedes. Tjek din mikrofon.",
           "emptyRecording": "Intet blev optaget.",
           "generic": "Kunne ikke gemme optagelsen.",
-          "silentRecording": "Optagelsen var tavs og blev kasseret. Tjek din mikrofon."
+          "silentRecording": "Optagelsen var tavs og blev kasseret. Tjek din mikrofon.",
+          "unsupportedSampleRate": "Din mikrofon optager med en samplefrekvens, Myne ikke kan transskribere. Intet blev gemt. Vælg en anden inputenhed, eller ændr dens samplefrekvens i systemets lydindstillinger."
         }
       },
       "widget": {
@@ -932,6 +934,7 @@
             "featureOff": "Tale-til-tekst er slået fra. Slå det til under Indstillinger → Transskription.",
             "modelLoadFailed": "Kunne ikke indlæse tale-til-tekst-modellen. Hvis du har valgt din egen model under Indstillinger → Developer → AI, så tjek dens filer; ellers gendanner en geninstallation af Myne den indbyggede.",
             "noModel": "Tale-til-tekst-modellen mangler. En geninstallation af Myne gendanner den.",
+            "tooLong": "Denne optagelse er for lang til at blive transskriberet. Lyden forbliver vedhæftet, så du kan stadig afspille den.",
             "vaultLocked": "Lås din boks op for at transskribere."
           },
           "disabledReason": "Aktivér AI under Indstillinger → Developer → AI for at transskribere.",
@@ -1164,10 +1167,6 @@
       "turnedIntoTemplate": "Gjort til skabelon",
       "convertedToNote": "Konverteret til note",
       "versionHistory": "Versionshistorik",
-      "exportMarkdown": "Eksportér som Markdown…",
-      "exportPdf": "Eksportér som PDF…",
-      "exportHtml": "Eksportér som HTML…",
-      "exportTxt": "Eksportér som almindelig tekst…",
       "trash": "Flyt til papirkurv"
     },
     "codeBlock": {
@@ -2034,10 +2033,6 @@
       "duplicate": "Dublér",
       "editFilterTitle": "Redigér filter",
       "emptyState": "Ingen noter endnu.",
-      "exportHtml": "Eksportér som HTML…",
-      "exportMarkdown": "Eksportér som Markdown…",
-      "exportPdf": "Eksportér som PDF…",
-      "exportTxt": "Eksportér som almindelig tekst…",
       "favoritesHeading": "Favoritter",
       "icon": "Ikon…",
       "mergeAnyway": "Flet alligevel",
@@ -2343,6 +2338,13 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Eksportér…",
+      "txt": "Almindelig tekst"
     }
   },
   "password": {
@@ -3057,6 +3059,9 @@
       "exactLabel": "Præcis timing",
       "exactOn": "Til",
       "horizon": "Påmindelser er registreret til og med {{date}}. Åbn Myne inden da for at holde dem i gang.",
+      "horizonLabel": "Planlæg forud",
+      "horizonLabelHelper": "Påmindelser klargøres så lang tid i forvejen. Myne skal være åben og låst op, for at en påmindelse kan komme frem.",
+      "horizonInertHelper": "Gemt på denne enhed. Intet læser den endnu: denne version leverer ikke opgavepåmindelser.",
       "label": "Opgavepåmindelser",
       "saveError": "Kunne ikke gemme indstillingen. Prøv igen.",
       "showTextAria": "Vis opgavens tekst i notifikationen",

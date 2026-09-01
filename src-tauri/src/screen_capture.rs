@@ -284,11 +284,26 @@ where
 /// rejected a malformed URL would answer "not a deep link" for exactly the
 /// inputs worth refusing. Case-insensitive because a URL scheme is.
 fn carries_deep_link<S: AsRef<std::ffi::OsStr>>(arg: &S) -> bool {
+    // The SCHEME, not the scheme-plus-authority. `myne://` matches only the
+    // authority form and steps around every other legal spelling of the same
+    // URL: `myne:theme/install` and `myne:/x` are both valid URIs with this
+    // scheme and neither starts with `myne://`, so an argv carrying one reached
+    // the permissive `flag_in` (myne-md/myne#482, found by review).
+    //
+    // What that costs is bounded but real: the flag and the `myne://` ingress
+    // arrive on the same vector, and `threat-model.md` §7 rates that ingress as
+    // reachable by ANY website. Refusing on the scheme alone means a token that
+    // both names this scheme and carries the flag is refused however it is
+    // spelled, which is the property the function's own name claims.
+    //
+    // A bare `myne:` prefix is enough and is not over-broad: an argv token
+    // starting with `myne:` is a URI with this scheme by construction, since a
+    // scheme is everything before the first colon and cannot contain one.
     arg.as_ref()
         .to_string_lossy()
         .trim_start()
         .to_ascii_lowercase()
-        .starts_with("myne://")
+        .starts_with("myne:")
 }
 
 /// The form of [`flag_in`] every OS-DELIVERED argv goes through, and the whole
@@ -946,6 +961,22 @@ mod tests {
         assert!(
             !flag_in_delivered_argv([DISABLE_FLAG, "  myne://x"]),
             "leading whitespace does not smuggle one past"
+        );
+        // The two spellings the `myne://` prefix stepped around (myne#482,
+        // found by review). Both are valid URIs with this scheme and neither
+        // carries the authority form, so both reached the permissive path.
+        // Widening the match to the SCHEME is what refuses them.
+        assert!(
+            !flag_in_delivered_argv([DISABLE_FLAG, "myne:theme/install"]),
+            "a scheme-only URI is still a deep link"
+        );
+        assert!(
+            !flag_in_delivered_argv([DISABLE_FLAG, "myne:/x"]),
+            "a single-slash path form is still a deep link"
+        );
+        assert!(
+            !flag_in_delivered_argv(["MYNE:THEME/INSTALL", DISABLE_FLAG]),
+            "and the scheme-only form is case-insensitive and order-independent too"
         );
 
         // And the ordinary terminal case still works, or the flag would be

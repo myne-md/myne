@@ -32,6 +32,20 @@ import { join } from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn();
+// The capability seam, mocked so this suite can render the panel as a client
+// with no capture affinity sees it. `capabilityPresent` is flipped per test.
+let capabilityPresent = true;
+vi.mock("../../src/platform/capabilities", async (orig) => {
+  const actual = (await orig()) as Record<string, unknown>;
+  return {
+    ...actual,
+    has: (name: string) =>
+      name === "screenCaptureProtection"
+        ? capabilityPresent
+        : (actual.has as (n: string) => boolean)(name),
+  };
+});
+
 vi.mock("../../src/platform/core", () => ({
   invoke: (...a: unknown[]) => invokeMock(...(a as [])),
 }));
@@ -343,6 +357,42 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     expect(toggle.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(toggle);
     expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(false);
+  });
+
+  it("leaves the per-vault switch LIVE on a client that has no override to read", async () => {
+    // The web regression this gate exists for (myne-md/myne#482, found by
+    // review). `useScreenCaptureOverride` returns early where there is no
+    // capture affinity to suppress, so `override` stays `null` there
+    // PERMANENTLY: nothing will ever publish. Reading that as "unknown" made
+    // `superseded` true forever, so the switch this same change rosters in
+    // `check-web-surfaces.mjs` and indexes in `settingsSearchIndex.ts` was inert
+    // on web, under a sentence about a control that client does not have.
+    //
+    // The distinction is between "the override could not be read", which fails
+    // towards protection and is right, and "no override exists here", which
+    // supersedes nothing.
+    //
+    // Deleting the `overrideApplies` gate in `PrivacyPanel` makes this fail.
+    capabilityPresent = false;
+    try {
+      stub({});
+      render(<PrivacyPanel />);
+      const row = await screen.findByTestId("settings.screen-capture");
+      await waitFor(() =>
+        expect(row.getAttribute("data-superseded")).toBe("false"),
+      );
+      expect(
+        screen.queryByText(t("settings.privacy.screenCaptureSuperseded")),
+      ).toBeNull();
+      expect(
+        screen.queryByText(t("settings.privacy.screenCaptureSupersededByFlag")),
+      ).toBeNull();
+      expect(
+        screen.getByTestId("settings.screen-capture-toggle").getAttribute("aria-disabled"),
+      ).not.toBe("true");
+    } finally {
+      capabilityPresent = true;
+    }
   });
 
   it("names the process flag rather than the row below when only the flag holds", async () => {
