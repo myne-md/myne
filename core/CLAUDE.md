@@ -51,18 +51,18 @@ The trait is deliberately scoped to note-CRUD + unlock/lock. Hooks that fire onl
 
 | Plugin | Owns |
 |---|---|
-| `attachments` | attachment crypto pipeline (`MYA1`/`MYC1`), sniffing, ref-scan, OCR + text-extraction cache |
+| `attachments` | attachment crypto pipeline (`MYA1`/`MYA5` bodies, `MYC1`/`MYC5` catalog), sniffing, ref-scan, OCR + text-extraction cache |
 | `captures` | `MYK1` watch-dictation queue drained on unlock — mobile-only |
 | `export` | whole-vault plaintext markdown-tree export — native-only |
 | `graph_layout` | `vault.graph` (`MYG1`) layout cache read/write |
 | `notes` | per-note CRUD + listing, title extraction, drawing-text projection |
-| `prefs` | `vault.prefs` (`MYP1`) read + the per-field setters |
+| `prefs` | `vault.prefs` (`MYP1`/`MYP5`) read + the per-field setters |
 | `quick_unlock` | PIN + biometric wrap-key paths (`MYQ1`); `apple.rs` is macOS/iOS-gated |
 | `secret_export` | the single narrow-seam `save_secret_text` write |
 | `share_import` | `MYF1` OS-share-sheet staging queue — mobile-only |
 | `snapshots` | list / preview / restore / prune over encrypted note history |
 | `sync` | the whole Phase 2 client engine: transport, SCRAM enroll, cycle, reconcile, conflict, device roster |
-| `themes` | `vault.themes` (`MYT1`) custom-palette store, validated through `theme-validator` |
+| `themes` | `vault.themes` (`MYT1`/`MYT5`) custom-palette store, validated through `theme-validator` |
 | `vault_change_password` | `change_password` rotation |
 | `vault_creation` | begin / commit / cancel session flow — **and its own `init()`**, see below |
 | `vault_delete` | one-shot vault destruction |
@@ -81,7 +81,7 @@ Not a plugin core, which is why it sits at the crate root rather than under `plu
 
 One caveat that belongs with the gate rather than in a commit message: **cargo unifies features across a workspace**, so `cargo test --workspace` always compiles this on. The feature only drops in an isolated single-package `--no-default-features` build, which is exactly how the audit build runs, and it protects nothing anywhere else.
 
-Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence, shared, though only desktop feeds it), `inference/` (above), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_label` (the `MYL1` sealed label store: the per-vault keychain key + the device-local file the LOCKED picker reads a vault's name from), `vault_meta_hash`, `note_txn`, `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
+Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence, shared, though only desktop feeds it), `inference/` (above), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_label` (the `MYL1` sealed label store: the per-vault keychain key + the device-local file the LOCKED picker reads a vault's name from), `vault_meta_hash`, `note_txn`, `content_nonce` (the ONE decryption-free `content_nonce` reader, which takes the base magic and the later generations as separate parameters, so a zero-generation reader is refused by the signature and a third generation is an append rather than a swap. A ONE-generation reader is still expressible (`later: &[]`) and is caught by `check-crypto-registries.mjs` rule 5 plus the unused-import lint rather than by the type; myne-md/myne#638), `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
 
 ### Command shape — three layers
 

@@ -683,43 +683,47 @@ pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
     sync_id_for(root_key, SubkeyRole::CatalogSyncId)
 }
 
-/// Read a vault singleton blob's outer 24-byte nonce (offset 6..30)
-/// decryption-free — the sync-plane change discriminator shared by the MYC1
-/// catalog and MYP1 prefs envelopes. `None` unless `bytes` opens with the
-/// expected 4-byte magic.
+/// Read a vault singleton blob's outer nonce (offset 6, `AEAD_NONCE_LEN` bytes)
+/// decryption-free: the sync-plane change discriminator shared by the
+/// `MYC1`/`MYC5` catalog, `MYP1`/`MYP5` prefs and `MYT1`/`MYT5` themes
+/// envelopes. `None` unless `bytes` opens with one of that family's magics.
 ///
-/// `magic` is always a `protocol` registry constant at the call sites below,
+/// Both are always `protocol` registry constants at the call sites below,
 /// never a re-typed literal (`protocol.md` §10.3 is the single source of truth
 /// for magic-byte allocation, and a magic that stops matching here does not
 /// error — the blob reads as unchanged and its family silently stops syncing).
-/// Same precedent as [`crate::note_nonce`] and [`crate::attachment_nonce`],
-/// and enforced by `scripts/check-crypto-registries.mjs` (epic #249).
+/// All three families read the nonce through
+/// [`crate::content_nonce::content_nonce_at`], which takes the base magic and
+/// the later generations as separate arguments. This function was the shape
+/// that got the two-generation part right first: [`crate::note_nonce`] and
+/// [`crate::attachment_nonce`] hand-wrote the comparison, and the second of
+/// them could therefore name one generation and did (myne-md/myne#638). Note
+/// what consolidating cost here, since the entry records it too: the old
+/// `(magic, magic_v0_2)` pair made a one-generation call absurd at the call
+/// site, and `later: &[]` is not absurd. Rule 5 carries that now. Also enforced by
+/// `scripts/check-crypto-registries.mjs` rules 2 and 5 (epic #249).
 ///
-/// The `6..30` slice bounds are still literals, and deliberately so: `protocol`
-/// exports `*_BLOB_HEADER_LEN` for these three families but no per-family
+/// The OFFSET (6) is still a literal, and deliberately so: `protocol` exports
+/// `*_BLOB_HEADER_LEN` for these three families but no per-family
 /// `OFFSET_*_NONCE` the way `protocol::blob` exports `OFFSET_CONTENT_NONCE`.
 /// Closing that gap means adding an exported offset constant per family in
-/// `protocol` first; until then the offsets are a known drift surface, not an
-/// oversight.
-fn read_singleton_nonce(bytes: &[u8], magic: &[u8; 4], magic_v0_2: &[u8; 4]) -> Option<[u8; 24]> {
+/// `protocol` first; until then the offset is a known drift surface, not an
+/// oversight. The nonce WIDTH is no longer a literal: `content_nonce_at` reads
+/// `AEAD_NONCE_LEN` bytes from it.
+fn read_singleton_nonce(bytes: &[u8], base: &[u8; 4], later: &[&[u8; 4]]) -> Option<[u8; 24]> {
     // BOTH generations. The `MY?5` envelope keeps the `MY?1` byte layout — only
     // the magic differs (§10.4.1 clause 6) — so the nonce is at the same offset.
     // Accepting only v0.1 makes every reader `None` on a migrated vault, and the
     // paragraph below spells out what that costs: the recorded baseline and the
     // on-disk nonce disagree forever, so every cycle re-classifies the record as
     // changed and re-adopts the server's bytes.
-    if bytes.len() < 30 || (&bytes[0..4] != magic && &bytes[0..4] != magic_v0_2) {
-        return None;
-    }
-    let mut nonce = [0u8; 24];
-    nonce.copy_from_slice(&bytes[6..30]);
-    Some(nonce)
+    crate::content_nonce::content_nonce_at(bytes, 6, base, later)
 }
 
 /// Download a synced singleton's bytes and verify them against the record that
 /// advertised them, per `sync-protocol.md` §11.3 — the pre-mutation check the
 /// note path does at `read_myn_content_nonce` and the attachment path at
-/// `read_mya1_content_nonce`.
+/// `read_attachment_content_nonce`.
 ///
 /// Returns `None` when there is nothing to pull, **and** when the served bytes
 /// do not carry the advertised `content_nonce`. Both answers mean the same
@@ -786,7 +790,7 @@ enum SingletonPull {
 
 /// The catalog's sync discriminator (`read_singleton_nonce` over MYC1).
 fn read_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, &CATALOG_BLOB_MAGIC, &CATALOG_BLOB_V0_2_MAGIC)
+    read_singleton_nonce(bytes, &CATALOG_BLOB_MAGIC, &[&CATALOG_BLOB_V0_2_MAGIC])
 }
 
 /// `vault.prefs`' reserved 16-byte sync-plane blob-id:
@@ -798,7 +802,7 @@ pub fn prefs_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 
 /// The prefs blob's sync discriminator (`read_singleton_nonce` over MYP1).
 fn read_prefs_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, &PREFS_BLOB_MAGIC, &PREFS_BLOB_V0_2_MAGIC)
+    read_singleton_nonce(bytes, &PREFS_BLOB_MAGIC, &[&PREFS_BLOB_V0_2_MAGIC])
 }
 
 /// `vault.themes`' reserved 16-byte sync-plane blob-id:
@@ -810,7 +814,7 @@ pub fn themes_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 
 /// The themes blob's sync discriminator (`read_singleton_nonce` over MYT1).
 fn read_themes_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    read_singleton_nonce(bytes, &THEMES_BLOB_MAGIC, &THEMES_BLOB_V0_2_MAGIC)
+    read_singleton_nonce(bytes, &THEMES_BLOB_MAGIC, &[&THEMES_BLOB_V0_2_MAGIC])
 }
 
 /// `<vault>/vault.themes` — the MYT1 custom-themes singleton.
@@ -2658,7 +2662,7 @@ async fn sync_cycle_attempt(
                     };
                     // Pre-decrypt manifest check (§4.2): the header nonce must
                     // be the one the record advertises.
-                    if crate::attachment_nonce::read_mya1_content_nonce(&bytes)
+                    if crate::attachment_nonce::read_attachment_content_nonce(&bytes)
                         != Some(c.content_nonce)
                     {
                         continue;
@@ -4228,6 +4232,19 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(40));
         }
         if port == 0 {
+            // `server_binary` floors a MISSING binary; this floors a binary that
+            // was found and did not come up. Without it a port-file timeout under
+            // load returns `None`, every caller's `else` arm prints SKIP, and the
+            // run is green having asserted nothing — the myne-md/myne#425 shape
+            // the sync-sim step's own comment records, reached by a different
+            // route. It matters more since myne-md/myne#638 put the four
+            // migrated-vault scenarios in that step.
+            assert!(
+                !crate::plugins::sync::test_fixtures::required("MYNE_TEST_REQUIRE_SERVER"),
+                "MYNE_TEST_REQUIRE_SERVER=1 was set and the myne-server binary was found, \
+                 but it did not report a port within the deadline. This run was asked to \
+                 exercise the real server and cannot."
+            );
             return None;
         }
         // Wait until the listener actually accepts.
@@ -4249,8 +4266,8 @@ mod tests {
     }
 
     /// Drift lock for the three singleton discriminators: each one must be
-    /// bound to its `protocol` §10.3 registry constant, and must refuse a
-    /// sibling family's magic. A re-typed literal that stopped matching would
+    /// bound to BOTH of its `protocol` §10.3 registry constants, and must
+    /// refuse a sibling family's magic in either generation. A re-typed literal that stopped matching would
     /// not error — `read_singleton_nonce` returns `None`, the blob reads as
     /// unchanged, and the family silently stops syncing. Nothing else in the
     /// tree compares these bytes against anything but themselves.
@@ -4267,14 +4284,29 @@ mod tests {
             b
         }
 
-        // Each reader accepts its own family's registry magic …
+        // Each reader accepts BOTH of its own family's registry magics. The
+        // v0.2 half is the half a migrated vault actually carries, and before
+        // myne-md/myne#638 this lock covered only v0.1, which is how the same
+        // defect one family over went unnoticed.
         assert_eq!(
             read_catalog_nonce(&envelope(&CATALOG_BLOB_MAGIC)),
             Some(NONCE)
         );
+        assert_eq!(
+            read_catalog_nonce(&envelope(&CATALOG_BLOB_V0_2_MAGIC)),
+            Some(NONCE)
+        );
         assert_eq!(read_prefs_nonce(&envelope(&PREFS_BLOB_MAGIC)), Some(NONCE));
         assert_eq!(
+            read_prefs_nonce(&envelope(&PREFS_BLOB_V0_2_MAGIC)),
+            Some(NONCE)
+        );
+        assert_eq!(
             read_themes_nonce(&envelope(&THEMES_BLOB_MAGIC)),
+            Some(NONCE)
+        );
+        assert_eq!(
+            read_themes_nonce(&envelope(&THEMES_BLOB_V0_2_MAGIC)),
             Some(NONCE)
         );
 
@@ -4286,6 +4318,11 @@ mod tests {
         assert_eq!(read_prefs_nonce(&envelope(&THEMES_BLOB_MAGIC)), None);
         assert_eq!(read_themes_nonce(&envelope(&CATALOG_BLOB_MAGIC)), None);
         assert_eq!(read_themes_nonce(&envelope(&PREFS_BLOB_MAGIC)), None);
+        // The same, across generations: a v0.2 magic must not open a sibling
+        // family's reader either.
+        assert_eq!(read_catalog_nonce(&envelope(&PREFS_BLOB_V0_2_MAGIC)), None);
+        assert_eq!(read_prefs_nonce(&envelope(&THEMES_BLOB_V0_2_MAGIC)), None);
+        assert_eq!(read_themes_nonce(&envelope(&CATALOG_BLOB_V0_2_MAGIC)), None);
 
         // Short of the 30-byte nonce window: no partial read.
         let short = envelope(&CATALOG_BLOB_MAGIC);
@@ -4296,6 +4333,9 @@ mod tests {
         assert_eq!(&CATALOG_BLOB_MAGIC, b"MYC1");
         assert_eq!(&PREFS_BLOB_MAGIC, b"MYP1");
         assert_eq!(&THEMES_BLOB_MAGIC, b"MYT1");
+        assert_eq!(&CATALOG_BLOB_V0_2_MAGIC, b"MYC5");
+        assert_eq!(&PREFS_BLOB_V0_2_MAGIC, b"MYP5");
+        assert_eq!(&THEMES_BLOB_V0_2_MAGIC, b"MYT5");
     }
 
     /// End-to-end proof: device A authors a note, pushes it through a real
@@ -4495,7 +4535,7 @@ mod tests {
     #[test]
     fn corrupt_blob_nonce_is_skipped_never_written() {
         let Some((_guard, url)) = spawn_server() else {
-            eprintln!("SKIP corrupt_blob_nonce_forces_manifest_rescan: myne-server not built");
+            eprintln!("SKIP corrupt_blob_nonce_forces_manifest_rescan: myne-server unavailable");
             return;
         };
 
@@ -5276,7 +5316,9 @@ mod tests {
         use std::sync::atomic::{AtomicBool, Ordering};
 
         let Some((_guard, url)) = spawn_server() else {
-            eprintln!("SKIP push_on_device_a_pokes_device_b_over_live_sse: myne-server not built");
+            eprintln!(
+                "SKIP push_on_device_a_pokes_device_b_over_live_sse: myne-server unavailable"
+            );
             return;
         };
 
@@ -7887,6 +7929,7 @@ mod tests {
     /// above pins note behavior in isolation).
     #[allow(clippy::too_many_arguments)]
     fn run_cycle_att(
+        version: MetaVersion,
         transport: &dyn SyncTransport,
         root_key: &[u8; 32],
         account_number_hash: [u8; 16],
@@ -7906,7 +7949,7 @@ mod tests {
             &vault_root.join("notes"),
             vault_root,
             PushGate::Allowed,
-            MetaVersion::V0_1,
+            version,
             Some(AttachmentKeys {
                 items_key,
                 items_key_id,
@@ -7918,6 +7961,7 @@ mod tests {
     /// under `attachments/<id-hex>` + a live MYC1 catalog entry.
     #[allow(clippy::too_many_arguments)]
     fn seed_attachment(
+        version: MetaVersion,
         vault: &Path,
         root_key: &[u8; 32],
         account_hash: &[u8; 16],
@@ -7928,7 +7972,8 @@ mod tests {
         created_at: u64,
     ) -> [u8; 32] {
         let id = protocol::compute_attachment_id(root_key, plaintext);
-        let blob = protocol::encode_attachment_blob(
+        let blob = protocol::encode_attachment_blob_versioned(
+            version,
             items_key,
             items_key_id,
             &id,
@@ -7936,13 +7981,34 @@ mod tests {
             plaintext,
         )
         .unwrap();
+        // Pin the generation the fixture actually produced. Without this a
+        // scenario can be handed the wrong `version` and re-run the v0.1 case
+        // under an `_on_a_migrated_vault` name, staying green while proving
+        // nothing, and it is the same silent-pass shape myne-md/myne#638 exists to
+        // remove. Asserted here rather than per scenario so every caller, and
+        // every scenario added later, is covered by construction.
+        assert_eq!(
+            &blob[0..4],
+            match version {
+                MetaVersion::V0_1 => protocol::attachment_blob::ATTACHMENT_BLOB_MAGIC.as_slice(),
+                MetaVersion::V0_2 =>
+                    protocol::attachment_blob::ATTACHMENT_BLOB_V0_2_MAGIC.as_slice(),
+            },
+            "seeded body carries the magic of the generation under test"
+        );
         let att_dir = vault.join("attachments");
         std::fs::create_dir_all(&att_dir).unwrap();
         crate::atomic_write::atomic_write(&att_dir.join(hex(&id)), &blob, true).unwrap();
 
-        let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+        let catalog_key =
+            protocol::derive_subkey_versioned(version, root_key, SubkeyRole::AttachmentsCatalogKey);
         let existing = std::fs::read(vault.join("vault.attachments")).ok();
-        let mut catalog = protocol::read_or_empty(&catalog_key, account_hash, existing.as_deref());
+        let mut catalog = protocol::read_or_empty_versioned(
+            version,
+            &catalog_key,
+            account_hash,
+            existing.as_deref(),
+        );
         let id_hex = hex(&id);
         // Mirror the production `attachment_import` causal version bump (#405):
         // `max(prior version) + 1`, so a re-add over a tombstone (version N)
@@ -7959,8 +8025,25 @@ mod tests {
         );
         meta.version = next_version;
         catalog.entries.insert(id_hex, meta);
-        let bytes =
-            protocol::encode_attachments_catalog(&catalog_key, account_hash, &catalog).unwrap();
+        let bytes = protocol::encode_attachments_catalog_versioned(
+            version,
+            &catalog_key,
+            account_hash,
+            &catalog,
+        )
+        .unwrap();
+        // The catalog is the other half of "this vault is v0.2", and the four
+        // scenarios assert against it. Pinned here for the same reason the body
+        // is: a `version` threaded correctly to one encoder and wrongly to the
+        // other still names itself `_on_a_migrated_vault` and passes.
+        assert_eq!(
+            &bytes[0..4],
+            match version {
+                MetaVersion::V0_1 => protocol::CATALOG_BLOB_MAGIC.as_slice(),
+                MetaVersion::V0_2 => protocol::CATALOG_BLOB_V0_2_MAGIC.as_slice(),
+            },
+            "seeded catalog carries the magic of the generation under test"
+        );
         crate::atomic_write::atomic_write(&vault.join("vault.attachments"), &bytes, true).unwrap();
         id
     }
@@ -7969,54 +8052,77 @@ mod tests {
     /// sync: catalog entry → tombstone (metadata scrubbed) + tombstone queue +
     /// blob unlink.
     fn delete_attachment_local(
+        version: MetaVersion,
         vault: &Path,
         root_key: &[u8; 32],
         account_hash: &[u8; 16],
         id: &[u8; 32],
         deleted_at: u64,
     ) {
-        let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+        let catalog_key =
+            protocol::derive_subkey_versioned(version, root_key, SubkeyRole::AttachmentsCatalogKey);
         let existing = std::fs::read(vault.join("vault.attachments")).ok();
-        let mut catalog = protocol::read_or_empty(&catalog_key, account_hash, existing.as_deref());
+        let mut catalog = protocol::read_or_empty_versioned(
+            version,
+            &catalog_key,
+            account_hash,
+            existing.as_deref(),
+        );
         let id_hex = hex(id);
         if let Some(meta) = catalog.entries.get(&id_hex).cloned() {
             catalog
                 .entries
                 .insert(id_hex.clone(), meta.into_tombstone(deleted_at));
         }
-        let bytes =
-            protocol::encode_attachments_catalog(&catalog_key, account_hash, &catalog).unwrap();
+        let bytes = protocol::encode_attachments_catalog_versioned(
+            version,
+            &catalog_key,
+            account_hash,
+            &catalog,
+        )
+        .unwrap();
         crate::atomic_write::atomic_write(&vault.join("vault.attachments"), &bytes, true).unwrap();
         add_pending_attachment_tombstone(vault, id).unwrap();
         let _ = std::fs::remove_file(vault.join("attachments").join(&id_hex));
     }
 
     fn read_catalog_of(
+        version: MetaVersion,
         vault: &Path,
         root_key: &[u8; 32],
         account_hash: &[u8; 16],
     ) -> protocol::AttachmentsCatalog {
-        let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+        let catalog_key =
+            protocol::derive_subkey_versioned(version, root_key, SubkeyRole::AttachmentsCatalogKey);
         let bytes = std::fs::read(vault.join("vault.attachments")).ok();
-        protocol::read_or_empty(&catalog_key, account_hash, bytes.as_deref())
+        protocol::read_or_empty_versioned(version, &catalog_key, account_hash, bytes.as_deref())
     }
 
-    /// Enroll two devices on a fresh server; returns everything the attachment
-    /// scenarios need. `None` → self-skip (binary not built).
-    #[allow(clippy::type_complexity)]
-    fn two_device_fixture(
-        tag: &str,
-    ) -> Option<(
-        ServerGuard,
-        Box<dyn SyncTransport>,
-        Box<dyn SyncTransport>,
-        std::path::PathBuf,
-        std::path::PathBuf,
-        [u8; 16],
-        [u8; 16],
-        String,
-        String,
-    )> {
+    /// Everything an attachment scenario needs from two enrolled devices.
+    struct TwoDevices {
+        /// Kills the server on drop; never read.
+        _guard: ServerGuard,
+        ta: Box<dyn SyncTransport>,
+        tb: Box<dyn SyncTransport>,
+        dir_a: std::path::PathBuf,
+        dir_b: std::path::PathBuf,
+        dev_a: [u8; 16],
+        dev_b: [u8; 16],
+        tok_a: String,
+        tok_b: String,
+        /// The account the two devices actually enrolled against.
+        ///
+        /// Returned rather than re-derived. Five scenarios used to recompute it
+        /// from `ATT_ROOT` and a re-typed tag literal, so enrolment and the
+        /// cycle addressed the same account only as long as two literals agreed;
+        /// a typo in either produced an empty-server puzzle rather than a key
+        /// mismatch.
+        account_hash: [u8; 16],
+    }
+
+    /// Enroll two devices on a fresh server. `None` → self-skip (binary not
+    /// built).
+    fn two_device_fixture(tag: &str) -> Option<TwoDevices> {
         let (guard, url) = spawn_server()?;
         let root_key = [0x42u8; 32];
         let account_hash = {
@@ -8058,17 +8164,18 @@ mod tests {
             dev_b,
         )
         .unwrap();
-        Some((
-            guard,
+        Some(TwoDevices {
+            _guard: guard,
             ta,
             tb,
             dir_a,
             dir_b,
             dev_a,
             dev_b,
-            hex32(&out_a.token),
-            hex32(&out_b.token),
-        ))
+            tok_a: hex32(&out_a.token),
+            tok_b: hex32(&out_b.token),
+            account_hash,
+        })
     }
 
     const ATT_ROOT: [u8; 32] = [0x42u8; 32];
@@ -8076,25 +8183,32 @@ mod tests {
     const ATT_ITEMS_ID: [u8; 16] = [0x22u8; 16];
 
     /// A imports an attachment; B receives the exact bytes + the live catalog
-    /// entry — the end-to-end replication proof over the real byte-transport.
-    #[test]
-    fn two_devices_replicate_an_attachment() {
-        let Some((_g, ta, tb, dir_a, dir_b, dev_a, dev_b, tok_a, tok_b)) =
-            two_device_fixture("repl")
-        else {
-            eprintln!("SKIP two_devices_replicate_an_attachment: myne-server not built");
+    /// entry: the end-to-end replication proof over the real byte-transport,
+    /// run once per generation.
+    ///
+    /// The `MYA5` half had no coverage anywhere before myne-md/myne#638, and
+    /// that absence is why the defect shipped: every attachment scenario here
+    /// hardcoded `MetaVersion::V0_1`, so the suite exercised the one generation
+    /// that worked while the generation real vaults are on pushed nothing at
+    /// all, with `attachments_pushed` at 0 and the run green.
+    ///
+    /// Push and pull are asserted separately on purpose: that defect broke BOTH
+    /// directions through the same reader, and a test that only checked B's
+    /// bytes would pass on a fix that repaired the scan and left the
+    /// downloaded-body verification behind. That the fixture really seeded the
+    /// generation under test is pinned inside `seed_attachment`, so every
+    /// scenario gets it rather than this one.
+    fn replication_proof(version: MetaVersion, tag: &str) {
+        let Some(fx) = two_device_fixture(tag) else {
+            eprintln!("SKIP replication_proof({tag}): myne-server unavailable");
             return;
         };
-        let account_hash = {
-            let d = protocol::compute_attachment_id(&ATT_ROOT, b"repl");
-            let mut h = [0u8; 16];
-            h.copy_from_slice(&d[..16]);
-            h
-        };
+        let account_hash = fx.account_hash;
 
         let plaintext = b"attachment payload from device A";
         let id = seed_attachment(
-            &dir_a,
+            version,
+            &fx.dir_a,
             &ATT_ROOT,
             &account_hash,
             &ATT_ITEMS,
@@ -8103,14 +8217,14 @@ mod tests {
             "payload.bin",
             1_000,
         );
-
         let push = run_cycle_att(
-            ta.as_ref(),
+            version,
+            fx.ta.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_a,
-            &tok_a,
-            &dir_a,
+            fx.dev_a,
+            &fx.tok_a,
+            &fx.dir_a,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
@@ -8122,26 +8236,27 @@ mod tests {
         );
 
         let pull = run_cycle_att(
-            tb.as_ref(),
+            version,
+            fx.tb.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_b,
-            &tok_b,
-            &dir_b,
+            fx.dev_b,
+            &fx.tok_b,
+            &fx.dir_b,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .expect("B cycle");
         assert_eq!(pull.attachments_pulled, 1, "B downloaded the body");
 
-        let a_bytes = std::fs::read(dir_a.join("attachments").join(hex(&id))).unwrap();
-        let b_bytes = std::fs::read(dir_b.join("attachments").join(hex(&id))).unwrap();
+        let a_bytes = std::fs::read(fx.dir_a.join("attachments").join(hex(&id))).unwrap();
+        let b_bytes = std::fs::read(fx.dir_b.join("attachments").join(hex(&id))).unwrap();
         assert_eq!(
             a_bytes, b_bytes,
             "B holds A's exact ciphertext (server-wins convergence)"
         );
 
-        let cat_b = read_catalog_of(&dir_b, &ATT_ROOT, &account_hash);
+        let cat_b = read_catalog_of(version, &fx.dir_b, &ATT_ROOT, &account_hash);
         let entry = cat_b
             .entries
             .get(&hex(&id))
@@ -8152,10 +8267,11 @@ mod tests {
         // Idle cycles push nothing (nonce-churn regression): the catalog was
         // adopted verbatim, so no re-encrypt → no endless push loop.
         for (t, dev, tok, dir) in [
-            (ta.as_ref(), dev_a, &tok_a, &dir_a),
-            (tb.as_ref(), dev_b, &tok_b, &dir_b),
+            (fx.ta.as_ref(), fx.dev_a, &fx.tok_a, &fx.dir_a),
+            (fx.tb.as_ref(), fx.dev_b, &fx.tok_b, &fx.dir_b),
         ] {
             let idle = run_cycle_att(
+                version,
                 t,
                 &ATT_ROOT,
                 account_hash,
@@ -8177,30 +8293,36 @@ mod tests {
             );
         }
 
-        std::fs::remove_dir_all(&dir_a).ok();
-        std::fs::remove_dir_all(&dir_b).ok();
+        std::fs::remove_dir_all(&fx.dir_a).ok();
+        std::fs::remove_dir_all(&fx.dir_b).ok();
+    }
+
+    #[test]
+    fn two_devices_replicate_an_attachment() {
+        replication_proof(MetaVersion::V0_1, "repl");
+    }
+
+    /// The same proof on a MIGRATED vault, where every body is `MYA5` and the
+    /// catalog is `MYC5`. Its own `#[test]` rather than a loop inside one, so a
+    /// regression names the generation it broke.
+    #[test]
+    fn two_devices_replicate_an_attachment_on_a_migrated_vault() {
+        replication_proof(MetaVersion::V0_2, "repl-v0-2");
     }
 
     /// A deletes the attachment; B's blob is erased and its catalog entry is a
     /// tombstone — and B's stale catalog can never resurrect it (§11.4).
-    #[test]
-    fn attachment_delete_propagates_with_resurrection_guard() {
-        let Some((_g, ta, tb, dir_a, dir_b, dev_a, dev_b, tok_a, tok_b)) =
-            two_device_fixture("del")
-        else {
-            eprintln!("SKIP attachment_delete_propagates: myne-server not built");
+    fn attachment_delete_propagates_with_resurrection_guard_case(version: MetaVersion, tag: &str) {
+        let Some(fx) = two_device_fixture(tag) else {
+            eprintln!("SKIP attachment_delete_propagates_with_resurrection_guard({tag}): myne-server unavailable");
             return;
         };
-        let account_hash = {
-            let d = protocol::compute_attachment_id(&ATT_ROOT, b"del");
-            let mut h = [0u8; 16];
-            h.copy_from_slice(&d[..16]);
-            h
-        };
+        let account_hash = fx.account_hash;
 
         let plaintext = b"to be deleted everywhere";
         let id = seed_attachment(
-            &dir_a,
+            version,
+            &fx.dir_a,
             &ATT_ROOT,
             &account_hash,
             &ATT_ITEMS,
@@ -8211,38 +8333,41 @@ mod tests {
         );
         // Replicate to B first.
         run_cycle_att(
-            ta.as_ref(),
+            version,
+            fx.ta.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_a,
-            &tok_a,
-            &dir_a,
+            fx.dev_a,
+            &fx.tok_a,
+            &fx.dir_a,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .unwrap();
         run_cycle_att(
-            tb.as_ref(),
+            version,
+            fx.tb.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_b,
-            &tok_b,
-            &dir_b,
+            fx.dev_b,
+            &fx.tok_b,
+            &fx.dir_b,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .unwrap();
-        assert!(dir_b.join("attachments").join(hex(&id)).exists());
+        assert!(fx.dir_b.join("attachments").join(hex(&id)).exists());
 
         // A deletes while B is "offline" (B holds a live catalog + the blob).
-        delete_attachment_local(&dir_a, &ATT_ROOT, &account_hash, &id, 2_000);
+        delete_attachment_local(version, &fx.dir_a, &ATT_ROOT, &account_hash, &id, 2_000);
         let del = run_cycle_att(
-            ta.as_ref(),
+            version,
+            fx.ta.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_a,
-            &tok_a,
-            &dir_a,
+            fx.dev_a,
+            &fx.tok_a,
+            &fx.dir_a,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
@@ -8252,28 +8377,29 @@ mod tests {
             "the §11.4 tombstone record pushed"
         );
         assert!(
-            read_pending_attachment_tombstones(&dir_a).is_empty(),
+            read_pending_attachment_tombstones(&fx.dir_a).is_empty(),
             "the queue drained after the push"
         );
 
         // B pulls: catalog-first merge → tombstone wins → local erase.
         let pull = run_cycle_att(
-            tb.as_ref(),
+            version,
+            fx.tb.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_b,
-            &tok_b,
-            &dir_b,
+            fx.dev_b,
+            &fx.tok_b,
+            &fx.dir_b,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .expect("B pull cycle");
         assert_eq!(pull.attachments_deleted, 1, "B erased the tombstoned body");
         assert!(
-            !dir_b.join("attachments").join(hex(&id)).exists(),
+            !fx.dir_b.join("attachments").join(hex(&id)).exists(),
             "B's blob is gone"
         );
-        let cat_b = read_catalog_of(&dir_b, &ATT_ROOT, &account_hash);
+        let cat_b = read_catalog_of(version, &fx.dir_b, &ATT_ROOT, &account_hash);
         assert!(
             cat_b
                 .entries
@@ -8285,12 +8411,13 @@ mod tests {
         // Resurrection guard: B's next cycles never re-push the dead entry or
         // re-download the body.
         let idle = run_cycle_att(
-            tb.as_ref(),
+            version,
+            fx.tb.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_b,
-            &tok_b,
-            &dir_b,
+            fx.dev_b,
+            &fx.tok_b,
+            &fx.dir_b,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
@@ -8305,31 +8432,38 @@ mod tests {
             "no resurrection churn"
         );
 
-        std::fs::remove_dir_all(&dir_a).ok();
-        std::fs::remove_dir_all(&dir_b).ok();
+        std::fs::remove_dir_all(&fx.dir_a).ok();
+        std::fs::remove_dir_all(&fx.dir_b).ok();
+    }
+
+    #[test]
+    fn attachment_delete_propagates_with_resurrection_guard() {
+        attachment_delete_propagates_with_resurrection_guard_case(MetaVersion::V0_1, "del");
+    }
+
+    /// The same scenario on a MIGRATED vault (`MYA5` bodies, `MYC5`
+    /// catalog). Its own `#[test]` so a regression names the generation it
+    /// broke, and a separate fixture tag so the two accounts never share
+    /// server state.
+    #[test]
+    fn attachment_delete_propagates_with_resurrection_guard_on_a_migrated_vault() {
+        attachment_delete_propagates_with_resurrection_guard_case(MetaVersion::V0_2, "del-v0-2");
     }
 
     /// Both devices import the SAME file independently (same content-addressed
     /// id, different random ciphertext) — the §4.2 server-wins rule converges
     /// both manifests on one ciphertext instead of diverging forever.
-    #[test]
-    fn double_import_converges_server_wins() {
-        let Some((_g, ta, tb, dir_a, dir_b, dev_a, dev_b, tok_a, tok_b)) =
-            two_device_fixture("dbl")
-        else {
-            eprintln!("SKIP double_import_converges: myne-server not built");
+    fn double_import_converges_server_wins_case(version: MetaVersion, tag: &str) {
+        let Some(fx) = two_device_fixture(tag) else {
+            eprintln!("SKIP double_import_converges_server_wins({tag}): myne-server unavailable");
             return;
         };
-        let account_hash = {
-            let d = protocol::compute_attachment_id(&ATT_ROOT, b"dbl");
-            let mut h = [0u8; 16];
-            h.copy_from_slice(&d[..16]);
-            h
-        };
+        let account_hash = fx.account_hash;
 
         let plaintext = b"identical file imported on two devices";
         let id_a = seed_attachment(
-            &dir_a,
+            version,
+            &fx.dir_a,
             &ATT_ROOT,
             &account_hash,
             &ATT_ITEMS,
@@ -8339,7 +8473,8 @@ mod tests {
             1_000,
         );
         let id_b = seed_attachment(
-            &dir_b,
+            version,
+            &fx.dir_b,
             &ATT_ROOT,
             &account_hash,
             &ATT_ITEMS,
@@ -8350,45 +8485,48 @@ mod tests {
         );
         assert_eq!(id_a, id_b, "content-addressing: same plaintext → same id");
         assert_ne!(
-            std::fs::read(dir_a.join("attachments").join(hex(&id_a))).unwrap(),
-            std::fs::read(dir_b.join("attachments").join(hex(&id_b))).unwrap(),
+            std::fs::read(fx.dir_a.join("attachments").join(hex(&id_a))).unwrap(),
+            std::fs::read(fx.dir_b.join("attachments").join(hex(&id_b))).unwrap(),
             "randomized encryption: same id, different ciphertext"
         );
 
         // A wins the race; B's divergent local copy must adopt A's bytes.
         run_cycle_att(
-            ta.as_ref(),
+            version,
+            fx.ta.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_a,
-            &tok_a,
-            &dir_a,
+            fx.dev_a,
+            &fx.tok_a,
+            &fx.dir_a,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .unwrap();
         run_cycle_att(
-            tb.as_ref(),
+            version,
+            fx.tb.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_b,
-            &tok_b,
-            &dir_b,
+            fx.dev_b,
+            &fx.tok_b,
+            &fx.dir_b,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .unwrap();
 
-        let a_bytes = std::fs::read(dir_a.join("attachments").join(hex(&id_a))).unwrap();
-        let b_bytes = std::fs::read(dir_b.join("attachments").join(hex(&id_a))).unwrap();
+        let a_bytes = std::fs::read(fx.dir_a.join("attachments").join(hex(&id_a))).unwrap();
+        let b_bytes = std::fs::read(fx.dir_b.join("attachments").join(hex(&id_a))).unwrap();
         assert_eq!(a_bytes, b_bytes, "server-wins converged the ciphertexts");
 
         // Convergence is stable: further cycles on both sides move nothing.
         for (t, dev, tok, dir) in [
-            (ta.as_ref(), dev_a, &tok_a, &dir_a),
-            (tb.as_ref(), dev_b, &tok_b, &dir_b),
+            (fx.ta.as_ref(), fx.dev_a, &fx.tok_a, &fx.dir_a),
+            (fx.tb.as_ref(), fx.dev_b, &fx.tok_b, &fx.dir_b),
         ] {
             let idle = run_cycle_att(
+                version,
                 t,
                 &ATT_ROOT,
                 account_hash,
@@ -8406,31 +8544,38 @@ mod tests {
             );
         }
 
-        std::fs::remove_dir_all(&dir_a).ok();
-        std::fs::remove_dir_all(&dir_b).ok();
+        std::fs::remove_dir_all(&fx.dir_a).ok();
+        std::fs::remove_dir_all(&fx.dir_b).ok();
+    }
+
+    #[test]
+    fn double_import_converges_server_wins() {
+        double_import_converges_server_wins_case(MetaVersion::V0_1, "dbl");
+    }
+
+    /// The same scenario on a MIGRATED vault (`MYA5` bodies, `MYC5`
+    /// catalog). Its own `#[test]` so a regression names the generation it
+    /// broke, and a separate fixture tag so the two accounts never share
+    /// server state.
+    #[test]
+    fn double_import_converges_server_wins_on_a_migrated_vault() {
+        double_import_converges_server_wins_case(MetaVersion::V0_2, "dbl-v0-2");
     }
 
     /// A re-add after a propagated deletion revives the entry (created_at >
     /// deleted_at) and re-uploads the body — the §11.4 rule-4 revival path,
     /// including the server-side un-tombstone CAS.
-    #[test]
-    fn attachment_readd_after_delete_revives() {
-        let Some((_g, ta, tb, dir_a, dir_b, dev_a, dev_b, tok_a, tok_b)) =
-            two_device_fixture("readd")
-        else {
-            eprintln!("SKIP attachment_readd_after_delete: myne-server not built");
+    fn attachment_readd_after_delete_revives_case(version: MetaVersion, tag: &str) {
+        let Some(fx) = two_device_fixture(tag) else {
+            eprintln!("SKIP attachment_readd_after_delete_revives({tag}): myne-server unavailable");
             return;
         };
-        let account_hash = {
-            let d = protocol::compute_attachment_id(&ATT_ROOT, b"readd");
-            let mut h = [0u8; 16];
-            h.copy_from_slice(&d[..16]);
-            h
-        };
+        let account_hash = fx.account_hash;
 
         let plaintext = b"deleted then deliberately re-imported";
         let id = seed_attachment(
-            &dir_a,
+            version,
+            &fx.dir_a,
             &ATT_ROOT,
             &account_hash,
             &ATT_ITEMS,
@@ -8440,48 +8585,52 @@ mod tests {
             1_000,
         );
         run_cycle_att(
-            ta.as_ref(),
+            version,
+            fx.ta.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_a,
-            &tok_a,
-            &dir_a,
+            fx.dev_a,
+            &fx.tok_a,
+            &fx.dir_a,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .unwrap();
         run_cycle_att(
-            tb.as_ref(),
+            version,
+            fx.tb.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_b,
-            &tok_b,
-            &dir_b,
+            fx.dev_b,
+            &fx.tok_b,
+            &fx.dir_b,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .unwrap();
 
         // Delete + propagate.
-        delete_attachment_local(&dir_a, &ATT_ROOT, &account_hash, &id, 2_000);
+        delete_attachment_local(version, &fx.dir_a, &ATT_ROOT, &account_hash, &id, 2_000);
         run_cycle_att(
-            ta.as_ref(),
+            version,
+            fx.ta.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_a,
-            &tok_a,
-            &dir_a,
+            fx.dev_a,
+            &fx.tok_a,
+            &fx.dir_a,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
         .unwrap();
         run_cycle_att(
-            tb.as_ref(),
+            version,
+            fx.tb.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_b,
-            &tok_b,
-            &dir_b,
+            fx.dev_b,
+            &fx.tok_b,
+            &fx.dir_b,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
@@ -8489,7 +8638,8 @@ mod tests {
 
         // Re-import on A with a LATER created_at (the deliberate re-add).
         let id2 = seed_attachment(
-            &dir_a,
+            version,
+            &fx.dir_a,
             &ATT_ROOT,
             &account_hash,
             &ATT_ITEMS,
@@ -8500,12 +8650,13 @@ mod tests {
         );
         assert_eq!(id, id2);
         let readd = run_cycle_att(
-            ta.as_ref(),
+            version,
+            fx.ta.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_a,
-            &tok_a,
-            &dir_a,
+            fx.dev_a,
+            &fx.tok_a,
+            &fx.dir_a,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
@@ -8514,12 +8665,13 @@ mod tests {
 
         // B revives: live entry wins the merge, body re-downloads.
         let pull = run_cycle_att(
-            tb.as_ref(),
+            version,
+            fx.tb.as_ref(),
             &ATT_ROOT,
             account_hash,
-            dev_b,
-            &tok_b,
-            &dir_b,
+            fx.dev_b,
+            &fx.tok_b,
+            &fx.dir_b,
             &ATT_ITEMS,
             &ATT_ITEMS_ID,
         )
@@ -8528,7 +8680,7 @@ mod tests {
             pull.attachments_pulled, 1,
             "B re-downloaded the revived body"
         );
-        let cat_b = read_catalog_of(&dir_b, &ATT_ROOT, &account_hash);
+        let cat_b = read_catalog_of(version, &fx.dir_b, &ATT_ROOT, &account_hash);
         assert!(
             cat_b
                 .entries
@@ -8537,8 +8689,22 @@ mod tests {
             "B's entry is live again (created_at > deleted_at)"
         );
 
-        std::fs::remove_dir_all(&dir_a).ok();
-        std::fs::remove_dir_all(&dir_b).ok();
+        std::fs::remove_dir_all(&fx.dir_a).ok();
+        std::fs::remove_dir_all(&fx.dir_b).ok();
+    }
+
+    #[test]
+    fn attachment_readd_after_delete_revives() {
+        attachment_readd_after_delete_revives_case(MetaVersion::V0_1, "readd");
+    }
+
+    /// The same scenario on a MIGRATED vault (`MYA5` bodies, `MYC5`
+    /// catalog). Its own `#[test]` so a regression names the generation it
+    /// broke, and a separate fixture tag so the two accounts never share
+    /// server state.
+    #[test]
+    fn attachment_readd_after_delete_revives_on_a_migrated_vault() {
+        attachment_readd_after_delete_revives_case(MetaVersion::V0_2, "readd-v0-2");
     }
 
     // ---- F1 Faz B: vault.meta reconcile (sync_meta_phase) --------------------
@@ -11430,7 +11596,7 @@ mod tests {
     #[test]
     fn a_refused_orphan_reclaim_does_not_cost_the_cycle_its_push() {
         let Some((_guard, url)) = spawn_server() else {
-            eprintln!("SKIP a_refused_orphan_reclaim_...: myne-server not built");
+            eprintln!("SKIP a_refused_orphan_reclaim_...: myne-server unavailable");
             return;
         };
         let root_key = [0x71u8; 32];
