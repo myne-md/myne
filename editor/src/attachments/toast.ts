@@ -14,7 +14,7 @@
 // undefined (test/node env without jsdom), so the import flows stay testable.
 
 import { hasDom } from "./styles";
-import { ICON_PATHS } from "../host/lib/icons";
+import { ICON_PATHS, type IconName } from "../host/lib/icons";
 import i18n from "../i18n";
 
 const DEFAULT_DURATION_MS = 3200;
@@ -27,7 +27,7 @@ const EXIT_MS = 180;
 /** Semantic flavour → status icon + rail tint. `neutral` shows no icon. */
 export type AttachmentToastVariant = "neutral" | "success" | "error" | "info";
 
-const VARIANT_ICON: Record<AttachmentToastVariant, string | null> = {
+const VARIANT_ICON: Record<AttachmentToastVariant, IconName | null> = {
   neutral: null,
   success: "circle-check",
   error: "circle-alert",
@@ -71,11 +71,11 @@ function dismissLabel(): string {
 }
 
 /** Inline SVG markup for one of our own icon paths — trusted, static data. */
-function svgMarkup(name: string, size: number): string {
+function svgMarkup(name: IconName, size: number): string {
   return (
     `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" ` +
     `stroke="currentColor" stroke-width="1.5" stroke-linecap="round" ` +
-    `stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] ?? ""}</svg>`
+    `stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`
   );
 }
 

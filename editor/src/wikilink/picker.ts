@@ -31,6 +31,7 @@ import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
 import { isSlashSuppressed } from "../slash/plugin";
 import { readNoteSet } from "./note-set";
+import { readRecentNotes } from "./recent-notes";
 import { readVaultHeadings, vaultHeadingsExtension } from "./vault-headings";
 import {
   readVaultBlockAnchors,
@@ -176,7 +177,11 @@ class WikilinkPickerView implements PluginValue {
         readVaultBlockAnchors(this.view.state),
       );
     }
-    return rankNotes(mode.query, readNoteSet(this.view.state));
+    return rankNotes(
+      mode.query,
+      readNoteSet(this.view.state),
+      readRecentNotes(this.view.state),
+    );
   }
 
   private open(triggerFrom: number, triggerTo: number): void {

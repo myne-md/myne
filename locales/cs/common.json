@@ -960,13 +960,15 @@
           "captureFailed": "Nahrávání se nepodařilo spustit. Zkontrolujte přístup k mikrofonu v Nastavení systému.",
           "generic": "Nahrávání se nepodařilo spustit.",
           "locked": "Pro nahrání hlasové poznámky odemkněte trezor.",
-          "noInputDevice": "Nebyl nalezen žádný mikrofon. Připojte ho a zkuste to znovu."
+          "noInputDevice": "Nebyl nalezen žádný mikrofon. Připojte ho a zkuste to znovu.",
+          "unsupportedSampleRate": "Váš mikrofon nahrává vzorkovací frekvencí, kterou Myne neumí přepsat. Vyberte jiné vstupní zařízení nebo změňte jeho vzorkovací frekvenci v nastavení zvuku systému."
         },
         "stopError": {
           "captureFailed": "Nahrávání selhalo. Zkontrolujte mikrofon.",
           "emptyRecording": "Nic nebylo nahráno.",
           "generic": "Nahrávku se nepodařilo uložit.",
-          "silentRecording": "Nahrávka byla tichá a byla zahozena. Zkontrolujte mikrofon."
+          "silentRecording": "Nahrávka byla tichá a byla zahozena. Zkontrolujte mikrofon.",
+          "unsupportedSampleRate": "Váš mikrofon nahrává vzorkovací frekvencí, kterou Myne neumí přepsat. Nic nebylo uloženo. Vyberte jiné vstupní zařízení nebo změňte jeho vzorkovací frekvenci v nastavení zvuku systému."
         }
       },
       "widget": {
@@ -1012,6 +1014,7 @@
             "featureOff": "Převod řeči na text je vypnutý. Zapněte ho v Nastavení → Přepis.",
             "modelLoadFailed": "Model pro převod řeči na text se nepodařilo načíst. Pokud jste v Nastavení → Developer → AI nastavili vlastní model, zkontrolujte jeho soubory; jinak přeinstalování Myne obnoví ten vestavěný.",
             "noModel": "Model pro převod řeči na text chybí. Přeinstalování Myne ho obnoví.",
+            "tooLong": "Tato nahrávka je pro přepis příliš dlouhá. Zvuk zůstává přiložený, takže si jej můžete přehrát.",
             "vaultLocked": "Pro přepis odemkněte svůj trezor."
           },
           "disabledReason": "Pro přepis zapněte AI v Nastavení → Developer → AI.",
@@ -1268,10 +1271,6 @@
       "turnedIntoTemplate": "Změněno na šablonu",
       "convertedToNote": "Převedeno na poznámku",
       "versionHistory": "Historie verzí",
-      "exportMarkdown": "Exportovat jako Markdown…",
-      "exportPdf": "Exportovat jako PDF…",
-      "exportHtml": "Exportovat jako HTML…",
-      "exportTxt": "Exportovat jako prostý text…",
       "trash": "Přesunout do koše"
     },
     "codeBlock": {
@@ -2207,10 +2206,6 @@
       "duplicate": "Duplikovat",
       "editFilterTitle": "Upravit filtr",
       "emptyState": "Zatím žádné poznámky.",
-      "exportHtml": "Exportovat jako HTML…",
-      "exportMarkdown": "Exportovat jako Markdown…",
-      "exportPdf": "Exportovat jako PDF…",
-      "exportTxt": "Exportovat jako prostý text…",
       "favoritesHeading": "Oblíbené",
       "icon": "Ikona…",
       "mergeAnyway": "Přesto sloučit",
@@ -2536,6 +2531,13 @@
     },
     "workspace": {
       "defaultSlotName": "Výchozí"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "Exportovat…",
+      "txt": "Prostý text"
     }
   },
   "password": {
@@ -3295,6 +3297,9 @@
       "exactLabel": "Přesné načasování",
       "exactOn": "Zapnuto",
       "horizon": "Připomínky jsou zaregistrovány do {{date}}. Otevřete Myne do té doby, aby chodily dál.",
+      "horizonLabel": "Plánovat dopředu",
+      "horizonLabelHelper": "Připomenutí se připravují s tímto předstihem. Aby dorazilo, musí být Myne spuštěné a odemčené.",
+      "horizonInertHelper": "Uloženo v tomto zařízení. Zatím to nikdo nečte: toto sestavení připomenutí úkolů nedoručuje.",
       "label": "Připomínky úkolů",
       "saveError": "Toto nastavení se nepodařilo uložit. Zkuste to znovu.",
       "showTextAria": "Zobrazit text úkolu v oznámení",
