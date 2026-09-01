@@ -302,7 +302,12 @@ pub fn vault_status_from_slot_kind(
     use crate::plugins::vault_unlock::state::SlotKind;
     match kind {
         SlotKind::Unlocked => VaultStatus::Unlocked,
-        SlotKind::Empty | SlotKind::Recovering => VaultStatus::Locked,
+        // A vault open as an import SOURCE reports Locked, and must: the
+        // clipper's only question is whether it may hand a clip to a vault that
+        // can accept a note, and a read-only source context cannot. Reporting
+        // Unlocked here would offer the clipper a vault whose every write path
+        // rejects at the slot guard.
+        SlotKind::Empty | SlotKind::Recovering | SlotKind::ImportSource => VaultStatus::Locked,
     }
 }
 

@@ -25,8 +25,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use e2e_fixture_gen::{
-    build_fixture_in, offsets, write_export_suite, write_fixture, DEFAULT_FIXTURE_GENERATION,
-    WEAK_TEST_KDF,
+    build_fixture_in, offsets, write_export_suite, write_fixture, write_import_source_suite,
+    DEFAULT_FIXTURE_GENERATION, WEAK_TEST_KDF,
 };
 use protocol::{MetaVersion, DEFAULT_V0_1_KDF_PARAMS};
 
@@ -50,7 +50,7 @@ fn json_escape(s: &str) -> String {
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage: e2e-fixture-gen --base <app-data-dir> [--count N] [--kdf weak|production] [--password <pw>] [--export-suite] [--generation v0.1|v0.2]"
+        "usage: e2e-fixture-gen --base <app-data-dir> [--count N] [--kdf weak|production] [--password <pw>] [--export-suite] [--import-source-suite] [--generation v0.1|v0.2]"
     );
     ExitCode::from(2)
 }
@@ -61,6 +61,7 @@ fn main() -> ExitCode {
     let mut kdf = WEAK_TEST_KDF;
     let mut password = DEFAULT_PASSWORD.to_string();
     let mut export_suite = false;
+    let mut import_source_suite = false;
     // The product's birth format unless the caller asks for a pre-flip vault.
     let mut generation = DEFAULT_FIXTURE_GENERATION;
     let mut generation_explicit = false;
@@ -93,6 +94,7 @@ fn main() -> ExitCode {
                 None => return usage(),
             },
             "--export-suite" => export_suite = true,
+            "--import-source-suite" => import_source_suite = true,
             "--generation" => match args.next().as_deref() {
                 Some("v0.1") => {
                     generation = MetaVersion::V0_1;
@@ -120,8 +122,28 @@ fn main() -> ExitCode {
         generation = MetaVersion::V0_1;
     }
 
+    // Same pin, same reason: the import-source suite writes MY01/MYA1/MYC1.
+    if import_source_suite {
+        if generation_explicit && generation != MetaVersion::V0_1 {
+            eprintln!("error: --import-source-suite writes v0.1 blobs; it cannot be combined with --generation v0.2");
+            return ExitCode::from(2);
+        }
+        generation = MetaVersion::V0_1;
+    }
+
+    // The suite goes into the LAST vault only. A vault-import scenario needs a
+    // target and a source, and laying the source's content into both would give
+    // the target the very titles the collision rules are supposed to meet for
+    // the first time during the import.
+    if import_source_suite && count < 2 {
+        eprintln!(
+            "error: --import-source-suite needs --count 2 or more (the last vault is the source)"
+        );
+        return ExitCode::from(2);
+    }
+
     let mut entries = Vec::with_capacity(count);
-    for _ in 0..count {
+    for index in 0..count {
         let fixture = match build_fixture_in(generation, &password, kdf) {
             Ok(f) => f,
             Err(_) => {
@@ -171,13 +193,39 @@ fn main() -> ExitCode {
                 attachment_json(&suite.pdf_attachment),
             );
         }
+        let mut import_source_json = String::new();
+        if import_source_suite && index + 1 == count {
+            let suite = match write_import_source_suite(&base, &fixture) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("error: import-source-suite write failed: {}", e.kind());
+                    return ExitCode::FAILURE;
+                }
+            };
+            import_source_json = format!(
+                ",\"importSourceSuite\":{{\"linkingNoteTitle\":\"{}\",\"collidingLinkedTitle\":\"{}\",\"collidingUnlinkedTitle\":\"{}\",\"untitledBody\":\"{}\",\"trashedTitle\":\"{}\",\"templateTitle\":\"{}\",\"referencedAttachmentId\":\"{}\",\"unreferencedAttachmentId\":\"{}\",\"tombstonedAttachmentId\":\"{}\",\"brokenLinkTarget\":\"{}\",\"dictionaryWordNotWritten\":\"{}\",\"ignoredWordNotWritten\":\"{}\"}}",
+                json_escape(&suite.linking_note_title),
+                json_escape(&suite.colliding_linked_title),
+                json_escape(&suite.colliding_unlinked_title),
+                json_escape(&suite.untitled_body),
+                json_escape(&suite.trashed_title),
+                json_escape(&suite.template_title),
+                suite.referenced_attachment_id,
+                suite.unreferenced_attachment_id,
+                suite.tombstoned_attachment_id,
+                json_escape(&suite.broken_link_target),
+                json_escape(&suite.dictionary_word_not_written),
+                json_escape(&suite.ignored_word_not_written),
+            );
+        }
         entries.push(format!(
-            "{{\"vaultId\":\"{}\",\"password\":\"{}\",\"phrase\":\"{}\",\"account\":\"{}\"{}}}",
+            "{{\"vaultId\":\"{}\",\"password\":\"{}\",\"phrase\":\"{}\",\"account\":\"{}\"{}{}}}",
             fixture.vault_id,
             json_escape(&fixture.password),
             fixture.phrase,
             fixture.account,
             export_suite_json,
+            import_source_json,
         ));
     }
 

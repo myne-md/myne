@@ -14,6 +14,11 @@
 
 pub mod commands;
 pub mod error;
+/// Opening a SOURCE vault for reading while a different vault stays unlocked
+/// (vault import, myne-md/myne#464). Lives beside the unlock plugin because it
+/// reuses its derivation steps; its COMMANDS are registered under the desktop
+/// `importer:` namespace, not this one.
+pub mod import_source;
 pub mod state;
 // Mid-session storage health (phase3-web-client task 22). A sibling of the boot
 // probe in `commands`, not an extension of it: the same three on-disk states mean
