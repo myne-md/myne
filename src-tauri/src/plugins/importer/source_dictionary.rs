@@ -72,7 +72,10 @@ pub struct SourceDictionaryWords {
 impl core::fmt::Debug for SourceDictionaryWords {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SourceDictionaryWords")
-            .field("personal_words", &format_args!("<{} words>", self.personal_words.len()))
+            .field(
+                "personal_words",
+                &format_args!("<{} words>", self.personal_words.len()),
+            )
             .finish()
     }
 }

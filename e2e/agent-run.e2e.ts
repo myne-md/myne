@@ -659,7 +659,11 @@ aiDescribe("ag7 an append writes into a note with no body", () => {
         // the only thing telling the user approving that the write is unanchored
         // and lands after the frontmatter. A visible control no test reads is one
         // refactor from disappearing silently.
-        expect(await s.exists(testIdSelector("agentReview.appendFlag"))).toBe(true);
+        // `byTestIdAll` rather than a presence helper: `Session` has no
+        // `exists`, and the call that named one type-checked nowhere, because
+        // `tsconfig.json` is include:["src"] and this tree is checked only by
+        // `scripts/check-test-typecheck.mjs` (myne-md/myne#647).
+        expect((await s.byTestIdAll("agentReview.appendFlag")).length).toBeGreaterThan(0);
 
         await (await s.byTestId("agentReview.approveAll")).click();
         await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 20_000 });

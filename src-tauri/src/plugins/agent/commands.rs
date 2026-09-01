@@ -38,10 +38,10 @@ use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Runtime, State};
 
-use myne_core::plugins::agent::history::{seed_messages, HistoryTurn, DEFAULT_HISTORY_BUDGET};
 use crate::plugins::agent::adapters::{EngineAdapter, SearchAdapter};
 use crate::plugins::local_inference::state::LocalInferenceState;
 use crate::plugins::local_inference::vector_store::LocalInferenceVectorState;
+use myne_core::plugins::agent::history::HistoryTurn;
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
@@ -49,16 +49,37 @@ pub async fn agent_start<R: Runtime>(
     app: AppHandle<R>,
     task: String,
     grant: ScopeGrant,
-    // The user's interface language, as a BCP-47 tag. Supplied by the WebView
-    // because that is where it lives: the chosen language is in `localStorage`
-    // (`src/i18n/index.ts`), not in `vault.prefs`, so the host cannot read it.
-    // Shape-checked before it reaches the system message; see
-    // `prompt::system_instructions`, which drops anything that is not a tag.
-    language: Option<String>,
-    // The visible chat turns, oldest first, as the client reports them. The
-    // BUDGET is applied here rather than by the caller: what reaches the model
-    // is host policy, and a WebView that pre-trimmed would be deciding it.
-    history: Vec<HistoryTurn>,
+    // **ACCEPTED AND IGNORED, and that is a defect rather than a design**
+    // (myne-md/myne#648). The WebView sends both on every run and this host
+    // reads neither, so a run gets no conversation and no language instruction:
+    // the model answers in English about a conversation it cannot see. Core is
+    // fully wired for both — `host_commands::step` reads `Session::language` and
+    // `Session::history` and hands them to `prompt::build_request` — and the one
+    // missing link is `AgentSessionState::open`, which fills those two fields
+    // with `Default` and has no parameter to fill them from.
+    //
+    // The wiring existed. It landed in 5ecddce9 (myne-md/myne#622) as a
+    // prune-then-insert that seeded `language`, `seed_messages(&history,
+    // budget)` and a `SeedContext`, and the merge train replaced that block with
+    // `open()`, which is #456's newer API, keeping the newer call and losing the
+    // three seeded fields. Nothing reported it: the parameters still parse, the
+    // command still succeeds, and CI never runs `cargo clippy -p myne-desktop
+    // --all-targets` with default features, so the unused bindings are invisible
+    // to every gate except the local pre-push battery.
+    //
+    // **Restoring HALF of it would be worse than leaving it.** `SeedContext` is
+    // gone from the tree entirely, and it is what dropped the seed when the
+    // exclusion set or the provider changed mid-run. `docs/decisions/ai/0541`
+    // rests the seed's egress bound on exactly that invalidation, so re-seeding
+    // the history without it would put conversation text back on the wire with
+    // the control that bounds it still missing. Both halves come back together,
+    // in #648, with the tests that pin them.
+    //
+    // Kept in the signature rather than deleted, because deleting them changes
+    // the IPC wire shape while `src/lib/agent-run-core.ts` still sends both as
+    // required arguments, and a silent shape change is how this got here.
+    #[allow(unused_variables)] language: Option<String>,
+    #[allow(unused_variables)] history: Vec<HistoryTurn>,
     on_open: Channel<AgentRunView>,
     // The run's cost as it accrues (myne-md/myne#456). A second channel rather
     // than a variant on `on_open`, because the two say different things at

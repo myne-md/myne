@@ -27,7 +27,8 @@
 // decision).
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ROOT = "core/src";
 
@@ -149,8 +150,23 @@ const SKIP_DIRS = new Set(["target"]);
 // `ok`. Injected after: named by file and line. And the shape the guard already
 // caught, a bare `std::fs::read` in the same file, is still named, so closing
 // this blind spot opened no other.
-const FS_CALL =
-  /(?:std::)?fs::[a-z_]+\s*\(|\bFile::(?:open|create)\b|\bOpenOptions::new\b|\bcrate::atomic_write::atomic_write[a-z_]*\s*\(/;
+//
+// **The lookbehind is not tidying, it is the fix for a false positive that shut
+// CI down** (myne-md/myne#647). `fs::` with nothing on its left matches INSIDE
+// any path segment ending in those two letters, and Rust has several that carry
+// no filesystem meaning whatever: `prefs::`, `refs::`, `defs::`. So
+// `protocol::prefs::device_scoped_consent(name)` was reported as direct
+// filesystem access in a file that had none, `pnpm-build` went red on develop,
+// and the serial chain behind it (`vitest`, `tauri-compile`, `cargo-test-tauri`)
+// never ran at all. A guard that fires on code it does not describe costs the
+// same as one that stays silent on code it does: both teach a reader to stop
+// believing the output.
+//
+// Verified in BOTH directions, because a fix checked only by "the tree is green
+// afterwards" is the non-evidence `CLAUDE.md` names: `protocol::prefs::foo(`
+// must stop matching, AND a bare `std::fs::read(` must still be caught.
+export const FS_CALL =
+  /(?<![A-Za-z0-9_])(?:std::)?fs::[a-z_]+\s*\(|\bFile::(?:open|create)\b|\bOpenOptions::new\b|\bcrate::atomic_write::atomic_write[a-z_]*\s*\(/;
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
@@ -162,6 +178,11 @@ function walk(dir, out = []) {
   return out;
 }
 
+// Everything below is the RUN. It is behind a main-module guard so
+// `tests/scripts/coreIoSeam.test.ts` can import `FS_CALL` without the import
+// walking `core/src` and calling `process.exit`. Same shape as
+// `check-i18n-coverage.mjs`.
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
 const argv = process.argv.slice(2);
 const files = (argv.length ? argv.filter((f) => f.endsWith(".rs")) : walk(ROOT)).filter((f) => {
   const rel = relative(process.cwd(), f);
@@ -300,3 +321,4 @@ console.log(
   `  ${touching.size} file(s) still reach the filesystem directly; ${pending} of them are ` +
     `awaiting a port. This number must only go down.`,
 );
+}
