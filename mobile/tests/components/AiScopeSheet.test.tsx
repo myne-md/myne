@@ -14,6 +14,7 @@
 // which the shared `agent.scope.*` keys rule out, but a MISSING one. That is
 // exactly what a test can pin, so every fact below is asserted by presence.
 
+import i18n from "@myne/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
@@ -178,9 +179,13 @@ describe("AiChatFlow scope", () => {
     render(<AiChatFlow grant={{ kind: "folder", value: "Projects" }} />);
     // The strip is there either way; what changes is what it says.
     expect(screen.getByTestId("ai.scope-strip")).toBeTruthy();
+    // The RESOLVED sentence, not the key. This asserted the key while the
+    // harness returned keys verbatim; the catalogs resolve now, so the key form
+    // would never appear and the check would have to be deleted rather than
+    // fixed. Resolving through `i18n.t` keeps it pinning WHICH sentence.
     await waitFor(() =>
       expect(screen.getByTestId("ai.scope-label").textContent).toContain(
-        "scopeCountUnavailable",
+        i18n.t("agent.composer.scopeCountUnavailable"),
       ),
     );
     // An exclusion line with no numbers behind it would be a claim nobody
@@ -190,7 +195,9 @@ describe("AiChatFlow scope", () => {
 
   it("asks when the run needs more, and grants it", async () => {
     agentStart.mockImplementation(
-      (_t: string, _g: unknown, onOpen: (v: AgentRunView) => void) => {
+      // `_lang` and `_hist` are the two required arguments myne-md/myne#618
+      // and #617 added between the grant and the callbacks.
+      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, onOpen: (v: AgentRunView) => void) => {
         onOpen(VIEW);
         return Promise.resolve({
           view: VIEW,
@@ -242,7 +249,9 @@ describe("AiChatFlow scope", () => {
 
   it("ends the run when the expansion is declined", async () => {
     agentStart.mockImplementation(
-      (_t: string, _g: unknown, onOpen: (v: AgentRunView) => void) => {
+      // `_lang` and `_hist` are the two required arguments myne-md/myne#618
+      // and #617 added between the grant and the callbacks.
+      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, onOpen: (v: AgentRunView) => void) => {
         onOpen(VIEW);
         return Promise.resolve({
           view: VIEW,

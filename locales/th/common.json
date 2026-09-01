@@ -663,6 +663,12 @@
       },
       "unfoldAll": {
         "label": "ขยายทั้งหมด"
+      },
+      "openThisWeekNote": {
+        "label": "เปิดบันทึกของสัปดาห์นี้"
+      },
+      "openThisMonthNote": {
+        "label": "เปิดบันทึกของเดือนนี้"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "ค้นหาโน้ตหรือเรียกใช้คำสั่ง…",
       "noMatches": "ไม่มีคำสั่งหรือโน้ตที่ตรงกัน"
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "เปิดบันทึกของวันนี้ไม่ได้",
+        "weekly": "เปิดบันทึกของสัปดาห์นี้ไม่ได้",
+        "monthly": "เปิดบันทึกของเดือนนี้ไม่ได้"
+      }
     }
   },
   "export": {
@@ -2767,20 +2780,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "ว่างเปล่า (ไม่ใช้เทมเพลต)",
+      "folderSearchEmpty": "ไม่มีโฟลเดอร์ที่ตรงกัน",
+      "folderSearchPlaceholder": "ค้นหาโฟลเดอร์…",
+      "searchEmpty": "ไม่มีเทมเพลตที่ตรงกัน",
+      "searchPlaceholder": "ค้นหาเทมเพลต…",
+      "untitledTemplate": "เทมเพลตไม่มีชื่อ",
+      "sectionDaily": "บันทึกรายวัน",
+      "sectionWeekly": "บันทึกรายสัปดาห์",
+      "sectionMonthly": "บันทึกรายเดือน",
+      "periodFolderLabel": "โฟลเดอร์",
+      "periodFolderHelper": "ที่เก็บบันทึก{{period}}ใหม่ ค่าเริ่มต้น: {{default}} โฟลเดอร์จะยังคงอยู่แม้จะว่างเปล่า",
+      "periodFormatLabel": "รูปแบบชื่อเรื่อง",
+      "periodFormatHelperDaily": "ชื่อเรื่องของบันทึกรายวันแต่ละฉบับ รองรับ YYYY, MM, DD, gggg (ปีสัปดาห์ ISO), ww (เลขสัปดาห์ ISO) และ [ข้อความ] สำหรับข้อความตามตัวอักษร ค่าเริ่มต้น: {{default}}",
+      "periodFormatHelperWeekly": "ชื่อเรื่องของบันทึกรายสัปดาห์แต่ละฉบับ รองรับ gggg (ปีสัปดาห์ ISO), ww (เลขสัปดาห์ ISO), YYYY, MM, DD และ [ข้อความ] สำหรับข้อความตามตัวอักษร ค่าเริ่มต้น: {{default}}",
+      "periodFormatHelperMonthly": "ชื่อเรื่องของบันทึกรายเดือนแต่ละฉบับ รองรับ YYYY, MM, gggg (ปีสัปดาห์ ISO), ww (เลขสัปดาห์ ISO) และ [ข้อความ] สำหรับข้อความตามตัวอักษร ค่าเริ่มต้น: {{default}}",
+      "periodTemplateLabel": "เทมเพลต",
+      "periodTemplateHelper": "เลือกเทมเพลตที่บันทึก{{period}}แต่ละฉบับจะเริ่มต้นจาก หรือเว้นว่างไว้เพื่อสร้างบันทึกเปล่าที่ใช้วันที่เป็นชื่อเรื่อง",
+      "collisionWarning": "บันทึก{{first}}และ{{second}}ชี้ไปที่บันทึกเดียวกัน เพราะใช้โฟลเดอร์เดียวกันและสร้างชื่อเรื่องเหมือนกัน คำสั่งทั้งสองจะเปิดบันทึกนั้น",
+      "weekStartNote": "สัปดาห์เริ่มต้นวันจันทร์ (ISO 8601) ดังนั้นวันแรก ๆ ของเดือนมกราคมอาจอยู่ในสัปดาห์สุดท้ายของปีก่อน และวันท้าย ๆ ของเดือนธันวาคมอาจอยู่ในสัปดาห์แรกของปีถัดไป",
+      "periodFolderSaveError": "บันทึกโฟลเดอร์{{period}}ไม่สำเร็จ โปรดลองอีกครั้ง",
+      "periodFormatSaveError": "บันทึกรูปแบบชื่อเรื่อง{{period}}ไม่สำเร็จ โปรดลองอีกครั้ง",
+      "periodTemplateSaveError": "บันทึกเทมเพลต{{period}}ไม่สำเร็จ โปรดลองอีกครั้ง",
+      "periodNameDaily": "รายวัน",
+      "periodNameWeekly": "รายสัปดาห์",
+      "periodNameMonthly": "รายเดือน",
+      "periodFolderAriaLabel": "โฟลเดอร์บันทึก{{period}}",
+      "periodFormatAriaLabel": "รูปแบบชื่อเรื่องบันทึก{{period}}",
+      "periodTemplateAriaLabel": "เทมเพลตบันทึก{{period}}",
       "dateFormatHelper": "ชื่อของโน้ตประจำวันแต่ละรายการ รองรับ YYYY, MM, DD ค่าเริ่มต้นคือ {{default}}",
       "dateFormatLabel": "รูปแบบวันที่ของโน้ตประจำวัน",
       "dateFormatSaveError": "บันทึกรูปแบบวันที่ไม่ได้ โปรดลองอีกครั้ง",
       "folderHelper": "ที่ที่จัดเก็บโน้ตประจำวันใหม่ ค่าเริ่มต้นคือ {{default}} โฟลเดอร์นี้จะถูกเก็บไว้แม้ว่างเปล่า",
       "folderLabel": "โฟลเดอร์โน้ตประจำวัน",
       "folderSaveError": "บันทึกโฟลเดอร์ประจำวันไม่ได้ โปรดลองอีกครั้ง",
-      "folderSearchEmpty": "ไม่มีโฟลเดอร์ที่ตรงกัน",
-      "folderSearchPlaceholder": "ค้นหาโฟลเดอร์…",
-      "searchEmpty": "ไม่มีเทมเพลตที่ตรงกัน",
-      "searchPlaceholder": "ค้นหาเทมเพลต…",
       "templateHelper": "เลือกเทมเพลตที่จะใช้เริ่มโน้ตประจำวันแต่ละรายการ หรือเว้นว่างไว้เพื่อได้โน้ตเปล่าที่ตั้งชื่อด้วยวันที่",
       "templateLabel": "เทมเพลตโน้ตประจำวัน",
-      "templateSaveError": "บันทึกเทมเพลตประจำวันไม่ได้ โปรดลองอีกครั้ง",
-      "untitledTemplate": "เทมเพลตไม่มีชื่อ"
+      "templateSaveError": "บันทึกเทมเพลตประจำวันไม่ได้ โปรดลองอีกครั้ง"
     },
     "deleteVault": {
       "cancel": "ยกเลิก",
@@ -3337,6 +3372,7 @@
         "dateFormat": "รูปแบบวันที่ วัน เดือน ปี ปฏิทิน date format iso dd/mm mm/dd",
         "timeFormat": "รูปแบบเวลา 24 ชั่วโมง 12 ชั่วโมง นาฬิกา time format am pm",
         "timezone": "เขตเวลา โซนเวลา ภูมิภาค วันนี้ timezone time zone tz utc iana",
+        "periodicNotes": "บันทึกตามรอบ รายสัปดาห์ รายเดือน สัปดาห์ เดือน โฟลเดอร์ เทมเพลต รูปแบบ",
         "aiHistoryBudget": "บทสนทนา ประวัติ บริบท ความจำ งบ ตัวอักษร เอเจนต์ แชท คำขอ"
       }
     },

@@ -663,6 +663,12 @@
       },
       "unfoldAll": {
         "label": "سب کھولیں"
+      },
+      "openThisWeekNote": {
+        "label": "اس ہفتے کا نوٹ کھولیں"
+      },
+      "openThisMonthNote": {
+        "label": "اس مہینے کا نوٹ کھولیں"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "نوٹس تلاش کریں یا کوئی کمانڈ چلائیں…",
       "noMatches": "کوئی کمانڈ یا نوٹ مطابقت نہیں رکھتا۔"
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "آج کا نوٹ نہیں کھل سکا۔",
+        "weekly": "اس ہفتے کا نوٹ نہیں کھل سکا۔",
+        "monthly": "اس مہینے کا نوٹ نہیں کھل سکا۔"
+      }
     }
   },
   "export": {
@@ -2767,20 +2780,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "خالی (کوئی ٹیمپلیٹ نہیں)",
+      "folderSearchEmpty": "کوئی فولڈر مطابقت نہیں رکھتا۔",
+      "folderSearchPlaceholder": "فولڈر تلاش کریں…",
+      "searchEmpty": "کوئی ٹیمپلیٹ مطابقت نہیں رکھتا۔",
+      "searchPlaceholder": "ٹیمپلیٹس تلاش کریں…",
+      "untitledTemplate": "بلا عنوان ٹیمپلیٹ",
+      "sectionDaily": "روزانہ نوٹس",
+      "sectionWeekly": "ہفتہ وار نوٹس",
+      "sectionMonthly": "ماہانہ نوٹس",
+      "periodFolderLabel": "فولڈر",
+      "periodFolderHelper": "نئے {{period}} نوٹس کہاں محفوظ ہوں گے۔ طے شدہ: {{default}}۔ فولڈر خالی ہونے پر بھی برقرار رہتا ہے۔",
+      "periodFormatLabel": "عنوان کی ساخت",
+      "periodFormatHelperDaily": "ہر روزانہ نوٹ کا عنوان۔ YYYY، MM، DD، gggg (ISO ہفتہ سال)، ww (ISO ہفتہ نمبر) اور لفظی متن کے لیے [متن] معاون ہیں۔ طے شدہ: {{default}}۔",
+      "periodFormatHelperWeekly": "ہر ہفتہ وار نوٹ کا عنوان۔ gggg (ISO ہفتہ سال)، ww (ISO ہفتہ نمبر)، YYYY، MM، DD اور لفظی متن کے لیے [متن] معاون ہیں۔ طے شدہ: {{default}}۔",
+      "periodFormatHelperMonthly": "ہر ماہانہ نوٹ کا عنوان۔ YYYY، MM، gggg (ISO ہفتہ سال)، ww (ISO ہفتہ نمبر) اور لفظی متن کے لیے [متن] معاون ہیں۔ طے شدہ: {{default}}۔",
+      "periodTemplateLabel": "سانچہ",
+      "periodTemplateHelper": "ہر {{period}} نوٹ جس سانچے سے شروع ہو وہ منتخب کریں، یا تاریخ کے عنوان والے خالی نوٹ کے لیے اسے خالی چھوڑ دیں۔",
+      "collisionWarning": "{{first}} اور {{second}} نوٹس ایک ہی نوٹ پر پہنچتے ہیں، کیونکہ ان کا فولڈر ایک ہے اور عنوان بھی ایک ہی بنتا ہے۔ دونوں کمانڈز وہی کھولیں گی۔",
+      "weekStartNote": "ہفتے پیر سے شروع ہوتے ہیں (ISO 8601)، اس لیے جنوری کے پہلے دن پچھلے سال کے آخری ہفتے میں اور دسمبر کے آخری دن اگلے سال کے پہلے ہفتے میں آ سکتے ہیں۔",
+      "periodFolderSaveError": "{{period}} نوٹس کا فولڈر محفوظ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "periodFormatSaveError": "{{period}} نوٹس کے عنوان کی ساخت محفوظ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+      "periodTemplateSaveError": "{{period}} نوٹس کا سانچہ محفوظ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "periodNameDaily": "روزانہ",
+      "periodNameWeekly": "ہفتہ وار",
+      "periodNameMonthly": "ماہانہ",
+      "periodFolderAriaLabel": "{{period}} نوٹس کا فولڈر",
+      "periodFormatAriaLabel": "{{period}} نوٹس کے عنوان کی ساخت",
+      "periodTemplateAriaLabel": "{{period}} نوٹس کا سانچہ",
       "dateFormatHelper": "ہر روزانہ نوٹ کا عنوان۔ YYYY، MM، DD کی معاونت ہے۔ طے شدہ {{default}} ہے۔",
       "dateFormatLabel": "روزانہ نوٹ کی تاریخ کا فارمیٹ",
       "dateFormatSaveError": "تاریخ کا فارمیٹ محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
       "folderHelper": "نئے روزانہ نوٹس کہاں رکھے جاتے ہیں۔ طے شدہ {{default}} ہے۔ فولڈر خالی ہونے پر بھی باقی رہتا ہے۔",
       "folderLabel": "روزانہ نوٹ کا فولڈر",
       "folderSaveError": "روزانہ فولڈر محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
-      "folderSearchEmpty": "کوئی فولڈر مطابقت نہیں رکھتا۔",
-      "folderSearchPlaceholder": "فولڈر تلاش کریں…",
-      "searchEmpty": "کوئی ٹیمپلیٹ مطابقت نہیں رکھتا۔",
-      "searchPlaceholder": "ٹیمپلیٹس تلاش کریں…",
       "templateHelper": "ہر روزانہ نوٹ شروع کرنے کے لیے کوئی ٹیمپلیٹ منتخب کریں، یا تاریخ کے عنوان والے خالی نوٹ کے لیے اسے خالی چھوڑ دیں۔",
       "templateLabel": "روزانہ نوٹ کا ٹیمپلیٹ",
-      "templateSaveError": "روزانہ ٹیمپلیٹ محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔",
-      "untitledTemplate": "بلا عنوان ٹیمپلیٹ"
+      "templateSaveError": "روزانہ ٹیمپلیٹ محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔"
     },
     "deleteVault": {
       "cancel": "منسوخ کریں",
@@ -3337,6 +3372,7 @@
         "dateFormat": "تاریخ فارمیٹ دن مہینہ سال iso dd/mm mm/dd کیلنڈر",
         "timeFormat": "وقت فارمیٹ 24 گھنٹے 12 گھنٹے گھڑی am pm",
         "timezone": "ٹائم زون وقت کا زون tz utc iana خطہ آج",
+        "periodicNotes": "وقفہ وار نوٹس ہفتہ وار ماہانہ ہفتہ مہینہ فولڈر سانچہ ساخت",
         "aiHistoryBudget": "گفتگو تاریخ سیاق یادداشت بجٹ حروف ایجنٹ چیٹ درخواست"
       }
     },

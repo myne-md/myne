@@ -102,6 +102,7 @@ const DEFAULT_PREFS: PrefsView = {
   daily_date_format: null,
   daily_folder: null,
   daily_template: null,
+  periodic_notes: {},
   favorites: [],
   item_order: {},
   editor_layout: null,

@@ -669,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Összes kibontása"
+      },
+      "openThisWeekNote": {
+        "label": "A heti jegyzet megnyitása"
+      },
+      "openThisMonthNote": {
+        "label": "A havi jegyzet megnyitása"
       }
     },
     "hotkeys": {
@@ -1543,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "Jegyzetek keresése vagy parancs futtatása…",
       "noMatches": "Nincs egyező parancs vagy jegyzet."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "A mai jegyzetet nem sikerült megnyitni.",
+        "weekly": "A heti jegyzetet nem sikerült megnyitni.",
+        "monthly": "A havi jegyzetet nem sikerült megnyitni."
+      }
     }
   },
   "export": {
@@ -2787,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Üres (nincs sablon)",
+      "folderSearchEmpty": "Nincs egyező mappa.",
+      "folderSearchPlaceholder": "Mappák keresése…",
+      "searchEmpty": "Nincs egyező sablon.",
+      "searchPlaceholder": "Sablonok keresése…",
+      "untitledTemplate": "Névtelen sablon",
+      "sectionDaily": "Napi jegyzetek",
+      "sectionWeekly": "Heti jegyzetek",
+      "sectionMonthly": "Havi jegyzetek",
+      "periodFolderLabel": "Mappa",
+      "periodFolderHelper": "Ide kerülnek az új {{period}} jegyzetek. Alapértelmezés: {{default}}. A mappa üresen is megmarad.",
+      "periodFormatLabel": "Címformátum",
+      "periodFormatHelperDaily": "Minden napi jegyzet címe. Támogatja a YYYY, MM, DD, gggg (ISO hétév), ww (ISO hétszám) elemeket és a [szöveg] formát a szó szerinti szöveghez. Alapértelmezés: {{default}}.",
+      "periodFormatHelperWeekly": "Minden heti jegyzet címe. Támogatja a gggg (ISO hétév), ww (ISO hétszám), YYYY, MM, DD elemeket és a [szöveg] formát a szó szerinti szöveghez. Alapértelmezés: {{default}}.",
+      "periodFormatHelperMonthly": "Minden havi jegyzet címe. Támogatja a YYYY, MM, gggg (ISO hétév), ww (ISO hétszám) elemeket és a [szöveg] formát a szó szerinti szöveghez. Alapértelmezés: {{default}}.",
+      "periodTemplateLabel": "Sablon",
+      "periodTemplateHelper": "Válasszon sablont, amellyel minden {{period}} jegyzet kezdődik, vagy hagyja üresen egy dátummal címzett üres jegyzethez.",
+      "collisionWarning": "A(z) {{first}} és {{second}} jegyzetek ugyanarra a jegyzetre mutatnak, mert közös mappát használnak és ugyanazt a címet adják. Mindkét parancs ezt nyitja meg.",
+      "weekStartNote": "A hetek hétfőn kezdődnek (ISO 8601), ezért január első napjai az előző év utolsó hetéhez tartozhatnak, december utolsó napjai pedig a következő év első hetéhez.",
+      "periodFolderSaveError": "A(z) {{period}} mappát nem sikerült menteni. Próbálja újra.",
+      "periodFormatSaveError": "A(z) {{period}} címformátumot nem sikerült menteni. Próbálja újra.",
+      "periodTemplateSaveError": "A(z) {{period}} sablont nem sikerült menteni. Próbálja újra.",
+      "periodNameDaily": "napi",
+      "periodNameWeekly": "heti",
+      "periodNameMonthly": "havi",
+      "periodFolderAriaLabel": "{{period}} jegyzetek mappája",
+      "periodFormatAriaLabel": "{{period}} jegyzetek címformátuma",
+      "periodTemplateAriaLabel": "{{period}} jegyzetek sablonja",
       "dateFormatHelper": "Minden napi jegyzet címe. Támogatja: ÉÉÉÉ, HH, NN. Alapértelmezett: {{default}}.",
       "dateFormatLabel": "Napi jegyzet dátumformátuma",
       "dateFormatSaveError": "Nem sikerült menteni a dátumformátumot. Kérlek, próbáld újra.",
       "folderHelper": "Hová kerülnek az új napi jegyzetek. Alapértelmezés: {{default}}. A mappa üresen is megmarad.",
       "folderLabel": "Napi jegyzetek mappája",
       "folderSaveError": "Nem sikerült menteni a napi jegyzetek mappáját. Kérlek, próbáld újra.",
-      "folderSearchEmpty": "Nincs egyező mappa.",
-      "folderSearchPlaceholder": "Mappák keresése…",
-      "searchEmpty": "Nincs egyező sablon.",
-      "searchPlaceholder": "Sablonok keresése…",
       "templateHelper": "Válassz egy sablont, amelyből minden napi jegyzet indul, vagy hagyd üresen egy dátummal címzett üres jegyzethez.",
       "templateLabel": "Napi jegyzet sablonja",
-      "templateSaveError": "Nem sikerült menteni a napi jegyzet sablonját. Kérlek, próbáld újra.",
-      "untitledTemplate": "Névtelen sablon"
+      "templateSaveError": "Nem sikerült menteni a napi jegyzet sablonját. Kérlek, próbáld újra."
     },
     "deleteVault": {
       "cancel": "Mégse",
@@ -3365,6 +3400,7 @@
         "dateFormat": "dátumformátum dátum formátum nap hónap év iso dd/mm mm/dd naptár date format calendar",
         "timeFormat": "időformátum idő formátum 24 órás 12 órás óra de du am pm time format clock",
         "timezone": "időzóna zóna tz utc iana régió ma timezone time zone today",
+        "periodicNotes": "időszakos jegyzetek heti havi hét hónap mappa sablon formátum",
         "aiHistoryBudget": "beszélgetés előzmények kontextus memória keret karakterek ügynök chat kérés"
       }
     },

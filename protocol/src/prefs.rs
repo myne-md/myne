@@ -1319,6 +1319,43 @@ pub struct PrefsView {
     #[serde(default)]
     pub paired_extensions: Vec<crate::paired_extension::PairedExtension>,
 
+    /// Periodic-notes settings (myne#177): one entry per `<period>.<setting>`
+    /// pair, e.g. `weekly.folder` → `Weekly/`, `monthly.format` → `YYYY-MM`,
+    /// `weekly.template` → a template note's UUIDv7. The three settings mirror
+    /// what `daily_folder` / `daily_date_format` / `daily_template` already
+    /// carry for the daily period, which keeps its three top-level fields and
+    /// is deliberately NOT migrated in here: prefs merge per field, so a device
+    /// on an older build would go on writing the flat fields while a newer one
+    /// wrote this map, and the two would silently diverge with no way to say
+    /// which is authoritative.
+    ///
+    /// A flat `BTreeMap<String, String>` rather than a map of nested objects,
+    /// which buys two things. The canonical encoder emits keys in lexicographic
+    /// order for free and the existing string-map codec applies unchanged (the
+    /// `folder_icons` / `item_colors` precedent class, keys + values
+    /// NFC-normalized at encode time). And the Phase 2 field clock is then
+    /// `periodic_notes/<period>.<setting>`, i.e. per SETTING: a folder edit on
+    /// one device and a template edit on another, to the same period in the
+    /// same round, both survive.
+    ///
+    /// The `<period>.<setting>` grammar is the CLIENT's, exactly like
+    /// `daily_date_format`'s token grammar. This codec validates nothing and
+    /// stores both halves verbatim, so an entry naming a period this build does
+    /// not know (a later `quarterly.folder`) decodes and is ignored rather than
+    /// failing the blob. That is what makes a fourth period cost no spec change.
+    ///
+    /// Default empty; **omitted entirely from the canonical JSON when empty**,
+    /// so a vault that configured no period is byte-identical to a pre-myne#177
+    /// `vault.prefs` (existing golden vectors unaffected, a migration-less
+    /// additive field on `MYP1`: no new magic, no new `SubkeyRole`, no new AAD
+    /// role, zero new crypto). **Non-load-bearing** (cold/derivable, AS-low): a
+    /// replayed or tampered value can at worst file a period note in the wrong
+    /// folder or title it differently, so no protective-envelope clamp.
+    /// Canonical key `periodic_notes`, which sorts after `paired_extensions`
+    /// (`pai` < `per`), before `reminder_horizon_days` (`p` < `r`).
+    #[serde(default)]
+    pub periodic_notes: BTreeMap<String, String>,
+
     /// Active right-panel tab id (right-panel tabs) — the id of the right
     /// sidebar tab the editor should restore (e.g. `backlinks`, `unlinked`,
     /// `outline`). `None` ≡ unset → the host applies its default (the first
@@ -1467,6 +1504,7 @@ impl Default for PrefsView {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -2231,6 +2269,18 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(
             &crate::paired_extension::canonical_encode_paired_extensions(&prefs.paired_extensions),
         );
+        out.push(b',');
+    }
+
+    // periodic_notes (canonical key 'per': after paired_extensions [pai < per],
+    // before reminder_horizon_days [p < r], myne#177). A canonical string→string
+    // map keyed `<period>.<setting>`, the folder_icons / item_colors encoding
+    // reused verbatim; omitted entirely when empty so a vault that configured no
+    // period is byte-identical to a pre-myne#177 vault.prefs (existing golden
+    // vectors unaffected).
+    if !prefs.periodic_notes.is_empty() {
+        out.extend_from_slice(b"\"periodic_notes\":");
+        push_canonical_string_map(&mut out, &prefs.periodic_notes);
         out.push(b',');
     }
 
@@ -3125,6 +3175,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // a token value or extension id that literally contains a later marker text.
     let paired_extensions =
         parse_optional_paired_extensions_field(rest, &mut cursor, b"\"paired_extensions\":")?;
+    // periodic_notes (key 'per': after paired_extensions [pai < per], before
+    // reminder_horizon_days [p < r], myne#177). The folder_icons string-map
+    // parse reused verbatim; absent → empty, and an entry naming a period this
+    // build does not know decodes and is ignored by the client rather than
+    // failing the blob.
+    let periodic_notes =
+        parse_optional_string_map_field(rest, &mut cursor, b"\"periodic_notes\":")?;
     // reminder_horizon_days + reminders_enabled (keys 'reminder' — after
     // paired_extensions ['p' < 'r'], before right_panel_* ['re' < 'ri'],
     // MYND-618). Parsed from the same monotonic cursor and in canonical order,
@@ -3295,6 +3352,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         startup_open,
         startup_open_note,
         paired_extensions,
+        periodic_notes,
         reminder_horizon_days,
         reminders_enabled,
         right_panel_active_tab,
@@ -4338,6 +4396,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -4418,6 +4477,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -4623,6 +4683,98 @@ mod tests {
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
     }
 
+    // periodic_notes (myne#177): the flat `<period>.<setting>` string map.
+
+    #[test]
+    fn periodic_notes_encodes_between_paired_extensions_and_reminders() {
+        let prefs = PrefsView {
+            periodic_notes: map_of(&[
+                ("monthly.folder", "Monthly/"),
+                ("weekly.folder", "Weekly/"),
+                ("weekly.format", "gggg-[W]ww"),
+            ]),
+            paired_extensions: Vec::new(),
+            reminder_horizon_days: Some(7),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            core::str::from_utf8(&encoded).expect("utf8"),
+            concat!(
+                r#"{"periodic_notes":{"monthly.folder":"Monthly/","weekly.folder":"Weekly/","#,
+                r#""weekly.format":"gggg-[W]ww"},"reminder_horizon_days":7,"#,
+                r#""screen_capture_protection":true}"#
+            )
+        );
+    }
+
+    #[test]
+    fn empty_periodic_notes_is_omitted_so_a_pre_feature_vault_is_byte_identical() {
+        // The whole no-migration argument rests on this: a vault that configures
+        // no period must encode to exactly what it encoded to before the field
+        // existed, or every golden vector moves.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+        assert!(!encoded
+            .windows(b"periodic_notes".len())
+            .any(|w| w == b"periodic_notes"));
+    }
+
+    #[test]
+    fn periodic_notes_round_trips_through_blob() {
+        let original = PrefsView {
+            periodic_notes: map_of(&[
+                ("monthly.format", "YYYY-MM"),
+                ("weekly.folder", "Weekly/"),
+                ("weekly.template", "0190a000-0000-7000-8000-000000000003"),
+            ]),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .expect("encode");
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn periodic_notes_keeps_a_period_this_build_does_not_know() {
+        // The `<period>.<setting>` grammar is the client's, not the codec's. An
+        // entry for a period that ships later (quarterly) has to survive a
+        // decode by an older build untouched, or adding a fourth period stops
+        // being free and starts being a migration.
+        let plaintext = br#"{"periodic_notes":{"quarterly.folder":"Quarterly/","weekly.folder":"Weekly/"},"screen_capture_protection":true}"#;
+        let parsed = canonical_json_decode(plaintext).expect("decode");
+        assert_eq!(
+            parsed.periodic_notes,
+            map_of(&[
+                ("quarterly.folder", "Quarterly/"),
+                ("weekly.folder", "Weekly/"),
+            ])
+        );
+        assert_eq!(
+            canonical_json_encode(&parsed).as_slice(),
+            plaintext.as_slice()
+        );
+    }
+
+    #[test]
+    fn periodic_notes_does_not_swallow_the_fields_that_follow_it() {
+        // The parser walks one monotonic forward cursor, so a field inserted in
+        // the middle can silently make every later field take its default. The
+        // two immediate neighbours are what this pins.
+        let plaintext = br#"{"periodic_notes":{"weekly.folder":"Weekly/"},"reminder_horizon_days":9,"reminders_enabled":false,"screen_capture_protection":true}"#;
+        let parsed = canonical_json_decode(plaintext).expect("decode");
+        assert_eq!(
+            parsed.periodic_notes,
+            map_of(&[("weekly.folder", "Weekly/")])
+        );
+        assert_eq!(parsed.reminder_horizon_days, Some(9));
+        assert!(!parsed.reminders_enabled);
+    }
+
     #[test]
     fn decoration_maps_round_trip_through_blob() {
         let original = PrefsView {
@@ -4815,6 +4967,7 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                periodic_notes: Default::default(),
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
@@ -4897,6 +5050,7 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                periodic_notes: Default::default(),
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
@@ -6580,6 +6734,7 @@ mod tests {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765000000),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6602,6 +6757,7 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(1765432100),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6625,6 +6781,7 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(u64::from(u32::MAX) + 12345),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6757,6 +6914,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6894,6 +7052,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             spell_enabled: Some(true),
             spell_languages: alloc::vec![String::from("en-US"), String::from("tr")],
             ..PrefsView::default()
@@ -6940,6 +7099,7 @@ mod tests {
     fn spell_enabled_false_round_trips() {
         let original = PrefsView {
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             spell_enabled: Some(false),
             ..PrefsView::default()
         };
@@ -7213,6 +7373,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7300,6 +7461,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7385,6 +7547,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7469,6 +7632,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7616,6 +7780,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7731,6 +7896,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7825,6 +7991,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7993,6 +8160,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8095,6 +8263,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8439,6 +8608,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8523,6 +8693,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8609,6 +8780,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8763,6 +8935,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8894,6 +9067,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -9215,6 +9389,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -9303,6 +9478,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -9652,6 +9828,7 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                periodic_notes: Default::default(),
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
@@ -9733,6 +9910,7 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                periodic_notes: Default::default(),
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
@@ -9879,6 +10057,7 @@ mod tests {
             new_note_location: Some(alloc::string::String::from("specific")),
             new_note_location_folder: Some(alloc::string::String::from("Inbox/")),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: Some(alloc::string::String::from("backlinks")),
             // set array (sorted + deduped)
             right_panel_hidden_tabs: alloc::vec![alloc::string::String::from("outline")],
@@ -10972,6 +11151,7 @@ mod tests {
             label: Some(String::from("Work")),
             last_backup_at: Some(1765432100),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -12789,5 +12969,256 @@ mod tests {
             json.contains("ext-a"),
             "non-secret extension_id should still serialize: {json}"
         );
+    }
+
+    /// Emit the two `periodic_notes` cases (myne#177) as ready-to-paste JSON
+    /// case objects, appended to the `vault-prefs` family rather than folded
+    /// into an existing generator, so every earlier case stays byte-stable.
+    ///
+    /// Two cases, the family's encrypt + decrypt_ok pair:
+    /// - `encrypt-periodic-notes`: a view carrying five `<period>.<setting>`
+    ///   entries across two periods. Pins the canonical position of the field
+    ///   (between `paired_extensions` and `reminder_horizon_days`) and the
+    ///   lexicographic key order INSIDE the map, which is what makes two
+    ///   implementations that build the map in different orders agree.
+    /// - `decrypt-periodic-notes`: the round trip.
+    ///
+    /// Nonce `0xF2` is the next free entry in the family's nonce registry.
+    ///
+    /// `cargo test -p protocol --lib emit_periodic_notes_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_periodic_notes_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF2; AEAD_NONCE_LEN];
+
+        // FOUR properties in one fixture, and three of them were unpinned when
+        // this generator first shipped.
+        //
+        // 1. The lexicographic key order INSIDE the map. The entries go in in a
+        //    deliberately non-sorted order across two periods, so a port that
+        //    emits insertion order produces different bytes. (`BTreeMap::from`
+        //    sorts on construction, so this is a statement about what the
+        //    ENCODER must do with an arbitrary source order rather than about
+        //    this literal; the assertion below is what holds it.)
+        //
+        // 2. The field's CANONICAL SLOT, and this is the correction. The first
+        //    version's description claimed to pin "after paired_extensions,
+        //    before reminder_horizon_days" over a blob containing neither: the
+        //    field had no left neighbour at all and its right neighbour was
+        //    `screen_capture_protection`. `vectors/vault-prefs/schema.md` states
+        //    the invariant that every field is pinned beside BOTH of its
+        //    canonical neighbours, because `vault.prefs` is canonical JSON and
+        //    key order is part of the bytes, so a case that pins a value alone
+        //    cannot notice a wrong slot. Both neighbours are present now.
+        //
+        // 3. An UNRECOGNISED period key, `quarterly.folder`. The field's own
+        //    schema text says a decoder MUST re-encode an entry whose period it
+        //    does not recognise, which is what makes a fourth period free, and
+        //    no case anywhere contained one. The corpus carried an actively
+        //    misleading precedent instead: `decrypt-unknown-field-tolerated`
+        //    pins an unknown TOP-LEVEL field being DROPPED from the re-encode,
+        //    which is the opposite of what this map requires.
+        //
+        // 4. NFC normalisation, fed in DECOMPOSED form. Every string in the
+        //    first fixture was pure ASCII, so the NFC claim in the same sentence
+        //    was unpinned too. `Wöchentlich/` is written here as `o` + U+0308
+        //    COMBINING DIAERESIS; the encoder must emit U+00F6, so the expected
+        //    bytes differ from the input literal and a port that skips the fold
+        //    fails on the blob rather than on a comparison it might not make.
+        //    `encrypt-labeled` uses exactly this device for `label`.
+        let prefs = PrefsView {
+            periodic_notes: BTreeMap::from([
+                (
+                    String::from("weekly.template"),
+                    String::from("0190a000-0000-7000-8000-000000000009"),
+                ),
+                (String::from("monthly.folder"), String::from("Monthly/")),
+                // NFD on input: `o` + U+0308, folded to U+00F6 on encode.
+                (String::from("weekly.folder"), String::from("Wo\u{308}chentlich/")),
+                (String::from("monthly.format"), String::from("YYYY-MM")),
+                (String::from("weekly.format"), String::from("gggg-[W]ww")),
+                // A period no build in this tree knows. It must survive the
+                // round trip verbatim rather than being dropped.
+                (String::from("quarterly.folder"), String::from("Quarterly/")),
+            ]),
+            // The two canonical NEIGHBOURS, so the slot is pinned rather than
+            // only the value: `paired_extensions` (p) < `periodic_notes` (pe)
+            // < `reminder_horizon_days` (r).
+            paired_extensions: alloc::vec![crate::paired_extension::PairedExtension {
+                extension_id: String::from("clipper@myne.md"),
+                paired_at: Some(1_765_432_000),
+                revoked: false,
+                token_value: String::from("9c1fb7a4"),
+            }],
+            reminder_horizon_days: Some(7),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            core::str::from_utf8(&canonical).expect("utf8"),
+            concat!(
+                r#"{"paired_extensions":[{"extension_id":"clipper@myne.md","paired_at":1765432000,"#,
+                r#""revoked":false,"token_value":"9c1fb7a4"}],"#,
+                r#""periodic_notes":{"monthly.folder":"Monthly/","monthly.format":"YYYY-MM","#,
+                // PRECOMPOSED here (U+00F6) against the DECOMPOSED input above
+                // (`o` + U+0308). That difference is the NFC pin: if the encoder
+                // skipped the fold this literal would not match.
+                "\"quarterly.folder\":\"Quarterly/\",\"weekly.folder\":\"W\u{f6}chentlich/\",",
+                r#""weekly.format":"gggg-[W]ww","#,
+                r#""weekly.template":"0190a000-0000-7000-8000-000000000009"},"#,
+                r#""reminder_horizon_days":7,"screen_capture_protection":true}"#
+            ),
+            "four things at once: the field sorts between paired_extensions (p) and \
+             reminder_horizon_days (r), its keys are emitted lexicographically, an \
+             unrecognised period survives verbatim, and the NFD input is folded to NFC \
+             (the literal above carries U+00F6, the input carried o + U+0308)",
+        );
+
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode periodic_notes");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+
+        // NOT `assert_eq!(decoded, prefs)`, and the difference is the NFC pin
+        // rather than a weaker assertion. The encoder normalises, so the decoded
+        // view carries `W` + U+00F6 where the source view carried `o` + U+0308:
+        // a round trip through this format is exact in BYTES and idempotent in
+        // VALUES, and it is not the identity on a decomposed input. Comparing
+        // against the source would have forced the fixture back to ASCII, which
+        // is how the NFC claim went unpinned in the first place.
+        let expected_decoded = PrefsView {
+            periodic_notes: {
+                let mut m = prefs.periodic_notes.clone();
+                m.insert(
+                    String::from("weekly.folder"),
+                    String::from("W\u{f6}chentlich/"),
+                );
+                m
+            },
+            ..prefs.clone()
+        };
+        assert_eq!(
+            decoded, expected_decoded,
+            "round trip must be exact, with the decomposed input folded to NFC",
+        );
+        // And it is a FIXED POINT: re-encoding what came back reproduces the
+        // same bytes, which is the property a port needs and the one an
+        // idempotence claim actually rests on.
+        assert_eq!(
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &decoded, &nonce)
+                .expect("re-encode"),
+            blob,
+            "the decoded view must re-encode to the same bytes",
+        );
+
+        // THE INPUT THE ENCRYPT CASE SHIPS IS THE DECOMPOSED ONE, and that is
+        // the whole NFC pin rather than a detail.
+        //
+        // The runner parses `input_plaintext_canonical_utf8_hex` into a
+        // `PrefsView`, RE-ENCODES it and compares against
+        // `expected_prefs_blob_hex`. Ship the canonical (precomposed) bytes as
+        // the input and `nfc()` is the identity on them, so a port that skips
+        // the fold entirely produces the expected blob and passes. Measured, not
+        // assumed: deleting the `.nfc()` from `push_canonical_string_map` left
+        // this case green until the input became decomposed.
+        //
+        // `encrypt-labeled` has the same shape and the same gap: its description
+        // says the label "is supplied in NFD in the generator source", which is
+        // true of the generator's `#[cfg(test)]` assertion and not of anything a
+        // PORT can run. This case is the one that closes it, and the field name
+        // is not a contradiction: the field is the ENCODER'S INPUT, and the
+        // encoder is what canonicalises.
+        let decomposed_plaintext: Vec<u8> = {
+            let text = core::str::from_utf8(&canonical).expect("utf8");
+            text.replace("W\u{f6}chentlich/", "Wo\u{308}chentlich/")
+                .into_bytes()
+        };
+        assert_ne!(
+            decomposed_plaintext, canonical,
+            "the substitution must actually have happened, or this case pins nothing",
+        );
+        assert_eq!(
+            encode_prefs_blob_raw(
+                &prefs_key_a,
+                &account_hash_a,
+                &serde_json::from_slice::<PrefsView>(&decomposed_plaintext).expect("parse"),
+                &nonce,
+            )
+            .expect("encode from decomposed"),
+            blob,
+            "a decomposed input must encode to the SAME bytes as the precomposed one",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-periodic-notes\",\n");
+        dump.push_str("      \"description\": \"myne#177 periodic-notes settings: a string map keyed <period>.<setting> holding the weekly equivalents of the three daily_* fields plus the two monthly ones. Pins FOUR things a port can get wrong independently. (1) The field's canonical position, and BOTH neighbours are in this blob rather than named in prose: paired_extensions (p) < periodic_notes (pe) < reminder_horizon_days (r). An earlier version of this case named those two neighbours and contained neither, so it pinned a value alone and could not have noticed a wrong slot. (2) The lexicographic key order INSIDE the map. Read that as a statement about the ENCODER rather than about this artefact: the shipped plaintext and view are both already sorted, so nothing here records an insertion order and no port can observe one. What the case actually holds is that these bytes are the sorted form, so an implementation that emits its own source order produces different bytes whenever that order differs. The generator feeds a deliberately unsorted literal, which is where the round trip is exercised, and that is a main-repo assertion a port cannot run. (3) An UNRECOGNISED period: quarterly.folder is a period no build in the reference tree knows, and it must be re-encoded verbatim, which is what makes a fourth period free without a format change. (4) NFC: weekly.folder is fed in DECOMPOSED form (o + U+0308) and these bytes carry the PRECOMPOSED U+00F6, so a port that skips the fold fails on the blob. Daily is NOT in this map by design and keeps its three top-level fields.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&decomposed_plaintext)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str("    },\n");
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-periodic-notes\",\n");
+        dump.push_str("      \"description\": \"Round trip with encrypt-periodic-notes: the blob decodes back to the same six entries, and a decoder that dropped or reordered a key fails here rather than silently losing a period's settings. TWO round-trip properties beyond that. quarterly.folder is a period NO build knows, and it must come back verbatim, because the format's forward-compat rule for this map is re-encode-what-you-do-not-recognise, which is the OPPOSITE of decrypt-unknown-field-tolerated one case over: an unknown TOP-LEVEL field is dropped from the re-encode, an unknown period key inside this map is not. And weekly.folder went in DECOMPOSED (o + U+0308) and comes back PRECOMPOSED (U+00F6), so the round trip is exact in bytes and idempotent in values without being the identity on a decomposed input; a port that skips the NFC fold produces different blob bytes rather than a comparison it might not make.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"paired_extensions\": [{ \"extension_id\": \"clipper@myne.md\", \"paired_at\": 1765432000, \"revoked\": false, \"token_value\": \"9c1fb7a4\" }],\n");
+        dump.push_str("        \"periodic_notes\": {\n");
+        dump.push_str("          \"monthly.folder\": \"Monthly/\",\n");
+        dump.push_str("          \"monthly.format\": \"YYYY-MM\",\n");
+        dump.push_str("          \"quarterly.folder\": \"Quarterly/\",\n");
+        dump.push_str("          \"weekly.folder\": \"W\u{f6}chentlich/\",\n");
+        dump.push_str("          \"weekly.format\": \"gggg-[W]ww\",\n");
+        dump.push_str("          \"weekly.template\": \"0190a000-0000-7000-8000-000000000009\"\n");
+        dump.push_str("        },\n");
+        dump.push_str("        \"reminder_horizon_days\": 7\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        std::fs::write("/tmp/myne_periodic_notes_prefs_cases.json", dump.as_bytes())
+            .expect("write periodic-notes prefs cases");
     }
 }

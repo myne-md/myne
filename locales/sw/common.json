@@ -663,6 +663,12 @@
       },
       "unfoldAll": {
         "label": "Kunjua zote"
+      },
+      "openThisWeekNote": {
+        "label": "Fungua dokezo la wiki hii"
+      },
+      "openThisMonthNote": {
+        "label": "Fungua dokezo la mwezi huu"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "Tafuta madokezo au endesha amri…",
       "noMatches": "Hakuna amri wala dokezo linalolingana."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Dokezo la leo halikuweza kufunguliwa.",
+        "weekly": "Dokezo la wiki hii halikuweza kufunguliwa.",
+        "monthly": "Dokezo la mwezi huu halikuweza kufunguliwa."
+      }
     }
   },
   "export": {
@@ -2767,20 +2780,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Wazi (bila kiolezo)",
+      "folderSearchEmpty": "Hakuna folda inayolingana.",
+      "folderSearchPlaceholder": "Tafuta folda…",
+      "searchEmpty": "Hakuna kiolezo kinacholingana.",
+      "searchPlaceholder": "Tafuta violezo…",
+      "untitledTemplate": "Kiolezo kisicho na kichwa",
+      "sectionDaily": "Madokezo ya kila siku",
+      "sectionWeekly": "Madokezo ya kila wiki",
+      "sectionMonthly": "Madokezo ya kila mwezi",
+      "periodFolderLabel": "Folda",
+      "periodFolderHelper": "Mahali madokezo mapya ya {{period}} yanapohifadhiwa. Chaguo-msingi: {{default}}. Folda hubaki hata ikiwa tupu.",
+      "periodFormatLabel": "Muundo wa kichwa",
+      "periodFormatHelperDaily": "Kichwa cha kila dokezo la kila siku. Inakubali YYYY, MM, DD, gggg (mwaka wa wiki wa ISO), ww (namba ya wiki ya ISO) na [maandishi] kwa maandishi halisi. Chaguo-msingi: {{default}}.",
+      "periodFormatHelperWeekly": "Kichwa cha kila dokezo la kila wiki. Inakubali gggg (mwaka wa wiki wa ISO), ww (namba ya wiki ya ISO), YYYY, MM, DD na [maandishi] kwa maandishi halisi. Chaguo-msingi: {{default}}.",
+      "periodFormatHelperMonthly": "Kichwa cha kila dokezo la kila mwezi. Inakubali YYYY, MM, gggg (mwaka wa wiki wa ISO), ww (namba ya wiki ya ISO) na [maandishi] kwa maandishi halisi. Chaguo-msingi: {{default}}.",
+      "periodTemplateLabel": "Kiolezo",
+      "periodTemplateHelper": "Chagua kiolezo ambacho kila dokezo la {{period}} litaanzia, au acha wazi ili kupata dokezo tupu lenye tarehe kama kichwa.",
+      "collisionWarning": "Madokezo ya {{first}} na {{second}} yanaishia kwenye dokezo moja, kwa sababu yanashiriki folda na yanatoa kichwa kilekile. Amri zote mbili zitalifungua.",
+      "weekStartNote": "Wiki huanza Jumatatu (ISO 8601), kwa hivyo siku za mwanzo za Januari zinaweza kuwa katika wiki ya mwisho ya mwaka uliopita, na siku za mwisho za Desemba katika wiki ya kwanza ya mwaka unaofuata.",
+      "periodFolderSaveError": "Folda ya madokezo ya {{period}} haikuweza kuhifadhiwa. Tafadhali jaribu tena.",
+      "periodFormatSaveError": "Muundo wa kichwa wa madokezo ya {{period}} haukuweza kuhifadhiwa. Tafadhali jaribu tena.",
+      "periodTemplateSaveError": "Kiolezo cha madokezo ya {{period}} hakikuweza kuhifadhiwa. Tafadhali jaribu tena.",
+      "periodNameDaily": "kila siku",
+      "periodNameWeekly": "kila wiki",
+      "periodNameMonthly": "kila mwezi",
+      "periodFolderAriaLabel": "Folda ya madokezo ya {{period}}",
+      "periodFormatAriaLabel": "Muundo wa kichwa wa madokezo ya {{period}}",
+      "periodTemplateAriaLabel": "Kiolezo cha madokezo ya {{period}}",
       "dateFormatHelper": "Kichwa cha kila dokezo la kila siku. Inakubali YYYY, MM, DD. Chaguomsingi ni {{default}}.",
       "dateFormatLabel": "Muundo wa tarehe wa dokezo la kila siku",
       "dateFormatSaveError": "Imeshindwa kuhifadhi muundo wa tarehe. Tafadhali jaribu tena.",
       "folderHelper": "Mahali madokezo mapya ya kila siku yanapowekwa. Chaguomsingi ni {{default}}. Folda huhifadhiwa hata ikiwa tupu.",
       "folderLabel": "Folda ya dokezo la kila siku",
       "folderSaveError": "Imeshindwa kuhifadhi folda ya kila siku. Tafadhali jaribu tena.",
-      "folderSearchEmpty": "Hakuna folda inayolingana.",
-      "folderSearchPlaceholder": "Tafuta folda…",
-      "searchEmpty": "Hakuna kiolezo kinacholingana.",
-      "searchPlaceholder": "Tafuta violezo…",
       "templateHelper": "Chagua kiolezo cha kuanzia kila dokezo la kila siku, au liache wazi ili upate dokezo tupu lenye kichwa cha tarehe.",
       "templateLabel": "Kiolezo cha dokezo la kila siku",
-      "templateSaveError": "Imeshindwa kuhifadhi kiolezo cha kila siku. Tafadhali jaribu tena.",
-      "untitledTemplate": "Kiolezo kisicho na kichwa"
+      "templateSaveError": "Imeshindwa kuhifadhi kiolezo cha kila siku. Tafadhali jaribu tena."
     },
     "deleteVault": {
       "cancel": "Ghairi",
@@ -3337,6 +3372,7 @@
         "dateFormat": "muundo wa tarehe siku mwezi mwaka iso dd/mm mm/dd kalenda",
         "timeFormat": "muundo wa saa am pm saa 24 saa 12 muda",
         "timezone": "eneo la saa ukanda wa saa tz utc iana kanda leo",
+        "periodicNotes": "madokezo ya mara kwa mara kila wiki kila mwezi wiki mwezi folda kiolezo muundo",
         "aiHistoryBudget": "mazungumzo historia muktadha kumbukumbu bajeti herufi wakala gumzo ombi"
       }
     },

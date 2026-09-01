@@ -669,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Tümünü genişlet"
+      },
+      "openThisWeekNote": {
+        "label": "Bu haftanın notunu aç"
+      },
+      "openThisMonthNote": {
+        "label": "Bu ayın notunu aç"
       }
     },
     "hotkeys": {
@@ -1543,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "Notlarda ara veya bir komut çalıştır…",
       "noMatches": "Eşleşen komut veya not yok."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Bugünün notu açılamadı.",
+        "weekly": "Bu haftanın notu açılamadı.",
+        "monthly": "Bu ayın notu açılamadı."
+      }
     }
   },
   "export": {
@@ -2787,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Boş (şablon yok)",
+      "folderSearchEmpty": "Eşleşen klasör yok.",
+      "folderSearchPlaceholder": "Klasörlerde ara…",
+      "searchEmpty": "Eşleşen şablon yok.",
+      "searchPlaceholder": "Şablonlarda ara…",
+      "untitledTemplate": "Başlıksız şablon",
+      "sectionDaily": "Günlük notlar",
+      "sectionWeekly": "Haftalık notlar",
+      "sectionMonthly": "Aylık notlar",
+      "periodFolderLabel": "Klasör",
+      "periodFolderHelper": "Yeni {{period}} notların nereye kaydedileceği. Varsayılan: {{default}}. Klasör boş kalsa da korunur.",
+      "periodFormatLabel": "Başlık biçimi",
+      "periodFormatHelperDaily": "Her günlük notun başlığı. YYYY, MM, DD, gggg (ISO hafta yılı), ww (ISO hafta numarası) ve düz metin için [metin] desteklenir. Varsayılan: {{default}}.",
+      "periodFormatHelperWeekly": "Her haftalık notun başlığı. gggg (ISO hafta yılı), ww (ISO hafta numarası), YYYY, MM, DD ve düz metin için [metin] desteklenir. Varsayılan: {{default}}.",
+      "periodFormatHelperMonthly": "Her aylık notun başlığı. YYYY, MM, gggg (ISO hafta yılı), ww (ISO hafta numarası) ve düz metin için [metin] desteklenir. Varsayılan: {{default}}.",
+      "periodTemplateLabel": "Şablon",
+      "periodTemplateHelper": "Her {{period}} notun başlayacağı şablonu seçin ya da tarihle adlandırılmış boş bir not için boş bırakın.",
+      "collisionWarning": "{{first}} ve {{second}} notlar aynı nota denk geliyor, çünkü aynı klasörü paylaşıyor ve aynı başlığı üretiyorlar. İki komut da aynı notu açacak.",
+      "weekStartNote": "Haftalar pazartesi başlar (ISO 8601), bu yüzden ocak ayının ilk günleri önceki yılın son haftasına, aralık ayının son günleri de sonraki yılın ilk haftasına ait olabilir.",
+      "periodFolderSaveError": "{{period}} klasörü kaydedilemedi. Lütfen tekrar deneyin.",
+      "periodFormatSaveError": "{{period}} başlık biçimi kaydedilemedi. Lütfen tekrar deneyin.",
+      "periodTemplateSaveError": "{{period}} şablonu kaydedilemedi. Lütfen tekrar deneyin.",
+      "periodNameDaily": "günlük",
+      "periodNameWeekly": "haftalık",
+      "periodNameMonthly": "aylık",
+      "periodFolderAriaLabel": "{{period}} not klasörü",
+      "periodFormatAriaLabel": "{{period}} not başlık biçimi",
+      "periodTemplateAriaLabel": "{{period}} not şablonu",
       "dateFormatHelper": "Her günlük notun başlığı. YYYY, MM, DD destekler. Varsayılan: {{default}}.",
       "dateFormatLabel": "Günlük not tarih biçimi",
       "dateFormatSaveError": "Tarih biçimi kaydedilemedi. Lütfen tekrar deneyin.",
       "folderHelper": "Yeni günlük notların kaydedildiği yer. Varsayılan: {{default}}. Bu klasör boş olsa bile korunur.",
       "folderLabel": "Günlük not klasörü",
       "folderSaveError": "Günlük klasörü kaydedilemedi. Lütfen tekrar deneyin.",
-      "folderSearchEmpty": "Eşleşen klasör yok.",
-      "folderSearchPlaceholder": "Klasörlerde ara…",
-      "searchEmpty": "Eşleşen şablon yok.",
-      "searchPlaceholder": "Şablonlarda ara…",
       "templateHelper": "Her günlük nota başlanacak bir şablon seçin veya tarihle başlıklandırılmış boş bir not için boş bırakın.",
       "templateLabel": "Günlük not şablonu",
-      "templateSaveError": "Günlük şablonu kaydedilemedi. Lütfen tekrar deneyin.",
-      "untitledTemplate": "Başlıksız şablon"
+      "templateSaveError": "Günlük şablonu kaydedilemedi. Lütfen tekrar deneyin."
     },
     "deleteVault": {
       "cancel": "İptal",
@@ -3365,6 +3400,7 @@
         "dateFormat": "tarih biçimi gün ay yıl iso gg/aa aa/gg takvim date format dd/mm mm/dd",
         "timeFormat": "saat biçimi 24 saat 12 saat öğleden önce öğleden sonra am pm time format clock",
         "timezone": "saat dilimi zaman dilimi tz utc iana bölge bugün timezone",
+        "periodicNotes": "periyodik notlar haftalık aylık hafta ay klasör şablon biçim",
         "aiHistoryBudget": "konuşma geçmiş bağlam bellek bütçe karakter ajan sohbet istek"
       }
     },

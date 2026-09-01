@@ -140,20 +140,26 @@ impl MyneBackend for IpcBackend {
         Err(map_wire_error(response.error))
     }
 
-    fn daily(&self) -> Result<String, BackendError> {
-        let response = self.request(&wire::Request::Daily)?;
+    fn period(&self, period: &str) -> Result<(String, bool), BackendError> {
+        let response = self.request(&wire::Request::Period {
+            period: period.to_string(),
+        })?;
         if response.ok {
-            return Ok(response.body.unwrap_or_default());
+            return Ok((
+                response.body.unwrap_or_default(),
+                response.used_device_clock,
+            ));
         }
         Err(map_wire_error(response.error))
     }
 
-    fn daily_append(&self, line: &str) -> Result<(), BackendError> {
-        let response = self.request(&wire::Request::DailyAppend {
+    fn period_append(&self, period: &str, line: &str) -> Result<bool, BackendError> {
+        let response = self.request(&wire::Request::PeriodAppend {
+            period: period.to_string(),
             line: line.to_string(),
         })?;
         if response.ok {
-            return Ok(());
+            return Ok(response.used_device_clock);
         }
         Err(map_wire_error(response.error))
     }
@@ -578,7 +584,7 @@ mod tests {
     #[test]
     fn daily_no_app_data_dir_is_app_not_running() {
         let backend = IpcBackend { app_data_dir: None };
-        assert_eq!(backend.daily(), Err(BackendError::AppNotRunning));
+        assert_eq!(backend.period("daily"), Err(BackendError::AppNotRunning));
     }
 
     #[test]
@@ -586,7 +592,7 @@ mod tests {
         let dir = ShortDir::new("daily-disabled");
         std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.daily(), Err(BackendError::CliDisabled));
+        assert_eq!(backend.period("daily"), Err(BackendError::CliDisabled));
     }
 
     #[test]
@@ -594,7 +600,7 @@ mod tests {
         let dir = ShortDir::new("daily-locked");
         std::fs::write(paths::status_path(dir.path()), b"L").unwrap();
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.daily(), Err(BackendError::VaultLocked));
+        assert_eq!(backend.period("daily"), Err(BackendError::VaultLocked));
     }
 
     #[test]
@@ -603,7 +609,10 @@ mod tests {
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
         serve_once(listener, br#"{"ok":true,"body":"today's note"}"#.to_vec());
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.daily(), Ok("today's note".to_string()));
+        assert_eq!(
+            backend.period("daily"),
+            Ok(("today's note".to_string(), false))
+        );
     }
 
     #[test]
@@ -615,7 +624,7 @@ mod tests {
             br#"{"ok":false,"error":{"kind":"folder_excluded","message":"x"}}"#.to_vec(),
         );
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.daily(), Err(BackendError::FolderExcluded));
+        assert_eq!(backend.period("daily"), Err(BackendError::FolderExcluded));
     }
 
     #[test]
@@ -627,7 +636,7 @@ mod tests {
             br#"{"ok":false,"error":{"kind":"vault_locked","message":"x"}}"#.to_vec(),
         );
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.daily(), Err(BackendError::VaultLocked));
+        assert_eq!(backend.period("daily"), Err(BackendError::VaultLocked));
     }
 
     #[test]
@@ -643,16 +652,22 @@ mod tests {
             }
         });
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        backend.daily().unwrap();
+        backend.period("daily").unwrap();
         let sent = rx.recv().unwrap();
         let value: serde_json::Value = serde_json::from_slice(&sent).unwrap();
-        assert_eq!(value["cmd"], "daily");
+        // myne#177: `myne daily` goes out as the general period command, which
+        // is what carries the timezone advisory to it.
+        assert_eq!(value["cmd"], "period");
+        assert_eq!(value["period"], "daily");
     }
 
     #[test]
     fn daily_append_no_app_data_dir_is_app_not_running() {
         let backend = IpcBackend { app_data_dir: None };
-        assert_eq!(backend.daily_append("x"), Err(BackendError::AppNotRunning));
+        assert_eq!(
+            backend.period_append("daily", "x"),
+            Err(BackendError::AppNotRunning)
+        );
     }
 
     #[test]
@@ -660,7 +675,10 @@ mod tests {
         let dir = ShortDir::new("daily-append-disabled");
         std::fs::write(paths::status_path(dir.path()), b"D").unwrap();
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.daily_append("x"), Err(BackendError::CliDisabled));
+        assert_eq!(
+            backend.period_append("daily", "x"),
+            Err(BackendError::CliDisabled)
+        );
     }
 
     #[test]
@@ -669,7 +687,7 @@ mod tests {
         let listener = UnixListener::bind(paths::socket_path(dir.path())).unwrap();
         serve_once(listener, br#"{"ok":true}"#.to_vec());
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.daily_append("a new line"), Ok(()));
+        assert_eq!(backend.period_append("daily", "a new line"), Ok(false));
     }
 
     #[test]
@@ -681,7 +699,10 @@ mod tests {
             br#"{"ok":false,"error":{"kind":"folder_excluded","message":"x"}}"#.to_vec(),
         );
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        assert_eq!(backend.daily_append("x"), Err(BackendError::FolderExcluded));
+        assert_eq!(
+            backend.period_append("daily", "x"),
+            Err(BackendError::FolderExcluded)
+        );
     }
 
     #[test]
@@ -703,10 +724,13 @@ mod tests {
                 "new",
                 Box::new(|b: &IpcBackend| b.create("x", None).unwrap_err()),
             ),
-            ("daily", Box::new(|b: &IpcBackend| b.daily().unwrap_err())),
+            (
+                "daily",
+                Box::new(|b: &IpcBackend| b.period("daily").unwrap_err()),
+            ),
             (
                 "daily_append",
-                Box::new(|b: &IpcBackend| b.daily_append("x").unwrap_err()),
+                Box::new(|b: &IpcBackend| b.period_append("daily", "x").unwrap_err()),
             ),
         ];
         for (name, call) in cases {
@@ -735,10 +759,11 @@ mod tests {
             }
         });
         let backend = IpcBackend::at(dir.path().to_path_buf());
-        backend.daily_append("captured thought").unwrap();
+        backend.period_append("daily", "captured thought").unwrap();
         let sent = rx.recv().unwrap();
         let value: serde_json::Value = serde_json::from_slice(&sent).unwrap();
-        assert_eq!(value["cmd"], "daily_append");
+        assert_eq!(value["cmd"], "period_append");
+        assert_eq!(value["period"], "daily");
         assert_eq!(value["line"], "captured thought");
     }
 }

@@ -699,6 +699,12 @@
       },
       "unfoldAll": {
         "label": "Tout déplier"
+      },
+      "openThisWeekNote": {
+        "label": "Ouvrir la note de cette semaine"
+      },
+      "openThisMonthNote": {
+        "label": "Ouvrir la note de ce mois"
       }
     },
     "hotkeys": {
@@ -1601,6 +1607,13 @@
     "commandPalette": {
       "searchPlaceholder": "Rechercher des notes ou exécuter une commande…",
       "noMatches": "Aucune commande ni note correspondante."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Impossible d'ouvrir la note d'aujourd'hui.",
+        "weekly": "Impossible d'ouvrir la note de cette semaine.",
+        "monthly": "Impossible d'ouvrir la note de ce mois."
+      }
     }
   },
   "export": {
@@ -2890,20 +2903,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Vierge (sans modèle)",
+      "folderSearchEmpty": "Aucun dossier ne correspond.",
+      "folderSearchPlaceholder": "Rechercher des dossiers…",
+      "searchEmpty": "Aucun modèle ne correspond.",
+      "searchPlaceholder": "Rechercher des modèles…",
+      "untitledTemplate": "Modèle sans titre",
+      "sectionDaily": "Notes quotidiennes",
+      "sectionWeekly": "Notes hebdomadaires",
+      "sectionMonthly": "Notes mensuelles",
+      "periodFolderLabel": "Dossier",
+      "periodFolderHelper": "Où sont classées les nouvelles notes {{period}}. Par défaut : {{default}}. Le dossier est conservé même vide.",
+      "periodFormatLabel": "Format du titre",
+      "periodFormatHelperDaily": "Le titre de chaque note quotidienne. Prend en charge YYYY, MM, DD, gggg (année ISO de semaine), ww (numéro de semaine ISO) et [texte] pour du texte littéral. Par défaut : {{default}}.",
+      "periodFormatHelperWeekly": "Le titre de chaque note hebdomadaire. Prend en charge gggg (année ISO de semaine), ww (numéro de semaine ISO), YYYY, MM, DD et [texte] pour du texte littéral. Par défaut : {{default}}.",
+      "periodFormatHelperMonthly": "Le titre de chaque note mensuelle. Prend en charge YYYY, MM, gggg (année ISO de semaine), ww (numéro de semaine ISO) et [texte] pour du texte littéral. Par défaut : {{default}}.",
+      "periodTemplateLabel": "Modèle",
+      "periodTemplateHelper": "Choisissez un modèle pour commencer chaque note {{period}}, ou laissez vide pour une note vide portant la date comme titre.",
+      "collisionWarning": "Les notes {{first}} et {{second}} aboutissent à la même note, car elles partagent un dossier et produisent le même titre. Les deux commandes l'ouvriront.",
+      "weekStartNote": "Les semaines commencent le lundi (ISO 8601), donc les premiers jours de janvier peuvent appartenir à la dernière semaine de l'année précédente, et les derniers jours de décembre à la première semaine de l'année suivante.",
+      "periodFolderSaveError": "Impossible d'enregistrer le dossier {{period}}. Veuillez réessayer.",
+      "periodFormatSaveError": "Impossible d'enregistrer le format du titre {{period}}. Veuillez réessayer.",
+      "periodTemplateSaveError": "Impossible d'enregistrer le modèle {{period}}. Veuillez réessayer.",
+      "periodNameDaily": "quotidienne",
+      "periodNameWeekly": "hebdomadaire",
+      "periodNameMonthly": "mensuelle",
+      "periodFolderAriaLabel": "Dossier des notes {{period}}",
+      "periodFormatAriaLabel": "Format du titre des notes {{period}}",
+      "periodTemplateAriaLabel": "Modèle des notes {{period}}",
       "dateFormatHelper": "Le titre de chaque note quotidienne. Prend en charge YYYY, MM, DD. Par défaut : {{default}}.",
       "dateFormatLabel": "Format de date des notes quotidiennes",
       "dateFormatSaveError": "Impossible d'enregistrer le format de date. Veuillez réessayer.",
       "folderHelper": "Où sont classées les nouvelles notes quotidiennes. Par défaut : {{default}}. Le dossier est conservé même lorsqu'il est vide.",
       "folderLabel": "Dossier des notes quotidiennes",
       "folderSaveError": "Impossible d'enregistrer le dossier quotidien. Veuillez réessayer.",
-      "folderSearchEmpty": "Aucun dossier ne correspond.",
-      "folderSearchPlaceholder": "Rechercher des dossiers…",
-      "searchEmpty": "Aucun modèle ne correspond.",
-      "searchPlaceholder": "Rechercher des modèles…",
       "templateHelper": "Choisissez un modèle à partir duquel démarrer chaque note quotidienne, ou laissez vide pour une note vide intitulée avec la date.",
       "templateLabel": "Modèle des notes quotidiennes",
-      "templateSaveError": "Impossible d'enregistrer le modèle quotidien. Veuillez réessayer.",
-      "untitledTemplate": "Modèle sans titre"
+      "templateSaveError": "Impossible d'enregistrer le modèle quotidien. Veuillez réessayer."
     },
     "deleteVault": {
       "cancel": "Annuler",
@@ -3475,6 +3510,7 @@
         "dateFormat": "format de date jour mois année iso jj/mm mm/jj calendrier date format",
         "timeFormat": "format d'heure 24 heures 12 heures horloge am pm time format",
         "timezone": "fuseau horaire zone tz utc iana région aujourd'hui timezone",
+        "periodicNotes": "notes périodiques hebdomadaire mensuel semaine mois dossier modèle format",
         "aiHistoryBudget": "conversation historique contexte mémoire budget caractères agent chat requête"
       }
     },

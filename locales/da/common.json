@@ -669,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "Fold alt ud"
+      },
+      "openThisWeekNote": {
+        "label": "Åbn denne uges note"
+      },
+      "openThisMonthNote": {
+        "label": "Åbn denne måneds note"
       }
     },
     "hotkeys": {
@@ -1543,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "Søg i noter eller kør en kommando…",
       "noMatches": "Ingen kommandoer eller noter matcher."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Dagens note kunne ikke åbnes.",
+        "weekly": "Denne uges note kunne ikke åbnes.",
+        "monthly": "Denne måneds note kunne ikke åbnes."
+      }
     }
   },
   "export": {
@@ -2787,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Tom (ingen skabelon)",
+      "folderSearchEmpty": "Ingen mapper matcher.",
+      "folderSearchPlaceholder": "Søg i mapper…",
+      "searchEmpty": "Ingen skabeloner matcher.",
+      "searchPlaceholder": "Søg i skabeloner…",
+      "untitledTemplate": "Skabelon uden titel",
+      "sectionDaily": "Daglige noter",
+      "sectionWeekly": "Ugentlige noter",
+      "sectionMonthly": "Månedlige noter",
+      "periodFolderLabel": "Mappe",
+      "periodFolderHelper": "Hvor nye {{period}} noter gemmes. Standard: {{default}}. Mappen bevares, også når den er tom.",
+      "periodFormatLabel": "Titelformat",
+      "periodFormatHelperDaily": "Titlen på hver daglig note. Understøtter YYYY, MM, DD, gggg (ISO-ugeår), ww (ISO-ugenummer) og [tekst] til bogstavelig tekst. Standard: {{default}}.",
+      "periodFormatHelperWeekly": "Titlen på hver ugentlig note. Understøtter gggg (ISO-ugeår), ww (ISO-ugenummer), YYYY, MM, DD og [tekst] til bogstavelig tekst. Standard: {{default}}.",
+      "periodFormatHelperMonthly": "Titlen på hver månedlig note. Understøtter YYYY, MM, gggg (ISO-ugeår), ww (ISO-ugenummer) og [tekst] til bogstavelig tekst. Standard: {{default}}.",
+      "periodTemplateLabel": "Skabelon",
+      "periodTemplateHelper": "Vælg en skabelon, som hver {{period}} note starter fra, eller lad feltet stå tomt for en tom note med datoen som titel.",
+      "collisionWarning": "{{first}} og {{second}} noter fører til den samme note, fordi de deler mappe og giver samme titel. Begge kommandoer åbner den.",
+      "weekStartNote": "Uger begynder om mandagen (ISO 8601), så de første dage i januar kan høre til sidste uge i det foregående år, og de sidste dage i december til første uge i det følgende.",
+      "periodFolderSaveError": "Mappen til {{period}} noter kunne ikke gemmes. Prøv igen.",
+      "periodFormatSaveError": "Titelformatet til {{period}} noter kunne ikke gemmes. Prøv igen.",
+      "periodTemplateSaveError": "Skabelonen til {{period}} noter kunne ikke gemmes. Prøv igen.",
+      "periodNameDaily": "daglige",
+      "periodNameWeekly": "ugentlige",
+      "periodNameMonthly": "månedlige",
+      "periodFolderAriaLabel": "Mappe til {{period}} noter",
+      "periodFormatAriaLabel": "Titelformat til {{period}} noter",
+      "periodTemplateAriaLabel": "Skabelon til {{period}} noter",
       "dateFormatHelper": "Titlen på hver daglig note. Understøtter ÅÅÅÅ, MM, DD. Standard er {{default}}.",
       "dateFormatLabel": "Datoformat for daglige noter",
       "dateFormatSaveError": "Kunne ikke gemme datoformatet. Prøv igen.",
       "folderHelper": "Hvor nye daglige noter placeres. Standard er {{default}}. Mappen beholdes, også når den er tom.",
       "folderLabel": "Mappe til daglige noter",
       "folderSaveError": "Kunne ikke gemme den daglige mappe. Prøv igen.",
-      "folderSearchEmpty": "Ingen mapper matcher.",
-      "folderSearchPlaceholder": "Søg i mapper…",
-      "searchEmpty": "Ingen skabeloner matcher.",
-      "searchPlaceholder": "Søg i skabeloner…",
       "templateHelper": "Vælg en skabelon, som hver daglig note skal starte fra, eller lad være tom for en tom note med datoen som titel.",
       "templateLabel": "Skabelon til daglige noter",
-      "templateSaveError": "Kunne ikke gemme den daglige skabelon. Prøv igen.",
-      "untitledTemplate": "Skabelon uden titel"
+      "templateSaveError": "Kunne ikke gemme den daglige skabelon. Prøv igen."
     },
     "deleteVault": {
       "cancel": "Annullér",
@@ -3365,6 +3400,7 @@
         "dateFormat": "datoformat dato dag måned år iso dd/mm mm/dd kalender date format",
         "timeFormat": "tidsformat klokkeslæt 24 timer 12 timer ur am pm time format",
         "timezone": "tidszone zone tz utc iana region i dag timezone",
+        "periodicNotes": "periodiske noter ugentlig månedlig uge måned mappe skabelon format",
         "aiHistoryBudget": "samtale historik kontekst hukommelse budget tegn agent chat forespørgsel"
       }
     },

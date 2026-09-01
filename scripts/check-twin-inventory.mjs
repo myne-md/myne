@@ -237,6 +237,21 @@ const SHIM_REASON =
 
 const CURATED_TWINS = [
   {
+    a: "src/notes/dailyNote.ts",
+    b: "mobile/src/lib/daily.ts",
+    what: "hand-mirrors the whole period resolver: isoWeek, formatDailyDate, zonedNow, PERIODS, PERIOD_DEFAULTS, periodRange, periodSettings, resolvePeriodNote",
+    why:
+      "Two different paths, so the path sweep cannot pair them and `check-twin-drift.mjs` " +
+      "inherits the blindness through `NAMED_TWINS`. Six doc comments across the two files say " +
+      "one mirrors the other `exactly`, and until myne-md/myne#177 nothing measured that. What a " +
+      "one-sided edit costs is stated by the files themselves: a period note is matched by " +
+      "folder plus title and nothing else, so a `PERIOD_DEFAULTS` or escape-grammar divergence " +
+      "files one week under two titles and the same vault ends up with two notes for it. The " +
+      "BEHAVIOURAL half is pinned separately and better, by `core/src/plugins/notes/" +
+      "period-title-cases.json`, which both trees and the Rust implementation run against; this " +
+      "entry is what makes a one-sided EDIT visible.",
+  },
+  {
     a: "src/App.tsx",
     b: "mobile/src/app/AppShell.tsx",
     what: "carries the twin boot probe, reprobe, Stage switch and dispatch",
@@ -759,6 +774,14 @@ const ROSTER = [
     destination: "per-client",
     reason:
       "Per-client by construction, not by drift: each adapter reads its own client's prefs seam, and mobile additionally re-reads on the prefs nonce because its host mounts the adapter above the stage machine, so unlock is the event that makes prefs readable at all. What must not diverge is the VALUE published, displayFromPrefs(prefs, language), and the language listener that republishes it, since a language switch re-renders neither mounting component. check-datetime-display-publisher.mjs holds the weaker property that each client tree has a publisher at all; a one-sided edit to what gets published is what this pair is here for (myne-md/myne#609).",
+  },
+  {
+    a: "src/notes/dailyNote.ts",
+    b: "mobile/src/lib/daily.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "Real code with two homes, at two different paths, so the path sweep cannot see it and check-twin-drift.mjs inherits that blindness. Six doc comments across the two files claim one mirrors the other exactly and nothing measured it. What a one-sided edit costs is stated by the files themselves: a period note is matched by folder plus title and nothing else, so a PERIOD_DEFAULTS or escape-grammar divergence files one week under two titles and one vault ends up with two notes for it. The behavioural half is pinned separately and better, by core/src/plugins/notes/period-title-cases.json, which both TypeScript trees and the Rust implementation run against; this entry exists so a one-sided EDIT is visible too. myne-md/myne#177.",
   },
   {
     a: "src/notes/prefsNonce.ts",

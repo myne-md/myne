@@ -669,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "모두 펼치기"
+      },
+      "openThisWeekNote": {
+        "label": "이번 주 노트 열기"
+      },
+      "openThisMonthNote": {
+        "label": "이번 달 노트 열기"
       }
     },
     "hotkeys": {
@@ -1543,6 +1549,13 @@
     "commandPalette": {
       "searchPlaceholder": "노트를 검색하거나 명령을 실행하세요…",
       "noMatches": "일치하는 명령이나 노트가 없습니다."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "오늘 노트를 열지 못했습니다.",
+        "weekly": "이번 주 노트를 열지 못했습니다.",
+        "monthly": "이번 달 노트를 열지 못했습니다."
+      }
     }
   },
   "export": {
@@ -2787,20 +2800,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "빈 노트(템플릿 없음)",
+      "folderSearchEmpty": "일치하는 폴더가 없습니다.",
+      "folderSearchPlaceholder": "폴더 검색…",
+      "searchEmpty": "일치하는 템플릿이 없습니다.",
+      "searchPlaceholder": "템플릿 검색…",
+      "untitledTemplate": "제목 없는 템플릿",
+      "sectionDaily": "일간 노트",
+      "sectionWeekly": "주간 노트",
+      "sectionMonthly": "월간 노트",
+      "periodFolderLabel": "폴더",
+      "periodFolderHelper": "새 {{period}} 노트가 저장되는 위치입니다. 기본값: {{default}}. 폴더는 비어 있어도 유지됩니다.",
+      "periodFormatLabel": "제목 형식",
+      "periodFormatHelperDaily": "각 일간 노트의 제목입니다. YYYY, MM, DD, gggg(ISO 주 연도), ww(ISO 주 번호)와 문자를 그대로 넣는 [텍스트]를 지원합니다. 기본값: {{default}}.",
+      "periodFormatHelperWeekly": "각 주간 노트의 제목입니다. gggg(ISO 주 연도), ww(ISO 주 번호), YYYY, MM, DD와 문자를 그대로 넣는 [텍스트]를 지원합니다. 기본값: {{default}}.",
+      "periodFormatHelperMonthly": "각 월간 노트의 제목입니다. YYYY, MM, gggg(ISO 주 연도), ww(ISO 주 번호)와 문자를 그대로 넣는 [텍스트]를 지원합니다. 기본값: {{default}}.",
+      "periodTemplateLabel": "템플릿",
+      "periodTemplateHelper": "각 {{period}} 노트를 시작할 템플릿을 고르거나, 날짜를 제목으로 하는 빈 노트를 원하면 비워 두세요.",
+      "collisionWarning": "{{first}} 노트와 {{second}} 노트는 같은 노트가 됩니다. 폴더가 같고 제목도 같아지기 때문입니다. 두 명령 모두 그 노트를 엽니다.",
+      "weekStartNote": "주는 월요일에 시작합니다(ISO 8601). 그래서 1월의 첫 며칠은 전년도의 마지막 주에, 12월의 마지막 며칠은 다음 해의 첫 주에 속할 수 있습니다.",
+      "periodFolderSaveError": "{{period}} 폴더를 저장하지 못했습니다. 다시 시도해 주세요.",
+      "periodFormatSaveError": "{{period}} 제목 형식을 저장하지 못했습니다. 다시 시도해 주세요.",
+      "periodTemplateSaveError": "{{period}} 템플릿을 저장하지 못했습니다. 다시 시도해 주세요.",
+      "periodNameDaily": "일간",
+      "periodNameWeekly": "주간",
+      "periodNameMonthly": "월간",
+      "periodFolderAriaLabel": "{{period}} 노트 폴더",
+      "periodFormatAriaLabel": "{{period}} 노트 제목 형식",
+      "periodTemplateAriaLabel": "{{period}} 노트 템플릿",
       "dateFormatHelper": "각 일일 노트의 제목입니다. YYYY, MM, DD를 지원합니다. 기본값은 {{default}}입니다.",
       "dateFormatLabel": "일일 노트 날짜 형식",
       "dateFormatSaveError": "날짜 형식을 저장하지 못했습니다. 다시 시도하세요.",
       "folderHelper": "새 일일 노트가 저장되는 위치입니다. 기본값은 {{default}}이며, 비어 있어도 폴더는 유지됩니다.",
       "folderLabel": "일일 노트 폴더",
       "folderSaveError": "일일 노트 폴더를 저장하지 못했습니다. 다시 시도하세요.",
-      "folderSearchEmpty": "일치하는 폴더가 없습니다.",
-      "folderSearchPlaceholder": "폴더 검색…",
-      "searchEmpty": "일치하는 템플릿이 없습니다.",
-      "searchPlaceholder": "템플릿 검색…",
       "templateHelper": "각 일일 노트를 시작할 템플릿을 선택하거나, 날짜를 제목으로 한 빈 노트를 만들려면 비워 두세요.",
       "templateLabel": "일일 노트 템플릿",
-      "templateSaveError": "일일 노트 템플릿을 저장하지 못했습니다. 다시 시도하세요.",
-      "untitledTemplate": "제목 없는 템플릿"
+      "templateSaveError": "일일 노트 템플릿을 저장하지 못했습니다. 다시 시도하세요."
     },
     "deleteVault": {
       "cancel": "취소",
@@ -3365,6 +3400,7 @@
         "dateFormat": "날짜 형식 일 월 년 달력 iso dd/mm mm/dd date format calendar",
         "timeFormat": "시간 형식 24시간 12시간 시계 오전 오후 time format clock am pm",
         "timezone": "시간대 표준시 지역 오늘 timezone time zone tz utc iana region",
+        "periodicNotes": "주기 노트 주간 월간 주 달 폴더 템플릿 형식",
         "aiHistoryBudget": "대화 기록 문맥 기억 예산 문자 에이전트 채팅 요청"
       }
     },

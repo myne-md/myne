@@ -663,6 +663,12 @@
       },
       "unfoldAll": {
         "label": "সব খুলুন"
+      },
+      "openThisWeekNote": {
+        "label": "এই সপ্তাহের নোট খুলুন"
+      },
+      "openThisMonthNote": {
+        "label": "এই মাসের নোট খুলুন"
       }
     },
     "hotkeys": {
@@ -1534,6 +1540,13 @@
     "commandPalette": {
       "searchPlaceholder": "নোট খুঁজুন বা কমান্ড চালান…",
       "noMatches": "কোনও কমান্ড বা নোট মেলেনি।"
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "আজকের নোট খোলা যায়নি।",
+        "weekly": "এই সপ্তাহের নোট খোলা যায়নি।",
+        "monthly": "এই মাসের নোট খোলা যায়নি।"
+      }
     }
   },
   "export": {
@@ -2767,20 +2780,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "খালি (কোনও টেমপ্লেট নয়)",
+      "folderSearchEmpty": "কোনও ফোল্ডার মেলেনি।",
+      "folderSearchPlaceholder": "ফোল্ডার খুঁজুন…",
+      "searchEmpty": "কোনও টেমপ্লেট মেলেনি।",
+      "searchPlaceholder": "টেমপ্লেট খুঁজুন…",
+      "untitledTemplate": "শিরোনামহীন টেমপ্লেট",
+      "sectionDaily": "দৈনিক নোট",
+      "sectionWeekly": "সাপ্তাহিক নোট",
+      "sectionMonthly": "মাসিক নোট",
+      "periodFolderLabel": "ফোল্ডার",
+      "periodFolderHelper": "নতুন {{period}} নোট কোথায় রাখা হবে। ডিফল্ট: {{default}}। ফোল্ডার খালি থাকলেও রয়ে যায়।",
+      "periodFormatLabel": "শিরোনামের বিন্যাস",
+      "periodFormatHelperDaily": "প্রতিটি দৈনিক নোটের শিরোনাম। YYYY, MM, DD, gggg (ISO সপ্তাহ-বছর), ww (ISO সপ্তাহ সংখ্যা) এবং আক্ষরিক লেখার জন্য [লেখা] সমর্থিত। ডিফল্ট: {{default}}।",
+      "periodFormatHelperWeekly": "প্রতিটি সাপ্তাহিক নোটের শিরোনাম। gggg (ISO সপ্তাহ-বছর), ww (ISO সপ্তাহ সংখ্যা), YYYY, MM, DD এবং আক্ষরিক লেখার জন্য [লেখা] সমর্থিত। ডিফল্ট: {{default}}।",
+      "periodFormatHelperMonthly": "প্রতিটি মাসিক নোটের শিরোনাম। YYYY, MM, gggg (ISO সপ্তাহ-বছর), ww (ISO সপ্তাহ সংখ্যা) এবং আক্ষরিক লেখার জন্য [লেখা] সমর্থিত। ডিফল্ট: {{default}}।",
+      "periodTemplateLabel": "টেমপ্লেট",
+      "periodTemplateHelper": "প্রতিটি {{period}} নোট যে টেমপ্লেট থেকে শুরু হবে তা বেছে নিন, অথবা তারিখ শিরোনামের খালি নোটের জন্য এটি ফাঁকা রাখুন।",
+      "collisionWarning": "{{first}} এবং {{second}} নোট একই নোটে গিয়ে দাঁড়ায়, কারণ তারা একই ফোল্ডার ভাগ করে এবং একই শিরোনাম তৈরি করে। দুটি কমান্ডই সেটি খুলবে।",
+      "weekStartNote": "সপ্তাহ সোমবার থেকে শুরু হয় (ISO 8601), তাই জানুয়ারির প্রথম দিনগুলি আগের বছরের শেষ সপ্তাহে এবং ডিসেম্বরের শেষ দিনগুলি পরের বছরের প্রথম সপ্তাহে পড়তে পারে।",
+      "periodFolderSaveError": "{{period}} নোটের ফোল্ডার সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
+      "periodFormatSaveError": "{{period}} নোটের শিরোনামের বিন্যাস সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
+      "periodTemplateSaveError": "{{period}} নোটের টেমপ্লেট সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
+      "periodNameDaily": "দৈনিক",
+      "periodNameWeekly": "সাপ্তাহিক",
+      "periodNameMonthly": "মাসিক",
+      "periodFolderAriaLabel": "{{period}} নোটের ফোল্ডার",
+      "periodFormatAriaLabel": "{{period}} নোটের শিরোনামের বিন্যাস",
+      "periodTemplateAriaLabel": "{{period}} নোটের টেমপ্লেট",
       "dateFormatHelper": "প্রতিটি দৈনিক নোটের শিরোনাম। YYYY, MM, DD সমর্থন করে। ডিফল্ট {{default}}।",
       "dateFormatLabel": "দৈনিক নোটের তারিখের ফর্ম্যাট",
       "dateFormatSaveError": "তারিখের ফর্ম্যাটটি সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
       "folderHelper": "নতুন দৈনিক নোট কোথায় রাখা হবে। ডিফল্ট {{default}}। ফোল্ডারটি খালি থাকলেও রেখে দেওয়া হয়।",
       "folderLabel": "দৈনিক নোটের ফোল্ডার",
       "folderSaveError": "দৈনিক ফোল্ডারটি সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
-      "folderSearchEmpty": "কোনও ফোল্ডার মেলেনি।",
-      "folderSearchPlaceholder": "ফোল্ডার খুঁজুন…",
-      "searchEmpty": "কোনও টেমপ্লেট মেলেনি।",
-      "searchPlaceholder": "টেমপ্লেট খুঁজুন…",
       "templateHelper": "প্রতিটি দৈনিক নোট কোন টেমপ্লেট থেকে শুরু হবে তা বেছে নিন, নয়তো খালি রাখলে তারিখ-শিরোনামের একটি ফাঁকা নোট তৈরি হবে।",
       "templateLabel": "দৈনিক নোটের টেমপ্লেট",
-      "templateSaveError": "দৈনিক টেমপ্লেটটি সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
-      "untitledTemplate": "শিরোনামহীন টেমপ্লেট"
+      "templateSaveError": "দৈনিক টেমপ্লেটটি সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।"
     },
     "deleteVault": {
       "cancel": "বাতিল",
@@ -3337,6 +3372,7 @@
         "dateFormat": "তারিখের ফর্ম্যাট দিন মাস বছর iso dd/mm mm/dd ক্যালেন্ডার",
         "timeFormat": "সময়ের ফর্ম্যাট 24 ঘণ্টা 12 ঘণ্টা ঘড়ি am pm",
         "timezone": "টাইম জোন সময় অঞ্চল tz utc iana এলাকা আজ",
+        "periodicNotes": "পর্যায়ক্রমিক নোট সাপ্তাহিক মাসিক সপ্তাহ মাস ফোল্ডার টেমপ্লেট বিন্যাস",
         "aiHistoryBudget": "কথোপকথন ইতিহাস প্রসঙ্গ মেমরি বাজেট অক্ষর এজেন্ট চ্যাট অনুরোধ"
       }
     },

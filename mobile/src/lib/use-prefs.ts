@@ -56,6 +56,8 @@ export const DEFAULT_PREFS: PrefsView = {
   // and is omitted from the encrypted blob so a vault that never chose stays
   // byte-identical to a pre-feature one.
   date_format: null,
+  periodic_notes: {},
+  timezone: null,
   favorites: [],
   item_order: {},
   editor_layout: null,
@@ -70,7 +72,6 @@ export const DEFAULT_PREFS: PrefsView = {
   archive_disabled: null,
   theme: null,
   time_format: null,
-  timezone: null,
   folder_icons: {},
   device_names: {},
   hidden_bar_items: [],

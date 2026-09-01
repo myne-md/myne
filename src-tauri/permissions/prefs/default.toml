@@ -31,6 +31,7 @@ permissions = [
   "allow-set-daily-date-format",
   "allow-set-daily-folder",
   "allow-set-daily-template",
+  "allow-set-periodic-note-setting",
   "allow-set-new-note-location",
   "allow-set-startup-open",
   "allow-set-editor-text-size",
@@ -206,6 +207,11 @@ commands.allow = ["set_daily_folder"]
 identifier = "allow-set-daily-template"
 description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_daily_template"]
+
+[[permission]]
+identifier = "allow-set-periodic-note-setting"
+description = "Allow invoking prefs:set_periodic_note_setting (myne#177: a Slot::Unlocked-gated setter for one periodic_notes entry, keyed <period>.<setting> where setting is folder/format/template; Some sets, None removes the key; a folder value is also registered as a deliberate folder so it survives empty, the set_daily_folder discipline; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_periodic_note_setting"]
 
 # MYND-462 "Files" settings panel: two write setters for the new-note default
 # location pair + the startup-open pair. Both inherit the same main-window-only

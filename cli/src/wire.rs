@@ -26,8 +26,21 @@ pub enum Request {
         #[serde(skip_serializing_if = "Option::is_none")]
         folder: Option<String>,
     },
-    Daily,
-    DailyAppend {
+    /// myne#177. A distinct command NAME rather than an optional field on
+    /// `daily`, so a host that predates periodic notes answers "unknown
+    /// command" instead of silently returning the daily note for a `weekly`
+    /// request. `period` is the wire spelling: `daily` / `weekly` / `monthly`.
+    ///
+    /// This crate no longer emits the older `daily` / `daily_append` shapes:
+    /// `myne daily` goes out as `period` with `"daily"`, so the timezone
+    /// advisory reaches the command where a one-day mismatch bites hardest.
+    /// The HOST still accepts the old shapes, for a `myne` binary older than
+    /// the app it is talking to.
+    Period {
+        period: String,
+    },
+    PeriodAppend {
+        period: String,
         line: String,
     },
 }
@@ -64,6 +77,17 @@ pub struct RawResponse {
     pub id: Option<String>,
     #[serde(default)]
     pub error: Option<WireError>,
+    /// myne#177. Present and `true` only when a display-timezone override is
+    /// set that the host does NOT apply to period resolution, so the user can
+    /// see why the app and the CLI might disagree about which note is
+    /// "today's". A FLAG rather than the host's sentence, deliberately: this
+    /// crate's `logging_discipline` allowlist rests on every value written to
+    /// stderr being produced HERE, and it checks names rather than values, so a
+    /// host-supplied string would have slipped a folder path or an `io::Error`
+    /// past it. `#[serde(default)]`, so a reply from a host
+    /// that predates the field decodes unchanged.
+    #[serde(default)]
+    pub used_device_clock: bool,
 }
 
 #[cfg(test)]
@@ -196,18 +220,30 @@ mod tests {
     }
 
     #[test]
-    fn daily_request_encodes_to_the_documented_shape() {
-        let json = serde_json::to_string(&Request::Daily).unwrap();
-        assert_eq!(json, r#"{"cmd":"daily"}"#);
+    fn daily_goes_out_as_a_period_request() {
+        // myne#177: this crate no longer emits `{"cmd":"daily"}`. Routing every
+        // period through one command is what carries the timezone advisory to
+        // `myne daily`, and the host still ACCEPTS the old shape for a `myne`
+        // binary older than the app (pinned host-side, in
+        // `src-tauri/src/cli_bridge/dispatch.rs`).
+        let json = serde_json::to_string(&Request::Period {
+            period: "daily".to_string(),
+        })
+        .unwrap();
+        assert_eq!(json, r#"{"cmd":"period","period":"daily"}"#);
     }
 
     #[test]
-    fn daily_append_request_encodes_to_the_documented_shape() {
-        let json = serde_json::to_string(&Request::DailyAppend {
+    fn daily_append_goes_out_as_a_period_append_request() {
+        let json = serde_json::to_string(&Request::PeriodAppend {
+            period: "daily".to_string(),
             line: "hello".to_string(),
         })
         .unwrap();
-        assert_eq!(json, r#"{"cmd":"daily_append","line":"hello"}"#);
+        assert_eq!(
+            json,
+            r#"{"cmd":"period_append","period":"daily","line":"hello"}"#
+        );
     }
 
     #[test]
@@ -216,6 +252,47 @@ mod tests {
             serde_json::from_str(r#"{"ok":true,"body":"today's markdown"}"#).unwrap();
         assert!(reply.ok);
         assert_eq!(reply.body, Some("today's markdown".to_string()));
+    }
+
+    #[test]
+    fn period_request_encodes_to_the_documented_shape() {
+        let json = serde_json::to_string(&Request::Period {
+            period: "weekly".to_string(),
+        })
+        .unwrap();
+        assert_eq!(json, r#"{"cmd":"period","period":"weekly"}"#);
+    }
+
+    #[test]
+    fn period_append_request_encodes_to_the_documented_shape() {
+        let json = serde_json::to_string(&Request::PeriodAppend {
+            period: "monthly".to_string(),
+            line: "hello".to_string(),
+        })
+        .unwrap();
+        assert_eq!(
+            json,
+            r#"{"cmd":"period_append","period":"monthly","line":"hello"}"#
+        );
+    }
+
+    #[test]
+    fn decodes_a_reply_carrying_the_device_clock_flag() {
+        let raw = r#"{"ok":true,"body":"Week 35","used_device_clock":true}"#;
+        let decoded: RawResponse = serde_json::from_str(raw).unwrap();
+        assert!(decoded.ok);
+        assert_eq!(decoded.body.as_deref(), Some("Week 35"));
+        assert!(decoded.used_device_clock);
+    }
+
+    #[test]
+    fn decodes_a_reply_without_the_device_clock_flag() {
+        // The older-host direction: the field is additive, so a reply that
+        // never carried it must still decode rather than failing the command.
+        let raw = r#"{"ok":true,"body":"Week 35"}"#;
+        let decoded: RawResponse = serde_json::from_str(raw).unwrap();
+        assert!(decoded.ok);
+        assert!(!decoded.used_device_clock);
     }
 
     #[test]

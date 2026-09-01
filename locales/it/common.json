@@ -699,6 +699,12 @@
       },
       "unfoldAll": {
         "label": "Espandi tutto"
+      },
+      "openThisWeekNote": {
+        "label": "Apri la nota di questa settimana"
+      },
+      "openThisMonthNote": {
+        "label": "Apri la nota di questo mese"
       }
     },
     "hotkeys": {
@@ -1601,6 +1607,13 @@
     "commandPalette": {
       "searchPlaceholder": "Cerca note o esegui un comando…",
       "noMatches": "Nessun comando o nota corrispondente."
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "Impossibile aprire la nota di oggi.",
+        "weekly": "Impossibile aprire la nota di questa settimana.",
+        "monthly": "Impossibile aprire la nota di questo mese."
+      }
     }
   },
   "export": {
@@ -2890,20 +2903,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "Vuoto (nessun modello)",
+      "folderSearchEmpty": "Nessuna cartella corrisponde.",
+      "folderSearchPlaceholder": "Cerca cartelle…",
+      "searchEmpty": "Nessun modello corrisponde.",
+      "searchPlaceholder": "Cerca modelli…",
+      "untitledTemplate": "Modello senza titolo",
+      "sectionDaily": "Note giornaliere",
+      "sectionWeekly": "Note settimanali",
+      "sectionMonthly": "Note mensili",
+      "periodFolderLabel": "Cartella",
+      "periodFolderHelper": "Dove vengono archiviate le nuove note {{period}}. Predefinito: {{default}}. La cartella viene mantenuta anche se vuota.",
+      "periodFormatLabel": "Formato del titolo",
+      "periodFormatHelperDaily": "Il titolo di ogni nota giornaliera. Supporta YYYY, MM, DD, gggg (anno ISO della settimana), ww (numero di settimana ISO) e [testo] per il testo letterale. Predefinito: {{default}}.",
+      "periodFormatHelperWeekly": "Il titolo di ogni nota settimanale. Supporta gggg (anno ISO della settimana), ww (numero di settimana ISO), YYYY, MM, DD e [testo] per il testo letterale. Predefinito: {{default}}.",
+      "periodFormatHelperMonthly": "Il titolo di ogni nota mensile. Supporta YYYY, MM, gggg (anno ISO della settimana), ww (numero di settimana ISO) e [testo] per il testo letterale. Predefinito: {{default}}.",
+      "periodTemplateLabel": "Modello",
+      "periodTemplateHelper": "Scegli un modello da cui iniziare ogni nota {{period}}, oppure lascia vuoto per una nota vuota intitolata con la data.",
+      "collisionWarning": "Le note {{first}} e {{second}} portano alla stessa nota, perché condividono una cartella e producono lo stesso titolo. Entrambi i comandi la apriranno.",
+      "weekStartNote": "Le settimane iniziano di lunedì (ISO 8601), quindi i primi giorni di gennaio possono appartenere all'ultima settimana dell'anno precedente, e gli ultimi giorni di dicembre alla prima settimana dell'anno successivo.",
+      "periodFolderSaveError": "Impossibile salvare la cartella {{period}}. Riprova.",
+      "periodFormatSaveError": "Impossibile salvare il formato del titolo {{period}}. Riprova.",
+      "periodTemplateSaveError": "Impossibile salvare il modello {{period}}. Riprova.",
+      "periodNameDaily": "giornaliera",
+      "periodNameWeekly": "settimanale",
+      "periodNameMonthly": "mensile",
+      "periodFolderAriaLabel": "Cartella delle note {{period}}",
+      "periodFormatAriaLabel": "Formato del titolo delle note {{period}}",
+      "periodTemplateAriaLabel": "Modello delle note {{period}}",
       "dateFormatHelper": "Il titolo di ogni nota giornaliera. Supporta YYYY, MM, DD. Predefinito: {{default}}.",
       "dateFormatLabel": "Formato data della nota giornaliera",
       "dateFormatSaveError": "Impossibile salvare il formato data. Riprova.",
       "folderHelper": "Dove vengono archiviate le nuove note giornaliere. Predefinito: {{default}}. La cartella viene mantenuta anche quando è vuota.",
       "folderLabel": "Cartella delle note giornaliere",
       "folderSaveError": "Impossibile salvare la cartella giornaliera. Riprova.",
-      "folderSearchEmpty": "Nessuna cartella corrisponde.",
-      "folderSearchPlaceholder": "Cerca cartelle…",
-      "searchEmpty": "Nessun modello corrisponde.",
-      "searchPlaceholder": "Cerca modelli…",
       "templateHelper": "Scegli un modello da cui partire per ogni nota giornaliera, oppure lascia vuoto per una nota vuota intitolata con la data.",
       "templateLabel": "Modello della nota giornaliera",
-      "templateSaveError": "Impossibile salvare il modello giornaliero. Riprova.",
-      "untitledTemplate": "Modello senza titolo"
+      "templateSaveError": "Impossibile salvare il modello giornaliero. Riprova."
     },
     "deleteVault": {
       "cancel": "Annulla",
@@ -3475,6 +3510,7 @@
         "dateFormat": "formato data giorno mese anno iso gg/mm mm/gg dd/mm calendario date format calendar",
         "timeFormat": "formato ora orario 24 ore 12 ore orologio am pm time format clock",
         "timezone": "fuso orario fusi tz utc iana regione oggi timezone time zone",
+        "periodicNotes": "note periodiche settimanale mensile settimana mese cartella modello formato",
         "aiHistoryBudget": "conversazione cronologia contesto memoria budget caratteri agente chat richiesta"
       }
     },

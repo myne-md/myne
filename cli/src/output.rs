@@ -202,6 +202,54 @@ pub fn print_daily_append(json: bool) {
     }
 }
 
+/// The advisory a period command prints when the host resolved the period on
+/// the device clock while a display-timezone override was set (myne#177).
+///
+/// It lives HERE rather than arriving on the wire, and that is the point: the
+/// crate's `logging_discipline` allowlist rests on every value an `eprintln!`
+/// interpolates being produced inside this crate, and it reads names rather
+/// than values, so a host-supplied string would have carried a folder path or
+/// an `io::Error` past it unnoticed. The host sends a bool; the wording is
+/// ours.
+///
+/// It deliberately does not name the zone: an IANA identifier is a coarse
+/// geolocation datum, which is why `protocol.md` §9.5 classes `timezone`
+/// device-local so it never merges from a peer, and stderr is the channel that
+/// ends up in `2>` redirects, CI logs and pasted output. The user set the
+/// override, so naming it back adds nothing they do not know.
+///
+/// **THE RESIDUAL, and it is accepted rather than absent.** The line is
+/// conditional, so its presence in a `2>` capture says "this vault has a
+/// `timezone` override set". That is one bit, it is the existence of a setting
+/// rather than its value, and it is strictly weaker than the identifier the
+/// paragraph above refuses. The alternative that removes it is printing
+/// unconditionally, since "this command used the device clock" is true of every
+/// period command whether or not an override exists, and that trade was
+/// declined: it turns a line that explains a genuinely confusing outcome (the
+/// desktop shows Monday, `myne weekly` opens Sunday's note) into permanent
+/// noise for every user who set no override, which is nearly all of them, and a
+/// warning that always fires is a warning nobody reads. Deciding whether the
+/// two zones actually DIFFER today, which would be the precise condition, needs
+/// the zone database `decisions/storage/0556` argues down, so it is not
+/// available at any price this design pays.
+///
+/// It already prints at most once per invocation: one command, one call, and
+/// nothing loops over periods.
+const DEVICE_CLOCK_NOTE: &str =
+    "note: this command used the device clock; the display timezone override is not applied to periodic-notes commands";
+
+/// Print [`DEVICE_CLOCK_NOTE`] to STDERR when the host used the device clock.
+///
+/// stderr rather than stdout, in both human and `--json` mode, and that is the
+/// load-bearing half: `myne weekly > this-week.md` is the obvious use, and a
+/// warning written into that file would corrupt the thing it was warning
+/// about. Under `--json` it would also make the output stop being JSON.
+pub fn print_device_clock_note(used_device_clock: bool) {
+    if used_device_clock {
+        eprintln!("{DEVICE_CLOCK_NOTE}");
+    }
+}
+
 /// Render a failure. Human mode writes to stderr so a failed `--json`-less
 /// invocation never corrupts stdout a caller might still be piping.
 pub fn print_error(err: &BackendError, json: bool) {

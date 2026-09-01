@@ -216,6 +216,10 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
   await page.addInitScript((config: MockConfig) => {
     const DEFAULT_PREFS = {
       screen_capture_protection: false,
+      // myne#177: the real host always sends this (serde emits a BTreeMap as
+      // `{}` rather than omitting it), so a mock without it models a host that
+      // does not exist.
+      periodic_notes: {},
       // MYND-619: an absent key reads as ENABLED, matching the Rust default —
       // reading it as off would silently disable reminders on every vault.
       reminders_enabled: true,
