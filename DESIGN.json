@@ -47,7 +47,7 @@
       }
     },
     "categoricalPalette": {
-      "purpose": "Eight decorative node-dot colors for the graph pane's color-group feature (graph-connection-ux-polish). Read side by side at small node radius, so legibility is a property of the set: hues stay clear of the three state roles above (never confusable with an error/warning/success color) and alternate lightness band per hue so adjacent colors stay distinguishable under red-green color-vision deficiency, not by hue alone. Source of truth is src/styles/tokens.css (light + dark + amoled, the amoled twin reusing the dark value verbatim); docs/design/colors_and_type.css mirrors light + dark.",
+      "purpose": "Eight decorative node-dot colors for the graph pane's color-group feature (graph-connection-ux-polish). Read side by side at small node radius, so legibility is a property of the set: hues stay clear of the three state roles above (never confusable with an error/warning/success color) and alternate lightness band per hue so adjacent colors stay distinguishable under red-green color-vision deficiency, not by hue alone. Source of truth is client-core/src/tokens.css (light + dark + amoled, the amoled twin reusing the dark value verbatim); docs/design/colors_and_type.css mirrors light + dark.",
       "colors": [
         { "name": "group-olive", "displayName": "Olive", "light": "#5d7b32", "dark": "#cce3ab" },
         { "name": "group-fern", "displayName": "Fern", "light": "#549f41", "dark": "#9cd98c" },

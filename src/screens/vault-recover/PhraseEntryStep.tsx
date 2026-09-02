@@ -135,7 +135,7 @@ const CELL_WRAP_BASE: CSSProperties = {
   position: "relative",
   display: "flex",
   alignItems: "center",
-  background: "var(--paper-1)",
+  background: "var(--paper)",
   borderRadius: 2,
   paddingInlineStart: 28,
   paddingInlineEnd: 8,
@@ -148,7 +148,12 @@ function cellWrapStyle(focused: boolean): CSSProperties {
   return {
     ...CELL_WRAP_BASE,
     border: `1px solid ${focused ? "var(--accent)" : "var(--line-1)"}`,
-    background: focused ? "var(--bg-1)" : "var(--paper-1)",
+    // No background branch: `--bg-1` IS `--paper` (the semantic alias), so the
+    // two arms named one value. They used to read `--bg-1` against `--paper-1`,
+    // and `--paper-1` does not exist, it resolved to nothing, so the unfocused
+    // cell showed the page through it, which on this screen is `--paper` again.
+    // The focus affordance is the border, and it always was
+    // (myne-md/myne#478).
   };
 }
 

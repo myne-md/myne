@@ -35,6 +35,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::vault_list,
             commands::vault_is_unlocked,
             commands::vault_slot_kind,
+            // myne-md/myne#476: the AUTHORITATIVE active-vault id, from the
+            // runtime slot map. Registered here so this client can stop
+            // deriving it from `registry.json` ordering, which is what #250
+            // deleted from desktop for naming the wrong vault after a
+            // quick-unlock or a recovery, the root cause of #241, the
+            // danger-zone delete erasing a vault the user was not looking at.
+            commands::vault_active_id,
             commands::report_user_activity,
         ])
         .setup(|app, _api| {

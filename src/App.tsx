@@ -31,6 +31,7 @@ import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { lockVault } from "./lib/vault-unlock";
 import { useIdleAutoLock } from "./hooks/useIdleAutoLock";
+import { effectiveAutoLockSecs } from "@myne/client-core";
 import { awaitingApprovalVerdict } from "./lib/pending-approval";
 import { leaveActiveVault, switchVault } from "./lib/vault-switch";
 import { prefsRead } from "./lib/prefs";
@@ -325,7 +326,10 @@ function App() {
   // `enabled` is left to the hook's own default, which is "wherever
   // `osIdleAutoLock` is absent", so desktop is untouched and the two clocks
   // never race. The timeout is the same `auto_lock_seconds` pref the editor
-  // uses; `0` disables, which is what a failed read falls back to.
+  // uses, through the same shared clamp, so no stored value can disable the
+  // lock. A failed READ still falls back to `0`, and that stays deliberate: an
+  // unreadable prefs blob is not a prefs value, and inventing a deadline for a
+  // screen that holds no plaintext would be worse than leaving the timer off.
   const [pendingIdleSecs, setPendingIdleSecs] = useState(0);
   useEffect(() => {
     if (stageName !== "pending-approval") {
@@ -335,7 +339,12 @@ function App() {
     let cancelled = false;
     void prefsRead()
       .then((prefs) => {
-        if (!cancelled) setPendingIdleSecs(prefs.auto_lock_seconds ?? 0);
+        // Clamped through the shared envelope for the reason
+        // `src/screens/Editor.tsx` states at its own call: on web this is the
+        // timer that fires, and a `null` pref meant no lock at all.
+        if (!cancelled) {
+          setPendingIdleSecs(effectiveAutoLockSecs(prefs.auto_lock_seconds ?? null));
+        }
       })
       .catch(() => {
         /* leave it disabled rather than inventing a deadline */

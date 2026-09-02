@@ -35,8 +35,28 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const REPO = new URL("..", import.meta.url).pathname;
 const TREES = ["e2e"];
+
+// `--scan <dir>`: walk THIS directory instead of the repo, so the guard's own
+// test can drive it over a throwaway tree (myne-md/myne#242, found while
+// landing that epic).
+//
+// The seam is not a convenience. `tests/scripts/e2eMenuTestids.test.ts` wrote
+// its probe scenario into the REAL `e2e/` tree, arguing, correctly, that a
+// fixture directory would test a walk the guard never performs, and that
+// probe is a `e2e/*.e2e.ts` file, which is one of
+// `scripts/check-manual-test-roster.mjs`'s six denominators. So for as long as
+// the probe existed, ANY concurrently-scheduled test running the roster guard
+// saw an `e2e` scenario no roster entry claims, and failed. Vitest runs test
+// files in parallel workers, so the two overlapped whenever the scheduler put
+// them in the same window, which made `pnpm test` red on a pairing nobody
+// chose. The objection the test's comment raises dissolves once the ROOT is an
+// argument: the walk is identical, it just starts somewhere else. Same shape as
+// `check-twin-inventory.mjs --roots` and `check-token-adoption.mjs --scan`,
+// both of which exist for exactly this reason.
+const scanAt = process.argv.indexOf("--scan");
+const ROOT = scanAt === -1 ? REPO : process.argv[scanAt + 1];
 
 /** Testids that render only while the sidebar's `+` menu is open. */
 const MENU_ONLY = [

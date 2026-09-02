@@ -232,6 +232,27 @@ pre-commit:
       glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,docs/dev/twin-inventory.md}"
       run: node scripts/check-twin-inventory.mjs --check
 
+    twin-drift-ratchet:
+      # myne#473: the recorded set of semantically-differing twin pairs may
+      # shrink, never grow. The neighbour above gates the ROSTER against a
+      # generated document; this one gates the TREE, so a pair that starts
+      # differing fails rather than passing with an unchanged roster entry.
+      # A set rather than a count, because the case that happens is one pair
+      # converging while another diverges, which leaves a count unmoved.
+      #
+      # `core/src/**` is in the glob and the reason is worth stating, because an
+      # earlier version of this comment claimed a `core/`-only commit "provably
+      # cannot change the answer" and that was false: three recorded pairs have
+      # their desktop side under `core/src/inference/` (engine.rs, error.rs,
+      # state.rs), so a commit touching only one of those can flip a pair from
+      # same to different. CI would still have caught it, but a comment that
+      # asserts a property the glob does not have is worse than no comment.
+      #
+      # A docs-only commit genuinely cannot change it: every side of every pair
+      # is code.
+      glob: "{src/**,src-tauri/src/**,core/src/**,mobile/**,scripts/check-twin-inventory.mjs,scripts/check-twin-drift-ratchet.mjs,scripts/twin-drift-ratchet.json}"
+      run: node scripts/check-twin-drift-ratchet.mjs
+
     manual-test-roster:
       # myne#548: every feature surface carries a pre-release manual-test verdict,
       # and no verdict outlives its files. The half of a release CI does not run
@@ -285,6 +306,28 @@ pre-commit:
       # what would otherwise happen (no compiler or lint reports a new literal).
       # A RATCHET: a file's recorded count may fall, never rise.
       run: node scripts/check-token-adoption.mjs
+
+    token-parity:
+      # myne#478: the sibling of `token-adoption` one step up, and they catch
+      # opposite failures. That one asks whether a value should have been a
+      # token; this one asks whether a token anybody NAMES actually exists, and
+      # whether two clients declare one name independently. Its first run found
+      # eight `var(--paper-1)` call sites resolving to nothing, one of them in
+      # the shared `@myne/editor` package, so it reached all three clients, plus
+      # 105 palette tokens mobile was missing, eight of which the shared editor
+      # toolbar drew swatches from.
+      #
+      # Globbed, and the glob is wider than `token-adoption`'s on purpose: a
+      # reference lives anywhere a component does, and the shared packages
+      # (`editor`, `dialect`, `ornaments`, `client-core`) are exactly where a
+      # broken one reaches every client at once.
+      # The eight trees are `scripts/lib/shared-roots.mjs`'s roster, which the
+      # guard IMPORTS. `copy/src` was missing from an earlier version of this
+      # glob while the guard walked it, which is the drift that module exists to
+      # prevent, one file over: a `var(--typo)` added to `copy/src` alone would
+      # have skipped the hook and been caught only by CI.
+      glob: "{src,mobile/src,web/src,editor/src,dialect/src,copy/src,ornaments/src,client-core/src}/**/*.{ts,tsx,css}"
+      run: node scripts/check-token-parity.mjs
 
     native-buttons:
       glob: "{src,web/src,editor/src,dialect/src}/**/*.tsx"

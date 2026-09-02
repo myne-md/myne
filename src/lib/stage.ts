@@ -19,12 +19,21 @@
 // from PasswordResetStep on A8f success).
 
 /**
- * Mirrors the Rust-side `IoFailureKind` enum
- * (`src-tauri/src/io_failure_kind.rs`) — bounded categorization of IO
- * failures surfaced by `vault_status`. No `String` payload (path
- * leakage prevention).
+ * Re-exported, not declared (myne-md/myne#475). This module used to carry its
+ * own copy of the four-member union, worded differently from the one in
+ * `types/vault-unlock-error.ts`, and `vault-status.ts` + `vault-summary.ts`
+ * resolved the name HERE while their eleven siblings resolved it THERE. Two
+ * declarations of one Rust enum is two places a variant can be added to, so the
+ * declaration now lives once, in `@myne/client-core`, beside the enum's other
+ * mirrors. The re-export keeps `FailClosedError`, `storage-pressure` and
+ * `io-banner` importing it from this module unchanged.
+ *
+ * The Rust source is `core/src/io_failure_kind.rs`, bounded categorization of
+ * IO failures surfaced by `vault_status`, with no `String` payload, because an
+ * OS error message can carry a path.
  */
-export type IoFailureKind = "PermissionDenied" | "NoSpace" | "NotFound" | "Other";
+import type { IoFailureKind } from "@myne/client-core/types/vault-unlock-error";
+export type { IoFailureKind };
 
 /**
  * Initial `vault.meta` status carried by the `unlock` stage. Drives

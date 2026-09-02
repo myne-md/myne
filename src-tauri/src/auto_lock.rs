@@ -1,6 +1,16 @@
 //! Auto-lock-on-idle protective envelope (MYND-121).
 //!
-//! This module owns the **code-enforced** part of the auto-lock policy —
+//! **The protective ENVELOPE is not here any more** (myne-md/myne#479): the
+//! three bounds, their compile-time invariants and the
+//! `effective_auto_lock_secs` clamp live in `myne-core`, because two other
+//! clients grew their own auto-locks while this module's header said the policy
+//! was desktop-only. What this module owns now is the desktop TIMER: the
+//! machine-level idle reader, the tick loop that compares idle against the
+//! cached timeout, the import-source TTL, and the teardown. The paragraph below
+//! described the envelope and is kept for the argument it carries about why the
+//! bounds are code constants rather than prefs fields.
+//!
+//! This module used to own the **code-enforced** part of the auto-lock policy,
 //! deliberately NOT stored in the replayable `vault.prefs` blob. The user's
 //! chosen timeout (`PrefsView::auto_lock_seconds`) is a *preference*; the
 //! always-on flag and the `[MIN, CEILING]` bounds are *code constants*. A
@@ -19,45 +29,24 @@ use crate::plugins::vault_unlock::state::{Slot, SlotKind, VaultRuntimeState};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-/// Default auto-lock timeout applied when the user has stored no preference
-/// (or when the `vault.prefs` blob was absent / tampered / replayed and
-/// collapsed to `PrefsView::default()` per `protocol.md` §9.5.5, surfacing
-/// here as `None`).
-///
-/// **PLACEHOLDER — 5 minutes.** The final value is a UX decision owned by
-/// MYND-122 / Penpot (see the feature PRD Open Questions). Chosen as a sane
-/// middle ground: short enough to bound A6 exposure, long enough not to
-/// interrupt active work. Must remain within `[MIN, CEILING]`.
-///
-/// Single-sourced in `myne-core` (the shared `VaultRuntimeState` seeds itself
-/// with it); re-exported here so the desktop auto-lock policy keeps the same
-/// `crate::auto_lock::DEFAULT_AUTO_LOCK_SECS` path.
-pub use myne_core::DEFAULT_AUTO_LOCK_SECS;
+// The protective envelope, its three constants, its compile-time invariants
+// and the `effective_auto_lock_secs` clamp, is SHARED, in `myne-core`
+// (myne-md/myne#479), and this module deliberately re-exports NONE of it.
+//
+// It used to live here, under a comment in `core/src/lib.rs` saying "the
+// auto-lock *policy enforcement* is desktop-only (`auto_lock` stays in the
+// desktop crate)". That sentence stopped being true when mobile and web shipped
+// their own auto-locks: both returned `prefs_value.unwrap_or(DEFAULT)` with no
+// clamp, so the ceiling's own docstring, "an A4 disk attacker cannot widen the
+// A6 exposure window", held on one client and not the other two.
+//
+// A re-export stood here for one round of this change and then had no consumer,
+// because the fix that made the envelope shared also made the trait method
+// DEFAULT to it: no client writes the delegation any more, so nothing in this
+// crate names the function. The two remaining readers reach for
+// `myne_core::AUTO_LOCK_CEILING_SECS` directly, which is the honest path to a
+// constant that is not this module's.
 
-/// Hard upper bound on the effective timeout, enforced in code.
-///
-/// This is the **load-bearing edge** of the protective envelope: because it
-/// lives here and not in the replayable `vault.prefs` blob, a replayed /
-/// deleted / tampered prefs value can only make auto-lock stricter (≤ this
-/// bound), never push it past — so an A4 disk attacker cannot widen the A6
-/// exposure window (`threat-model.md` §7; `decisions.md` 2026-05-30).
-///
-/// **PLACEHOLDER — 60 minutes.** Final value owned by MYND-122.
-pub const AUTO_LOCK_CEILING_SECS: u32 = 3600;
-
-/// Lower bound on the effective timeout.
-///
-/// Unlike the ceiling, this is a **UX-comfort floor, not a security edge** —
-/// an attacker who *shortens* the timeout only causes more-frequent locking
-/// (annoyance), never a privacy break (grill Q6). It exists so an absurdly
-/// small replayed value cannot lock the vault mid-keystroke.
-///
-/// **PLACEHOLDER — 30 seconds.** Final value owned by MYND-122.
-pub const MIN_AUTO_LOCK_SECS: u32 = 30;
-
-// Compile-time invariants on the placeholder constants: a future edit that
-// inverts the bounds or moves DEFAULT outside [MIN, CEILING] fails the BUILD
-// (not just a test) and keeps the `clamp` min<=max contract sound.
 /// How long a vault-import SOURCE slot may hold a second vault's key material
 /// before the tick above reclaims it (myne-md/myne#464).
 ///
@@ -74,34 +63,6 @@ pub const MIN_AUTO_LOCK_SECS: u32 = 30;
 /// reason this constant exists is that the target's reclaimer is switched off
 /// during an import.
 const IMPORT_SOURCE_TTL: core::time::Duration = core::time::Duration::from_secs(30 * 60);
-
-const _: () = assert!(MIN_AUTO_LOCK_SECS > 0);
-const _: () = assert!(MIN_AUTO_LOCK_SECS <= AUTO_LOCK_CEILING_SECS);
-const _: () = assert!(DEFAULT_AUTO_LOCK_SECS >= MIN_AUTO_LOCK_SECS);
-const _: () = assert!(DEFAULT_AUTO_LOCK_SECS <= AUTO_LOCK_CEILING_SECS);
-
-/// Resolve the **effective** auto-lock timeout from the user's stored
-/// preference, applying the code-enforced protective envelope.
-///
-/// `prefs_value` is `PrefsView::auto_lock_seconds` — `None` when the user
-/// never chose a timeout OR when the prefs blob was absent / tampered /
-/// replayed and collapsed to defaults (`protocol.md` §9.5.5).
-///
-/// The return type is `u32` (never `Option`): there is **no disabled
-/// state**. The mapping is:
-///
-/// - `None` → [`DEFAULT_AUTO_LOCK_SECS`] (already in range).
-/// - `Some(0)` → [`MIN_AUTO_LOCK_SECS`] — a sentinel-shaped "off" from a replayed blob cannot disable the lock.
-/// - `Some(huge)` → [`AUTO_LOCK_CEILING_SECS`].
-/// - `Some(in-range)` → the value unchanged.
-///
-/// This is the replay-resistance core (stories 16, 18): every prefs input an
-/// A4 disk attacker can produce lands on a protective state.
-pub fn effective_auto_lock_secs(prefs_value: Option<u32>) -> u32 {
-    prefs_value
-        .unwrap_or(DEFAULT_AUTO_LOCK_SECS)
-        .clamp(MIN_AUTO_LOCK_SECS, AUTO_LOCK_CEILING_SECS)
-}
 
 // ---- machine-level idle reader (MYND-121, stories 2 + 3) --------------
 //
@@ -546,64 +507,6 @@ impl<R: Runtime> LockTeardown for AppTeardown<'_, R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn none_resolves_to_default() {
-        assert_eq!(effective_auto_lock_secs(None), DEFAULT_AUTO_LOCK_SECS);
-    }
-
-    #[test]
-    fn in_range_value_passes_through_unchanged() {
-        assert_eq!(effective_auto_lock_secs(Some(600)), 600);
-    }
-
-    #[test]
-    fn zero_clamps_up_to_floor_never_disables() {
-        // A sentinel-shaped "off" from a replayed / old blob CANNOT disable
-        // auto-lock — it clamps to the floor (story 16).
-        assert_eq!(effective_auto_lock_secs(Some(0)), MIN_AUTO_LOCK_SECS);
-    }
-
-    #[test]
-    fn huge_value_clamps_down_to_ceiling() {
-        // A replayed long / "off-via-overflow" timeout cannot exceed the
-        // ceiling — the A6 exposure window stays bounded (story 16).
-        assert_eq!(
-            effective_auto_lock_secs(Some(u32::MAX)),
-            AUTO_LOCK_CEILING_SECS
-        );
-        assert_eq!(
-            effective_auto_lock_secs(Some(999_999)),
-            AUTO_LOCK_CEILING_SECS
-        );
-    }
-
-    #[test]
-    fn every_prefs_input_lands_on_a_protective_state() {
-        // The replay-resistance table (stories 16, 18): NO input — absent,
-        // sentinel-off, replayed-long, above-ceiling, or any in-between —
-        // yields a non-protective (disabled / above-ceiling / below-floor)
-        // result. This is the highest-value test for the feature.
-        for input in [
-            None,
-            Some(0),
-            Some(1),
-            Some(MIN_AUTO_LOCK_SECS),
-            Some(DEFAULT_AUTO_LOCK_SECS),
-            Some(AUTO_LOCK_CEILING_SECS),
-            Some(AUTO_LOCK_CEILING_SECS + 1),
-            Some(u32::MAX),
-        ] {
-            let eff = effective_auto_lock_secs(input);
-            assert!(eff >= MIN_AUTO_LOCK_SECS, "{input:?} -> {eff} below floor");
-            assert!(
-                eff <= AUTO_LOCK_CEILING_SECS,
-                "{input:?} -> {eff} above ceiling"
-            );
-            // Always-on: never zero / disabled.
-            assert!(eff > 0, "{input:?} -> {eff} would disable auto-lock");
-        }
-    }
 
     // ---- machine/window idle combination (MYND-121) -------------------
 

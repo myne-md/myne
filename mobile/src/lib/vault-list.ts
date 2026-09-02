@@ -104,13 +104,50 @@ export function stableVaultNumber(
 }
 
 /**
- * Resolve the active vault's id — the head of the canonical last-unlock
- * ordering (the same vault the boot picker / switcher treat as active under
- * SYNC-1). `null` when no vault is discoverable. Shared by the automatic-backup
- * scheduler ({@link ../hooks/useBackupScheduler}) and its Settings block.
+ * The id of the ONLY vault on this device, or `null` when there are zero or
+ * two-plus (#250).
+ *
+ * The pre-unlock delete surfaces run with no unlocked slot, so
+ * {@link activeVaultId} has nothing to report, the disk list is the only
+ * source. They normally receive the chosen vault's id from the stage; this
+ * covers the single-vault entry that carries none. Returning `null` at ≥2 is
+ * the point: "delete the vault" is ambiguous there, and picking one silently is
+ * exactly the class of guess #250 removes.
  */
-export async function resolveActiveVaultId(): Promise<string | null> {
+export async function soleVaultId(): Promise<string | null> {
   const res = await listVaults();
-  if (!("ok" in res) || res.ok.length === 0) return null;
-  return orderByLastUnlock(res.ok)[0].id;
+  if (!("ok" in res) || res.ok.length !== 1) return null;
+  return res.ok[0].id;
+}
+
+/**
+ * The AUTHORITATIVE active vault id, read from the runtime slot map (#250).
+ *
+ * This replaces `resolveActiveVaultId()`, which answered the same question by
+ * ordering `listVaults()` on `last_unlock` and taking the head. That ordering
+ * reads the non-authoritative `registry.json` cache, and the cache was stamped
+ * by the password-unlock path only, so after a quick-unlock or a recovery it
+ * named a *different* vault than the one actually open, while three desktop
+ * consumers treated its answer as fact. Desktop deleted it in #250; this client
+ * kept exporting it verbatim, with zero callers, until myne-md/myne#476, a
+ * landmine rather than a live bug, and the first caller reaching for the
+ * obvious-sounding name would have reproduced a data-loss defect on a device
+ * whose vault is often the only copy.
+ *
+ * `null` means no vault is unlocked. Callers must treat that as "no target",
+ * never as "use whichever one looks most recent". Prefer threading the id you
+ * already hold (`stage.vaultId`) over calling this; it exists for the surfaces
+ * that genuinely cannot receive it.
+ */
+export async function activeVaultId(): Promise<string | null> {
+  try {
+    return (
+      (await invoke<string | null>("plugin:vault-unlock|vault_active_id")) ??
+      null
+    );
+  } catch {
+    // A refused/failed probe is "unknown", which is the same instruction as
+    // "no vault": do not act on a guess.
+    return null;
+  }
 }

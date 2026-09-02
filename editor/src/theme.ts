@@ -449,7 +449,11 @@ export const myneTheme = EditorView.theme({
     margin: "6px 0",
     border: "1px solid var(--line-1, #d8d5cc)",
     borderRadius: "var(--radius-2, 6px)",
-    background: "var(--paper-1)",
+    // `--paper`, not `--paper-1`: the surface ramp's light end is the bare name
+    // and `--paper-1` is declared nowhere, so this block rendered with no
+    // background on all three clients while its two siblings above carried
+    // fallbacks (myne-md/myne#478). Fallback added to match them.
+    background: "var(--paper, #fbfbfa)",
     fontFamily: "var(--font-sans)",
     fontSize: "13px",
     lineHeight: "1.5",

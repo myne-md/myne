@@ -238,11 +238,26 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     }
 
     // ---- Group 5: prefs application ---------------------------------------
-    fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-        // Mobile has no auto-lock policy; fall back to the shared default the
-        // runtime state seeds itself with (no desktop clamp range available).
-        prefs_value.unwrap_or(myne_core::DEFAULT_AUTO_LOCK_SECS)
-    }
+    // `effective_auto_lock_secs` is deliberately NOT overridden: the trait's
+    // default is `myne_core::effective_auto_lock_secs`, which clamps
+    // (myne-md/myne#479).
+    //
+    // The body that stood here was `prefs_value.unwrap_or(DEFAULT_AUTO_LOCK_SECS)`
+    // under a comment reading "mobile has no auto-lock policy … no desktop
+    // clamp range available". Both halves were wrong by then: this client does
+    // have an auto-lock, and the clamp was not desktop-specific, it was merely
+    // in the desktop crate.
+    //
+    // What it cost is narrower than an earlier version of this comment claimed,
+    // and the correction matters because the wrong version reads as a shipped
+    // exposure. The value this hook returns feeds
+    // `VaultRuntimeState::auto_lock_timeout_secs`, whose only production reader
+    // is the desktop tick loop, which this client does not compile. This
+    // client's actual idle timer is in the WebView and already clamped through
+    // its own copy of the envelope. So the unclamped body was a TRAP for the
+    // next Rust-side reader here, not a live A6 window. Defaulting the method is
+    // what makes silence land on the guarantee; a client that wants a different
+    // envelope overrides and argues for it.
     fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
 
     // ---- Group 6: auth-flow side-effects ----------------------------------

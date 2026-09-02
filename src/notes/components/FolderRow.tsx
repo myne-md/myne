@@ -112,7 +112,7 @@ const renameInputStyle: CSSProperties = {
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
-  background: "var(--paper-1)",
+  background: "var(--paper)",
   border: "1px solid var(--accent)",
   borderRadius: "var(--radius-1)",
   padding: "1px 4px",

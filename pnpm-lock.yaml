@@ -62,6 +62,9 @@ importers:
       '@lezer/markdown':
         specifier: 1.6.4
         version: 1.6.4
+      '@myne/client-core':
+        specifier: workspace:*
+        version: link:client-core
       '@myne/copy':
         specifier: workspace:*
         version: link:copy
@@ -180,6 +183,8 @@ importers:
       vitest:
         specifier: 4.1.8
         version: 4.1.8(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0))
+
+  client-core: {}
 
   copy: {}
 
@@ -341,6 +346,12 @@ importers:
       '@lezer/markdown':
         specifier: 1.6.4
         version: 1.6.4
+      '@myne/client-core':
+        specifier: workspace:*
+        version: link:../client-core
+      '@myne/copy':
+        specifier: workspace:*
+        version: link:../copy
       '@tauri-apps/api':
         specifier: ^2.11.0
         version: 2.11.0

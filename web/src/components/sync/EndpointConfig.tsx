@@ -38,7 +38,7 @@ const ORIGIN: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   padding: "var(--space-2) var(--space-3)",
-  background: "var(--paper-1)",
+  background: "var(--paper)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-1)",
   overflowWrap: "anywhere",
