@@ -324,7 +324,7 @@ export function ExactAlarmBlock({ api, onResolved }: ExactAlarmBlockProps): Reac
                 padding: 0,
                 font: "inherit",
                 fontSize: 15,
-                color: "var(--accent-1)",
+                color: "var(--accent)",
                 cursor: "pointer",
               }}
             >

@@ -90,6 +90,14 @@ const GUARDED = [
   { root: "editor", seam: null, advice: SHARED_PACKAGE_ADVICE("editor") },
   { root: "dialect", seam: null, advice: SHARED_PACKAGE_ADVICE("dialect") },
   { root: "copy", seam: null, advice: SHARED_PACKAGE_ADVICE("copy") },
+  // `client-core` is `seam: null` and that is the package's whole entry
+  // criterion rather than a consequence of it (myne-md/myne#242). A module
+  // belongs there only if BOTH clients answer the same question AND it reaches
+  // no host, so "does this compile under a total Tauri ban" IS the membership
+  // test. It is what keeps `src/lib/vault-*.ts` out: seven of those nine call
+  // `invoke` at module scope, and their shared answer lives in `myne-core`
+  // behind an IPC command instead of in a package.
+  { root: "client-core", seam: null, advice: SHARED_PACKAGE_ADVICE("client-core") },
   // `ornaments` and `preview` (myne#394) are shared source packages on the same
   // terms as the three above, and they reach FURTHER than the others: both are
   // consumed by the website and by the myne-themes gallery renderer, neither of

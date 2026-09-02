@@ -82,6 +82,15 @@ const SCAN_ROOTS = presentSharedRoots().present;
  * there has nothing to resolve against.
  */
 const EXEMPT = [
+  // THE token sheet, the one every client imports since myne-md/myne#478 moved
+  // the palette out of the two per-client copies. Its literals are the values
+  // the tokens have; there is nothing above them to bind to.
+  "client-core/src/tokens.css",
+  // The desktop and mobile sheets that used to hold that palette. Still exempt,
+  // and still for the original reason rather than by inertia: each keeps
+  // component-local custom properties of its own (`--toast-accent`, the
+  // `--myne-fade-*` trio, mobile's `--m-*` metrics) and those are definitions
+  // too.
   "src/styles/tokens.css", // the token sheet itself
   // Mobile's token sheet, the same file one client over. Its absence here was
   // drift rather than a decision: the two are the same kind of file, and the

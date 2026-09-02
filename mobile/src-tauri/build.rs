@@ -40,6 +40,17 @@ fn main() {
                     "vault_status",
                     "vault_is_unlocked",
                     "vault_slot_kind",
+                    // myne-md/myne#476 adds `vault_active_id`, the AUTHORITATIVE
+                    // "which vault is open" answer, read from the runtime slot
+                    // map. Desktop has had it since #250, which removed the
+                    // TS-side `resolveActiveVaultId()` for ordering a
+                    // best-effort disk cache that only the password-unlock path
+                    // ever stamped: after a quick-unlock or a recovery it named
+                    // a DIFFERENT vault than the one actually open, and the
+                    // danger-zone delete erased that one (#241). Mobile still
+                    // carried the deleted function and could not call this
+                    // command at all, because it was registered nowhere here.
+                    "vault_active_id",
                 ]),
             )
             .plugin(

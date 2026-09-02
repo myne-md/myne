@@ -24,6 +24,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "../../src/App";
 import { RootErrorBoundary } from "../../src/components/RootErrorBoundary";
+// The shared token layer (myne-md/myne#478). FIRST, before the desktop app-shell
+// sheet this client also compiles, because both that sheet and the ornament one
+// read the values it supplies.
+import "@myne/client-core/tokens.css";
 import "../../src/styles/tokens.css";
 // The ornament layer (myne#394). The web client shares `src/lib/theme.ts`, so it
 // already reflects every `data-o-*` selection onto the root — without this import

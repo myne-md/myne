@@ -525,6 +525,22 @@ steps:
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
       - node scripts/check-token-adoption.mjs
+      # Token PARITY (myne#478), the opposite question from the ratchet above:
+      # does a token anybody names actually exist, and does one name have two
+      # independent declarations? Neither half fails to compile and the wrong
+      # output is a plausible surface, a card with no background reads as flat
+      # design. The measured cost of not asking: 105 palette tokens missing from
+      # mobile (folder-group and text-highlight colours, both of which SYNC as
+      # vault content) and eight `var(--paper-1)` references resolving to
+      # nothing, one in the shared editor package.
+      - node scripts/check-token-parity.mjs
+      # Twin-drift RATCHET (myne#473): the recorded set of semantically-differing
+      # desktop/mobile twin pairs may shrink, never grow. Distinct from the
+      # `twin-inventory` step below, which is unfiltered because it gates a
+      # generated `docs/**` file: this one gates the TREE, produces no document,
+      # and cannot be changed by a docs-only commit, so it belongs here, under
+      # the same `code-paths` filter as its neighbours.
+      - node scripts/check-twin-drift-ratchet.mjs
       # Native-button guard: tokens.css carries no base `button {}` rule, so a
       # <button> with neither className nor style renders as browser chrome —
       # and nothing else reports it (tsc is happy; the token ratchet counts

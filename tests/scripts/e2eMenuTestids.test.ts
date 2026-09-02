@@ -8,7 +8,8 @@
 // so it rested on nobody having watched it fire.
 
 import { execFileSync } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -16,19 +17,38 @@ const ROOT = new URL("../..", import.meta.url).pathname;
 const GUARD = join(ROOT, "scripts", "check-e2e-menu-testids.mjs");
 
 let probe: string | null = null;
+let scratch: string | null = null;
 afterEach(() => {
   if (probe !== null) rmSync(probe, { force: true });
   probe = null;
+  if (scratch !== null) rmSync(scratch, { recursive: true, force: true });
+  scratch = null;
 });
 
-/** Write one scenario file into the real `e2e/` tree and run the guard over it.
- *  The guard walks that tree by construction, so a fixture directory would test
- *  a walk the guard never performs. */
+/** Write one scenario file into a THROWAWAY tree and run the guard over it.
+ *
+ *  This used to write into the real `e2e/` directory, arguing that the guard
+ *  walks that tree by construction so a fixture directory would test a walk it
+ *  never performs. The argument was right about the walk and wrong about the
+ *  cost: a `e2e/*.e2e.ts` file is one of `scripts/check-manual-test-roster.mjs`'s
+ *  six denominators, so for as long as the probe existed, any concurrently
+ *  scheduled test running THAT guard saw a scenario no roster entry claims and
+ *  failed. Vitest runs files in parallel workers, so `pnpm test` went red on a
+ *  pairing nobody chose (myne-md/myne#242).
+ *
+ *  `--scan <dir>` resolves it without weakening anything: the walk is the same
+ *  code over the same shape, it just starts in a directory only this test can
+ *  see. Same seam as `check-twin-inventory.mjs --roots`. */
 function runWith(body: string): { code: number; out: string } {
-  probe = join(ROOT, "e2e", "_guard-probe.e2e.ts");
+  scratch = mkdtempSync(join(tmpdir(), "e2e-menu-testids-"));
+  mkdirSync(join(scratch, "e2e"), { recursive: true });
+  probe = join(scratch, "e2e", "_guard-probe.e2e.ts");
   writeFileSync(probe, body, "utf8");
   try {
-    const out = execFileSync("node", [GUARD], { encoding: "utf8", cwd: ROOT });
+    const out = execFileSync("node", [GUARD, "--scan", scratch], {
+      encoding: "utf8",
+      cwd: ROOT,
+    });
     return { code: 0, out };
   } catch (e) {
     const err = e as { status: number; stdout: string; stderr: string };

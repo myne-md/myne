@@ -275,16 +275,29 @@ impl VaultLifecycleHooks for WebHooks {
 
     // ── Group 5/6: policy + auth-flow side-effects ──────────────────────────
 
-    /// **Implemented**, with the same fallback the shared default gives.
-    ///
-    /// Not the desktop clamp: that range exists because an OS idle detector
-    /// feeds it, and `osIdleAutoLock` is in the web descriptor's ABSENT set —
-    /// the browser's timer is the page's own activity, which is a different
-    /// signal with a different meaningful range. Task 42 owns that range if it
-    /// turns out to need one; until then the shared default is honest.
-    fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-        prefs_value.unwrap_or(myne_core::DEFAULT_AUTO_LOCK_SECS)
-    }
+    // `effective_auto_lock_secs` is deliberately NOT overridden: the trait's
+    // default is `myne_core::effective_auto_lock_secs`, which clamps
+    // (myne-md/myne#479).
+    //
+    // The override that stood here returned `prefs_value.unwrap_or(DEFAULT)`
+    // under an argument about the idle SOURCE, "not the desktop clamp: that
+    // range exists because an OS idle detector feeds it, and `osIdleAutoLock` is
+    // in the web descriptor's ABSENT set". That is a fair argument about the
+    // FLOOR, which `core/src/lib.rs` documents as a UX-comfort bound and not a
+    // security edge. It is not an argument about the CEILING, which is the
+    // security half: `AUTO_LOCK_CEILING_SECS` is load-bearing because
+    // `vault.prefs` is a replayable blob and the clamp is what keeps a tampered
+    // `auto_lock_seconds` able only to SHORTEN the timeout. OPFS is as
+    // replayable as a disk, so on this client a replayed 4_000_000_000 gave an
+    // unbounded A6 exposure window (`threat-model.md` §7).
+    //
+    // The same body was found on mobile in the same pass, which is the point
+    // worth recording: nothing compares these three files. The twin inventory's
+    // `TREE_PAIRS` are `(src, mobile/src)` and `(src-tauri/src,
+    // mobile/src-tauri/src)`, so `web/wasm/src/` is outside the inventory, the
+    // drift ratchet and `check-twin-drift.mjs` alike, this one was found by
+    // reading, not by a guard. If the browser timer turns out to need a
+    // different FLOOR, override and argue for that alone.
 
     /// **Decided absent.** The clipper is a native-messaging host; `clipper` is
     /// in the descriptor's ABSENT set.

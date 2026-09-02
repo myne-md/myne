@@ -19,12 +19,21 @@
 // from PasswordResetStep on A8f success).
 
 /**
- * Mirrors the Rust-side `IoFailureKind` enum
- * (`src-tauri/src/io_failure_kind.rs`) — bounded categorization of IO
- * failures surfaced by `vault_status`. No `String` payload (path
- * leakage prevention).
+ * Re-exported, not declared (myne-md/myne#475). This module used to carry its
+ * own copy of the four-member union, worded differently from the one in
+ * `types/vault-unlock-error.ts`, and `vault-status.ts` + `vault-summary.ts`
+ * resolved the name HERE while their eleven siblings resolved it THERE. Two
+ * declarations of one Rust enum is two places a variant can be added to, so the
+ * declaration now lives once, in `@myne/client-core`, beside the enum's other
+ * mirrors. The re-export keeps `RecoverFlow` and `io-banner` importing it from
+ * this module unchanged.
+ *
+ * The Rust source is `core/src/io_failure_kind.rs`, bounded categorization of
+ * IO failures surfaced by `vault_status`, with no `String` payload, because an
+ * OS error message can carry a path.
  */
-export type IoFailureKind = "PermissionDenied" | "NoSpace" | "NotFound" | "Other";
+import type { IoFailureKind } from "@myne/client-core/types/vault-unlock-error";
+export type { IoFailureKind };
 
 /**
  * Initial `vault.meta` status carried by the `unlock` stage. Drives
@@ -315,44 +324,24 @@ export type Action =
    * arm is only the "make a brand-new vault" branch.
    */
   | { type: "editor.create-vault" }
-  /**
-   * editor → welcome. **Terminal-destructive transition.** Dispatched
-   * by App.tsx on the `onDeleteVaultSuccess` callback chain from
-   * AccountPanel (Settings → Account → Danger zone → Delete vault
-   * confirmation), fired either:
-   *   - On the `vault_delete` IPC resolve (full success: vault.meta
-   *     gone + slot Empty + cryptographic-erase complete via backend's
-   *     `take_and_run_blocking` drop-before-spawn_blocking ordering).
-   *   - On the user's Continue click in the post-fail banner after a
-   *     `PartialDelete` or `Io` rejection (slot is already Empty from
-   *     the same zeroize-before-unlink ordering; the editor cannot
-   *     resume, the Continue button is the terminal exit path).
-   *
-   * vault.meta is gone from disk (or partially gone in the PartialDelete
-   * case); a re-probe via `vault_status` would return `Missing`, so
-   * landing on `welcome` matches the boot-probe semantic. This Action
-   * is the in-session canonical surface for that transition (parallel
-   * to `editor.lock`'s in-session role for editor → unlock).
-   *
-   * See `decisions.md` 2026-05-26 entry "MYND-108 vault-delete-confirm
-   * gate" + `agent-tooling/features/ui-vault-delete/prd.md` §"Implementation
-   * Decisions → Stage union extension".
-   */
-  /**
-   * unlock → welcome. Terminal-destructive transition from the
-   * Unlock screen's tertiary "Lost both password and recovery
-   * phrase? Delete vault and start over" link (MYND-108-bis).
-   * Dispatched by the Unlock screen's `"delete-vault"` sub-view
-   * `onSubmit` happy path AND the post-fail `onContinueAfterPartial`
-   * callback. Backend accepts via the `Slot::Empty + vault.meta-exists`
-   * no-keys arm (`decisions.md` 2026-05-26 entry "MYND-108-bis
-   * vault_delete extended to accept Slot::Empty + vault.meta-exists");
-   * cryptographic-erase claim is structurally inapplicable on this
-   * path (no in-memory keys to zeroize — the user has lost both
-   * credentials). Welcome matches the post-delete boot-probe
-   * semantic (vault.meta is gone, so a re-probe routes to welcome
-   * regardless).
-   */
+  // TWO ORPHANED DOCBLOCKS WERE HERE, and both argued a routing decision this
+  // client no longer makes (myne-md/myne#477).
+  //
+  // Neither was attached to a union member: they described `editor → welcome`
+  // and `unlock → welcome` as the post-delete transitions, each with a
+  // paragraph reasoning that "a re-probe via `vault_status` would return
+  // `Missing`, so landing on `welcome` matches the boot-probe semantic". That
+  // stopped being true on both clients: post-delete routing is a REPROBE now,
+  // and `lib/vault-delete.ts` in this very tree states the resulting rule -
+  // picker at ≥2, that vault's unlock at 1, welcome at 0 - and says the old
+  // shape "stranded a multi-vault user on the first-run screen".
+  //
+  // So they were not stale comments on live code; they were the ARGUMENT for a
+  // reverted decision, sitting in the file that decides routing, with nothing
+  // in the type system to make them wrong. `scripts/check-twin-drift.mjs` names
+  // this pair in its own header as a divergence that went unseen for seven
+  // months of commits.
+
   /**
    * unlock → recover(phrase-entry). Cold-start entry: user clicked
    * the "Recovery phrase ile aç" link below the password CTA.

@@ -1573,9 +1573,11 @@ mod tests {
         fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
-        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-            prefs_value.unwrap_or(myne_core::DEFAULT_AUTO_LOCK_SECS)
-        }
+        // `effective_auto_lock_secs` deliberately not overridden: the trait's
+        // default clamps (myne-md/myne#479). This body used to be the unclamped
+        // `unwrap_or`, which is the exact shape that change removed from two
+        // production clients, so a fixture carrying it handed the next author
+        // the defect as the copyable example.
         fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
         fn preempt_inflight_backup<'a>(
             &'a self,
