@@ -52,6 +52,8 @@ import {
   type Action,
   type VaultRecoverState,
 } from "./reducer";
+import { stageRootStyle } from "../../components/primitives/stageRoot";
+import { scrollRegionStyle } from "../../hooks/useScrollEdges";
 
 interface PhraseEntryStepProps {
   state: VaultRecoverState;
@@ -65,10 +67,7 @@ interface PhraseEntryStepProps {
 }
 
 const ROOT_STYLE: CSSProperties = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  ...stageRootStyle,
   background: "var(--bg-1)",
   fontFamily: "var(--font-sans)",
   padding: "var(--space-6)",
@@ -86,6 +85,19 @@ const CARD_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-4)",
+  // Bounded and scrollable, because `stageRootStyle` bounds the root. This is
+  // the tallest surface in the tree (24 cells plus chrome) and it is the screen
+  // a user with nothing but their recovery phrase has to complete. A capped root
+  // with `alignItems: center` pushes a too-tall card out of BOTH ends, so on a
+  // short window the heading and the submit button leave together, with no way
+  // to reach either. `CenteredCard` and `VaultPicker` carry the same pair.
+  //
+  // `scrollRegionStyle` and NOT `fillingScrollRegionStyle`: this card is a
+  // direct child of `stageRootStyle`, which is a ROW, so growing on its main
+  // axis is a full-bleed width rather than a taller scroller. `maxWidth: 600`
+  // above was the only thing keeping that invisible here.
+  ...scrollRegionStyle,
+  maxHeight: "100%",
 };
 
 const EYEBROW_STYLE: CSSProperties = {
@@ -123,7 +135,7 @@ const CELL_WRAP_BASE: CSSProperties = {
   position: "relative",
   display: "flex",
   alignItems: "center",
-  background: "var(--paper-1)",
+  background: "var(--paper)",
   borderRadius: 2,
   paddingInlineStart: 28,
   paddingInlineEnd: 8,
@@ -136,7 +148,12 @@ function cellWrapStyle(focused: boolean): CSSProperties {
   return {
     ...CELL_WRAP_BASE,
     border: `1px solid ${focused ? "var(--accent)" : "var(--line-1)"}`,
-    background: focused ? "var(--bg-1)" : "var(--paper-1)",
+    // No background branch: `--bg-1` IS `--paper` (the semantic alias), so the
+    // two arms named one value. They used to read `--bg-1` against `--paper-1`,
+    // and `--paper-1` does not exist, it resolved to nothing, so the unfocused
+    // cell showed the page through it, which on this screen is `--paper` again.
+    // The focus affordance is the border, and it always was
+    // (myne-md/myne#478).
   };
 }
 

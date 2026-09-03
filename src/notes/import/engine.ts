@@ -49,6 +49,7 @@ import {
   type ImportFailureReason,
 } from "../../lib/import-errors";
 import {
+  applyTitle,
   mapImportedFile,
   type IllegalSegmentFlag,
   type PreexistingFolder,
@@ -140,6 +141,14 @@ export interface ImportResult {
    *  importer, or if nothing compressed. */
   compression: CompressionTally;
   emptyFoldersPreserved: number;
+  /**
+   * Folders the import created that the reserved byte budget could not register
+   * (myne-md/myne#613). Zero in every ordinary case. Non-zero means those
+   * folders behave as they did before this feature: they exist while they hold
+   * notes and vanish when the last one leaves, so the user is told rather than
+   * discovering it weeks later.
+   */
+  foldersNotPreserved: number;
   /** Remaining (un-ingested) `.md` count if cancelled mid-walk; `null` if completed. */
   cancelled: number | null;
   /** Total `.md` files discovered (the N in "Importing X of N"). */
@@ -234,7 +243,9 @@ export async function importFromSource(
     if (loaded.compression !== undefined) {
       compression = addCompressionTally(compression, loaded.compression);
     }
-    const mapped = mapImportedFile(rel, loaded.markdown);
+    const mapped = mapImportedFile(rel, loaded.markdown, {
+      titleFromFilename: source.titleFromFilename,
+    });
     illegalFlags.push(...mapped.illegalFlags);
     if (mapped.preexistingFolder !== null) {
       preexistingFolders.push(mapped.preexistingFolder);
@@ -249,18 +260,53 @@ export async function importFromSource(
     // noteIdentityKey → folderKey → normalizeFolderPath (idempotent), so passing
     // the raw FM value here is enough (no extra normalization needed).
     const identityFolder = mapped.preexistingFolder?.existing ?? folder;
-    if (decideImport(seen, identityFolder, mapped.readTimeTitle, policy) === "skip") {
+
+    // A source with its own policy answers the duplicate question itself, and
+    // may answer it with a RENAME. The engine stays one loop: it does not know
+    // why a source renamed a note, only that the title it must key the identity
+    // set on is the one it was given back.
+    const decision = source.policy?.decide({
+      relPath: rel,
+      folder: identityFolder,
+      markdown: mapped.plaintext,
+      seen,
+    }) ?? {
+      kind: decideImport(seen, identityFolder, mapped.readTimeTitle, policy),
+      renamedTitle: null,
+    };
+
+    if (decision.kind === "skip") {
       skippedExisting++;
     } else {
+      const finalTitle = decision.renamedTitle ?? mapped.readTimeTitle;
       // Media is processed only for notes we actually create, on the
       // folder-injected plaintext (the `folder:` FM carries no media refs).
       let plaintext = mapped.plaintext;
+      // The rename lands in the body's own `title:` field, through the same
+      // surgery create and rename use, so the note IS the renamed note rather
+      // than a note the report claims was renamed.
+      if (decision.renamedTitle !== null) {
+        plaintext = applyTitle(plaintext, decision.renamedTitle);
+      }
       if (options.importMedia) {
         const m = await processImportedMedia(plaintext, options.importMedia);
         plaintext = m.body;
         addByType(media.ingested, m.counts.ingested);
         addByType(media.omitted, m.counts.omitted);
         compression = addCompressionTally(compression, m.compression);
+      }
+      // The source's last pass, once the note is known to be created and its
+      // final title is known. For the Myne source this is where each referenced
+      // attachment is re-sealed into the target vault and its embed rewritten,
+      // which is why it is async and why it runs here rather than in `load()`:
+      // `load()` does not yet know whether the note survives the duplicate
+      // decision, and re-sealing an attachment for a note that gets skipped
+      // would write blobs nothing references.
+      if (source.policy !== undefined) {
+        plaintext = await source.policy.finalize(plaintext, {
+          relPath: rel,
+          renamedTitle: decision.renamedTitle,
+        });
       }
       try {
         await sink.createNote(plaintext);
@@ -274,14 +320,19 @@ export async function importFromSource(
       }
       imported++;
       noteFolders.push(folder); // empty-dir collection stays path-derived
-      seen.add(noteIdentityKey(identityFolder, mapped.readTimeTitle));
+      // Keyed on the FINAL title, not the source's, and fed on BOTH paths.
+      // A source with its own policy is handed this set in `decide`, so a note
+      // created earlier in this run is visible to the decision about the next
+      // one. Feeding it only on the fallback path is what let two source notes
+      // whose titles fold equal both be created inside one import.
+      seen.add(noteIdentityKey(identityFolder, finalTitle));
       // Record fidelity loss only for notes we actually created — a skipped
       // duplicate has no note for the import report to link to.
       if (loaded.lossy.length > 0) {
         lossyNotes.push({
           relPath: rel,
           folder: identityFolder,
-          title: mapped.readTimeTitle,
+          title: finalTitle,
           dropped: loaded.lossy,
         });
       }
@@ -289,18 +340,42 @@ export async function importFromSource(
     options.onProgress?.(i + 1, total);
   }
 
-  // ----- SYNC-4: one deliberate-folders write for empty source dirs -----
+  // ----- one deliberate-folders write for the whole import -----
   // Guarded like the import-report write in `ports.ts`: this runs AFTER every
   // note has landed, so failing the whole import here would report failure for
-  // an import that fully succeeded. Preserving empty folders is fidelity, not
+  // an import that fully succeeded. Preserving the folder tree is fidelity, not
   // content.
-  const deliberate = collectDeliberateImportFolders(allDirs, noteFolders);
-  let emptyFoldersPreserved = deliberate.length;
+  //
+  // myne-md/myne#613 widened WHAT is registered. It used to be only the source
+  // dirs that arrived EMPTY, because a folder holding notes was proved by those
+  // notes and needed no record. Under at-fill a folder is registered the first
+  // time it holds a note, so the importer registers every folder it created.
+  // Special-casing it the other way was considered and rejected: it would leave
+  // this issue's own defect in place for imported vaults, which are the largest.
+  //
+  // ONE write, not one per folder: each re-encrypts the whole `vault.prefs`.
+  const emptyDirs = collectDeliberateImportFolders(allDirs, noteFolders);
+  const withNotes = [...new Set(noteFolders.filter((f): f is string => f !== null))];
+  const deliberate = [...new Set([...emptyDirs, ...withNotes])];
+  let emptyFoldersPreserved = emptyDirs.length;
+  let foldersNotPreserved = 0;
   if (deliberate.length > 0) {
     try {
-      await sink.setDeliberateFolders(deliberate);
+      foldersNotPreserved = await sink.setDeliberateFolders(deliberate);
+      // The refusal count is over the WHOLE registration and does not say which
+      // entries it dropped, so subtracting it from the empty-dir count is a
+      // LOWER bound rather than a measurement: exact when nothing was refused,
+      // which is every ordinary import, and never overstating otherwise. The
+      // report shows `foldersNotPreserved` beside it, which is the number the
+      // user acts on.
+      emptyFoldersPreserved = Math.max(0, emptyDirs.length - foldersNotPreserved);
     } catch {
       emptyFoldersPreserved = 0;
+      // The folders THIS import created, not the whole union: `deliberate` also
+      // holds folders the vault already had, and those are unaffected by a
+      // failed write. Reporting the union told the user that folders which will
+      // not vanish are about to (myne-md/myne#613 pr-review).
+      foldersNotPreserved = emptyDirs.length + withNotes.length;
     }
   }
 
@@ -316,6 +391,7 @@ export async function importFromSource(
     media,
     compression,
     emptyFoldersPreserved,
+    foldersNotPreserved,
     cancelled,
     total,
     lossyNotes,

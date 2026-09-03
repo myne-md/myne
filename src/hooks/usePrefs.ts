@@ -20,17 +20,20 @@
 // past ~5 fields, revisit (separate PRD).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { observeEgressControls } from "../notes/ai/chatStore";
 import i18n from "../i18n";
 import {
   PrefsView,
   prefsRead,
+  type SetMutation,
   setAiEnabled as persistAiEnabled,
-  setAiExcludedFolders as persistAiExcludedFolders,
+  mutateAiExcludedFolders as persistAiExcludedFolders,
   setAutoLockTimeout,
   setAutoTagEnabled as persistAutoTagEnabled,
   setCliEnabled as persistCliEnabled,
-  setCliExcludedFolders as persistCliExcludedFolders,
+  mutateCliExcludedFolders as persistCliExcludedFolders,
   setCliRateLimitDisabled as persistCliRateLimitDisabled,
+  setChatHistoryBudget as persistChatHistoryBudget,
   setDeveloperMode as persistDeveloperMode,
   setDateFormat,
   setTimeFormat,
@@ -42,6 +45,17 @@ import {
   setBarItemsOrder as persistBarItemsOrder,
   setHiddenBarItems as persistHiddenBarItems,
   setKeymapBinding as persistKeymapBinding,
+  // Imported UNALIASED, deliberately. `check-ipc-binding-callers.mjs` strips
+  // whole import statements and then bare-word matches the binding's name in
+  // what is left, so an alias makes the desktop call site invisible to it: the
+  // remainder contains only `persistReminderHorizonDays`. With this branch also
+  // removing `ReminderSettings.tsx`'s unaliased call, the sole surviving
+  // unaliased production reference was mobile's own same-named setter, and the
+  // guard's caller loop is not module-scoped, so MOBILE's call was what kept the
+  // DESKTOP binding reported as live. Delete mobile's picker and a fully wired
+  // desktop binding reads as dead; delete the desktop wire and the guard stays
+  // green. There is no name collision here to justify the alias.
+  setReminderHorizonDays,
   setRightPanelActiveTab as persistRightPanelActiveTab,
   setRightPanelHiddenTabs as persistRightPanelHiddenTabs,
   setRightPanelTabOrder as persistRightPanelTabOrder,
@@ -74,6 +88,7 @@ const DEFAULT_PREFS: PrefsView = {
   attachment_ocr_enabled: true,
   ai_excluded_folders: [],
   developer_mode: false,
+  chat_history_budget: null,
   archived_folders: [],
   auto_lock_seconds: null,
   // MYND-651: matches the Rust default. A default-off positive opt-in, so the
@@ -88,6 +103,7 @@ const DEFAULT_PREFS: PrefsView = {
   daily_date_format: null,
   daily_folder: null,
   daily_template: null,
+  periodic_notes: {},
   favorites: [],
   item_order: {},
   editor_layout: null,
@@ -154,18 +170,31 @@ interface UsePrefsResult {
   /** Flip the auto-tag sub-toggle (optimistic; same pattern). Co-gated on
    *  `ai_enabled` at the surface, not here. */
   setAutoTagEnabled: (enabled: boolean) => Promise<void>;
-  /** Replace the AI excluded-folders set (optimistic; same pattern). */
-  setAiExcludedFolders: (folders: string[]) => Promise<void>;
+  /**
+   * Add to and remove from the AI excluded-folders set (optimistic; same
+   * pattern). Takes verbs rather than a whole set: see `SetMutation`, and
+   * myne-md/myne#613 for what a whole-set write cost.
+   */
+  setAiExcludedFolders: (
+    mutation: SetMutation,
+    next: string[],
+  ) => Promise<void>;
   /** Flip the Developer mode toggle (optimistic; same converge-on-error pattern). */
   setDeveloperMode: (enabled: boolean) => Promise<void>;
+  /** `null` clears the override. The stored value may be lower than the one
+   *  passed: the host clamps it, and this hook re-reads to show what stuck. */
+  setChatHistoryBudget: (budget: number | null) => Promise<void>;
   /**
    * Open or close the CLI terminal-access door (myne-cli epic, MYND-490).
    * Optimistic; same converge-on-error pattern. The socket itself follows
    * within one supervisor tick — this only writes the preference.
    */
   setCliEnabled: (enabled: boolean) => Promise<void>;
-  /** Replace the CLI excluded-folders set (optimistic; same pattern). */
-  setCliExcludedFolders: (folders: string[]) => Promise<void>;
+  /** Add to and remove from the CLI excluded-folders set (optimistic). */
+  setCliExcludedFolders: (
+    mutation: SetMutation,
+    next: string[],
+  ) => Promise<void>;
   /**
    * Remove (or restore) the default-on CLI command rate limit. A pace bound on
    * a runaway script, NOT a permission check — see `cli_bridge::rate_limit`.
@@ -178,6 +207,16 @@ interface UsePrefsResult {
    * Same pattern as `toggleScreenCapture`.
    */
   setAutoLock: (seconds: number) => Promise<void>;
+  /**
+   * Set the reminder registration horizon (days). Same optimistic-then-converge
+   * discipline as {@link setAutoLock}, which it is the near-twin of: a numeric
+   * prefs field with a `null` never-set state and a fixed set of offered values.
+   *
+   * It lives here rather than as a component-local optimistic write (myne#508)
+   * so the settings row holds no state of its own and the panel holds no echo
+   * for it, the same reason the ~40 setters around it do.
+   */
+  setReminderHorizon: (days: number) => Promise<void>;
   /**
    * Persist the full hidden-bottom-bar-items set (bottom-bar customization).
    * Optimistic: the cache updates immediately so the BottomBar reflects the
@@ -283,6 +322,12 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
         // every consumer that reads a field off it.
         if (!cancelled && view && mine > applied.current) {
           applied.current = mine;
+          // Every applied view is observed, so a change to the egress controls
+          // cuts the chat-history seed whichever way it arrived. See
+          // `chatStore.observeEgressControls`: `ai_excluded_folders` is
+          // Shared(SetUnion), so it also arrives by sync merge, where no setter
+          // on this machine is called.
+          observeEgressControls(view.ai_excluded_folders, view.ai_provider);
           setPrefs(view);
         }
       } catch {
@@ -373,6 +418,37 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  // The agent's chat-history seed budget (myne-md/myne#617).
+  //
+  // Unlike every toggle here, this one re-reads on SUCCESS as well as on
+  // failure: the host CLAMPS the value, so what it stored can be lower than
+  // what was sent, and an optimistic update alone would leave a number on
+  // screen that is not the number a run will use.
+  const setChatHistoryBudgetPref = useCallback(
+    async (budget: number | null) => {
+      setPrefs((p) => ({ ...p, chat_history_budget: budget }));
+      try {
+        await persistChatHistoryBudget(budget);
+      } catch {
+        onError?.(i18n.t("settings.prefs.saveError"));
+      } finally {
+        // Converges on BOTH arms, which is why the re-read is in `finally`
+        // rather than written out twice. On failure it is the same rollback
+        // every other setter here does; on SUCCESS it is load-bearing, because
+        // the host clamps and the value it stored can be lower than the one
+        // sent. A setter that converged only on failure would leave the panel
+        // showing a bound no run will use.
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed. Keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+      }
+    },
+    [onError],
+  );
+
   // Developer mode toggle (`developer-mode` feature, MYND-593). Same
   // optimistic-then-converge discipline as `setAiEnabledPref`.
   const setDeveloperModePref = useCallback(
@@ -394,32 +470,90 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
-  const setAiExcludedFoldersPref = useCallback(
-    async (folders: string[]) => {
-      setPrefs((p) => ({ ...p, ai_excluded_folders: folders }));
+  /**
+   * The shared core of the two EGRESS-control setters (`ai_excluded_folders`,
+   * `cli_excluded_folders`). One copy rather than two, because what it holds is
+   * a fail-open guard and two copies is the shape where one of them later stops
+   * guarding.
+   *
+   * `next` is only the optimistic cache value; `mutation` is what is written.
+   * They are separate arguments because the caller's optimistic view and its
+   * claim about what changed are genuinely different things, and collapsing them
+   * is what let a stale view delete a peer's entry (myne-md/myne#613).
+   *
+   * Three outcomes, and the middle one is the reason this is not
+   * `writeOptimisticPref`, which discards what the write returned:
+   *
+   *   - clean, so the optimistic value stands;
+   *   - the reserved byte budget REFUSED some additions
+   *     (`SET_FIELD_BUDGET_BYTES`), so the cache is now claiming a folder is
+   *     excluded from the AI or the CLI that is not excluded on disk. That is a
+   *     fail-open reading of a control `docs/threat-model.md` A17 names, so
+   *     converge to disk truth and say what happened rather than leaving the
+   *     safer-looking value up;
+   *   - the write threw, so re-read disk truth and report the ordinary error.
+   *
+   * A failed re-read leaves the optimistic value in place on both failure paths:
+   * the notice still fires, and the next successful read corrects the cache.
+   */
+  const writeExcludedFolders = useCallback(
+    async (
+      patch: Partial<PrefsView>,
+      persist: (mutation: SetMutation) => Promise<number>,
+      mutation: SetMutation,
+    ) => {
+      setPrefs((p) => ({ ...p, ...patch }));
+      // The seed cut used to be here. It moved down into
+      // `prefs.setAiExcludedFolders`, which is the single point every exclusion
+      // write passes through, so it now sits beside the identical one in
+      // `setAiProvider` instead of a layer above it. `persistAiExcludedFolders`
+      // below is that binding, so the ordering the cut depends on (before the
+      // write, before any await) is unchanged.
+      let messageKey: string | null = null;
       try {
-        await persistAiExcludedFolders(folders);
-      } catch {
-        try {
-          const view = await prefsRead();
-          setPrefs(view);
-        } catch {
-          // Keep the optimistic value; the backend tracing logged the failure.
+        if ((await persist(mutation)) > 0) {
+          messageKey = "settings.prefs.folderListFull";
         }
-        onError?.(i18n.t("settings.prefs.saveError"));
+      } catch {
+        messageKey = "settings.prefs.saveError";
       }
+      if (messageKey === null) return;
+      try {
+        setPrefs(await prefsRead());
+      } catch {
+        // Keep the optimistic value; backend tracing logged the original write.
+      }
+      onError?.(i18n.t(messageKey));
     },
     [onError],
+  );
+
+  const setAiExcludedFoldersPref = useCallback(
+    (mutation: SetMutation, next: string[]) =>
+      writeExcludedFolders(
+        { ai_excluded_folders: next },
+        persistAiExcludedFolders,
+        mutation,
+      ),
+    [writeExcludedFolders],
   );
 
   /**
    * Shared optimistic-then-reread-on-error core: patch the cache immediately
    * (so an open surface re-renders live), persist, and on failure re-read disk
-   * truth — the same convergence discipline the setters above spell out by
-   * hand. Every setter written from here on composes this instead of copying
-   * the block again.
+   * truth, the same convergence discipline the setters above spell out by hand.
+   * Every setter written from here on composes this instead of copying the block
+   * again.
+   *
+   * **Named `writeOptimisticPref`, not `writePref`** (myne-md/myne#507). That
+   * name belongs to `src/lib/prefs.ts`'s module-private chokepoint, the one that
+   * bumps the prefs nonce and that `scripts/check-prefs-nonce.mjs` enforces. This
+   * one touches no IPC and bumps nothing: it patches a cache and delegates. Two
+   * functions with the same name and different semantics, one layer apart, is
+   * how myne#251 happened, and myne#496 renamed the mobile twin out of the same
+   * collision.
    */
-  const writePref = useCallback(
+  const writeOptimisticPref = useCallback(
     async (patch: Partial<PrefsView>, persist: () => Promise<void>) => {
       setPrefs((p) => ({ ...p, ...patch }));
       try {
@@ -443,22 +577,28 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   // every tick, so a failed write that converges back to disk truth also
   // converges the socket.
   const setCliEnabledPref = useCallback(
-    (enabled: boolean) => writePref({ cli_enabled: enabled }, () => persistCliEnabled(enabled)),
-    [writePref],
+    (enabled: boolean) => writeOptimisticPref({ cli_enabled: enabled }, () => persistCliEnabled(enabled)),
+    [writeOptimisticPref],
   );
 
+  // The AI setter's twin, through the same core: see `writeExcludedFolders` for
+  // why these two do not go through `writeOptimisticPref`.
   const setCliExcludedFoldersPref = useCallback(
-    (folders: string[]) =>
-      writePref({ cli_excluded_folders: folders }, () => persistCliExcludedFolders(folders)),
-    [writePref],
+    (mutation: SetMutation, next: string[]) =>
+      writeExcludedFolders(
+        { cli_excluded_folders: next },
+        persistCliExcludedFolders,
+        mutation,
+      ),
+    [writeExcludedFolders],
   );
 
   const setCliRateLimitDisabledPref = useCallback(
     (disabled: boolean) =>
-      writePref({ cli_rate_limit_disabled: disabled }, () =>
+      writeOptimisticPref({ cli_rate_limit_disabled: disabled }, () =>
         persistCliRateLimitDisabled(disabled),
       ),
-    [writePref],
+    [writeOptimisticPref],
   );
 
   const setAutoLock = useCallback(
@@ -481,6 +621,17 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       }
     },
     [onError],
+  );
+
+  // myne#508. Through the shared `writeOptimisticPref` rather than a hand-rolled
+  // twin of `setAutoLock` above: the two differ only in the field and the
+  // persist call, which is exactly what that helper exists to absorb.
+  const setReminderHorizon = useCallback(
+    (days: number) =>
+      writeOptimisticPref({ reminder_horizon_days: days }, () =>
+        setReminderHorizonDays(days),
+      ),
+    [writeOptimisticPref],
   );
 
   const setHiddenBarItems = useCallback(
@@ -587,37 +738,37 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
-  // The four editor-typography setters, over the shared `writePref` core.
+  // The four editor-typography setters, over the shared `writeOptimisticPref` core.
   const setEditorTextSizePref = useCallback(
-    (value: string | null) => writePref({ editor_text_size: value }, () => setEditorTextSize(value)),
-    [writePref],
+    (value: string | null) => writeOptimisticPref({ editor_text_size: value }, () => setEditorTextSize(value)),
+    [writeOptimisticPref],
   );
   const setEditorLineSpacingPref = useCallback(
     (value: string | null) =>
-      writePref({ editor_line_spacing: value }, () => setEditorLineSpacing(value)),
-    [writePref],
+      writeOptimisticPref({ editor_line_spacing: value }, () => setEditorLineSpacing(value)),
+    [writeOptimisticPref],
   );
   const setDateFormatPref = useCallback(
-    (value: string | null) => writePref({ date_format: value }, () => setDateFormat(value)),
-    [writePref],
+    (value: string | null) => writeOptimisticPref({ date_format: value }, () => setDateFormat(value)),
+    [writeOptimisticPref],
   );
   const setTimeFormatPref = useCallback(
-    (value: string | null) => writePref({ time_format: value }, () => setTimeFormat(value)),
-    [writePref],
+    (value: string | null) => writeOptimisticPref({ time_format: value }, () => setTimeFormat(value)),
+    [writeOptimisticPref],
   );
   const setTimezonePref = useCallback(
-    (value: string | null) => writePref({ timezone: value }, () => setTimezone(value)),
-    [writePref],
+    (value: string | null) => writeOptimisticPref({ timezone: value }, () => setTimezone(value)),
+    [writeOptimisticPref],
   );
   const setEditorContentWidthPref = useCallback(
     (value: string | null) =>
-      writePref({ editor_content_width: value }, () => setEditorContentWidth(value)),
-    [writePref],
+      writeOptimisticPref({ editor_content_width: value }, () => setEditorContentWidth(value)),
+    [writeOptimisticPref],
   );
   const setEditorFontFamilyPref = useCallback(
     (value: string | null) =>
-      writePref({ editor_font_family: value }, () => setEditorFontFamily(value)),
-    [writePref],
+      writeOptimisticPref({ editor_font_family: value }, () => setEditorFontFamily(value)),
+    [writeOptimisticPref],
   );
 
   const setKeymapBindingPref = useCallback(
@@ -659,6 +810,11 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       const view = await prefsRead();
       if (mine <= applied.current) return;
       applied.current = mine;
+      // Same observation as the mount read, and this is the path a synced
+      // change actually takes: the sync apply bumps the prefs nonce, every
+      // `usePrefs` re-reads, and the change is visible here with no setter
+      // having run.
+      observeEgressControls(view.ai_excluded_folders, view.ai_provider);
       setPrefs(view);
     } catch {
       // Keep the current cache (safer-state per spec § 9.5.5).
@@ -681,8 +837,10 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setCliEnabled: setCliEnabledPref,
     setCliExcludedFolders: setCliExcludedFoldersPref,
     setCliRateLimitDisabled: setCliRateLimitDisabledPref,
+    setChatHistoryBudget: setChatHistoryBudgetPref,
     setDeveloperMode: setDeveloperModePref,
     setAutoLock,
+    setReminderHorizon,
     setHiddenBarItems,
     setBarItemsOrder,
     setRightPanelActiveTab,

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const setDeliberateFoldersMock = vi.fn();
 vi.mock("../../src/lib/prefs", () => ({
-  setDeliberateFolders: (...a: unknown[]) => setDeliberateFoldersMock(...a),
+  mutateDeliberateFolders: (...a: unknown[]) => setDeliberateFoldersMock(...a),
 }));
 
 import { deriveFolderTree } from "../../src/notes/folderTree";
@@ -133,14 +133,58 @@ describe("planFolderDelete — remove note-empty deliberate folders", () => {
   });
 });
 
-describe("persistFolderDelete — writes the trimmed deliberate set", () => {
-  it("calls setDeliberateFolders with the next set", async () => {
-    setDeliberateFoldersMock.mockResolvedValueOnce(undefined);
+describe("persistFolderDelete: states the subtree, and lets the core resolve it", () => {
+  beforeEach(() => setDeliberateFoldersMock.mockReset().mockResolvedValue(0));
+
+  /** The mutation the delete sent. */
+  const sent = () =>
+    setDeliberateFoldersMock.mock.calls[0]?.[0] as {
+      remove?: string[];
+      removePrefix?: string[];
+    };
+
+  it("sends the folded key as a prefix verb, not a list of survivors", async () => {
     const set = ["Drafts/", "Keep/"];
-    const t = tree([], set);
-    const plan = planFolderDelete("Drafts/", t, set);
+    const plan = planFolderDelete("Drafts/", tree([], set), set);
     await persistFolderDelete(plan);
     expect(setDeliberateFoldersMock).toHaveBeenCalledTimes(1);
-    expect(setDeliberateFoldersMock).toHaveBeenCalledWith(["Keep/"]);
+    // The write says WHICH SUBTREE went, not what is left (`Keep/`) and not a
+    // list this view happened to hold. Those are three different claims and only
+    // the first is safe: a list is a statement about entries this caller may
+    // never have seen, and disk holds entries four fire-and-forget at-fill
+    // writers put there (myne-md/myne#613).
+    expect(sent()).toEqual({ removePrefix: ["drafts/"] });
+    expect(sent().remove).toBeUndefined();
+  });
+
+  it("states the FOLDED key, so the core matches what the planner matched", async () => {
+    const set = ["Projects/"];
+    const plan = planFolderDelete("PROJECTS/", tree([], set), set);
+    await persistFolderDelete(plan);
+    expect(sent().removePrefix).toEqual(["projects/"]);
+  });
+
+  it("writes NOTHING for a root delete", async () => {
+    // The case four disk-derivation tests never covered, and the one that could
+    // wipe the vault's whole folder list. `removedKey` used to be `""` for the
+    // root no-op and the filter that consumed it used
+    // `String.prototype.startsWith`, which is true for every input: the sentinel
+    // meant to match nothing matched everything, and `deliberate_folders` syncs,
+    // so every empty folder on every device would have gone. It is `null` now,
+    // which makes the case unrepresentable rather than relying on a reader.
+    const plan = planFolderDelete("", tree([], ["Alpha/", "Beta/"]), [
+      "Alpha/",
+      "Beta/",
+    ]);
+    expect(plan.removedKey).toBeNull();
+    await persistFolderDelete(plan);
+    expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
   });
 });
+
+// Which STORED entries a prefix takes is deliberately not tested here any more.
+// It is a property of `apply_set_mutation`, inside the prefs write mutex, and
+// this side can only assert it against a mock of that rule, which is testing the
+// mock. The Rust cases are `remove_prefix_takes_the_stored_subtree_and_an_empty_prefix_takes_nothing`
+// (including the name-prefix sibling and the empty-prefix no-op) in
+// `core/src/plugins/prefs/set_mutation.rs`.

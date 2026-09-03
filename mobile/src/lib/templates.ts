@@ -28,5 +28,5 @@ export async function createTemplate(name: string, folder: string | null): Promi
   let bytes: Uint8Array = enc.encode(buildInitialPlaintext(normalizeFolderPath(folder)));
   bytes = patchTitleField(bytes, name);
   bytes = patchTemplateField(bytes, "true");
-  return noteCreate(dec.decode(bytes));
+  return noteCreate(dec.decode(bytes), normalizeFolderPath(folder));
 }

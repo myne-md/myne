@@ -62,7 +62,7 @@ const CTA: React.CSSProperties = {
  *  locale renders an honest sentence rather than a raw dotted key. */
 const TITLE = "This vault is open in another tab";
 const BODY =
-  "Only one tab can hold a vault open at a time — two would write to the same " +
+  "Only one tab can hold a vault open at a time. Two would write to the same " +
   "storage and corrupt it. Close the other tab to continue here.";
 const FREED = "The other tab has closed. Reload to open your vault here.";
 const RELOAD = "Reload";

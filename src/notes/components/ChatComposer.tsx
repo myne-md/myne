@@ -49,6 +49,7 @@ import {
   agentCapability,
   agentPreviewGrant,
   type GrantPreview,
+  type ProbeProgress,
   type ProbeVerdict,
   type ScopeGrant,
 } from "../../lib/agent-run";
@@ -103,7 +104,10 @@ export function ChatComposer({
   folders,
   onNotesWritten,
 }: ChatComposerProps) {
-  const { t } = useTranslation();
+  // `i18n` for its `language`, which the agent run sends to the host: the
+  // chosen language lives in this side's localStorage, so the backend has no
+  // way to read it, and without it a run answers a Turkish question in English.
+  const { t, i18n } = useTranslation();
   // Whether the scope picker is expanded. Collapsed by default: the scope shows
   // as text with a control to change it, so the ordinary run reads as one line.
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -136,6 +140,13 @@ export function ChatComposer({
    *  Component state on purpose, unlike the verdict: it describes a call this
    *  composer has in flight, and a composer that unmounts takes it with it. */
   const [probing, setProbing] = useState(false);
+  /** Which attempt the probe is on, while it is on one (myne-md/myne#575).
+   *
+   *  Component state beside `probing`, and for the same reason: it describes a
+   *  call THIS composer has in flight, so a composer that unmounts takes it
+   *  with it. The VERDICT is the thing that has to outlive the component, and
+   *  it lives in the store. */
+  const [probeAt, setProbeAt] = useState<ProbeProgress | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const verdict = typeof probe === "object" ? probe : null;
 
@@ -149,7 +160,7 @@ export function ChatComposer({
     if (typeof known === "object" && known !== null) return known;
     setProbing(true);
     try {
-      const v = await agentCapability();
+      const v = await agentCapability(setProbeAt);
       setProbeVerdict(v);
       return v;
     } catch {
@@ -160,6 +171,7 @@ export function ChatComposer({
       return null;
     } finally {
       setProbing(false);
+      setProbeAt(null);
     }
   }
 
@@ -252,6 +264,7 @@ export function ChatComposer({
           autoApplyFailed: t("agent.composer.autoApplyFailed"),
           providerRejected: t("agent.composer.providerRejected"),
         },
+        i18n.language || null,
         onNotesWritten,
       );
     } finally {
@@ -309,11 +322,16 @@ export function ChatComposer({
         </div>
       ) : null}
 
-      {/* The user-originated scope control, and the size it resolves to. Only in
-          Edit mode: in Ask mode the grounding is the whole vault's index and
-          there is nothing here for the user to grant. */}
-      {
-        <div style={ROW_STYLE}>
+      {/* The user-originated scope control, and the size it resolves to.
+          Unconditional: this used to be Edit-mode only, because Ask grounded on
+          the whole vault index and had nothing for the user to grant, and
+          `design-notes/ai/0524` then gave the tab ONE mode. Every message is a
+          run now, so every message has a scope and the control belongs on screen
+          for all of them. The comment is corrected rather than deleted because
+          the Edit-mode wording outlived the modes by long enough for
+          `agent-run.e2e.ts` to keep driving a control that no longer existed
+          (myne-md/myne#596). */}
+      <div style={ROW_STYLE}>
           <span style={CAPTION_STYLE}>{t("agent.composer.scopeLabel")}</span>
           {/* **The picker is one step back, and the scope is not** (issue A).
               The common run is the open note, and reading a dropdown before
@@ -373,25 +391,24 @@ export function ChatComposer({
               ) : null}
             </>
           ) : null}
-        </div>
-      }
+      </div>
 
-      {/* **The permission control** (myne-md/myne#551). Edit mode only: Ask
-          proposes nothing, so there is nothing for it to decide. What the
+      {/* **The permission control** (myne-md/myne#551). Unconditional, for the
+          reason the scope row above states: this used to be Edit-mode only
+          because Ask proposed nothing and had nothing to decide, and
+          `design-notes/ai/0524` then gave the tab ONE mode. What the
           automatic side is bounded by is stated where it is enforced
-          (`autoApplyRun`), not here — the summary is that it stays inside the
+          (`autoApplyRun`), not here. The summary is that it stays inside the
           scope the user approved and that a removal still needs its own act,
           because the host refuses one inside a bulk approval whatever the
           caller sends. */}
-      {
-        <Segmented
-          testId="ai.composer-permission"
-          ariaLabel={t("agent.composer.permissionLabel")}
-          value={agent.autoApply ? "auto" : "ask"}
-          onChange={(v) => setAutoApply(v === "auto")}
-          options={permissionOptions}
-        />
-      }
+      <Segmented
+        testId="ai.composer-permission"
+        ariaLabel={t("agent.composer.permissionLabel")}
+        value={agent.autoApply ? "auto" : "ask"}
+        onChange={(v) => setAutoApply(v === "auto")}
+        options={permissionOptions}
+      />
 
       <form
         onSubmit={(e) => {
@@ -428,7 +445,16 @@ export function ChatComposer({
           disabled={blocked}
         >
           {probing
-            ? t("agent.composer.checking")
+            ? // **The count, once the host has reported one.** The plain label
+              // is still what the first frames show, because the first attempt
+              // has not been announced yet at the moment Send is pressed, and a
+              // "0 of 3" would be a number describing nothing.
+              probeAt === null
+              ? t("agent.composer.checking")
+              : t("agent.composer.checkingAt", {
+                  attempt: probeAt.attempt,
+                  of: probeAt.of,
+                })
             : t("editor.chrome.rightPanel.aiChat.send")}
         </Button>
       </form>

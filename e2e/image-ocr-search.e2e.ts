@@ -122,8 +122,8 @@ async function selectedNoteId(s: Session): Promise<string> {
 // bought nothing and burned six minutes of runner time per failure, which makes
 // contention worse for every spec after it.
 //
-// The debt is real coverage: while this is quarantined nothing on the merge gate
-// proves an OCR'd word reaches search. Un-quarantine it with the boot-cost
+// The debt is real coverage: while this is quarantined nothing in `e2e-floor`'s
+// counted set proves an OCR'd word reaches search. Un-quarantine it with the boot-cost
 // investigation the other five contention victims are also waiting on
 // (e2e/CLAUDE.md), not by nudging timeouts.
 // DE-QUARANTINED (myne-md/myne#555). The quarantine reason was

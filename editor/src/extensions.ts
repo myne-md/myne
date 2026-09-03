@@ -32,12 +32,17 @@ import {
 } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import {
+  deleteMarkupBackward,
+  markdown,
+  markdownLanguage,
+} from "@codemirror/lang-markdown";
 import { Subscript, Superscript, Emoji } from "@lezer/markdown";
 import {
   Compartment,
   EditorState,
   type Extension,
+  Prec,
   type StateEffect,
 } from "@codemirror/state";
 import { Wikilink } from "@myne/dialect/lezer/wikilink";
@@ -51,11 +56,17 @@ import { TaskField } from "@myne/dialect/lezer/task-field";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { lineBoundaryKeymap } from "./line-boundary";
+import { lineVerticalExtension, lineVerticalKeymap } from "./line-vertical";
+import { taskRowSelection } from "./task-selection";
 import { viewModeExtension, type ViewMode } from "./view-mode";
 import { textDirectionExtension } from "./direction";
 import { tableKeymap } from "./decorations/table";
 import { wikilinkChipExtensions } from "./wikilink";
 import { noteSetExtension } from "./wikilink/note-set";
+import {
+  recentNotesExtension,
+  type RecentNotesSource,
+} from "./wikilink/recent-notes";
 import { drawingEmbedIoExtension } from "./drawing/embed-io";
 import { activeDrawingEmbedField } from "./decorations/drawing-embed";
 import { lineNumbersExtension } from "./line-numbers";
@@ -69,6 +80,7 @@ import { attachmentInsertPlaceholderExtension } from "./attachments/insert-place
 import { slashMenuExtension } from "./slash/plugin";
 import { aiSlashEnabledFacet } from "./slash/aiSlash";
 import { transcriptionEnabledFacet } from "./attachments/transcription-gate";
+import { noteIdExtension } from "./note-identity";
 import { ghostTextExtension } from "./ai/ghostText";
 
 // AI surface (slash AI commands + inline ghost-text) lives in a CM6 Compartment
@@ -135,6 +147,7 @@ export function reconfigureEditorKeymap(
 ): StateEffect<unknown> {
   return editorKeymapCompartment.reconfigure(editorKeymapSurface(overrides));
 }
+
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
 import { completionExtension } from "./completion";
@@ -144,11 +157,58 @@ import { findExtension } from "./find/find-extension";
 import { spellDecorations } from "./decorations/spell";
 import { spellCorrectionMenu } from "./spell/correction-menu";
 import { buildMyneKeymap, collapseMultiSelection } from "./keymap";
+import { continueListMarkup } from "./list-continuation";
 import { vimExtension } from "./vim";
 import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
+import { ambientLabelRefresh } from "./decorations/plugin-factory";
 import { scrollSlackExtension } from "./scroll-slack";
 import { myneTheme } from "./theme";
+
+/**
+ * The Enter / Backspace pair `markdown()` installs by default, rebuilt with
+ * `nonTightLists: false` (myne-md/myne#562) and, on Enter, with the two repairs
+ * that config cannot reach (`list-continuation.ts`, myne-md/myne#588 + #593:
+ * the list stays as tight as the user wrote it, and a task marker keeps the
+ * separator GFM requires).
+ *
+ * # What the default does
+ *
+ * `insertNewlineContinueMarkup` handles "Enter on an empty list item" in two
+ * arms. The one everybody expects deletes a level of markup, so a second Enter
+ * leaves a plain line where the empty item was. The other one inserts a blank
+ * line at `line.from` and pushes the empty item DOWN a row, the CommonMark
+ * "make a tight two-item list non-tight" behaviour, which is correct for prose
+ * lists and is not what an editor with rendered checkboxes should do.
+ *
+ * The gate picking between them reads (lang-markdown 6.5.0):
+ *
+ *     first.to >= pos || second && second.to < pos ||
+ *     line.from > 0 && !/[^\s>]/.test(doc.lineAt(line.from - 1).text) ||
+ *     config.nonTightLists === false
+ *
+ * `markdown()` builds the command with NO config, so the last clause is dead and
+ * the blank-line arm wins on the second Enter. The third Enter then appears to
+ * work only because the blank line the second one inserted now satisfies the
+ * PRECEDING clause. That is the reported "the checklist slides down twice, then
+ * disappears".
+ *
+ * # Why a keymap of our own rather than a higher-precedence Enter
+ *
+ * Shadowing Enter alone would leave the library's `deleteMarkupBackward` bound
+ * to Backspace by a keymap we no longer control, so a future change to
+ * `addKeymap` semantics would silently drop or double one of the two. Declining
+ * the pair (`addKeymap: false`) and re-declaring both keeps them a pair.
+ *
+ * `Prec.high` matches what `markdown()` itself uses, so ordering against
+ * `defaultKeymap` is unchanged.
+ */
+const markdownMarkupKeymap: Extension = Prec.high(
+  keymap.of([
+    { key: "Enter", run: continueListMarkup },
+    { key: "Backspace", run: deleteMarkupBackward },
+  ]),
+);
 
 export function myneExtensions(opts?: {
   viewMode?: ViewMode;
@@ -170,6 +230,17 @@ export function myneExtensions(opts?: {
    *  seed the rebindable editor keymap Compartment. Pushed live on change via
    *  `reconfigureEditorKeymap`. Absent → in-code defaults. */
   keymapOverrides?: Readonly<Record<string, readonly string[]>>;
+  /** myne-md/myne#520: which note this view holds. Read by the cover banner so
+   *  its Change / Remove name their target instead of leaving the host to guess
+   *  from focus. Absent → `null`, which every consumer reads as "fall back to
+   *  the focused note". */
+  noteId?: string | null;
+  /** myne-md/myne#601: how to ask the host which notes were touched most
+   *  recently, newest first, for the `[[` picker's tiebreak. A SOURCE rather
+   *  than a snapshot, installed once here: the order has one owner on the host
+   *  side, and pushing snapshots in made it per view, so panes disagreed. See
+   *  `wikilink/recent-notes.ts`. Absent → the ranking is score alone. */
+  recentNotes?: RecentNotesSource;
 }): readonly Extension[] {
   const viewMode = opts?.viewMode ?? "live";
   const readOnly = opts?.readOnly ?? false;
@@ -200,6 +271,11 @@ export function myneExtensions(opts?: {
     highlightActiveLine(),
     markdown({
       base: markdownLanguage,
+      // The library's own Enter/Backspace pair is declined here and rebuilt
+      // below with a configured `insertNewlineContinueMarkup`. See
+      // `markdownMarkupKeymap` for why the default is wrong on a task line
+      // (myne-md/myne#562).
+      addKeymap: false,
       // codeNestMarkdownExtension nests per-language Lezer parsers into closed
       // fenced blocks (MYND-154). NOT the stock `codeLanguages` option — see
       // code-highlight.ts. Do not also pass `codeLanguages` (would double-nest).
@@ -228,6 +304,13 @@ export function myneExtensions(opts?: {
         codeNestMarkdownExtension,
       ],
     }),
+    // Replaces the keymap `markdown()` would have installed itself (declined
+    // above via `addKeymap: false`). Same two chords, same precedence; Enter
+    // runs the repaired continuation (myne-md/myne#562, #588, #593).
+    markdownMarkupKeymap,
+    // A triple-click on a list row keeps the caret on that row (myne-md/myne#560).
+    // Composed after the language so `listContentStart` has a parse tree to read.
+    taskRowSelection(),
     codeSyntaxHighlighting,
     // Attachment catalog (MYND-164): loads `catalog_list` once on mount into a
     // StateField the form-C embed decorator resolves ids against. Composed
@@ -257,6 +340,9 @@ export function myneExtensions(opts?: {
     // reconfigures it from `useResolverNotes()`). MUST precede the chip + hover
     // so the facet exists when they read it.
     noteSetExtension(),
+    // myne-md/myne#601: the recency order the `[[` picker breaks ties with,
+    // seeded empty (a host that tracks none leaves the ranking on score alone).
+    recentNotesExtension(opts?.recentNotes),
     // Inline drawing embeds (MYND-634): the host-injected note-CRUD IO seam +
     // the transient edit-in-place state. Mounted mode-INDEPENDENTLY (unlike the
     // drawing-embed decoration, which is inside the view-mode stack) so the IO
@@ -277,6 +363,7 @@ export function myneExtensions(opts?: {
     // and the base slash menu only.
     aiCompartment.of(aiSurface(opts?.aiEnabled ?? false)),
     transcriptionCompartment.of(transcriptionSurface(opts?.transcriptionEnabled ?? true)),
+    noteIdExtension(opts?.noteId ?? null),
     // `[[` note picker (MYND-38) — fuzzy note search → canonical §3 emit. Reads
     // the WL-5 note-set facet; reuses the slash-menu surface + fuzzyFilter.
     wikilinkPickerExtension(),
@@ -332,6 +419,13 @@ export function myneExtensions(opts?: {
       // than CodeMirror's raw coordinate probe against the editor's right edge,
       // which drops the caret a row in this app's centred column (myne#286).
       ...lineBoundaryKeymap,
+      // Before defaultKeymap for the same reason one layer up: `cursorLineUp` /
+      // `cursorLineDown` fall back to that SAME probe internally, where no
+      // keymap can reach it, and their pixel-x goal means two different columns
+      // on a 2em heading and the 14px line under it. These keep a character
+      // column instead (myne-md/myne#631). AFTER tableKeymap, so arrowing into a
+      // read-only table still wins.
+      ...lineVerticalKeymap,
       ...defaultKeymap,
       { key: "Mod-u", run: undoSelection, preventDefault: true },
     ]),
@@ -346,6 +440,8 @@ export function myneExtensions(opts?: {
     // the rebindable Compartment above) reads this facet.
     indentUnit.of("    "),
     EditorView.lineWrapping,
+    // The sticky character column the arrow bindings above read (myne#631).
+    lineVerticalExtension(),
     // Scroll slack below the last line (#375) so the tail of a long note can be
     // lifted off the bottom edge of the viewport. NOT CodeMirror's
     // `scrollPastEnd()` — see the module header for why that one is wrong here.
@@ -381,5 +477,19 @@ export function myneExtensions(opts?: {
     // editor's `data-focus-typewriter` ancestor gate is present (focusActive &&
     // pref). Keeps the active line vertically centered as the cursor moves.
     focusModeExtension(),
+    // Ambient-label refresh (myne-md/myne#609): turns a display-settings or
+    // language change into the rebuild signal the shared decoration gate reads.
+    // It decorates nothing.
+    //
+    // HERE rather than inside `myneDecorations()`, and the difference is real:
+    // that array lives in `viewModeDecorationsCompartment`, which `source` mode
+    // empties and every mode switch rebuilds. Mounted there, the subscription
+    // was destroyed and re-registered on each live/reading/source toggle and
+    // absent entirely in source mode, while its own comment claimed one mount
+    // per editor. No user-visible defect followed, since source mode draws no
+    // ambient label and a mode switch rebuilds everything anyway, but the
+    // lifetime did not match the claim and `view-mode.ts` describes that array
+    // as the decoration stack, which an extension that decorates nothing is not.
+    ambientLabelRefresh(),
   ];
 }

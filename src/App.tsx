@@ -23,6 +23,7 @@ import {
   type VaultId,
 } from "./lib/stage";
 import { PairingDialog } from "./components/PairingDialog";
+import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
 import { Toaster } from "./components/toast/Toaster";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
 import { has } from "./platform/capabilities";
@@ -30,6 +31,7 @@ import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { lockVault } from "./lib/vault-unlock";
 import { useIdleAutoLock } from "./hooks/useIdleAutoLock";
+import { effectiveAutoLockSecs } from "@myne/client-core";
 import { awaitingApprovalVerdict } from "./lib/pending-approval";
 import { leaveActiveVault, switchVault } from "./lib/vault-switch";
 import { prefsRead } from "./lib/prefs";
@@ -324,7 +326,10 @@ function App() {
   // `enabled` is left to the hook's own default, which is "wherever
   // `osIdleAutoLock` is absent", so desktop is untouched and the two clocks
   // never race. The timeout is the same `auto_lock_seconds` pref the editor
-  // uses; `0` disables, which is what a failed read falls back to.
+  // uses, through the same shared clamp, so no stored value can disable the
+  // lock. A failed READ still falls back to `0`, and that stays deliberate: an
+  // unreadable prefs blob is not a prefs value, and inventing a deadline for a
+  // screen that holds no plaintext would be worse than leaving the timer off.
   const [pendingIdleSecs, setPendingIdleSecs] = useState(0);
   useEffect(() => {
     if (stageName !== "pending-approval") {
@@ -334,7 +339,12 @@ function App() {
     let cancelled = false;
     void prefsRead()
       .then((prefs) => {
-        if (!cancelled) setPendingIdleSecs(prefs.auto_lock_seconds ?? 0);
+        // Clamped through the shared envelope for the reason
+        // `src/screens/Editor.tsx` states at its own call: on web this is the
+        // timer that fires, and a `null` pref meant no lock at all.
+        if (!cancelled) {
+          setPendingIdleSecs(effectiveAutoLockSecs(prefs.auto_lock_seconds ?? null));
+        }
       })
       .catch(() => {
         /* leave it disabled rather than inventing a deadline */
@@ -724,6 +734,27 @@ function App() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      {/* The escape hatch from screen-capture protection (myne-md/myne#482).
+          FIRST in DOM order, deliberately: it is a skip link, off-screen until
+          focused, so being first is what puts it one Tab from a cold launch and
+          one Shift+Tab from the autofocused password field on `Unlock`. On
+          Windows the protection genuinely works, which is what leaves a
+          remote-desktop or magnifier user looking at a black rectangle with the
+          account number, the recovery-phrase ceremony and the device-join QR
+          behind it.
+
+          Mounted once and WITHOUT a stage predicate. The first revision used
+          `stage.name !== "editor"`, reasoning that after unlock the Privacy
+          panel carries the same control. That is false on the three screens
+          `Editor.tsx` returns before `EditorChrome` (`DeviceRevoked`,
+          `StorageLost`, `FailClosedError`), none of which mounts
+          `SettingsModal`, and the last of which renders with the vault LOCKED
+          and protection forced back on. A predicate kept in step with a screen
+          roster nobody enumerates is the failure `useRevealAfterIdleLock` was
+          consolidated to fix; unconditional costs one invisible tab stop on the
+          editor. Renders nothing where the capability is absent (web has no
+          capture affinity to lose). */}
+      <ScreenCaptureEscape />
       {/* macOS overlay-mode title bar — `tauri.conf.json` sets
           `titleBarStyle: "Overlay"` so the webview extends under the
           traffic-light area. Non-editor stages get this plain 38px window-drag

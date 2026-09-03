@@ -23,7 +23,7 @@
 // translation may cross either.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const readCliAccessState = vi.fn();
 vi.mock("../../src/lib/cli-access", async (importOriginal) => {
@@ -291,5 +291,96 @@ describe("toggles", () => {
     expect(
       screen.getByTestId("settings.cli-rate-limit-toggle").getAttribute("aria-checked"),
     ).toBe("true");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// myne-md/myne#613 (pr-review round 2): the CLI exclusion editor is an egress
+// control, and it must be able to REMOVE and must CONVERGE.
+//
+// `cli_excluded_folders` is what keeps the terminal client out of a folder. Its
+// AI sibling got three tests in round one and this file got none, so the whole
+// seed-diff mechanism was covered on one list and uncovered on the other while
+// both are the same promise to the user.
+// ---------------------------------------------------------------------------
+
+describe("CliAccessSettings: the excluded-folders editor", () => {
+  it("a removal reaches the write as a removal", () => {
+    const onSet = vi.fn();
+    renderBlock({ excludedFolders: ["Private/", "Money/"], onSetExcludedFolders: onSet });
+    const box = screen.getByTestId("settings.cli-excluded-folders") as HTMLTextAreaElement;
+    expect(box.value).toBe("Private/\nMoney/");
+
+    fireEvent.change(box, { target: { value: "Private/" } });
+    fireEvent.blur(box);
+
+    // THE ASSERTION, and it is on the SECOND argument. The first is the desired
+    // set, which a removal and an add both produce; the baseline is what turns
+    // it into a mutation, and passing `[]` there silently makes removal
+    // impossible while every other assertion in this file still passes.
+    const [folders, seededFrom] = onSet.mock.calls[0] as [string[], string[]];
+    expect(folders).toEqual(["Private/"]);
+    expect(seededFrom).toEqual(["Private/", "Money/"]);
+  });
+
+  it("converges on the stored set after a refused write", () => {
+    // `usePrefs.writeExcludedFolders` re-reads disk on BOTH failure paths (a
+    // budget refusal and a thrown write), so the prop holds truth afterwards.
+    // Without the re-seed the textarea kept rendering the entry that was
+    // refused, and the user was shown a folder listed as excluded from the CLI
+    // that the CLI can read: fail-OPEN on an egress control.
+    const { rerender } = render(
+      <CliAccessSettings
+        enabled
+        excludedFolders={["Private/", "Refused/"]}
+        rateLimitDisabled={null}
+        onSetEnabled={() => {}}
+        onSetExcludedFolders={() => {}}
+        onSetRateLimitDisabled={() => {}}
+      />,
+    );
+    rerender(
+      <CliAccessSettings
+        enabled
+        excludedFolders={["Private/"]}
+        rateLimitDisabled={null}
+        onSetEnabled={() => {}}
+        onSetExcludedFolders={() => {}}
+        onSetRateLimitDisabled={() => {}}
+      />,
+    );
+    expect(
+      (screen.getByTestId("settings.cli-excluded-folders") as HTMLTextAreaElement).value,
+    ).toBe("Private/");
+  });
+
+  it("does not clobber an edit in flight", () => {
+    // Why the re-seed is guarded rather than unconditional. Same reason the AI
+    // twin's is, and the guard is what makes convergence safe to add at all.
+    const { rerender } = render(
+      <CliAccessSettings
+        enabled
+        excludedFolders={["Private/"]}
+        rateLimitDisabled={null}
+        onSetEnabled={() => {}}
+        onSetExcludedFolders={() => {}}
+        onSetRateLimitDisabled={() => {}}
+      />,
+    );
+    const box = screen.getByTestId("settings.cli-excluded-folders") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "TypedFirst/" } });
+    rerender(
+      <CliAccessSettings
+        enabled
+        excludedFolders={["Private/", "Landed/"]}
+        rateLimitDisabled={null}
+        onSetEnabled={() => {}}
+        onSetExcludedFolders={() => {}}
+        onSetRateLimitDisabled={() => {}}
+      />,
+    );
+    expect(
+      (screen.getByTestId("settings.cli-excluded-folders") as HTMLTextAreaElement).value,
+    ).toBe("TypedFirst/");
   });
 });

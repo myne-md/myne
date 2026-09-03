@@ -13,6 +13,10 @@ import App from "./App";
 import { RootErrorBoundary } from "./components/RootErrorBoundary";
 import { initThemeDeepLinks } from "./lib/themeDeepLink";
 import { installGlobalFailureHandlers } from "./lib/global-failure";
+// The shared token layer (myne-md/myne#478), one source for every design token,
+// consumed by all three clients. FIRST, because the app-shell sheet below and
+// the ornament sheet after it both read the values it supplies.
+import "@myne/client-core/tokens.css";
 import "./styles/tokens.css";
 // The ornament layer (myne#394). After the token sheet, because every rule in it
 // reads tokens the theme supplies. Drawing nothing until a component declares a

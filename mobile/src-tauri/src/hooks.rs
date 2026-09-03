@@ -43,6 +43,13 @@
 //! stay in RAM and bleed into the next vault to unlock. `scripts/check-lock-
 //! teardown.mjs` is the machine half of that rule.
 //!
+//! The eighth is [`agent_teardown_on_lock`](MobileHooks::agent_teardown_on_lock)
+//! (myne-md/myne#456), and it belongs to the same family as the three above for
+//! the same reason: this client now holds the agent's run table and its session
+//! transcript, so an empty body would be a lock that does not lock. On this
+//! client it is also the ORDINARY path rather than an exceptional one, because
+//! a run dies with the foreground here by decision.
+//!
 //! Every other hook stays a no-op until its subsystem lands on mobile (see
 //! `mobile/CLAUDE.md`) — `zeroize_spell`, `abort_active_recording`,
 //! `pdf_export_teardown_on_lock` and `clear_staged_descriptor` are empty
@@ -164,7 +171,26 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     }
     fn abort_active_recording(&self) {}
     fn pdf_export_teardown_on_lock(&self) {}
-    fn agent_teardown_on_lock(&self) {}
+    /// **Not empty since myne-md/myne#456**, and the empty version is worth
+    /// naming because it is what `scripts/check-lock-teardown.mjs` exists to
+    /// refuse: this client now HOLDS both tables, so an empty body here is not
+    /// "the subsystem is not here", it is a lock that does not lock.
+    ///
+    /// A run holds a note-id set derived from decrypted plaintext, a transcript
+    /// containing whole note bodies, and a proposal of anchors and replacements
+    /// copied verbatim out of them. `myne-core` calls this at every slot-drop
+    /// site, manual lock, idle auto-lock, the vault-SWITCH branch of unlock,
+    /// `vault_delete`, the change-password force-relock: so the body is all
+    /// this client owes.
+    ///
+    /// The vault-switch site is the one that makes it urgent rather than
+    /// hygienic: without this, vault A's proposal is still in memory while
+    /// vault B is open. And on this client it is also the ORDINARY path, not an
+    /// exceptional one: a run dies with the foreground here by decision, so
+    /// locking or pocketing the phone is how most runs end.
+    fn agent_teardown_on_lock(&self) {
+        crate::plugins::agent::teardown_on_lock(&self.app);
+    }
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, enabled: bool, site: &'static str) {
         // Native screen-capture protection lives in `crate::screen_guard`,
@@ -212,11 +238,26 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     }
 
     // ---- Group 5: prefs application ---------------------------------------
-    fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-        // Mobile has no auto-lock policy; fall back to the shared default the
-        // runtime state seeds itself with (no desktop clamp range available).
-        prefs_value.unwrap_or(myne_core::DEFAULT_AUTO_LOCK_SECS)
-    }
+    // `effective_auto_lock_secs` is deliberately NOT overridden: the trait's
+    // default is `myne_core::effective_auto_lock_secs`, which clamps
+    // (myne-md/myne#479).
+    //
+    // The body that stood here was `prefs_value.unwrap_or(DEFAULT_AUTO_LOCK_SECS)`
+    // under a comment reading "mobile has no auto-lock policy … no desktop
+    // clamp range available". Both halves were wrong by then: this client does
+    // have an auto-lock, and the clamp was not desktop-specific, it was merely
+    // in the desktop crate.
+    //
+    // What it cost is narrower than an earlier version of this comment claimed,
+    // and the correction matters because the wrong version reads as a shipped
+    // exposure. The value this hook returns feeds
+    // `VaultRuntimeState::auto_lock_timeout_secs`, whose only production reader
+    // is the desktop tick loop, which this client does not compile. This
+    // client's actual idle timer is in the WebView and already clamped through
+    // its own copy of the envelope. So the unclamped body was a TRAP for the
+    // next Rust-side reader here, not a live A6 window. Defaulting the method is
+    // what makes silence land on the guarantee; a client that wants a different
+    // envelope overrides and argues for it.
     fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
 
     // ---- Group 6: auth-flow side-effects ----------------------------------

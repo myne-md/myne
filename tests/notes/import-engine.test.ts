@@ -65,6 +65,8 @@ interface HarnessOptions {
   createError?: unknown;
   /** Reject the deliberate-folders write. */
   deliberateFails?: boolean;
+  /** How many additions the reserved byte budget refuses (myne-md/myne#613). */
+  budgetRefuses?: number;
 }
 
 function harness(tree: Tree, root = "/v", opts: HarnessOptions = {}): Harness {
@@ -108,6 +110,10 @@ function harness(tree: Tree, root = "/v", opts: HarnessOptions = {}): Harness {
     async setDeliberateFolders(folders) {
       if (opts.deliberateFails) throw new Error("nope");
       deliberateWrites.push([...folders]);
+      // The real port returns how many additions the byte budget refused
+      // (myne-md/myne#613). A fake that returned nothing made the engine
+      // compute `n - undefined` and report NaN, which is how this was found.
+      return opts.budgetRefuses ?? 0;
     },
   };
   return { ports, created, deliberateWrites };
@@ -180,14 +186,37 @@ describe("importVault — walk, classify, serial ingest", () => {
     expect(h.created).toHaveLength(0); // no duplicate
   });
 
-  it("preserves an empty source dir via one set_deliberate_folders write (SYNC-4)", async () => {
+  it("registers every folder the import created, in one write (myne-md/myne#613)", async () => {
     const h = harness({
       Projects: { "spec.md": "# spec\n" },
       Empty: {}, // no note beneath
     });
     const r = await importVault("/v", h.ports, new Set(), "skip");
+    // `Projects/` is registered even though it holds a note. Before myne#613
+    // only `Empty/` was, because a folder holding notes was proved by those
+    // notes; under at-fill it has to be registered the first time it holds one,
+    // or deleting `spec.md` later takes `Projects/` with it. Asserting the
+    // whole array rather than a `toContain` is what makes this a regression
+    // test for the narrower behaviour rather than a superset of it.
+    expect(h.deliberateWrites).toEqual([["Empty/", "Projects/"]]);
+    expect(h.deliberateWrites).toHaveLength(1); // ONE write, not one per folder
+    // The REPORT still counts only the empty ones, which is what the user was
+    // told about: `Projects/` was never at risk of vanishing during the import.
     expect(r.emptyFoldersPreserved).toBe(1);
-    expect(h.deliberateWrites).toEqual([["Empty/"]]);
+    expect(r.foldersNotPreserved).toBe(0);
+  });
+
+  it("reports folders the byte budget refused instead of losing them silently", async () => {
+    const h = harness(
+      { Projects: { "spec.md": "# spec\n" }, Empty: {} },
+      "/v",
+      { budgetRefuses: 1 },
+    );
+    const r = await importVault("/v", h.ports, new Set(), "skip");
+    expect(r.foldersNotPreserved).toBe(1);
+    // A lower bound, deliberately: the count does not say WHICH entry was
+    // refused, so the report never claims more than it can prove.
+    expect(r.emptyFoldersPreserved).toBe(0);
   });
 });
 

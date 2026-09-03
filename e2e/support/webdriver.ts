@@ -185,6 +185,45 @@ export class Element {
     });
   }
 
+  /** Triple-click via the W3C Actions API: three button-0 down/up pairs in ONE
+   *  action sequence, which is what raises `event.detail` to 3 and makes CM6
+   *  run its line-selection gesture. Three separate `click` calls would each
+   *  arrive with `detail: 1` and select nothing.
+   *
+   *  Drives `taskRowSelection` (myne-md/myne#560), whose whole subject is what
+   *  a triple-click leaves behind on a list row. jsdom has no `detail`-aware
+   *  selection model, so the two unit lanes assert the decision and the wiring
+   *  and both DISPATCH the transaction the gesture would produce; this is the
+   *  only lane where the gesture itself runs. */
+  async tripleClick(): Promise<void> {
+    await this.session.send("POST", "/actions", {
+      actions: [
+        {
+          type: "pointer",
+          id: "mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            {
+              type: "pointerMove",
+              duration: 0,
+              origin: { [ELEMENT_KEY]: this.elementId },
+              x: 0,
+              y: 0,
+            },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+            { type: "pause", duration: 0 },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+            { type: "pause", duration: 0 },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+          ],
+        },
+      ],
+    });
+  }
+
   /** Types text into the element (W3C "element send keys"). */
   sendKeys(text: string): Promise<void> {
     return this.session.send("POST", this.path("/value"), { text });
@@ -421,7 +460,7 @@ export interface FindOptions {
 // margin — it only tripled their fail time, bloating the suite to ~46 min and
 // tripping the 60-min Woodpecker pipeline timeout, which Canceled the whole run
 // mid-e2e. The real fixes are elsewhere: the e2e step is now non-blocking
-// (.woodpecker.yml) so a tail flake no longer gates, the repo timeout is raised
+// (.woodpecker/e2e.yml) so a tail flake no longer gates, the repo timeout is raised
 // to 120 min for headroom, and the durable cure is the boot-cost work. With
 // e2e non-blocking a FAST fail is preferable, so 45 s stays.) 45 s already
 // closed most of the tail (nav1 unlock, tp1 attachment-text); the rest is the

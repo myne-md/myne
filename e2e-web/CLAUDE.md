@@ -78,7 +78,7 @@ lane can drive: `chrome`, `firefox`, `safari`. What CI *seats* is narrower.
 
 | Browser | CI seat | How it is verified |
 |---|---|---|
-| Chromium | yes — the `e2e-web` step, `chromium` + `chromium-driver` from its own `apt-get install` | the whole lane, on every push that trips the `code-paths` filter |
+| Chromium | yes, via the `e2e-web` step, `chromium` + `chromium-driver` from its own `apt-get install` | the whole lane, on every run of the manual E2E workflow (`.woodpecker/e2e.yml`; **not** on a push) |
 | Firefox | driver supported (`geckodriver`); seated only where the step names it | host-local, `MYNE_WEB_E2E_BROWSER=firefox ./scripts/e2e-web-local.sh` |
 | Safari | **no, and it cannot be** | manual macOS gate, per release |
 | Edge | **no** | never measured, not even in the Phase 0 spike |

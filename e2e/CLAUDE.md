@@ -57,9 +57,125 @@
 - **Load-bearing banner copy is asserted by FULL-LITERAL equality** via
   `src/lib/load-bearing-copy.ts` (or `ioBanner(...)` where production renders
   that mapping). A copy collapse must fail a test.
+- **A frontend-only change needs the crate to relink, or the binary keeps
+  ANOTHER TREE's bundle.** The frontend is embedded at compile time, so a diff
+  confined to `src/`, `editor/` or any other frontend tree touches no Rust source,
+  cargo relinks nothing, and `target/release/myne-desktop` keeps whatever
+  `dist/` it embedded when it was last compiled. It was found in its cross-tree
+  form, back when the cargo target volume was shared, so the stale bundle could be
+  a **different worktree's** frontend. It happened on myne-md/myne#520: `pnpm build` emitted a correct `dist/`, the
+  build reported success, and the app under test loaded
+  `main-CoKDUqv9.js` out of `.claude/worktrees/554-…/dist`, whose host still
+  dispatched the pre-fix event, so a correct fix's own scenario failed and read
+  as "the fix does not work". The three `e2e-*.sh` build scripts now
+  `touch src-tauri/src/lib.rs` before `pnpm tauri build`; **`e2e-one.sh` does
+  not build at all**, so after a frontend edit it is testing the previous
+  binary, which is the same trap wearing a different hat. When a scenario
+  contradicts a fix you have read in the source, check WHICH bundle the WebView
+  loaded before you believe it: `[...document.querySelectorAll('script[src]')]`
+  from the page seat gives the hashed filename, and `find . -name '<that>'`
+  says which tree it came from.
+- **The cargo target volume is PER TREE, and it has to be.** Every tree is
+  bind-mounted at the same in-container path, `/work`, so two checkouts of this
+  repo are indistinguishable to cargo: same package, same version, same absolute
+  source path. One shared volume therefore lets a build here reuse an rlib
+  compiled from ANOTHER tree, and worktrees live under `.claude/worktrees/` by
+  convention, so they sit inside the mount and this is the normal case rather
+  than an exotic one. `scripts/lib/e2e-docker.sh` keys the volume on `pwd` and is
+  sourced by every script that runs this repo in the container (eight of them as
+  of myne-md/myne#596, which added `e2e-ai-cargotest.sh`; the count is deliberately
+  not written as a number a new runner would falsify). The cost is one
+  full rebuild per tree, once, which is exactly what the sharing was buying at the
+  price of results that describe a different tree.
+
+  **The registry cache had the mirror-image defect, and it was six copies.** Every
+  runner sets `CARGO_HOME=/home/e2e/.cargo`, so that is the only registry path
+  cargo reads or writes, and six of the seven mounted the named volume at the
+  image's `/usr/local/cargo/registry` instead. That volume held 574 MB of crate
+  sources no run had consulted since the override was added, and
+  `/home/e2e/.cargo` does not exist in the image at all, so every containerised
+  run re-downloaded the crates.io index and every crate and then threw the result
+  away with `--rm`. Nothing reports it: the run is green, only slow, which is
+  exactly why it survived. `e2e-ai-buildrun.sh` found it, fixed itself, and wrote
+  down that its siblings were still wrong; the mount is now in the include with
+  the rest.
+
+  **The key lives in one file because four copies of it was already the bug twice.**
+  It has to be byte identical everywhere, since two scripts that hash the same tree
+  differently get two volumes and the second rebuilds from scratch while looking
+  like a cache. The copies also missed three call sites entirely
+  (`e2e-batch.sh`, `capture-theme-preview.sh`, `capture-userguide.sh` kept the
+  shared volume), and in a fourth (`e2e-local.sh`) the assignment landed INSIDE the
+  `RUN_FLAGS=( … )` array literal, where bash reads it as an element rather than an
+  assignment: the subshell ran, nothing was assigned, and `set -u` aborted the
+  script on the next line. Neither `bash -n` nor any guard sees either shape.
+- **The symptom is a compile error in code you did not touch.** A build refused
+  with `run_probe` taking 2 arguments while
+  `core/src/plugins/agent/probe.rs` plainly declared 3, and `ProbeProgress`
+  unresolved while the struct was right there. Neither file was in the diff. The
+  discriminator is two commands: `cargo check -p myne-desktop` on the host, and
+  the same inside
+  `docker run -v "$(pwd):/work" -v "$E2E_TARGET_VOLUME":/work/target` (source
+  `scripts/lib/e2e-docker.sh` first, or pass the shared name to reproduce the
+  original failure).
+  Host green plus container red is the volume, and the container run itself
+  clears it by recompiling the crate. Read the file through the container before
+  suspecting the mount (`docker run --rm -v "$(pwd):/work" -w /work myne-e2e
+  grep -n '<symbol>' <path>`); if the container sees the right source and cargo
+  still disagrees, the artifact is what is wrong, not the tree.
+- **A captured element handle cannot be re-found, so a click on one can only time
+  out.** `Element.click` retries while WebKit reports the node is in the DOM but
+  not hit-testable, which is the case it exists for. It cannot answer a node that
+  has been REPLACED: the handle is stale on every poll, and the failure reads
+  `waitUntil(element interactable + clicked) timed out … [stale element
+  reference]`, which looks like a slow app and is not. The sidebar list
+  re-renders on a save settling, on a sync tick and on the row's own selection,
+  so the window between `await noteRow(...)` and `.click()` is real. Measured on
+  `nco3`: one failure in eight runs after two retries, then three consecutive
+  passes with no change. Drive a row with `clickNoteRow`, which re-finds inside
+  the poll, the shape `clickByTestId` already uses for a bare testid.
+- **`e2e-one.sh` can report a red that `e2e-buildrun.sh` does not, on the same
+  tree and the same volume.** Measured on myne-md/myne#461's branch: `ws1` in
+  `workspace-state.e2e.ts` passed in 3.6 s under `e2e-buildrun.sh` and then hung
+  to the 180 s test timeout under `e2e-one.sh`, twice, with no source change
+  between them and with `e2e/fixture-gen` already compiled (measured at 4.3 s, so
+  the cold-cargo explanation in the toolchain guard is not this one). The
+  mechanism is NOT established, so this says only what was observed. The rule
+  that follows is: **a red from `e2e-one.sh` is a reason to re-run under
+  `e2e-buildrun.sh`, never a result on its own.** `e2e-one.sh` is for iterating
+  while you already believe the code is wrong; the build-and-run script is what
+  produces an answer worth writing into a PR.
 - **KDF policy:** weak-KDF generator fixtures by default (legal: unlock reads
-  params from `vault.meta`; creation stays pinned — no code branch). The VR-1
-  recovery drill + creation scenarios run PRODUCTION params every pipeline.
+  params from `vault.meta`; creation stays pinned, with no code branch). The VR-1
+  recovery drill and the creation scenarios run PRODUCTION params on every run of
+  the manual E2E workflow. Until myne-md/myne#579 that read "every pipeline",
+  which is the half of `design-notes/ops/0181` this change retired alongside
+  the merge gate: the drill still runs at m=256 MiB, t=3, p=2, but no push runs
+  it.
+
+- **A new `*.e2e.ts` file owes a line in the manual test roster.**
+  `scripts/check-manual-test-roster.mjs` fails the commit until some entry in
+  `scripts/manual-test-roster.mjs` names the file in its `automatedBy`. The rule
+  is not bookkeeping: this suite runs only in a Linux container against
+  WebKitGTK, so a scenario proves one of the eight client surfaces the roster
+  counts, and the roster is
+  where what it does NOT prove is written down. Naming it is also what stops a
+  human from re-walking, every release, what you just automated. **Naming the
+  file is enough**: a new scenario needs a mention in an existing entry's
+  `automatedBy`, not an entry of its own, and a new SURFACE can be discharged
+  either by a roster entry or by a `NOT_A_SURFACE` record carrying its reason.
+
+  When a scenario you add covers an observation a roster item currently carries,
+  delete that item in the same change and run
+  `node scripts/check-manual-test-roster.mjs --record`. That lowers
+  `totalMinutesCeiling` and nothing else: the gate POLICY (`gatedTiers`,
+  `gatedClients`) is untouched by an item deletion, so there is nothing to
+  narrow and nothing to argue for. Deleting the item is the ratchet moving, and
+  it is the point of writing the scenario. Say in the ratchet's `$comment` which
+  scenario took the work, the same way a ceiling RAISE has to argue for itself.
+  One thing the guard will stop you on: if the item you delete was its entry's
+  LAST manual item, that entry now needs an `exemptionReason` of at least 40
+  characters. `decisions.md` 2026-08-25 (myne-md/myne#548).
 
 ## Authoring conventions
 
@@ -74,6 +190,16 @@
   `dismissImporterOffer`, `enterRecoveryPhrase`, `completePasswordReset`),
   `support/realistic-fixture.ts` (`seedProductionVault` — VC-1 capture with
   generator fallback).
+- **A scenario whose fixture seeds ≥2 vaults boots to the PICKER, not the unlock
+  screen**, so it owes `selectPickerRow(session, vaultId)` before
+  `unlockToEditor`. `initialStageFromProbe` routes ≥2 vaults to `picker`, which
+  renders no `unlock.password-input`, so a scenario that skips the row wastes
+  three 45-second waits and then reports a timeout naming the ELEMENT rather
+  than the stage. That reads as flake and is a precondition. It cost a full
+  container round trip on `import-myne-vault` (myne-md/myne#464);
+  `prefs.e2e.ts` and `vault-label.e2e.ts` get it right and are the shape to
+  copy. This is the vault-count precondition above having a consequence, not
+  just a comment.
 - Selectors are `byTestId` / `testIdSelector(id, attrs?)` only — no CSS-class
   or text selectors. A fresh vault's first editor shows the importer
   onboarding offer overlay: call `dismissImporterOffer` before clicking
@@ -90,14 +216,17 @@
   keystroke, so asserting straight after `sendKeys` is both correct and
   instant. Follow it with a positive probe (send a key, assert it took effect)
   so the absence cannot pass merely because input stopped arriving.
-- **The `myne-e2e-target` Docker volume is shared across git worktrees.** A run
-  can fail to BUILD against a stale crate compiled from another branch — the
-  giveaway is a compile error naming a field that exists in neither your source
-  nor `develop` (observed: `PrefsView has no field named editor_vim_mode`, with
-  the note listing `attachment_ocr_enabled`, a field belonging to a different
-  feature branch). Fix: `docker volume rm myne-e2e-target`, then a full rebuild
-  (`--skip-build` is not enough). Same class as the shared-`CARGO_TARGET_DIR`
-  collision, one layer down.
+- **The `myne-e2e-target` Docker volume USED to be shared across git worktrees,
+  and the volume is still on disk.** A run could fail to BUILD against a stale
+  crate compiled from another branch, the giveaway being a compile error naming a
+  field that exists in neither your source nor `develop` (observed:
+  `PrefsView has no field named editor_vim_mode`, with the note listing
+  `attachment_ocr_enabled`, a field belonging to a different feature branch). The
+  per-tree keying above closed the class; this entry stays because a machine that
+  ran the suite before it still has the shared volume, and because the same
+  reasoning applies to any other volume shared across trees. Fix, then and now:
+  `docker volume rm myne-e2e-target`, then a full rebuild (`--skip-build` is not
+  enough). Same class as the shared-`CARGO_TARGET_DIR` collision, one layer down.
 - **`e2e-one.sh` re-provisions the pinned Rust toolchain per run, which flakes the boot.**
   Each `e2e-one.sh` invocation spawns a fresh `--rm` container whose `RUSTUP_HOME`
   is not a persisted volume, so `rust-toolchain.toml`'s pinned toolchain re-downloads
@@ -121,6 +250,25 @@
   code: `CARGO_BUILD_JOBS=3` costs wall clock and changes nothing about the artifact, so the
   run still proves what the 3× gate asks. `docker stats --no-stream` during the build is how
   you confirm it, and it is worth doing before believing a red build on an unchanged tree.
+
+  **Measured 2026-09-03, and the job cap did NOT fix it, so the paragraph above is right about
+  the symptom and wrong about the lever.** On a 16 GB host with an 8 GiB colima VM, the same
+  SIGKILL landed at `CARGO_BUILD_JOBS=3` and again at `CARGO_BUILD_JOBS=1`. One rustc invocation
+  is what does not fit: `myne_desktop_lib` is built `--crate-type staticlib --crate-type cdylib
+  --crate-type rlib` at `opt-level=3` with candle, tokenizers, tauri and webkit in the closure,
+  and there is no `[profile.release]` override anywhere in the workspace, so the default 16
+  codegen units are all this crate gets. Capping concurrent CRATES cannot reduce the peak of a
+  single one. Raising the VM to 12 GiB built it in 1m 56s on the same tree.
+
+  So the order to try is memory first, jobs second. Two traps on the memory side, both paid for.
+  `colima start --memory N` silently keeps the disk size from the FIRST start, and a mismatch
+  against the real image aborts every later start with `disk shrinking is not supported`, which
+  names neither memory nor the file to edit; the stale target lives in
+  `~/.colima/_lima/colima/colima.yaml` and `~/.colima/_lima/colima/lima.yaml`, and no combination
+  of flags overrides it. And the job cap is now reachable at all: every runner built its
+  `E2E_ENV` as a fixed `export …` string, so `CARGO_BUILD_JOBS` was documented here and wired to
+  nothing (`scripts/lib/e2e-docker.sh`, myne-md/myne#476). Export it on the host and it lands in
+  the container; leave it unset and the command line is byte-identical to what it was.
 - Post-exit assertions (disk state AFTER the app quit): launch with
   `keepDataDir: true`, capture `dataHome` in the SEED callback (the
   launch-failure path leaks the dir otherwise), gate on
@@ -134,11 +282,17 @@
   is the gate, with `./scripts/e2e-batch.sh <spec>…` when several specs need
   it. `./scripts/e2e-local.sh` runs the whole suite and is the wrong tool for
   proving one scenario. Invocations: `docs/dev/e2e.md`.
-- **`describeE2E.flaky` takes a scenario OUT of the merge gate.** It is the
-  quarantine marker (`support/scenario.ts`): the blocking `e2e` CI step skips
-  the flaky set so an unrelated PR cannot go red on someone else's contention
-  flake, and the non-blocking `e2e-quarantine` step (`MYNE_E2E_QUARANTINE=1`,
-  `failure: ignore`) runs only them and reports without gating. Reserve it for a
+- **This suite is not a merge gate and has not been one since
+  myne-md/myne#579.** It lives in `.woodpecker/e2e.yml`, a workflow that runs
+  only on a manual trigger carrying `RUN_E2E=true`, and the release runbook owns
+  that trigger. A green push pipeline says nothing about any scenario in this
+  directory. `docs/dev/e2e.md` "When CI runs these suites" has the procedure.
+- **`describeE2E.flaky` takes a scenario out of the counted set.** It is the
+  quarantine marker (`support/scenario.ts`): the `e2e` step skips the flaky set,
+  and the `e2e-quarantine` step (`MYNE_E2E_QUARANTINE=1`, `failure: ignore`)
+  runs only them and reports without gating. What counts is `e2e-floor`'s pair
+  of numbers, a floor on scenarios EXECUTED and a ceiling on scenarios FAILED,
+  and a quarantined scenario leaves both. Reserve it for a
   scenario verified as a runner-contention victim, keep the set short, and
   record the debt on the tracking issue — a real failure marked `.flaky` is a
   real failure nobody will see. **Currently quarantined: nothing.** The list was
@@ -372,7 +526,7 @@
 - **The AI lane needs BOTH halves, and until recently neither was reachable
   locally.** A scenario gated on `MYNE_E2E_AI=1` also needs the binary built
   `--features local-inference-stub`, or `StubEngine` is not the backend and the
-  gate is meaningless; `.woodpecker.yml` pairs them and `e2e-buildrun.sh`
+  gate is meaningless; `.woodpecker/e2e.yml` pairs them and `e2e-buildrun.sh`
   supplies neither. That is the mechanism by which a whole family of specs was
   written and never run once on a developer machine. `scripts/e2e-ai-buildrun.sh`
   pairs them; repeating a spec argument runs it that many times in the same warm

@@ -13,13 +13,20 @@ let warned = false;
 
 // Quarantine gate (flaky-test epic). A `describeE2E.flaky(...)` spec is a
 // KNOWN contention-victim: a mount that never paints within budget on a
-// contended CI runner (verified cross-branch in the flakiness profile — NOT a
-// logic bug). The blocking `e2e` step SKIPS these so an unrelated PR can't go
-// red on someone else's flake; the non-blocking `e2e-quarantine` step
-// (`MYNE_E2E_QUARANTINE=1`, `failure: ignore`) runs ONLY these and reports
-// without gating. Keep the flaky set SHORT and visible: a quarantined spec is a
-// debt to pay down (deterministic mount signal / contention fix), never a place
-// to bury a real failure. `describeE2E.flaky` is a describe.skip in a normal run.
+// contended CI runner (verified cross-branch in the flakiness profile, NOT a
+// logic bug). The `e2e` step SKIPS these; the `e2e-quarantine` step
+// (`MYNE_E2E_QUARANTINE=1`) runs ONLY these. Keep the flaky set SHORT and
+// visible: a quarantined spec is a debt to pay down (deterministic mount signal
+// or contention fix), never a place to bury a real failure. `describeE2E.flaky`
+// is a describe.skip in a normal run.
+//
+// Neither step blocks a merge, and this comment said one of them did until
+// myne-md/myne#579. Both live in `.woodpecker/e2e.yml`, which runs on a manual
+// trigger before a release and on no push or pull request; `e2e` is
+// `failure: ignore` there and `e2e-floor` is the only step that can redden the
+// run. So what quarantining a spec actually costs is its place in `e2e-floor`'s
+// counted set (`scripts/e2e-scenario-floor.json`), which is the number a release
+// reads.
 const quarantineOnly = process.env.MYNE_E2E_QUARANTINE === "1";
 
 function gate(isFlaky: boolean): typeof describe | typeof describe.skip {
@@ -29,9 +36,9 @@ function gate(isFlaky: boolean): typeof describe | typeof describe.skip {
 }
 
 /** `describe` that self-skips (with one honest reason line) when the
- *  platform/binary can't run the harness — macOS host, missing build.
+ *  platform or binary cannot run the harness (a macOS host, a missing build).
  *  `.flaky` marks a quarantined contention-victim scenario (see the gate note
- *  above): skipped in the blocking run, run only in the non-blocking one. */
+ *  above): skipped in the stable run, run only in the quarantine one. */
 export const describeE2E = Object.assign(gate(false), { flaky: gate(true) });
 
 export function skipReason(): string | undefined {

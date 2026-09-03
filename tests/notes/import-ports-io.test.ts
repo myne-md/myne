@@ -8,16 +8,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // --- Mock every IO seam ports.ts pulls in. ---
 const prefsRead = vi.fn();
-const setDeliberateFolders = vi.fn();
+const mutateDeliberateFoldersMock = vi.fn();
 const noteCreate = vi.fn();
 const noteList = vi.fn();
 const loadNoteBatch = vi.fn();
 const attachmentImport = vi.fn();
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("../../src/lib/prefs", () => ({
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   prefsRead: (...a: unknown[]) => prefsRead(...a),
-  setDeliberateFolders: (...a: unknown[]) => setDeliberateFolders(...a),
+  mutateDeliberateFolders: (...a: unknown[]) => mutateDeliberateFoldersMock(...a),
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 vi.mock("../../src/notes/createNote", () => ({
   noteCreate: (...a: unknown[]) => noteCreate(...a),
@@ -46,7 +51,7 @@ import type { ImportDirEntry, ImportPorts } from "../../src/notes/import/engine"
 beforeEach(() => {
   for (const m of [
     prefsRead,
-    setDeliberateFolders,
+    mutateDeliberateFoldersMock,
     noteCreate,
     noteList,
     loadNoteBatch,
@@ -68,7 +73,7 @@ function fakePorts(tree: Record<string, ImportDirEntry[]>): ImportPorts {
     },
     readFile: async () => "",
     createNote: async () => "id",
-    setDeliberateFolders: async () => {},
+    setDeliberateFolders: async () => 0, // nothing refused for budget (myne-md/myne#613)
   };
 }
 
@@ -120,21 +125,33 @@ describe("buildMediaIndex", () => {
 });
 
 describe("createImportPorts.setDeliberateFolders", () => {
-  it("unions the importer's folders with the vault's existing set", async () => {
-    prefsRead.mockResolvedValue({ deliberate_folders: ["Existing/"] });
-    setDeliberateFolders.mockResolvedValue(undefined);
+  it("states an ADD and never a whole set", async () => {
+    mutateDeliberateFoldersMock.mockResolvedValue(undefined);
     const ports = createImportPorts("/root");
     await ports.setDeliberateFolders(["New/", "Existing/"]);
-    const written = setDeliberateFolders.mock.calls[0]![0] as string[];
-    expect([...written].sort()).toEqual(["Existing/", "New/"]);
+    expect(mutateDeliberateFoldersMock).toHaveBeenCalledWith({
+      add: ["New/", "Existing/"],
+    });
   });
 
-  it("falls back to just the importer's set when prefsRead fails", async () => {
+  it("never reads prefs, so a read failure cannot reach the write", async () => {
+    // This replaces a test that asserted the OPPOSITE and was right to at the
+    // time: the port used to read the stored set, union its own folders in, and
+    // write the whole thing back, falling back to the EMPTY set when the read
+    // failed. Under myne-md/myne#613's removal discipline that fallback would
+    // have written an absence it had never checked, which the merge then applies
+    // as a delete on every device: one transient prefs read error during an
+    // import, and every registered empty folder in the vault is gone.
+    //
+    // The fix was to stop needing the read. Asserted as "prefsRead is not
+    // called" rather than as "the fallback behaves well", because a fallback
+    // that cannot be reached is weaker evidence than a read that does not exist.
     prefsRead.mockRejectedValue(new Error("SlotNotUnlocked"));
-    setDeliberateFolders.mockResolvedValue(undefined);
+    mutateDeliberateFoldersMock.mockResolvedValue(undefined);
     const ports = createImportPorts("/root");
     await ports.setDeliberateFolders(["Only/"]);
-    expect(setDeliberateFolders).toHaveBeenCalledWith(["Only/"]);
+    expect(prefsRead).not.toHaveBeenCalled();
+    expect(mutateDeliberateFoldersMock).toHaveBeenCalledWith({ add: ["Only/"] });
   });
 });
 

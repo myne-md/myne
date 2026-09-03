@@ -1,723 +1,92 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! The agent plugin's IPC surface.
+//! The desktop agent plugin's IPC surface.
 //!
-//! Eight commands, and every one of them is thin: it resolves state, calls into
-//! `myne-core`'s agent plugin, and returns. No policy lives here.
+//! Eight `#[tauri::command]` wrappers and nothing else. Since myne-md/myne#456
+//! the host-generic half, the session table, the guards, the scope source, the
+//! result types and `step` itself, lives in
+//! [`myne_core::plugins::agent::host_commands`], because both Tauri clients ran
+//! the identical sequence and differed in exactly two places: which engine
+//! answers, and how a scope is searched. Those two arrive as trait objects.
 //!
-//! **What the payload may and may not carry**, because the sentence that used
-//! to stand here said "none of these commands accepts a scope … from its
-//! payload" and three of them take a `grant: ScopeGrant` (myne-md/myne#531
-//! review round five). What the payload carries is the user's REQUEST — which
-//! notes or which folder they picked in the approval dialog — and a request is
-//! not a permission. Every grant is resolved host-side against the vault index
-//! and the current `ai_excluded_folders`, refused when it canonicalizes to the
-//! vault root, and refused again when the clamp empties it; the frozen set the
-//! run may read is the host's answer, never the caller's list. What no command
-//! accepts is the thing that would make the caller the authority: an
-//! excluded-folder list, a request class, or an already-resolved note set. That
-//! is the rule `decisions/ai/0462` states as "'the caller behaved' is not a
-//! property of a seam".
+//! **What is left here is the wiring that genuinely differs**, and it is the
+//! `State<'_, …>` list: this client resolves a `LocalInferenceState` and a
+//! `LocalInferenceVectorState` to build its engine and its embedding-backed
+//! searcher, and mobile resolves neither. That is the three-layer command shape
+//! `core/CLAUDE.md` describes, applied to a plugin that had not adopted it.
 //!
-//! The **transcript** is the one piece of session state that lives here rather
-//! than in core: core's run holds the approved scope and the cancel flag, which
-//! are what every other module needs, and a growing message list is a host
-//! session concern. Both are dropped by the same lock teardown.
+//! Which guards apply per command is documented on `mod.rs` and is unchanged by
+//! the move: they are the same functions, called from core now.
+//!
+//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline".
 
-use myne_core::host::tauri_host::TauriHost;
-use myne_core::plugins::agent::apply::{ApplyOutcome, Approval, RefusedEdit};
-use myne_core::plugins::agent::engine::{Content, Message};
-use myne_core::plugins::agent::error::{AgentError, EditRejection};
-use myne_core::plugins::agent::probe::{run_probe, ProbeThreshold, ProbeVerdict};
-use myne_core::plugins::agent::prompt::{Proposal, ProposedNote};
-use myne_core::plugins::agent::run::{AgentRunState, AgentRunView, AppliedRun, GrantOrigin};
-use myne_core::plugins::agent::run_loop::{drive, LoopDeps, LoopEnd, LoopOutcome};
-use myne_core::plugins::agent::scope::{
-    expand_run, preview_grant, start_run, ExclusionSource, ScopeGrant, ScopeSource,
-};
-use myne_core::plugins::agent::{apply_approved, edit::ProposedEdit};
-use myne_core::plugins::prefs::commands::prefs_read_from_host;
-use myne_core::plugins::snapshots::commands::snapshot_restore_from_host;
-use myne_core::plugins::vault_indices::state::NoteRecord;
-use myne_core::plugins::vault_indices::VaultIndicesState;
-use myne_core::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
-use myne_core::vault_io::StdVaultIo;
-use serde::Serialize;
-use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use myne_core::plugins::agent::apply::{ApplyOutcome, Approval};
+use myne_core::plugins::agent::edit::ProposedEdit;
+use myne_core::plugins::agent::error::AgentError;
+use myne_core::plugins::agent::host_commands::{
+    apply_from_host, probe_threshold, require_ai_enabled, require_unlocked, step, undo_from_host,
+    AgentSessionState, AgentStepResult, AgentUndoResult, GrantPreview, HostScopeSource,
+};
+use myne_core::plugins::agent::probe::{run_probe, ProbeProgress, ProbeVerdict};
+use myne_core::plugins::agent::run::{AgentRunState, AgentRunView, AppliedRun, GrantOrigin};
+use myne_core::plugins::agent::run_loop::RunProgress;
+use myne_core::plugins::agent::scope::{expand_run, preview_grant, start_run, ScopeGrant};
+use myne_core::plugins::vault_indices::state::VaultIndicesState;
+use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Runtime, State};
-use zeroize::Zeroize;
 
-use super::adapters::{
-    EngineAdapter, NoteReadAdapter, RestoreAdapter, SearchAdapter, WriteAdapter,
-};
+use crate::plugins::agent::adapters::{EngineAdapter, SearchAdapter};
 use crate::plugins::local_inference::state::LocalInferenceState;
 use crate::plugins::local_inference::vector_store::LocalInferenceVectorState;
+use myne_core::plugins::agent::history::HistoryTurn;
 
-/// The probe's pass bar, from the file that records it.
-///
-/// `include_str!` rather than a literal so there is exactly one place the
-/// numbers live, and that place can carry the measurements that produced them.
-/// The file currently declares itself unmeasured; see
-/// `scripts/agent-probe-threshold.json`.
-const PROBE_THRESHOLD_JSON: &str = include_str!("../../../../scripts/agent-probe-threshold.json");
-
-#[derive(serde::Deserialize)]
-struct RawThreshold {
-    attempts: u8,
-    required: u8,
-    status: String,
-    measurements: Vec<serde_json::Value>,
-}
-
-/// The bar a backend must clear, or a stated reason it could not be read.
-///
-/// **Returns `Result` rather than panicking, and the reason is where this is
-/// called from.** [`agent_capability`] is a `#[tauri::command]`, so an
-/// `.expect()` or a failed `assert_eq!` in here unwinds across the IPC
-/// boundary. Tauri catches that and answers the caller with an opaque
-/// serialization failure, which tells the user nothing and, on a panic that
-/// happens while a lock is held, poisons it for the rest of the session. The
-/// input is compiled in, so today it cannot fail; a panic reachable from IPC is
-/// one edit away from being a runtime one, and this shape does not have that
-/// edge. Found in review round five of myne-md/myne#531.
-///
-/// The strictness itself is not relaxed: [`tests::the_compiled_in_threshold_file_is_well_formed`]
-/// asserts the real file parses AND that its two halves agree, so a malformed
-/// or self-contradicting record is a failing `cargo test` on every platform
-/// rather than a surprise at the first press of the button.
-fn parse_probe_threshold(json: &str) -> Result<ProbeThreshold, String> {
-    let raw: RawThreshold = serde_json::from_str(json)
-        .map_err(|_| "agent-probe-threshold.json is malformed".to_string())?;
-    // **The `status` field has to mean something, or it is decoration.** It
-    // declared itself a blocking obligation and gated nothing: this function
-    // read `attempts` and `required` and never looked at it, so flipping it to
-    // `measured` with an empty `measurements` would have changed no behaviour
-    // and no check.
-    let measured = raw.status == "measured";
-    let has_measurements = !raw.measurements.is_empty();
-    if measured != has_measurements {
-        return Err(format!(
-            "agent-probe-threshold.json: status is {:?} but measurements has {} entries. \
-             The two must agree: `measured` with no measurements is a claim nobody made, \
-             and `unmeasured` with measurements is a record that has stopped describing itself.",
-            raw.status,
-            raw.measurements.len(),
-        ));
-    }
-    Ok(ProbeThreshold {
-        attempts: raw.attempts,
-        required: raw.required,
-        provisional: !measured,
-    })
-}
-
-/// The threshold the probe runs against.
-///
-/// Falls back FAIL-CLOSED when the record cannot be read: a bar no backend
-/// clears, marked provisional, so agent mode reports itself unavailable rather
-/// than available on an unverified backend. The opposite default would let a
-/// broken record switch the gate off.
-fn probe_threshold() -> ProbeThreshold {
-    parse_probe_threshold(PROBE_THRESHOLD_JSON).unwrap_or_else(|reason| {
-        tracing::error!(event = "agent_probe_threshold_unreadable", %reason);
-        ProbeThreshold {
-            attempts: 1,
-            required: u8::MAX,
-            provisional: true,
-        }
-    })
-}
-
-/// Host-side session state for a run: what the user asked, the running
-/// transcript, and what has been proposed so far.
-#[derive(Default)]
-struct Session {
-    task: String,
-    transcript: Vec<Message>,
-    proposal: Proposal,
-    /// Whether a `step` is inside its model call for this run.
-    ///
-    /// `step` takes the transcript and the proposal with `mem::take` under a
-    /// scoped lock, releases it for the length of a model call, then writes both
-    /// back. Two concurrent calls on one run id therefore raced: the second
-    /// found the transcript already taken and drove from an empty one, and
-    /// whichever returned last overwrote the other's work, silently discarding a
-    /// transcript and a proposal. Not reachable from the shipped single-dialog
-    /// surface, and `agent_approve_scope` takes its `run_id` from the payload,
-    /// so reachability is a property of the caller rather than of this code
-    /// (myne-md/myne#531 review round six).
-    in_flight: bool,
-}
-
-/// The table of live sessions. Cleared by the same lock teardown that clears
-/// core's run table.
-#[derive(Default)]
-pub struct AgentSessionState {
-    sessions: Mutex<BTreeMap<String, Session>>,
-}
-
-impl AgentSessionState {
-    /// Which of the approved EDITS the host recorded the model proposing.
-    ///
-    /// **The other half of the rule its sibling below states about itself.**
-    /// `read_approved_new_notes` resolves new notes by index into the host's own
-    /// record, so "the caller cannot invent a note the model never proposed"
-    /// holds for creates. The edits arrived as free `note_id`/`anchor`/
-    /// `replacement` strings and were never compared to anything, so the same
-    /// sentence was true of one half of the apply and false of the other
-    /// (myne-md/myne#531 review round six).
-    ///
-    /// Returns the recognised edits and, separately, the positions of the ones
-    /// that were not, so the caller can report them as refusals rather than drop
-    /// them silently: a row the user pressed Apply on that quietly does nothing
-    /// is the failure mode the whole review surface exists to avoid.
-    ///
-    /// Compared by VALUE, not by index. The screen may send any subset in any
-    /// order, and an index-based contract would mean changing what the WebView
-    /// sends, the store, the review screen and its E2E for a property this
-    /// buys outright.
-    ///
-    /// A session that is gone recognises nothing, which fails closed: the run is
-    /// over, and an apply against a record the host no longer holds is exactly
-    /// the case this refuses.
-    pub fn retain_proposed_edits(
-        &self,
-        run_id: &str,
-        approved: &[ProposedEdit],
-    ) -> (Vec<ProposedEdit>, Vec<usize>) {
-        let table = self.sessions.lock().expect("agent session table poisoned");
-        let proposed: &[ProposedEdit] = match table.get(run_id) {
-            Some(session) => &session.proposal.edits,
-            None => &[],
-        };
-        let mut kept = Vec::with_capacity(approved.len());
-        let mut unknown = Vec::new();
-        for (index, edit) in approved.iter().enumerate() {
-            if proposed.contains(edit) {
-                kept.push(edit.clone());
-            } else {
-                unknown.push(index);
-            }
-        }
-        (kept, unknown)
-    }
-
-    /// The new notes the user approved, resolved against the run's own record.
-    ///
-    /// Two separate properties, and an earlier version conflated them. **Which
-    /// notes exist** is host-side: the caller names indices into the proposal the
-    /// host itself recorded, so it cannot invent a note the model never proposed.
-    /// **Which of those to create** is the user's, expressed as that index list,
-    /// because a create is a write and SYNC-17's restatement says no write
-    /// happens without a per-note approval. Handing the whole recorded list to
-    /// the apply satisfied the first and skipped the second.
-    ///
-    /// Out-of-range indices are dropped rather than erroring: they can only come
-    /// from a stale screen, and refusing the whole apply over one is worse than
-    /// applying the rest.
-    ///
-    /// **Reads without consuming.** The consuming version of this ran BEFORE
-    /// `apply_approved`, which can still fail from three places (an out-of-scope
-    /// run, a refused restore point, a failed batch write), and on any of them
-    /// the notes were gone from the record and had never been created. The
-    /// screen went on rendering them, so a retry sent the same indices, found a
-    /// shorter list, and silently created nothing: a write the user approved
-    /// that does not happen, reported only as the original failure. `apply.rs`
-    /// took care not to let a failed create discard the outcome; this was the
-    /// mirror hole one layer up.
-    ///
-    /// Consumption is now keyed off what was ACTUALLY created, by
-    /// [`Self::consume_created_new_notes`], so the two cannot disagree.
-    pub fn read_approved_new_notes(
-        &self,
-        run_id: &str,
-        approved: &[usize],
-    ) -> Vec<(usize, ProposedNote)> {
-        let table = self.sessions.lock().expect("agent session table poisoned");
-        let Some(session) = table.get(run_id) else {
-            return Vec::new();
-        };
-        let mut wanted: Vec<usize> = approved.to_vec();
-        wanted.sort_unstable();
-        wanted.dedup();
-        wanted
-            .into_iter()
-            .filter_map(|index| {
-                session
-                    .proposal
-                    .new_notes
-                    .get(index)
-                    .map(|note| (index, note.clone()))
-            })
-            .collect()
-    }
-
-    /// Drop the notes an apply actually created, so a retry cannot create them
-    /// twice and a FAILED apply leaves everything retryable.
-    ///
-    /// Takes the indices the apply reported as created rather than the ones it
-    /// was asked to create, which is the whole point: those two lists differ
-    /// exactly when something went wrong, and that is the case the previous
-    /// design got backwards.
-    pub fn consume_created_new_notes(&self, run_id: &str, created: &[usize]) {
-        let mut table = self.sessions.lock().expect("agent session table poisoned");
-        let Some(session) = table.get_mut(run_id) else {
-            return;
-        };
-        let mut wanted: Vec<usize> = created.to_vec();
-        wanted.sort_unstable();
-        wanted.dedup();
-        // Highest index first so each removal leaves the lower ones in place.
-        for index in wanted.iter().rev() {
-            if *index < session.proposal.new_notes.len() {
-                let mut note = session.proposal.new_notes.remove(*index);
-                // The body came out of the model and quotes note text; overwrite
-                // rather than free, on the same rule as the teardown below.
-                note.title.zeroize();
-                note.body.zeroize();
-                // And the folder, for the reason the teardown below already
-                // states about itself: it is `Option<String>` rather than
-                // `String`, so it is not the shape the eye checks for, and it
-                // was missed here for exactly that reason a second time
-                // (myne-md/myne#531 review round six). `ProposedNote` derives no
-                // `ZeroizeOnDrop`, so nothing catches it if this line goes.
-                if let Some(folder) = note.folder.as_mut() {
-                    folder.zeroize();
-                }
-            }
-        }
-    }
-
-    /// Wipe and drop every session. The vault-lock teardown path.
-    ///
-    /// **Overwrites before dropping**, which is the difference between this and
-    /// a plain `clear()`. A transcript holds whole note bodies and a proposal
-    /// holds the anchors copied out of them; dropping frees that memory without
-    /// touching it, and `threat-model.md` §7 requires the AI path's RAM to be
-    /// `Zeroizing`-scoped. The sibling teardown this rides alongside (the AI
-    /// vector store) overwrites in place for the same reason.
-    pub fn clear(&self) {
-        let mut table = self.sessions.lock().expect("agent session table poisoned");
-        for session in table.values_mut() {
-            wipe_session(session);
-        }
-        table.clear();
-    }
-
-    /// Drop every session whose run the core table no longer holds, wiping it
-    /// first.
-    ///
-    /// **The bound this table was missing.** `AgentRunState` caps at
-    /// `MAX_LIVE_RUNS` and evicts the oldest, and nothing removed the evicted
-    /// run's SESSION: after nine ordinary runs, run one's task string, its
-    /// transcript of whole note bodies and its proposal of anchors copied
-    /// verbatim out of them stayed resident and unreachable until the vault
-    /// locked. The cap bounded a set of note ids and left the plaintext holder
-    /// unbounded (myne-md/myne#531 review round six).
-    ///
-    /// It could not be fixed where the eviction is: that lives in `myne-core`
-    /// and this table lives in the desktop crate, which is why core grew
-    /// `live_ids()` and this prunes to it rather than being told what was
-    /// dropped. Called at the start of a run, which is the only moment a run can
-    /// be evicted.
-    ///
-    /// Wipes through the same `wipe_session` the lock teardown uses, so the two
-    /// cannot report different notions of "gone".
-    pub fn prune_to(&self, live: &std::collections::BTreeSet<String>) {
-        let mut table = self.sessions.lock().expect("agent session table poisoned");
-        let dead: Vec<String> = table
-            .keys()
-            .filter(|id| !live.contains(*id))
-            .cloned()
-            .collect();
-        for id in dead {
-            if let Some(mut session) = table.remove(&id) {
-                wipe_session(&mut session);
-            }
-        }
-    }
-
-    /// How many sessions are live.
-    ///
-    /// Exists for the teardown assertion and nothing else: the test that proves
-    /// a lock leaves no transcript behind has to read the state rather than a
-    /// return value, because `clear` could report success while a session sat in
-    /// the table. `allow(dead_code)` because production has no reason to count
-    /// them, and removing them would remove the only way to check the claim.
-    #[allow(dead_code)]
-    pub fn len(&self) -> usize {
-        self.sessions
-            .lock()
-            .expect("agent session table poisoned")
-            .len()
-    }
-
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-/// Overwrite everything a session holds, before it is dropped.
-///
-/// **Overwrites before dropping**, which is the difference between this and a
-/// plain `clear()`. A transcript holds whole note bodies and a proposal holds
-/// the anchors copied out of them; dropping frees that memory without touching
-/// it, and `threat-model.md` §7 requires the AI path's RAM to be
-/// `Zeroizing`-scoped. One function rather than two copies, so the lock teardown
-/// and the eviction prune cannot drift into different notions of total.
-fn wipe_session(session: &mut Session) {
-    session.task.zeroize();
-    // Overwrite before dropping, and cover BOTH arms so the teardown
-    // is total by construction rather than by whichever arm currently
-    // holds the sensitive half. `UntrustedNote` wipes through
-    // `Zeroizing` on drop; `Trusted` is a plain `String` with no such
-    // drop, so a bare `.clear()` freed it untouched.
-    //
-    // What each arm holds today, since that is what a later reader
-    // would use to decide whether this loop can go: the model's reply
-    // is `Content::note` (`run_loop::drive`, tagged untrusted in this
-    // same change because an anchor is note text copied verbatim), and
-    // the `Trusted` spans are the host's own refusal prose. The point
-    // is that the answer moves, and a teardown keyed to today's answer
-    // is one tagging change away from being partial again.
-    for message in &mut session.transcript {
-        for span in &mut message.content {
-            if let Content::Trusted(t) = span {
-                t.zeroize();
-            }
-        }
-    }
-    session.transcript.clear();
-    for edit in &mut session.proposal.edits {
-        edit.anchor.zeroize();
-        edit.replacement.zeroize();
-    }
-    for note in &mut session.proposal.new_notes {
-        note.title.zeroize();
-        note.body.zeroize();
-        // The folder too. It is `Option<String>` rather than `String`,
-        // which is the whole reason it was missed: the two lines above
-        // are the shape the eye checks for. A proposed folder is a
-        // vault-structure string the model produced from note content,
-        // so it belongs with them.
-        if let Some(folder) = note.folder.as_mut() {
-            folder.zeroize();
-        }
-    }
-    session.proposal.summary.zeroize();
-}
-
-/// What a grant would resolve to. Every number here is the host's.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GrantPreview {
-    /// How many notes the grant would add, already clamped.
-    pub note_count: usize,
-    /// How many the `ai_excluded_folders` clamp removed.
-    pub excluded_count: usize,
-    /// How many named ids the index does not know. Non-zero only for a note
-    /// list; they fail closed and are dropped.
-    pub unknown_count: usize,
-    /// What the run's total scope would become. A union, not a sum.
-    pub new_total: usize,
-}
-
-/// What a start or a resume produced.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AgentStepResult {
-    /// The run.
-    pub view: AgentRunView,
-    /// Everything proposed so far.
-    pub proposal: Proposal,
-    /// Why the loop stopped.
-    pub end: LoopEnd,
-    /// How many model round-trips THIS STEP made.
-    ///
-    /// Per-step rather than per-run, like `chars_off_device` three lines down and
-    /// for the same reason: `drive()` starts its counter at zero on every call,
-    /// and the surface accumulates. The comment used to say "in total", which is
-    /// a different contract than the value carries; nothing user-visible was
-    /// wrong (`src/notes/agent/agentStore.ts` accumulates correctly), but a later
-    /// reader hanging a cap or a warning off this field would have read it as a
-    /// run total.
-    pub iterations: usize,
-    /// How many notes it has read in full.
-    pub notes_read: usize,
-    /// Characters that left the device for this step's requests, or `None` when
-    /// none did.
-    ///
-    /// Per-step rather than per-run, because the surface accumulates it exactly
-    /// as it accumulates `iterations` and `notes_read`. `None` and `Some(0)`
-    /// stay distinguishable across IPC for the reason
-    /// [`myne_core::plugins::agent::engine::AgentCompletion::chars_off_device`]
-    /// gives.
-    pub chars_off_device: Option<usize>,
-    /// How many notes the `ai_excluded_folders` clamp removed from the grant
-    /// that produced this step. Shown on the approval screen.
-    pub excluded_count: usize,
-}
-
-/// Refuse unless AI is switched on, read from the vault's own prefs.
-///
-/// The WebView hiding the tab is not a gate: `src-tauri/CLAUDE.md` treats the
-/// ACL surface as reachable by a compromised or dev-tools-driven page (TB6), and
-/// every sibling generation surface re-reads this host-side before touching a
-/// model. Without it, agent mode is the one AI surface whose opt-in lives only
-/// in the page that the opt-in is supposed to constrain.
-async fn require_ai_enabled<R: Runtime>(
-    app: &AppHandle<R>,
-    vault: &VaultRuntimeState,
-) -> Result<(), AgentError> {
-    let host = TauriHost::new(app.clone());
-    let view = prefs_read_from_host(&host, vault, &StdVaultIo)
-        .await
-        .map_err(|_| AgentError::ReadFailed)?;
-    if view.ai_enabled {
-        Ok(())
-    } else {
-        Err(AgentError::AiDisabled)
-    }
-}
-
-/// Refuse unless the vault is unlocked.
-///
-/// **Seven of the eight commands call this FIRST**, and the eighth is
-/// `agent_cancel`. Borrowing `State<'_, VaultRuntimeState>` does not gate
-/// anything, so without this the locked-vault refusal was an accident of which
-/// helper ran first and reported the wrong cause.
-///
-/// `agent_cancel` deliberately does not call it: it touches only the run table,
-/// and a run that survived into a locked vault is a bug the teardown covers,
-/// not something to refuse here. (This doc said "the five commands" and named
-/// `agent_status` as the second abstainer; that command was removed in review
-/// round two and the count was never true — `mod.rs` has the roster. Found in
-/// review round five of myne-md/myne#531.)
-async fn require_unlocked(vault: &VaultRuntimeState) -> Result<(), AgentError> {
-    match vault.slot_kind_active().await {
-        SlotKind::Unlocked => Ok(()),
-        _ => Err(AgentError::SlotNotUnlocked),
-    }
-}
-
-/// The desktop's answer to core's scope questions.
-///
-/// One implementation for all three entry points. Core owns the ORDER (refuse a
-/// root grant, read the exclusions, snapshot the index, resolve, refuse an empty
-/// result); this only says where the two inputs come from. That split is what
-/// lets the mobile port supply an implementation rather than re-derive a
-/// sequence, and it is why a client cannot supply an index snapshot without also
-/// supplying the exclusions.
-struct DesktopScopeSource<'a, R: Runtime> {
-    app: AppHandle<R>,
-    vault: &'a VaultRuntimeState,
-    indices: &'a VaultIndicesState,
-}
-
-#[async_trait::async_trait]
-impl<R: Runtime> ScopeSource for DesktopScopeSource<'_, R> {
-    async fn records(&self) -> Result<BTreeMap<String, NoteRecord>, AgentError> {
-        Ok(self.indices.snapshot())
-    }
-
-    async fn excluded_folders(&self) -> Result<Vec<String>, AgentError> {
-        read_excluded(&self.app, self.vault).await
-    }
-}
-
-/// The `ai_excluded_folders` set, from `vault.prefs`, at this moment.
-///
-/// One reader for both seams. `ScopeSource` uses it when a grant is resolved and
-/// `ExclusionSource` uses it on every read tool inside the loop, and a second copy
-/// of this three-line body is how the two would eventually disagree about where
-/// the set comes from.
-async fn read_excluded<R: Runtime>(
-    app: &AppHandle<R>,
-    vault: &VaultRuntimeState,
-) -> Result<Vec<String>, AgentError> {
-    let host = TauriHost::new(app.clone());
-    let view = prefs_read_from_host(&host, vault, &StdVaultIo)
-        .await
-        .map_err(|_| AgentError::ReadFailed)?;
-    Ok(view.ai_excluded_folders)
-}
-
-/// The loop's half of the seam: the exclusion set and nothing else.
-///
-/// Deliberately NOT `DesktopScopeSource`, which also answers `records()`. The
-/// loop must not re-read the index (`LoopDeps::records` says why), so it is handed
-/// a source that cannot.
-struct DesktopExclusions<'a, R: Runtime> {
-    app: AppHandle<R>,
-    vault: &'a VaultRuntimeState,
-}
-
-#[async_trait::async_trait]
-impl<R: Runtime> ExclusionSource for DesktopExclusions<'_, R> {
-    async fn excluded_now(&self) -> Result<Vec<String>, AgentError> {
-        read_excluded(&self.app, self.vault).await
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn step<R: Runtime>(
-    app: AppHandle<R>,
-    run_id: String,
-    runs: Arc<AgentRunState>,
-    sessions: &AgentSessionState,
-    indices: &VaultIndicesState,
-    vault: &VaultRuntimeState,
-    ai: &LocalInferenceState,
-    vectors: &LocalInferenceVectorState,
-    cancel: Arc<AtomicBool>,
-    excluded_count: usize,
-) -> Result<AgentStepResult, AgentError> {
-    // Claimed under the SAME lock the take happens under, so there is no window
-    // between deciding to proceed and emptying the session. Released in the
-    // write-back below, on every exit from this function.
-    let (task, mut transcript, mut proposal) = {
-        let mut table = sessions
-            .sessions
-            .lock()
-            .expect("agent session table poisoned");
-        let s = table.get_mut(&run_id).ok_or(AgentError::NoSuchRun)?;
-        if s.in_flight {
-            return Err(AgentError::StepAlreadyRunning);
-        }
-        s.in_flight = true;
-        (
-            s.task.clone(),
-            std::mem::take(&mut s.transcript),
-            std::mem::take(&mut s.proposal),
-        )
-    };
-
-    let engine = EngineAdapter { state: ai, cancel };
-    let reader = NoteReadAdapter {
-        host: TauriHost::new(app.clone()),
-        state: vault,
-    };
-    let searcher = SearchAdapter { state: ai, vectors };
-    let records = indices.snapshot();
-    let exclusions = DesktopExclusions {
-        app: app.clone(),
-        vault,
-    };
-    let deps = LoopDeps {
-        engine: &engine,
-        reader: &reader,
-        searcher: &searcher,
-        records: &records,
-        exclusions: &exclusions,
-    };
-
-    // **Not `?`.** The transcript and the proposal were taken out of the session
-    // above, so propagating here drops both while the run stays in the table.
-    // `EngineAdapter::complete` returns `Cancelled` when the run's flag is set
-    // before or after the model call, so pressing Stop during generation, which
-    // is the long part of an iteration and therefore the usual moment, threw
-    // away everything the run had proposed. The loop's OWN cancel checks
-    // deliberately return `Ok(LoopEnd::Cancelled)` with the proposal intact, and
-    // the surface has a `cancelled` status for exactly that: the two routes
-    // disagreed and the reachable one was the lossy one. Any transient engine
-    // error had the same effect on a paused-for-scope run, whose resume depends
-    // on the transcript that vanished.
-    let driven = drive(&runs, &run_id, &task, &mut transcript, &deps).await;
-    let outcome: LoopOutcome = match driven {
-        Ok(o) => o,
-        Err(e) => {
-            // Put back what was taken, so the next step or the review screen
-            // still sees the work. Best-effort by construction: if the session
-            // is gone the run is over and there is nothing to preserve.
-            let mut table = sessions
-                .sessions
-                .lock()
-                .expect("agent session table poisoned");
-            if let Some(s) = table.get_mut(&run_id) {
-                s.transcript = transcript;
-                s.proposal = proposal;
-                // **And the flag, on the FAILURE path too.** Releasing only on
-                // success is how an in-flight marker turns one failed model call
-                // into a permanently wedged run: the flag stays set, every later
-                // step reports `StepAlreadyRunning`, and nothing clears it short
-                // of a vault lock. Both exits from this function release it, and
-                // there is no `?` between the claim and either of them.
-                s.in_flight = false;
-            }
-            // The one place a step's failure is visible at all
-            // (myne-md/myne#546). The surface renders "The agent could not
-            // start", which names no cause, and until this line the host left
-            // no trace of one either: a start that failed on a debug build with
-            // logging on produced zero output. `kind()` rather than the error,
-            // because two variants carry a note id.
-            tracing::debug!(
-                target: "myne::agent",
-                event = "step_failed",
-                error_kind = e.kind(),
-            );
-            return Err(e);
-        }
-    };
-
-    // Accumulate across resumes: a run that paused for a scope approval and
-    // resumed has one proposal, not two.
-    proposal.edits.extend(outcome.proposal.edits);
-    proposal.new_notes.extend(outcome.proposal.new_notes);
-    if !outcome.proposal.summary.is_empty() {
-        proposal.summary = outcome.proposal.summary;
-    }
-
-    {
-        let mut table = sessions
-            .sessions
-            .lock()
-            .expect("agent session table poisoned");
-        if let Some(s) = table.get_mut(&run_id) {
-            s.transcript = transcript;
-            s.proposal = proposal.clone();
-            s.in_flight = false;
-        }
-    }
-
-    // A cancel the loop has now observed is terminal, so the run and its session
-    // go together. Not done in `agent_cancel`: that only sets the flag, and
-    // removing the run there would race the in-flight loop into `NoSuchRun`
-    // instead of the `Cancelled` end it is written to return. A `Finished` run
-    // deliberately stays (the apply reads its frozen scope); see
-    // `AgentRunState::end`.
-    let cancelled = matches!(outcome.end, LoopEnd::Cancelled);
-    let view = runs.view(&run_id)?;
-    if cancelled {
-        runs.end(&run_id);
-        sessions
-            .sessions
-            .lock()
-            .expect("agent session table poisoned")
-            .remove(&run_id);
-    }
-
-    Ok(AgentStepResult {
-        view,
-        proposal,
-        end: outcome.end,
-        iterations: outcome.iterations,
-        notes_read: outcome.notes_read,
-        chars_off_device: outcome.chars_off_device,
-        excluded_count,
-    })
-}
-
-/// Start a run: resolve the initial scope, then drive until it stops.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn agent_start<R: Runtime>(
     app: AppHandle<R>,
     task: String,
     grant: ScopeGrant,
+    // **ACCEPTED AND IGNORED, and that is a defect rather than a design**
+    // (myne-md/myne#648). The WebView sends both on every run and this host
+    // reads neither, so a run gets no conversation and no language instruction:
+    // the model answers in English about a conversation it cannot see. Core is
+    // fully wired for both — `host_commands::step` reads `Session::language` and
+    // `Session::history` and hands them to `prompt::build_request` — and the one
+    // missing link is `AgentSessionState::open`, which fills those two fields
+    // with `Default` and has no parameter to fill them from.
+    //
+    // The wiring existed. It landed in 5ecddce9 (myne-md/myne#622) as a
+    // prune-then-insert that seeded `language`, `seed_messages(&history,
+    // budget)` and a `SeedContext`, and the merge train replaced that block with
+    // `open()`, which is #456's newer API, keeping the newer call and losing the
+    // three seeded fields. Nothing reported it: the parameters still parse, the
+    // command still succeeds, and CI never runs `cargo clippy -p myne-desktop
+    // --all-targets` with default features, so the unused bindings are invisible
+    // to every gate except the local pre-push battery.
+    //
+    // **Restoring HALF of it would be worse than leaving it.** `SeedContext` is
+    // gone from the tree entirely, and it is what dropped the seed when the
+    // exclusion set or the provider changed mid-run. `design-notes/ai/0541`
+    // rests the seed's egress bound on exactly that invalidation, so re-seeding
+    // the history without it would put conversation text back on the wire with
+    // the control that bounds it still missing. Both halves come back together,
+    // in #648, with the tests that pin them.
+    //
+    // Kept in the signature rather than deleted, because deleting them changes
+    // the IPC wire shape while `src/lib/agent-run-core.ts` still sends both as
+    // required arguments, and a silent shape change is how this got here.
+    #[allow(unused_variables)] language: Option<String>,
+    #[allow(unused_variables)] history: Vec<HistoryTurn>,
     on_open: Channel<AgentRunView>,
+    // The run's cost as it accrues (myne-md/myne#456). A second channel rather
+    // than a variant on `on_open`, because the two say different things at
+    // different times: `on_open` fires once and makes the run addressable,
+    // while this fires per model round-trip and is the disclosure control
+    // `design-notes/ai/0515` rests on.
+    on_progress: Channel<RunProgress>,
     runs: State<'_, Arc<AgentRunState>>,
     sessions: State<'_, AgentSessionState>,
     indices: State<'_, VaultIndicesState>,
@@ -727,7 +96,27 @@ pub async fn agent_start<R: Runtime>(
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
-    let source = DesktopScopeSource {
+    // **Re-read the gate, do not trust the cell.** `require_ai_enabled` reads
+    // `ai_enabled` from disk, and that is the ONLY part of the gate that was
+    // genuinely read at request time: the consent, the key and the model come
+    // from `LocalInferenceState`'s cached snapshot, which some other surface
+    // filled whenever it last happened to. `provider_gate.rs`'s module doc says
+    // the gate is "host-side, and re-read at request time", and three mobile
+    // comments say the refresh is done "exactly as desktop does". It was not:
+    // `.refresh()` appeared only in `local_inference/commands.rs` and
+    // `invalidate()` only on the lock path.
+    //
+    // That matters more since myne-md/myne#456, which removed `developer_mode`
+    // from this gate and names the device-local consent as the compensating
+    // control. A control read from a cache cannot carry that weight.
+    //
+    // A refresh here rather than an invalidate inside the consent and key
+    // setters, which is the cheaper shape and the wrong one: `ai_provider_key`
+    // still SYNCS, so a key that arrives from another device passes through no
+    // setter on this one and would leave the cell stale exactly where a
+    // revocation matters most.
+    ai.refresh().await;
+    let source = HostScopeSource {
         app: app.clone(),
         vault: vault.inner(),
         indices: indices.inner(),
@@ -745,25 +134,9 @@ pub async fn agent_start<R: Runtime>(
     // widen what crosses TB13.
     let run_id = myne_core::plugins::agent::run::new_run_id();
     let (resolved, cancel) = start_run(&runs, run_id.clone(), &grant, &source).await?;
-    // **Prune AFTER the start, which is the only moment a run can be evicted.**
-    // `AgentRunState` caps at `MAX_LIVE_RUNS` and drops the oldest to make room
-    // for this one; nothing removed the evicted run's session, so its task, its
-    // transcript of whole note bodies and its proposal of verbatim anchors
-    // stayed resident until the vault locked. The eviction is in core and this
-    // table is desktop-side, so the prune asks core what is still live rather
-    // than being told what went (myne-md/myne#531 review round six).
-    sessions.prune_to(&runs.live_ids());
-    sessions
-        .sessions
-        .lock()
-        .expect("agent session table poisoned")
-        .insert(
-            run_id.clone(),
-            Session {
-                task,
-                ..Default::default()
-            },
-        );
+    // Prune-then-insert, in that order, and the order is why this is one call
+    // rather than two here: see `AgentSessionState::open`.
+    sessions.open(&run_id, task, &runs.live_ids());
     // **Before the loop, not after it.** This command returns once the loop has
     // stopped, which on a remote provider is minutes, and until myne-md/myne#544
     // that return was the only thing that ever handed the surface a run id. So
@@ -799,10 +172,20 @@ pub async fn agent_start<R: Runtime>(
         &sessions,
         &indices,
         &vault,
-        &ai,
-        &vectors,
+        // The two seams this client supplies for itself: its own engine, and
+        // an embedding-backed searcher. Mobile builds different ones and calls
+        // the same `step`.
+        &EngineAdapter {
+            state: ai.inner(),
+            cancel: Arc::clone(&cancel),
+        },
+        &SearchAdapter {
+            state: ai.inner(),
+            vectors: vectors.inner(),
+        },
         cancel,
         resolved.excluded_count,
+        on_progress,
     )
     .await;
     tracing::debug!(
@@ -828,6 +211,10 @@ pub async fn agent_approve_scope<R: Runtime>(
     app: AppHandle<R>,
     run_id: String,
     grant: ScopeGrant,
+    // The approved leg reports its cost too. Without this the figures would
+    // freeze the moment a run asked to widen its scope, which is exactly the
+    // point at which a user most wants to see them moving.
+    on_progress: Channel<RunProgress>,
     runs: State<'_, Arc<AgentRunState>>,
     sessions: State<'_, AgentSessionState>,
     indices: State<'_, VaultIndicesState>,
@@ -837,7 +224,9 @@ pub async fn agent_approve_scope<R: Runtime>(
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
-    let source = DesktopScopeSource {
+    // Same reason as `agent_start`: the gate is read here, not remembered.
+    ai.refresh().await;
+    let source = HostScopeSource {
         app: app.clone(),
         vault: vault.inner(),
         indices: indices.inner(),
@@ -854,10 +243,20 @@ pub async fn agent_approve_scope<R: Runtime>(
         &sessions,
         &indices,
         &vault,
-        &ai,
-        &vectors,
+        // The two seams this client supplies for itself: its own engine, and
+        // an embedding-backed searcher. Mobile builds different ones and calls
+        // the same `step`.
+        &EngineAdapter {
+            state: ai.inner(),
+            cancel: Arc::clone(&cancel),
+        },
+        &SearchAdapter {
+            state: ai.inner(),
+            vectors: vectors.inner(),
+        },
         cancel,
         resolved.excluded_count,
+        on_progress,
     )
     .await
 }
@@ -889,7 +288,7 @@ pub async fn agent_preview_grant<R: Runtime>(
     // leaving a gap. Cheaper to make the claim true than to record an exception
     // nobody wanted.
     require_ai_enabled(&app, &vault).await?;
-    let source = DesktopScopeSource {
+    let source = HostScopeSource {
         app: app.clone(),
         vault: vault.inner(),
         indices: indices.inner(),
@@ -934,67 +333,19 @@ pub async fn agent_apply<R: Runtime>(
     vault: State<'_, VaultRuntimeState>,
     hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<ApplyOutcome, AgentError> {
-    require_unlocked(&vault).await?;
-    require_ai_enabled(&app, &vault).await?;
-    // The excluded-folder set is re-read HERE, at the write, rather than carried
-    // from the run that proposed these edits. A user who excludes a folder while
-    // a proposal sits on the review screen means it, and the newest answer is the
-    // one that should decide what gets created.
-    let excluded = DesktopScopeSource {
-        app: app.clone(),
-        vault: vault.inner(),
-        indices: indices.inner(),
-    }
-    .excluded_folders()
-    .await?;
-    // READ, not take. Consumption happens after the apply, keyed off what it
-    // actually created, so a failure leaves every approved note retryable.
-    let new_notes = sessions.read_approved_new_notes(&run_id, &approved_new_notes);
-    // The edit-side twin: only edits the host recorded the model proposing are
-    // applied, and the rest are reported rather than dropped. The indices are
-    // positions in the APPROVED list, which is what `RefusedEdit::index` means
-    // everywhere else on this path.
-    let (approved, not_proposed) = sessions.retain_proposed_edits(&run_id, &approved);
-    let reader = NoteReadAdapter {
-        host: TauriHost::new(app.clone()),
-        state: vault.inner(),
-    };
-    let restore = RestoreAdapter {
-        host: TauriHost::new(app.clone()),
-        state: vault.inner(),
-    };
-    let writer = WriteAdapter {
-        host: TauriHost::new(app),
-        state: vault.inner(),
-        hooks: hooks.inner().clone(),
-    };
-    let mut outcome = apply_approved(
-        &runs, &run_id, &approved, &new_notes, &excluded, approval, &reader, &restore, &writer,
+    apply_from_host(
+        app,
+        run_id,
+        approved,
+        approved_new_notes,
+        approval,
+        runs.inner(),
+        sessions.inner(),
+        indices.inner(),
+        vault.inner(),
+        hooks.inner(),
     )
-    .await?;
-    for index in not_proposed {
-        outcome.refused.push(RefusedEdit {
-            note_id: String::new(),
-            index,
-            reason: EditRejection::NotProposed,
-        });
-    }
-    // Now drop the ones that landed, and only those. On the `?` above nothing is
-    // consumed, which is the point: the user can retry and the notes are still
-    // there. A per-note `createFailed` refusal is retryable for the same reason.
-    sessions.consume_created_new_notes(&run_id, &outcome.created_new_note_indices);
-    // Record it under the run id, so undo survives the review screen closing.
-    // Recorded only when something was actually written: an apply whose every
-    // edit was refused took no restore point, and offering to undo it would be
-    // an offer to restore nothing.
-    if !outcome.restore_points.is_empty() || !outcome.notes_created.is_empty() {
-        runs.record_applied(AppliedRun {
-            run_id: run_id.clone(),
-            restore_points: outcome.restore_points.clone(),
-            notes_created: outcome.notes_created.len(),
-        });
-    }
-    Ok(outcome)
+    .await
 }
 
 /// The run the user could still undo, if there is one.
@@ -1041,75 +392,27 @@ pub async fn agent_undo<R: Runtime>(
     vault: State<'_, VaultRuntimeState>,
     hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<AgentUndoResult, AgentError> {
-    require_unlocked(&vault).await?;
-    let record = runs.take_applied(&run_id)?;
-    let notes_created = record.notes_created;
-    let host = TauriHost::new(app);
-    let mut reverted = 0usize;
-    let mut failed = Vec::new();
-    for (note_id, snapshot_id) in record.restore_points {
-        let snapshot_id_for_retry = snapshot_id.clone();
-        match snapshot_restore_from_host(
-            &host,
-            vault.inner(),
-            hooks.inner(),
-            note_id.clone(),
-            snapshot_id,
-            &StdVaultIo,
-        )
-        .await
-        {
-            Ok(()) => reverted += 1,
-            Err(_) => failed.push((note_id, snapshot_id_for_retry)),
-        }
-    }
-    // **Put the FAILED points back, so the undo can be retried.**
-    // `take_applied` consumes deliberately: a second undo of the same record
-    // would restore the same snapshots over whatever the user has written since,
-    // which would look successful. That reasoning covers the notes that WERE
-    // restored and not the ones that were not. Those were never touched, so a
-    // retry cannot overwrite anything, and consuming the whole record made a
-    // partial failure permanent. Found in the review of myne-md/myne#531.
-    //
-    // `notes_created` is not carried back: those notes are still there, an undo
-    // never reverted them, and re-reporting the count on a retry would say the
-    // second attempt left them behind as if that were news.
-    if !failed.is_empty() {
-        runs.record_applied(AppliedRun {
-            run_id: run_id.clone(),
-            restore_points: failed.clone(),
-            notes_created: 0,
-        });
-    }
-    let failed: Vec<String> = failed.into_iter().map(|(id, _)| id).collect();
-    Ok(AgentUndoResult {
-        reverted,
-        failed,
-        notes_created_not_reverted: notes_created,
-    })
-}
-
-/// What an undo did.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AgentUndoResult {
-    /// How many notes were restored to their pre-apply text.
-    pub reverted: usize,
-    /// Notes whose snapshot would not restore. Named so the user can act.
-    pub failed: Vec<String>,
-    /// How many notes the run CREATED and this undo therefore left in place.
-    pub notes_created_not_reverted: usize,
+    undo_from_host(app, run_id, runs.inner(), vault.inner(), hooks.inner()).await
 }
 
 /// Whether agent mode can run on the configured backend, and why not.
 #[tauri::command]
 pub async fn agent_capability<R: Runtime>(
     app: AppHandle<R>,
+    // **The wait, reported while it is a wait** (myne-md/myne#575). This command
+    // returns once, when everything is done, which was measured at 40 seconds;
+    // until then the surface showed one unchanging label and read as a hang. A
+    // `Channel` rather than an event, for the reason `agent_start`'s `on_open`
+    // gives: it is an ordinary parameter, so there is no new command and no ACL
+    // change.
+    on_attempt: Channel<ProbeProgress>,
     ai: State<'_, LocalInferenceState>,
     vault: State<'_, VaultRuntimeState>,
 ) -> Result<ProbeVerdict, AgentError> {
     require_unlocked(&vault).await?;
     require_ai_enabled(&app, &vault).await?;
+    // Same reason as `agent_start`: the gate is read here, not remembered.
+    ai.refresh().await;
     let engine = EngineAdapter {
         state: ai.inner(),
         cancel: Arc::new(AtomicBool::new(false)),
@@ -1125,7 +428,12 @@ pub async fn agent_capability<R: Runtime>(
     // flag that could only ever read `false` would be a claim the code cannot
     // make.
     let started = std::time::Instant::now();
-    let verdict = run_probe(&engine, probe_threshold()).await;
+    // A failed send is ignored, exactly as `agent_start`'s is: a closed channel
+    // means the surface let go, and the probe is unaffected either way.
+    let sink = move |p: ProbeProgress| {
+        let _ = on_attempt.send(p);
+    };
+    let verdict = run_probe(&engine, probe_threshold(), &sink).await;
     tracing::debug!(
         target: "myne::agent",
         event = "probe_returned",
@@ -1135,17 +443,16 @@ pub async fn agent_capability<R: Runtime>(
         // here.
         passed = verdict.as_ref().map(|v| v.passed).unwrap_or(false),
         passes = verdict.as_ref().map(|v| v.passes).unwrap_or(0),
+        // What was actually ASKED. Since the early exit this is the number the
+        // elapsed time above is explained by, and it differs from the threshold
+        // whenever the verdict settled early.
+        asked = verdict.as_ref().map(|v| v.attempts.len()).unwrap_or(0),
     );
     verdict
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::collections::BTreeSet;
-
-    // ---- the run id reaches the surface before the loop runs -------------
-
     /// `agent_start` sends the run's view BEFORE it drives the loop.
     ///
     /// The ordering is the entire fix (myne-md/myne#544): this command returns
@@ -1185,242 +492,46 @@ mod tests {
         );
     }
 
-    // ---- the compiled-in probe threshold --------------------------------
-
-    /// The strictness that used to live in an `assert_eq!` inside
-    /// `probe_threshold`, moved here so it fails a `cargo test` rather than an
-    /// IPC call.
-    #[test]
-    fn the_compiled_in_threshold_file_is_well_formed() {
-        let parsed = parse_probe_threshold(PROBE_THRESHOLD_JSON)
-            .expect("agent-probe-threshold.json must parse and be self-consistent");
-        assert!(
-            parsed.required <= parsed.attempts,
-            "a bar of {} out of {} attempts can never be cleared",
-            parsed.required,
-            parsed.attempts
-        );
-    }
-
-    /// Both directions of the status/measurements agreement, injected. The
-    /// check is worth nothing unless it has been seen to fire, and a check that
-    /// is only ever run against a passing input has not been.
-    #[test]
-    fn a_record_that_disagrees_with_itself_is_refused_both_ways() {
-        let claims_measured =
-            r#"{"attempts":3,"required":2,"status":"measured","measurements":[]}"#;
-        assert!(
-            parse_probe_threshold(claims_measured).is_err(),
-            "`measured` with no measurements is a claim nobody made"
-        );
-        let claims_unmeasured =
-            r#"{"attempts":3,"required":2,"status":"unmeasured","measurements":[{"backend":"x"}]}"#;
-        assert!(
-            parse_probe_threshold(claims_unmeasured).is_err(),
-            "`unmeasured` with measurements has stopped describing itself"
-        );
-        assert!(
-            parse_probe_threshold("not json").is_err(),
-            "a malformed record is refused rather than parsed into a default"
-        );
-    }
-
-    /// The fallback direction: unreadable must mean UNAVAILABLE, not available.
-    #[test]
-    fn an_unreadable_record_falls_back_to_a_bar_no_backend_clears() {
-        // Driving the fallback through the real function rather than asserting
-        // the literal: what matters is what a caller receives when the parse
-        // fails, and a test that restated the constant would pass against a
-        // version that never used it.
-        let fallback = parse_probe_threshold("not json").unwrap_or(ProbeThreshold {
-            attempts: 1,
-            required: u8::MAX,
-            provisional: true,
-        });
-        assert!(
-            fallback.required > fallback.attempts,
-            "fail-closed: an unreadable threshold must be unclearable, not permissive"
-        );
-        assert!(fallback.provisional, "and it must not claim to be measured");
-    }
-
-    fn note(title: &str) -> ProposedNote {
-        ProposedNote {
-            title: title.into(),
-            body: "body".into(),
-            folder: None,
-        }
-    }
-
-    fn session_with(notes: &[&str]) -> AgentSessionState {
-        let st = AgentSessionState::default();
-        let mut table = st.sessions.lock().unwrap();
-        let mut s = Session::default();
-        s.proposal.new_notes = notes.iter().map(|t| note(t)).collect();
-        table.insert("r".to_string(), s);
-        drop(table);
-        st
-    }
-
-    fn remaining(st: &AgentSessionState) -> Vec<String> {
-        st.sessions
-            .lock()
-            .unwrap()
-            .get("r")
-            .map(|s| {
-                s.proposal
-                    .new_notes
-                    .iter()
-                    .map(|n| n.title.clone())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    /// Reading the approved notes must not remove them.
+    /// Every command that consults the provider gate re-reads it first.
     ///
-    /// The consuming version ran BEFORE the apply, which can still fail, and on
-    /// failure the notes were gone from the record and never created: the screen
-    /// kept rendering them, a retry sent the same indices, found a shorter list,
-    /// and silently created nothing.
+    /// `provider_gate.rs` says the gate is "host-side, and re-read at request
+    /// time", and until myne-md/myne#456's review that was true of `ai_enabled`
+    /// alone: the consent, the key and the model came from a cached snapshot
+    /// filled by whichever surface last touched it. The compensating control for
+    /// dropping `developer_mode` from the gate cannot be a cached one.
+    ///
+    /// Driven at the source, like `cli_bridge::socket`'s accept-loop test:
+    /// asserting this behaviourally would mean standing up a real `AppHandle`
+    /// and a vault. The three names are spelled out rather than derived, so a
+    /// FOURTH gate-consulting command does not join silently; it fails review
+    /// instead, which is where that decision belongs.
     #[test]
-    fn reading_approved_new_notes_leaves_the_record_intact_for_a_retry() {
-        let st = session_with(&["A", "B", "C"]);
-        let read = st.read_approved_new_notes("r", &[0, 2]);
-        assert_eq!(read.len(), 2);
-        assert_eq!(read[0].0, 0);
-        assert_eq!(read[1].0, 2);
-        // The state, not the return value: a read that reported the right pair
-        // while removing them would pass a return-value assertion.
-        assert_eq!(remaining(&st), vec!["A", "B", "C"]);
-    }
-
-    /// And consuming drops exactly what landed, so a partial apply stays
-    /// retryable for the rest.
-    #[test]
-    fn consuming_drops_only_the_notes_that_were_created() {
-        let st = session_with(&["A", "B", "C"]);
-        st.consume_created_new_notes("r", &[1]);
-        assert_eq!(remaining(&st), vec!["A", "C"]);
-    }
-
-    #[test]
-    fn consuming_nothing_is_what_a_failed_apply_does() {
-        let st = session_with(&["A", "B"]);
-        st.consume_created_new_notes("r", &[]);
-        assert_eq!(remaining(&st), vec!["A", "B"]);
-    }
-
-    #[test]
-    fn an_out_of_range_index_is_dropped_rather_than_erroring() {
-        // Only a stale screen can send one, and refusing the whole apply over it
-        // is worse than applying the rest.
-        let st = session_with(&["A"]);
-        assert_eq!(st.read_approved_new_notes("r", &[0, 9]).len(), 1);
-        st.consume_created_new_notes("r", &[9]);
-        assert_eq!(remaining(&st), vec!["A"]);
-    }
-
-    #[test]
-    fn the_probe_threshold_parses_from_the_recorded_file() {
-        let t = probe_threshold();
-        assert!(t.attempts >= 1);
-        assert!(t.required >= 1);
-        assert!(
-            t.required <= t.attempts,
-            "a bar higher than the attempt count could never be met"
-        );
-    }
-
-    #[test]
-    fn the_recorded_threshold_file_says_whether_it_was_measured() {
-        // The number is debt until someone runs the probe against real models.
-        // Asserting the field exists is what keeps the honesty from being
-        // quietly dropped in a later edit.
-        let v: serde_json::Value = serde_json::from_str(PROBE_THRESHOLD_JSON).unwrap();
-        assert!(v.get("status").is_some(), "the file states its own status");
-        assert!(
-            v.get("measurements").is_some(),
-            "and carries the measurements, or an empty list saying there are none"
-        );
-    }
-
-    #[test]
-    fn sessions_clear_leaves_none_behind() {
-        let s = AgentSessionState::default();
-        s.sessions.lock().unwrap().insert(
-            "r".into(),
-            Session {
-                task: "t".into(),
-                ..Default::default()
-            },
-        );
-        assert_eq!(s.len(), 1);
-        s.clear();
-        assert!(s.is_empty(), "no transcript survives a lock");
-    }
-
-    // ---- the session table's bound ---------------------------------------
-
-    fn session_with_task(task: &str) -> Session {
-        Session {
-            task: task.into(),
-            ..Default::default()
+    fn every_gate_consulting_command_refreshes_the_snapshot_first() {
+        let src = include_str!("commands.rs");
+        for name in [
+            "pub async fn agent_start",
+            "pub async fn agent_approve_scope",
+            "pub async fn agent_capability",
+        ] {
+            let at = src
+                .find(name)
+                .unwrap_or_else(|| panic!("{name} must exist"));
+            let end = src[at..]
+                .find("\n}\n")
+                .map(|i| at + i)
+                .unwrap_or_else(|| panic!("{name} must have a body"));
+            let body = &src[at..end];
+            let gate = body
+                .find("require_ai_enabled")
+                .unwrap_or_else(|| panic!("{name} must consult the gate"));
+            let refresh = body.find("ai.refresh().await").unwrap_or_else(|| {
+                panic!("{name} no longer refreshes the snapshot before the gate")
+            });
+            assert!(
+                refresh > gate,
+                "{name} refreshes before it checks ai_enabled, which reads the disk anyway; \
+                 the refresh belongs after it so a refused request costs no prefs read"
+            );
         }
-    }
-
-    /// The run table caps and evicts; this table did not, so an evicted run's
-    /// plaintext stayed resident until the vault locked
-    /// (myne-md/myne#531 review round six).
-    #[test]
-    fn a_session_whose_run_was_evicted_is_dropped() {
-        let s = AgentSessionState::default();
-        {
-            let mut t = s.sessions.lock().unwrap();
-            t.insert("evicted".into(), session_with_task("old"));
-            t.insert("live".into(), session_with_task("current"));
-        }
-        assert_eq!(s.len(), 2);
-        s.prune_to(&BTreeSet::from(["live".to_string()]));
-        let table = s.sessions.lock().unwrap();
-        assert_eq!(
-            table.keys().cloned().collect::<Vec<_>>(),
-            vec!["live".to_string()],
-            "only the run core still holds keeps its session"
-        );
-    }
-
-    /// The direction a prune is most likely to break: pruning must not remove a
-    /// session whose run is live, which would take the transcript out from under
-    /// a running step.
-    #[test]
-    fn a_live_run_keeps_its_session() {
-        let s = AgentSessionState::default();
-        s.sessions
-            .lock()
-            .unwrap()
-            .insert("r".into(), session_with_task("t"));
-        s.prune_to(&BTreeSet::from(["r".to_string(), "other".to_string()]));
-        assert_eq!(s.len(), 1);
-    }
-
-    /// The prune drives the SAME wipe the lock teardown does, so the two cannot
-    /// drift into different notions of "gone". Asserted through `wipe_session`
-    /// directly, because a dropped session's memory cannot be read afterwards
-    /// and a test that claimed to check it would be claiming more than its
-    /// inputs can prove.
-    #[test]
-    fn the_prune_and_the_lock_teardown_wipe_through_one_function() {
-        let mut session = Session {
-            task: "secret task".into(),
-            ..Default::default()
-        };
-        session.proposal.summary = "secret summary".into();
-        wipe_session(&mut session);
-        assert!(session.task.bytes().all(|b| b == 0), "task overwritten");
-        assert!(
-            session.proposal.summary.bytes().all(|b| b == 0),
-            "summary overwritten"
-        );
     }
 }

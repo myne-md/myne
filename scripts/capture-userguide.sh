@@ -14,6 +14,8 @@
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 
 IMAGE=myne-e2e
 SKIP_BUILD=0
@@ -47,24 +49,14 @@ RUN_FLAGS=(
   --rm
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
-  -v myne-e2e-target:/work/target
-  # Mounted where cargo actually LOOKS, which is `$CARGO_HOME/registry` — and
-  # `E2E_ENV` below sets `CARGO_HOME=/home/e2e/.cargo`. At
-  # `/usr/local/cargo/registry` nothing in this container reads it, so every
-  # `--rm` run re-downloaded the whole crate set (measured live: 528 MB written
-  # to the container-local path while the persisted volume held 59 MB
-  # untouched). `e2e-ai-buildrun.sh` already had it right.
-  -v myne-e2e-cargo-registry:/home/e2e/.cargo/registry
+  -v "$E2E_TARGET_VOLUME":/work/target
+  "${E2E_REGISTRY_MOUNT[@]}"
   # Per-member node_modules volumes, matching the three e2e runners. Without
   # them the container's `pnpm install` rewrites each bind-mounted workspace
   # member's symlinks and breaks the HOST install — the documented failure mode
   # (e2e/CLAUDE.md). This script had never carried them; it got away with it
   # only because a capture run happens rarely.
-  -v myne-e2e-nm-dialect:/work/dialect/node_modules
-  -v myne-e2e-nm-editor:/work/editor/node_modules
-  -v myne-e2e-nm-copy:/work/copy/node_modules
-  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
-  -v myne-e2e-nm-preview:/work/preview/node_modules
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
   -w /work
   --user root
 )
@@ -74,7 +66,7 @@ E2E_ENV="export ${SCALE_ENV}HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HO
 # repo root stays host-owned (root), so the unprivileged `e2e` build user can't
 # create /work/dist and `vite build` fails with EACCES. (Docker Desktop on macOS
 # masks this via ownership remapping; native Linux / CI does not.)
-FIX_PERMS='chown -R e2e:e2e /work /home/e2e/.cargo'
+FIX_PERMS='chown -R e2e:e2e /work'
 
 BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
 if [[ "$SKIP_BUILD" == 1 ]]; then
@@ -82,7 +74,7 @@ if [[ "$SKIP_BUILD" == 1 ]]; then
 fi
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&

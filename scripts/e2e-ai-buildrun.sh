@@ -5,7 +5,7 @@
 # BOTH or neither: the binary must be built `--features local-inference-stub`
 # (so `StubEngine` answers instead of a missing model), and the suite must run
 # with `MYNE_E2E_AI=1` (so `aiDescribe` is not `describe.skip`). CI pairs them in
-# `.woodpecker.yml`; locally there was no way to get them at all, which is how a
+# `.woodpecker/e2e.yml`; locally there was no way to get them at all, which is how a
 # whole family of specs came to be written without ever being run once.
 #
 #   ./scripts/e2e-ai-buildrun.sh agent-run
@@ -17,11 +17,14 @@
 # single runs measures the harness rather than the scenario.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 IMAGE=myne-e2e
 
 # `voice-capture-stub` is what `e2e-buildrun.sh` passes and the rest of the
 # suite expects; `local-inference-stub` is this runner's reason to exist.
-INNER='set -e; pnpm install --frozen-lockfile && pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub; set +e; PASS=""; FAIL="";'
+# The `touch` forces the frontend re-embed; scripts/e2e-buildrun.sh says why.
+INNER='set -e; pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub; set +e; PASS=""; FAIL="";'
 i=0
 for spec in "$@"; do
   i=$((i + 1))
@@ -38,36 +41,25 @@ RUN_FLAGS=(
   # Member node_modules MUST be volumes too (mirrors e2e-local.sh): the
   # container's pnpm install otherwise rewrites the bind-mounted members'
   # symlinks to container-side .pnpm hashes, breaking the HOST install.
-  -v myne-e2e-nm-dialect:/work/dialect/node_modules
-  -v myne-e2e-nm-editor:/work/editor/node_modules
-  -v myne-e2e-nm-copy:/work/copy/node_modules
-  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
-  -v myne-e2e-nm-preview:/work/preview/node_modules
-  -v myne-e2e-target:/work/target
-  # **At `$CARGO_HOME/registry`, not `/usr/local/cargo/registry`.** `E2E_ENV`
-  # below sets `CARGO_HOME=/home/e2e/.cargo`, so that is the only registry path
-  # cargo reads or writes; a volume mounted anywhere else is a cache nothing
-  # consults. Mounted at the image's default path, this runner re-downloaded the
-  # crates.io index and every crate source on EVERY invocation, threw the result
-  # away with `--rm`, and spent ~15 min doing it before the first line of the
-  # build appeared. Nothing reports that: the run is green, only slow, which is
-  # why it survived.
-  #
-  # The four sibling runners (`e2e-buildrun.sh`, `e2e-local.sh`, `e2e-one.sh`,
-  # `e2e-batch.sh`) still mount it at the unused path. This file was copied from
-  # them, so the defect is theirs first; fixing them is a change with its own
-  # claim to verify and does not belong in myne-md/myne#529. Deliberate
-  # divergence, recorded here rather than left to read as a typo.
-  -v myne-e2e-cargo-registry:/home/e2e/.cargo/registry
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
+  -v "$E2E_TARGET_VOLUME":/work/target
+  # At `$CARGO_HOME/registry`, and the reason is in `scripts/lib/e2e-docker.sh`.
+  # This runner found it and fixed itself while recording that the four siblings
+  # were still mounting the volume where nothing reads it; that divergence is
+  # closed, and the mount lives in the include so a seventh runner inherits it.
+  "${E2E_REGISTRY_MOUNT[@]}"
   -w /work
   --user root
 )
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true MYNE_E2E_AI=1 npm_config_store_dir=/home/e2e/.pnpm-store'
+# Host-side append, NOT inside the single-quoted literal above: that string is
+# passed through to the container's bash, where `$E2E_CARGO_JOBS` is unset and
+# would expand to nothing. See scripts/lib/e2e-docker.sh.
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS"
 
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/ornaments/node_modules /work/preview/node_modules /work/target /home/e2e/.cargo/registry'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $INNER

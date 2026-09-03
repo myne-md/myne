@@ -16,5 +16,5 @@
     <string name="myne_encrypted_two_line">Encrypted\nand private</string>
     <string name="myne_voice_note">New voice note</string>
 
-    <string name="myne_tile_new_note_label">Myne — New note</string>
+    <string name="myne_tile_new_note_label">Myne: New note</string>
 </resources>

@@ -2,7 +2,7 @@
 # Reproducible-wasm gate for CI (phase3-web-client task 16).
 #
 # Installs the pinned `wasm-bindgen-cli`, then runs the double-build check.
-# Lives in a committed script rather than inline in `.woodpecker.yml` for the
+# Lives in a committed script rather than inline in `.woodpecker/main.yml` for the
 # reason that file already documents twice: Woodpecker's config-compile runs env
 # substitution over the YAML, and a shell expansion there can error the whole
 # pipeline config rather than the step.

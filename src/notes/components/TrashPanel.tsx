@@ -60,9 +60,16 @@ const EMPTY_TRASH_BTN_STYLE: CSSProperties = {
   transition: HOVER_TRANSITION,
 };
 
+/**
+ * A staged purge, plus how it was asked for. `viaKey` is the activating event's
+ * own answer (`detail === 0` is keyboard activation) and it reaches
+ * `DeleteConfirmModal` as `openedByKey`: both of these are the cryptographic
+ * erase of `design-notes/storage/0105`, so a key that is still held from
+ * opening the dialog must not be able to answer it.
+ */
 type Confirm =
-  | { kind: "single"; id: NoteId; title: string | null }
-  | { kind: "empty"; ids: NoteId[] }
+  | { kind: "single"; id: NoteId; title: string | null; viaKey: boolean }
+  | { kind: "empty"; ids: NoteId[]; viaKey: boolean }
   | null;
 
 export type TrashPanelProps = {
@@ -180,8 +187,12 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                 })}
                 style={EMPTY_TRASH_BTN_STYLE}
                 data-testid="trash.empty"
-                onClick={() =>
-                  setConfirm({ kind: "empty", ids: records.map((r) => r.noteUuid) })
+                onClick={(e) =>
+                  setConfirm({
+                    kind: "empty",
+                    ids: records.map((r) => r.noteUuid),
+                    viaKey: e.detail === 0,
+                  })
                 }
               >
                 {t("notes.trash.empty")}
@@ -247,11 +258,12 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                     data-note-id={r.noteUuid}
                     title={t("notes.trash.delete")}
                     aria-label={t("notes.trash.delete")}
-                    onClick={() =>
+                    onClick={(e) =>
                       setConfirm({
                         kind: "single",
                         id: r.noteUuid,
                         title: r.title,
+                        viaKey: e.detail === 0,
                       })
                     }
                   >
@@ -270,6 +282,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
           noteTitle={confirm.title}
           title={t("notes.trash.purgeConfirmTitle")}
           confirmLabel={t("notes.trash.purgeConfirmCta")}
+          openedByKey={confirm.viaKey}
           onCancel={() => setConfirm(null)}
           onConfirm={() => void confirmPurge()}
         />
@@ -281,6 +294,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
             count: confirm.ids.length,
           })}
           confirmLabel={t("notes.trash.emptyConfirmCta")}
+          openedByKey={confirm.viaKey}
           onCancel={() => setConfirm(null)}
           onConfirm={() => void confirmPurge()}
         />

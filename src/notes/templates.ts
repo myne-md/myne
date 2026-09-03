@@ -19,6 +19,7 @@ import {
   TEMPLATE_FLAG_VALUE,
 } from "../dialect";
 import { noteCreate } from "./createNote";
+import { flushBeforeFrontmatterWrite } from "./flushBeforeFrontmatterWrite";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
 import { noteList } from "./listNotes";
@@ -48,7 +49,9 @@ export async function createTemplate(
   // State A/B compose to canonical `---\ntitle: <name>\ntemplate: true\n---\n\n<body>`.
   bytes = patchTitleField(bytes, name);
   bytes = patchTemplateField(bytes, TEMPLATE_FLAG_VALUE);
-  return await noteCreate(decoder.decode(bytes));
+  // A template note is filed nowhere: `createTemplate` writes `template: true`
+  // and no `folder:`, so there is no folder to register.
+  return await noteCreate(decoder.decode(bytes), null);
 }
 
 /**
@@ -58,6 +61,11 @@ export async function createTemplate(
  * content edit). Rejects with whatever `noteRead` / `noteUpdate` propagate.
  */
 export async function convertNoteToTemplate(noteId: string): Promise<void> {
+  // Same class as `setNoteCover`, same reason (myne-md/myne#520): this is
+  // read-patch-write against disk on a note that may be open and dirty, and it
+  // is fired from the command palette, which is exactly the type-then-Cmd+K
+  // window that fits inside one autosave debounce.
+  await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const marked = patchTemplateField(encoder.encode(current), TEMPLATE_FLAG_VALUE);
   await noteUpdate(noteId, decoder.decode(marked));
@@ -73,6 +81,7 @@ export async function convertNoteToTemplate(noteId: string): Promise<void> {
  * safe on a note that is not a template. Rejects with the underlying IPC error.
  */
 export async function convertTemplateToNote(noteId: string): Promise<void> {
+  await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const demoted = patchTemplateField(encoder.encode(current), null);
   await noteUpdate(noteId, decoder.decode(demoted));

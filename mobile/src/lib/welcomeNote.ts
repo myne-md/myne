@@ -55,7 +55,8 @@ export function welcomeNoteMarkdown(): string {
  */
 export async function seedWelcomeNote(): Promise<void> {
   try {
-    await noteCreate(stampUpdated(welcomeNoteMarkdown()));
+    // The welcome note is a root note by construction.
+    await noteCreate(stampUpdated(welcomeNoteMarkdown()), null);
   } catch {
     // Onboarding nicety, not load-bearing — swallow any IPC/encode failure.
   }

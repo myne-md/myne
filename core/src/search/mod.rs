@@ -1279,8 +1279,25 @@ mod tests {
 
     // ---- MYND-448a: separate attachment docs --------------------------
 
-    fn att(id_hex: &str, title: &str, body: &str) -> (String, String, String) {
-        (id_hex.to_string(), title.to_string(), body.to_string())
+    /// Build a `(attachment_id_hex, title, body)` triple with a CATALOG-SHAPED
+    /// id: 64 lowercase hex, which is what `hex_encode` produces and what
+    /// `parse_search_doc_id` now requires.
+    ///
+    /// The seed used to be pasted in as the id itself, so these fixtures ran on
+    /// three-character ids no catalog could ever hold. That is not cosmetic: an
+    /// unfaithful fixture is what let `make_attachment_doc_id`'s two `&str`
+    /// arguments be transposed without a single test noticing.
+    fn att_id(seed: &str) -> String {
+        let mut id: String = seed.bytes().map(|b| char::from(b'a' + (b % 6))).collect();
+        while id.len() < 64 {
+            id.push_str(&id.clone());
+        }
+        id.truncate(64);
+        id
+    }
+
+    fn att(seed: &str, title: &str, body: &str) -> (String, String, String) {
+        (att_id(seed), title.to_string(), body.to_string())
     }
 
     #[test]
@@ -1298,7 +1315,7 @@ mod tests {
         assert_eq!(
             doc_id::parse_search_doc_id(&hits[0].id),
             doc_id::SearchDocId::Attachment {
-                attachment_id: "deadbeef",
+                attachment_id: &att_id("deadbeef"),
                 note_id: "note1",
             }
         );
@@ -1383,7 +1400,7 @@ mod tests {
         assert_eq!(
             doc_id::parse_search_doc_id(&hits[0].id),
             doc_id::SearchDocId::Attachment {
-                attachment_id: "bbb",
+                attachment_id: &att_id("bbb"),
                 note_id: "note2",
             }
         );

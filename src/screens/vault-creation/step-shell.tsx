@@ -7,6 +7,8 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Icon } from "../../components/primitives/Icon";
 import type { IconName } from "../../lib/icons";
+import { stageRootStyle } from "../../components/primitives/stageRoot";
+import { scrollRegionStyle, useScrollEdges } from "../../hooks/useScrollEdges";
 
 interface StepLayoutProps {
   width?: number;
@@ -21,24 +23,34 @@ export function StepLayout({
   gap = 20,
   children,
 }: StepLayoutProps) {
+  const { ref, fadeProps } = useScrollEdges<HTMLDivElement>();
   return (
     <div
       style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        ...stageRootStyle,
         background: "var(--bg-1)",
         padding: "var(--space-5)",
       }}
     >
       <div
+        ref={ref}
+        {...fadeProps}
         style={{
           width,
           display: "flex",
           flexDirection: "column",
           gap,
           alignItems: align === "center" ? "center" : "stretch",
+          // Bounded and scrollable, because `stageRootStyle` bounds the ROOT.
+          // Before that, `min-height: 100vh` let the box grow to fit and overflow
+          // ran off the bottom only, so the top of the step stayed on screen.
+          // A capped root with `alignItems: center` pushes a too-tall column out
+          // of BOTH ends instead, and these are the tallest surfaces in the tree:
+          // on a short window the recovery-phrase display and the password step
+          // lose their heading and their Continue button at once, with no way to
+          // reach either. Same pair `CenteredCard` and `VaultPicker` got.
+          ...scrollRegionStyle,
+          maxHeight: "100%",
         }}
       >
         {children}

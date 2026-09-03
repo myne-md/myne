@@ -127,6 +127,9 @@ describe("chat store helpers + run epoch", () => {
     const token = sendChatMessage("what color is the sky?");
     appendChatToken(token, "It is ");
     appendChatToken(token, "blue.");
+    // Provenance, not citations: this parameter took the Ask flow's retrieval
+    // hits, and Ask is gone (myne-md/myne#552). Passed rather than dropped: an
+    // optional parameter no test ever supplies is one nothing exercises.
     finalizeChatTurn(token, { kind: "in-process" });
 
     const state = getChat();

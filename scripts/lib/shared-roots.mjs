@@ -30,6 +30,7 @@ export const SHARED_ROOTS = Object.freeze([
   "editor/src",
   "dialect/src",
   "copy/src",
+  "client-core/src",
   "ornaments/src",
   // `preview/src` is deliberately ABSENT. It is a captured ARTEFACT (the app's
   // own DOM and stylesheet, plus one plain-ESM helper), not source compiled into

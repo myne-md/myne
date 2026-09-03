@@ -48,10 +48,31 @@ const SOURCES: &[(&str, &str)] = &[
 ///
 /// **Adding a name here is a deliberate act.** `HELP` and the search
 /// advisory are compile-time constants; `message` is the output of
-/// `output::error_parts`, whose every arm is asserted bounded below. A name
-/// that resolves to a note id, a folder, a path or an `io::Error` can never
-/// be added — that is the DENY list, and stderr is a diagnostic channel.
-const ALLOWED_STDERR_INTERPOLATIONS: &[&str] = &["HELP", "SEARCH_SCOPE_ADVISORY", "message"];
+/// `output::error_parts`, whose every arm is asserted bounded below;
+/// `period` (myne#177) is a `&'static str` chosen by a two-armed match on an
+/// already-matched literal, so it is one of `weekly` / `monthly` and can hold
+/// nothing the user typed; `DEVICE_CLOCK_NOTE` (myne#177) is a `&'static str`
+/// in `output.rs`. A name that resolves to a note id, a folder, a path or an
+/// `io::Error` can never be added. That is the DENY list, and stderr is a
+/// diagnostic channel.
+///
+/// One entry was removed rather than kept, and the removal is the interesting
+/// half. `timezone_note` used to sit here and held a string DESERIALIZED OFF
+/// THE SOCKET, which broke the property every other entry has: it was not
+/// produced in this crate, so its boundedness rested on the host keeping its
+/// own constant, which this guard cannot see. The wire now carries a bool and
+/// the sentence is `output.rs`'s, so the claim is true by construction.
+///
+/// Note what this guard reads: the NAME, not the value. It refused `command`
+/// (the raw verb the user typed) on exactly the right grounds, and the fix was
+/// to stop interpolating it rather than to widen the list.
+const ALLOWED_STDERR_INTERPOLATIONS: &[&str] = &[
+    "HELP",
+    "SEARCH_SCOPE_ADVISORY",
+    "message",
+    "period",
+    "DEVICE_CLOCK_NOTE",
+];
 
 /// Remove `#[cfg(test)] mod … { … }` blocks, brace-matched — the same shape
 /// (and the same reasoning) as the desktop-side audit's own helper: a plain

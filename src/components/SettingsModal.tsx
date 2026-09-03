@@ -682,7 +682,7 @@ export function SettingsModal({
     ),
     ai: <AiPanel onShowToast={onShowToast} onDialogOpenChange={setChildDialogOpen} />,
     network: <NetworkPanel />,
-    editor: <EditorPanel />,
+    editor: <EditorPanel onShowToast={onShowToast} />,
     files: <FilesPanel />,
     transcription: <TranscriptionPanel />,
     hotkeys: <HotkeysPanel />,

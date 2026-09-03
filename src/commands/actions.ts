@@ -41,6 +41,7 @@ import {
   type ThemeChoice,
 } from "../lib/prefs";
 import { applyTheme } from "../lib/theme";
+import { screenCaptureOverrideIsActive } from "../hooks/useScreenCaptureOverride";
 import i18n from "../i18n";
 
 /** Next element after `current` (or `fallback` when unset) in a cyclic list. */
@@ -249,7 +250,15 @@ const toggleScreenCaptureAction: CommandAction = {
   get category() {
     return i18n.t("commands.actions.category.app");
   },
-  visibility: editorOnly,
+  // Hidden while the device-local override is on (myne-md/myne#482), the same
+  // state that renders the Privacy switch inert. Without this the palette
+  // reopens the door the panel just closed: the write lands in `vault.prefs`,
+  // reports success, and `screen_capture::resolve` turns it into `false` at the
+  // native call, so the user is told protection changed over a window that did
+  // not. Hidden rather than disabled because the palette has nowhere to put the
+  // helper sentence the panel uses to explain it.
+  visibility: (ctx) =>
+    screenCaptureOverrideIsActive() ? "hidden" : editorOnly(ctx),
   run: (ctx) => {
     void setScreenCaptureProtection(!ctx.prefs.screen_capture_protection);
   },
@@ -488,7 +497,7 @@ const moveNoteAction = notesAction("note.move", "commands.actions.moveNote.label
 const emptyTrashAction = notesAction(
   "trash.empty",
   "commands.actions.emptyTrash.label",
-  (c) => c.onEmptyTrash(),
+  (c) => c.onEmptyTrash(c.activatedByKey === true),
   false,
 );
 
@@ -721,7 +730,39 @@ const openTodayNoteAction: CommandAction = {
   // reached via the ordinary Daily/ sidebar folder (no calendar, no date-picker).
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
-    ctx.onOpenTodayNote();
+    ctx.onOpenPeriodNote("daily");
+  },
+};
+
+const openThisWeekNoteAction: CommandAction = {
+  id: "periodic.open-this-week",
+  get label() {
+    return i18n.t("commands.actions.openThisWeekNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  // The weekly sibling of `daily.open-today` (myne#177), and deliberately the
+  // same shape: palette-only, no built-in hotkey, and past weeks reached
+  // through the ordinary sidebar folder. There is no previous/next command and
+  // no picker. That is the anti-calendar line daily already drew.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onOpenPeriodNote("weekly");
+  },
+};
+
+const openThisMonthNoteAction: CommandAction = {
+  id: "periodic.open-this-month",
+  get label() {
+    return i18n.t("commands.actions.openThisMonthNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onOpenPeriodNote("monthly");
   },
 };
 
@@ -1405,6 +1446,8 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   deleteWorkspaceAction,
   newNoteFromTemplateAction,
   openTodayNoteAction,
+  openThisWeekNoteAction,
+  openThisMonthNoteAction,
   randomNoteAction,
   manageTemplatesAction,
   openAttachmentsAction,

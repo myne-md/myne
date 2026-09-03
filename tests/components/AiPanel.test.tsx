@@ -92,19 +92,35 @@ let aiProviderModel: string | null = null;
 /** What the HOST says is answering. `in_process_local` is the honest default:
  *  a fresh profile has no provider resolved, whatever the preferences say. */
 let backendClass = "in_process_local";
+/** The stored budget the panel re-syncs its draft from. `null` is "unset", which
+ *  is a third state rather than a zero: zero means seed nothing. */
+let chatHistoryBudget: number | null = null;
+const setChatHistoryBudget = vi.fn((v: number | null) => {
+  chatHistoryBudget = v;
+  return Promise.resolve();
+});
+// MUTABLE, and that is the point (myne-md/myne#613 pr-review). A hard-coded `[]`
+// is the state the defect hid in: the panel seeded its textarea and its diff
+// baseline from the FIRST render, when `usePrefs` still holds `DEFAULT_PREFS`,
+// so a stored exclusion could never be removed through this surface. A test that
+// never sees a non-empty stored set cannot tell that from correct behaviour.
+let aiExcludedFolders: string[] = [];
+const setAiExcludedFoldersMock = vi.fn();
 vi.mock("../../src/hooks/usePrefs", () => ({
   usePrefs: () => ({
     prefs: {
       ai_enabled: aiEnabled,
       auto_tag_enabled: autoTagEnabled,
-      ai_excluded_folders: [],
+      ai_excluded_folders: aiExcludedFolders,
       ai_provider: aiProvider,
       ai_provider_consent: aiProvider,
       ai_provider_model: aiProviderModel,
+      chat_history_budget: chatHistoryBudget,
     },
     setAiEnabled: vi.fn(),
-    setAiExcludedFolders: vi.fn(),
+    setAiExcludedFolders: (...a: unknown[]) => setAiExcludedFoldersMock(...a),
     setAutoTagEnabled,
+    setChatHistoryBudget,
   }),
 }));
 
@@ -702,5 +718,140 @@ describe("AiPanel — what is answering right now", () => {
     // change (src/CLAUDE.md); a caption does not, and this is what keeps that
     // claim true rather than remembered.
     expect(caption.closest("[data-setting-row]")).toBeNull();
+  });
+});
+
+/**
+ * The chat-history budget control (myne-md/myne#617).
+ *
+ * Four unasserted branches used to sit between a typed number and how much
+ * plaintext leaves the device, and one of them was a defect review found: for
+ * `type="number"` the value IDL attribute returns "" for anything the control
+ * cannot parse, so "abc" took the clear-the-override branch and silently reset
+ * the bound to the host default. A control whose whole purpose is a privacy
+ * bound owes coverage more than most.
+ */
+describe("the chat-history budget control", () => {
+  const input = () => screen.getByLabelText("settings.ai.historyBudgetLabel");
+
+  beforeEach(() => {
+    chatHistoryBudget = null;
+    setChatHistoryBudget.mockClear();
+  });
+
+  it("has an accessible name, since SettingRow renders its label as a span", () => {
+    render(<AiPanel onShowToast={() => {}} />);
+    expect(input()).toBeTruthy();
+  });
+
+  it("stores a number the user typed", async () => {
+    render(<AiPanel onShowToast={() => {}} />);
+    fireEvent.change(input(), { target: { value: "500" } });
+    fireEvent.blur(input());
+    await waitFor(() => expect(setChatHistoryBudget).toHaveBeenCalledWith(500));
+  });
+
+  it("clears the override when the field is genuinely empty", async () => {
+    chatHistoryBudget = 500;
+    render(<AiPanel onShowToast={() => {}} />);
+    fireEvent.change(input(), { target: { value: "" } });
+    fireEvent.blur(input());
+    await waitFor(() => expect(setChatHistoryBudget).toHaveBeenCalledWith(null));
+  });
+
+  it("does NOT clear the override when the field holds unparseable input", async () => {
+    // The defect: jsdom mirrors the browser here, so `value` is "" and
+    // `validity.badInput` is what tells the two apart. A user who select-alls,
+    // mistypes and tabs away must not have their bound silently reset.
+    chatHistoryBudget = 500;
+    render(<AiPanel onShowToast={() => {}} />);
+    const el = input() as HTMLInputElement;
+    Object.defineProperty(el, "validity", {
+      configurable: true,
+      value: { badInput: true },
+    });
+    fireEvent.change(el, { target: { value: "" } });
+    fireEvent.blur(el);
+    await waitFor(() => expect(el.value).toBe("500"));
+    expect(setChatHistoryBudget).not.toHaveBeenCalled();
+  });
+
+  it("rejects a negative number rather than coercing it", async () => {
+    render(<AiPanel onShowToast={() => {}} />);
+    fireEvent.change(input(), { target: { value: "-5" } });
+    fireEvent.blur(input());
+    await waitFor(() => expect(setChatHistoryBudget).not.toHaveBeenCalled());
+  });
+
+  it("is disabled when AI is off, like every other control in this panel", () => {
+    aiEnabled = false;
+    render(<AiPanel onShowToast={() => {}} />);
+    expect((input() as HTMLInputElement).disabled).toBe(true);
+    aiEnabled = true;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// myne-md/myne#613 (pr-review): the excluded-folders editor must be able to
+// REMOVE.
+//
+// `ai_excluded_folders` is the control `docs/threat-model.md` A17 rests its
+// remote-provider mitigation on. The panel seeded its draft and its diff
+// baseline from `usePrefs`, whose first render is `DEFAULT_PREFS`, so both
+// captured the empty list and `mutationFrom([], folders)` was add-only. Before
+// the add/remove verbs the whole-set write DID remove, destructively but
+// effectively, so the fix for this issue took removal away from an egress
+// control.
+// ---------------------------------------------------------------------------
+
+describe("AiPanel: the excluded-folders editor after the prefs read lands", () => {
+  beforeEach(() => {
+    aiExcludedFolders = [];
+    setAiExcludedFoldersMock.mockReset();
+    aiEnabled = true;
+  });
+
+  it("shows the stored set once it arrives, not the empty first render", async () => {
+    const { rerender } = render(<AiPanel />);
+    // The read lands AFTER the first render, which is what `usePrefs` does.
+    aiExcludedFolders = ["Private/", "Money/"];
+    rerender(<AiPanel />);
+    const box = (await screen.findByTestId(
+      "ai.excluded-folders",
+    )) as HTMLTextAreaElement;
+    expect(box.value).toBe("Private/\nMoney/");
+  });
+
+  it("a removal reaches the write as a removal", async () => {
+    const { rerender } = render(<AiPanel />);
+    aiExcludedFolders = ["Private/", "Money/"];
+    rerender(<AiPanel />);
+    const box = (await screen.findByTestId(
+      "ai.excluded-folders",
+    )) as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "Private/" } });
+    fireEvent.blur(box);
+    // THE ASSERTION. Pre-fix the mutation was `{ add: ["Private/"], remove: [] }`,
+    // so the folder the user deleted stayed excluded on disk forever.
+    const [mutation] = setAiExcludedFoldersMock.mock.calls[0] as [
+      { add: string[]; remove: string[] },
+    ];
+    expect(mutation.remove).toEqual(["Money/"]);
+    expect(mutation.add).toEqual([]);
+  });
+
+  it("does not clobber an edit that started before the read landed", async () => {
+    // Why the re-seed is guarded rather than unconditional: a user who began
+    // typing into the empty box must not have it replaced under them.
+    const { rerender } = render(<AiPanel />);
+    const box = (await screen.findByTestId(
+      "ai.excluded-folders",
+    )) as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "TypedFirst/" } });
+    aiExcludedFolders = ["Private/"];
+    rerender(<AiPanel />);
+    expect(
+      (screen.getByTestId("ai.excluded-folders") as HTMLTextAreaElement).value,
+    ).toBe("TypedFirst/");
   });
 });

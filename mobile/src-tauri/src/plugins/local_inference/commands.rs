@@ -90,13 +90,10 @@ pub async fn transcribe<R: Runtime>(
         let wav = decode_attachment_plaintext(&vault_dir, &keys, &attachment_id)
             .map_err(|_| EngineError::TranscriptionFailed)?;
         // Decode + resample to 16 kHz mono; wrap the derived PCM.
-        let pcm = Zeroizing::new(super::audio::wav_to_mono_16k(&wav).map_err(|e| match e {
-            // The one decode failure that is not worth retrying: the same
-            // clip is refused every time, so it must not reach the UI as a
-            // generic failure with a retry button (myne#485).
-            super::audio::AudioError::TooLong => EngineError::AudioTooLong,
-            _ => EngineError::TranscriptionFailed,
-        })?);
+        // `?` through `From<AudioError>` (`error.rs`), which is exhaustive, so a
+        // new decode failure stops the build there rather than collapsing into
+        // `TranscriptionFailed` silently (myne#485, myne#510).
+        let pcm = Zeroizing::new(super::audio::wav_to_mono_16k(&wav)?);
         drop(wav);
         // Stream each decoded segment through the cancel publish-guard into the
         // IPC channel; the transcript text is never logged.
@@ -134,7 +131,14 @@ fn read_account_number_hash(
     vault_dir: &Path,
 ) -> Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]> {
     let bytes = std::fs::read(vault_dir.join("vault.meta")).ok()?;
-    protocol::parse_vault_meta(&bytes)
+    // Either generation (myne-md/myne#433), which this twin did not get until
+    // myne-md/myne#479. `parse_vault_meta` hard-rejects the `NTV5` magic, and
+    // this reader answers `None` rather than erroring, so on a MIGRATED vault
+    // the AAD binding silently failed to resolve and the transcript cache
+    // simply stopped sealing, no error, no log, a plausible "nothing cached".
+    // That is the exact silent shape `scripts/check-version-routing.mjs`
+    // exists to catch, and its `ROOTS` had never included this tree.
+    protocol::parse_vault_meta_any(&bytes)
         .map(|m| m.account_number_hash)
         .ok()
 }

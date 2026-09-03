@@ -12,6 +12,7 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use super::error::{PrefsReadError, PrefsWriteError};
+use super::set_mutation::{apply_set_mutation, SetMutation};
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
@@ -347,7 +348,7 @@ async fn update_prefs_with_dir(
 
     // MYND-478 (sync-protocol.md §10.2): stamp the LWW field clock of every
     // SHARED field this write changed — centrally, so no setter can forget.
-    // Device-local and set-union fields are never stamped; a wall-clock
+    // Device-local fields are never stamped; set-union fields are stamped PER ENTRY, for adds and removals alike, except the two monotone egress sets (`ai_excluded_folders`, `cli_excluded_folders`), which stamp nothing at all (myne-md/myne#613); a wall-clock
     // failure degrades to clock 0 (the legacy value) rather than blocking the
     // write.
     // Host clock (task 14 — the TODO this replaces was recorded in task 12).
@@ -363,12 +364,35 @@ async fn update_prefs_with_dir(
     let now_ms = host.now_unix_millis();
     crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(&before, &mut prefs, now_ms);
 
+    // myne#613: the last-resort cap guard, AFTER stamping, because stamping is
+    // the step that grows the blob. `apply_set_mutation`'s budget already keeps
+    // an ordinary write well inside the cap, including the tombstones a future
+    // removal will mint, so on every vault this feature created this sheds
+    // nothing and costs one length measurement.
+    //
+    // It is here for the vault that arrives OVER that budget anyway: one merged
+    // from a peer, or one whose set fields predate the budget entirely. On those
+    // a removal can still push the plaintext past the cap, and a removal is the
+    // one operation that must never be refused, since deleting is the only
+    // remedy the budget-full notice offers. Shedding the oldest tombstone is the
+    // recoverable loss; a `PrefsEncodeFailed` on a delete is not.
+    let shed = crate::plugins::prefs::set_mutation::shed_retained_clocks(&mut prefs);
+    if shed > 0 {
+        tracing::warn!(
+            stage = "prefs",
+            event = "retained_clocks_shed",
+            count = shed,
+            "the prefs blob was over the plaintext cap; shed the oldest removal clocks to keep it writable"
+        );
+    }
+
     // MYND-517: did this write change the SHARED subset? Compared via
     // `shared_subset_hash` — the §10.2.1 push gate's own discriminator — so
     // the bump below fires exactly when the sync phase would see a dirty
     // prefs blob: shared LWW edits (via their stamped clock), set-union edits
-    // (clockless, via the value itself), and `device_names` key changes all
-    // register; a device-local-only or no-op write never does.
+    // (via the value itself, and since myne#613 via their per-entry clocks too
+    // on the three fields that propagate removals), and `device_names` key
+    // changes all register; a device-local-only or no-op write never does.
     let shared_changed = shared_subset_hash(&prefs) != shared_subset_hash(&before);
 
     let blob_bytes =
@@ -1205,12 +1229,19 @@ pub(crate) async fn set_ai_provider_with_dir(
     Ok(())
 }
 
-/// `Slot::Unlocked`-gated setter for the one-time remote-provider consent
-/// (myne#415, SYNC-22).
+/// `Slot::Unlocked`-gated setter for the remote-provider consent
+/// (myne#415, SYNC-22; device-local since myne-md/myne#456).
 ///
 /// **A gate, not a display flag.** The request path checks it, so a client
-/// whose UI never showed the screen still cannot send. It is account-scoped —
-/// it syncs, so a newly enrolled device inherits it (`threat-model.md` §5).
+/// whose UI never showed the screen still cannot send.
+///
+/// **The caller hands a PROVIDER NAME and this function stores the
+/// device-scoped token.** The suffix is added here rather than by the caller so
+/// there is one writer of the stored spelling: the gate compares for equality,
+/// and a second spelling would be a silent refusal rather than an error anybody
+/// sees. `provider_gate::CONSENT_DEVICE_SUFFIX` carries the whole argument for
+/// why the token exists; in one line, a legacy bare-name value is what both
+/// silently-re-routed populations hold, and the gate must not accept it.
 pub async fn set_ai_provider_consent_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -1227,6 +1258,13 @@ pub async fn set_ai_provider_consent_from_host(
             return Err(PrefsWriteError::InvalidValue);
         }
     }
+    // Stored device-scoped, which is the form `provider_gate` requires: a bare
+    // wire name is refused there, so writing one here would record a consent
+    // that never opens the gate. `granted_for` is validated against
+    // `KNOWN_AI_PROVIDERS` above, so the name reaching the grammar is known.
+    let stored = granted_for
+        .as_deref()
+        .map(protocol::prefs::device_scoped_consent);
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     let present = granted_for.is_some();
@@ -1235,7 +1273,7 @@ pub async fn set_ai_provider_consent_from_host(
         state,
         hooks,
         |prefs| {
-            prefs.ai_provider_consent = granted_for.clone();
+            prefs.ai_provider_consent = stored.clone();
         },
         io,
         host,
@@ -1904,12 +1942,12 @@ pub async fn set_spell_languages_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    languages: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_spell_languages_with_dir(&dir, state, hooks, languages, io, host).await
+    set_spell_languages_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -1920,13 +1958,13 @@ pub async fn set_spell_languages<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    languages: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_spell_languages_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        languages,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -1937,25 +1975,37 @@ pub(crate) async fn set_spell_languages_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    languages: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = languages.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.spell_languages = languages;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "spell_languages", &mutation);
         },
         io,
         host,
     )
     .await?;
 
-    tracing::info!(event = "prefs_written", field = "spell_languages", count);
-    Ok(())
+    tracing::info!(
+        event = "prefs_written",
+        field = "spell_languages",
+        added,
+        removed,
+        refused,
+    );
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for ONE command's keymap override (hotkeys
@@ -2046,21 +2096,27 @@ pub(crate) async fn set_keymap_binding_with_dir(
 /// the virtual-folder model). Read-modify-write under the per-plugin
 /// write mutex. **No native side-effect** (unlike
 /// `set_screen_capture_protection`) — purely a disk commit, so the
-/// disk-then-native ordering rule does not apply here. The caller passes
-/// the full desired set; v0.1 single-device writes it verbatim
-/// (union + add-wins is a Phase 2 sync-merge concern, not a v0.1
-/// write-API concern). Folded-identity dedup is the caller's job; the
-/// codec only sorts + exact-dedups for canonical byte-stability.
+/// disk-then-native ordering rule does not apply here.
+///
+/// The caller passes a [`SetMutation`], never a whole set. That is the myne#613
+/// fix rather than a refactor: a whole-set write from a stale view reads to
+/// `stamp_changed_shared_fields` as an intentional deletion of every entry the
+/// view never saw, so a lost update became a distributed delete. The mutation is
+/// applied to the CURRENT stored set, inside this write's mutex, which is what
+/// makes the stamper's `before \ after` diff sound.
+///
+/// Folded-identity dedup is the caller's job for the DISPLAY form; the identity
+/// a removal matches on is taken from the field's own classification row.
 pub async fn set_deliberate_folders_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_deliberate_folders_with_dir(&dir, state, hooks, folders, io, host).await
+    set_deliberate_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2071,13 +2127,13 @@ pub async fn set_deliberate_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    folders: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_deliberate_folders_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        folders,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -2088,17 +2144,23 @@ pub async fn set_deliberate_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = folders.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.deliberate_folders = folders;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "deliberate_folders", &mutation);
         },
         io,
         host,
@@ -2107,8 +2169,14 @@ pub async fn set_deliberate_folders_with_dir(
 
     // Folder COUNT only — never the paths (folder structure is AS3
     // Sensitive; see ../../CLAUDE.md "Secret-handling logging discipline").
-    tracing::info!(event = "prefs_written", field = "deliberate_folders", count,);
-    Ok(())
+    tracing::info!(
+        event = "prefs_written",
+        field = "deliberate_folders",
+        added,
+        removed,
+        refused,
+    );
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for the `archived_folders` set (folder-archive)
@@ -2116,20 +2184,22 @@ pub async fn set_deliberate_folders_with_dir(
 /// sidebar/tree while the notes stay resolvable). Read-modify-write under the
 /// per-plugin write mutex. **No native side-effect** (a pure disk commit, same
 /// shape as [`set_deliberate_folders`] — unlike `set_ai_excluded_folders` there
-/// is no AI runtime to reconcile). The caller passes the full desired set; v0.1
-/// single-device writes it verbatim (union + add-wins is a Phase 2 sync-merge
-/// concern). Folded-identity dedup is the caller's job; the codec only sorts +
-/// exact-dedups for canonical byte-stability.
+/// is no AI runtime to reconcile).
+///
+/// Takes a [`SetMutation`] rather than a whole set, for the reason spelled out
+/// on [`set_deliberate_folders_from_host`]. `archived_folders` propagates
+/// removals, so a removal here stamps a clock and reaches every device: clearing
+/// this set is a vault-wide act, not a device-local one.
 pub async fn set_archived_folders_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_archived_folders_with_dir(&dir, state, hooks, folders, io, host).await
+    set_archived_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2140,13 +2210,13 @@ pub async fn set_archived_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    folders: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_archived_folders_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        folders,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -2157,17 +2227,23 @@ pub async fn set_archived_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = folders.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.archived_folders = folders;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "archived_folders", &mutation);
         },
         io,
         host,
@@ -2176,8 +2252,14 @@ pub async fn set_archived_folders_with_dir(
 
     // Folder COUNT only — never the paths (folder structure is AS3
     // Sensitive; see the `set_deliberate_folders` note + ../../CLAUDE.md).
-    tracing::info!(event = "prefs_written", field = "archived_folders", count,);
-    Ok(())
+    tracing::info!(
+        event = "prefs_written",
+        field = "archived_folders",
+        added,
+        removed,
+        refused,
+    );
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for the `ai_enabled` AI opt-in toggle (local-ai
@@ -2316,6 +2398,88 @@ pub(crate) async fn set_attachment_ocr_enabled_with_dir(
         event = "prefs_written",
         field = "attachment_ocr_enabled",
         enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for `chat_history_budget` (myne-md/myne#617):
+/// how many characters of visible chat history an agent run may be seeded with.
+///
+/// **The clamp is HERE, at the write, and that placement is the control.**
+/// `MAX_HISTORY_BUDGET` bounds how much of the user's plaintext one run can
+/// send to a provider, multiplied by the loop's iteration ceiling, and TB13
+/// records that no other per-run volume cap exists. A bound applied in the
+/// settings input instead would be a host-side rule whose trigger came from the
+/// caller, which is the exact shape `apply.rs` already learned about itself: one
+/// field away from off. Any path that reaches this command gets the same
+/// ceiling, including one that never rendered a control.
+///
+/// `None` clears the override and returns the host to its own default.
+pub async fn set_chat_history_budget_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    budget: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_chat_history_budget_with_dir(&dir, state, hooks, budget, io, host).await
+}
+
+/// IPC wrapper. Delegates; this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_chat_history_budget<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    budget: Option<u32>,
+) -> Result<(), PrefsWriteError> {
+    set_chat_history_budget_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        budget,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_chat_history_budget`].
+pub(crate) async fn set_chat_history_budget_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    budget: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let clamped = budget.map(|b| b.min(crate::plugins::agent::history::MAX_HISTORY_BUDGET as u32));
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.chat_history_budget = clamped;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // The VALUE is a bound the user chose, not content, so it is safe to log
+    // and useful when a run's cost is being read back.
+    //
+    // `value = clamped`, matching `set_reminder_horizon_days` rather than
+    // inventing a field name, and carrying the `Option` rather than flattening
+    // it: `unwrap_or(0)` made "unset" and an explicit zero log identically, and
+    // zero is a real distinct choice here ("seed nothing") rather than an
+    // absence.
+    tracing::info!(
+        event = "prefs_written",
+        field = "chat_history_budget",
+        value = ?clamped
     );
     Ok(())
 }
@@ -2464,20 +2628,20 @@ pub async fn set_ai_excluded_folders_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     // Disk-side commit FIRST, under the mutex.
-    set_ai_excluded_folders_with_dir(&dir, state, hooks, folders, io, host).await?;
+    let refused = set_ai_excluded_folders_with_dir(&dir, state, hooks, mutation, io, host).await?;
     // Reflect the new exclusion set into the AI runtime SECOND: purge any
     // now-excluded note from the resident store + persisted blob (SYNC-14).
     // Read back the authoritative policy (opt-in may be off).
     if let Ok(view) = prefs_read_with_dir(&dir, state, io).await {
         hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
     }
-    Ok(())
+    Ok(refused)
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2488,13 +2652,13 @@ pub async fn set_ai_excluded_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    folders: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_ai_excluded_folders_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        folders,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -2505,17 +2669,23 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = folders.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.ai_excluded_folders = folders;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "ai_excluded_folders", &mutation);
         },
         io,
         host,
@@ -2527,9 +2697,11 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
     tracing::info!(
         event = "prefs_written",
         field = "ai_excluded_folders",
-        count
+        added,
+        removed,
+        refused,
     );
-    Ok(())
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for the `cli_enabled` CLI terminal-access door
@@ -2605,12 +2777,12 @@ pub async fn set_cli_excluded_folders_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_cli_excluded_folders_with_dir(&dir, state, hooks, folders, io, host).await
+    set_cli_excluded_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2621,13 +2793,13 @@ pub async fn set_cli_excluded_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
-    folders: Vec<String>,
-) -> Result<(), PrefsWriteError> {
+    mutation: SetMutation,
+) -> Result<u32, PrefsWriteError> {
     set_cli_excluded_folders_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        folders,
+        mutation,
         &crate::vault_io::StdVaultIo,
     )
     .await
@@ -2638,17 +2810,23 @@ pub(crate) async fn set_cli_excluded_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
-    folders: Vec<String>,
+    mutation: SetMutation,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
-    let count = folders.len();
+) -> Result<u32, PrefsWriteError> {
+    let (added, removed) = (mutation.add.len(), mutation.remove.len());
+    // The closure runs inside the write mutex and cannot return a value,
+    // so the refusal count comes back through a cell.
+    let mut refused: usize = 0;
     update_prefs_with_dir(
         vault_dir,
         state,
         hooks,
         |prefs| {
-            prefs.cli_excluded_folders = folders;
+            // `folded` is no longer passed: `apply_set_mutation` reads the
+            // field's identity rule off `CLASSIFICATION` itself, so a swapped
+            // literal here is no longer expressible (myne-md/myne#613).
+            refused = apply_set_mutation(prefs, "cli_excluded_folders", &mutation);
         },
         io,
         host,
@@ -2660,9 +2838,11 @@ pub(crate) async fn set_cli_excluded_folders_with_dir(
     tracing::info!(
         event = "prefs_written",
         field = "cli_excluded_folders",
-        count
+        added,
+        removed,
+        refused,
     );
-    Ok(())
+    Ok(refused as u32)
 }
 
 /// Slot::Unlocked-gated setter for the `cli_rate_limit_disabled` toggle
@@ -3782,6 +3962,142 @@ pub(crate) async fn set_daily_template_with_dir(
     Ok(())
 }
 
+/// The three settings a period carries, mirroring what `daily_folder` /
+/// `daily_date_format` / `daily_template` carry for the daily period. The key
+/// written into `periodic_notes` is `<period>.<setting>` (myne#177).
+const PERIOD_SETTINGS: [&str; 3] = ["folder", "format", "template"];
+
+/// Slot::Unlocked-gated setter for one `periodic_notes` entry (myne#177),
+/// keyed `<period>.<setting>`, e.g. `weekly` + `folder`. `Some(value)` sets it,
+/// `None` removes the key, which the Phase 2 merge represents as a stamped
+/// absence rather than as "this device never had it". Read-modify-write under
+/// the write mutex; disk-first; non-load-bearing.
+///
+/// Two host-side validations, because the codec deliberately performs none. The
+/// **setting** must be one of [`PERIOD_SETTINGS`], so a typo cannot write a key
+/// nothing will ever read. The **period** must be a non-empty run of ASCII
+/// lowercase letters, which keeps the `<period>.<setting>` grammar unambiguous:
+/// a period containing a dot would produce a key that parses two ways. The
+/// period is deliberately NOT checked against a closed list, because a build that
+/// ships a fourth period writes `quarterly.folder` with no codec, spec or
+/// vector change, and an older build decodes that entry and ignores it.
+///
+/// `daily` is accepted by the grammar but is not where the daily period lives:
+/// daily keeps its three top-level fields, and writing `daily.folder` here
+/// would create a second home for one setting. The caller owns that; the UI
+/// routes daily to `set_daily_folder` and friends.
+pub async fn set_periodic_note_setting_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    period: String,
+    setting: String,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_periodic_note_setting_with_dir(&dir, state, hooks, period, setting, value, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_periodic_note_setting<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    period: String,
+    setting: String,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_periodic_note_setting_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        period,
+        setting,
+        value,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_periodic_note_setting`].
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn set_periodic_note_setting_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    period: String,
+    setting: String,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    if !PERIOD_SETTINGS.contains(&setting.as_str()) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    if period.is_empty() || !period.chars().all(|c| c.is_ascii_lowercase()) {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    // Daily is refused HERE, not merely avoided by the caller. Daily keeps its
+    // three flat top-level fields, and `daily_match::period_settings` returns
+    // early for it and never reads this map, so a `daily.folder` entry would
+    // write, sync and be read by nothing: a second home for one setting, which
+    // is the exact shape the no-migration decision exists to prevent. It was
+    // reachable, and only `PeriodicNotesSettings.tsx`'s `period === "daily"`
+    // branch kept it from happening.
+    if period == "daily" {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    let key = format!("{period}.{setting}");
+    let cleared = value.is_none();
+
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            match value {
+                Some(v) => {
+                    prefs.periodic_notes.insert(key.clone(), v.clone());
+                    // A period folder is registered as a deliberate folder for
+                    // the same reason the daily one is (MYND-144): the folder
+                    // has no notes in it until the first period note is
+                    // created, and without this it would not appear in the
+                    // sidebar, so the setting would look like it did nothing.
+                    if setting == "folder" && !prefs.deliberate_folders.contains(&v) {
+                        prefs.deliberate_folders.push(v);
+                    }
+                }
+                None => {
+                    prefs.periodic_notes.remove(&key);
+                }
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // Field + which entry + set/cleared. The SETTING is a closed vocabulary
+    // this function just validated against `PERIOD_SETTINGS`; the PERIOD is a
+    // bounded-charset grammar token (a non-empty run of ASCII lowercase, daily
+    // excluded) rather than a closed list, deliberately, so a build shipping a
+    // fourth period needs no change here. Neither is user text, and the VALUE
+    // (a folder path, AS3 Sensitive) is never logged. See
+    // src-tauri/CLAUDE.md "Secret-handling logging discipline".
+    tracing::info!(
+        event = "prefs_written",
+        field = "periodic_notes",
+        entry = %key,
+        cleared
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the new-note default-location pair (MYND-462,
 /// "Files" settings panel) — `new_note_location` (the mode: root/current/specific) +
 /// `new_note_location_folder` (the target folder when mode == "specific"). Set
@@ -4124,8 +4440,15 @@ pub async fn set_time_format<R: Runtime>(
 /// — an IANA zone identifier, or `None` to clear to the `system` default.
 ///
 /// **Display only.** It decides what the app treats as "today" and how a stored
-/// wall-clock value is printed; it never enters a `.myn` file, a blob, or the
-/// sync wire (`prefs_classification` files it DeviceLocal for that reason).
+/// wall-clock value is printed; it never enters a `.myn` file, so a note never
+/// records where its author was.
+///
+/// It DOES enter a blob, and this comment said otherwise until myne-md/myne#609:
+/// the body below writes the zone into `vault.prefs`, which the sync layer
+/// pushes and pulls verbatim. `PrefClass::DeviceLocal` is a MERGE
+/// classification (`docs/spec/sync-protocol.md` 10.2) meaning the local value
+/// survives the merge, not a statement that the value stays on the device, and
+/// 10.2.1 has a newly enrolled device adopt it as a starting default.
 pub async fn set_timezone_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -4414,9 +4737,16 @@ pub async fn set_auto_lock_timeout_with_dir(
     .await?;
 
     // Effect SECOND (only on disk success): refresh the cached effective
-    // timeout the running idle timer reads, clamped through the envelope so
-    // a live change can never exceed the ceiling. The clamp is desktop-only
-    // (auto_lock stays in the desktop crate) and is threaded via the hook.
+    // timeout, clamped through the envelope so a live change can never exceed
+    // the ceiling. The clamp is SHARED since myne-md/myne#479
+    // (`crate::effective_auto_lock_secs`) and is the hook trait's DEFAULT, so a
+    // client that overrides nothing still gets it.
+    //
+    // What reads the value it writes is DESKTOP only: `VaultRuntimeState::
+    // auto_lock_timeout_secs` is consumed by `src-tauri/src/auto_lock.rs`'s tick
+    // loop and by nothing else. The WebView timers on mobile and web read the
+    // pref themselves and clamp with the TypeScript mirror
+    // (`@myne/client-core`), so this line is not what bounds them.
     state.set_auto_lock_timeout_secs(hooks.effective_auto_lock_secs(Some(seconds)));
 
     tracing::info!(
@@ -5258,9 +5588,14 @@ mod tests {
             .expect("current-thread runtime build")
     }
 
-    /// A `Hooks` whose `effective_auto_lock_secs` is a no-op (returns the value
-    /// unchanged) — the core has no desktop clamp range. The clamp-WIRING
-    /// assertion lives desktop-side (`auto_lock` owns the clamp + its tests).
+    /// A `Hooks` that overrides nothing.
+    ///
+    /// **It CLAMPS**, and an earlier version of this doc said the opposite
+    /// ("a no-op, returns the value unchanged, the core has no desktop clamp
+    /// range"). Since myne-md/myne#479 the envelope is shared and
+    /// `VaultLifecycleHooks::effective_auto_lock_secs` is defaulted to it, which
+    /// `NoopHooks` inherits. A test written on the old belief would assert
+    /// against a clamped value and read as passing for the wrong reason.
     fn noop_hooks() -> crate::hooks::Hooks {
         std::sync::Arc::new(crate::hooks::NoopHooks)
     }
@@ -5305,6 +5640,164 @@ mod tests {
         });
     }
 
+    // periodic_notes setter (myne#177).
+
+    #[test]
+    fn set_periodic_note_setting_writes_the_composed_key_and_registers_the_folder() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "weekly".into(),
+                "folder".into(),
+                Some("Weekly/".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set weekly folder");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("weekly.folder")
+                    .map(String::as_str),
+                Some("Weekly/")
+            );
+            // The daily folder's discipline (MYND-144): without this the folder
+            // is invisible in the sidebar until the first note lands in it, so
+            // the setting looks like it did nothing.
+            assert!(prefs.deliberate_folders.iter().any(|f| f == "Weekly/"));
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_clears_by_removing_the_key() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            for (setting, value) in [("folder", "Weekly/"), ("template", "0190a000-tmpl")] {
+                set_periodic_note_setting_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    "weekly".into(),
+                    setting.into(),
+                    Some(value.into()),
+                    &io,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect("set");
+            }
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "weekly".into(),
+                "template".into(),
+                None,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear template");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(!prefs.periodic_notes.contains_key("weekly.template"));
+            // Clearing one setting must not disturb the period's others.
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("weekly.folder")
+                    .map(String::as_str),
+                Some("Weekly/")
+            );
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_refuses_an_unknown_setting_or_a_dotted_period() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            for (period, setting) in [
+                ("weekly", "colour"),       // not one of the three
+                ("weekly.extra", "folder"), // a dot makes the key ambiguous
+                ("", "folder"),             // empty period
+                ("Weekly", "folder"),       // not a bare lowercase word
+                // Daily keeps its three flat fields; an entry here would write,
+                // sync and be read by nothing, which is a second home for one
+                // setting.
+                ("daily", "folder"),
+                ("daily", "format"),
+                ("daily", "template"),
+            ] {
+                let err = set_periodic_note_setting_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    period.into(),
+                    setting.into(),
+                    Some("x".into()),
+                    &io,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect_err("must refuse");
+                assert!(
+                    matches!(err, PrefsWriteError::InvalidValue),
+                    "{period}.{setting}"
+                );
+            }
+            // Refusing means writing nothing, not writing something odd.
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(prefs.periodic_notes.is_empty());
+        });
+    }
+
+    #[test]
+    fn set_periodic_note_setting_accepts_a_period_this_build_has_no_ui_for() {
+        // The period is validated as a GRAMMAR, not against a closed list. That
+        // is what makes a fourth period a client-side change with no codec,
+        // spec or vector edit behind it.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            set_periodic_note_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "quarterly".into(),
+                "folder".into(),
+                Some("Quarterly/".into()),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set quarterly folder");
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                prefs
+                    .periodic_notes
+                    .get("quarterly.folder")
+                    .map(String::as_str),
+                Some("Quarterly/")
+            );
+        });
+    }
+
     #[test]
     fn set_union_pref_edit_bumps_the_sync_push_window() {
         // MYND-517: set-union fields are SHARED but clockless (never stamped
@@ -5317,7 +5810,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &hooks,
-                vec!["en".into()],
+                SetMutation::adding_all(vec!["en".into()]),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6013,6 +6506,7 @@ mod tests {
                     item_order: Default::default(),
                     keymap: Default::default(),
                     active_workspace: None,
+                    chat_history_budget: None,
                     archive_disabled: None,
                     archived_folders: Vec::new(),
                     editor_layout: None,
@@ -6030,6 +6524,7 @@ mod tests {
                     new_note_location: None,
                     new_note_location_folder: None,
                     paired_extensions: Vec::new(),
+                    periodic_notes: Default::default(),
                     right_panel_active_tab: None,
                     right_panel_hidden_tabs: Vec::new(),
                     right_panel_tab_order: Vec::new(),
@@ -6204,7 +6699,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Projects/"]),
+                SetMutation::adding_all(alloc_vec(["Projects/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6262,10 +6757,13 @@ mod tests {
     }
 
     // The clamp-WIRING test (`set_auto_lock_timeout_stores_raw_but_caches_clamped`)
-    // asserts the cached effective timeout is clamped to the desktop ceiling. The
-    // clamp is desktop-only (`auto_lock`), so that test lives desktop-side
-    // (`src-tauri/src/plugins/prefs/mod.rs` tests) where a real clamping hook is
-    // available; the clamp function itself is unit-tested in `auto_lock.rs`.
+    // asserts the cached effective timeout is clamped to the ceiling, and it
+    // still lives desktop-side (`src-tauri/src/plugins/prefs/mod.rs` tests) for
+    // historical reasons rather than because the clamp is desktop-only: since
+    // myne-md/myne#479 it is shared and defaulted, so `noop_hooks()` above
+    // clamps too. The clamp FUNCTION is unit-tested beside itself in
+    // `core/src/lib.rs::auto_lock_envelope_tests`, and the trait DEFAULT is
+    // covered in `core/src/hooks.rs`.
 
     #[test]
     fn deliberate_folders_round_trip_via_set_then_read() {
@@ -6276,7 +6774,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Projects/Myne/", "Archive/2025/"]),
+                SetMutation::adding_all(alloc_vec(["Projects/Myne/", "Archive/2025/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6299,7 +6797,13 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                SetMutation {
+                    add: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove: vec!["Projects/Myne/".to_string(), "Archive/2025/".to_string()],
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6323,7 +6827,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Projects/"]),
+                SetMutation::adding_all(alloc_vec(["Projects/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6341,7 +6845,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Projects/Myne/", "Archive/2025/"]),
+                SetMutation::adding_all(alloc_vec(["Projects/Myne/", "Archive/2025/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6364,7 +6868,13 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                SetMutation {
+                    add: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove: vec!["Projects/Myne/".to_string(), "Archive/2025/".to_string()],
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6406,7 +6916,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Private/", "Archive/2025/"]),
+                SetMutation::adding_all(alloc_vec(["Private/", "Archive/2025/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6440,7 +6950,13 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                SetMutation {
+                    add: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove: vec!["Private/".to_string(), "Archive/2025/".to_string()],
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6455,6 +6971,88 @@ mod tests {
     }
 
     // ---- Developer mode setter (developer-mode, MYND-593) -------------
+
+    /// **The clamp is the control, so it is asserted through the COMMAND, not
+    /// through a helper** (myne-md/myne#617). This number bounds how much of the
+    /// user's plaintext one agent run sends to a provider, multiplied by the
+    /// loop's iteration ceiling, and TB13 records that no other per-run volume
+    /// cap exists. A test that called a clamping function directly would prove
+    /// the function clamps and say nothing about whether the write path uses it,
+    /// which is exactly the gap between a host-side rule and a host-side rule
+    /// whose trigger came from the caller.
+    #[test]
+    fn chat_history_budget_is_clamped_at_the_write_not_in_the_ui() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x53).await;
+            let io = crate::vault_io::StdVaultIo;
+            let max = crate::plugins::agent::history::MAX_HISTORY_BUDGET as u32;
+
+            // Unset by default: the host applies its own, and the field is
+            // omitted from the blob entirely.
+            let base = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(base.chat_history_budget, None);
+
+            // A value over the ceiling is STORED at the ceiling. Read back from
+            // disk rather than trusted from the return value: a host that
+            // reported success and wrote the raw number would pass a
+            // return-value assertion.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(max + 50_000),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let over = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(
+                over.chat_history_budget,
+                Some(max),
+                "an over-ceiling budget must be stored at the ceiling, not as sent"
+            );
+
+            // An ordinary value survives unchanged, which is the direction that
+            // would make the clamp a bug rather than a bound.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(1_500),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let ordinary = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(ordinary.chat_history_budget, Some(1_500));
+
+            // And `None` clears the override rather than storing a zero: unset
+            // and "seed nothing" are different states, and only one of them is
+            // the default.
+            set_chat_history_budget_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                None,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(cleared.chat_history_budget, None);
+        });
+    }
 
     #[test]
     fn developer_mode_persist_and_reload_round_trip() {
@@ -6551,7 +7149,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Secret/"]),
+                SetMutation::adding_all(alloc_vec(["Secret/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6606,7 +7204,7 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                alloc_vec(["Private/", "Archive/2025/"]),
+                SetMutation::adding_all(alloc_vec(["Private/", "Archive/2025/"])),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -6653,7 +7251,13 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                Vec::new(),
+                SetMutation {
+                    add: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove: vec!["Private/".to_string(), "Archive/2025/".to_string()],
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )
@@ -7855,7 +8459,11 @@ mod tests {
                 tmp.path(),
                 &state,
                 &noop_hooks(),
-                vec!["tr".to_string(), "en-US".to_string(), "tr".to_string()],
+                SetMutation::adding_all(vec![
+                    "tr".to_string(),
+                    "en-US".to_string(),
+                    "tr".to_string(),
+                ]),
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
             )

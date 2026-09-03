@@ -502,6 +502,37 @@ export function readTitleFromFmBody(fmBody: string): string | null {
   return null;
 }
 
+/**
+ * Read the FM `folder:` scalar from a frontmatter **body**, by the same rules
+ * {@link readTitleFromFmBody} uses.
+ *
+ * Exists because myne-md/myne#613 made the `folder:` value a PERSISTED,
+ * SYNCED, BUDGETED thing: it is written into `deliberate_folders`, so a value
+ * read wrongly becomes a real folder in the sidebar of every device, spends
+ * reserve that the byte budget then refuses real additions against, and cannot
+ * be cleared by deleting the folder the note is actually in.
+ *
+ * The first version of that reader was hand-rolled next to its caller and was
+ * missing two of `extractTitleScalar`'s rules: it did not strip a trailing
+ * ` # comment`, so `folder: Work # archive` registered the folder key
+ * `Work # archive/`, and it did not reject a block scalar, so `folder: |`
+ * registered `|/`. Neither is where the note lands, because the note's own
+ * `folder:` is read elsewhere by real YAML semantics. Sharing the scalar rule is
+ * the fix; a second copy of it was the defect.
+ *
+ * Returns the literal scalar, NOT a canonical folder path: the caller decides
+ * whether to normalise, because the two call sites want different things.
+ */
+export function readFolderFromFmBody(fmBody: string): string | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = FOLDER_KEY_RE.exec(line);
+    if (m === null) continue;
+    return extractTitleScalar(m[2] ?? "");
+  }
+  return null;
+}
+
 // === patchFirstH1Line — Q7 (β mirror-existing) write target for body `# H1` ===
 //
 // Spec: design-notes.md 2026-05-15 "Note title write target" — when the

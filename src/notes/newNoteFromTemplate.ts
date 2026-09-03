@@ -43,13 +43,45 @@ const decoder = new TextDecoder();
  * `weekday` follows the host locale (the app-language proxy until an in-app
  * language setting lands).
  */
-export function buildRenderContext(now: Date, title: string): RenderContext {
+/** The period a note made by HAND belongs to: the single day it was made on.
+ *
+ * A named function rather than an inline `{ start: now, end: now }`, because the
+ * two call sites that use it are making a claim (`{{period_start}}` and
+ * `{{period_end}}` both mean today here) and an anonymous object literal reads
+ * like a placeholder. It is also what lets `buildRenderContext`'s `period` be
+ * required: the meaning did not disappear with the default, it moved to the
+ * caller that means it. */
+export function singleDay(now: Date): { start: Date; end: Date } {
+  return { start: now, end: now };
+}
+
+export function buildRenderContext(
+  now: Date,
+  title: string,
+  // REQUIRED, and that is the correction rather than an inconvenience. This
+  // read `period?: {...}` with a `?? now` fallback below, which is the shape the
+  // root `CLAUDE.md` records under "a guard parameter with a default value is an
+  // opt-in guard": a future weekly or monthly create path that omits it renders
+  // both period tokens as TODAY, with no type error, no failing test and a
+  // plausible-looking title. Requiring it makes the compiler name every call
+  // site, the way the Rust side already does. The single-day meaning is not
+  // lost, it moved: `singleDay(now)` says it at the call site that means it.
+  period: { start: Date; end: Date },
+): RenderContext {
   return {
     title,
     date: formatLocalDate(now),
     time: formatLocalTime(now),
     datetime: formatLocalDateTime(now),
     weekday: formatLocalWeekday(now),
+    // myne#177. Absent `period`, the period is the single day `now` falls on,
+    // which is exactly right for a daily note and for a note made by hand, and
+    // is why the two tokens are never empty. `{{date}}` is deliberately NOT
+    // re-pointed at the period start: the same template file can be both a
+    // weekly template and something instantiated by hand, and a token whose
+    // meaning depended on the call site would make one file say two things.
+    periodStart: formatLocalDate(period.start),
+    periodEnd: formatLocalDate(period.end),
   };
 }
 
@@ -88,12 +120,23 @@ export function extractTemplateBody(plaintext: string): string {
 export async function createNoteFromTemplate(
   templateId: string,
   name: string,
+  // No defaults on either, and `period` required below: reaching `period` means
+  // passing both positionally, so the defaults these two used to carry were
+  // already dead the moment that parameter landed. Removing them says so.
   folder: string | null,
   now: Date,
+  // LAST, and deliberately: this parameter was added after the function had
+  // positional callers, and inserting it before `now` re-bound every one of
+  // them silently (`tests/` is outside `tsc`'s `include`, so only Vitest reads
+  // those call sites).
+  //
+  // REQUIRED for the reason `buildRenderContext`'s own parameter is. A caller
+  // that means "today" says `singleDay(now)` rather than saying nothing.
+  period: { start: Date; end: Date },
 ): Promise<string> {
   const template = await noteRead(templateId);
   const body = extractTemplateBody(template);
-  const rendered = renderTemplate(body, buildRenderContext(now, name));
+  const rendered = renderTemplate(body, buildRenderContext(now, name, period));
   return await createNoteFromBody(rendered, name, folder);
 }
 
@@ -134,5 +177,5 @@ export async function createNoteFromBody(
   if (normalizedFolder !== null) {
     bytes = patchFolderField(bytes, normalizedFolder);
   }
-  return await noteCreate(decoder.decode(bytes));
+  return await noteCreate(decoder.decode(bytes), normalizedFolder);
 }

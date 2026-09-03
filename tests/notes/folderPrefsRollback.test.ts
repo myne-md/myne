@@ -21,6 +21,19 @@ import { describe, expect, it } from "vitest";
 const SOURCE = "src/notes/components/useFolderManagement.ts";
 
 /**
+ * The orchestrator behind the hook, added to the scan because the class moved
+ * there and the guard stayed here.
+ *
+ * `renameFolder` awaits `mutateDeliberateFolders` PAST its transactional batch, so
+ * it can fail with the rename already on disk, and myne-md/myne#520's review put
+ * the handling for that in `folderActions.ts` as a `try`/`catch`. This file read
+ * one source and one literal shape (`.catch(() => {})`), so a swallow in its own
+ * class landed in a file it does not open. Widened rather than exempted: a guard
+ * whose scope stops where the code went is a guard that reports ok about nothing.
+ */
+const ORCHESTRATOR = "src/notes/folderActions.ts";
+
+/**
  * Persist calls that legitimately swallow their failure. Each one must say why
  * — an entry here is a claim that losing this write costs the user nothing.
  */
@@ -60,10 +73,10 @@ describe("folder prefs writes", () => {
   });
 
   it("each archived_folders write captures the previous value first", () => {
-    // The revert needs something to revert TO. A `setArchivedFolders(...)` whose
+    // The revert needs something to revert TO. A `mutateArchivedFolders(...)` whose
     // catch does not restore a captured value is the same bug wearing a catch.
     const src = readFileSync(SOURCE, "utf8");
-    const persists = [...src.matchAll(/void setArchivedFolders\([^)]*\)\.catch\(\(\) => \{([^}]*)\}\)/g)];
+    const persists = [...src.matchAll(/void mutateArchivedFolders\((?:[^()]|\([^()]*\))*\)\.catch\(\(\) => \{([^}]*)\}\)/g)];
     expect(
       persists.length,
       "the archived-folder persist sites must still be recognisable here",
@@ -74,5 +87,33 @@ describe("folder prefs writes", () => {
         "every archived_folders persist must revert its optimistic state on failure",
       ).toBe(true);
     }
+  });
+});
+
+describe("the orchestrator's post-commit prefs write", () => {
+  it("does not swallow the failure, it reports it", () => {
+    // `renameFolder` cannot throw here (the rename is already on disk and the
+    // caller still owes the decoration and archived-folder re-rooting), so the
+    // only two honest shapes are "retry" and "report". A bare `catch {}` with
+    // neither is the defect this file exists for, one file over from where it
+    // used to look.
+    const src = readFileSync(ORCHESTRATOR, "utf8");
+    // myne#613: the write states the mutation the planner computed rather than
+    // handing over a whole set for the backend to diff.
+    const block = /await mutateDeliberateFolders\(plan\.deliberateMutation\);/g;
+    const writes = [...src.matchAll(block)];
+    expect(
+      writes.length,
+      "the post-commit deliberate write must still be recognisable here",
+    ).toBeGreaterThanOrEqual(2); // the attempt and its one retry
+    expect(
+      src.includes("deliberateWriteFailed = true;"),
+      "the failure must reach the caller as a value rather than being swallowed",
+    ).toBe(true);
+  });
+
+  it("keeps the field on the result type, so a caller cannot miss it", () => {
+    const src = readFileSync(ORCHESTRATOR, "utf8");
+    expect(src).toContain("deliberateWriteFailed?: boolean;");
   });
 });

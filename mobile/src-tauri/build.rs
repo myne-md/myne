@@ -11,6 +11,23 @@
 fn main() {
     tauri_build::try_build(
         tauri_build::Attributes::new()
+            // Agentic note editing (myne-md/myne#456). Every one of the eight
+            // reaches decrypted note plaintext and two of them WRITE, so the
+            // capability that bundles them is main-window-only.
+            .plugin(
+                "agent",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "agent_start",
+                    "agent_approve_scope",
+                    "agent_preview_grant",
+                    "agent_cancel",
+                    "agent_apply",
+                    "agent_undo",
+                    "agent_last_run",
+                    "agent_capability",
+                    "agent_list_provider_models",
+                ]),
+            )
             .plugin(
                 "vault-creation",
                 tauri_build::InlinedPlugin::new().commands(&["begin", "commit", "cancel"]),
@@ -23,6 +40,17 @@ fn main() {
                     "vault_status",
                     "vault_is_unlocked",
                     "vault_slot_kind",
+                    // myne-md/myne#476 adds `vault_active_id`, the AUTHORITATIVE
+                    // "which vault is open" answer, read from the runtime slot
+                    // map. Desktop has had it since #250, which removed the
+                    // TS-side `resolveActiveVaultId()` for ordering a
+                    // best-effort disk cache that only the password-unlock path
+                    // ever stamped: after a quick-unlock or a recovery it named
+                    // a DIFFERENT vault than the one actually open, and the
+                    // danger-zone delete erased that one (#241). Mobile still
+                    // carried the deleted function and could not call this
+                    // command at all, because it was registered nowhere here.
+                    "vault_active_id",
                 ]),
             )
             .plugin(
@@ -50,6 +78,16 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&[
                     "prefs_read",
                     "set_screen_capture_protection",
+                    // AI (myne-md/myne#456). Six: the device-local opt-in, the
+                    // provider selection, its consent, its model, the key
+                    // (write-only), and the has-key probe that exists so the
+                    // key never has a getter.
+                    "set_ai_enabled",
+                    "set_ai_provider",
+                    "set_ai_provider_consent",
+                    "set_ai_provider_key",
+                    "set_ai_provider_model",
+                    "ai_provider_has_key",
                     "set_deliberate_folders",
                     "set_archived_folders",
                     "set_device_name",

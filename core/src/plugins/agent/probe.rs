@@ -112,7 +112,7 @@ pub fn probe_request() -> AgentRequest {
         messages: vec![
             Message {
                 role: Role::System,
-                content: vec![Content::Trusted(system_instructions())],
+                content: vec![Content::Trusted(system_instructions(None))],
             },
             Message {
                 role: Role::User,
@@ -160,15 +160,48 @@ pub fn grade(reply: &str) -> AttemptVerdict {
     }
 }
 
+/// Which attempt is in flight, so the surface can say so (myne-md/myne#575).
+///
+/// **Counts only, and that is what makes it safe to send anywhere.** Both
+/// fields are small integers the host chose; nothing here is derived from a
+/// reply, so this crosses IPC without joining any of the lists in
+/// `src-tauri/CLAUDE.md`.
+///
+/// `of` is the threshold's ALLOWANCE rather than a promise: since the early exit
+/// below, a run that settles at 2 of 3 simply stops, and "2 of 3" then reads as
+/// the good news it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProbeProgress {
+    /// 1-based, so it reads as "attempt 2 of 3" without arithmetic.
+    pub attempt: u8,
+    /// The most that will be asked.
+    pub of: u8,
+}
+
 /// Run the probe against a backend.
+///
+/// `on_attempt` is called BEFORE each request goes out, so the surface can say
+/// which attempt it is waiting on rather than showing one unchanging label for
+/// what was measured at 40 seconds. A sink rather than a channel because this
+/// crate has no IPC: the host adapts it, exactly as `agent_start` does for its
+/// run view.
 pub async fn run_probe(
     engine: &dyn AgentEngine,
     threshold: ProbeThreshold,
+    // `Sync` because this crate's async fns must produce `Send` futures on the
+    // native targets, and the sink is held across an `await`. A closure that
+    // captures a `Channel` satisfies it; so does one that captures nothing.
+    on_attempt: &(dyn Fn(ProbeProgress) + Sync),
 ) -> Result<ProbeVerdict, AgentError> {
     let request = probe_request();
     let mut attempts = Vec::with_capacity(threshold.attempts as usize);
     let mut passes = 0u8;
-    for _ in 0..threshold.attempts {
+    for n in 0..threshold.attempts {
+        on_attempt(ProbeProgress {
+            attempt: n + 1,
+            of: threshold.attempts,
+        });
         // The probe deliberately ignores the disclosure counter: it is a fixed
         // synthetic string, not vault text, so counting it into the run summary
         // would report characters that never came from a note.
@@ -193,11 +226,39 @@ pub async fn run_probe(
             passes += 1;
         }
         attempts.push(v);
+        // **Stop once the verdict cannot change** (myne-md/myne#575). The loop
+        // used to run every attempt unconditionally, so a 2-of-3 threshold that
+        // had already seen two passes spent a third provider request whose
+        // result was arithmetically irrelevant. Both measured runs did exactly
+        // that, and in both the wasted attempt happened to be the slowest: 22.3s
+        // of 40.6s, and 13.8s of 26.5s.
+        //
+        // The saving is not the 1/3 it looks like. Three identical requests to
+        // the same provider came back in 4.4s, 13.9s and 22.3s, so what stopping
+        // early removes is the TAIL: you wait for the slowest of two rather than
+        // the slowest of three, and the difference between those grows with the
+        // variance rather than with the mean.
+        //
+        // Both directions, because only checking for the pass would leave a
+        // failing backend paying full price to be told what the second failure
+        // already settled. `remaining` is what is still unasked, so
+        // `passes + remaining < required` is "even if everything left passes, it
+        // cannot reach the bar".
+        let remaining = threshold.attempts - attempts.len() as u8;
+        if passes >= threshold.required || passes + remaining < threshold.required {
+            break;
+        }
     }
     tracing::debug!(
         target: "myne_core::agent",
         event = "probe_done",
         passes,
+        // What was actually ASKED, beside what the threshold allowed. The two
+        // used to be the same number by construction; since the early exit they
+        // differ whenever the verdict settled before the last attempt, and the
+        // gap is the whole saving, so reporting only the allowance would hide
+        // the thing this line is now most useful for.
+        asked = attempts.len(),
         attempts = threshold.attempts,
         required = threshold.required,
         passed = passes >= threshold.required,
@@ -234,6 +295,7 @@ mod tests {
             _r: &AgentRequest,
         ) -> Result<AgentCompletion, AgentError> {
             Ok(AgentCompletion {
+                truncated: false,
                 reply: self
                     .0
                     .lock()
@@ -250,6 +312,16 @@ mod tests {
             replies.iter().rev().map(|s| s.to_string()).collect(),
         ))
     }
+
+    /// How many replies the engine has left, which is how many it was NOT
+    /// asked for. The early exit is a claim about requests that did not go out,
+    /// and the returned verdict alone cannot prove one.
+    fn unasked(e: &Fixed) -> usize {
+        e.0.lock().unwrap().len()
+    }
+
+    /// The progress sink for tests that are not about progress.
+    fn ignore(_: ProbeProgress) {}
 
     #[test]
     fn a_correct_reply_passes() {
@@ -303,11 +375,107 @@ mod tests {
                 required: 2,
                 provisional: false,
             },
+            &ignore,
+        ))
+        .unwrap();
+        assert!(v.passed);
+        assert_eq!(v.passes, 2);
+        // **Two attempts, not three** (myne-md/myne#575). The bar is 2 of 3, so
+        // the second pass settles it and the third request cannot change the
+        // answer. Asserted on the ENGINE as well as on the verdict, because a
+        // shorter `attempts` vec would also be produced by simply recording
+        // less, and what this is about is a request that never went out. In the
+        // two measured runs that request was the slowest of the three.
+        assert_eq!(v.attempts.len(), 2);
+        assert_eq!(unasked(&e), 1, "the third reply was never asked for");
+    }
+
+    #[test]
+    fn a_backend_under_the_bar_stops_as_soon_as_it_cannot_reach_it() {
+        // The other direction, and the one a pass-only check would miss: two
+        // failures out of three mean the bar of 2 is already unreachable, so a
+        // failing backend must not pay full price to be told what it already
+        // knows.
+        let g = good_reply();
+        let e = engine(&["junk", "junk", &g]);
+        let v = block_on(run_probe(
+            &e,
+            ProbeThreshold {
+                attempts: 3,
+                required: 2,
+                provisional: false,
+            },
+            &ignore,
+        ))
+        .unwrap();
+        assert!(!v.passed);
+        assert_eq!(v.attempts.len(), 2);
+        assert_eq!(unasked(&e), 1, "the third reply was never asked for");
+    }
+
+    #[test]
+    fn a_verdict_that_needs_every_attempt_still_takes_every_attempt() {
+        // The early exit must not become "stop at 2 whatever the numbers say".
+        // One pass and one failure leaves the bar reachable, so the third
+        // attempt is the one that decides it.
+        let g = good_reply();
+        let e = engine(&[&g, "junk", &g]);
+        let v = block_on(run_probe(
+            &e,
+            ProbeThreshold {
+                attempts: 3,
+                required: 2,
+                provisional: false,
+            },
+            &ignore,
         ))
         .unwrap();
         assert!(v.passed);
         assert_eq!(v.passes, 2);
         assert_eq!(v.attempts.len(), 3);
+        assert_eq!(unasked(&e), 0);
+    }
+
+    #[test]
+    fn the_surface_is_told_which_attempt_is_in_flight() {
+        // Reported BEFORE each request rather than after, because the whole
+        // point is the wait: a progress line that arrives when the attempt
+        // finishes describes a wait that is already over.
+        let g = good_reply();
+        let e = engine(&[&g, "junk", &g]);
+        let seen = Mutex::new(Vec::new());
+        let sink = |p: ProbeProgress| seen.lock().unwrap().push((p.attempt, p.of));
+        block_on(run_probe(
+            &e,
+            ProbeThreshold {
+                attempts: 3,
+                required: 2,
+                provisional: false,
+            },
+            &sink,
+        ))
+        .unwrap();
+        assert_eq!(*seen.lock().unwrap(), vec![(1, 3), (2, 3), (3, 3)]);
+    }
+
+    #[test]
+    fn progress_stops_when_the_probe_does() {
+        // No line for an attempt that never runs: the counter must not tick to
+        // "3 of 3" and then finish, which would report a request nobody made.
+        let g = good_reply();
+        let seen = Mutex::new(Vec::new());
+        let sink = |p: ProbeProgress| seen.lock().unwrap().push(p.attempt);
+        block_on(run_probe(
+            &engine(&[&g, &g, "junk"]),
+            ProbeThreshold {
+                attempts: 3,
+                required: 2,
+                provisional: false,
+            },
+            &sink,
+        ))
+        .unwrap();
+        assert_eq!(*seen.lock().unwrap(), vec![1u8, 2]);
     }
 
     #[test]
@@ -321,6 +489,7 @@ mod tests {
                 required: 2,
                 provisional: false,
             },
+            &ignore,
         ))
         .unwrap();
         assert!(!v.passed);
@@ -335,7 +504,7 @@ mod tests {
             provisional: false,
         };
         let g = good_reply();
-        let v = block_on(run_probe(&engine(&[&g]), t)).unwrap();
+        let v = block_on(run_probe(&engine(&[&g]), t, &ignore)).unwrap();
         assert_eq!(
             v.threshold, t,
             "a report can show the bar, not just the result"

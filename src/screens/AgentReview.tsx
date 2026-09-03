@@ -34,9 +34,11 @@ import { RunCostLine } from "../notes/agent/components/RunCostLine";
 import { Button } from "../components/primitives/Button";
 import { changedLineCount, diffWithSegments } from "../dialect";
 import {
+  removalFlagLabel,
   agentApply,
   agentUndo,
   editHidesNoteAs,
+  hasRefusals,
   netDeletion,
   splitForBulkApproval,
   type AgentApplyResult,
@@ -59,33 +61,6 @@ import {
   useAgent,
 } from "../notes/agent/agentStore";
 
-/** What approving this removal on its own will do, in the user's words.
- *
- *  **A `switch` over literal keys rather than a template key**, and that is not
- *  style. `scripts/check-i18n.mjs` scans static `t("…")` literals by design (an
- *  expression-aware scanner is a scanner with a bypass), so
- *  ``t(`agent.review.removalFlag.${field}`)`` would put five user-facing
- *  sentences outside every check in this repository — the exact hole
- *  `tests/lib/editRejectionMirror.test.ts` had to be written to close for the
- *  refusal strings. Written this way, a missing key is a `check-i18n` failure
- *  in `pre-commit`.
- *
- *  Exhaustive over `HidingField`, so a sixth marker fails to typecheck here
- *  rather than rendering an empty flag beside a destructive button. */
-function removalFlagLabel(field: HidingField, t: (key: string) => string): string {
-  switch (field) {
-    case "trashed":
-      return t("agent.review.removalFlag.trashed");
-    case "deleted":
-      return t("agent.review.removalFlag.deleted");
-    case "archived":
-      return t("agent.review.removalFlag.archived");
-    case "template":
-      return t("agent.review.removalFlag.template");
-    case "conflict":
-      return t("agent.review.removalFlag.conflict");
-  }
-}
 
 /** A deletion this large gets a visual flag.
  *
@@ -529,6 +504,12 @@ function EditRowView({
   return (
     <article
       data-testid="agentReview.edit"
+      /* Replace or append. The diff renders identically for both (an append
+         diffs an empty anchor against the new text, so every line reads as an
+         addition, which is exactly what it is), so this attribute is the only
+         thing that lets a scenario tell the two shapes apart. A literal, never
+         a runtime expression carrying content. */
+      data-kind={row.edit.kind ?? "replace"}
       data-rejected={rejected ? "true" : "false"}
       data-applied={applied ? "true" : "false"}
       style={{
@@ -560,6 +541,19 @@ function EditRowView({
             style={{ color: "var(--fg-1)", fontWeight: "var(--weight-semibold)" }}
           >
             {removalFlagLabel(row.removes, t)}
+          </span>
+        ) : null}
+        {/* Which VERB this row is, made visible. The diff renders an append
+            and a replacement identically (an append diffs an empty anchor
+            against the new text, so every line reads as an addition), and
+            "informed approval" is this screen's whole premise: an append is
+            unanchored and lands after the frontmatter block, which is a
+            different write from replacing text the reader can see in front of
+            them. `data-kind` above tells a SCENARIO the two apart; this tells
+            the person approving. */}
+        {row.edit.kind === "append" ? (
+          <span data-testid="agentReview.appendFlag" style={{ color: "var(--fg-2)" }}>
+            {t("agent.review.appendFlag")}
           </span>
         ) : null}
         {/* The visual-only flag. Deliberately weaker than the one above. */}
@@ -714,8 +708,13 @@ function ApplyReport({ result }: { result: AgentApplyResult }) {
         </p>
       ) : null}
       {/* Refusals are shown with their cause. A change that could not be placed
-          must never look like a change that was not needed. */}
-      {result.refused.length > 0 || result.refusedNewNotes.length > 0 ? (
+          must never look like a change that was not needed.
+
+          `hasRefusals` rather than the condition spelled out here, because
+          `applyWasCleanAndComplete` asks the same question to decide whether to
+          keep this dialog OPEN (myne-md/myne#596). Two copies that drifted would
+          dismiss the screen over the list it was about to draw. */}
+      {hasRefusals(result) ? (
         <ul
           data-testid="agentReview.refusedList"
           style={{ margin: 0, paddingInlineStart: "var(--space-5)", color: "var(--fg-2)" }}

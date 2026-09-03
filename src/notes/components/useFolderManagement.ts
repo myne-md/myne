@@ -29,8 +29,10 @@ import { collectSubtreeNoteIdsFromCache } from "../archivedFolders";
 import i18n from "../../i18n";
 import { usePrefs } from "../../hooks/usePrefs";
 import {
-  setArchivedFolders,
-  setDeliberateFolders,
+  mutateArchivedFolders,
+  mutateDeliberateFolders,
+  registerDeliberateFolders,
+  mutationFrom,
   setFavorites as persistFavorites,
   setFolderIcons as persistFolderIcons,
   setItemColors as persistItemColors,
@@ -49,6 +51,7 @@ import {
 import { moveNote } from "../moveNote";
 import { writeTabDrag } from "../tabDrag";
 import { itemKey, noteItem } from "../workspaceState";
+import { panesNotSettledMessage } from "../workspaceContext";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
 import {
@@ -131,6 +134,13 @@ function findByFoldedKey(
 export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const { prefs } = usePrefs();
   const [deliberate, setDeliberate] = useState<string[]>([]);
+  // A ref alongside the state, read by `addDeliberate` (myne-md/myne#613
+  // pr-review). That path used to compute its `next` inside a `setDeliberate`
+  // updater and fire the IPC, the rollback and a user-visible notice from there;
+  // updater functions are double-invoked in React 19 dev StrictMode, so the
+  // notice could appear twice. Reading the ref keeps the updater pure.
+  const deliberateRef = useRef<string[]>(deliberate);
+  deliberateRef.current = deliberate;
   // Sync the local set from the mount-time prefs read; later mutated by ops.
   useEffect(() => {
     setDeliberate(prefs.deliberate_folders);
@@ -333,23 +343,47 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     [ctx.cache, itemOrder],
   );
 
-  const addDeliberate = useCallback((path: string) => {
-    setDeliberate((prev) => {
+  const addDeliberate = useCallback(
+    (path: string) => {
+      // Computed from the ref rather than inside a `setDeliberate` updater.
+      // Updater functions are double-invoked in React 19 dev StrictMode, and
+      // this one issues an IPC and, since myne-md/myne#613, a user-VISIBLE
+      // notice: the shape was survivable while the effect was invisible and is
+      // not once a toast can appear twice.
+      const prev = deliberateRef.current;
       const key = foldSegment(path);
       const already = prev.some(
-        (p) => foldSegment(normalizeFolderPath(p) ?? "") === key,
+        (held: string) => foldSegment(normalizeFolderPath(held) ?? "") === key,
       );
-      if (already) return prev;
+      if (already) return;
       const next = [...prev, path];
+      setDeliberate(next);
       // #259 audit: revert on a failed write like every sibling. An empty
       // folder that exists only in this set silently disappears at the next
-      // unlock if the write never landed — and the user was shown it as made.
-      void setDeliberateFolders(next).catch(() => {
-        setDeliberate(prev);
+      // unlock if the write never landed, and the user was shown it as made.
+      //
+      // myne-md/myne#613 split that one failure into two, because they need
+      // opposite treatment. A thrown write is retried once inside
+      // `registerDeliberateFolders` and only reported if it fails again: there
+      // is nothing the user can do about a disk hiccup, and a notice they
+      // cannot act on teaches them to dismiss notices. A budget refusal is
+      // reported at once and NOT retried, because the reserve is full, the next
+      // attempt refuses identically, and the remedy is theirs.
+      //
+      // The budget case does NOT revert: the folder was created, it works
+      // exactly as folders did before this feature, and what it loses is only
+      // the promise to outlive being emptied, which is what the notice says.
+      void registerDeliberateFolders(mutationFrom(prev, next)).then((outcome) => {
+        if (outcome === "budget-full") {
+          setBlockNotice(i18n.t("notes.folderManagement.folderListFull"));
+        } else if (outcome === "failed") {
+          setDeliberate(prev);
+          setBlockNotice(i18n.t("notes.folderManagement.folderNotRemembered"));
+        }
       });
-      return next;
-    });
-  }, []);
+    },
+    [],
+  );
 
   // ---- context menu --------------------------------------------------------
   const openMenu = useCallback(
@@ -438,12 +472,38 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
    */
   const applyFolderPathChange = useCallback(
     async (node: FolderNode, newPath: string) => {
-      const result = await renameFolder(
-        node.path,
-        newPath,
-        notesForOps(),
-        deliberate,
-      );
+      // `renameFolder` opens with `flushOpenPanes()`, which REJECTS when a pane
+      // did not settle (myne-md/myne#520). Declining the rename is the right
+      // answer, since the batch reads every note from disk and would write over
+      // whatever that pane still holds, but a silent decline is
+      // indistinguishable from a rename that did nothing. Say so.
+      //
+      // Two different sentences rather than one, and neither rethrows. A bare
+      // `catch` attributed every rejection to an unsettled pane; a rethrow
+      // reported nothing at all, because every route in is a `void fm.…` with no
+      // `.catch`. The third failure mode, a rejection with the rename already
+      // committed, is not here any more: `renameFolder` reports that one as
+      // `deliberateWriteFailed` precisely so this catch cannot swallow the
+      // re-rooting the landed rename still owes. See the tail of this callback.
+      let result;
+      try {
+        result = await renameFolder(node.path, newPath, notesForOps(), deliberate);
+      } catch (err) {
+        // Both arms REPORT, and neither rethrows. Every caller of this reaches it
+        // through a `void fm.moveFolderTo(...)` or `void fm.commitRenameFolder(...)`
+        // with no `.catch`, so a rethrow is an unhandled rejection and nothing on
+        // screen, which is worse than the wrong notice it replaced. The folder
+        // sentence is the folder-specific one rather than the neutral shared
+        // string, which is what `panesNotSettledMessage` taking resolved
+        // sentences is for.
+        setBlockNotice(
+          panesNotSettledMessage(err, {
+            unsettled: i18n.t("notes.folderManagement.unsettledSave"),
+            failed: i18n.t("notes.folderManagement.renameFailed"),
+          }),
+        );
+        return;
+      }
       setDeliberate(result.nextDeliberate);
       // Re-root the folder's color + icon onto the new path (and any descendant
       // folder's, since the rename re-roots the whole subtree) so a rename
@@ -455,20 +515,49 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // subtree would silently un-archive. Folded-prefix, same subtree as the
         // deliberate re-root inside `renameFolder`.
         const reroot = rerootArchivedFolders(node.path, newPath, archivedFolders);
-        if (reroot.rewritten > 0) {
+        const oldKey = foldSegment(normalizeFolderPath(node.path) ?? "");
+        if (oldKey !== "") {
           // #259: revert the optimistic state when the disk write fails —
           // otherwise the UI shows the re-rooted set for the rest of the
           // session while `vault.prefs` still holds paths under the OLD name,
           // and at the next unlock the whole subtree silently un-archives.
           // Same shape as `performFolderArchive` below, which had it already.
+          //
+          // The WRITE states the subtree as one prefix verb and lets the core
+          // resolve it against the stored set (myne#613 review round 2); only
+          // the optimistic state uses `reroot.next`. The `rewritten > 0` guard
+          // is gone with it, because it read the same local set: it can only
+          // under-report, and under-reporting here skips a re-root that was
+          // needed. `reroot` is still what the UI renders, which is the half a
+          // local set is allowed to decide.
           const prevArchived = archivedFolders;
           setArchivedFoldersState(reroot.next);
-          void setArchivedFolders(reroot.next).catch(() => {
+          void mutateArchivedFolders({
+            renamePrefix: [{ from: oldKey, to: newPath }],
+          }).catch(() => {
             setArchivedFoldersState(prevArchived);
           });
         }
       }
       await Promise.all(result.moved.map((id) => ctx.refreshOne(id)));
+      // Last, and deliberately AFTER the re-rooting above. The rename committed
+      // and only the `deliberate_folders` write failed, so the notes are right
+      // and one setting is not; running the re-rooting first is what keeps the
+      // decoration map and `archived_folders` from ALSO drifting off a rename
+      // that landed. Nothing reconciles `vault.prefs` against note frontmatter
+      // later, so the user is the reconciliation.
+      if (result.deliberateWriteFailed === true) {
+        // The in-memory set KEEPS the new path, deliberately, and this is the one
+        // place in this file that does not revert an optimistic prefs write. The
+        // #259 shape reverts because there the write was the whole action; here
+        // the rename landed on disk, so the old path is the value that disagrees
+        // with the notes. Neither choice is right, and the message is what makes
+        // the surviving disagreement legible instead of silent: it names the
+        // residue (an empty folder back under the old name at the next unlock)
+        // and says removing it is safe, rather than promising a retry that a
+        // second rename cannot perform.
+        setBlockNotice(i18n.t("notes.folderManagement.deliberateWriteFailed"));
+      }
     },
     [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap],
   );
@@ -578,7 +667,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // disk's favour.
         const prevArchived = archivedFolders;
         setArchivedFoldersState(nextArchived);
-        void setArchivedFolders(nextArchived).catch(() => {
+        void mutateArchivedFolders(mutationFrom(prevArchived, nextArchived)).catch(() => {
           setArchivedFoldersState(prevArchived);
         });
       }
@@ -598,7 +687,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     (plan: FolderArchivePlan) => {
       const prev = archivedFolders;
       setArchivedFoldersState(plan.nextArchived);
-      void setArchivedFolders(plan.nextArchived).catch(() => {
+      void mutateArchivedFolders(mutationFrom(archivedFolders, plan.nextArchived)).catch(() => {
         setArchivedFoldersState(prev); // disk write failed → revert optimistic UI
       });
       // If the open/selected note just left the working set, don't dwell on it.
@@ -625,7 +714,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       const next = planFolderUnarchive(path, archivedFolders);
       if (next.length === prev.length) return; // nothing archived under `path`
       setArchivedFoldersState(next);
-      void setArchivedFolders(next).catch(() => {
+      void mutateArchivedFolders(mutationFrom(prev, next)).catch(() => {
         setArchivedFoldersState(prev);
       });
     },
@@ -653,7 +742,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       if (nextArchived.length !== archivedFolders.length) {
         const prevArchived = archivedFolders;
         setArchivedFoldersState(nextArchived);
-        void setArchivedFolders(nextArchived).catch(() => {
+        void mutateArchivedFolders(mutationFrom(prevArchived, nextArchived)).catch(() => {
           setArchivedFoldersState(prevArchived);
         });
       }
@@ -663,7 +752,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // of the sibling call sites): shown as applied, persisted or not.
         const prevDeliberate = deliberate;
         setDeliberate(nextDeliberate);
-        void setDeliberateFolders(nextDeliberate).catch(() => {
+        void mutateDeliberateFolders(mutationFrom(prevDeliberate, nextDeliberate)).catch(() => {
           setDeliberate(prevDeliberate);
         });
       }

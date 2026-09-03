@@ -103,11 +103,41 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Privacy ────────────────────────────────────────────────────────────────
   {
     id: "privacy.screen-capture",
-    capability: "screenCaptureProtection",
+    // NO `capability`, and that is the asymmetry with the override entry
+    // below. `PrivacyPanel` renders THIS row unconditionally, so tagging it
+    // was the inverse of the rule `src/CLAUDE.md` states: search filtered it
+    // out on web while the panel rendered it, which is a setting a user can
+    // see and cannot find. The prose in this file and in
+    // `check-web-surfaces.mjs` said the two rows matched; correcting the
+    // prose without correcting the gate would have left the same defect with
+    // better documentation.
     panelId: "privacy",
     titleKey: "settings.privacy.screenCaptureLabel",
     descriptionKey: "settings.privacy.screenCaptureHelperOn",
     keywordsKey: "settings.search.keywords.screenCapture",
+  },
+  {
+    // myne-md/myne#482. The device-local escape hatch, mirrored here so a user
+    // who took it pre-unlock has an obvious way back. `capability`-tagged
+    // because `PrivacyPanel` wraps THIS row in `has("screenCaptureProtection")`
+    // and an untagged entry would navigate to an anchor that was never
+    // rendered. The per-vault row above is NOT gated, so the two differ: this
+    // comment claimed they matched, and the web verdict in
+    // `check-web-surfaces.mjs` said the same, both wrongly. The gate is new and
+    // one-sided, and it stays that way deliberately: the per-vault field is
+    // vault content that a user may want to read and set on a client where the
+    // native call does nothing, while this row writes a device-local file whose
+    // only purpose is suppressing a call that client never makes.
+    //
+    // No `developerGated`: the person this exists for is a low-vision or
+    // remote-desktop user on a black window, and a setting behind Developer
+    // mode cannot be found by them.
+    id: "privacy.screen-capture-override",
+    capability: "screenCaptureProtection",
+    panelId: "privacy",
+    titleKey: "settings.privacy.screenCaptureOverrideLabel",
+    descriptionKey: "settings.privacy.screenCaptureOverrideHelper",
+    keywordsKey: "settings.search.keywords.screenCaptureOverride",
   },
   {
     // myne-md/myne#411. One gate, and deliberately not the other.
@@ -344,23 +374,69 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "editor.daily-notes-folder",
     panelId: "editor",
-    titleKey: "settings.dailyNotes.folderLabel",
-    descriptionKey: "settings.dailyNotes.folderHelper",
+    titleKey: "settings.dailyNotes.sectionDaily",
+    descriptionKey: "settings.dailyNotes.periodFolderLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
   },
   {
     id: "editor.daily-notes-date-format",
     panelId: "editor",
-    titleKey: "settings.dailyNotes.dateFormatLabel",
-    descriptionKey: "settings.dailyNotes.dateFormatHelper",
+    titleKey: "settings.dailyNotes.sectionDaily",
+    descriptionKey: "settings.dailyNotes.periodFormatLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
   },
   {
     id: "editor.daily-notes-template",
     panelId: "editor",
-    titleKey: "settings.dailyNotes.templateLabel",
-    descriptionKey: "settings.dailyNotes.templateHelper",
+    titleKey: "settings.dailyNotes.sectionDaily",
+    descriptionKey: "settings.dailyNotes.periodTemplateLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
+  },
+  // myne#177. The weekly and monthly rows get their own entries rather than
+  // riding the daily ones: search scrolls to a setting's ANCHOR, and the three
+  // periods are three anchors. Each is titled by its section and described by
+  // its row, so three results are not all called "Folder".
+  {
+    id: "editor.weekly-notes-folder",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionWeekly",
+    descriptionKey: "settings.dailyNotes.periodFolderLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.weekly-notes-date-format",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionWeekly",
+    descriptionKey: "settings.dailyNotes.periodFormatLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.weekly-notes-template",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionWeekly",
+    descriptionKey: "settings.dailyNotes.periodTemplateLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.monthly-notes-folder",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionMonthly",
+    descriptionKey: "settings.dailyNotes.periodFolderLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.monthly-notes-date-format",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionMonthly",
+    descriptionKey: "settings.dailyNotes.periodFormatLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
+  },
+  {
+    id: "editor.monthly-notes-template",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.sectionMonthly",
+    descriptionKey: "settings.dailyNotes.periodTemplateLabel",
+    keywordsKey: "settings.search.keywords.periodicNotes",
   },
   {
     id: "editor.reminders",
@@ -626,6 +702,21 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.ai.autoTagHelper",
     keywordsKey: "settings.search.keywords.aiAutoTag",
     testid: "ai.auto-tag-toggle",
+  },
+  {
+    // myne-md/myne#617. Both gates, because they are independent and neither
+    // implies the other: `capability` drops it where there is no local-AI
+    // surface at all, `developerGated` drops it where the group is hidden.
+    // Search that found a setting the panel never rendered would scroll to
+    // nothing.
+    id: "ai.history-budget",
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    titleKey: "settings.ai.historyBudgetLabel",
+    descriptionKey: "settings.ai.historyBudgetHelper",
+    keywordsKey: "settings.search.keywords.aiHistoryBudget",
+    testid: "ai.history-budget-input",
   },
   {
     id: "ai.models",

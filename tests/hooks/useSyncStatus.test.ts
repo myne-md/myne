@@ -122,3 +122,64 @@ describe("useSyncStatus — interval cleared on unmount (leak guard)", () => {
     expect(invokeMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("useSyncStatus: an unchanged poll writes no state (myne-md/myne#566)", () => {
+  it("keeps the same object across two identical reads", async () => {
+    // Every poll deserializes a fresh object, so `Object.is` never matches and
+    // each tick re-rendered every subscriber to paint an identical frame. On the
+    // editor screen that subtree is the sidebar: `NoteList` -> `VirtualList` ->
+    // ~30 un-memoized `NoteRow`s, once per poller per five seconds, for nothing.
+    // `useUnsyncedEdits` has guarded the same property since it was written; this
+    // hook did not, so a caller added beside it silently gave it back.
+    //
+    // `mockImplementation` rather than `mockResolvedValue`: the latter hands back
+    // ONE object on every call, so React's own `Object.is` bailout would preserve
+    // the identity whether or not the hook compared anything, and the test would
+    // pass against a hook that does nothing.
+    invokeMock.mockImplementation(async () => ({ state: "idle" }));
+    const { result } = renderHook(() => useSyncStatus());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const first = result.current.status;
+    expect(first).toEqual({ state: "idle" });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    // The poll really happened, and the identity survived it anyway.
+    expect(invokeMock).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe(first);
+  });
+
+  it("writes when a payload field moves, not only when the state name does", async () => {
+    // The two payload-carrying variants are the ones a name-only comparison would
+    // freeze: a conflict count climbing 1 to 2 is a different answer.
+    invokeMock.mockImplementation(async () => ({ state: "conflicts", count: 1 }));
+    const { result } = renderHook(() => useSyncStatus());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.status).toEqual({ state: "conflicts", count: 1 });
+
+    invokeMock.mockImplementation(async () => ({ state: "conflicts", count: 2 }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    expect(result.current.status).toEqual({ state: "conflicts", count: 2 });
+  });
+
+  it("writes when the state name moves", async () => {
+    invokeMock.mockImplementation(async () => ({ state: "idle" }));
+    const { result } = renderHook(() => useSyncStatus());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    invokeMock.mockImplementation(async () => ({ state: "syncing" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    expect(result.current.status).toEqual({ state: "syncing" });
+  });
+});

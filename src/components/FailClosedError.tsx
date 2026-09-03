@@ -21,7 +21,7 @@ import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { has } from "../platform/capabilities";
 import { collectDiagnostics } from "../lib/collect-diagnostics";
-import { useCopyStatus } from "./CopyStatus";
+import { useActionStatus } from "./ActionStatus";
 import { copyText } from "../lib/clipboard";
 import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import type { TFunction } from "i18next";
@@ -156,8 +156,10 @@ export function FailClosedError({
   // result of whatever the user did most recently. The shared hook reverts and
   // carries the live region; the deliberate silence on FAILURE is untouched and
   // is argued at the call site below.
-  const { outcome, flashing, markCopied } = useCopyStatus();
-  const copied = flashing && outcome === "copied";
+  // One affordance on this screen, so the union has one member and the
+  // comparison below cannot be spelled wrong.
+  const { outcome, flashing, mark } = useActionStatus<"copy">();
+  const copied = flashing && outcome?.action === "copy" && outcome.ok;
   // The restore door is offered only where BACKUP EXISTS (phase3-web-client
   // task 70). Boot routing already keeps a web client away from the
   // `corrupted-vault` surface (`initialStageFromProbe` sends it to
@@ -219,7 +221,7 @@ export function FailClosedError({
               void collectDiagnostics(code)
                 .then((text) =>
                   copyText(clipboardWriteText, text, {
-                    onSuccess: { kind: "inline", run: markCopied },
+                    onSuccess: { kind: "inline", run: () => mark("copy", true) },
                     onFailure: {
                       kind: "silent",
                       reason:

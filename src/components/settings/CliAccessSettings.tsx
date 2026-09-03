@@ -10,8 +10,11 @@
 // the same shape as screen-capture protection and auto-lock sitting beside it.
 // It is deliberately NOT Account, where "Connected extensions" lives — that
 // block pairs a separately-distributed application across a trust boundary
-// (TB10), whereas the `myne` sidecar ships inside this bundle, under this
-// bundle's own signature, and is never paired with anything.
+// (TB10), whereas the `myne` sidecar ships inside this bundle, built from the
+// same workspace and the same Cargo.lock, and is never paired with anything.
+// (Not "under this bundle's own signature", which this comment said until
+// 2026-08-25: the desktop bundle carries no signature any OS checks. See
+// docs/threat-model.md TB12 and design-notes/security/0534.)
 //
 // # The copy is the load-bearing part
 //
@@ -41,7 +44,7 @@
 // honest across locales is the threat-model entry above plus review, the same
 // as every other translated privacy string.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { normalizeFolderPath } from "../../dialect/folderPath";
 import {
@@ -149,7 +152,20 @@ interface CliAccessSettingsProps {
   /** `cli_rate_limit_disabled` — `null` means unset, i.e. the limit applies. */
   rateLimitDisabled: boolean | null;
   onSetEnabled: (next: boolean) => void;
-  onSetExcludedFolders: (folders: string[]) => void;
+  /**
+   * Commit the exclusion list. `seededFrom` is what this component's draft was
+   * seeded FROM, and the caller diffs against it rather than against the live
+   * prefs cache (myne-md/myne#613): the user may have been typing for minutes,
+   * and an exclusion a peer added in that window is in the cache and not in the
+   * draft, so diffing against the cache would call it a removal.
+   *
+   * Both values come from here because both have to be taken at the same
+   * moment. A seed held by the parent was captured at the PARENT's first render,
+   * before `usePrefs` had read from disk, so it was the empty list while this
+   * component seeded its draft from the real one, and the resulting mutation
+   * could never carry a removal.
+   */
+  onSetExcludedFolders: (folders: string[], seededFrom: string[]) => void;
   onSetRateLimitDisabled: (next: boolean) => void;
 }
 
@@ -167,6 +183,27 @@ export function CliAccessSettings({
   const [excludedDraft, setExcludedDraft] = useState<string>(() =>
     excludedFolders.join("\n"),
   );
+  // Taken from the SAME value, at the same render, as the draft above. See
+  // `onSetExcludedFolders` for what splitting the two across two components
+  // cost.
+  const seededFromRef = useRef<string[]>(excludedFolders);
+  // Re-seed when the stored set changes under us, unless the user has started
+  // typing. The first-render seed above is sound here (unlike the AI twin's,
+  // because `PrivacyPanel` mounts this behind `prefs.developer_mode`, which is
+  // false until the disk read lands), but CONVERGENCE was missing: after a
+  // budget refusal or a failed write, `usePrefs.writeExcludedFolders` re-reads
+  // disk and the cache holds truth, while this textarea went on rendering the
+  // entry that was refused. The user was told once by a toast and then shown,
+  // for the rest of the session, a folder listed as excluded from the CLI that
+  // the CLI can read. That is fail-OPEN on an egress control, and it is the same
+  // fix `AiPanel` got for the same reason: `docs/threat-model.md` A17's
+  // mitigation is this list, and the CLI one is its untested sibling.
+  const excludedTouchedRef = useRef(false);
+  useEffect(() => {
+    if (excludedTouchedRef.current) return;
+    seededFromRef.current = excludedFolders;
+    setExcludedDraft(excludedFolders.join("\n"));
+  }, [excludedFolders]);
   const [state, setState] = useState<CliAccessState>(UNKNOWN_CLI_ACCESS_STATE);
 
   // Session state: read on mount, then on a slow tick so the age stays current
@@ -192,7 +229,16 @@ export function CliAccessSettings({
     };
   }, []);
 
-  const commitExcluded = () => onSetExcludedFolders(foldersFromDraft(excludedDraft));
+  const commitExcluded = () => {
+    const folders = foldersFromDraft(excludedDraft);
+    onSetExcludedFolders(folders, seededFromRef.current);
+    seededFromRef.current = folders;
+    // The edit is committed, so the draft is no longer the user's unsaved work
+    // and the re-seed may converge it again. Without this reset the panel stops
+    // tracking disk for the rest of the session after the first keystroke,
+    // which is the fail-open state one keystroke later.
+    excludedTouchedRef.current = false;
+  };
 
   // The door is open but the shell cannot find the command — the ordinary
   // macOS case, where `~/.local/bin` is not on `$PATH` by default. Only shown
@@ -267,7 +313,12 @@ export function CliAccessSettings({
           id="cli-excluded-folders"
           data-testid="settings.cli-excluded-folders"
           value={excludedDraft}
-          onChange={(e) => setExcludedDraft(e.target.value)}
+          onChange={(e) => {
+            // Once the user has typed, the re-seed above stops: their edit is
+            // never replaced by a value that landed mid-keystroke.
+            excludedTouchedRef.current = true;
+            setExcludedDraft(e.target.value);
+          }}
           onBlur={commitExcluded}
           rows={3}
           spellCheck={false}

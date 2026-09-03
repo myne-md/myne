@@ -11,26 +11,159 @@
     "noApprovers": "此账户上目前没有其他设备可以批准它。请在一台已有访问权限的设备上打开 Myne，然后回到这里。",
     "pendingStartOver": "改用其他账户重新开始",
     "pendingTitle": "等待批准",
-    "sasMatch": "它们匹配——继续",
+    "sasMatch": "一致，继续",
     "sasMismatch": "它们不匹配",
-    "verifyBody": "在继续之前，请确认两台设备上的验证码相同。如果不同，请停止——出问题的是连接，而不是你的密码。",
+    "verifyBody": "在继续之前，请确认两台设备上的这个验证码相同。如果不同，请停止：出问题的是连接，而不是你的密码。",
+    "verifyChanged": "验证码在你查看时发生了变化。请再次比对两个屏幕。如果它持续变化，请停止，不要继续。",
     "verifyTitle": "比对此验证码",
     "title": "登录你的保险库",
     "working": "正在设置…"
   },
   "accountEntry": {
+    "createAccount": "我还没有账号。创建一个。",
     "checkFailed": "无法核对该账号。请重试。",
     "checking": "正在检查…",
     "continue": "继续",
-    "hint": "它的格式类似 MY-XXXX-XXXX-XXXX-XXXX-XXXX。核对在你的设备上就地完成——目前不会发送任何内容。",
+    "hint": "它的格式类似 MY-XXXX-XXXX-XXXX-XXXX-XXXX。核对在你的设备上就地完成。目前不会发送任何内容。",
     "invalid": "该账号无效。请核对后重试。",
     "title": "输入你的账号"
+  },
+  "agent": {
+    "composer": {
+      "placeholder": "让 AI 修改这些笔记",
+      "scopeLabel": "正在处理",
+      "scopeChange": "更改",
+      "scopeOpenNote": "此笔记",
+      "scopeCount_one": "{{count}} 篇笔记",
+      "scopeCount_other": "{{count}} 篇笔记",
+      "scopeCountUnavailable": "暂时无法确认该文件夹中有多少篇笔记。",
+      "startFailed": "智能体无法启动。",
+      "autoApplyFailed": "无法自动应用这些更改。未写入任何内容；请打开审阅自行应用。",
+      "permissionLabel": "本次运行结束时",
+      "permissionAsk": "先审阅",
+      "permissionAuto": "自动应用",
+      "providerRejected": "服务商拒绝了此请求，本次运行已停止。未写入任何内容。这是 Myne 发送的内容有问题，与你的笔记或设置无关。",
+      "unchecked": "编辑能力检测未能完成，智能体暂时不可用。请确认你的模型或服务商可访问，然后重试。",
+      "unsupported": "此模型无法可靠地进行精确编辑，智能体不可用。请选择更大的模型或一个服务商。",
+      "unsupportedDetail": "它通过了 {{attempts}} 项检测中的 {{passes}} 项；需要 {{required}} 项。",
+      "checking": "正在检测模型…",
+      "checkingAt": "正在检测模型…（{{attempt}}/{{of}}）",
+      "unsupportedProvisional": "该通过标准尚未在各模型上测定过，因此可能偏严或偏松。",
+      "scopeNone": "没有打开的笔记，所以暂时没有可处理的内容"
+    },
+    "progress": {
+      "working": "处理中",
+      "awaitingScope": "等待你确认",
+      "cancelled": "已取消",
+      "exhausted": "步骤过多，已停止",
+      "stalled": "已停止：此模型无法在该笔记上取得进展",
+      "done": "已完成",
+      "scopeTotal_one": "可更改 {{count}} 篇笔记",
+      "scopeTotal_other": "可更改 {{count}} 篇笔记",
+      "cancel": "停止",
+      "expandFailed": "无法扩大范围。",
+      "grantsUser_one": "你设定的 {{count}} 个范围",
+      "grantsUser_other": "你设定的 {{count}} 个范围",
+      "grantsModel_one": "它请求的 {{count}} 个",
+      "grantsModel_other": "它请求的 {{count}} 个",
+      "cancelledBackground": "因为 Myne 转入后台，此次运行已取消。没有写入任何内容。准备好后再问一次。"
+    },
+    "scope": {
+      "title": "要包含 {{folder}} 吗？",
+      "grant_one": "AI 将能够读取并更改 {{folder}} 中的 {{count}} 篇笔记。",
+      "grant_other": "AI 将能够读取并更改 {{folder}} 中的 {{count}} 篇笔记。",
+      "newTotal_one": "本次运行随后将总共涵盖 {{count}} 篇笔记。",
+      "newTotal_other": "本次运行随后将总共涵盖 {{count}} 篇笔记。",
+      "excluded_one": "{{count}} 篇笔记已排除在 AI 之外，不会被纳入。",
+      "excluded_other": "{{count}} 篇笔记已排除在 AI 之外，不会被纳入。",
+      "egressRemote": "这些笔记将发送给 {{provider}}，该服务并非由 Myne 运营。它们会离开本设备。",
+      "egressLocal": "这些笔记会发送给本机上运行的程序。它们不会离开本设备。",
+      "reasonLabel": "它的理由：",
+      "approve": "允许",
+      "decline": "这次不用",
+      "countsUnavailable": "AI 请求同时读取 {{folder}}。暂时无法确认这会增加多少篇笔记。"
+    },
+    "review": {
+      "title": "审阅更改",
+      "close": "关闭",
+      "scopeTotal_one": "范围内 {{count}} 篇笔记",
+      "scopeTotal_other": "范围内 {{count}} 篇笔记",
+      "noChanges": "智能体没有提出任何更改。",
+      "noteHeading_one": "{{count}} 处更改",
+      "noteHeading_other": "{{count}} 处更改",
+      "changedLines_one": "{{count}} 行",
+      "changedLines_other": "{{count}} 行",
+      "removalFlag": {
+        "trashed": "将此笔记移至回收站",
+        "deleted": "在所有设备上删除此笔记",
+        "archived": "将此笔记移至归档",
+        "template": "将此笔记转为模板",
+        "conflict": "将此笔记标记为冲突副本"
+      },
+      "largeDeletion": "会删除大量文本",
+      "rejectEdit": "拒绝",
+      "restoreEdit": "保留",
+      "applyRemoval": "单独应用",
+      "rejectAll": "全部拒绝",
+      "approveAll_one": "批准 {{count}} 处更改",
+      "approveAll_other": "批准 {{count}} 处更改",
+      "appliedCount_one": "已应用 {{count}} 处更改。",
+      "appliedCount_other": "已应用 {{count}} 处更改。",
+      "refused": {
+        "anchorNotFound": "无法应用：该文本已不在笔记中。",
+        "anchorAmbiguous": "无法应用：该文本出现了多次。",
+        "anchorEmpty": "无法应用：没有可匹配的文本。",
+        "outOfScope": "无法应用：该笔记不在本次运行的范围内。",
+        "removalNeedsOwnAct": "未在此应用：将笔记移出需要单独确认。",
+        "readFailed": "无法应用：无法读取该笔记。",
+        "unsafeFrontmatter": "未创建：提议的标题或文件夹包含换行符。",
+        "excludedFolder": "未创建：该文件夹已排除在 AI 之外。",
+        "createFailed": "未创建：写入新笔记失败。其他更改仍已应用。",
+        "excludedNow": "无法应用：该笔记所在的文件夹现已排除在 AI 之外。",
+        "notProposed": "无法应用：该更改不属于本次运行的提议。",
+        "noteMoved": "无法应用：该更改会把笔记移动到另一个文件夹。",
+        "appendEmpty": "无法应用：没有可添加的内容。",
+        "appendWouldWriteFrontmatter": "无法应用：该文本会变成笔记的属性块。"
+      },
+      "applyFailed": "无法应用这些更改。",
+      "undo": "撤销本次运行",
+      "undoFailed": "无法撤销本次运行。",
+      "undoReport": "已恢复 {{reverted}} 篇笔记。本次运行创建的 {{kept}} 篇笔记予以保留。",
+      "alreadyApplied": "已应用",
+      "untitledNote": "无标题笔记",
+      "vaultRoot": "保险库根目录",
+      "newNotesHeading_one": "{{count}} 篇新笔记",
+      "newNotesHeading_other": "{{count}} 篇新笔记",
+      "createdCount_one": "已创建 {{count}} 篇笔记。",
+      "createdCount_other": "已创建 {{count}} 篇笔记。",
+      "runSummaryRequests_one": "{{count}} 次请求",
+      "runSummaryRequests_other": "{{count}} 次请求",
+      "runSummaryNotes_one": "已读取 {{count}} 篇笔记",
+      "runSummaryNotes_other": "已读取 {{count}} 篇笔记",
+      "runSummaryOffDevice_one": "你的笔记中约 {{count}} 个字符已发送给服务商",
+      "runSummaryOffDevice_other": "你的笔记中约 {{count}} 个字符已发送给服务商",
+      "runSummaryOnDevice": "没有任何内容离开本设备",
+      "appendFlag": "追加到末尾"
+    },
+    "undo": {
+      "offer_one": "上次运行更改了 {{count}} 篇笔记。",
+      "offer_other": "上次运行更改了 {{count}} 篇笔记。",
+      "action": "撤销本次运行",
+      "reverted_one": "已恢复 {{count}} 篇笔记。",
+      "reverted_other": "已恢复 {{count}} 篇笔记。",
+      "failed_one": "有 {{count}} 篇笔记无法恢复。",
+      "failed_other": "有 {{count}} 篇笔记无法恢复。",
+      "createdNotReverted_one": "本次运行创建的 {{count}} 篇笔记已保留原样。",
+      "createdNotReverted_other": "本次运行创建的 {{count}} 篇笔记已保留原样。",
+      "sessionOnly": "这个一键撤销在你锁定保险库或关闭应用之前有效。之后请从某条笔记的版本历史中逐条恢复。",
+      "sessionOnlyLink": "打开版本历史"
+    }
   },
   "ai": {
     "answeredBy": {
       "inProcess": "在此设备上回答",
       "localRuntime": "由 {{name}} 在这台电脑上回答",
-      "remote": "由 {{provider}} 回答——你的笔记已发送到那里"
+      "remote": "由 {{provider}} 回答。你的笔记已发送到那里。"
     }
   },
   "attachments": {
@@ -42,8 +175,8 @@
       "deleteCta": "删除 {{count}} 个未使用",
       "deleteCta_one": "删除 {{count}} 个未使用",
       "deleteCta_other": "删除 {{count}} 个未使用",
-      "corpusIncomplete": "请先完成同步——此设备尚未拥有你的全部笔记。未删除任何内容。",
-      "error": "无法清理。部分笔记可能无法读取——未删除任何内容。",
+      "corpusIncomplete": "请先完成同步。此设备尚未拥有你的全部笔记。未删除任何内容。",
+      "error": "无法清理。部分笔记可能无法读取。未删除任何内容。",
       "intro_one": "此附件未被任何笔记使用。删除它是永久性的，无法撤销。",
       "intro_other": "这 {{count}} 个附件未在任何笔记中使用。删除后将永久生效，无法撤销。",
       "summaryFreed": " · 释放了 {{size}}",
@@ -82,7 +215,7 @@
       "actionsTitle": "操作",
       "checking": "正在检查…",
       "checkUnusedFailedNotice": "无法检查未使用的附件。请重试。",
-      "corpusIncompleteNotice": "请先完成同步——此设备尚未拥有你的全部笔记，因此无法判断哪些附件未被使用。",
+      "corpusIncompleteNotice": "请先完成同步。此设备尚未拥有你的全部笔记，因此无法判断哪些附件未被使用。",
       "cleanUnused": "清理未使用",
       "cleanUnusedTitle": "删除未在任何笔记中使用的附件",
       "colCreated": "创建时间",
@@ -127,6 +260,7 @@
       "title": "附件",
       "transcribeDone": "转录完成。",
       "transcribeFailed": "转录失败。请重试。",
+      "transcribeTooLong": "此录音过长，无法转录。音频仍作为附件保留，你仍然可以播放它。",
       "transcribeFeatureOff": "语音转文字已关闭。请在设置 → 转录 中开启。",
       "transcribeModelLoadFailed": "无法加载语音转文字模型。请重新安装 Myne，或在设置 → 开发者 → AI 中检查你的自定义模型。",
       "transcribeNoModelHint": "缺少语音转文字模型。重新安装 Myne 即可恢复它。",
@@ -159,7 +293,7 @@
       "untitled": "无标题"
     },
     "needsApp": "附件清理需要使用应用。",
-    "noUnused": "没有未使用的附件——每个文件都被引用。",
+    "noUnused": "没有未使用的附件：每个文件都被引用。",
     "scanError": "无法扫描未使用的附件。",
     "erasedToast_one": "已抹除 {{count}} 个未使用的文件。",
     "erasedToast_other": "已抹除 {{count}} 个未使用的文件。",
@@ -171,8 +305,8 @@
     "addError": "无法添加该文件。",
     "deleteError": "无法删除该附件。",
     "renameError": "无法重命名该附件。",
-    "unusedSummary_one": "有 {{count}} 个附件未被任何笔记引用（{{size}}）。抹除是一次永久性的加密删除——没有回收站。",
-    "unusedSummary_other": "有 {{count}} 个附件未被任何笔记引用（{{size}}）。抹除是一次永久性的加密删除——没有回收站。",
+    "unusedSummary_one": "有 {{count}} 个附件未被任何笔记引用（{{size}}）。抹除是一次永久性的加密删除。没有回收站。",
+    "unusedSummary_other": "有 {{count}} 个附件未被任何笔记引用（{{size}}）。抹除是一次永久性的加密删除。没有回收站。",
     "eraseCta_one": "抹除 {{count}} 个未使用的文件",
     "eraseCta_other": "抹除 {{count}} 个未使用的文件",
     "emptyState": "尚无附件。点按“上传”以添加图片或 PDF。",
@@ -192,7 +326,7 @@
         "joinFailure": "备份意外失败。未留下任何文件。",
         "memberTooLarge": "此保险库中的某个文件超过了备份格式允许的大小。",
         "vaultNotFound": "未找到可备份的保险库。",
-        "verifyFailed": "已写入的备份未通过校验，已被丢弃。请重试——若问题重复出现，请换用其他存储介质。"
+        "verifyFailed": "已写入的备份未通过校验，已被丢弃。请重试，若问题重复出现，请换用其他存储介质。"
       },
       "restore": {
         "authOperationInProgress": "另一项保险库操作正在进行中。请等待其完成后再试。",
@@ -247,7 +381,7 @@
       "task": "含任务的笔记",
       "content": "正文全文检索"
     },
-    "searchPlaceholder": "搜索笔记或运行命令——试试 tag: · path: · task:",
+    "searchPlaceholder": "搜索笔记或运行命令。试试 tag: · path: · task:",
     "sectionCommands": "命令",
     "sectionNotes": "笔记",
     "untitledNote": "无标题"
@@ -494,6 +628,12 @@
       "saveWorkspaceAs": {
         "label": "工作区另存为…"
       },
+      "removeNoteCover": {
+        "label": "移除笔记封面"
+      },
+      "setNoteCover": {
+        "label": "设置笔记封面…"
+      },
       "showGraph": {
         "label": "显示关系图视图…"
       },
@@ -529,6 +669,12 @@
       },
       "unfoldAll": {
         "label": "全部展开"
+      },
+      "openThisWeekNote": {
+        "label": "打开本周笔记"
+      },
+      "openThisMonthNote": {
+        "label": "打开本月笔记"
       }
     },
     "hotkeys": {
@@ -573,7 +719,7 @@
       }
     },
     "rebind": {
-      "invalidChordReason": "请加上一个修饰键（⌘、Ctrl 或 Alt）——单个按键不能作为快捷键。"
+      "invalidChordReason": "请加上一个修饰键（⌘、Ctrl 或 Alt）。单个按键不能作为快捷键。"
     },
     "picker": {
       "vaultRoot": "保险库根目录",
@@ -587,6 +733,7 @@
   },
   "common": {
     "cancel": "取消",
+    "close": "关闭",
     "dismiss": "关闭",
     "prompt": {
       "cancel": "取消",
@@ -620,10 +767,10 @@
       "convert": {
         "cancel": "取消",
         "confirm": "转换",
-        "skipped": "已跳过——{{note}}",
+        "skipped": "已跳过：{{note}}",
         "subtitle_one": "将重写 1 处引用。提交前请检查。",
         "subtitle_other": "将重写 {{count}} 处引用。提交前请检查。",
-        "subtitleEmpty": "没有可转换的内容——未解析到任何源文件。",
+        "subtitleEmpty": "没有可转换的内容：未解析到任何源文件。",
         "title": "转换导入的附件"
       },
       "convertCommand": {
@@ -643,7 +790,10 @@
         },
         "skippedSuffix": " · 跳过 {{count}} 个",
         "skippedSuffix_one": " · 已跳过 {{count}} 个",
-        "skippedSuffix_other": " · 已跳过 {{count}} 个"
+        "skippedSuffix_other": " · 已跳过 {{count}} 个",
+        "layoutPreserved": "{{count}} 项保留了尺寸或替代文本",
+        "layoutPreserved_one": "{{count}} 个保留了尺寸或替代文本",
+        "layoutPreserved_other": "{{count}} 个保留了尺寸或替代文本"
       },
       "fileKind": {
         "generic": "文件",
@@ -715,7 +865,7 @@
       "recording": {
         "barAria": "正在录制语音笔记",
         "cancel": "取消",
-        "noAudio": "未检测到声音——请检查你的麦克风。",
+        "noAudio": "未检测到声音。请检查你的麦克风。",
         "saving": "正在保存…",
         "stop": "停止"
       },
@@ -741,16 +891,18 @@
       "voice": {
         "startError": {
           "alreadyRecording": "已有录音正在进行中。",
-          "captureFailed": "无法开始录音——请在“系统设置”中检查麦克风访问权限。",
+          "captureFailed": "无法开始录音。请在“系统设置”中检查麦克风访问权限。",
           "generic": "无法开始录音。",
           "locked": "请先解锁保险库再录制语音笔记。",
-          "noInputDevice": "未找到麦克风。请连接一个后重试。"
+          "noInputDevice": "未找到麦克风。请连接一个后重试。",
+          "unsupportedSampleRate": "你的麦克风以 Myne 无法转写的采样率录音。请改用其他输入设备，或在系统声音设置中更改它的采样率。"
         },
         "stopError": {
-          "captureFailed": "录音失败——请检查你的麦克风。",
+          "captureFailed": "录音失败。请检查你的麦克风。",
           "emptyRecording": "未录制到任何内容。",
           "generic": "无法保存录音。",
-          "silentRecording": "录音无声，已被丢弃——请检查你的麦克风。"
+          "silentRecording": "录音无声，已被丢弃。请检查你的麦克风。",
+          "unsupportedSampleRate": "你的麦克风以 Myne 无法转写的采样率录音。没有保存任何内容。请改用其他输入设备，或在系统声音设置中更改它的采样率。"
         }
       },
       "widget": {
@@ -764,11 +916,26 @@
           "remove": "移除",
           "rename": "重命名",
           "reveal": "在附件库中显示",
-          "transcribe": "转录"
+          "transcribe": "转录",
+          "customSize": "自定义尺寸…",
+          "customSizeInvalid": "请输入以像素为单位的宽度（1-8192）或百分比（1-100%）。",
+          "editAlt": "编辑替代文本…",
+          "size": {
+            "small": "小",
+            "medium": "中",
+            "large": "大",
+            "full": "全宽"
+          },
+          "align": {
+            "left": "左对齐",
+            "center": "居中对齐",
+            "right": "右对齐"
+          },
+          "altInvalid": "替代文本不能包含“]”，那会破坏嵌入。"
         },
         "pdfFallback": "PDF",
         "textPreview": {
-          "truncated": "预览已截断——导出以获取完整文件。"
+          "truncated": "预览已截断。导出以获取完整文件。"
         },
         "tombstone": {
           "brokenAria": "失效的附件引用：{{filename}}",
@@ -781,6 +948,7 @@
             "featureOff": "语音转文字已关闭。请在设置 → 转录 中开启。",
             "modelLoadFailed": "无法加载语音转文字模型。如果你在设置 → 开发者 → AI 中设置了自定义模型，请检查它的文件；否则重新安装 Myne 即可恢复内置模型。",
             "noModel": "缺少语音转文字模型。重新安装 Myne 即可恢复它。",
+            "tooLong": "这段录音太长，无法转写。音频仍作为附件保留，你依然可以播放。",
             "vaultLocked": "请解锁保险库后再进行转录。"
           },
           "disabledReason": "请在设置 → Developer → AI 中启用 AI 后再进行转录。",
@@ -791,7 +959,16 @@
           "progress": "正在转录…",
           "stop": "停止"
         },
-        "urlImageFallback": "图片"
+        "urlImageFallback": "图片",
+        "unreadableSegment": "无法读取：{{segments}}"
+      },
+      "customSizePrompt": {
+        "title": "自定义尺寸",
+        "confirm": "设置尺寸"
+      },
+      "altPrompt": {
+        "title": "替代文本",
+        "confirm": "保存"
       }
     },
     "callout": {
@@ -880,7 +1057,7 @@
           "insert": "插入",
           "normal": "普通",
           "replace": "替换",
-          "title": "Vim 模式——按 Esc 回到普通模式",
+          "title": "Vim 模式：按 Esc 回到普通模式",
           "visual": "可视"
         },
         "graphTitle": "关系图（⌘⇧G）",
@@ -889,7 +1066,6 @@
         "openSettings": "打开设置",
         "settingsTitle": "设置（⌘,）",
         "showGraph": "显示关系图视图",
-        "syncStatus": "仅本地 · 未同步",
         "tagsTitle": "标签",
         "togglePreview": "切换并排预览",
         "viewModeTitle": "查看模式：{{mode}}（点击循环切换）",
@@ -911,23 +1087,33 @@
       "resizeNotesSidebar": "调整笔记侧边栏大小",
       "rightPanel": {
         "aiChat": {
+          "agentTurn": {
+            "noAnswer": "智能体没有给出回答就停止了。请再问一次，或换一种说法。",
+            "newNotes_one": "{{count}} 篇新笔记。",
+            "newNotes_other": "{{count}} 篇新笔记。",
+            "proposed_one": "已提议 {{count}} 处更改。",
+            "proposed_other": "已提议 {{count}} 处更改。"
+          },
           "askPlaceholder": "就你的笔记提一个问题…",
           "askSubmit": "提问",
           "assistant": "助手",
           "citations": "来源",
           "composerPlaceholder": "向你的笔记发消息…",
-          "empty": "AI 输出——摘要、答案和建议——会显示在这里。",
+          "empty": "AI 输出（摘要、答案和建议）会显示在这里。",
           "error": "AI 请求无法完成。",
           "errorTurn": "助手无法回答。",
-          "gettingReadyHint": "正在为 AI 准备你的笔记——请稍候。",
+          "gettingReadyHint": "正在为 AI 准备你的笔记。请稍候。",
+          "noSearchModelHint": "提问会在此设备上搜索你的笔记，这需要本机的搜索模型。服务商无法代劳。请在设置 → 开发者 → AI 中选择一个。用 AI 编辑笔记仍然可用。",
           "insert": "插入到笔记",
-          "noAnswer": "没有答案——请尝试换个说法。",
+          "noAnswer": "没有答案。请尝试换个说法。",
+          "newChat": "新对话",
           "noModelHint": "尚未设置 AI 服务商，因此聊天、摘要、改写和语义搜索都无法运行。请在设置 → 开发者 → AI 中设置一个。",
           "unreachableHint": "你设置的服务商没有响应。请确认它正在运行，然后重新发送。",
           "unavailableHint": "此构建版本的 Myne 在编译时未包含本地 AI，因此这里无法运行任何内容。",
           "offHint": "本地 AI 已关闭。请在设置 → 开发者 → AI 中开启。",
           "send": "发送",
           "statusGettingReady": "正在准备…",
+          "statusNoSearchModel": "无搜索模型",
           "statusNoModel": "无服务商",
           "statusUnreachable": "无响应",
           "statusUnavailable": "不可用",
@@ -939,7 +1125,7 @@
           "truncated": "已总结前 {{count}} 个字符。",
           "you": "你"
         },
-        "allHidden": "所有标签页均已隐藏——右键单击以恢复。",
+        "allHidden": "所有标签页均已隐藏。右键单击以恢复。",
         "outline": {
           "collapse": "折叠此节",
           "empty": "没有标题",
@@ -986,6 +1172,7 @@
     },
     "noteActions": {
       "buttonLabel": "笔记操作",
+      "convertFailed": "无法转换此笔记的类型，因此它保持不变。",
       "rename": "重命名",
       "move": "移动到文件夹…",
       "duplicate": "创建副本",
@@ -994,10 +1181,6 @@
       "turnedIntoTemplate": "已转为模板",
       "convertedToNote": "已转为笔记",
       "versionHistory": "版本历史",
-      "exportMarkdown": "导出为 Markdown…",
-      "exportPdf": "导出为 PDF…",
-      "exportHtml": "导出为 HTML…",
-      "exportTxt": "导出为纯文本…",
       "trash": "移至回收站"
     },
     "codeBlock": {
@@ -1008,7 +1191,7 @@
       "done": "完成",
       "edit": "编辑绘图 {{name}}",
       "editAction": "编辑",
-      "empty": "空白绘图——点击开始绘制",
+      "empty": "空白绘图：点击开始绘制",
       "open": "打开",
       "rename": "重命名绘图"
     },
@@ -1029,7 +1212,15 @@
       "replaceAllCount": "全部替换（{{total}}）",
       "replaceOne": "替换",
       "replacePlaceholder": "替换为",
-      "toggleReplace": "切换替换"
+      "toggleReplace": "切换替换",
+      "dateFallback": "正在搜索 {{stored}}，这是该日期的存储形式。",
+      "replaceOffOnDateFallback": "当日期是以其存储形式匹配到的时候，替换会关闭，以免一次替换让该日期无法读取。"
+    },
+    "cover": {
+      "add": "添加封面",
+      "change": "更换封面",
+      "emptyLibraryMobile": "此保险库中还没有图片。上传一张用作封面。",
+      "writeFailed": "无法更新笔记封面"
     },
     "folding": {
       "clickToUnfold": "点击以展开",
@@ -1049,7 +1240,8 @@
       "titlePlaceholder": "无标题"
     },
     "mermaid": {
-      "rendering": "正在渲染图表…"
+      "rendering": "正在渲染图表…",
+      "renderFailed": "无法渲染此图表：{{reason}}"
     },
     "slash": {
       "aiContinue": "继续写作（AI）",
@@ -1196,9 +1388,9 @@
     "vim": {
       "ex": {
         "refused": {
-          "edit": "不支持 `:e`——Myne 打开的是笔记，而不是文件。请使用命令面板或侧边栏。",
+          "edit": "不支持 `:e`。Myne 打开的是笔记，而不是文件。请使用命令面板或侧边栏。",
           "map": "Myne 不支持自定义按键映射。快捷键在设置 → 快捷键中配置。",
-          "set": "不支持 `:set`——Myne 没有 vim 选项。编辑器偏好设置位于设置 → 编辑器中。",
+          "set": "不支持 `:set`。Myne 没有 vim 选项。编辑器偏好设置位于设置 → 编辑器中。",
           "source": "不支持 `:source`。Myne 有意不提供任何配置脚本接口。",
           "unsupported": "Myne 不支持该命令。"
         },
@@ -1223,10 +1415,10 @@
         "convertedToast_one": "已转换 {{count}} 个 Wiki 链接",
         "convertedToast_other": "已转换 {{count}} 个 wiki 链接",
         "noneToConvert": "此笔记中没有可转换的导入 wiki 链接。",
-        "nothingToConvert": "没有可转换的内容——没有可解析的导入 wiki 链接。",
+        "nothingToConvert": "没有可转换的内容：没有可解析的导入 wiki 链接。",
         "rewriteCount_one": "将重写 {{count}} 个链接",
         "rewriteCount_other": "将重写 {{count}} 个链接",
-        "skipped": "已跳过——{{reason}}",
+        "skipped": "已跳过：{{reason}}",
         "title": "转换此笔记中导入的 wiki 链接",
         "staleDocument": "预览打开期间此笔记发生了变化，因此未转换任何内容。请重新运行一次，以查看当前的链接。"
       },
@@ -1247,6 +1439,9 @@
       "attachFailed": "无法附加该文件。",
       "archiveFailed": "无法归档此笔记。",
       "aiRewriteFailed": "改写无法完成，因此你选中的内容保持不变。",
+      "aiRewriteNoSelection": "请先选中要重写的文本，然后再次运行“重写所选内容”。",
+      "aiRewriteUnavailable": "“重写所选内容”暂时无法运行。你的笔记未做任何更改。",
+      "aiRewriteExcluded": "这篇笔记位于你已排除在 AI 之外的文件夹中，因此未重写任何内容。",
       "aiRewriteNoProvider": "尚未设置 AI 服务商，因此未改写任何内容。请在设置 → 开发者 → AI 中设置一个。",
       "trashFailed": "无法将此笔记移至回收站。"
     },
@@ -1355,6 +1550,13 @@
     "commandPalette": {
       "searchPlaceholder": "搜索笔记或运行命令…",
       "noMatches": "没有匹配的命令或笔记。"
+    },
+    "periodicNotes": {
+      "openFailed": {
+        "daily": "无法打开今天的笔记。",
+        "weekly": "无法打开本周的笔记。",
+        "monthly": "无法打开本月的笔记。"
+      }
     }
   },
   "export": {
@@ -1373,10 +1575,10 @@
         "ioNoSpace": "目标位置空间不足。",
         "ioPermissionDenied": "没有权限写入目标位置。",
         "ioWriteDefault": "无法写入导出的文件。",
-        "noteNotFound": "此笔记已不存在——可能已被删除。",
+        "noteNotFound": "此笔记已不存在。可能已被删除。",
         "pdfCaptureFailed": "无法生成 PDF，因此未导出任何内容。",
         "pdfExportInProgress": "已有一个 PDF 导出正在进行中。请等待其完成后再试。",
-        "pdfPayloadMissing": "导出已中断——如果保险库已锁定，请解锁后重试。",
+        "pdfPayloadMissing": "导出已中断。如果保险库已锁定，请解锁后重试。",
         "pdfRenderTimeout": "笔记渲染耗时过长，因此未导出任何内容。",
         "pdfWindowCreateFailed": "无法打开导出窗口，因此未导出任何内容。",
         "targetExists": "目标位置已存在同名文件。",
@@ -1482,7 +1684,7 @@
       "reload": "重新加载"
     },
     "corrupted": {
-      "body": "如果你有备份，可以将其恢复——你当前的文件不会被改动；备份会先作为一个单独的保险库恢复。",
+      "body": "如果你有备份，可以将其恢复。你当前的文件不会被改动；备份会先作为一个单独的保险库恢复。",
       "cta": "关闭应用",
       "title": "保险库文件已损坏。"
     },
@@ -1524,7 +1726,7 @@
       "folderDeleteConfirmCta": "移至回收站",
       "folderDeleteError": "无法将该文件夹的笔记移至回收站。请重试。",
       "folderDeleteTitle": "将此文件夹移至回收站？",
-      "folderDeleteWarning": "它们会被移入回收站——你随时可以恢复。永久删除是另一个单独的步骤。",
+      "folderDeleteWarning": "它们会被移入回收站。你随时可以恢复。永久删除是另一个单独的步骤。",
       "restore": "恢复",
       "restoreError": "无法恢复该笔记。请重试。",
       "title": "存档",
@@ -1596,7 +1798,7 @@
         "is": "是",
         "isNot": "不是"
       },
-      "noConditions": "暂无条件——此视图显示所有页面。",
+      "noConditions": "暂无条件。此视图显示所有页面。",
       "noteCount_one": "{{count}} 篇笔记",
       "noteCount_other": "{{count}} 篇笔记",
       "of": "以下条件：",
@@ -1625,7 +1827,12 @@
       "illegalSegment": "文件夹名不能包含 / \\ | # ^ [ ]，也不能以空格开头或结尾。",
       "tooLong": "该文件夹路径太长了。",
       "moveIntoSelf": "文件夹不能移动到自身内部。",
-      "moveCollision": "那里已经有同名的文件夹了。"
+      "moveCollision": "那里已经有同名的文件夹了。",
+      "unsettledSave": "有一篇打开的笔记尚未保存完成，因此该文件夹未作改动。等它保存完成后再试一次。",
+      "renameFailed": "无法重命名该文件夹，因此它保持不变。",
+      "deliberateWriteFailed": "文件夹已重命名，但它的一项设置未能保存。每次解锁时，都会有一个空文件夹以旧名称重新出现；删除它是安全的，不会改动其他任何内容。再次重命名该文件夹并不会清除它。",
+      "folderListFull": "Myne 能记住的文件夹数量有限，而该列表已满。此文件夹仍可使用，但当最后一篇笔记离开它时，它就会消失。删除一个你不再需要的文件夹可以腾出空间。",
+      "folderNotRemembered": "文件夹已创建，但 Myne 未能记录它。当最后一篇笔记离开它时，它就会消失；如果它仍然是空的，下次解锁时它就不在了。再次创建它是安全的。"
     },
     "folderNote": {
       "defaultTitle": "索引"
@@ -1637,7 +1844,7 @@
       "openFolderNote": "打开文件夹笔记"
     },
     "graph": {
-      "allConnected": "所有内容都已连接——没有孤立的笔记。",
+      "allConnected": "所有内容都已连接：没有孤立的笔记。",
       "building": "正在构建关系图…",
       "colorGroups": {
         "addRule": "添加规则",
@@ -1646,7 +1853,7 @@
         "dragHandleTitle": "拖动以重新排序",
         "editFilterButton": "编辑筛选器…",
         "editFilterTitle": "编辑颜色分组筛选器",
-        "emptyBody": "颜色分组可以按标签或文件夹为关系图节点着色——工作笔记用一种颜色，个人笔记用另一种。请添加你的第一条规则。",
+        "emptyBody": "颜色分组可以按标签或文件夹为关系图节点着色：工作笔记用一种颜色，个人笔记用另一种。请添加你的第一条规则。",
         "emptyTitle": "暂无颜色分组",
         "enableToggleAriaLabel": "启用规则",
         "filterAllNotes": "匹配所有笔记",
@@ -1667,7 +1874,7 @@
       "noNotes": "还没有可生成关系图的笔记。",
       "overCap": "此保险库较大——全库关系图已被限制。请筛选某个标签或显示孤立笔记来浏览。",
       "refresh": "刷新",
-      "refreshTitle": "保险库已变更——重新构建关系图",
+      "refreshTitle": "保险库已变更：重新构建关系图",
       "settings": {
         "appearanceHeading": "外观",
         "closeTitle": "关闭",
@@ -1724,15 +1931,15 @@
         "mediaOmittedSuffix_one": " · 已略去 {{count}} 个",
         "mediaOmittedSuffix_other": " · 已略去 {{count}} 个",
         "needsAttention": "需要注意",
-        "needsAttentionHelp": "这些笔记按原样导入。建议的修复只是起点——复制其中一个，然后在打开笔记后重命名。",
+        "needsAttentionHelp": "这些笔记按原样导入。建议的修复只是起点。复制其中一个，然后在打开笔记后重命名。",
         "noFolderChosen": "未选择文件夹",
         "notesImported_one": "篇笔记已导入",
         "notesImported_other": "篇笔记已导入",
         "policyCopyHint": "在现有笔记旁边一并导入。",
         "policyCopyLabel": "作为副本导入",
-        "policySkipHint": "推荐——重新运行导入绝不会重复或覆盖。",
+        "policySkipHint": "推荐：重新运行导入绝不会重复或覆盖。",
         "policySkipLabel": "跳过它",
-        "preexistingDetail": "此笔记原本已有自己的文件夹：“{{existing}}”，Myne 予以保留——其文件夹可能与它在磁盘上的位置不同。",
+        "preexistingDetail": "此笔记原本已有自己的文件夹：“{{existing}}”，Myne 予以保留。其文件夹可能与它在磁盘上的位置不同。",
         "preparing": "正在准备…",
         "progressNotes": " 篇笔记",
         "progressOf": " / ",
@@ -1740,7 +1947,7 @@
         "reasonPathTooLong": "文件夹 + 标题的路径太长",
         "reasonSegmentTooLong": "名称超过了 Myne 允许的长度",
         "scanning": "正在扫描你的保险库…",
-        "setupIntro": "Myne 会就地导入并加密你的笔记——没有任何内容离开本设备，你的原始文件也不会被改动。",
+        "setupIntro": "Myne 会就地导入并加密你的笔记。没有任何内容离开本设备，你的原始文件也不会被改动。",
         "statCancelled": "已取消",
         "statCanvasSkipped": "已跳过 .canvas 文件",
         "statCompressed": "已压缩的图片",
@@ -1761,18 +1968,22 @@
         "statExcalidrawSkipped": "已跳过的 Excalidraw 绘图",
         "unfollowedLinkOutside": "这是指向你所选文件夹之外某个文件夹的快捷方式，因此 Myne 没有跟随它。请把那个文件夹移动或复制到你的保险库内，然后重新导入。",
         "unfollowedLinkLoop": "这个快捷方式指回 Myne 已经进入过的文件夹，跟随它会无限循环下去。它下面的内容没有被遗漏。",
-        "unfollowedLinkBroken": "这个快捷方式没有指向任何地方——它原本指向的内容已被移动或删除。",
-        "unreadableDetail": "已跳过——{{reason}} 导入的其余部分继续进行。",
+        "unfollowedLinkBroken": "这个快捷方式没有指向任何地方。它原本指向的内容已被移动或删除。",
+        "unreadableDetail": "已跳过：{{reason}} 导入的其余部分继续进行。",
         "stoppedAt": "在中断之前，{{total}} 篇笔记中已导入 {{imported}} 篇。它们已在你的保险库中，可以安全保留。",
         "reasonNotUtf8": "Myne 无法把此文件作为文本读取。它可能使用较旧的编码保存，或者根本不是文本文件。",
         "reasonPathRejected": "Myne 无法在你所选的文件夹内访问此文件。",
         "reasonPermissionDenied": "Myne 没有读取此文件的权限。",
         "reasonNotFound": "Myne 处理到它时，此文件已经不在了。",
         "reasonNoSpace": "此设备的存储空间已用尽。",
-        "reasonUnknown": "Myne 无法说明原因。"
+        "reasonUnknown": "Myne 无法说明原因。",
+        "foldersNotKeptNote": "{{count}} 个会在最后一篇笔记离开时消失",
+        "foldersNotKeptNote_one": "{{count}} 个会在最后一篇笔记离开时消失",
+        "foldersNotKeptNote_other": "{{count}} 个会在最后一篇笔记离开时消失",
+        "statFoldersNotKept": "未保留的文件夹"
       },
       "offer": {
-        "body": "将你现有的笔记导入 Myne。每篇笔记在导入时都会被加密——没有任何内容离开本设备，你的原始文件会完全留在原处。",
+        "body": "将你现有的笔记导入 Myne。每篇笔记在导入时都会被加密。没有任何内容离开本设备，你的原始文件会完全留在原处。",
         "chooseFolder": "选择文件夹…",
         "laterHint": "你随时可以稍后从“设置 → 存储”导入。",
         "notNow": "暂不",
@@ -1793,14 +2004,14 @@
           "label": "Notion",
           "pickerTitle": "选择你解压后的 Notion 导出文件夹",
           "survives": "保留：页面、文件夹结构、作为字段的页面属性，以及作为 wiki 链接的内部链接。每个数据库还会变成一篇表格笔记，并链接到它的各行。",
-          "loses": "请先解压导出文件——Myne 读取的是文件夹，而不是 .zip。折叠块、标注框和彩色文字没有对应形式，会列在导入报告中。",
+          "loses": "请先解压导出文件：Myne 读取的是文件夹，而不是 .zip。折叠块、标注框和彩色文字没有对应形式，会列在导入报告中。",
           "short": "一个解压后的导出文件夹"
         },
         "evernote": {
           "label": "Evernote",
           "pickerTitle": "选择你的 Evernote .enex 文件",
           "survives": "保留：文件中的每一篇笔记、格式和附件。加密块会以文本形式保留，你仍可在 Evernote 中解密它们。",
-          "loses": "不保留：提醒和笔记历史。过大的导出文件会被拒绝，而不是冒险处理——如果遇到这种情况，请把导出文件拆分。",
+          "loses": "不保留：提醒和笔记历史。过大的导出文件会被拒绝，而不是冒险处理。遇到这种情况请把导出文件拆分。",
           "short": "单个 .enex 导出文件"
         },
         "html": {
@@ -1814,15 +2025,61 @@
           "label": "CSV",
           "pickerTitle": "选择你的 .csv 文件",
           "survives": "会变成一篇包含该表格的笔记。",
-          "loses": "它是一篇笔记，而不是每行一篇——Myne 不是数据库。过宽或过长的文件会被截断，导入报告会说明截断了多少。",
+          "loses": "它是一篇笔记，而不是每行一篇：Myne 不是数据库。过宽或过长的文件会被截断，导入报告会说明截断了多少。",
           "short": "单个电子表格文件"
+        },
+        "myne": {
+          "label": "Myne 保险库",
+          "loses": "版本历史、已删除的笔记和模板留在来源保险库中。没有被任何导入笔记使用的附件不会带过来。来源保险库不会被改动；如果你在同步它，它会继续同步。",
+          "pickerTitle": "选择要从中导入的保险库",
+          "short": "此设备上的另一个保险库",
+          "survives": "笔记、文件夹、标签、你所导入笔记之间的链接，以及这些笔记使用的附件。你添加到来源保险库词典中的单词也会一并带过来。"
         }
+      },
+      "myne": {
+        "done": {
+          "historyStays": "版本历史留在你导入来源的那个保险库中。",
+          "sourceUnchanged": "你导入来源的那个保险库没有被改动。如果你在同步它，它会继续同步。"
+        },
+        "errors": {
+          "alreadyOpen": "该保险库已为另一次导入打开。请先完成或取消那一次。",
+          "busy": "另一项保险库操作正在进行。请等它完成后再试一次。",
+          "credential": "该密码或恢复短语未能打开保险库。请检查后再试一次。"
+        },
+        "importLabel": "为此次导入命名",
+        "importLabelHint": "如果你导入的某篇笔记与你已有的笔记同名，并且导入的内容中有链接指向它，那么导入的那篇会用这个名称重命名。如果你再次运行这次导入，请沿用同一个名称，这样就不会有任何内容被导入两次。",
+        "importLabelIllegal": "该名称无法使用：笔记名称不能包含 \\ / | # ^ [ ]，也不能以空格开头或结尾。",
+        "loading": "正在查找你的其他保险库…",
+        "noOtherVaults": "此设备上没有可供导入的其他保险库。请先恢复一个备份，它就会成为你可以在这里导入的保险库。",
+        "opening": "正在打开…",
+        "passwordLabel": "该保险库的密码",
+        "phraseLabel": "该保险库的 24 个单词的恢复短语",
+        "report": {
+          "attachmentsCrossed": "已带入的附件",
+          "attachmentsDeduped": "你已经有的附件",
+          "attachmentsFailed": "此保险库未接受的附件",
+          "dictionaryUnreadable": "无法读取来源保险库的词典，因此没有带入任何单词。",
+          "dictionaryWordsAdded": "已带入的词典单词",
+          "linksLeftUnresolved": "无法指向任何位置的链接",
+          "linksRetargeted": "已指向重命名后笔记的链接",
+          "templatesLeftBehind": "未带入的模板",
+          "tombstonedEmbeds": "其文件已在来源中删除的嵌入内容",
+          "trashedLeftBehind": "来源保险库回收站中未带入的笔记",
+          "untitledImported": "已带入的无标题笔记"
+        },
+        "unnamedVault": "保险库 {{n}}",
+        "usePassword": "改用密码",
+        "usePhrase": "改用恢复短语",
+        "vaultLabel": "导入来源",
+        "vaultPlaceholder": "选择一个保险库",
+        "wordAria": "第 {{number}} 个单词，共 24 个"
       }
     },
     "list": {
       "addToFavorites": "添加到收藏",
       "archive": "存档",
       "archiveBulkError": "无法存档这些笔记。",
+      "renameFailed": "无法保存该名称，因此这篇笔记保留了原来的名称。",
       "archiveFolder": "归档文件夹",
       "archiveNote": "存档",
       "archiveSingleError": "无法存档该笔记。",
@@ -1837,7 +2094,7 @@
       "bulkMove": "将 {{count}} 篇笔记移动到…",
       "bulkMove_one": "将 {{count}} 篇笔记移至…",
       "bulkMove_other": "将 {{count}} 篇笔记移至…",
-      "caseMergeBody": "已存在名为“{{name}}”的文件夹。它们会合并——是否重命名其中一个以将它们分开？",
+      "caseMergeBody": "已存在名为“{{name}}”的文件夹。它们会合并。是否重命名其中一个以将它们分开？",
       "color": "颜色…",
       "createFirstNote": "+ 创建你的第一篇笔记",
       "createFolderNote": "创建文件夹笔记",
@@ -1847,14 +2104,10 @@
       "deleteFolderBody_other": "“{{name}}”及其 {{count}} 篇笔记",
       "deleteFolderConfirm": "删除文件夹",
       "deleteFolderTitle": "删除此文件夹？",
-      "deleteFolderWarning": "笔记会被移入回收站——你之后可以恢复它们。",
+      "deleteFolderWarning": "笔记会被移入回收站。你之后可以恢复它们。",
       "duplicate": "创建副本",
       "editFilterTitle": "编辑筛选器",
       "emptyState": "暂无笔记。",
-      "exportHtml": "导出为 HTML…",
-      "exportMarkdown": "导出为 Markdown…",
-      "exportPdf": "导出为 PDF…",
-      "exportTxt": "导出为纯文本…",
       "favoritesHeading": "收藏",
       "icon": "图标…",
       "mergeAnyway": "仍然合并",
@@ -1899,9 +2152,9 @@
       "viewSettingsTitle": "视图设置",
       "imported_one": "已将 1 篇笔记导入此文件夹",
       "imported_other": "已将 {{count}} 篇笔记导入此文件夹",
-      "importedWithSkips": "已导入 {{count}} 篇——跳过 {{skipped}} 篇",
-      "importedWithSkips_one": "已导入 {{count}} 篇笔记——跳过 {{skipped}} 篇",
-      "importedWithSkips_other": "已导入 {{count}} 篇笔记——跳过 {{skipped}} 篇",
+      "importedWithSkips": "已导入 {{count}} 篇 · 跳过 {{skipped}} 篇",
+      "importedWithSkips_one": "已导入 {{count}} 篇 · 跳过 {{skipped}} 篇",
+      "importedWithSkips_other": "已导入 {{count}} 篇 · 跳过 {{skipped}} 篇",
       "importNoMarkdown": "拖放的内容中没有 Markdown 文件",
       "moveFolderTo": "将文件夹移动到…"
     },
@@ -1948,7 +2201,7 @@
     "row": {
       "addToFavorites": "添加到收藏",
       "folderIndexBadgeLabel": "文件夹笔记",
-      "folderIndexBadgeTitle": "文件夹笔记——此文件夹的索引",
+      "folderIndexBadgeTitle": "文件夹笔记：此文件夹的索引",
       "folderIndexConflictLabel": "文件夹已有索引笔记",
       "folderIndexConflictTitle": "此文件夹已有索引笔记",
       "loadError": "无法加载此笔记",
@@ -1965,24 +2218,24 @@
     },
     "saveStatus": {
       "conflict": "正在解决编辑冲突…",
-      "conflictTitle": "此笔记在另一台设备上被更改过——两个版本都会保留",
+      "conflictTitle": "此笔记在另一台设备上被更改过：两个版本都会保留",
       "editing": "正在编辑",
       "editingEllipsis": "正在编辑…",
-      "editingTitle": "正在编辑——自动保存已就绪",
+      "editingTitle": "正在编辑：自动保存已就绪",
       "justNow": "刚刚",
       "retry": "重试",
       "saved": "已保存",
       "savedRelative": "已于 {{rel}} 保存",
       "saveFailed": "保存失败",
-      "saveFailedTitle": "保存失败——点击重试",
+      "saveFailedTitle": "保存失败：点击重试",
       "storageFull": "存储空间已满",
-      "storageFullTitle": "已没有空间保存此笔记。请释放空间（或移除一些附件），然后重试。在保存成功之前，此次编辑仅存在于此窗口中——服务器上也没有。",
+      "storageFullTitle": "已没有空间保存此笔记。请释放空间（或移除一些附件），然后重试。在保存成功之前，此次编辑仅存在于此窗口中。服务器上也没有。",
       "saving": "正在保存",
       "savingEllipsis": "正在保存…"
     },
     "snapshotFailed": {
       "dismiss": "关闭",
-      "message": "无法保存快照——你的笔记已保存，但其版本历史可能不完整（磁盘可能已满）。"
+      "message": "无法保存快照。你的笔记已保存，但其版本历史可能不完整（磁盘可能已满）。"
     },
     "snapshots": {
       "cancel": "取消",
@@ -2001,14 +2254,14 @@
       "encryptedSize": "已加密 · {{size}}",
       "errorCannotDecrypt": "无法解密此快照。",
       "errorGeneric": "出了点问题。请重试。",
-      "errorIo": "发生磁盘错误——磁盘可能已满或无法写入。",
+      "errorIo": "发生磁盘错误。磁盘可能已满或无法写入。",
       "errorNotFound": "该快照已不再可用。",
       "errorStorageAccess": "无法访问保险库的快照存储。",
       "errorVaultLocked": "保险库已锁定。请解锁后查看快照。",
       "justNow": "刚刚",
       "listLabel": "快照列表",
       "loading": "正在加载…",
-      "noPrevious": "这是最早的快照——它之前没有可供比较的版本。",
+      "noPrevious": "这是最早的快照。它之前没有可供比较的版本。",
       "restore": "恢复",
       "restoreCta": "恢复此快照",
       "restoredStatus": "已恢复。你原有的版本已保存为一个快照。",
@@ -2023,7 +2276,7 @@
       "openNotes": "打开笔记",
       "pin": "固定",
       "pinned": "已固定",
-      "pinnedTitle": "已固定——取消固定后才能关闭",
+      "pinnedTitle": "已固定：取消固定后才能关闭",
       "unpin": "取消固定",
       "untitled": "无标题"
     },
@@ -2062,7 +2315,7 @@
       "emptyConfirmTitle": "清空回收站？",
       "emptyPartialFailure_one": "有 {{count}} 篇笔记无法删除，仍留在回收站中。",
       "emptyPartialFailure_other": "{{count}} 篇笔记无法删除，仍保留在回收站中。",
-      "emptyBody": "你删除的笔记会进入这里。它们会一直保留，直到你清空回收站——在此之前你随时可以恢复其中任何一篇。",
+      "emptyBody": "你删除的笔记会进入这里。它们会一直保留，直到你清空回收站。你随时可以恢复其中任何一篇。",
       "emptyTitle": "回收站为空",
       "emptyState": "回收站为空。",
       "purgeConfirmCta": "永久删除",
@@ -2077,11 +2330,12 @@
       "heading": "未链接的提及",
       "link": "链接",
       "linkTooltip": "将此提及链接到 {{title}}",
-      "refresh": "提及可能已变更——刷新",
+      "refresh": "提及可能已变更：刷新",
       "searching": "正在搜索…",
       "thisNote": "本笔记",
       "untitled": "无标题"
     },
+    "unsettledSave": "有一篇打开的笔记尚未保存完成，因此没有任何改动。等它保存完成后再试一次。",
     "views": {
       "cards": {
         "changeCover": "更改封面",
@@ -2136,7 +2390,7 @@
       "columnsEmpty": "未找到属性",
       "columnsHint": "以列（表格）或详情行（列表 / 卡片）形式显示的 frontmatter 属性。",
       "columnsPlaceholder": "添加列…",
-      "coverImageHint": "其值为图片的 frontmatter 属性——将显示为每张卡片的封面。留空则不显示封面。",
+      "coverImageHint": "其值为图片的 frontmatter 属性，将显示为每张卡片的封面。留空则不显示封面。",
       "coverImagePlaceholder": "例如 cover",
       "coverImageProperty": "封面图片属性",
       "groupBy": "分组依据",
@@ -2159,6 +2413,13 @@
     },
     "workspace": {
       "defaultSlotName": "默认"
+    },
+    "export": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "pdf": "PDF",
+      "submenuLabel": "导出…",
+      "txt": "纯文本"
     }
   },
   "password": {
@@ -2187,12 +2448,14 @@
     "intro": "将此保险库升级到新格式。你的笔记将获得跨设备自动合并的能力。此操作会为整个保险库重新生成密钥；在你确认之前，旧副本会保留在此设备上。",
     "passwordLabel": "主密码",
     "phraseLabel": "恢复短语",
-    "phraseHelp": "此项必填——你的新密钥会用这条短语封装，这样恢复功能才能继续可用。请输入恢复短语中的全部单词。",
+    "phraseHelp": "此项必填：你的新密钥会用这条短语封装，这样恢复功能才能继续可用。请输入恢复短语中的全部单词。",
     "submit": "迁移",
     "migrating": "正在迁移…",
     "done": "已将 {{count}} 篇笔记迁移到新格式。",
+    "done_one": "已将 {{count}} 篇笔记迁移到新格式。",
+    "done_other": "已将 {{count}} 篇笔记迁移到新格式。",
     "settle": {
-      "intro": "你的保险库已升级。在你完成收尾之前，旧副本仍留在此设备上——在那之前，更改密码并不会把它锁起来。",
+      "intro": "你的保险库已升级。在你完成收尾之前，旧副本仍留在此设备上。在那之前，更改密码并不会把它锁起来。",
       "confirm": "一切正常，移除旧副本",
       "abort": "有问题，把旧保险库放回去",
       "errorAlreadySynced": "此保险库已以新格式同步过，因此无法放回去。如果你需要旧的那一份，请从备份中恢复。",
@@ -2201,7 +2464,7 @@
     },
     "progressCount": "已重新加密 {{done}} 项，共 {{total}} 项…",
     "error": {
-      "recoveryPhraseRequired": "该恢复短语与此保险库不匹配。请输入正确的恢复短语以进行迁移——这是必需的，这样恢复功能才能继续可用。",
+      "recoveryPhraseRequired": "该恢复短语与此保险库不匹配。请输入正确的恢复短语以进行迁移。这是必需的，这样恢复功能才能继续可用。",
       "wrongPassword": "该密码与此保险库不匹配。",
       "alreadyMigrated": "此保险库已经是新格式了。",
       "generic": "迁移无法完成。你的保险库未发生变化；请重试。"
@@ -2212,7 +2475,8 @@
       "cancelledVaultLocked": "恢复已取消：保险库已锁定。",
       "operationInProgress": "操作正在进行中。请稍候。",
       "unexpected": "出现意外错误。请重试。",
-      "vaultNotFound": "未找到保险库文件。请重新启动应用。"
+      "vaultNotFound": "未找到保险库文件。请重新启动应用。",
+      "openAsImportSource": "当前有一次导入正在读取此保险库。请先完成或取消那次导入，然后再恢复此保险库。"
     },
     "vaultUnreadable": "保险库文件无法读取。请从备份恢复。",
     "genericError": "出了点问题。请重试。",
@@ -2224,7 +2488,7 @@
     "accountTitle": "输入你的账户编号",
     "accountLead": "在你保存恢复短语的地方可以找到它。它用于标识要恢复的保险库。",
     "accountInvalid": "账户编号无效——请检查后重新输入。",
-    "accountOptionalHint": "没有它？将此处留空并继续——你只需要 24 个单词的恢复短语。",
+    "accountOptionalHint": "没有它？将此处留空并继续。你只需要 24 个单词的恢复短语。",
     "paste": "粘贴",
     "phraseGridHint": "逐个输入每个单词，或一次性粘贴全部 24 个以填满网格。",
     "submitProgress": "提交 · {{filled}} / {{total}}",
@@ -2311,12 +2575,12 @@
     "backLabel": "返回",
     "cancelLabel": "取消",
     "collision": {
-      "body": "此备份对应的保险库已存在于本设备上。你可以保留两者——恢复的副本会作为一个单独的保险库出现在你的保险库列表中——或者现在恢复，然后自行从保险库列表中移除原有的保险库（移除时会要求你输入 DELETE，且只有在确认恢复的保险库能正常打开后才有意义）。",
+      "body": "此备份对应的保险库已存在于本设备上。你可以保留两者：恢复的副本会作为一个单独的保险库出现在你的保险库列表中。也可以现在恢复，然后自行从保险库列表中移除原有的保险库。移除时会要求你输入 DELETE，且只有在确认恢复的保险库能正常打开后才有意义。",
       "keepBoth": "保留两者",
       "replaceExisting": "恢复，然后替换原有保险库…"
     },
     "damaged": {
-      "body": "备份文件已损坏，因此未恢复任何内容。如果这是你唯一的副本，抢救功能可以恢复完好的笔记，并准确列出无法读取的内容——结果始终会被标记为部分恢复。",
+      "body": "备份文件已损坏，因此未恢复任何内容。如果这是你唯一的副本，抢救功能可以恢复完好的笔记，并准确列出无法读取的内容。结果始终会被标记为部分恢复。",
       "close": "关闭",
       "salvage": "抢救完好的笔记…"
     },
@@ -2324,7 +2588,7 @@
       "tryAnotherFile": "尝试其他文件"
     },
     "pick": {
-      "body": "请选择一个 <code>.myne-backup</code> 文件。备份会在恢复任何内容之前先经过校验；恢复的保险库可使用该保险库的密码或恢复短语解锁——与正常解锁完全一致。",
+      "body": "请选择一个 <code>.myne-backup</code> 文件。备份会在恢复任何内容之前先经过校验；恢复的保险库可使用该保险库的密码或恢复短语解锁，与正常解锁完全一致。",
       "chooseFile": "选择备份文件…",
       "corruptedSuffix": "你当前的保险库不会被改动：备份会先作为一个单独的保险库恢复。"
     },
@@ -2333,8 +2597,8 @@
       "collidedNote": "此保险库原有的副本仍在你的保险库列表中。一旦确认恢复的保险库能正常打开，你就可以从保险库列表中移除旧的那个（届时会要求你输入 DELETE）。",
       "notes": "笔记：{{n}}",
       "openVaultList": "打开保险库列表",
-      "partialHeader_one": "部分恢复——有 {{count}} 个项目无法读取。",
-      "partialHeader_other": "部分恢复——有 {{count}} 项无法读取。",
+      "partialHeader_one": "部分恢复：有 {{count}} 项无法读取。",
+      "partialHeader_other": "部分恢复：有 {{count}} 项无法读取。",
       "restored": "保险库已恢复。",
       "versionHistory": "版本历史条目：{{n}}"
     },
@@ -2355,8 +2619,14 @@
       "changelogButton": "查看更新日志…",
       "changelogHelper": "各版本的更新说明。将在 MYND-119 完成后显示。",
       "changelogLabel": "更新日志",
-      "developerModeHelper": "显示 Myne 默认收起的高级设置：那些会让你离开 Myne 所担保路径的选项，以及大多数人从不需要的高级工具。关闭它只是把它们重新隐藏——你已经开启的功能仍然开启，要关闭某项功能需要到它自己的开关处。",
+      "developerModeHelper": "显示 Myne 默认收起的高级设置：那些会让你离开 Myne 所担保路径的选项，以及大多数人从不需要的高级工具。关闭它只是把它们重新隐藏。你已经开启的功能仍然开启，要关闭某项功能需要到它自己的开关处。",
       "developerModeLabel": "开发者模式",
+      "legalLabel": "法律信息",
+      "legalHelper": "在浏览器中打开 myne.md 上的页面。界面为德语时显示德语版本。",
+      "legalPrivacy": "隐私政策",
+      "legalTerms": "测试版条款",
+      "legalNotice": "举报违法内容",
+      "legalLawEnforcement": "执法请求",
       "licenseBody": "预览版（pre-alpha）· 文档采用 CC-BY-4.0 · 第 1 阶段发布时应用代码采用 AGPL-3.0。",
       "licenseLabel": "许可证",
       "tagline": "预览版（pre-alpha）· 第 1 阶段桌面客户端",
@@ -2373,7 +2643,7 @@
         "ioError": "磁盘错误，请重试。",
         "joinFailure": "出了点问题，请重试。",
         "samePasswordRejected": "新密码与当前密码相同。",
-        "serverAckPending": "你的新密码在此设备上已生效，但 Myne 无法连接服务器来保存它。在保存成功之前，你的其他设备仍需要旧密码——而如果在那之前此浏览器上的副本被清除，这次更改就会丢失。它会自动重试。",
+        "serverAckPending": "你的新密码在此设备上已生效，但 Myne 无法连接服务器来保存它。在保存成功之前，你的其他设备仍需要旧密码；如果在那之前此浏览器上的副本被清除，这次更改就会丢失。它会自动重试。",
         "weakNewPassword": "新密码至少需要 12 个字符。"
       },
       "changePasswordHeading": "更改密码",
@@ -2388,8 +2658,9 @@
       "parallelism": "并行度",
       "timeCost": "时间开销",
       "vaultLabelEyebrow": "保险库标签",
-      "vaultLabelHelper": "在应用内切换器中显示的此保险库名称。以加密形式存储于保险库内部；绝不会以明文形式离开你的设备。",
+      "vaultLabelHelper": "此保险库的名称，显示在应用内切换器中，以及解锁前的启动保险库选择器上。以加密形式存储于保险库内部；绝不会以明文形式离开你的设备。",
       "vaultLabelPlaceholder": "添加标签…",
+      "vaultLabelRenameNotice": "在你于其他设备上解锁此保险库之前，那些设备的锁定屏幕会继续显示它们上次存储的内容：较早的名称；如果从未存储过，则显示占位名称。",
       "vaultLabelSave": "保存",
       "vaultIconLabel": "图标",
       "vaultIconDefault": "默认（文字标志）",
@@ -2437,11 +2708,11 @@
       "editorFont": "编辑器字体",
       "showEditTimesSubtitle": "每篇笔记下方的时间戳",
       "graphSettingsLabel": "关系图外观",
-      "graphSettingsHelper": "节点颜色、标签、大小和布局作用力在关系图内部设置——打开关系图并使用它角落里的齿轮按钮。它们按设备保存，因此在这里的更改不会跟随到你的手机上。",
+      "graphSettingsHelper": "节点颜色、标签、大小和布局作用力在关系图内部设置。打开关系图并使用它角落里的齿轮按钮。它们按设备保存，因此在这里的更改不会跟随到你的手机上。",
       "openGraph": "打开关系图"
     },
     "archive": {
-      "helper": "允许将笔记移入存档，使其不出现在主列表中。关闭此项会将每篇已存档的笔记恢复到其所在文件夹，并隐藏存档控件。",
+      "helper": "允许将笔记移入存档，使其不出现在主列表中。关闭此项会将每篇已存档的笔记恢复到其所在文件夹，取消每个已存档文件夹的存档状态，并隐藏存档控件。它作用于整个保险库，在所有设备上生效。",
       "label": "存档",
       "off": "关闭",
       "on": "开启",
@@ -2449,9 +2720,9 @@
     },
     "attachmentCompression": {
       "label": "导入时压缩图片",
-      "helper": "在粘贴或拖入的图片被加密并存储之前先缩小它们，这样你的保险库、备份和同步都会更小。此操作不可逆——不会保留原始文件。",
+      "helper": "在粘贴或拖入的图片被加密并存储之前先缩小它们，这样你的保险库、备份和同步都会更小。此操作不可逆：不会保留原始文件。",
       "helperScopeEveryDevice": "适用于整个保险库，在每台设备上生效。",
-      "helperScopeNotHere": "适用于整个保险库，但在此浏览器中不生效——在这里添加的图片会按原样存储。",
+      "helperScopeNotHere": "适用于整个保险库，但在此浏览器中不生效：在这里添加的图片会按原样存储。",
       "errorSaveSetting": "无法保存此设置。"
     },
     "transcription": {
@@ -2481,7 +2752,7 @@
       "saveFailedToast": "无法保存备份设置。",
       "searchEmpty": "无匹配项。",
       "searchPlaceholder": "搜索…",
-      "statusFailed": "自动备份失败——{{stamp}}",
+      "statusFailed": "自动备份失败：{{stamp}}",
       "statusLastBackup": "上次备份：{{stamp}}",
       "statusNever": "尚未进行自动备份。",
       "title": "自动备份"
@@ -2521,7 +2792,7 @@
     "cliAccess": {
       "label": "终端访问",
       "helperOff": "已关闭。`myne` 命令无法读取或更改此保险库中的任何内容。",
-      "helperOn": "在此保险库解锁期间开启。任何以你的账户运行的程序都可以通过它读取、搜索和创建笔记——Myne 无法把你的终端和脚本区分开，除了门是开着的之外不做任何检查。它从不索要你的密码，会在保险库锁定的那一刻关闭，并且无法删除笔记。",
+      "helperOn": "在此保险库解锁期间开启。任何以你的账户运行的程序都可以通过它读取、搜索和创建笔记。Myne 无法把你的终端和脚本区分开，除了门是开着的之外不做任何检查。它从不索要你的密码，会在保险库锁定的那一刻关闭，并且无法删除笔记。",
       "lastUsedNever": "自此保险库解锁以来未使用过。",
       "lastUsedJustNow": "刚刚使用过。",
       "lastUsedMinutesAgo": "上次使用于 {{count}} 分钟前。",
@@ -2536,10 +2807,10 @@
       "notOnPathHint": "你的 shell 还找不到 `myne`。请把这一行加入你的 shell 配置文件，然后打开一个新终端：",
       "pathLine": "export PATH=\"{{dir}}:$PATH\"",
       "excludedLabel": "终端永远看不到的文件夹",
-      "excludedHelper": "每行一个文件夹路径。这些文件夹中的笔记不会出现在任何终端结果里，也无法从终端写入其中——它们在应用中仍然完全可用。你可以在开启终端访问之前先设置它。",
+      "excludedHelper": "每行一个文件夹路径。这些文件夹中的笔记不会出现在任何终端结果里，也无法从终端写入其中。它们在应用中仍然完全可用。你可以在开启终端访问之前先设置它。",
       "excludedPlaceholder": "Private/\nJournal/",
       "rateLimitLabel": "让终端全速运行",
-      "rateLimitHelper": "默认情况下，Myne 每分钟最多响应 120 条终端命令。这是对失控脚本的速度限制，不是权限检查——没有任何机制判断哪个程序可以发起请求。如果要做批量工作，比如把每篇笔记都通过另一个工具处理，请开启此项。"
+      "rateLimitHelper": "默认情况下，Myne 每分钟最多响应 120 条终端命令。这是对失控脚本的速度限制，不是权限检查：没有任何机制判断哪个程序可以发起请求。如果要做批量工作，比如把每篇笔记都通过另一个工具处理，请开启此项。"
     },
     "clipperInstall": {
       "error": "无法更新浏览器剪藏设置。",
@@ -2571,7 +2842,7 @@
       "export": "导出",
       "exportError": "无法导出该主题。请重试。",
       "fileFilterName": "Myne 主题",
-      "helper": "使用你自己的配色方案。主题在使用前会在本设备上验证——不会上传任何内容。",
+      "helper": "使用你自己的配色方案。主题在使用前会在本设备上验证。不会上传任何内容。",
       "importButton": "导入主题…",
       "importError": "该文件不是有效的主题。请打开参考文档查看格式。",
       "label": "自定义主题",
@@ -2582,20 +2853,42 @@
     },
     "dailyNotes": {
       "blankTemplate": "空白（无模板）",
-      "dateFormatHelper": "每篇日记的标题。支持 YYYY、MM、DD。默认为 {{default}}。",
-      "dateFormatLabel": "日记日期格式",
-      "dateFormatSaveError": "无法保存日期格式。请重试。",
-      "folderHelper": "新日记的存放位置。默认为 {{default}}——即使为空也会保留该文件夹。",
-      "folderLabel": "日记文件夹",
-      "folderSaveError": "无法保存日记文件夹。请重试。",
       "folderSearchEmpty": "没有匹配的文件夹。",
       "folderSearchPlaceholder": "搜索文件夹…",
       "searchEmpty": "没有匹配的模板。",
       "searchPlaceholder": "搜索模板…",
+      "untitledTemplate": "无标题模板",
+      "sectionDaily": "每日笔记",
+      "sectionWeekly": "每周笔记",
+      "sectionMonthly": "每月笔记",
+      "periodFolderLabel": "文件夹",
+      "periodFolderHelper": "新建{{period}}笔记的存放位置。默认值：{{default}}。即使为空，文件夹也会保留。",
+      "periodFormatLabel": "标题格式",
+      "periodFormatHelperDaily": "每篇每日笔记的标题。支持 YYYY、MM、DD、gggg（ISO 周年）、ww（ISO 周数），以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodFormatHelperWeekly": "每篇每周笔记的标题。支持 gggg（ISO 周年）、ww（ISO 周数）、YYYY、MM、DD，以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodFormatHelperMonthly": "每篇每月笔记的标题。支持 YYYY、MM、gggg（ISO 周年）、ww（ISO 周数），以及表示原样文本的 [文本]。默认值：{{default}}。",
+      "periodTemplateLabel": "模板",
+      "periodTemplateHelper": "选择每篇{{period}}笔记的起始模板，或留空以创建以日期为标题的空白笔记。",
+      "collisionWarning": "{{first}}笔记和{{second}}笔记会指向同一篇笔记，因为它们共用文件夹并生成相同的标题。两个命令都会打开它。",
+      "weekStartNote": "每周从星期一开始（ISO 8601），因此一月初的几天可能属于上一年的最后一周，十二月末的几天可能属于下一年的第一周。",
+      "periodFolderSaveError": "无法保存{{period}}笔记的文件夹。请重试。",
+      "periodFormatSaveError": "无法保存{{period}}笔记的标题格式。请重试。",
+      "periodTemplateSaveError": "无法保存{{period}}笔记的模板。请重试。",
+      "periodNameDaily": "每日",
+      "periodNameWeekly": "每周",
+      "periodNameMonthly": "每月",
+      "periodFolderAriaLabel": "{{period}}笔记文件夹",
+      "periodFormatAriaLabel": "{{period}}笔记标题格式",
+      "periodTemplateAriaLabel": "{{period}}笔记模板",
+      "dateFormatHelper": "每篇日记的标题。支持 YYYY、MM、DD。默认为 {{default}}。",
+      "dateFormatLabel": "日记日期格式",
+      "dateFormatSaveError": "无法保存日期格式。请重试。",
+      "folderHelper": "新日记的存放位置。默认为 {{default}}。即使为空也会保留该文件夹。",
+      "folderLabel": "日记文件夹",
+      "folderSaveError": "无法保存日记文件夹。请重试。",
       "templateHelper": "选择一个用于创建每篇日记的模板，或留空以创建一篇以日期为标题的空白笔记。",
       "templateLabel": "日记模板",
-      "templateSaveError": "无法保存日记模板。请重试。",
-      "untitledTemplate": "无标题模板"
+      "templateSaveError": "无法保存日记模板。请重试。"
     },
     "deleteVault": {
       "cancel": "取消",
@@ -2702,15 +2995,15 @@
       },
       "reservedBadge": "此处不可用",
       "reservedBadgeTitle": "你的浏览器会用 {{chord}} {{action}}，因此这个组合键永远不会传到 Myne。该快捷键在桌面应用中仍然有效。",
-      "reservedRefused": "{{chord}} 属于你的浏览器——它会{{action}}。请换一个快捷键；你的桌面端快捷键不受影响。",
-      "reservedUnreliable": "{{chord}} 可能无法传到 Myne——在某些浏览器中它会{{action}}。仍已添加。",
+      "reservedRefused": "{{chord}} 属于你的浏览器：它会{{action}}。请换一个快捷键；你的桌面端快捷键不受影响。",
+      "reservedUnreliable": "{{chord}} 可能无法传到 Myne：在某些浏览器中它会{{action}}。仍已添加。",
       "resetAll": "重置所有快捷键…",
       "resetAllConfirm": "将每个自定义快捷键都重置为默认值？",
       "resetAllYes": "全部重置",
       "restoreDefaultAria": "恢复 {{command}} 的默认值",
       "searchAriaLabel": "搜索快捷键",
       "searchPlaceholder": "搜索快捷键…",
-      "warnAlreadyUsed": "已被 {{commands}} 使用——仍已添加。"
+      "warnAlreadyUsed": "已被 {{commands}} 使用。仍已添加。"
     },
     "language": {
       "helper": "选择应用的显示语言。",
@@ -2746,7 +3039,7 @@
     "ai": {
       "autoTagHelper": "当你停下不再输入时，设备上的一个小模型会读取这篇笔记，并在它顶部建议标签。在你接受某条建议之前，不会添加任何内容。",
       "autoTagLabel": "自动建议标签",
-      "autoTagUnavailable": "此构建版本不包含标签模型，因此无法建议标签。Myne 从不下载模型——在包含该模型的构建版本中，此开关会自动开启。",
+      "autoTagUnavailable": "此构建版本不包含标签模型，因此无法建议标签。Myne 从不下载模型。在包含该模型的构建版本中，此开关会自动开启。",
       "consent": {
         "accept": "将我的笔记发送给 {{provider}}",
         "cancel": "取消",
@@ -2756,10 +3049,11 @@
         "title": "在 Myne 向 {{provider}} 发送任何内容之前",
         "whatLabel": "哪些内容会离开你的设备",
         "whenLabel": "它在什么时候离开",
-        "whoLabel": "谁会收到它"
+        "whoLabel": "谁会收到它",
+        "connectionLabel": "如何传输"
       },
       "disclosureToggle": "这是如何运作的？",
-      "enableHelper": "运行你提供的模型。它在哪里运行——以及你的笔记是否会离开此设备——取决于你在下方指定的服务商。实验性功能，默认关闭。",
+      "enableHelper": "运行你提供的模型。它在哪里运行、你的笔记是否会离开此设备，都取决于你在下方指定的服务商。实验性功能，默认关闭。",
       "enableLabel": "启用本地 AI",
       "excludedHelper": "这些文件夹中的笔记永远不会被 AI 读取或索引。每行一个文件夹路径。",
       "excludedLabel": "排除的文件夹",
@@ -2770,49 +3064,62 @@
       "endpointModelLabel": "在那里使用的模型",
       "endpointModelPlaceholder": "运行时列出的模型名称",
       "endpointRejected": {
-        "malformed": "这不是 Myne 可以使用的地址。它需要包含协议和明确的端口——例如 http://127.0.0.1:11434。",
-        "notLoopback": "此地址必须位于这台电脑上——localhost、127.0.0.1 或 ::1。要使用运行在别处的服务商，请改在“远程服务商”中指定它。",
+        "malformed": "这不是 Myne 可以使用的地址。它需要包含协议和明确的端口，例如 http://127.0.0.1:11434。",
+        "notLoopback": "此地址必须位于这台电脑上：localhost、127.0.0.1 或 ::1。要使用运行在别处的服务商，请改在“远程服务商”中指定它。",
         "unsupportedScheme": "只接受 http 和 https 地址。"
       },
       "endpointSaveFailed": "无法保存该地址。请确认 Myne 能够写入它的设置。",
       "endpointThirdParty": "{{name}} 是一个独立的程序，有它自己的网络行为，Myne 无法控制它。当它在这台电脑上运行时，你的笔记会被发送给它。",
       "providerError": {
-        "barred": "这类请求绝不会发送给服务商——它要么在此设备上运行，要么根本不运行。",
+        "barred": "这类请求绝不会发送给服务商：它要么在此设备上运行，要么根本不运行。",
         "failed": "操作未成功。没有保存任何内容，也没有再次发送任何内容。",
+        "localModelMissing": "设置中记录的本地模型已不在此设备上。没有任何内容被发送到任何地方。请在设置 → 开发者 → AI 中重新选择模型，或指定一个服务商。",
         "noCredential": "尚未为此服务商设置 API 密钥。请在设置 → 开发者 → AI 中添加一个。",
-        "quotaExhausted": "服务商拒绝了此请求——你的额度已用尽，或超出了速率限制。这需要在服务商那边解决，而不是在 Myne 中。",
+        "notReady": "目前还没有可用于回答的模型。没有任何内容被发送到任何地方。请在设置 → 开发者 → AI 中选择模型，或指定一个服务商。",
+        "noEmbeddingModel": "提问会在此设备上搜索你的笔记，这需要本机的搜索模型。服务商无法代劳。没有任何内容被发送到任何地方。请在设置 → 开发者 → AI 中选择搜索模型。",
+        "indexNotReady": "你的笔记仍在建立搜索索引。没有任何内容被发送到任何地方。请稍后重试。",
+        "requestRejected": "服务商拒绝接受此请求。未保存任何内容。这是 Myne 所发送内容的问题，而不是你的设置或笔记的问题。",
+        "policyRefused": "服务商依据其自身规则拒绝了此请求：账户防护限制、工作区策略，或你的套餐不包含的模型。这需要与服务商解决，而不是在 Myne 中解决。",
+        "quotaExhausted": "服务商拒绝了此请求：你的额度已用尽，或超出了速率限制。这需要在服务商那边解决，而不是在 Myne 中。",
         "refused": "服务商拒绝了连接。它可能已停止运行，或屏蔽了此网络。",
         "timeout": "服务商未及时响应。没有留下任何仍在运行的任务。",
-        "unauthorized": "服务商拒绝了你的 API 密钥。请更换它——它可能有误、已被吊销，或属于另一个账户。",
-        "unreachable": "无法连接到服务商。请检查你的网络连接。"
+        "unauthorized": "服务商拒绝了你的 API 密钥。请更换它：它可能有误、已被吊销，或属于另一个账户。",
+        "unreachable": "无法连接到服务商。请检查你的网络连接。",
+        "featureOff": "此设备上的 AI 已关闭。没有发送任何内容。请在设置中的 AI 处打开。",
+        "consentMissing": "你尚未同意从此设备向该提供方发送笔记。没有发送任何内容。请在设置中的 AI 处重新选择提供方，并阅读将要发送的内容。"
       },
       "modelChoose": "选择文件…",
-      "modelEmbeddingLabel": "搜索模型——语义搜索和问答",
+      "modelEmbeddingLabel": "搜索模型：语义搜索和问答",
       "modelFilter": {
         "gguf": "GGUF 模型",
         "safetensors": "Safetensors 模型"
       },
-      "modelGenerationLabel": "文本模型——聊天、摘要、写作",
+      "modelGenerationLabel": "文本模型：聊天、摘要、写作",
       "modelNone": "未选择文件",
       "modelSaveFailed": "无法保存模型路径（它必须位于你的保险库之外）。",
       "modelTranscriptionLabel": "语音转文字模型（转录）",
-      "modelsHelper": "Myne 从不下载模型——那意味着通过网络发送数据。在浏览器中打开链接获取一个模型，然后在此处选择下载好的文件。在此处选择的模型会在你的设备上运行；如果你已指定服务商，则改由该服务商回答。",
+      "modelsHelper": "Myne 从不下载模型。那意味着通过网络发送数据。在浏览器中打开链接获取一个模型，然后在此处选择下载好的文件。在此处选择的模型会在你的设备上运行；如果你已指定服务商，则改由该服务商回答。",
       "providerHelper": "Myne 可以不在本机运行模型，而是向你指定的服务发送请求。这样做时，你的笔记会离开此设备。默认是“无”，意味着完全不会联系任何服务。",
       "providerKeyAdd": "粘贴你的 API 密钥",
       "providerKeyLabel": "API 密钥",
       "providerKeyNone": "尚未存储密钥，因此目前无法发送任何内容。",
       "providerKeyRevoke": "移除此密钥",
       "providerKeyReplace": "粘贴新密钥以替换已存储的那一个",
-      "providerKeyStored": "已存储一个密钥。Myne 绝不会再把它显示给你——粘贴一个新的即可替换它。",
+      "providerKeyStored": "已存储一个密钥。Myne 绝不会再把它显示给你。粘贴一个新的即可替换它。",
       "providerActive": "正在回答：{{name}}",
       "providerLabel": "远程服务商",
       "providerModelCount_one": "有 {{count}} 个模型可用。",
       "providerModelCount_other": "有 {{count}} 个模型可用。",
       "providerModelEmpty": "此服务商没有为你的账户提供任何模型。",
-      "providerModelHelper": "Myne 不预设任何默认模型。列表来自服务商，因此始终保持最新，你也绝不会为自己没有选择的模型付费。",
+      "providerModelHelper": "Myne 不预设任何默认模型。列表来自服务商，因此始终保持最新，你也绝不会为自己没有选择的模型付费。列表中只有能读写文本的模型，因为 Myne 只会向服务商请求这一类模型。",
+      "providerModelHidden_one": "已隐藏 {{count}} 个模型：它不能读写文本。",
+      "providerModelHidden_other": "已隐藏 {{count}} 个模型：它们不能读写文本。",
       "providerModelLabel": "模型",
       "providerModelLoad": "加载模型",
       "providerModelNone": "未选择模型",
+      "providerModelNoTextModels": "此服务商发布了模型，但没有一个能读写文本。Myne 只请求文本，因此这里都无法使用。",
+      "providerModelShowAll": "显示全部模型",
+      "providerModelShowTextOnly": "仅显示文本模型",
       "providerModelUnfetched": "先加载列表，再选择模型。",
       "providerNone": "无",
       "providerNothingAnswering": "尚未设置任何可用于回答的模型或服务商。",
@@ -2820,32 +3127,42 @@
       "recommendedFilesEmbedding": "需要 model.safetensors + config.json + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesGeneration": "需要 .gguf 文件 + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesTranscription": "需要 Whisper 的 .gguf 文件 + config.json + tokenizer.json 位于同一文件夹中。",
-      "title": "AI"
+      "title": "AI",
+      "mobileEnableLabel": "在这部手机上使用 AI",
+      "mobileEnableHelper": "默认关闭。这台手机上没有任何 AI 模型会回答问题或读取你的笔记，所以每个请求都会发往你在下面指定的服务，你的笔记也会在那时离开本设备。转写和图片文字仍在本机运行，使用随 Myne 一起提供的模型。",
+      "mobileKeyAdd": "保存密钥",
+      "mobileKeyReplace": "更换密钥",
+      "mobileRevokeHelper": "同时移除提供方、其密钥和这部手机的许可，恢复到从未设置过的状态。其他设备会继续工作，直到你在那里也移除为止。",
+      "mobileApproveLabel": "允许从这部手机发送",
+      "mobileApproveHelper": "提供方及其密钥来自另一台设备。在你阅读将要发送的内容并在此允许之前，这部手机不会发送任何内容。",
+      "historyBudgetHelper": "每次请求携带多少最近对话内容，以字符计。留空则使用默认值。数值越大，AI 越能跟上较长的对话，同时也会发送更多内容：如果服务商不在本设备上，这意味着每一步运行都有更多你的文本离开设备。",
+      "historyBudgetLabel": "每次请求携带的对话"
     },
     "network": {
       "disabledCue": "同步不再通过 Tor 路由。新的连接会直接连往同步服务器。",
       "errorRead": "无法读取当前设置。请再次切换开关以重新设置。",
       "errorSave": "无法保存该设置。没有任何改动。",
-      "errorSidecar": "Tor 路由已开启，但 Tor 客户端无法启动。同步已暂停，直到它可用为止——没有任何内容被直接发送。",
+      "errorSidecar": "Tor 路由已开启，但 Tor 客户端无法启动。同步已暂停，直到它可用为止。没有任何内容被直接发送。",
       "postureActive": "同步正在通过 Tor",
-      "postureConnecting": "正在连接 Tor——同步已暂停",
+      "postureConnecting": "正在连接 Tor：同步已暂停",
       "postureConnectingDetail": "这通常需要几秒钟。在此期间没有任何内容被直接发送。",
-      "postureExempt": "同步未使用 Tor——此地址指向本设备",
+      "postureExempt": "同步未使用 Tor：此地址指向本设备",
       "postureExemptDetail": "你配置的同步服务器地址指向这台电脑，因此 Myne 与它之间的连接不会经过 Tor 线路。如果该地址又转发到别处的服务器，Myne 无法察觉，也无法为它路由。同步没有暂停。",
       "postureHeading": "当前状态",
       "postureInactive": "同步直接连往同步服务器",
-      "postureUnavailable": "Tor 不可用——同步已暂停",
+      "postureUnavailable": "Tor 不可用：同步已暂停",
       "postureUnavailableDetail": "没有任何内容被直接发送。请关闭此设置再重新开启，以尝试启动 Tor 客户端；或者将它关闭，不经 Tor 进行同步。",
-      "residualExit": "Tor 线路中的最后一个中继——出口节点——能看到你连接的是哪台同步服务器。它无法读取你同步的内容；那些内容始终端到端加密。",
+      "residualExit": "Tor 线路中的最后一个中继，即出口节点，能看到你连接的是哪台同步服务器。它无法读取你同步的内容；那些内容始终端到端加密。",
       "residualMetadata": "同步服务器仍然能看到你何时同步、推送了多少个数据块及其大小，以及你有多少台设备。Tor 不会改变这一点。",
       "residualPayment": "如果你为托管同步付费，付款和你的账户仍可能与你本人关联。Tor 改变的是连接来自何处，而不是账单记录。",
       "residualScope": "只有 Myne 自己的同步流量会经过 Tor。此设备上的其他一切都不会。",
       "residualsToggle": "它隐藏不了什么",
-      "torHelper": "向同步服务器隐藏你的 IP 地址和位置，并向你的网络和网络服务提供商隐藏你与哪台服务器同步——他们仍然能看到此设备正在连接 Tor。它不会让你对 Myne 匿名，也不会向服务器隐藏你同步了什么或在何时同步。",
+      "torHelper": "向同步服务器隐藏你的 IP 地址和位置，并向你的网络和网络服务提供商隐藏你与哪台服务器同步。他们仍然能看到此设备正在连接 Tor。它不会让你对 Myne 匿名，也不会向服务器隐藏你同步了什么或在何时同步。",
       "torLabel": "通过 Tor 路由同步"
     },
     "prefs": {
-      "saveError": "无法保存偏好设置——请重试"
+      "saveError": "无法保存偏好设置。请重试。",
+      "folderListFull": "该文件夹列表已满。请先从中移除一个文件夹，然后再添加。"
     },
     "reminders": {
       "aria": "在此设备上显示任务提醒",
@@ -2853,6 +3170,9 @@
       "exactLabel": "精确时间",
       "exactOn": "已开启",
       "horizon": "提醒已注册至 {{date}}。请在那之前打开 Myne，以便继续收到提醒。",
+      "horizonLabel": "提前安排",
+      "horizonLabelHelper": "提醒会提前这么久设置好。Myne 需要处于打开且已解锁的状态，提醒才会送达。",
+      "horizonInertHelper": "已保存在此设备上。目前还没有任何功能读取它：此版本不发送任务提醒。",
       "label": "任务提醒",
       "saveError": "无法保存该设置。请重试。",
       "showTextAria": "在通知中显示任务文本",
@@ -2863,13 +3183,21 @@
       "autoLockLabel": "自动锁定",
       "autoLockSearchEmpty": "没有匹配的时长。",
       "autoLockSearchPlaceholder": "搜索时长…",
+      "hideVaultNamesLabel": "在锁定屏幕上隐藏保险库名称",
+      "hideVaultNamesHelper": "在有可用钥匙串的设备上，只要此设备解锁过某个保险库，保险库选择器就会显示它的名称。开启此项后，每个保险库改为显示“保险库 2”这样的占位名称，且无论列表如何重新排序，该编号都始终跟随同一个保险库。",
+      "hideVaultNamesErases": "开启此项会销毁用于读取本机所存名称的密钥，因此这些名称在此设备上无法恢复；只要保持开启，就不会再写入任何名称。",
+      "hideVaultNamesResidue": "它无法触及此前已生成的副本：在名称仍在显示时制作的全系统备份、磁盘映像或本磁盘的任何其他系统级副本，都同时包含已存储的名称及其密钥。",
+      "hideVaultNamesUnavailable": "此份 Myne 无法存储保险库名称，因此不会在这里存储任何名称，也无法开启此选项。选择器已经为每个保险库显示占位名称。",
+      "hideVaultNamesErrorRead": "无法读取当前设置。请拨动开关重新设置。",
+      "hideVaultNamesErrorSave": "无法保存设置，因此设置未更改。如果你当时正在开启它，部分已存储的名称可能已被销毁；请再次开启以完成操作。",
+      "hideVaultNamesErrorErase": "有一个已存储的名称无法销毁，因此该设置保持关闭，而不是声称完成了并未发生的擦除。请重试。",
       "realtimeSyncHelper": "来自其他设备的更改会通过一个无内容的信号在几秒内到达——服务器只转发“有内容发生了变化”，而绝不会转发变化的内容。无论如何，在你的保险库解锁期间，应用都会定期检查服务器，因此这不会增加任何实质性的可见性；无需进行任何配置。",
       "realtimeSyncLabel": "实时同步",
       "screenCaptureHelperOff": "在解锁前始终启用此保护。解锁后则遵循此偏好设置。",
       "screenCaptureHelperOn": "在 Windows 10（2020 年 5 月更新）及更高版本上有效。macOS 和 Linux 没有为此提供系统 API，因此在这些系统上无法阻止捕获。",
       "screenCaptureLabel": "屏幕捕获保护",
       "screenCaptureSubtitle": "阻止截屏和屏幕录制",
-      "screenshotBlocked": "屏幕保护已开启——Myne 的截图会是空白的。",
+      "screenshotBlocked": "屏幕保护已开启：Myne 的截图会是空白的。",
       "autoLockAfter": "自动锁定间隔",
       "autoLock1m": "1 分钟",
       "autoLock5m": "5 分钟",
@@ -2877,7 +3205,12 @@
       "autoLock30m": "30 分钟",
       "autoLock1h": "1 小时",
       "quickUnlockSubtitleAndroid": "自动锁定后使用 PIN 重新进入",
-      "quickUnlockSubtitle": "自动锁定后使用 {{method}} 或 PIN 重新进入"
+      "quickUnlockSubtitle": "自动锁定后使用 {{method}} 或 PIN 重新进入",
+      "screenCaptureOverrideHelper": "仅在此设备上关闭屏幕捕获保护，解锁保险库之前和之后都是如此。如果屏幕放大镜、远程桌面软件或正在远程协助你的人看到的是一个黑色窗口，请开启此项。它不会被同步。",
+      "screenCaptureOverrideLabel": "允许在此设备上进行屏幕捕获",
+      "screenCaptureOverrideUnknown": "无法读取此设备的屏幕捕获设置，因此当前没有应用此偏好设置。请重新打开“设置”再试一次。",
+      "screenCaptureSuperseded": "在此设备上已关闭。请参见下方的“允许在此设备上进行屏幕捕获”。此偏好设置会被保留，当你关闭那一项时会再次生效。",
+      "screenCaptureSupersededByFlag": "在本次会话中已关闭，因为 Myne 是以 --disable-screen-capture-protection 启动的。此偏好设置会被保留，下次你在不带该参数的情况下打开 Myne 时会再次生效。"
     },
     "quickUnlock": {
       "errorBusy": "另一项保险库操作正在进行中。请稍后重试。",
@@ -2890,7 +3223,7 @@
       "errorPinTooShort_one": "PIN 必须至少为 {{count}} 位数字。",
       "errorPinTooShort_other": "PIN 必须至少为 {{count}} 位数字。",
       "helperConfigured": "已通过 {{method}} 配置。自动锁定后重新进入时可跳过主密码。使用 PIN 时，重新启动后需要再次输入主密码；使用指纹或面容验证时，即使重新启动也无需主密码，直到此设备上录入的指纹或面容发生变化。",
-      "helperNotConfigured": "自动锁定后，用 PIN 或 Touch ID 代替完整主密码重新进入。这是在加密保险库之上的便捷功能——使用 PIN 时，重新启动后需要再次输入主密码；使用 Touch ID 时，即使重新启动也无需主密码，直到此设备上录入的指纹发生变化。",
+      "helperNotConfigured": "自动锁定后，用 PIN 或 Touch ID 代替完整主密码重新进入。这是在加密保险库之上的便捷功能：使用 PIN 时，重新启动后需要再次输入主密码；使用 Touch ID 时，重新启动后也无需主密码，直到此设备上录入的指纹发生变化。",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "快速解锁 PIN",
@@ -2913,9 +3246,9 @@
       "biometricToggleSubtitle": "自动锁定后使用 {{method}} 解锁",
       "pinOnLead": "PIN 快速解锁已",
       "pinOnEmphasis": "开启",
-      "pinOnRest": "。保险库自动锁定后，你可以使用 PIN 而非完整密码重新进入——仅限本次应用会话。冷启动始终需要完整密码。",
+      "pinOnRest": "。保险库自动锁定后，你可以使用 PIN 而非完整密码重新进入（仅限本次应用会话）。冷启动始终需要完整密码。",
       "turnOffPin": "关闭 PIN",
-      "pinSetupHelper": "设置一个 6 位以上的 PIN，以便在自动锁定后快速重新解锁。该 PIN 封装一个设备本地密钥——它绝不会离开此设备，也绝不会触及你的恢复短语。",
+      "pinSetupHelper": "设置一个 6 位以上的 PIN，以便在自动锁定后快速重新解锁。该 PIN 封装一个设备本地密钥：它绝不会离开此设备，也绝不会触及你的恢复短语。",
       "pinReplacesBiometric": " 设置 PIN 会取代 {{method}} 解锁。",
       "pinPlaceholder6": "至少 6 位数字",
       "confirmPin": "确认 PIN",
@@ -2948,10 +3281,10 @@
     "spell": {
       "errorSaveLanguages": "无法保存拼写检查语言。",
       "errorSaveSetting": "无法保存拼写检查设置。",
-      "helper": "在你输入时为拼写错误的单词添加下划线。完全离线——你的笔记绝不会离开设备。",
+      "helper": "在你输入时为拼写错误的单词添加下划线。完全离线：你的笔记绝不会离开设备。",
       "label": "拼写检查",
       "languagesAriaLabel": "拼写检查语言",
-      "languagesHelper": "只要一个单词在任一所选语言中有效，就视为正确——便于在其他语言的笔记中混入英文术语。",
+      "languagesHelper": "只要一个单词在任一所选语言中有效，就视为正确。便于在其他语言的笔记中混入英文术语。",
       "languagesLabel": "语言",
       "languagesPlaceholder": "选择语言…",
       "languagesSearchEmpty": "没有匹配的语言。",
@@ -2960,20 +3293,20 @@
       "on": "开启"
     },
     "storage": {
-      "backupHelper": "备份与你的保险库一样保持加密，存放在单个经校验的 .myne-backup 文件中。恢复时使用该保险库的密码或恢复短语——与正常解锁完全一致。",
+      "backupHelper": "备份与你的保险库一样保持加密，存放在单个经校验的 .myne-backup 文件中。恢复时使用该保险库的密码或恢复短语，与正常解锁完全一致。",
       "backupLabel": "备份",
       "backUpVault": "备份保险库…",
       "exportAction": "导出…",
       "exportBody": "将保险库导出为 Markdown",
-      "exportHelper": "纯 Markdown 文件树——未加密。",
+      "exportHelper": "纯 Markdown 文件树。未加密。",
       "exportLabel": "导出",
       "importHelper": "从 Obsidian、Notion、Evernote、HTML 文件或 CSV 导入笔记。所有内容都会就地导入并加密；你的原始文件不会被改动。",
       "importLabel": "导入",
       "importObsidian": "导入笔记…",
-      "locationHelper": "每个保险库都是此路径下的一个加密文件夹。请优先使用下方的“备份”按钮，而非手动复制——它会校验所写入的文件。",
+      "locationHelper": "每个保险库都是此路径下的一个加密文件夹。请优先使用下方的“备份”按钮，而非手动复制：它会校验所写入的文件。",
       "locationLabel": "保险库位置",
       "openInFiles": "在文件管理器中打开",
-      "webLocationHelper": "你的笔记保存在此浏览器为本站点分配的存储中，由浏览器管理——没有可打开的文件夹。清除本站点的数据会移除本地副本；由于此客户端会同步，重新登录即可把它下载回来。",
+      "webLocationHelper": "你的笔记保存在此浏览器为本站点分配的存储中，由浏览器管理。没有可打开的文件夹。清除本站点的数据会移除本地副本；由于此客户端会同步，重新登录即可把它下载回来。",
       "webLocationLabel": "你的笔记存放在哪里",
       "pathUnavailable": "路径不可用",
       "restoreBackup": "从备份恢复…"
@@ -3086,9 +3419,11 @@
         "focusMode": "专注模式 专注 打字机 调暗 非活动行 无干扰 focus mode typewriter dim distraction",
         "font": "字体 字型 等宽 无衬线 衬线 排版 font typeface sans serif mono typography",
         "graphSettings": "关系图 外观 物理 作用力 节点 连线 布局 颜色分组 标签 画布 graph appearance physics forces nodes links layout color groups labels canvas",
+        "hideVaultNames": "隐藏 保险库 名称 锁定屏幕 选择器 占位 标签 隐私 擦除 钥匙串 防窥 hide vault names lock screen picker placeholder privacy erase keychain",
         "hotkeys": "快捷键 热键 键盘 组合键 按键绑定 键位 hotkeys keyboard shortcuts keybindings keymap",
         "import": "导入 笔记 迁移 obsidian notion evernote enex html csv import migrate migration",
         "language": "语言 界面语言 区域 翻译 界面 language locale interface translation ui",
+        "legal": "法律 隐私政策 条款 法律声明 数据保护 执法 举报 滥用 legal privacy policy terms impressum gdpr dsgvo law enforcement abuse report data protection",
         "lastActiveNote": "继续 上次 最近笔记 恢复 同步 打开 continue last note resume sync",
         "license": "许可证 授权 开源 法律 agpl license open source legal",
         "lineNumbers": "行号 编号 边栏 编辑器 显示 line numbers gutter editor",
@@ -3097,7 +3432,7 @@
         "newNoteLocation": "新笔记 位置 保存位置 文件夹 默认 创建 new note location folder default",
         "torRouting": "tor 路由 洋葱 代理 网络 ip 地址 位置 隐藏 同步 匿名 routing onion proxy network address location hide sync anonymity",
         "quickUnlock": "快速解锁 解锁 pin 指纹 生物识别 面容 touch id quick unlock biometric",
-        "reminders": "提醒 通知 提示 警报 任务 截止 到期 reminders notify notification alert task due remind",
+        "reminders": "提醒 通知 提示 警报 任务 截止 到期 提前 天数 范围 注册 reminders notify notification alert task due remind horizon registration ahead days",
         "realtimeSync": "实时同步 实时 同步 连接 推送 轮询 real time sync live connection polling",
         "screenCapture": "屏幕捕获 截图 录屏 保护 阻止 隐私 screen capture protection screenshot recording",
         "showEditTimes": "编辑时间 时间戳 修改时间 日期 显示 笔记 show edit times timestamps modified",
@@ -3123,12 +3458,15 @@
         "viewMode": "默认视图 查看模式 实时 阅读 源代码 预览 default view mode live reading source",
         "dateFormat": "日期格式 日期 日 月 年 日历 date format day month year iso dd/mm mm/dd calendar",
         "timeFormat": "时间格式 时间 时钟 24小时制 12小时制 上午 下午 time format 24 hour 12 hour clock am pm",
-        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today"
+        "timezone": "时区 区域 地区 今天 timezone time zone tz utc iana region today",
+        "periodicNotes": "周期笔记 每周 每月 周 月 文件夹 模板 格式",
+        "aiHistoryBudget": "对话 历史 上下文 记忆 预算 字符 代理 聊天 请求",
+        "screenCaptureOverride": "屏幕捕获 覆盖 允许 关闭 禁用 放大镜 远程桌面 无障碍 解锁 黑屏 screen capture override allow disable magnifier remote desktop accessibility unlock black"
       }
     },
     "dateTime": {
       "dateLabel": "日期格式",
-      "dateHelper": "任务、已保存的视图和附件中日期的显示方式。",
+      "dateHelper": "在 Myne 显示日期的每个位置，日期以何种方式书写。",
       "dateSystem": "跟随语言",
       "timeLabel": "时间格式",
       "timeHelper": "选择时间以 24 小时制还是 12 小时制显示。",
@@ -3136,36 +3474,47 @@
       "time24": "24 小时制",
       "time12": "12 小时制",
       "zoneLabel": "时区",
-      "zoneHelper": "由哪个时区决定什么算作今天。留空则跟随此设备。你在笔记中写下的时间永远不会被改动——09:00 在任何地方都还是 09:00。",
+      "zoneHelper": "由哪个时区决定什么算作今天，也因此决定你的每日、每周和每月笔记打开的是哪一篇。留空则跟随此设备。此选择按设备各自确定：其他设备不会覆盖它，因此一个覆盖设置可能让此设备与你的其他设备处在不同的一天。你在笔记中写下的时间永远不会被改动；09:00 在任何地方都还是 09:00。",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne 不认识该时区。请使用类似 Europe/Berlin 的名称。",
       "errorSave": "无法保存该设置。"
     }
   },
   "storageLost": {
-    "allSynced": "没有丢失任何内容——这里的每一篇笔记都已到达服务器。",
+    "allSynced": "没有丢失任何内容：这里的每一篇笔记都已到达服务器。",
     "evicted": {
-      "body": "你的浏览器清除了本站点的存储以释放空间。没有任何内容损坏，服务器上也没有删除任何内容——所有已同步的内容都还在。",
+      "body": "你的浏览器清除了本站点的存储以释放空间。没有任何内容损坏，服务器上也没有删除任何内容。所有已同步的内容都还在。",
       "title": "你的浏览器清除了此保险库的本地副本"
     },
     "lockCta": "锁定并重试",
     "reDownloadCta": "重新设置此浏览器",
     "reEnrolNotice": "重新设置会把此浏览器注册为一台新设备，因此它需要等待你的另一台设备批准，之后才能同步。",
     "unopenable": {
-      "body": "此保险库的本地副本已无法读取。服务器上的内容不受影响——这里的副本只是缓存，可以被替换。",
+      "body": "此保险库的本地副本已无法读取。服务器上的内容不受影响：这里的副本只是缓存，可以被替换。",
       "title": "此保险库的本地副本无法读取"
     },
-    "unsyncedIntro": "有 {{count}} 篇笔记尚未到达服务器。它们已经丢失——这是唯一的副本：",
-    "unsyncedIntro_one": "有 {{count}} 篇笔记尚未到达服务器。它已经丢失——这是唯一的副本：",
-    "unsyncedIntro_other": "有 {{count}} 篇笔记尚未到达服务器。它们已经丢失——这是唯一的副本：",
+    "unsyncedIntro": "有 {{count}} 篇笔记尚未到达服务器。它已经丢失，这是唯一的副本：",
+    "unsyncedIntro_one": "有 {{count}} 篇笔记尚未到达服务器。它已经丢失，这是唯一的副本：",
+    "unsyncedIntro_other": "有 {{count}} 篇笔记尚未到达服务器。它们已经丢失，这是唯一的副本：",
     "unsyncedOverflow": "…还有另外 {{count}} 篇。",
     "unsyncedOverflow_one": "…还有另外 {{count}} 篇。",
     "unsyncedOverflow_other": "…还有另外 {{count}} 篇。"
   },
   "sync": {
-    "materialising": "正在下载你的笔记——第 {{done}} 篇，共 {{total}} 篇。你可以先开始写；其余的会陆续出现。",
-    "credentialAmbiguous": "你的密码可能在此设备和另一台设备上都被更改过，Myne 无法判断哪一次更改更晚——因此它没有做任何更改。请在一台已有访问权限的设备上登录，以理清此事。",
-    "vaultRekeyed": "此保险库已在另一台设备上升级到新格式。请重新解锁以继续——没有任何内容丢失。",
+    "betaTerms": {
+      "title": "开启同步之前",
+      "intro": "同步会将你的笔记加密后发送到服务器。有四件事值得先了解。",
+      "whatThisIsLabel": "这是什么",
+      "dataLossLabel": "如果两项机密都丢失",
+      "whatHappensNextLabel": "测试版结束时",
+      "whatWeCanSeeLabel": "我们能看到什么",
+      "readFull": "阅读完整条款",
+      "review": "审阅测试版条款",
+      "accept": "我已了解，开启同步"
+    },
+    "materialising": "正在下载你的笔记：第 {{done}} 篇，共 {{total}} 篇。你可以先开始写；其余的会陆续出现。",
+    "credentialAmbiguous": "你的密码可能在此设备和另一台设备上都被更改过，Myne 无法判断哪一次更改更晚，因此它没有做任何更改。请在一台已有访问权限的设备上登录，以理清此事。",
+    "vaultRekeyed": "此保险库已在另一台设备上升级到新格式。请重新解锁以继续。没有任何内容丢失。",
     "attachments": {
       "aria": {
         "downloading": "正在下载 {{name}}",
@@ -3175,7 +3524,7 @@
       "heading": "附件同步",
       "status": {
         "done": "已完成",
-        "failedWillRetry": "失败——将重试",
+        "failedWillRetry": "失败，将重试",
         "paused": "已暂停"
       }
     },
@@ -3194,7 +3543,7 @@
       "compareTheirs": "冲突副本",
       "compareTitle": "正在比较“{{title}}”",
       "discard": "丢弃",
-      "empty": "没有冲突——你的设备已同步。",
+      "empty": "没有冲突。你的设备已同步。",
       "groupTitle_one": "{{original}} 的 {{count}} 个冲突副本",
       "groupTitle_other": "{{original}} 有 {{count}} 个冲突副本",
       "keepAsSeparate": "保留为独立副本",
@@ -3208,7 +3557,7 @@
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
       "error": "无法生成 QR 码。请重试。",
       "generate": "生成 QR 码",
-      "hint": "粘贴你的账号以生成一个可供手机扫描的 QR 码——它会为你填好服务器和账号。",
+      "hint": "粘贴你的账号以生成一个可供手机扫描的 QR 码。它会为你填好服务器和账号。",
       "invalidAccount": "这看起来不是有效的账号。",
       "notConfigured": "请先配置同步服务器，然后再生成 QR 码。",
       "scanWithApp": "用 iOS 应用扫描",
@@ -3242,12 +3591,23 @@
       "shortName": "设备 {{hex}}",
       "syncedHere": "已在此同步",
       "thisDevice": "此设备",
+      "reasonUnreachable": "服务器没有响应",
+      "reasonCertChanged": "其证书不是此设备信任的那一个",
+      "reasonUnexpected": "意外错误",
+      "reasonRejected": "服务器拒绝了此设备的登录",
+      "reasonFrozen": "账户已被冻结",
+      "reasonDeviceLimit": "账户已达到设备数量上限",
+      "reasonAwaitingApproval": "此设备仍在等待批准",
+      "reasonNotConfigured": "尚未配置同步服务器",
+      "certChanged": "同步服务器有响应，但其证书与此设备固定的证书不同。",
+      "certChangedHint": "证书续期是这个样子，冒充者也是这个样子。Myne 无法区分两者，因此不会去猜。请从你的服务器获取指纹，然后在上方“同步服务器”处重新输入服务器 URL，并在提示时粘贴指纹。",
       "transportHint": "如果服务器已迁移或其证书已更改，请在上方的“同步服务器”中重新输入服务器 URL 以重新信任它。",
       "unreachable": "无法连接到同步（{{error}}）。",
       "verifyBody": "检查你刚刚批准的设备上是否出现相同的验证码。如果匹配，它们就在你的账户上。如果不匹配，请移除该设备。",
       "verifyMatch": "它们匹配",
       "verifyMismatch": "它们不匹配",
       "verifyPending": "此验证码将在新设备完成首次同步后出现。",
+      "verifyChanged": "验证码在你查看时发生了变化。请再次比对两个屏幕。如果它持续变化，请停止，不要继续。",
       "verifySyncing": "正在同步…",
       "verifyTitle": "验证新设备",
       "verifyAction": "比对验证码",
@@ -3262,15 +3622,16 @@
       "connecting": "正在连接…",
       "fingerprintLabel": "服务器证书指纹：",
       "confirmFingerprintRequired": "Tor 路由已开启，因此此设备不会信任一份未被告知要期待的证书。请从服务器本身，或从一台已经连接的设备上获取你服务器的 SHA-256 证书指纹，然后粘贴到这里。",
-      "confirmFingerprintMismatch": "此服务器出示的证书与你输入的不一致。没有保存任何内容。请检查你粘贴的指纹——如果它是对的，请不要连接：此设备与你的服务器之间夹着别的东西。",
-      "confirmFingerprintDeclined": "没有保存任何内容——此设备未连接到那台服务器。等你拿到它的证书指纹后再回来。",
+      "confirmFingerprintMismatch": "此服务器出示的证书与你输入的不一致。没有保存任何内容。请检查你粘贴的指纹。如果它是对的，请不要连接：此设备与你的服务器之间夹着别的东西。",
+      "certificateChanged": "此服务器出示的证书与此设备信任的证书不同。未做任何更改。如果是你续期了证书，请在下方粘贴新指纹；如果不是，请不要连接。",
+      "confirmFingerprintDeclined": "没有保存任何内容：此设备未连接到那台服务器。等你拿到它的证书指纹后再回来。",
       "pinStatic": "已根据 Myne 的内置证书进行验证。",
       "pinTofu": "在首次连接时固定。请在你的各设备之间比对此指纹。",
-      "fixedOrigin": "此客户端只与一台服务器同步，该服务器在部署时就已设定。无法在此处更改——此页面只被允许与这一个地址通信。",
+      "fixedOrigin": "此客户端只与一台服务器同步，该服务器在部署时就已设定。无法在此处更改：此页面只被允许与这一个地址通信。",
       "fixedOriginNone": "此部署未配置同步服务器。",
       "pinPlatformTrust": "已根据你浏览器的证书存储进行验证。此客户端无法自行固定证书。",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "无法连接到该服务器——请检查 URL 以及它是否正在运行。"
+      "unreachable": "无法连接到该服务器。请检查 URL 以及它是否正在运行。"
     },
     "enroll": {
       "accountNumberLabel": "账号",
@@ -3301,7 +3662,7 @@
     },
     "fingerprint": {
       "title": "在信任这台服务器之前先核对它的证书",
-      "why": "Tor 路由已开启，因此这第一次连接会经由一位陌生人运行的中继到达服务器。在证书被固定之前，此设备会接受它收到的任何证书——包括那个中继伪造的证书。请输入你的服务器公布的指纹，Myne 会在固定任何东西之前先做比对。如果不匹配，则不会保存任何内容。",
+      "why": "Tor 路由已开启，因此这第一次连接会经由一位陌生人运行的中继到达服务器。在证书被固定之前，此设备会接受它收到的任何证书，包括那个中继伪造的证书。请输入你的服务器公布的指纹，Myne 会在固定任何东西之前先做比对。如果不匹配，则不会保存任何内容。",
       "label": "预期的证书指纹",
       "placeholder": "来自你服务器的 SHA-256 指纹",
       "echoLabel": "你输入的内容",
@@ -3309,36 +3670,38 @@
       "echoProgress": "目前已输入 {{total}} 个字符中的 {{count}} 个。",
       "echoProgress_one": "目前已输入 {{total}} 个字符中的 {{count}} 个。",
       "echoProgress_other": "目前已输入 {{total}} 个字符中的 {{count}} 个。",
-      "echoInvalid": "SHA-256 指纹由 64 个字符组成，每个字符是 0–9 或 a–f。冒号、空格以及开头的“sha256:”都没有问题——其他内容都不属于指纹。",
+      "echoInvalid": "SHA-256 指纹由 64 个字符组成，每个字符是 0–9 或 a–f。冒号、空格以及开头的“sha256:”都没有问题。其他内容都不属于指纹。",
       "helpToggle": "我到哪里去找这个指纹？",
-      "helpNotOverTor": "不要通过这条连接去取。通过同一条线路取回的指纹什么也证明不了——能替换证书的一方同样能替换那个页面。",
+      "helpNotOverTor": "不要通过这条连接去取。通过同一条线路取回的指纹什么也证明不了：能替换证书的一方同样能替换那个页面。",
       "helpFromServer": "在运行你服务器的那台机器上：openssl x509 -noout -fingerprint -sha256 -in <你的证书文件>",
       "helpFromDevice": "在一台已连接到此账号的设备上：设置 → 同步 中会显示相同的指纹。",
-      "helpNoFingerprint": "如果这些方式你都拿不到它，那么在 Tor 路由开启的情况下无法添加这台服务器。你可以在设置 → 网络 中关闭 Tor 路由并直接连接——那会把你的 IP 地址暴露给服务器，以及任何能监视你网络的人。",
-      "decline": "我没有指纹——取消"
+      "helpNoFingerprint": "如果这些方式你都拿不到它，那么在 Tor 路由开启的情况下无法添加这台服务器。你可以在设置 → 网络 中关闭 Tor 路由并直接连接。那会把你的 IP 地址暴露给服务器，以及任何能监视你网络的人。",
+      "decline": "我没有指纹，取消"
     },
     "join": {
       "accountLabel": "账号",
       "cancel": "取消",
       "continue": "继续",
-      "error": "无法添加此设备。请检查服务器 URL、账号和密码——以及服务器是否可以连接。",
+      "error": "无法添加此设备。请检查服务器 URL、账号和密码，以及服务器是否可以连接。",
       "help": "使用你的账号和密码登录。在某台现有设备批准后，此设备便会同步你的笔记。无需恢复短语。",
       "passwordLabel": "密码",
       "pinnedCompare": "此设备已固定你服务器的证书。请检查此指纹在你的其他设备上是否匹配。",
       "confirmFingerprintRequired": "Tor 路由已开启，因此此设备不会信任一份未被告知要期待的证书。请从服务器本身，或从一台已经连接的设备上获取你服务器的 SHA-256 证书指纹，然后粘贴到这里。",
-      "confirmFingerprintMismatch": "此服务器出示的证书与你输入的不一致。此设备没有被添加，也没有保存任何内容。请检查你粘贴的指纹——如果它是对的，请不要继续：此设备与你的服务器之间夹着别的东西。",
+      "confirmFingerprintMismatch": "此服务器出示的证书与你输入的不一致。此设备没有被添加，也没有保存任何内容。请检查你粘贴的指纹。如果它是对的，请不要继续：此设备与你的服务器之间夹着别的东西。",
       "pinnedTitle": "服务器证书已固定",
       "serverLabel": "同步服务器",
       "serverPlaceholder": "https://your-server.example",
-      "sasMatch": "它们匹配——继续",
-      "sasMismatch": "它们不匹配——移除此设备",
+      "sasMatch": "它们匹配，继续",
+      "sasMismatch": "它们不匹配，移除此设备",
       "submit": "添加设备",
       "submitting": "正在添加…",
       "title": "将此设备添加到账号",
       "verifyBody": "检查此验证码是否与你用于批准的设备上的验证码一致。",
+      "verifyChanged": "验证码在你查看时发生了变化。请再次比对两个屏幕。如果它持续变化，请停止，不要继续。",
       "verifyTitle": "验证此设备",
-      "waitingHint": "请保持此窗口打开——一旦获得批准，此处会出现一个验证码，可与你的其他设备进行比对。",
-      "waitingTitle": "等待批准"
+      "waitingHint": "请保持此窗口打开。一旦获得批准，此处会出现一个验证码，可与你的其他设备进行比对。",
+      "waitingTitle": "等待批准",
+      "sasAbortFailed": "无法断开此设备的连接。它仍在该服务器上注册，请将其视为不可信：打开设置 → 同步并在那里将其移除。你的笔记未被删除。"
     },
     "panel": {
       "addDevice": {
@@ -3383,10 +3746,14 @@
       }
     },
     "reconcile": {
-      "message": "此设备离线了一段时间——正在追赶同步进度。你的笔记很安全。"
+      "message": "此设备离线了一段时间，正在追赶同步进度。你的笔记很安全。"
     },
     "recovered": {
       "restoredToast": "已恢复为一篇新笔记。"
+    },
+    "stale": {
+      "body": "Myne 已有数天未能连上同步服务器。你的笔记正保存在此设备上，但没有任何内容离开过它，因此这是唯一的副本。请打开设置 → 同步查看原因。",
+      "dismiss": "忽略"
     },
     "status": {
       "awaitingApproval": "等待批准",
@@ -3394,11 +3761,12 @@
       "conflicts_other": "{{count}} 个冲突待处理",
       "error": "同步出错",
       "errorAuth": "同步登录已过期",
-      "errorFrozen": "账户已冻结——上传已暂停",
+      "errorFrozen": "账户已冻结：上传已暂停",
       "errorDeviceRevoked": "此设备已从你的账户中移除",
-      "errorStorageFull": "存储空间已满——同步已暂停",
-      "errorQuota": "存储空间已满——上传已暂停",
-      "errorRateLimited": "同步被限流——正在重试",
+      "errorCertChanged": "服务器证书已更改：请验证后重新连接",
+      "errorStorageFull": "存储空间已满：同步已暂停",
+      "errorQuota": "存储空间已满：上传已暂停",
+      "errorRateLimited": "同步被限流：正在重试",
       "errorTooLarge": "有一个文件太大，无法上传",
       "loading": "正在获取同步状态…",
       "notEnrolled": "未加入",
@@ -3417,19 +3785,19 @@
       "serverSection": "服务器",
       "serverNotSet": "未设置",
       "statusLabel": "状态",
-      "hubHelp": "同步让你的笔记在各设备之间保持最新。所有内容在发送前都会在此设备上加密——服务器永远看不到你的笔记。",
+      "hubHelp": "同步让你的笔记在各设备之间保持最新。所有内容在发送前都会在此设备上加密。服务器永远看不到你的笔记。",
       "connectedTls": "已通过 TLS 连接。",
       "connectedLocal": "已在你的本地网络上连接。",
       "connectError": "无法连接到该服务器。请检查地址后重试。",
       "serverAddressLabel": "服务器地址",
       "serverAddressPlaceholder": "https://sync.example.com",
       "fingerprintLabel": "证书指纹",
-      "fingerprintCompare": "请将此与你已信任设备上的同一屏幕进行比对——它们必须一致。",
+      "fingerprintCompare": "请将此与你已信任设备上的同一屏幕进行比对。它们必须一致。",
       "pinStatic": "已根据此服务器的已知证书进行验证。",
       "pinTofu": "在首次连接时固定。请在你的各设备之间进行比对以确认。",
       "enrollNotConfigured": "请先设置同步服务器，然后再添加此设备。",
       "enrollTransport": "无法连接到同步服务器。请检查你的网络连接后重试。",
-      "accountNumberHint": "请仔细核对此编号——它看起来不太对。",
+      "accountNumberHint": "请仔细核对此编号。它看起来不太对。",
       "passwordPlaceholder": "你的保险库密码",
       "recoveryPhraseHint": "输入或粘贴你的 24 个单词。粘贴会按顺序填入各单元格。",
       "verifyBody": "检查你刚刚批准的设备上是否出现相同的验证码。如果匹配，它们就在你的账户上。如果不匹配，请移除该设备。",
@@ -3447,11 +3815,11 @@
     "banner": {
       "conflictsNeedReview_one": "{{count}} 个冲突需要审阅",
       "conflictsNeedReview_other": "{{count}} 个冲突需要审阅",
-      "catchingUp": "正在赶上同步进度——你的笔记是安全的。",
+      "catchingUp": "正在赶上同步进度。你的笔记是安全的。",
       "verifyDevices": "验证设备"
     },
     "tor": {
-      "connecting": "正在连接 Tor。同步已暂停，直到连接就绪——没有任何内容被直接发送。",
+      "connecting": "正在连接 Tor。同步已暂停，直到连接就绪。没有任何内容被直接发送。",
       "settingsHint": "设置 → 网络",
       "unavailable": "Tor 不可用，因此同步已暂停。没有任何内容被直接发送。关闭 Tor 路由即可不经它进行同步。"
     }
@@ -3515,7 +3883,7 @@
       "closeLabel": "关闭模板",
       "deleteRowLabel": "删除模板 {{name}}（移入回收站）",
       "editTemplateLabel": "编辑模板 {{name}}",
-      "emptyBody": "创建一个模板，以便复用某种笔记框架——会议记录、每日日志、读书笔记。在新建笔记时即可从中选用。",
+      "emptyBody": "创建模板以复用某种笔记框架：会议记录、每日日志、读书笔记。在新建笔记时即可从中选用。",
       "emptyTitle": "暂无模板",
       "listLabel": "模板",
       "loading": "正在加载…",
@@ -3527,7 +3895,7 @@
     },
     "emptyBefore": "尚无模板。点按 ",
     "newAction": "新建",
-    "emptyAfter": " 以创建可重复使用的笔记模板——然后基于它创建笔记（并在设置中选择一个作为你的每日笔记模板）。",
+    "emptyAfter": " 以创建可重复使用的笔记模板，然后基于它创建笔记（并在设置中选择一个作为你的每日笔记模板）。",
     "use": "使用",
     "edit": "编辑",
     "deleteConfirm": "删除此模板？",
@@ -3540,7 +3908,7 @@
     "cancel": "取消",
     "close": "关闭",
     "collision": {
-      "keepBoth": "两者都保留——安装为“{{name}}”",
+      "keepBoth": "两者都保留，安装为“{{name}}”",
       "question": "你已经有一个名为“{{name}}”的主题。",
       "replace": "替换“{{name}}”"
     },
@@ -3555,7 +3923,7 @@
       "unsupportedVersion": "该链接是为较新版本的 Myne 制作的。请先更新 Myne，然后重试。"
     },
     "errorTitle": "无法读取该主题",
-    "helper": "主题是一套配色方案，不是代码。Myne 在使用前会在此设备上验证它——不会上传任何内容。",
+    "helper": "主题是一套配色方案，不是代码。Myne 在使用前会在此设备上验证它。不会上传任何内容。",
     "question": "要使用此主题吗？",
     "title": "安装主题"
   },
@@ -3567,10 +3935,11 @@
     "errors": {
       "alreadyUnlocked": "保险库已解锁。",
       "inProgress": "操作正在进行中。",
-      "kdfMemoryExceedsHost": "打开此保险库需要 {{required}} MiB 内存——超出了此浏览器能提供的上限（{{available}} MiB）。保险库本身没有问题；请在 Myne 桌面应用中打开它。",
+      "kdfMemoryExceedsHost": "打开此保险库需要 {{required}} MiB 内存，超出了此浏览器能提供的上限（{{available}} MiB）。保险库本身没有问题；请在 Myne 桌面应用中打开它。",
       "unexpected": "出现意外错误。请重试。",
       "vaultNotFound": "未找到保险库文件。请重新启动应用。",
-      "vaultUpgraded": "此保险库已升级到当前版本 Myne 尚不支持的更新格式。你的数据没有问题——请将 Myne 更新到最新版本再打开它。"
+      "vaultUpgraded": "此保险库已升级到当前版本 Myne 尚不支持的更新格式。你的数据没有问题。请将 Myne 更新到最新版本再打开它。",
+      "openAsImportSource": "当前有一次导入正在读取此保险库。请先完成或取消那次导入，然后再解锁此保险库。"
     },
     "passwordLabel": "密码",
     "passwordPlaceholder": "密码",
@@ -3593,7 +3962,7 @@
     "subtitleBiometric": "使用 Touch ID 确认以继续。",
     "suspicion": {
       "lockedDuringChange": "密码更改已取消：保险库已锁定。",
-      "metaChangedExternally": "保险库已在另一个会话中被修改——请重新解锁。"
+      "metaChangedExternally": "保险库已在另一个会话中被修改。请重新解锁。"
     },
     "title": "解锁你的保险库。",
     "vaultUnreadable": "保险库文件无法读取。请从备份恢复。",
@@ -3620,7 +3989,7 @@
     "unlockWithPinInstead": "改用 PIN 解锁",
     "useRecoveryPhrase": "使用你的恢复短语",
     "deleteConfirmTitle": "删除此保险库？",
-    "deletePartialError": "部分文件无法移除。此保险库已无法使用——继续以重新开始。",
+    "deletePartialError": "部分文件无法移除。此保险库已无法使用。继续即可重新开始。",
     "failClosedEyebrow": "无法打开保险库",
     "restoreHint": "从备份恢复以继续。"
   },
@@ -3639,12 +4008,15 @@
       "committing": "正在保存…",
       "copied": "已复制",
       "copy": "复制",
-      "copyFailed": "无法复制——请改用“另存为文件”。",
-      "eyebrow": "第 4 步，共 4 步——账号",
+      "copyFailed": "无法复制。请改用“另存为文件”。",
+      "downloadStarted": "已发送到浏览器的下载内容。请确认它确实到达了：文件去往何处由你的浏览器决定，Myne 看不到它是否到达。",
+      "eyebrow": "第 4 步，共 4 步：账号",
       "heading": "保存你的账号。",
-      "intro": "这是你的持有人令牌——请像对待现金一样对待它。",
+      "intro": "这是你的持有人令牌。请像对待现金一样对待它。",
       "saveAsFile": "另存为文件",
-      "shownOnceBody": "请立即保存——Myne 无法为你找回它。日后注册同步时需要用到它。",
+      "saveFailed": "无法保存文件。请改为复制账号，或把它写下来。",
+      "savedToFile": "已保存。这是一个纯文本文件，请把它放在只有你能读取的地方。",
+      "shownOnceBody": "请立即保存。Myne 无法为你找回它。日后注册同步时需要用到它。",
       "shownOnceEmphasis": "它只会显示这一次。"
     },
     "briefing": {
@@ -3652,17 +4024,17 @@
       "continue": "继续创建保险库",
       "eyebrow": "在创建保险库之前",
       "heading": "在创建保险库之前",
-      "intro": "Myne 会加密你的笔记，只有你才能打开它们。由此引出三点——请阅读后继续。",
+      "intro": "Myne 会加密你的笔记，只有你才能打开它们。由此引出三点。请阅读后继续。",
       "statements": {
         "no-email": {
           "ackLabel": "我明白没有邮箱恢复。",
           "statement": "没有邮箱恢复。永远都不会有。",
-          "why": "我们从不索取你的邮箱，所以没有重置链接，也没有可供客服解锁的账户。这不是缺失的功能——这正是保障所在。邮箱恢复意味着我们能读取你的笔记，而 Myne 的设计就是让我们做不到。"
+          "why": "我们从不索取你的邮箱，所以没有重置链接，也没有可供客服解锁的账户。这不是缺失的功能。这正是保障所在。邮箱恢复意味着我们能读取你的笔记，而 Myne 的设计就是让我们做不到。"
         },
         "no-store": {
           "ackLabel": "我明白 Myne 无法找回我的密码。",
           "statement": "你的密码用来解锁保险库。我们不会存储它。",
-          "why": "你的密码是用于派生解密笔记密钥的输入。它绝不会离开本设备，我们的服务器上也没有任何东西能复现它。这正是保护你笔记隐私的原因——也是我们无法为你重置它的原因。"
+          "why": "你的密码是用于派生解密笔记密钥的输入。它绝不会离开本设备，我们的服务器上也没有任何东西能复现它。这正是保护你笔记隐私的原因，也是我们无法为你重置它的原因。"
         },
         "phrase-backup": {
           "ackLabel": "我明白恢复短语是我唯一的备份。",
@@ -3675,7 +4047,7 @@
     "confirm": {
       "back": "返回",
       "continue": "继续",
-      "eyebrow": "第 3 步，共 4 步——确认短语",
+      "eyebrow": "第 3 步，共 4 步：确认短语",
       "heading": "回填你短语中的四个单词。",
       "intro": "我们会询问几个指定位置，以核实你已保存它。",
       "mismatch": "与第 {{pos}} 个单词不匹配。",
@@ -3685,6 +4057,11 @@
       "caption": "这需要一点时间。",
       "footerHint": "如果耗时超过 30 秒，请关闭窗口后重试。",
       "heading": "正在加密你的保险库"
+    },
+    "provisioning": {
+      "heading": "正在创建你的账户",
+      "caption": "正在向同步服务器注册此保险库。接下来是你的恢复短语。",
+      "footerHint": "这需要一点时间。请保持此标签页打开直到完成，以便出错时它能自行清理。"
     },
     "errors": {
       "accountNumberInvalid": {
@@ -3748,7 +4125,7 @@
         "title": "同时进行的保险库创建过多"
       },
       "vaultArtifactsPresent": {
-        "body": "无法创建新保险库，因为本设备上已存在保险库数据。请关闭应用并重新启动——启动界面会将你引导至解锁流程。",
+        "body": "无法创建新保险库，因为本设备上已存在保险库数据。请关闭应用并重新启动。启动界面会将你引导至解锁流程。",
         "title": "保险库已存在"
       },
       "vaultBusyAuth": {
@@ -3770,33 +4147,45 @@
       "genericError": {
         "body": "请重试。",
         "title": "出了点问题"
+      },
+      "provisionFailed": {
+        "body": "我们无法连接同步服务器，因此这个浏览器中没有留下可打开的内容。你的恢复短语从未展示给你，所以没有什么需要抄写，也没有什么会丢失。恢复联网后请重新开始。",
+        "title": "你的账户未被创建"
       }
     },
     "password": {
       "back": "返回",
-      "eyebrow": "第 1 步，共 4 步——主密码",
+      "eyebrow": "第 1 步，共 4 步：主密码",
       "heading": "创建保险库",
       "helperLead": "Myne 不会存储你的密码或恢复短语。",
       "submit": "生成恢复短语"
     },
     "phrase": {
       "back": "返回",
-      "continue": "我已保存——确认短语",
+      "clipboardNotCleared": "你的浏览器不允许 Myne 事后清除剪贴板，因此这 24 个单词会一直留在那里，直到你复制别的内容。请把它们粘贴到密码管理器，然后再复制任意其他内容。",
+      "continue": "我已保存，确认短语",
+      "copied": "已复制。只要应用保持运行，即使你继续下一步，Myne 也会在 30 秒后清除它。",
+      "copiedNoAutoClear": "已复制。Myne 在这里无法清除你的剪贴板，因此这些单词会一直留在剪贴板上，直到你复制别的内容。",
       "copy": "复制",
-      "eyebrow": "第 2 步，共 4 步——恢复短语",
+      "extensionNotice": "可访问本站点的浏览器扩展能够读取此页面上的内容。如果你无法确定此配置文件中的每个扩展都可信，请使用桌面应用或干净的浏览器配置文件来完成这一步。",
+      "copyFailed": "无法复制。请改用“另存为文件”。",
+      "downloadStarted": "已发送到浏览器的下载内容。请确认它确实到达了：文件去往何处由你的浏览器决定，Myne 看不到它是否到达。",
+      "eyebrow": "第 2 步，共 4 步：恢复短语",
       "heading": "记下这 24 个单词。",
-      "intro": "这个短语，连同你的密码，是恢复保险库的唯一方法。请离线存储——纸张、密码管理器、硬件钱包。请像对待现金一样对待它。",
+      "intro": "这个短语，连同你的密码，是恢复保险库的唯一方法。请离线存储：纸张、密码管理器、硬件钱包。请像对待现金一样对待它。",
       "reveal": "显示短语",
-      "saveAsFile": "另存为文件"
+      "saveAsFile": "另存为文件",
+      "saveFailed": "无法保存文件。请改为复制这些单词，或把它们写下来。",
+      "savedToFile": "已保存。这是一个纯文本文件，请把它放在只有你能读取的地方。"
     },
     "ready": {
       "backedUp": "已备份 ✓",
       "backingUp": "正在备份…",
       "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "备份未能完成——未留下任何文件。你随时可以在“设置 → 存储”中备份。",
+      "backupError": "备份未能完成。未留下任何文件。你随时可以在“设置 → 存储”中备份。",
       "backupFilterName": "Myne 备份",
       "backUpNow": "立即备份此保险库",
-      "body": "Myne 已将你的保险库写入你的应用数据文件夹。你的主密码和恢复短语是唯一的返回途径——请确保两者都已妥善保管在安全的地方。",
+      "body": "Myne 已将你的保险库写入你的应用数据文件夹。你的主密码和恢复短语是唯一的返回途径。请确保两者都已妥善保管在安全的地方。",
       "decrypting": "正在解密…",
       "done": "完成",
       "heading": "你的保险库已就绪。",
@@ -3833,7 +4222,7 @@
         "weakPassword": "新密码至少需要 12 个字符。"
       },
       "eyebrow": "恢复 · 新密码",
-      "helperBody": "保险库已用恢复短语打开。旧密码将不再有效——请立即设置新的主密码。",
+      "helperBody": "保险库已用恢复短语打开。你的旧密码已不再有效。请立即设置新的主密码。",
       "helperEmphasis": "恢复短语保持不变。",
       "submit": "设置新密码",
       "title": "设置新的主密码"
@@ -3888,8 +4277,8 @@
       "doneTitle": "已清理",
       "errorBody": "出了点问题。请关闭应用后重试。",
       "errorTitle": "清理失败",
-      "foundBody_one": "有 {{count}} 个残留文件来自上次未完成的删除。它们已经无法读取——你不会丢失任何可恢复的内容。",
-      "foundBody_other": "有 {{count}} 个文件残留自上次未完成的删除。它们已经无法读取——你不会丢失任何可恢复的内容。",
+      "foundBody_one": "有 {{count}} 个残留文件来自上次未完成的删除。它们已经无法读取。你不会丢失任何可恢复的内容。",
+      "foundBody_other": "有 {{count}} 个残留文件来自上次未完成的删除。它们已经无法读取。你不会丢失任何可恢复的内容。",
       "foundTitle": "上次未完成删除的残留文件",
       "partialBody_one": "有 {{count}} 个文件可能被另一个应用锁定（杀毒软件、文件同步或搜索索引）。请关闭该应用后稍等片刻重试，或手动移除保险库文件夹。",
       "partialBody_other": "有 {{count}} 个文件可能被其他应用（杀毒软件、文件同步或搜索索引）锁定。请关闭应用，稍后重试，或手动移除该保险库文件夹。",
@@ -3919,7 +4308,7 @@
     "nothingToPreview": "暂无可预览的内容。"
   },
   "conflicts": {
-    "empty": "没有需要审阅的冲突——你的笔记已同步。",
+    "empty": "没有需要审阅的冲突。你的笔记已同步。",
     "groupTitle_one": "{{count}} 个冲突副本",
     "groupTitle_other": "{{count}} 个冲突副本",
     "groupTitleOfNote": "（笔记 {{hex}}）"
@@ -3951,14 +4340,14 @@
   },
   "restoreBackup": {
     "title": "移动端尚不可用",
-    "body": "从备份文件恢复在移动端尚不可用——请创建保险库或使用你的恢复短语恢复。"
+    "body": "从备份文件恢复在移动端尚不可用。请创建保险库或使用你的恢复短语恢复。"
   },
   "recording": {
     "deniedTitle": "麦克风访问权限已关闭",
     "errorTitle": "无法开始录制",
     "deniedBody": "要录制语音笔记，请在“设置 › Myne › 麦克风”中允许 Myne 访问麦克风。",
     "noDeviceBody": "在此设备上未找到麦克风。",
-    "emptyBody": "该录音为空——未捕获任何内容。",
+    "emptyBody": "该录音为空。未捕获任何内容。",
     "genericBody": "录制时出了点问题。请重试。",
     "stopAria": "停止录制"
   },
@@ -3988,14 +4377,15 @@
   "join": {
     "transportError": "无法连接到该同步服务器。请检查地址和你的网络连接，然后重试。",
     "passwordPlaceholder": "你的保险库密码",
-    "waitingHint": "请保持此屏幕打开——一旦获得批准，此处会出现一个验证码，可与你的其他设备进行比对。",
+    "waitingHint": "请保持此屏幕打开。一旦获得批准，此处会出现一个验证码，可与你的其他设备进行比对。",
     "verifyBody": "检查此验证码是否与你用于批准的设备上显示的验证码相同。",
+    "verifyChanged": "验证码在你查看时发生了变化。请再次比对两个屏幕。如果它持续变化，请停止，不要继续。",
     "removing": "正在移除…",
-    "sasMismatch": "它们不匹配——移除此设备",
+    "sasMismatch": "它们不匹配，移除此设备",
     "title": "连接到你的账户",
     "lead": "输入你的账户详情，将你的笔记带到此设备。一切都保持端到端加密。",
     "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "请仔细核对此编号——它看起来不太对。",
+    "accountHint": "请仔细核对此账号。它看起来不太对。",
     "approvalHint": "当你从一台已拥有你账户的设备上批准此设备后，你的笔记就会出现。",
     "connectingSubtitle": "正在获取你的账户并在此设备上解锁你的保险库。",
     "qr": {
@@ -4004,15 +4394,15 @@
       "confirmServer": "服务器",
       "confirmTitle": "添加此设备？",
       "continue": "继续",
-      "expired": "此 QR 码已过期——请在你的另一台设备上显示一个新的，然后重新扫描。",
+      "expired": "此 QR 码已过期。请在你的另一台设备上显示一个新的，然后重新扫描。",
       "invalid": "这不是 Myne 的设备 QR 码。",
-      "newerVersion": "此 QR 码来自较新版本的 Myne——请更新应用后重试。",
+      "newerVersion": "此 QR 码来自较新版本的 Myne。请更新应用后重试。",
       "pinHosted": "Myne 托管的服务器",
       "pinNone": "自托管服务器",
       "pinSelfHost": "证书已从你信任的设备固定",
       "scan": "扫描 QR 码",
       "scanFailed": "无法扫描。请重试，或手动输入你的信息。",
-      "scanUnavailable": "此设备不支持扫描——请在下方输入你的信息。"
+      "scanUnavailable": "此设备不支持扫描。请在下方输入你的信息。"
     }
   },
   "createVault": {
@@ -4020,7 +4410,12 @@
     "beginGeneric": "无法开始创建保险库。请重试。",
     "wordNumber": "第 {{position}} 个单词",
     "commitError": "无法保存你的保险库。请重试。",
+    "copyPhrase": "复制",
+    "phraseCopied": "已复制。它只留在此设备上，系统会在 30 秒后清除它。",
+    "phraseCopyFailed": "无法复制。请改用“保存到文件”。",
     "savedToFile": "已保存到 {{label}}",
+    "savedToShareSheet": "已保存在 Myne 内部，系统文件管理器无法访问那里。这是一个纯文本文件，因此如果你通过分享面板把副本放到你能访问的位置，请选择只有你能读取的地方，而不是云盘。如果你关闭了面板，再次点按“保存”即可。",
+    "savedFileWritten": "已保存在 Myne 内部。这是一个纯文本文件，因此你所做的任何副本都请放在只有你能读取的地方。此设备没有报告可以从哪里访问该文件，因此在你确认之前，请当作它只能从应用内部访问。",
     "saveFileError": "无法保存文件。",
     "stepLabel": "创建保险库 · {{current}} / {{total}}",
     "briefingTitle": "在开始之前",
@@ -4054,31 +4449,31 @@
   },
   "web": {
     "openElsewhere": {
-      "body": "同一时间只能有一个标签页打开保险库——两个标签页会写入同一处存储并把它损坏。请关闭另一个标签页，以便在这里继续。",
+      "body": "同一时间只能有一个标签页打开保险库。两个标签页会写入同一处存储并把它损坏。请关闭另一个标签页，以便在这里继续。",
       "freed": "另一个标签页已关闭。重新加载即可在这里打开你的保险库。",
       "reload": "重新加载",
       "title": "此保险库已在另一个标签页中打开"
     },
     "reload": {
-      "body": "重新加载此页面会再次要求输入你的密码——这是设计使然，没有更快的进入方式。页面关闭期间，你的保险库在此设备上保持加密状态，密钥每次都会根据你的密码重新派生。",
+      "body": "重新加载此页面会再次要求输入你的密码。这是设计使然，没有更快的进入方式。页面关闭期间，你的保险库在此设备上保持加密状态，密钥每次都会根据你的密码重新派生。",
       "title": "重新加载意味着要再输一次密码"
     },
     "wall": {
       "getNative": "获取桌面版或移动版 Myne",
       "noAccount": {
         "body": "账户是在 Myne 桌面应用或移动应用中创建的，而不是在这里。",
-        "reason": "创建账户会生成你的 24 个单词的恢复短语，并且只向你显示一次。网页绝不应该成为向你展示该短语的地方——一旦它在那里泄露，Myne 无法收回它。",
+        "reason": "创建账户会生成你的 24 个单词的恢复短语，并且只向你显示一次。网页绝不应该成为向你展示该短语的地方。一旦它在那里泄露，Myne 无法收回它。",
         "title": "你需要先有一个账户"
       },
       "noSync": {
         "body": "此浏览器未配置同步服务器，因此它没有可打开的内容。",
-        "reason": "与桌面应用不同，浏览器本身不保留可作退路的保险库——它的笔记来自同步。请在桌面应用或移动应用中设置好，然后回到这里。",
+        "reason": "与桌面应用不同，浏览器本身不保留可作退路的保险库。它的笔记来自同步。请在桌面应用或移动应用中设置好，然后回到这里。",
         "title": "尚未设置同步"
       }
     },
     "unavailableHere": {
       "backup": "加密备份的创建和恢复都在 Myne 桌面应用中进行，它可以把备份文件写到你选择的位置。这里的笔记来自服务器，因此此浏览器通过同步来恢复自身。",
-      "creation": "新账户在 Myne 桌面应用中创建。它会向你显示恢复短语——而恢复短语绝不应由网页来显示。",
+      "creation": "此浏览器中已有一个账户。要再创建一个，请打开 Myne 桌面应用，或使用不同的浏览器配置文件。",
       "multiVault": "此浏览器只保存一个账户。要使用另一个账户，请在 Myne 桌面应用或另一个浏览器配置文件中打开它。",
       "phraseRecovery": "使用恢复短语进行恢复要在 Myne 桌面应用中完成。你的恢复短语绝不应输入到网页中。",
       "title": "在浏览器中不可用"
@@ -4086,9 +4481,9 @@
     "unsupported": {
       "title": "Myne 无法在此浏览器中运行",
       "mobileTitle": "在此设备上打开 Myne 应用",
-      "handoff": "Myne 的桌面应用（macOS、Windows、Linux）和移动应用（iOS、Android）没有这些限制——而且它们会在运行前验证自身的签名，这是网页做不到的。",
+      "handoff": "Myne 的桌面应用（macOS、Linux）和移动应用（Android）没有这类限制，而且应用装好后就一直在那里：如果你保留了下载的那份文件，它仍在你自己的磁盘上，你可以拿它与 Myne 为当前版本公布的哈希值核对。没有任何东西会替你做这个比对。目前尚未发布 Windows 版本，也没有可安装的 iOS 版本。而网页在你每次访问时都会被重新发送到你的浏览器，你的浏览器不会对它做任何检查。",
       "reason": {
-        "desktop-form-factor": "浏览器中的 Myne 是为桌面电脑打造的——它需要手机或平板浏览器无法提供的内存和输入方式。何况在此设备上，Myne 应用本来就是更好的客户端：它更快，可以离线工作，并且在浏览器清除存储时仍会保住你的笔记。",
+        "desktop-form-factor": "浏览器中的 Myne 是为桌面电脑打造的。它需要手机或平板浏览器无法提供的内存和输入方式。何况在此设备上，Myne 应用本来就是更好的客户端：它更快，可以离线工作，并且在浏览器清除存储时仍会保住你的笔记。",
         "webassembly": "此浏览器不支持 WebAssembly，而加密核心正是运行在它之上。",
         "wasm-memory-headroom": "此浏览器无法预留保险库密钥派生所需的约 336 MB 内存。手机和平板浏览器通常都做不到；该限制由保险库自身设定，若为某一台设备调低它，保险库在其他所有地方都将无法读取。",
         "worker": "此浏览器不支持 Web Workers，而保险库的存储和加密正是在其中运行的。",
@@ -4098,5 +4493,19 @@
         "crypto-getrandomvalues": "此浏览器不提供加密安全的随机数源。"
       }
     }
+  },
+  "screenCaptureEscape": {
+    "disableBody": "屏幕捕获保护会请求操作系统把此窗口排除在截屏和屏幕录制之外。它在 Windows 10（2020 年 5 月更新）及更高版本上有效；macOS 和 Linux 没有为此提供系统 API，因此在这些系统上无法阻止捕获。在它确实生效的系统上，远程桌面软件和屏幕放大镜同样看不到这个窗口，这正是这里提供关闭选项的原因。",
+    "disableConfirm": "关闭保护",
+    "disableCost": "关闭它仅对此设备生效，并且在你重新开启之前一直保持关闭，解锁保险库之前和之后都是如此。不会有任何内容被发送到任何地方，也不会改动任何保险库设置，但这个选择会保存在此设备上的一个设置文件中，而且在你重新开启保护之后，该文件仍会留在那里。",
+    "disableTitle": "关闭屏幕捕获保护？",
+    "disableTrigger": "关闭屏幕捕获保护",
+    "flagNotice": "本次会话是以 --disable-screen-capture-protection 启动的，因此无论此设置如何，保护都会一直关闭，直到你退出为止。",
+    "restoreBody": "屏幕捕获保护在此设备上已关闭。重新开启它会请求操作系统再次把此窗口排除在截屏和屏幕录制之外；在 Windows 10（2020 年 5 月更新）及更高版本上，这同时也会让远程桌面软件和屏幕放大镜看不到它。macOS 和 Linux 没有为此提供系统 API，因此在这些系统上无法阻止捕获。",
+    "restoreConfirm": "开启保护",
+    "restoreTitle": "重新开启屏幕捕获保护？",
+    "restoreTrigger": "开启屏幕捕获保护",
+    "saveFailed": "该设置无法保存，因此没有任何改动。请重试，或以 --disable-screen-capture-protection 启动 Myne。",
+    "savedForNextLaunch": "已保存。本次会话的保护仍处于关闭状态，因为它是以 --disable-screen-capture-protection 启动的；下次你在不带该参数的情况下打开 Myne 时，保护就会恢复。"
   }
 }

@@ -122,5 +122,5 @@ export function formatBytes(bytes: number): string {
 export function describeShortfall(v: Extract<QuotaVerdict, { reason: "insufficient" }>): string {
   return `This vault needs ${formatBytes(v.requiredBytes)} of browser storage and ${formatBytes(
     v.availableBytes,
-  )} is available — ${formatBytes(v.shortfallBytes)} short.`;
+  )} is available (${formatBytes(v.shortfallBytes)} short).`;
 }

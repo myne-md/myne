@@ -19,10 +19,14 @@ const support: Support = harnessSupport(harnessEnv());
 let warned = false;
 
 // Quarantine gate, mirroring the desktop lane's `MYNE_E2E_QUARANTINE=1`: the
-// blocking step skips known contention-victims so an unrelated change cannot go
-// red on someone else's flake, and a separate non-blocking step runs ONLY those
-// and reports without gating. Keep the flaky set short and visible — a
-// quarantined scenario is a debt, never a place to bury a real failure.
+// stable run skips known contention-victims, and a separate run takes ONLY
+// those. Keep the flaky set short and visible: a quarantined scenario is a debt,
+// never a place to bury a real failure.
+//
+// This comment said "the blocking step" until myne-md/myne#579, and on this lane
+// that was true: `e2e-web` was a blocking per-push gate. It is not one now. The
+// lane lives in `.woodpecker/e2e.yml`, runs on a manual trigger before a release
+// and on no push or pull request, so no change can go red on it either way.
 const quarantineOnly = process.env.MYNE_WEB_E2E_QUARANTINE === "1";
 
 function gate(isFlaky: boolean): typeof describe | typeof describe.skip {

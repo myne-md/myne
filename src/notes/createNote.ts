@@ -15,15 +15,43 @@
 import { invoke } from "../platform/core";
 import { buildInitialPlaintext } from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
+import { mutateDeliberateFolders } from "../lib/prefs";
 
 /**
- * Encrypt + atomically write a new `.myn` note. Returns the canonical
- * lowercase-hyphenated 36-char `NoteId` string.
+ * Encrypt + atomically write a new `.myn` note, and register the folder it lands
+ * in. Returns the canonical lowercase-hyphenated 36-char `NoteId`.
  *
  * Rejects with a `NoteCreateError` (see `src/types/note-create-error.ts`).
+ *
+ * **`folder` is required, and that is the fix rather than the signature**
+ * (myne-md/myne#613). At-fill first landed at the four surfaces somebody thought
+ * of, and the daily note, a note from a template, a folder note, a duplicate, a
+ * drawing and every template instantiation registered nothing, while decision
+ * 0541 claimed the rule for all of them. The unlock back-fill does not close it
+ * either: it walks LIVE notes, so a daily folder emptied by trashing every daily
+ * note stayed gone. A defaulted argument would have left the next create path
+ * silently unregistered too; a required one makes the compiler name every
+ * caller, which is `CLAUDE.md`'s own "a default is the arm that never fires".
+ *
+ * Pass `null` for the vault root, and for a BULK caller that issues its own
+ * single registration afterwards. Each prefs write re-encrypts the whole blob,
+ * so a hundred notes must not cost a hundred writes; the importer and the
+ * example-vault seeder pass `null` and say so at the call.
+ *
+ * The registration is fire-and-forget and ADD-only: it can never claim a
+ * removal, so the worst a failure costs is that the folder is not remembered
+ * yet, and never the note.
  */
-export async function noteCreate(plaintext: string): Promise<string> {
-  return await invoke<string>("plugin:notes|note_create", { plaintext });
+export async function noteCreate(
+  plaintext: string,
+  folder: string | null,
+): Promise<string> {
+  const id = await invoke<string>("plugin:notes|note_create", { plaintext });
+  const norm = normalizeFolderPath(folder);
+  if (norm !== null) {
+    void mutateDeliberateFolders({ add: [norm] }).catch(() => {});
+  }
+  return id;
 }
 
 /**
@@ -39,5 +67,6 @@ export async function noteCreate(plaintext: string): Promise<string> {
  * stays dialect-blind: it receives this as opaque plaintext.
  */
 export async function createNote(folder: string | null = null): Promise<string> {
-  return await noteCreate(buildInitialPlaintext(normalizeFolderPath(folder)));
+  const norm = normalizeFolderPath(folder);
+  return await noteCreate(buildInitialPlaintext(norm), norm);
 }

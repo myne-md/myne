@@ -15,6 +15,7 @@ import {
 import { HAS_TAURI, closeApp } from "../../lib/app-window";
 import { unlockWithPassword } from "../../lib/commands";
 import { deleteVault } from "../../lib/vault-delete";
+import { soleVaultId } from "../../lib/vault-list";
 import {
   quickUnlockStatus,
   quickUnlockWithPin,
@@ -507,8 +508,37 @@ export function UnlockFlow(props: UnlockFlowProps) {
     setDeleting(true);
     setDeleteFailed(false);
     try {
+      // Required target since myne-md/myne#476. The flow normally receives the
+      // chosen vault's id from the stage; the single-vault entry that carries
+      // none resolves the sole vault from disk. At ≥2 vaults with no id there
+      // is no unambiguous answer, so refuse rather than erase a guess, the
+      // same contract `src/screens/Unlock.tsx` has held since #250. The
+      // parameter used to be optional and this call passed a possibly-undefined
+      // prop straight through; the backend would have rejected it, but as a
+      // deserialization error dressed as a delete failure.
+      const target = vaultId ?? (await soleVaultId());
+      if (target == null) {
+        // Refuse, and refuse QUIETLY, which is the desktop shape
+        // (`src/screens/Unlock.tsx` dispatches `delete-vault-bug-canary`: it
+        // clears in-flight, shows no banner and leaves the form usable).
+        //
+        // The first version of this branch set `deleteFailed`, and that is the
+        // TERMINAL partial-delete state: it makes the sheet undismissable,
+        // unmounts Cancel, renders "Some files couldn't be removed. The vault is
+        // no longer usable." and leaves one button that calls
+        // `onDeleteVaultSuccess`. Nothing had been deleted. Telling a user their
+        // vault is destroyed when it is intact, with no way back to the unlock
+        // form, is a worse failure than the ambiguous target it was reporting.
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[UnlockFlow] vault_delete refused: ambiguous target");
+        }
+        setDeleting(false);
+        setConfirmingDelete(false);
+        return;
+      }
       if (HAS_TAURI) {
-        await deleteVault(vaultId);
+        await deleteVault(target);
       } else {
         await new Promise((r) => setTimeout(r, 350));
       }

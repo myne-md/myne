@@ -31,7 +31,19 @@ let load: Loader = async () => {
     startOnLoad: false,
     securityLevel: "strict", // sanitize + no click/script in diagrams
     htmlLabels: false, // no raw-HTML labels
-    fontFamily: "inherit",
+    // NOT `inherit` (myne-md/myne#629). `mermaid.render(id, code)` is called
+    // with no container, and in that branch mermaid appends its temp div to
+    // `document.body` and passes it NO font-family. The container branch four
+    // lines above it in mermaid's own source does pass one. So `inherit`
+    // resolved against `document.body` (--font-sans at --text-base) while the
+    // finished SVG is displayed inside `.cm-editor` (--editor-font-family, mono
+    // by default, at --editor-text-size). Every `getBBox()` in the dagre layout
+    // was therefore taken against a font the diagram is never drawn in, and the
+    // labels overran the boxes measured for them. A `:root` custom property has
+    // one value in every context in the document, so naming the token directly
+    // makes measurement and display agree by construction rather than by both
+    // happening to sit under the same ancestor.
+    fontFamily: "var(--font-sans)",
     // The diagram renders on a fixed-light card (`.cm-mermaid-card`, theme.ts;
     // and the export's `.mermaid-diagram`, print-stylesheet.ts) so it reads on
     // either editor theme AND in the light HTML/PDF export. We pin the FULL light
@@ -42,7 +54,7 @@ let load: Loader = async () => {
     // every node class so a flowchart reads identically in-editor and in export.
     theme: "default",
     themeVariables: {
-      fontFamily: "inherit",
+      fontFamily: "var(--font-sans)",
       background: "#fbfbfa",
       edgeLabelBackground: "#fbfbfa",
       textColor: "#1a1a17",

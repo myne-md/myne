@@ -17,6 +17,16 @@
 //
 // All visible text is set via `textContent` (never `innerHTML`) per TB2.
 
+import {
+  decodedAspectOf,
+  rememberAspect,
+} from "./decoded-aspect";
+import {
+  isCurrentGeneration,
+  previewCache,
+  previewInFlight,
+  sessionGeneration,
+} from "./session-caches";
 import { type EditorView, WidgetType } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
 import { getHost } from "../host";
@@ -39,8 +49,11 @@ import { buildOverflowMenu, type OverflowAction, type OverflowRow } from "./acti
 import {
   type DroppedEmbedSegment,
   type EmbedLayout,
+  embedAccessibleName,
+  embedWidthCss,
   emptyEmbedLayout,
   isAliasSafeText,
+  MAX_EMBED_DIMENSION_PX,
   sameEmbedLayout,
 } from "@myne/dialect/embedLayout";
 import {
@@ -50,6 +63,7 @@ import {
   setAlt,
   toggleAlign,
   toggleWidthPercent,
+  setWidthPx,
   toggleWidthPx,
   updateEmbedLayout,
 } from "./embedLayoutActions";
@@ -85,12 +99,7 @@ const FRAME_WIDTH = 320;
  * value that reaches here; this is defence in depth, not the only defence.
  */
 function applyEmbedLayout(frame: HTMLElement, layout: EmbedLayout): void {
-  const width =
-    layout.widthPx !== null
-      ? `${layout.widthPx}px`
-      : layout.widthPercent !== null
-        ? `${layout.widthPercent}%`
-        : null;
+  const width = embedWidthCss(layout);
   if (width !== null) {
     frame.style.width = width;
     frame.style.maxWidth = "100%";
@@ -131,10 +140,25 @@ function sameDroppedSegments(
  * loud marker would read as damage.
  */
 
-function buildDroppedSegmentMarker(
+/**
+ * Append the §3.9.3 marker to `host`, or nothing when there is nothing to
+ * report.
+ *
+ * The emptiness test lives HERE rather than at each of the six call sites, and
+ * that is the whole reason this takes a host instead of returning an element.
+ * Reporting a dropped segment is two remembered halves per widget, taking the
+ * list through the constructor and appending the marker in `toDOM`, and four of
+ * the six widgets shipped having done the first and not the second. A call site
+ * that forgets `if (dropped.length > 0)` renders an empty marker, which is a
+ * visible defect; a call site that forgets the whole block renders nothing,
+ * which is invisible. One call, one thing to remember.
+ */
+function appendDroppedSegmentMarker(
+  host: HTMLElement,
   dropped: readonly DroppedEmbedSegment[],
   testidPrefix: string,
-): HTMLElement {
+): void {
+  if (dropped.length === 0) return;
   const mark = document.createElement("span");
   mark.className = "cm-attachment-embed-warning";
   mark.setAttribute("data-testid", `${testidPrefix}.unreadable`);
@@ -147,7 +171,7 @@ function buildDroppedSegmentMarker(
   mark.setAttribute("role", "img");
   mark.setAttribute("aria-label", label);
   mark.title = label;
-  return mark;
+  host.appendChild(mark);
 }
 
 /**
@@ -178,14 +202,14 @@ function applyEmbedAltText(
   frame.removeAttribute("role");
   frame.removeAttribute("aria-label");
 
-  if (layout.alt === "") {
+  const { name, decorative } = embedAccessibleName(layout, filename);
+  if (decorative) {
     // Decorative: hide the media, keep the frame and everything inside it.
     media.setAttribute("alt", "");
     media.setAttribute("role", "presentation");
     media.removeAttribute("aria-label");
     return;
   }
-  const name = layout.alt ?? filename;
   media.setAttribute("alt", name);
   media.setAttribute("role", "img");
   media.setAttribute("aria-label", name);
@@ -197,6 +221,26 @@ export type TombstoneKind = "deleted" | "broken";
 
 // --- resolved raster / SVG -------------------------------------------------
 
+/**
+ * # The measurement the aspect cache exists for (myne-md/myne#604)
+ *
+ * Typing one character before a mid-line embed destroys and rebuilds the
+ * widget's DOM. Measured in Chromium against this exact widget: the frame's
+ * probe tag changes from one render to the next, while an embed alone on its
+ * own line keeps its tag and its DOM. `eq()` is correct and does not prevent it;
+ * CodeMirror rebuilds a line's content when that line's text changes.
+ *
+ * Each rebuild restarts `toDOM`, which used to hide the `<img>` until its `load`
+ * fired, so the frame collapsed from 240px to 31px and sprang back a frame
+ * later. That is the flash, and with the document scrolled it is also the jump:
+ * the content height moves under the scroll position.
+ *
+ * The store itself lives in `./decoded-aspect`, a leaf with no imports, because
+ * the vault-teardown paths have to clear it and importing THIS file to do that
+ * dragged the whole attachment-widget subtree into the app's eager graph. That
+ * file states the measurement.
+ */
+
 export class AttachmentImageWidget extends WidgetType {
   /** The object URL resolved at BUILD time. `eq()` is keyed on it so that when
    *  the host warms this id on web (pending placeholder → real blob URL, #211)
@@ -207,15 +251,55 @@ export class AttachmentImageWidget extends WidgetType {
   private readonly url: string;
   /** Tear-down for the body-mounted overflow menu: see the file card's. */
   private menuTeardown: (() => void) | null = null;
+  /** Tear-down for the drag-resize handles' window-level pointer listeners. */
+  private resizeTeardown: (() => void) | null = null;
 
   constructor(
     private readonly id: string,
     private readonly filename: string,
-    private readonly layout: EmbedLayout = emptyEmbedLayout(),
-    private readonly dropped: readonly DroppedEmbedSegment[] = [],
+    private readonly layout: EmbedLayout,
+    private readonly dropped: readonly DroppedEmbedSegment[],
+    /** Whether this embed is drawn as a whole-line block. Only the block form
+     *  carries resize handles: an inline embed has no stable edge to grab (the
+     *  line reflows around it as it grows) and dragging inside a line box is
+     *  indistinguishable from a text selection. Part of `eq()` because a source
+     *  edit can move an embed between the two forms, and the handles have to
+     *  follow it. */
+    /*
+     * REQUIRED, deliberately. A default here is the shape the root CLAUDE.md
+     * records as an opt-in guard: a call site that forgets the argument gets
+     * `false`, which is a valid inline embed with no resize handles, and `eq()`
+     * then compares `false === false`, so nothing rebuilds to tell anyone.
+     * Making it required is what lets the compiler name every site instead.
+     */
+    private readonly block: boolean,
   ) {
     super();
     this.url = attachmentUrl(id);
+  }
+
+  /**
+   * Height before the first draw, so CM's height map does not discover the real
+   * one as a surprise mutation mid-scroll. Same job as the text preview's
+   * further down this file, which this widget had no counterpart to: a block
+   * embed scrolled out and back was estimated at a line's height and corrected
+   * on measure, which is the jump the aspect reservation removes for a REBUILD
+   * and did nothing for a re-entry.
+   *
+   * Answered only when it can be answered exactly. An explicit `h=` is the
+   * height. Otherwise a known decoded ratio plus a known width gives it, and
+   * `decodedAspectOf` is undefined until this vault has drawn this image once,
+   * which is the same condition the box reservation keys off. A percentage
+   * width depends on the content column, which is not readable from here, so
+   * that case returns -1 and lets CM guess rather than inventing a number: a
+   * wrong estimate is worse than none, since CM trusts it until it measures.
+   */
+  get estimatedHeight(): number {
+    if (this.layout.heightPx !== null) return this.layout.heightPx;
+    const aspect = decodedAspectOf(this.id);
+    if (aspect === undefined || aspect <= 0) return -1;
+    if (this.layout.widthPercent !== null) return -1;
+    return Math.round((this.layout.widthPx ?? FRAME_WIDTH) / aspect);
   }
 
   eq(other: AttachmentImageWidget): boolean {
@@ -223,6 +307,7 @@ export class AttachmentImageWidget extends WidgetType {
       other.id === this.id &&
       other.filename === this.filename &&
       other.url === this.url &&
+      other.block === this.block &&
       // Without this the widget survives a layout edit unchanged: CM6 keeps the
       // old DOM whenever eq() says the rebuild matches.
       sameEmbedLayout(other.layout, this.layout) &&
@@ -241,8 +326,14 @@ export class AttachmentImageWidget extends WidgetType {
 
     // Clean progress chip ("Loading…") until the first decrypt+decode paints —
     // NOT the struck/tombstone style. Removed once the <img> fires `load`.
-    const loading = makeProgressChip("loading");
-    frame.appendChild(loading);
+    //
+    // Only on a FIRST paint (myne-md/myne#604). Once this id's shape is known
+    // the box is reserved below and the image arrives into it, so a chip would
+    // be a second thing flashing in a space that is no longer empty. The whole
+    // point of the reservation is that a rebuild looks like nothing happened.
+    const knownAspect = decodedAspectOf(this.id);
+    const loading = knownAspect === undefined ? makeProgressChip("loading") : null;
+    if (loading !== null) frame.appendChild(loading);
 
     const img = document.createElement("img");
     img.className = "cm-attachment-img";
@@ -266,16 +357,29 @@ export class AttachmentImageWidget extends WidgetType {
     if (this.layout.heightPx !== null) {
       img.style.height = `${this.layout.heightPx}px`;
     }
-    // Hidden until decoded so the progress chip is the only thing visible while
-    // the bytes decrypt; swap on load (or drop the chip on error so a genuine
-    // broken-image affordance still surfaces).
-    img.style.display = "none";
+    // The box is reserved from the remembered ratio, so the image occupies its
+    // final height from the first frame and a rebuild is invisible
+    // (myne-md/myne#604). `aspect-ratio` rather than a pixel height because the
+    // width is the layout's to decide: `w=`, the 320px default cap, or the
+    // aligned `fit-content` form. Only the height follows from the image.
+    //
+    // On a FIRST paint the ratio is unknown, so the old behaviour stands: hide
+    // the `<img>` and show the chip, because an unhidden zero-size image next to
+    // a chip is two placeholders for one thing. That first settle is the one
+    // jump left, and it is unavoidable while `CatalogRow` carries no dimensions
+    // (`editor/src/host.ts`).
+    if (knownAspect !== undefined && this.layout.heightPx === null) {
+      img.style.aspectRatio = String(knownAspect);
+    } else if (knownAspect === undefined) {
+      img.style.display = "none";
+    }
     img.addEventListener("load", () => {
+      rememberAspect(this.id, img);
       img.style.display = "";
-      loading.remove();
+      loading?.remove();
     });
     img.addEventListener("error", () => {
-      loading.remove();
+      loading?.remove();
     });
     // Click the rendered image → full-size lightbox preview (same decrypted
     // source). Cursor + title hint the affordance.
@@ -287,20 +391,28 @@ export class AttachmentImageWidget extends WidgetType {
     });
     frame.appendChild(img);
 
-    if (this.dropped.length > 0) frame.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-image"));
+    appendDroppedSegmentMarker(frame, this.dropped, "attachment-image");
 
     const menu = buildEmbedOverflowMenu(view, frame, this.id, this.filename, this.dropped, "attachment-image");
     this.menuTeardown = menu.teardown;
     frame.appendChild(menu.wrap);
 
+    // Drag-to-resize, on the block form only (myne-md/myne#604). See
+    // `appendResizeHandles` for why the inline form gets none.
+    this.resizeTeardown = appendResizeHandles(view, frame, img, this.id, this.block);
+
     return frame;
   }
 
   // If CM6 discards the widget while its menu is open, tear the menu down so its
-  // document `mousedown` listener cannot outlive the DOM.
+  // document `mousedown` listener cannot outlive the DOM. Same for a resize
+  // drag: it holds window-level `pointermove`/`pointerup` listeners, and a
+  // keystroke elsewhere rebuilds this widget mid-drag (measured, myne#604).
   destroy(): void {
     this.menuTeardown?.();
     this.menuTeardown = null;
+    this.resizeTeardown?.();
+    this.resizeTeardown = null;
   }
 
   // Let the click reach the <img> handler (lightbox) rather than being
@@ -542,8 +654,8 @@ export class AttachmentPdfWidget extends WidgetType {
   constructor(
     private readonly id: string,
     private readonly filename: string,
-    private readonly layout: EmbedLayout = emptyEmbedLayout(),
-    private readonly dropped: readonly DroppedEmbedSegment[] = [],
+    private readonly layout: EmbedLayout,
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -625,7 +737,7 @@ export class AttachmentPdfWidget extends WidgetType {
       },
     });
 
-    if (this.dropped.length > 0) frame.appendChild(buildDroppedSegmentMarker(this.dropped, "attachment-pdf"));
+    appendDroppedSegmentMarker(frame, this.dropped, "attachment-pdf");
 
     const menu = buildEmbedOverflowMenu(view, frame, this.id, this.filename, this.dropped, "attachment-pdf");
     this.menuTeardown = menu.teardown;
@@ -758,6 +870,10 @@ export class AttachmentFileCardWidget extends WidgetType {
     private readonly id: string,
     private readonly filename: string,
     private readonly size: number,
+    /** Segments the author wrote that this version could not read
+     *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
+     *  just the media ones (myne-md/myne#518). */
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
   }
@@ -766,7 +882,8 @@ export class AttachmentFileCardWidget extends WidgetType {
     return (
       other.id === this.id &&
       other.filename === this.filename &&
-      other.size === this.size
+      other.size === this.size &&
+      sameDroppedSegments(other.dropped, this.dropped)
     );
   }
 
@@ -821,6 +938,7 @@ export class AttachmentFileCardWidget extends WidgetType {
     );
     this.menuTeardown = menu.teardown;
     card.appendChild(menu.wrap);
+    appendDroppedSegmentMarker(card, this.dropped, "attachment-file");
     return card;
   }
 
@@ -860,6 +978,10 @@ export class AttachmentAudioWidget extends WidgetType {
   constructor(
     private readonly id: string,
     private readonly filename: string,
+    /** Segments the author wrote that this version could not read
+     *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
+     *  just the media ones (myne-md/myne#518). */
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -869,7 +991,8 @@ export class AttachmentAudioWidget extends WidgetType {
     return (
       other.id === this.id &&
       other.filename === this.filename &&
-      other.url === this.url
+      other.url === this.url &&
+      sameDroppedSegments(other.dropped, this.dropped)
     );
   }
 
@@ -897,6 +1020,7 @@ export class AttachmentAudioWidget extends WidgetType {
     // (rename/export still use the full filename).
     name.textContent = stripFileExtension(this.filename);
     root.appendChild(name);
+    appendDroppedSegmentMarker(root, this.dropped, "attachment-audio");
 
     // Middle row: play button + waveform track + overflow menu, vertically
     // centered together (the play button aligns with the waveform line).
@@ -1193,6 +1317,10 @@ export class AttachmentVideoWidget extends WidgetType {
     private readonly id: string,
     private readonly filename: string,
     private readonly size: number,
+    /** Segments the author wrote that this version could not read
+     *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
+     *  just the media ones (myne-md/myne#518). */
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
     this.url = attachmentUrl(id);
@@ -1203,7 +1331,8 @@ export class AttachmentVideoWidget extends WidgetType {
       other.id === this.id &&
       other.filename === this.filename &&
       other.size === this.size &&
-      other.url === this.url
+      other.url === this.url &&
+      sameDroppedSegments(other.dropped, this.dropped)
     );
   }
 
@@ -1283,7 +1412,17 @@ export class AttachmentVideoWidget extends WidgetType {
       if (swapped) return;
       swapped = true;
       this.teardown?.(); // pause + release the buffer + tear the video menu down
-      const fallback = new AttachmentFileCardWidget(this.id, this.filename, this.size);
+      // `this.dropped` is threaded through rather than dropped: the swap does
+      // `frame.replaceChildren(card)` below, which removes the marker this
+      // widget appended, so a video that carries an unreadable segment AND
+      // fails to decode would lose its §3.9.3 report entirely. The compiler
+      // named this site the moment the parameter stopped having a default.
+      const fallback = new AttachmentFileCardWidget(
+        this.id,
+        this.filename,
+        this.size,
+        this.dropped,
+      );
       const card = fallback.toDOM(view);
       frame.classList.remove("cm-attachment-frame", "cm-attachment-video");
       frame.removeAttribute("role");
@@ -1294,6 +1433,7 @@ export class AttachmentVideoWidget extends WidgetType {
       this.teardown = () => fallback.destroy();
     });
 
+    appendDroppedSegmentMarker(frame, this.dropped, "attachment-video");
     return frame;
   }
 
@@ -1405,12 +1545,12 @@ const PREVIEW_GRID_MAX_COLS = 256;
 /** One decrypt round trip's outcome. An error is an outcome too: a failing
  *  read degrades to the file-card once instead of re-issuing an IPC every time
  *  the embed scrolls back into view. */
-type PreviewOutcome =
+export type PreviewOutcome =
   | { kind: "text"; text: string; truncated: boolean }
   | { kind: "structured"; content: StructuredPreview }
   | { kind: "error" };
 
-interface PreviewCacheEntry {
+export interface PreviewCacheEntry {
   outcome: PreviewOutcome;
   /** Last measured card height (px) — feeds `estimatedHeight` so a widget
    *  re-entering the viewport is laid out at its real height immediately. */
@@ -1422,13 +1562,16 @@ interface PreviewCacheEntry {
  *  `ATTACHMENT_TEXT_PREVIEW_CAP`), so worst-case retention stays modest. */
 const PREVIEW_CACHE_MAX = 24;
 
-/** LRU-ish preview cache keyed by {@link previewCacheKey}: `Map` iterates in
- *  insertion order, a hit re-inserts, overflow evicts the oldest. */
-const previewCache = new Map<string, PreviewCacheEntry>();
-
-/** In-flight de-dup: concurrent `toDOM` for the same attachment (the same file
- *  embedded twice, or a rebuild racing a slow read) share ONE IPC round trip. */
-const previewInFlight = new Map<string, Promise<PreviewOutcome>>();
+// The two maps live in `./session-caches`, a leaf with no imports, because the
+// vault-leaving paths have to clear them and reaching into THIS file to do that
+// puts the whole attachment-widget subtree into the app's eager bundle graph.
+// The key derivation, the LRU eviction and the in-flight de-dup below are still
+// this file's; only the containers moved. `session-caches.ts` states why.
+//
+// LRU-ish: `Map` iterates in insertion order, a hit re-inserts, overflow evicts
+// the oldest. The in-flight map lets concurrent `toDOM` for the same attachment
+// (the same file embedded twice, or a rebuild racing a slow read) share ONE IPC
+// round trip.
 
 /** Cache key: attachment id + preview tier (the structured kinds parse
  *  differently from the raw-text tier, so they cache separately). */
@@ -1467,9 +1610,15 @@ function fetchPreviewOutcome(
 ): Promise<PreviewOutcome> {
   let inflight = previewInFlight.get(key);
   if (inflight === undefined) {
+    // Captured at ISSUE, compared before the write. A lock or a vault switch
+    // between the two bumps the generation, and the outcome is then returned to
+    // this caller (whose widget is about to be torn down anyway) without ever
+    // reaching the module-scope cache. Clearing the map cannot do this: the
+    // closure below already holds `key` and writes straight into `previewCache`.
+    const issuedAt = sessionGeneration();
     inflight = read().then((outcome) => {
       previewInFlight.delete(key);
-      previewCachePut(key, outcome);
+      if (isCurrentGeneration(issuedAt)) previewCachePut(key, outcome);
       return outcome;
     });
     previewInFlight.set(key, inflight);
@@ -1501,12 +1650,21 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     private readonly id: string,
     private readonly filename: string,
     private readonly size: number,
+    /** Segments the author wrote that this version could not read
+     *  (`markdown-dialect.md` §3.9.3). Reported on every resolved embed, not
+     *  just the media ones (myne-md/myne#518). */
+    private readonly dropped: readonly DroppedEmbedSegment[],
   ) {
     super();
   }
 
   eq(other: AttachmentTextPreviewWidget): boolean {
-    return other.id === this.id && other.filename === this.filename && other.size === this.size;
+    return (
+      other.id === this.id &&
+      other.filename === this.filename &&
+      other.size === this.size &&
+      sameDroppedSegments(other.dropped, this.dropped)
+    );
   }
 
   // Height estimate BEFORE the first draw, so CM's height map doesn't discover
@@ -1673,6 +1831,7 @@ export class AttachmentTextPreviewWidget extends WidgetType {
       this.resizeObserver.observe(card);
     }
 
+    appendDroppedSegmentMarker(card, this.dropped, "attachment-text");
     return card;
   }
 
@@ -1762,31 +1921,49 @@ export class AttachmentTextPreviewWidget extends WidgetType {
  *  takes the export-only file-card path. */
 export function makeResolvedWidget(
   row: CatalogRow,
-  layout: EmbedLayout = emptyEmbedLayout(),
-  dropped: readonly DroppedEmbedSegment[] = [],
+  layout: EmbedLayout,
+  dropped: readonly DroppedEmbedSegment[],
+  /** Whether the caller is drawing this embed as a whole-line block. Only the
+   *  image widget reads it today, to decide whether to carry drag-resize handles
+   *  (myne-md/myne#604); the other five ignore it. Threaded through here rather
+   *  than read from the DOM because the widget is constructed before it has any.
+   *
+   *  Required, not defaulted to the inline arm. A default here would answer for
+   *  every future caller in the direction that draws no handles, which is the
+   *  shape `CLAUDE.md` records under "a guard parameter with a default value is
+   *  an opt-in guard": the arm that never fires is the one a new call site
+   *  silently takes. Both builders state their form. */
+  block: boolean,
 ): WidgetType {
-  // Only the media widgets take a layout today. A file card, an audio player
-  // and a text preview have no meaningful width/alignment story yet, and giving
-  // them one silently would be a feature nobody specified.
+  // `layout` is media-only and `dropped` is NOT, and the two used to travel
+  // together as if they were one thing (myne-md/myne#518). A file card, an audio
+  // player and a text preview have no meaningful width/alignment story yet, so
+  // giving them a layout silently would be a feature nobody specified. A dropped
+  // SEGMENT is a different fact: it says the author wrote a known key with a
+  // value this version could not read, and that is worth telling them whatever
+  // the attachment turns out to be. `markdown-dialect.md` §3.9.3 asks for the
+  // marker without scoping it to a media type, and four of the six widgets took
+  // the list and discarded it, so a bad segment on an audio embed was reported
+  // nowhere at all.
   if (row.contentType === "application/pdf") {
     return new AttachmentPdfWidget(row.id, row.filename, layout, dropped);
   }
   if (isRenderableImageType(row.contentType)) {
-    return new AttachmentImageWidget(row.id, row.filename, layout, dropped);
+    return new AttachmentImageWidget(row.id, row.filename, layout, dropped, block);
   }
   if (isPlayableAudioType(row.contentType)) {
-    return new AttachmentAudioWidget(row.id, row.filename);
+    return new AttachmentAudioWidget(row.id, row.filename, dropped);
   }
   if (isPlayableVideoType(row.contentType)) {
-    return new AttachmentVideoWidget(row.id, row.filename, row.size);
+    return new AttachmentVideoWidget(row.id, row.filename, row.size, dropped);
   }
   // Generic with a previewable extension → inline read-only preview (Tier-1
   // text/code/csv, or Tier-2 Rust-parsed docx/xlsx).
   if (isPreviewableTextFile(row.filename) || isPreviewableStructuredFile(row.filename)) {
-    return new AttachmentTextPreviewWidget(row.id, row.filename, row.size);
+    return new AttachmentTextPreviewWidget(row.id, row.filename, row.size, dropped);
   }
   // Otherwise generic / non-renderable → export-only file-card.
-  return new AttachmentFileCardWidget(row.id, row.filename, row.size);
+  return new AttachmentFileCardWidget(row.id, row.filename, row.size, dropped);
 }
 
 /** The raster/SVG content-types the `attachment://` handler serves inline. */
@@ -1808,4 +1985,169 @@ function isPlayableAudioType(contentType: string): boolean {
  *  would still degrade gracefully via the widget's error→file-card fallback.) */
 function isPlayableVideoType(contentType: string): boolean {
   return contentType === "video/mp4" || contentType === "video/webm";
+}
+
+/** Narrowest a drag may leave an image. Below this the handles overlap each
+ *  other and there is nothing left to grab to undo the drag. */
+const MIN_RESIZE_PX = 80;
+
+/**
+ * Notion-style drag-to-resize: a bar on the right edge and a grip at the
+ * bottom-right corner (myne-md/myne#604).
+ *
+ * # Block only
+ *
+ * An inline embed gets none, and that is not a shortcut. Its box sits in a line
+ * box that reflows around it as it grows, so the edge you grabbed moves under
+ * the pointer mid-drag; and a press-and-drag inside a line is how a text
+ * selection starts, so the two gestures would compete on the same pixels. The
+ * block form has a stable right edge and nothing else claims a horizontal drag
+ * there.
+ *
+ * # What it writes
+ *
+ * `w=<px>`, through `updateEmbedLayout`, which `embedLayoutActions.ts` names as
+ * the only authoring path for the layout segments. The drag itself only moves
+ * CSS; the document is touched ONCE, on release, so a drag is one undo step
+ * rather than one per frame.
+ *
+ * # Why the listeners are on the window
+ *
+ * A pointer leaves the handle almost immediately once a drag starts. The
+ * teardown is handed back to the widget rather than left to a `pointerup` that
+ * may never arrive at this element: a keystroke elsewhere in the document
+ * rebuilds this widget's DOM mid-drag, which is measured behaviour, and a
+ * listener whose element is gone is a leak that keeps resizing a detached node.
+ */
+function appendResizeHandles(
+  view: EditorView,
+  frame: HTMLElement,
+  img: HTMLImageElement,
+  id: string,
+  block: boolean,
+): (() => void) | null {
+  if (!block) return null;
+  let disposeDrag: (() => void) | null = null;
+
+  const startDrag = (event: PointerEvent, axis: "x" | "both"): void => {
+    // Dispose any drag still live before starting another. A second
+    // `pointerdown` on the other handle used to overwrite `disposeDrag`
+    // outright, orphaning the first drag's window listeners: the widget's
+    // `destroy()` disposes only the last one, and this function's own
+    // docstring names that exact leak as the reason the teardown is handed
+    // back at all.
+    disposeDrag?.();
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const box = img.getBoundingClientRect();
+    const startWidth = box.width;
+    const startHeight = box.height;
+    // The content column is the ceiling: a width past it would be clipped by the
+    // editor rather than honoured, so the handle would keep moving while nothing
+    // changed on screen.
+    const maxWidth = Math.max(
+      MIN_RESIZE_PX,
+      Math.min(view.contentDOM.getBoundingClientRect().width, MAX_EMBED_DIMENSION_PX),
+    );
+    let width = startWidth;
+    // Only the corner grip writes a height. The edge bar leaves it alone, so a
+    // width-only drag keeps the image's own proportions, which is what an edge
+    // handle means everywhere else. `null` here is "unchanged", not "cleared".
+    let height: number | null = null;
+    frame.classList.add("cm-attachment-resizing");
+    // Written once rather than on every move: it does not change during a drag,
+    // and a pointer sending coalesced events writes style faster than the
+    // browser paints.
+    //
+    // BOTH caps come off, not just the image's. The image is a flex child of
+    // `.cm-attachment-frame`, and the theme caps that frame at 320px, so
+    // lifting only the image left the frame holding the real ceiling. On an
+    // embed with no `w=` segment, which is every image at its default size and
+    // precisely what this gesture is for, the drag then showed no growth at
+    // all: the width climbed toward the content column while nothing on screen
+    // moved, the handle detached from the pointer, and the size jumped only
+    // once `pointerup` wrote the layout and the rebuilt widget took
+    // `applyEmbedLayout`'s path. That path lifts the frame too, but only when a
+    // width is already set, which by definition it is not here.
+    const framePreDragMaxWidth = frame.style.maxWidth;
+    frame.style.maxWidth = "100%";
+    img.style.maxWidth = "100%";
+    // Style writes are coalesced into one per frame. A fast pointer delivers
+    // more `pointermove` events than there are frames, and each one used to be
+    // its own layout write.
+    let frameRequest = 0;
+    const paint = (): void => {
+      frameRequest = 0;
+      img.style.width = `${width}px`;
+      if (height !== null) img.style.height = `${height}px`;
+    };
+
+    const onMove = (e: PointerEvent): void => {
+      width = Math.round(
+        Math.min(maxWidth, Math.max(MIN_RESIZE_PX, startWidth + (e.clientX - startX))),
+      );
+      if (axis === "both") {
+        height = Math.round(
+          Math.min(
+            MAX_EMBED_DIMENSION_PX,
+            Math.max(MIN_RESIZE_PX, startHeight + (e.clientY - startY)),
+          ),
+        );
+      }
+      if (frameRequest === 0) frameRequest = requestAnimationFrame(paint);
+    };
+
+    const onUp = (): void => {
+      cleanup();
+      const movedWidth = Math.round(width) !== Math.round(startWidth);
+      const movedHeight = height !== null && Math.round(height) !== Math.round(startHeight);
+      if (!movedWidth && !movedHeight) return; // a click, not a drag
+      updateEmbedLayout(view, frame, id, (current) => ({
+        ...current,
+        ...setWidthPx(width),
+        // An explicit height is aspect distortion on purpose, which is what the
+        // widget's own comment says `h=` means and what dragging a corner asks
+        // for. The edge bar never reaches here, so a width-only drag leaves
+        // whatever height the author had (usually none).
+        ...(height !== null ? { heightPx: height } : {}),
+      }));
+    };
+
+    const cleanup = (): void => {
+      if (frameRequest !== 0) cancelAnimationFrame(frameRequest);
+      frameRequest = 0;
+      frame.classList.remove("cm-attachment-resizing");
+      // Put the frame's own cap back. On the commit path the rebuilt widget
+      // sets it again from the layout; on an ABANDONED drag (pointercancel, or
+      // a release that moved nothing) nothing rebuilds, so without this the
+      // embed would silently keep an uncapped frame for the rest of the
+      // session.
+      frame.style.maxWidth = framePreDragMaxWidth;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", cleanup);
+      disposeDrag = null;
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", cleanup);
+    disposeDrag = cleanup;
+  };
+
+  for (const spec of [
+    { cls: "cm-attachment-resize-e", axis: "x" as const, testid: "attachment-image.resize-e" },
+    { cls: "cm-attachment-resize-se", axis: "both" as const, testid: "attachment-image.resize-se" },
+  ]) {
+    const handle = document.createElement("span");
+    handle.className = `cm-attachment-resize ${spec.cls}`;
+    handle.setAttribute("data-testid", spec.testid);
+    handle.setAttribute("aria-hidden", "true");
+    handle.addEventListener("pointerdown", (e) => startDrag(e, spec.axis));
+    frame.appendChild(handle);
+  }
+
+  return () => disposeDrag?.();
 }

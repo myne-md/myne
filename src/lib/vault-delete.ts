@@ -36,6 +36,7 @@
 // MYND-108-bis.
 
 import { invoke } from "../platform/core";
+import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import { has as hasCapability } from "../platform/capabilities";
 import { appDataDir, join } from "../platform/path";
 import type { VaultDeleteError } from "../types/vault-delete-error";
@@ -244,5 +245,13 @@ export async function deleteVault(vaultId: string): Promise<void> {
   // best-effort disk cache happened to name. Making it required moves that
   // class of mistake to compile time, which is why the type is `string` and
   // not `string | undefined`.
+  // The ambient date/time DISPLAY store, on the one leaving path that reaches
+  // neither `lockVault` nor `leaveActiveVault`. It is module scope in
+  // `@myne/editor` and holds the reader's formats and TIME ZONE, all derived
+  // from the decrypted prefs of the vault being ERASED, so without this they
+  // stay resident afterwards, still deciding what counts as "today" for whatever
+  // the app shows next. `myne-core` drops its half in `vault_delete`; this is
+  // the WebView half (myne-md/myne#609, found in review).
+  resetDateTimeDisplayForLock();
   await invoke<void>("plugin:vault-delete|vault_delete", { vaultId });
 }

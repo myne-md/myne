@@ -16,6 +16,8 @@ import type { ReactNode } from "react";
 
 // ── IPC-boundary module mocks ──────────────────────────────────────────────
 const createNote = vi.fn();
+const mutateDeliberateFolders = vi.fn();
+const prefsRead = vi.fn();
 const deleteNote = vi.fn();
 const deleteNoteRouted = vi.fn();
 const trashNote = vi.fn();
@@ -32,6 +34,14 @@ const hydrateVaultIndicesOnUnlock = vi.fn();
 
 vi.mock("../../src/notes/createNote", () => ({
   createNote: (...a: unknown[]) => createNote(...a),
+}));
+// myne-md/myne#613: the create path registers the folder it just filled, so the
+// write has to be observable here. `prefsRead` and `normalizeNewNoteLocation`
+// come along because the same module supplies the new-note-location fallback.
+vi.mock("../../src/lib/prefs", () => ({
+  mutateDeliberateFolders: (...a: unknown[]) => mutateDeliberateFolders(...a),
+  prefsRead: (...a: unknown[]) => prefsRead(...a),
+  normalizeNewNoteLocation: (v: unknown) => v,
 }));
 vi.mock("../../src/notes/deleteNote", () => ({
   deleteNote: (...a: unknown[]) => deleteNote(...a),
@@ -113,11 +123,18 @@ beforeEach(() => {
     reindexNote,
     vaultIndicesRemove,
     hydrateVaultIndicesOnUnlock,
+    mutateDeliberateFolders,
+    prefsRead,
   ]) {
     m.mockReset();
   }
   loadNoteBatch.mockResolvedValue([]);
   reindexNote.mockResolvedValue(undefined);
+  // The create path registers the folder it filled (myne-md/myne#613). It is
+  // fire-and-forget, so the spy must still return a promise or the .catch()
+  // throws inside the caller.
+  mutateDeliberateFolders.mockResolvedValue(0);
+  prefsRead.mockResolvedValue({ new_note_location: null });
   vaultIndicesRemove.mockResolvedValue(undefined);
   hydrateVaultIndicesOnUnlock.mockResolvedValue(undefined);
 });
@@ -178,6 +195,35 @@ describe("useSelectedNote — create", () => {
     });
     expect(createNote).toHaveBeenCalledWith("Daily/");
     expect(loadNoteBatch).toHaveBeenCalledWith(["f-id"]);
+  });
+
+  it("hands the resolved folder to the create, which is what registers it", async () => {
+    // The registration itself moved to `noteCreate`, the chokepoint every create
+    // path shares (myne-md/myne#613 pr-review), and it is asserted there, in
+    // `tests/notes/createDeleteNote.test.ts`. `createNote` is mocked here, so
+    // what this file can still prove is the half it owns: the sidebar resolves a
+    // target and passes it down. Registering here TOO would be a second full
+    // `vault.prefs` re-encrypt for one note.
+    createNote.mockResolvedValue("f-id");
+    loadNoteBatch.mockResolvedValue([rec("f-id", { folder: "Daily/" })]);
+    const { result } = renderHook(() => useSelectedNote(), { wrapper });
+    await act(async () => {
+      await result.current.createAndStartRename("Daily/");
+    });
+    expect(createNote).toHaveBeenCalledWith("Daily/");
+    expect(mutateDeliberateFolders).not.toHaveBeenCalled();
+  });
+
+  it("a root create passes null down and registers nothing", async () => {
+    createNote.mockResolvedValue("r-id");
+    loadNoteBatch.mockResolvedValue([rec("r-id")]);
+    prefsRead.mockResolvedValue({ new_note_location: null });
+    const { result } = renderHook(() => useSelectedNote(), { wrapper });
+    await act(async () => {
+      await result.current.createAndStartRename(null);
+    });
+    expect(createNote).toHaveBeenCalledWith(null);
+    expect(mutateDeliberateFolders).not.toHaveBeenCalled();
   });
 });
 

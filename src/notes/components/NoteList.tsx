@@ -23,6 +23,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { viewsEnabled, VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
+import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import { noteRead } from "../readNote";
 import {
   archivedRecords,
@@ -49,15 +50,8 @@ import {
   normalizeFolderPath,
 } from "../../dialect/folderPath";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
-import {
-  noteExportOptions,
-  runNoteExportFlow,
-  runNoteHtmlExportFlow,
-  runNotePdfExportFlow,
-  runNoteTxtExportFlow,
-  type NoteExportUiHooks,
-} from "../exportFlow";
-import { has as hasCapability } from "../../platform/capabilities";
+import type { NoteExportUiHooks } from "../exportFlow";
+import { noteExportEntries } from "../noteExportMenu";
 import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
@@ -72,7 +66,7 @@ import {
 } from "../folderNote";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
-import { useWorkspace } from "../workspaceContext";
+import { isPanesNotSettled, panesNotSettledMessage, useWorkspace } from "../workspaceContext";
 import { IconButton } from "../../components/primitives/IconButton";
 import type { IconName } from "../../lib/icons";
 import { ViewsSection } from "./ViewsSection";
@@ -295,7 +289,24 @@ export async function executeRenameCommit(
   newTitle: string,
   ctx: Pick<UseSelectedNoteReturn, "commitRename">,
   read: (id: NoteId) => Promise<string> = noteRead,
+  flush: () => Promise<void> = flushBeforeFrontmatterWrite,
 ): Promise<void> {
+  // BEFORE the read, and the order is the defect rather than a preference.
+  // This is a read-patch-write against disk on a note that may be open and
+  // dirty in a pane, so it owes the same step every other writer of that class
+  // owes (`flushBeforeFrontmatterWrite`'s header). `commitRename` does flush,
+  // but only for INBOUND notes, over a `sources` list that explicitly filters
+  // out `args.renamedNoteId` (`renameInbound.ts`), so the renamed note's OWN
+  // dirty pane was never covered and the bytes read here were the pre-typing
+  // ones. What that cost: the stale body written under the new title, the
+  // dirty pane skipping its reload because `hasPendingWork()` is true, and its
+  // next autosave putting the pre-rename title back. The rename silently
+  // reverts, or, with the section 11.3 hash on, mints a keep-both conflict
+  // copy and drops the user's typing out of the open note.
+  //
+  // Injectable for the same reason `read` is: the test asserts the ORDER, and
+  // an order is not observable from a return value.
+  await flush();
   const currentBytes = await read(noteId);
   await ctx.commitRename(noteId, currentBytes, newTitle);
 }
@@ -592,7 +603,7 @@ const NEW_FOLDER_INPUT_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
-  background: "var(--paper-1)",
+  background: "var(--paper)",
   border: "1px solid var(--accent)",
   borderRadius: "var(--radius-1)",
   padding: "3px 6px",
@@ -602,7 +613,7 @@ const NEW_FOLDER_INPUT_STYLE: CSSProperties = {
 const BLOCK_NOTICE_STYLE: CSSProperties = {
   margin: "6px 10px",
   padding: "8px 10px",
-  background: "var(--warning-soft, var(--paper-1))",
+  background: "var(--warning-soft, var(--paper))",
   borderInlineStart: "2px solid var(--line-3)",
   borderRadius: "var(--radius-1)",
   fontFamily: "var(--font-sans)",
@@ -1773,7 +1784,34 @@ function PopulatedList({
           onStartRename={ctx.startRename}
           onContextMenu={handleContextMenu}
           onCommitRename={async (noteId, newTitle) => {
-            await executeRenameCommit(noteId, newTitle, ctx);
+            // The inline title rename inherits the same refusal the folder
+            // rename does: `commitRename` awaits `flushOpenPanes()` whenever an
+            // inbound note is open, rolls the optimistic rename back and
+            // rethrows. Without this the user watches the title flip to the new
+            // value and silently flip back, with the only other trace an
+            // unhandled rejection in the console. Same message as the folder
+            // path's, because it is the same fact about the same pane.
+            //
+            // Anything else gets the generic sentence rather than a rethrow:
+            // the prop is typed `=> void` and the caller discards the promise,
+            // so a rethrow here is an unhandled rejection and a title that
+            // reverted for no stated reason. The rollback has already run in
+            // `commitRename`, so both arms are true.
+            try {
+              await executeRenameCommit(noteId, newTitle, ctx);
+            } catch (err) {
+              const refused = isPanesNotSettled(err);
+              setTrashError(
+                panesNotSettledMessage(err, {
+                  unsettled: t("notes.unsettledSave"),
+                  failed: t("notes.list.renameFailed"),
+                }),
+              );
+              if (import.meta.env.DEV && !refused) {
+                // eslint-disable-next-line no-console
+                console.warn("[NoteList] rename failed:", err);
+              }
+            }
           }}
           onCancelRename={ctx.cancelRename}
           favorited={favorited}
@@ -2220,70 +2258,28 @@ function PopulatedList({
       {
         // Per-note plaintext egress (MYND-116) — live tree note rows only;
         // Trash / Templates surfaces deliberately don't carry it.
-        id: "export-markdown",
+        //
+        // ONE row with a submenu, where there used to be one row per format.
+        // Four of them ran down the middle of a menu that has ten entries, and
+        // the same four were spelled out again in the editor's "…" menu. The
+        // formats come from `noteExportEntries` now, which is also where the
+        // `pdfExport` capability gate moved. The gate used to live here and
+        // only here, so the other menu offered PDF on hosts that cannot make
+        // one.
+        id: "export",
         group: "export",
-        label: t("notes.list.exportMarkdown"),
-        onSelect: () =>
-          void runNoteExportFlow(
-            noteExportOptions(
-              menu.id,
-              ctx.cache.get(menu.id)?.title ?? null,
-              exportHooks,
-            ),
-          ),
-      },
-      // The PDF item is OMITTED where `pdfExport` is absent (task 48), matching
-      // the palette, which drops the same action through `ACTION_CAPABILITY`.
-      // Two render sites, one answer — a menu that offered it while the palette
-      // did not would be the "unreachable by menu, still reachable elsewhere"
-      // gap task 27 exists to close, pointing the other way.
-      ...(hasCapability("pdfExport")
-        ? [
-      {
-        // Sibling PDF egress (MYND-255) — same export group, same shared-
-        // flow discipline (runNotePdfExportFlow is the palette's flow too).
-        id: "export-pdf",
-        group: "export",
-        label: t("notes.list.exportPdf"),
-        onSelect: () =>
-          void runNotePdfExportFlow(
-            noteExportOptions(
-              menu.id,
-              ctx.cache.get(menu.id)?.title ?? null,
-              exportHooks,
-            ),
-          ),
-      },
-          ]
-        : []),
-      {
-        // Sibling HTML egress (MYND-340) — same export group, same shared-
-        // flow discipline (runNoteHtmlExportFlow is the palette's flow too).
-        id: "export-html",
-        group: "export",
-        label: t("notes.list.exportHtml"),
-        onSelect: () =>
-          void runNoteHtmlExportFlow(
-            noteExportOptions(
-              menu.id,
-              ctx.cache.get(menu.id)?.title ?? null,
-              exportHooks,
-            ),
-          ),
-      },
-      {
-        // Sibling plain-text egress (MYND-340).
-        id: "export-txt",
-        group: "export",
-        label: t("notes.list.exportTxt"),
-        onSelect: () =>
-          void runNoteTxtExportFlow(
-            noteExportOptions(
-              menu.id,
-              ctx.cache.get(menu.id)?.title ?? null,
-              exportHooks,
-            ),
-          ),
+        label: t("notes.export.submenuLabel"),
+        // Never called: a row with `children` opens them instead of acting.
+        onSelect: () => {},
+        children: noteExportEntries(
+          menu.id,
+          ctx.cache.get(menu.id)?.title ?? null,
+          exportHooks,
+        ).map((entry) => ({
+          id: entry.id,
+          label: t(entry.labelKey),
+          onSelect: entry.run,
+        })),
       },
       // Archive (MYND-331): pull the note out of the working set into the
       // indefinite-retention Archive section. Near Delete, but not destructive.
@@ -2793,7 +2789,6 @@ function PopulatedList({
       )}
       {confirmKeyboardDelete !== null && (
         <DeleteConfirmModal
-          initialFocus="confirm"
           title={t("notes.list.trashConfirmTitle")}
           noteTitle={
             confirmKeyboardDelete.kind === "single"

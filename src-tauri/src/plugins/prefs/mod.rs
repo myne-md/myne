@@ -78,6 +78,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_daily_date_format,
             commands::set_daily_folder,
             commands::set_daily_template,
+            commands::set_periodic_note_setting,
             commands::set_new_note_location,
             commands::set_startup_open,
             commands::set_editor_text_size,
@@ -104,6 +105,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_ai_enabled,
             commands::set_attachment_ocr_enabled,
             commands::set_attachment_compression_enabled,
+            commands::set_chat_history_budget,
             commands::set_developer_mode,
             commands::set_ai_excluded_folders,
             commands::set_editor_default_view_mode,
@@ -236,9 +238,9 @@ mod desktop_tests {
         fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
-        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-            crate::auto_lock::effective_auto_lock_secs(prefs_value)
-        }
+        // `effective_auto_lock_secs` deliberately not overridden: the trait's
+        // default clamps (myne-md/myne#479), and a test hook that restated the
+        // delegation would be a fourth place the envelope is named.
         fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
         fn preempt_inflight_backup<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
             Box::pin(std::future::ready(()))
@@ -281,7 +283,7 @@ mod desktop_tests {
             // ...but the cached effective timeout is clamped to the ceiling.
             assert_eq!(
                 state.auto_lock_timeout_secs(),
-                crate::auto_lock::AUTO_LOCK_CEILING_SECS
+                myne_core::AUTO_LOCK_CEILING_SECS
             );
         });
     }

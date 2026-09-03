@@ -115,60 +115,43 @@ export const EXPORT_PLAIN_TEXT_SENTENCE =
 export const BACKUP_SCHEDULE_FAILED_TOAST =
   "Automatic backup failed. Check your backup folder in Settings → Storage.";
 
-// Device removal honesty (MYND-425). "Remove device" revokes a per-device sync
-// token — it stops the server from serving that device — but it does NOT
-// cryptographically lock out a device that already holds root_key (an attacker
-// with the vault file + the password/phrase is unaffected, threat-model no-FS
-// note). The copy MUST say what removal does and does not do, and MUST NEVER
-// imply a cryptographic lockout. E2E asserts these by FULL-literal equality
-// (SYNC-8); changing either is a decisions.md event, not a copy edit.
-
-/** Short confirm line for the Remove-device action. */
-export const REMOVE_DEVICE_CONFIRM =
-  "Remove this device from sync?";
-
-/** The honest "what it does / what it doesn't do" disclosure (expandable). It
- *  is deliberately two plain sentences: the effect (sync stops) and the limit
- *  (no cryptographic lockout) — never collapsed, never overstated. */
-export const REMOVE_DEVICE_DISCLOSURE =
-  "Removing this device revokes its sync access, so the server stops syncing to it. It does not lock a device that already has your vault and password — removal is not a remote wipe.";
-
-// Sync integrity alert (MYND-427 task 2). When the engine's head-verify fails to
-// extend the last-seen head (a rollback or a withheld/omitted update), the client
-// raises a hard, honest integrity alert (SuspicionBanner-class) — NEVER silently
-// accepted. The copy is load-bearing honesty: it says the problem is *possible*
-// (head-verify catches rollback/non-extension, but a perfectly-consistent
-// withholding is not generally detectable — the threat-model no-general-detection
-// note), it never claims Myne detects all tampering, and it reassures that local
-// notes are safe. E2E asserts it by FULL-literal equality (SYNC-8); changing it is
-// a decisions.md event, not a copy edit.
-
-/** The hard integrity-alert banner shown on a rollback / non-extending head. */
-export const SYNC_INTEGRITY_ALERT =
-  "Possible sync integrity problem: the server may have sent out-of-date or altered sync data, which Myne did not accept. Your local notes are safe. If this keeps happening, verify your devices.";
-
-// Device-enrollment copy (MYND-425 task 5). The add-device flow proves account
-// ownership with {account# + password OR 24-word phrase}; a wrong credential and
-// a wrong account number both fail at the same AEAD-open step, so the failure copy
-// MUST be a single non-distinguishing message — exactly the unlock/recovery
-// discipline above (collapsing to "wrong password" alone would leak that the
-// account number was valid). The pending message must be honest about the
-// approval gate (the server holds the device until an already-trusted device
-// approves it — Myne cannot sync until then). E2E asserts these by FULL-literal
-// equality (SYNC-8); changing any is a decisions.md event, not a copy edit.
-
-/** Non-distinguishing enroll failure — covers wrong account#, wrong credential,
- *  or a missing/corrupt vault.meta on the server, with one message. */
-export const ENROLL_NON_DISTINGUISHING_BANNER =
-  "Account number, password, or recovery phrase is incorrect. Please try again.";
-
-/** Honest enroll-pending notice — the device is held by the approval gate. */
-export const ENROLL_PENDING_NOTICE =
-  "This device is waiting for approval. Approve it from a device that already has access to start syncing.";
-
-/** Enroll success — the device was approved and a sync token issued. */
-export const ENROLL_APPROVED_NOTICE =
-  "This device is now connected and syncing.";
+// Sync / enroll / device load-bearing copy (MYND-425/427) is SINGLE-SOURCED in
+// the shared `@myne/copy` package (SYNC-42) so the literals are byte-identical
+// across the desktop + mobile clients by construction, cross-client paraphrase
+// is impossible. Re-exported here verbatim, exactly as `src/lib/load-bearing-copy.ts`
+// does, so every mobile consumer and its FULL-literal test target (SYNC-8) is
+// unchanged. Changing any is a decisions.md event, never a copy edit; the
+// load-bearing rationale lives in `@myne/copy`.
+//
+// This block used to be six hand-written copies of these literals
+// (myne-md/myne#474). They were byte-identical to the originals, BY HAND, which
+// is precisely the distinction SYNC-42 exists to make: `pnpm-workspace.yaml`
+// described the package as keeping them identical "by construction" and
+// `mobile/vite.config.ts` named it among the packages this client consumes,
+// while mobile imported it zero times and nothing failed if one side was edited
+// alone.
+export {
+  REMOVE_DEVICE_CONFIRM,
+  REMOVE_DEVICE_DISCLOSURE,
+  SYNC_INTEGRITY_ALERT,
+  ENROLL_NON_DISTINGUISHING_BANNER,
+  ENROLL_PENDING_NOTICE,
+  ENROLL_APPROVED_NOTICE,
+  // Not previously reachable from this client at all, and STAGED rather than
+  // consumed: mobile has no beta-terms surface today (desktop's is
+  // `src/components/sync/BetaTermsConsent.tsx`), so these five have no caller
+  // here yet. They are re-exported now so that the surface, when it lands,
+  // reaches for the literal rather than retyping it: this is text a user AGREED
+  // to, and an acceptance recorded against a differently-worded copy on one
+  // client is not an acceptance of what another client asked (operations#15,
+  // decisions.md 0483). An earlier version of this comment said mobile already
+  // shows them, which was not true.
+  BETA_TERMS_VERSION,
+  BETA_TERMS_WHAT_THIS_IS,
+  BETA_TERMS_DATA_LOSS,
+  BETA_TERMS_WHAT_HAPPENS_NEXT,
+  BETA_TERMS_WHAT_WE_CAN_SEE,
+} from "@myne/copy";
 // Browser-extension clip success notice (desktop-ingest task 7, MYND-442). A
 // clip lands at the vault ROOT (SYNC-15) and the user keeps working — the
 // notice is a non-blocking toast with a "view" affordance that opens the new

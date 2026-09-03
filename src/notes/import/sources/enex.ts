@@ -115,7 +115,7 @@ export function preserveEnCrypt(doc: Document): number {
     const body = (el.textContent ?? "").replace(/\s+/g, "");
     const pre = doc.createElement("pre");
     pre.textContent =
-      `[Evernote encrypted block — cipher=${cipher}` +
+      `[Evernote encrypted block: cipher=${cipher}` +
       (hint !== null && hint.length > 0 ? ` hint=${hint}` : "") +
       `]\n${body}`;
     el.replaceWith(pre);

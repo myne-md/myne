@@ -11,6 +11,7 @@
 
 import { invoke } from "../platform/core";
 import { bumpPrefsNonce, getPrefsNonce } from "../notes/prefsNonce";
+import { blockSeedingOfExistingTurns } from "../notes/ai/chatStore";
 
 /**
  * Editor three-pane layout — sidebar widths (px) + collapsed flags (MYND-137).
@@ -308,6 +309,10 @@ export interface PrefsView {
    * defaulted to `[]`. Non-load-bearing.
    */
   ai_excluded_folders: string[];
+  /** Characters of chat history an agent run may be seeded with. `null` means
+   *  unset, and the host applies its own default. Clamped at the write, so the
+   *  stored value can be lower than the one sent. */
+  chat_history_budget: number | null;
   /**
    * Developer mode toggle (`developer-mode` feature, MYND-593). `false` ≡ off
    * (the default). Serialized from Rust `bool`; omitted from the encrypted
@@ -374,8 +379,12 @@ export interface PrefsView {
    * names the recipient, so the request path compares this to the active
    * selection instead of trusting that some setter cleared a flag.
    *
-   * Account-scoped: it syncs, so a newly enrolled device inherits it and sends
-   * without re-asking (`threat-model.md` §5, ledger SYNC-22).
+   * **Device-local since myne-md/myne#456**, and it was account-scoped until
+   * then. The old behaviour is what SYNC-22 recorded as an accepted residual:
+   * a newly enrolled device inherited the selection, the consent AND the key,
+   * and sent without anyone at that device seeing the screen. It stops here
+   * now: the key still syncs, so a phone can hold it, and it still sends
+   * nothing until somebody approves on that phone (`threat-model.md` §5).
    */
   ai_provider_consent: string | null;
   /**
@@ -432,6 +441,22 @@ export interface PrefsView {
    */
   daily_template: string | null;
   /**
+   * Periodic-notes settings (myne#177): one entry per `<period>.<setting>`
+   * pair, e.g. `weekly.folder` → `Weekly/`, `monthly.format` → `YYYY-MM`. The
+   * three settings mirror what the `daily_*` fields above carry for the daily
+   * period, which keeps its own three fields and is deliberately not migrated
+   * in here (prefs merge per field, so a device on an older build would keep
+   * writing the flat ones and the two would silently diverge).
+   *
+   * Flat rather than nested so the Phase 2 field clock is per SETTING: a folder
+   * edit on one device and a template edit on another, to the same period in
+   * the same round, both survive. An entry naming a period this build has no UI
+   * for decodes and is ignored, which is what makes a fourth period free.
+   * Absent in vaults that configured no period → the Rust decoder defaults it
+   * to `{}`. Serialized from Rust `BTreeMap<String, String>`.
+   */
+  periodic_notes: Record<string, string>;
+  /**
    * Favorited notes — an ordered list of note UUIDs surfaced in the sidebar's
    * Favorites section, in display order (MYND-183). A sequence: the backend
    * preserves element order verbatim. UUIDs only (folders are not favoritable).
@@ -479,10 +504,18 @@ export interface PrefsView {
    * the host's own zone.
    *
    * **Display only.** It decides what the app treats as "today" and how a stored
-   * wall-clock value is printed; it never enters a `.myn` file, a blob, or the
-   * sync wire — `dialect/src/taskFields.ts` keeps note times zone-free, and this
-   * does not walk that back. Filed device-local by `prefs_classification`, since
-   * the right zone is a property of where the device is. Canonical key slot:
+   * wall-clock value is printed. It never enters a `.myn` file, so a note never
+   * records where its author was: `dialect/src/taskFields.ts` keeps note times
+   * zone-free and this does not walk that back.
+   *
+   * It DOES live in the encrypted `vault.prefs` blob, which is pushed and pulled
+   * like every other prefs field. Corrected by myne-md/myne#609, which found
+   * this comment claiming "never enters a blob or the sync wire" and then found
+   * the same sentence in eight more places, the normative spec and a published
+   * user-guide article among them. Filed
+   * device-local by `prefs_classification`, and that is a MERGE classification:
+   * the local value survives the sync-protocol.md 10.2 merge, and 10.2.1 has a
+   * newly enrolled device adopt it as a starting default. Canonical key slot:
    * after `time_format`, before `transcription_enabled`.
    */
   timezone: string | null;
@@ -839,13 +872,18 @@ export function __resetPrefsReadForTest(): void {
  * than an invisible omission. `scripts/check-prefs-nonce.mjs` holds the rule:
  * a setter invoking a prefs command outside this helper fails the commit.
  */
-async function writePref(
+async function writePref<T = void>(
   command: string,
   args: Record<string, unknown>,
   opts: { bump?: boolean } = {},
-): Promise<void> {
-  await invoke<void>(command, args);
+): Promise<T> {
+  // Generic since myne-md/myne#613: the five set-field setters return how many
+  // additions the reserved byte budget refused, and the import surface reports
+  // that as a shortfall. Every other setter still resolves to `void`, which is
+  // the default, so no other call site changes.
+  const out = await invoke<T>(command, args);
   if (opts.bump !== false) bumpPrefsNonce();
+  return out;
 }
 
 export async function setScreenCaptureProtection(enabled: boolean): Promise<void> {
@@ -853,12 +891,109 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
 }
 
 /**
- * Persist the full deliberate_folders set (the carrier for empty /
- * deliberately-created folders, MYND-144). The caller passes the entire
- * desired set; v0.1 single-device writes it verbatim. Folded-identity dedup
- * (case-insensitivity) is the caller's responsibility — the Rust codec only
- * sorts + exact-dedups for canonical byte-stability. A rejected promise means
- * the disk write failed and the caller's optimistic UI must revert.
+ * What a caller did to a `vault.prefs` set field: entries it added, entries it
+ * removed (myne-md/myne#613).
+ *
+ * There is deliberately no "make the set equal this list" form. That form is the
+ * defect: the backend used to receive a whole set and derive the removals by
+ * diffing it against the stored one, so a caller holding a view that predated a
+ * peer's addition claimed a deletion it never made, and the merge then applied
+ * that deletion on every device. Both halves are now stated rather than deduced,
+ * and a caller that means to change nothing sends nothing.
+ */
+export interface SetMutation {
+  /** Entries to add. Already present is a no-op, not an error. */
+  add?: string[];
+  /**
+   * Entries to remove, matched by the field's own identity: the canonical
+   * folder key for the four folder sets, the raw code for `spell_languages`.
+   * Absent is a no-op, not an error.
+   */
+  remove?: string[];
+  /**
+   * Subtrees to remove: every STORED entry at or under one of these folded
+   * prefixes, whether or not this caller has ever seen it.
+   *
+   * The verb exists because `remove` cannot express a folder deletion honestly.
+   * Deleting `Projects/` means deleting whatever is stored under it, and only
+   * the write knows what that is: this caller's list is a React view that four
+   * fire-and-forget at-fill writers can leave stale, so a delete issued inside
+   * that window under-removes, and the surviving entry carries a NEWER add clock
+   * than the removal, so the folder comes back on every device. Re-reading prefs
+   * here narrows that window and does not close it, and it would have to be
+   * written once per client per operation.
+   *
+   * An entry that folds to the empty string is IGNORED by the core rather than
+   * treated as the root. Do not rely on a sentinel: pass nothing for a no-op.
+   */
+  /**
+   * Entries to add ONLY where no removal of them is on record: absent from the
+   * stored set AND carrying a removal clock.
+   *
+   * For a REPAIR rather than a user act. The unlock back-fill registers folders
+   * that LIVE notes prove exist, and that is a state a peer's deletion has not
+   * reached yet, because notes and prefs travel separately. With a plain `add`
+   * the repair is stamped `now_ms`, beats the peer's removal clock, and puts the
+   * folder back on every device permanently with nobody having asked for it.
+   *
+   * A genuine user act still wins, because at-fill uses `add`.
+   */
+  addUnlessRemoved?: string[];
+  removePrefix?: string[];
+  /**
+   * Subtrees to re-root: every STORED entry at or under `from` is rewritten with
+   * `to` in place of that prefix.
+   *
+   * One verb rather than a remove plus an add, because as two halves a rename
+   * can half-apply under the byte budget: the removals land, each stamps a
+   * deletion that propagates to every device, and the additions are refused,
+   * which turns a rename into a synchronised delete.
+   */
+  renamePrefix?: { from: string; to: string }[];
+}
+
+/**
+ * The mutation a caller performed, derived from ITS OWN before and after.
+ *
+ * This looks like the diff that caused myne-md/myne#613 and is the opposite of
+ * it, so the distinction is worth stating. The defect was the BACKEND diffing a
+ * caller's snapshot against the DISK: a peer's entry the snapshot never saw
+ * appeared only on the disk side and was read as a deletion. Here both sides are
+ * the caller's own values, so the delta is exactly what this caller did, and it
+ * stays correct however stale the caller's view is relative to the disk. An
+ * entry the caller never knew about appears in neither side and is therefore
+ * never mentioned, which is precisely the property that was missing.
+ *
+ * Use it where a component holds both states. Where a planner already reports
+ * what it removed, pass that instead: a stated removal beats a derived one.
+ */
+export function mutationFrom(
+  before: readonly string[],
+  after: readonly string[],
+): SetMutation {
+  const had = new Set(before);
+  const has = new Set(after);
+  return {
+    add: after.filter((e) => !had.has(e)),
+    remove: before.filter((e) => !has.has(e)),
+  };
+}
+
+/**
+ * Add to and remove from the deliberate_folders set (the carrier for empty /
+ * deliberately-created folders, MYND-144).
+ *
+ * Takes VERBS, not a set. It took the whole desired set until myne-md/myne#613,
+ * and that is what let a caller holding a stale view claim a deletion it never
+ * made: the sync stamper derives removals from `before \ after`, so a peer's
+ * addition the caller never saw read as an intentional delete and travelled to
+ * every device. Folded-identity dedup is the CORE's job now
+ * (`apply_set_mutation`), not the caller's.
+ *
+ * Returns how many additions the reserved byte budget refused, which is zero in
+ * every ordinary case. A rejected promise means the disk write failed and the
+ * caller's optimistic UI must revert; {@link registerDeliberateFolders} wraps
+ * both outcomes into one verdict for the surfaces that show a notice.
  *
  * Bumps the prefs nonce on success (like every sibling folder-set setter, e.g.
  * {@link setArchivedFolders}) so OTHER `usePrefs` consumers — the palette's
@@ -866,8 +1001,58 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
  * not the sidebar's local set — see a freshly-created empty folder without an
  * app reload.
  */
-export async function setDeliberateFolders(folders: string[]): Promise<void> {
-  await writePref("plugin:prefs|set_deliberate_folders", { folders });
+export async function mutateDeliberateFolders(
+  mutation: SetMutation,
+): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_deliberate_folders", { mutation });
+}
+
+/**
+ * What a deliberate-folders registration ended up doing (myne-md/myne#613).
+ *
+ * Three outcomes rather than a boolean, because the two failures need opposite
+ * user treatment and collapsing them produces a notice that is wrong for one of
+ * them. `budget-full` is actionable (delete a folder) and permanent until the
+ * user acts; `failed` is not actionable and is usually transient.
+ */
+export type DeliberateWriteOutcome = "ok" | "budget-full" | "failed";
+
+/** How long to wait before the single retry below. */
+const DELIBERATE_RETRY_MS = 300;
+
+/**
+ * Register folders, retrying ONCE on a transient failure, and classify the
+ * result for a surface that shows a notice.
+ *
+ * The split is on whether the user can do anything:
+ *
+ *   - A thrown write is retried after {@link DELIBERATE_RETRY_MS}, because there
+ *     is nothing for the user to do about a disk hiccup and a notice they
+ *     cannot act on trains them to dismiss notices. Only a SECOND failure is
+ *     reported.
+ *   - A budget refusal is reported immediately and is NOT retried: the reserve
+ *     is full, the next attempt refuses identically, and the remedy (delete a
+ *     folder) is the user's.
+ *
+ * One retry, not a backoff loop. The caller is a click, the surface is already
+ * showing the folder optimistically, and a second failure 300 ms later is
+ * evidence enough that this is not a hiccup. A longer schedule would leave a
+ * folder on screen for seconds that is not going to land.
+ */
+export async function registerDeliberateFolders(
+  mutation: SetMutation,
+): Promise<DeliberateWriteOutcome> {
+  try {
+    return (await mutateDeliberateFolders(mutation)) > 0 ? "budget-full" : "ok";
+  } catch {
+    // Transient, probably. Give it one more go before saying anything.
+  }
+  await new Promise((r) => setTimeout(r, DELIBERATE_RETRY_MS));
+  try {
+    return (await mutateDeliberateFolders(mutation)) > 0 ? "budget-full" : "ok";
+  } catch {
+    return "failed";
+  }
 }
 
 /**
@@ -889,8 +1074,35 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
  *
  * A value outside the host's known set is **refused**, not stored, so the
  * promise rejects rather than leaving a selection the request path ignores.
+ *
+ * **Changing the provider cuts the chat-history seed, the same way changing
+ * `ai_excluded_folders` does (myne-md/myne#617 review).** Since #617 an agent
+ * run is seeded with the visible transcript, so without this a conversation
+ * held entirely on-device is re-sent in full to a provider the user configured
+ * afterwards. The consent screen enumerates what leaves the device and does not
+ * name the conversation so far, so the seed would cross a boundary under a
+ * consent that never mentioned it.
+ *
+ * **Cut on every change, including clearing to `null`.** Clearing sends future
+ * runs to a local model runtime, which `threat-model.md` TB12 is a trust
+ * boundary in its own right (a separately distributed daemon on the same
+ * machine), so "clearing is free" is not true, only cheaper. One rule is
+ * learnable and two are not, which is the argument `design-notes/ai/0553`
+ * already makes about the seed itself.
+ *
+ * **The cut lives here rather than in `usePrefs`**, unlike the exclusion one,
+ * because this binding is the single point every provider change passes
+ * through: `AiPanel` calls it from three places (clear, re-select an already
+ * consented provider, and accept consent), and a cut in the caller would be
+ * three chances to miss one. `vault-switch.ts` reaches into stores from this
+ * layer for the same reason.
+ *
+ * It fires BEFORE the write, and before any await: a failed persist does not
+ * withdraw the intent, and the other order leaves a window in which a run could
+ * seed the turns this is protecting.
  */
 export async function setAiProvider(provider: string | null): Promise<void> {
+  blockSeedingOfExistingTurns();
   await writePref("plugin:prefs|set_ai_provider", { provider });
 }
 
@@ -997,14 +1209,56 @@ export async function setDeveloperMode(enabled: boolean): Promise<void> {
 }
 
 /**
+ * Persist `chat_history_budget`: how many characters of visible chat history
+ * an agent run may be seeded with (myne-md/myne#617). `null` clears the
+ * override and returns the run to the host's own default.
+ *
+ * **The value is CLAMPED host-side, and this wrapper deliberately does not
+ * clamp it.** The bound is what limits how much of the user's plaintext one run
+ * can send to a provider, multiplied by the loop's iteration ceiling, so it has
+ * to hold for every path that reaches the command rather than for the one that
+ * happened to render a control. A second clamp here would read as the control
+ * and hide the day the real one stopped working.
+ */
+export async function setChatHistoryBudget(budget: number | null): Promise<void> {
+  await writePref("plugin:prefs|set_chat_history_budget", { budget });
+}
+
+/**
  * Persist the full `ai_excluded_folders` set (local-ai epic, ai-ux-surface
  * MYND-408, SYNC-14) — folders the AI never reads/indexes. Same canonical set
  * encoding as `deliberate_folders` (the Rust codec NFC-sorts + exact-dedups).
  * The caller passes the entire desired set; a rejected promise means the disk
  * write failed and the caller's optimistic UI must revert.
+ *
+ * **The seed cut lives here, beside the one in [`setAiProvider`], rather than in
+ * `usePrefs`.** This binding is the single point every exclusion write passes
+ * through, and the two controls bound the same thing, so splitting them across
+ * two layers meant a reader had to find both to know the rule. It fires BEFORE
+ * the write and before any await: the user has stated an intent about what may
+ * reach a provider, and a failed disk write does not withdraw it.
+ *
+ * It is not the only trigger, and the other one is the reason this control needs
+ * two. `ai_excluded_folders` is classified `Shared(SetUnion)`, so it also
+ * arrives by SYNC MERGE, where no setter on this machine runs at all;
+ * `chatStore.observeEgressControls` catches that by watching the value on every
+ * prefs read. This one catches the stated intent, including when the write
+ * fails; that one catches the arrival, whatever route it took.
  */
-export async function setAiExcludedFolders(folders: string[]): Promise<void> {
-  await writePref("plugin:prefs|set_ai_excluded_folders", { folders });
+export async function mutateAiExcludedFolders(
+  mutation: SetMutation,
+): Promise<number> {
+  // BEFORE the write, and before any await, for the reason `setAiProvider`'s
+  // doc gives: a failed persist does not withdraw the intent, and the other
+  // order leaves a window in which a run could seed the turns this protects.
+  //
+  // develop added this to `setAiExcludedFolders` (myne-md/myne#617 review)
+  // while this branch replaced that whole-set writer with the add/remove verb,
+  // so the merge had two functions and one call. Without it a user who excludes
+  // a folder keeps every turn already on screen seedable into the next run,
+  // which is exactly what SYNC-14 has no in-flight carve-out for.
+  blockSeedingOfExistingTurns();
+  return await writePref<number>("plugin:prefs|set_ai_excluded_folders", { mutation });
 }
 
 /**
@@ -1025,8 +1279,10 @@ export async function setCliEnabled(enabled: boolean): Promise<void> {
  * means the disk write failed and the caller's optimistic UI must revert.
  * Same pattern as {@link setAiExcludedFolders}.
  */
-export async function setCliExcludedFolders(folders: string[]): Promise<void> {
-  await writePref("plugin:prefs|set_cli_excluded_folders", { folders });
+export async function mutateCliExcludedFolders(
+  mutation: SetMutation,
+): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_cli_excluded_folders", { mutation });
 }
 
 /**
@@ -1042,8 +1298,10 @@ export async function setCliExcludedFolders(folders: string[]): Promise<void> {
  * archived subtree live (same chokepoint discipline as {@link
  * setShowNoteTimestamps}).
  */
-export async function setArchivedFolders(folders: string[]): Promise<void> {
-  await writePref("plugin:prefs|set_archived_folders", { folders });
+export async function mutateArchivedFolders(
+  mutation: SetMutation,
+): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_archived_folders", { mutation });
 }
 
 /**
@@ -1314,6 +1572,35 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
 }
 
 /**
+ * The three settings a period carries (myne#177), mirroring what
+ * `daily_folder` / `daily_date_format` / `daily_template` carry for daily.
+ */
+export type PeriodSetting = "folder" | "format" | "template";
+
+
+/**
+ * Set ONE periodic-notes entry (myne#177): `periodic_notes["<period>.<setting>"]`.
+ * Unlike {@link setFolderIcons} this takes a single entry rather than the whole
+ * map, which is what gives the entry its own Phase 2 field clock: two devices
+ * editing two settings of the same period in one round both keep their edit.
+ * Pass `value = null` to clear the entry; the backend removes the key, which
+ * the merge represents as a stamped absence rather than as "never had it".
+ *
+ * A `folder` value is also registered as a deliberate folder backend-side, so
+ * the folder shows in the sidebar before its first note exists.
+ *
+ * The backend refuses a setting outside the three, and a period that is not a
+ * bare lowercase word, because a period carrying a dot would make the key ambiguous.
+ */
+export async function setPeriodicNoteSetting(
+  period: string,
+  setting: PeriodSetting,
+  value: string | null,
+): Promise<void> {
+  await writePref("plugin:prefs|set_periodic_note_setting", { period, setting, value });
+}
+
+/**
  * Name ONE device (MYND-548) — `device_names[deviceIdHex] = name`, the label the
  * device list leads with. Unlike {@link setFolderIcons} this takes a single
  * entry, not the whole map: entries are written by different devices and merged
@@ -1339,9 +1626,23 @@ export async function setDeviceName(deviceIdHex: string, name: string): Promise<
  * platform from `navigator` instead** — that would be a second default-name
  * heuristic diverging per client, which is exactly what keeping names in one
  * synced map is meant to prevent.
+ *
+ * Memoised, because the answer is a compile-time constant of the running binary
+ * and this is an IPC round trip. Desktop has one caller today and mobile's twin
+ * has four; the memo is here anyway so the two modules stay comparable, which is
+ * how a fix to one reaches the other.
+ *
+ * Only a SUCCESS is cached. A rejected promise held here would turn one
+ * transient IPC failure into a permanently wrong answer for the process.
  */
+let platformProbe: Promise<string> | null = null;
+
 export async function devicePlatform(): Promise<string> {
-  return await invoke<string>("plugin:prefs|device_platform");
+  platformProbe ??= invoke<string>("plugin:prefs|device_platform").catch((e: unknown) => {
+    platformProbe = null;
+    throw e;
+  });
+  return await platformProbe;
 }
 
 /**
@@ -1421,8 +1722,10 @@ export async function setSpellEnabled(enabled: boolean): Promise<void> {
  * applies the {OS-locale ∪ en-US} default at read time). Disk-first, no native
  * side-effect; a rejected promise means the disk write failed.
  */
-export async function setSpellLanguages(languages: string[]): Promise<void> {
-  await writePref("plugin:prefs|set_spell_languages", { languages });
+export async function mutateSpellLanguages(
+  mutation: SetMutation,
+): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_spell_languages", { mutation });
 }
 
 /**
@@ -1554,9 +1857,13 @@ export async function setTimeFormat(value: string | null): Promise<void> {
 }
 
 /**
- * Set (or clear) the DISPLAY timezone override (myne#279) — pass an IANA zone
- * identifier, or `null` to follow the host's own zone. Display only: it never
- * reaches a note, a blob or the sync wire.
+ * Set (or clear) the DISPLAY timezone override (myne#279). Pass an IANA zone
+ * identifier, or `null` to follow the host's own zone.
+ *
+ * Display only: it never reaches a note, so a note never records where its
+ * author was. It DOES ride the encrypted `vault.prefs` blob; device-local is a
+ * MERGE classification, not a transmission one. The long form is on
+ * `PrefsView.timezone` above.
  */
 export async function setTimezone(value: string | null): Promise<void> {
   await writePref("plugin:prefs|set_timezone", { value });

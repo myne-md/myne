@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Type-only, so it is erased at runtime and does not defeat the `vi.resetModules()`
+// + dynamic-import seam below.
+import type { AiCapabilityReport } from "../../src/lib/ai-capability";
+
 const invoke = vi.fn();
 vi.mock("../../src/platform/core", () => ({ invoke }));
 
@@ -101,7 +105,11 @@ describe("surfaceStateOf", () => {
 
   it("keeps the host's cause instead of collapsing it to a boolean", async () => {
     const { surfaceStateOf } = await seam();
-    const report = {
+    // Annotated rather than inferred, so the NEXT field added to the report
+    // fails on this line with the field's name. Untyped, the drift surfaced
+    // four call sites down as "not assignable", which is how `indexReady`
+    // (myne-md/myne#545) went missing here without anyone reading a name.
+    const report: AiCapabilityReport = {
       compiled: true,
       backendId: "candle",
       backendClass: "in_process_local",
@@ -109,9 +117,10 @@ describe("surfaceStateOf", () => {
       embedding: { available: false, cause: "remote_barred" },
       transcription: { available: false, cause: "unreachable" },
       autoTag: { available: true, cause: null },
-      // myne-md/myne#545 added this: whether the embedding index is BUILT, as
-      // distinct from whether an embedding model exists at all. Required, and
-      // irrelevant to what this test asserts — the causes above.
+      // Coherent with `embedding` above: nothing to index against. The field
+      // itself is myne-md/myne#545 — whether the embedding index is BUILT, as
+      // distinct from whether an embedding model exists at all. Required here,
+      // and irrelevant to what this test asserts, which is the causes above.
       indexReady: false,
     };
     // Three unavailable features, three DIFFERENT reasons. Before this task all

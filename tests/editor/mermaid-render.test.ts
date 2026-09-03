@@ -66,6 +66,29 @@ describe("mermaid rendering", () => {
     expect(query(m, ".cm-mermaid-fallback pre")?.textContent).toContain("graph TD");
   });
 
+  it("names the reason under the fallback, rather than discarding it", async () => {
+    // myne-md/myne#629: the `error` string used to be matched on and thrown
+    // away, so a diagram that failed showed its own source and said nothing
+    // about why. A typo in a node id and a diagram type mermaid does not know
+    // were the same picture. Deleting the reason paragraph leaves every other
+    // assertion in this file green, which is why this one is separate.
+    m = withMermaid(failRenderer);
+    await tick();
+    const reason = query(m, ".cm-mermaid-error");
+    expect(reason).not.toBeNull();
+    expect(reason?.textContent).toContain("Parse error on line 1");
+  });
+
+  it("says nothing extra when the render failed without a reason", async () => {
+    // The empty-svg-no-error arm: mermaid resolved, produced nothing, and named
+    // no cause. A reason line reading "could not be rendered: " would be worse
+    // than none.
+    m = withMermaid(async () => ({ svg: "", error: null }));
+    await tick();
+    expect(query(m, ".cm-mermaid-fallback pre")).not.toBeNull();
+    expect(query(m, ".cm-mermaid-error")).toBeNull();
+  });
+
   it("round-trips a mermaid block byte-identical", () => {
     expect(roundTripBytes(DIAGRAM)).toBe(DIAGRAM);
   });

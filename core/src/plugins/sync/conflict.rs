@@ -15,7 +15,16 @@
 //!   [`merge_set_union`] / [`merge_scalar_lww`] / [`merge_sequence_lww`] are the
 //!   toolkit prefs/dictionary/catalog fields reconcile with (set-union for
 //!   tag/word/folder sets, scalar-LWW for single values, sequence-LWW for
-//!   ordered lists). Pure, deterministic, tie-broken without a clock dependency.
+//!   ordered lists). Pure and deterministic.
+//!
+//!   `merge_set_union` is tie-broken without a clock dependency, and is the only
+//!   set primitive left here: the FOLDED variant the four `vault.prefs` folder
+//!   sets used moved to `prefs_merge::merge_set_with_removals` in
+//!   myne-md/myne#613, because those sets stopped being clockless. A folded
+//!   union with no removal clock cannot express a deletion, which is what that
+//!   issue fixed; leaving a primitive here that still could would have left two
+//!   meanings of "set-union" in this crate, with the stale one looking
+//!   canonical.
 //! - **Map singletons → per-key union** ([`merge_attachments_catalog`] by
 //!   attachment-id, [`merge_custom_themes`] by theme name): both reconcile per
 //!   entry via the shared [`join_by_version`] — greater causal `version` wins,
@@ -81,47 +90,6 @@ pub fn merge_set_union<T: Ord + Clone>(a: &[T], b: &[T]) -> Vec<T> {
     let mut out: Vec<T> = a.iter().chain(b.iter()).cloned().collect();
     out.sort();
     out.dedup();
-    out
-}
-
-/// Case-fold identity of a folder path — NFC then default (language-agnostic)
-/// Unicode lowercase — matching the TS `folderPath.ts::foldSegment`
-/// (`markdown-dialect.md` §3.6.2). The one fold the display layer
-/// (`deriveFolderTree`) and this merge plane must agree on so `Projects/` ≡
-/// `projects/`. Deliberately NOT the Turkish casefold (`text::turkish_lower`) —
-/// folder identity uses the same locale-independent `toLowerCase()` the dialect
-/// does, or the two planes would disagree.
-fn fold_folder_key(path: &str) -> String {
-    use unicode_normalization::UnicodeNormalization;
-    crate::text::default_lower(&path.nfc().collect::<String>())
-}
-
-/// §10.2 **fold-aware set-union** for folder-path sets (`deliberate_folders`,
-/// `archived_folders`, `ai_excluded_folders`; MYND-562): the union of both
-/// sides, then entries sharing a folded folder identity collapse to a single
-/// canonical representative — the byte-lexicographically smallest raw display
-/// form — so `personal/` and `PERSONAL/` never coexist. Sorted + deduplicated
-/// like [`merge_set_union`]; clockless. NOT used for `spell_languages` (language
-/// codes, not a folder set — those stay case-sensitive).
-pub fn merge_set_union_folded(a: &[String], b: &[String]) -> Vec<String> {
-    use std::collections::BTreeMap;
-    // folded key → lexicographic-min raw display form seen for that identity.
-    let mut winners: BTreeMap<String, String> = BTreeMap::new();
-    for raw in a.iter().chain(b.iter()) {
-        winners
-            .entry(fold_folder_key(raw))
-            .and_modify(|w| {
-                if raw < w {
-                    *w = raw.clone();
-                }
-            })
-            .or_insert_with(|| raw.clone());
-    }
-    // Each folded key holds one lexicographic-min raw form; distinct folded keys
-    // can never share a raw form, so the collected values are already unique —
-    // only a sort (they emerge in folded-key order) is needed, no dedup.
-    let mut out: Vec<String> = winners.into_values().collect();
-    out.sort();
     out
 }
 
@@ -475,29 +443,6 @@ mod tests {
         let a = vec!["alpha", "beta"];
         let b = vec!["beta", "gamma"];
         assert_eq!(merge_set_union(&a, &b), vec!["alpha", "beta", "gamma"]);
-    }
-
-    #[test]
-    fn folded_set_union_collapses_case_variants_to_min() {
-        // MYND-562: "personal/" and "PERSONAL/" are one folder identity — the
-        // fold-aware union keeps a single lexicographic-min representative
-        // ("PERSONAL/" < "personal/" byte-wise) while leaving distinct folders
-        // intact. Symmetric across argument order.
-        let a: Vec<String> = vec!["personal/".into(), "Work/".into()];
-        let b: Vec<String> = vec!["PERSONAL/".into(), "Ideas/".into()];
-        let expected: Vec<String> = vec!["Ideas/".into(), "PERSONAL/".into(), "Work/".into()];
-        assert_eq!(merge_set_union_folded(&a, &b), expected);
-        assert_eq!(merge_set_union_folded(&b, &a), expected);
-    }
-
-    #[test]
-    fn folded_set_union_nfc_folds_decomposed_and_precomposed() {
-        // Decomposed "café/" (e + U+0301) and precomposed "Café/" share a
-        // folded identity (NFC + lowercase); one canonical survivor.
-        let a: Vec<String> = vec!["cafe\u{0301}/".into()];
-        let b: Vec<String> = vec!["Caf\u{00e9}/".into()];
-        let merged = merge_set_union_folded(&a, &b);
-        assert_eq!(merged.len(), 1);
     }
 
     #[test]

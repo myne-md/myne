@@ -22,11 +22,13 @@ import { normalizeTranscribeError } from "../../src/lib/transcribe";
 // The roster below is PARSED FROM THE RUST SOURCE rather than copied. A copy is
 // a third place to forget.
 
+// `myne-core`, not `src-tauri`, since myne-md/myne#456 moved the inference seam
+// there. The move made this test fail by NAME, `ENOENT` on a path that no
+// longer exists: which is the right failure and is why the path is a constant
+// rather than a glob: a glob would have found some other `error.rs` and compared
+// the TS taxonomy against the wrong Rust enum, silently.
 const ERROR_RS = fileURLToPath(
-  new URL(
-    "../../src-tauri/src/plugins/local_inference/error.rs",
-    import.meta.url,
-  ),
+  new URL("../../core/src/inference/error.rs", import.meta.url),
 );
 
 /** Every `EngineError::Variant => "tag"` arm of `kind()`, read from the source. */
@@ -59,6 +61,8 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     refused: "same — transcription is in-process only",
     remote_barred:
       "transcription is user-initiated and in-process only, so the SYNC-14 bar can never fire on this path",
+    consent_missing:
+      "the provider consent gate is only consulted when a request is about to go to a provider, and transcription never sends one (myne-md/myne#456)",
     no_credential:
       "transcription never reaches a provider, so there is no credential for it to be missing (myne#415)",
     unauthorized: "same — no provider, no credential to be rejected",
@@ -76,8 +80,13 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
       "transcription is in-process only, so no request is ever built for a provider to reject (myne#547)",
   },
   provider: {
-    feature_off:
-      "the AI beta gate is checked host-side before a provider is selected, so this never arrives from a provider call",
+    // `feature_off` USED to be here, claiming "the AI beta gate is checked
+    // host-side before a provider is selected, so this never arrives from a
+    // provider call". myne-md/myne#456 made that false: the agent's remote arm
+    // runs `authorize_remote`, which checks `ai_enabled` FIRST and returns
+    // `FeatureOff`, and on a phone the AI tab can be open when the pref flips.
+    // It is a handled cause now, with its own sentence, so the entry is gone
+    // rather than reworded.
     vault_locked:
       "a provider request only runs from an unlocked vault; the lock tears the transcript down instead",
     no_model:
@@ -90,6 +99,8 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     transcription_failed: "no provider accepts audio (decisions.md 2026-08-09)",
     deferred:
       "only a backend that serializes compute can defer, and this one runs out of process — Backend::serializes_compute is false for it",
+    audio_too_long:
+      "no provider accepts audio (decisions.md 2026-08-09), so this refusal is raised only by the in-process WAV decoder and never arrives from a provider call (myne#510)",
   },
   tagSuggest: {
     feature_off:
@@ -111,6 +122,8 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     quota_exhausted: "same — nothing is ever billed on this path",
     policy_refused:
       "same — the SYNC-14 bar means no provider is ever asked, so none can refuse under its own policy (myne#466)",
+    consent_missing:
+      "same again: the SYNC-14 bar fires before the consent gate is reached, so auto-tag can never be refused for a consent nobody was asked for (myne-md/myne#456)",
     empty_completion:
       "collapses into not_ready for this surface: a tag pass that produced nothing shows no band, and there is nothing for the user to rephrase — the pass has no prompt they wrote",
     local_model_missing:
@@ -120,6 +133,8 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     index_not_ready: "same — the tag pass retrieves nothing",
     request_rejected:
       "the SYNC-14 bar means auto-tag never reaches a provider, so none can reject its request (myne#547)",
+    audio_too_long:
+      "transcription-only (myne#510): the tag pass is handed note TEXT and never opens an audio attachment, so the WAV decoder's ceiling is not on its path",
   },
 };
 
@@ -177,6 +192,27 @@ describe("EngineError cause taxonomy", () => {
         unaccounted,
         `${surface} silently collapses these EngineError causes into its catch-all. ` +
           `Either map them in the normalizer, or add each to NOT_APPLICABLE.${surface} with the reason it cannot reach this surface.`,
+      ).toEqual([]);
+    });
+
+    // **An exemption becomes stale in TWO ways, and this file only checked
+    // one.** The obvious one is the Rust variant going away. The other is the
+    // surface starting to HANDLE the cause, which leaves a reasoned claim that
+    // "this cannot reach here" sitting beside a normalizer that distinguishes
+    // it: the record then argues against the code, and a later reader deciding
+    // whether a fifth surface needs the cause reads the wrong answer. Found by
+    // myne-md/myne#456, which handled `feature_off` on the provider surface
+    // while its exemption stayed green saying the cause never arrives.
+    it(`${surface}: no not-applicable entry for a cause it actually handles`, () => {
+      const byTag = new Map(taxonomy.map((t) => [t.tag, t.variant]));
+      const contradicted = Object.keys(NOT_APPLICABLE[surface]).filter((tag) => {
+        const variant = byTag.get(tag);
+        return variant !== undefined && handles(surface, tag, variant);
+      });
+      expect(
+        contradicted,
+        `${surface} distinguishes these causes AND declares them not-applicable. ` +
+          `Remove the NOT_APPLICABLE entry: it is a claim the normalizer contradicts.`,
       ).toEqual([]);
     });
 

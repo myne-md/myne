@@ -11,7 +11,7 @@
 //!
 //! Two roles are **bundled** first-party task-models instead: transcription
 //! (MYND-270) and auto-tag (`infer_tags`, MYND-651). Bundling is not
-//! downloading — the weights ship inside the signed, reproducible build, so
+//! downloading — the weights ship inside the build itself, so
 //! SYNC-2 is intact (`decisions.md` 2026-07-19, 2026-07-31). Auto-tag also has
 //! no picker override at all, so it never re-enters the untrusted-model case.
 //!
@@ -79,7 +79,8 @@ const TAG_PROMPT_MAX_CHARS: usize = 8_000;
 /// user turn; this line is ours and is never attacker-influenceable.
 const TAG_SYSTEM_INSTRUCTION: &str =
     "You suggest short topical tags for a note. Reply with a lowercase, \
-     comma-separated list of tags and nothing else.";
+     comma-separated list of tags and nothing else. Write the tags in the \
+     same language as the note.";
 /// Deterministic sampling seed (reproducible generations).
 const SAMPLE_SEED: u64 = 299_792_458;
 /// Generation temperature (mild — coherent, lightly varied).

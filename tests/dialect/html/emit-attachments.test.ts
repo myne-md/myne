@@ -212,12 +212,65 @@ describe("an image carrying layout segments stays an image", () => {
     ["an unknown key from a newer client", "pic.png|future=x"],
   ])("still renders an <img> with %s", async (_label, alias) => {
     const { html, excludedAttachments } = await emitNoteHtml(`${embed(ID_A, alias)}\n`);
-    expect(html).toContain('class="att-image"');
+    // `att-image` is present, not the whole attribute: an authored alignment
+    // adds `att-align-*` beside it (myne-md/myne#518), so an exact-attribute
+    // match would pin the ABSENCE of the layout this now carries.
+    expect(html).toMatch(/class="att-image(?: att-align-\w+)?"/);
     expect(html).not.toContain("att-placeholder");
     // The raw segment text must never be printed into the document.
     expect(html).not.toContain("w=300");
     expect(html).not.toContain("future=x");
     expect(excludedAttachments).toEqual([]);
+  });
+
+  // myne-md/myne#518. `docs/spec/wikilink.md` §5.1 is normative: "An authored
+  // alt replaces the filename on the rendered media and on the embed's
+  // accessible name. An authored EMPTY alt marks the media decorative." HTML is
+  // the one output format where both are native and free, and it emitted the
+  // filename for the first and lost the second entirely.
+  it("uses an authored alt as the accessible name, not the filename", async () => {
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png|alt=A sunset")}\n`);
+    expect(html).toContain('alt="A sunset"');
+    expect(html).not.toContain('alt="pic.png"');
+  });
+
+  it("keeps an authored EMPTY alt empty, because that is the decorative marker", async () => {
+    // The half that `??` protects and `||` would destroy. `alt=""` is the author
+    // saying "skip this"; falling back to the filename makes a screen reader
+    // announce `pic.png` on an image chosen to be silent.
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png|alt=")}\n`);
+    expect(html).toContain('alt=""');
+    expect(html).not.toContain('alt="pic.png"');
+  });
+
+  it("falls back to the filename when the author wrote no alt at all", async () => {
+    // The other direction. `null` (no alt segment) is NOT `""` (decorative), and
+    // a fix that collapsed the two would satisfy the case above on its own.
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png")}\n`);
+    expect(html).toContain('alt="pic.png"');
+  });
+
+  it("applies an authored width and alignment, without leaking the segments", async () => {
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png|w=300|align=right")}\n`);
+    expect(html).toContain("width:300px");
+    expect(html).toContain("max-width:100%");
+    expect(html).toContain("att-align-right");
+    expect(html).not.toContain("w=300");
+    expect(html).not.toContain("align=right");
+  });
+
+  it("applies a percentage width as a percentage", async () => {
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png|w=50%")}\n`);
+    expect(html).toContain("width:50%");
+    expect(html).not.toContain("width:50px");
+  });
+
+  it("writes no style attribute at all when the author chose no layout", async () => {
+    // A projection that always carried a style attribute would be harder to
+    // read and would imply a choice the author did not make.
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png")}\n`);
+    expect(html).toContain('class="att-image"');
+    expect(html).not.toContain("style=");
   });
 
   it("keeps the two halves of the projection agreeing", async () => {

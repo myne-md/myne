@@ -79,10 +79,17 @@ export interface FingerprintReading {
  */
 export function readFingerprintInput(raw: string): FingerprintReading {
   const trimmed = raw.trim();
-  const body =
+  const labelled =
     trimmed.startsWith("sha256:") || trimmed.startsWith("SHA256:")
       ? trimmed.slice("sha256:".length)
       : trimmed;
+  // Everything after the last `=`, mirroring `pin_confirm::normalize_fingerprint`.
+  // `openssl x509 -noout -fingerprint -sha256` — the exact command the help
+  // disclosure below hands the operator — prints `sha256 Fingerprint=6F:60:…`,
+  // with a space rather than the colon the two prefixes above strip, so a whole
+  // paste used to count as junk and the field reported it as invalid.
+  const eq = labelled.lastIndexOf("=");
+  const body = eq === -1 ? labelled : labelled.slice(eq + 1);
   let hex = "";
   let hasJunk = false;
   for (const ch of body) {
@@ -105,7 +112,18 @@ export function readFingerprintInput(raw: string): FingerprintReading {
  * was written** — no endpoint, no pin, no vault container — so the screen stays
  * where it is with the field revealed, and declining costs nothing to undo.
  */
-export type FingerprintGateRefusal = "PinConfirmationRequired" | "FingerprintMismatch";
+export type FingerprintGateRefusal =
+  | "PinConfirmationRequired"
+  | "FingerprintMismatch"
+  /**
+   * The endpoint is already trusted and the server presented a different
+   * certificate (myne#581). Reaches the gate for the same reason the other two
+   * do — nothing was written, and the way forward is a fingerprint the user
+   * obtained out of band — but it arises at RE-connect rather than at
+   * enrollment, which is why it exists at all: before it, re-entering the URL
+   * silently replaced the pin with whatever answered.
+   */
+  | "CertificateChanged";
 
 /**
  * Does this rejection mean "the gate wants a fingerprint", and which one?
@@ -118,7 +136,11 @@ export type FingerprintGateRefusal = "PinConfirmationRequired" | "FingerprintMis
  */
 export function fingerprintGateRefusal(e: unknown): FingerprintGateRefusal | null {
   const kind = (e as { kind?: unknown } | null)?.kind;
-  return kind === "PinConfirmationRequired" || kind === "FingerprintMismatch" ? kind : null;
+  return kind === "PinConfirmationRequired" ||
+    kind === "FingerprintMismatch" ||
+    kind === "CertificateChanged"
+    ? kind
+    : null;
 }
 
 /** Split hex into fixed-width groups for the eye-compare. */

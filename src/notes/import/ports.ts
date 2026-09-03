@@ -27,8 +27,14 @@ import { invoke } from "../../platform/core";
 import { noteCreate } from "../createNote";
 import { noteList } from "../listNotes";
 import { loadNoteBatch, type TitleRecord } from "../loadNoteBatch";
-import { prefsRead, setDeliberateFolders } from "../../lib/prefs";
-import { buildExistingIdentitySet, type ExistingNote, type DuplicatePolicy } from "./conflict";
+import { mutateDeliberateFolders } from "../../lib/prefs";
+import {
+  buildExistingIdentitySet,
+  hashBodyForIdentity,
+  type ExistingNote,
+  type DuplicatePolicy,
+} from "./conflict";
+import { noteRead } from "../readNote";
 import {
   importFromSource,
   importVault,
@@ -103,21 +109,6 @@ export async function importSetHold(active: boolean): Promise<void> {
 // `joinPath` is imported from the seam, not redefined: the media index below is
 // keyed by the paths the WALK produced, so the two must agree byte-for-byte.
 
-/**
- * Union the importer's empty-dir folders with the vault's existing
- * `deliberate_folders` (pure; the Rust codec sorts + exact-dedups on write, so
- * order here is irrelevant). Without this the importer's write would replace —
- * not extend — the user's pre-existing deliberate folders (SYNC-4).
- */
-export function mergeDeliberateFolders(
-  existing: readonly string[],
-  add: readonly string[],
-): string[] {
-  const set = new Set<string>(existing);
-  for (const f of add) set.add(f);
-  return [...set];
-}
-
 /** Project the sidebar's `TitleRecord`s to the conflict module's `ExistingNote`
  *  identity shape (folder + title + lifecycle). `trashed`/`template` pass through
  *  unchanged — `buildExistingIdentitySet` excludes trashed/template/untitled. */
@@ -132,12 +123,61 @@ export function titleRecordsToExistingNotes(
   }));
 }
 
+/** The untitled half, given a batch somebody else already paid for. */
+async function untitledIdentitiesFrom(
+  records: Awaited<ReturnType<typeof loadNoteBatch>>,
+): Promise<{ folder: string | null; bodyHash: string }[]> {
+  const untitled = records.filter(
+    (r) => r.title === null && r.trashed === null && !r.template,
+  );
+  const out: { folder: string | null; bodyHash: string }[] = [];
+  for (const record of untitled) {
+    try {
+      out.push({
+        folder: record.folder,
+        bodyHash: hashBodyForIdentity(await noteRead(record.noteUuid)),
+      });
+    } catch {
+      // A note that will not read cannot contribute an identity. Skipping it
+      // means at worst one duplicate on a re-import, where failing the whole
+      // import would mean none of the notes arrive at all.
+    }
+  }
+  return out;
+}
+
 /** Build the live-vault `(folder,title)` identity set from the authoritative
  *  note list (not the partial sidebar cache) for the SYNC-5 idempotent skip. */
 export async function loadExistingIdentity(): Promise<Set<string>> {
   const ids = await noteList();
   const records = await loadNoteBatch(ids);
   return buildExistingIdentitySet(titleRecordsToExistingNotes(records));
+}
+
+/**
+ * Both halves of the identity snapshot in ONE pass over the vault.
+ *
+ * A Myne import needs the titled set and the untitled body hashes, and calling
+ * the two loaders above did the walk twice: two `noteList()` calls and two
+ * `loadNoteBatch()` decrypts of every note in the target, concurrently, for a
+ * result that is a pure function of one read. On a vault of any size that is the
+ * single most expensive thing the import does before it has imported anything.
+ *
+ * The untitled half still costs one `noteRead` per untitled note, which the
+ * batch does not carry: `loadNoteBatch` returns titles and lifecycle flags, and
+ * the untitled key is a hash of the BODY. That read is unavoidable and is not
+ * what this shares.
+ */
+export async function loadIdentitySnapshot(): Promise<{
+  titled: Set<string>;
+  untitled: { folder: string | null; bodyHash: string }[];
+}> {
+  const ids = await noteList();
+  const records = await loadNoteBatch(ids);
+  return {
+    titled: buildExistingIdentitySet(titleRecordsToExistingNotes(records)),
+    untitled: await untitledIdentitiesFrom(records),
+  };
 }
 
 // ── the tree-backed arm (phase3-web-client task 71) ──────────────────────────
@@ -281,22 +321,49 @@ export function mediaImporterForTree(
 }
 
 /** Real ports bound to the picked vault `root`. */
+/**
+ * Ports for a source with NO external directory at all.
+ *
+ * The Myne vault source reads another vault through the host's own key slot, so
+ * it never touches the external-directory read seam. `readDir` / `readFile`
+ * therefore have nothing legitimate to return and throw rather than answering
+ * something plausible: a source that reached them would be reading a path it has
+ * no business reading, and a silent empty answer is how that becomes a bug
+ * nobody sees. `createNote`, `setDeliberateFolders` and `setImportHold` are the
+ * real ones, and they are the whole of what the engine needs here.
+ */
+export function createVaultOnlyPorts(): ImportPorts {
+  const refuse = (): never => {
+    throw new Error("this import source reads no external directory");
+  };
+  const real = createImportPorts("");
+  return {
+    readDir: refuse,
+    readFile: refuse,
+    createNote: real.createNote,
+    setDeliberateFolders: real.setDeliberateFolders,
+    setImportHold: real.setImportHold,
+  };
+}
+
 export function createImportPorts(root: string): ImportPorts {
   return {
     readDir: (absPath) => importReadDir(root, absPath),
     readFile: (absPath) => importReadFile(root, absPath),
-    createNote: (plaintext) => noteCreate(plaintext),
-    setDeliberateFolders: async (folders) => {
-      let existing: string[] = [];
-      try {
-        existing = (await prefsRead()).deliberate_folders;
-      } catch {
-        // Prefs read failure → fall back to writing just the importer's set
-        // (best-effort; the SYNC-4 empty-dir carrier is non-load-bearing).
-        existing = [];
-      }
-      await setDeliberateFolders(mergeDeliberateFolders(existing, folders));
-    },
+    // `null` because the importer is a BULK path: `engine.ts` collects every
+    // folder it created and issues ONE `setDeliberateFolders` at the end. A
+    // per-note registration here would re-encrypt the whole `vault.prefs` blob
+    // once per imported note (myne-md/myne#613).
+    createNote: (plaintext) => noteCreate(plaintext, null),
+    // myne#613: no read, and therefore no fallback. The importer says "add
+    // these"; the backend unions them into whatever is stored. Before the verbs
+    // existed this had to read the set, union locally and write the whole thing
+    // back, and its catch fell back to the EMPTY set on a read failure. That was
+    // harmless while the merge was a clockless union and became a broadcast
+    // delete of every registered folder the moment removals started
+    // propagating: the write claimed an absence it had never checked.
+    setDeliberateFolders: async (folders) =>
+      await mutateDeliberateFolders({ add: [...folders] }),
     setImportHold: (active) => importSetHold(active),
   };
 }
@@ -425,7 +492,10 @@ const IMPORT_HOLD_RENEW_MS = 20_000;
  * import that FAILS because it could not defer a lock would be a new way to
  * lose an import.
  */
-async function withImportHold<T>(ports: ImportPorts, body: () => Promise<T>): Promise<T> {
+export async function withImportHold<T>(
+  ports: ImportPorts,
+  body: () => Promise<T>,
+): Promise<T> {
   const setHold = ports.setImportHold;
   if (setHold === undefined) return body();
 

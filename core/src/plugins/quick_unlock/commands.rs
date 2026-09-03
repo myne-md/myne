@@ -487,6 +487,27 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
             let items_key = protocol::derive_items_key_versioned(version, &root_key, &meta)
                 .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
             let vault_meta_bytes_hash = crate::vault_meta_hash::vault_meta_sha256(&meta_bytes);
+            // Drop every import source before the slot is installed, for the
+            // reason `vault_unlock::commands` states above its own
+            // unconditional call and this path did not honour: `reseal_attachment`
+            // resolves its destination from the ACTIVE vault, so a source slot
+            // surviving into this session would re-seal one vault's attachment
+            // plaintext into a vault the user never named as an import target.
+            //
+            // Quick-unlock reaches the same slot install through a different
+            // door, and was the ONE slot-installing path in the tree without the
+            // call (myne-md/myne#464, found by review). `threat-model.md` A6 as
+            // amended by this feature bounds a source vault's residency as "no
+            // longer than the target vault's own session"; a slot that crosses
+            // a PIN or biometric unlock is not bounded by that sentence at all,
+            // only by the 30-minute TTL.
+            //
+            // Unconditional, and before the install rather than after it, for
+            // the same two reasons: on every path that has no import source it
+            // is one read-lock probe over an empty map, and putting it first
+            // means no window exists in which the new slot and an old source
+            // are both live.
+            crate::plugins::vault_unlock::import_source::close_all(state).await;
             state
                 .set_unlocked_locking_others(
                     vault_id,
@@ -1034,9 +1055,11 @@ mod tests {
         fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
-        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
-        }
+        // `effective_auto_lock_secs` deliberately not overridden: the trait's
+        // default clamps (myne-md/myne#479). This body used to be the unclamped
+        // `unwrap_or`, which is the exact shape that change removed from two
+        // production clients, so a fixture carrying it handed the next author
+        // the defect as the copyable example.
         fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
         fn invalidate_quick_unlock(&self, _: &std::path::Path) {}
         fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
@@ -1141,6 +1164,75 @@ mod tests {
             hooks.search_hydrations(),
             1,
             "quick-unlock must run the whole post-unlock pipeline, not just prefs"
+        );
+    }
+
+    /// A quick-unlock of a DIFFERENT vault drops the import sources the
+    /// outgoing vault opened.
+    ///
+    /// The reachable path, which is what makes this a defect rather than
+    /// tidiness: vault A is unlocked and holds an open source, and the user
+    /// switches to vault B, which has quick-unlock configured. That switch runs
+    /// `set_unlocked_locking_others` through THIS function rather than through
+    /// `unlock_from_host`, and quick-unlock was the one slot-installing path in
+    /// the tree that did not first call `import_source::close_all`
+    /// (myne-md/myne#464, found by review). A plain lock is not the hole: it
+    /// closes the sources on the way out.
+    ///
+    /// What it costs is the sentence `threat-model.md` A6 gained in this same
+    /// feature. The source's keys stay resident into a session belonging to a
+    /// vault the user never named as an import target, bounded only by the
+    /// 30-minute TTL, and `reseal_attachment` resolves its destination from the
+    /// ACTIVE vault, so a re-seal in that window writes one vault's attachment
+    /// plaintext into another.
+    ///
+    /// Deleting the `close_all` line in `quick_unlock_with_dir` makes this fail.
+    #[test]
+    fn quick_unlock_drops_the_outgoing_vaults_import_sources() {
+        rt().block_on(quick_unlock_drops_the_outgoing_vaults_import_sources_inner())
+    }
+    async fn quick_unlock_drops_the_outgoing_vaults_import_sources_inner() {
+        let tmp = ScopedTempDir::new("qu-import-source").unwrap();
+        let dir = tmp.path();
+        write_sealed_meta(dir);
+
+        let setup_state = unlocked_state();
+        seed_unlocked(&setup_state, dir).await;
+        let provider = MockProvider::new(PROVIDER_KIND_PIN, 0x11);
+        setup_with_dir(dir, &setup_state, provider.clone(), &ACCOUNT_HASH)
+            .await
+            .expect("setup");
+
+        // Vault A is unlocked and holds a source. `set_import_source` refuses
+        // when nothing is unlocked, which is itself the guard that makes this
+        // the only shape the hole has.
+        let live = unlocked_state();
+        live.mark_full_unlock_done();
+        seed_unlocked(&live, dir).await;
+        let source_id = crate::vault_id::VaultId::mint();
+        live.set_import_source(
+            source_id,
+            crate::plugins::vault_unlock::state::fixture_import_source(0x41, 0x42, 0x43, 0),
+        )
+        .await
+        .expect("source opens against an unlocked vault");
+
+        quick_unlock_with_dir(
+            dir,
+            crate::paths::vault_id_from_root(dir),
+            &live,
+            provider,
+            &crate::host::NoopHost,
+            &test_hooks(),
+            &test_io(),
+            &crate::vault_label::key::UnavailableKeychain,
+        )
+        .await
+        .expect("quick unlock");
+
+        assert!(
+            live.take_import_source(source_id).await.is_none(),
+            "the source vault's key material must not survive a quick-unlock",
         );
     }
 

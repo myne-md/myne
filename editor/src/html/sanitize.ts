@@ -108,7 +108,28 @@ export function registerHighlightClassHook(purifier: Purifier): void {
 type Loader = () => Promise<Purifier>;
 let load: Loader = async () => {
   const mod = await import("dompurify");
-  return mod.default as unknown as Purifier;
+  // An ISOLATED instance, not the module's shared default one, and this is a
+  // correctness fix rather than tidiness (myne-md/myne#629).
+  //
+  // `addHook` mutates whichever instance it is called on, for the life of the
+  // process and for EVERY caller of that instance. The hook below drops `class`
+  // from everything that is not `<mark class="hl-*">`, which is right for the
+  // embedded-HTML surface it was written for and wrong for anyone else. Mermaid
+  // bundles DOMPurify and calls `sanitize` on that same shared default instance
+  // (`securityLevel: 'strict'`), and Vite dedupes the two imports to one module,
+  // so registering here silently stripped every `class` from every rendered
+  // diagram. Mermaid styles its nodes through a `<style>` block keyed on those
+  // classes, so each shape fell back to the SVG default `fill`, which is black:
+  // measured in the shipped WebView as 0 class attributes in a 10753-character
+  // SVG whose stylesheet carried `.node rect{fill:#eef0f4}`, against 61 in a
+  // plain browser that had never loaded this module.
+  //
+  // The factory call is what makes the instance private. Nothing about the
+  // embedded-HTML rules changes: the same hook, the same `ALLOWED_TAGS` and
+  // `ALLOWED_ATTR`, applied to the same input, on an instance no other consumer
+  // can reach.
+  const factory = mod.default as unknown as (win: typeof globalThis) => Purifier;
+  return factory(globalThis) as Purifier;
 };
 let purifierPromise: Promise<Purifier> | null = null;
 

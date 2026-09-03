@@ -20,7 +20,7 @@ use std::io::Read;
 use backend::{IpcBackend, MyneBackend};
 
 const HELP: &str = "\
-myne — talk to the running Myne desktop app from the terminal
+myne: talk to the running Myne desktop app from the terminal
 
 USAGE:
     myne [--json] <command>
@@ -32,16 +32,20 @@ COMMANDS:
     new [--folder <path>]    Create a note from stdin
     daily                    Print today's daily note, creating it if needed
     daily:append <text>      Append a line to today's daily note
+    weekly                   Print this week's note, creating it if needed
+    weekly:append <text>     Append a line to this week's note
+    monthly                  Print this month's note, creating it if needed
+    monthly:append <text>    Append a line to this month's note
 
 Trashed notes and templates are not notes you are working with, so they
-are absent from list, search and show — the same notes the app itself
+are absent from list, search and show: the same notes the app itself
 leaves out of its own lists.
 
-Some folders may be excluded from these results — see Settings. An
+Some folders may be excluded from these results (see Settings). An
 excluded note's id looks identical to an unknown one everywhere above, and
 an excluded search hit is simply absent, with no count of what was hidden.
 Writing into an excluded folder with `new --folder` is refused outright.
-If the configured daily-notes folder is excluded, `daily`/`daily:append`
+If a configured periodic-notes folder is excluded, that period's commands
 both fail with a clear error rather than a silent no-op.
 
 Myne must already be running, unlocked, and have CLI access enabled in
@@ -54,8 +58,14 @@ enum CommandOutput {
     Show(String),
     Search(Vec<backend::SearchHit>),
     New(String),
-    Daily(String),
-    DailyAppend,
+    /// A period note's body plus whether the host used the device clock in
+    /// place of a display-timezone override (myne#177). The advisory that flag
+    /// selects goes to stderr, so piping stdout is unaffected. `daily` produces
+    /// this too: routing every period through one shape is what stops the
+    /// advisory reaching `weekly` and `monthly` while the command where a
+    /// one-day mismatch bites hardest says nothing.
+    Period(String, bool),
+    PeriodAppend(bool),
 }
 
 /// Parsed argv, split into the two flags this crate supports and the
@@ -181,31 +191,51 @@ fn main() {
                 .create(&body, folder.as_deref())
                 .map(CommandOutput::New)
         }
-        "daily" => {
+        // myne#177: all three periods and their append variants, as ONE pair of
+        // arms rather than six. `daily` routes through the same wire command as
+        // the other two, which is what carries the timezone advisory to the
+        // command where a one-day mismatch bites hardest; the host still accepts
+        // the older `daily` shape for a `myne` binary older than the app.
+        "daily" | "weekly" | "monthly" => {
+            // A `&'static str` chosen by the match, never the raw word the user
+            // typed: stderr is the diagnostic channel and uncontrolled input may
+            // not reach it (`logging_discipline.rs`).
+            let period: &'static str = match command {
+                "weekly" => "weekly",
+                "monthly" => "monthly",
+                _ => "daily",
+            };
             if positional.len() > 1 {
-                eprintln!("myne: 'daily' takes no arguments");
+                eprintln!("myne: '{period}' takes no arguments");
                 std::process::exit(exit::USAGE);
             }
-            IpcBackend::new().daily().map(CommandOutput::Daily)
+            IpcBackend::new()
+                .period(period)
+                .map(|(body, used_device_clock)| CommandOutput::Period(body, used_device_clock))
         }
-        "daily:append" => {
+        "daily:append" | "weekly:append" | "monthly:append" => {
+            let period: &'static str = match command {
+                "weekly:append" => "weekly",
+                "monthly:append" => "monthly",
+                _ => "daily",
+            };
             if positional.len() > 2 {
-                eprintln!("myne: 'daily:append' takes exactly one argument");
+                eprintln!("myne: '{period}:append' takes exactly one argument");
                 std::process::exit(exit::USAGE);
             }
             // A missing argument AND a blank one are the same usage error:
             // appending an empty line writes a note revision that looks like
-            // nothing happened, the silent-no-op shape task 9 exists to
+            // nothing happened, the silent-no-op shape this command exists to
             // avoid. Same `trim()` judgement `new` applies to empty stdin.
             let line = positional.get(1).copied().unwrap_or("");
             if line.trim().is_empty() {
-                eprintln!("myne: 'daily:append' requires a line of text\n");
+                eprintln!("myne: '{period}:append' requires a line of text\n");
                 eprintln!("{HELP}");
                 std::process::exit(exit::USAGE);
             }
             IpcBackend::new()
-                .daily_append(line)
-                .map(|()| CommandOutput::DailyAppend)
+                .period_append(period, line)
+                .map(CommandOutput::PeriodAppend)
         }
         // The unrecognized word is deliberately NOT echoed back. `git`-style
         // "unknown command 'foo'" reads friendlier, but the word here is
@@ -240,11 +270,16 @@ fn main() {
             output::print_new(&id, json);
             std::process::exit(exit::OK);
         }
-        Ok(CommandOutput::Daily(body)) => {
+        Ok(CommandOutput::Period(body, used_device_clock)) => {
+            // The note goes to stderr, the body to stdout: `myne weekly > file`
+            // must keep working, and a warning that lands in the file is a
+            // warning that corrupts the thing it was warning about.
+            output::print_device_clock_note(used_device_clock);
             output::print_show(&body, json);
             std::process::exit(exit::OK);
         }
-        Ok(CommandOutput::DailyAppend) => {
+        Ok(CommandOutput::PeriodAppend(used_device_clock)) => {
+            output::print_device_clock_note(used_device_clock);
             output::print_daily_append(json);
             std::process::exit(exit::OK);
         }

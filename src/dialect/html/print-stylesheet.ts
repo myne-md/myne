@@ -55,6 +55,9 @@ export const PRINT_CSS = `/* Note print stylesheet. Light palette only. */
   --fg-1:     #1a1a17;  /* --fg-1 / --ink-1 (titles, headings, emphasis) */
   --fg-2:     #3a3934;  /* --fg-2 / --ink-2 (body text) */
   --fg-3:     #6b6a64;  /* --fg-3 / --ink-3 (muted: captions, placeholders) */
+  --diagram-surface: #fbfbfa;  /* the fixed-light card a mermaid diagram sits on */
+  --diagram-ink:     #1a1a17;  /* its ink, pinned as a pair with the surface */
+  --diagram-danger:  #8a2a23;  /* the render-failure line, on that same surface */
   --accent:       #2c4a7a;  /* --accent (links, wikilinks, info/accent bar) */
   --accent-soft:  #e8edf5;  /* --accent-soft (info/accent callout tint) */
   --danger:       #8a2a23;  /* --danger (danger callout bar) */
@@ -367,14 +370,14 @@ code {
   margin: 12px 0;
   text-align: center;
   max-width: 100%;
-  color: var(--fg-1);
+  color: var(--diagram-ink);
   break-inside: avoid;
   page-break-inside: avoid;
 }
 .mermaid-diagram svg {
   max-width: 100%;
   height: auto;
-  background: #fbfbfa;
+  background: var(--diagram-surface);
   border: 1px solid var(--line-1);
   border-radius: var(--radius-2);
   padding: 12px;
@@ -478,6 +481,30 @@ kbd {
   border-radius: var(--radius-2);
   break-inside: avoid;
   page-break-inside: avoid;
+}
+
+/* An authored alignment (issue 518, wikilink.md section 5.1). The rule
+   above is already margin: 12px auto, so CENTRE is what an unaligned image
+   already does; the two other cases override one margin each. Classes rather
+   than an inline margin string, mirroring the editor, so the emitter writes no
+   author-derived text into a style attribute it does not have to.
+
+   The centre rule is written out even though it restates that default, and the
+   redundancy is the point: this file is handed to another program. A PDF
+   renderer or a user stylesheet that changes .att-image's margin would silently
+   un-centre every image the author explicitly centred, and an authored choice
+   is exactly the one that must not depend on a default holding. */
+.att-image.att-align-left {
+  margin-left: 0;
+  margin-right: auto;
+}
+.att-image.att-align-right {
+  margin-left: auto;
+  margin-right: 0;
+}
+.att-image.att-align-center {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Excluded PDF / non-embeddable attachment: muted italic 11.5px line. */
