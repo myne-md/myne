@@ -2386,6 +2386,10 @@ export const ROSTER = Object.freeze([
       // scenarios below exercise the branch where every format is offered and
       // none of them can reach the branch where one is withheld.
       "e2e-web/note-export-capability.e2e.ts",
+      // The ordering half, also browser-only: the plaintext-egress sentence is
+      // the OS save dialog's TITLE on desktop, so `confirmEgress` is never
+      // called there and the dialog this drives does not exist to be driven.
+      "e2e-web/export-egress-disclosure.e2e.ts",
       "e2e/note-export.e2e.ts",
       "e2e/note-export-html.e2e.ts",
       "e2e/note-export-txt.e2e.ts",

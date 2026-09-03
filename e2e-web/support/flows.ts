@@ -281,6 +281,37 @@ export async function clickContextMenuItem(
 }
 
 /**
+ * Click a LEAF context-menu item, one that performs its action and dismisses
+ * the menu, and wait for the menu to be gone.
+ *
+ * The pair to {@link clickContextMenuItem}, which waits for the menu to still
+ * be there because it is used on rows that OPEN a submenu. Waiting for items
+ * after a leaf click is waiting for a menu that is on its way out, so the two
+ * cases cannot share one contract: the first version of this scenario used the
+ * submenu helper on a format row and timed out against a menu that had closed
+ * exactly as it should.
+ *
+ * Same DOM click, same reason: {@link openNoteContextMenu} records that the
+ * driver's synthesized pointer does not reach this surface in Chromium.
+ */
+export async function clickContextMenuLeaf(session: Session, itemId: string): Promise<void> {
+  await session.execute(
+    `var el = document.querySelector('[data-testid="notes.context-menu-item"][data-item-id="${itemId}"]');` +
+      `if (!el) throw new Error('no context-menu leaf ${itemId} to click');` +
+      "el.click();",
+  );
+  await session.waitUntil(
+    async () => {
+      const n = await session.execute<number>(
+        "return document.querySelectorAll('[data-testid=\"notes.context-menu-item\"]').length;",
+      );
+      return n === 0 ? true : null;
+    },
+    { label: `context menu dismissed after ${itemId}`, timeoutMs: 15_000 },
+  );
+}
+
+/**
  * Open a note row's context menu, and wait until it has items.
  *
  * **A dispatched `contextmenu`, not the driver's right-click, and that is a
