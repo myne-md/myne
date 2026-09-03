@@ -38,9 +38,9 @@ import {
   DEFAULT_DAILY_DATE_FORMAT,
   DEFAULT_DAILY_FOLDER,
   formatDailyDate,
-  resolveTodayNote,
+  resolvePeriodNote,
 } from "../../src/notes/dailyNote";
-import { buildRenderContext } from "../../src/notes/newNoteFromTemplate";
+import { buildRenderContext, singleDay } from "../../src/notes/newNoteFromTemplate";
 import type { TitleRecord } from "../../src/notes/loadNoteBatch";
 
 /**
@@ -208,14 +208,20 @@ describe("the daily note resolves at invocation, not at page load", () => {
       note({ id: "a", title: "2026-03-10", folder: "Daily/" }),
       note({ id: "b", title: "2026-03-11", folder: "Daily/" }),
     ];
-    const monday = resolveTodayNote(local(2026, 3, 10), null, null, notes);
-    const tuesday = resolveTodayNote(local(2026, 3, 11), null, null, notes);
-    expect(monday).toEqual({ kind: "open", id: "a", dateTitle: "2026-03-10" });
-    expect(tuesday).toEqual({ kind: "open", id: "b", dateTitle: "2026-03-11" });
+    // `resolvePeriodNote(now, period, settings, notes)` since myne#177 made the
+    // daily flow one case of three; `{}` is "no folder, no format", which is
+    // what the two nulls used to say. `toMatchObject` rather than `toEqual`
+    // because the result now also carries the `range` the create path fills
+    // `{{period_start}}` from, and pinning it here would assert the calendar
+    // rather than the clock, which is this file's subject.
+    const monday = resolvePeriodNote(local(2026, 3, 10), "daily", {}, notes);
+    const tuesday = resolvePeriodNote(local(2026, 3, 11), "daily", {}, notes);
+    expect(monday).toMatchObject({ kind: "open", id: "a", dateTitle: "2026-03-10" });
+    expect(tuesday).toMatchObject({ kind: "open", id: "b", dateTitle: "2026-03-11" });
   });
 
   it("asks to CREATE for a day with no note, in the configured folder", () => {
-    const res = resolveTodayNote(local(2026, 3, 12), null, null, [
+    const res = resolvePeriodNote(local(2026, 3, 12), "daily", {}, [
       note({ id: "a", title: "2026-03-10", folder: "Daily/" }),
     ]);
     expect(res.kind).toBe("create");
@@ -236,8 +242,8 @@ describe("a template's tokens render at instantiation, not at authoring", () => 
     // containing `{{date}}` must stamp the day the NOTE is made, not the day
     // the template was written. Two `now` values through one context builder
     // is the whole check.
-    const monday = buildRenderContext(local(2026, 3, 10, 9, 5), "Standup");
-    const tuesday = buildRenderContext(local(2026, 3, 11, 9, 5), "Standup");
+    const monday = buildRenderContext(local(2026, 3, 10, 9, 5), "Standup", singleDay(local(2026, 3, 10, 9, 5)));
+    const tuesday = buildRenderContext(local(2026, 3, 11, 9, 5), "Standup", singleDay(local(2026, 3, 11, 9, 5)));
     expect(monday.date).toBe("2026-03-10");
     expect(tuesday.date).toBe("2026-03-11");
     expect(monday.title).toBe(tuesday.title);
@@ -247,7 +253,7 @@ describe("a template's tokens render at instantiation, not at authoring", () => 
     // 00:30 local. A context built from UTC accessors would stamp the previous
     // day for every user east of Greenwich — the exact failure the
     // `localDateTime` module's header says it exists to prevent.
-    const ctx = buildRenderContext(local(2026, 3, 10, 0, 30), "Journal");
+    const ctx = buildRenderContext(local(2026, 3, 10, 0, 30), "Journal", singleDay(local(2026, 3, 10, 0, 30)));
     expect(ctx.date).toBe("2026-03-10");
     expect(ctx.time).toBe("00:30");
     expect(ctx.datetime).toBe("2026-03-10 00:30");
@@ -256,7 +262,7 @@ describe("a template's tokens render at instantiation, not at authoring", () => 
   it("the weekday follows the host locale while the date does not", () => {
     // Two fields with deliberately different rules, and a test that pins both:
     // `weekday` is localized (the app-language proxy), `date` is not.
-    const ctx = buildRenderContext(local(2026, 3, 10), "X");
+    const ctx = buildRenderContext(local(2026, 3, 10), "X", singleDay(local(2026, 3, 10)));
     expect(ctx.date).toBe("2026-03-10");
     expect(ctx.weekday.length).toBeGreaterThan(0);
     // 2026-03-10 is a Tuesday. Asserted through `Intl` rather than pasted so
@@ -295,12 +301,17 @@ describe("createNoteFromTemplate cannot read the wall clock behind a caller's ba
     // today's — a note that disagrees with itself, and a once-a-release walk
     // would have to be run at exactly the wrong second to see it.
     const src = readSource("src/screens/Editor.tsx");
+    // `onOpenTodayNote` became `onOpenPeriodNote` when myne#177 folded weekly
+    // and monthly into one entry point, and the instant is now taken through
+    // `zonedNow` so the day is the DISPLAY timezone's. Both facts move the
+    // strings this asserts; the property does not, which is that ONE binding
+    // reaches both the resolve and the template render.
     const flow = src.slice(
-      src.indexOf("const onOpenTodayNote"),
-      src.indexOf("const onOpenTodayNote") + 2000,
+      src.indexOf("const onOpenPeriodNote"),
+      src.indexOf("const onOpenPeriodNote") + 2000,
     );
-    expect(flow).toContain("const now = new Date();");
-    expect(flow).toContain("resolveTodayNote(\n        now,");
+    expect(flow).toContain("const now = zonedNow(new Date(), prefs.timezone);");
+    expect(flow).toContain("resolvePeriodNote(now,");
     // …and the template branch takes that same binding rather than a fresh one.
     const templateCall = flow.slice(flow.indexOf("createNoteFromTemplate("));
     expect(templateCall.slice(0, 200)).toContain("now,");

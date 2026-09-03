@@ -41,7 +41,16 @@ const REPO_ROOT = process.cwd();
 // block at all, so reading the canon copy here would silently drop a third of
 // the matrix — the third with a pure-black background, which is the one most
 // likely to lose a dark swatch.
-const CSS = readFileSync(join(REPO_ROOT, "src/styles/tokens.css"), "utf8");
+// **Both sheets, concatenated.** myne-md/myne#478 moved the design TOKENS to
+// `client-core/src/tokens.css` and left `src/styles/tokens.css` as this
+// client's component layer; its own header says so. Reading one of them
+// means a token that moves between them turns this into a test that fails
+// about its own input, which is how this file came to report 167 missing
+// tokens against a palette that was entirely present.
+const CSS = [
+  readFileSync(join(REPO_ROOT, "client-core/src/tokens.css"), "utf8"),
+  readFileSync(join(REPO_ROOT, "src/styles/tokens.css"), "utf8"),
+].join("\n");
 
 /** The eight colour-group keys, in palette order. */
 const GROUPS = [

@@ -116,7 +116,7 @@ describe("the daily-note title is Gregorian and ASCII whatever the host locale i
     // agree with Gregorian on the runner's own locale would pass every
     // assertion above and fail on a Thai user's machine — which is precisely
     // the bug nobody catches, because the developer's machine is not Thai.
-    for (const forbidden of ["Intl.", "toLocaleDateString", "toLocaleString", "toLocaleTimeString"]) {
+    for (const forbidden of ["toLocaleDateString", "toLocaleString", "toLocaleTimeString"]) {
       expect(
         SOURCE.includes(forbidden),
         `src/notes/dailyNote.ts reaches for \`${forbidden}\`. A daily note is found ` +
@@ -125,6 +125,28 @@ describe("the daily-note title is Gregorian and ASCII whatever the host locale i
           `the vault matches them, and changing the machine's language orphans ` +
           `every daily note written before the change.`,
       ).toBe(false);
+    }
+
+    // **`Intl.` is banned by LOCALE, not outright, and the distinction is the
+    // whole rule.** A blanket ban was right while this file only formatted, and
+    // it stopped being right when `zonedNow` landed: converting an instant into
+    // a timezone's calendar day needs `Intl.DateTimeFormat`, and there is no
+    // other API for it. What makes that safe is the FIXED locale — `"en-US"`
+    // with a `timeZone`, whose output is the same on a Thai machine as on this
+    // one. What is never safe is a locale the host chooses, which is exactly
+    // the one-line "respect the user's locale" edit this file's header records
+    // injecting. So the check is that every `Intl.` construction names a
+    // literal locale.
+    for (const call of SOURCE.match(/new Intl\.[A-Za-z]+\(\s*[^,)]*/g) ?? []) {
+      const firstArg = call.slice(call.indexOf("(") + 1).trim();
+      expect(
+        /^"[a-zA-Z-]+"$/.test(firstArg),
+        `src/notes/dailyNote.ts builds \`${call.trim()}…\` with a non-literal locale. ` +
+          `A host-chosen locale is what puts a Thai user's titles in the Buddhist ` +
+          `era; a hard-coded one (\`"en-US"\` with a \`timeZone\`) answers the same ` +
+          `on every machine, which is why the timezone conversion is allowed to ` +
+          `use one at all.`,
+      ).toBe(true);
     }
   });
 });
