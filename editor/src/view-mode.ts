@@ -18,7 +18,7 @@
 // gutter (line-numbers.ts). The decoration stack (`myneDecorations()`) is the
 // ONLY thing toggled for source mode; it does not include syntax highlighting.
 
-import { Compartment, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { myneDecorations } from "./decorations";
 import { readingModeFacet } from "./decorations/cursor-aware";
@@ -67,8 +67,24 @@ function editableFor(mode: ViewMode, readOnly: boolean): Extension {
   // Reading view is read-only; an explicit `readOnly` (companion mirror) also
   // forces it. Live + source are editable. Reading mode also provides the
   // reading-mode facet so cursor-aware reveal is hard-off (never lifts source).
+  //
+  // `EditorState.readOnly` is the load-bearing half and it was missing
+  // (myne-md/myne#564). `EditorView.editable.of(false)` stops the USER typing,
+  // and CodeMirror's own documentation is explicit that it "doesn't affect API
+  // calls that change the editor content, even when those are bound to keys".
+  // Every editing command in `@codemirror/commands` guards on
+  // `state.readOnly` instead, and nothing in this tree ever set it, so every one
+  // of those guards was inert: `deleteCharBackward`, `insertNewlineContinueMarkup`
+  // and the two whole-line delete chords in `line-boundary.ts` would all have run
+  // on a surface whose entire contract is that the note cannot be changed there.
+  //
+  // Setting it here rather than adding a check per command is the difference
+  // between one true statement and one per caller, and the next command someone
+  // binds inherits it for free.
+  const locked = readOnly || mode === "reading";
   return [
-    EditorView.editable.of(!(readOnly || mode === "reading")),
+    EditorView.editable.of(!locked),
+    EditorState.readOnly.of(locked),
     readingModeFacet.of(mode === "reading"),
   ];
 }

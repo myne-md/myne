@@ -15,12 +15,16 @@
 // whole probe again.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: { count?: number }) =>
       opts?.count !== undefined ? `${key}:${opts.count}` : key,
+    // The composer reads `i18n.language` and passes it to the run, because the
+    // host cannot read the chosen language (it lives in localStorage). A mock
+    // returning only `t` made every send throw before it reached `startAgentRun`.
+    i18n: { language: "en" },
   }),
 }));
 
@@ -138,6 +142,49 @@ describe("ChatComposer", () => {
     expect(agentCapability).not.toHaveBeenCalled();
   });
 
+  it("counts the probe's attempts on the button while it waits", async () => {
+    // myne-md/myne#575. The probe was measured at 40 seconds on a remote
+    // provider, and the button said one unchanging thing for the whole of it,
+    // which reads as a hang. Driven through the real binding's callback rather
+    // than by setting state, so deleting the `onAttempt` argument in
+    // `ensureCapability` fails this rather than leaving it green.
+    let announce: ((p: { attempt: number; of: number }) => void) | undefined;
+    let settle: ((v: unknown) => void) | undefined;
+    agentCapability.mockImplementation((onAttempt: unknown) => {
+      announce = onAttempt as (p: { attempt: number; of: number }) => void;
+      return new Promise((resolve) => {
+        settle = resolve;
+      });
+    });
+    mount();
+    type("tidy the headings");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    // Before the host has announced anything there is no number to show, and a
+    // "0 of 3" would describe nothing.
+    await waitFor(() => expect(announce).toBeDefined());
+    expect(screen.getByTestId("ai.composer-send").textContent).toContain(
+      "agent.composer.checking",
+    );
+
+    act(() => announce!({ attempt: 2, of: 3 }));
+    expect(screen.getByTestId("ai.composer-send").textContent).toContain(
+      "agent.composer.checkingAt",
+    );
+
+    // And it goes away when the probe does, rather than sticking on the last
+    // attempt it happened to see.
+    await act(async () => {
+      settle!(PASSING);
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.composer-send").textContent).not.toContain(
+        "agent.composer.checking",
+      ),
+    );
+  });
+
   it("does not re-probe after a remount", async () => {
     // myne-md/myne#568. `AiChatTab` mounts conditionally on the right panel's
     // active tab, so this is an ordinary tab switch away and back, and it used
@@ -197,11 +244,18 @@ describe("ChatComposer", () => {
     fireEvent.click(screen.getByTestId("ai.composer-send"));
     await waitFor(() => expect(agentStart).toHaveBeenCalled());
     expect(agentCapability).toHaveBeenCalledTimes(1);
-    // The third argument is the open-channel callback the run reports its id
-    // through (myne-md/myne#544); the scope is what this test is about.
+    // Third is the interface language, which the host cannot read for itself
+    // (myne-md/myne#618); fourth is the visible chat history the run is seeded
+    // with (myne-md/myne#617); fifth is the open-channel callback the run
+    // reports its id through (myne-md/myne#544). The scope is what this test is
+    // about, and asserting the whole call is what keeps a new argument from
+    // being added without anyone deciding it should be.
     expect(agentStart).toHaveBeenCalledWith(
       "tidy the headings",
       { kind: "notes", value: ["n1"] },
+      "en",
+      expect.any(Array),
+      expect.any(Function),
       expect.any(Function),
     );
     // A second send reuses the verdict rather than paying for it again.
@@ -230,6 +284,9 @@ describe("ChatComposer", () => {
     expect(agentStart).toHaveBeenCalledWith(
       "rename the concept",
       { kind: "folder", value: "Projects" },
+      "en",
+      expect.any(Array),
+      expect.any(Function),
       expect.any(Function),
     );
   });

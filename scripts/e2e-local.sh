@@ -21,8 +21,17 @@
 #                         quarantined spec self-skips and this reports success.
 #   MYNE_E2E_AI=1         run the inference suites. Needs the
 #                         `local-inference-stub` build too: use e2e-ai-buildrun.sh.
+#   MYNE_E2E_ONLY="a b"   run only these spec files. For answering one question
+#                         about one change: a shared-tree edit can move an element
+#                         an existing scenario clicks, and waiting out the whole
+#                         suite to learn whether it did is how that check gets
+#                         skipped. NOT a way to gate a branch. The gate is the
+#                         full suite, and `e2e-floor` exists because a run that
+#                         executes fewer scenarios still exits 0.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 
 IMAGE=myne-e2e
 SKIP_BUILD=0
@@ -68,21 +77,10 @@ RUN_FLAGS=(
   # (and vice versa). Latent until a member gained a real external dependency
   # (editor/ → @excalidraw); bites as `Cannot find module` on whichever side
   # ran `pnpm install` second.
-  -v myne-e2e-nm-dialect:/work/dialect/node_modules
-  -v myne-e2e-nm-editor:/work/editor/node_modules
-  -v myne-e2e-nm-copy:/work/copy/node_modules
-  -v myne-e2e-nm-ornaments:/work/ornaments/node_modules
-  -v myne-e2e-nm-preview:/work/preview/node_modules
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
   # Incremental Rust builds across runs.
-  -v myne-e2e-target:/work/target
-  # Mounted where cargo actually LOOKS, which is `$CARGO_HOME/registry` — and
-  # `E2E_ENV` below sets `CARGO_HOME=/home/e2e/.cargo`. It used to be mounted at
-  # `/usr/local/cargo/registry`, which nothing in this container reads: measured
-  # inside a live run, cargo had written 528 MB to `/home/e2e/.cargo/registry`
-  # (container-local, discarded by `--rm`) while the persisted volume held 59 MB
-  # and was untouched. So "incremental across runs" held for the target dir and
-  # never for the crate downloads.
-  -v myne-e2e-cargo-registry:/home/e2e/.cargo/registry
+  -v "$E2E_TARGET_VOLUME":/work/target
+  "${E2E_REGISTRY_MOUNT[@]}"
   -w /work
   # Volumes are created root-owned; the container user is `e2e` (the
   # suites assert chmod-denial paths, which root would bypass).
@@ -91,8 +89,12 @@ RUN_FLAGS=(
 
 # `su` resets the environment, and login shells re-source /etc/profile
 # (clobbering the rust image's PATH) — export explicitly, same idiom as
-# .woodpecker.yml's cargo-test-tauri step.
+# .woodpecker/main.yml's cargo-test-tauri step.
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
+# Host-side append, NOT inside the single-quoted literal above: that string is
+# passed through to the container's bash, where `$E2E_CARGO_JOBS` is unset and
+# would expand to nothing. See scripts/lib/e2e-docker.sh.
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS"
 
 # Forwarded HOST-side, because the container inherits neither and a spec gated on
 # one of them SELF-SKIPS rather than failing: a run that verified nothing reports
@@ -112,26 +114,29 @@ fi
 if [[ -n "$SERVER_BIN" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/$SERVER_BIN"
 fi
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target /home/e2e/.cargo'
 
 if [[ "$SHELL_MODE" == 1 ]]; then
   exec docker run -it "${RUN_FLAGS[@]}" "$IMAGE" \
-    bash -c "$FIX_PERMS && su e2e -s /bin/bash -c '$E2E_ENV && cd /work && exec bash -i'"
+    bash -c "$E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '$E2E_ENV && cd /work && exec bash -i'"
 fi
 
 # `--features voice-capture-stub` (myne#389 item D): the deterministic 440 Hz
 # capture source is a COMPILE-time variant now, not an env knob, so the voice
 # scenarios need it built in. Additive to the default features.
-BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle -- --features voice-capture-stub'
+# `touch src-tauri/src/lib.rs`: the frontend is EMBEDDED at compile time, so a
+# frontend-only change relinks nothing and the binary keeps the bundle it
+# embedded when it was last compiled, which with a shared target volume can be
+# another worktree's. scripts/e2e-buildrun.sh carries the worked example.
+BUILD_CMD='pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub'
 if [[ "$SKIP_BUILD" == 1 ]]; then
   BUILD_CMD='pnpm install --frozen-lockfile'
 fi
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&
-    xvfb-run -a pnpm test:e2e $RETRY_FLAG
+    xvfb-run -a pnpm test:e2e $RETRY_FLAG ${MYNE_E2E_ONLY:-}
   '
 "

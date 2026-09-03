@@ -608,6 +608,64 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
       expect(screen.queryByTestId("ai.agent-answer")).toBeNull();
     });
 
+    // myne-md/myne#574. A run that stalls proposed nothing AND answered
+    // nothing, so the no-changes line comes back and reports the less useful of
+    // the two facts: it reads as a considered verdict on the note, when what
+    // happened is that the run never did its work.
+    it("says a stalled run gave no answer, rather than reporting no changes", () => {
+      sendAgentTurn("how many personal tasks are in this note", "This note");
+      settleAgentTurn({ ...SUMMARY, edits: 0, newNotes: 0, end: "stalled" });
+      render(<AiChatTab />);
+      const shown = screen.getByTestId("ai.agent-summary").textContent ?? "";
+      expect(shown).toContain("agentTurn.noAnswer");
+      expect(shown).not.toContain("agent.review.noChanges");
+    });
+
+    it("says the same for a run that ran out of steps", () => {
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({
+        ...SUMMARY,
+        edits: 0,
+        newNotes: 0,
+        end: "exhaustedIterations",
+      });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+        "agentTurn.noAnswer",
+      );
+    });
+
+    it("keeps the no-changes line for a run that finished having decided so", () => {
+      // The other direction, and the one that must not move: a `finished` run
+      // with an empty proposal really did look and conclude there was nothing
+      // to change. So did a `cancelled` one, by the user's own act.
+      sendAgentTurn("tidy the headings", "Projects");
+      settleAgentTurn({ ...SUMMARY, edits: 0, newNotes: 0, end: "finished" });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+        "agent.review.noChanges",
+      );
+    });
+
+    it("shows the answer, not the no-answer line, when a stalled run still said something", () => {
+      // A run can stall AFTER answering: the model replies and then goes round
+      // in circles instead of finishing. The answer is still the answer.
+      sendAgentTurn("how many personal tasks are in this note", "This note");
+      settleAgentTurn({
+        ...SUMMARY,
+        edits: 0,
+        newNotes: 0,
+        end: "stalled",
+        summary: "You have 16 personal tasks in this note.",
+      });
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.agent-answer").textContent).toBe(
+        "You have 16 personal tasks in this note.",
+      );
+      const shown = screen.getByTestId("ai.agent-summary").textContent ?? "";
+      expect(shown).not.toContain("agentTurn.noAnswer");
+    });
+
     it("treats a whitespace-only summary as none", () => {
       // The model can close with a bare newline. Rendering that is an empty
       // bubble line, and worse, it would suppress the no-changes sentence on a

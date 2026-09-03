@@ -16,17 +16,20 @@
 // It is deliberately NOT a persistent history. One run, the most recent. The
 // durable per-note path is the snapshots panel, which holds every one of these
 // snapshots permanently and restores them one at a time.
+//
+// **The logic moved to `useUndoLastRun` and is shared with the mobile client**
+// (myne-md/myne#456). What is left here is the rendering. That split is not
+// tidiness: this component carried three recorded defect fixes (the apply
+// COUNTER as the effect key, the report keyed to its run, the epoch captured
+// before each await), each invisible until it happens to a user, and a second
+// hand-typed copy would have been a second chance to get all three wrong. The
+// hook's own header states them.
 
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../../components/primitives/Button";
-import {
-  agentLastRun,
-  agentUndo,
-  type AgentUndoResult,
-} from "../../../lib/agent-run";
-import { currentRunEpoch, setUndoable, useAgent } from "../agentStore";
+import { agentLastRun, agentUndo } from "../../../lib/agent-run";
+import { undoResultText, useUndoLastRun } from "../useUndoLastRun";
 
 export interface UndoLastRunProps {
   /** Called after an undo changed notes on disk, so the caller can reload what
@@ -37,76 +40,13 @@ export interface UndoLastRunProps {
 
 export function UndoLastRun({ onReverted }: UndoLastRunProps) {
   const { t } = useTranslation();
-  const agent = useAgent();
-  const [busy, setBusy] = useState(false);
-  // The report, and WHICH run it describes. The run id is not decoration: an
-  // earlier version kept only the report, so after one undo this strip showed
-  // that report forever and the NEXT run's undo offer never rendered, since the
-  // two arms below are mutually exclusive. Keying the report to its run is what
-  // lets a new run supersede it.
-  const [result, setResult] = useState<{
-    runId: string;
-    report: AgentUndoResult;
-  } | null>(null);
+  const { run, report, busy, undo } = useUndoLastRun({
+    agentLastRun,
+    agentUndo,
+    ...(onReverted === undefined ? {} : { onReverted }),
+  });
 
-  // Re-read whenever an apply lands, and on mount. The host is the owner, so
-  // this asks rather than infers: an apply in another surface, or a lock that
-  // cleared the record, both show up here on the next read without this
-  // component modelling either event.
-  const appliedTick = agent.applied?.applied ?? 0;
-  useEffect(() => {
-    let live = true;
-    // Captured before the await: a reply landing after the vault was left must
-    // not re-seed the offer with the previous vault's note ids. The unmount
-    // this used to rely on is a rendering fact, not a guarantee.
-    const epoch = currentRunEpoch();
-    void agentLastRun()
-      .then((run) => {
-        if (!live) return;
-        setUndoable(run, epoch);
-        // A different run than the one the report describes means the report is
-        // history. Dropping it here rather than on the undo is deliberate: the
-        // report has to survive its own render, and the event that makes it
-        // stale is a LATER run, not the undo that produced it.
-        setResult((prev) =>
-          prev !== null && run !== null && run.runId !== prev.runId ? null : prev,
-        );
-      })
-      .catch(() => {
-        // A failed read means the offer is not shown. Failing closed here is
-        // right: an Undo button that cannot name a run would fail on press.
-        if (live) setUndoable(null, epoch);
-      });
-    return () => {
-      live = false;
-    };
-  }, [appliedTick]);
-
-  const run = agent.undoable;
-  if (run === null && result === null) return null;
-
-  async function undo() {
-    if (run === null || busy) return;
-    setBusy(true);
-    try {
-      const r = await agentUndo(run.runId);
-      setResult({ runId: run.runId, report: r });
-      // The host consumed the record, so the offer goes with it rather than
-      // waiting for the next read. A second press would report `noSuchRun`.
-      setUndoable(null, currentRunEpoch());
-      onReverted?.(run.restorePoints.map(([noteId]) => noteId));
-    } catch {
-      setResult(null);
-      // Re-read rather than guessing: the run may be gone (a lock landed) or
-      // the call may simply have failed, and those want different offers.
-      const epoch = currentRunEpoch();
-      await agentLastRun()
-        .then((r) => setUndoable(r, epoch))
-        .catch(() => setUndoable(null, epoch));
-    } finally {
-      setBusy(false);
-    }
-  }
+  if (run === null && report === null) return null;
 
   return (
     <div
@@ -122,7 +62,7 @@ export function UndoLastRun({ onReverted }: UndoLastRunProps) {
         fontSize: "var(--text-sm)",
       }}
     >
-      {result === null && run !== null ? (
+      {report === null && run !== null ? (
         <>
           <span data-testid="agentUndoLast.summary" style={{ flex: 1 }}>
             {t("agent.undo.offer", { count: run.restorePoints.length })}
@@ -137,20 +77,9 @@ export function UndoLastRun({ onReverted }: UndoLastRunProps) {
           </Button>
         </>
       ) : null}
-      {result !== null ? (
+      {report !== null ? (
         <span data-testid="agentUndoLast.result" style={{ flex: 1 }}>
-          {t("agent.undo.reverted", { count: result.report.reverted })}
-          {result.report.failed.length > 0
-            ? ` ${t("agent.undo.failed", { count: result.report.failed.length })}`
-            : ""}
-          {/* The half an undo cannot do. Said every time rather than only when
-              it would surprise someone, because "the run was undone" otherwise
-              reads as covering the notes it created. */}
-          {result.report.notesCreatedNotReverted > 0
-            ? ` ${t("agent.undo.createdNotReverted", {
-                count: result.report.notesCreatedNotReverted,
-              })}`
-            : ""}
+          {undoResultText(report, t)}
         </span>
       ) : null}
     </div>

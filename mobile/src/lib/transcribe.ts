@@ -1,7 +1,13 @@
 // Transcription IPC wrapper (mobile, MYND-563) — the SINGLE call path to the
-// local-inference `transcribe` command, used by the audio-attachment surface and
-// the in-note audio widget (through `EditorHost.transcribe`) so neither grows a
-// divergent call path. It opens a per-segment streaming `Channel<string>`
+// local-inference `transcribe` command, used by the audio-attachment surface.
+// It does NOT yet reach the in-note audio widget: this comment claimed it did,
+// "through `EditorHost.transcribe`", and mobile populates no such slot (grep
+// `mobile/src` for `transcribe:`). That matters beyond tidiness, because the
+// widget indexes its hint table by the EDITOR's union and this module's union
+// carries `"not_ready"`, which has no row there; wiring the slot without
+// reconciling the two would render an empty hint (myne-md/myne#510).
+//
+// It opens a per-segment streaming `Channel<string>`
 // feeding `onSegment`, and resolves with the FULL transcript when transcription
 // ends. The decrypted PCM + transcript never leave Rust except as this final
 // string / the streamed segments — AS1-class content, never logged here.
@@ -78,7 +84,19 @@ function normalizeTranscribeError(raw: unknown): TranscribeError {
       : raw !== null && typeof raw === "object" && "kind" in raw
         ? String((raw as { kind: unknown }).kind)
         : "";
-  if (tag === "NotReady" || tag === "not_ready") return { kind: "not_ready" };
-  if (tag === "AudioTooLong" || tag === "audio_too_long") return { kind: "too_long" };
-  return { kind: "failed" };
+  // Normalized to snake_case first rather than each spelling written twice.
+  // Tauri serializes a unit variant as its identifier (`AudioTooLong`) while
+  // `EngineError::kind` emits snake_case (`audio_too_long`), and hand-writing
+  // both rows put a silent fall-through to `"failed"` one transcription error
+  // away, twice per cause. The desktop normalizer was rewritten this way in
+  // myne-md/myne#510; this is the same fix on the twin, which keeps its own
+  // deliberately coarser three-arm union.
+  switch (tag.replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase()) {
+    case "not_ready":
+      return { kind: "not_ready" };
+    case "audio_too_long":
+      return { kind: "too_long" };
+    default:
+      return { kind: "failed" };
+  }
 }

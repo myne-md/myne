@@ -77,6 +77,8 @@ export interface SeededVault {
   account: string;
   /** Present only when seeded with `exportSuite: true`. */
   exportSuite?: ExportSuite;
+  /** Present only on the LAST vault, and only with `importSourceSuite: true`. */
+  importSourceSuite?: ImportSourceSuite;
 }
 
 /** One attachment of the MYND-116 note-export suite. */
@@ -111,6 +113,33 @@ export interface ExportSuite {
   pdfAttachment: ExportSuiteAttachment;
 }
 
+/**
+ * Names the vault-import source suite laid down, so a scenario asserts against
+ * the strings the generator wrote rather than against re-typed copies.
+ *
+ * The two `…NotWritten` fields are exactly that: reported, not written. The
+ * generator cannot seal a `vault.dictionary` without keeping a second copy of
+ * the postcard payload that lives in `src-tauri/src/spell/dictionary.rs`, and a
+ * fixture that re-implements a format drifts from it silently. The dictionary
+ * carry is covered by `tests/notes/import/myneDictionary.test.ts` and by
+ * `plugins::importer::source_dictionary::tests` instead.
+ */
+export interface ImportSourceSuite {
+  linkingNoteTitle: string;
+  collidingLinkedTitle: string;
+  collidingUnlinkedTitle: string;
+  untitledBody: string;
+  trashedTitle: string;
+  templateTitle: string;
+  referencedAttachmentId: string;
+  unreferencedAttachmentId: string;
+  /** Embedded by an imported note, absent from the source catalog: no blob. */
+  tombstonedAttachmentId: string;
+  brokenLinkTarget: string;
+  dictionaryWordNotWritten: string;
+  ignoredWordNotWritten: string;
+}
+
 export interface SeedOptions {
   kdf?: "weak" | "production";
   count?: number;
@@ -118,6 +147,16 @@ export interface SeedOptions {
   /** Lay the MYND-116 note-export suite into every seeded vault.
    *  Implies `generation: "v0.1"` — the suite writes `MY01`/`MYA1`/`MYC1`. */
   exportSuite?: boolean;
+  /**
+   * Lay the vault-import source suite into the LAST seeded vault
+   * (myne-md/myne#464). Needs `count >= 2`, and the generator refuses fewer:
+   * a vault-import scenario needs a target and a source, and putting the
+   * source's content into both would hand the target the very titles the
+   * collision rules are supposed to meet for the first time during the import.
+   *
+   * Implies `generation: "v0.1"` for the same reason `exportSuite` does.
+   */
+  importSourceSuite?: boolean;
   /**
    * Which protocol generation the seeded vault is written in. Defaults to the
    * product's birth format (v0.2 — `decisions.md` 2026-08-13), so a scenario
@@ -195,9 +234,12 @@ export function seedVaults(appDataDir: string, opts: SeedOptions = {}): SeededVa
   ];
   if (opts.password) args.push("--password", opts.password);
   if (opts.exportSuite) args.push("--export-suite");
+  if (opts.importSourceSuite) args.push("--import-source-suite");
   // `--export-suite` pins v0.1 generator-side; passing both is refused there
   // rather than silently reconciled, so only forward an explicit choice.
-  if (opts.generation && !opts.exportSuite) args.push("--generation", opts.generation);
+  if (opts.generation && !opts.exportSuite && !opts.importSourceSuite) {
+    args.push("--generation", opts.generation);
+  }
   let stdout: string;
   try {
     stdout = execFileSync(bin, args, {
@@ -288,6 +330,16 @@ export function vaultLabelPath(appDataDir: string, vaultId: string): string {
  *  beside `sync-config.json` under `app_config_dir` and not under any vault. */
 export function hideVaultNamesFlagPath(appConfigDir: string): string {
   return join(appConfigDir, "vault-names.json");
+}
+
+/** Path to the device-local screen-capture override,
+ *  `<app_config_dir>/screen-capture.json`
+ *  (`core/src/screen_capture_override.rs`, myne-md/myne#482). Same directory
+ *  and same reason as `vault-names.json` above: a DEVICE setting, not vault
+ *  data, and it has to be readable before any vault is open because
+ *  "unreadable before unlock" is the lockout it exists to open. */
+export function screenCaptureOverridePath(appConfigDir: string): string {
+  return join(appConfigDir, "screen-capture.json");
 }
 
 /**

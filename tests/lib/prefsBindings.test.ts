@@ -34,7 +34,8 @@ import {
   prefsRead,
   setAutoLockTimeout,
   setDailyTemplate,
-  setDeliberateFolders,
+  mutateDeliberateFolders,
+  registerDeliberateFolders,
   setEditorContentWidth,
   setEditorFontFamily,
   setEditorLayout,
@@ -44,7 +45,7 @@ import {
   setKeymapBinding,
   setScreenCaptureProtection,
   setShowNoteTimestamps,
-  setSpellLanguages,
+  mutateSpellLanguages,
   setTheme,
   toggleFavoriteOnDisk,
   setVaultLabel,
@@ -141,10 +142,10 @@ describe("command name + arg-key shape", () => {
     });
   });
 
-  it("setSpellLanguages passes the full set under { languages }", async () => {
-    await setSpellLanguages(["en-US", "tr"]);
+  it("mutateSpellLanguages passes the mutation under { mutation }", async () => {
+    await mutateSpellLanguages({ add: ["en-US", "tr"] });
     expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|set_spell_languages", {
-      languages: ["en-US", "tr"],
+      mutation: { add: ["en-US", "tr"] },
     });
   });
 });
@@ -176,13 +177,13 @@ describe("prefs-nonce bump discipline", () => {
     expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(1);
   });
 
-  it("setDeliberateFolders bumps the nonce so non-sidebar consumers see new empty folders", async () => {
+  it("mutateDeliberateFolders bumps the nonce so non-sidebar consumers see new empty folders", async () => {
     // The "Move note to folder…" picker reads deliberate_folders from the prefs
     // blob, not the sidebar's local set — without this bump a freshly-created
     // empty folder is invisible to it until an app reload.
-    await setDeliberateFolders(["Arsiv/"]);
+    await mutateDeliberateFolders({ add: ["Arsiv/"] });
     expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|set_deliberate_folders", {
-      folders: ["Arsiv/"],
+      mutation: { add: ["Arsiv/"] },
     });
     expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(1);
   });
@@ -357,7 +358,7 @@ describe("the roster: every export that writes vault.prefs bumps the nonce", () 
     // before its `invoke` leaves the loop through `writes.length === 0` and
     // silently stops being tested. This number is measured, and it is also the
     // guard against the read-then-write exclusion the mock above fixed.
-    expect(covered.length).toBeGreaterThanOrEqual(68);
+    expect(covered.length).toBeGreaterThanOrEqual(69);
     expect(covered).toContain("toggleFavoriteOnDisk");
     // Two names pinned rather than left to the count, because these two toggles
     // are the ones a user reads as a privacy promise, so a surface showing the
@@ -376,5 +377,68 @@ describe("the roster: every export that writes vault.prefs bumps the nonce", () 
     // §6 claim: the displayed state of these toggles must match disk.
     expect(covered).toContain("setScreenCaptureProtection");
     expect(covered).toContain("setRemindersEnabled");
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// myne-md/myne#613: the retry-and-classify wrapper the folder surfaces use.
+//
+// The three outcomes get opposite user treatment, so what is under test is the
+// CLASSIFICATION and the ATTEMPT COUNT together. Either alone passes for a wrong
+// version: a wrapper that retried a budget refusal still returns `budget-full`,
+// and one that gave up on the first hiccup still returns a valid outcome.
+// ---------------------------------------------------------------------------
+
+/** How many times the deliberate-folders command reached `invoke`. */
+function attempts(): number {
+  return invokeMock.mock.calls.filter(
+    ([cmd]) => cmd === "plugin:prefs|set_deliberate_folders",
+  ).length;
+}
+
+describe("registerDeliberateFolders: retry the hiccup, report the budget", () => {
+  it("a clean write is `ok`, on one attempt", async () => {
+    invokeMock.mockResolvedValue(0);
+    await expect(registerDeliberateFolders({ add: ["Ideas/"] })).resolves.toBe("ok");
+    expect(attempts()).toBe(1);
+  });
+
+  it("a transient failure retries and reports `ok`, saying nothing to the user", async () => {
+    invokeMock.mockRejectedValueOnce(new Error("disk hiccup")).mockResolvedValue(0);
+    await expect(registerDeliberateFolders({ add: ["Ideas/"] })).resolves.toBe("ok");
+    // The attempt count is the assertion. A version that gave up on the first
+    // failure would return "failed" and show a notice for a hiccup the user can
+    // do nothing about, which is how a surface teaches people to dismiss it.
+    expect(attempts()).toBe(2);
+  });
+
+  it("a persistent failure is `failed`, after exactly two attempts", async () => {
+    invokeMock.mockRejectedValue(new Error("disk is gone"));
+    await expect(registerDeliberateFolders({ add: ["Ideas/"] })).resolves.toBe("failed");
+    expect(attempts()).toBe(2);
+  });
+
+  it("a budget refusal is `budget-full` and is NOT retried", async () => {
+    invokeMock.mockResolvedValue(1);
+    await expect(registerDeliberateFolders({ add: ["Ideas/"] })).resolves.toBe(
+      "budget-full",
+    );
+    // One attempt, not two. The reserve is full: a second attempt refuses
+    // identically, so retrying would only delay a notice the user must act on.
+    expect(attempts()).toBe(1);
+  });
+
+  it("the retry sends the SAME mutation, not a re-derived one", async () => {
+    invokeMock.mockRejectedValueOnce(new Error("hiccup")).mockResolvedValue(0);
+    await registerDeliberateFolders({ add: ["Ideas/"], remove: ["Old/"] });
+    const sent = invokeMock.mock.calls
+      .filter(([cmd]) => cmd === "plugin:prefs|set_deliberate_folders")
+      .map(([, args]) => (args as { mutation: unknown }).mutation);
+    expect(sent).toHaveLength(2);
+    // A re-derivation between attempts is the whole defect this issue closed,
+    // one layer up: the second attempt must not consult anything that could
+    // have changed underneath it.
+    expect(sent[1]).toEqual(sent[0]);
   });
 });

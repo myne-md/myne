@@ -105,6 +105,48 @@ leaving a force-push behind.**
 | 2026-08-13 | `fd8d23c1041351c196bdac274f956fe2fcaa8107` | `sha256:c5f4cd6e8399e96c5ddd8894b078cd595e67eaab4e106f6ef553d7908611ec98` |
 | 2026-08-14 | `fd8d23c1041351c196bdac274f956fe2fcaa8107` | `sha256:d175d1fde8e1234c17ebfc4915e199d05e0d2728ade201d36f8c3ff9052dee25` |
 | 2026-08-14 | `fd8d23c1041351c196bdac274f956fe2fcaa8107` | `sha256:1d8ccfeb4e673113ebc3f92da257c31a2fd62e70263af75387337f40832cad4d` |
+| 2026-08-26 | `5ffe8d388ddeb91e7b08859d122f5e29515a16fc` | `sha256:4870edbb39370d94faaf536cca1e87f708a4ee3d33bb67d156a47db1d4ccacb8` |
+| 2026-09-02 | `0b115cf0d68312126527704c1fd395d9696008da` | `sha256:9f695eb8b43bb1d02e949a0503a8920a5e7505ca1d749a743142d11e7f85f0e6` |
+
+### v0.7.0 has one row, and it rests on one machine rather than two
+
+`0b115cf0` was built once, on macOS / arm64 emulated to `linux/amd64` through
+`web/container/Dockerfile`, with both `--build-arg` values. No second host
+confirmed it. That is weaker evidence than the v0.6.0 row below, which two
+machines agreed on, and the difference is stated here rather than left for a
+reader to infer from a table where both rows look alike.
+
+One thing the single build did establish, because it happened by accident and
+was caught before it reached this table. The same commit built with no
+`--platform` on this Apple Silicon host produced a **linux/arm64** image whose
+`version.json` reported
+`sha256:f55888d154cf3684360d4dc40d78872c2c8764267a1925d8874f71085c8dc2fe`. The
+amd64 build of the identical source reported the row above. Two hashes, one
+commit, one machine, one flag: that is the "why the build host is part of the
+hash" section below, measured again rather than quoted.
+
+### v0.6.0 has one row, and that is the point
+
+v0.5.0 needed three rows because three build hosts produced three hashes.
+`5ffe8d38` needed one, because two hosts produced the same one:
+
+| build host | bundle_hash |
+|---|---|
+| macOS / arm64, emulated to `linux/amd64` via `web/container/Dockerfile` | `sha256:4870edbb…` |
+| Linux / amd64, native, `web/container/Dockerfile` | `sha256:4870edbb…` |
+
+Both ran the procedure this file documents, with `--platform linux/amd64` and
+both `--build-arg` values. This is
+[#228](https://github.com/myne-md/myne/issues/228) measured rather than
+asserted: the row above rests on two machines agreeing, not on one machine's
+word.
+
+One difference between the two builds is worth naming because it is evidence
+rather than noise. An earlier build of the same commit carried a wall-clock
+`built_at`; these two carry the commit's own timestamp. The `bundle_hash` is
+identical across all three, which is only consistent with `version.json` being
+excluded from the hash it reports, and that exclusion is what makes the hash
+reproducible at all.
 
 ### Why v0.5.0 has three rows for one commit
 

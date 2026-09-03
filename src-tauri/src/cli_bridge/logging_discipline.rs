@@ -130,8 +130,8 @@ struct ScriptedLister {
     show: fn(&str) -> ShowOutcome,
     search: fn(&str) -> SearchOutcome,
     new_note: fn(&str, Option<&str>) -> NewOutcome,
-    daily: fn() -> DailyOutcome,
-    daily_append: fn(&str) -> DailyAppendOutcome,
+    daily: fn(&str) -> DailyOutcome,
+    daily_append: fn(&str, &str) -> DailyAppendOutcome,
 }
 
 impl NoteLister for ScriptedLister {
@@ -147,11 +147,11 @@ impl NoteLister for ScriptedLister {
     fn create_note(&self, body: &str, folder: Option<&str>) -> NewOutcome {
         (self.new_note)(body, folder)
     }
-    fn daily(&self) -> DailyOutcome {
-        (self.daily)()
+    fn period(&self, period: &str) -> DailyOutcome {
+        (self.daily)(period)
     }
-    fn daily_append(&self, line: &str) -> DailyAppendOutcome {
-        (self.daily_append)(line)
+    fn period_append(&self, period: &str, line: &str) -> DailyAppendOutcome {
+        (self.daily_append)(period, line)
     }
 }
 
@@ -193,11 +193,11 @@ fn open_limiter() -> SharedRateLimiter {
 fn serve(request: &[u8], lister: &dyn NoteLister, limiter: &SharedRateLimiter) -> Option<Vec<u8>> {
     let mut reader = Cursor::new(request.to_vec());
     let mut writer = Vec::new();
-    dispatch::serve_connection(&mut reader, &mut writer, lister, limiter);
+    dispatch::serve_connection(&mut reader, &mut writer, lister, limiter, None);
     if writer.is_empty() {
         return None;
     }
-    super::framing::read_frame(&mut Cursor::new(writer)).ok()
+    super::framing::read_frame_within(&mut Cursor::new(writer), None).ok()
 }
 
 #[test]
@@ -212,8 +212,8 @@ fn success_paths_carry_their_payload_on_the_wire_and_nothing_into_the_logs() {
             }])
         },
         new_note: |_, _| NewOutcome::Ok(SENTINEL_NOTE_ID.to_string()),
-        daily: || DailyOutcome::Ok(SENTINEL_BODY.to_string()),
-        daily_append: |_| DailyAppendOutcome::Ok,
+        daily: |_| DailyOutcome::Ok(SENTINEL_BODY.to_string(), false),
+        daily_append: |_, _| DailyAppendOutcome::Ok(false),
     };
     let limiter = open_limiter();
     let (replies, captured) = capture(|| {
@@ -250,8 +250,8 @@ fn every_failure_class_logs_no_denied_value() {
                 show: |_| ShowOutcome::VaultLocked,
                 search: |_| SearchOutcome::VaultLocked,
                 new_note: |_, _| NewOutcome::VaultLocked,
-                daily: || DailyOutcome::VaultLocked,
-                daily_append: |_| DailyAppendOutcome::VaultLocked,
+                daily: |_| DailyOutcome::VaultLocked,
+                daily_append: |_, _| DailyAppendOutcome::VaultLocked,
             },
         ),
         (
@@ -261,8 +261,8 @@ fn every_failure_class_logs_no_denied_value() {
                 show: |_| ShowOutcome::Io,
                 search: |_| SearchOutcome::Io,
                 new_note: |_, _| NewOutcome::Io,
-                daily: || DailyOutcome::Io,
-                daily_append: |_| DailyAppendOutcome::Io,
+                daily: |_| DailyOutcome::Io,
+                daily_append: |_, _| DailyAppendOutcome::Io,
             },
         ),
         (
@@ -272,8 +272,8 @@ fn every_failure_class_logs_no_denied_value() {
                 show: |_| ShowOutcome::NotFound,
                 search: |_| SearchOutcome::Ok(vec![]),
                 new_note: |_, _| NewOutcome::FolderExcluded,
-                daily: || DailyOutcome::FolderExcluded,
-                daily_append: |_| DailyAppendOutcome::FolderExcluded,
+                daily: |_| DailyOutcome::FolderExcluded,
+                daily_append: |_, _| DailyAppendOutcome::FolderExcluded,
             },
         ),
     ];
@@ -296,8 +296,8 @@ fn a_rate_limited_request_logs_a_bounded_event_and_never_the_request() {
         show: |_| ShowOutcome::Io,
         search: |_| SearchOutcome::Io,
         new_note: |_, _| NewOutcome::Io,
-        daily: || DailyOutcome::Io,
-        daily_append: |_| DailyAppendOutcome::Io,
+        daily: |_| DailyOutcome::Io,
+        daily_append: |_, _| DailyAppendOutcome::Io,
     };
     // A budget of zero throttles the very first request, so the sentinel-
     // bearing frame is refused before it is even parsed.
@@ -321,8 +321,8 @@ fn malformed_truncated_and_oversized_frames_log_only_the_bounded_frame_label() {
         show: |_| ShowOutcome::Io,
         search: |_| SearchOutcome::Io,
         new_note: |_, _| NewOutcome::Io,
-        daily: || DailyOutcome::Io,
-        daily_append: |_| DailyAppendOutcome::Io,
+        daily: |_| DailyOutcome::Io,
+        daily_append: |_, _| DailyAppendOutcome::Io,
     };
     let limiter = open_limiter();
 

@@ -41,6 +41,15 @@ export const KEY = {
   HOME: String.fromCharCode(0xe011),
   /** W3C `End`, the sibling of HOME above. */
   END: String.fromCharCode(0xe010),
+  /** W3C `ArrowUp` / `ArrowDown`. Vertical caret motion is Myne's own command
+   *  (`editor/src/line-vertical.ts`, myne-md/myne#631) rather than CodeMirror's,
+   *  and its defect only exists under a real layout engine, so this lane is the
+   *  only one that can press these against the shipped behaviour. */
+  ARROW_UP: String.fromCharCode(0xe013),
+  ARROW_DOWN: String.fromCharCode(0xe015),
+  /** W3C `ArrowLeft`. The same lane uses it to walk back from a line's end to a
+   *  known interior column, which is a fact a click cannot give it. */
+  ARROW_LEFT: String.fromCharCode(0xe012),
 } as const;
 
 /** Press a single key (optionally with Shift held) at the focused element. */

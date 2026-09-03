@@ -29,9 +29,14 @@ vi.mock("../../src/platform/capabilities", async (importOriginal) => {
   return { ...real, has: (cap: string) => hasMock(cap) };
 });
 
-vi.mock("../../src/lib/prefs", () => ({
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   prefsRead: async () => ({ attachment_compression_enabled: true }),
   setAttachmentCompressionEnabled: async () => {},
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 
 const { AttachmentCompressionSettings } = await import(

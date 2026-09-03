@@ -9,6 +9,7 @@ import { syntaxTree } from "@codemirror/language";
 import {
   type EditorState,
   type Extension,
+  StateEffect,
   StateField,
 } from "@codemirror/state";
 import {
@@ -22,6 +23,7 @@ import {
   editorFocusField,
   editorFocusTracker,
 } from "./cursor-aware";
+import { subscribeDateTimeDisplay } from "@myne/editor/host/lib/datetimeFormat";
 
 /** True when background parsing advanced the tree between the two states —
  *  the tree is reference-stable, so inequality means a reparse landed. Without
@@ -32,20 +34,80 @@ import {
 export const treeChanged = (update: ViewUpdate): boolean =>
   syntaxTree(update.startState) !== syntaxTree(update.state);
 
-/** Default update trigger: doc / viewport / selection / focus / parse changes —
- *  used by every cursor-aware decoration (emphasis, link, inline-code,
- *  heading, blockquote, hr, frontmatter). */
+/**
+ * A label this editor draws depends on AMBIENT state that no transaction
+ * carries: the reader's date and time format, and the interface language
+ * (myne-md/myne#609).
+ *
+ * Both are read at BUILD time by the decoration that needs them, which is the
+ * right place for them, and neither changes the document, the viewport, the
+ * selection or the focus. So without this effect the default gate below never
+ * fires and the label keeps whatever it was built with. `callout.ts` records
+ * exactly that outcome and accepts it: "a switched language re-labels on the
+ * next rebuild (any edit, scroll or selection move). It isn't wired." This is
+ * the wiring, and it is deliberately in the SHARED gate rather than in one
+ * decoration's own, because at least three families read ambient state (task
+ * chips, recurrence labels, callout titles) and a per-decoration channel would
+ * have to be remembered by the fourth.
+ */
+export const ambientLabelsChanged = StateEffect.define<null>();
+
+/** Default update trigger: doc / viewport / selection / focus / parse changes,
+ *  plus an ambient-label refresh, used by every cursor-aware decoration
+ *  (emphasis, link, inline-code, heading, blockquote, hr, frontmatter). */
 const cursorAwareUpdate = (update: ViewUpdate): boolean =>
   update.docChanged ||
   update.viewportChanged ||
   update.selectionSet ||
   update.focusChanged ||
-  treeChanged(update);
+  treeChanged(update) ||
+  update.transactions.some((tr) =>
+    tr.effects.some((e) => e.is(ambientLabelsChanged)),
+  );
 
-/** Update trigger for decorations that don't depend on cursor position —
- *  e.g. task-list (checkbox is always rendered). */
-const docOnlyUpdate = (update: ViewUpdate): boolean =>
-  update.docChanged || update.viewportChanged || treeChanged(update);
+/**
+ * Turns a display-settings change into the effect above. Mounted once per
+ * editor in `extensions.ts`, NOT inside `myneDecorations()`: that array lives
+ * in the view-mode compartment, which `source` mode empties and every mode
+ * switch rebuilds, so a subscription there would churn on each toggle and be
+ * absent in source mode.
+ *
+ * A subscription rather than a prop, because the display settings already live
+ * in a shared store that all three clients read, so one subscription here covers
+ * the desktop, the web and the mobile mounts. Threading a prop would mean the
+ * same wiring twice, in two client trees, with nothing to catch the second one
+ * being forgotten. That is precisely the shape myne-md/myne#609 was filed for:
+ * one publisher, three readers, and no gate that could see the asymmetry.
+ *
+ * **The interface language rides this same channel and needs no listener of its
+ * own.** `DateTimeDisplay` carries `locale`, the host adapter republishes when
+ * the app language changes, and `setDateTimeDisplay` compares `locale` among the
+ * four fields it diffs. So a language switch reaches here as an ordinary store
+ * change. That matters beyond tidiness: a second subscription would have to go
+ * through the `EditorHost` seam, since this package deliberately sees only `t`,
+ * and a new seam method costs every implementation plus the seam contract, for a
+ * signal the store already carries.
+ *
+ * The handle is released in `destroy()`. A listener that survives its view
+ * dispatches into a destroyed editor on the next settings change.
+ */
+export function ambientLabelRefresh(): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      private readonly release: () => void;
+
+      constructor(view: EditorView) {
+        this.release = subscribeDateTimeDisplay(() => {
+          view.dispatch({ effects: ambientLabelsChanged.of(null) });
+        });
+      }
+
+      destroy(): void {
+        this.release();
+      }
+    },
+  );
+}
 
 export function makeCursorAwareDecorationPlugin(
   build: (view: EditorView) => DecorationSet,
@@ -71,12 +133,6 @@ export function makeGatedDecorationPlugin(
   );
 }
 
-export function makeDocOnlyDecorationPlugin(
-  build: (view: EditorView) => DecorationSet,
-): Extension {
-  return makeDecorationPlugin(build, docOnlyUpdate);
-}
-
 /**
  * StateField analog of `makeCursorAwareDecorationPlugin`, for decorations that
  * CM6 forbids from a ViewPlugin — block-replace or any replace crossing a line
@@ -97,10 +153,20 @@ export function makeCursorAwareStateField(
     update(decorations, tr) {
       const selectionChanged = !tr.startState.selection.eq(tr.state.selection);
       const treeChanged = syntaxTree(tr.startState) !== syntaxTree(tr.state);
+      // The ambient clause belongs here too, and leaving it out would defeat the
+      // reason it went into the shared gate at all (myne-md/myne#609). This
+      // scaffold's users are the decorations CodeMirror FORBIDS from a
+      // ViewPlugin, so the fourth family that wants an ambient label and lands
+      // on this path would silently get the pre-#609 behaviour: exactly the
+      // "somebody will forget" case the shared gate exists for, one scaffold
+      // over. None of today's users draws one, so this is latent rather than a
+      // fix, and it is here so it stays that way.
+      const ambient = tr.effects.some((e) => e.is(ambientLabelsChanged));
       if (
         !tr.docChanged &&
         !selectionChanged &&
         !editorFocusChanged(tr) &&
+        !ambient &&
         !treeChanged
       ) {
         return decorations;

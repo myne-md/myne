@@ -37,19 +37,38 @@ vi.mock("../../src/hooks/usePrefs", () => ({
   usePrefs: () => ({ prefs }),
 }));
 
-const setDeliberateFolders = vi.fn(() => Promise.resolve());
+// Typed to ACCEPT the mutation rather than `() => …`, so a spread into it is not
+// a type error. The sibling spies below keep the zero-arg shape they had; this
+// one is typed because myne-md/myne#613 gave it a second caller
+// (`registerDeliberateFolders`) and adding a 16th recorded type error to pay for
+// a test would be the wrong direction on `check-test-typecheck.mjs`'s ratchet.
+const setDeliberateFolders = vi.fn((_mutation?: unknown) => Promise.resolve());
+// `addDeliberate` calls the retry-and-classify wrapper rather than the bare
+// binding (myne-md/myne#613). Same spy, so every assertion below still reads the
+// mutation that reached the prefs layer; the wrapper resolves to an OUTCOME, and
+// `"ok"` is the arm that shows the user nothing.
+const registerDeliberateFolders = vi.fn(() => Promise.resolve("ok"));
 const setArchivedFolders = vi.fn(() => Promise.resolve());
 const setFavorites = vi.fn(() => Promise.resolve());
 const setFolderIcons = vi.fn(() => Promise.resolve());
 const setItemColors = vi.fn(() => Promise.resolve());
 const setItemOrder = vi.fn(() => Promise.resolve());
-vi.mock("../../src/lib/prefs", () => ({
-  setDeliberateFolders: (...a: unknown[]) => setDeliberateFolders(...a),
-  setArchivedFolders: (...a: unknown[]) => setArchivedFolders(...a),
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
+  mutateDeliberateFolders: (...a: unknown[]) => setDeliberateFolders(...a),
+  registerDeliberateFolders: (...a: unknown[]) => {
+    setDeliberateFolders(...a);
+    return registerDeliberateFolders();
+  },
+  mutateArchivedFolders: (...a: unknown[]) => setArchivedFolders(...a),
   setFavorites: (...a: unknown[]) => setFavorites(...a),
   setFolderIcons: (...a: unknown[]) => setFolderIcons(...a),
   setItemColors: (...a: unknown[]) => setItemColors(...a),
   setItemOrder: (...a: unknown[]) => setItemOrder(...a),
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 
 const moveNote = vi.fn(() => Promise.resolve());
@@ -227,8 +246,52 @@ describe("create folder", () => {
     act(() => result.current.startNewFolder(""));
     act(() => result.current.commitNewFolder("Ideas"));
     expect(result.current.deliberate).toContain("Ideas/");
-    expect(setDeliberateFolders).toHaveBeenCalledWith(["Ideas/"]);
+    expect(setDeliberateFolders).toHaveBeenCalledWith({ add: ["Ideas/"], remove: [] });
     expect(result.current.newFolder).toBeNull();
+  });
+
+  it("a full byte budget keeps the folder and says so (myne-md/myne#613)", async () => {
+    registerDeliberateFolders.mockResolvedValueOnce("budget-full");
+    const { result } = mount([]);
+    act(() => result.current.startNewFolder(""));
+    act(() => result.current.commitNewFolder("Ideas"));
+    await act(async () => {});
+    // KEPT, deliberately. The folder was created and works exactly as folders
+    // did before this feature; what it loses is only the promise to outlive
+    // being emptied, which is what the notice says. Reverting here would delete
+    // a folder the user just made, over a limit rather than a failure.
+    expect(result.current.deliberate).toContain("Ideas/");
+    expect(result.current.blockNotice).toMatch(/list is full/i);
+  });
+
+  it("a persistent write failure reverts the folder and says so", async () => {
+    registerDeliberateFolders.mockResolvedValueOnce("failed");
+    const { result } = mount([]);
+    act(() => result.current.startNewFolder(""));
+    act(() => result.current.commitNewFolder("Ideas"));
+    await act(async () => {});
+    // The opposite arm: nothing was recorded, so showing the folder would be a
+    // lie that survives until the next unlock.
+    expect(result.current.deliberate).not.toContain("Ideas/");
+    expect(result.current.blockNotice).toMatch(/couldn't record it/i);
+  });
+
+  it("a transient failure the wrapper recovered from shows nothing", async () => {
+    // The wrapper resolves `"ok"` for a first attempt that threw and a second
+    // that landed, so the SURFACE must stay silent for a hiccup the user can do
+    // nothing about. The rejection is injected here rather than assumed: the
+    // first version of this test set no mock at all and was byte-for-byte the
+    // happy path above, while its comment described a retry that never ran.
+    registerDeliberateFolders.mockImplementationOnce(async () => {
+      await Promise.reject(new Error("hiccup")).catch(() => {});
+      return "ok";
+    });
+    const { result } = mount([]);
+    act(() => result.current.startNewFolder(""));
+    act(() => result.current.commitNewFolder("Ideas"));
+    await act(async () => {});
+    expect(result.current.deliberate).toContain("Ideas/");
+    expect(result.current.blockNotice).toBeNull();
   });
 
   it("empty input → cancel, no persist, no notice", () => {
@@ -270,7 +333,7 @@ describe("create folder", () => {
     expect(setDeliberateFolders).not.toHaveBeenCalled();
     act(() => result.current.confirmCaseMerge());
     expect(result.current.caseMerge).toBeNull();
-    expect(setDeliberateFolders).toHaveBeenCalledWith(["work/"]);
+    expect(setDeliberateFolders).toHaveBeenCalledWith({ add: ["work/"], remove: [] });
   });
 
   it("cancelCaseMerge drops the pending merge without adding", () => {

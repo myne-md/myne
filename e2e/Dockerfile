@@ -33,7 +33,7 @@ FROM rust:1.96.0-slim
 RUN rustup component add rustfmt clippy \
     && rustup target add wasm32-unknown-unknown
 
-# Tauri build sysdeps (same list as .woodpecker.yml's tauri-compile step)
+# Tauri build sysdeps (same list as .woodpecker/main.yml's tauri-compile step)
 # + the E2E runtime additions: webkit2gtk-driver (WebKitWebDriver binary),
 # xvfb + xauth (headless X server for the real window).
 # libasound2-dev: ALSA dev headers required by cpal's alsa-sys backend

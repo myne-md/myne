@@ -67,7 +67,15 @@ test.describe("compact editor swipe-back", () => {
     await expect(page.getByTestId("workspace.app-header")).toBeVisible();
     await expect(page.getByTestId("editor.top-bar")).toHaveCount(0);
     // The empty new note was discarded, exactly like the back chevron.
-    await expect(page.getByText("No notes yet")).toBeVisible();
+    //
+    // Counted as ROWS rather than read off the "No notes yet" placeholder,
+    // because since myne-md/myne#613 that placeholder is not what an empty
+    // vault shows: a deliberate folder persists once a note has landed in it,
+    // so the tree renders folder rows and correctly short-circuits nothing.
+    // `folders/empty-folders.flow.ts` asserts that directly. The dev-only
+    // demo seeder registers three such folders in this tier, which is what
+    // made the old assertion a proxy that stopped tracking its subject.
+    await expect(page.getByTestId("notes.row")).toHaveCount(0);
   });
 
   test("swipe-back autosaves typed content before popping", async ({ page }) => {

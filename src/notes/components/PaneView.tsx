@@ -20,6 +20,13 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { CMEditor, type ScrollAnchorRequest, type CMEditorProps, type EditorSwapApi } from "../../editor/CMEditor";
+import { noteBecameActive, recentNoteIds } from "../recentNotes";
+import {
+  applyScrollAnchor,
+  evictClosedTabs,
+  recallScroll,
+  rememberScroll,
+} from "../scrollMemory";
 import type { EditorState } from "@codemirror/state";
 import { resolveDefaultViewMode, type ViewMode } from "../../editor/view-mode";
 import { headingSections } from "../../dialect";
@@ -39,6 +46,7 @@ import { createNote } from "../createNote";
 import { createDrawing } from "../createDrawing";
 import { nextDrawingTitle } from "../drawingEmbedTitle";
 import { useSelectedNote, type NoteId } from "../sidebarState";
+import { settleFrontmatterWrite } from "../settleFrontmatterWrite";
 import { useLiveResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
 import { useVaultHeadings } from "../useVaultHeadings";
@@ -73,6 +81,8 @@ import { setNoteCover } from "../setNoteCover";
 import { upsertSavedView } from "../../lib/prefs";
 import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
+import { Toast } from "../../components/Toast";
+import { panesNotSettledMessage } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -163,6 +173,68 @@ type OutlineTrackView = Parameters<NonNullable<CMEditorProps["onReady"]>>[0];
  *  px of the viewport top (outline-scroll-tracking) — a small lead so the
  *  highlight flips as the heading arrives at the top rather than after. */
 const OUTLINE_ACTIVE_OFFSET_PX = 8;
+
+/** How long a scroll has to stop before the reading position is recorded
+ *  (myne-md/myne#600). Long enough that a flick records once rather than per
+ *  frame, short enough that a pane torn down straight after a scroll still has
+ *  its position. The anchor is only ever read on a note switch, an unmount or a
+ *  resize, none of which can happen inside this window without the user first
+ *  stopping. */
+const SCROLL_SETTLE_MS = 120;
+
+/**
+ * A trailing-edge debounce that owns its own handle.
+ *
+ * Both scroll-anchor effects below want the same thing: run this once the user
+ * stops, and cancel it if the effect tears down first. Written out, that is a
+ * `let timer = 0`, a clear-then-set, a reset inside the callback and a clear in
+ * the cleanup, four places that have to agree, twice. The pairing that matters
+ * is the last one: forgetting the cleanup leaves a timer holding a `view` and a
+ * `scroller` past unmount, which no compiler and no test reports.
+ *
+ * So the handle is closed over rather than remembered, and `cancel` is the only
+ * thing the cleanup has to call.
+ */
+function trailingEdge(delayMs: number): {
+  run: (fn: () => void) => void;
+  cancel: () => void;
+  flush: () => void;
+} {
+  let timer = 0;
+  let pending: (() => void) | null = null;
+  const clear = () => {
+    if (timer !== 0) clearTimeout(timer);
+    timer = 0;
+    pending = null;
+  };
+  return {
+    run: (fn) => {
+      if (timer !== 0) clearTimeout(timer);
+      pending = fn;
+      timer = window.setTimeout(() => {
+        timer = 0;
+        pending = null;
+        fn();
+      }, delayMs);
+    },
+    cancel: clear,
+    /**
+     * Run the pending callback now instead of dropping it.
+     *
+     * The two teardowns want opposite things and used to call the same one. A
+     * pending RESTORE is worth dropping: it would scroll a pane that is going
+     * away. A pending REMEMBER is the opposite, and the effect that owns it says
+     * so in its own comment, that a pane can leave without any effect seeing it.
+     * Cancelling there threw away the last scroll the reader made inside the
+     * settle window, which is precisely the one they would expect back.
+     */
+    flush: () => {
+      const fn = pending;
+      clear();
+      fn?.();
+    },
+  };
+}
 
 /**
  * What the pane body dispatch resolved to, and which FRAME it needs (myne#534).
@@ -357,9 +429,18 @@ export function PaneView({
         }
         setScrollAnchor({ anchor, nonce: Date.now() });
       }
-      void ctx.open(noteUuid as NoteId);
+      // Open through the WORKSPACE, not through the sidebar's selection
+      // (myne-md/myne#601). `ctx.open` only sets `selectedId` and reads the
+      // body; the tab it eventually produces comes from the bridge effect in
+      // `screens/Editor.tsx`, which opens one ONLY when the note is not already
+      // in a pane, so a link to an already-open note did nothing at all, and so
+      // did a link to whatever was already selected. Both are the common case
+      // once a few tabs are open, which is what "clicking a backlink does not go
+      // to the note" was. `openInFocused` reveals an open note and opens a
+      // closed one, which is what a link click means either way.
+      ws.openInFocused(noteUuid as NoteId);
     },
-    [ctx],
+    [ws],
   );
   // Outline tab → editor scroll bridge (right-panel tabs): the panel-level
   // Outline tab emits a heading-reveal request through the module-level signal
@@ -439,9 +520,7 @@ export function PaneView({
   // by the primary CMEditor's `onSwapReady` (null while unmounted — e.g. a drawing
   // tab — in which case we fall back to the plain content-mirror path).
   const swapApiRef = useRef<EditorSwapApi | null>(null);
-  const stateCacheRef = useRef<Map<NoteId, { state: EditorState; scrollTop: number }>>(
-    new Map(),
-  );
+  const stateCacheRef = useRef<Map<NoteId, EditorState>>(new Map());
   const prevActiveIdRef = useRef<NoteId | null>(null);
 
   // MYND-305 × MYND-534: the target note-id of an in-flight deep-link OPEN (a
@@ -453,6 +532,13 @@ export function PaneView({
   // stale flag into a later plain tab-switch (which must restore cached scroll).
   const deepLinkOpenTargetRef = useRef<NoteId | null>(null);
 
+  // myne-md/myne#600: the note whose remembered reading position still has to be
+  // put back, once its body is on screen. Set by the disk-read path (a first
+  // open in this pane, which is what a SPLIT produces), consumed once by the
+  // effect below. The cached-swap path needs none of this: the state it applies
+  // already holds the document, so it restores inline.
+  const pendingScrollRestoreRef = useRef<NoteId | null>(null);
+
   // MYND-534: evict cached EditorStates for notes no longer open in this pane (a
   // closed tab), so the cache is bounded by the pane's open-tab count and a
   // reopen starts fresh (grill Q3 — tab-switch-only lifetime).
@@ -460,13 +546,18 @@ export function PaneView({
     .filter((t) => t.kind === "note")
     .map((t) => t.id)
     .join("\u0000");
+  // The pane's note-tab set as of the previous pass. This, and not the state
+  // cache, is what makes a CLOSED tab identifiable: `evictClosedTabs` carries
+  // the reasoning, including why the cache's keys answer a different question.
+  const openNoteIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const open = new Set(
       leaf.tabs.filter((t) => t.kind === "note").map((t) => t.id),
     );
-    for (const key of [...stateCacheRef.current.keys()]) {
-      if (!open.has(key)) stateCacheRef.current.delete(key);
-    }
+    // The reading position goes with the state (myne-md/myne#600): closing a tab
+    // is the reader saying they are done with it.
+    evictClosedTabs(openNoteIdsRef.current, open, stateCacheRef.current);
+    openNoteIdsRef.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNoteTabKey]);
 
@@ -544,6 +635,58 @@ export function PaneView({
     if (focused) recomputeActiveHeading();
   }, [focused, recomputeActiveHeading]);
 
+  // myne-md/myne#600: put a first-opened note's remembered line back, once its
+  // body is actually on screen. Fires on `content` because that is when the view
+  // holds the document the anchor refers to; the pending ref makes it once per
+  // open rather than once per keystroke.
+  useEffect(() => {
+    const noteId = pendingScrollRestoreRef.current;
+    if (noteId === null || noteId !== activeId) return;
+    const view = outlineViewRef.current;
+    if (view === null || view.state.doc.length === 0) return;
+    pendingScrollRestoreRef.current = null;
+    const anchor = recallScroll(noteId);
+    if (anchor === undefined) {
+      const scroller = outlineScrollerRef.current;
+      if (scroller !== null) scroller.scrollTop = 0;
+      return;
+    }
+    applyScrollAnchor(view, anchor);
+  }, [content, activeId]);
+
+  // myne-md/myne#600: a width change re-wraps the text, so the pixel the reader
+  // was at now points at different content, so put the LINE back instead. This is
+  // the second half of the split complaint: the pane that survives a split is
+  // not remounted, it is merely narrower.
+  useEffect(() => {
+    const scroller = outlineScrollerRef.current;
+    if (scroller === null || typeof ResizeObserver === "undefined") return;
+    let lastWidth = scroller.clientWidth;
+    const settle = trailingEdge(SCROLL_SETTLE_MS);
+    // Coalesced to the end of the resize, not per observation. Dragging the
+    // split divider fires this once per frame, and each firing dispatched a
+    // CodeMirror transaction carrying a `scrollIntoView`, whose own scroll then
+    // re-entered the handler above. One restore when the drag stops is the whole
+    // of what the reader wants anyway.
+    const observer = new ResizeObserver(() => {
+      const width = scroller.clientWidth;
+      if (width === lastWidth) return; // height-only change: nothing re-wrapped
+      lastWidth = width;
+      settle.run(() => {
+        const view = outlineViewRef.current;
+        const noteId = activeIdRef.current;
+        if (view === null || noteId === null) return;
+        const anchor = recallScroll(noteId);
+        if (anchor !== undefined) applyScrollAnchor(view, anchor);
+      });
+    });
+    observer.observe(scroller);
+    return () => {
+      settle.cancel();
+      observer.disconnect();
+    };
+  }, []);
+
   // Watch the pane's real scroll container with a rAF-throttled listener. Stable
   // across note switches — the view handle is read live via the ref, so a
   // not-yet-ready view simply no-ops until `onReady` fires.
@@ -551,7 +694,26 @@ export function PaneView({
     const scroller = outlineScrollerRef.current;
     if (scroller === null) return;
     let raf = 0;
+    const settle = trailingEdge(SCROLL_SETTLE_MS);
+    // myne-md/myne#600: remember on every SETTLED scroll, not only when the note
+    // changes. A pane can leave without any effect seeing it (a split unmounts
+    // it outright), and the last thing the reader did before that is exactly
+    // what they expect back.
+    //
+    // On a trailing timeout rather than inside the rAF above, because
+    // `rememberScroll` reads two bounding rects and runs a hit test, and the
+    // anchor is only ever CONSUMED on a note switch, an unmount or a resize.
+    // Per-frame precision buys nothing and cost two forced layout flushes per
+    // frame in every mounted pane, including the ones `recomputeActiveHeading`
+    // deliberately early-returns for because they are not focused.
+    const rememberSoon = () =>
+      settle.run(() => {
+        const view = outlineViewRef.current;
+        const noteId = activeIdRef.current;
+        if (view !== null && noteId !== null) rememberScroll(noteId, view, scroller);
+      });
     const onScroll = () => {
+      rememberSoon();
       if (raf !== 0) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
@@ -561,6 +723,11 @@ export function PaneView({
     scroller.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       if (raf !== 0) cancelAnimationFrame(raf);
+      // Flush, not cancel: see `trailingEdge`. The callback null-checks the view
+      // and the note, so this is inert on the unmount paths where the editor
+      // child has already cleared the ref, and it is the effect re-running (a
+      // new `recomputeActiveHeading`) that it reliably saves a scroll from.
+      settle.flush();
       scroller.removeEventListener("scroll", onScroll);
     };
   }, [recomputeActiveHeading]);
@@ -666,16 +833,25 @@ export function PaneView({
     // NEVER break the switch — on failure we drop the swap API and reload.
     if (api !== null && prevId !== null && prevId !== activeId) {
       try {
-        cache.set(prevId, {
-          state: api.captureState(),
-          scrollTop: scroller?.scrollTop ?? 0,
-        });
+        cache.set(prevId, api.captureState());
+        // myne-md/myne#600: the reading position is remembered as a DOCUMENT
+        // anchor, in a module-level map, so it survives the split that unmounts
+        // this pane and the re-wrap that a narrower pane causes. The pixel the
+        // cache used to carry alongside the state survived neither.
+        const outgoingView = outlineViewRef.current;
+        if (outgoingView !== null && scroller !== null) {
+          rememberScroll(prevId, outgoingView, scroller);
+        }
       } catch {
         swapApiRef.current = null;
         api = null;
       }
     }
     prevActiveIdRef.current = activeId;
+    // myne-md/myne#601: becoming a pane's active note IS the "touched" signal
+    // the `[[` picker orders by. Recorded here because this effect is where
+    // every way of opening a note converges, whatever opened it.
+    if (activeId !== null) noteBecameActive(activeId);
 
     if (activeId === null) {
       setContent("");
@@ -702,13 +878,13 @@ export function PaneView({
     if (api !== null && cached !== undefined) {
       let swapped = false;
       try {
-        api.applyState(cached.state);
+        api.applyState(cached);
         swapped = true;
       } catch {
         swapApiRef.current = null; // view unusable → force a clean reload
       }
       if (swapped) {
-        const doc = cached.state.doc.toString();
+        const doc = cached.doc.toString();
         setContent(doc);
         // myne#288 — flush the OUTGOING note before baselining the incoming one.
         //
@@ -726,13 +902,16 @@ export function PaneView({
         autosaveRef.current?.acceptReloadedBody(doc);
         setLoading(false);
         // Anchor-driven open → land at the top and let the anchor effect take it
-        // to the heading (or hold at top if not found); otherwise restore the
-        // note's own cached scroll. Same 0-then-scrollIntoView shape as first open.
-        const top = anchorDrivenOpen ? 0 : cached.scrollTop;
-        // Restore scroll after the swapped-in content lays out.
-        requestAnimationFrame(() => {
-          if (!cancelled && scroller !== null) scroller.scrollTop = top;
-        });
+        // to the heading; otherwise put the note's own remembered line back.
+        const remembered = anchorDrivenOpen ? undefined : recallScroll(activeId);
+        const swappedView = outlineViewRef.current;
+        if (remembered === undefined) {
+          requestAnimationFrame(() => {
+            if (!cancelled && scroller !== null) scroller.scrollTop = 0;
+          });
+        } else if (swappedView !== null) {
+          applyScrollAnchor(swappedView, remembered);
+        }
         return () => {
           cancelled = true;
         };
@@ -754,9 +933,17 @@ export function PaneView({
         // Same ordering hazard as the cached-swap path above (myne#288).
         autosaveRef.current?.flushOutgoing();
         autosaveRef.current?.acceptReloadedBody(body);
-        requestAnimationFrame(() => {
-          if (!cancelled && scroller !== null) scroller.scrollTop = 0;
-        });
+        // myne-md/myne#600: a note read from disk has no view holding it yet, so
+        // the loading gate rebuilds one and the body arrives through the value
+        // mirror. Hand the restore to the effect below, which fires once the
+        // content is on screen. This is the SPLIT path: the new pane has no
+        // cached state, but the reading position is remembered outside the pane.
+        pendingScrollRestoreRef.current = anchorDrivenOpen ? null : activeId;
+        if (anchorDrivenOpen) {
+          requestAnimationFrame(() => {
+            if (!cancelled && scroller !== null) scroller.scrollTop = 0;
+          });
+        }
       } catch {
         if (!cancelled) setContent("");
       } finally {
@@ -929,10 +1116,43 @@ export function PaneView({
   // lock / close / quit.
   const { registerFlush, unregisterFlush } = ws;
   const flushIfDirty = autosave.flushIfDirty;
+  const lastSaveFailed = autosave.lastSaveFailed;
+  // Answer whether the pane SETTLED, not merely whether the flush returned.
+  // `fireSave` swallows its own rejection into `saveStatus`, so a failed
+  // `note_update` resolves this flush exactly like a successful one.
+  //
+  // `lastSaveFailed`, NOT `hasPendingWork`, and the difference cost three E2E
+  // scenarios before it shipped. `hasPendingWork` is a "do not clobber me" flag:
+  // it answers true whenever the live body differs from what the hook believes
+  // is on disk, which is the ORDINARY state right after a save whose buffer
+  // moved on, and for a clean pane `flushIfDirty` returns without saving at all.
+  // Reporting that as "did not settle" made `flushAll` reject after a perfectly
+  // normal save, so the cover write behind it was refused and the user got a
+  // write-failed toast. What a caller about to read-patch-write this note needs
+  // to know is only whether the flush it just awaited actually persisted.
+  // `saveInFlight` is the THIRD thing this has to ask, and leaving it out was a
+  // silent hole rather than a simplification. `flushIfDirty` awaits two levels
+  // on its in-flight branch because a hand-off re-registers `inFlightRef`; its
+  // `await fireSave()` branch does not re-check at all, and on a hand-off
+  // `fireSave` resolves EARLY (it nulls `inFlightRef`, marks `handedOff`, fires
+  // the follow-up and returns). The follow-up's first statement clears the
+  // failure flag, so `lastSaveFailed()` reads clean for a save that has not
+  // landed, and this reported SETTLED. What that costs is the whole reason the
+  // flush exists: the caller reads the pre-typing disk bytes, patches its
+  // field, writes, and the in-flight follow-up lands on top and reverts it.
+  // With the section 11.3 hash on it is worse, because the follow-up declares
+  // the first save's body as its expected base while disk now holds the
+  // caller's, so it is refused `BaseMismatch` and mints a keep-both conflict
+  // copy for a note no remote writer ever touched.
+  const saveInFlight = autosave.saveInFlight;
+  const flushAndReport = useCallback(async () => {
+    await flushIfDirty();
+    return !lastSaveFailed() && !saveInFlight();
+  }, [flushIfDirty, lastSaveFailed, saveInFlight]);
   useEffect(() => {
-    registerFlush(leaf.id, flushIfDirty);
+    registerFlush(leaf.id, flushAndReport);
     return () => unregisterFlush(leaf.id);
-  }, [leaf.id, flushIfDirty, registerFlush, unregisterFlush]);
+  }, [leaf.id, flushAndReport, registerFlush, unregisterFlush]);
 
   // Surgical sidebar refresh after a successful save (title/H1 edits
   // propagate to the row label). Tracks the `saved.at` identity.
@@ -1218,6 +1438,13 @@ export function PaneView({
         <div style={{ minWidth: 0, flex: companionVisible ? 1 : undefined }}>
           <CMEditor
             value={content}
+            // myne-md/myne#520: which note this pane is holding. The cover
+            // banner's controls name their target with it instead of leaving
+            // the shell to infer one from focus, which was wrong the moment
+            // the banner pressed was in a pane that is not the focused one.
+            // Pushed live rather than keyed, because this view is long-lived
+            // and notes are swapped through it.
+            noteId={activeId}
             // Set only by the autosave `updated:` echo; undefined for every
             // authoritative writer, so those still apply unconditionally.
             valueBase={buffer.base}
@@ -1228,6 +1455,11 @@ export function PaneView({
             vaultHeadings={vaultHeadings}
             vaultBlockAnchors={vaultBlockAnchors}
             onOpenWikilink={handleOpenWikilink}
+            // The module function itself, not a snapshot of it. Stable across
+            // renders, so the editor installs it once and asks when the picker
+            // opens; a mirrored array made every pane rank off the order from
+            // the last time THAT pane switched notes.
+            recentNotes={recentNoteIds}
             // MYND-617: the task-query blocks in this document. Absent entries
             // render as loading, never as an empty result.
             taskQueryResults={taskQueryResults}
@@ -1298,6 +1530,9 @@ export function PaneView({
           >
             <CMEditor
               value={content}
+              // Same note as the primary editor above: the reading mirror draws
+              // its own cover banner, so its controls need the same target.
+              noteId={activeId}
               // Deliberately NO `valueBase`: this mirror holds no local edits,
               // so it must adopt every value unconditionally. Handing it the
               // primary's baseline would make it silently skip `updated:`
@@ -1466,7 +1701,15 @@ export function PaneView({
           flex: 1,
           minHeight: 0,
           // Which frame this is, and why, is on `PaneBody` above.
-          overflow: paneBody.fill ? "hidden" : "auto",
+          //
+          // Vertical only (myne-md/myne#630). `overflow: auto` is both axes, so
+          // this div was a horizontal scroll container in its own right, sitting
+          // outside `.cm-scroller` and reachable even after the editor stopped
+          // scrolling sideways. A pane is a fixed-width column by construction,
+          // one of a split, so there is nothing here that should be reached by
+          // scrolling right.
+          overflowX: "hidden",
+          overflowY: paneBody.fill ? "hidden" : "auto",
           // No TOP padding here: this div is the scroll parent of the in-note
           // find bar's sticky top panel, and a top padding leaves a band above the
           // bar where scrolled text bleeds through (MYND-299 QA). The 12px top
@@ -1550,6 +1793,7 @@ function PaneLoading() {
  * is stale) the wrapper holds a calm, quiet body — no spinner churn.
  */
 function ViewHost({ viewId }: { viewId: string }) {
+  const { t } = useTranslation();
   const { def, result } = useViewResult(viewId);
   const ws = useWorkspace();
   const sidebar = useSelectedNote();
@@ -1579,6 +1823,10 @@ function ViewHost({ viewId }: { viewId: string }) {
   // defaulting to `cover` on first use (and recorded onto the view so the cards
   // render reads it back).
   const [coverNoteId, setCoverNoteId] = useState<string | null>(null);
+  // A refused or failed cover write, shown as a toast. Before this the catch
+  // below was bare, so the two rejection classes the fix introduced were
+  // reported nowhere and a refused write looked exactly like a successful one.
+  const [coverError, setCoverError] = useState<string | null>(null);
   const onSetCover = useCallback((noteId: string) => setCoverNoteId(noteId), []);
   const coverPropertyKey = def?.image ?? "cover";
   // Whether the picker's target note already has a resolvable cover (enables the
@@ -1604,17 +1852,53 @@ function ViewHost({ viewId }: { viewId: string }) {
       void (async () => {
         try {
           await setNoteCover(noteId, coverPropertyKey, choice);
+          // Settle FIRST, and the order is the whole point rather than a
+          // preference. It used to sit after `upsertSavedView`, which is a
+          // `vault.prefs` write that can reject, so a failed prefs write took
+          // the settle down with it and landed in the catch below as a cover
+          // failure. That reintroduces exactly what the paragraph beneath says
+          // this call exists to prevent, on the call site it names as the one
+          // most at risk, and it does so while telling the user the cover write
+          // failed when the note write had already succeeded.
+          //
+          // Settle (`src/CLAUDE.md`, "A backend write made OUTSIDE a pane's
+          // autosave loop leaves that pane holding a stale buffer"). This call
+          // site is the one that needs it most and had none: the target is a
+          // note in a VIEW RESULT, so by definition it is not the note this
+          // pane is showing and it is the likeliest of all cover writers to be
+          // open, and dirty, somewhere else. Without the re-read that pane's
+          // buffer still has no `cover:` line and its next keystroke autosaves
+          // the cover away. `setNoteCover`'s flush closed the race; this closes
+          // the staleness, which is the other half. The recipe is called rather
+          // than copied: it used to be a closure in `Editor.tsx` and this site
+          // hand-copied its two lines.
+          await settleFrontmatterWrite(sidebar, noteId as NoteId);
           // First cover on a view with no image property → adopt `cover` as the
           // view's cover property so the card render picks it up.
           if (choice !== null && def !== null && def.image === undefined) {
             await upsertSavedView({ ...def, image: coverPropertyKey });
           }
-        } catch {
-          /* surfaced via backend tracing */
+        } catch (err) {
+          // The two NEW rejection classes are constructed in the WebView and
+          // never reach backend tracing, so the old bare catch reported them
+          // nowhere: `setNoteCover` now opens with `flushBeforeFrontmatterWrite`
+          // (which throws `PanesNotSettledError`) and `settleFrontmatterWrite`
+          // deliberately propagates a failed record refresh. This is the call
+          // site `flushBeforeFrontmatterWrite`'s own header names as most at
+          // risk, and it was the only cover caller with no outcome at all while
+          // the editor screen shows `editor.cover.writeFailed` for the same
+          // failure. A refused cover write was byte-identical to a successful
+          // one here.
+          setCoverError(
+            panesNotSettledMessage(err, {
+              unsettled: t("notes.unsettledSave"),
+              failed: t("editor.cover.writeFailed"),
+            }),
+          );
         }
       })();
     },
-    [coverNoteId, coverPropertyKey, def],
+    [coverNoteId, coverPropertyKey, def, sidebar],
   );
   // The non-mutating card context menu (task 8) — the CLOSED four-item set
   // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy
@@ -1684,6 +1968,7 @@ function ViewHost({ viewId }: { viewId: string }) {
         onPick={(choice) => applyCover(choice)}
         onRemove={() => applyCover(null)}
       />
+      <Toast message={coverError} onDone={() => setCoverError(null)} variant="error" />
     </div>
   );
 }

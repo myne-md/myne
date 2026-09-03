@@ -101,7 +101,9 @@ pub(crate) async fn snapshot_list_in(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+            return Err(SnapshotError::VaultNotUnlocked)
+        }
     };
 
     if let Some(notes_dir) = notes_dir_beside(&snapshots_dir) {
@@ -220,7 +222,9 @@ pub(crate) async fn snapshot_preview_in(
     let slot = state.slot_read_active().await;
     let (items_key, items_key_id) = match &*slot {
         Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-        Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+            return Err(SnapshotError::VaultNotUnlocked)
+        }
     };
 
     let note_uuid_bytes = *note_id.as_uuid().as_bytes();
@@ -378,7 +382,9 @@ pub(crate) async fn snapshot_restore_in(
         let slot = state.slot_read_active().await;
         let (items_key, items_key_id) = match &*slot {
             Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-            Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+            Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+                return Err(SnapshotError::VaultNotUnlocked)
+            }
         };
         let note_uuid_bytes = *note_id_parsed.as_uuid().as_bytes();
         let live_path = notes_dir.join(format!("{}.myn", note_id_parsed.as_uuid()));
@@ -418,7 +424,9 @@ pub(crate) async fn snapshot_restore_in(
         let slot = state.slot_read_active().await;
         let (items_key, items_key_id) = match &*slot {
             Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
-            Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+            Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+                return Err(SnapshotError::VaultNotUnlocked)
+            }
         };
         let note_uuid_bytes = *note_id_parsed.as_uuid().as_bytes();
         let path = snapshots_dir.join(crate::snapshot_store::snapshot_filename(
@@ -617,7 +625,9 @@ pub(crate) async fn snapshot_prune_in(
     let slot = state.slot_read_active().await;
     match &*slot {
         Slot::Unlocked(_) => {}
-        Slot::Empty | Slot::Recovering { .. } => return Err(SnapshotError::VaultNotUnlocked),
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+            return Err(SnapshotError::VaultNotUnlocked)
+        }
     }
 
     let note_uuid = note_id.as_uuid().to_string();
@@ -790,9 +800,11 @@ mod tests {
         fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
-        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
-        }
+        // `effective_auto_lock_secs` deliberately not overridden: the trait's
+        // default clamps (myne-md/myne#479). This body used to be the unclamped
+        // `unwrap_or`, which is the exact shape that change removed from two
+        // production clients, so a fixture carrying it handed the next author
+        // the defect as the copyable example.
         fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
         fn preempt_inflight_backup<'a>(
             &'a self,

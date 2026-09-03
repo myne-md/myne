@@ -29,10 +29,19 @@
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { REMINDER_HORIZON_DAYS, horizonEndDate } from "@myne/reminder-schedule";
+import {
+  REMINDER_HORIZON_CHOICES,
+  horizonEndDate,
+  resolveHorizonDays,
+} from "@myne/reminder-schedule";
 import { REMINDER_APPROXIMATE_DELIVERY_SENTENCE } from "../lib/load-bearing-copy";
-import { createExactAlarmApi, type ExactAlarmApi, type ReminderExactness } from "../lib/reminders";
-import { Switch } from "./inputs";
+import {
+  createExactAlarmApi,
+  remindersReachTheOs,
+  type ExactAlarmApi,
+  type ReminderExactness,
+} from "../lib/reminders";
+import { Segmented, Switch } from "./inputs";
 
 const rowLabel: CSSProperties = { fontSize: 16, color: "var(--fg-1)" };
 const rowValue: CSSProperties = { fontSize: 15, color: "var(--fg-3)" };
@@ -88,13 +97,14 @@ export function horizonDate(horizonDays: number | null, today: Date): string {
   // computed `today + (N - 1)` — so the same vault told two devices two
   // different dates, and this one named a day LATER than any reminder the
   // scheduler would actually register (the horizon is inclusive of today).
-  return horizonEndDate(today, horizonDays ?? REMINDER_HORIZON_DAYS);
+  return horizonEndDate(today, resolveHorizonDays(horizonDays));
 }
 
 export type ReminderSwitchBlockProps = {
   enabled: boolean;
   horizonDays: number | null;
   onEnabledChange: (next: boolean) => void;
+  onHorizonChange: (next: number) => void;
   /** Injected in tests; production reads the local calendar day. */
   today?: Date;
 };
@@ -109,17 +119,42 @@ export type ReminderSwitchBlockProps = {
  * opened often but a vault may be unlocked rarely, and registration only happens
  * inside an unlocked session. "Reminders are registered through <date>" turns
  * "they run out if you do not open the app" from a surprise into a stated
- * property. It is hidden while reminders are off, because there is then no
- * horizon to state.
+ * property.
+ *
+ * It is hidden while reminders are off, because there is then no horizon to
+ * state, and hidden while `remindersReachTheOs()` is false, because there is
+ * then no registration to state either (myne#508). The picker beside it is not
+ * hidden on that second condition: the preference is real and persisted
+ * whatever reads it, and a control the user can set is not the same claim as a
+ * sentence saying something already happened.
  */
 export function ReminderSwitchBlock({
   enabled,
   horizonDays,
   onEnabledChange,
+  onHorizonChange,
   today,
 }: ReminderSwitchBlockProps): ReactNode {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const through = horizonDate(horizonDays, today ?? new Date());
+  // `-1` when the resolved horizon is not one of the offered choices, which
+  // renders no segment selected. That is the honest answer rather than a
+  // rounded one: `resolveHorizonDays` clamps into the safe RANGE, not onto the
+  // offered SET, because the scheduler has to honour the horizon actually
+  // stored and snapping it here would make the control disagree with what the
+  // pass registers. Only a hand-edited blob or another build can produce such a
+  // value, since the two pickers are the only writers. The desktop twin
+  // resolves the same way through the same helper and shows the same nothing.
+  const selected = (REMINDER_HORIZON_CHOICES as readonly number[]).indexOf(
+    resolveHorizonDays(horizonDays),
+  );
+  // The same standard API the desktop twin formats with, so the two cannot
+  // disagree and neither needs a catalog key per option.
+  const days = new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language, {
+    style: "unit",
+    unit: "day",
+    unitDisplay: "long",
+  });
 
   return (
     <>
@@ -140,9 +175,58 @@ export function ReminderSwitchBlock({
         </div>
       </Group>
       {enabled && (
-        <p style={helper} data-testid="settings.reminders-horizon">
-          {t("settings.reminders.horizon", { date: through })}
-        </p>
+        <>
+          {/* myne#508: the horizon had a line stating it and no way to change
+              it. It sits under the switch rather than in a card of its own
+              because the switch owns this section's heading (see
+              `ExactAlarmBlock` below), which is also why `SettingsSheet`'s
+              `SegmentBlock` is not reused: that helper wraps its content in a
+              settings card. Its `rowLabel` type is, so the control reads as a
+              named setting rather than as a caption.
+
+              The preference is written and persisted regardless of whether
+              anything on this client reads it yet, device-locally, and the pass
+              reads it the day it is wired. */}
+          <div
+            style={{ marginTop: "var(--space-3)" }}
+            data-testid="settings.reminders-horizon-picker"
+          >
+            <div style={{ ...rowLabel, margin: "0 var(--space-1) var(--space-2)" }}>
+              {t("settings.reminders.horizonLabel")}
+            </div>
+            <Segmented
+              options={REMINDER_HORIZON_CHOICES.map((d) => days.format(d))}
+              active={selected}
+              onChange={(i) => onHorizonChange(REMINDER_HORIZON_CHOICES[i])}
+              ariaLabel={t("settings.reminders.horizonLabel")}
+              testIdPrefix="settings.reminders-horizon-picker"
+              optionValues={REMINDER_HORIZON_CHOICES.map(String)}
+            />
+          </div>
+          {/* Which helper is true follows what this client can do, the same way
+              the desktop row's does. The desktop sentence ("Reminders are set
+              up this far in advance") is true where the pass runs and false
+              here, where `reminderPass.ts` has no caller, so an inert build
+              says so rather than saying nothing: a bare label over four day
+              counts leaves a user acting on the glossary's privacy reading with
+              no bound in force and no way to know it. Both flip together with
+              the line below. */}
+          <p style={helper} data-testid="settings.reminders-horizon-helper">
+            {remindersReachTheOs()
+              ? t("settings.reminders.horizonLabelHelper")
+              : t("settings.reminders.horizonInertHelper")}
+          </p>
+          {/* Gated in myne#508. This sentence says an operating system is
+              holding these reminders, and on mobile nothing is: the pass that
+              would register them has no caller. The desktop twin has gated the
+              same sentence on the same kind of predicate since MYND-618, and
+              this client was asserting it unconditionally in 32 locales. */}
+          {remindersReachTheOs() && (
+            <p style={helper} data-testid="settings.reminders-horizon">
+              {t("settings.reminders.horizon", { date: through })}
+            </p>
+          )}
+        </>
       )}
     </>
   );
@@ -240,7 +324,7 @@ export function ExactAlarmBlock({ api, onResolved }: ExactAlarmBlockProps): Reac
                 padding: 0,
                 font: "inherit",
                 fontSize: 15,
-                color: "var(--accent-1)",
+                color: "var(--accent)",
                 cursor: "pointer",
               }}
             >

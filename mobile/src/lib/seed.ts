@@ -11,15 +11,30 @@
 import { noteCreate, noteUpdate, noteList, noteRead } from "./notes";
 import { frontmatterTitle } from "./note-organize";
 import { welcomeNoteTitle } from "./welcomeNote";
-import { setFavorites, upsertSavedView, setViewOrder, type SavedView } from "./prefs";
+import { mutateDeliberateFolders, setFavorites, upsertSavedView, setViewOrder, type SavedView } from "./prefs";
+import { normalizeFolderPath } from "../dialect/folderPath";
 import { attachmentImport } from "./attachments";
 import { emitAttachmentEmbed } from "./attachmentRef";
 
 // ── plaintext builders ───────────────────────────────────────────────────────
 
+/** Every folder `noteText` has been asked to file a seeded note into.
+ *
+ *  Collected here because this is the ONE place a seeded folder is decided, and
+ *  the seeder writes dozens of notes: registering per note would cost one whole
+ *  `vault.prefs` re-encrypt each (myne#613). `seedDemoVault` drains it once at
+ *  the end. Module scope is safe because the seeder runs once per fresh vault
+ *  and drains what it collected; it is cleared at the start of each run anyway.
+ */
+const seededFolders = new Set<string>();
+
 function noteText(o: { title: string; folder?: string | null; updated: string; body: string }): string {
   const fm = [`title: ${o.title}`];
-  if (o.folder) fm.push(`folder: ${o.folder}`);
+  if (o.folder) {
+    fm.push(`folder: ${o.folder}`);
+    const norm = normalizeFolderPath(o.folder);
+    if (norm !== null) seededFolders.add(norm);
+  }
   fm.push(`updated: ${o.updated}`);
   return `---\n${fm.join("\n")}\n---\n\n${o.body}\n`;
 }
@@ -123,7 +138,12 @@ export async function seedTestData(): Promise<void> {
   // 2) Notes — created in dependency-free order; ids captured for favourites +
   //    version history. Wikilinks reference note TITLES (resolved by the vault).
   const id: Record<string, string> = {};
-  const add = async (key: string, text: string) => { id[key] = await noteCreate(text); };
+  // BULK: the seeder writes dozens of notes and each prefs write re-encrypts
+  // the whole blob, so registration is not per note here. `noteText` records
+  // every folder it files a note into and the one registration is issued at the
+  // end of this function.
+  seededFolders.clear();
+  const add = async (key: string, text: string) => { id[key] = await noteCreate(text, null); };
 
   await add("welcome", noteText({
     title: "Welcome to Myne", updated: iso(30 * 60_000),
@@ -389,13 +409,22 @@ export async function seedTestData(): Promise<void> {
     body: "# Project Roadmap\n\nBeta invites going out this week. 🎉\n\n- [x] Lock the spec\n- [x] Wire the API\n- [x] Beta invite list\n\n#work #planning #shipped",
   }));
 
+  // 3b) The ONE folder registration the bulk path owes, drained from what
+  // `noteText` recorded. Without it a seeded folder emptied by trashing its
+  // notes would vanish, and the unlock back-fill could not recover it either,
+  // because it walks LIVE notes (myne#613 review round 2).
+  if (seededFolders.size > 0) {
+    await mutateDeliberateFolders({ add: [...seededFolders] });
+  }
+
   // 4) Favourites.
   await setFavorites([id.welcome, id.roadmap, id.book]);
 
   // 5) Templates.
-  await noteCreate(templateText("Meeting notes", "# {{title}}\n\n**Date:** {{date}}\n**Attendees:** \n\n## Agenda\n- \n\n## Notes\n\n## Action items\n- [ ] "));
-  await noteCreate(templateText("Daily journal", "# {{date}}\n\n## Grateful for\n- \n\n## Today\n\n## Tomorrow\n- [ ] "));
-  await noteCreate(templateText("Project brief", "# {{title}}\n\n## Problem\n\n## Goal\n\n## Scope\n- \n\n## Risks\n"));
+  // Templates are root notes; same bulk reasoning as `add` above.
+  await noteCreate(templateText("Meeting notes", "# {{title}}\n\n**Date:** {{date}}\n**Attendees:** \n\n## Agenda\n- \n\n## Notes\n\n## Action items\n- [ ] "), null);
+  await noteCreate(templateText("Daily journal", "# {{date}}\n\n## Grateful for\n- \n\n## Today\n\n## Tomorrow\n- [ ] "), null);
+  await noteCreate(templateText("Project brief", "# {{title}}\n\n## Problem\n\n## Goal\n\n## Scope\n- \n\n## Risks\n"), null);
 
   // 6) Saved views — a mix of tag / folder / text / AND filters + view types.
   const views: SavedView[] = [

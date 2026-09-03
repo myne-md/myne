@@ -10,8 +10,10 @@ import {
 import { listVaults } from "../lib/vault-list";
 import { probeSlotKind } from "../lib/vault-slot-kind";
 import { lockVault } from "../lib/vault-unlock";
+import { endAgentRun } from "../lib/agent-lifetime";
 import { HAS_TAURI } from "../lib/app-window";
 import { clearCustomTheme, paintSelectedCustomTheme } from "../lib/customTheme";
+import { useDateTimeDisplaySync } from "../lib/useDateTimeDisplaySync";
 
 import { WelcomeFlow } from "./flows/WelcomeFlow";
 import { JoinFlow } from "./flows/JoinFlow";
@@ -50,6 +52,13 @@ type JoinEntry = keyof typeof JOIN_SUCCESS;
  * design gallery is a separate dev route (see App.tsx).
  */
 export function AppShell() {
+  // Publish the date/time display settings into the shared store every
+  // formatting surface reads (myne-md/myne#609). At the ROOT, and for the same
+  // reason `ToastHost` is: `StageSwitch` returns early in several places, so a
+  // hook mounted inside it would stop publishing on the stages that return
+  // first, and a store that stops being written is indistinguishable from one
+  // nobody ever wrote. That was the shape of the original defect.
+  useDateTimeDisplaySync();
   return (
     <>
       <StageSwitch />
@@ -274,14 +283,28 @@ function StageSwitch() {
           // flow's own `sync_join_account` unlocks the vault it bootstraps,
           // which evicts this one at the IPC layer (SYNC-1) — the same posture
           // `onCreateVault` takes toward the create → auto-unlock chain.
-          onJoinAccount={() => setJoinFrom("editor")}
+          // Same reason as the delete path below: not preceded by `lockVault`,
+          // and the vault it bootstraps is a different one.
+          onJoinAccount={() => {
+            endAgentRun("lock", "");
+            setJoinFrom("editor");
+          }}
           onSwitchVault={async (vaultId: VaultId) => {
             await lockVault().catch(() => {});
             dispatch({ type: "editor.switch-vault", vaultId });
           }}
           // Vault deletion is the one exit that does NOT go through `lockVault`
           // (the slot is gone, not locked), so it reverts the palette itself.
+          // Deletion is the one exit that does NOT go through `lockVault` (the
+          // slot is gone, not locked), so it must end the agent run itself
+          // (myne-md/myne#456). The store is module scope and survives every
+          // unmount, so without this a proposal holding anchors and replacements
+          // copied verbatim out of the DELETED vault's notes stays resident and
+          // renders in the next vault's AI tab. That is the myne-md/myne#529
+          // shape exactly: a teardown wired to the lock and not to the other
+          // vault-leaving path.
           onDeleteVaultSuccess={() => {
+            endAgentRun("lock", "");
             clearCustomTheme();
             reprobe(); // #45 — see the unlock surface above
           }}

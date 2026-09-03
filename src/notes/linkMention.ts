@@ -91,7 +91,7 @@ export function decideLinkWriteRoute(
 export class OpenDirtyGuardError extends Error {
   readonly noteId: string;
   constructor(noteId: string) {
-    super("Cannot link into an open note with unsaved edits — save it first.");
+    super("Cannot link into an open note with unsaved edits. Save it first.");
     this.name = "OpenDirtyGuardError";
     this.noteId = noteId;
   }

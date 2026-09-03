@@ -16,6 +16,8 @@
 #                         `local-inference-stub` build too: use e2e-ai-buildrun.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/lib/e2e-docker.sh
+source scripts/lib/e2e-docker.sh
 IMAGE=myne-e2e
 
 # Build the in-container loop that runs each spec separately and tallies results.
@@ -59,18 +61,17 @@ RUN_FLAGS=(
   --rm
   -v "$(pwd):/work"
   -v myne-e2e-node-modules:/work/node_modules
-  -v myne-e2e-target:/work/target
-  # Mounted where cargo actually LOOKS, which is `$CARGO_HOME/registry` — and
-  # `E2E_ENV` below sets `CARGO_HOME=/home/e2e/.cargo`. At
-  # `/usr/local/cargo/registry` nothing in this container reads it, so every
-  # `--rm` run re-downloaded the whole crate set (measured live: 528 MB written
-  # to the container-local path while the persisted volume held 59 MB
-  # untouched). `e2e-ai-buildrun.sh` already had it right.
-  -v myne-e2e-cargo-registry:/home/e2e/.cargo/registry
+  "${E2E_MEMBER_NM_VOLUMES[@]}"
+  -v "$E2E_TARGET_VOLUME":/work/target
+  "${E2E_REGISTRY_MOUNT[@]}"
   -w /work
   --user root
 )
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
+# Host-side append, NOT inside the single-quoted literal above: that string is
+# passed through to the container's bash, where `$E2E_CARGO_JOBS` is unset and
+# would expand to nothing. See scripts/lib/e2e-docker.sh.
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS"
 
 # **Forward the quarantine gate, or a quarantined spec SELF-SKIPS and this
 # script reports SKIP for a run you believed verified something.** That is not
@@ -97,10 +98,9 @@ for arch in arm64 amd64; do
     break
   fi
 done
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/target /home/e2e/.cargo'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
-  $FIX_PERMS && su e2e -s /bin/bash -c '
+  $E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
     $INNER

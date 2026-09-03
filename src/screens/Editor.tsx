@@ -53,9 +53,11 @@ import {
   OPEN_COVER_PICKER_EVENT,
   REMOVE_COVER_EVENT,
   type OpenCoverPickerDetail,
-} from "../notes/openCoverPickerSignal";
+  type RemoveCoverDetail,
+} from "@myne/editor/cover-signal";
 import { CoverPicker, type CoverChoice } from "../components/attachments/CoverPicker";
 import { setNoteCover } from "../notes/setNoteCover";
+import { backfillDeliberateFolders } from "../notes/folderBackfill";
 import { COVER_FIELD_KEY } from "../dialect";
 import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { focusKindOf } from "../commands/scope";
@@ -71,6 +73,7 @@ import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
 import { RemoteMergeHint } from "../components/sync/RemoteMergeHint";
 import { Icon } from "../components/primitives/Icon";
+import { PanelToggleGlyph } from "../components/primitives/PanelToggleGlyph";
 import { Tooltip } from "../components/primitives/Tooltip";
 import {
   hoverSurface,
@@ -106,8 +109,12 @@ import {
   noteList,
   loadNoteBatch,
   createNoteFromTemplate,
+  singleDay,
   createBlankNamedNote,
-  resolveTodayNote,
+  resolvePeriodNote,
+  periodSettings,
+  zonedNow,
+  type Period,
   convertNoteToTemplate,
   convertTemplateToNote,
 } from "../notes";
@@ -131,6 +138,10 @@ import {
   type ExportToast,
   type NoteExportUiHooks,
 } from "../notes/exportFlow";
+import {
+  noteExportFormats,
+  type NoteExportFormat,
+} from "../notes/noteExportMenu";
 import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
 import { ExportEgressNotice } from "../components/export/ExportEgressNotice";
 import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
@@ -186,6 +197,7 @@ import {
   trashedRecords,
   type NoteId,
 } from "../notes/sidebarState";
+import { settleFrontmatterWrite as settleFrontmatterWriteFor } from "../notes/settleFrontmatterWrite";
 import { sidebarCommands } from "../notes/sidebarCommands";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "../platform/webviewWindow";
@@ -203,6 +215,7 @@ import { createInAppNotifier } from "../lib/reminderNotifier";
 import { useLiveVaultTasks } from "../notes/taskIndex";
 import i18n from "../i18n";
 import { useIdleAutoLock } from "../hooks/useIdleAutoLock";
+import { effectiveAutoLockSecs } from "@myne/client-core";
 import { runFlushChain } from "../lib/flush-chain";
 import {
   ContextMenu,
@@ -210,6 +223,8 @@ import {
 } from "../notes/components/ContextMenu";
 import {
   HAS_OVERLAY_WINDOW_CONTROLS,
+  TITLE_BAR_CONTROL_HEIGHT,
+  TITLE_BAR_CONTROL_TOP,
   TRAFFIC_LIGHT_GAP,
   dragRegionProps,
 } from "./titlebar";
@@ -219,7 +234,11 @@ import { useResponsiveCollapse } from "./responsiveCollapse";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
 import { REVEAL_ATTACHMENT_EVENT } from "../editor/attachments/fileCardActions";
 import { CenterViewProvider, type CenterView } from "./centerView";
-import { WorkspaceProvider, useWorkspace } from "../notes/workspaceContext";
+import {
+  WorkspaceProvider,
+  panesNotSettledMessage,
+  useWorkspace,
+} from "../notes/workspaceContext";
 import { ClipDispatchListener } from "../clip/ClipDispatchListener";
 import { PaneTree } from "../notes/components/PaneTree";
 import { STRIP_HEIGHT } from "../notes/components/TabStrip";
@@ -1025,6 +1044,7 @@ function EditorChrome({
     enabled: barPrefs.reminders_enabled,
     tasks: reminderTasks,
     notifier: reminderNotifier,
+    horizonDays: barPrefs.reminder_horizon_days,
   });
   // `barMenu` holds the open menu's anchor coords + which mode it is in: a
   // plain `{x, y}` opens the bar-wide visibility checklist (right-click on
@@ -1483,6 +1503,21 @@ function EditorChrome({
     }
   }, []);
 
+  // The four writers `runFlushChain` runs, in one object rather than one per
+  // call site. Four identical literals is four places for the fifth writer to
+  // be added to three of them, and `runFlushChain` cannot see the omission: its
+  // parameter is a complete object either way. What varies between the callers
+  // is the REASON, which is the second argument and stays at the call site.
+  const flushSteps = useMemo(
+    () => ({
+      flushAll,
+      persistWorkspace,
+      persistVaultIndices,
+      flushGraphLayout: flushGraphLayoutNow,
+    }),
+    [flushAll, persistWorkspace, persistVaultIndices],
+  );
+
   // MYND-166 / MYND-308 — mirror the current container into the backend's
   // in-RAM staging slot on every change (incl. the restored/default state on
   // mount). The backend flushes it to vault.workspace on `ExitRequested`, so an
@@ -1564,10 +1599,15 @@ function EditorChrome({
           if (cancelled) return;
           // Stop the default close; we terminate manually after the flush.
           event.preventDefault();
-          await flushAll();
-          await persistWorkspace();
-          await persistVaultIndices();
-          await flushGraphLayoutNow();
+          // The chain, not a bare await sequence, and for the same reason the
+          // lock CTA below uses it (task 93): one writer's rejection must not
+          // take the rest of the chain with it, and here it must not take
+          // `w.destroy()` either. `flushAll` rejects when a pane fails to settle
+          // (myne-md/myne#520), and the default close is ALREADY cancelled at
+          // this point, so a bare await would wedge the window unclosable
+          // exactly when a save is failing. On Windows the title-bar X is the
+          // only quit affordance, so that is the whole quit path.
+          await runFlushChain(flushSteps, "closing");
           // `destroy()`, NOT `close()`: the capability ACL grants
           // `core:window:allow-destroy` but deliberately NOT `allow-close`
           // (TB6 surface — see lib/app-window.ts). `close()` rejects under the
@@ -1600,7 +1640,7 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [flushAll, persistWorkspace, persistVaultIndices]);
+  }, [flushSteps]);
 
   // Web graceful exit (MYND-574 task 93). The Tauri close-intercept above is a
   // no-op in a browser — its own catch says so — which meant every tab close
@@ -1626,20 +1666,12 @@ function EditorChrome({
         // difference (a hidden tab must not write `vault.workspace`, whose mtime
         // is a lock/quit signal), so the divergence is a named parameter rather
         // than two sequences that happen to differ by a line.
-        await runFlushChain(
-          {
-            flushAll,
-            persistWorkspace,
-            persistVaultIndices,
-            flushGraphLayout: flushGraphLayoutNow,
-          },
-          kind,
-        );
+        await runFlushChain(flushSteps, kind);
       } finally {
         setUnsavedGuard("flushing", false);
       }
     });
-  }, [flushAll, persistWorkspace, persistVaultIndices]);
+  }, [flushSteps]);
 
   // Task 88 — the second, much longer-lived holder of the same guard.
   //
@@ -1676,11 +1708,12 @@ function EditorChrome({
           if (cancelled) return;
           void (async () => {
             // Content flush first (data integrity), workspace descriptor
-            // second (convenience — droppable if the grace window expires).
-            await flushAll();
-            await persistWorkspace();
-            await persistVaultIndices();
-            await flushGraphLayoutNow();
+            // second (convenience, droppable if the grace window expires). The
+            // chain isolates each step, so a `flushAll` rejection from a pane
+            // that did not settle (myne-md/myne#520) neither skips the two
+            // persists behind it nor raises an unhandled rejection inside the
+            // auto-lock grace window, where nothing would report it.
+            await runFlushChain(flushSteps, "lock");
           })();
         });
         if (cancelled) {
@@ -1696,7 +1729,7 @@ function EditorChrome({
       cancelled = true;
       if (unlisten !== undefined) unlisten();
     };
-  }, [flushAll, persistWorkspace, persistVaultIndices]);
+  }, [flushSteps]);
 
   // Lock button flush-then-lock — `decisions.md` 2026-05-07 canonical
   // flush-on-lock, now across all panes; persist the workspace before lock.
@@ -1707,15 +1740,7 @@ function EditorChrome({
     // failure did not merely lose a cache: it cancelled the auto-lock, leaving
     // the keys live in the Worker and the plaintext mounted, past the idle
     // deadline, with nothing said.
-    await runFlushChain(
-      {
-        flushAll,
-        persistWorkspace,
-        persistVaultIndices,
-        flushGraphLayout: flushGraphLayoutNow,
-      },
-      "lock",
-    );
+    await runFlushChain(flushSteps, "lock");
     await lockVault().catch(() => {
       /* lock is best-effort, parent callback still fires */
     });
@@ -1732,7 +1757,7 @@ function EditorChrome({
     // one, since closing a screen un-applies nothing.
     clearAgentForLock();
     onLock?.();
-  }, [flushAll, persistWorkspace, persistVaultIndices, onLock]);
+  }, [flushSteps, onLock]);
 
   // Idle auto-lock where the platform has no OS-level idle detection — the web
   // client (phase3-web-client task 43). Desktop keeps `src-tauri/src/auto_lock.rs`
@@ -1743,7 +1768,20 @@ function EditorChrome({
   // the flush would lose the last edits of exactly the session the user walked
   // away from.
   useIdleAutoLock({
-    timeoutSecs: barPrefs.auto_lock_seconds ?? 0,
+    // Through the SHARED envelope, not `?? 0` (myne-md/myne#479). This hook is
+    // the timer that fires on the web client, where `?? 0` meant a `null`
+    // `auto_lock_seconds` DISABLED the idle lock: `useIdleAutoLock` activates on
+    // `timeoutSecs > 0`, and `protocol.md` §9.5.5 collapses an absent, tampered
+    // or replayed `vault.prefs` to exactly that null. `threat-model.md` §7 puts
+    // this timeout in the code-enforced class and says a replayed prefs blob
+    // "can only make auto-lock stricter, never disable it or exceed the
+    // ceiling", so the raw pref was the one input that could.
+    //
+    // The Rust-side clamp does not reach here: it feeds
+    // `VaultRuntimeState::auto_lock_timeout_secs`, whose only reader is the
+    // desktop Rust timer. Desktop is unaffected either way, since this hook is
+    // inactive wherever `osIdleAutoLock` is present.
+    timeoutSecs: effectiveAutoLockSecs(barPrefs.auto_lock_seconds ?? null),
     onIdle: () => void handleLockFlushed(),
   });
 
@@ -1990,7 +2028,7 @@ function EditorChrome({
         data-editor-chrome
         style={{
           position: "absolute",
-          top: 6,
+          top: TITLE_BAR_CONTROL_TOP,
           left: leftToggleX,
           zIndex: 30,
           display: "flex",
@@ -2026,7 +2064,7 @@ function EditorChrome({
         <div
           style={{
             position: "absolute",
-            top: 6,
+            top: TITLE_BAR_CONTROL_TOP,
             right: RIGHT_TOGGLE_X,
             zIndex: 30,
           }}
@@ -2244,7 +2282,11 @@ function EditorChrome({
         onCreateFromTemplate={(templateId, name) => {
           // Location-agnostic: lands at the root, where the header new-note
           // button's blank note would land (folder = null).
-          void createNoteFromTemplate(templateId, name, null, new Date())
+          // `singleDay(now)`: a note made by hand belongs to the day it was
+          // made on, so both period tokens render as today. Said explicitly
+          // because the parameter is required now, which is what stops a
+          // future weekly path from silently inheriting this meaning.
+          void createNoteFromTemplate(templateId, name, null, new Date(), singleDay(new Date()))
             .then((id) => ctx.open(id as NoteId))
             .catch(() => {
               /* creation failure surfaces via sidebar UX */
@@ -2552,7 +2594,7 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
   alignSelf: "center",
   alignItems: "center",
   justifyContent: "center",
-  height: 26,
+  height: TITLE_BAR_CONTROL_HEIGHT,
   flexShrink: 0,
   border: 0,
   borderRadius: "var(--radius-1)",
@@ -2640,14 +2682,6 @@ function TitleBarToggle({
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const icon =
-    side === "left"
-      ? collapsed
-        ? "panel-left"
-        : "panel-left-close"
-      : collapsed
-        ? "panel-right"
-        : "panel-right-close";
   const label =
     side === "left"
       ? collapsed
@@ -2674,7 +2708,7 @@ function TitleBarToggle({
         opacity: disabled ? 0.4 : 1,
       }}
     >
-      <Icon name={icon} size={16} />
+      <PanelToggleGlyph side={side} collapsed={collapsed} />
     </button>
   );
 }
@@ -2771,6 +2805,15 @@ type CommandPaletteHostProps = {
   setToast: Dispatch<SetStateAction<EditorToast | null>>;
 };
 
+// One period-note failure string per period. Spelled out as literals rather
+// than built from the period name, because a template-built key is invisible to
+// `check-i18n.mjs` and would go missing from the catalog silently.
+const PERIOD_OPEN_FAILED_KEY: Record<Period, string> = {
+  daily: "editor.periodicNotes.openFailed.daily",
+  weekly: "editor.periodicNotes.openFailed.weekly",
+  monthly: "editor.periodicNotes.openFailed.monthly",
+};
+
 function CommandPaletteHost({
   open,
   onClose,
@@ -2831,7 +2874,9 @@ function CommandPaletteHost({
   // fires straight from the palette — this renders the same count-aware
   // DeleteConfirmModal the TrashPanel footer uses, and only confirm purges.
   // Rendered as a sibling like `picker`, so it survives the palette closing.
-  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<number | null>(null);
+  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<
+    { count: number; viaKey: boolean } | null
+  >(null);
   // The note cover's picker (myne-md/myne#410). Editor-local boolean, per the
   // desktop modal carve-out that governs every other modal here. Deliberately
   // its OWN mount, separate from the cards-view picker inside `PaneView`: this
@@ -2840,7 +2885,13 @@ function CommandPaletteHost({
   // `| null` rather than an `open` flag, matching `picker` and
   // `emptyTrashConfirm` beside it: two booleans would encode four states for a
   // two-state thing, and every close would have to remember to reset both.
-  const [coverPicker, setCoverPicker] = useState<{ hasCover: boolean } | null>(null);
+  // `noteId` is the note the picker was opened FOR, not necessarily the focused
+  // one (myne-md/myne#520). `null` means the entry point did not name one, and
+  // `applyNoteCover` falls back to `activeNoteId` for those: the command palette
+  // and the title-row control both genuinely mean "the focused note".
+  const [coverPicker, setCoverPicker] = useState<
+    { hasCover: boolean; noteId: string | null } | null
+  >(null);
   // AI surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9): the `ai_enabled`
   // gate + the AI Chat reveal, threaded into CommandContext so AI capability
   // actions (siblings 4/6/7) gate on `stageName === "editor" && aiEnabled` and
@@ -2876,51 +2927,64 @@ function CommandPaletteHost({
   useEffect(() => {
     clearAiOutput();
   }, [ctx.selectedId]);
-  // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
-  // set (authoritative note_list + loadNoteBatch, not the partial sidebar cache).
-  // Found → open; not found → create (from the daily template if set, else a
-  // blank note titled today's date, the eager-title specialization of #5) in the
-  // daily folder, then open. Past days are reached via the ordinary sidebar
-  // folder — no calendar.
-  const onOpenTodayNote = useCallback(async () => {
-    try {
-      const prefs = await prefsRead();
-      const ids = await noteList();
-      const notes = await loadNoteBatch(ids);
-      // ONE instant for both the title and the template render. Two
-      // `new Date()` calls a few statements apart can straddle midnight, which
-      // would title the note with yesterday's date and render `{{date}}` as
-      // today's — a note that disagrees with itself.
-      const now = new Date();
-      const res = resolveTodayNote(
-        now,
-        prefs.daily_date_format,
-        prefs.daily_folder,
-        notes,
-      );
-      let id: NoteId;
-      if (res.kind === "open") {
-        id = res.id;
-      } else if (prefs.daily_template) {
-        // Daily template set → instantiate from it (date as eager title).
-        id = (await createNoteFromTemplate(
-          prefs.daily_template,
-          res.dateTitle,
-          res.folder,
-          now,
-        )) as NoteId;
-      } else {
-        // No daily template → a blank note titled with the date.
-        id = (await createBlankNamedNote(res.dateTitle, res.folder)) as NoteId;
+  // Open this period's note (MYND-191 daily, myne#177 weekly + monthly): one
+  // entry point for all three, error handling included. Idempotent
+  // open-or-create over the FULL note set (authoritative note_list +
+  // loadNoteBatch, not the partial sidebar cache). Found → open; not found →
+  // create, from that period's template if it has one and otherwise a blank
+  // note titled with the period, in that period's folder, then open. Past
+  // periods are reached through the ordinary sidebar folder, no calendar.
+  //
+  // Daily is not special here: `periodSettings` is where the prefs asymmetry
+  // lives (daily reads three flat fields, the others read the map), and a
+  // second wrapper for it would put that knowledge in a second place.
+  const onOpenPeriodNote = useCallback(
+    async (period: Period) => {
+      try {
+        const prefs = await prefsRead();
+        const ids = await noteList();
+        const notes = await loadNoteBatch(ids);
+        const settings = periodSettings(prefs, period);
+        // ONE instant, read once, in the DISPLAY timezone (myne#177). It
+        // anchors the period AND renders the template's `{{date}}`/`{{time}}`:
+        // the date the app shows, the date it files under and the date the body
+        // carries all have to be the same date, and with a `timezone` override
+        // set none of the three agreed.
+        const now = zonedNow(new Date(), prefs.timezone);
+        const res = resolvePeriodNote(now, period, settings, notes);
+        let id: NoteId;
+        if (res.kind === "open") {
+          id = res.id;
+        } else if (settings.template) {
+          // Template set → instantiate from it (the period title as eager
+          // title, the period's own bounds behind
+          // {{period_start}}/{{period_end}}).
+          id = (await createNoteFromTemplate(
+            settings.template,
+            res.dateTitle,
+            res.folder,
+            now,
+            { start: res.range.start, end: res.range.end },
+          )) as NoteId;
+        } else {
+          // No template → a blank note titled with the period.
+          id = (await createBlankNamedNote(res.dateTitle, res.folder)) as NoteId;
+        }
+        await ctx.open(id);
+      } catch (err) {
+        // The user is TOLD. A DEV-only console.warn is an empty catch in a
+        // production build, which makes the palette command a silent no-op:
+        // seven awaits run behind this, any of which can fail, and the mobile
+        // twin of this function has always surfaced it.
+        setToast({ message: t(PERIOD_OPEN_FAILED_KEY[period]), variant: "error" });
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn(`[Editor] open the ${period} note failed:`, err);
+        }
       }
-      await ctx.open(id);
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.warn("[Editor] open today's note failed:", err);
-      }
-    }
-  }, [ctx]);
+    },
+    [ctx, setToast, t],
+  );
   // "Open random note" (MYND-323): serendipitous review. Picks uniformly from the
   // live, non-template notes (mirrors sidebar visibility — trashed/templates are
   // excluded). With ≥2 eligible notes the current one is dropped so the pick
@@ -3016,11 +3080,11 @@ function CommandPaletteHost({
       onTrashNote: () => {
         if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
       },
-      onEmptyTrash: () => {
+      onEmptyTrash: (viaKey: boolean) => {
         // Permanent purge — request the count-aware confirm instead of firing
         // directly (the TrashPanel footer's flow); the purge runs on confirm.
         const count = trashedRecords(ctx.cache).length;
-        if (count > 0) setEmptyTrashConfirm(count);
+        if (count > 0) setEmptyTrashConfirm({ count, viaKey });
       },
       onToggleFavorite: () => {
         if (ctx.selectedId === null) return;
@@ -3190,7 +3254,7 @@ function CommandPaletteHost({
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
-      onOpenTodayNote,
+      onOpenPeriodNote,
       onOpenRandomNote,
       onOpenAttachments,
       onOpenSnapshots,
@@ -3204,11 +3268,11 @@ function CommandPaletteHost({
       // banner control and the title-row control are both hover-revealed.
       onSetNoteCover: () => {
         onClose();
-        setCoverPicker({ hasCover: false });
+        setCoverPicker({ hasCover: false, noteId: null });
       },
       onRemoveNoteCover: () => {
         onClose();
-        applyNoteCover(null);
+        applyNoteCover(null, null);
       },
       onShowGraph,
       onShowTags,
@@ -3251,7 +3315,7 @@ function CommandPaletteHost({
       onOpenSettings,
       onManageTemplates,
       onNewNoteFromTemplate,
-      onOpenTodayNote,
+      onOpenPeriodNote,
       onOpenRandomNote,
       onOpenAttachments,
       onOpenSnapshots,
@@ -3314,13 +3378,13 @@ function CommandPaletteHost({
   // frontmatter, then re-read the record so the tree settles. Skipped for a
   // dirty buffer, which the reload guards.
   //
-  // Shared by every such write in this component (template convert, note cover)
-  // rather than copied per caller: the recipe belongs to the BUG CLASS, so if it
-  // ever gains a step, one edit covers all of them.
-  const settleFrontmatterWrite = (id: string) => {
-    ctx.reloadOpenNote();
-    return ctx.refreshOne(id);
-  };
+  // Shared by every such write, and the recipe itself lives in
+  // `src/notes/settleFrontmatterWrite.ts` rather than here, because a third
+  // caller in another file hand-copied the two lines back when it was a closure
+  // in this component. It belongs to the BUG CLASS, so if it ever gains a step,
+  // one edit has to cover all of them.
+  const settleFrontmatterWrite = (id: string) =>
+    settleFrontmatterWriteFor(ctx, id as NoteId);
   // Convert with an undo toast: promoting a note to a template makes it LEAVE
   // the sidebar (templates are inverse-visibility, hidden like trash), so the
   // toast is what keeps it from reading as "my note vanished". Undo runs the
@@ -3328,6 +3392,18 @@ function CommandPaletteHost({
   const convertActive = (toTemplate: boolean) => {
     if (activeNoteId === null) return;
     const id = activeNoteId;
+    // The convert and its UNDO answer the same two rejection classes with the
+    // same two sentences, so the pair is resolved once here rather than spelled
+    // twice twenty lines apart, which is what the helper it calls exists to stop.
+    const reportConvertFailure = (err: unknown) => {
+      setToast({
+        message: panesNotSettledMessage(err, {
+          unsettled: t("notes.unsettledSave"),
+          failed: t("editor.noteActions.convertFailed"),
+        }),
+        variant: "error",
+      });
+    };
     const forward = toTemplate ? convertNoteToTemplate : convertTemplateToNote;
     const inverse = toTemplate ? convertTemplateToNote : convertNoteToTemplate;
     // The convert wrote the `template:` flag straight to disk, out of band of
@@ -3346,31 +3422,73 @@ function CommandPaletteHost({
             label: t("notes.list.undo"),
             onAction: () => {
               setToast(null);
-              void inverse(id).then(settle).catch(() => {});
+              // The UNDO inherits the same refusal the forward path does, and it
+              // is the sixth surface rather than a special case: `inverse` is
+              // the other convert, so it opens with the same flush. Undo also
+              // dismisses this toast first, so a swallowed rejection leaves the
+              // user with a note that did not revert and nothing on screen at
+              // all.
+              void inverse(id).then(settle).catch(reportConvertFailure);
             },
           },
         });
       })
-      .catch(() => {
-        /* mutation failure leaves the note unchanged; no toast */
-      });
+      // It used to say nothing, on the reasoning that a failed mutation leaves
+      // the note unchanged. That stopped being the whole story when the convert
+      // gained `flushBeforeFrontmatterWrite`: a REFUSED convert also leaves the
+      // note unchanged, and it is the app declining rather than a backend
+      // failing, which is a fact the user's own unsaved text explains and which
+      // clears itself once that save lands. Silence here is indistinguishable
+      // from a converted note whose row simply moved out of the sidebar, which
+      // is exactly what the undo toast above exists to prevent for the
+      // successful case.
+      .catch(reportConvertFailure);
   };
   // The note cover (myne-md/myne#410). `setNoteCover` writes `cover:` straight
   // to disk while the note is OPEN, so it is the same staleness class as the
-  // template convert above and settles the same way.
-  const applyNoteCover = (choice: CoverChoice | null) => {
-    const id = activeNoteId;
+  // template convert above and settles the same way. It also flushes any dirty
+  // pane first, and so does the convert; both do it inside the writer rather
+  // than here, so no caller can skip it (myne-md/myne#520,
+  // `notes/flushBeforeFrontmatterWrite.ts`).
+  //
+  // `target` is the note the CONTROL named, and reading `activeNoteId`
+  // unconditionally was the other half of #520: the banner's controls
+  // `preventDefault` on `mousedown`, so a press in an unfocused pane never
+  // focuses it and the passive effect that syncs the selection has not run
+  // either, which cleared the OTHER pane's note. `null` keeps the old meaning,
+  // "the focused note", which is what the palette and the title-row control
+  // actually mean.
+  const applyNoteCover = (choice: CoverChoice | null, target: string | null) => {
+    const id = target ?? activeNoteId;
     setCoverPicker(null);
     if (id === null) return;
     void setNoteCover(id, COVER_FIELD_KEY, choice)
       .then(() => settleFrontmatterWrite(id))
-      .catch(() => {
+      .catch((err: unknown) => {
         // Say so. A swallowed failure here is indistinguishable from "the cover
         // I picked did not apply for some reason I cannot see": the note is
         // unchanged, the picker has already closed, and nothing on screen moved.
-        setToast({ message: t("editor.cover.writeFailed"), variant: "error" });
+        //
+        // Through the shared helper, like the saved-view card's cover write one
+        // file over: this is the SAME branch on the same writer, and the two
+        // surfaces were answering it differently. A refusal is the app declining
+        // because of the user's own unsaved text and clears itself when that save
+        // lands; "could not update" gives them nothing to act on.
+        setToast({
+          message: panesNotSettledMessage(err, {
+            unsettled: t("notes.unsettledSave"),
+            failed: t("editor.cover.writeFailed"),
+          }),
+          variant: "error",
+        });
       });
   };
+  // The note the open picker will write to, resolved ONCE here rather than at
+  // each of the CoverPicker's three props below, which would be three copies of
+  // one precedence rule to keep in step. `null` when no picker is open, or when
+  // the entry point named nothing and nothing is selected either.
+  const coverPickerTarget =
+    coverPicker === null ? null : (coverPicker.noteId ?? activeNoteId);
   // The banner's two hover controls reach this component through window signals,
   // the same shape the vim `:q` ex command uses: the banner is CodeMirror DOM in
   // the shared editor package, with no route into the React context that owns
@@ -3378,9 +3496,19 @@ function CommandPaletteHost({
   useEffect(() => {
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<OpenCoverPickerDetail>).detail;
-      setCoverPicker({ hasCover: detail?.hasCover === true });
+      setCoverPicker({
+        hasCover: detail?.hasCover === true,
+        noteId: detail?.noteId ?? null,
+      });
     };
-    const onRemove = () => applyNoteCover(null);
+    // `?? null` on a possibly-absent detail rather than a destructure: the event
+    // is dispatched by whichever host build is loaded, and a bare
+    // `new CustomEvent(REMOVE_COVER_EVENT)` still has to mean "the focused note"
+    // rather than throw.
+    const onRemove = (e: Event) => {
+      const detail = (e as CustomEvent<RemoveCoverDetail>).detail;
+      applyNoteCover(null, detail?.noteId ?? null);
+    };
     window.addEventListener(OPEN_COVER_PICKER_EVENT, onOpen);
     window.addEventListener(REMOVE_COVER_EVENT, onRemove);
     return () => {
@@ -3393,6 +3521,18 @@ function CommandPaletteHost({
     // `src/CLAUDE.md` warns about, and buys nothing here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNoteId]);
+
+  // The palette's four export handlers, keyed by the shared format id, so the
+  // "…" menu's submenu stays a projection of `noteExportFormats()` instead of a
+  // third copy of the list. `?.()` rather than a bare reference because
+  // `CommandContext` declares several of its callbacks optional, and a submenu
+  // row owes a handler either way.
+  const exportHandlerByFormat: Record<NoteExportFormat["id"], () => void> = {
+    "export-markdown": () => commandCtx.onExportNoteMarkdown?.(),
+    "export-pdf": () => commandCtx.onExportNotePdf?.(),
+    "export-html": () => commandCtx.onExportNoteHtml?.(),
+    "export-txt": () => commandCtx.onExportNoteTxt?.(),
+  };
 
   const noteActionItems: NoteActionMenuItem[] = [
     {
@@ -3411,7 +3551,7 @@ function CommandPaletteHost({
       // label that guesses would be wrong half the time. The picker itself is
       // the surface that shows what is already there.
       label: t("editor.cover.add"),
-      onSelect: () => setCoverPicker({ hasCover: false }),
+      onSelect: () => setCoverPicker({ hasCover: false, noteId: null }),
     },
     {
       kind: "action",
@@ -3452,31 +3592,27 @@ function CommandPaletteHost({
     { kind: "divider" },
     {
       kind: "action",
-      action: "export-markdown",
+      action: "export",
       icon: "download",
-      label: t("editor.noteActions.exportMarkdown"),
-      onSelect: commandCtx.onExportNoteMarkdown,
-    },
-    {
-      kind: "action",
-      action: "export-pdf",
-      icon: "download",
-      label: t("editor.noteActions.exportPdf"),
-      onSelect: commandCtx.onExportNotePdf,
-    },
-    {
-      kind: "action",
-      action: "export-html",
-      icon: "download",
-      label: t("editor.noteActions.exportHtml"),
-      onSelect: commandCtx.onExportNoteHtml,
-    },
-    {
-      kind: "action",
-      action: "export-txt",
-      icon: "download",
-      label: t("editor.noteActions.exportTxt"),
-      onSelect: commandCtx.onExportNoteTxt,
+      // ONE row with a submenu, where there used to be one row per format. Four
+      // of them made up a third of this menu, and the sidebar row's menu
+      // carried the same four again. The list itself now comes from
+      // `noteExportFormats()`, shared with that menu, including the
+      // `pdfExport` gate, which used to be on the sidebar side only, so this
+      // menu was the one still offering PDF on a host that cannot make one.
+      label: t("notes.export.submenuLabel"),
+      // Never called: a row with `children` opens them instead of acting.
+      onSelect: () => {},
+      children: noteExportFormats().map((format) => ({
+        action: format.id,
+        label: t(format.labelKey),
+        // Still the palette's own handlers, so this stays a second SURFACE onto
+        // one IPC path rather than a second path, the rule this menu's header
+        // states. They also close the palette, which the direct-flow runner in
+        // `noteExportEntries` has no business doing, and that is the whole
+        // reason the shared module stops at the format list here.
+        onSelect: exportHandlerByFormat[format.id],
+      })),
     },
     { kind: "divider" },
     {
@@ -3502,7 +3638,7 @@ function CommandPaletteHost({
         <div
           style={{
             position: "absolute",
-            top: 6,
+            top: TITLE_BAR_CONTROL_TOP,
             // Sits just left of the right-sidebar toggle (at RIGHT_TOGGLE_X),
             // one cluster gap between them, so the two read as one group.
             right: RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + TITLE_BAR_CLUSTER_GAP,
@@ -3537,20 +3673,29 @@ function CommandPaletteHost({
         }}
       />
       <CoverPicker
-        open={coverPicker !== null && activeNoteId !== null}
+        // `coverPickerTarget` is the note the entry point named, falling back to
+        // the focused one, so a picker opened from a banner in an unfocused pane
+        // writes to that pane's note (myne-md/myne#520).
+        open={coverPickerTarget !== null}
         // Comes from whichever entry point opened it: the banner's Change
         // control passes true (a banner only renders for a note that has one),
         // the "Add cover" entries pass false.
         hasCover={coverPicker?.hasCover === true}
         onClose={() => setCoverPicker(null)}
-        onPick={(choice) => applyNoteCover(choice)}
-        onRemove={() => applyNoteCover(null)}
+        onPick={(choice) => applyNoteCover(choice, coverPickerTarget)}
+        onRemove={() => applyNoteCover(null, coverPickerTarget)}
       />
       {emptyTrashConfirm !== null && (
         <DeleteConfirmModal
           title={t("notes.trash.emptyConfirmTitle")}
-          body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm })}
+          body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm.count })}
           confirmLabel={t("notes.trash.emptyConfirmCta")}
+          // The palette's own answer, threaded through `CommandContext`. It was
+          // an unconditional `true` for one E2E run, on the reasoning that the
+          // palette is a keyboard-first surface, and `et1` failed three times
+          // over: a row selected with a click leaves no Enter to release, so the
+          // dialog ate the user's first press.
+          openedByKey={emptyTrashConfirm.viaKey}
           onCancel={() => setEmptyTrashConfirm(null)}
           onConfirm={() => {
             setEmptyTrashConfirm(null);
@@ -3608,7 +3753,25 @@ function SidebarBootstrap() {
     void (async () => {
       try {
         const ids = await noteList();
-        await ctx.refreshAll(ids);
+        const records = await ctx.refreshAll(ids);
+        // myne-md/myne#613: register the folders this vault's notes already
+        // prove, once per unlocked session. A vault created before at-fill has
+        // no registrations at all, so its oldest folders are exactly the ones
+        // that still vanish when emptied.
+        //
+        // Here rather than inside `refreshAll` on purpose: this effect is
+        // `booted`-latched, so it is the unlock, while `refreshAll`'s six other
+        // callers include every sync pull. Backfilling on a pull would re-add a
+        // folder a peer had deleted, from notes whose deletions have not
+        // arrived yet. Fire-and-forget: it never blocks the sidebar and never
+        // fails the boot.
+        // `prefsRead()` rather than the `usePrefs` cache: at first render that
+        // cache still holds the defaults while its own read is in flight, and
+        // an empty `deliberate_folders` read as truth would make this send an
+        // ADD for every folder on every unlock, forever.
+        void prefsRead()
+          .then((p) => backfillDeliberateFolders(records, p.deliberate_folders))
+          .catch(() => {});
         const target = takeDeepLinkNoteId();
         if (target !== null && ids.includes(target)) ctx.select(target);
       } catch (e) {
@@ -4273,11 +4436,6 @@ function SidebarPane({
       // than the inner wrapper so the ornament spans the pane's full height
       // even while the collapse animation is running.
       {...ornamentRole("surface")}
-      // Observability only (myne-md/myne#555). The responsive auto-collapse is
-      // a WIDTH, so the E2E assertion is this element's measured box — the
-      // scenario deliberately does not read a `collapsed` flag the app would be
-      // reporting about itself.
-      data-testid={`editor.sidebar-${side}`}
       style={{
         position: "relative",
         width: collapsed ? 0 : width,

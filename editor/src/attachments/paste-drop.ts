@@ -23,6 +23,7 @@ import {
   autoPasteName,
   importMany,
   importToastMessage,
+  ownLineInsertion,
 } from "./insert";
 import { getHost } from "../host";
 import { showAttachmentToast } from "./toast";
@@ -176,12 +177,15 @@ export function insertEmbedsForOutcomes(
   const embeds = successes.map((o) =>
     emitAttachmentEmbed(o.attachment.id, o.attachment.filename),
   );
-  const insert = embeds.join("\n");
   // Clamp the anchor — the async round-trip may outlive a doc edit.
   const at = Math.min(insertAt, view.state.doc.length);
+  // Each embed on a line of its own (myne-md/myne#604), which is the form the
+  // renderer draws as a block: see `ownLineInsertion` for why the placement
+  // belongs to the insert path rather than to the decoration.
+  const { insert, anchor } = ownLineInsertion(view.state.doc, at, embeds.join("\n"));
   view.dispatch({
     changes: { from: at, insert },
-    selection: { anchor: at + insert.length },
+    selection: { anchor },
     userEvent: "input.attachment-insert",
   });
 }

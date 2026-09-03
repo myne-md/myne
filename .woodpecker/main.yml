@@ -1,0 +1,1574 @@
+# Woodpecker CI — Myne main repo
+# Self-hosted Woodpecker via Forgejo mirror of GitHub.
+# Decision: docs/decisions.md "2026-05-01 — CI: self-hosted Woodpecker via Forgejo mirror"
+# Plan: tracked in GitHub Issues under the myne-md org
+#
+# Notes:
+# - Each step runs in its own container; installed packages do NOT inherit between steps.
+# - Linux runner only; macOS + Windows checked manually before release (revisit at v1.0).
+# - THIS FILE IS ONE OF TWO WORKFLOWS. `.woodpecker/e2e.yml` is the other, and
+#   it holds BOTH end-to-end suites, the desktop tauri-driver suite and the
+#   browser web lane. Nothing in it runs on a push or a pull request: it is
+#   manual-only, triggered before a release (myne-md/myne#579, and the decision
+#   entry `docs/decisions/ops/0529`). So a green
+#   run of THIS file is not a claim that the E2E suites pass; the release
+#   runbook owns that claim.
+# - THREE lanes, one pipeline (MYND-574; the third landed 2026-08-13). The
+#   desktop lane is one serial chain (pnpm-build -> vitest -> tauri-compile ->
+#   cargo-test-tauri) because every one of those steps runs `pnpm install` into
+#   the shared workspace node_modules and concurrent installs corrupt it. The
+#   WEB lane hangs off the end of that chain (`web-build`, alongside
+#   `sync-sim`) so it adds nothing to the desktop lane's wall-clock. The MOBILE
+#   lane (`mobile-build` -> `npm-licenses` -> `mobile-vitest` ->
+#   `mobile-flow-logic`, plus `mobile-compile`) hangs off `web-build` for the
+#   same reason and by the same rule. One Rust wasm gate runs early and
+#   independently of all three, `wasm-protocol`; its reproducibility half
+#   `wasm-repro` was split out and now depends on `cargo-test-tauri`, so it is
+#   deliberately NOT early (that step's own comment carries the measurement).
+#   Every web and mobile step carries the same `code-paths` globs as the compile
+#   steps, so a docs-only commit runs none of them, and every step that can go
+#   red is listed in `notify-failure`.
+#   This paragraph said "TWO lanes" and "the two Rust wasm gates that run early
+#   ... (`wasm-protocol`)" until myne-md/myne#584: two counts, one of them naming
+#   a single step, and the mobile lane sitting unmentioned in the same file. It
+#   is the first thing anyone opening this file reads, so it is the worst place
+#   in the repository for a number that has stopped describing anything.
+# - Future: cache cargo + pnpm artifacts; pre-build a custom image with rust + node + Tauri sysdeps.
+
+when:
+  - event: push
+    branch: [develop, main]
+  - event: pull_request
+  # Allow re-triggering the whole pipeline by hand from the Woodpecker UI
+  # ("Run pipeline" / manual trigger). Without a matching `manual` event the
+  # UI submits an empty pipeline (no step matches) and the run is rejected.
+  #
+  # `RUN_E2E != "true"` makes the manual trigger carry ONE intent at a time.
+  # `.woodpecker/e2e.yml` claims the manual event with `RUN_E2E == "true"`, so
+  # without this negation an E2E trigger would ALSO run this whole pipeline,
+  # which would put two workflows CONCURRENTLY on the shared host, with the agent's
+  # `WOODPECKER_MAX_WORKFLOWS=2`, and that is the
+  # shared host, which is the documented root cause of the E2E suite's mount
+  # timeouts. A lane whose whole purpose is a clean pre-release signal must not
+  # be racing a full pipeline for the same cores.
+  #
+  # An unset RUN_E2E evaluates to the empty string, so an ordinary manual
+  # re-run, the case this entry was added for, is unaffected: `"" != "true"`.
+  - event: manual
+    evaluate: 'RUN_E2E != "true"'
+
+variables:
+  # The prebuilt CI base image (myne-md/myne#585). It bakes the eleven Tauri
+  # sysdeps, mold, git, the pinned Rust components and wasm32 target, Node, pnpm
+  # and Go, so the five steps that used to apt-install that set on every run do
+  # not. `tauri-compile`'s own comment measures that install at 68 s, and four of
+  # the five are on the push path.
+  #
+  # PINNED BY DIGEST, never by tag: a tag is mutable, so republishing one would
+  # change what a gate ran on without changing a tracked byte. The digest is
+  # recorded in `ci/image.json` and `scripts/check-ci-image.mjs` holds the two
+  # together, along with the three versions the Dockerfile bakes against
+  # `rust-toolchain.toml`, `.nvmrc` and `package.json`'s `packageManager`.
+  #
+  # BUILT AND PUBLISHED BY HAND, never by CI. These pipelines verify and do not
+  # publish (myne-md/myne#584), and an image-publishing step would additionally
+  # be the one case where CI rewrites its own input. Procedure:
+  # `myne-ops/runbooks/ci-base-image.md`.
+  #
+  # Written ONCE as an anchor. Five hand-copies of a digest is five places to
+  # drift, and a stale one fails in a way that reads as an infrastructure
+  # outage rather than as an edit somebody made.
+  ci_image: &ci_image ghcr.io/myne-md/myne-ci@sha256:99fbe08624fd824de91a9615202439fceb4d696e2bb911e175f4624096131b67
+
+steps:
+  # ─── Rust formatting ─────────────────────────────────────────
+  cargo-fmt:
+    image: rust:1.96.0-slim
+    # Docs-only path filter (Q2): a step is SKIPPED only when EVERY changed file
+    # matches an exclude glob — one code file changed ⇒ full pipeline (fail-open;
+    # path is also ignored for manual/cron so those always run). The anchor is
+    # defined here (first step) and aliased as `*code-paths` by every other
+    # compile/test step. hooks-parity deliberately keeps NO filter (its EOF/
+    # whitespace/SPDX checks apply to docs too), so it runs on every push.
+    #
+    # TWO anchors, and the inner one is not decoration. A `when` entry carries an
+    # implicit `status: success`, so a step that must run after an unrelated red
+    # has to spell `status: [success, failure]` out — and a YAML list entry
+    # cannot alias `*code-paths` and add a key to it. Such a step aliases
+    # `*code-path-globs` instead and writes its own `status:` beside it, so the
+    # glob list stays one source of truth rather than a hand-copy per step.
+    # `e2e-floor` (now in `.woodpecker/e2e.yml`) carried exactly that
+    # hand-copy until myne-md/myne#458.
+    when: &code-paths
+      - path: &code-path-globs
+          exclude: ['docs/**', '*.md', '**/CLAUDE.md', '**/README.md']
+    commands:
+      - rustup component add rustfmt
+      - cargo fmt --all -- --check
+
+  # ─── Rust lint ───────────────────────────────────────────────
+  # Scoped to `protocol` crate: src-tauri pulls Tauri sysdeps (libwebkit2gtk, etc.)
+  # which the slim image lacks; tauri-compile step covers workspace compile gate.
+  cargo-clippy:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    # Shared compile cache (H1) — root front-lane steps use the top-level cache
+    # dirs. cargo-clippy and cargo-test get the SAME config on purpose: they share
+    # the workspace target/, so a mismatched RUSTC_WRAPPER between them would churn
+    # cargo fingerprints. (sccache passes clippy-driver through, but the dep rustc
+    # compiles it caches are what cargo-test then reuses.)
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      - rustup component add clippy
+      - cargo clippy -p protocol --all-targets -- -D warnings
+
+  # ─── Rust tests ──────────────────────────────────────────────
+  # Scoped to `protocol` crate (see cargo-clippy comment above).
+  cargo-test:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    # Shared compile cache (H1) — the front-lane gate (~100s; ~cargo-deny went
+    # prebuilt so this now bounds when the heavy chain starts). Same cache config
+    # as cargo-clippy above (shared workspace target/). Argon2id KATs dominate the
+    # runtime and stay uncached; only the compile portion caches (~20-40s).
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      - /cache/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
+
+  # ─── Rust supply-chain audit ─────────────────────────────────
+  # `git` is required by cargo-deny to fetch the rustsec advisory-db.
+  cargo-deny:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    commands:
+      # cargo-deny is installed from the official pinned prebuilt release
+      # (sha256-verified) instead of `cargo install` from source (~149s + runs
+      # the whole cargo-deny dependency tree's build scripts). It was the slowest
+      # front-lane step and gated when the heavy chain starts, so this both
+      # speeds CI and tightens the supply chain (Q5). Bump the version + sha
+      # together (asset: cargo-deny-<ver>-x86_64-unknown-linux-musl.tar.gz, tag
+      # has no `v` prefix; sha from the .sha256 sibling asset).
+      # `git` is still required by `cargo deny check` for the rustsec advisory-db.
+      - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates
+      - |
+        curl -fsSL "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz" -o /tmp/cargo-deny.tgz
+        echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  /tmp/cargo-deny.tgz" | sha256sum -c -
+        tar -xzf /tmp/cargo-deny.tgz -C /tmp --strip-components=1
+        install -m0755 /tmp/cargo-deny /usr/local/bin/cargo-deny
+      - cargo deny check
+
+  # ─── AI no-egress dependency gate ────────────────────────────
+  # Proves the shipped tree carries no networked / model-download crate now that
+  # on-device AI is default-on (decisions.md 2026-07-02). `cargo tree` only
+  # RESOLVES the graph (no compile), so this is cheap and needs no Tauri sysdeps
+  # — just git for the Cargo.lock-singleton + wildcard checks. SYNC-2.
+  ai-no-network:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends git
+      - bash src-tauri/scripts/ai-no-network-check.sh
+
+  # ─── wasm32 target gate for `protocol` (phase3-web-client task 9) ──
+  # The crypto core is SHARED with the web client rather than reimplemented, so
+  # `wasm32-unknown-unknown` is a supported target and must not rot between web
+  # tasks. Front-lane and dependency-free (no `depends_on`), so it runs in
+  # parallel with the other cheap Rust steps and adds nothing to the desktop
+  # chain's duration.
+  #
+  # The script does more than build: it asserts the CSPRNG hook is UNRESOLVED
+  # and that wasm-bindgen has not crept into the graph. A plain
+  # `cargo build --target wasm32-unknown-unknown` passes with no entropy source
+  # at all (an rlib never resolves the embedder hook), so "wasm32 builds green"
+  # on its own would be evidence of nothing. Logic lives in the committed script
+  # — same reason as ai-no-network and hooks-parity: Woodpecker's env
+  # substitution must never see shell dollar-brace expansions.
+  wasm-protocol:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      # No `rustup target add` here on purpose: `rust-toolchain.toml` pins
+      # `targets = ["wasm32-unknown-unknown"]`, so the target is present from the
+      # toolchain install. A gate that installs its own target is a gate that
+      # silently does not run wherever the line was forgotten.
+      # llvm-nm — the script reads the getrandom rlib's symbol table.
+      - rustup component add llvm-tools
+      - bash scripts/wasm-csprng-check.sh
+      # myne-core's wasm graph must keep resolving (phase3-web-client task 78).
+      # Until task 79 removes core's Tauri references this still fails INSIDE
+      # core, so the gate is on the dependency resolution specifically: reaching
+      # core's own code is the pass condition.
+      - bash scripts/wasm-core-graph-check.sh
+      # The wasm ENTRY crate (phase3-web-client task 11). Gated here because
+      # nothing else reaches it: `cargo clippy --workspace --all-targets` and
+      # `cargo test --workspace` run for the HOST triple, where this crate's
+      # `#[wasm_bindgen]` exports and its CSPRNG registration do not compile at
+      # all — so a broken `cfg`, a clippy error, or a plain compile break in the
+      # wasm-only half would pass every other gate in this pipeline.
+      #
+      # `cargo build`, not `wasm-bindgen`: generating the JS glue needs a pinned
+      # `wasm-bindgen-cli` (see `scripts/build-wasm.sh`), which belongs to the
+      # bundle build rather than to a compile gate. What this catches is the Rust.
+      #
+      # The build ALSO proves the CSPRNG registration resolves: with no
+      # `register_custom_getrandom!` the link fails with
+      # `undefined symbol: __getrandom_custom` (task 81, verified by probe).
+      - cargo clippy -p myne-web-wasm --target wasm32-unknown-unknown -- -D warnings
+      # The SHARED crates' wasm-only arms (phase3-web-client task 77). The step
+      # above lints the entry crate; these two are where most of the
+      # `#[cfg(target_arch = "wasm32")]` code actually lives — the browser
+      # transport factory, `task::run_blocking_future`'s wasm arm, the session
+      # token store's selection, the TOFU-pin refusal — and NOTHING reached them
+      # before: `cargo clippy --workspace --all-targets` in the `lint` step
+      # builds for the host triple, where those arms do not compile at all.
+      - cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
+      # The wasm entry crate's HOST-triple unit tests (phase3-web-client task 77).
+      #
+      # Not a wasm-target run and it does not need one: these are source-level
+      # and pure-logic guards that compile for the host — the dispatch roster
+      # cross-check, the `WebHooks`-not-`NoopHooks` installation assertion, the
+      # OPFS kind-mapping mirror. Nothing else in this pipeline reaches them:
+      # `cargo-test` runs `-p protocol`, `cargo-test-tauri` runs
+      # `-p myne-desktop -p myne-core`, and neither names this crate.
+      #
+      # The hole was not theoretical. Two dispatch arms added on 2026-07-28
+      # shipped without their `capability::DISPATCHED` entries, which makes
+      # `classify` report a DISPATCHED command as unported — the roster test
+      # caught it locally, and would have caught nothing here.
+      - cargo test -p myne-web-wasm
+
+  # ─── Reproducible wasm artefact ──────────────────────────────
+  # Two cold builds into separate target directories must produce the same
+  # digest (MYND-574 task 16).
+  #
+  # This runs in CI as well as locally on purpose: CI is a DIFFERENT machine —
+  # different user, different checkout path, a Linux container rather than
+  # macOS — so a path remap that only works on the author's box fails here. That
+  # cross-machine difference is most of the value; a same-machine check can only
+  # prove independence from the target directory.
+  #
+  # `threat-model.md` §6 makes reproducible builds the substitute for the missing
+  # third-party audit, and A15/TB11 makes the published bundle hash the web
+  # client's only defence against hostile code delivery. A hash nobody can
+  # reproduce is a number the publisher asserts about itself.
+  #
+  # All logic in a COMMITTED script, never inline — the same rule
+  # `ai-no-network-check.sh` and `hooks-parity-check.sh` follow, because
+  # Woodpecker's config-compile runs env substitution over this file and a shell
+  # expansion in a step (or even in a comment) can error the whole pipeline
+  # config.
+  #
+  # `nodejs` because `build-wasm.sh` reads cargo's `--message-format=json`
+  # artefact record with it, and `rust:slim` has no node. Added 2026-07-29 after
+  # this step ran for the FIRST TIME: it landed with MYND-574 and every pipeline
+  # since errored at config-compile, so it was written, reviewed and merged
+  # without once executing. A gate that has never run is a gate whose result
+  # nobody has seen — which is the same failure class the step itself exists to
+  # catch, one layer up.
+  #
+  # ─── Why this is its OWN step, and why it depends on a step it does not use ──
+  # Woodpecker compiles `depends_on` into STAGES and runs them one after another:
+  # every step in a stage starts together and the next stage waits for the
+  # SLOWEST one, whether or not anything connects them. Measured on pipelines
+  # 649, 655 and 661 — `vitest` starts at the exact second `wasm-protocol` ends
+  # every time, though it depends only on `pnpm-build`, which finished 160 s
+  # earlier.
+  #
+  # These two commands are 120 s of `wasm-protocol`'s 222 s, in the first stage,
+  # whose second-slowest step is `pnpm-build` at 64 s. Nothing depends on them.
+  # So they were 120 s of pure waiting for every other step in the pipeline.
+  # `depends_on: [cargo-test-tauri]` lands them in the stage that holds
+  # `web-build` and `sync-sim`. That is NOT the last stage: `web-build` still
+  # feeds the four-step mobile tail and `web-container-check`, so an over-run
+  # here delays those too, not just the pipeline's end.
+  #
+  # The placement was chosen when the stage also held the 1118 s `e2e` step,
+  # under which 120 s cost nothing at all. `e2e` has since moved to
+  # `.woodpecker/e2e.yml`, so the cover is now whatever `sync-sim` and
+  # `web-build` take: `sync-sim` downloads a Go toolchain, apt-installs the full
+  # GTK dev chain, clones and builds myne-server and runs nextest, so the
+  # exposure is probably still nil. Probably is the operative word. Read the
+  # stage timings on a real pipeline before moving this step again.
+  #
+  # Only the REPRODUCIBILITY half moved. The correctness gates above — the
+  # CSPRNG-hook check, the wasm dependency graph, both wasm clippys, the entry
+  # crate's tests — stay in the first stage and still fail at minute two. This
+  # one is a publish-time property, and the trade it makes is explicit: it now
+  # surfaces at minute ~15 instead of minute ~4.
+  # ─── This step's run condition belongs to its CONSUMER, not to itself ────────
+  # `web-build` bundles `web/src/worker/worker.ts`, which imports
+  # `../../wasm/pkg/myne_web_wasm.js`. That directory is gitignored, so it is
+  # never in a checkout, and `web:build` does not generate it. This step is the
+  # only thing in the pipeline that populates it, through
+  # `scripts/wasm-repro-check.sh` calling `build-wasm.sh --verify`.
+  #
+  # `web-build` deliberately carries `status: [success, failure]`, because the
+  # A15 compensating controls it runs — the recovery-phrase-absence grep among
+  # them — are worth asking about even on a red pipeline. This step carried a
+  # BARE `when`, whose implicit `status: success` is pipeline-wide rather than
+  # `depends_on`-scoped, and a bare `depends_on` edge that a red
+  # `cargo-test-tauri` also skips. So the consumer ran on red and its producer
+  # did not, and `web-build` died with
+  # `[UNRESOLVED_IMPORT] Could not resolve '../../wasm/pkg/myne_web_wasm.js'`.
+  #
+  # That message is worse than a plain failure: it names a missing dependency,
+  # so it reads as a broken branch rather than as a step that was skipped, and
+  # it MASKS the pipeline's real first failure. Six open PRs were red behind it
+  # at once.
+  #
+  # Both halves have to move together or the hole stays open on the other path.
+  # The optional edge still ORDERS — it only stops requiring that the parent
+  # SUCCEEDED — so the serial chain that keeps two heavy workspace builds off
+  # the same host at once is unchanged. The rule this restores is stated at the
+  # `code-paths` anchor above: a producer and its consumer share a run
+  # condition, and this step was the one place it was not applied.
+  wasm-repro:
+    image: rust:1.96.0-slim
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    depends_on:
+      - name: cargo-test-tauri
+        optional: true
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends nodejs
+      - bash scripts/wasm-repro-check.sh
+
+  # ─── Hook-parity backstop ────────────────────────────────────
+  # SPDX headers, EOF newline, trailing whitespace live ONLY in the lefthook
+  # pre-commit set (bypassable via --no-verify) and had no remote gate. This
+  # step is that gate. Git-only, so cheap; all logic is in the committed script
+  # (NOT inline) — like ai-no-network above — so Woodpecker's env-substitution
+  # never sees shell dollar-brace expansions and can't error config-compile.
+  # i18n-catalog is gated in pnpm-build (needs node); damm32 VALUE drift by cargo-test.
+  hooks-parity:
+    image: rust:1.96.0-slim
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends git file
+      - bash scripts/hooks-parity-check.sh
+
+  # ─── TypeScript typecheck + Vite build ───────────────────────
+  # `node:25` does not ship corepack; install pnpm directly via npm.
+  # ─── The bundle-hash record is append-only (MYND-574 task 56) ────────────────
+  # No `code-paths` filter, deliberately: the record IS a doc, so a docs-only
+  # commit is exactly when it changes and exactly when this must run.
+  #
+  # Rows are added, never edited or removed. A withdrawn build is published as a
+  # NEW row for its replacement — deleting the bad entry is the rewrite the
+  # record exists to make impossible to do quietly.
+  bundle-record:
+    image: node:25
+    commands:
+      - git fetch origin develop --depth=50 || true
+      - node scripts/check-bundle-record.mjs --append-only origin/develop
+
+  # ─── Every desktop/mobile twin carries a verdict (#472) ──────────────────────
+  # No `code-paths` filter, for exactly bundle-record's reason one step up: the
+  # guard's `--check` half compares the GENERATED docs/dev/twin-inventory.md
+  # against what --emit would write, so a docs/** file is one of its inputs. A
+  # hand edit to that document is a docs-only commit, and under the filter CI
+  # would never look, leaving only the --no-verify-bypassable pre-commit hook.
+  #
+  # It lived inside the filtered pnpm-build step until review, under a comment
+  # asserting the document "is never read by the check". The line directly below
+  # that comment read it.
+  #
+  # Distinct from check-twin-drift.mjs, which stays a warning in pnpm-build: that
+  # one fires on a NEW one-sided change and says nothing about the pairs that had
+  # already drifted. A twin ENTERING the set fails HERE, which is decisions.md
+  # 0488's own failure signal mechanised: "A mobile/ directory that started to
+  # grow its own copy of a shared screen would be the signal that this decision
+  # had failed."
+  twin-inventory:
+    image: node:25
+    commands:
+      - node scripts/check-twin-inventory.mjs --check
+
+  # myne#548: the manual half of a release, gated the way the automated half is.
+  #
+  # UNFILTERED, and for the same two reasons `twin-inventory` above is. First, it
+  # `--check`s a GENERATED document (`docs/dev/manual-test-roster.md`), so a hand
+  # edit to it is a docs-only commit that the `code-paths` filter would skip.
+  # Second, the roster records what a human must verify before a tag, and a
+  # docs-only commit is exactly when a procedure document moves.
+  #
+  # It is its own step rather than a line inside `pnpm-build` so it needs no
+  # `pnpm install` and can go red on a commit that touches nothing else.
+  manual-test-roster:
+    image: node:25
+    commands:
+      - node scripts/check-manual-test-roster.mjs --check
+
+  # ─── Translation coverage is measured rather than asserted (#589) ────────────
+  # No `code-paths` filter, for exactly the reason bundle-record and
+  # twin-inventory carry none: the `--check` half compares the GENERATED
+  # docs/dev/i18n-coverage.md against what `--emit` would write, so a docs/**
+  # file is one of its inputs and a hand edit to it is a docs-only commit the
+  # filter would skip.
+  #
+  # It does not overlap `check-i18n.mjs` inside pnpm-build. That guard gates the
+  # ENGLISH source only, on purpose: an absent translation is a legitimate state
+  # that Weblate fills and English falls back for, so gating it would block every
+  # copy edit. What the design left uncovered is #589 itself: the same 215 keys
+  # missing from all 31 catalogs for three weeks, every gate green, and two
+  # documents asserting the catalogs were at 100%. So coverage is PUBLISHED into
+  # a generated record and the record is gated, while the three defects that are
+  # not a matter of degree stay hard failures here: roster parity in both
+  # directions, no partial plural group (a missing category falls straight
+  # through to English mid-sentence), and interpolation-placeholder parity.
+  i18n-coverage:
+    image: node:25
+    commands:
+      - node scripts/check-i18n-coverage.mjs --check
+
+  pnpm-build:
+    image: node:25
+    when: *code-paths
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # platform-seam backstop (phase3-web-client tasks 2 + 76): the same guard the
+      # pre-commit hook runs, so `--no-verify` cannot land a direct
+      # `@tauri-apps/*` import outside `src/platform/`. Sub-second and
+      # node-builtins only, so it runs BEFORE the build to fail fast.
+      - node scripts/check-platform-seam.mjs
+      # Async-execution seam guard (MYND-574 task 80). Same fail-fast placement
+      # and the same reason as the platform-seam guard above: sub-second, and a
+      # violation is invisible to every compiler and lint on both targets.
+      - node scripts/check-core-task-seam.mjs
+      # Filesystem-seam ratchet (MYND-574 task 17). Same class as the two guards
+      # above: `std::fs` compiles for wasm32 and fails at runtime, so a new call
+      # site is invisible to every compiler on both targets.
+      - node scripts/check-core-io-seam.mjs
+      # myne#442 — the version-routing ratchet (see the script header).
+      - node scripts/check-version-routing.mjs
+      # Web command-coverage guard (MYND-574 task 11): every IPC command name in
+      # the shared tree is classified in `web/wasm/src/capability.rs`. Spans TS
+      # and Rust, so no compiler on either side sees both halves.
+      - node scripts/check-web-command-coverage.mjs
+      # Capability-descriptor drift gate (MYND-574 task 27): the UI's omission
+      # set and the dispatcher's refusal set must agree, in both directions.
+      - node scripts/check-web-capabilities.mjs
+      # Crypto-registry chokepoints (epic #249): direct HKDF `.expand`, a
+      # re-typed §10.3 magic, a hand-rolled u16-BE length prefix, a production
+      # `encode_*_raw` caller. All four compile clean, pass clippy and pass
+      # every other guard — and all four fail silently at runtime rather than
+      # loudly. Backstop for the pre-commit hook; sub-second, node-builtins
+      # only, so it runs before the build to fail fast.
+      - node scripts/check-crypto-registries.mjs
+      # Prefs-nonce chokepoint (#251): every vault.prefs write flows through
+      # `writePref`, which bumps the nonce sibling `usePrefs` instances re-read
+      # on. Backstop for the pre-commit hook — `--no-verify` must not land a
+      # setter whose change the open editor never receives.
+      - node scripts/check-prefs-nonce.mjs
+      # Date/time display publisher (myne-md/myne#609): a client tree that reads
+      # the shared display store must also write to it. One publisher served
+      # three readers, so mobile printed defaults while holding a synced value,
+      # and no compiler, lint or existing guard could express the gap: the
+      # consumer and the publisher are different files in different packages,
+      # linked by a module-scope variable rather than a call.
+      - node scripts/check-datetime-display-publisher.mjs
+      - node scripts/check-clipboard-feedback.mjs
+      # Unwired-module ratchet (#272): a module with no production importer does
+      # not run, and nothing else in the toolchain says so — the single-tab vault
+      # lock shipped that way while the OPFS write path skipped its TOCTOU guard
+      # believing the lock was held.
+      - node scripts/check-unwired.mjs
+      # IPC bindings with no caller (myne#529): the layer above the ratchet
+      # above. A command declared, permitted, registered and mirrored in TS can
+      # still be called by nothing, and then the feature behind it ships inert.
+      - node scripts/check-ipc-binding-callers.mjs
+      # Playwright image vs lockfile (myne#529): the image bakes browsers for
+      # its own version, so a tag behind the lockfile fails every test inside
+      # `browserType.launch`. It took the whole mobile-flow-logic lane down,
+      # 179 tests, and looked like a broken suite rather than a missing binary.
+      - node scripts/check-playwright-image.mjs
+      # Frontend lock teardown (myne#529): the WebView half of the Rust-side
+      # `check-lock-teardown.mjs`. A vault-leaving path that skips one clear
+      # leaves a module-scope store resident into the next vault's session.
+      - node scripts/check-frontend-lock-teardown.mjs
+      # Mobile export-backup exclusion (myne#491): the plaintext export directory
+      # (`Documents`) stays out of iCloud Backup and Android Auto Backup. Four
+      # files in three languages carry that property and no compiler compares
+      # them; a saved recovery phrase reconstructs the vault, so a one-sided
+      # drift is a zero-knowledge break that every build reports as green.
+      - node scripts/check-mobile-export-backup.mjs
+      # Embed-layout grammar drift (myne#409): the TS canonical grammar and the
+      # narrow Rust mirror in the export rewrite share one numeric bound. Both
+      # sides claimed the published embed-layout vectors held them together, and
+      # that vector step is commented out below pending a vectors_token secret,
+      # so the stated lock ran nowhere. This one runs.
+      - node scripts/check-embed-layout-drift.mjs
+      # Token-adoption ratchet (myne#394): a literal written into an inline style
+      # can never be reached by a custom theme, and nothing else in the toolchain
+      # reports one. Counts may shrink as each surface is converted, never grow.
+      - node scripts/check-token-adoption.mjs
+      # Token PARITY (myne#478), the opposite question from the ratchet above:
+      # does a token anybody names actually exist, and does one name have two
+      # independent declarations? Neither half fails to compile and the wrong
+      # output is a plausible surface, a card with no background reads as flat
+      # design. The measured cost of not asking: 105 palette tokens missing from
+      # mobile (folder-group and text-highlight colours, both of which SYNC as
+      # vault content) and eight `var(--paper-1)` references resolving to
+      # nothing, one in the shared editor package.
+      - node scripts/check-token-parity.mjs
+      # Twin-drift RATCHET (myne#473): the recorded set of semantically-differing
+      # desktop/mobile twin pairs may shrink, never grow. Distinct from the
+      # `twin-inventory` step below, which is unfiltered because it gates a
+      # generated `docs/**` file: this one gates the TREE, produces no document,
+      # and cannot be changed by a docs-only commit, so it belongs here, under
+      # the same `code-paths` filter as its neighbours.
+      - node scripts/check-twin-drift-ratchet.mjs
+      # Native-button guard: tokens.css carries no base `button {}` rule, so a
+      # <button> with neither className nor style renders as browser chrome —
+      # and nothing else reports it (tsc is happy; the token ratchet counts
+      # literals, of which a styleless button has none).
+      - node scripts/check-native-buttons.mjs
+      # Ornament vocabulary (myne#394): Rust, TS and CSS must agree on which
+      # values exist, or a theme setting validates and then draws nothing.
+      - node scripts/check-ornament-vocabulary.mjs
+      # Lock-teardown hooks (myne#454): a client that manages a plaintext-derived
+      # RAM state must implement the hook that wipes it on every slot drop. An
+      # empty body compiles, satisfies clippy and passes every other guard, so a
+      # lock quietly stops locking; mobile shipped three that way.
+      - node scripts/check-lock-teardown.mjs
+      # E2E menu-testid guard (#275): a scenario reaching for a control that
+      # renders only inside an open menu fails as a timeout, which reads as flake.
+      - node scripts/check-e2e-menu-testids.mjs
+      # E2E toolchain drift: e2e/Dockerfile vs rust-toolchain.toml. A mismatch
+      # makes every container re-provision the pinned toolchain at runtime, and
+      # a run that raced that provisioning reported 255 failures in 266 s — 245
+      # of them one infrastructure error wearing a test's name.
+      - node scripts/check-e2e-toolchain.mjs
+      # Icon asset-check (MYND-128, SYNC-19). It rode inside the `e2e` step
+      # until myne-md/myne#579 and would otherwise have become a per-release
+      # check by accident; it needs neither a binary nor a display.
+      - node scripts/check-icons.mjs
+      # The one contract the two workflow files duplicate by design: the
+      # desktop build's `--features` list. `tauri-compile` below carries the
+      # stub features purely so those arms cannot bit-rot while the suite that
+      # consumes them runs only before a release, and that protection is real
+      # only while both lists agree. Compared in both directions.
+      - node scripts/check-woodpecker-split.mjs
+      # The prebuilt CI base image against the versions the repo pins, and the
+      # workflow digest against `ci/image.json` (myne-md/myne#585). Both drifts
+      # are silent: a stale image makes rustup re-provision the pinned toolchain
+      # at runtime rather than failing, and a stale digest fails in a way that
+      # reads as an infrastructure outage rather than as an edit.
+      # Twin-module drift (#261): a fix that lands on one client and never
+      # reaches its counterpart. WARNING ONLY and exits 0 by design — most
+      # one-sided changes are legitimate, so a gate here would be wrong and
+      # would be bypassed within a week. The value is converting silence into a
+      # recorded decision in the PR body. Skips itself where the companion is
+      # not cloned, which is every CI run today.
+      - node scripts/check-twin-drift.mjs
+      # Theme-preview snapshot freshness (myne#394). WARNING ONLY: the snapshot
+      # is what the website builder and the theme gallery render, and a stale one
+      # keeps working — it simply shows an older interface, which nothing else
+      # reports. Most UI changes do not affect it, so this states the case rather
+      # than blocking on a container capture run.
+      - node scripts/check-preview-freshness.mjs
+      # CLI sidecar contract (cli-thin-client task 11): the `myne` CLI crate has
+      # no dependency on `myne-desktop`, so the bundle identifier + the
+      # socket/status basenames are duplicated by design — drift compiles clean
+      # on both sides and only shows up as "app not running" against a running
+      # app. Also asserts the sidecar is still in `bundle.externalBin`.
+      - node scripts/check-cli-sidecar.mjs
+      # Declared-payload ratchet (ai-bundle-slim myne#190 task 2): the bytes
+      # `bundle.resources` + `bundle.externalBin` + the release binary declare,
+      # gated at 2% growth. CI never builds an installer (`tauri build
+      # --no-bundle`), so there is no artifact to weigh; the declared payload is
+      # the measurable-in-CI proxy, and weights are incompressible so it tracks
+      # the download ~1:1. Only `resources` is gated here — it is committed and
+      # buildless, so this node-only step measures the same bytes the runner
+      # would ship. It also fails on a Git-LFS pointer, which is the one way
+      # this number could quietly become meaningless.
+      - node scripts/check-desktop-payload-budget.mjs
+      - pnpm build
+      # Test-tree typecheck ratchet. `pnpm build` above is `include: ["src"]` —
+      # it checks what SHIPS, which is right for it, and leaves tests/, e2e/ and
+      # e2e-web/ checked by NOTHING: Vitest transpiles without checking and no
+      # other step runs tsc over them. A wrong-arity call in a spec therefore
+      # surfaced only as a runtime driver error inside a scenario, where it reads
+      # as a product bug or as flake — `runPaletteAction` was called with two of
+      # its three arguments in two specs, and both sat among the suite's
+      # "chronic failures" for it. Counts may fall, never rise.
+      - node scripts/check-test-typecheck.mjs
+      # i18n-catalog parity (hook-only otherwise): fails on empty English source
+      # values or static t()/i18n.t() keys missing from locales/en/common.json.
+      # Node-builtins only (no extra deps); folded here since node is set up.
+      - node scripts/check-i18n.mjs
+
+  # ─── Frontend unit tests (Vitest) ────────────────────────────
+  # 59 test files under tests/ (markdown dialect, editor, notes, commands;
+  # 718 tests). These live outside src/ so `pnpm build` (tsc, `include: ["src"]`)
+  # does NOT run them — Vitest is their only EXECUTION gate. Their TYPES are
+  # checked by `check-test-typecheck.mjs` in `pnpm-build` (a ratchet over
+  # `tsconfig.tests.json`); before that guard they were checked nowhere at all.
+  vitest:
+    image: node:25
+    when: *code-paths
+    # Serialized after pnpm-build: both run `pnpm install` into the shared
+    # workspace node_modules; running them concurrently corrupts pnpm's temp
+    # dirs (ERR_PNPM_ENOENT). The pnpm-install steps form one linear chain:
+    # pnpm-build → vitest → tauri-compile → cargo-test-tauri.
+    depends_on: [pnpm-build]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm test
+      # The platform-seam CONTRACT against the implementation this lane owns
+      # (phase3-web-client task 62). `pnpm test` above already ran it — this line
+      # re-runs the desktop subject alone so a FAILING seam names its lane and its
+      # implementation in the step title, instead of being one red file inside a
+      # 436-file run. Seconds of runtime for an attribution nobody has to dig for.
+      #
+      # No duplication in the sense the task means: there is ONE contract
+      # (`tests/platform/seam-contract.ts`), parameterised over a transport. The
+      # two subject files supply the transports; neither restates an assertion.
+      - pnpm test:seam:desktop
+
+  # ─── Tauri compile-gate ──────────────────────────────────────
+  # Verifies the Tauri Rust+TS compile path on Linux.
+  # Does NOT produce a signed bundle — release pipeline (Plan 1 §C-launch) handles cross-platform signed builds.
+  tauri-compile:
+    image: *ci_image
+    when: *code-paths
+    # depends_on vitest (not pnpm-build) to keep the pnpm-install steps serial —
+    # see the vitest step comment.
+    depends_on: [cargo-clippy, vitest]
+    environment:
+      # Woodpecker sets CI=woodpecker, but the Tauri CLI's `--ci` flag is
+      # env-bound and only accepts true/false → normalize it, otherwise
+      # `tauri build` aborts with "invalid value 'woodpecker' for '--ci'".
+      CI: "true"
+      # mold linker for the candle+tauri release link (CI-only, Q6). Kept out of
+      # a committed .cargo/config.toml so macOS/local dev is unaffected; the
+      # signed release pipeline keeps its own linker.
+      RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # Persistent compile cache (H1): sccache + a shared cargo registry, provided
+      # by the agent's WOODPECKER_BACKEND_DOCKER_VOLUMES mounts (host /srv/wp-cache
+      # → /cache/*; see /root/cicd-myne/docker-compose.yml on the CI box). sccache
+      # is content-addressed + concurrency-safe (MAX_WORKFLOWS=2 stays); the signed
+      # release build is a SEPARATE pipeline and never uses this cache. To disable:
+      # remove the agent volume line + these five vars.
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      # Raise the open-file soft limit to the hard cap before the build: the
+      # Tauri CLI + parallel cargo codegen open enough fds to hit the runner's
+      # low default soft limit, which surfaces as a `tauri build` panic
+      # (`Os code 24 / Too many open files`, EMFILE → core dump, exit 134).
+      - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      # 68 s, and it stays 68 s. A shared apt archive cache on `/cache` was tried
+      # here and reverted after two pipelines measured no change at all (666 and
+      # 668, both still "Need to get 220 MB of archives"). Two causes stacked:
+      # Debian's images ship `/etc/apt/apt.conf.d/docker-clean` setting
+      # `Binary::apt::APT::Keep-Downloaded-Packages "false"`, so apt deletes every
+      # .deb after installing it wherever the archive path points; and files in
+      # `apt.conf.d` are read in LEXICAL order with later ones winning, so
+      # `docker-clean` overrode a `01`-prefixed override of that setting.
+      #
+      # Not worth a third attempt at this size. Of the 68 s only ~22 s is the
+      # 220 MB download; the rest is dpkg unpacking 929 MB, which no download
+      # cache touches. The whole 68 s comes back with a PREBUILT IMAGE that has
+      # these packages baked in, which is a registry plus a build pipeline plus
+      # an image-freshness gate, and belongs to its own change rather than to a
+      # line hidden in this step.
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # Lint the shared `myne-core` crate here (not in the slim cargo-clippy
+      # step): myne-core depends on `tauri` (default features), so it needs the
+      # webkit/gtk -dev chains the base image bakes. No frontend dist needed,
+      # since myne-core has no `generate_context!`.
+      - cargo clippy -p myne-core --all-targets -- -D warnings
+      # Default build now compiles the on-device AI (local-inference is in
+      # `default` as of decisions.md 2026-07-02) — no `--features` flag needed.
+      # `-c` overrides beforeBuildCommand to reuse the dist/ already built by the
+      # pnpm-build step (shared workspace) instead of rebuilding it here (Q3);
+      # `test -d dist || pnpm build` still rebuilds if dist/ is somehow absent.
+      # The override keeps the sidecar half of `beforeBuildCommand`
+      # (cli-thin-client task 11) and only swaps the frontend half: staging the
+      # sidecars is what `bundle.externalBin` consumes, and running it here is
+      # also the only CI exercise `scripts/build-{cli,tor}-sidecar.mjs` get.
+      # BOTH sidecars, not just `myne`: `build.rs` resolves every
+      # `bundle.externalBin` entry as a resource path and PANICS on a missing
+      # one ("resource path `binaries/myne-tor-…` doesn't exist"), so dropping
+      # the arti half here fails the build outright rather than shipping a
+      # bundle without a Tor client. It costs one release build of `arti` on a
+      # cold cache; sccache pays it once.
+      # `--features voice-capture-stub` (myne#389 item D): the voice E2E
+      # scenarios need a capture source that is not a microphone the runner does
+      # not have. The suite no longer runs from this file, since
+      # `.woodpecker/e2e.yml` builds its OWN binary with the same two features,
+      # and the flag stays here anyway, deliberately: it keeps the arm COMPILING on
+      # every push, so it cannot bit-rot between releases and hand the manual
+      # lane a build failure at the one moment nobody has time for it. It is
+      # additive to the default feature set, so this build still compiles the
+      # production arm; `cargo-test-tauri` (default features) compiles the
+      # `not(feature = "voice-capture-stub")` arm, so both stay covered with no
+      # new step. The feature pulls no dependency, so no dep fingerprint moves.
+      # `--features local-inference-stub` (SYNC-9, ai-provider-seam task 3): the
+      # same reasoning, for AI, and it stays here for the same bit-rot reason.
+      # Nine of the ten AI E2E scenarios gate on `MYNE_E2E_AI === "1"`; the stub
+      # engine gives the deterministic outputs those scenarios assert against
+      # (`stub-infer: …`, a fixed embedding) with no model shipped into the repo.
+      # `.woodpecker/e2e.yml` sets that variable and builds with this feature.
+      # Also additive and dependency-free; `cargo-test-tauri` still compiles the
+      # production arm.
+      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
+      # Keep the E2E fixture generator compiling on every push. `cargo build
+      # --release -p e2e-fixture-gen` inside the old `e2e` step was the ONLY
+      # place in CI that touched this workspace member (`cargo-clippy` and
+      # `cargo-test` are `-p protocol`, `cargo-test-tauri` is `-p myne-desktop
+      # -p myne-core`), so when the suite moved to `.woodpecker/e2e.yml` a Rust
+      # break in that crate would have surfaced only when somebody triggered the
+      # manual lane, in its first step, at release time. Same class as the icon
+      # guard above, and the answer is the same: a `check` is cheap and belongs
+      # here. `pre-push`'s `cargo test --workspace` covers it locally, but
+      # `--no-verify` is routine enough that the CI backstop earns its seconds.
+      - cargo check -p e2e-fixture-gen
+      # Guard the AI-free auditable variant: `--no-default-features` drops candle
+      # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
+      # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.
+      # Now that AI is default-on this path would otherwise never compile in CI and
+      # could bit-rot. Two commands, and the second is the one that sees the test
+      # tree: `check` skips `#[cfg(test)]` entirely, so a helper gated on it whose
+      # only caller sits behind a feature is dead when the feature is off and no
+      # bare `check` reports it (myne-md/myne#510 shipped that for one review round).
+      #
+      # `--all-targets`, added by myne-md/myne#510, and the flag is the whole
+      # point: without it this never compiles `#[cfg(test)]` code, so a helper
+      # gated on `cfg(test)` whose only caller sits behind `local-inference` is
+      # dead in this variant and nothing here sees it. That shipped for one
+      # review round and was caught by hand, not by this step. `clippy` rather
+      # than `check` for the same reason: dead code is a lint, and `-D warnings`
+      # is what turns it into a failure.
+      - cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings
+      # Cache hit-rate visibility (H1) — never fails the step.
+      - /cache/bin/sccache --show-stats || true
+
+  # ─── Backend host tests (src-tauri / myne-desktop) ───────────
+  # The protocol-scoped cargo-test above can't reach src-tauri: it needs the
+  # Tauri sysdeps to compile, plus a frontend dist/ because lib.rs's
+  # `generate_context!()` embeds `frontendDist` at compile time. 502 tests
+  # (paths, atomic_write, auto_lock, search, vault_* plugins, prefs, …).
+  # depends_on tauri-compile so the two heavy workspace builds don't run
+  # concurrently on the shared CI host. Also runs `myne-core`'s own tests
+  # (the shared vault/notes/prefs plugin cores) in the same sysdeps env —
+  # the slim cargo-test step can't, since myne-core pulls Tauri default-features.
+  cargo-test-tauri:
+    image: *ci_image
+    when: *code-paths
+    depends_on: [tauri-compile]
+    environment:
+      CI: "true"
+    commands:
+      # 67 s, the same set `tauri-compile` installs one stage earlier, and sharing
+      # the downloads between them does NOT work — see that step for the two
+      # stacked causes and for why a prebuilt image rather than a cache is the
+      # answer at this size.
+      # vault_delete / vault_unlock tests assert UNIX permission-denial and
+      # undeletable-file paths; root bypasses both (CI containers default to
+      # root), so run the build + tests as an unprivileged user — the tests
+      # themselves note "CI must run unprivileged".
+      - useradd -m ci && chown -R ci:ci .
+      # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
+      # tauri-compile) inside the unprivileged shell where the build actually runs.
+      # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
+      # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core --no-fail-fast'
+
+  # ─── Sync simulation harness (multi-device, real myne-server) ─
+  # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
+  # REAL ephemeral myne-server (the engine behavior only surfaces across two
+  # devices talking to the actual server). Those tests self-skip without the
+  # server binary, so cargo-test + cargo-test-tauri COMPILE them but never
+  # EXECUTE them — this step provides the binary so they run for real.
+  #
+  # myne-server is a PRIVATE companion repo (same situation as the disabled
+  # vector step below): cloned via a Woodpecker secret. Until the
+  # `myne_server_token` secret is configured the step SKIPS cleanly (exit 0) so
+  # it never blocks a merge. Add the secret in the Woodpecker UI
+  # (repo → Settings → Secrets):
+  #   name=myne_server_token  value=<Forgejo PAT with read access to Myne/myne-server>
+  #
+  # depends_on cargo-test-tauri: keeps the heavy compile steps serial on the
+  # shared host and reuses the warm workspace `dist/` (generate_context! embeds
+  # it at compile time). It used to hang off `e2e`, which was the last step in
+  # that serial chain until the suite moved to `.woodpecker/e2e.yml`;
+  # `cargo-test-tauri` is now the tail, so the edge moved down one and the
+  # property it was buying is unchanged. Only `sync::sim::` runs; the
+  # `#[ignore]`d RED bug-repro tests stay dormant until their fix lands and
+  # un-ignores them.
+  # ─── Web-target lane (phase3-web-client task 8) ──────────────
+  # Builds the `web/` target: typecheck of the web tree against the shared
+  # `src/` tree, then the production bundle with the platform seam substituted
+  # for its web implementation.
+  #
+  # Placement is deliberate and is the whole point of this being a separate
+  # step. The desktop lane is one SERIAL chain — pnpm-build → vitest →
+  # tauri-compile → cargo-test-tauri, and it is serial because every one
+  # of those steps runs `pnpm install` into the shared workspace node_modules,
+  # which concurrent installs corrupt (see the vitest step's comment). So there
+  # are exactly two options: insert this into the chain, which lengthens the
+  # desktop pipeline by this step's duration, or hang it off the end, which does
+  # not. The task's constraint is that the desktop lane's steps and timings stay
+  # untouched, so: off the end, alongside sync-sim.
+  #
+  # `optional: true` on cargo-test-tauri: the edge exists to SERIALISE, not
+  # because this step consumes anything cargo-test-tauri produces, and a web
+  # build break is independent of the desktop backend tests. This step is NOT
+  # `failure: ignore`: a broken web build is a real break and must go red.
+  web-build:
+    image: node:25
+    # Same `status: [success, failure]` as the mobile lane. `optional: true` on
+    # the upstream edge only says "do not WAIT for a step that may not run"; the
+    # implicit `status: success` in a bare `when` is pipeline-wide, so without
+    # these keys this step is SKIPPED whenever anything upstream reddens. That
+    # silently skips the four web artefact greps, the seam contract, the bundle
+    # budget and the screen/surface/testid rosters, and by this file's own
+    # sentence a gate that did not run is indistinguishable from one that
+    # passed. Two of those greps hold A15 compensating controls, and a red
+    # backend test suite is no reason to stop asking whether the web bundle
+    # ships the recovery phrase.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    # ─── Depends on `wasm-repro`, and that is a CORRECTNESS edge ────────────────
+    # `pnpm web:build` bundles `web/src/worker/worker.ts`, which imports
+    # `../../wasm/pkg/myne_web_wasm.js`. That path is GITIGNORED, so it is never
+    # in a CI checkout, and `web:build` does not generate it: the script is
+    # `tsc && vite build && emit-web-version`, with no `build-wasm.sh` in it.
+    #
+    # The only step that populates `web/wasm/pkg/` is `wasm-repro`, through
+    # `scripts/wasm-repro-check.sh` calling `build-wasm.sh --verify`. Until now
+    # this step and that one were SIBLINGS, both hanging off `cargo-test-tauri`,
+    # so which of them reached the artefact first was a race with no edge
+    # deciding it. Measured on two consecutive pipelines, and this step lost
+    # both: #765 started alongside `wasm-repro` and died 29 s in while that step
+    # needed 142 s; #766 died 58 s in against 188 s. The error is
+    # `[UNRESOLVED_IMPORT] Could not resolve '../../wasm/pkg/myne_web_wasm.js'`,
+    # which reads as a missing dependency rather than as a missing edge.
+    #
+    # `optional: true` is still right and still does the job: an optional edge
+    # ORDERS, it only stops requiring that the parent SUCCEEDED. That is exactly
+    # what is wanted here, because a reproducibility mismatch in `wasm-repro` is
+    # not a reason to stop asking whether the web bundle ships the recovery
+    # phrase. The ordering is what this step needs; the verdict is not.
+    #
+    # `wasm-repro` itself depends on `cargo-test-tauri`, so the serial chain the
+    # old edge existed to preserve is unchanged.
+    depends_on:
+      - name: wasm-repro
+        optional: true
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm web:build
+      # Zero-third-party-origin drift gate (MYND-574 tasks 55 + 60). The CSP is
+      # the runtime guarantee; this pins the SURFACE — which external origins
+      # appear in the shipped JS at all — and fails when a new one shows up, so
+      # it gets read by a person instead of shipping silently. Same shape as
+      # `ai-no-network-check.sh` on the Rust side.
+      # The same platform-seam contract, against the WEB implementation
+      # (phase3-web-client task 62). This is what makes seam divergence a
+      # build failure by construction rather than something a missing E2E
+      # scenario would have to notice: the web lane cannot go green while the
+      # web seam answers differently from the contract every client shares.
+      #
+      # Runs BEFORE the artefact greps on purpose — a seam that does not satisfy
+      # its contract makes questions about the bundle premature.
+      - pnpm test:seam:web
+      - node scripts/check-web-third-party.mjs
+      # The recovery phrase must be ABSENT from the served bundle, not hidden
+      # (MYND-574 task 32). Same shape as the third-party gate above and for the
+      # same reason: it is a question about the ARTEFACT, which no test can ask.
+      # `decisions.md` 2026-07-26 makes the absence normative and `protocol.md`
+      # §7 sets the stakes — the phrase survives every password change and there
+      # is no rotation command, so one exposure is permanent.
+      - node scripts/check-web-no-phrase.mjs
+      # No production test hook in the served bundle (MYND-574 task 105). Same
+      # artefact-grep shape, and the stakes are the same kind: a hook the bundle
+      # ships is an API any script that gets execution on the page can call, and
+      # on this client that is the whole threat model (TB11).
+      - node scripts/check-web-no-test-hooks.mjs
+      # Command-surface completeness + capability agreement, run in the WEB lane
+      # too (MYND-574 task 28: "runs in both lanes").
+      #
+      # Both already run in the desktop lane's `pnpm-build` step. Repeating them
+      # here is not redundancy for its own sake: this lane is the one that fails
+      # when the web client is broken, and these two properties are the ones that
+      # break it silently — a command with no classification, or a UI descriptor
+      # disagreeing with the dispatcher. A web-lane failure points at the web
+      # client; the same failure in the desktop lane reads as a desktop problem.
+      - node scripts/check-web-command-coverage.mjs
+      - node scripts/check-web-capabilities.mjs
+      # First-load budget ratchet (MYND-574 task 68). Reads the built
+      # `web/dist/index.html`, sums the entry's static graph, and fails when the
+      # gzip transfer size grows past the recorded baseline by more than its
+      # margin — so a bundle increase is a decision someone records (re-baseline
+      # with `--update`, which shows up as a diff) rather than a drift nobody
+      # sees. Also fails if the wasm core lands on the first-load path at all:
+      # it is needed at unlock, not at first paint.
+      #
+      # Here rather than in the desktop lane because it needs `web/dist`, which
+      # only this step builds.
+      - node scripts/check-web-bundle-budget.mjs
+      # Every screen has a web verdict, and the excluded ones are really gone
+      # (MYND-574 task 70). Two halves: a roster that fails when a file under
+      # `src/screens/` has no verdict (a new screen otherwise ships to the
+      # browser by default), and a marker grep over `web/dist` that fails if an
+      # "excluded" screen is in the artefact after all — the same
+      # absence-not-unreachability bar as `check-web-no-phrase.mjs`.
+      - node scripts/check-web-screens.mjs
+      # The same two questions for the SERVICE layer — settings panels, `src/lib`,
+      # `src/hooks` (MYND-574 task 96). Different directory, same failure: a
+      # module with no verdict ships by default, and nothing ROUTES to a hook, so
+      # no screen audit finds it. `--emit` regenerates the checked-in assessment
+      # from this roster; CI runs the gate without it.
+      - node scripts/check-web-surfaces.mjs
+      # The E2E observability contract for the web-only screens (MYND-574 task
+      # 100). `src/CLAUDE.md` states the rule and 489 testids in `src/` are held
+      # to it by review alone — which works only where a screen has an owner who
+      # reviews it. The web screens' builders never mention `data-*`, and the
+      # tasks that CONSUME the testids land later, so the gap would be found by
+      # a scenario that cannot select anything. Also enforces the SYNC-7 leak
+      # budget: no `data-*` on a pre-unlock screen may carry a runtime value,
+      # because the account number is typed on one of them.
+      - node scripts/check-web-testids.mjs
+      # The vitest specs that assert the same two properties (tests/web/,
+      # tests/platform/) — so the web lane covers them as tests, not only as
+      # scripts, and the seam contract runs against BOTH implementations here.
+      #
+      # SCOPED to those two directories, which is what the sentence above always
+      # said it wanted. It used to be a bare `pnpm test`, i.e. the ENTIRE 7,400-
+      # test suite — the same suite the `vitest` step has already run earlier in
+      # this pipeline. Two consequences, both observed on one pipeline (#446):
+      #
+      #   - it doubled the exposure to any flake in the desktop suite, and did.
+      #     `vitest` ran the full suite green; `web-build` ran the identical
+      #     command on the identical commit minutes later and went red on
+      #     `tests/editor/table-in-blockquote.test.ts`. Same input, two answers
+      #     — which is what a flake IS, proved here for free by the duplication
+      #     rather than by repeated runs;
+      #   - it spent ~2 minutes re-running tests that had already passed, on the
+      #     step that gates the web deploy.
+      #
+      # Coverage is unchanged: the full suite still runs, once, in `vitest`.
+      - pnpm exec vitest run tests/web tests/platform
+
+  # ─── Mobile lane (the client moved in-repo; see decisions.md) ────────────────
+  # These four steps replace the whole of `myne-mobile/.woodpecker.yml`, and the
+  # thing worth noticing is what is NOT here: that pipeline began by cloning THIS
+  # repo and `git reset --hard`-ing it to `develop` tip, then symlinking nine
+  # directories next to the checkout, because the mobile crate path-depends on
+  # `protocol` + `core` and its TS aliases resolve into `src/`, `editor/`,
+  # `dialect/`, `ornaments/` and `locales/`. That block is deleted rather than
+  # ported. It is also what made mobile CI unable to gate anything: a mobile
+  # commit built against whatever develop happened to be at that moment, so the
+  # same SHA gave different answers on different days, and a change HERE that
+  # broke mobile stayed invisible until somebody pushed THERE.
+  #
+  # Three of that pipeline's six steps are simply gone, absorbed by workspace-wide
+  # steps that already exist: `cargo fmt --all` (cargo-fmt) and `cargo deny check`
+  # (cargo-deny) now reach the mobile crates because they are workspace members,
+  # and its `pnpm install` half is the shared one.
+  #
+  # Placement follows `web-build`'s rule exactly, and for its reason: the desktop
+  # lane is one serial chain because each of its steps runs `pnpm install` into
+  # the shared workspace node_modules, so this hangs off the END and adds nothing
+  # to that chain's wall-clock.
+  #
+  # ─── Why every step in this lane carries `status: [success, failure]` ────────
+  # myne-md/myne#458. Placement bought the lane wall-clock and cost it isolation:
+  # a `when` entry carries an implicit `status: success`, and that condition is
+  # PIPELINE-WIDE rather than scoped to `depends_on`. So any red step anywhere
+  # skipped this whole lane, including steps it has no dependency path to.
+  # The web deploy step going red skipped `npm-licenses`, `mobile-vitest` and
+  # `mobile-flow-logic` even though `mobile-build` itself was green. (That step
+  # is gone since myne-md/myne#584; the shape it demonstrated is not.)
+  #
+  # What that cost, measured during the v0.5.0 release rather than reasoned
+  # about: the mobile Vitest suite had not executed in CI once since the client
+  # moved in-repo. Run by hand it failed — `mobile/tests/reminder-tap.test.ts`
+  # carried a ~0.7%-per-run assertion flake, fixed in `794c33e8`. `npm-licenses`,
+  # the workspace-wide license gate, had likewise never run here. Same class as
+  # the `e2e-floor` rationale (that step now lives in `.woodpecker/e2e.yml`): a
+  # gate that did not run is indistinguishable from a gate that passed.
+  #
+  # Where it bit was narrower and worse than "a step went red once". The deploy
+  # step was `event: manual` + `branch: develop` (decisions 0484), so it did not
+  # run on a push at all, which means these four gates vanished on exactly the
+  # runs that published `app.myne.md`. The deploy has since left this pipeline
+  # entirely (myne-md/myne#584), so that particular pairing cannot recur; the
+  # keys below stay because the pipeline-wide `status` rule that caused it has
+  # not changed.
+  #
+  # `mobile-build` is in the list even though the symptom was downstream of it,
+  # and that is the part worth not trimming: `npm-licenses` and `mobile-vitest`
+  # depend on it with a plain list (non-optional), and `mobile-flow-logic`
+  # depends on `mobile-vitest` the same way. A red step scheduled BEFORE
+  # `mobile-build` skips it, and the three then skip too, `status:` key or not.
+  # Exempting the four without the head would be four comments claiming a
+  # property the lane does not have.
+  #
+  # The path filter is unchanged in effect — each step still aliases the same
+  # globs, so a docs-only commit still skips the lane. What changed is that a
+  # failure somewhere else is no longer evidence about this lane.
+  mobile-build:
+    image: node:25
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    depends_on:
+      - name: web-build
+        optional: true
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm mobile:build
+
+  # npm dependency-license gate — the npm analogue of cargo-deny, and the one
+  # step here that got STRICTER by moving. It lived in `myne-mobile/scripts/` and
+  # walked only that client's dependency tree, so the desktop and web npm trees
+  # had never been license-gated at all; the first workspace-wide run turned up
+  # five ungated packages. One lockfile is what made a workspace-wide run mean
+  # anything.
+  npm-licenses:
+    image: node:25
+    # `status: [success, failure]` — see the lane header above (#458).
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    # Optional for the reason given on `mobile-vitest` below: the edge orders
+    # the installs and no longer requires the parent to have succeeded. The
+    # license gate needs an install to have happened, and it performs its own.
+    depends_on:
+      - name: mobile-build
+        optional: true
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # THE STORE PATH IS PASSED TWICE ON PURPOSE, and the two must agree
+      # (myne-md/myne#515). `pnpm licenses list` builds its answer from the
+      # lockfile plus the content-addressable STORE, so it has to be pointed at
+      # the same one the install wrote to — and it REJECTS `--store-dir`
+      # ("Unknown option"), which is why the guard translates the path into
+      # `--config.store-dir=` itself.
+      #
+      # Told to only one of the two, this gate answered
+      # ERR_PNPM_MISSING_PACKAGE_INDEX_FILE on every run for months, and the two
+      # mobile test steps downstream of it were skipped with it. Two adjacent
+      # literals rather than a config file, so the invariant is on the screen.
+      - node scripts/check-npm-licenses.mjs --store-dir /cache/cargo/pnpm-store
+
+  # Mobile frontend unit tests (the ported state machine + helpers). Serialized
+  # after mobile-build so the pnpm-install steps stay linear, same as the desktop
+  # lane's vitest.
+  mobile-vitest:
+    image: node:25
+    # `status: [success, failure]` — see the lane header above (#458). This is
+    # the step whose silent absence the issue was opened over.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    # Chained after `npm-licenses` rather than beside it. Both are children of
+    # `mobile-build` and both run `pnpm install --frozen-lockfile` into the
+    # SHARED workspace `node_modules`, so as siblings they installed
+    # concurrently, which this file names by its failure at the lane header:
+    # ERR_PNPM_ENOENT from corrupted temp dirs. The comment below already
+    # asserted the installs stay linear; that was true of the parent and false
+    # of the sibling. The lane is off the critical path by design, so the added
+    # wall clock is free.
+    # `optional: true` on this lane's three internal edges (myne-md/myne#515).
+    #
+    # The chain itself is load-bearing and stays: all four steps run
+    # `pnpm install --frozen-lockfile` into the SHARED workspace `node_modules`,
+    # and as siblings they raced into ERR_PNPM_ENOENT. An optional dependency
+    # still ORDERS, so the serial-install property survives untouched; what it
+    # drops is the requirement that the parent SUCCEEDED.
+    #
+    # That requirement is what turned one broken step into three: `npm-licenses`
+    # sits in the middle, so a license failure removed the mobile Vitest suite
+    # and the whole Playwright flow-logic tier from the run. The lane's
+    # `status: [success, failure]` does not help here, since it defeats the
+    # pipeline-wide implicit `status: success` and never a failed `depends_on`.
+    #
+    # Decoupling both directions is why this is preferred to moving
+    # `npm-licenses` to the tail: a reorder can only ever protect one side,
+    # because somebody has to be last, and the tail is behind `mobile-vitest`,
+    # which this file already records as carrying a ~0.7%-per-run flake.
+    depends_on:
+      - name: npm-licenses
+        optional: true
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm mobile:test
+
+  # Sync UI flow-logic tier (MYND-462 T3) — NOT end-to-end. Playwright drives
+  # headless Chromium against the Vite DEV SERVER with a MOCK Tauri IPC, so it
+  # exercises the flow machine via the `data-testid` contract: no device, no Rust
+  # backend, no real transport. Device-level UI testing is the SYNC-44 exemption
+  # (MYND-467). Keep the "flow-logic" label — never call this tier end-to-end.
+  #
+  # The dev server it starts is on :1422. Desktop holds :1420 and web :1421; the
+  # mobile client claimed :1420 too while it was a separate checkout, which in one
+  # repo would have let `reuseExistingServer` attach these specs to the DESKTOP
+  # app and report green about the wrong client.
+  mobile-flow-logic:
+    # The image tag MUST match the `@playwright/test` version `pnpm-lock.yaml`
+    # resolves, and `scripts/check-playwright-image.mjs` is what holds it there.
+    # The image bakes browser binaries under `/ms-playwright/<name>-<revision>/`,
+    # and the revision a Playwright release looks for is pinned inside that
+    # release. So a tag one minor behind the lockfile is not "slightly old": the
+    # installed Playwright looks for a revision the image does not carry and
+    # every test dies in `browserType.launch` before its first assertion.
+    #
+    # That is exactly what shipped. `mobile/package.json` asked for `^1.61.1`,
+    # the lockfile drifted to 1.62.1, the tag stayed at v1.61.1, and all 179
+    # flow-logic tests across 44 files failed with `Executable doesn't exist at
+    # /ms-playwright/chromium_headless_shell-1234/...` on develop and on every
+    # branch. The lane was red for so long that its redness stopped being read.
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
+    # `status: [success, failure]` — see the lane header above (#458).
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    # Optional for the reason given on `mobile-vitest` above.
+    depends_on:
+      - name: mobile-vitest
+        optional: true
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm mobile:test:flow
+
+  # Mobile Rust: clippy + unit tests for `myne-mobile` and its four Tauri
+  # plugins. A step of its own rather than extra `-p` flags on `cargo-test-tauri`
+  # for the placement reason above — that step is inside the serial desktop
+  # chain, and this must not lengthen it. It needs the Tauri Linux WebView
+  # sysdeps; compiling the mobile lib for the Linux host is what exercises the
+  # platform-agnostic Rust logic (the real iOS/Android builds need Xcode and the
+  # Android SDK+NDK and belong to the release matrix, exactly as the desktop
+  # signed-bundle pipeline is separate from this verification CI).
+  mobile-compile:
+    image: *ci_image
+    # `status: [success, failure]` — see the lane header above (#458). It hangs
+    # off `web-build` optionally, which survives that ONE step failing and not
+    # the pipeline-wide condition; both are needed.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    depends_on:
+      - name: web-build
+        optional: true
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
+      - cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard --no-fail-fast
+
+  # ─── Web container check (the deploy half of this chain is gone) ────────────
+  # `web-docker-build`, `web-docker-deploy` and `web-smoke` lived here. The last
+  # two were pure publication and are gone: CI verifies and does not publish
+  # (myne-md/myne#584). The by-hand procedure is
+  # `myne-ops/runbooks/web-client-deploy.md`.
+  #
+  # What is KEPT is the half that was never a deploy. `check-web-container-headers.sh`
+  # asks whether the running container SERVES its CSP, COOP, COEP, CORP, HSTS
+  # and the rest, which is a different question from whether the config is
+  # right, and it is the only thing that can ask it. A container serving no CSP
+  # and a `/healthz` answering with the whole SPA both shipped once, and neither
+  # is visible to any unit test: the only thing that can see them is a request
+  # to a running container.
+  #
+  # WHAT WAS DROPPED FROM IT, and where it went. The image is no longer tagged
+  # `myne-web:prod`, since nothing here deploys it. And the
+  # `check-bundle-record.mjs --has` gate is not run here: that one is a DEPLOY
+  # precondition rather than a build check (a bundle may only reach the origin
+  # once its hash was published in a reviewed commit), so it moved into the
+  # runbook, beside the deploy it guards. It is the only compensating control
+  # A15/TB11 has, and running it on a build nobody is about to ship would only
+  # teach people to ignore it going red.
+  #
+  # ─── Why a `web/**` path filter and not `*code-paths` ───────────────────────
+  # This step costs real time: `web/container/Dockerfile` rebuilds the wasm in a
+  # Rust image and runs a second full `pnpm install` plus `web:build`, none of
+  # which the host layer cache can keep across a source change. What it checks
+  # is what the CONTAINER serves, and the only inputs to that are the container
+  # definition, the header source (`web/csp.ts`) and the bundle itself. A commit
+  # that touches none of them cannot move the answer, so it does not pay for it.
+  web-container-check:
+    # CLI pinned to the docker library's current major to match the host daemon
+    # (29.x). The old docker:28-cli only logged benign BuildKit session-
+    # healthcheck noise ("only one connection allowed") against the 29 daemon.
+    image: docker:cli
+    when:
+      - path:
+          include: ['web/**', 'scripts/check-web-container-headers.sh']
+        status: [success, failure]
+    depends_on:
+      - name: web-build
+        optional: true
+    environment:
+      # THE actual cause of every failure this step had while it was
+      # `web-docker-build` (#392 to #396, hidden until the full step log was read
+      # past its truncation): the header-check gate runs INSIDE this step
+      # container, and reaching a probe container via a published host port and
+      # curl 127.0.0.1 cannot cross the netns boundary, so "the container never
+      # answered". Hand the script this step's own docker network so it attaches
+      # the probe to that network and reaches it BY NAME through docker's
+      # embedded DNS instead. Must equal the agent's
+      # WOODPECKER_BACKEND_DOCKER_NETWORK.
+      MYNE_WEB_TEST_NETWORK: woodpecker-workflows
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      # `.git` is excluded from the build context, so the commit identity is
+      # passed in: `version.json` would otherwise read `unknown`, and the header
+      # check asserts that file is served no-store with a bundle hash in it.
+      # No `:prod` tag: this image is built to be asked questions, not shipped.
+      - >
+        docker build -f web/container/Dockerfile
+        --build-arg MYNE_BUILD_COMMIT=$CI_COMMIT_SHA
+        --build-arg MYNE_BUILD_TIMESTAMP=$CI_COMMIT_TIMESTAMP
+        -t myne-web:$CI_COMMIT_SHA .
+      - apk add --no-cache bash curl nodejs
+      - MYNE_WEB_IMAGE=myne-web:$CI_COMMIT_SHA bash scripts/check-web-container-headers.sh --no-build
+
+  sync-sim:
+    image: *ci_image
+    # The comment below says this step runs REGARDLESS of its upstream's result,
+    # and with a bare `when` that was not true: `optional: true` only removes the
+    # wait, while the implicit `status: success` is pipeline-wide and skipped
+    # this step whenever the upstream was red. The claim is now enforced rather
+    # than asserted.
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    # `optional: true`: run AFTER cargo-test-tauri (keeps the heavy steps serial
+    # on the shared host) but REGARDLESS of its result. The edge used to point at
+    # `e2e`, which was the tail of the serial chain and chronically flaky on
+    # develop, so a plain `depends_on` skipped sync-sim whenever the UI suite
+    # went red; the suite has since moved to `.woodpecker/e2e.yml` and
+    # `cargo-test-tauri` is the tail. The reason for keeping the edge optional is
+    # unchanged: the sync engine's cross-device correctness is independent of
+    # whatever runs before it, so gate sync-sim on the SERVER binary + its own
+    # tests and on nothing else. Same pattern notify-failure uses to run on
+    # upstream failure.
+    depends_on:
+      - name: cargo-test-tauri
+        optional: true
+    environment:
+      CI: "true"
+      # mold linker for the myne-core sync test binary link (CI-only, Q6).
+      RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # Persistent compile cache (H1) — see tauri-compile's comment.
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+      # Forgejo PAT (read:repository on Myne/myne-server) for the private-
+      # companion clone below. The secret `myne_server_token` is configured on
+      # THIS repo (Woodpecker → repo → Settings → Secrets). The guard below
+      # still `exit 0`s when it resolves empty (e.g. a fork PR), so sync-sim
+      # never blocks a merge. CAUTION for future edits: a from_secret pointing
+      # at a secret this repo cannot see errors the WHOLE pipeline at
+      # config-compile (no step runs) — never reference a secret before it is
+      # configured on the repo.
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
+    commands:
+      # `$$` is NOT a typo and NOT decoration. Woodpecker pre-processes dollar-brace
+      # in commands and substitutes its OWN variables; a name it does not know
+      # becomes the empty string BEFORE the shell ever sees the line. Written
+      # with a single dollar, this guard compiled to `if [ -z "" ]` — always
+      # true — so the step printed "skipping sync-sim" and `exit 0`d on every
+      # run, with the secret present, and 30 sim tests never executed while the
+      # step reported green. `$${…}` escapes the pre-processor (the same idiom
+      # the android step's `$${ANDROID_NDK_HOME:+…}` already uses); the sibling
+      # guards below reach the shell only because they are brace-LESS
+      # (`$VECTORS_TOKEN`, `$PUSHOVER_TOKEN`), which the pre-processor leaves
+      # alone. Never write a single-dollar brace token in a command here.
+      - |
+        if [ -z "$${MYNE_SERVER_TOKEN:-}" ]; then
+          echo "myne_server_token not provided -> skipping sync-sim (re-add the from_secret to enable)";
+          exit 0;
+        fi
+      # fd soft limit -> hard cap (EMFILE guard, see tauri-compile).
+      - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      # Sysdeps to compile/link myne-desktop's test binary (same set as
+      # cargo-test-tauri) + git for the clone. node/pnpm NOT needed: dist/ is
+      # already in the shared workspace from the pnpm-build step.
+      # Clone the private companion via the Forgejo mirror (git.myne.md/Myne/
+      # myne-server — the in-house source a Forgejo PAT authenticates against,
+      # NOT github.com; it tracks develop on a 10-minute interval) + build a
+      # static binary.
+      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server"
+      - cd "$CI_WORKSPACE/myne-server" && CGO_ENABLED=0 /usr/local/go/bin/go build -o myne-server ./cmd/myne-server
+      - cd "$CI_WORKSPACE"
+      # Point the harness at the freshly built server and run ONLY the sim suite.
+      - export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server/myne-server"
+      # And REQUIRE it, now that the binary is guaranteed built three lines up.
+      # Without this the sim tests self-skip on a missing binary and report
+      # `ok` — so a clone or a `go build` that half-failed would leave this step
+      # green having asserted nothing, which is exactly how 27 server-backed
+      # tests in `orchestrator.rs` came to report green on every machine that
+      # lacked the server (myne-md/myne#425). The variable is set HERE and not
+      # globally on purpose: every other step runs without a server, and
+      # requiring one there would turn a correct skip into a failure.
+      - export MYNE_TEST_REQUIRE_SERVER=1
+      # Sync moved to myne-core (decisions.md 2026-07-07); sim suite is now
+      # `myne_core::plugins::sync::sim`. It no longer self-skips here — see
+      # MYNE_TEST_REQUIRE_SERVER above.
+      # Quoted: the `:: ` (colon-colon-space) in the test-path filter is parsed
+      # as a YAML key:value map otherwise, failing config-compile ("cannot
+      # unmarshal map into string").
+      # BOTH server-backed suites, not just the sim. The `orchestrator::tests`
+      # half self-skips without a server exactly like the sim half does, so
+      # before myne-md/myne#638 it ran in NO step: `cargo-test-tauri` compiles it
+      # and sets no `MYNE_E2E_SERVER`, and this filter did not match it. That
+      # left the four `_on_a_migrated_vault` attachment scenarios passing
+      # everywhere by never executing, and they are the only behavioural proof
+      # that a v0.2 vault syncs its attachments at all, which is the #425 shape the
+      # comment above describes, one filter over.
+      - "/cache/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim) + test(plugins::sync::orchestrator)' --no-fail-fast"
+
+  # ─── Cross-impl vector verification, both lanes ─────────────────────────────
+  # `protocol/tests/vectors.rs` reads the companion fixtures and asserts
+  # byte-equality of the public API across all 34 runners (argon2id, ctx-aead,
+  # hkdf-sha256, account-number, phrase_normalize, myn-blob, vault-meta and
+  # every §10.3 blob family). Since MYND-574 task 15 the SAME runners also
+  # execute inside a real browser (`scripts/browser-vectors.sh`, wasm32 plus
+  # headless Chrome), which is not a nicety: the web client's execution target
+  # is a browser's wasm engine, and a suite that only ever ran on aarch64 and
+  # x86_64 is evidence about a different machine.
+  #
+  # ─── This step was commented out for months, and why that mattered ──────────
+  # `myne-test-vectors` is private, so the clone needs a token, and a
+  # `from_secret:` naming a secret the repo cannot see fails CONFIG-COMPILE:
+  # the whole pipeline errors before any step runs, on every branch. That is not
+  # hypothetical. This step was uncommented on 2026-07-28 on the assertion that
+  # the secret was provisioned; it was not, and every gate on this repo was dead
+  # on every branch and every PR until the re-comment the next day.
+  #
+  # The cost of leaving it closed was easy to misread as zero, and was not:
+  # `cargo-test` runs the `vectors` target (it is `-p protocol`), every runner
+  # prints `[skip]`, and the step reports green having asserted nothing. So the
+  # byte-level agreement `protocol/CLAUDE.md` and `docs/threat-model.md` §6 both
+  # lean on was enforced on no machine (myne-md/myne#586).
+  #
+  # ─── github.com, not the Forgejo mirror ─────────────────────────────────────
+  # The closed version cloned `git.myne.md/Myne/myne-test-vectors`, and that
+  # half had never run, so nothing had ever confirmed the mirror exists. The
+  # proven pattern in this project is `myne-server`'s `vector-gate`, which
+  # clones from github.com with a read-scoped GitHub PAT and runs green today.
+  # `vectors_token` on this repo is that shape.
+  #
+  # ─── Tip, not a pinned SHA, deliberately unlike myne-server ─────────────────
+  # `myne-server` pins a commit because it is a SECOND implementation and a
+  # stable target is what lets it catch up. This repo is where the vectors are
+  # generated FROM, so it must agree with the published tip at all times: a
+  # vectors change that the Rust client no longer matches should redden this
+  # pipeline the day it lands. A pin here would go stale silently, which is the
+  # other half of what myne-md/myne#586 found (that server pin sat two months
+  # behind while passing).
+  #
+  # The empty-token guard is load-bearing rather than defensive. The secret is
+  # scoped to `push` and `manual` events only, so a `pull_request` run resolves
+  # it empty and this step skips cleanly instead of failing; the same holds for
+  # a fork PR, which gets no secrets at all.
+  vector-verification:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    depends_on: [cargo-test]
+    environment:
+      # Assert rather than skip: this is the one place a missing fixture is a
+      # failure rather than a fresh clone. `cases_json` in
+      # `protocol/tests/vectors.rs` reads this and panics with the missing path
+      # instead of `eprintln!` + `return None`. Without it an expired token or a
+      # moved ref returns this step to green-and-empty, which is the state it
+      # spent months in.
+      MYNE_VECTORS_REQUIRED: "1"
+      VECTORS_TOKEN:
+        from_secret: vectors_token
+    commands:
+      - |
+        if [ -z "$VECTORS_TOKEN" ]; then
+          echo "vectors_token not provided (pull_request or fork) -> skipping cross-impl vectors";
+          exit 0;
+        fi
+      # chromium and its driver are what make the browser lane possible, and the
+      # driver's major version must match the browser's, which is why they are
+      # installed as a PAIR from the same distro archive rather than pinned
+      # separately (chromedriver 151 refuses a Chrome 150 session outright).
+      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl chromium chromium-driver
+      - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@github.com/myne-md/myne-test-vectors.git" myne-test-vectors
+      # Native lane: the desktop and mobile execution target.
+      - cargo test -p protocol --test vectors
+      # Browser lane: the web client's. Same runners, same fixtures, a different
+      # wasm engine. The script fails rather than skips when either the fixtures
+      # or a driver are missing.
+      - CHROMEDRIVER=/usr/bin/chromedriver bash scripts/browser-vectors.sh
+
+  # Failure notification via Pushover. The token + group come ONLY from CI
+  # secrets, never committed (public repo). A missing secret (e.g. a fork PR)
+  # makes the step skip silently, and failure:ignore keeps it from ever failing
+  # the pipeline. depends_on lists every step (optional:true) so notify waits on
+  # each terminal status without racing; a skipped step drops out silently. Only
+  # bare dollar-VAR is used here, never Woodpecker brace- or paren-substitution
+  # syntax — even inside a comment, a literal brace-substitution token makes
+  # Woodpecker's envsubst pass fail config-compile ("unable to parse variable
+  # name"), erroring the WHOLE pipeline before any step runs.
+  notify-failure:
+    image: alpine:3.21
+    depends_on:
+      - name: cargo-fmt
+        optional: true
+      - name: cargo-clippy
+        optional: true
+      - name: cargo-test
+        optional: true
+      - name: cargo-deny
+        optional: true
+      - name: ai-no-network
+        optional: true
+      - name: hooks-parity
+        optional: true
+      - name: wasm-protocol
+        optional: true
+      # Split out of `wasm-protocol` so its 120 s double build leaves the first
+      # stage. It can still go red on its own, and this file is the only thing
+      # that pushes a failure to the maintainer, so it needs its own slot: a
+      # step split off without one is a gate that goes quiet.
+      - name: wasm-repro
+        optional: true
+      # The slot this reserved is now filled (myne-md/myne#586). It is the only
+      # thing that pushes a failure to the maintainer, and a gate nobody is told
+      # about is a gate that goes red unnoticed.
+      - name: vector-verification
+        optional: true
+      - name: pnpm-build
+        optional: true
+      - name: vitest
+        optional: true
+      - name: tauri-compile
+        optional: true
+      - name: cargo-test-tauri
+        optional: true
+      # NO E2E ENTRIES HERE, and their absence is the change rather than an
+      # oversight: `myne-server-build`, `e2e`, `e2e-quarantine`, `e2e-floor` and
+      # `e2e-web` all moved to `.woodpecker/e2e.yml`, which carries its OWN
+      # `notify-failure` step. A `depends_on` naming a step in another workflow
+      # does not resolve, so listing them here would not wait for anything. It
+      # would only read as coverage this pipeline no longer has.
+      - name: bundle-record
+        optional: true
+      # Unfiltered like bundle-record, so it can go red on a docs-only commit,
+      # which is precisely the commit that hand-edits its generated projection.
+      - name: twin-inventory
+        optional: true
+      # myne#548. Unfiltered like `twin-inventory` above and red for the same two
+      # reasons: a stale generated projection, or a feature surface that entered
+      # the tree with no manual-test verdict. This file is the only thing that
+      # pushes a failure to the maintainer, so a step added without a slot here
+      # is a gate that goes quiet.
+      - name: manual-test-roster
+        optional: true
+      # Unfiltered for the same reason, and listed for the same one: a stale
+      # docs/dev/i18n-coverage.md is a docs-only commit away, and a gate nobody
+      # is paged for is a gate that stays red.
+      - name: i18n-coverage
+        optional: true
+      - name: web-build
+        optional: true
+      # The mobile lane. Every one of these five is a blocking gate with no
+      # failure:ignore, so each can go red on its own, which is the reason
+      # mobile CI failures used to notify a different pipeline in a different
+      # repo. This used to point at `mobile-crosscheck` as the worked example of
+      # a step left off this list; that step is gone (myne-md/myne#584), since
+      # `ANDROID_NDK_HOME` was provisioned nowhere in the tree, so it installed
+      # the Android target and exited 0 on every push while its entry here
+      # claimed it could go red.
+      - name: mobile-build
+        optional: true
+      - name: npm-licenses
+        optional: true
+      - name: mobile-vitest
+        optional: true
+      - name: mobile-flow-logic
+        optional: true
+      - name: mobile-compile
+        optional: true
+      # The deploy chain (task 112). A deploy that fails silently is worse than
+      # one that fails loudly: the previous container keeps serving and nobody
+      # learns the new build never shipped.
+      - name: web-container-check
+        optional: true
+      - name: sync-sim
+        optional: true
+    environment:
+      PUSHOVER_TOKEN:
+        from_secret: pushover_token
+      PUSHOVER_GROUP:
+        from_secret: pushover_group
+    commands:
+      - apk add --no-cache curl
+      - |
+        if [ -z "$PUSHOVER_TOKEN" ]; then echo "pushover secret absent; skipping"; exit 0; fi
+        curl -fsS -m 15 \
+          --data-urlencode "token=$PUSHOVER_TOKEN" \
+          --data-urlencode "user=$PUSHOVER_GROUP" \
+          --data-urlencode "title=❌ $CI_REPO_NAME failed · $CI_COMMIT_BRANCH" \
+          --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
+          --data-urlencode "url=$CI_PIPELINE_URL" \
+          https://api.pushover.net/1/messages.json
+    # ─── The org-wide notify rule, stated because it was not (myne-md/myne#584) ──
+    # A PULL-REQUEST failure sends nothing. It is not an oversight and it is not
+    # a gap: `myne-bot` runs a pipeline on every PR and reports the result on the
+    # PR itself, so a push notification per branch iteration would be noise on
+    # top of a signal the author is already looking at. A push or a manual run
+    # has no such surface, which is why those two do notify.
+    #
+    # Five repos carry a `notify-failure` step and they disagreed three ways:
+    # this one, `myne-server` and `myne-test-vectors` omitted `pull_request`
+    # while `myne-clipper` and `myne-themes` included it, and not one file said
+    # which was intended. All five now read the same and all five say why, so
+    # the next person to notice the asymmetry finds a decision rather than a
+    # difference to "fix".
+    when:
+      - event: [push, manual]
+        status: failure
+    failure: ignore

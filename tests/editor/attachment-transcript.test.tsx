@@ -24,7 +24,9 @@ vi.mock("../../src/editor/attachments/toast", () => ({
 }));
 
 import { AttachmentAudioWidget } from "../../src/editor/attachments/widgets";
-import { __clearTranscriptStore } from "../../src/editor/attachments/transcript";
+// The production reset, not a test-only twin: it is the function the vault
+// teardown paths call, so exercising it here is worth more than a private one.
+import { resetTranscripts } from "../../src/editor/attachments/session-caches";
 import { showAttachmentToast } from "../../src/editor/attachments/toast";
 import { type EditorHost, getHost, setEditorHost } from "../../src/editor/host";
 import type { TranscribeHandle, TranscribeOptions } from "../../src/editor/host";
@@ -102,7 +104,7 @@ interface EditorViewStub {
 
 /** Build the audio widget DOM against `view`, opening the ⋮ menu. */
 function build(view: EditorViewStub): HTMLElement {
-  const dom = new AttachmentAudioWidget(ID, "Voice note 1.wav").toDOM(view as never);
+  const dom = new AttachmentAudioWidget(ID, "Voice note 1.wav", []).toDOM(view as never);
   document.body.appendChild(dom);
   return dom;
 }
@@ -116,7 +118,7 @@ function transcribeRow(): HTMLButtonElement | null {
 }
 
 beforeEach(() => {
-  __clearTranscriptStore();
+  resetTranscripts();
   vi.stubGlobal(
     "IntersectionObserver",
     class {
@@ -225,11 +227,19 @@ describe("Transcription run → progress → expander → insert", () => {
 });
 
 describe("per-cause hint + Stop", () => {
+  // Every member of `TranscribeErrorKind` except `"failed"`, which is a toast
+  // rather than a hint. Hand-maintained, and it silently stayed at four when
+  // myne-md/myne#510 added a fifth: this is the only test that RENDERS a hint
+  // and asserts it is non-empty and distinct, so a missing row here means the
+  // widget shipped `i18n.t(undefined)` with the whole tree green.
+  // `tests/lib/transcribeErrorKindMirror.test.ts` is the guard that now fails
+  // when the roster and the union disagree.
   const ACTIONABLE_CAUSES = [
     { kind: "feature_off" },
     { kind: "vault_locked" },
     { kind: "no_model" },
     { kind: "model_load_failed" },
+    { kind: "too_long" },
   ] as const;
 
   it("renders a distinct, non-empty hint for each actionable cause (MYND-591)", async () => {
@@ -254,7 +264,7 @@ describe("per-cause hint + Stop", () => {
       // Reset between iterations (afterEach only runs once for the whole test).
       setEditorHost(baseHost);
       document.body.innerHTML = "";
-      __clearTranscriptStore();
+      resetTranscripts();
       vi.mocked(showAttachmentToast).mockClear();
     }
     // Each cause maps to its own message — a regression that collapses them back

@@ -13,7 +13,7 @@
 
 import { patchFolderField, patchUpdatedField } from "../dialect";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
-import { setDeliberateFolders } from "../lib/prefs";
+import { mutateDeliberateFolders, type SetMutation } from "../lib/prefs";
 import { isBatchCommitted } from "../types/note-batch-error";
 import {
   noteWriteBatchTransactional,
@@ -36,6 +36,26 @@ export type FolderDeletePlan = {
   nextDeliberate: string[];
   /** The deliberate entries dropped (target + deliberate descendants). */
   removed: string[];
+  /**
+   * The folded, trailing-slash key the plan matched on, or `null` for a root
+   * no-op.
+   *
+   * Carried rather than recomputed, because `persistFolderDelete` hands it to
+   * the core as a prefix verb and has to match on exactly the key the planner
+   * used. Deciding the fold in two places is how a prefix match starts
+   * disagreeing with the set it is filtering.
+   *
+   * **`null` rather than `""` for the root case, and that is the fix rather than
+   * the style.** This field was an empty string, and the disk-side filter that
+   * consumed it did `foldSegment(norm).startsWith(plan.removedKey)`.
+   * `String.prototype.startsWith("")` is true for every input, so the sentinel
+   * meant to match NOTHING matched EVERYTHING: a root plan sent a removal for
+   * the entire stored set, and since `deliberate_folders` syncs, every empty
+   * folder in the vault would have gone on every device. Only the caller's habit
+   * of passing a `FolderNode.path` kept it latent. `null` makes the case
+   * unrepresentable instead of relying on a reader to notice.
+   */
+  removedKey: string | null;
 };
 
 function findNode(nodes: readonly FolderNode[], key: string): FolderNode | null {
@@ -85,7 +105,12 @@ export function planFolderDelete(
   const normalized = normalizeFolderPath(targetPath);
   // Root (absent) is not a deletable folder — no-op, nothing removed.
   if (normalized === null) {
-    return { noteIds: [], nextDeliberate: [...deliberateFolders], removed: [] };
+    return {
+      noteIds: [],
+      nextDeliberate: [...deliberateFolders],
+      removed: [],
+      removedKey: null,
+    };
   }
   const targetKey = foldSegment(normalized); // trailing-slash folded form
 
@@ -102,19 +127,44 @@ export function planFolderDelete(
     if (key.startsWith(targetKey)) removed.push(f);
     else nextDeliberate.push(f);
   }
-  return { noteIds, nextDeliberate, removed };
+  return { noteIds, nextDeliberate, removed, removedKey: targetKey };
 }
 
 /**
  * Persist the trimmed deliberate set for a planned folder delete. Note-trashing
  * + cache-sync is the caller's job (it needs the sidebar cache); this helper
- * only writes the cold deliberate_folders set. Rejects with whatever
- * {@link setDeliberateFolders} propagates.
+ * only writes the deliberate_folders set. Rejects with whatever
+ * {@link mutateDeliberateFolders} propagates.
+ *
+ * **The removal is stated as a PREFIX and resolved by the core**, not derived
+ * here. The planner's `removed` is computed from the caller's React state, and
+ * that state stopped being authoritative when myne#613 gave `deliberate_folders`
+ * four fire-and-forget writers (a note created into a folder, a note moved into
+ * one, a bulk move, the boot back-fill). The hook catches up only through a
+ * nonce bump, so a delete issued inside that window states no removal for the
+ * just-registered entry: the registration survives on disk and the folder the
+ * user deleted comes back, empty and permanent, at the next unlock, and it comes
+ * back on EVERY device, because the surviving entry carries a newer add clock
+ * than the removal. That is this issue's own defect inverted.
+ *
+ * An earlier fix re-read `prefsRead()` here and filtered it. That was better and
+ * still wrong in two ways the review named: the read and the write are two IPC
+ * round trips, so an at-fill add landing between them survives the delete; and
+ * it has to be written once per client per operation, which is four copies of a
+ * prefix rule and the twin drift that comes with them. The core resolves the
+ * prefix inside the prefs write mutex, once, for both clients.
+ *
+ * `plan.removed` is still the right value for the OPTIMISTIC state the sidebar
+ * renders; it is only the write that must not trust it.
+ *
+ * A root plan carries `removedKey: null` and writes nothing. It is not expressed
+ * as an empty prefix, because an empty prefix is a prefix of everything.
  */
 export async function persistFolderDelete(
   plan: FolderDeletePlan,
 ): Promise<void> {
-  await setDeliberateFolders(plan.nextDeliberate);
+  if (plan.removedKey === null) return;
+  await mutateDeliberateFolders({ removePrefix: [plan.removedKey] });
 }
 
 // ---- folder archive (folder-archive) ----------------------------------
@@ -237,6 +287,17 @@ export type FolderRenameResult = {
   nextDeliberate: string[];
   /** True when the rename was rejected before any work (root source/target). */
   invalid?: boolean;
+  /**
+   * The `deliberate_folders` write failed, AFTER the rename committed.
+   *
+   * Reported as a value for the same reason the post-commit batch case is: past
+   * the commit, throwing tells the caller a rename that is on disk did not
+   * happen, and it skips the decoration and `archived_folders` re-rooting that
+   * still have to run. Those live in `vault.prefs` and nothing reconciles them
+   * later, so the subtree silently un-archives at the next unlock. The caller
+   * finishes the re-rooting and reports THIS separately.
+   */
+  deliberateWriteFailed?: boolean;
 };
 
 /** A note with its decrypted body — the input the transactional rename planner
@@ -259,6 +320,25 @@ export type FolderRenameBatchPlan =
       inboundIds: string[];
       nextDeliberate: string[];
       deliberateRewritten: number;
+      /**
+       * The deliberate-set change this rename makes, as ONE prefix verb the core
+       * resolves against the stored set.
+       *
+       * It used to be `mutationFrom(deliberateFolders, nextDeliberate)`, a delta
+       * over the caller's own React copy, and the review found the same hole the
+       * delete had: an entry one of the four fire-and-forget at-fill writers put
+       * on disk, or one a peer landed, is in neither side, so it is neither
+       * re-rooted nor removed and stays under the OLD path. The renamed-away
+       * folder then reappears empty at the next unlock, which this file's own
+       * retry loop already describes as "an empty folder that reappears under
+       * the old name at every unlock and that no rename can clear".
+       *
+       * As one verb it is also atomic under the byte budget. As a remove plus an
+       * add it could half-apply, landing the removals, stamping each as a
+       * deletion that propagates to every device, and refusing the additions,
+       * which turns a rename into a synchronised delete.
+       */
+      deliberateMutation: SetMutation;
     };
 
 /**
@@ -339,7 +419,19 @@ export function planFolderRenameBatch(
     }
   }
 
-  return { batch, movedIds, inboundIds, nextDeliberate, deliberateRewritten };
+  return {
+    batch,
+    movedIds,
+    inboundIds,
+    nextDeliberate,
+    deliberateRewritten,
+    // A no-op rename states nothing. Everything else states the subtree once and
+    // lets the core resolve it against what is actually stored.
+    deliberateMutation:
+      oldNorm === newNorm
+        ? {}
+        : { renamePrefix: [{ from: oldKey, to: newNorm }] },
+  };
 }
 
 /**
@@ -440,8 +532,39 @@ export async function renameFolder(
     }
   }
 
+  // Past the commit, so a failure here is REPORTED rather than thrown. The
+  // rename is on disk; the caller still owes the decoration and
+  // `archived_folders` re-rooting, and a throw would skip both while telling the
+  // user nothing happened.
+  let deliberateWriteFailed = false;
   if (plan.deliberateRewritten > 0) {
-    await setDeliberateFolders(plan.nextDeliberate);
+    // Retried ONCE before it is reported, and the retry is the difference
+    // between a recoverable state and a permanent one. A second rename cannot
+    // fix this later: `planFolderRenameBatch` keys its rewrite off the folder's
+    // CURRENT path, and after a relaunch the stale entry is under the OLD one,
+    // so `deliberateRewritten` comes back 0 and this block does not even run.
+    // The residue is an empty folder that reappears under the old name at every
+    // unlock and that no rename can clear.
+    //
+    // The refusal count this returns is not read, and that is now sound rather
+    // than an oversight: the mutation is a single `renamePrefix`, the byte
+    // budget refuses only ADDITIONS, and a re-root adds nothing. It was NOT
+    // sound while this passed a remove-plus-add pair, where a refusal dropped
+    // the additions, landed the removals, and left `deliberateWriteFailed`
+    // false, so the user was told nothing at all.
+    try {
+      await mutateDeliberateFolders(plan.deliberateMutation);
+    } catch {
+      try {
+        await mutateDeliberateFolders(plan.deliberateMutation);
+      } catch {
+        // A flag, not the error. Nothing downstream reads it, the sentence the
+        // caller renders is fixed, and `unknown` invited a reader to think
+        // otherwise. It also made the discriminator `!== undefined`, which
+        // reports SUCCESS for a rejection carrying `undefined`.
+        deliberateWriteFailed = true;
+      }
+    }
   }
 
   // The folder changed on the moved notes → re-index (live, decrypt-free) so
@@ -458,5 +581,6 @@ export async function renameFolder(
     failed: [],
     deliberateRewritten: plan.deliberateRewritten,
     nextDeliberate: plan.nextDeliberate,
+    deliberateWriteFailed,
   };
 }

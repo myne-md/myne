@@ -16,7 +16,9 @@
 // the prose is its projection.
 
 import { readdirSync, readFileSync, statSync, existsSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
+
+import { TS_FILES, walkFiles } from "./lib/surface-files.mjs";
 
 const DIRS = [
   join("src", "components", "settings"),
@@ -94,7 +96,7 @@ const V = {
     "adapted",
     "Ships; import goes through the file-picker seam (`pickFiles` + `readPickedSmallText`) and export through the download seam (task 45). The import half only became true with #262 — this entry described the fix while the code still called `dialog.open`, a typed refusal in the browser, so a valid theme file was reported as invalid.",
   ],
-  "src/components/settings/DailyNotesSettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/PeriodicNotesSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/DefaultViewModeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/EditorPanel.tsx": [
     "adapted",
@@ -126,7 +128,7 @@ const V = {
   ],
   "src/components/settings/PrivacyPanel.tsx": [
     "adapted",
-    "Ships; the screen-capture toggle, the quick-unlock block and the hide-vault-names row are capability-gated, and all three are filtered from search. The hide-vault-names row is gated on `lockedVaultNames` (myne-md/myne#411): a browser origin holds exactly one container, so the locked picker the setting governs never renders there, and there is no OS keychain to seal its store. The CLI block carries a `developer_mode` gate on top of its capability gate (#181); on web the capability half already decides it.",
+    "Ships; the device-local screen-capture OVERRIDE row, the quick-unlock block and the hide-vault-names row are capability-gated, and all three are filtered from search. The per-vault screen-capture toggle beside the override is deliberately NOT gated, and this verdict claimed for a long time that it was: it is a `vault.prefs` field a user may read and set on a client where the native call does nothing, while the override writes a device-local file whose only purpose is suppressing a call that client never makes. The hide-vault-names row is gated on `lockedVaultNames` (myne-md/myne#411): a browser origin holds exactly one container, so the locked picker the setting governs never renders there, and there is no OS keychain to seal its store. The CLI block carries a `developer_mode` gate on top of its capability gate (#181); on web the capability half already decides it.",
   ],
   "src/components/settings/QuickUnlockSettings.tsx": [
     "adapted",
@@ -175,15 +177,23 @@ const V = {
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
-  "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused. Same shape as the other AI-path wrappers below: reachable code, refused command."],
-  "src/lib/ai-model-store.ts": ["adapted", "No AI surface mounts on web (`localAi` is absent), so nothing reaches this."],
+  "src/lib/agent-protocol.ts": [
+    "ported",
+    "The wire TYPES and the pure predicates over them, split out of `agent-run.ts` so mobile could share them. It has no host reach at all \u2014 type declarations, a marker table and four functions over their own arguments \u2014 so it compiles and runs in the browser exactly as written. It is unreachable there for the same reason its siblings are (`agent` is `Class::Unsupported` in web/wasm/src/capability.rs), but unreachable is not the same as adapted: nothing about this module changes shape on web, and marking it `adapted` would claim a divergence that does not exist.",
+  ],
+  "src/lib/agent-run-core.ts": [
+    "adapted",
+    "The agent plugin's IPC bindings as a FACTORY: `invoke` and `Channel` arrive as arguments because a shared module may not import either (`scripts/check-platform-seam.mjs`). Same verdict and same reason as `agent-run.ts`, which is its desktop caller: every command it wraps is refused on web, since `agent` is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope). The factory itself would construct on web; what it returns has nothing to talk to.",
+  ],
+  "src/lib/agent-run.ts": ["adapted", "Unreachable where the `agent` plugin is absent: it is `Class::Unsupported` in web/wasm/src/capability.rs (myne-md/myne#529 puts web out of scope), so every command this module wraps is refused."],
+  "src/lib/ai-model-store.ts": ["adapted", "Unreachable where `localAi` is absent: no AI surface mounts on web, so nothing reads the store."],
   "src/lib/ai-capability.ts": [
     "adapted",
     "Runs as written and gives the right answer for the wrong-looking reason: the `local-inference` plugin is `Unsupported` in the dispatcher, so the invoke is refused and the module returns UNCOMPILED_REPORT — which is exactly true on web, where no AI is compiled. Nothing renders it there (`localAi` is absent), so it is unreachable in practice; it is `adapted` rather than `excluded` because it is correct if it ever is reached.",
   ],
   "src/lib/ai-tags.ts": [
     "adapted",
-    "Same as ai-chat: the auto-tag seam is unreachable where `localAi` is absent, and its command is `Unsupported` in the dispatcher.",
+    "The auto-tag seam is unreachable where `localAi` is absent, and its command is `Unsupported` in the dispatcher.",
   ],
   "src/lib/aiExcludedFolders.ts": ["ported", "Pure path predicate; also read by non-AI callers."],
   "src/lib/app-window.ts": [
@@ -191,6 +201,25 @@ const V = {
     "`closeApp` was deleted in task 95; the fail-closed exit is the `app-exit` seam, whose web arm reloads the page.",
   ],
   "src/lib/attachments.ts": ["ported", "IPC bindings; the import path moved to the seam in task 67."],
+  "src/lib/import-source-vault.ts": [
+    "typed-unsupported",
+    "Vault import (myne-md/myne#464). Every binding here wraps an `importer:` " +
+      "command, and `web/wasm/src/capability.rs` classifies that whole plugin " +
+      "`Class::Unsupported`, so none of them can be dispatched in the browser. " +
+      "The placement is the reason: putting these under `vault-unlock:` or " +
+      "`attachments:` would have widened plugins the web client DOES dispatch. " +
+      "NOT `excluded`, and the correction is the finding: this module SHIPS. " +
+      "`ObsidianImportModal.tsx` imports it statically, `src/screens/Editor.tsx` " +
+      "imports and mounts that modal, and neither is in " +
+      "`web/vite.config.ts`'s `SUBSTITUTED_MODULES`, so the `plugin:importer|*` " +
+      "literals are in `web/dist`. The first version of this entry claimed " +
+      "absence AND omitted the marker string, so the absence half of this guard " +
+      "skipped it entirely: a false record that was unverifiable by " +
+      "construction. What IS absent is the setup step " +
+      "(`src/notes/import/MyneVaultSetup.tsx`, substituted), because it takes a " +
+      "recovery phrase; the bindings are merely unreachable, since the absent " +
+      "`vaultImport` capability keeps the source out of the picker.",
+  ],
   "src/lib/backup-errors.ts": [
     "excluded",
     "Backup error copy; leaves with the modules that produce those errors.",
@@ -310,6 +339,10 @@ const V = {
 
   "src/lib/spell.ts": ["adapted", "Unreachable where `spellCheck` is absent; the editor host omits the `spell` member."],
   "src/lib/stage.ts": ["adapted", "Boot routing branches on capabilities: an empty web client goes to account-entry, a corrupt one to re-sync (task 85)."],
+  "src/lib/sync-staleness.ts": [
+    "ported",
+    "Pure arithmetic over the last-successful-sync timestamp, plus the copy that says so after three days. It belongs on web MORE than on desktop, not less: a desktop vault works offline indefinitely, while the web client is sync-required (`decisions.md` 2026-07-26), so a sync that stopped working is the difference between a vault that is merely idle and one the user cannot reach from anywhere else.",
+  ],
   "src/lib/syntaxTheme.ts": ["ported", "CodeMirror theme."],
   "src/lib/theme-errors.ts": ["ported", "Error copy."],
   "src/lib/theme.ts": ["ported", "CSSOM only."],
@@ -330,6 +363,14 @@ const V = {
   "src/lib/vault-creation-logging.ts": [
     "excluded",
     "Creation-flow logging; same reason as vault-creation-errors.",
+  ],
+  "src/hooks/useScreenCaptureOverride.ts": [
+    "adapted",
+    "Ships, and short-circuits before its first IPC here. It owns the client state of the device-local screen-capture override for both surfaces that touch it (myne-md/myne#482), and its mount read is gated on the `screenCaptureProtection` capability, which is absent on web, so the hook holds `null` and both consumers render the override as off, which is what they would render anyway. The gate lives here rather than at each caller because it used to sit AFTER the escape's effect, which cost a Worker round trip per mount for an answer the capability set already had.",
+  ],
+  "src/lib/screen-capture-override.ts": [
+    "typed-unsupported",
+    "Ships, and on this client no call reaches IPC. All three wrappers name commands the wasm dispatcher classifies `Unsupported` for the whole `screen-capture` plugin, and every caller is gated on the `screenCaptureProtection` capability, which the web descriptor omits: `ScreenCaptureEscape` and the Privacy row omit their controls, and `useRevealAfterIdleLock` returns before calling `showWindowProtected` (a page has no hidden window to reveal and no capture affinity to lose). The gating is what makes this `typed-unsupported` rather than a live refusal path: the backend answer exists and is typed, and nothing on this client asks for it. `threat-model.md` A15/TB11 already records that the web client has no screen-capture protection, so an escape from it would be a control with no referent (myne-md/myne#482, #483).",
   ],
   "src/lib/vault-delete.ts": ["adapted", "Task 72 owns what deletion MEANS on a sync-required client; the binding itself is portable."],
   "src/lib/vault-migrate.ts": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration (#420) is a desktop flow (Class::Unsupported in web/wasm/src/capability.rs, like vault-creation): a browser client joins an already-current account over sync and never migrates. The binding is present but its command answers the typed refusal on web."],
@@ -355,6 +396,14 @@ const V = {
 
   // ── src/hooks ───────────────────────────────────────────────────────────
   "src/hooks/useAccountStatus.ts": ["ported", "Sync account status; degrades to null on an older server."],
+  "src/hooks/useScrollEdges.ts": [
+    "ported",
+    "Pure DOM geometry (scrollTop/clientHeight/scrollHeight) behind a ResizeObserver and a "
+      + "MutationObserver, both feature-detected because a host may lack them. No host call, no "
+      + "seam import, no capability. Its four consumers all ship on web: CenteredCard, "
+      + "VaultPicker, step-shell and PhraseEntryStep, which is a pre-unlock screen, so the "
+      + "absence half of this guard covers it there.",
+  ],
   "src/hooks/useHeadFingerprintCompare.ts": [
     "ported",
     "The SYNC-40 eye-compare poll + its push hold (myne#462). More load-bearing here than on desktop: per `decisions.md` 2026-07-26 a web client re-runs this compare on EVERY re-bootstrap, because OPFS is evictable.",
@@ -428,16 +477,7 @@ const V = {
 };
 
 export function surfaceFiles(dirs = DIRS) {
-  const out = [];
-  const walk = (dir) => {
-    for (const name of readdirSync(dir).sort()) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (/\.(ts|tsx)$/.test(name)) out.push(relative(".", full));
-    }
-  };
-  dirs.forEach(walk);
-  return out;
+  return walkFiles(dirs, { extensions: TS_FILES });
 }
 
 export function rosterGaps(files, verdicts = V) {

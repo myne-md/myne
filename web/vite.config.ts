@@ -197,6 +197,27 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "vault-creation",
     "ReadyLocalArtefacts",
   ),
+  // The FOURTH phrase path, and the one that arrived after the list above was
+  // written (myne-md/myne#464). Vault-to-vault import asks for the SOURCE
+  // vault's credential, and a source vault's credential may be its 24-word
+  // recovery phrase. The card is already filtered out of the picker by the
+  // absent `vaultImport` capability, so this is unreachable at runtime, and
+  // unreachable is not the bar: `check-web-no-phrase.mjs` exists because
+  // enrolment tried exactly that and the grid was found still in the artefact.
+  //
+  // The feature is absent on its own merits too, independently of the phrase: a
+  // browser origin holds ONE container under a constant vault id (task 85), so
+  // there is no second vault to import from, and `importer:` is
+  // `Class::Unsupported` wholesale.
+
+  [path.join(repoRoot, "src", "notes", "import", "MyneVaultSetup")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "notes",
+    "import",
+    "MyneVaultSetup",
+  ),
   [path.join(repoRoot, "src", "components", "sync", "EnrollPhraseCredential")]: path.join(
     repoRoot,
     "web",

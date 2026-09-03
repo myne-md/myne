@@ -8,7 +8,7 @@
 # desktop build and not this one.
 [package]
 name = "myne-mobile"
-version = "0.5.0"
+version = "0.7.0"
 description = "Myne — mobile client"
 authors = ["Myne"]
 edition = "2021"
@@ -67,7 +67,15 @@ protocol = { path = "../../protocol" }
 # client consumes one source of truth instead of a copied backend. The
 # desktop-only side-effects attach through `myne_core::hooks` (mobile installs
 # the no-op `NoopHooks`).
-myne-core = { path = "../../core" }
+#
+# `remote-ai` turns on the inference seam and the remote-provider arm
+# (myne-md/myne#456). Enabled directly rather than through a mobile feature of
+# its own, because there is no local-inference half here to gate it behind: on a
+# phone every AI request goes to a user-named remote provider, by decision, so
+# the arm is either present or the feature does not exist. Desktop chains the
+# same core feature off its `local-inference` instead, which is what keeps its
+# `--no-default-features` auditable build free of remote-provider code.
+myne-core = { path = "../../core", features = ["remote-ai"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 # Custom-URL-scheme (`myne://`) delivery for the iOS home/lock-screen widgets +
@@ -118,6 +126,11 @@ uuid = { version = "1", features = ["v4", "v7"] }
 thiserror = "2"
 getrandom = "0.2"
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
+# Implementing `myne-core`'s agent seams (myne-md/myne#456), the same reason and
+# the same version the desktop crate declares it for. A PROC-MACRO, so it
+# contributes no runtime code and adds nothing to the shared lockfile that the
+# `VaultIo` seam had not already put there.
+async-trait = "0.1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
 # `tracing` for structured ops-side logging (stage tags + bounded
 # variant-name fields only; see the main repo's src-tauri/CLAUDE.md

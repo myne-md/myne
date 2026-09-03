@@ -55,8 +55,6 @@
 //! without anyone configuring it, and the suite passing on it unmodified is a
 //! second piece of evidence the walk was asking for.
 
-
-
 use myne_core::text::{default_lower, fold_diacritics, turkish_lower};
 
 /// Every locale that could plausibly change a case mapping, plus the empty
@@ -82,7 +80,9 @@ const LOCALES: &[&str] = &[
 static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn lock_env() -> std::sync::MutexGuard<'static, ()> {
-    ENV_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Run `f` under each locale and return the answers, one per locale.

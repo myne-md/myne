@@ -91,7 +91,11 @@ test.describe("tablet workspace layout", () => {
     await expect(page.getByText("Trash is empty")).toBeVisible();
 
     await page.getByTestId("sidebar.nav-notes").click();
-    await expect(page.getByText("No notes yet")).toBeVisible();
+    // Back on the notes slice with nothing in it. Row count rather than the
+    // "No notes yet" placeholder: a deliberate folder keeps the tree non-empty
+    // since myne-md/myne#613.
+    await expect(page.getByTestId("workspace.list-pane")).toBeVisible();
+    await expect(page.getByTestId("notes.row")).toHaveCount(0);
   });
 
   test("sheets clamp to a centered card instead of stretching edge to edge", async ({ page }) => {

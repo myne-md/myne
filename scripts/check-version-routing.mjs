@@ -62,7 +62,16 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-const ROOTS = ["core/src", "src-tauri/src"];
+// `mobile/src-tauri/src` joined on myne-md/myne#479, and its absence had cost
+// exactly what this guard exists to prevent. Mobile's local `workspace` plugin
+// parsed `vault.meta` with the v0.1-only `parse_vault_meta`, which hard-rejects
+// `NTV5`, so on a MIGRATED vault that client's workspace reads and writes both
+// failed while every other mobile plugin, going through `myne-core`, kept
+// working. The guard reported `0 still debt` the whole time, over a tree it
+// never opened. A root list that omits a whole client is the
+// `check-prefs-nonce.mjs` shape the root CLAUDE.md records: the success line
+// says `ok` and means it about less than the reader assumes.
+const ROOTS = ["core/src", "src-tauri/src", "mobile/src-tauri/src"];
 
 /**
  * The call classes. `re` is matched per non-comment, non-test line.
@@ -199,6 +208,15 @@ const ALLOWED = new Map([
   ["src-tauri/src/plugins/notes/search_sync.rs#kek", [3, "cache: vault.search (SearchIndexKey) — the desktop twin"]],
   ["src-tauri/src/plugins/local_inference/hydrate.rs#kek", [1, "cache: vault.embeddings (AiEmbeddingsKey), dropped by the migration"]],
   ["src-tauri/src/plugins/local_inference/commands.rs#kek", [2, "cache: attachments-text (AttachmentTextKey), dropped by the migration"]],
+  // The mobile twin of the entry above, verbatim reason and verbatim count,
+  // which is the point: it seals the same MYE1 transcript cache under the same
+  // subkey role, so it is legitimate for exactly the same reason. It enters the
+  // record on myne-md/myne#479, with the tree (`mobile/src-tauri/src`) rather
+  // than after a change to the file. Its `#meta` sibling did NOT get an entry
+  // and was fixed instead: desktop moved to `parse_vault_meta_any` in
+  // myne-md/myne#433 and this twin never did, so on a migrated vault it
+  // answered `None` and the cache silently stopped sealing.
+  ["mobile/src-tauri/src/plugins/local_inference/commands.rs#kek", [2, "cache: attachments-text (AttachmentTextKey), dropped by the migration, the mobile twin of the desktop entry above"]],
   ["src-tauri/src/plugins/attachments/read_text.rs#kek", [1, "cache: attachments-text (AttachmentTextKey)"]],
   // The WRITER of that same cache, and it belongs in this table for exactly the
   // reason its six readers do. `attachments-text/` is device-local, never

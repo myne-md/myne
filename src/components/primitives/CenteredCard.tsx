@@ -6,16 +6,17 @@
 
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { HOVER_TRANSITION, hoverSurface } from "./hoverSurface";
+import { fillingScrollRegionStyle, useScrollEdges } from "../../hooks/useScrollEdges";
+import { stageRootStyle } from "./stageRoot";
 
 interface CenteredCardProps {
   children: ReactNode;
 }
 
+// The stage envelope is shared; `stageRoot.ts` carries the 38px reasoning and
+// the ancestor contract it replaces `100vh` with.
 const ROOT_STYLE: CSSProperties = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  ...stageRootStyle,
   background: "var(--bg-1)",
   fontFamily: "var(--font-sans)",
   padding: "var(--space-6)",
@@ -28,15 +29,50 @@ const CARD_STYLE: CSSProperties = {
   padding: "var(--space-6)",
   maxWidth: 480,
   width: "100%",
+  // Bounded by the space the root was given, and no taller. The card itself does
+  // NOT scroll and is NOT masked: see `SCROLL_STYLE` below.
+  maxHeight: "100%",
+  minHeight: 0,
+  display: "flex",
+  flexDirection: "column",
+};
+
+/**
+ * The scroller, INSIDE the card's padding rather than the card itself.
+ *
+ * Masking the card was the obvious shape and it was wrong twice over. A
+ * `mask-image` clips the whole rendered box, so the card's own `--bg-2` fill,
+ * its `--line-1` hairline and its `--radius-2` corners faded to transparent the
+ * moment anything overflowed, which is exactly the chrome `docs/design/README.md`
+ * defines a card by. And the fade band is `--space-5` against `--space-6` of
+ * padding, so it sat entirely in the gutter: it dissolved the frame and faded
+ * almost none of the content it was added for. `VaultPicker` had it right from
+ * the start by masking its list.
+ */
+const SCROLL_STYLE: CSSProperties = {
+  ...fillingScrollRegionStyle,
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-4)",
+  // Negative insets so the scrollbar and the faded edges reach the card's
+  // padding box, then re-applied as padding inside: the content still clears the
+  // frame, and nothing is clipped a second time by the gutter.
+  margin: "calc(var(--space-6) * -1)",
+  padding: "var(--space-6)",
 };
 
 export function CenteredCard({ children }: CenteredCardProps) {
+  // Soft edges once the content outgrows the window, for the same reason the
+  // vault list has them: a hairline crop reads as a rendering fault, a fade
+  // reads as "there is more this way". See `src/hooks/useScrollEdges.ts`.
+  const { ref, fadeProps } = useScrollEdges<HTMLDivElement>();
   return (
     <div style={ROOT_STYLE}>
-      <div style={CARD_STYLE}>{children}</div>
+      <div style={CARD_STYLE}>
+        <div ref={ref} style={SCROLL_STYLE} {...fadeProps}>
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

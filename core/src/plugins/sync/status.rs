@@ -39,6 +39,18 @@ pub enum SyncRuntimeStatus {
     Error {
         /// A bounded, non-secret reason tag.
         detail: String,
+        /// Epoch-ms of the last cycle that completed on this device, or `None`
+        /// if none ever has (myne#583). Carried ONLY on this variant: how long
+        /// sync has been failing is a question that only exists while it is
+        /// failing, and attaching a clock to `Idle` would invite a UI that
+        /// displays one.
+        ///
+        /// It is a raw timestamp rather than a rendered duration because the
+        /// coarsening belongs to the surface: AS15 keeps per-device sync
+        /// wall-clocks off screen, so the client turns this into "several days"
+        /// and never into a date.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        last_success_at: Option<u64>,
     },
     /// Unresolved conflict copies are present (count surfaced to the UI).
     Conflicts {
@@ -97,13 +109,17 @@ pub fn overlay_status(
     base: SyncRuntimeStatus,
     live: Option<LiveStatus>,
     conflict_count: u32,
+    last_success_at: Option<u64>,
 ) -> SyncRuntimeStatus {
     if !matches!(base, SyncRuntimeStatus::Idle) {
         return base;
     }
     match live {
         Some(LiveStatus::Syncing) => SyncRuntimeStatus::Syncing,
-        Some(LiveStatus::Error(detail)) => SyncRuntimeStatus::Error { detail },
+        Some(LiveStatus::Error(detail)) => SyncRuntimeStatus::Error {
+            detail,
+            last_success_at,
+        },
         None if conflict_count > 0 => SyncRuntimeStatus::Conflicts {
             count: conflict_count,
         },
@@ -134,6 +150,7 @@ pub async fn read_status(
     let cfg = super::config::read_config(io, &path).await?;
     let vault_root =
         crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await).ok();
+    let mut last_success_at: Option<u64> = None;
     let (token_present, identity_present, conflict_count) = match vault_root.as_deref() {
         Some(dir) => {
             use super::token_store::TokenStore as _;
@@ -143,10 +160,11 @@ pub async fn read_status(
             );
             // A pending device persists its identity (device_id) even before its
             // token is issued, so identity-without-token = awaiting approval.
-            let identity = super::state::read_sync_state(io, dir)
-                .await
-                .map(|s| s.device_id_hex.is_some())
-                .unwrap_or(false);
+            let persisted = super::state::read_sync_state(io, dir).await.ok();
+            let identity = persisted
+                .as_ref()
+                .is_some_and(|s| s.device_id_hex.is_some());
+            last_success_at = persisted.and_then(|s| s.last_success_at_ms);
             // Unresolved conflict copies (decryption-free — reads the staging dir).
             let conflicts = super::orchestrator::list_pending_conflicts(io, dir)
                 .await
@@ -156,7 +174,7 @@ pub async fn read_status(
         None => (false, false, 0),
     };
     let base = status_from(cfg.endpoint_url.is_some(), token_present, identity_present);
-    Ok(overlay_status(base, live, conflict_count))
+    Ok(overlay_status(base, live, conflict_count, last_success_at))
 }
 
 /// Which of the two "cannot sync yet" states this device is in: awaiting
@@ -320,7 +338,7 @@ mod tests {
             SyncRuntimeStatus::Pending,
         ] {
             assert_eq!(
-                overlay_status(base.clone(), Some(LiveStatus::Syncing), 3),
+                overlay_status(base.clone(), Some(LiveStatus::Syncing), 3, None),
                 base
             );
         }
@@ -329,25 +347,27 @@ mod tests {
     #[test]
     fn live_wins_over_conflicts_and_conflicts_over_idle() {
         assert_eq!(
-            overlay_status(SyncRuntimeStatus::Idle, Some(LiveStatus::Syncing), 2),
+            overlay_status(SyncRuntimeStatus::Idle, Some(LiveStatus::Syncing), 2, None),
             SyncRuntimeStatus::Syncing
         );
         assert_eq!(
             overlay_status(
                 SyncRuntimeStatus::Idle,
                 Some(LiveStatus::Error("rate_limited".into())),
-                2
+                2,
+                None
             ),
             SyncRuntimeStatus::Error {
-                detail: "rate_limited".into()
+                detail: "rate_limited".into(),
+                last_success_at: None
             }
         );
         assert_eq!(
-            overlay_status(SyncRuntimeStatus::Idle, None, 2),
+            overlay_status(SyncRuntimeStatus::Idle, None, 2, None),
             SyncRuntimeStatus::Conflicts { count: 2 }
         );
         assert_eq!(
-            overlay_status(SyncRuntimeStatus::Idle, None, 0),
+            overlay_status(SyncRuntimeStatus::Idle, None, 0, None),
             SyncRuntimeStatus::Idle
         );
     }

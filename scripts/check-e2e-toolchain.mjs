@@ -26,6 +26,7 @@
 //
 //   node scripts/check-e2e-toolchain.mjs
 
+import { woodpeckerConfigPaths } from "./lib/woodpecker-configs.mjs";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -105,7 +106,44 @@ if (missing.length > 0) {
 // required — CI adds `mold`, a linker it wants for its own build times and the
 // local image has no reason to carry. A both-ways comparison would fail on that
 // and the honest fix would be to add packages nobody needs.
-const woodpecker = readFileSync(join(ROOT, ".woodpecker.yml"), "utf8");
+// **The CI corpus is three places now, and naming one of them was how this
+// check went blind.** It used to read a single `.woodpecker.yml`; myne-md/myne#579
+// split that into the `.woodpecker/` DIRECTORY and myne-md/myne#585 moved the
+// build sysdeps into the prebuilt base image, so the file this opened stopped
+// existing and the guard died on ENOENT rather than reporting anything. The
+// three that carry an apt line today: every Woodpecker config (through the one
+// module that knows where they live, imported rather than copied), the E2E
+// lane script that now owns the seat's runtime set, and `ci/Dockerfile`, which
+// bakes what the seat starts from — a package in the image IS installed on the
+// seat, so leaving it out would demand a redundant apt entry.
+//
+// A path that is absent is a FAILURE rather than a smaller corpus: this check
+// compares two package sets, and a set read from nothing is empty, which agrees
+// with everything.
+const CI_SOURCES = [
+  ...woodpeckerConfigPaths(ROOT),
+  join(ROOT, "scripts", "ci-e2e-lane.sh"),
+  join(ROOT, "ci", "Dockerfile"),
+];
+const woodpecker = CI_SOURCES.map((f) => {
+  try {
+    return readFileSync(f, "utf8");
+  } catch {
+    console.error(
+      `check-e2e-toolchain: cannot read ${f}\n\n` +
+        "  Every CI source this check compares against must be readable. A missing\n" +
+        "  one silently shrinks the package set it derives, and a set derived from\n" +
+        "  nothing agrees with every image. Fix the path rather than the check.",
+    );
+    process.exit(1);
+  }
+}).join("\n")
+  // Fold shell/Dockerfile line continuations FIRST. The markers this check
+  // greps for (`webkit2gtk-driver`, `libwebkit2gtk-4.1-dev`) sit on the
+  // continuation line while `apt-get install` sits on the one before it, so a
+  // per-line filter matches neither half and reports "the lane was
+  // restructured" about a lane that is fine.
+  .replace(/\\\n\s*/g, " ");
 
 /**
  * The package names on an `apt-get install` line.
@@ -172,7 +210,7 @@ const ciAptLines = woodpecker
   .filter((l) => l.includes("apt-get install") && l.includes("webkit2gtk-driver"));
 if (ciAptLines.length === 0) {
   console.error(
-    "check-e2e-toolchain: no E2E `apt-get install` line in .woodpecker.yml\n\n" +
+    "check-e2e-toolchain: no E2E `apt-get install` line in any CI source\n\n" +
       "  Looked for a line installing `webkit2gtk-driver`, which is what makes an\n" +
       "  apt line an E2E-seat one. Zero matches means the CI lane was restructured\n" +
       "  and this check is now blind — fix the marker rather than deleting the\n" +
@@ -199,7 +237,7 @@ const compileAptLines = woodpecker
   .filter((l) => l.includes("apt-get install") && l.includes("libwebkit2gtk-4.1-dev"));
 if (compileAptLines.length === 0) {
   console.error(
-    "check-e2e-toolchain: no build-sysdeps `apt-get install` line in .woodpecker.yml\n\n" +
+    "check-e2e-toolchain: no build-sysdeps `apt-get install` line in any CI source\n\n" +
       "  Looked for a line installing `libwebkit2gtk-4.1-dev`, which is what marks\n" +
       "  an apt line as the Tauri BUILD sysdeps. Without it this check cannot tell\n" +
       "  a build dep from an E2E runtime dep, and would demand every -dev package\n" +
@@ -240,7 +278,7 @@ if (seatDrift.length > 0) {
       "\n\n  CI does not build e2e/Dockerfile — the `e2e` and `e2e-quarantine`\n" +
       "  steps apt-install their own list on a bare rust image. A scenario using\n" +
       "  a binary present only locally passes here and fails there with a bare\n" +
-      "  ENOENT. Add the package to BOTH apt lines in .woodpecker.yml.",
+      "  ENOENT. Add the package to BOTH apt lines in the CI sources.",
   );
   process.exit(1);
 }

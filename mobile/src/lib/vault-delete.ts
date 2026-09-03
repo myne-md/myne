@@ -36,7 +36,7 @@
 // MYND-108-bis.
 
 import { invoke } from "../platform/core";
-import type { VaultDeleteError } from "../types/vault-delete-error";
+import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 
 export type {
   VaultDeleteError,
@@ -46,113 +46,22 @@ export {
   isVaultDeleteIoError,
 } from "../types/vault-delete-error";
 
-/**
- * UI-side discriminated union carrying the form-banner payload for a
- * post-fail `DeleteVaultConfirmForm`. Lives in this module (rather
- * than in `DeleteVaultConfirmForm.tsx`) so the error-mapping helper
- * below can produce values of this shape without the lib module
- * depending on a UI component.
- *
- * - `partial-delete` — backend `VaultDeleteError::PartialDelete`
- *   surfaces the count of files that could not be unlinked
- *   (AV scanner / Spotlight / OneDrive sync lock). Vault directory
- *   path comes from UI-side resolution (`appDataDir() + "vault"`),
- *   not from the backend response (backend DENY-list discipline
- *   forbids path-in-tracing).
- * - `io` — backend `VaultDeleteError::Io { io_error_kind }`. Generic
- *   disk-error scenario; UI shows a banner with a generic copy and
- *   the resolved vault path. The `io_error_kind` discriminant is not
- *   surfaced to the user (kernel-dependent categorization).
- */
-export type DeleteVaultPartialFailContext =
-  | {
-      kind: "partial-delete";
-      remainingCount: number;
-      vaultDirPath: string;
-    }
-  | {
-      kind: "io";
-      vaultDirPath: string;
-    };
-
-/**
- * Result of mapping a `VaultDeleteError` against a resolved vault
- * path. Consumers (AccountPanel + Unlock + VaultRecover sub-step)
- * pattern-match on `kind`: `"bug-canary"` triggers a dev-only
- * `console.warn` with no user-facing surface; `"partial-fail"`
- * populates the form's `partialFailContext` prop to drive the
- * post-fail banner + Continue button.
- */
-export type DeleteVaultErrorMapping =
-  | { kind: "bug-canary" }
-  | { kind: "partial-fail"; context: DeleteVaultPartialFailContext };
-
-function assertNeverDeleteVaultError(x: never): never {
-  throw new Error(
-    `[vault-delete] unhandled VaultDeleteError variant: ${JSON.stringify(x)}`,
-  );
-}
-
-/**
- * Map a `VaultDeleteError` into a UI-actionable verdict. Lifted from
- * AccountPanel.tsx during MYND-108-bis so Unlock + Recovery
- * lost-credentials surfaces can reuse the same exhaustive narrowing
- * (`assertNever` default arm catches missing variants at compile
- * time).
- *
- * Three variants (`VaultBusyAuth`, `VaultNotUnlocked`,
- * `VaultNotFound`) are UI/router bug indicators in normal flow:
- *
- *   - From AccountPanel: Settings mounted → `Slot::Unlocked`; if the
- *     backend returns `VaultNotUnlocked`, something raced or the
- *     router is buggy.
- *   - From Unlock or Recovery: the IPC should accept either
- *     `Slot::Empty + meta-exists` (MYND-108-bis) or `Slot::Recovering`
- *     (MYND-105 R3); `VaultNotUnlocked` is unreachable but the
- *     frontend still treats it as bug-canary defense-in-depth.
- *   - `VaultBusyAuth` only fires if a concurrent auth-pipeline op
- *     races (rare in v0.1 single-vault single-flow UX).
- *   - `VaultNotFound` means nothing-on-disk; in lost-credentials
- *     surfaces the user shouldn't be in those screens at all if no
- *     vault.meta exists (boot probe routes to Welcome).
- *
- * Two variants are real user-facing errors:
- *
- *   - `PartialDelete { remaining_count }` — surface count + vault
- *     path; Continue → Welcome.
- *   - `Io { io_error_kind }` — generic disk-error copy + vault
- *     path; Continue → Welcome.
- *
- * Vault path comes from the caller (resolved UI-side via
- * `appDataDir() + join("vault")`).
- */
-export function mapDeleteVaultError(
-  e: VaultDeleteError,
-  vaultDirPath: string,
-): DeleteVaultErrorMapping {
-  switch (e.kind) {
-    case "VaultBusyAuth":
-    case "VaultNotUnlocked":
-    case "VaultNotFound":
-      return { kind: "bug-canary" };
-    case "PartialDelete":
-      return {
-        kind: "partial-fail",
-        context: {
-          kind: "partial-delete",
-          remainingCount: e.detail.remaining_count,
-          vaultDirPath,
-        },
-      };
-    case "Io":
-      return {
-        kind: "partial-fail",
-        context: { kind: "io", vaultDirPath },
-      };
-    default:
-      return assertNeverDeleteVaultError(e);
-  }
-}
+// The delete-error MAPPING is deliberately not here (myne-md/myne#476).
+//
+// This module used to carry a 110-line copy of desktop's
+// `mapDeleteVaultError` plus its two payload types and its `assertNever` arm,
+// with ZERO callers on this client. Its own docstring named the three consumers
+//, AccountPanel, Unlock, VaultRecover, and all three are desktop components
+// that do not exist here, so a reader comparing the two trees would have
+// concluded mobile maps its delete errors. It does not: both mobile delete
+// surfaces catch and show one generic message.
+//
+// That gap is real and is recorded rather than papered over by an uncalled
+// function. Closing it means giving this client a `vaultDirDisplayPath`
+// equivalent as well, desktop's mapping carries a resolved vault path into the
+// partial-fail banner, and mobile has no such resolver, which is a change to
+// this surface's error UX rather than to vault targeting, and belongs with
+// whoever makes it.
 
 /**
  * Destroy the current vault.
@@ -182,25 +91,44 @@ export function mapDeleteVaultError(
  * call.
  *
  * **Rejection paths** (see `VaultDeleteError` for the full taxonomy):
- *   - `PartialDelete { remaining_count }` — real user-facing
- *     scenario (AV scanner / Spotlight / OneDrive sync file lock).
- *     UI: post-fail mode banner with count + vault path + Continue
- *     button → same Welcome transition as happy-path.
+ *   - `PartialDelete { remaining_count }`, real user-facing scenario (AV
+ *     scanner / Spotlight / OneDrive sync file lock).
  *   - `Io { io_error_kind }` — rare pre-walk filesystem failure.
- *     UI: generic disk-error banner + Continue.
- *   - `VaultBusyAuth` / `VaultNotUnlocked` / `VaultNotFound` —
- *     UI/router bug indicators; `mapDeleteVaultError` returns
- *     `{ kind: "bug-canary" }` for all three (dev-only `console.warn`,
- *     no user banner). `VaultNotUnlocked` is unreachable from current
- *     backend paths but retained in the wire format for forward
- *     compatibility.
+ *   - `VaultBusyAuth` / `VaultNotUnlocked` / `VaultNotFound`, UI/router bug
+ *     indicators. `VaultNotUnlocked` is unreachable from current backend paths
+ *     but retained in the wire format for forward compatibility.
+ *
+ * **What this client DOES with them, said plainly**: both delete surfaces catch
+ * and show one generic message. The paragraph that stood here described
+ * desktop's behaviour, a post-fail banner carrying the count and the vault
+ * path, a Continue affordance, `mapDeleteVaultError` returning a bug-canary,
+ * which is exactly the misreading the note above the `deleteVault` declaration
+ * says the deleted copy was causing, restated in this module's own API doc. The
+ * gap is real and open; see that note for what closing it costs.
  */
-export async function deleteVault(vaultId?: string): Promise<void> {
-  // SYNC-6 explicit-id targeting (MYND-205): pass the chosen vault's
-  // canonical hyphenated `VaultId` string to erase exactly `vaults/<id>/`,
-  // leaving any sibling vault untouched. Omitting the id (or passing a
-  // malformed one) falls back to the active (sole `Unlocked`) vault — the
-  // SYNC-1 vault the in-vault danger-zone delete is driven from — which keeps
-  // the pre-multi-vault single-vault callers working unchanged.
+export async function deleteVault(vaultId: string): Promise<void> {
+  // SYNC-6 explicit-id targeting (MYND-205), REQUIRED since myne-md/myne#476:
+  // pass the chosen vault's canonical hyphenated `VaultId` string to erase
+  // exactly `vaults/<id>/`, leaving any sibling vault untouched.
+  //
+  // The parameter used to be optional here, and the comment that stood in this
+  // place described a fallback that does not exist: it said omitting the id
+  // "falls back to the active (sole `Unlocked`) vault … which keeps the
+  // pre-multi-vault single-vault callers working unchanged". This client
+  // registers `myne_core::plugins::vault_delete::commands`, whose Tauri
+  // signature is `vault_id: String`, non-optional, #250 removed the optional
+  // target on the Rust side because THE FALLBACK WAS THE BUG, and
+  // `core/src/plugins/vault_delete/commands.rs` says so in those words. So
+  // `deleteVault(undefined)` was never a fallback; it was a deserialization
+  // rejection wearing a reassuring comment. Making the parameter required moves
+  // that to compile time, which is why the type is `string` and not
+  // `string | undefined`.
+  // The ambient date/time DISPLAY store, on the one leaving path that does not
+  // go through `lockVault`. It is module scope in `@myne/editor` and holds the
+  // formats and TIME ZONE derived from the prefs of the vault being ERASED, and
+  // this path leaves the editor without advancing the prefs nonce, so nothing
+  // republishes and the deleted vault's values stay resident for the rest of the
+  // process (myne-md/myne#609, found in review).
+  resetDateTimeDisplayForLock();
   await invoke<void>("plugin:vault-delete|vault_delete", { vaultId });
 }

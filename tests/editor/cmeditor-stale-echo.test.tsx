@@ -85,6 +85,7 @@ function EchoingHost(props: {
   seen(buf.text);
   return (
     <CMEditor
+      noteId={null}
       value={buf.text}
       valueBase={buf.base}
       onChange={(next) => setBuf({ text: next })}
@@ -227,7 +228,7 @@ describe("CMEditor — the controlled-value mirror decides on causality", () => 
     // the plain controlled mirror.
     let view: EditorView | null = null;
     const { container, rerender } = render(
-      <CMEditor value="one" onChange={() => {}} onReady={(v) => (view = v)} />,
+      <CMEditor noteId={null} value="one" onChange={() => {}} onReady={(v) => (view = v)} />,
     );
     if (view === null) throw new Error("onReady should hand back the live view");
     const live = view as EditorView;
@@ -236,7 +237,7 @@ describe("CMEditor — the controlled-value mirror decides on causality", () => 
       const end = live.state.doc.length;
       live.dispatch({ changes: { from: end, to: end, insert: " local" } });
     });
-    rerender(<CMEditor value="two" onChange={() => {}} />);
+    rerender(<CMEditor noteId={null} value="two" onChange={() => {}} />);
 
     expect(docText(container)).toContain("two");
   });

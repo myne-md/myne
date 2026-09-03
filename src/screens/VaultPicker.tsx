@@ -52,6 +52,8 @@ import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
 import type { TFunction } from "i18next";
 import { Icon } from "../components/primitives/Icon";
 import { MyneMark } from "../components/primitives/MyneMark";
+import { fillingScrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
+import { stageRootStyle } from "../components/primitives/stageRoot";
 import { Spinner } from "../components/Spinner";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
 import {
@@ -137,11 +139,10 @@ function rowLabel(
 // frame's 440px width + 24px section gap, so this is a local card rather
 // than the shared <CenteredCard> (which is 480px / `--space-4` gap).
 
+// The stage envelope is shared; `stageRoot.ts` carries the 38px reasoning and
+// the ancestor contract it replaces `100vh` with.
 const ROOT_STYLE: CSSProperties = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  ...stageRootStyle,
   background: "var(--paper)",
   fontFamily: "var(--font-sans)",
   padding: "var(--space-6)",
@@ -150,6 +151,10 @@ const ROOT_STYLE: CSSProperties = {
 const CARD_STYLE: CSSProperties = {
   width: 440,
   maxWidth: "100%",
+  // Never taller than the space it was given. Without this the card grows to fit
+  // however many vaults exist and takes the overflow off-screen with it.
+  maxHeight: "100%",
+  minHeight: 0,
   background: "var(--paper-2)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-2)",
@@ -160,6 +165,8 @@ const CARD_STYLE: CSSProperties = {
 };
 
 const BRAND_ROW_STYLE: CSSProperties = {
+  // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
+  flexShrink: 0,
   display: "flex",
   alignItems: "center",
   gap: "var(--space-3)",
@@ -172,6 +179,8 @@ const WORDMARK_STYLE: CSSProperties = {
 };
 
 const HEADING_STYLE: CSSProperties = {
+  // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
+  flexShrink: 0,
   margin: 0,
   fontSize: "var(--text-2xl)",
   lineHeight: "var(--leading-snug)",
@@ -180,6 +189,8 @@ const HEADING_STYLE: CSSProperties = {
 };
 
 const SUBLINE_STYLE: CSSProperties = {
+  // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
+  flexShrink: 0,
   margin: 0,
   fontSize: "var(--text-base)",
   lineHeight: "var(--leading-normal)",
@@ -189,10 +200,20 @@ const SUBLINE_STYLE: CSSProperties = {
 
 // ── Vault list + rows ────────────────────────────────────────────────────
 
+// The ONLY scrolling region on this screen (myne-md/myne#565). The vault count is
+// unbounded and this is a pre-unlock surface, so a card that outgrows the window
+// is not a cosmetic overflow: it is a screen with no reachable "create another"
+// and no reachable rows past the fold. Scrolling the LIST rather than the card
+// keeps the brand row, the heading and the three actions on screen at any count.
+//
+// `minHeight: 0` is load-bearing: a flex item's default `min-height: auto`
+// refuses to shrink below its content, which would leave `overflowY` with nothing
+// to do and push the overflow back out to the card.
 const LIST_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-2)",
+  ...fillingScrollRegionStyle,
 };
 
 function rowStyle(hovered: boolean): CSSProperties {
@@ -257,6 +278,8 @@ const CHEVRON_STYLE: CSSProperties = {
 // ── Create-another affordance (divider + chip-less accent action) ─────────
 
 const DIVIDER_STYLE: CSSProperties = {
+  // Fixed chrome: shrinks never, so the LIST absorbs the height pressure.
+  flexShrink: 0,
   height: 1,
   border: 0,
   margin: 0,
@@ -264,6 +287,7 @@ const DIVIDER_STYLE: CSSProperties = {
 };
 
 const CREATE_LINK_STYLE: CSSProperties = {
+  flexShrink: 0,
   display: "flex",
   flexDirection: "row",
   alignItems: "center",
@@ -423,6 +447,8 @@ export function VaultPicker({ onSelect, onCreateAnother,
   onRestoreBackup, onJoinDevice }: VaultPickerProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
+  // Soft top/bottom edges on the vault list once it outgrows the card.
+  const { ref: listRef, fadeProps: listFade } = useScrollEdges<HTMLDivElement>();
   // Subscribe to the shared 30s tick so the row timestamps stay live.
   useTick();
 
@@ -491,7 +517,10 @@ export function VaultPicker({ onSelect, onCreateAnother,
   return (
     <PickerCard>
       <p style={SUBLINE_STYLE}>{t("vaultPicker.subline")}</p>
-      <div style={LIST_STYLE}>
+      {/* The fade is applied here rather than baked into LIST_STYLE because it
+          is conditional on scroll position; see `useScrollEdges.ts` for why a
+          fixed mask on both edges is wrong at rest. */}
+      <div ref={listRef} style={LIST_STYLE} {...listFade}>
         {state.vaults.map((vault) => (
           <VaultRow
             key={vault.id}

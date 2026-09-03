@@ -74,7 +74,17 @@ export function FolderActionsSheet({
             />
           )}
           {sep}
-          {row(t("notes.list.deleteFolderConfirm"), onTrash, { danger: true, groupTop: true })}
+          {row(t("notes.list.deleteFolderConfirm"), onTrash, {
+            danger: true,
+            groupTop: true,
+            // myne-md/myne#613 gave this control its first testid, because
+            // mobile's only automated lane could not reach it, which is how the
+            // cache-derived removal shipped unnoticed. Both branches then named
+            // it, differently. `-action` wins because it has the live consumer:
+            // `mobile/tests/flow-logic/folders/folder-delete-confirm.flow.ts`
+            // clicks it, and nothing reads the other spelling.
+            testId: "notes.folder-delete-action",
+          })}
         </>
       )}
     </Sheet>

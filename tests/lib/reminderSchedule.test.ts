@@ -9,8 +9,10 @@ import { describe, expect, it } from "vitest";
 import {
   diffReminders,
   horizonEndDate,
+  REMINDER_HORIZON_CHOICES,
   REMINDER_HORIZON_DAYS,
   reminderId,
+  resolveHorizonDays,
   runReminderPass,
   targetReminders,
   type PendingReminder,
@@ -90,10 +92,79 @@ describe("the target set", () => {
     expect(far).toEqual([]);
   });
 
-  it("includes the last instant inside the horizon", () => {
-    const edge = targetReminders([task({ remind: "2026-08-04 09:00" })], NOW, 7);
-    expect(edge).toHaveLength(1);
+  it("includes the last instant inside the horizon, and nothing on the day after", () => {
+    // NOW is 2026-07-28, so a 7-day horizon covers through 2026-08-03: today
+    // plus six, the day `horizonEndDate` names and the settings line states.
+    //
+    // The second half is the assertion that changed in myne#508. The cutoff was
+    // a rolling `now + N × 86_400_000`, so 08-04 09:00 was admitted while the
+    // line said "through 3 August". The display and the registered set were
+    // two different claims about one bound, and at N=1 the gap was a whole day
+    // of instants the user was told were not registered.
+    expect(horizonEndDate(NOW, 7)).toBe("2026-08-03");
+    expect(targetReminders([task({ remind: "2026-08-03 23:00" })], NOW, 7)).toHaveLength(1);
+    expect(targetReminders([task({ remind: "2026-08-04 09:00" })], NOW, 7)).toEqual([]);
     expect(REMINDER_HORIZON_DAYS).toBe(7);
+  });
+
+  it("empties at the last minute of the day on a one-day horizon, and refills after midnight", () => {
+    // `from` and `to` are the same string during that minute, so the set is
+    // empty. Correct rather than degenerate: a one-day horizon covers today,
+    // and at 23:59 no instant today is still in the future. What it costs is
+    // one minute of churn at the boundary, because the pass cancels what it
+    // holds and re-registers on the other side. Pinned so the shape is a
+    // recorded property, not something the OS tier discovers.
+    const lastMinute = new Date(2026, 6, 28, 23, 59);
+    const tomorrow = [task({ remind: "2026-07-29 09:00" })];
+    expect(targetReminders(tomorrow, lastMinute, 1)).toEqual([]);
+
+    // One minute later it is a new day, and tomorrow's reminder is today's.
+    const justAfter = new Date(2026, 6, 29, 0, 0);
+    expect(targetReminders(tomorrow, justAfter, 1)).toHaveLength(1);
+
+    // The wider horizons have no such minute: 3 days from 23:59 still reaches
+    // into the days after it.
+    expect(targetReminders(tomorrow, lastMinute, 3)).toHaveLength(1);
+  });
+
+  it("registers a midnight reminder at horizon 1, which the two bounds used to drop between them", () => {
+    // The case the test above sidesteps by using 09:00. An instant at exactly
+    // 00:00 is excluded by `at > to` on the previous day, whose `to` is that
+    // day's 23:59, and a pass re-runs within 60 s, so the first pass of the new
+    // day sees `from` equal to the instant. Under `at <= from` it was in the
+    // target set on neither side of midnight and no timer was ever armed for it.
+    const midnight = [task({ remind: "2026-07-29 00:00" })];
+
+    // The previous day: correctly out of range, and it is `to` that excludes it.
+    const dayBefore = new Date(2026, 6, 28, 23, 59);
+    expect(targetReminders(midnight, dayBefore, 1)).toEqual([]);
+
+    // The first pass of the new day, where `from` is the instant itself. This is
+    // the assertion that fails under `at <= from`.
+    const atMidnight = new Date(2026, 6, 29, 0, 0);
+    expect(targetReminders(midnight, atMidnight, 1)).toHaveLength(1);
+
+    // One minute later it is past, and past instants are still skipped. Stated
+    // so the fix cannot be read as admitting overdue reminders: it widens the
+    // lower bound by exactly one minute, the one the instant is due in.
+    const laterThatDay = new Date(2026, 6, 29, 0, 1);
+    expect(targetReminders(midnight, laterThatDay, 1)).toEqual([]);
+  });
+
+  it("skips an instant strictly in the past and admits one due this minute", () => {
+    // The other half of moving the bound from `<=` to `<`, so the change cannot
+    // be read as admitting overdue reminders. `from` is minute-resolution.
+    const now = new Date(2026, 6, 29, 9, 0);
+    expect(targetReminders([task({ remind: "2026-07-29 09:00" })], now, 1)).toHaveLength(1);
+    expect(targetReminders([task({ remind: "2026-07-29 08:59" })], now, 1)).toEqual([]);
+  });
+
+  it("covers today and only today at the shortest horizon", () => {
+    // The choice the issue was actually asking for, and the one where a rolling
+    // 24-hour cutoff was most obviously wrong: "registered through today" has
+    // to mean today.
+    expect(targetReminders([task({ remind: "2026-07-28 23:00" })], NOW, 1)).toHaveLength(1);
+    expect(targetReminders([task({ remind: "2026-07-29 09:00" })], NOW, 1)).toEqual([]);
   });
 
   it("defaults a date-only reminder to 09:00, not midnight", () => {
@@ -381,9 +452,121 @@ describe("horizon date parity across clients", () => {
     const { horizonThrough } = await import(
       "../../src/components/settings/ReminderSettings"
     );
-    for (const days of [1, 2, 7, 30]) {
+    // Every value a client can actually hold: the four offered choices, plus
+    // `null` for a vault that never chose one. Both sides take the STORED
+    // value, so both resolve it the same way; passing a raw out-of-range number
+    // to `horizonEndDate` would compare a resolved input against an unresolved
+    // one and prove nothing about either.
+    for (const days of [...REMINDER_HORIZON_CHOICES, null]) {
       const today = new Date(2026, 0, 31, 12, 0);
-      expect(horizonThrough(days, "2026-01-31")).toBe(horizonEndDate(today, days));
+      expect(horizonThrough(days, "2026-01-31")).toBe(
+        horizonEndDate(today, resolveHorizonDays(days)),
+      );
     }
+  });
+
+  it("names the same day for a stored horizon neither client offers", async () => {
+    // A hand-edited blob or a future build can store anything. Both clients
+    // clamp through `resolveHorizonDays`, so they agree on what it means rather
+    // than one of them honouring it and the other not.
+    const { horizonThrough } = await import(
+      "../../src/components/settings/ReminderSettings"
+    );
+    const today = new Date(2026, 0, 31, 12, 0);
+    // `4` is the case the endpoints hide. `0`, `-3` and `999` all clamp ONTO a
+    // member of the choice set, so a version of `resolveHorizonDays` that
+    // snapped to the nearest offered choice would pass them too. Four is
+    // in-range and off-set, which is the only input that tells the two
+    // behaviours apart.
+    for (const stored of [0, -3, 999, 4]) {
+      expect(horizonThrough(stored, "2026-01-31")).toBe(
+        horizonEndDate(today, resolveHorizonDays(stored)),
+      );
+    }
+  });
+
+  it("clamps at the derivation, so a caller cannot opt out by passing a raw value", () => {
+    // `targetReminders` and `horizonEndDate` still carry
+    // `horizonDays: number = REMINDER_HORIZON_DAYS`, which is an opt-in bound:
+    // a caller handing a stored value straight in opts out by omission, and
+    // mobile's pass is the next thing that will do exactly that. A stored `0`
+    // reaching them unclamped names YESTERDAY, so the cutoff falls before
+    // `from` and the pass withdraws every reminder the notifier holds.
+    expect(horizonEndDate(NOW, 0)).toBe(horizonEndDate(NOW, 1));
+    expect(targetReminders([task({ remind: "2026-07-28 23:00" })], NOW, 0)).toHaveLength(1);
+    expect(targetReminders([task({ remind: "2026-07-28 23:00" })], NOW, -5)).toHaveLength(1);
+    // And the ceiling, from the other side: a value past the default cannot
+    // widen the window threat-model.md 7 accepts.
+    expect(horizonEndDate(NOW, 999)).toBe(horizonEndDate(NOW, REMINDER_HORIZON_DAYS));
+  });
+
+  it("clamps into the range and does NOT snap onto the offered set", () => {
+    // The scheduler has to honour the horizon actually stored: snapping `4` to a
+    // neighbouring choice would make the pass register a window the user never
+    // asked for, so what an off-set value costs is a picker with no segment
+    // selected rather than a wrong one. Both clients resolve through this, so
+    // both show the same nothing.
+    expect(resolveHorizonDays(4)).toBe(4);
+    expect([...REMINDER_HORIZON_CHOICES]).not.toContain(4);
+    expect((REMINDER_HORIZON_CHOICES as readonly number[]).indexOf(resolveHorizonDays(4))).toBe(-1);
+
+    // The range ends are what it does clamp, and `0` is the one that mattered:
+    // `??` passed it through, and a zero-day horizon renders "registered through
+    // yesterday" while registering nothing at all.
+    expect(resolveHorizonDays(0)).toBe(1);
+    expect(resolveHorizonDays(-3)).toBe(1);
+    expect(resolveHorizonDays(999)).toBe(REMINDER_HORIZON_DAYS);
+    expect(resolveHorizonDays(2.7)).toBe(2);
+    // `NaN` is the value the clamp alone cannot catch: `Math.max(NaN, 1)` and
+    // `Math.min(NaN, 7)` are both `NaN`, and a `NaN` horizon builds the cutoff
+    // string "NaN-NaN-NaNT23:59", which every real instant sorts below. The
+    // bound would vanish in the widest direction on exactly the input this
+    // function exists to survive.
+    expect(resolveHorizonDays(Number.NaN)).toBe(REMINDER_HORIZON_DAYS);
+    expect(resolveHorizonDays(Number.POSITIVE_INFINITY)).toBe(REMINDER_HORIZON_DAYS);
+    expect(targetReminders([task({ remind: "2026-09-01 09:00" })], NOW, Number.NaN)).toEqual([]);
+  });
+});
+
+// The picker's option set is shared for the reason #52 recorded about the date
+// derivation: two clients deriving the same thing apart is how one vault told
+// two devices two different answers. These hold the SET to the properties both
+// clients' renderers assume of it.
+describe("the horizon choices (myne#508)", () => {
+  it("is an ascending set of whole positive days containing the default", () => {
+    // Four properties of one array, because they fail together and a reader
+    // asking "what must this list satisfy" wants one place to look.
+    //
+    // The default's membership is the load-bearing one: both pickers resolve
+    // `resolveHorizonDays(stored)` to an index, and a default outside the list
+    // resolves to -1, which renders no selected segment at all for a vault
+    // whose real horizon is seven days. Zero or a negative would register
+    // nothing while the copy still said "registered through <date>", and a
+    // fraction would make `shiftDay` produce a non-date.
+    const days = [...REMINDER_HORIZON_CHOICES];
+    expect(days).toContain(REMINDER_HORIZON_DAYS);
+    expect([...days].sort((a, b) => a - b)).toEqual(days);
+    expect(new Set(days).size).toBe(days.length);
+    for (const d of days) {
+      expect(Number.isInteger(d)).toBe(true);
+      expect(d).toBeGreaterThan(0);
+    }
+  });
+
+  it("stays inside `Segmented`'s option band, which is what keeps both pickers one shape", () => {
+    // `docs/design/README.md` ("Which picker"): `Segmented` is 2-4 options and
+    // `Select` takes over at 5. A fifth choice would push the desktop into a
+    // dropdown while mobile kept a segmented control, so the count is a design
+    // constraint rather than a preference.
+    expect(REMINDER_HORIZON_CHOICES.length).toBeGreaterThanOrEqual(2);
+    expect(REMINDER_HORIZON_CHOICES.length).toBeLessThanOrEqual(4);
+  });
+
+  it("resolves a never-set horizon to the default and an explicit one to itself", () => {
+    // `null` is a legitimate persisted state, not an error. Both clients' lines
+    // and both clients' pickers go through this, so it is the one place the
+    // question is answered.
+    expect(resolveHorizonDays(null)).toBe(REMINDER_HORIZON_DAYS);
+    expect(resolveHorizonDays(1)).toBe(1);
   });
 });

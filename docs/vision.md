@@ -19,7 +19,7 @@ Privacy-aware users who want Obsidian-like flexibility face an impossible choice
 
 Myne is the only encrypted notes app where the entire stack — protocol, client, sync server — is open source, and where your notes stay plain markdown after decryption. If you stop trusting us, you self-host. If you stop using us, you walk away with your files into any editor on your machine. There is no proprietary format, no migration tool required, no lock-in.
 
-One qualification, stated here rather than buried: a **browser** client is delivered from a server on every page load, with no signature the browser checks — a materially weaker delivery channel than a signed, reproducible desktop build, and one that gives up a guarantee the native clients keep. What that costs, exactly and against which adversary, is `threat-model.md` A15 / TB11; it is not restated here.
+One qualification, stated here rather than buried: a **browser** client is delivered from a server on every page load, with no signature the browser checks — a materially weaker delivery channel than a desktop build the user downloads once and keeps, and one that gives up a guarantee the native clients keep. (The desktop build is not signed either, and this sentence said it was until 2026-08-25: `decisions.md` entry 0534. What the native channel has is persistence, not verification. The artifact stays on disk, so a substitution reaches only whoever downloaded during the window and the file is still there to compare by hand against the published hash list. A page is re-sent every visit and leaves nothing behind.) What that costs, exactly and against which adversary, is `threat-model.md` A15 / TB11; it is not restated here.
 
 ## Success Criteria
 

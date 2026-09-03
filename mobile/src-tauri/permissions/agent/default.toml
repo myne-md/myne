@@ -1,0 +1,68 @@
+# Permissions for the in-app `agent` Tauri plugin (myne-md/myne#456).
+# Picked up under the `agent:` ACL namespace only because `build.rs` declares
+# this as an `InlinedPlugin`. Capability files reference these as
+# `agent:default` (or `agent:allow-<cmd>`).
+#
+# Every one of the nine reaches decrypted note plaintext, and two of them
+# WRITE, so the capability that grants this bundle is main-window-only.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the agent plugin: start, resume, cancel and inspect an agent run, apply the edits the user approved, undo an applied run, and report whether the configured backend can hold the edit format."
+permissions = [
+  "allow-agent-start",
+  "allow-agent-approve-scope",
+  "allow-agent-preview-grant",
+  "allow-agent-cancel",
+  "allow-agent-apply",
+  "allow-agent-undo",
+  "allow-agent-last-run",
+  "allow-agent-capability",
+  "allow-agent-list-provider-models",
+]
+
+[[permission]]
+identifier = "allow-agent-start"
+description = "Allow invoking agent:agent_start (resolve a scope and drive an agent run until it stops)."
+commands.allow = ["agent_start"]
+
+[[permission]]
+identifier = "allow-agent-approve-scope"
+description = "Allow invoking agent:agent_approve_scope (grant the scope expansion a run asked for, and resume it)."
+commands.allow = ["agent_approve_scope"]
+
+[[permission]]
+identifier = "allow-agent-preview-grant"
+description = "Allow invoking agent:agent_preview_grant (what a grant would resolve to, without committing it)."
+commands.allow = ["agent_preview_grant"]
+
+[[permission]]
+identifier = "allow-agent-cancel"
+description = "Allow invoking agent:agent_cancel (stop a run in flight)."
+commands.allow = ["agent_cancel"]
+
+[[permission]]
+identifier = "allow-agent-apply"
+description = "Allow invoking agent:agent_apply (WRITES: apply the edits the user approved on the review screen)."
+commands.allow = ["agent_apply"]
+
+[[permission]]
+identifier = "allow-agent-undo"
+description = "Allow invoking agent:agent_undo (WRITES: put the notes an applied run wrote back the way they were)."
+commands.allow = ["agent_undo"]
+
+[[permission]]
+identifier = "allow-agent-last-run"
+description = "Allow invoking agent:agent_last_run (which applied run, if any, can still be undone)."
+commands.allow = ["agent_last_run"]
+
+[[permission]]
+identifier = "allow-agent-capability"
+description = "Allow invoking agent:agent_capability (probe whether the configured backend can hold the anchored edit format)."
+commands.allow = ["agent_capability"]
+
+[[permission]]
+identifier = "allow-agent-list-provider-models"
+description = "Allow invoking agent:agent_list_provider_models (ask the named provider which models it publishes, so the chooser has a list). An EGRESS, gated exactly like a completion: an authenticated listing call tells the provider this account exists and is active. It fetches model names and never weights."
+commands.allow = ["agent_list_provider_models"]

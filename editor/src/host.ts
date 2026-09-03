@@ -19,6 +19,7 @@
 // omitted on a platform that doesn't back them — the engine then hides those
 // affordances rather than showing one that fails on click.
 
+import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
 /** A node of the Rust-built tag tree (mirror of notes/vaultIndices). */
@@ -56,6 +57,7 @@ export type TranscribeErrorKind =
   | "vault_locked"
   | "no_model"
   | "model_load_failed"
+  | "too_long"
   | "failed";
 
 /** A running transcription (SYNC-V5). `done` resolves with the FULL transcript
@@ -399,26 +401,38 @@ export interface EditorHost {
   /** OPTIONAL — the note cover's picker (myne-md/myne#410).
    *
    *  The banner is CodeMirror DOM inside this package; the picker is the host's
-   *  own modal, and the host is also the only thing that knows which note the
-   *  focused pane holds. So the editor ASKS rather than opens, exactly like
+   *  own modal. So the editor ASKS rather than opens, exactly like
    *  `workspace.closeActiveTab` above, and for the same reason.
+   *
+   *  It used to ask without naming a target, on the reasoning that "the host is
+   *  also the only thing that knows which note the focused pane holds". That
+   *  was wrong in a split (myne-md/myne#520): the banner's controls
+   *  `preventDefault` on `mousedown`, so pressing one in an UNFOCUSED pane
+   *  never focuses it, and the shell's selected note is still the other pane's.
+   *  Both members now carry the id, and `null` is the only case left where the
+   *  host still guesses.
    *
    *  A host that omits this renders no cover controls at all: the affordance is
    *  hidden rather than shown broken, which is the seam's whole contract. */
   cover?: {
-    /** Open the host's cover picker for whichever note is focused.
+    /** Open the host's cover picker for the note named by `noteId`.
      *
      *  `hasCover` flows this way round because the EDITOR knows it and the shell
      *  does not: the banner has just resolved the note's `cover:` field, while
      *  the shell's note cache carries no cover state. The picker uses it to
-     *  decide whether to offer its own Remove action. */
-    openPicker: (hasCover: boolean) => void;
-    /** Clear the focused note's cover.
+     *  decide whether to offer its own Remove action.
+     *
+     *  `noteId` is `null` when the host never supplied one (`noteIdFacet`), in
+     *  which case the host falls back to the focused note, which is the
+     *  pre-#520 behaviour and is still correct for the command palette. */
+    openPicker: (hasCover: boolean, noteId: string | null) => void;
+    /** Clear the cover of the note named by `noteId`, with the same `null`
+     *  fallback as `openPicker`.
      *
      *  A separate member rather than a trip through the picker: removing is a
      *  one-click intent, and routing it through a modal the user then has to
      *  act inside makes two controls that do the same thing. */
-    remove: () => void;
+    remove: (noteId: string | null) => void;
   };
 }
 
@@ -437,4 +451,56 @@ export function getHost(): EditorHost {
     throw new Error("@myne/editor: setEditorHost() was not called before the editor mounted.");
   }
   return current;
+}
+
+/**
+ * The TOP-LEVEL host members a widget may reach only while the document is
+ * WRITABLE, and the two words carry a limit worth reading before trusting the
+ * roster.
+ *
+ * The list is here, beside the members themselves, rather than at the widgets
+ * that consume them. That placement is the point: a widget's write is invisible
+ * to every mechanism that makes an editor read-only, so gating it was a clause
+ * each widget had to remember. `EditorState.readOnly` stops COMMANDS and the
+ * reading mirror's `NOOP_ON_CHANGE` stops document changes; neither stops a DOM
+ * handler that calls the host, and the host re-encrypts the note on disk. Two
+ * such controls were found by hand in myne-md/myne#520's review (the cover
+ * banner's Remove and the frontmatter panel's Add cover) and each grew its own
+ * `view.state.readOnly ? undefined : getHost().cover` line.
+ *
+ * **What this roster cannot cover, so that "covered" is not read into it.**
+ * `attachments.attachmentRename`, `attachments.attachmentExport` and
+ * `attachments.import` all re-encrypt on disk and are NOT here, because naming
+ * `attachments` would also withhold `resolveRef` and `catalogList`, which a
+ * reading mirror legitimately needs. They are also reached through
+ * `editor/src/host/lib/attachments.ts`, thin `getHost()` bridges that take no
+ * `EditorState` at all, so this gate could not be applied at those call sites
+ * even with a path-shaped roster. Extending the mechanism means moving it into
+ * that bridge layer, which every write consumer already goes through, and that
+ * is a larger change than the two controls this closed. Until then the roster
+ * covers one member, and it says which.
+ */
+const HOST_WRITE_MEMBERS = ["cover"] as const satisfies readonly (keyof EditorHost)[];
+
+/**
+ * One write-capable host member, or `undefined` when `state` is read-only.
+ *
+ * `undefined` rather than a throw, because the seam's contract is already that a
+ * host omitting an optional member renders no affordance for it: a widget that
+ * checks `cover !== undefined` before drawing its controls needs no second
+ * branch for the read-only case, and gets the right one for free.
+ *
+ * Returning the MEMBER rather than a gated host also means nothing is cloned. An
+ * earlier shape did `{...host}` and deleted the key, which allocated a copy of a
+ * fifteen-member object with nested namespaces on every widget mount, and both
+ * call sites then read exactly one member off it.
+ *
+ * The `key` parameter is typed to the roster, so reaching for a member that is
+ * not write-gated is a compile error rather than a silent pass-through.
+ */
+export function writableMember<K extends (typeof HOST_WRITE_MEMBERS)[number]>(
+  state: EditorState,
+  key: K,
+): EditorHost[K] | undefined {
+  return state.readOnly ? undefined : getHost()[key];
 }

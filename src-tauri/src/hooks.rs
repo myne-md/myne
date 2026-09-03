@@ -263,9 +263,12 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     }
 
     // ---- Group 5: prefs application ---------------------------------------
-    fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-        crate::auto_lock::effective_auto_lock_secs(prefs_value)
-    }
+    // `effective_auto_lock_secs` is deliberately NOT overridden: the trait's
+    // default IS `myne_core::effective_auto_lock_secs`, which is what this body
+    // delegated to through `crate::auto_lock`'s re-export (myne-md/myne#479).
+    // Three implementors each writing the same one-line delegation is three
+    // places the next reader has to check, and two of the three were wrong when
+    // this was measured.
     fn hydrate_clipper_pairing(&self, paired: &[protocol::PairedExtension]) {
         // MYND-443: hydrate the browser-clipper pairing-token registry from the
         // just-read prefs blob so a paired extension keeps working after a

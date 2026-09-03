@@ -47,6 +47,14 @@ function label(name: string): string {
 /** The source's user-facing name. Nominative only — never a Myne feature name. */
 const SOURCE_LABEL: Readonly<Record<ImportSourceId, string>> = {
   csv: "CSV",
+  // Present for exhaustiveness over `ImportSourceId`, and unreachable through
+  // THIS function: a Myne source loses no constructs, so `lossyNotes` is always
+  // empty and `buildImportReport` returns `null` before reading this map. Its
+  // report is `buildMyneImportReport` in `myneRun.ts`, which triggers on the
+  // not-crossed set instead. "another Myne vault" rather than "Myne", because
+  // the report says where the notes came FROM and "imported from Myne" reads as
+  // though the vault they landed in were something else.
+  myne: "another Myne vault",
   evernote: "Evernote",
   html: "HTML",
   notion: "Notion",
@@ -62,7 +70,7 @@ const SOURCE_LABEL: Readonly<Record<ImportSourceId, string>> = {
  * than read here so the function stays pure and testable.
  */
 export function reportTitle(source: ImportSourceId, stamp: string): string {
-  return `Import report — ${SOURCE_LABEL[source]} ${stamp}`;
+  return `Import report (${SOURCE_LABEL[source]}) ${stamp}`;
 }
 
 /** `YYYY-MM-DD HH.MM` — colon-free so the title is legal on every platform. */
@@ -78,7 +86,7 @@ function rows(lossy: readonly LossyNote[]): string[] {
   return lossy.map((n) => {
     const where = n.folder === null || n.folder.length === 0 ? "vault root" : n.folder;
     const what = n.dropped.map(label).join("; ");
-    return `- [[${n.title}]] — in \`${where}\` — ${what}`;
+    return `- [[${n.title}]] in \`${where}\`: ${what}`;
   });
 }
 

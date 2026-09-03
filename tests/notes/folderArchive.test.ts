@@ -35,6 +35,17 @@ function rec(p: Partial<TitleRecord> & { noteUuid: string }): TitleRecord {
     conflict: p.conflict ?? false,
     conflictOf: p.conflictOf ?? null,
     hasSource: p.hasSource ?? false,
+    // `kind` (MYND-499, drawing notes) and `done` (MYND-613) were added to
+    // `TitleRecord` and this fixture was never updated, so it had been failing
+    // to satisfy the type it claims to build. It was not invisible: this file is
+    // covered by `tsconfig.tests.json` and `scripts/check-test-typecheck.mjs`,
+    // which had it recorded in the budget at one error. That guard is a ratchet,
+    // so a recorded error is allowed rather than reported, which is why nobody
+    // saw it. Both fields default to the "ordinary note" reading, which is what
+    // every case in this file wants, and the budget is re-recorded in this
+    // change so the allowance does not outlive the defect.
+    kind: p.kind ?? null,
+    done: p.done ?? null,
   };
 }
 
@@ -87,6 +98,63 @@ describe("filterVisibleDeliberate", () => {
     const keys = archivedFolderKeys(["Projects/"]);
     expect(
       filterVisibleDeliberate(["Projects/", "Projects/Myne/", "Other/"], keys),
+    ).toEqual(["Other/"]);
+  });
+
+  // myne-md/myne#613. The cases in this block were written
+  // when `deliberate_folders` held only the folders a user had made through
+  // "New folder", so the list was a handful of entries and every test used one.
+  // Under #613 a folder is registered the first time a note lands in it, so the
+  // list becomes the vault's ENTIRE folder set: hundreds of entries, deep
+  // chains, case variants, and near-miss siblings that were never in the shape
+  // this filter was written against. The filter itself needs no change and gets
+  // none here; what it needs is coverage at the size it now sees, because a
+  // prefix test that is right on three entries and wrong on a name-prefix
+  // sibling is a bug nobody would have hit before and everybody hits now.
+  it("hides a whole registered subtree, however deep, from one archived root", () => {
+    const keys = archivedFolderKeys(["Projects/"]);
+    const registered = [
+      "Projects/",
+      "Projects/Myne/",
+      "Projects/Myne/2026/",
+      "Projects/Myne/2026/Q3/",
+      "Projects/Myne/2026/Q3/Notes/",
+      "Projects/Archive/",
+      "Personal/",
+      "Personal/Recipes/",
+    ];
+    expect(filterVisibleDeliberate(registered, keys)).toEqual([
+      "Personal/",
+      "Personal/Recipes/",
+    ]);
+  });
+
+  it("keeps a sibling whose name merely STARTS with the archived one", () => {
+    // The trailing slash is what makes the prefix test safe, and it is the one
+    // property that silently breaks if anyone ever normalises it away. With the
+    // set now holding every folder in the vault, a `Projects` / `ProjectsX`
+    // pair stops being a contrived example and becomes a thing users have.
+    const keys = archivedFolderKeys(["Projects/"]);
+    expect(
+      filterVisibleDeliberate(
+        ["Projects/", "ProjectsX/", "ProjectsArchive/", "Projects/Myne/"],
+        keys,
+      ),
+      // Input order, not sorted: the filter is a `.filter()` and preserves the
+      // caller's order. Asserted literally rather than through `.sort()`, which
+      // is what the first draft of this test did and which would have passed
+      // just as happily if the function had started reordering.
+    ).toEqual(["ProjectsX/", "ProjectsArchive/"]);
+  });
+
+  it("folds case variants, so an archived folder hides an entry recorded under another casing", () => {
+    // At-fill registers whatever casing the note's `folder:` carried, while the
+    // archive set carries whatever casing the user archived. Those legitimately
+    // differ, and the folded identity is the only thing that makes them the same
+    // folder.
+    const keys = archivedFolderKeys(["projects/"]);
+    expect(
+      filterVisibleDeliberate(["PROJECTS/", "Projects/Myne/", "Other/"], keys),
     ).toEqual(["Other/"]);
   });
 });

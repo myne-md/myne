@@ -72,6 +72,7 @@ function harness(tree: Tree, root = "/v"): Harness {
     },
     async setDeliberateFolders(folders) {
       deliberate.push([...folders]);
+      return 0; // nothing refused for budget (myne-md/myne#613)
     },
   };
   return { ports, created, createdList, deliberate };
@@ -142,8 +143,11 @@ describe("MYND-90 round-trip — C1 preservation (allowlist-modulo byte equality
     expect(r.ignore.canvasSkipped).toBe(1);
     expect(r.ignore.nonMarkdownSkipped).toBe(1); // readme.txt
     expect(r.ignore.hiddenIgnored).toBe(3); // .obsidian dir + .git dir + .foo.md
-    expect(r.emptyFoldersPreserved).toBe(1);
-    expect(h.deliberate).toEqual([["Empty/"]]);
+    expect(r.emptyFoldersPreserved).toBe(1); // only `Empty/` arrived empty
+    // `Sub/` is registered too, because under at-fill a folder that holds notes
+    // still needs a record or it vanishes when its last note leaves
+    // (myne-md/myne#613). `top.md` sits at the root, which is not a folder.
+    expect(h.deliberate).toEqual([["Empty/", "Sub/"]]);
   });
 
   it("import-twice idempotency: second run skips all FM-titled notes (SYNC-5)", async () => {

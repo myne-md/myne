@@ -110,7 +110,7 @@ Used in: `decisions.md` 2026-08-16
 
 ### **agentic note editing** &nbsp; 📦 *Product*
 
-The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Two verbs, edit a note body and create a note; deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, move, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` or `folder:` line is a rename or a move by the same mechanism trashing is. What bounds those is that each appears in the diff the user approves. Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
+The feature in which the AI proposes changes to the user's own notes and nothing reaches the vault until the user approves a diff (myne-md/myne#529). Three verbs, edit a note body, append to a note body and create a note (the [append verb](#append-verb) was added by myne-md/myne#616); deletion needs no verb because trashing is a `trashed:` frontmatter timestamp and therefore a body edit. Hard delete, rename, folder and attachment operations are excluded **from the verb set**, which is not the same as unreachable: an approved anchored edit reaches frontmatter, so changing a `title:` line is a rename by the same mechanism trashing is, and what bounds it is that it appears in the diff the user approves. **Moving a note is the exception, and it is refused rather than merely visible**: the [folder lock](#folder-lock) compares the note's folder before and after every agent write and rejects any that changes it, under both approval labels, because the folder is what `ai_excluded_folders` is keyed on (`decisions/ai/0554`). Runs on both provider arms under the posture `decisions.md` 2026-08-09 set. It **supersedes the prompt-injection bound `threat-model.md` §7 used to state** (the model does now have tools) and replaces it with a claim about scope and approval that the same section names as behavioural rather than structural. Desktop only in v1; mobile is myne-md/myne#530, blocked on myne-md/myne#456.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -122,9 +122,19 @@ Used in: `decisions.md` 2026-08-19
 
 ### **Ask mode / Edit mode** &nbsp; 📦 *Product*
 
-The two settings of the one composer in the AI Chat tab (myne-md/myne#533). Ask sends a grounded chat message; Edit starts an [agent run](#agent-run) and reveals the user-originated scope control. The mode is a control the user sets rather than an intent the model infers, because the two mistakes do not cost the same: a question misread as an edit starts a scope-holding run and spends provider requests, while the reverse costs a re-send. The tab opens in Ask, and the mode is not remembered across a remount, so a user returning later is never one keystroke from a run they did not set up in this session.
+**Retired, and kept as the term it is not.** This entry defined the two settings of the one composer in the AI Chat tab (myne-md/myne#533): Ask sent a grounded chat message, Edit started an [agent run](#agent-run) and revealed the user-originated scope control, and the tab opened in Ask. There are no modes now. `decisions.md` 2026-08-22 entry 0524 gave the tab ONE flow: every message starts an agent run, the agent answers a question with its `finish` summary and proposes edits when that is what was asked for, and the segmented control that used to choose the flow now chooses the **permission mode** (ask before applying, or apply inside the approved scope, `decisions.md` 2026-08-20 entry 0522). The scope control is unconditional, because every message now has a scope.
 
-Used in: `decisions.md` 2026-08-19
+Kept rather than deleted because the retired names outlived the controls in three places at once: `ai.composer-mode-edit` was driven by every scenario in `e2e/agent-run.e2e.ts` for months after it stopped rendering, which killed that whole suite invisibly, and two comments in `ChatComposer.tsx` still described Edit-mode-only blocks (`decisions.md` 2026-08-28 entry 0538, myne-md/myne#596).
+
+Used in: `decisions.md` 2026-08-19, 2026-08-22 entry 0524, 2026-08-28 entry 0538
+
+### **append verb** &nbsp; 📦 *Product*
+
+The third verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#616): it adds text at the end of a note's body rather than replacing an [edit anchor](#edit-anchor). It exists because there was no way to write into an EMPTY note. An empty anchor is refused, so "add this list to the open note" failed for a structural reason no message explained, and the model answered by asking the user for the list it had just written. Appending to a long note was possible but expensive, since the model had to reproduce the whole tail verbatim as an anchor.
+
+Two rules keep it from becoming a frontmatter writer, and both are about the RESULT rather than the input. The text is positioned after the note's frontmatter block rather than at the end of the raw file, so in a note that has one, appended text can never be the first line. And an append that would give the note a frontmatter block it did not have is refused outright, which closes the case positioning alone does not: a note whose body merely BEGINS with `---` has an opener nothing closed, and an ordinary `---` separator in the appended text would close it and turn the user's own first lines into frontmatter.
+
+Used in: `decisions/ai/0554`
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -172,6 +182,14 @@ A region of CodeMirror 6 editor state registered with `EditorView.atomicRanges` 
 
 Used in: `spec/wikilink.md` §5.2
 
+### **at-fill registration** &nbsp; 📦 *Product*
+
+The rule that a folder becomes a [deliberate folder](#deliberate-folder) the first time it holds a note, rather than only when the user reaches a "New folder" command (myne-md/myne#613). Creating a note in a folder, moving one into it, and importing a vault that contains it all register it; so does an explicit folder create. Nothing UNregisters it, in particular not its last note leaving, which is the behaviour the rule exists to produce: a folder made by dragging a note into a name the user typed is as deliberate as one made from a menu, and used to disappear silently when emptied because nothing had recorded it.
+
+Registration is an ADD, never a whole-set write, so a client holding a stale view cannot claim a removal it never made. It is idempotent, and a client registers once per user operation rather than once per note: a fifty-note bulk move is one write, because each write re-encrypts the whole `vault.prefs` blob. A vault created before the rule is registered once, after unlock, by walking the folders its live notes prove; trashed and archived notes prove nothing, so a folder the user had already emptied is not resurrected. Bounded by the [set-field byte budget](#set-field-byte-budget).
+
+Used in: `spec/protocol.md` §9.5.2; myne-md/myne#613
+
 ### **at-rest encryption** &nbsp; 🏗️ *Construction*
 
 The property that data stored persistently is encrypted whenever it is not actively being processed. Myne's at-rest encryption applies to every byte of note content, vault metadata, and key material on the user's disk (`spec/protocol.md` §9). Distinct from in-transit encryption (TLS), which protects only data crossing the network.
@@ -201,7 +219,7 @@ A [`vault.attachments`](#vaultattachments) entry whose optional `deleted_at` fie
 
 ### **attachment embed** &nbsp; 📦 *Product* *(Myne-divergent: yes; no Obsidian counterpart)*
 
-The Myne form for embedding an encrypted [attachment](#attachment) in a note, `spec/wikilink.md` §2 **form 12**: `![[att:<attachment-id-hex>|filename]]`, historically called **form C**. The `att:` scheme prefix routes resolution to the `vault.attachments` catalog rather than the note index, and the remainder must be a 64-character lowercase-hex [attachment-id](#attachment-id); a prefix with an invalid id is not an attachment embed and degrades to an ordinary embed chip rather than erroring. It renders as an ATOMIC widget with no source-lift, so the caret never enters it and the `att:` target is never exposed as editable text: a user cannot hand-write or hand-edit one inside Myne, and every authoring affordance emits it instead. What it renders as is a serve-time decision (inline image, PDF reader, audio or video player, file card, or a tombstone for an id the catalog cannot resolve), not an ingest gate. It may carry [embed layout segments](#embed-layout-segment). On an attachments-included export it is rewritten to a plain wikilink embed naming the exported file, carrying its layout segments in Obsidian’s own spelling where one exists, so it never reaches Obsidian in this form.
+The Myne form for embedding an encrypted [attachment](#attachment) in a note, `spec/wikilink.md` §2 **form 12**: `![[att:<attachment-id-hex>|filename]]`, historically called **form C**. The `att:` scheme prefix routes resolution to the `vault.attachments` catalog rather than the note index, and the remainder must be a 64-character lowercase-hex [attachment-id](#attachment-id); a prefix with an invalid id is not an attachment embed and degrades to an ordinary embed chip rather than erroring. It renders as an ATOMIC widget with no source-lift, so the caret never enters it and the `att:` target is never exposed as editable text: a user cannot hand-write or hand-edit one inside Myne, and every authoring affordance emits it instead. What it renders as is a serve-time decision (inline image, PDF reader, audio or video player, file card, or a tombstone for an id the catalog cannot resolve), not an ingest gate. **Where** it renders is a second serve-time decision with the same shape: an embed alone on its line, whitespace aside, is drawn as a whole-line BLOCK, and one sharing a line with prose stays inline. Every insert path Myne owns writes it onto a line of its own, so the block is the form a user meets; an embed already written mid-line, by an import or by hand, is never moved (myne-md/myne#604). It may carry [embed layout segments](#embed-layout-segment), which the block form can also author by drag. On an attachments-included export it is rewritten to a plain wikilink embed naming the exported file, carrying its layout segments in Obsidian’s own spelling where one exists, so it never reaches Obsidian in this form.
 
 Used in: `spec/wikilink.md` §2 form 12, §2.1, §5.1; `spec/markdown-dialect.md` §6
 
@@ -262,6 +280,12 @@ Used in: `threat-model.md` §7; `decisions.md` 2026-05-30 "Auto-lock on idle"
 On-device tag suggestion ([local inference](#local-inference), MYND-651): a **dedicated bundled task-model** (a small quantized Qwen2 GGUF shipped as a Tauri resource, like the transcription model — not the side-loaded generation model) reads the open note a debounce interval after typing settles and proposes a few tags, surfaced in the [tag suggestion band](#tag-suggestion-band). Candidates are open-vocabulary, then folded and ranked against the vault's own [tag index](#tag-index) under the §3.7.8 tag-identity rule — existing tags preferred (solid chips), a genuinely new tag coined only when nothing fits (dashed `+` chip). Accepting writes the tag into the note's frontmatter `tags:` list (idempotent under the fold); suggestions themselves are **RAM-only**, never persisted. Off by default behind its own `auto_tag_enabled` pref (an additive `vault.prefs`/`MYP1` field) *under* the `ai_enabled` beta opt-in, enforced host-side; an [AI-excluded folder](#ai-excluded-folder) short-circuits before any model call. Desktop-only (no Candle on web; mobile deferred to MYND-653). Replaces the earlier command-palette + AI-Chat-tab tag surface (MYND-411). See `decisions.md` 2026-07-31; `threat-model.md` §7 "Local AI".
 
 Used in: `vision.md`; `threat-model.md` §7; `decisions.md` 2026-07-01, 2026-07-31
+
+### **automation debt (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+An observation that was proposed as a manual item and ruled out because an existing or plausible `e2e/`, `e2e-web/`, Vitest or cargo test could honestly assert it. Paying it is the only thing that lowers `totalMinutesCeiling`, so it is the mechanism by which the roster shrinks and the gate widens rather than a backlog of nice-to-haves. Tracked as issues rather than as a file, because a second list beside the roster is the drift the roster exists to stop: myne-md/myne#554 and its four lane sub-issues carry the 265 observations the first derivation ruled out.
+
+Used in: `decisions.md` 2026-08-25 (manual test roster, myne-md/myne#548), myne-md/myne#554
 
 ### **backup schedule** &nbsp; 📦 *Product*
 
@@ -426,9 +450,9 @@ Used in: MYND-444
 
 ### **code-signed releases** &nbsp; 🛠️ *Tooling*
 
-Myne desktop installers and auto-update payloads are cryptographically signed with hardware-backed keys controlled by the team. Auto-update verification (`threat-model.md` §3 TB7) refuses any artifact that fails signature or hash check. The signing keys are themselves the largest unmitigated risk against A9 (compromised distribution).
+**Retired as a description of Myne, and kept as the term it is not.** This entry said Myne's desktop installers and auto-update payloads were signed with hardware-backed keys and that auto-update refused any artifact failing the check. Every clause is false: no Apple Developer ID and no Windows Authenticode certificate exists, so the `.dmg`, `.deb`, `.AppImage` and `.pkg.tar.zst` carry no signature any OS checks, and there is no in-app auto-update to verify anything (`threat-model.md` TB7 and A9, corrected by `decisions.md` 2026-08-15 entry 0496; this definition was missed by that sweep and corrected by entry 0534). What Myne actually has is **signed release hashes**: each release's `SHA256SUMS` is signed with an offline **minisign** key and cross-published on a second origin, and the user verifies it by hand. The signature authenticates the hash list, not the installer, and no operating system checks it. The Android `.apk` is the one artifact carrying an OS-checked signature, because Android refuses to install an unsigned package.
 
-Used in: `threat-model.md` §3 TB7, §6
+Used in: `threat-model.md` TB7, §4 A9, §6
 
 ### **CodeMirror 6** &nbsp; 🛠️ *Tooling*
 
@@ -466,6 +490,16 @@ Adversary class A2: subpoena, court order, national security letter, or other le
 
 Used in: `threat-model.md` §1 (A2)
 
+### **content-scaled field** &nbsp; 📋 *Protocol*
+
+A stored field whose size grows with how much the user has MADE, rather than with how many features the software has. `deliberate_folders` is the first one in `vault.prefs`: one more folder is one more entry, and the user does not think of a folder as a setting.
+
+Its opposite is a **feature-scaled** field, where one more preference is one more key, so the plaintext grows only when the software does and a cap chosen once stays generous indefinitely. `vault.prefs` was sized on that assumption, and the two kinds sharing one fixed cap is what makes the [set-field byte budget](#set-field-byte-budget) necessary: an over-cap save FAILS rather than truncating, so an unbounded content-scaled field can leave a vault unable to save any preference at all.
+
+The distinction is worth naming because the next such field will be added by somebody who is not thinking about the cap. `spec/protocol.md` §9.5.4 exists to be the thing it is checked against.
+
+Used in: `spec/protocol.md` §9.5.4; myne-md/myne#613
+
 ### **conflict copy** &nbsp; 📋 *Protocol*
 
 The artifact of [keep-both conflict resolution](#keep-both-conflict-resolution): when the sync engine detects a concurrent edit, it materializes the remote revision as a **new** `.myn` note carrying the Myne-managed `conflict: true` + `conflict_of: <original note_uuid>` frontmatter fields (`spec/markdown-dialect.md` §3.6.1) so both edits survive. A conflict copy is excluded from the live sidebar, folder-tree, full-text search, and the backlink resolver — surfaced only in the **Conflicts view**, reached via a count badge — until the user resolves it ("Keep as separate" clears the markers so it re-enters the live set; "Discard" deletes it). TS orchestrator (`src/notes/conflictCopy.ts`) over `note_create` + `patchFrontmatterField`; no backend command, no `.myn` envelope change (MYND-427). Phase 2.
@@ -495,6 +529,12 @@ Used in: `spec/protocol.md` §3.2, §3.4
 The table in `spec/protocol.md` §3.4 listing every authorized context string and its role for v0.1. Adding a new role in a minor revision means adding a row to the registry, not bumping the protocol version. Registered roles in v0.1: `itemsKey-wrap`, `prefs-key`, `search-index-key`, `attachments-catalog-key`, `attachments-id-hmac` (active), plus `server-auth`, `backup-key`, and `vault-head-mac` (all reserved — derived material unused in v0.1; `backup-key` demoted 2026-06-10; `vault-head-mac` is the Phase 2 [vault head](#vault-head) MAC key, MYND-416). The next major version defines its own HKDF context-string prefix (not pre-allocated).
 
 Used in: `spec/protocol.md` §3.4
+
+### **core tier / standard tier (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+The two severities a [manual test roster](#manual-test-roster) item may carry. **core** is exactly three things and nothing else: failing means **data loss**, failing means a **security or privacy boundary broke** (plaintext leaving the device, a locked vault still readable, a phrase or key on screen or in a log, an egress with no user consent), or the item verifies the **upgrade over a real vault** from the previous release. Everything else is **standard**. The tier is not a priority label: together with the client it decides whether a row blocks a release today, because `gatedTiers` in `scripts/manual-test-ratchet.json` names the tier or tiers that stop a tag. Widening the gate has exactly two moves, adding a client and adding the other tier, which is why that field is a list rather than a string.
+
+Used in: `scripts/manual-test-roster.mjs`, `scripts/manual-test-ratchet.json`, `docs/dev/manual-test-roster.md`, `decisions.md` 2026-08-21 (manual test roster, myne-md/myne#548)
 
 ### **cover (note)** &nbsp; 📦 *Product*
 
@@ -560,7 +600,9 @@ Reference: Chan & Rogaway, "On Committing Authenticated Encryption", ESORICS 202
 
 The Phase 1 editor pattern where decorations on the line containing the cursor lift to expose the underlying markdown source for editing, then reapply when the cursor leaves the line. There is no separate "rendered view" / "source view" mode-switch — cursor location *is* the reveal. Headings show their leading `#`s on the active line and hide them off-line; bold and italic delimiters reveal on entry; inline link URLs become editable when the cursor enters their parent line. Wikilink chips are an exception per `spec/wikilink.md` §5.4 (chips stay atomic regardless of cursor position). **Task-field chips are a second exception** (MYND-614): they never open on caret entry — a date is a structured value, not prose, and a line carrying three chips would reflow every time the caret travelled it — but they *do* open while the find panel is open, because a search that lands on a match inside hidden text and highlights nothing is worse than not finding it. Reading mode never reveals, under either exception.
 
-Used in: `spec/markdown-dialect.md`, `myne-agents/features/editor-mvp/rfc.md`; `decisions.md` 2026-07-28
+**The task checkbox has a third trigger: a SELECTION that overlaps it** (myne-md/myne#560). It lifts when a selection merely overlaps the hidden `- [ ]` run, not only when a caret is inside it, and its trigger is per-range rather than per-line. Stated for that construct rather than as a class rule about widget-replacing decorations, because it is not one: `revealsRange` has a single caller in the tree, and the two exceptions above go the other way. Wikilink chips stay atomic under a selection as under a caret (`spec/wikilink.md` §5.4, and its form-12 embeds likewise), and task-field chips open only for the find panel. The reason is not editing but painting: the rendered checkbox has an opaque accent fill, and a translucent selection band across it, beside the same band over plain text, is two tones in one selection. Showing the source removes the opaque surface rather than working around it, and it is the honest answer: what is selected is the markup, so the markup is what belongs on screen and on the clipboard. Restyling decorations (emphasis, link, inline code) keep the older per-endpoint rule: a mark changing style under a selection is harmless where a widget vanishing is not.
+
+Used in: `spec/markdown-dialect.md`, `myne-agents/features/editor-mvp/rfc.md`; `decisions.md` 2026-07-28, 2026-08-25 (entry 0536)
 
 ### **custom folder icon** &nbsp; 📦 *Product*
 
@@ -618,6 +660,8 @@ Used in: `spec/account-number.md` §4
 
 An ordinary `.myn` note representing one calendar day, identified by **folder + date-title** (e.g. a note titled `2026-06-07` inside the `Daily/` folder) — **not** a calendar object, date-object model, or date-indexed database. The "Open today's note" command resolves today's note idempotently: it computes today's date-title from `now` via the `daily_date_format` pref and looks for a non-trashed, non-template note matching the daily folder + date-title under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2); found → open, not found → create (from the [note template](#note-template) the `daily_template` pref points at, or blank with the date as title) and open. Three `vault.prefs` fields configure it (`spec/protocol.md` §9.5.2): **daily folder** (`daily_folder`, default `Daily/`, also registered as a [deliberate folder](#deliberate-folder) so it survives empty), **daily date format** (`daily_date_format`, default `YYYY-MM-DD`), and **daily template** (`daily_template`, a template UUID or unset). Past days are reached via the ordinary sidebar folder — no date-picker, no jump-to-date. Bounded as a plain-markdown skeleton + date navigation by construction, respecting the anti-Notion / no-calendar commitment (`vision.md`). See [decisions.md](decisions.md) 2026-06-07 (MYND-191).
 
+Since myne-md/myne#177 the daily note is one [periodic note](#periodic-note) among three; its three `daily_*` fields are unchanged and are deliberately NOT migrated into the `periodic_notes` map.
+
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07 (MYND-182 / MYND-191)
 
 ### **default new-note location** &nbsp; 📦 *Product*
@@ -636,9 +680,11 @@ The styleable placeholder an editor embed renders when its [attachment-id](#atta
 
 ### **deliberate folder** &nbsp; 📦 *Product*
 
-A folder the user explicitly created that persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). The set is *cold* — written only on explicit folder create / delete, never on note move — and merges as a union (add-wins) under Phase 2 sync. A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2). See also [folder](#folder), [item order](#item-order).
+A folder the user means to keep, which persists in the sidebar tree even when it holds no note. Because the virtual-folder model derives folders from each note's `folder:` frontmatter, an empty folder has no note to carry it; deliberate folders are therefore persisted as a set (the top-level `deliberate_folders` array) inside the encrypted `vault.prefs` (`spec/protocol.md` §9.5.2). A folder that exists only because notes carry its path is *implicit* and vanishes when its last note leaves; a deliberate folder survives. Identity is case-fold + NFC (`spec/markdown-dialect.md` §3.6.2).
 
-Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2; `decisions.md` 2026-05-29
+**Revised by myne-md/myne#613, in both halves.** The set used to be *cold*, written on explicit folder create and delete alone, which meant a folder made by dragging a note into a new name was never recorded and vanished the moment it was emptied. It is now written by [at-fill registration](#at-fill-registration) as well, and bounded by a [set-field byte budget](#set-field-byte-budget). And it used to merge as a clockless add-wins union, under which a folder delete could never reach a second device; it now carries per-entry removal clocks (`spec/sync-protocol.md` §10.2). The two egress-control sets that share its codec, [AI-excluded folder](#ai-excluded-folder) and [CLI-excluded folder](#cli-excluded-folder), deliberately kept the clockless union. See also [folder](#folder), [item order](#item-order).
+
+Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2, `spec/sync-protocol.md` §10.2; `decisions.md` 2026-05-29, myne-md/myne#613
 
 ### **Developer mode** &nbsp; 📦 *Product*
 
@@ -764,7 +810,7 @@ A note whose editing surface is an **Excalidraw canvas** instead of the CodeMirr
 
 ### **Ed25519** &nbsp; 🔐 *Primitive*
 
-The EdDSA signature scheme over the twisted Edwards form of Curve25519 (RFC 8032). Not used by Myne's at-rest cryptography in v0.1; reserved for code-signing of releases (`threat-model.md` §3 TB7) and for a later version's multi-device identity.
+The EdDSA signature scheme over the twisted Edwards form of Curve25519 (RFC 8032). Not used by Myne's at-rest cryptography in v0.1. It is what **minisign** signs release hash lists with, so it is in use on the `TB7` channel today (`threat-model.md` §3 TB7): over the `SHA256SUMS` file, not over any installer, and checked by the user rather than by an operating system. Also reserved for a later version's multi-device identity.
 
 Used in: `threat-model.md` §3 TB7
 Reference: RFC 8032.
@@ -875,7 +921,7 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-15
 
 ### **field clock** &nbsp; 📋 *Protocol*
 
-The per-field LWW timestamp of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): an epoch-milliseconds integer, one per [shared pref](#shared-pref) LWW field (or per `device_names/<key>` entry), stored in the additive `field_clocks` map inside the encrypted [vault.prefs](#vaultprefs) payload (`spec/protocol.md` §9.5.2) and stamped by the setter that last changed the field. The merge takes the newer clock per field, counts an absent clock as 0 (pre-feature blobs), and breaks equal clocks byte-lexicographically toward the greater value — the attachments-catalog `filename` precedent — so replicas converge without coordination. Per-field (rather than per-blob) clocks are what let concurrent edits to *different* fields both survive.
+The per-field LWW timestamp of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): an epoch-milliseconds integer, one per [shared pref](#shared-pref) LWW field, or per ENTRY of a per-key map (`device_names/<key>`, `item_colors/<key>`, `folder_icons/<key>`, `item_order/<container>`) or of a clocked set-union field (`deliberate_folders/<foldedEntry>`, `archived_folders/<foldedEntry>`, `spell_languages/<rawCode>`, myne-md/myne#613; the two monotone egress sets are never stamped and have no key here, see [removal clock](#removal-clock)), stored in the additive `field_clocks` map inside the encrypted [vault.prefs](#vaultprefs) payload (`spec/protocol.md` §9.5.2) and stamped by the setter that last changed the field. The merge takes the newer clock per field, counts an absent clock as 0 (pre-feature blobs), and breaks equal clocks byte-lexicographically toward the greater value (the attachments-catalog `filename` precedent), so replicas converge without coordination. Per-field (rather than per-blob) clocks are what let concurrent edits to *different* fields both survive.
 
 Used in: `sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; `decisions.md` 2026-07-13
 
@@ -896,6 +942,14 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-17 (MYND-348)
 A *virtual* organizational container for notes, shown as a nested tree in the sidebar. A note's folder is a slash-delimited path stored in its `folder:` frontmatter (`spec/markdown-dialect.md` §3.6.1); the on-disk layout never reflects it — `notes/<uuid>.myn` stays flat (`spec/protocol.md` §9.1), so folder structure is encrypted metadata (`threat-model.md` AS3) reconstructed client-side. The tree is a derived view: `dedup_union` of the ancestor-expanded paths from every note's `folder:` field and the [deliberate-folder](#deliberate-folder) set, under case-fold + NFC identity (`spec/markdown-dialect.md` §3.6.2). A folder carried only by notes is *implicit* and vanishes when its last note leaves; a deliberate folder persists when empty. Folders and folderless notes share a single interleaved tree at every level, ordered by [item order](#item-order) (MYND-183) — a folderless note is not bucketed into a separate section but renders at the root level alongside top-level folders. Distinct from a *tag* (a separate, non-hierarchical organizational axis that coexists with folders). See also [item order](#item-order).
 
 Used in: `spec/markdown-dialect.md` §3.6.1–3.6.2, `spec/protocol.md` §9.1, §9.5.2; `decisions.md` 2026-05-29
+
+### **folder lock** &nbsp; 📦 *Product*
+
+The host-side rule that no [agent run](#agent-run) write may change which [folder](#folder) a note is in (myne-md/myne#616). It compares the note's `folder:` frontmatter value before and after the write is composed and refuses any write that changes it, under BOTH approval labels, and it is re-derived host-side rather than read from the IPC payload.
+
+The reason it is a refusal rather than a line in the diff: the folder is what `ai_excluded_folders` is keyed on, so a move is the one edit that can change which notes a LATER run may read. A user approving a diff is judging the text in front of them, not re-deriving an exclusion set from it. It covers `folder:` and nothing else, deliberately, because a blanket frontmatter lock would silently withdraw the agent's ability to archive.
+
+Used in: `decisions/ai/0554`, `threat-model.md` §7
 
 ### **folder note** &nbsp; 📦 *Product*
 
@@ -957,6 +1011,12 @@ The canonical Myne autosave call-pattern locked in `decisions.md` 2026-05-07 "`n
 
 Used in: `decisions.md` 2026-05-07 (pattern), 2026-05-15 (concrete timings); MYND-81
 
+### **gating row (manual test roster)** &nbsp; 🛠️ *Tooling*
+
+One observation on one client that stops the tag when it fails. A row is the `(item, client)` pair rather than the item, because an observation naming macOS, Linux and Windows is three sittings; counting once per item understates the roster by more than half. Which rows gate is recorded in `scripts/manual-test-ratchet.json` as a tier list plus a client list, not implied: at the first measurement the gate is the `core` tier on every client this release ships, seven of the eight, 58.9 of 163.7 hours. The rest is walked and recorded and does not block yet, and that share only shrinks. A failed gating row is passed anyway only by `verdict: override` with a written, length-checked reason that lands in git.
+
+Used in: `scripts/manual-test-plan.mjs`, `scripts/manual-test-ratchet.json`, `scripts/manual-test-verified.json`
+
 ### **ghost-text** &nbsp; 📦 *Product*
 
 The dimmed inline completion the writing-assistant ([local inference](#local-inference)) shows at the cursor: a `Decoration.widget` overlay (never in the document buffer) rendering the model's short continuation in `--fg-3` italic, accepted with **Tab** (inserts it as plain markdown, one undo step) and dismissed by **Esc** or any edit. Fired on a paused cursor by a debounced CM6 `ViewPlugin` that cancels any in-flight inference on a doc/viewport change so a stale suggestion never lands. Composed into the editor only when `ai_enabled` (and the note is not an [AI-excluded folder](#ai-excluded-folder)). Modeled on the `spell.ts` StateEffect→StateField loader pattern (MYND-410).
@@ -994,7 +1054,7 @@ Used in: `threat-model.md` §1 (A10 discussion)
 
 ### **embed layout segment** &nbsp; 📦 *Product* *(Myne-divergent: yes; keyed segments, and `align=` has no Obsidian counterpart)*
 
-An author's size, alignment or alt-text choice for one embedded attachment, written as an extra **keyed** segment on the form-C [attachment embed](#attachment-embed) (`![[att:<id>|photo.png|w=300|align=center|alt=A sunset]]`; `spec/wikilink.md` §2 form 12 / §5.1, myne#409). The closed vocabulary is `w` (`1..8192` px or `1..100%`), `h` (`1..8192` px), `align` (`left`/`center`/`right`) and `alt` (free text). Three rules bind: **segment 1 is always the filename**, and from segment 2 on an unkeyed segment rejoins it with its `|` (an attachment filename may itself contain a pipe, so a positional reading would corrupt notes already on disk); **`alt=` is terminal**, swallowing the rest of the embed so alt prose may contain pipes, with an authored-EMPTY `alt=` meaning a deliberately decorative image; and an unreadable segment is **dropped without rewriting the note's bytes**, reported to the author when a known key carried a bad value and passed over silently when the key itself is unknown (an unknown key is a newer client's choice read by an older one, not an error the reader can act on). A width is a **maximum intent**: render clamps it to the editor's content column, which is itself a user preference. Segments are authored only through the embed's overflow menu, never typed, because the embed is atomic and never source-lifts. On an attachments-included export a pixel `w` becomes Obsidian's own `|300` / `|300x200` spelling and the rest travels through; `align` is a Myne extension Obsidian has no core syntax for.
+An author's size, alignment or alt-text choice for one embedded attachment, written as an extra **keyed** segment on the form-C [attachment embed](#attachment-embed) (`![[att:<id>|photo.png|w=300|align=center|alt=A sunset]]`; `spec/wikilink.md` §2 form 12 / §5.1, myne#409). The closed vocabulary is `w` (`1..8192` px or `1..100%`), `h` (`1..8192` px), `align` (`left`/`center`/`right`) and `alt` (free text). Three rules bind: **segment 1 is always the filename**, and from segment 2 on an unkeyed segment rejoins it with its `|` (an attachment filename may itself contain a pipe, so a positional reading would corrupt notes already on disk); **`alt=` is terminal**, swallowing the rest of the embed so alt prose may contain pipes, with an authored-EMPTY `alt=` meaning a deliberately decorative image; and an unreadable segment is **dropped without rewriting the note's bytes**, reported to the author when a known key carried a bad value and passed over silently when the key itself is unknown (an unknown key is a newer client's choice read by an older one, not an error the reader can act on). A width is a **maximum intent**: render clamps it to the editor's content column, which is itself a user preference. Segments are never typed, because the embed is atomic and never source-lifts. There are two authoring paths, both of which write through the same one function: the embed's overflow menu (the size presets, a custom size prompt, the alignment and alt rows), and dragging the resize handles on a [block-drawn](#attachment-embed) embed, which writes `w=` from the right edge and `w=` plus `h=` from the corner grip (myne-md/myne#604). On an attachments-included export a pixel `w` becomes Obsidian's own `|300` / `|300x200` spelling and the rest travels through; `align` is a Myne extension Obsidian has no core syntax for.
 
 Used in: `spec/wikilink.md` §2, §5.1; `spec/markdown-dialect.md` §6, §7; `decisions.md` 2026-08-15
 
@@ -1052,7 +1112,9 @@ Two limits are honest, measured properties rather than bugs. **Turkish diacritic
 
 The editor's Cmd/Ctrl+F find bar (MYND-175): a **literal, single-document** search over the one open note's decrypted CodeMirror doc text — exact substring, case-fold toggle, no regex — with all-match highlighting, next/prev navigation (Enter / Shift+Enter, wrapping), and a live "k/N" count. Built on the `@codemirror/search` engine with a Myne-token *docked* panel (not the stock widget); the WebView's native Cmd/Ctrl+F is suppressed app-wide. **Deliberately distinct from the [search index](#search-index)**: that is the stemmed, BM25-ranked, Rust-side *cross-note* surface ("which notes relate to this term"); in-note find is the unranked literal *locate* tool ("exactly where in the note I'm reading"). The count is a read-only projection over the engine's match set (never a filter); matches inside folded tables/code are counted and un-fold on navigation, while a frontmatter match is counted but not raw-revealed (always-on Properties widget). The query + match cache are **WebView-only, never persisted**, released on the lock-time reload — best-effort (V8 strings can't be zeroized; AS1-dominated), **not** "zeroize-on-lock" (which is the Rust-side index). See also [search index](#search-index) (`decisions.md` 2026-05-31).
 
-Used in: `decisions.md` 2026-05-31
+**Two literal passes since myne-md/myne#609, not one.** A task chip prints its `due` and `remind` dates in the reader's chosen date format while the document holds `YYYY-MM-DD`, and CodeMirror's search reads the document rather than the DOM, so a reader typing what is on screen found nothing. When the typed query matches nothing AND reads back as a date under that reader's own format, the bar runs a SECOND literal search for the stored form and says in the bar which text produced the matches. Literal FIRST, so a date written as ordinary prose still matches as itself; the second pass gets a turn only when the first found nothing. Still **no regex**, and that is the load-bearing half rather than a detail: an alternation would need `literal: false`, which routes REPLACE through regular-expression substitution and its dollar-sequence expansion. **Replace is disabled while the fallback produced the matches**, because the matched bytes are the stored form and a replacement typed in the reader's format would leave a value `parseTaskInstant` refuses, dropping the task out of every dated view. The gate is a predicate at the decision point, consulted by the buttons AND by the replace field's Enter handler; a version that disabled only the buttons left the keyboard path open (`decisions.md` 2026-08-29).
+
+Used in: `decisions.md` 2026-05-31, `decisions.md` 2026-08-29
 
 ### **in-transit encryption** &nbsp; 🏗️ *Construction*
 
@@ -1076,6 +1138,18 @@ The self-host bundle's TLS edge (a vetted Caddy reverse proxy) configured to **d
 
 Used in: `self-host-policy.md` §3, `decisions.md` 2026-06-20 (MYND-438)
 
+### **inline status mark** &nbsp; 📦 *Product*
+
+A named icon that sits **inside a text run** to say what a surface owes: the trailing slot of a sidebar note row, the bottom bar beside the save readout. It is a distinct class from an ordinary **icon**, which names a thing, and `docs/design/README.md` carves two of the icon rules out for it rather than bending them: it is drawn at 12px rather than 16 and up, because at 16 in a row's trailing slot it reads as a badge attached to the note rather than as a mark on it; and it is coloured by MEANING (`--accent` while work is in flight, `--fg-3` while it is merely outstanding) rather than by `currentColor`.
+
+The class used to carve out a third rule, hand-drawn geometry at 7 to 8px, on the argument that no Lucide pair distinguishes a filled dot from a hollow one at that size. The premise held and the conclusion did not: what shipped under it was a three-quarter ring that read as a stalled spinner, and then a solid triangle that read as a bullet point down a column of rows. The answer to "no glyph is legible at 7px" is not a cleverer glyph but a larger one (myne-md/myne#603).
+
+Two rules govern which mark is which. **One shape per fact**: two facts may not share a glyph, which is the report that created this class in the first place. **Motion is a state, never a shape**: rotation is shown only for work that ends, and two states are never told apart by rotation alone, since a distinction visible only to someone watching the screen is not a distinction.
+
+A mark is never a live region. It has no text content, so `role="status"` on it announces nothing, and the surface renders a persistently-mounted visually-hidden region beside it instead.
+
+Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx` (`StatusMark`)
+
 ### **inline tag** &nbsp; 📦 *Product*
 
 A `#`-prefixed identifier appearing inside note body text (as opposed to the YAML `tags:` frontmatter list). Recognized by the Myne dialect per `spec/markdown-dialect.md` §3.7. Boundary: line-start or whitespace must precede the `#`; `abc#tag` does not match. Character set: Unicode (excluding the General/Supplemental Punctuation blocks and an explicit ASCII-punctuation set). Numeric-only forms (`#1984`) reject; `#y1984` accepts. Nested forms via `/` (`#parent/child`) supported with unbounded depth. The parser only recognizes; never rewrites — byte-stability per §6 C1 extends to inline-tag bytes. Tag identity (case-fold, NFC normalization) is the consuming index layer's responsibility, not the parser's.
@@ -1084,7 +1158,7 @@ Used in: `spec/markdown-dialect.md` §3.7, §6 C1
 
 ### **insider threat** &nbsp; ⚠️ *Threat*
 
-Adversary class A11: a Myne team member acting maliciously. The architecture grants the team no privileged read access — keys never leave the client. The single privileged asset is the code-signing key (TB8); compromise reduces to A9 (compromised distribution).
+Adversary class A11: a Myne team member acting maliciously. The architecture grants the team no privileged read access — keys never leave the client. The single privileged asset is the release-signing key (TB8), the offline minisign key that signs each release's hash list, together with the Android release keystore; compromise reduces to A9 (compromised distribution). There is no desktop code-signing key, which is a gap rather than a reassurance.
 
 Used in: `threat-model.md` §1 (A11)
 
@@ -1181,9 +1255,9 @@ Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **locale catalog** &nbsp; 🛠️ *Tooling*
 
-A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are **Weblate**-managed and must not be hand-edited in the repo (that races Weblate) — with one recorded exception, the 2026-08-03 in-repo backfill that brought all 31 to 100%, which `decisions.md` explains is not a precedent. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's.
+A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; the other 31 are owned by **Weblate**. The repo rule was "never hand-edit one", suspended twice for in-repo backfills (2026-08-03, 2026-08-25) and now suspended on a stated condition rather than by exception: while `translate.myne.md` has closed registration and no translators enrolled, the catalogs are filled in-repo. New keys are added by `pnpm i18n:extract` (`i18next-cli`); each catalog carries its own **CLDR** plural categories, which are not English's. How complete each one is, is not asserted anywhere in prose: `docs/dev/i18n-coverage.md` is generated from the catalogs and gated by `scripts/check-i18n-coverage.mjs --check`, because the four documents that did carry a figure kept asserting 100% for three weeks after 215 keys had stopped being translated in every language.
 
-Used in: `docs/dev/i18n.md`; `locales/`.
+Used in: `docs/dev/i18n.md`; `docs/dev/i18n-coverage.md`; `locales/`.
 
 ### **KDF (Key Derivation Function)** &nbsp; 🏗️ *Construction*
 
@@ -1310,7 +1384,7 @@ The right-panel tab answering **both** directions of a note's [bidirectional lin
 
 ### **local inference** &nbsp; 📦 *Product* (*Myne-divergent*)
 
-On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, on the user's machine by default. **Amended 2026-08-09:** "on the user's machine, always" is no longer the whole story — a user may name an [AI provider](#ai-provider), and a [remote AI provider](#remote-ai-provider) receives note text off-device. What survives unconditionally is **no model download by Myne and no telemetry, ever**; what replaced the rest is *nothing leaves until the user names a provider*. *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, **runtime opt-in beta** capability — it ships in the default build (`decisions.md` 2026-07-02) but stays off until the user enables it at Settings → Developer → AI (`ai_enabled` pref, default off), reachable only once [Developer mode](#developer-mode) is on (`decisions.md` 2026-07-30), and the denylist gate (`ai-no-network-check.sh`) proves what it can actually prove — *no third-party crate in the closure originates outbound requests* — which is a crate-level property, not "this binary cannot reach the network" (`decisions.md` 2026-08-04). The AI-free auditable binary is the `--no-default-features` build. Powers summarize, semantic search / Q&A, [auto-tag](#auto-tag), and the writing-assistant ([ghost-text](#ghost-text) + slash commands). **Three classes of model now, and the distinctions are load-bearing:** the generation and embedding roles are the **user's own side-loaded files** (untrusted input — Myne does not vouch for them), while the *task-models* — transcription (`decisions.md` 2026-07-19) and auto-tag (`decisions.md` 2026-07-31) — are **first-party weights bundled inside the signed, reproducible desktop build**. Bundling is not downloading: no runtime fetch path exists in either case, which is the property the never-downloaded commitment actually protects. The third class is a **provider-served** model — weights Myne never sees at all, held by a [local model runtime](#local-model-runtime) or a [remote AI provider](#remote-ai-provider). v0.1 runs the runtime in-process for the first two classes, with a sandboxed keyless sidecar deferred as pre-default-on hardening — so a bundled model narrows the supply-chain surface but earns no key-isolation claim. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01, 2026-07-02.
+On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, on the user's machine by default. **Amended 2026-08-09:** "on the user's machine, always" is no longer the whole story — a user may name an [AI provider](#ai-provider), and a [remote AI provider](#remote-ai-provider) receives note text off-device. What survives unconditionally is **no model download by Myne and no telemetry, ever**; what replaced the rest is *nothing leaves until the user names a provider*. *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, **runtime opt-in beta** capability — it ships in the default build (`decisions.md` 2026-07-02) but stays off until the user enables it at Settings → Developer → AI (`ai_enabled` pref, default off), reachable only once [Developer mode](#developer-mode) is on (`decisions.md` 2026-07-30), and the denylist gate (`ai-no-network-check.sh`) proves what it can actually prove — *no third-party crate in the closure originates outbound requests* — which is a crate-level property, not "this binary cannot reach the network" (`decisions.md` 2026-08-04). The AI-free auditable binary is the `--no-default-features` build. Powers summarize, semantic search / Q&A, [auto-tag](#auto-tag), and the writing-assistant ([ghost-text](#ghost-text) + slash commands). **Three classes of model now, and the distinctions are load-bearing:** the generation and embedding roles are the **user's own side-loaded files** (untrusted input — Myne does not vouch for them), while the *task-models* — transcription (`decisions.md` 2026-07-19) and auto-tag (`decisions.md` 2026-07-31) — are **first-party weights bundled inside the desktop build itself**, covered by that release's minisign-signed `SHA256SUMS` rather than by any signature on the build. (This entry said "the signed, reproducible desktop build" until 2026-08-25 and both words were wrong for desktop: see **code-signed releases** and **reproducible builds** in this file, and entry 0534.) Bundling is not downloading: no runtime fetch path exists in either case, which is the property the never-downloaded commitment actually protects. The third class is a **provider-served** model — weights Myne never sees at all, held by a [local model runtime](#local-model-runtime) or a [remote AI provider](#remote-ai-provider). v0.1 runs the runtime in-process for the first two classes, with a sandboxed keyless sidecar deferred as pre-default-on hardening — so a bundled model narrows the supply-chain surface but earns no key-isolation claim. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01, 2026-07-02.
 
 ### **AI provider** &nbsp; 📦 *Product* (*Myne-divergent*)
 
@@ -1334,7 +1408,7 @@ Used in: `threat-model.md` §3 TB13, §1 A17; `decisions.md` 2026-08-09
 
 ### **named provider** &nbsp; 📦 *Product*
 
-The state a user puts Myne into by choosing an [AI provider](#ai-provider), and the subject of the invariant that replaced the old no-network claim: **no byte leaves the device unless the user has named a provider.** "Named" is doing real work — it is not "AI is enabled" and not "a provider is reachable", but "the user chose this one". So is **"the user"**: the naming is recorded at **account** scope, not device scope — the selection, the key and the consent record are synced vault content, so a newly enrolled device inherits them and sends without re-asking (`threat-model.md` §5; ledger SYNC-22). Enforced structurally rather than by convention: unset is the default and makes the path unreachable, and an explicit per-file, reason-carrying allowlist governs which source locations may open a socket on the AI path (the ratchet lands **empty**, so every later addition must argue for itself).
+The state a user puts Myne into by choosing an [AI provider](#ai-provider), and the subject of the invariant that replaced the old no-network claim: **no byte leaves the device unless the user has named a provider.** "Named" is doing real work — it is not "AI is enabled" and not "a provider is reachable", but "the user chose this one". So is **"the user"**, and its scope CHANGED in myne-md/myne#456: the naming is now read at **device** scope. The selection, the key and the chosen model are synced vault content, so a newly enrolled device inherits a configured provider; the **consent record is device-local**, so that device sends nothing until somebody there has read the consent screen and agreed. This entry said the opposite until that change, and recorded the account-scope reading as an accepted residual (ledger SYNC-22, `threat-model.md` §5), which was defensible only while no device could resolve the half-configured state: building the mobile consent surface is what removed the excuse. The key stays shared on purpose, so revocation still reaches every device. Enforced structurally rather than by convention: unset is the default and makes the path unreachable, and an explicit per-file, reason-carrying allowlist governs which source locations may open a socket on the AI path (the ratchet lands **empty**, so every later addition must argue for itself).
 
 Used in: `decisions.md` 2026-08-09; `threat-model.md` §7
 
@@ -1352,17 +1426,27 @@ Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **effective backend** &nbsp; 📦 *Product*
 
-Which AI backend a request **actually** reaches, as opposed to which one the preferences name. The two can differ: selecting the remote arm requires seven conditions to hold at once (developer mode, the AI beta flag, a recognized [AI provider](#ai-provider), matching consent, a stored key, a non-empty model selection, and preferences read from the vault unlocked right now), and any one failing falls back silently to the local arm. Naming a provider satisfies one of the seven, so a caption derived from that alone can claim a backend that answered nothing. Attribution of where a note's text went is a trust surface, so it names this. The separate [trust headline](#trust-headline) deliberately stays on the configured value instead, because over-claiming egress makes a reader cautious while under-claiming tells them their text stayed home when it did not.
+Which AI backend a request **actually** reaches, as opposed to which one the preferences name. The two can differ: selecting the remote arm requires six conditions to hold at once (the AI beta flag, a recognized [AI provider](#ai-provider), matching consent, a stored key, a non-empty model selection, and preferences read from the vault unlocked right now), and any one failing falls back silently to the local arm. It was **seven** until myne-md/myne#456, which removed developer mode from the request-time gate: the control it was standing in for is now the consent, which that change made device-local, and the two are a pair rather than one being dropped. Naming a provider satisfies one of the six, so a caption derived from that alone can claim a backend that answered nothing. **Matching consent means DEVICE-SCOPED consent**: a legacy bare-provider-name value, which is what a device enrolled before the reclassification and a desktop install that turned Developer mode off both hold, fails this condition and falls back to the local arm until the user agrees again (`protocol.md` §9.5.2). Attribution of where a note's text went is a trust surface, so it names this. The separate [trust headline](#trust-headline) deliberately stays on the configured value instead, because over-claiming egress makes a reader cautious while under-claiming tells them their text stayed home when it did not.
 
 Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
 ### **conversational AI chat** &nbsp; 📦 *Product*
 
-The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history; a run's task was addressed to a different loop, under a scope this call knows nothing about. History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
+The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. Since myne-md/myne#533 it is also where an [agent run](#agent-run) is started and read: the tab has ONE composer whose Ask/Edit mode says which flow the next message takes, and a run appears as a turn in this same transcript rather than in a second surface (`decisions.md` 2026-08-19). Only the chat's own turns are sent back as conversation history to the ASK model; a run's task was addressed to a different loop, under a scope this call knows nothing about. The reverse direction is not symmetric and changed on 2026-08-30: an [agent run](#agent-run) IS seeded with the visible transcript, under a [chat history budget](#chat-history-budget), so a follow-up can refer to the answer before it (`decisions/ai/0553`). History is **RAM-only, dropped on lock**: no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (on-device by default, but chat is precisely the surface a user-named [AI provider](#ai-provider) may serve, including a [remote AI provider](#remote-ai-provider), so "no provider call" no longer holds here after 2026-08-09); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
 
 ### **streaming token channel** &nbsp; 📋 *Protocol*
 
 The IPC mechanism that streams a [local-inference](#local-inference) generation's tokens to the WebView as they are produced: a `tauri::ipc::Channel<String>` opened by the `chat_stream` command, each decoded token forwarded through a publish-guarded callback (checked against the shared cancel flag before every send, so a vault-lock mid-stream never emits into a torn-down transcript). It is the SYNC-7 "supersede" the local-ai ledger anticipated — streaming was deferred in the spike and added here for the [conversational AI chat](#conversational-ai-chat) surface. Each token is AS1-class plaintext (never logged, DENY-list). See `decisions.md` 2026-07-04.
+
+### **chat history budget** &nbsp; 📦 *Product*
+
+How many CHARACTERS of the visible [conversational AI chat](#conversational-ai-chat) transcript an [agent run](#agent-run) may be seeded with (myne-md/myne#617). Stored as `chat_history_budget` on `PrefsView`, device-local and never synced, because a bound on how much THIS machine sends to a provider is a property of that machine. Default 3000, clamped at the write to 12000.
+
+A character count rather than a turn count, deliberately: the request is re-sent on every one of up to 24 iterations, so the number is multiplied by the iteration count and, on a remote provider, by characters that leave the device. Three long answers and three short ones are the same turn count and a very different cost. Oldest turns are dropped first, and a turn that alone exceeds the budget is truncated and marked rather than dropped, with a matching system-prompt instruction that a shortened earlier message must never be treated as complete.
+
+Its canonical key sorts after `auto_lock_seconds`, which is a format requirement and not a naming preference: see `protocol.md` §9.5.2 on why a new prefs key inside the prefix-matched run silently blinds every field behind it in an older client.
+
+Used in: `decisions/ai/0553`, `protocol.md` §9.5.2, `threat-model.md` TB12, TB13, §7
 
 ### **chat citation** &nbsp; 📦 *Product*
 
@@ -1384,9 +1468,15 @@ Used in: `spec/protocol.md` §10.4.1, `decisions.md` 2026-08-09 + 2026-08-11.
 
 ### **magic bytes** &nbsp; 📋 *Protocol*
 
-Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. Reserved for the next major version: `NT05`, `NTV5`. **Allocated for v0.2:** `NC05`, the CRDT note-type (`spec/protocol.md` §10.7). Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
+Fixed ASCII byte sequences at the start of Myne on-disk files that identify the format version. v0.1: `MY01` for per-note `.myn` files, `MYV1` for `vault.meta`. **Allocated and shipping under v0.2** (`spec/protocol.md` §10.3, §10.3.1: a vault created today is v0.2 throughout): `NC05` the CRDT note-type, `NTV5` `vault.meta`, plus `MYP5`, `MYA5`, `MYC5`, `MYD5` and `MYT5`. Reserved for the next major version, still placeholders: `NT05` and the remaining `MY?5` values. Magic bytes plus the AAD prefix and context-string prefix together implement the forward-incompatible major-version model.
 
 Used in: `spec/protocol.md` §9.1, §9.2, §9.3, §10.3, §10.7
+
+### **manual test roster** &nbsp; 🛠️ *Tooling*
+
+The recorded answer to "what must a human verify before this release, and why can no machine verify it instead". One entry per feature surface, each carrying the paths that implement it, the clients it ships on, the `e2e/` scenarios that already automate it, and the observations a person must make. It lives in `scripts/manual-test-roster.mjs` and IS the gate, so the record and the check cannot disagree; `docs/dev/manual-test-roster.md` is a generated projection of it and never a second source. Coverage is compared both ways against six directories, `src/screens/`, `src/components/settings/`, `web/src/screens/`, `web/src/components/settings/`, `mobile/src/app/flows/` and `e2e/*.e2e.ts`, so a surface entering the tree fails by name and a verdict whose files are gone fails as stale. Which six is checked too: a shared tree that grows a surface directory outside that list fails by name rather than being skipped. The rule that decides membership is that **an item earns a place only if a machine cannot honestly judge it**: an observation an `e2e/` scenario could assert is [automation debt](#automation-debt-manual-test-roster), not a manual item.
+
+Used in: `scripts/manual-test-roster.mjs`, `scripts/check-manual-test-roster.mjs`, `docs/dev/manual-test-roster.md`, `myne-ops/runbooks/release-checklist.md` phase 1, `decisions.md` 2026-08-21 (manual test roster, myne-md/myne#548)
 
 ### **master password** &nbsp; 🗝️ *Key/identifier*
 
@@ -1714,9 +1804,17 @@ The one-time MAC algorithm by Daniel J. Bernstein, used as the authenticator ins
 
 Used in: `spec/protocol.md` §5.1
 
+### **prompt-cache marker** &nbsp; 📋 *Protocol*
+
+The `cache_control` field Myne attaches to the SYSTEM turn of an OpenRouter request (myne-md/myne#620), asking the provider to cache that prefix. The system turn is the one span byte-identical across every iteration of a run, which is what makes it worth caching; no other turn carries one, and a test pins that, because a marker on a user or assistant turn would be asking the provider to retain note content as a cache prefix.
+
+**A posture change rather than a boundary change.** A17 puts the provider operator's retention outside anything this threat model constrains, so the same bytes reach the same party either way. What is new is that Myne is now ASKING for retention rather than merely accepting whatever happens, and that is the part a reader deciding whether to trust the feature would want on the record. Ollama receives no marker: it serves the model directly and models no prefix cache.
+
+Used in: `decisions/ai/0555`, `threat-model.md` TB13
+
 ### **proposed edit** &nbsp; 📦 *Product*
 
-One anchored change an [agent run](#agent-run) suggests to a note body: an [edit anchor](#edit-anchor) plus the text that replaces it. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
+One change an [agent run](#agent-run) suggests to a note body. It comes in two kinds. A REPLACE carries an [edit anchor](#edit-anchor) plus the text that replaces it. An APPEND carries no anchor at all, because there is nothing to anchor to: it adds text at the end of the body, which is the only shape that can write into an empty note (see [append verb](#append-verb)). One kind field on one list, rather than a second list, so every check that already runs over proposed edits keeps running over both by construction. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -1793,6 +1891,16 @@ Rust struct (and matching TypeScript IPC payload type) shape of the decrypted `v
 
 Used in: `src-tauri/src/plugins/prefs/`; `protocol/src/prefs.rs`; `spec/protocol.md` §9.5
 
+### **Protected-branch guard** &nbsp; 🛠️ *Tooling*
+
+*(Aliases: none. Myne-divergent: no.)*
+
+The `protected-branch` lefthook `pre-push` command carried by every `myne-md` repository. It refuses a push whose **remote** ref is `refs/heads/develop`, `refs/heads/main` or `refs/heads/release`, matching the remote ref rather than the current branch name so that `git push origin HEAD:develop` from a feature branch, and a branch deletion, are caught by the same line. `release` is on the list because it is the branch that deploys: `myne-website` maps `release` to production and `develop` to staging, so a `develop`-only guard protected the branch with no blast radius. It exists because the real control is unavailable: the org is on the GitHub free plan with private repositories, so both the branch-protection API and the rulesets API answer 403 on every repo.
+
+**Hygiene, not enforcement**, which is the hook's own wording rather than a hedge added here. `--no-verify`, `LEFTHOOK=0` and `LEFTHOOK_EXCLUDE=protected-branch` each bypass it, and it exists only in clones where `lefthook install` has been run, so a fresh clone, the jailed runner and `myne-bot` are uncovered. Two hatches are sanctioned instead: `MYNE_ALLOW_PROTECTED_PUSH=1` for a one-off, and `git config myne.allowProtectedPush true` for a repository whose normal workflow genuinely is a direct push ([myne-range](#myne-range), `homebrew-tap`, `myne-branding`). Both parse a VALUE (`1`, `true`, `yes`, `on`, case-insensitively) and refuse anything else, so they agree on what "allow" means and `=0` keeps the guard on rather than switching it off. The flag is read with `git config --local` deliberately, since a plain `--get` reads the merged cascade and one `--global` setting would switch the guard off in all eleven clones at once. A `min_version` at the top of each `lefthook.yml` is what stops an older binary from silently dropping `use_stdin` and leaving the guard green and inert.
+
+Used in: `lefthook.yml` (every `myne-md` repo); root `CLAUDE.md`; `scripts/hooks-parity-check.sh`; `decisions.md` 2026-08-27
+
 ### **per-account quota** &nbsp; 📦 *Product*
 
 The Phase 2 hosted-sync storage ceiling: per-account aggregate **deduplicated** ciphertext bytes (AS17 — one stored blob is counted once, not once per referencing note). Keyed on the account, never on identity beyond `account_number_hash`; a self-host operator sets their own ceiling (the protocol exposes the counter, the operator sets policy — TB5). Distinct from the [per-account rate-limit](#per-account-rate-limit) (bytes-at-rest vs request-frequency). Phase 2.
@@ -1822,6 +1930,20 @@ Used in: `spec/server-protocol.md` §3.1, §4 (SYNC-2, MYND-425)
 The Phase 2 server storage layout: each vault's ciphertext blobs live in a namespace scoped to that vault — there is **no global content-addressed bucket**. Because attachment-ids are vault-scoped keyed-HMAC (`protocol.md` §9.9), cross-vault deduplication is **structurally impossible** (and undesired — a global bucket would be a known-file confirmation oracle). Dedup is intra-vault only; quota (AS17) and the tombstone ledger are kept clean per vault. Phase 2.
 
 Used in: `spec/server-protocol.md` §2
+
+### **period anchor** &nbsp; 📦 *Product*
+
+The single date a [periodic note](#periodic-note)'s title is formatted from: the FIRST day of the period the current instant falls in. Today for a daily note, that week's Monday for a weekly one, that month's first day for a monthly one. It is what makes "open this period" idempotent: every day inside one period yields the same anchor, so it yields the same title, so it resolves to the same note. Computed **per client**, and the rule is narrower than "honour the `timezone` pref wherever it is set": a client honours the override where it can also SHOW and CHANGE it (`decisions/storage/0556`). The desktop has that setting and applies it, so the date it shows and the date it files under are the same date. Mobile ships no control and displays nothing derived from the override, so it reads the device clock; the CLI reads the device clock and says so on stderr. The reason is that `timezone` is device-local as a MERGE class rather than as an exclusion from the blob, so a device enrolled after the override was set inherits it in the prefs seed without ever having offered it: applying an inherited zone on mobile would move which note a period command opens while changing nothing the user could see, explain or alter. The accepted cost, stated in that entry rather than implied here, is that a user whose override sits in a different calendar day from their device can hold one weekly note from the desktop and another from the phone, both real, both synced, and nothing reconciles them, because the match rule is folder plus title and nothing else. Distinct from the period's inclusive **bounds**, which the `{{period_start}}` / `{{period_end}}` [note-template](#note-template) tokens carry. (myne-md/myne#177)
+
+Used in: `decisions/storage/0556`, `spec/protocol.md` §9.5.2
+
+### **periodic note** &nbsp; 📦 *Product*
+
+An ordinary `.myn` note representing one calendar period (a day, a week or a month), identified by **folder + title** exactly as a [daily note](#daily-note) is, and **not** a calendar object or date-indexed database. Three periods ship (daily, weekly, monthly); quarterly and yearly were deliberately cut. Each period configures a folder, a title format and an optional [note template](#note-template), and each has an "open this period" command that resolves idempotently: found → open, not found → create and open. Past periods are reached through the ordinary sidebar folder: no previous/next command, no picker, no calendar, which is the same line the daily note already drew (`vision.md`).
+
+Daily keeps its three top-level `vault.prefs` fields; weekly and monthly live in the `periodic_notes` map, keyed `<period>.<setting>` (`spec/protocol.md` §9.5.2). The split is a sync property rather than a style: prefs merge per field, so a device on an older build would keep writing `daily_folder` while a newer one wrote the map, and nothing could say which is authoritative. A weekly title is an ISO 8601 week (`gggg-[W]ww`, Monday start, week-year rather than calendar year), frozen with no first-day-of-week setting because changing one would silently re-point every weekly note already on disk. (myne-md/myne#177)
+
+Used in: `spec/protocol.md` §9.5.2; `spec/sync-protocol.md` §10.2
 
 ### **property** &nbsp; 📦 *Product*
 
@@ -1865,6 +1987,21 @@ Used in: `decisions.md` 2026-07-13
 The intermediate variant of the [`Slot`] enum representing a vault that has successfully completed phrase-based recovery (`vault_recover_with_phrase`) but has not yet committed a new master password (`vault_complete_recovery`). Carries `root_key`, `items_key`, `items_key_id`, and `recovered_at: Instant` in `Zeroizing` wrappers — both keys are derived eagerly during the recovery step so the entire credential chain is verified before the slot transitions. Editor commands cannot pattern-match `Slot::Recovering` and are therefore structurally denied access during this window per `recovery-flow.md` §4.1's non-dismissible chained step. The only legal transitions out are `Slot::Recovering → Slot::Unlocked` (via `vault_complete_recovery` success) or `Slot::Recovering → Slot::Empty` (via `vault_lock` — the §4.3 within-session bail case).
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
+
+### **ImportSource** (slot state) &nbsp; 📦 *Product*
+
+The read-only variant of the [`Slot`] enum, holding a second vault's keys for the length of a [vault import](#vault-import) (myne-md/myne#464). Carries `root_key`, `items_key`, `items_key_id` in `Zeroizing` wrappers plus `opened_at`, exactly as **Recovering** does, and for the same reason: the whole credential chain is verified when the slot is created rather than at first use. It is NOT an unlock and has no transition into one: every editor command matches `Slot::Unlocked` and so rejects it at compile time, and the only ways out are the import ending, the [target vault](#target-vault) locking or switching, and an independent 30-minute TTL swept by the idle timer. It does not count against the one-`Unlocked` invariant, because it is not an `Unlocked` entry: two vaults' keys can be resident at once, which is the one thing about this feature the threat model had to be amended for (`threat-model.md` A6).
+
+Used in: `threat-model.md` A6, `decisions.md` 2026-08-30 "A vault opened for READING is a slot, not an unlock"
+### **removal clock** &nbsp; 📋 *Protocol*
+
+The per-entry timestamp that lets a set-union preference express a DELETION (myne-md/myne#613). A union alone cannot: an entry removed on one device is an absence, indistinguishable from "this device never had the entry", so the peer's copy is restored by the next union and the deletion undoes itself within two rounds, with no concurrency required. The clock is the tombstone that makes the difference legible.
+
+Stamped on `<field>/<entry>` in the [field clock](#field-clock) map for the three CLOCKED set fields, [deliberate folder](#deliberate-folder), [archived folder](#archived-folder) and the spell-language set. **A removal is a stamped absence**: the removing side stamps the key, and a single-sided entry is dropped when the absent side's clock is strictly greater than the present side's. Equal clocks keep the entry, "absent sorts lowest", which is the recoverable direction. **An addition is stamped too**, which the per-key maps do not need: without an add stamp a re-added entry carries no clock of its own and loses to its own tombstone permanently, so a folder deleted and later refilled could never come back. A clock is retained even when neither side holds the entry, indefinitely, because dropping it lets a third device that still holds the entry at an older clock resurrect what two others deleted.
+
+**The two egress controls deliberately have none.** [AI-excluded folder](#ai-excluded-folder) and [CLI-excluded folder](#cli-excluded-folder) keep the clockless monotone union: a removal clock orders un-exclusion by wall clock, so a forward-skewed device could unexclude a folder no correctly-clocked device can restore, and the failure direction there is note plaintext leaving the device. The cost, stated rather than implied, is that once a second device holds an exclusion it is add-only. See [set-field byte budget](#set-field-byte-budget), which the retained clocks are measured against.
+
+Used in: `spec/sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; myne-md/myne#613
 
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
@@ -1991,9 +2128,17 @@ A widening of an [agent scope](#agent-scope) during a run, approved by the user 
 
 Used in: `decisions.md` 2026-08-16
 
+### **screen-capture override** &nbsp; 📦 *Product*
+
+*(Aliases: screen-capture escape, pre-unlock escape hatch. `threat-model.md` §7, `decisions.md` 0562 and the manual-test roster all say `escape`; the component is `ScreenCaptureEscape.tsx`. One thing, listed here under the name the setting carries.)*
+
+The device-local escape hatch from [screen-capture protection](#screen-capture-protection) (myne-md/myne#482). One boolean at `<app_config_dir>/screen-capture.json`, plus a `--disable-screen-capture-protection` process flag that leaves no file at all, reachable from a keyboard-focusable control on every pre-unlock screen and set only through a consent step that states the cost. It exists because the three decisions that made protection always-on before unlock left the toggle sealed inside `vault.prefs` and its control post-unlock, so on Windows a user on remote-control software or a magnifier saw a black window with the account number, the recovery-phrase ceremony and the device-join QR behind it. **Device-wide, not pre-unlock-only** (an override that lapsed at unlock would put the black window straight back) so while it is set the per-vault preference is superseded rather than silently ignored. It is deliberately **not** a sealed store: every keychain-backed store in this codebase is Apple-only, which would have shipped the escape on the two platforms where nothing is claimed and omitted it on the one where the layer works. An unreadable file resolves to protection ON, the opposite direction from [hide vault names](#hide-vault-names) and for the opposite reason, and the process flag is the recovery path for that case. What it discloses at rest is bounded in `threat-model.md` §7.
+
+Used in: `decisions.md` 2026-08-30 (entry 0541); `threat-model.md` §6, §7
+
 ### **screen-capture protection** &nbsp; 📦 *Product*
 
-Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (Windows `WDA_EXCLUDEFROMCAPTURE`, macOS `NSWindowSharingNone`). **Effective on Windows 10 build 19041+ only.** The macOS call is still made but nothing is claimed for it — Apple documents `NSWindowSharingNone` as a legacy constant macOS no longer uses and states no public API exists for preventing screen capture. No Linux display server offers an application-requestable exclusion; on KDE Plasma 6.6+ and Hyprland 0.50+ the **user** can configure one as a window rule. `decisions.md` 2026-08-15 supersedes the macOS clause of 2026-05-27.
+Best-effort native window exclusion preventing OS screen-recording and screenshot APIs from capturing Myne content. Applied at app startup via Tauri's `set_content_protected` (Windows `WDA_EXCLUDEFROMCAPTURE`, macOS `NSWindowSharingNone`). **Effective on Windows 10 build 19041+ only.** The macOS call is still made but nothing is claimed for it. Apple documents `NSWindowSharingNone` as a legacy constant macOS no longer uses and states no public API exists for preventing screen capture. No Linux display server offers an application-requestable exclusion; on KDE Plasma 6.6+ and Hyprland 0.50+ the **user** can configure one as a window rule. `decisions.md` 2026-08-15 supersedes the macOS clause of 2026-05-27. It is always applied before unlock regardless of any saved *vault* preference, with one consented device-local exception: see [screen-capture override](#screen-capture-override) (`decisions.md` 0562).
 
 Used in: `threat-model.md` §6, §7
 
@@ -2004,6 +2149,22 @@ The one assertion suite that pins the behaviour of the [platform seam](#platform
 **Known gap, recorded rather than implied away.** The [platform seam](#platform-seam) got a third implementation in myne#492, `mobile/src/platform/`, and it has no contract driver: `tests/platform/` holds two subjects, not three. So the coverage claim above is exact and deliberately narrower than "every implementation", which is what this entry used to say while a third seam shipped outside it. The suite is already parameterised for a third subject (it takes a `supports` set), so closing the gap is a driver file rather than a redesign; until it lands, mobile's seam is verified by its own specs and by the twin-drift warning, not by this contract.
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
+
+### **save readout** &nbsp; 📦 *Product*
+
+The bottom-bar line that says what the current window owes the open note (myne-md/myne#566, reshaped by myne-md/myne#603). Five states, each with its own glyph, so the state is readable without reading the words:
+
+- **`Saved · N min ago`**: a solid dot. Settled, nothing owed.
+- **`Editing…`**: `circle-dashed`, still. Written and not yet saved: autosave is armed. The state a whole writing session is spent in, which is why it does not move.
+- **`Saving…`**: `loader-circle`, turning, in `--accent`. A disk write, which ends.
+- **`Resolving edit conflict…`**: the same turning `loader-circle`. A conflict copy is being written; it also ends.
+- **`Save failed · Retry`**: a cross, in `--warning`, with a retry control.
+
+It carried a **sixth, unrelated** fact until #603: whether the note had reached the server. That was drawn with the same glyph as `Editing…`, a pixel to its right, so the readout showed two identical grey marks meaning two different things. Sync debt is its own axis and has its own icon, the [unsynced mark](#unsynced-mark).
+
+Three of the five are [inline status marks](#inline-status-mark); `Saved` and `Save failed` are not, because neither is a degree of progress.
+
+Used in: `src/components/Spinner.tsx`, `src/notes/components/SaveStatus.tsx`
 
 ### **search index** &nbsp; 📦 *Product*
 
@@ -2029,7 +2190,7 @@ Used in: `spec/protocol.md` §3.4, §5.2, §9.6
 
 ### **service worker** &nbsp; 📦 *Product*
 
-A script the browser installs for an origin and consults for that origin's network requests. In the Phase 3 web client it is the intended **code-pinning** mechanism: once implemented it will serve the bundle it already holds and accept a replacement only when that bundle's hash is *both* signed by a release key the worker carries *and* present in the public append-only record of released hashes — so a bundle substituted *later* cannot reach a client that has already loaded once.
+A script the browser installs for an origin and consults for that origin's network requests. In the Phase 3 web client it is the intended **code-pinning** mechanism: once implemented it will serve the bundle it already holds and accept a replacement only when that bundle's hash is *both* signed by a release key the worker carries *and* present in the append-only record of released hashes (which is private today, so "public" describes the intent rather than the state; `decisions.md` entry 0534) — so a bundle substituted *later* cannot reach a client that has already loaded once.
 
 **The policy is fixed; the worker is not built.** `decisions.md` 2026-07-26 settles the update rules deliberately ahead of the implementation, because pinning code and shipping security fixes are in direct tension and resolving that tension inside an update path nobody reviews as a security decision is exactly how the hole reopens. What exists today is that policy alone, extracted as a pure function (`web/src/sw/update-policy.ts`, whose only caller is its unit test): no worker script ships, nothing registers one, and nothing currently pins a loaded bundle. Until one does, the compensating controls that actually ship against [served-code delivery](#served-code-delivery) are the detection-oriented pair — the reproducible bundle build, and the per-release hashes published in [`web-bundle-hashes.md`](web-bundle-hashes.md).
 
@@ -2059,6 +2220,18 @@ Used in: `spec/protocol.md` §9.7; `decisions.md` 2026-06-17 (MYND-308)
 
 The encrypted `vault.workspace` artifact (`MYW1`, `spec/protocol.md` §9.7) carrying the editor's **workspace state** — the open-tab set per pane, the recursive pane-split layout, each pane's active tab, the focused pane, per-tab cursor/scroll positions, and per-tab [view mode](#view-mode) (MYND-166; per-tab view mode added by MYND-299, named slots by MYND-308). AS3-Sensitive (note ids + structure): persisting *which notes are open* is activity metadata, so it rides inside the AEAD envelope under [session-state-key](#session-state-key) rather than as plaintext local state. The inner descriptor is client-opaque to the protocol layer (like the [search index](#search-index)); since MYND-308 it holds `{slots, active}` ([named workspaces](#named-workspace)) and `workspace_format_version` is `0x02` (an old `0x01` binary hits `FormatUnsupported` → single empty pane). Write cadence is **graceful-exit only** in the single-workspace baseline (manual lock / idle auto-lock grace / quit, never per tab-switch), **coalesced to ≤ once per ~5 min of active use** once named workspaces are in play (MYND-308 — a bounded relaxation of §9.7.4, `threat-model.md` §7), and on **mobile** resolves "quit" to **app-background** alongside lock, dirty-gated (MYND-561 — the platform has no quit signal; §9.7.4 "Mobile exit analogs") — so the blob's mtime stays a coarse signal, never a high-resolution editor-activity log. Best-effort, not crash-durable; a missing / tampered / malformed / wrong-version blob falls back to a single empty pane (§9.7.4).
 
+### **set-field byte budget** &nbsp; 📋 *Protocol*
+
+The bound a `vault.prefs` write is held to so that the 64 KiB plaintext cap (`spec/protocol.md` §9.5.4) is never reached. It is measured over the WHOLE canonical plaintext, every [content-scaled field](#content-scaled-field) and feature-scaled one together with the retained `field_clocks` tombstones, and it sits at the cap less 4 KiB of headroom in the reference implementation.
+
+**Not a per-field share, and the correction is worth stating** because the first version of this entry described one. Five set fields share one cap, so each of them cannot be granted half of it; and an estimate over one field's live entries can see neither the other four fields nor the tombstones that outlive their entries, so it reports room in a blob already past the cap.
+
+It exists because `deliberate_folders` is the first preference whose size grows with the user's CONTENT rather than with the number of features, and an over-cap `vault.prefs` save fails outright rather than truncating. Without a bound, a vault with enough folders would stop being able to save any preference at all. Past the budget an individual addition is REFUSED and the write still succeeds, so the folder behaves as folders did before [at-fill registration](#at-fill-registration): it exists while it holds a note, and stops existing when the last one leaves. The user is told, because deleting a folder is a real remedy.
+
+Two properties are normative rather than incidental. Refusals are **ordered** shallowest-first then alphabetically, so a full budget leaves the vault's top-level structure standing rather than an arbitrary slice, which is what makes the limit explainable. And a **removal is never refused**. That one is a property rather than an assertion: a removal does not shrink the blob, it trades a live member for a permanent tombstone, and on a folder set the tombstone is the larger of the two. What makes the promise true is that every live entry is charged for the tombstone it will one day mint, so the room a removal needs was reserved when the entry was admitted.
+
+Used in: `spec/protocol.md` §9.5.4; myne-md/myne#613
+
 ### **selection toolbar** &nbsp; 📦 *Product*
 
 The floating UI surface that appears above an active text selection in the Phase 1 editor, exposing format actions (bold / italic / strikethrough / inline-code / link / heading dropdown). Positioning uses the shared `src/editor/positioning.ts` helper — `getBoundingClientRect` + viewport-edge clamp + flip-below-when-no-room-above. The 🔗 (link) button opens an **inline URL overlay** adjacent to the selection rather than a `window.prompt()` or modal, matching `PRODUCT.md`'s "modals not as first reach for interaction" anti-pattern. Implemented as a CodeMirror 6 `ViewPlugin` that mounts/unmounts the toolbar based on selection state; absent when the selection is empty. **Opt-out per host since MYND-559:** `myneExtensions` / `CMEditorProps` take `selectionToolbar`, default `true` (desktop), and a host that renders its own formatting surface passes `false` — the plugin is then never constructed, rather than mounted-and-hidden. The mobile client does exactly that, driving formatting from its above-keyboard format bar instead, so on mobile this surface does not exist.
@@ -2073,7 +2246,7 @@ Used in: `vision.md`, `threat-model.md` §3
 
 ### **served-code delivery** &nbsp; ⚠️ *Threat*
 
-The property that distinguishes the web client's code channel from every other one Myne uses: the client program is re-sent from an origin on **every page load**, the browser verifies no signature over it, and the user keeps no artifact afterwards to hash or compare. This makes the origin operator able to serve one identified account modified code and everyone else the honest code, undetectably at the time and in the same page the master password is typed into. It is a **separate boundary (TB11) and a separate adversary (A15)**, not a variant of the signed, hash-published, reproducible distribution channel TB7 describes — a served bundle satisfies none of TB7's three crossing conditions. Compensating controls are detection-oriented and close *later substitution*, not *targeted first delivery*. Two of them ship: the reproducible bundle build, and the per-release bundle hashes published in a public append-only record ([`web-bundle-hashes.md`](web-bundle-hashes.md)). The third — a [service worker](#service-worker) pinning the code after first load — has its policy fixed (`decisions.md` 2026-07-26) but no implementation, so today nothing bounds a later substitution either.
+The property that distinguishes the web client's code channel from every other one Myne uses: the client program is re-sent from an origin on **every page load**, the browser verifies no signature over it, and the user keeps no artifact afterwards to hash or compare. This makes the origin operator able to serve one identified account modified code and everyone else the honest code, undetectably at the time and in the same page the master password is typed into. It is a **separate boundary (TB11) and a separate adversary (A15)**, not a variant of the distribution channel TB7 describes, whose crossing conditions a served bundle satisfies none of. (This entry called that channel "signed, hash-published, reproducible" until 2026-08-25, and two of the three were wrong: desktop artifacts carry no signature any OS checks and are not reproducible. Hash-published is the one that holds. Entry 0534.) Compensating controls are detection-oriented and close *later substitution*, not *targeted first delivery*. Two of them ship, and one of those two is not yet usable by the reader it is for: the reproducible bundle build, and the per-release bundle hashes written to an append-only record ([`web-bundle-hashes.md`](web-bundle-hashes.md)) that lives in a private repository, so nobody outside the project can look a hash up in it. The third — a [service worker](#service-worker) pinning the code after first load — has its policy fixed (`decisions.md` 2026-07-26) but no implementation, so today nothing bounds a later substitution either.
 
 Used in: `threat-model.md` §1 A15, §3 TB11, §5
 
@@ -2113,6 +2286,16 @@ An opaque UUIDv4 identifying an in-flight vault-creation session held in the Tau
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow: backend session pattern", "Vault creation session TTL"
 
+### **scroll-fade edge** &nbsp; 📦 *Product*
+
+The soft top or bottom edge on a scrollable region that says "there is more this way" (myne-md/myne#565). Rendered as a `mask-image` on the SCROLLER, never as an overlay gradient: an overlay has to guess the surface colour behind it, and every theme and every custom palette makes that guess differently, so a mask that fades the content itself is the only form that survives a palette the author never saw.
+
+**Conditional, and that is the whole affordance.** Each edge appears only while there is content past it, so a region whose content fits carries no fade at all. A permanent fade is decoration, and worse, it is a lie about whether scrolling would do anything. The two edges are independent: `data-fade-top` and `data-fade-bottom` are set separately from the scroll position, and their absence is the correct rendering rather than a default.
+
+Masked on the scroller and not on its container, for the reason `CenteredCard` records: a `mask-image` clips the whole rendered box, so masking a card fades its own fill, its hairline and its corners, which is what a card IS.
+
+Used in: `src/hooks/useScrollEdges.ts`, `src/styles/tokens.css`
+
 ### **sealed label store** &nbsp; 📋 *Protocol*
 
 The device-local cache that lets the locked [vault picker](#vault-picker) show a vault's real name after a relaunch, when the name itself is AEAD-sealed inside that vault's [vault.prefs](#vaultprefs) and therefore unreadable until unlock. One `MYL1` file per vault at the vault root beside `vault.quickunlock`, sealed under a **per-vault** 32-byte `wrap_key` held in the OS keychain, never a `DeriveSubkey(root_key, …)` subkey: a derived subkey cannot be destroyed on its own while its root survives, so it could not deliver per-vault erase. The per-vault scoping is what preserves vault deletion's per-`VaultId` cryptographic-erase guarantee, since deleting a vault destroys that vault's key. Only a vault this device has unlocked at least once is ever named; there is no key with which to read the label of one it has not. Device-local, never synced, and structurally excluded from the backup container by the `§9.11.3` closed allowlist. See also [hide vault names](#hide-vault-names).
@@ -2144,7 +2327,7 @@ Used in: `spec/protocol.md` §7.1
 
 ### **signed bundle update** &nbsp; 📦 *Product*
 
-The verification story the web client is **laid out for but does not yet have**: a released bundle whose hashes are published to a public append-only record, reproducible from source so a third party can rebuild and compare, and structured so it can later enrol in an external code-transparency scheme without restructuring. It is deliberately *detection*, not prevention — it makes a silent later substitution discoverable after the fact, and closes nothing about targeted first delivery. Contrast the native clients' `TB7` channel, where a signature is verified **before any code runs** and a failed check refuses the update outright.
+The verification story the web client is **laid out for but does not yet have**: a released bundle whose hashes are published to a public append-only record, reproducible from source so a third party can rebuild and compare, and structured so it can later enrol in an external code-transparency scheme without restructuring. It is deliberately *detection*, not prevention — it makes a silent later substitution discoverable after the fact, and closes nothing about targeted first delivery. **Two clauses here describe an intent rather than a state, and both were read as fact until 2026-08-25** (`decisions.md` entry 0534). The record of released bundle hashes lives in a private repository today, so the reader this definition addresses cannot open it. And the contrast this entry used to draw against the native `TB7` channel, "where a signature is verified before any code runs and a failed check refuses the update outright", is false in every clause: no desktop artifact carries a signature any OS checks, nothing verifies one at launch, and there is no update for a check to refuse. What genuinely distinguishes `TB7` is persistence: a native artifact is downloaded once and stays on disk, so a substitution reaches only whoever downloaded during the window and the file is still there to compare by hand against the published `SHA256SUMS`. A web bundle is re-sent on every visit, can be aimed at one visitor, and leaves nothing behind to check.
 
 Used in: `threat-model.md` §1 A15, §3 TB11, §4
 
@@ -2190,15 +2373,23 @@ Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **Slot** &nbsp; 📦 *Product*
 
-The three-state enum that holds a vault's auth state inside `VaultRuntimeState`'s `RwLock<HashMap<VaultId, Slot>>` — one entry per vault, keyed by [VaultId](#vaultid) (an absent key IS the `Empty` case; no `Empty` entries are stored). Variants: `Slot::Empty` (no vault open), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access). Editor commands match only `Slot::Unlocked(uv) => ...`; the `Slot::Recovering` and `Slot::Empty` variants are structurally rejected at compile time (per entry). The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Multi-vault made the storage a `HashMap<VaultId, Slot>` (the singleton→map type-swap landed 2026-06-09) under the **≤1-`Unlocked` invariant**: at most one entry is ever `Unlocked` — the **active vault** is that sole `Unlocked` entry (no separate pointer), and unlocking a second vault first locks the current one. `auth_permits` stays a single global capacity-1 semaphore (one Argon2id auth op in flight client-wide, never per-vault). The per-entry lifecycle reasoning carries forward unchanged.
+The four-state enum that holds a vault's auth state inside `VaultRuntimeState`'s `RwLock<HashMap<VaultId, Slot>>` — one entry per vault, keyed by [VaultId](#vaultid) (an absent key IS the `Empty` case; no `Empty` entries are stored). Variants: `Slot::Empty` (no vault open), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access), `Slot::ImportSource { ... }` (a second vault opened read-only as the source of a [vault import](#vault-import), myne-md/myne#464). Editor commands match only `Slot::Unlocked(uv) => ...`; the other three variants are structurally rejected at compile time (per entry). The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Multi-vault made the storage a `HashMap<VaultId, Slot>` (the singleton→map type-swap landed 2026-06-09) under the **≤1-`Unlocked` invariant**: at most one entry is ever `Unlocked` — the **active vault** is that sole `Unlocked` entry (no separate pointer), and unlocking a second vault first locks the current one. An `ImportSource` entry does not count against it and never promotes into it: a second vault's keys can be resident, and they still cannot open an editor. `auth_permits` stays a single global capacity-1 semaphore (one Argon2id auth op in flight client-wide, never per-vault). The per-entry lifecycle reasoning carries forward unchanged.
 
-Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization", 2026-06-09 "Runtime multi-slot core"
+Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization", 2026-06-09 "Runtime multi-slot core", 2026-08-30 "A vault opened for READING is a slot, not an unlock"
 
 ### **SlotKind** &nbsp; 📋 *Protocol*
 
-The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_slot_kind` command (**not** by [vault_status](#vault_status), which probes `vault.meta` on disk). Three variants: `Empty | Recovering | Unlocked`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of three bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_slot_kind` round-trip would be paranoia).
+The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_slot_kind` command (**not** by [vault_status](#vault_status), which probes `vault.meta` on disk). Four variants: `Empty | Recovering | Unlocked | ImportSource`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of four bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`, `"ImportSource"`. `ImportSource` is reachable only when the caller passes an explicit `VaultId`, which the import picker does; the active-vault probe resolves an `Unlocked` entry else a `Recovering` one and deliberately never sees an import source. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_slot_kind` round-trip would be paranoia).
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
+
+### **smart-home** &nbsp; 📦 *Product*
+
+What `Cmd+←` and `Cmd+Shift+←` do on a [line-task](#line-task) or any other list row: the first press stops at the item's **content start**, past the marker, and a second press reaches the raw line start (myne-md/myne#561). On `- [x] buy milk` the line the user sees begins at `buy`, because `- [x] ` is decoration-hidden and drawn as a checkbox, so a boundary at the raw offset would select or delete markup that is not on screen.
+
+Progressive by design, which is why it is a keymap behaviour rather than a selection rewrite: the second press needs to know where the first one landed, and nothing further back in the chain does. `Cmd+Backspace` shares the same boundary, so a first press takes the label and a second takes the marker. Forward is untouched, because the end of a line is the end of a line on every kind of line.
+
+Used in: `editor/src/line-boundary.ts`
 
 ### **snapshot** &nbsp; 📦 *Product*
 
@@ -2250,6 +2441,10 @@ Adversary class A8: a transitive dependency in npm, Cargo, or Go modules ships m
 
 Used in: `threat-model.md` §1 (A8), §7
 
+### **sync arc** &nbsp; 📦 *Product* *(retired 2026-08-29; see decisions.md)*
+
+*Retired by myne-md/myne#603. It named one glyph doing two jobs: what the current window owed a note, and whether that note had reached the server. Drawn as a three-quarter ring at 7 to 8px, it did neither legibly, and on the `Editing…` readout it drew both facts as two identical marks a pixel apart. The two facts now have their own names and their own icons, the [save readout](#save-readout) and the [unsynced mark](#unsynced-mark). Preserved for audit trail.*
+
 ### **sync cursor** &nbsp; 📋 *Protocol*
 
 The Phase 2 opaque, per-device **monotone position** marking how far a device has pulled. A pull sends the cursor and receives the [per-blob sync-meta](#per-blob-sync-meta) for everything changed since; the cursor then advances. It carries **no wall-clock** (clock/order authority is the [version vector](#version-vector-vv), §4.1 Pin 4) — it is a catch-up bookmark, not a security primitive. Persisted device-locally alongside (but separate from) the [vault head](#vault-head) baseline. Phase 2.
@@ -2291,6 +2486,14 @@ Used in: VaultIndices (MYND-31), `spec/markdown-dialect.md` §3.7
 The editor surface [auto-tag](#auto-tag) renders into (MYND-651): a CodeMirror block widget anchored at the frontmatter/body boundary, hosting the suggested tags as chips — solid for a tag the vault already has, dashed `+` for one the model coined. One tap accepts (the tag is written into the note's frontmatter `tags:`, not injected as an inline `#tag`); dismiss drops it from the band. **Absent / zero-length when there is nothing to suggest**, so an idle note is never shifted — the byte-stability and shared-listener discipline are inherited from the [tag chip](#tag-chip) decoration cluster's installer. Inert where no inference engine exists (web, and mobile until MYND-653), so it is never a dead affordance.
 
 Used in: MYND-651, `decisions.md` 2026-07-31
+
+### **Source vault** &nbsp; 📦 *Product*
+
+*(Aliases: import source vault. Myne-divergent: yes — the term only exists because Myne can import from its own format.)*
+
+In a **vault import**, the vault notes are read FROM. Always another local vault on the same device, never the one currently unlocked, and never modified by the import: it is read through a dedicated read-only key slot (`Slot::ImportSource`) that holds its `root_key` and `items_key` for the length of the run and is zeroized when the run ends, when the target vault locks, or when an independent TTL expires. Contrast **target vault**.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
 
 ### **Spell check** &nbsp; 📦 *Product*
 
@@ -2339,7 +2542,7 @@ Used in: `spec/markdown-dialect.md` §3.9.4; `decisions.md` 2026-07-28; MYND-617
 
 ### **task reminder** &nbsp; 📦 *Product*
 
-A nudge at a chosen moment for a [line-task](#line-task) carrying a [`remind`](#remind) field (MYND-618). Delivered in **two layers**: an in-app layer while Myne is open, and — on platforms that hold such registrations — an OS **pre-registration** layer so one can fire while Myne is closed.
+A nudge at a chosen moment for a [line-task](#line-task) carrying a [`remind`](#remind) field (MYND-618). Delivered in **two layers**: an in-app layer while Myne is open and unlocked, and, on platforms that hold such registrations, an OS **pre-registration** layer so one can fire while Myne is closed. **The second layer ships on no client today** (myne-md/myne#508): the desktop has no OS adapter, and mobile's registration pass has no production caller. Everything below describes it because both are one wiring change away, not because either performs it now.
 
 **Locking does not cancel the registered set**, which is an explicit departure from the rule that every plaintext surface is torn down on every lock path, recorded in `decisions.md` 2026-07-28. The rule protects vault *content*; what the platform holds here is a timestamp and a content-free string. It is also barely a choice: the default auto-lock is five minutes with no off switch, so cancelling on lock would end reminders five minutes after the user stops typing.
 
@@ -2349,11 +2552,13 @@ Used in: `threat-model.md` §7; `decisions.md` 2026-07-28; MYND-618
 
 ### **registration horizon** &nbsp; 📦 *Product*
 
-How far ahead a device hands pending [task reminders](#task-reminder) to its operating system. Device-local and user-adjustable; Myne's default is seven days.
+How far ahead a device hands pending [task reminders](#task-reminder) to its operating system. Device-local and user-adjustable; Myne's default is seven days, and it is also the longest a client offers.
 
 ***A privacy bound before a resource one.*** Pending reminder **times** leave the AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7), so a shorter horizon exposes less. Its consequence is **stated rather than discovered**: reminders stop if Myne is not opened within the horizon, because registration can only happen inside an unlocked session — so the UI shows the date through which reminders are currently registered.
 
-Used in: `spec/protocol.md` §9.5.2; `threat-model.md` §7; `decisions.md` 2026-07-28
+**It bounds the in-app tier too, which is the only tier that ships today** (myne-md/myne#508). Where no operating system holds the registration, the horizon is the window the *running app* arms timers within: the same set, decided by the same `targetReminders` cutoff, delivered by the app rather than the platform. So it is a delivery bound on a client that holds no OS registration and a privacy bound on one that does, and only the second tier renders the "registered through \<date\>" line. That distinction is why the offered horizons are all **shorter** than the default rather than longer: the privacy reading is the one a user is entitled to act on, and widening the window is a `threat-model.md` §7 change rather than a preference.
+
+Used in: `spec/protocol.md` §9.5.2; `threat-model.md` §7; `decisions.md` 2026-07-28, 2026-08-29
 
 ### **reminder registration** &nbsp; 📦 *Product*
 
@@ -2361,7 +2566,7 @@ One [task reminder](#task-reminder) as the operating system holds it: an **opaqu
 
 ***The identifier is opaque on purpose, and that is a Myne-divergent choice.*** The client's own key for a reminder names where the task lives, which is the right key for reconciling a set and the wrong thing to hand a platform: a registration is written into the operating system's own persistence — and on Android into a pending intent — where a note identifier would be correlatable metadata outside the AEAD envelope. So what crosses is random bytes minted per registration, and the mapping back to a task is held **in memory only**. The cost is accepted rather than hidden: a new session cannot name the previous one's registrations, so it clears and re-registers them.
 
-**Who holds the set differs by platform.** iOS keeps it entirely in OS-owned storage. Android exposes no way to enumerate an app's alarms, so the client also keeps a device-local `{identifier → instant}` record — same content as the OS would hold, different holder, and it is what makes a registration survive the reboot that drops every alarm.
+**Who holds the set differs by platform**, on the client that will hold one: no shipping build registers with an operating system today (see [task reminder](#task-reminder), myne-md/myne#508), so the set is empty everywhere and what follows describes the shape it takes when a pass fills it. iOS keeps it entirely in OS-owned storage. Android exposes no way to enumerate an app's alarms, so the client also keeps a device-local `{identifier → instant}` record — same content as the OS would hold, different holder, and it is what makes a registration survive the reboot that drops every alarm.
 
 Used in: `threat-model.md` §7; `decisions.md` 2026-07-29; MYND-619
 
@@ -2457,6 +2662,32 @@ The recorded classification of every twin module: both paths, a mechanical byte-
 
 Used in: `scripts/check-twin-inventory.mjs`, `docs/dev/twin-inventory.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
 
+### **twin-drift ratchet** &nbsp; 🛠️ *Tooling*
+
+The recorded SET of twin pairs that currently differ semantically. It may shrink, never grow: a pair appearing in it that was not there before fails the build, and `--record` REFUSES to write a grown set, so the command the failure message suggests cannot be used to make the failure go away. A set rather than a count, because the case that actually happens is one pair converging while another diverges, which leaves a count unmoved. Only the SEMANTIC field gates: 15 of the tree's byte-different pairs differ only in a comment or the platform-seam import, and gating the byte flag would redden `pre-commit` for adding a comment to either side of a byte-identical pair. Its denominator has a separate floor, `EXAMINED_FLOOR`, kept in the guard rather than in the record, because shrinking the twin roster would shrink the set for free and read as progress.
+
+Used in: `scripts/check-twin-drift-ratchet.mjs`, `scripts/twin-drift-ratchet.json`, `decisions.md` 2026-09-02 (twin-drift ratchet, myne-md/myne#473)
+
+### **`@myne/client-core`** &nbsp; 🛠️ *Tooling*
+
+The cross-client DECISION layer: a source package holding what desktop, web and mobile all answer identically, consumed the way `@myne/copy` and `@myne/dialect` are. Its entry criterion is narrow and mechanically enforced: a module belongs there only if both clients answer the same question AND it reaches no host, which is `scripts/check-platform-seam.mjs`'s `seam: null`. That is what keeps the `src/lib/vault-*.ts` family OUT, seven of those nine call `invoke` at module scope, and their shared answer lives in `myne-core` behind an IPC command instead. Holds the Rust-error mirrors, the design-token sheet, the auto-lock envelope and the [boot decision](#boot-decision); both clients keep one-line re-export shims at the old paths, so importers are unchanged and the twin pairs collapse to byte-identical, EXCEPT where the shared thing is a decision rather than a value: the two stage machines still differ, on purpose, because what they share is the answer and not the screen.
+
+Used in: `client-core/`, `scripts/lib/shared-roots.mjs`, `scripts/check-platform-seam.mjs`, `decisions.md` 2026-09-02 (myne-md/myne#242)
+
+### **boot decision** &nbsp; 🛠️ *Tooling*
+
+What the boot probe FOUND, as a six-variant union with no screen in it: a resumable recovery, a live session, a failed vault-list read, no vaults, exactly one vault (carrying its id and status), or two or more. Shared by every client in `@myne/client-core/stage-decision`; each client maps it to its own `Stage`, which is where the capability gates live because a `has()` query is a fact about the host and that package reaches none.
+
+The split is at the decision rather than at the screen deliberately. A shared `Stage` union would be the obvious answer and the wrong one: mobile has no `account-entry` and no `pending-approval`, so widening its union would put a dead arm in every exhaustive switch for two states it cannot reach, against `decisions.md` 0488's line that the screens SHOULD differ. Measured before it moved: the two implementations were byte-identical except for the two capability ternaries, and of the twenty legal transitions the two tables shared, not one routed differently.
+
+Used in: `client-core/src/stage-decision.ts`, `src/lib/stage.ts`, `mobile/src/lib/stage.ts`, `tests/lib/stageDecision.test.ts`, `decisions.md` 2026-09-03 (myne-md/myne#477)
+
+### **token parity** &nbsp; 🛠️ *Tooling*
+
+Two rules over the design-token layer. One token name may have one declaration, so a name declared by both the shared sheet and a client sheet, or by two client sheets, is either a recorded override with a stated reason or a failure. And a `var(--x)` with NO fallback must name a token something declares, because an undeclared one resolves to nothing and the property is simply not applied, which reads as a deliberate flat surface rather than a bug. Scoped to fallback-less references on purpose: `var(--x, #fff)` degrades to a stated value and is a choice. Its first run found eight `var(--paper-1)` call sites, one of them in the shared `@myne/editor` package, against a token `src/CLAUDE.md` warns by name does not exist.
+
+Used in: `scripts/check-token-parity.mjs`, `client-core/src/tokens.css`, `decisions.md` 2026-09-02 (myne-md/myne#478)
+
 ### **decision (twin verdict)** &nbsp; 🛠️ *Tooling*
 
 The verdict for a twin where both clients answer the same question, so a divergence is a bug by definition. It belongs in a shared package and its entry carries a destination, which may be `undecided` where the destination turns on a question another sub-feature settles. The majority verdict by a wide margin; `docs/dev/twin-inventory.md` carries the current count, which is generated rather than hand-copied.
@@ -2481,6 +2712,14 @@ The verdict for a twin whose shared answer already lives in `myne-core` or a `@m
 
 Used in: `scripts/check-twin-inventory.mjs`, `core/CLAUDE.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
 
+### **Target vault** &nbsp; 📦 *Product*
+
+*(Aliases: none. Myne-divergent: yes — see source vault.)*
+
+In a **vault import**, the vault notes are written INTO: the one that is unlocked, the one whose keys seal every arriving note and re-sealed attachment, and the only one the import changes. Contrast **source vault**.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
+
 ### **Tauri** &nbsp; 🛠️ *Tooling*
 
 A Rust-based framework for building cross-platform desktop applications with web-technology UIs. Myne's Phase 1 desktop-client framework (`decisions.md` Deferred #5 resolution). Supersedes the prior Electron baseline. Advantages: small TCB, ~10 MB binary vs ~150 MB Electron, ~40 MB idle RAM vs ~250 MB, achievable reproducible builds, structural memory hygiene via Rust's `zeroize`/`secrecy`/`subtle` crates, smaller updater attack surface.
@@ -2491,15 +2730,21 @@ Used in: `decisions.md`, `vision.md`, `threat-model.md` §3 TB7
 Language-aware token coloring of a fenced code block's contents inside the editor, applied as a presentation overlay over the live markdown source (never mutating it — notes stay plain markdown after decryption). Implemented via a nested Lezer parser + a code-only `HighlightStyle`; distinct from the cursor-aware *reveal* used for other markdown chrome (code is always colored, not hidden/revealed). Introduced MYND-154.
 Used in: `src/editor/code-highlight.ts`, `docs/decisions.md` (2026-05-29).
 
+### **diagram surface (`--diagram-*` tokens)** &nbsp; 📦 *Product*
+
+The three CSS design tokens that keep a rendered [mermaid diagram](#mermaid-diagram) legible on every theme: `--diagram-surface` (the card behind it), `--diagram-ink` (the text on that card) and `--diagram-danger` (the render-failure line on the same card). They are **not** aliases of `--paper` and `--ink-1`, and the distinction is the whole point: mermaid's node palette is baked light in `themeVariables`, so the card has to stay light whatever the editor theme does, and a surface that follows the theme while the ink does not is the drift that produced dark text on a dark card. Surface and ink are a PAIR rather than two independent values, which is why naming only one of them was the bug. Every built-in theme block leaves all three alone; a custom theme can set them, because `theme-validator` accepts any name that is not `--_`-prefixed, so the invariant is a convention rather than a construction. Defined in the runtime `client-core/src/tokens.css`, which every client imports (myne-md/myne#478; it was two per-client sheets until then), mirrored in the canonical `docs/design/colors_and_type.css`, and consumed by the editor card and the HTML/PDF export stylesheet. Introduced myne-md/myne#629.
+
+Used in: `src/styles/tokens.css`, `mobile/src/styles/tokens.css`, `docs/design/colors_and_type.css`, `editor/src/theme.ts`, `src/dialect/html/print-stylesheet.ts`.
+
 ### **syntax palette (`--syntax-*` tokens)** &nbsp; 📦 *Product*
-The family of CSS design tokens (`--syntax-keyword`, `--syntax-string`, `--syntax-comment`, …) defining the syntax-highlighting colors, with a light and a dark value each. Every hue clears WCAG AA (≥4.5:1) contrast against the `--paper-2` code-card fill in both themes. The editor's code `HighlightStyle` maps Lezer code tags onto these tokens; no ad-hoc hex. Defined in the runtime `src/styles/tokens.css` (what the app loads) and mirrored in the canonical `docs/design/colors_and_type.css`. Introduced MYND-154.
+The family of CSS design tokens (`--syntax-keyword`, `--syntax-string`, `--syntax-comment`, …) defining the syntax-highlighting colors, with a light and a dark value each. Every hue clears WCAG AA (≥4.5:1) contrast against the `--paper-2` code-card fill in both themes. The editor's code `HighlightStyle` maps Lezer code tags onto these tokens; no ad-hoc hex. Defined in the runtime `client-core/src/tokens.css` (what every client loads) and mirrored in the canonical `docs/design/colors_and_type.css`. Introduced MYND-154.
 Used in: `src/styles/tokens.css`, `docs/design/colors_and_type.css`, `src/editor/code-highlight.ts`.
 
 ### **template variable** &nbsp; 📦 *Product*
 
-A `{{token}}` placeholder in a [note template](#note-template) body that the variable engine substitutes against a fixed built-in registry at note-creation time. The v1 registry is `{{date}}`, `{{time}}`, `{{title}}`, `{{datetime}}`, `{{weekday}}` (lowercase-only; unknown tokens are left literal, which doubles as the escape mechanism). Substitution is **deterministic, one-shot, eager** — parse → registry lookup → substitute, never an expression, formula, callback, or format-argument mini-language (the anti-plugin / no-scripting commitment, `vision.md`). The engine is inferred-not-declared: it scans the template body for tokens at fill time rather than reading a declared-variables field, and reads no clock or locale itself (the host injects the time-derived values). Output is plain markdown — a rendered token emits only literal text. See `spec/markdown-dialect.md` §3.6.1, the variable-engine module in `protocol/`, MYND-188.
+A `{{token}}` placeholder in a [note template](#note-template) body that the variable engine substitutes against a fixed built-in registry at note-creation time. The registry is `{{date}}`, `{{time}}`, `{{title}}`, `{{datetime}}`, `{{weekday}}`, `{{period_start}}` and `{{period_end}}` (lowercase-only; unknown tokens are left literal, which doubles as the escape mechanism). The last two are the bounds of the [periodic note](#periodic-note) being instantiated (myne-md/myne#177); they are defined for every period and for a note made by hand, where both equal the current day, so a token is never rendered empty. Substitution is **deterministic, one-shot, eager** — parse → registry lookup → substitute, never an expression, formula, callback, or format-argument mini-language (the anti-plugin / no-scripting commitment, `vision.md`). The engine is inferred-not-declared: it scans the template body for tokens at fill time rather than reading a declared-variables field, and reads no clock or locale itself (the host injects the time-derived values). Output is plain markdown — a rendered token emits only literal text. See `spec/markdown-dialect.md` §3.6.1, the variable-engine module in `protocol/`, MYND-188.
 
-Used in: `protocol/` variable engine (MYND-188); `spec/markdown-dialect.md` §3.6.1
+Used in: `protocol/` variable engine (MYND-188, myne-md/myne#177); `spec/markdown-dialect.md` §3.6.1
 
 ### **test vector** &nbsp; 📋 *Protocol*
 
@@ -2532,6 +2777,14 @@ The vocabulary is also not the readability gate: the WCAG floors apply to the co
 Distinguish it from the **value-shape allowlist**, which is a security control over what a value may *look like* and is deliberately narrow (`threat-model.md` "Custom-theme CSS-value surface"). The vocabulary says which keys mean something; the allowlist says which values may exist at all. Widening the first has never required widening the second.
 
 Used in: `decisions.md` 2026-08-06; `spec/protocol.md` §9.21
+
+### **throughput routing preference** &nbsp; 📋 *Protocol*
+
+The `provider.sort = throughput` field on every OpenRouter request (myne-md/myne#620), including ordinary chat as well as [agent runs](#agent-run). OpenRouter is a broker that forwards to model vendors, so "who receives this" is a set Myne can bound only at its first hop; the `provider` object is the one surface Myne has over the second hop, and this is Myne starting to use it.
+
+**The criterion expressed is speed, and no data-handling term is expressed. That is a choice rather than an absence.** The broker's routing object does carry one, `data_collection`, which routes only to vendors that do not store or train on prompts, alongside `only` and `ignore` for explicit vendor pinning. Myne adopted the field about speed and declined that one. Whether to set `data_collection: deny` is an open product decision recorded in `decisions/ai/0555`: it narrows the recipient set on the axis this project cares about most, and it narrows it enough that a given model may have no qualifying vendor, which turns a privacy default into a feature that intermittently fails. What it buys is measured (a run served at 9 to 22 tokens per second where 150 would have been 63 seconds instead of 792); what it costs is that the set of possible recipients is now influenced by Myne rather than left to the broker's default.
+
+Used in: `decisions/ai/0555`, `threat-model.md` TB13
 
 ### **threat model** &nbsp; ⚠️ *Threat*
 
@@ -2597,6 +2850,16 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-17 (MYND-348)
 
 An [attachment](#attachment) referenced by **zero live notes** — either orphaned (its referencing note(s) deleted) or never inserted (imported into the library but not yet embedded). It stays in the [`vault.attachments`](#vaultattachments) catalog and visible in the library (Myne is library-first; `protocol.md` §9.10 keeps metadata after note deletion); it is **never** auto-deleted. The only thing that removes it is the explicit user-triggered "Clean unused attachments" sweep, which recomputes the zero-reference set authoritatively (scanning every note, fail-closed) and cryptographically erases the confirmed set. Distinct from a [stray attachment file](#stray-attachment-file) (catalog-less crash remnant). (MYND-171; `decisions.md` 2026-06-13)
 
+### **unsynced mark** &nbsp; 📦 *Product*
+
+The [inline status mark](#inline-status-mark) that says a note's current bytes have not reached the server: `cloud-off`, a cloud with a corner-to-corner slash, at the trailing edge of a sidebar note row and after the [save readout](#save-readout) in the bottom bar (myne-md/myne#603).
+
+It **depicts the sentence**, and after three attempts that is the whole of the lesson. It was a hollow 6px ring, which at that size is the same glyph as a dot. It became the save readout's own three-quarter arc, which put two identical grey marks a pixel apart on the `Editing…` readout meaning two different things. It became a solid 8px triangle, which was at least distinct and depicted nothing, so down a column of sidebar rows it read as a bullet point. Each of the three was hand-drawn geometry small enough to be unlearnable; the fix was a named icon at a size where an icon works.
+
+It **never moves and is never `--accent`**, unlike the readout's own marks. There is no bounded in-flight variant of it to express: a note can sit unsynced for a week on a machine that is shut, so motion and the accent colour both stay with the save readout, where the work ends.
+
+Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`, `src/notes/components/NoteRow.tsx`, `src/notes/components/SaveStatus.tsx`
+
 ### **UUIDv4** &nbsp; 📋 *Protocol*
 
 Random-only UUID variant. Not used in Myne v0.1; reserved as a candidate for a later version if the millisecond-resolution timing leakage of UUIDv7 (used for note filenames) becomes unacceptable.
@@ -2614,6 +2877,22 @@ Used in: `spec/protocol.md` §9.1
 The first Myne protocol specification (`spec/protocol.md`). Covers Phase 1 at-rest encryption only. Sync, multi-device, sharing, and post-quantum primitives are out of scope; they appear in a later major version.
 
 Used in: `spec/protocol.md` (titled v0.1)
+
+### **Vault import** &nbsp; 📦 *Product*
+
+*(Aliases: Myne vault import. Myne-divergent: yes.)*
+
+Bringing notes from one Myne vault into another, as the first entry in the import-source picker. It ADDS notes to the open vault, which is what distinguishes it from **restore backup**: a restore PLACES a whole vault and never decrypts a note, where an import decrypts each note under the **source vault**'s keys and re-seals it under the **target vault**'s. Notes, folders, tags, the links between imported notes, the attachments those notes reference, and the source's added dictionary words cross. Version history, trashed notes, templates, unreferenced attachments, prefs, themes, workspace layout, the search index, the device roster and sync enrolment do not.
+
+Used in: `threat-model.md` A6, `spec/markdown-dialect.md` §6
+
+### **Import label** &nbsp; 📦 *Product*
+
+*(Aliases: none. Myne-divergent: yes.)*
+
+The name a user gives one **vault import**, prefilled from the **source vault**'s own name. It does two jobs. It is the suffix a colliding note is renamed with (`Project` becomes `Project (Eski laptop)`), which is what lets an imported wikilink be pointed at the note that came with it rather than at the target's own note of that name. And because it is stable rather than a counter, re-running the same import under the same label re-derives the same renamed title, finds it already present, and skips: the label is what makes a repeat import idempotent, and changing it is what makes it not.
+
+Used in: `spec/markdown-dialect.md` §6
 
 ### **VaultId** &nbsp; 🗝️ *Key/identifier*
 
@@ -2820,7 +3099,7 @@ Used in: `spec/markdown-dialect.md` §3.2/§7
 
 ### **mermaid diagram** &nbsp; 📦 *Product*
 
-A ```mermaid fenced code block rendered as an SVG diagram in the editor (MYND-49) via lazy-loaded Mermaid (`securityLevel:'strict'`, `htmlLabels:false` — mermaid sanitizes its own SVG with its bundled DOMPurify). `fenced-code.ts` skips the `mermaid` info-string so the diagram widget renders it instead of a code card; parse-error / load-failure falls back to a monospace card. Cursor-aware whole-block reveal; render-only (§6 C1). Mermaid is the **heaviest dependency** in the project (≈+100 transitive packages), lazy-loaded so a diagram-free note pays zero bytes — shipped as a conscious decision (`decisions.md` 2026-06-08) over the auto-grill's defer recommendation. PlantUML is not rendered (stays a code card).
+A ```mermaid fenced code block rendered as an SVG diagram in the editor (MYND-49) via lazy-loaded Mermaid (`securityLevel:'strict'`, `htmlLabels:false`: mermaid sanitizes its own SVG with its bundled DOMPurify). `fenced-code.ts` skips the `mermaid` info-string so the diagram widget renders it instead of a code card; parse-error / load-failure falls back to a monospace card carrying a single line naming mermaid's reason when it gave one. A diagram renders at its NATURAL size and scrolls inside its own card rather than being scaled down to the column width (myne-md/myne#629). Cursor-aware whole-block reveal; render-only (§6 C1). Mermaid is the **heaviest dependency** in the project (≈+100 transitive packages), lazy-loaded so a diagram-free note pays zero bytes. Shipped as a conscious decision (`decisions.md` 2026-06-08) over the auto-grill's defer recommendation. PlantUML is not rendered (stays a code card).
 
 Used in: `spec/markdown-dialect.md` §7; `dependency-policy.md`
 
@@ -2936,7 +3215,8 @@ The **Library** column names what Myne's own clients actually link — `protocol
 | Major version | Per-note magic | Vault-meta magic | AAD prefix | Context-string prefix | Status |
 |---|---|---|---|---|---|
 | v0.1 | `MY01` | `MYV1` | `"myne.v0.1|"` | `"myne.v0.1 "` | Active (this document) |
-| next major (reserved) | `NT05` | `NTV5` | not pre-allocated | not pre-allocated | Reserved; the next major version defines its own AAD/HKDF prefix |
+| v0.2 | `NC05` | `NTV5` | `"myne.v0.2\|"` | `"myne.v0.2 "` | Active: the birth format since 2026-08-13 (§10.3.1); `MYP5`/`MYA5`/`MYC5`/`MYD5`/`MYT5` ship with it |
+| next major (reserved) | `NT05` | `NTV5` | not pre-allocated | not pre-allocated | Reserved; the next major version defines its own AAD/HKDF prefix. Note `NTV5` is consumed by v0.2 above, so which magic the next major's `vault.meta` carries is an open question rather than a settled reservation |
 
 The four prefixes for a single major version are deliberately non-interchangeable: each lives in a different cryptographic call site, and using one in place of another is a protocol violation. See entry **`myne.v0.1` prefix** and `spec/protocol.md` §10.3.
 
@@ -2946,7 +3226,7 @@ The four prefixes for a single major version are deliberately non-interchangeabl
 - **Assets** (`AS…`) → `threat-model.md` §2
 - **Trust boundaries** (`TB…`) → `threat-model.md` §3
 
-Each of the three rosters is open-ended and has grown since v0.1 (most recently with the web client's A15 / TB11), so the ranges are deliberately not restated here — those three sections are the enumeration of record. These enumerations are normative and frequently referenced from other docs (e.g., "TB7 mitigates A9 via signed auto-update"), but enumerating each one in the glossary would duplicate the threat model. Read those sections directly when an entry references an A/AS/TB number.
+Each of the three rosters is open-ended and has grown since v0.1 (most recently with the web client's A15 / TB11), so the ranges are deliberately not restated here — those three sections are the enumeration of record. These enumerations are normative and frequently referenced from other docs (e.g., "A15 and TB11 are web-client-only"), but enumerating each one in the glossary would duplicate the threat model. Read those sections directly when an entry references an A/AS/TB number.
 
 ---
 

@@ -2,6 +2,14 @@
 # Install once per clone:  brew install lefthook && lefthook install
 # Skip ad-hoc:             LEFTHOOK=0 git commit ...   (or  git commit --no-verify)
 
+# Pinned to the version this hook battery was actually verified against, not to
+# the earliest that might work. The distinction matters because `lefthook run`
+# and the real git hook path IGNORE an unknown key without a word (only
+# `lefthook validate` rejects one, and hooks never call it), so an older binary
+# would silently drop `use_stdin` below and leave a guard that greenly checks
+# nothing. Measured on 2.1.10 in both directions. myne-md/myne#592.
+min_version: 2.1.10
+
 pre-commit:
   parallel: true
   commands:
@@ -32,7 +40,7 @@ pre-commit:
       # phase3-web-client task 2: `src/platform/` is the only place under
       # `src/` allowed to import `@tauri-apps/*`. Without this the seam erodes
       # on the next feature and the web build silently regains a hard Tauri
-      # dependency. `.woodpecker.yml` runs the same script as the backstop so
+      # dependency. `.woodpecker/main.yml` runs the same script as the backstop so
       # `--no-verify` does not slip a violation past.
       #
       # Task 76 extended it to `editor/`, `dialect/` and `copy/` — the shared
@@ -111,6 +119,19 @@ pre-commit:
       # rather than glob-scoped: rule 2 is "no module outside prefs.ts invokes a
       # prefs write", which a new file elsewhere can break.
       run: node scripts/check-prefs-nonce.mjs
+
+    datetime-display-publisher:
+      # myne-md/myne#609: the shared date/time display store had exactly ONE
+      # publisher in the whole tree while three clients read it. The mobile
+      # client rendered the desktop's task panel, so it consumed the store from
+      # the day it moved in-repo and wrote nothing into it, leaving the store at
+      # its defaults for the life of the process. `date_format` is Shared
+      # scalar-LWW, so a format chosen on a computer synced to the phone, which
+      # held it and printed something else. Nothing reported it: it type-checks,
+      # every lint passes, the store has a sane default and the wrong output is a
+      # plausible date. Whole-tree rather than glob-scoped, because the rule is
+      # about a tree as a whole and a new file anywhere can start consuming.
+      run: node scripts/check-datetime-display-publisher.mjs
 
     clipboard-feedback:
       # myne-md/myne#390 + myne-md/myne#455: eleven clipboard call sites across
@@ -211,13 +232,64 @@ pre-commit:
       glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,docs/dev/twin-inventory.md}"
       run: node scripts/check-twin-inventory.mjs --check
 
+    twin-drift-ratchet:
+      # myne#473: the recorded set of semantically-differing twin pairs may
+      # shrink, never grow. The neighbour above gates the ROSTER against a
+      # generated document; this one gates the TREE, so a pair that starts
+      # differing fails rather than passing with an unchanged roster entry.
+      # A set rather than a count, because the case that happens is one pair
+      # converging while another diverges, which leaves a count unmoved.
+      #
+      # `core/src/**` is in the glob and the reason is worth stating, because an
+      # earlier version of this comment claimed a `core/`-only commit "provably
+      # cannot change the answer" and that was false: three recorded pairs have
+      # their desktop side under `core/src/inference/` (engine.rs, error.rs,
+      # state.rs), so a commit touching only one of those can flip a pair from
+      # same to different. CI would still have caught it, but a comment that
+      # asserts a property the glob does not have is worse than no comment.
+      #
+      # A docs-only commit genuinely cannot change it: every side of every pair
+      # is code.
+      glob: "{src/**,src-tauri/src/**,core/src/**,mobile/**,scripts/check-twin-inventory.mjs,scripts/check-twin-drift-ratchet.mjs,scripts/twin-drift-ratchet.json}"
+      run: node scripts/check-twin-drift-ratchet.mjs
+
+    manual-test-roster:
+      # myne#548: every feature surface carries a pre-release manual-test verdict,
+      # and no verdict outlives its files. The half of a release CI does not run
+      # is the half nothing could describe: the desktop E2E suite is 133 files, and
+      # the 301 scenarios `scripts/e2e-scenario-floor.json` requires to execute
+      # all run in a Linux container against WebKitGTK,
+      # so macOS desktop, Windows desktop, Safari, iOS and Android have no
+      # automated UI coverage at all, and until this roster nothing in the tree
+      # said so. Seven manual procedure documents existed and four were reachable
+      # from no release step.
+      #
+      # `--check` also gates the generated `docs/dev/manual-test-roster.md`, and
+      # CI runs the same invocation in its own UNFILTERED step for the reason
+      # `twin-inventory` above records: a hand edit to a generated projection is a
+      # docs-only commit, which the `code-paths` filter would skip, leaving this
+      # bypassable hook as the only gate.
+      #
+      # NO GLOB, deliberately, and the measurement is the argument. Rule 1 ("no
+      # verdict outlives its files") ranges over 952 distinct roster paths, and a
+      # glob describing the DENOMINATOR covers 145 of them. The other 807 sit
+      # outside it entirely, 579 of those under `src/notes`, `src/lib`,
+      # `mobile/src`, `editor/src`, `src-tauri/src`, `core/src` and `web/src` and
+      # the rest scattered wider still, so renaming any of them would break the
+      # guard's opening rule with the local hook blind to it. Widening the glob until it
+      # covered the rule would name most of the repository anyway, and `--check`
+      # gates a generated `docs/**` file, which a docs-only commit would skip.
+      # It costs 50 ms, measured, against `check-twin-inventory.mjs --check` at
+      # 128 ms and `check-token-adoption.mjs` at 196 ms in this same hook.
+      run: node scripts/check-manual-test-roster.mjs --check
+
     embed-layout-drift:
       # myne#409: the form-C embed-layout grammar is written in TypeScript
       # (canonical, source-consumed by all three clients) and, for the export
       # rewrite alone, mirrored narrowly in Rust. Both files and the decision
       # entry said the two halves were "held together by the published
       # embed-layout vectors" — and that vector step is commented out in
-      # .woodpecker.yml pending a vectors_token secret, MYNE_VECTORS_REQUIRED
+      # .woodpecker/main.yml pending a vectors_token secret, MYNE_VECTORS_REQUIRED
       # is set nowhere outside that comment, and both runners skip silently
       # when the companion repo is absent. So the stated lock ran on no
       # machine. This compares the one shared numeric bound, the same way
@@ -234,6 +306,28 @@ pre-commit:
       # what would otherwise happen (no compiler or lint reports a new literal).
       # A RATCHET: a file's recorded count may fall, never rise.
       run: node scripts/check-token-adoption.mjs
+
+    token-parity:
+      # myne#478: the sibling of `token-adoption` one step up, and they catch
+      # opposite failures. That one asks whether a value should have been a
+      # token; this one asks whether a token anybody NAMES actually exists, and
+      # whether two clients declare one name independently. Its first run found
+      # eight `var(--paper-1)` call sites resolving to nothing, one of them in
+      # the shared `@myne/editor` package, so it reached all three clients, plus
+      # 105 palette tokens mobile was missing, eight of which the shared editor
+      # toolbar drew swatches from.
+      #
+      # Globbed, and the glob is wider than `token-adoption`'s on purpose: a
+      # reference lives anywhere a component does, and the shared packages
+      # (`editor`, `dialect`, `ornaments`, `client-core`) are exactly where a
+      # broken one reaches every client at once.
+      # The eight trees are `scripts/lib/shared-roots.mjs`'s roster, which the
+      # guard IMPORTS. `copy/src` was missing from an earlier version of this
+      # glob while the guard walked it, which is the drift that module exists to
+      # prevent, one file over: a `var(--typo)` added to `copy/src` alone would
+      # have skipped the hook and been caught only by CI.
+      glob: "{src,mobile/src,web/src,editor/src,dialect/src,copy/src,ornaments/src,client-core/src}/**/*.{ts,tsx,css}"
+      run: node scripts/check-token-parity.mjs
 
     native-buttons:
       glob: "{src,web/src,editor/src,dialect/src}/**/*.tsx"
@@ -270,13 +364,57 @@ pre-commit:
       run: node scripts/check-e2e-menu-testids.mjs
 
     woodpecker-substitution:
-      # A single-dollar brace token anywhere in .woodpecker.yml — INCLUDING a
-      # comment — fails Woodpecker's envsubst pass and kills the whole pipeline
-      # on every branch before any step runs. This guard is here and not in CI
-      # because CI is what breaks: a check for "the CI config does not compile"
-      # can never fire from inside CI.
-      glob: ".woodpecker.yml"
+      # A single-dollar brace token anywhere in a Woodpecker workflow file,
+      # INCLUDING inside a comment, fails Woodpecker's envsubst pass and kills
+      # the whole pipeline on every branch before any step runs. This guard is here
+      # and not in CI because CI is what breaks: a check for "the CI config does
+      # not compile" can never fire from inside CI.
+      #
+      # The glob is the DIRECTORY since myne-md/myne#579 split the config into
+      # `main.yml` (per-push) and `e2e.yml` (manual, pre-release). `.woodpecker.yml`
+      # is listed too, and it earns its place: Woodpecker's lookup takes the
+      # DIRECTORY and ignores a root file, so resurrecting one produces dead
+      # config that changes nothing and reports nothing. Touching it fires this
+      # hook, and `scripts/lib/woodpecker-configs.mjs` then refuses outright
+      # rather than scanning around it. That roster is also what makes the guard
+      # fail BY NAME when a workflow file it expects has gone missing, instead of
+      # reporting ok on a smaller walk.
+      glob:
+        - ".woodpecker/*.yml"
+        - ".woodpecker/*.yaml"
+        - ".woodpecker.yml"
       run: node scripts/check-woodpecker-substitution.mjs
+
+    woodpecker-split:
+      # The two workflow files duplicate ONE thing by design: the desktop
+      # build's `--features` list. `main.yml`'s `tauri-compile` carries the stub
+      # features purely so those compile arms cannot bit-rot while the suite that
+      # consumes them runs only before a release, and that protection is real
+      # only while both lists agree. Four prose blocks asserted it and nothing
+      # checked it; this compares them in both directions and fails by name when
+      # either build line has been renamed away.
+      glob:
+        - ".woodpecker/*.yml"
+        - ".woodpecker/*.yaml"
+      run: node scripts/check-woodpecker-split.mjs
+
+    ci-image:
+      # `ci/Dockerfile` drifting from the versions the repo pins, or the digest
+      # in the workflows drifting from `ci/image.json`. Same family as
+      # `e2e-toolchain` below and `playwright-image` above, and the same silence:
+      # rustup honours `rust-toolchain.toml` at RUNTIME, so a stale image
+      # re-provisions the pinned toolchain inside whichever step makes the first
+      # cargo call rather than failing, and a stale digest reads as an
+      # infrastructure outage rather than as an edit somebody made.
+      glob:
+        - "ci/Dockerfile"
+        - "ci/image.json"
+        - ".woodpecker/*.yml"
+        - ".woodpecker/*.yaml"
+        - "rust-toolchain.toml"
+        - ".nvmrc"
+        - "package.json"
+      run: node scripts/check-ci-image.mjs
 
     e2e-toolchain:
       # e2e/Dockerfile drifting from rust-toolchain.toml. Nothing fails to build:
@@ -370,6 +508,18 @@ pre-commit:
       # Load-bearing copy renders from constants and is intentionally out of scope.
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n.mjs
+
+    i18n-coverage:
+      # The companion to i18n-catalog above, covering what that guard leaves out
+      # by design: it gates the ENGLISH source only, so translation coverage can
+      # fall for weeks with every gate green (myne-md/myne#589: the same 215
+      # keys missing from all 31 catalogs). Three hard checks (roster parity both
+      # ways, no partial plural group, placeholder parity) plus a generated
+      # record, docs/dev/i18n-coverage.md, that --check compares.
+      # Deliberately NOT globbed: the record is a docs/** file, so a hand edit to
+      # it is a docs-only commit any code glob would skip. Regenerate with
+      # `node scripts/check-i18n-coverage.mjs --emit`.
+      run: node scripts/check-i18n-coverage.mjs --check
 
     decisions-index:
       # docs/decisions.md is generated over docs/decisions/**. Without this, the first person to
@@ -543,7 +693,7 @@ pre-commit:
 
 pre-push:
   # Heavier checks — matches CLAUDE.md's "Common commands" baseline.
-  # Local pre-push net; Woodpecker CI (.woodpecker.yml) is the remote gate.
+  # Local pre-push net; Woodpecker CI (.woodpecker/) is the remote gate.
   parallel: false
   # A target directory of the hook's OWN, and the reason is a real failure that
   # cost four pushes: `cargo-test` went red twice in a row while the identical
@@ -568,6 +718,116 @@ pre-push:
   # the command ran and `target/pre-push` was never created, which is exactly
   # the shape of fix that looks applied and does nothing.
   commands:
+
+    protected-branch:
+      # Refuse a push whose REMOTE ref is a protected branch. There is no
+      # server-side branch protection to lean on: the org's plan does not offer
+      # it for private repos, and all eleven are private (measured against the
+      # API, not inferred from a repo's own prose). So nothing on GitHub sits
+      # between a mistyped `git push` and a branch that matters.
+      # Measurements and context: myne-md/myne#592.
+      #
+      # This stops an ACCIDENT, not an intent, and the distinction is the whole
+      # honest claim. Three doors bypass it and none can be closed from here:
+      # `--no-verify`, `LEFTHOOK=0` (which line 3 of this file recommends) and
+      # `LEFTHOOK_EXCLUDE=protected-branch`. On top of that the hook exists only
+      # where `lefthook install` has been run, so a fresh clone, the jailed
+      # unattended runner and `myne-bot` are not covered. Hygiene, not
+      # enforcement, and no substitute for server-side protection.
+      #
+      # `priority: 1` because lefthook sorts commands ALPHABETICALLY rather than
+      # in file order (verified, not assumed), so without it this would run
+      # somewhere in the middle of a repo's battery instead of at the front.
+      #
+      # Be precise about what that buys, because the obvious reading is wrong:
+      # it makes the refusal PRINT first, and nothing more. There is no
+      # `piped: true` on this hook, so every remaining command still runs to
+      # completion before git aborts the push. Interrupt rather than wait.
+      # `piped: true` would give real fail-fast and was rejected deliberately:
+      # in a repo with a heavy battery the command that sorts first after this
+      # one carries that repo's slowest and flakiest tests, so piping would let
+      # one flake suppress every gate behind it on every push. That is a
+      # permanent cost for an occasional convenience.
+      priority: 1
+      # `use_stdin: true` is LOAD-BEARING and losing it is SILENT. Without it
+      # the command receives empty stdin, the loop below runs zero times, and
+      # lefthook prints a green tick while the push to `develop` goes through.
+      # Verified by deleting the line and watching exactly that happen.
+      #
+      # Two things now stand between that and a dead guard. The `min_version`
+      # at the top of this file makes an older lefthook refuse the config
+      # outright rather than drop the key, which matters because `lefthook run`
+      # and the real `git commit`/`git push` path IGNORE an unknown key without
+      # a word (only `lefthook validate` rejects one, and hooks never call it).
+      # And the pass line below prints the ref count, so a guard that received
+      # nothing says `checked 0 ref(s)` instead of looking like a clean push.
+      use_stdin: true
+      # Matched on the REMOTE ref, never on the current branch name: the
+      # accident's usual shape is `git push origin HEAD:develop` from a feature
+      # branch, and a branch-name check misses it entirely. A deletion
+      # (`git push origin :develop`) carries the same remote ref and is caught
+      # on the same line.
+      #
+      # All three names in every repo, so the block stays byte-identical across
+      # all of them and can be diffed rather than re-read. `develop` is the
+      # default in nine and `main` in `homebrew-tap`, while `myne-themes`
+      # carries both. `release` is here because it is the branch that DEPLOYS:
+      # `myne-website`'s own `.woodpecker.yml` maps `release` to production and
+      # `develop` to staging, so guarding only `develop` would have protected
+      # the branch with no blast radius and skipped the one that publishes.
+      run: |
+        n=0
+        blocked=""
+        while read -r _local_ref _local_sha remote_ref _remote_sha; do
+          n=$((n + 1))
+          case "$remote_ref" in
+            # The leading space is deliberate: the messages below interpolate
+            # `$blocked` straight after a word, so adding one there doubles it.
+            refs/heads/develop|refs/heads/main|refs/heads/release)
+              blocked="$blocked $remote_ref" ;;
+          esac
+        done
+        if [ -z "$blocked" ]; then
+          # Printed on every clean push on purpose. `checked 0 ref(s)` is the
+          # visible symptom of a guard that got no stdin, which is otherwise
+          # indistinguishable from a guard that looked and found nothing.
+          echo "protected-branch: checked $n ref(s), none protected"
+          exit 0
+        fi
+        # Two ways to allow it. The env var is for a one-off. The git-config
+        # flag is for a repo whose normal workflow IS pushing to its default
+        # branch, so that such a repo does not push someone into exporting the
+        # env var from their shell profile, which would switch the guard off in
+        # every other clone at once.
+        #
+        # `--local` is what makes that true and a plain `--get` would not:
+        # `--get` reads the MERGED cascade, so one `--global` flag would disable
+        # the guard everywhere and reintroduce the exact failure this hatch
+        # exists to prevent. `--local` reads only this repo's own .git/config.
+        # Verified in both directions.
+        #
+        # Both hatches parse a VALUE rather than test for presence, and they
+        # agree on what "allow" means. Testing `-n` would have let
+        # `MYNE_ALLOW_PROTECTED_PUSH=0` and `=false` open the gate, which is the
+        # opposite of what someone typing that means, while the git-config side
+        # rejected the same literals. An unrecognised value refuses: this fails
+        # closed, like every other decision in this block.
+        allow=no
+        case "$(printf '%s' "${MYNE_ALLOW_PROTECTED_PUSH:-}" | tr 'A-Z' 'a-z')" in
+          1|true|yes|on) allow=yes ;;
+        esac
+        if [ "$(git config --local --bool --get myne.allowProtectedPush 2>/dev/null)" = true ]; then
+          allow=yes
+        fi
+        if [ "$allow" = yes ]; then
+          echo "protected-branch: allowed$blocked"
+          exit 0
+        fi
+        echo "protected-branch: refusing a direct push to$blocked"
+        echo "  Push a branch and open a pull request instead."
+        echo "  One-off:        MYNE_ALLOW_PROTECTED_PUSH=1 git push ..."
+        echo "  This repo does not use PRs:  git config myne.allowProtectedPush true"
+        exit 1
 
     damm32-table-drift:
       # MYND-74: the frozen Damm-32 quasigroup table is generated into two
@@ -686,7 +946,12 @@ commit-msg:
   commands:
     no-ai-coauthor:
       run: |
-        if grep -qiE 'Co-Authored-By:.*(Claude|Anthropic)|Generated with .*Claude|🤖 Generated' "{1}"; then
-          echo "commit message carries an AI co-author/attribution trailer — remove it (project policy)."
+        # The message file still holds git's `#` comment block at hook time,
+        # and anything below the scissors line, so a raw grep refuses a commit
+        # whose only match sits in text git is about to throw away. Both cases
+        # were measured refusing before this. Cut at the scissors marker, drop
+        # comment lines, then grep what actually reaches the commit.
+        if sed -e '/^#.*>8/,$d' "{1}" | git stripspace --strip-comments | grep -qiE 'Co-Authored-By:.*(Claude|Anthropic)|Generated with .*Claude|🤖 Generated'; then
+          echo "commit message carries an AI co-author/attribution trailer. Remove it (project policy)."
           exit 1
         fi

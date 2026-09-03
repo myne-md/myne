@@ -25,8 +25,7 @@ use std::collections::BTreeMap;
 use protocol::PrefsView;
 use serde::Serialize;
 
-use super::conflict::{merge_set_union, merge_set_union_folded};
-use super::prefs_classification::{PrefClass, SharedDiscipline, CLASSIFICATION};
+use super::prefs_classification::{classify, PrefClass, SharedDiscipline, CLASSIFICATION};
 
 /// Read a field's LWW clock (absent = 0, §10.2).
 fn clock_of(view: &PrefsView, field: &str) -> u64 {
@@ -145,39 +144,245 @@ fn merge_per_key_map<V: Serialize + Clone + PartialEq>(
                 );
                 out.insert(key.clone(), merged);
             }
-            // Single-sided key: either the other side never had it, or the other
-            // side DELETED it (myne#296). The clocks tell the two apart — a
-            // deletion stamps `<field>/<key>` on the removing side, and a side
-            // that simply never held the key has no clock for it at all.
-            (Some(v), None) | (None, Some(v)) => {
-                let (present, absent) = if local_map.contains_key(key) {
-                    (local, remote)
-                } else {
-                    (remote, local)
-                };
-                let present_clock = clock_of(present, &clock_key);
-                let absent_clock = clock_of(absent, &clock_key);
-                if absent_clock > present_clock {
-                    // The absent side removed it more recently than the present
-                    // side last wrote it → the removal wins. Its clock is
-                    // carried forward so the peer that still holds the value
-                    // drops it on the next round instead of pushing it back.
-                    clocks.insert(clock_key, absent_clock);
-                    continue;
+            // Single-sided key (myne#296): the shared rule decides, and the two
+            // arms differ only in which side is the present one.
+            (Some(v), None) => {
+                if single_sided_survives(&clock_key, local, remote, clocks) {
+                    out.insert(key.clone(), v.clone());
                 }
-                // Equal clocks keep the value — "absent sorts lowest" is the
-                // tiebreak this module already uses, and it is the conservative
-                // direction: a decoration that survives one extra round is
-                // recoverable, a value deleted by a clock collision is not.
-                let c = present_clock;
-                if c > 0 {
-                    clocks.insert(clock_key, c);
+            }
+            (None, Some(v)) => {
+                if single_sided_survives(&clock_key, remote, local, clocks) {
+                    out.insert(key.clone(), v.clone());
                 }
-                out.insert(key.clone(), v.clone());
             }
             (None, None) => unreachable!("key came from one of the two maps"),
         }
     }
+    out
+}
+
+/// The merge discipline of one set-union field, read off the classification as a
+/// unit so the two halves cannot be passed in the wrong order.
+///
+/// They were two adjacent `bool` parameters until clippy's `too_many_arguments`
+/// forced the question, and the lint was right for a reason beyond arity: a
+/// swapped pair typechecks, and one of the two swaps makes an egress control
+/// fail open.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SetDiscipline {
+    /// Entry identity is the canonical folder key rather than the raw value.
+    folded: bool,
+    /// A removal may be inherited from a peer. False for the egress controls.
+    removals_propagate: bool,
+}
+
+/// The discipline of a set-union field, read off the normative classification
+/// table.
+///
+/// It is a function rather than an argument at the merge call site because the
+/// STAMPER cannot have a call site: `stamp_changed_shared_fields` iterates
+/// `CLASSIFICATION`, so a flag passed at the merge would be unreachable there
+/// and the two would derive clock keys from two different expressions. The table
+/// is the only place both consumers can read the same answer from.
+///
+/// Panics on a field merged as a set but not classified as one, which is the
+/// half a type cannot catch: the classification and the merge line are written
+/// independently, and a disagreement is invisible until a removal stops
+/// converging on somebody's second device.
+fn set_fold(field: &str) -> SetDiscipline {
+    match classify(field) {
+        Some(PrefClass::Shared(SharedDiscipline::SetUnion {
+            folded,
+            removals_propagate,
+        })) => SetDiscipline {
+            folded,
+            removals_propagate,
+        },
+        _ => panic!(
+            "{field} is merged as a set-union but not classified as one; \
+             `prefs_classification::CLASSIFICATION` is the single source of that"
+        ),
+    }
+}
+
+/// §10.2 / myne#296: does a key held by exactly ONE side survive the merge?
+///
+/// The two readings of a single-sided key are "the other side never had it" and
+/// "the other side deleted it", and only the clocks tell them apart: a removal
+/// stamps `<field>/<key>` on the removing side, a side that never held the key
+/// has no clock for it at all. A strictly-greater absent clock is therefore a
+/// deletion and wins; anything else keeps the value, equal clocks included,
+/// because an entry that survives one extra round can be deleted again while one
+/// dropped by a clock collision cannot be recovered.
+///
+/// Either way the winning clock rides forward, which is the half that makes a
+/// deletion CONVERGE rather than merely happen once: without it the peer still
+/// holding the value pushes it back on the next round.
+///
+/// Shared by the per-key map merge and the set merge because it is one normative
+/// rule, and the two shapes differ only in the branch where BOTH sides hold the
+/// key (a map tiebreaks on the value, a set has no value to tiebreak on). Those
+/// stay separate; this does not, so a future refinement to the removal rule
+/// cannot be applied to one shape and forgotten on the other.
+fn single_sided_survives(
+    clock_key: &str,
+    present: &PrefsView,
+    absent: &PrefsView,
+    clocks: &mut BTreeMap<String, u64>,
+) -> bool {
+    let present_clock = clock_of(present, clock_key);
+    let absent_clock = clock_of(absent, clock_key);
+    if absent_clock > present_clock {
+        clocks.insert(clock_key.to_string(), absent_clock);
+        return false;
+    }
+    if present_clock > 0 {
+        clocks.insert(clock_key.to_string(), present_clock);
+    }
+    true
+}
+
+/// The identity a set entry races on: the canonical folder key for the four
+/// folder sets, the raw value for `spell_languages`. `folded` comes from the
+/// classification table, so the merge below and the stamper above cannot pick
+/// different keys for the same entry.
+///
+/// Goes through `crate::folder_key::canonical_folder` rather than the sync
+/// module's own fold, and the difference is not cosmetic. A plain fold (NFC plus
+/// lowercase) leaves `Projects` and `Projects/` as two identities for one
+/// folder, so a removal stamped against one shape would miss the other, and
+/// `markdown-dialect.md` §3.6.2 tolerates a missing trailing slash on reads
+/// while the Obsidian importer preserves `folder:` verbatim. `canonical_folder`
+/// adds the trailing slash and drops empty segments, which makes the identity
+/// total over the shapes that can actually reach the set. It is also the module
+/// whose own doc says a second copy of this rule is the failure it exists to
+/// prevent.
+fn set_entry_identity(folded: bool, raw: &str) -> String {
+    if folded {
+        crate::folder_key::canonical_folder(raw)
+    } else {
+        raw.to_string()
+    }
+}
+
+/// Collapse one side's raw entries to `identity -> display form`, where the
+/// display form is the byte-lexicographically smallest raw seen for that
+/// identity. Unfolded fields are the degenerate case (identity == display).
+fn set_by_identity(folded: bool, entries: &[String]) -> BTreeMap<String, String> {
+    let mut out: BTreeMap<String, String> = BTreeMap::new();
+    for raw in entries {
+        out.entry(set_entry_identity(folded, raw))
+            .and_modify(|w| {
+                if raw < w {
+                    *w = raw.clone();
+                }
+            })
+            .or_insert_with(|| raw.clone());
+    }
+    out
+}
+
+/// §10.2 set-union merge **with per-entry removal clocks** (myne#613).
+///
+/// The union half is unchanged and still conflict-free: an entry either side
+/// holds survives. What is new is that an entry present on ONE side only is no
+/// longer automatically kept. It is kept unless the absent side's
+/// `<field>/<entry>` clock is strictly greater than the present side's, which is
+/// that side saying "I deleted this" rather than "I never had it".
+///
+/// The single-sided rule itself lives in `single_sided_survives`, shared with
+/// `merge_per_key_map`. What stays here is the part that genuinely differs: a
+/// map picks a winning VALUE when both sides hold the key, while a set has no
+/// value to pick and only needs the lexicographic-min display form (MYND-562).
+fn merge_set_with_removals(
+    field: &str,
+    discipline: SetDiscipline,
+    local: &PrefsView,
+    remote: &PrefsView,
+    local_set: &[String],
+    remote_set: &[String],
+    clocks: &mut BTreeMap<String, u64>,
+) -> Vec<String> {
+    let SetDiscipline {
+        folded,
+        removals_propagate,
+    } = discipline;
+    let lm = set_by_identity(folded, local_set);
+    let rm = set_by_identity(folded, remote_set);
+
+    // A removal clock must outlive the entry it removed (myne#613 review).
+    //
+    // The id set below is built from the two SETS, so a clock whose entry is
+    // gone from both sides is never visited, and `merge_prefs` starts `clocks`
+    // empty and assigns the result wholesale: the tombstone is not merely
+    // skipped, it is deleted. Measured over three rounds before this existed. A
+    // deletes at 300 against B at 100 and the clock is kept; merging the two
+    // converged views drops it; a third device that was offline for that
+    // exchange still holds the entry at 100, meets a peer with no clock at all,
+    // and wins. The deletion is undone by a clock three hundred units older.
+    //
+    // Retention is indefinite, decided 2026-08-29. A horizon was offered and
+    // rejected on the ground that a device offline longer than the horizon is
+    // exactly the case the clock exists for. The cost is stated in
+    // `protocol.md` §9.5.4 beside the budget rather than left implied.
+    if removals_propagate {
+        let prefix = format!("{field}/");
+        for (k, v) in local.field_clocks.iter().chain(remote.field_clocks.iter()) {
+            if !k.starts_with(&prefix) {
+                continue;
+            }
+            let carried = clocks.entry(k.clone()).or_insert(*v);
+            *carried = (*carried).max(*v);
+        }
+    }
+
+    let mut out: Vec<String> = Vec::new();
+    let ids: std::collections::BTreeSet<&String> = lm.keys().chain(rm.keys()).collect();
+    for id in ids {
+        let clock_key = format!("{field}/{id}");
+        match (lm.get(id), rm.get(id)) {
+            // Held by both: no conflict about membership, only about which raw
+            // casing to display. Carry the greater clock forward so a later
+            // removal on either device has something to beat.
+            (Some(l), Some(r)) => {
+                // The carry-forward is gated on `removals_propagate` like every
+                // other clock touch in this function. It was not, and the arm's
+                // own comment two lines down claimed "a monotone set never
+                // consults the clocks": a stray clock on an egress control (a
+                // corrupted blob, or one written by an earlier build) would then
+                // persist across every merge forever, on a field nothing reads
+                // it for. Bounded in practice, because the stamper writes none
+                // for those fields, which is why this is a tidy-up rather than a
+                // live defect.
+                if removals_propagate {
+                    let c = clock_of(local, &clock_key).max(clock_of(remote, &clock_key));
+                    if c > 0 {
+                        clocks.insert(clock_key, c);
+                    }
+                }
+                out.push(l.min(r).clone());
+            }
+            // Single-sided: the same shared rule as the per-key maps.
+            // A monotone set never consults the clocks: a single-sided entry
+            // always survives, which is the pure union this field had before
+            // myne#613 and the only direction an egress control may fail in.
+            (Some(v), None) if !removals_propagate => out.push(v.clone()),
+            (None, Some(v)) if !removals_propagate => out.push(v.clone()),
+            (Some(v), None) => {
+                if single_sided_survives(&clock_key, local, remote, clocks) {
+                    out.push(v.clone());
+                }
+            }
+            (None, Some(v)) => {
+                if single_sided_survives(&clock_key, remote, local, clocks) {
+                    out.push(v.clone());
+                }
+            }
+            (None, None) => unreachable!("identity came from one of the two sides"),
+        }
+    }
+    out.sort();
     out
 }
 
@@ -215,10 +420,12 @@ pub fn shared_subset_hash(view: &PrefsView) -> String {
 /// "stamped by the setter that last changed the field"). Driven by the
 /// normative classification table so every current and future setter routed
 /// through the central prefs write path stamps correctly with zero per-setter
-/// code: set-union fields stay clockless, device-local fields are never
-/// stamped, and `device_names` stamps per changed/added key under its
-/// namespaced `device_names/<key>` name. Field values are compared via their
-/// serde-JSON encodings (deterministic; field names match §9.5.2 keys).
+/// code: device-local fields are never stamped, `device_names` stamps per
+/// changed/added key under its namespaced `device_names/<key>` name, and
+/// set-union fields stamp per ENTRY under `<field>/<entry>` for both additions
+/// and removals (myne#613, superseding this comment's original "set-union fields
+/// stay clockless"). Field values are compared via their serde-JSON encodings
+/// (deterministic; field names match §9.5.2 keys).
 pub fn stamp_changed_shared_fields(before: &PrefsView, after: &mut PrefsView, now_ms: u64) {
     let b = serde_json::to_value(before).expect("prefs view serializes");
     let a = serde_json::to_value(&*after).expect("prefs view serializes");
@@ -251,7 +458,57 @@ pub fn stamp_changed_shared_fields(before: &PrefsView, after: &mut PrefsView, no
                     }
                 }
             }
-            PrefClass::Shared(SharedDiscipline::SetUnion) => {}
+            // myne#613: the set analogue of the per-key map arm above, and it
+            // stamps BOTH directions rather than only the removal.
+            //
+            // The removal stamp carries the myne#296 reasoning from the arm
+            // above, one shape over.
+            //
+            // The ADD stamp is the half that is easy to leave out and breaks a
+            // case nobody tries by hand. Once removals are stamped, a re-added
+            // entry that carries no clock of its own loses to its own tombstone
+            // forever: delete `Projects/` at t=200, file a note back into it at
+            // t=300, and the folder is registered locally and dropped on every
+            // merge. Stamping the add gives it something to win with.
+            //
+            // Keyed by the classification's own `folded` flag, so the clock key
+            // here is byte-identical to the one `merge_set_with_removals`
+            // computes. Two call sites deciding that independently is exactly
+            // how a stamper and a merge stop agreeing.
+            // Unchanged set: nothing to stamp, and worth short-circuiting rather
+            // than proving it the long way. Without this, a write that touched
+            // `theme` still folds every entry of all five sets on both sides,
+            // which under myne#613 is the vault's whole folder list, twice, for
+            // an empty symmetric difference. Same guard the scalar arm below
+            // uses, and correct for the same reason: equal arrays give equal
+            // identity sets.
+            PrefClass::Shared(SharedDiscipline::SetUnion { .. })
+                if a.get(*name) == b.get(*name) => {}
+
+            // A monotone set stamps nothing at all. There is no removal to
+            // record, and stamping an ADD would only grow `field_clocks` with
+            // keys no merge ever reads.
+            PrefClass::Shared(SharedDiscipline::SetUnion {
+                removals_propagate: false,
+                ..
+            }) => {}
+            PrefClass::Shared(SharedDiscipline::SetUnion { folded, .. }) => {
+                let ids = |v: Option<&serde_json::Value>| -> std::collections::BTreeSet<String> {
+                    v.and_then(|v| v.as_array())
+                        .map(|a| {
+                            a.iter()
+                                .filter_map(|e| e.as_str())
+                                .map(|s| set_entry_identity(*folded, s))
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                };
+                let before_ids = ids(b.get(*name));
+                let after_ids = ids(a.get(*name));
+                for id in before_ids.symmetric_difference(&after_ids) {
+                    after.field_clocks.insert(format!("{name}/{id}"), now_ms);
+                }
+            }
             PrefClass::Shared(_) if a.get(*name) != b.get(*name) => {
                 after.field_clocks.insert((*name).to_string(), now_ms);
             }
@@ -295,6 +552,24 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
             )
         };
     }
+    // Sibling macro for the set-union fields (myne#613). Same footgun-guard as
+    // `lww!` and `per_key!`: one `$field` drives both the clock namespace and
+    // the accessed set, so a name/set mismatch cannot be typed. `set_fold` adds
+    // the second half, and its own doc says why it is a function rather than an
+    // argument here.
+    macro_rules! set_union {
+        ($name:literal, $field:ident) => {
+            merge_set_with_removals(
+                $name,
+                set_fold($name),
+                local,
+                remote,
+                &local.$field,
+                &remote.$field,
+                &mut clocks,
+            )
+        };
+    }
 
     // Folder decorations are per-key map merges too (MYND-562): concurrent edits
     // to DIFFERENT folder keys both survive (whole-map LWW dropped one). Keys are
@@ -308,6 +583,12 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     // clobbers another folder's order (whole-sequence LWW dropped one — the
     // exact loss MYND-562 fixed for the decoration maps above).
     let item_order = per_key!("item_order", item_order);
+    // periodic_notes (myne#177): keys are `<period>.<setting>`, so a folder edit
+    // on one device and a template edit on another, to the SAME period in the
+    // same round, race on separate clocks and both survive. That is the whole
+    // reason the field is a flat map rather than a map of nested objects: a
+    // per-period value would have put both edits on one clock and dropped one.
+    let periodic_notes = per_key!("periodic_notes", periodic_notes);
 
     // The struct literal lists EVERY PrefsView field with no `..` — the same
     // compile-time drift lock as the classification conformance test: a new
@@ -315,12 +596,16 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     // §10.2 classification row.
     PrefsView {
         // ---- shared: scalar-LWW -----------------------------------------
-        // The remote-provider triple (myne#415, SYNC-15/SYNC-22). LWW rather
+        // The remote-provider fields (myne#415, SYNC-15/SYNC-22). LWW rather
         // than a union because a credential cannot be merged — rotating on one
         // device must REPLACE, and revoking propagates as an LWW write of
         // `None`, which is what makes revocation reach the other devices.
+        //
+        // It was a TRIPLE until myne-md/myne#456. `ai_provider_consent` left for
+        // the device-local group below, which is what closes SYNC-22: a device
+        // now inherits the selection, the model and the key, and none of those
+        // is permission to use them.
         ai_provider: lww!("ai_provider", ai_provider),
-        ai_provider_consent: lww!("ai_provider_consent", ai_provider_consent),
         // The one LWW field whose value is `Zeroizing`-wrapped (myne-md/myne#444),
         // so it takes the keyed form for the same reason `saved_views` does: the
         // tiebreak bytes are NORMATIVE (§10.2 — "the values' canonical
@@ -380,28 +665,22 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         label: lww!("label", label),
         new_note_location: lww!("new_note_location", new_note_location),
         new_note_location_folder: lww!("new_note_location_folder", new_note_location_folder),
-        // ---- shared: set-union (clockless; the shared conflict.rs primitive) --
-        // Folder-path sets fold case-insensitively so `personal/` ≡ `PERSONAL/`
-        // never coexist (MYND-562); `spell_languages` (language codes) stays
-        // case-sensitive on the plain union.
-        ai_excluded_folders: merge_set_union_folded(
-            &local.ai_excluded_folders,
-            &remote.ai_excluded_folders,
-        ),
-        archived_folders: merge_set_union_folded(&local.archived_folders, &remote.archived_folders),
-        // myne-cli epic (MYND-490): a folder-path set, same fold discipline as
+        // ---- shared: set-union with per-entry removal clocks (myne#613) ------
+        // Was clockless until myne#613, which is what made a removal
+        // unexpressible: the peer's copy came back within two rounds and every
+        // folder delete undid itself on a multi-device vault. `set_union!` reads
+        // the fold discipline off the classification table rather than repeating
+        // it here, so folder sets (`personal/` ≡ `PERSONAL/`, MYND-562) and
+        // case-sensitive language codes cannot drift apart from their rows.
+        ai_excluded_folders: set_union!("ai_excluded_folders", ai_excluded_folders),
+        archived_folders: set_union!("archived_folders", archived_folders),
+        // myne-cli epic (MYND-490): a folder-path set, same discipline as
         // ai_excluded_folders/archived_folders/deliberate_folders — an exclusion
         // added on one device must never be lost in a merge with a device that
         // lacks it.
-        cli_excluded_folders: merge_set_union_folded(
-            &local.cli_excluded_folders,
-            &remote.cli_excluded_folders,
-        ),
-        deliberate_folders: merge_set_union_folded(
-            &local.deliberate_folders,
-            &remote.deliberate_folders,
-        ),
-        spell_languages: merge_set_union(&local.spell_languages, &remote.spell_languages),
+        cli_excluded_folders: set_union!("cli_excluded_folders", cli_excluded_folders),
+        deliberate_folders: set_union!("deliberate_folders", deliberate_folders),
+        spell_languages: set_union!("spell_languages", spell_languages),
         // ---- shared: sequence-LWW-on-whole -------------------------------
         favorites: lww!("favorites", favorites),
         view_order: lww!("view_order", view_order),
@@ -438,9 +717,22 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // item_order (MYND-596): per-container map merge, computed above so it
         // borrows `clocks` once — moved here from the sequence-LWW group.
         item_order,
+        // periodic_notes (myne#177): per-setting map merge, same reason.
+        periodic_notes,
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
+        // Device-local for the reason the classification table gives: a bound
+        // on how much THIS machine sends to a provider. The local value always
+        // survives the merge.
+        chat_history_budget: local.chat_history_budget,
         ai_enabled: local.ai_enabled,
+        // myne-md/myne#456: moved out of the scalar-LWW group above. Approving a
+        // provider is a decision a person makes AT a device, not a fact about
+        // the account, so it must not arrive by sync. The local value winning
+        // "always" is exactly right here: a remote `Some("openrouter")` may not
+        // overwrite a local `None`, because that would be the whole SYNC-22
+        // defect wearing a merge rule's clothes.
+        ai_provider_consent: local.ai_provider_consent.clone(),
         // MYND-441: device-local like `ai_enabled`, and for the same reason —
         // battery and thermal capacity differ per device, so turning OCR off on
         // a phone must not turn it off on the desktop.
@@ -629,8 +921,12 @@ mod tests {
         assert_eq!(merged.favorites, vec!["note-1".to_string()]);
     }
 
+    /// Renamed by myne#613, which made these fields carry per-entry removal
+    /// clocks: the old name claimed clocklessness, which is now false, while the
+    /// body asserts the UNION result, which is still true and still the point.
+    /// A name that describes a rule the code no longer follows is worse than no
     #[test]
-    fn set_union_fields_union_clocklessly() {
+    fn set_union_fields_union_when_neither_side_claims_a_removal() {
         let a = PrefsView {
             ai_excluded_folders: vec!["Private/".into(), "Journal/".into()],
             ai_provider: None,
@@ -825,6 +1121,95 @@ mod tests {
         assert!(!merged.field_clocks.contains_key("auto_lock_seconds"));
     }
 
+    /// myne-md/myne#456: the consent does NOT travel and the key DOES, and the
+    /// test asserts both in one merge because either half alone is satisfied by
+    /// a defect.
+    ///
+    /// Assert only "consent does not arrive" and a change that made the whole AI
+    /// cluster device-local passes, while silently breaking revocation: deleting
+    /// a key on one device would stop reaching the others, so a compromised
+    /// credential would keep working on every device the user did not visit.
+    /// Assert only "the key arrives" and the SYNC-22 defect this closes is
+    /// untouched. The pair is the property.
+    ///
+    /// The direction matters too. The remote carries a consent and the LOCAL
+    /// side has none, which is exactly the newly-enrolled-device shape: an
+    /// approval made on a laptop must not become an approval by this device.
+    #[test]
+    fn consent_does_not_travel_but_the_key_does() {
+        assert_eq!(
+            classify("ai_provider_consent"),
+            Some(PrefClass::DeviceLocal)
+        );
+
+        // The newly-enrolled device: nothing approved here.
+        let local = PrefsView {
+            ai_provider_consent: None,
+            ai_provider_key: None,
+            ai_provider: None,
+            ..PrefsView::default()
+        };
+        // The laptop that configured everything, with a clock that would win.
+        let mut remote = PrefsView {
+            ai_provider: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_key: Some(zeroize::Zeroizing::new("sk-remote".into())),
+            ..PrefsView::default()
+        };
+        stamped(&mut remote, "ai_provider", u64::MAX);
+        stamped(&mut remote, "ai_provider_consent", u64::MAX);
+        stamped(&mut remote, "ai_provider_key", u64::MAX);
+
+        let merged = merge_prefs(&local, &remote);
+
+        assert_eq!(
+            merged.ai_provider_consent, None,
+            "an approval made on another device must not arrive by sync (SYNC-22)"
+        );
+        assert_eq!(
+            merged.ai_provider.as_deref(),
+            Some("openrouter"),
+            "the SELECTION is an account fact and still travels"
+        );
+        assert_eq!(
+            merged.ai_provider_key.as_deref().map(|k| k.as_str()),
+            Some("sk-remote"),
+            "the credential still travels, so rotating it on one device reaches the rest"
+        );
+        // A device-local field carries no clock into the merged map, which is
+        // what stops a later merge from resurrecting it as a shared value.
+        assert!(!merged.field_clocks.contains_key("ai_provider_consent"));
+
+        // The other direction, because revocation is the case a one-way test
+        // would miss: clearing the key on the remote must reach this device.
+        let configured_local = PrefsView {
+            ai_provider: Some("openrouter".into()),
+            ai_provider_consent: Some("openrouter".into()),
+            ai_provider_key: Some(zeroize::Zeroizing::new("sk-old".into())),
+            ..PrefsView::default()
+        };
+        let mut revoked_remote = PrefsView {
+            ai_provider: None,
+            ai_provider_key: None,
+            ..PrefsView::default()
+        };
+        stamped(&mut revoked_remote, "ai_provider", u64::MAX);
+        stamped(&mut revoked_remote, "ai_provider_key", u64::MAX);
+
+        let after_revoke = merge_prefs(&configured_local, &revoked_remote);
+        assert_eq!(
+            after_revoke.ai_provider_key, None,
+            "a revoke must reach every device, which is why the key stays shared"
+        );
+        assert_eq!(
+            after_revoke.ai_provider_consent.as_deref(),
+            Some("openrouter"),
+            "this device's own approval is untouched by a remote revoke; the gate \
+             is an equality against the active provider, so with the provider \
+             cleared it refuses anyway"
+        );
+    }
+
     /// MYND-651: `auto_tag_enabled` is Shared/ScalarLww, so the newer clock
     /// wins and the flag DOES cross devices — the deliberate contrast with its
     /// device-local co-gate `ai_enabled`, which does not. The pair is what makes
@@ -980,6 +1365,52 @@ mod tests {
         }
     }
 
+    #[test]
+    fn periodic_notes_merges_per_setting_not_per_period() {
+        // myne#177. The flat `<period>.<setting>` key shape was chosen over a
+        // map of nested objects for exactly this: two edits to the SAME period
+        // in the same round, on different settings, must both survive. With a
+        // per-period value they would have shared one clock and one would have
+        // been dropped. Asserting the property rather than the shape, because
+        // the shape is what a later refactor would change.
+        let mut a = PrefsView::default();
+        a.periodic_notes
+            .insert("weekly.folder".into(), "Weekly/".into());
+        a.periodic_notes
+            .insert("monthly.format".into(), "YYYY-MM".into());
+        stamped(&mut a, "periodic_notes/weekly.folder", 100);
+        stamped(&mut a, "periodic_notes/monthly.format", 100);
+
+        let mut b = PrefsView::default();
+        // Same period, different setting: must not clobber a's folder.
+        b.periodic_notes
+            .insert("weekly.template".into(), "0190a000-tmpl".into());
+        // Same key, newer clock: must win.
+        b.periodic_notes
+            .insert("monthly.format".into(), "YYYY/MM".into());
+        stamped(&mut b, "periodic_notes/weekly.template", 200);
+        stamped(&mut b, "periodic_notes/monthly.format", 300);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(
+                merged.periodic_notes.get("weekly.folder").unwrap(),
+                "Weekly/"
+            );
+            assert_eq!(
+                merged.periodic_notes.get("weekly.template").unwrap(),
+                "0190a000-tmpl"
+            );
+            assert_eq!(
+                merged.periodic_notes.get("monthly.format").unwrap(),
+                "YYYY/MM"
+            );
+            assert_eq!(
+                merged.field_clocks.get("periodic_notes/monthly.format"),
+                Some(&300)
+            );
+        }
+    }
+
     // ── myne#296: a removal must be representable ───────────────────────────
     //
     // Before this, a per-key map merge was a pure key UNION with no way to say
@@ -1124,15 +1555,26 @@ mod tests {
         // field_clocks key (byte-identity discipline).
         let a = PrefsView {
             label: Some("Alpha".into()),
+            // myne#613: set entries are included deliberately. They are now the
+            // field most able to bloat `field_clocks`, since the set grows with
+            // the vault's folder count, so "a legacy blob gains no clocks" has to
+            // hold for them specifically and not just for the scalars.
+            deliberate_folders: vec!["Alpha/".into()],
             ..PrefsView::default()
         };
         let b = PrefsView {
             label: Some("Beta".into()),
+            deliberate_folders: vec!["Beta/".into()],
             ..PrefsView::default()
         };
 
         let merged = merge_prefs(&a, &b);
         assert_eq!(merged.label.as_deref(), Some("Beta")); // lexicographic
+        assert_eq!(
+            merged.deliberate_folders,
+            vec!["Alpha/".to_string(), "Beta/".to_string()],
+            "both survive: neither side claims a removal"
+        );
         assert!(merged.field_clocks.is_empty());
     }
 
@@ -1330,7 +1772,12 @@ mod tests {
         let mut after = PrefsView {
             label: Some("Renamed".into()),            // shared LWW → stamps
             theme: Some(protocol::ThemeChoice::Dark), // device-local → no stamp
-            deliberate_folders: vec!["A/".into()],    // set-union → clockless
+            // myne#613: set-union was clockless and is not any more. It stamps
+            // PER ENTRY, under the folded identity, and still never under the
+            // bare field name. The assertion below is unchanged and load-bearing,
+            // because a bare-name stamp would make one folder's edit race the
+            // whole set and drop concurrent additions on the other device.
+            deliberate_folders: vec!["A/".into()],
             ..PrefsView::default()
         };
         stamp_changed_shared_fields(&before, &mut after, 12345);
@@ -1338,7 +1785,11 @@ mod tests {
         assert_eq!(after.field_clocks.get("label"), Some(&12345));
         assert!(!after.field_clocks.contains_key("theme"));
         assert!(!after.field_clocks.contains_key("deliberate_folders"));
-        assert_eq!(after.field_clocks.len(), 1);
+        assert_eq!(
+            after.field_clocks.get("deliberate_folders/a/"),
+            Some(&12345)
+        );
+        assert_eq!(after.field_clocks.len(), 2);
     }
 
     #[test]
@@ -1370,5 +1821,615 @@ mod tests {
         assert_eq!(after.field_clocks.get("device_names/bb"), Some(&777));
         assert!(!after.field_clocks.contains_key("device_names"));
         assert_eq!(after.field_clocks.len(), 2);
+    }
+
+    // ── myne#613: a removal must be representable in a SET field too ────────
+    //
+    // The per-key maps got this in myne#296. The five set-union fields did not,
+    // and `merge_set_union_folded` is a pure union with no clock and no
+    // tombstone, so removing an entry could not be expressed: device A deletes,
+    // device B still holds the entry, and the next union restores it within two
+    // rounds, with no concurrency required. Under myne#613 every folder a note
+    // lands in enters `deliberate_folders`, which turns that from a defect
+    // affecting hand-made folders into one affecting every folder delete.
+    //
+    // Table-driven over all five fields rather than five copies, and driven off
+    // the classification table itself, so a set field added later is covered by
+    // construction instead of by somebody remembering to copy a test.
+
+    /// Every `SetUnion` field, read off the normative classification rather than
+    /// hand-listed. A new set field joins these tests by existing.
+    fn set_union_fields() -> Vec<&'static str> {
+        CLASSIFICATION
+            .iter()
+            .filter(|(_, c)| matches!(c, PrefClass::Shared(SharedDiscipline::SetUnion { .. })))
+            .map(|(n, _)| *n)
+            .collect()
+    }
+
+    fn put_set(view: &mut PrefsView, field: &str, values: &[&str]) {
+        let v: Vec<String> = values.iter().map(|s| (*s).to_string()).collect();
+        match field {
+            "ai_excluded_folders" => view.ai_excluded_folders = v,
+            "archived_folders" => view.archived_folders = v,
+            "cli_excluded_folders" => view.cli_excluded_folders = v,
+            "deliberate_folders" => view.deliberate_folders = v,
+            "spell_languages" => view.spell_languages = v,
+            other => panic!("not a set-union field: {other}"),
+        }
+    }
+
+    fn read_set<'a>(view: &'a PrefsView, field: &str) -> &'a [String] {
+        match field {
+            "ai_excluded_folders" => &view.ai_excluded_folders,
+            "archived_folders" => &view.archived_folders,
+            "cli_excluded_folders" => &view.cli_excluded_folders,
+            "deliberate_folders" => &view.deliberate_folders,
+            "spell_languages" => &view.spell_languages,
+            other => panic!("not a set-union field: {other}"),
+        }
+    }
+
+    /// A member value legal for the field: the four folder sets take canonical
+    /// trailing-slash paths, `spell_languages` takes language codes. A folder
+    /// path would still pass the merge as a language code, but it would stop the
+    /// folded-identity assertions below from meaning anything.
+    fn member(field: &str, n: usize) -> String {
+        if folds(field) {
+            ["Alpha/", "Beta/", "Gamma/"][n].to_string()
+        } else {
+            ["en-US", "tr-TR", "de-DE"][n].to_string()
+        }
+    }
+
+    /// The clock key the merge and the stamper must agree on: the folded
+    /// identity for a folder set, the raw code for `spell_languages`.
+    fn entry_clock_key(field: &str, value: &str) -> String {
+        // The fold RULE is respelled here rather than calling
+        // `set_entry_identity`, deliberately: a test that computes the key with
+        // the same function the production code uses cannot catch that function
+        // being wrong. Which fields fold is read off the classification instead
+        // of hardcoded, because that is a roster and not a rule, and a second
+        // unfolded set field would otherwise get folder-shaped members and a
+        // folded assertion applied to it.
+        if folds(field) {
+            let segs: Vec<&str> = value.split('/').filter(|s| !s.is_empty()).collect();
+            format!("{field}/{}/", segs.join("/").to_lowercase())
+        } else {
+            format!("{field}/{value}")
+        }
+    }
+
+    /// Whether this set field folds its entries, taken from the normative
+    /// classification rather than from a field-name literal.
+    fn folds(field: &str) -> bool {
+        match classify(field) {
+            Some(PrefClass::Shared(SharedDiscipline::SetUnion { folded, .. })) => folded,
+            other => panic!("{field} is not a set-union field: {other:?}"),
+        }
+    }
+
+    /// Whether a removal on one device reaches the others. False for the two
+    /// egress controls, whose union stays monotone.
+    fn removals_propagate(field: &str) -> bool {
+        match classify(field) {
+            Some(PrefClass::Shared(SharedDiscipline::SetUnion {
+                removals_propagate, ..
+            })) => removals_propagate,
+            other => panic!("{field} is not a set-union field: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_removed_set_entry_stays_removed() {
+        for field in set_union_fields() {
+            if !removals_propagate(field) {
+                continue; // monotone by design: own test below
+            }
+            let m0 = member(field, 0);
+            // A removed it at 300 (so it holds the stamp and not the value);
+            // B still holds it, stamped older.
+            let mut a = PrefsView::default();
+            stamped(&mut a, &entry_clock_key(field, &m0), 300);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &[&m0]);
+            stamped(&mut b, &entry_clock_key(field, &m0), 100);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert!(
+                    !read_set(&merged, field).contains(&m0),
+                    "{field}: the removal must win over the peer's older value"
+                );
+                assert_eq!(
+                    merged.field_clocks.get(&entry_clock_key(field, &m0)),
+                    Some(&300),
+                    "{field}: the removal must carry its clock, so the peer drops \
+                     it next round rather than pushing it back"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_set_entry_the_peer_never_had_still_unions_in() {
+        for field in set_union_fields() {
+            let m0 = member(field, 0);
+            // The other reading of a single-sided entry, and the one the plain
+            // union already got right: B simply never held it. No clock on B's
+            // side, so nothing claims a deletion.
+            let mut a = PrefsView::default();
+            put_set(&mut a, field, &[&m0]);
+            stamped(&mut a, &entry_clock_key(field, &m0), 100);
+            let b = PrefsView::default();
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert!(
+                    read_set(&merged, field).contains(&m0),
+                    "{field}: an entry the peer never held must survive"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_set_re_add_after_a_removal_wins_on_the_newer_clock() {
+        for field in set_union_fields() {
+            let m0 = member(field, 0);
+            // A removed it at 100; B added it back at 200. The add is newer than
+            // the deletion, so it comes back. Without stamping the ADD as well as
+            // the removal this case is unreachable: the re-added value would
+            // carry the pre-removal clock and lose to its own tombstone forever.
+            let mut a = PrefsView::default();
+            stamped(&mut a, &entry_clock_key(field, &m0), 100);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &[&m0]);
+            stamped(&mut b, &entry_clock_key(field, &m0), 200);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert!(
+                    read_set(&merged, field).contains(&m0),
+                    "{field}: a re-add newer than the removal must come back"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn an_equal_clock_keeps_the_set_entry() {
+        for field in set_union_fields() {
+            let m0 = member(field, 0);
+            // "Absent sorts lowest" is the tiebreak this module already uses for
+            // the per-key maps, and it is the recoverable direction: an entry
+            // that survives one extra round can be deleted again, one dropped by
+            // a clock collision cannot be recovered.
+            let mut a = PrefsView::default();
+            stamped(&mut a, &entry_clock_key(field, &m0), 500);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &[&m0]);
+            stamped(&mut b, &entry_clock_key(field, &m0), 500);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert!(
+                    read_set(&merged, field).contains(&m0),
+                    "{field}: equal clocks must keep the value"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_set_removal_does_not_take_its_siblings_with_it() {
+        for field in set_union_fields() {
+            if !removals_propagate(field) {
+                continue; // monotone by design: own test below
+            }
+            let (m0, m1) = (member(field, 0), member(field, 1));
+            // The failure the per-key maps were built to avoid, one field over:
+            // a removal must be scoped to its own entry, never to the field.
+            let mut a = PrefsView::default();
+            put_set(&mut a, field, &[&m1]);
+            stamped(&mut a, &entry_clock_key(field, &m0), 300);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &[&m0, &m1]);
+            stamped(&mut b, &entry_clock_key(field, &m0), 100);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert!(!read_set(&merged, field).contains(&m0), "{field}: removed");
+                assert!(
+                    read_set(&merged, field).contains(&m1),
+                    "{field}: the sibling entry must be untouched by the removal"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_folder_set_removal_is_keyed_by_folded_identity() {
+        // The four folder sets fold `personal/` and `PERSONAL/` to one identity
+        // (MYND-562), so a removal recorded on one casing must remove the other.
+        // `spell_languages` is deliberately excluded and gets the opposite
+        // assertion below: language codes are case-sensitive.
+        for field in set_union_fields() {
+            if !removals_propagate(field) {
+                continue; // monotone by design: own test below
+            }
+            if !folds(field) {
+                continue;
+            }
+            let mut a = PrefsView::default();
+            stamped(&mut a, &entry_clock_key(field, "personal/"), 300);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &["PERSONAL/"]);
+            stamped(&mut b, &entry_clock_key(field, "PERSONAL/"), 100);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert!(
+                    read_set(&merged, field).is_empty(),
+                    "{field}: a removal on one casing must remove the folded twin"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_removal_clock_outlives_the_entry_on_both_sides() {
+        // The tombstone-GC defect, at the unit level. Both sides have already
+        // dropped the entry and only the clock records that it was deleted. If
+        // the merge does not carry that clock forward, the very next round with
+        // a device that was offline resurrects the entry.
+        for field in set_union_fields() {
+            if !removals_propagate(field) {
+                continue;
+            }
+            let m0 = member(field, 0);
+            let key = entry_clock_key(field, &m0);
+
+            // Two converged views: the entry is gone from both, the clock stands.
+            let mut a = PrefsView::default();
+            stamped(&mut a, &key, 300);
+            let mut b = PrefsView::default();
+            stamped(&mut b, &key, 300);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert_eq!(
+                    merged.field_clocks.get(&key),
+                    Some(&300),
+                    "{field}: a removal clock must survive both sides dropping \
+                     the entry, or the deletion has nothing left to win with"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_third_device_cannot_resurrect_what_two_others_deleted() {
+        // The property the test above exists to produce, played out. Round one
+        // deletes; round two is the two converged devices meeting again; round
+        // three is the peer that was offline for both, still holding the entry
+        // under its original add clock. Before the carry-forward this returned
+        // the entry, undone by a clock three hundred units older than the
+        // removal.
+        for field in set_union_fields() {
+            if !removals_propagate(field) {
+                continue;
+            }
+            let m0 = member(field, 0);
+            let key = entry_clock_key(field, &m0);
+
+            // Device A deleted it at 300; device B still held it at 100.
+            let mut a = PrefsView::default();
+            stamped(&mut a, &key, 300);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &[&m0]);
+            stamped(&mut b, &key, 100);
+
+            let round1 = merge_prefs(&a, &b);
+            assert!(!read_set(&round1, field).contains(&m0), "{field}: round 1");
+
+            // A and B converge, then meet once more with nothing left to say.
+            let round2 = merge_prefs(&round1, &round1);
+            assert!(!read_set(&round2, field).contains(&m0), "{field}: round 2");
+
+            // The offline third device rejoins, still holding it at 100.
+            let mut c = PrefsView::default();
+            put_set(&mut c, field, &[&m0]);
+            stamped(&mut c, &key, 100);
+
+            for merged in [merge_prefs(&round2, &c), merge_prefs(&c, &round2)] {
+                assert!(
+                    !read_set(&merged, field).contains(&m0),
+                    "{field}: a device that was offline for the deletion must \
+                     not bring the entry back"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_monotone_set_carries_no_clocks_forward_either() {
+        // The exclusion sets stamp nothing, so there is nothing to carry, and
+        // the carry-forward must not invent a reason to keep a stray key. A
+        // legacy or server-supplied clock on a monotone field is the only way
+        // one can exist, and it earns no place in the merged view.
+        for field in set_union_fields() {
+            if removals_propagate(field) {
+                continue;
+            }
+            let m0 = member(field, 0);
+            let mut a = PrefsView::default();
+            stamped(&mut a, &entry_clock_key(field, &m0), 300);
+            let b = PrefsView::default();
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert!(
+                    !merged
+                        .field_clocks
+                        .contains_key(&entry_clock_key(field, &m0)),
+                    "{field}: a monotone set keeps no per-entry clock"
+                );
+            }
+        }
+
+        // The BOTH-SIDES-HOLD arm, which the single-sided case above does not
+        // reach. It carried the clock forward unconditionally until this pass,
+        // so this test passed while proving less than its name asserts: a stray
+        // clock on an egress control persisted across every merge forever.
+        let mut both_a = PrefsView {
+            ai_excluded_folders: vec!["Private/".to_string()],
+            ..Default::default()
+        };
+        both_a.field_clocks.insert(
+            "ai_excluded_folders/private/".to_string(),
+            1_765_432_100_000,
+        );
+        let both_b = PrefsView {
+            ai_excluded_folders: vec!["Private/".to_string()],
+            ..Default::default()
+        };
+        let merged = merge_prefs(&both_a, &both_b);
+        assert!(
+            !merged
+                .field_clocks
+                .keys()
+                .any(|k| k.starts_with("ai_excluded_folders/")),
+            "a monotone set must carry no clock forward even when both sides \
+             hold the entry, so a stray one cannot become permanent"
+        );
+    }
+
+    #[test]
+    fn a_cross_side_casing_pair_collapses_to_the_lexicographic_min_display_form() {
+        // MYND-562, carried over from `conflict.rs`'s `merge_set_union_folded`
+        // tests when myne#613 left that function with no production caller and
+        // deleted it. These two assertions were the ONLY place in the tree that
+        // covered the cross-side case, and the new removal tests do not: they
+        // assert an empty result, which a merge that dropped the fold entirely
+        // would also produce.
+        //
+        // "PERSONAL/" < "personal/" byte-wise, so the upper-case form is the
+        // survivor. Distinct folders are untouched, and the result is the same
+        // in both argument orders.
+        for field in set_union_fields() {
+            if !folds(field) {
+                continue;
+            }
+            let mut a = PrefsView::default();
+            put_set(&mut a, field, &["personal/", "Work/"]);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &["PERSONAL/", "Ideas/"]);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert_eq!(
+                    read_set(&merged, field),
+                    ["Ideas/", "PERSONAL/", "Work/"],
+                    "{field}: one representative per folded identity, the \
+                     byte-lexicographic minimum"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nfc_folds_a_decomposed_and_a_precomposed_entry_into_one() {
+        // The second assertion carried over from the deleted `conflict.rs`
+        // tests. Decomposed "cafe" + U+0301 and precomposed "Café" are one
+        // folder, and nothing else in this module would notice if the NFC pass
+        // were dropped from the identity.
+        for field in set_union_fields() {
+            if !folds(field) {
+                continue;
+            }
+            let mut a = PrefsView::default();
+            put_set(&mut a, field, &["cafe\u{0301}/"]);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &["Caf\u{00e9}/"]);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert_eq!(
+                    read_set(&merged, field).len(),
+                    1,
+                    "{field}: one survivor, not two spellings of one folder"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_folder_identity_ignores_a_missing_trailing_slash() {
+        // Why the identity goes through `canonical_folder` rather than a plain
+        // NFC-plus-lowercase fold: `markdown-dialect.md` §3.6.2 tolerates a
+        // missing trailing slash on reads, and the Obsidian importer preserves
+        // `folder:` verbatim, so both shapes can reach these sets. Under a
+        // fold-only identity they are two clock keys for one folder and a
+        // removal stamped against one silently misses the other.
+        for field in set_union_fields() {
+            if !folds(field) {
+                continue;
+            }
+            let mut a = PrefsView::default();
+            put_set(&mut a, field, &["Projects"]);
+            let mut b = PrefsView::default();
+            put_set(&mut b, field, &["Projects/"]);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert_eq!(
+                    read_set(&merged, field).len(),
+                    1,
+                    "{field}: with and without the trailing slash is one folder"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn an_egress_exclusion_survives_a_peer_claiming_it_was_removed() {
+        // `ai_excluded_folders` and `cli_excluded_folders` are not preferences.
+        // `threat-model.md` A17 rests its remote-provider mitigation on the
+        // first, and the shipped UI promises both absolutely ("Notes in these
+        // folders are never read or indexed by AI"; "Folders the terminal never
+        // sees"). Their union is monotone SO THAT the merge can only fail
+        // closed: an exclusion present on any device survives.
+        //
+        // The clock here is the strongest claim a peer can make (300 against a
+        // present side that has none at all), and it still loses. Under the
+        // removal discipline the other three fields carry, this same input drops
+        // the entry, which is the fail-OPEN direction: note plaintext from a
+        // folder the user excluded reaching a remote provider.
+        //
+        // The failure this guards against needs no attacker and no concurrency,
+        // only a device whose wall clock runs fast, because a re-add from a
+        // correctly-clocked device stamps the SMALLER clock and can never win.
+        for field in set_union_fields() {
+            if removals_propagate(field) {
+                continue;
+            }
+            let m0 = member(field, 0);
+            let mut a = PrefsView::default();
+            put_set(&mut a, field, &[&m0]);
+            let mut b = PrefsView::default();
+            stamped(&mut b, &entry_clock_key(field, &m0), 300);
+
+            for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+                assert!(
+                    read_set(&merged, field).contains(&m0),
+                    "{field}: an egress exclusion must survive a peer's removal \
+                     claim, however new that claim's clock is"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_monotone_set_stamps_no_clock_at_all() {
+        // No removal is expressible, so no clock is worth writing: stamping the
+        // adds would grow `field_clocks` with keys nothing ever reads, on a blob
+        // that is re-encrypted and re-pushed on every prefs write.
+        for field in set_union_fields() {
+            if removals_propagate(field) {
+                continue;
+            }
+            let (m0, m1) = (member(field, 0), member(field, 1));
+            let mut before = PrefsView::default();
+            put_set(&mut before, field, &[&m0]);
+            let mut after = PrefsView::default();
+            put_set(&mut after, field, &[&m1]);
+
+            stamp_changed_shared_fields(&before, &mut after, 777);
+
+            assert!(
+                after.field_clocks.is_empty(),
+                "{field}: a monotone set stamps nothing"
+            );
+        }
+    }
+
+    #[test]
+    fn the_two_egress_controls_are_the_monotone_ones() {
+        // Pins WHICH fields are monotone, so the split cannot be widened or
+        // narrowed without this test naming it. Reads the classification rather
+        // than restating it, and compares both directions: a field that gains
+        // removals, and one that loses them, both fail here.
+        let monotone: Vec<&str> = set_union_fields()
+            .into_iter()
+            .filter(|f| !removals_propagate(f))
+            .collect();
+        assert_eq!(
+            monotone,
+            vec!["ai_excluded_folders", "cli_excluded_folders"],
+            "only the egress controls are monotone; the organisational sets \
+             carry removal clocks (myne#613)"
+        );
+    }
+
+    #[test]
+    fn spell_languages_removal_is_case_sensitive() {
+        // The other direction of the rule above, asserted rather than assumed:
+        // folding language codes would be a defect, so `de-DE` and `de-de` are
+        // two entries and removing one must leave the other standing.
+        let mut a = PrefsView {
+            spell_languages: vec!["de-de".to_string()],
+            ..PrefsView::default()
+        };
+        stamped(&mut a, "spell_languages/de-DE", 300);
+        let mut b = PrefsView {
+            spell_languages: vec!["de-DE".to_string(), "de-de".to_string()],
+            ..PrefsView::default()
+        };
+        stamped(&mut b, "spell_languages/de-DE", 100);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(merged.spell_languages, vec!["de-de".to_string()]);
+        }
+    }
+
+    #[test]
+    fn stamping_a_set_field_is_per_entry_for_both_adds_and_removals() {
+        for field in set_union_fields() {
+            if !removals_propagate(field) {
+                continue; // monotone: stamps nothing, own test above
+            }
+            let (m0, m1) = (member(field, 0), member(field, 1));
+            let mut before = PrefsView::default();
+            put_set(&mut before, field, &[&m0]);
+            let mut after = PrefsView::default();
+            put_set(&mut after, field, &[&m1]);
+
+            stamp_changed_shared_fields(&before, &mut after, 777);
+
+            assert_eq!(
+                after.field_clocks.get(&entry_clock_key(field, &m1)),
+                Some(&777),
+                "{field}: an ADDED entry is stamped, without which a re-add could \
+                 never beat its own tombstone"
+            );
+            assert_eq!(
+                after.field_clocks.get(&entry_clock_key(field, &m0)),
+                Some(&777),
+                "{field}: a REMOVED entry is stamped, which is the claim the merge \
+                 compares"
+            );
+            assert!(
+                !after.field_clocks.contains_key(field),
+                "{field}: the bare field name must never be stamped for a set"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unchanged_set_field_is_not_stamped() {
+        for field in set_union_fields() {
+            let m0 = member(field, 0);
+            let mut before = PrefsView::default();
+            put_set(&mut before, field, &[&m0]);
+            let mut after = before.clone();
+
+            stamp_changed_shared_fields(&before, &mut after, 777);
+
+            assert!(
+                after.field_clocks.is_empty(),
+                "{field}: an untouched set must stamp nothing, or every unrelated \
+                 prefs write would bloat field_clocks by the vault's folder count"
+            );
+        }
     }
 }

@@ -67,7 +67,10 @@ fn a_genuine_scanner_failure_is_a_different_kind() {
     // does not.
     let json = serde_json::to_value(Error::Plugin("camera denied".into())).expect("serializes");
     assert_eq!(json.get("kind").and_then(|v| v.as_str()), Some("Plugin"));
-    assert_ne!(json.get("kind").and_then(|v| v.as_str()), Some("Unsupported"));
+    assert_ne!(
+        json.get("kind").and_then(|v| v.as_str()),
+        Some("Unsupported")
+    );
 }
 
 #[test]
@@ -77,7 +80,7 @@ fn a_cancelled_scan_is_a_success_with_no_value_rather_than_an_error() {
     // showing them "scanning is unavailable" would be false.
     let cancelled: ScanResponse = serde_json::from_str("{}").expect("cancel decodes");
     assert!(cancelled.value.is_none());
-    let scanned: ScanResponse = serde_json::from_str(r#"{"value":"myne://join?x=1"}"#)
-        .expect("a scan decodes");
+    let scanned: ScanResponse =
+        serde_json::from_str(r#"{"value":"myne://join?x=1"}"#).expect("a scan decodes");
     assert_eq!(scanned.value.as_deref(), Some("myne://join?x=1"));
 }

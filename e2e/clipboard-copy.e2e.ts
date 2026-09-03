@@ -24,10 +24,16 @@
 // `docs/dev/clipboard-sensitivity-verification.md`, manual and honestly labelled.
 // A scenario here that claimed to check them would be worse than none.
 
+import fs from "node:fs";
+import path from "node:path";
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOffer,
+  openExportSubmenuItem,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 
@@ -45,6 +51,15 @@ const PASSWORD = "correct horse battery staple 42";
  */
 const PHRASE_COPIED =
   "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.";
+
+/** The SAVE success string on the desktop's dialog arm (myne-md/myne#522).
+ *
+ *  Duplicated for the same reason as `PHRASE_COPIED`, and asserted by EQUALITY
+ *  for one more: this screen has two affordances sharing one status line, and
+ *  the defect being pinned is a save rendering the COPY sentence. "Something
+ *  appeared" passes that; the wrong sentence does not. */
+const PHRASE_SAVED =
+  "Saved. It is a plain text file, so keep it somewhere only you can read.";
 
 describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#390)", () => {
   it("says nothing before the copy, and the SUCCESS string after it", async () => {
@@ -90,7 +105,7 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
       // live region that is only inserted once there is something to say cannot
       // announce it, because a screen reader watches a region it already knows
       // about. This is the half that is easy to get wrong and impossible to see.
-      const status = await s.byTestId("create.phrase-copy-status", {
+      const status = await s.byTestId("create.phrase-action-status", {
         timeoutMs: 10_000,
       });
       expect((await status.text()).trim()).toBe("");
@@ -111,6 +126,71 @@ describeE2E("cb1 the phrase step reports its copy, and says which outcome (myne#
         async () => ((await status.text()).trim() === PHRASE_COPIED ? true : null),
         { label: "phrase copy reports SUCCESS, not merely an outcome", timeoutMs: 10_000 },
       );
+
+      // ---- the SAVE half (myne-md/myne#522) --------------------------------
+      //
+      // Save as file reported NOTHING on either outcome until this issue: it
+      // succeeded silently and it failed silently, on the screen the copy half
+      // above exists for. Worse than a generic missing toast, because the
+      // failed-copy string this scenario just asserted reads `Couldn't copy.
+      // Use "Save as file" instead.` and named the silent path as the recovery.
+      //
+      // The native save dialog is not driveable by WebDriver, so the sanctioned
+      // page-seat interception is used (`e2e/CLAUDE.md`, "Page-seat dialog
+      // interception"; `note-export.e2e.ts` ne3 is the template): the ONE IPC
+      // URL for `plugin:dialog|save` gets a synthetic ok-Response carrying a
+      // known path, every other URL reaches the native fetch, and everything
+      // past the dialog is the real flow, including the Rust write.
+      // Outside the vault tree: `secret-export|save_secret_text` re-validates
+      // its destination and REFUSES the app-data / vault directory, which is the
+      // narrow-seam guard this scenario must not fight.
+      const saveDir = path.join(app.dataHome, "phrase-saves");
+      fs.mkdirSync(saveDir, { recursive: true });
+      const savePath = path.join(saveDir, "e2e-phrase.txt");
+      const patched = await s.execute<boolean>(
+        "if (window.__e2eDialogPatched !== true) {" +
+          "  const saveUrl = window.__TAURI_INTERNALS__.convertFileSrc('plugin:dialog|save', 'ipc');" +
+          "  const origFetch = window.fetch.bind(window);" +
+          "  const wrapper = function (input, init) {" +
+          "    const url = typeof input === 'string' ? input : input && input.url;" +
+          "    if (url === saveUrl) {" +
+          "      return Promise.resolve(new Response(JSON.stringify(window.__e2eDialogSavePath), {" +
+          "        status: 200," +
+          "        headers: { 'content-type': 'application/json', 'Tauri-Response': 'ok' }," +
+          "      }));" +
+          "    }" +
+          "    return origFetch(input, init);" +
+          "  };" +
+          "  window.fetch = wrapper;" +
+          // Assert the assignment TOOK. A non-writable `fetch` would silently
+          // keep the real transport and open an undriveable native dialog.
+          "  window.__e2eDialogPatched = window.fetch === wrapper;" +
+          "}" +
+          "window.__e2eDialogSavePath = arguments[0];" +
+          "return window.__e2eDialogPatched === true;",
+        [savePath],
+      );
+      expect(patched).toBe(true);
+
+      await (await s.byTestId("create.phrase-save")).click();
+
+      // The SAVE sentence, by equality. The regression this pins is one status
+      // line serving two affordances: before #522 the line either said nothing
+      // at all, or (once it spoke) said the copy sentence for a save.
+      await s.waitUntil(
+        async () => ((await status.text()).trim() === PHRASE_SAVED ? true : null),
+        {
+          label: "phrase save reports the SAVE sentence, not the copy one",
+          timeoutMs: 15_000,
+        },
+      );
+
+      // The sentence AND the file. Asserting only the sentence would pass a
+      // build that announces success unconditionally, which is exactly the
+      // defect this same issue fixed on the web arm. Length only, never the
+      // contents: SYNC-13 forbids a failure diff that could print the phrase.
+      expect(fs.existsSync(savePath)).toBe(true);
+      expect(fs.readFileSync(savePath, "utf8").trim().split(/\s+/).length).toBe(24);
     });
   });
 });
@@ -130,9 +210,7 @@ async function openExportMenuItem(s: Session, noteId: string) {
     testIdSelector("notes.row", { "data-note-id": noteId }),
   );
   await row.rightClick();
-  return s.waitForElement(
-    testIdSelector("notes.context-menu-item", { "data-item-id": "export-markdown" }),
-  );
+  return openExportSubmenuItem(s, "export-markdown");
 }
 
 describeE2E("cb2 a note copy toasts, from a stage the toast host only just reached", () => {

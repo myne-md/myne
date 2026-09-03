@@ -29,9 +29,14 @@ vi.mock("../../src/lib/vault-delete", async () => {
   );
   return { ...actual, deleteVault: (...a: unknown[]) => deleteVault(...a) };
 });
-vi.mock("../../src/lib/prefs", () => ({
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   prefsRead: (...a: unknown[]) => prefsRead(...a),
   setVaultLabel: (...a: unknown[]) => setVaultLabel(...a),
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 vi.mock("../../src/lib/vault-list", () => ({
   listVaults: (...a: unknown[]) => listVaults(...a),

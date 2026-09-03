@@ -34,6 +34,7 @@ import { completeRecovery } from "../../lib/vault-recover";
 import { ioBanner } from "../../lib/io-banner";
 import type { VaultRecoveryError } from "../../types/vault-recovery-error";
 import type { Action, PasswordOutcome, VaultRecoverState } from "./reducer";
+import { stageRootStyle } from "../../components/primitives/stageRoot";
 
 interface PasswordResetStepProps {
   state: VaultRecoverState;
@@ -120,6 +121,14 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
         kind: "banner-retry",
         banner: i18n.t("vaultRecover.passwordReset.errors.weakPassword"),
       };
+    case "VaultOpenAsImportSource":
+      // A8f cannot produce this in practice: reaching password-reset means the
+      // slot for this vault was `Recovering`, and an import source slot is a
+      // different variant on the same key, so the two cannot both hold it. The
+      // exhaustiveness check still forces a mapping, and a stage-transition
+      // bug-canary is the honest one rather than a banner claiming a state the
+      // user can act on here.
+      return { kind: "fail-closed", reason: "invalid-state" };
   }
 }
 
@@ -134,10 +143,7 @@ const INFO_BOX_STYLE: CSSProperties = {
 };
 
 const ROOT_STYLE: CSSProperties = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  ...stageRootStyle,
   background: "var(--bg-1)",
   fontFamily: "var(--font-sans)",
   padding: "var(--space-5)",

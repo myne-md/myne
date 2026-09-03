@@ -184,6 +184,7 @@ pub use phrase::{
     RECOVERY_PHRASE_WORD_COUNT,
 };
 pub use prefs::{
+    canonical_clock_member_cost, canonical_plaintext_len, canonical_set_entry_cost,
     decode_prefs_blob, decode_prefs_blob_versioned, encode_prefs_blob, encode_prefs_blob_raw,
     encode_prefs_blob_versioned, EditorLayout, PrefsBlobError, PrefsView, ThemeChoice,
     MAX_PREFS_PLAINTEXT_LEN, PREFS_BLOB_ACCOUNT_HASH_LEN, PREFS_BLOB_HEADER_LEN, PREFS_BLOB_MAGIC,

@@ -86,6 +86,66 @@ function newPaneId(): PaneId {
   return crypto.randomUUID();
 }
 
+/**
+ * `flushAll` refused: at least one pane did not settle, so the disk does not
+ * match the buffer and nothing may be written on top of it.
+ *
+ * A NAMED class rather than a bare `Error`, because five surfaces now inherit
+ * this rejection and every one of them has to tell it apart from a backend
+ * failure. They mean different things to the user and to the code: a backend
+ * failure is reported by the backend's own tracing and is retryable, while this
+ * one is the app declining, is the user's own unsaved text, and clears itself
+ * the moment that save lands. A `catch {}` that attributes both to the same
+ * cause either says nothing (four of the five did) or names a cause it has not
+ * established (the fifth did).
+ */
+export class PanesNotSettledError extends Error {
+  /** The panes that did not settle. Named, not counted: "2 panes" cannot be
+   *  acted on, and which two decides whether the user is looking at a full
+   *  disk, one bad note, or a pane they thought they had closed. */
+  readonly panes: readonly PaneId[];
+
+  constructor(panes: readonly PaneId[]) {
+    super(
+      `flushOpenPanes: ${panes.length} pane(s) did not settle (${panes.join(", ")}); ` +
+        `refusing to report the disk as current`,
+    );
+    this.name = "PanesNotSettledError";
+    this.panes = panes;
+  }
+}
+
+/** True for the rejection {@link PanesNotSettledError} describes, across a
+ *  module boundary and a `structuredClone`-free promise chain. `instanceof` is
+ *  enough today (one bundle, one class identity) and the helper is what every
+ *  call site uses, so a future transport change is one edit. */
+export function isPanesNotSettled(err: unknown): err is PanesNotSettledError {
+  return err instanceof PanesNotSettledError;
+}
+
+/**
+ * Which sentence a caught rejection deserves: the app declined, or something
+ * failed.
+ *
+ * Four surfaces were spelling `isPanesNotSettled(err) ? t(a) : t(b)` verbatim,
+ * which is one distinction living in four places and a fifth surface away from
+ * inventing a fifth key for it.
+ *
+ * It takes RESOLVED sentences rather than translation keys, the shape
+ * `saveOutcomeMessage` established one commit earlier and for the same reason:
+ * `check-i18n.mjs` matches a static `t("literal")`, so a key passed as a string
+ * drops out of the only check that proves it exists in the catalog. Both
+ * sentences stay at the call site, where they can also stay SPECIFIC: the folder
+ * rename can say the folder was left alone, which is more use than a neutral
+ * sentence and is not true anywhere else.
+ */
+export function panesNotSettledMessage(
+  err: unknown,
+  sentences: { readonly unsettled: string; readonly failed: string },
+): string {
+  return isPanesNotSettled(err) ? sentences.unsettled : sentences.failed;
+}
+
 export type WorkspaceApi = {
   root: WorkspaceNode;
   focusedPaneId: PaneId;
@@ -247,7 +307,11 @@ export type WorkspaceApi = {
   toggleCompanion: (paneId: PaneId) => void;
 
   // ── flush registry (one entry per live pane editor) ────────────
-  registerFlush: (paneId: PaneId, flush: () => Promise<void>) => void;
+  /** Register this pane's flush. It resolves TRUE when the pane settled clean
+   *  and FALSE when it did not, which is the only way `flushAll` can tell a
+   *  save that failed from one that landed: every layer below swallows the
+   *  rejection into that pane's `saveStatus`. */
+  registerFlush: (paneId: PaneId, flush: () => Promise<boolean>) => void;
   unregisterFlush: (paneId: PaneId) => void;
   /** Flush every registered pane editor's pending save (lock / close). */
   flushAll: () => Promise<void>;
@@ -573,10 +637,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Flush registry — refs (no re-render). Keyed by paneId.
-  const flushers = useRef<Map<PaneId, () => Promise<void>>>(new Map());
+  // Flush registry. Refs, so no re-render. Keyed by paneId.
+  const flushers = useRef<Map<PaneId, () => Promise<boolean>>>(new Map());
   const registerFlush = useCallback(
-    (paneId: PaneId, flush: () => Promise<void>) => {
+    (paneId: PaneId, flush: () => Promise<boolean>) => {
       flushers.current.set(paneId, flush);
     },
     [],
@@ -584,14 +648,43 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const unregisterFlush = useCallback((paneId: PaneId) => {
     flushers.current.delete(paneId);
   }, []);
+  /**
+   * Flush every pane, and REJECT when any of them did not settle.
+   *
+   * The rejection is the whole point and it used to be impossible. This
+   * swallowed each flusher's rejection, and `useAutosave.fireSave` swallows one
+   * too, into that pane's `saveStatus`. Two layers of swallow meant every
+   * caller here, the folder rename, the inbound title rename, the frontmatter
+   * writers and vim `:w`, was told the disk matched the buffer whether or not
+   * it did. A pane whose `note_update` failed (storage full, an IPC error, a
+   * conflict handler that threw) reported success, the caller read the STALE
+   * disk bytes, patched a field and wrote, and the pane was left holding
+   * unsaved text it then had to lose or conflict on.
+   *
+   * A pane's own error UI is still its own: this reports only WHETHER it
+   * settled, so the caller can decline to write on top of it. Each flusher
+   * answers with `!lastSaveFailed()` after its flush, which reads refs rather
+   * than React state and so answers for the buffer as it is now. NOT
+   * `!hasPendingWork()`: that is true after any save whose buffer moved on, so
+   * it reported an ordinary success as "did not settle" and made this reject
+   * after every normal save. The comment at the call site in `PaneView.tsx`
+   * carries the measurement.
+   */
   const flushAll = useCallback(async () => {
-    await Promise.all(
-      [...flushers.current.values()].map((f) =>
-        f().catch(() => {
-          /* per-flush error already routed through that pane's saveStatus */
-        }),
+    const settled = await Promise.all(
+      [...flushers.current.entries()].map(([paneId, f]) =>
+        f().then(
+          (ok) => (ok ? null : paneId),
+          // A flusher that REJECTS outright did not settle either. Caught here
+          // rather than left to `Promise.all` so one pane's failure does not
+          // hide the others: every pane is awaited and every failing id reaches
+          // the message below.
+          () => paneId,
+        ),
       ),
     );
+    const unsettled = settled.filter((id): id is PaneId => id !== null);
+    if (unsettled.length > 0) throw new PanesNotSettledError(unsettled);
   }, []);
 
   // WL-8 rename auto-update seam: expose the open-note set + flush-all to the

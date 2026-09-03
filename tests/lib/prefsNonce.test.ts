@@ -28,10 +28,18 @@ import {
   analyse as analyseUntyped,
   PREFS_MODULES as PREFS_MODULES_UNTYPED,
   SCANNED_TREES as SCANNED_TREES_UNTYPED,
+  WRITE_PREF_BINDING as WRITE_PREF_BINDING_UNTYPED,
 } from "../../scripts/check-prefs-nonce.mjs";
 
 const PREFS_MODULES = PREFS_MODULES_UNTYPED as string[];
 const SCANNED_TREES = SCANNED_TREES_UNTYPED as string[];
+const WRITE_PREF_BINDING = WRITE_PREF_BINDING_UNTYPED as RegExp;
+
+/** Does rule 3's matcher see a binding in this source? */
+function bindsWritePref(src: string): boolean {
+  WRITE_PREF_BINDING.lastIndex = 0;
+  return WRITE_PREF_BINDING.test(src);
+}
 
 /** The guard's return, named here because the script carries no declarations. */
 interface PrefsReport {
@@ -74,6 +82,37 @@ describe("the prefs-nonce guard", () => {
 
   it("catches a prefs write in every shape TypeScript accepts", () => {
     const { failures } = analyse({ prefsSource: `async function writePref() {}\n${EVASIONS}` });
+    expect(failures).toHaveLength(5);
+    for (const f of failures) expect(f.command).toBe("set_ai_enabled");
+  });
+
+  it("accepts the GENERIC chokepoint and the generic call (myne-md/myne#613)", () => {
+    // `writePref` became `writePref<T = void>` so the five set mutators can
+    // return the budget refusal count. Both of this guard's `writePref`
+    // matchers required a bare `(`, so the chokepoint read as MISSING and all
+    // five set writes read as direct invokes: six failures, none of them real.
+    // The fixture above declares the OLD shape, so it exercises neither arm.
+    const generic = [
+      "async function writePref<T = void>(",
+      "  command: string,",
+      ") {}",
+      'await writePref<number>("plugin:prefs|set_deliberate_folders", { mutation });',
+      'await writePref("plugin:prefs|set_ai_enabled", { enabled });',
+    ].join("\n");
+    expect(analyse({ prefsSource: generic }).failures).toEqual([]);
+  });
+
+  it("still catches a raw invoke beside a GENERIC chokepoint", () => {
+    // The other direction, and the one nobody thinks to try: widening a matcher
+    // must not stop it catching what it caught before. A guard that has stopped
+    // checking is green by definition.
+    const generic = [
+      "async function writePref<T = void>(",
+      "  command: string,",
+      ") {}",
+      ...EVASIONS.split("\n"),
+    ].join("\n");
+    const { failures } = analyse({ prefsSource: generic });
     expect(failures).toHaveLength(5);
     for (const f of failures) expect(f.command).toBe("set_ai_enabled");
   });
@@ -131,5 +170,43 @@ describe("the prefs-nonce guard", () => {
     // failure proves the rule can fire, not that it is quiet when it should be.
     const { failures } = analyse();
     expect(failures.filter((f) => f.command === "(missing tree)")).toEqual([]);
+  });
+
+  // ---- rule 3: the chokepoint's name is not reused --------------------------
+  //
+  // Driven over the MATCHER rather than through `analyse`, for the reason the
+  // guard's own docstring gives about rule 1: rule 3 reads real files off disk,
+  // and the tree is clean, so the only way to watch it fire would be to write a
+  // colliding declaration into the repo and delete it again. Both directions are
+  // asserted, because a matcher that catches everything is as useless as one
+  // that catches nothing.
+
+  describe("rule 3's binding matcher", () => {
+    it.each([
+      ["const writePref = useCallback(", "the exact pre-myne#507 shape in usePrefs.ts"],
+      ["async function writePref(", "the chokepoint's own spelling, in the wrong file"],
+      ["function writePref(", "a plain declaration"],
+      ["let writePref = (", "a reassignable binding"],
+      ["var writePref = function (", "the old spelling"],
+      ["const o = { writePref: async (", "a method on an object literal"],
+      ["const o = { writePref: function (", "the same, spelled out"],
+    ])("catches %s", (src) => {
+      expect(bindsWritePref(src)).toBe(true);
+    });
+
+    it.each([
+      ["const writeOptimisticPref = useCallback(", "myne#507's rename"],
+      ["const writeDraftPref = useCallback(", "myne#496's rename on the mobile side"],
+      ["const writePrefs = useCallback(", "a different name that merely starts the same"],
+      ["await writePref({ a: 1 });", "a CALL, which is what a legitimate consumer does"],
+      ["import { writePref } from './prefs';", "an import, which declares nothing new"],
+    ])("does not catch %s", (src) => {
+      expect(bindsWritePref(src)).toBe(false);
+    });
+
+    it("finds no collision in the real tree, which is the claim the guard prints", () => {
+      const { failures } = analyse();
+      expect(failures.filter((f) => f.command === "(name collision)")).toEqual([]);
+    });
   });
 });

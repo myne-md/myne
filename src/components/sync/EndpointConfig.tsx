@@ -50,7 +50,7 @@ const INPUT: CSSProperties = {
   minWidth: 0,
   padding: "var(--space-2) var(--space-3)",
   fontSize: "var(--text-sm)",
-  background: "var(--paper-1)",
+  background: "var(--paper)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-1)",
   color: "var(--fg-1)",
@@ -219,9 +219,13 @@ export function EndpointConfig() {
         if (refusal !== null) {
           setConfirmNeeded(true);
           setMsg(
-            refusal === "PinConfirmationRequired"
-              ? t("sync.endpoint.confirmFingerprintRequired")
-              : t("sync.endpoint.confirmFingerprintMismatch"),
+            t(
+              refusal === "PinConfirmationRequired"
+                ? "sync.endpoint.confirmFingerprintRequired"
+                : refusal === "CertificateChanged"
+                  ? "sync.endpoint.certificateChanged"
+                  : "sync.endpoint.confirmFingerprintMismatch",
+            ),
           );
           return;
         }

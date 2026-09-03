@@ -12,8 +12,28 @@
 //   - `src/App.tsx` replaced post-delete routing with `reprobe`;
 //     `mobile/src/lib/stage.ts` still routes to the first-run Welcome
 //     screen — SEVEN MONTHS of commits later
-//   - `mobile/src-tauri/src/hooks.rs` has `emit_snapshot_write_failed` as a
-//     bare empty body while desktop emits and renders an indicator
+//   - `mobile/src-tauri/src/hooks.rs` HAD `emit_snapshot_write_failed` as a
+//     bare empty body while desktop emitted and rendered an indicator. FIXED:
+//     mobile emits, with a comment naming the defect it closed. Kept in this
+//     list rather than deleted, because the list is what this guard was written
+//     from and a fixed instance still shows the shape; the tense is the part
+//     that has to stay true (myne-md/myne#479).
+//   - `mobile/src-tauri/src/hooks.rs` returned an UNCLAMPED
+//     `effective_auto_lock_secs`, and so did `web/wasm/src/hooks.rs`. Found by
+//     comparing the twins for myne-md/myne#479, not by any check. Worth stating
+//     at its real size: that value is read only by the desktop tick loop, which
+//     neither client compiles, so it was a trap for the next Rust-side reader
+//     rather than a shipped A6 window. Chasing it is what surfaced the one that
+//     WAS live, in the web client's TypeScript timer, which took the raw pref
+//     and read `null` as "disabled". The fix moved the envelope into
+//     `myne-core`, gave the trait method a clamping DEFAULT, and routed both
+//     WebView call sites through the TypeScript mirror.
+//   - `mobile/src-tauri/src/plugins/workspace/` was a 297-line local fork of a
+//     core plugin desktop had already migrated to, and it had fallen behind by
+//     a v0.1-only `vault.meta` parser, so on a MIGRATED vault the phone's
+//     workspace reads and writes both failed while every other plugin worked.
+//     `scripts/check-version-routing.mjs` is the guard for that class and its
+//     `ROOTS` did not include `mobile/src-tauri/src`; it does now.
 //   - `mobile/src/lib/welcomeNote.ts` is still English-only after
 //     `@myne/i18n` went live on mobile
 //

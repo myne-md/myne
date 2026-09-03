@@ -15,6 +15,13 @@ packages:
   # Shared load-bearing user-facing copy (SYNC-42) — privacy-property strings
   # kept byte-identical across the desktop + mobile clients by construction.
   - copy
+  # The cross-client DECISION layer (myne-md/myne#242), the questions both
+  # clients answer, where a divergence is a bug by definition. Holds the
+  # TypeScript mirrors of the Rust error enums that live in `core/`/`protocol/`,
+  # and the token layer a custom theme can set. Narrow on purpose: a module
+  # belongs here only if it touches no host at all, which is what keeps it
+  # `seam: null` in `scripts/check-platform-seam.mjs`.
+  - client-core
   # Shared ornament layer (myne#394) — the stylesheet a custom theme's ornament
   # selections resolve against, plus the role helper components declare through.
   - ornaments

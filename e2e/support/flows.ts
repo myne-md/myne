@@ -729,10 +729,10 @@ export async function waitForInlineImage(
  * — and the driver's error code distinguishes none of them. Reports the covering
  * node by tag plus its testid where it has one, never by its text.
  */
-async function hitTest(session: Session, testId: string): Promise<string> {
+async function hitTest(session: Session, selector: string): Promise<string> {
   try {
     return await session.execute<string>(
-      "var el = document.querySelector('[data-testid=\"' + arguments[0] + '\"]');" +
+      "var el = document.querySelector(arguments[0]);" +
         "if (!el) return 'the element vanished between the click and this read';" +
         "var r = el.getBoundingClientRect();" +
         "if (r.width === 0 || r.height === 0) return 'its box is ' + r.width + 'x' + r.height;" +
@@ -746,25 +746,26 @@ async function hitTest(session: Session, testId: string): Promise<string> {
         "var id = at.getAttribute('data-testid');" +
         "return 'covered at its centre by <' + at.tagName.toLowerCase() + '>' +" +
         "  (id ? ' [' + id + ']' : ' with no testid');",
-      [testId],
+      [selector],
     );
   } catch (raw) {
     return `hit-test unreadable (${(raw as Error).message})`;
   }
 }
 
-/** Scroll `testId` to the middle of whatever scroll container holds it.
+/** Scroll the first match of `selector` to the middle of whatever scroll
+ *  container holds it.
  *
  *  `scrollIntoView` walks every ancestor scroller, which is the part WebDriver's
  *  own pre-click scroll does not reliably do in WebKit. Best-effort: a failure
  *  here must not turn into the caller's error, because the click that follows is
  *  the assertion. */
-async function scrollIntoView(session: Session, testId: string): Promise<void> {
+async function scrollIntoView(session: Session, selector: string): Promise<void> {
   try {
     await session.execute(
-      "var el = document.querySelector('[data-testid=\"' + arguments[0] + '\"]');" +
+      "var el = document.querySelector(arguments[0]);" +
         "if (el) el.scrollIntoView({ block: 'center', inline: 'center' });",
-      [testId],
+      [selector],
     );
   } catch {
     // The element may have gone between the find and this call; the poll re-finds.
@@ -776,9 +777,27 @@ export async function clickByTestId(
   testId: string,
   opts?: { timeoutMs?: number },
 ): Promise<void> {
+  await clickBySelector(session, testIdSelector(testId), opts);
+}
+
+/**
+ * {@link clickByTestId} over an arbitrary CSS selector.
+ *
+ * The body used to be inline above and reachable only by a bare testid, so a
+ * control addressed by testid PLUS an attribute (a note row carries
+ * `data-note-id`) had to hand-roll its own poll, and the first one that did lost
+ * all three things this function exists for: the per-poll `scrollIntoView`, the
+ * `lastReason` that makes a timeout name a cause, and the error whitelist that
+ * keeps a broken session from becoming a 45 s wait.
+ */
+export async function clickBySelector(
+  session: Session,
+  selector: string,
+  opts?: { timeoutMs?: number },
+): Promise<void> {
   // **The last swallowed reason, so the timeout can name a cause.** Every arm
   // below returns `null` and polls again, which is right — but it made the
-  // failure message `<testId> located + clicked timed out`, which does not
+  // failure message `<selector> located + clicked timed out`, which does not
   // distinguish "the element is not in the DOM" from "it is there and something
   // is covering it" from "it is there and WebKit says it is not interactable".
   // Those are three different bugs and the message named none of them, so
@@ -789,9 +808,9 @@ export async function clickByTestId(
   let lastReason = "never polled";
   await session.waitUntil(
     async () => {
-      const [el] = await session.byTestIdAll(testId);
+      const [el] = await session.findElements(selector);
       if (el === undefined) {
-        lastReason = "no element carries that testid";
+        lastReason = "nothing matches that selector";
         return null;
       }
       // **Bring it into view inside its OWN scroll container before clicking.**
@@ -803,7 +822,7 @@ export async function clickByTestId(
       // reported the modal container itself painted at the button's centre. No
       // budget fixes that, because the button never moves on its own. Cheap and
       // best-effort, so it runs on every poll rather than only after a refusal.
-      await scrollIntoView(session, testId);
+      await scrollIntoView(session, selector);
       try {
         await el.clickOnce();
       } catch (e) {
@@ -822,7 +841,7 @@ export async function clickByTestId(
           // round trip, and the answer is the fix. Structural only, so a covered
           // control cannot leak its own contents into a CI log.
           lastReason =
-            `found, but the click reported "${e.code}"; ` + (await hitTest(session, testId));
+            `found, but the click reported "${e.code}"; ` + (await hitTest(session, selector));
           return null; // replaced or not hit-testable yet — re-find next poll
         }
         throw e;
@@ -838,7 +857,7 @@ export async function clickByTestId(
     // out here at 20 s in the full 2-shard suite, on the compare screen that
     // re-renders after a mid-ceremony sync the scenario deliberately provokes.
     {
-      label: () => `${testId} located + clicked (last poll: ${lastReason})`,
+      label: () => `${selector} located + clicked (last poll: ${lastReason})`,
       timeoutMs: opts?.timeoutMs ?? 45_000,
     },
   );
@@ -1099,6 +1118,125 @@ export async function clickNewMenuItem(session: Session, testId: string): Promis
     },
     { label: `new-menu item [${testId}] committed (dropdown closed)` },
   );
+}
+
+// ── sidebar note rows ────────────────────────────────────────────────────────
+//
+// Lifted out of `workspace-state.e2e.ts` when a second suite needed to build a
+// split (myne-md/myne#520's cover scenario). Copying them would have been the
+// third copy of the context-menu rationale below, which is the part that has to
+// stay true rather than the three lines of driving.
+
+/** The sidebar rows' note-ids, in DOM order, once exactly `expected` exist. */
+export async function noteRowIds(
+  session: Session,
+  expected: number,
+): Promise<string[]> {
+  const rows = await session.waitUntil(
+    async () => {
+      const found = await session.byTestIdAll("notes.row");
+      return found.length === expected ? found : null;
+    },
+    { label: `${expected} note rows`, timeoutMs: 15_000 },
+  );
+  return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
+}
+
+/** The id of the note `createNote` just made: it leaves that note selected, and
+ *  the id lives on the ROW rather than anywhere in the editor. Reading it here,
+ *  rather than counting rows afterwards, is what keeps a scenario working on a
+ *  seeded vault: `seedVault({ exportSuite: true })` brings its own notes, so
+ *  "exactly N rows" is a fixture detail rather than something the scenario
+ *  controls. Same reading `seedEmbedIntoNote` below uses. */
+export async function selectedNoteId(session: Session): Promise<string> {
+  const row = await session.waitForElement(
+    testIdSelector("notes.row") + '[aria-current="true"]',
+  );
+  const noteId = (await row.attribute("data-note-id")) ?? "";
+  if (noteId === "") throw new Error("selectedNoteId: the active note row carries no id");
+  return noteId;
+}
+
+/** One sidebar row, by note id. */
+/**
+ * Right-click the first match of `selector`, re-finding it on every poll.
+ *
+ * `Element.rightClick` already retries a not-yet-hit-testable element, and like
+ * `Element.click` it cannot answer a node that has been REPLACED: the handle is
+ * stale on every poll and the wait can only time out. Same fix as
+ * {@link clickBySelector}, and it is here rather than left for later because
+ * `rowMenuPick` sits one line below the click that was fixed and drives the same
+ * re-rendering sidebar list.
+ */
+export async function rightClickBySelector(session: Session, selector: string): Promise<void> {
+  let lastReason = "never polled";
+  await session.waitUntil(
+    async () => {
+      const [el] = await session.findElements(selector);
+      if (el === undefined) {
+        lastReason = "nothing matches that selector";
+        return null;
+      }
+      await scrollIntoView(session, selector);
+      try {
+        await el.rightClick();
+        return true;
+      } catch (e) {
+        if (
+          e instanceof WebDriverError &&
+          (e.code === "stale element reference" ||
+            e.code === "element not interactable" ||
+            e.code === "element click intercepted")
+        ) {
+          lastReason =
+            `found, but the right-click reported "${e.code}"; ` +
+            (await hitTest(session, selector));
+          return null;
+        }
+        throw e;
+      }
+    },
+    { label: () => `${selector} located + right-clicked (last poll: ${lastReason})` },
+  );
+}
+
+/**
+ * Click a note row, re-finding it on every poll.
+ *
+ * `(await noteRow(s, id)).click()` captures the handle ONCE and then polls the
+ * click against it. `Element.click` retries a not-interactable element, which is
+ * the case it was written for, but a handle whose node has been REPLACED is
+ * stale on every poll and can only time out: the sidebar list re-renders on a
+ * save settling, on a sync tick and on the row's own selection, so the window
+ * between finding and clicking is real. Measured on `nco3`, which failed once in
+ * eight runs with `[stale element reference]` after two retries, then passed
+ * three consecutive times unchanged.
+ *
+ * A row is addressed by testid PLUS `data-note-id`, which is why this exists at
+ * all rather than being a `clickByTestId` call.
+ */
+export async function clickNoteRow(session: Session, noteId: string): Promise<void> {
+  await clickBySelector(session, testIdSelector("notes.row", { "data-note-id": noteId }));
+}
+
+/** Right-click a note row and pick a context-menu item by `data-item-id`. The
+ *  new-tab / open-to-side gestures are driven through the row's REAL context menu
+ *  (`open-in-new-tab` / `open-to-side`) rather than middle-click / Alt-click: the
+ *  WebDriver synthetic middle-click never fires `auxclick` under WebKit, and the
+ *  Alt-modifier click doesn't establish the split, both production gestures, but
+ *  not driver-addressable. The context-menu items invoke the SAME workspace
+ *  actions (openNewTabInFocused / openToSide). */
+export async function rowMenuPick(
+  session: Session,
+  noteId: string,
+  itemId: string,
+): Promise<void> {
+  await rightClickBySelector(session, testIdSelector("notes.row", { "data-note-id": noteId }));
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+    )
+  ).click();
 }
 
 /** Create a note via the sidebar CTA and commit `title` through the
@@ -1460,9 +1598,66 @@ export async function replaceFieldText(
 
 /** Current CodeMirror document text (`textContent()` — the doc lives in
  *  nested .cm-line elements this driver's getText drops). Re-found per
- *  call: CM remounts across relock/reload. */
+ *  call: CM remounts across relock/reload.
+ *
+ *  **This is the RENDERED text, which is not always the stored text.** Every
+ *  replace widget substitutes its own label for the source it covers, so a
+ *  scenario asking "did the file keep its bytes" must use
+ *  {@link editorSourceText} instead. That distinction cost four scenarios in
+ *  myne-md/myne#609: the task chip used to print its stored value verbatim, so
+ *  reading a date off the render happened to work, and the moment the chip
+ *  started printing the reader's chosen format the same assertions started
+ *  timing out on text that was never gone from the document. */
 export async function editorText(session: Session): Promise<string> {
   return (await session.waitForElement(CM_CONTENT)).textContent();
+}
+
+/**
+ * The note's SOURCE text: the document as the file holds it, read in the one
+ * view mode where nothing decorates it.
+ *
+ * Switches the focused note tab to `source` through the production bottom-bar
+ * CTA, reads, then cycles back to the mode it started in so a later assertion
+ * in the same scenario sees the editor it expects.
+ *
+ * **Why the view mode rather than something cheaper.** Three cheaper routes
+ * were tried against the running app and none of them reveals a task chip:
+ * putting the caret on the chip's line (the chips render on the caret line,
+ * which `tc4` demonstrates by waiting for one there), opening the find panel
+ * (its reveal is scoped to chips overlapping a MATCH, so a line with no match
+ * keeps its chips), and reading a `data-` attribute (there is none carrying the
+ * value, and adding one would be a test hook in production DOM). Source mode is
+ * the app's own answer to "show me what is actually written".
+ */
+export async function editorSourceText(session: Session): Promise<string> {
+  const mode = async (): Promise<string> =>
+    (await (await session.byTestId("editor.view-mode-cta")).attribute("data-view-mode")) ?? "";
+
+  /** Click the CTA until `want` is current, waiting on each click to land.
+   *
+   *  The wait compares against the mode read immediately BEFORE that click, not
+   *  against the mode this function started in. Written the second way first,
+   *  where the second iteration's wait was already satisfied by the FIRST
+   *  click's effect and so confirmed nothing: a click that did not register
+   *  would have been read as one that did. */
+  const cycleTo = async (want: string): Promise<void> => {
+    // live -> reading -> source -> live, so at most two clicks reach any mode
+    // from any other. Three is the bound plus one, and a fourth would mean the
+    // CTA is not cycling, which the loop exit then reports as a stuck mode.
+    for (let i = 0; i < 3 && (await mode()) !== want; i += 1) {
+      const before = await mode();
+      await (await session.byTestId("editor.view-mode-cta")).click();
+      await session.waitUntil(async () => ((await mode()) !== before ? true : null), {
+        label: `the view mode advanced away from ${before}`,
+      });
+    }
+  };
+
+  const started = await mode();
+  await cycleTo("source");
+  const text = await editorText(session);
+  await cycleTo(started);
+  return text;
 }
 
 /**
@@ -1649,4 +1844,49 @@ export async function collapseNotesSidebar(session: Session): Promise<void> {
     trigger: "[editor.sidebar-toggle][data-side=left]",
     outcome: 'data-collapsed="true"',
   });
+}
+
+/**
+ * Open the sidebar context menu's `Export…` submenu and return the row for one
+ * format.
+ *
+ * The four formats used to be top-level rows. They moved behind one parent row
+ * (myne-md/myne#611) because eight rows across two menus for four actions is
+ * what the maintainer was looking at, and the leaf ids did not change, so a
+ * scenario that reaches straight for `export-markdown` still COMPILES, still
+ * reads correct, and simply times out. That is the failure
+ * `check-e2e-menu-testids.mjs` exists to prevent for the sidebar `+` menu, and
+ * its roster does not cover this menu, so this helper is the substitute: one
+ * place that knows the submenu is there.
+ *
+ * The parent click is safe to repeat. Unlike the `+` menu, whose every item
+ * COMMITS, a row carrying `children` performs no action at all: `ContextMenu`'s
+ * `handleSelect` returns early for it and the click handler only records where
+ * to put the submenu. So a missed click and a landed click are both recoverable
+ * by clicking again, and neither can double-fire an export.
+ *
+ * Call it with the menu already open (after `row.rightClick()`).
+ */
+export async function openExportSubmenuItem(
+  session: Session,
+  format: "export-markdown" | "export-pdf" | "export-html" | "export-txt",
+) {
+  const leaf = testIdSelector("notes.context-menu-item", {
+    "data-item-id": format,
+  });
+  await session.waitUntil(
+    async () => {
+      if ((await session.findElements(leaf)).length > 0) return true;
+      const parent = await session.findElements(
+        testIdSelector("notes.context-menu-item", { "data-item-id": "export" }),
+      );
+      // The menu itself may not have rendered yet; let the outer budget poll
+      // rather than throwing on a parent row that is simply not there.
+      if (parent.length === 0) return null;
+      await parent[0].click();
+      return (await session.findElements(leaf)).length > 0 ? true : null;
+    },
+    { label: `export submenu open, ${format} present` },
+  );
+  return session.waitForElement(leaf);
 }

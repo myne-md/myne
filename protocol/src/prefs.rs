@@ -305,8 +305,12 @@ pub struct PrefsView {
     /// Deliberately-created folder paths (canonical trailing-slash display
     /// form) that persist independently of whether any note carries them —
     /// the carrier for empty folders in the virtual-folder model (MYND-144 /
-    /// grill 2026-05-29). Default empty. Conflict semantics (Phase 2) =
-    /// union + add-wins. Encoded as a canonical JSON string array
+    /// grill 2026-05-29). Default empty. Conflict semantics are a union that
+    /// carries a per-entry removal clock in `field_clocks` (myne#613,
+    /// `sync-protocol.md` §10.2), NOT the clockless add-wins union this line
+    /// described until then: without the clock a deletion is indistinguishable
+    /// from never having had the entry, so a peer restores it. Encoded as a
+    /// canonical JSON string array
     /// (NFC-normalized, lexicographically sorted, exact-deduped, and **omitted
     /// entirely when empty** so a vault with no deliberate folders is
     /// byte-identical to a v0.1.0 `vault.prefs`).
@@ -522,10 +526,13 @@ pub struct PrefsView {
     /// the enum interpretation + unknown→default fallback live on the client, no
     /// codec-level validation (the `editor_content_width` precedent class).
     ///
-    /// **Display only.** It never enters a `.myn` file, a blob or the sync wire
-    /// as a formatting instruction — `dialect/src/taskFields.ts` keeps the
-    /// on-disk bytes zone-free and format-free, and this decides how they are
-    /// printed, nothing else. Canonical key `date_format` — sorts after
+    /// **Display only.** It never enters a `.myn` file as a formatting
+    /// instruction: `dialect/src/taskFields.ts` keeps the on-disk bytes
+    /// zone-free and format-free, and this decides how they are printed,
+    /// nothing else. It does of course live in a blob, namely this one, and it
+    /// is Shared scalar-LWW, so it reaches every device by design. The "or a
+    /// blob or the sync wire" this line used to carry was simply wrong
+    /// (myne-md/myne#609). Canonical key `date_format`, sorting after
     /// `daily_template` (`dai` < `dat`), before `deliberate_folders`
     /// (`da` < `de`). Omitted when `None`, so a vault that never chose a format
     /// is byte-identical to a pre-feature `vault.prefs`. **Non-load-bearing**
@@ -903,13 +910,19 @@ pub struct PrefsView {
     ///
     /// **Display only, and that is load-bearing for a different reason than the
     /// two fields above.** It decides what the app considers "today" and how a
-    /// stored wall-clock value is printed — it NEVER enters a `.myn` file, a
-    /// blob or the sync wire. `dialect/src/taskFields.ts` states the rule this
-    /// preserves: no timezone offset and no zone identifier is ever produced,
-    /// times are local wall-clock, which is what a personal reminder means and
-    /// which keeps a coarse geolocation datum out of a file that gets exported
-    /// as plaintext. Storing the *display* choice in `vault.prefs` — encrypted
-    /// at rest, never in note bytes — does not walk that back.
+    /// stored wall-clock value is printed. It NEVER enters a `.myn` file:
+    /// `dialect/src/taskFields.ts` states the rule this preserves, that no
+    /// timezone offset and no zone identifier is ever produced, times are local
+    /// wall-clock, which is what a personal reminder means and which keeps a
+    /// coarse geolocation datum out of a file that gets exported as plaintext.
+    /// Storing the *display* choice here, encrypted at rest and never in note
+    /// bytes, does not walk that back.
+    ///
+    /// It DOES enter a blob, namely this one, and the sentence above said
+    /// otherwise in the same paragraph that then described storing it here
+    /// (myne-md/myne#609). The blob is pushed and pulled verbatim; `DeviceLocal`
+    /// governs the MERGE, so the local value survives, and `sync-protocol.md`
+    /// 10.2.1 has a newly enrolled device adopt it as a starting default.
     ///
     /// Canonical key `timezone` — sorts after `time_format` (`_` < `z`), before
     /// `transcription_enabled` (`ti` < `tr`). Omitted when `None`.
@@ -972,6 +985,54 @@ pub struct PrefsView {
     /// before `custom_theme` (`b` < `c`).
     #[serde(default)]
     pub bar_items_order: Vec<String>,
+
+    /// How many characters of visible chat history an agent run may be seeded
+    /// with (myne-md/myne#617). `None` means the host applies its own default.
+    ///
+    /// **A bound rather than a feature toggle.** `build_request` re-sends every
+    /// message on every iteration, up to the loop's 24-iteration ceiling, so
+    /// this number is multiplied by the iteration count, and on the remote arm
+    /// it is multiplied into characters that leave the device. TB13 and
+    /// `docs/decisions/ai/0515` both record that no per-run volume cap exists
+    /// anywhere else, which is why the host clamps it.
+    ///
+    /// **The clamp is WRITE-side, which is a weaker class than
+    /// `auto_lock_seconds`, and saying otherwise would overstate it.** That
+    /// field resolves `clamp(...)` in code at every read, so a replayed or
+    /// tampered `vault.prefs` can only make auto-lock stricter no matter who
+    /// wrote it. This one is clamped in its setter, so the bound holds while
+    /// every writer clamps: a property of today's call sites rather than of the
+    /// value. Nothing reachable exploits the difference (the blob is AEAD-sealed
+    /// and AAD-bound, so a replay can only restore a previously-clamped value),
+    /// and the read path deliberately does not re-clamp so a second copy of the
+    /// ceiling cannot drift from the real one. A second writer, on the mobile
+    /// port or anywhere else, is the case that would make this matter, and it is
+    /// the reason the distinction is written down rather than glossed.
+    ///
+    /// Additive on `MYP1` and omitted entirely when unset, so a vault that
+    /// never touched it is byte-identical to a pre-feature `vault.prefs` (the
+    /// `archive_disabled` precedent class). Canonical key
+    /// `chat_history_budget`, which sorts after `bar_items_order` (`b` < `c`)
+    /// before `cli_enabled` (`ch` < `cl`).
+    ///
+    /// **That position is the load-bearing part of the name, not a preference.**
+    /// The decoder locates every field up to and including `auto_lock_seconds`
+    /// by `strip_prefix`, so an unknown key inside that run is not skipped: it
+    /// sits in front of the next marker and every prefix-chained field behind it
+    /// misses and takes its default. A field named for its consumer
+    /// (`agent_history_budget`) sorted into exactly that run, and an already
+    /// shipped client reading a blob that carried it would have decoded
+    /// SUCCESSFULLY while silently losing `auto_lock_seconds`,
+    /// `ai_excluded_folders` and the `Zeroizing`-wrapped `ai_provider_key`, then
+    /// persisted that loss on its next read-modify-write. Successfully is the
+    /// bad part: `update_prefs_with_dir` refuses to write over a read that
+    /// ERRORED, and this degrades without erroring. Named for what is budgeted
+    /// instead, the key lands in the cursor-scanned region, where
+    /// `find_top_level_marker` scans forward and an unknown key between two
+    /// known ones is skipped. `docs/spec/protocol.md` §9.5.2's forward-compat
+    /// clause is only true of that region, and an additive field belongs there.
+    #[serde(default)]
+    pub chat_history_budget: Option<u32>,
 
     /// CLI terminal-access door toggle (myne-cli epic, MYND-490; `cli-thin-client`
     /// task 2). `false` ≡ the door is closed (the default) — the local socket the
@@ -1262,6 +1323,43 @@ pub struct PrefsView {
     #[serde(default)]
     pub paired_extensions: Vec<crate::paired_extension::PairedExtension>,
 
+    /// Periodic-notes settings (myne#177): one entry per `<period>.<setting>`
+    /// pair, e.g. `weekly.folder` → `Weekly/`, `monthly.format` → `YYYY-MM`,
+    /// `weekly.template` → a template note's UUIDv7. The three settings mirror
+    /// what `daily_folder` / `daily_date_format` / `daily_template` already
+    /// carry for the daily period, which keeps its three top-level fields and
+    /// is deliberately NOT migrated in here: prefs merge per field, so a device
+    /// on an older build would go on writing the flat fields while a newer one
+    /// wrote this map, and the two would silently diverge with no way to say
+    /// which is authoritative.
+    ///
+    /// A flat `BTreeMap<String, String>` rather than a map of nested objects,
+    /// which buys two things. The canonical encoder emits keys in lexicographic
+    /// order for free and the existing string-map codec applies unchanged (the
+    /// `folder_icons` / `item_colors` precedent class, keys + values
+    /// NFC-normalized at encode time). And the Phase 2 field clock is then
+    /// `periodic_notes/<period>.<setting>`, i.e. per SETTING: a folder edit on
+    /// one device and a template edit on another, to the same period in the
+    /// same round, both survive.
+    ///
+    /// The `<period>.<setting>` grammar is the CLIENT's, exactly like
+    /// `daily_date_format`'s token grammar. This codec validates nothing and
+    /// stores both halves verbatim, so an entry naming a period this build does
+    /// not know (a later `quarterly.folder`) decodes and is ignored rather than
+    /// failing the blob. That is what makes a fourth period cost no spec change.
+    ///
+    /// Default empty; **omitted entirely from the canonical JSON when empty**,
+    /// so a vault that configured no period is byte-identical to a pre-myne#177
+    /// `vault.prefs` (existing golden vectors unaffected, a migration-less
+    /// additive field on `MYP1`: no new magic, no new `SubkeyRole`, no new AAD
+    /// role, zero new crypto). **Non-load-bearing** (cold/derivable, AS-low): a
+    /// replayed or tampered value can at worst file a period note in the wrong
+    /// folder or title it differently, so no protective-envelope clamp.
+    /// Canonical key `periodic_notes`, which sorts after `paired_extensions`
+    /// (`pai` < `per`), before `reminder_horizon_days` (`p` < `r`).
+    #[serde(default)]
+    pub periodic_notes: BTreeMap<String, String>,
+
     /// Active right-panel tab id (right-panel tabs) — the id of the right
     /// sidebar tab the editor should restore (e.g. `backlinks`, `unlinked`,
     /// `outline`). `None` ≡ unset → the host applies its default (the first
@@ -1353,6 +1451,7 @@ impl Default for PrefsView {
         Self {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -1409,6 +1508,7 @@ impl Default for PrefsView {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -1716,6 +1816,21 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if !prefs.bar_items_order.is_empty() {
         out.extend_from_slice(b"\"bar_items_order\":");
         push_ordered_string_array(&mut out, &prefs.bar_items_order);
+        out.push(b',');
+    }
+
+    // chat_history_budget (canonical key 'chat_history_budget', after
+    // bar_items_order ['b' < 'c'], before cli_enabled ['ch' < 'cl']). How many
+    // characters of chat history an agent run may be seeded with
+    // (myne-md/myne#617). Deliberately in the CURSOR-scanned region rather than
+    // the strip_prefix run: an unknown key inside that run blinds every field
+    // behind it in an older client, which is silent rather than an error. See
+    // the field's own doc on PrefsView. Omitted entirely when None so a vault
+    // that never set it is byte-identical to a pre-feature vault.prefs
+    // (preserves existing KAT vectors).
+    if let Some(budget) = prefs.chat_history_budget {
+        out.extend_from_slice(b"\"chat_history_budget\":");
+        push_json_uint(&mut out, budget);
         out.push(b',');
     }
 
@@ -2161,6 +2276,18 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // periodic_notes (canonical key 'per': after paired_extensions [pai < per],
+    // before reminder_horizon_days [p < r], myne#177). A canonical string→string
+    // map keyed `<period>.<setting>`, the folder_icons / item_colors encoding
+    // reused verbatim; omitted entirely when empty so a vault that configured no
+    // period is byte-identical to a pre-myne#177 vault.prefs (existing golden
+    // vectors unaffected).
+    if !prefs.periodic_notes.is_empty() {
+        out.extend_from_slice(b"\"periodic_notes\":");
+        push_canonical_string_map(&mut out, &prefs.periodic_notes);
+        out.push(b',');
+    }
+
     // reminder_horizon_days (canonical key 'reminder_h' — after
     // paired_extensions ['p' < 'r'], before reminders_enabled ['_' 0x5F <
     // 's' 0x73], MYND-618). Omitted entirely when None so a vault that never
@@ -2396,6 +2523,77 @@ fn push_ordered_string_array(out: &mut Vec<u8>, items: &[String]) {
     out.push(b']');
 }
 
+/// The suffix marking an `ai_provider_consent` recorded **on the reading
+/// device, under the device-local classification**, rather than inherited.
+///
+/// **Why the value carries its own classification** (myne-md/myne#456, found by
+/// review). Two populations hold a consent that no longer means what the gate
+/// reads it to mean, and neither can be told apart from a fresh one by the
+/// value alone:
+///
+/// * A desktop install that named a provider, consented, stored a key and then
+///   turned Developer mode OFF. Under the previous build `developer_mode` was a
+///   request-time precondition AND the backend selection consulted it, so that
+///   configuration was answered by the in-process local arm and nothing left
+///   the device. With the precondition gone the identical preferences authorize
+///   the REMOTE arm, so note plaintext begins crossing TB13 on upgrade with no
+///   user act and no notice.
+/// * A device enrolled BEFORE the reclassification, which inherited the value
+///   under the old SHARED class. The prefs merge keeps the local value always,
+///   so no merge will ever revise it, while `threat-model.md` TB13,
+///   `sync-protocol.md` 10.2 and `CONSENT_DEVICE_SCOPE` in `@myne/copy` all now
+///   state device scope without qualification.
+///
+/// **One token rather than a migration.** A one-time clear needs somewhere to
+/// record that it ran, which is a new field or a new device-local blob; making
+/// the value carry its classification makes the field its own marker. A legacy
+/// value fails the gate, the surface shows the consent screen, the user agrees,
+/// and the scoped value is written. Fail-closed for both populations,
+/// self-extinguishing, and no new format family.
+///
+/// `@` cannot appear in a provider wire name (`openrouter`, `ollama-cloud`), so
+/// the split is unambiguous and a legacy value is RECOGNISABLE rather than
+/// merely unequal, which is what lets a surface say "you agreed once, under a
+/// build with a second gate" instead of "you never agreed".
+pub const CONSENT_DEVICE_SUFFIX: &str = "@device";
+
+/// The stored value for a consent recorded on this device for `provider_wire`.
+///
+/// Every writer goes through this rather than formatting the string, so a
+/// second spelling cannot appear: the gate compares for equality and a mismatch
+/// is a silent refusal rather than an error anybody sees.
+pub fn device_scoped_consent(provider_wire: &str) -> alloc::string::String {
+    let mut out =
+        alloc::string::String::with_capacity(provider_wire.len() + CONSENT_DEVICE_SUFFIX.len());
+    out.push_str(provider_wire);
+    out.push_str(CONSENT_DEVICE_SUFFIX);
+    out
+}
+
+/// Whether `stored` is a consent recorded on THIS device for `provider_wire`.
+///
+/// A legacy bare-wire-name value is deliberately not accepted; that is the fix
+/// rather than an oversight, and [`CONSENT_DEVICE_SUFFIX`] carries the reason.
+pub fn consent_is_device_scoped(stored: Option<&str>, provider_wire: &str) -> bool {
+    match stored {
+        Some(v) => match v.strip_suffix(CONSENT_DEVICE_SUFFIX) {
+            Some(name) => name == provider_wire,
+            None => false,
+        },
+        None => false,
+    }
+}
+
+/// Whether `stored` is a LEGACY consent for `provider_wire`: the bare wire
+/// name, recorded before the reclassification.
+///
+/// Separated from "no consent at all" so a surface can say the true thing. The
+/// user did agree once, to this same provider, under a build where a second
+/// host-side precondition also had to hold.
+pub fn consent_is_legacy(stored: Option<&str>, provider_wire: &str) -> bool {
+    stored == Some(provider_wire)
+}
+
 /// Append a canonical JSON object of string→integer members (surrounding
 /// `{` / `}`, comma-joined `"key":123` members) for the `field_clocks` LWW
 /// clock map (MYND-478). Keys are NFC-normalized and emitted in lexicographic
@@ -2561,12 +2759,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     };
 
     // ---- ai_enabled (optional, after active_workspace — SYNC-12) ----
-    // Canonical key order active_workspace < ai_enabled < ai_excluded_folders <
-    // archive_disabled, so when present this bool is a literal PREFIX of the
-    // post-active_workspace bytes (strip_prefix, not find_subslice — a later
-    // folder name containing an `"ai_enabled":`-looking substring cannot fool
-    // it). Emitted only as `true` by the encoder; `false` is tolerated for
-    // robustness. Absent → false (the default). MUST be followed by `,`.
+    // Canonical key order active_workspace < ai_enabled < ai_excluded_folders
+    // < archive_disabled, so when present this bool is a literal PREFIX of the
+    // post-active_workspace bytes (strip_prefix, not
+    // find_subslice — a later folder name containing an `"ai_enabled":`-looking
+    // substring cannot fool it). Emitted only as `true` by the encoder; `false`
+    // is tolerated for robustness. Absent → false (the default). MUST be
+    // followed by `,`.
     let ai_enabled_marker = b"\"ai_enabled\":";
     let (ai_enabled, post_ai_enabled) = match post_active.strip_prefix(ai_enabled_marker) {
         Some(after) => {
@@ -2807,6 +3006,16 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // preserved verbatim (sort/dedup is encode-side and this field is a
     // sequence, so neither happens). Present-but-malformed → PlaintextParseFailed.
     let bar_items_order = parse_optional_array_field(rest, &mut cursor, b"\"bar_items_order\":")?;
+    // chat_history_budget (canonical key 'chat_history_budget', after
+    // bar_items_order ['b' < 'c'], before cli_enabled ['ch' < 'cl']). How many
+    // characters of chat history an agent run may be seeded with
+    // (myne-md/myne#617). Located from the same monotonic cursor as its
+    // neighbours, which is what makes it tolerable to a client that has never
+    // heard of it: `find_top_level_marker` scans FORWARD, so an unknown key
+    // between two known ones is stepped over rather than left blocking the next
+    // marker. Absent → None (the default).
+    let chat_history_budget =
+        parse_optional_uint_field(rest, &mut cursor, b"\"chat_history_budget\":")?;
     // cli_enabled (canonical key 'cli_enabled' — after bar_items_order ['b' <
     // 'c'], before cli_excluded_folders ['cli_en' < 'cli_ex']). CLI
     // terminal-access door toggle (myne-cli epic, MYND-490). Parsed from the
@@ -2969,6 +3178,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // a token value or extension id that literally contains a later marker text.
     let paired_extensions =
         parse_optional_paired_extensions_field(rest, &mut cursor, b"\"paired_extensions\":")?;
+    // periodic_notes (key 'per': after paired_extensions [pai < per], before
+    // reminder_horizon_days [p < r], myne#177). The folder_icons string-map
+    // parse reused verbatim; absent → empty, and an entry naming a period this
+    // build does not know decodes and is ignored by the client rather than
+    // failing the blob.
+    let periodic_notes =
+        parse_optional_string_map_field(rest, &mut cursor, b"\"periodic_notes\":")?;
     // reminder_horizon_days + reminders_enabled (keys 'reminder' — after
     // paired_extensions ['p' < 'r'], before right_panel_* ['re' < 'ri'],
     // MYND-618). Parsed from the same monotonic cursor and in canonical order,
@@ -3091,6 +3307,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         folder_icons,
         hidden_bar_items,
         bar_items_order,
+        chat_history_budget,
         cli_enabled,
         cli_excluded_folders,
         cli_rate_limit_disabled,
@@ -3138,6 +3355,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         startup_open,
         startup_open_note,
         paired_extensions,
+        periodic_notes,
         reminder_horizon_days,
         reminders_enabled,
         right_panel_active_tab,
@@ -3329,6 +3547,38 @@ fn parse_optional_bool_field(
             let val_start = *cursor + rel_idx + marker.len();
             let (val, after) =
                 parse_json_bool(&rest[val_start..]).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            if after.first() != Some(&b',') {
+                return Err(PrefsBlobError::PlaintextParseFailed);
+            }
+            *cursor = rest.len() - after.len();
+            Ok(Some(val))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Parse an OPTIONAL canonical JSON unsigned-integer field whose key marker is
+/// `marker`, searching `rest` from `*cursor` onward. The `u32` sibling of
+/// [`parse_optional_bool_field`], with the same monotonic-cursor canonical
+/// key-order discipline: on a hit it advances `*cursor` past the value's
+/// trailing `,` and returns `Some`, on a miss it returns `None` and leaves
+/// `*cursor` where it was.
+///
+/// The trailing `,` is REQUIRED rather than optional, exactly as in the bool
+/// sibling: `screen_capture_protection` is mandatory and canonically last, so a
+/// further field always follows, and a value that runs to `}` is malformed. A
+/// trailing `.` (a float, FORBIDDEN per `docs/spec/protocol.md` §9.5.2)
+/// therefore rejects here rather than truncating.
+fn parse_optional_uint_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Option<u32>, PrefsBlobError> {
+    match find_top_level_marker(rest, *cursor, marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (val, consumed) = parse_json_uint(&rest[val_start..])?;
+            let after = &rest[val_start + consumed..];
             if after.first() != Some(&b',') {
                 return Err(PrefsBlobError::PlaintextParseFailed);
             }
@@ -3870,6 +4120,54 @@ fn find_top_level_marker(rest: &[u8], from: usize, marker: &[u8]) -> Option<usiz
 
 // ---- encode / decode primitives ---------------------------------------
 
+/// Length in bytes of the canonical JSON plaintext `prefs` encodes to.
+///
+/// Exposed for the set-field byte budget in `myne-core` (myne-md/myne#613),
+/// which has to answer "how close is this whole blob to
+/// [`MAX_PREFS_PLAINTEXT_LEN`]" rather than "how big is this one field". The two
+/// are not the same question, and the difference is everything the earlier
+/// per-field estimate could not see: the four other set fields, the
+/// `field_clocks` entries that outlive the entries they belonged to, and the
+/// rest of the blob.
+///
+/// This encodes, so it is not free. Call it once for a base and add per-entry
+/// deltas rather than calling it per candidate.
+pub fn canonical_plaintext_len(prefs: &PrefsView) -> usize {
+    canonical_json_encode(prefs).len()
+}
+
+/// Bytes one set-field entry costs inside the canonical plaintext, comma
+/// included.
+///
+/// The companion to [`canonical_plaintext_len`], and exposed for the same
+/// caller: a budget that measures the blob once and then adds per-entry deltas
+/// needs those deltas in the ENCODER's units, not the caller's. Two rules make
+/// `entry.len() + 3` wrong, and both are in this file rather than in the
+/// caller's: the entry is NFC-normalised ([`canonical_folder_list`]), which can
+/// move its byte length in either direction, and it is escaped
+/// ([`crate::canonical_json`]), where a `"` or a `\` costs two bytes and a C0
+/// control character costs six.
+///
+/// So the arithmetic lives here, next to the encoder it has to agree with,
+/// rather than being re-derived by `myne-core`. A second copy of an escape table
+/// is a second thing to keep in step.
+pub fn canonical_set_entry_cost(entry: &str) -> usize {
+    let normalized = entry.nfc().collect::<String>();
+    crate::canonical_json::json_string_len(&normalized) + 1
+}
+
+/// Bytes one `field_clocks` member costs inside the canonical plaintext: the
+/// key, a colon, the decimal value and a comma.
+///
+/// Same contract and same reason as [`canonical_set_entry_cost`]. The value's
+/// own width is passed rather than assumed, because the caller is budgeting for
+/// a clock that does not exist yet and the only honest input is the width the
+/// stamper will write.
+pub fn canonical_clock_member_cost(key: &str, value_digits: usize) -> usize {
+    let normalized = key.nfc().collect::<String>();
+    crate::canonical_json::json_string_len(&normalized) + 1 + value_digits + 1
+}
+
 /// Encode a `vault.prefs` blob with caller-supplied randomness
 /// (`_raw` per `protocol/CLAUDE.md` randomness-injection convention).
 ///
@@ -4098,6 +4396,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -4148,6 +4447,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -4177,6 +4477,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -4227,6 +4528,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -4432,6 +4734,98 @@ mod tests {
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
     }
 
+    // periodic_notes (myne#177): the flat `<period>.<setting>` string map.
+
+    #[test]
+    fn periodic_notes_encodes_between_paired_extensions_and_reminders() {
+        let prefs = PrefsView {
+            periodic_notes: map_of(&[
+                ("monthly.folder", "Monthly/"),
+                ("weekly.folder", "Weekly/"),
+                ("weekly.format", "gggg-[W]ww"),
+            ]),
+            paired_extensions: Vec::new(),
+            reminder_horizon_days: Some(7),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            core::str::from_utf8(&encoded).expect("utf8"),
+            concat!(
+                r#"{"periodic_notes":{"monthly.folder":"Monthly/","weekly.folder":"Weekly/","#,
+                r#""weekly.format":"gggg-[W]ww"},"reminder_horizon_days":7,"#,
+                r#""screen_capture_protection":true}"#
+            )
+        );
+    }
+
+    #[test]
+    fn empty_periodic_notes_is_omitted_so_a_pre_feature_vault_is_byte_identical() {
+        // The whole no-migration argument rests on this: a vault that configures
+        // no period must encode to exactly what it encoded to before the field
+        // existed, or every golden vector moves.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+        assert!(!encoded
+            .windows(b"periodic_notes".len())
+            .any(|w| w == b"periodic_notes"));
+    }
+
+    #[test]
+    fn periodic_notes_round_trips_through_blob() {
+        let original = PrefsView {
+            periodic_notes: map_of(&[
+                ("monthly.format", "YYYY-MM"),
+                ("weekly.folder", "Weekly/"),
+                ("weekly.template", "0190a000-0000-7000-8000-000000000003"),
+            ]),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .expect("encode");
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn periodic_notes_keeps_a_period_this_build_does_not_know() {
+        // The `<period>.<setting>` grammar is the client's, not the codec's. An
+        // entry for a period that ships later (quarterly) has to survive a
+        // decode by an older build untouched, or adding a fourth period stops
+        // being free and starts being a migration.
+        let plaintext = br#"{"periodic_notes":{"quarterly.folder":"Quarterly/","weekly.folder":"Weekly/"},"screen_capture_protection":true}"#;
+        let parsed = canonical_json_decode(plaintext).expect("decode");
+        assert_eq!(
+            parsed.periodic_notes,
+            map_of(&[
+                ("quarterly.folder", "Quarterly/"),
+                ("weekly.folder", "Weekly/"),
+            ])
+        );
+        assert_eq!(
+            canonical_json_encode(&parsed).as_slice(),
+            plaintext.as_slice()
+        );
+    }
+
+    #[test]
+    fn periodic_notes_does_not_swallow_the_fields_that_follow_it() {
+        // The parser walks one monotonic forward cursor, so a field inserted in
+        // the middle can silently make every later field take its default. The
+        // two immediate neighbours are what this pins.
+        let plaintext = br#"{"periodic_notes":{"weekly.folder":"Weekly/"},"reminder_horizon_days":9,"reminders_enabled":false,"screen_capture_protection":true}"#;
+        let parsed = canonical_json_decode(plaintext).expect("decode");
+        assert_eq!(
+            parsed.periodic_notes,
+            map_of(&[("weekly.folder", "Weekly/")])
+        );
+        assert_eq!(parsed.reminder_horizon_days, Some(9));
+        assert!(!parsed.reminders_enabled);
+    }
+
     #[test]
     fn decoration_maps_round_trip_through_blob() {
         let original = PrefsView {
@@ -4573,6 +4967,7 @@ mod tests {
                 transcription_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
@@ -4623,6 +5018,7 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                periodic_notes: Default::default(),
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
@@ -4654,6 +5050,7 @@ mod tests {
                 transcription_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
@@ -4704,6 +5101,7 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                periodic_notes: Default::default(),
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
@@ -5455,6 +5853,7 @@ mod tests {
     fn cli_and_develop_prefs_fields_round_trip_together() {
         let original = PrefsView {
             bar_items_order: alloc::vec![alloc::string::String::from("view-mode")], // cli_enabled's left neighbour
+            chat_history_budget: None,
             cli_enabled: true,
             cli_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
             cli_rate_limit_disabled: Some(true),
@@ -6120,6 +6519,70 @@ mod tests {
     }
 
     #[test]
+    fn chat_history_budget_round_trips_alongside_its_neighbours() {
+        // The whole prefix-chained run plus both cursor-region neighbours in one
+        // blob. The defect this pins is not hypothetical: the field first
+        // shipped as `agent_history_budget`, which sorts INSIDE the
+        // strip_prefix run, and its `ai_enabled` arm rewound to the cursor from
+        // before the budget was consumed, so with the budget set and AI off
+        // every prefix-chained field behind it decoded to its default:
+        // `auto_lock_seconds`, `ai_excluded_folders` and the `Zeroizing`
+        // provider key among them. `ai_enabled: false` is therefore the arm
+        // that matters and it is asserted below in both states.
+        for ai_enabled in [true, false] {
+            let original = PrefsView {
+                active_workspace: Some(alloc::string::String::from("ws-1")),
+                ai_enabled,
+                ai_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
+                ai_provider_key: Some(Zeroizing::new(alloc::string::String::from("sk-secret"))),
+                archive_disabled: Some(true),
+                auto_lock_seconds: Some(300),
+                bar_items_order: alloc::vec![alloc::string::String::from("graph")],
+                chat_history_budget: Some(3000),
+                cli_enabled: true,
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode");
+            assert_eq!(decoded, original, "ai_enabled = {ai_enabled}");
+        }
+    }
+
+    #[test]
+    fn an_unknown_key_in_the_cursor_region_does_not_blind_the_fields_behind_it() {
+        // The forward-compatibility property §9.5.2 states, and the reason
+        // `chat_history_budget` is named to sort where it does. An older client
+        // meets a key it has never heard of; in the cursor-scanned region
+        // `find_top_level_marker` steps over it, so everything behind it still
+        // decodes. Injected here rather than asserted in prose, because the
+        // failure is silent: the blob decodes SUCCESSFULLY minus the fields it
+        // lost, and `update_prefs_with_dir` only refuses to write over a read
+        // that ERRORED.
+        let original = PrefsView {
+            auto_lock_seconds: Some(300),
+            bar_items_order: alloc::vec![alloc::string::String::from("graph")],
+            cli_enabled: true,
+            custom_theme: Some(alloc::string::String::from("midnight")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let text = core::str::from_utf8(&encoded).expect("utf8");
+        // A future field, canonically between bar_items_order and cli_enabled.
+        let injected = text.replace(
+            "\"cli_enabled\"",
+            "\"chat_history_budget_v2\":7,\"cli_enabled\"",
+        );
+        assert_ne!(injected, text, "the injection point moved");
+        let decoded = canonical_json_decode(injected.as_bytes()).expect("decode");
+        assert!(decoded.cli_enabled);
+        assert_eq!(
+            decoded.custom_theme,
+            Some(alloc::string::String::from("midnight"))
+        );
+        assert_eq!(decoded.auto_lock_seconds, Some(300));
+    }
+
+    #[test]
     fn archive_disabled_round_trips_alongside_neighbors() {
         // Exercise the strip_prefix decode path with both canonical neighbors
         // present, so a regression in the post_active → post_archive threading
@@ -6322,6 +6785,7 @@ mod tests {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765000000),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6344,6 +6808,7 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(1765432100),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6367,6 +6832,7 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(u64::from(u32::MAX) + 12345),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6408,6 +6874,7 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
@@ -6431,6 +6898,7 @@ mod tests {
     fn encode_emits_theme_after_all_other_fields() {
         // Full field-mix: a < d < e < f < i < s < t. theme sits last.
         let prefs = PrefsView {
+            chat_history_budget: None,
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
@@ -6497,6 +6965,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6634,6 +7103,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             spell_enabled: Some(true),
             spell_languages: alloc::vec![String::from("en-US"), String::from("tr")],
             ..PrefsView::default()
@@ -6680,6 +7150,7 @@ mod tests {
     fn spell_enabled_false_round_trips() {
         let original = PrefsView {
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             spell_enabled: Some(false),
             ..PrefsView::default()
         };
@@ -6899,6 +7370,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -6952,6 +7424,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -6984,6 +7457,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7038,6 +7512,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7072,6 +7547,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7122,6 +7598,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7155,6 +7632,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7205,6 +7683,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7298,6 +7777,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7351,6 +7831,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7406,6 +7887,7 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7465,6 +7947,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7500,6 +7983,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7558,6 +8042,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7664,6 +8149,7 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7725,6 +8211,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7772,6 +8259,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -7826,6 +8314,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -7873,6 +8362,7 @@ mod tests {
         let prefs = PrefsView {
             auto_lock_seconds: Some(300),
             bar_items_order: alloc::vec!["graph".into(), "tags".into()],
+            chat_history_budget: None,
             custom_theme: Some("midnight".into()),
             ..PrefsView::default()
         };
@@ -8110,6 +8600,7 @@ mod tests {
     fn encode_emits_auto_lock_seconds_first_in_canonical_order() {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
+            chat_history_budget: None,
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
@@ -8168,6 +8659,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8201,6 +8693,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8251,6 +8744,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8286,6 +8780,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8336,6 +8831,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8439,6 +8935,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8489,6 +8986,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8566,6 +9064,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8619,6 +9118,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8889,6 +9389,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8939,6 +9440,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -8976,6 +9478,7 @@ mod tests {
             transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -9026,6 +9529,7 @@ mod tests {
             new_note_location: None,
             new_note_location_folder: None,
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -9324,6 +9828,7 @@ mod tests {
                 transcription_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
@@ -9374,6 +9879,7 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                periodic_notes: Default::default(),
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
@@ -9404,6 +9910,7 @@ mod tests {
                 transcription_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
@@ -9454,6 +9961,7 @@ mod tests {
                 new_note_location: None,
                 new_note_location_folder: None,
                 paired_extensions: Vec::new(),
+                periodic_notes: Default::default(),
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
@@ -9484,6 +9992,8 @@ mod tests {
         // the set-vs-sequence array discipline for each. `canonical_json_encode`
         // self-validates the key order + discipline at mint (round-trip below).
         let prefs_populated = PrefsView {
+            // A populated value, so this vector exercises the encoder arm as
+            // well as the field's presence (myne-md/myne#617).
             // inverse-default bools (default true → emitted only when false)
             attachment_compression_enabled: false,
             attachment_ocr_enabled: false,
@@ -9505,6 +10015,7 @@ mod tests {
                 alloc::string::String::from("tags"),
                 alloc::string::String::from("graph"),
             ],
+            chat_history_budget: Some(3000),
             // set array (sorted + deduped)
             cli_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
             cli_rate_limit_disabled: Some(true),
@@ -9597,6 +10108,7 @@ mod tests {
             new_note_location: Some(alloc::string::String::from("specific")),
             new_note_location_folder: Some(alloc::string::String::from("Inbox/")),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: Some(alloc::string::String::from("backlinks")),
             // set array (sorted + deduped)
             right_panel_hidden_tabs: alloc::vec![alloc::string::String::from("outline")],
@@ -10095,7 +10607,7 @@ mod tests {
         dump.push_str("[\n");
         dump.push_str("  {\n");
         dump.push_str("    \"vector_id\": \"vault-prefs/v0.1/encrypt-ai-provider\",\n");
-        dump.push_str("    \"description\": \"myne#415 remote-provider quartet. PrefsView carries BOTH lexicographic neighbours (ai_excluded_folders before, archive_disabled after) so the case pins the canonical POSITION of ai_provider < ai_provider_consent < ai_provider_key < ai_provider_model, not merely their presence. ai_provider_key is present in the ENCRYPTED blob and MUST NOT cross the host->UI boundary in any implementation (protocol.md 9.5.2). Generated by `cargo test -p protocol --lib emit_ai_provider_prefs_vectors -- --ignored` (in protocol/src/prefs.rs).\",\n");
+        dump.push_str("    \"description\": \"myne#415 remote-provider quartet. PrefsView carries BOTH lexicographic neighbours (ai_excluded_folders before, archive_disabled after) so the case pins the canonical POSITION of ai_provider < ai_provider_consent < ai_provider_key < ai_provider_model, not merely their presence. ai_provider_key is present in the ENCRYPTED blob and MUST NOT cross the host->UI boundary in any implementation (protocol.md 9.5.2). Generated by `cargo test -p protocol --lib emit_ai_provider_prefs_vectors -- --ignored` (in protocol/src/prefs.rs). LEGACY CONSENT VALUE, kept for its published bytes: ai_provider_consent here is the BARE wire name, which is the shape a pre-myne-md/myne#633 vault holds and which the remote-inference gate now REFUSES. The grammar an implementation must write is pinned by encrypt-ai-consent-device-scoped / decrypt-ai-consent-device-scoped beside this case.\",\n");
         dump.push_str("    \"case_kind\": \"encrypt\",\n");
         dump.push_str(&alloc::format!(
             "    \"input_root_key_hex\": \"{}\",\n",
@@ -10124,7 +10636,7 @@ mod tests {
         dump.push_str("  },\n");
         dump.push_str("  {\n");
         dump.push_str("    \"vector_id\": \"vault-prefs/v0.1/decrypt-ai-provider\",\n");
-        dump.push_str("    \"description\": \"Round-trip with encrypt-ai-provider: the blob decodes back to a PrefsView carrying the provider selection, the consent name, the key and the chosen model, each read from its canonical position between ai_excluded_folders and archive_disabled. A decoder that mis-orders the quartet fails here rather than silently returning a shifted value.\",\n");
+        dump.push_str("    \"description\": \"Round-trip with encrypt-ai-provider: the blob decodes back to a PrefsView carrying the provider selection, the consent name, the key and the chosen model, each read from its canonical position between ai_excluded_folders and archive_disabled. A decoder that mis-orders the quartet fails here rather than silently returning a shifted value. The consent value it returns is the legacy bare form; see decrypt-ai-consent-device-scoped for the device-scoped grammar the gate accepts and for the predicate that separates the two.\",\n");
         dump.push_str("    \"case_kind\": \"decrypt_ok\",\n");
         dump.push_str(&alloc::format!(
             "    \"input_blob_hex\": \"{}\",\n",
@@ -10159,6 +10671,199 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write provider prefs vectors dump");
+    }
+
+    /// Generator for the DEVICE-SCOPED `ai_provider_consent` pair — the grammar
+    /// `provider_gate` actually requires (myne-md/myne#633), which the published
+    /// vectors did not describe.
+    ///
+    /// **Why this is a correctness gap and not a coverage nicety.**
+    /// `encrypt-ai-provider` pins `ai_provider_consent: "openrouter"`, a BARE
+    /// wire name. Since #633 that value is exactly what
+    /// `core/src/inference/provider_gate.rs` REFUSES: it calls
+    /// [`consent_is_device_scoped`], which requires the
+    /// [`CONSENT_DEVICE_SUFFIX`] tail. So an independent implementation that
+    /// conformed to the published vector wrote a consent that never opens the
+    /// gate, and the failure surfaced as "the AI does nothing" with a stored
+    /// preference that looks correct in the blob.
+    ///
+    /// Nothing reported it, and nothing could. The byte-level suite passes
+    /// because the emitter and the fixture agree; they agree on the pre-#633
+    /// grammar, which is a check comparing a value against a second copy of
+    /// itself. Only a case that carries the CURRENT grammar can tell them apart.
+    ///
+    /// The bare case is deliberately NOT rewritten. Its bytes are published and
+    /// a port may already conform to them, and it is the legacy shape a real
+    /// migrated vault still holds, so it stays as the thing a reader must be
+    /// able to recognise. What changes is that this pair exists beside it and
+    /// says which of the two the gate accepts. `decrypt-ai-consent-device-scoped`
+    /// carries `expected_consent_is_device_scoped` and
+    /// `expected_consent_is_legacy` for BOTH values, so the predicate itself is
+    /// pinned rather than left to be re-derived from the suffix by hand.
+    ///
+    /// Nonce `0xF9` — the next free entry in this family's registry
+    /// (0x77..0xF8 taken).
+    ///
+    /// `cargo test -p protocol --lib emit_ai_consent_scope_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_ai_consent_scope_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF9; AEAD_NONCE_LEN];
+
+        // The value is BUILT by the grammar function rather than written as a
+        // literal, so the case cannot drift from the implementation it pins:
+        // change the suffix and this fixture changes with it, loudly, instead of
+        // continuing to assert a string nothing produces any more.
+        let consent = device_scoped_consent("openrouter");
+        assert_eq!(consent.as_str(), "openrouter@device");
+        assert!(consent_is_device_scoped(
+            Some(consent.as_str()),
+            "openrouter"
+        ));
+        assert!(!consent_is_legacy(Some(consent.as_str()), "openrouter"));
+        // And the other direction, which is the whole reason the pair exists.
+        assert!(!consent_is_device_scoped(Some("openrouter"), "openrouter"));
+        assert!(consent_is_legacy(Some("openrouter"), "openrouter"));
+        // A consent recorded for a DIFFERENT provider is neither. The gate reads
+        // an equality, not a flag, so this is a distinct answer rather than a
+        // degenerate one.
+        assert!(!consent_is_device_scoped(
+            Some(consent.as_str()),
+            "anthropic"
+        ));
+        assert!(!consent_is_legacy(Some(consent.as_str()), "anthropic"));
+
+        // Same neighbours as `emit_ai_provider_prefs_vectors`, so the two cases
+        // differ in exactly one value and a port can diff them directly.
+        let view = PrefsView {
+            ai_excluded_folders: alloc::vec![String::from("Private/")],
+            ai_provider: Some(String::from("openrouter")),
+            ai_provider_consent: Some(consent.clone()),
+            ai_provider_key: Some(Zeroizing::new(String::from("sk-vector-fixture-000"))),
+            ai_provider_model: Some(String::from("meta-llama/llama-3.1-8b")),
+            archive_disabled: Some(true),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&view);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"ai_excluded_folders":["Private/"],"ai_provider":"openrouter","ai_provider_consent":"openrouter@device","ai_provider_key":"sk-vector-fixture-000","ai_provider_model":"meta-llama/llama-3.1-8b","archive_disabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "the suffix must not move the field out of its canonical slot",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &view, &nonce)
+            .expect("encode device-scoped consent");
+        let back = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(back, view);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+        dump.push_str("  {\n");
+        dump.push_str(
+            "    \"vector_id\": \"vault-prefs/v0.1/encrypt-ai-consent-device-scoped\",\n",
+        );
+        dump.push_str("    \"description\": \"The DEVICE-SCOPED ai_provider_consent grammar (myne-md/myne#633). The stored value is the provider's wire name followed by the literal suffix '@device' — 'openrouter@device' here — and it is that whole string, not the bare wire name, that the remote-inference gate accepts. Identical to encrypt-ai-provider in every other byte, so a port can diff the two blobs and see that the only change is the consent value, still in its canonical slot between ai_provider and ai_provider_key. The suffix is device-local by construction: consent is not a vault-wide grant that follows the blob to another machine, so a vault synced to a second device arrives with a consent that device has not given and the gate refuses it there. A port that stores the bare wire name produces a preference that reads correctly and never opens the gate. Generated by `cargo test -p protocol --lib emit_ai_consent_scope_prefs_vectors -- --ignored` (in protocol/src/prefs.rs).\",\n");
+        dump.push_str("    \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "    \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str("  },\n");
+        dump.push_str("  {\n");
+        dump.push_str(
+            "    \"vector_id\": \"vault-prefs/v0.1/decrypt-ai-consent-device-scoped\",\n",
+        );
+        dump.push_str("    \"description\": \"Round-trip with encrypt-ai-consent-device-scoped, plus the PREDICATE the grammar exists for. expected_consent_is_device_scoped and expected_consent_is_legacy are given for both the device-scoped value and the bare wire name encrypt-ai-provider pins, against the same provider and against a different one. A port implements two questions here: does this stored value carry the suffix AND name this provider (accept), and is it the bare name of this provider (a legacy grant, refused — it is what a pre-#633 vault holds, so recognising it is how an implementation knows to ask again rather than to fail silently). A stored consent naming a DIFFERENT provider answers no to both: the gate is an equality against the provider about to receive the text, never a flag.\",\n");
+        dump.push_str("    \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "    \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"expected_consent_device_suffix\": \"{}\",\n",
+            CONSENT_DEVICE_SUFFIX
+        ));
+        dump.push_str("    \"expected_consent_predicate\": [\n");
+        for (stored, provider) in [
+            (consent.as_str(), "openrouter"),
+            ("openrouter", "openrouter"),
+            (consent.as_str(), "anthropic"),
+        ] {
+            dump.push_str("      {\n");
+            dump.push_str(&alloc::format!(
+                "        \"stored\": \"{}\",\n        \"provider_wire\": \"{}\",\n",
+                stored,
+                provider
+            ));
+            dump.push_str(&alloc::format!(
+                "        \"expected_consent_is_device_scoped\": {},\n        \"expected_consent_is_legacy\": {}\n",
+                consent_is_device_scoped(Some(stored), provider),
+                consent_is_legacy(Some(stored), provider)
+            ));
+            dump.push_str("      },\n");
+        }
+        // Trim the trailing comma of the last predicate entry.
+        while dump.ends_with(",\n") {
+            dump.truncate(dump.len() - 2);
+            dump.push('\n');
+        }
+        dump.push_str("    ],\n");
+        dump.push_str("    \"expected_prefs_view\": {\n");
+        dump.push_str("      \"ai_excluded_folders\": [\"Private/\"],\n");
+        dump.push_str("      \"ai_provider\": \"openrouter\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"ai_provider_consent\": \"{}\",\n",
+            consent
+        ));
+        dump.push_str("      \"ai_provider_key\": \"sk-vector-fixture-000\",\n");
+        dump.push_str("      \"ai_provider_model\": \"meta-llama/llama-3.1-8b\",\n");
+        dump.push_str("      \"archive_disabled\": true,\n");
+        dump.push_str("      \"screen_capture_protection\": true\n");
+        dump.push_str("    }\n");
+        dump.push_str("  }\n");
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_consent_scope_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write consent-scope prefs vectors dump");
     }
 
     /// Generator for the `device_names` vector pair (appended to the companion
@@ -10690,6 +11395,7 @@ mod tests {
             label: Some(String::from("Work")),
             last_backup_at: Some(1765432100),
             paired_extensions: Vec::new(),
+            periodic_notes: Default::default(),
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
@@ -11579,6 +12285,355 @@ mod tests {
         .expect("write vault-prefs field-clocks vectors dump");
     }
 
+    /// Generator for the `chat_history_budget` `vault-prefs` cases
+    /// (myne-md/myne#617, the agent chat-history seed budget).
+    ///
+    /// Writes `/tmp/myne_vault_prefs_chat_history_budget_vectors.json`, a JSON
+    /// array fragment spliced by hand into the companion repo's existing
+    /// `cases` array.
+    ///
+    /// **Why the field needs a vector at all**, since it is one optional
+    /// integer: `vault.prefs` is canonical JSON, so key ORDER is part of the
+    /// bytes, and this field's slot is the load-bearing half of its own design.
+    /// It sorts between `bar_items_order` (`b`) and `cli_enabled` (`cl`), which
+    /// puts it in the region `find_top_level_marker` scans forward through;
+    /// named `agent_history_budget` it would have landed inside the
+    /// prefix-matched run that ends at `auto_lock_seconds`, where an
+    /// unrecognised key blinds every field behind it in a client that predates
+    /// it (`docs/spec/protocol.md` §9.5.2, schema-evolution paragraph). A port
+    /// that emits the right value in the wrong slot produces a blob this crate
+    /// cannot decode, and until these cases existed no vector said so: the
+    /// companion repo carried a schema property with the claim written in prose
+    /// and nothing behind it.
+    ///
+    /// **Both canonical NEIGHBOURS are present in the fixture**, which is what
+    /// makes this a slot pin rather than a value pin. The blob carries
+    /// `bar_items_order` and `cli_enabled` either side of it.
+    ///
+    /// The value is 3000, deliberately not the host's 12000 ceiling: the
+    /// ceiling is a host policy applied in the SETTER and is not a property of
+    /// the format, so pinning it here would put a second copy of a host
+    /// constant in another repository, where drift is silent. What the vectors
+    /// pin is the bare-decimal integer encoding, the canonical slot, and the
+    /// omitted-when-unset rule (every other case in the family carries no
+    /// `chat_history_budget` key at all and stays byte-identical to its
+    /// pre-feature self).
+    ///
+    /// Nonce `0xF8` — the next free entry in this family's registry
+    /// (0x77..0xF7 taken).
+    ///
+    /// `cargo test -p protocol --lib emit_chat_history_budget_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_chat_history_budget_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce_chb: [u8; AEAD_NONCE_LEN] = [0xF8; AEAD_NONCE_LEN];
+        let prefs_chb = PrefsView {
+            bar_items_order: alloc::vec![
+                String::from("view-mode"),
+                String::from("tags"),
+                String::from("graph"),
+            ],
+            chat_history_budget: Some(3000),
+            cli_enabled: true,
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs_chb);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"bar_items_order":["view-mode","tags","graph"],"chat_history_budget":3000,"cli_enabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin bar_items_order (b) < chat_history_budget (ch) < cli_enabled (cl), and the budget as a bare decimal integer",
+        );
+        let blob_chb = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_chb, &nonce_chb)
+            .expect("encode chat-history-budget");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_chb).expect("decode");
+        assert_eq!(
+            decoded, prefs_chb,
+            "chat-history-budget blob must round-trip exactly"
+        );
+
+        // The omit-when-unset half, asserted rather than described: the same
+        // view with the field back to `None` must encode to bytes carrying no
+        // `chat_history_budget` key at all, so a vault that never overrode the
+        // host default stays byte-identical to its pre-feature self.
+        let prefs_unset = PrefsView {
+            chat_history_budget: None,
+            ..prefs_chb.clone()
+        };
+        let canonical_unset = canonical_json_encode(&prefs_unset);
+        assert_eq!(
+            canonical_unset.as_slice(),
+            br#"{"bar_items_order":["view-mode","tags","graph"],"cli_enabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "an unset budget must be omitted entirely, not encoded as 0",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-chat-history-budget
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-chat-history-budget\",\n");
+        dump.push_str("      \"description\": \"The agent chat-history seed budget (myne-md/myne#617). An optional unsigned integer encoded as a BARE DECIMAL, pinned between both of its canonical neighbours: bar_items_order (b) < chat_history_budget (ch) < cli_enabled (cl). That slot is the load-bearing half of the field's design -- it sits in the region a decoder scans forward through, so an older client steps over it, whereas a name sorting before auto_lock_seconds would have landed in the prefix-matched run where an unknown key blinds every field behind it (protocol.md 9.5.2 schema evolution). The value 3000 is deliberately not the host's clamp ceiling: that ceiling is applied in the SETTER and is host policy rather than format, so no vector pins it. Unset is OMITTED ENTIRELY rather than encoded as 0, which every other case in this family demonstrates by carrying no such key and staying byte-identical to its pre-feature self. Same vault-A inputs as the sibling cases; prefs_nonce=0xF8x24. Generated by emit_chat_history_budget_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_chb)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_chb)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-chat-history-budget
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-chat-history-budget\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-chat-history-budget: the blob decodes back to a PrefsView carrying chat_history_budget=3000 between bar_items_order and cli_enabled under the same root_key + account_number_hash. A decoder that does not know the field (pre-myne#617) tolerates it per the 9.5.2 forward-compat rule and treats the budget as ABSENT rather than as 0 -- absent means the host applies its own default, which is a third state distinct from 'seed nothing'. That distinction is why this case exists beside the encrypt one: a port that maps a missing key to 0 decodes this blob correctly and its own default-carrying blob incorrectly.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_chb)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"bar_items_order\": [\"view-mode\", \"tags\", \"graph\"],\n");
+        dump.push_str("        \"chat_history_budget\": 3000,\n");
+        dump.push_str("        \"cli_enabled\": true\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_chat_history_budget_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs chat-history-budget vectors dump");
+    }
+
+    /// Generator for the **set-entry removal clock** `vault-prefs` cases
+    /// (myne-md/myne#613).
+    ///
+    /// `cargo test -p protocol --lib emit_set_removal_clock_prefs_vectors -- --ignored`
+    ///
+    /// The suite had exactly one `field_clocks` case before this
+    /// (`encrypt-field-clocks`), and its clocks are a bare field name plus a
+    /// `device_names/<key>` entry. Neither is the shape myne#613 introduces:
+    /// a clock keyed by a **set** entry, and the same clock with the entry
+    /// **absent**, which is how a removal is expressed at rest. A port that
+    /// encoded either differently would diverge on bytes that no existing case
+    /// covers, and `sync-protocol.md` §10.2 now rests on those bytes meaning the
+    /// same thing on both sides of a sync.
+    ///
+    /// The third case is the one that catches an encoder rather than a merge:
+    /// a folded non-ASCII folder key sitting beside an ASCII one, which pins
+    /// that `field_clocks` keys sort by **byte** order (so `deliberate_folders/b`
+    /// precedes `deliberate_folders/bücher/`) and that the multi-byte key is
+    /// emitted as raw UTF-8 rather than `\u`-escaped. An implementation that
+    /// sorted by code point, or escaped non-ASCII, would produce a different
+    /// blob for the same vault and lose the entry on every merge.
+    #[test]
+    #[ignore]
+    fn emit_set_removal_clock_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        // Case 1: the entry is LIVE and carries its own clock.
+        let nonce_live: [u8; AEAD_NONCE_LEN] = [0xE1; AEAD_NONCE_LEN];
+        let mut clocks_live = BTreeMap::new();
+        clocks_live.insert(
+            String::from("deliberate_folders/projects/myne/"),
+            1_765_432_101_000u64,
+        );
+        let prefs_live = PrefsView {
+            deliberate_folders: alloc::vec![String::from("Projects/Myne/")],
+            field_clocks: clocks_live,
+            ..PrefsView::default()
+        };
+        let canonical_live = canonical_json_encode(&prefs_live);
+        assert_eq!(
+            canonical_live.as_slice(),
+            br#"{"deliberate_folders":["Projects/Myne/"],"field_clocks":{"deliberate_folders/projects/myne/":1765432101000},"screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin deliberate_folders (d) < field_clocks (fi) < screen_capture_protection (s), and the clock key as the FOLDED entry identity while the set holds the raw display form",
+        );
+        let blob_live =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_live, &nonce_live)
+                .expect("encode set-entry live");
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_live).expect("decode"),
+            prefs_live,
+            "live set-entry blob must round-trip exactly"
+        );
+
+        // Case 2: the SAME clock with the entry gone. This is a removal at rest.
+        // `deliberate_folders` is omit-when-empty, so the set key disappears
+        // entirely and the clock is the only thing left saying it ever existed.
+        let nonce_removed: [u8; AEAD_NONCE_LEN] = [0xE2; AEAD_NONCE_LEN];
+        let mut clocks_removed = BTreeMap::new();
+        clocks_removed.insert(
+            String::from("deliberate_folders/projects/myne/"),
+            1_765_432_102_000u64,
+        );
+        let prefs_removed = PrefsView {
+            field_clocks: clocks_removed,
+            ..PrefsView::default()
+        };
+        let canonical_removed = canonical_json_encode(&prefs_removed);
+        assert_eq!(
+            canonical_removed.as_slice(),
+            br#"{"field_clocks":{"deliberate_folders/projects/myne/":1765432102000},"screen_capture_protection":true}"#.as_slice(),
+            "a removal encodes as a clock with NO corresponding set key: the empty set is omitted entirely, so the stamp is the whole claim",
+        );
+        let blob_removed = encode_prefs_blob_raw(
+            &prefs_key_a,
+            &account_hash_a,
+            &prefs_removed,
+            &nonce_removed,
+        )
+        .expect("encode set-entry removed");
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_removed).expect("decode"),
+            prefs_removed,
+            "removal blob must round-trip exactly"
+        );
+
+        // Case 3: a folded non-ASCII key beside an ASCII one.
+        let nonce_folded: [u8; AEAD_NONCE_LEN] = [0xE3; AEAD_NONCE_LEN];
+        let mut clocks_folded = BTreeMap::new();
+        clocks_folded.insert(
+            String::from("deliberate_folders/bücher/"),
+            1_765_432_103_000u64,
+        );
+        clocks_folded.insert(
+            String::from("deliberate_folders/archive/"),
+            1_765_432_104_000u64,
+        );
+        let prefs_folded = PrefsView {
+            deliberate_folders: alloc::vec![String::from("Archive/"), String::from("Bücher/")],
+            field_clocks: clocks_folded,
+            ..PrefsView::default()
+        };
+        let canonical_folded = canonical_json_encode(&prefs_folded);
+        assert_eq!(
+            canonical_folded.as_slice(),
+            r#"{"deliberate_folders":["Archive/","Bücher/"],"field_clocks":{"deliberate_folders/archive/":1765432104000,"deliberate_folders/bücher/":1765432103000},"screen_capture_protection":true}"#.as_bytes(),
+            "pins how a non-ASCII folder key is escaped and where it sorts among the clock keys; an implementation that disagrees produces a different blob for the same vault",
+        );
+        let blob_folded =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_folded, &nonce_folded)
+                .expect("encode set-entry folded");
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_folded).expect("decode"),
+            prefs_folded,
+            "folded-key blob must round-trip exactly"
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        let mut case =
+            |id: &str, desc: &str, canonical: &[u8], nonce: &[u8], blob: &[u8], last: bool| {
+                dump.push_str("    {\n");
+                dump.push_str(&alloc::format!("      \"vector_id\": \"{id}\",\n"));
+                dump.push_str(&alloc::format!("      \"description\": \"{desc}\",\n"));
+                dump.push_str("      \"case_kind\": \"encrypt\",\n");
+                dump.push_str(&alloc::format!(
+                    "      \"input_root_key_hex\": \"{}\",\n",
+                    hex_lower(&root_a)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"input_account_number_hash_hex\": \"{}\",\n",
+                    hex_lower(&account_hash_a)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+                    hex_lower(canonical)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"input_prefs_nonce_hex\": \"{}\",\n",
+                    hex_lower(nonce)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"informational_prefs_key_hex\": \"{}\",\n",
+                    hex_lower(&*prefs_key_a)
+                ));
+                dump.push_str(&alloc::format!(
+                    "      \"expected_prefs_blob_hex\": \"{}\"\n",
+                    hex_lower(blob)
+                ));
+                dump.push_str(if last { "    }\n" } else { "    },\n" });
+            };
+
+        case(
+            "vault-prefs/v0.1/encrypt-set-entry-clock-live",
+            "Set-entry removal clock, live half (myne-md/myne#613, sync-protocol.md \\u00a710.2). A set-union field carries a per-entry clock under `<field>/<entry>`, where the entry key is the FOLDED folder identity (`projects/myne/`) while the set itself holds the raw display form (`Projects/Myne/`). Pins the canonical key order deliberate_folders (d) < field_clocks (fi) < screen_capture_protection (s) with a set-keyed clock present. Same vault-A inputs as the sibling cases; prefs_nonce=0xE1x24. Generated by emit_set_removal_clock_prefs_vectors in protocol/src/prefs.rs.",
+            &canonical_live,
+            &nonce_live,
+            &blob_live,
+            false,
+        );
+        case(
+            "vault-prefs/v0.1/encrypt-set-entry-clock-removed",
+            "Set-entry removal clock, removed half (myne-md/myne#613). The SAME clock key with no corresponding set entry: `deliberate_folders` is omit-when-empty so the set key is absent entirely, and the stamp is the whole claim that the entry was deleted rather than never held. This is the shape sync-protocol.md \\u00a710.2 resolves against a peer that still holds the entry. What this ENCRYPT case pins is that the orphan key survives the encode and is present in the plaintext, byte for byte: it does not, and cannot, pin that a DECODER preserves it, because an encrypt case never hands a port a blob to read. The decode half is asserted in the reference implementation by the round-trip in `emit_set_removal_clock_prefs_vectors`'s own module tests, and a port that wants the same assurance owes itself a decode of this blob; a decoder that dropped the orphan key would silently undo every folder deletion on a multi-device vault, and nothing in this file would say so. Same vault-A inputs; prefs_nonce=0xE2x24. Generated by emit_set_removal_clock_prefs_vectors in protocol/src/prefs.rs.",
+            &canonical_removed,
+            &nonce_removed,
+            &blob_removed,
+            false,
+        );
+        case(
+            "vault-prefs/v0.1/encrypt-set-entry-clock-folded-non-ascii",
+            "Set-entry removal clock with a non-ASCII folded key (myne-md/myne#613). Two clock keys, one ASCII and one multi-byte, beside their raw set entries. Pins two things a port can get wrong with no test noticing. First, non-ASCII is emitted as RAW UTF-8 and never \\\\u-escaped, in both the set entry and the clock key: an implementation whose JSON writer escapes by default (many do) produces a different plaintext, a different AEAD tag, and a blob the other side cannot decrypt. Second, the multi-byte key sorts in the same sequence as its ASCII sibling, which pins that a port sorts the clock map at all and does not reorder around a non-ASCII key. It deliberately does NOT claim to discriminate byte order from code-point order: UTF-8 byte order and code-point order are identical by construction, so no case can separate them, and the only ordering a vector here could discriminate is UTF-16 code-unit order, which needs an astral character against a BMP one and is not what these two keys are. Same vault-A inputs; prefs_nonce=0xE3x24. Generated by emit_set_removal_clock_prefs_vectors in protocol/src/prefs.rs.",
+            &canonical_folded,
+            &nonce_folded,
+            &blob_folded,
+            true,
+        );
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_set_removal_clock_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs set-removal-clock vectors dump");
+    }
+
     /// Generator for the display-formatting quartet's `vault-prefs` cases —
     /// `auto_tag_enabled`, `date_format`, `time_format`, `timezone`.
     ///
@@ -11667,7 +12722,7 @@ mod tests {
         // case 1/2: encrypt-datetime-quartet
         dump.push_str("    {\n");
         dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-datetime-quartet\",\n");
-        dump.push_str("      \"description\": \"The four display-formatting preferences that had no cross-implementation vector: auto_tag_enabled (on-device tag suggestion, emitted only when true), date_format, time_format and timezone (myne#279 display overrides). Each is written beside BOTH of its canonical neighbours so the case pins its slot rather than merely its value: auto_lock_seconds < auto_tag_enabled < bar_items_order; daily_template < date_format < deliberate_folders; theme < time_format < timezone < transcription_enabled. vault.prefs is canonical JSON, so key order is part of the bytes — a port emitting a correct value in the wrong slot produces a blob the reference decoder rejects. All four values are display-only: none ever enters a .myn file, a blob or the sync wire as a formatting instruction. Same vault-A inputs as the sibling cases; prefs_nonce=0xD4x24. Generated by emit_datetime_quartet_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"description\": \"The four display-formatting preferences that had no cross-implementation vector: auto_tag_enabled (on-device tag suggestion, emitted only when true), date_format, time_format and timezone (myne#279 display overrides). Each is written beside BOTH of its canonical neighbours so the case pins its slot rather than merely its value: auto_lock_seconds < auto_tag_enabled < bar_items_order; daily_template < date_format < deliberate_folders; theme < time_format < timezone < transcription_enabled. vault.prefs is canonical JSON, so key order is part of the bytes: a port emitting a correct value in the wrong slot produces a blob the reference decoder rejects. All four values are display-only: none ever enters a .myn file as a formatting instruction. They do live in this blob, which is what the case encodes, and date_format/time_format are shared across devices by design. Same vault-A inputs as the sibling cases; prefs_nonce=0xD4x24. Generated by emit_datetime_quartet_prefs_vectors in protocol/src/prefs.rs.\",\n");
         dump.push_str("      \"case_kind\": \"encrypt\",\n");
         dump.push_str(&alloc::format!(
             "      \"input_root_key_hex\": \"{}\",\n",
@@ -12348,5 +13403,259 @@ mod tests {
             json.contains("ext-a"),
             "non-secret extension_id should still serialize: {json}"
         );
+    }
+
+    /// Emit the two `periodic_notes` cases (myne#177) as ready-to-paste JSON
+    /// case objects, appended to the `vault-prefs` family rather than folded
+    /// into an existing generator, so every earlier case stays byte-stable.
+    ///
+    /// Two cases, the family's encrypt + decrypt_ok pair:
+    /// - `encrypt-periodic-notes`: a view carrying five `<period>.<setting>`
+    ///   entries across two periods. Pins the canonical position of the field
+    ///   (between `paired_extensions` and `reminder_horizon_days`) and the
+    ///   lexicographic key order INSIDE the map, which is what makes two
+    ///   implementations that build the map in different orders agree.
+    /// - `decrypt-periodic-notes`: the round trip.
+    ///
+    /// Nonce `0xF2` is the next free entry in the family's nonce registry.
+    ///
+    /// `cargo test -p protocol --lib emit_periodic_notes_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_periodic_notes_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF2; AEAD_NONCE_LEN];
+
+        // FOUR properties in one fixture, and three of them were unpinned when
+        // this generator first shipped.
+        //
+        // 1. The lexicographic key order INSIDE the map. The entries go in in a
+        //    deliberately non-sorted order across two periods, so a port that
+        //    emits insertion order produces different bytes. (`BTreeMap::from`
+        //    sorts on construction, so this is a statement about what the
+        //    ENCODER must do with an arbitrary source order rather than about
+        //    this literal; the assertion below is what holds it.)
+        //
+        // 2. The field's CANONICAL SLOT, and this is the correction. The first
+        //    version's description claimed to pin "after paired_extensions,
+        //    before reminder_horizon_days" over a blob containing neither: the
+        //    field had no left neighbour at all and its right neighbour was
+        //    `screen_capture_protection`. `vectors/vault-prefs/schema.md` states
+        //    the invariant that every field is pinned beside BOTH of its
+        //    canonical neighbours, because `vault.prefs` is canonical JSON and
+        //    key order is part of the bytes, so a case that pins a value alone
+        //    cannot notice a wrong slot. Both neighbours are present now.
+        //
+        // 3. An UNRECOGNISED period key, `quarterly.folder`. The field's own
+        //    schema text says a decoder MUST re-encode an entry whose period it
+        //    does not recognise, which is what makes a fourth period free, and
+        //    no case anywhere contained one. The corpus carried an actively
+        //    misleading precedent instead: `decrypt-unknown-field-tolerated`
+        //    pins an unknown TOP-LEVEL field being DROPPED from the re-encode,
+        //    which is the opposite of what this map requires.
+        //
+        // 4. NFC normalisation, fed in DECOMPOSED form. Every string in the
+        //    first fixture was pure ASCII, so the NFC claim in the same sentence
+        //    was unpinned too. `Wöchentlich/` is written here as `o` + U+0308
+        //    COMBINING DIAERESIS; the encoder must emit U+00F6, so the expected
+        //    bytes differ from the input literal and a port that skips the fold
+        //    fails on the blob rather than on a comparison it might not make.
+        //    `encrypt-labeled` uses exactly this device for `label`.
+        let prefs = PrefsView {
+            periodic_notes: BTreeMap::from([
+                (
+                    String::from("weekly.template"),
+                    String::from("0190a000-0000-7000-8000-000000000009"),
+                ),
+                (String::from("monthly.folder"), String::from("Monthly/")),
+                // NFD on input: `o` + U+0308, folded to U+00F6 on encode.
+                (
+                    String::from("weekly.folder"),
+                    String::from("Wo\u{308}chentlich/"),
+                ),
+                (String::from("monthly.format"), String::from("YYYY-MM")),
+                (String::from("weekly.format"), String::from("gggg-[W]ww")),
+                // A period no build in this tree knows. It must survive the
+                // round trip verbatim rather than being dropped.
+                (String::from("quarterly.folder"), String::from("Quarterly/")),
+            ]),
+            // The two canonical NEIGHBOURS, so the slot is pinned rather than
+            // only the value: `paired_extensions` (p) < `periodic_notes` (pe)
+            // < `reminder_horizon_days` (r).
+            paired_extensions: alloc::vec![crate::paired_extension::PairedExtension {
+                extension_id: String::from("clipper@myne.md"),
+                paired_at: Some(1_765_432_000),
+                revoked: false,
+                token_value: String::from("9c1fb7a4"),
+            }],
+            reminder_horizon_days: Some(7),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            core::str::from_utf8(&canonical).expect("utf8"),
+            concat!(
+                r#"{"paired_extensions":[{"extension_id":"clipper@myne.md","paired_at":1765432000,"#,
+                r#""revoked":false,"token_value":"9c1fb7a4"}],"#,
+                r#""periodic_notes":{"monthly.folder":"Monthly/","monthly.format":"YYYY-MM","#,
+                // PRECOMPOSED here (U+00F6) against the DECOMPOSED input above
+                // (`o` + U+0308). That difference is the NFC pin: if the encoder
+                // skipped the fold this literal would not match.
+                "\"quarterly.folder\":\"Quarterly/\",\"weekly.folder\":\"W\u{f6}chentlich/\",",
+                r#""weekly.format":"gggg-[W]ww","#,
+                r#""weekly.template":"0190a000-0000-7000-8000-000000000009"},"#,
+                r#""reminder_horizon_days":7,"screen_capture_protection":true}"#
+            ),
+            "four things at once: the field sorts between paired_extensions (p) and \
+             reminder_horizon_days (r), its keys are emitted lexicographically, an \
+             unrecognised period survives verbatim, and the NFD input is folded to NFC \
+             (the literal above carries U+00F6, the input carried o + U+0308)",
+        );
+
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode periodic_notes");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+
+        // NOT `assert_eq!(decoded, prefs)`, and the difference is the NFC pin
+        // rather than a weaker assertion. The encoder normalises, so the decoded
+        // view carries `W` + U+00F6 where the source view carried `o` + U+0308:
+        // a round trip through this format is exact in BYTES and idempotent in
+        // VALUES, and it is not the identity on a decomposed input. Comparing
+        // against the source would have forced the fixture back to ASCII, which
+        // is how the NFC claim went unpinned in the first place.
+        let expected_decoded = PrefsView {
+            periodic_notes: {
+                let mut m = prefs.periodic_notes.clone();
+                m.insert(
+                    String::from("weekly.folder"),
+                    String::from("W\u{f6}chentlich/"),
+                );
+                m
+            },
+            ..prefs.clone()
+        };
+        assert_eq!(
+            decoded, expected_decoded,
+            "round trip must be exact, with the decomposed input folded to NFC",
+        );
+        // And it is a FIXED POINT: re-encoding what came back reproduces the
+        // same bytes, which is the property a port needs and the one an
+        // idempotence claim actually rests on.
+        assert_eq!(
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &decoded, &nonce)
+                .expect("re-encode"),
+            blob,
+            "the decoded view must re-encode to the same bytes",
+        );
+
+        // THE INPUT THE ENCRYPT CASE SHIPS IS THE DECOMPOSED ONE, and that is
+        // the whole NFC pin rather than a detail.
+        //
+        // The runner parses `input_plaintext_canonical_utf8_hex` into a
+        // `PrefsView`, RE-ENCODES it and compares against
+        // `expected_prefs_blob_hex`. Ship the canonical (precomposed) bytes as
+        // the input and `nfc()` is the identity on them, so a port that skips
+        // the fold entirely produces the expected blob and passes. Measured, not
+        // assumed: deleting the `.nfc()` from `push_canonical_string_map` left
+        // this case green until the input became decomposed.
+        //
+        // `encrypt-labeled` has the same shape and the same gap: its description
+        // says the label "is supplied in NFD in the generator source", which is
+        // true of the generator's `#[cfg(test)]` assertion and not of anything a
+        // PORT can run. This case is the one that closes it, and the field name
+        // is not a contradiction: the field is the ENCODER'S INPUT, and the
+        // encoder is what canonicalises.
+        let decomposed_plaintext: Vec<u8> = {
+            let text = core::str::from_utf8(&canonical).expect("utf8");
+            text.replace("W\u{f6}chentlich/", "Wo\u{308}chentlich/")
+                .into_bytes()
+        };
+        assert_ne!(
+            decomposed_plaintext, canonical,
+            "the substitution must actually have happened, or this case pins nothing",
+        );
+        assert_eq!(
+            encode_prefs_blob_raw(
+                &prefs_key_a,
+                &account_hash_a,
+                &serde_json::from_slice::<PrefsView>(&decomposed_plaintext).expect("parse"),
+                &nonce,
+            )
+            .expect("encode from decomposed"),
+            blob,
+            "a decomposed input must encode to the SAME bytes as the precomposed one",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-periodic-notes\",\n");
+        dump.push_str("      \"description\": \"myne#177 periodic-notes settings: a string map keyed <period>.<setting> holding the weekly equivalents of the three daily_* fields plus the two monthly ones. Pins FOUR things a port can get wrong independently. (1) The field's canonical position, and BOTH neighbours are in this blob rather than named in prose: paired_extensions (p) < periodic_notes (pe) < reminder_horizon_days (r). An earlier version of this case named those two neighbours and contained neither, so it pinned a value alone and could not have noticed a wrong slot. (2) The lexicographic key order INSIDE the map. Read that as a statement about the ENCODER rather than about this artefact: the shipped plaintext and view are both already sorted, so nothing here records an insertion order and no port can observe one. What the case actually holds is that these bytes are the sorted form, so an implementation that emits its own source order produces different bytes whenever that order differs. The generator feeds a deliberately unsorted literal, which is where the round trip is exercised, and that is a main-repo assertion a port cannot run. (3) An UNRECOGNISED period: quarterly.folder is a period no build in the reference tree knows, and it must be re-encoded verbatim, which is what makes a fourth period free without a format change. (4) NFC: weekly.folder is fed in DECOMPOSED form (o + U+0308) and these bytes carry the PRECOMPOSED U+00F6, so a port that skips the fold fails on the blob. Daily is NOT in this map by design and keeps its three top-level fields.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&decomposed_plaintext)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str("    },\n");
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-periodic-notes\",\n");
+        dump.push_str("      \"description\": \"Round trip with encrypt-periodic-notes: the blob decodes back to the same six entries, and a decoder that dropped or reordered a key fails here rather than silently losing a period's settings. TWO round-trip properties beyond that. quarterly.folder is a period NO build knows, and it must come back verbatim, because the format's forward-compat rule for this map is re-encode-what-you-do-not-recognise, which is the OPPOSITE of decrypt-unknown-field-tolerated one case over: an unknown TOP-LEVEL field is dropped from the re-encode, an unknown period key inside this map is not. And weekly.folder went in DECOMPOSED (o + U+0308) and comes back PRECOMPOSED (U+00F6), so the round trip is exact in bytes and idempotent in values without being the identity on a decomposed input; a port that skips the NFC fold produces different blob bytes rather than a comparison it might not make.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"paired_extensions\": [{ \"extension_id\": \"clipper@myne.md\", \"paired_at\": 1765432000, \"revoked\": false, \"token_value\": \"9c1fb7a4\" }],\n");
+        dump.push_str("        \"periodic_notes\": {\n");
+        dump.push_str("          \"monthly.folder\": \"Monthly/\",\n");
+        dump.push_str("          \"monthly.format\": \"YYYY-MM\",\n");
+        dump.push_str("          \"quarterly.folder\": \"Quarterly/\",\n");
+        dump.push_str("          \"weekly.folder\": \"W\u{f6}chentlich/\",\n");
+        dump.push_str("          \"weekly.format\": \"gggg-[W]ww\",\n");
+        dump.push_str("          \"weekly.template\": \"0190a000-0000-7000-8000-000000000009\"\n");
+        dump.push_str("        },\n");
+        dump.push_str("        \"reminder_horizon_days\": 7\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        std::fs::write("/tmp/myne_periodic_notes_prefs_cases.json", dump.as_bytes())
+            .expect("write periodic-notes prefs cases");
     }
 }

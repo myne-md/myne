@@ -28,8 +28,13 @@ vi.mock("../../src/notes/noteWriteBatch", () => ({
 vi.mock("../../src/notes/vaultIndices", () => ({
   reindexNoteFromBody: (...a: unknown[]) => reindexMock(...a),
 }));
-vi.mock("../../src/lib/prefs", () => ({
-  setDeliberateFolders: (...a: unknown[]) => setDeliberateFoldersMock(...a),
+vi.mock("../../src/lib/prefs", async (importOriginal) => ({
+  mutateDeliberateFolders: (...a: unknown[]) => setDeliberateFoldersMock(...a),
+  // The REAL derivation, not a copy of it. It is what decides whether a
+  // stale view can claim a deletion (myne-md/myne#613), so a stub here would
+  // test the stub, and a hand-copy would be one more place for the real one
+  // to drift away from.
+  mutationFrom: (await importOriginal<typeof import("../../src/lib/prefs")>()).mutationFrom,
 }));
 
 import {
@@ -216,9 +221,73 @@ describe("renameFolder — async apply (transactional)", () => {
     expect(writeBatchMock).toHaveBeenCalledTimes(1);
     const batch = writeBatchMock.mock.calls[0]![0] as Array<{ noteId: string; plaintext: string }>;
     expect(batch.map((e) => e.noteId).sort()).toEqual(["n1", "ref"]);
-    expect(setDeliberateFoldersMock).toHaveBeenCalledWith(["Work/"]);
+    // A rename states the SUBTREE once and the core re-roots whatever is
+    // stored under it. It used to send a remove-plus-add pair derived from the
+    // caller's own set, which could mention neither an entry an at-fill writer
+    // had just put on disk nor one a peer had landed: those stayed under the OLD
+    // path and reappeared empty at the next unlock (myne-md/myne#613 review).
+    // One verb is also atomic, where the pair could land its removals, stamp
+    // each as a propagating deletion, and have its additions refused by the byte
+    // budget.
+    expect(setDeliberateFoldersMock).toHaveBeenCalledWith({
+      renamePrefix: [{ from: "projects/", to: "Work/" }],
+    });
     // Moved note re-indexed; the pure inbound-only note is not a move.
     expect(reindexMock).toHaveBeenCalledWith("n1", expect.stringContaining("folder: Work/"));
+  });
+
+  // The `deliberate_folders` write happens PAST the commit, so a failure there
+  // has the rename on disk. Throwing would tell the caller a rename that landed
+  // did not, and skip the decoration and archived-folder re-rooting it still
+  // owes; those live in `vault.prefs` and nothing reconciles them later.
+  it("retries the post-commit deliberate write once before giving up", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock
+      .mockRejectedValueOnce(new Error("prefs busy"))
+      .mockResolvedValueOnce(undefined);
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], ["P/"]);
+
+    expect(setDeliberateFoldersMock).toHaveBeenCalledTimes(2);
+    // The retry is the difference between recoverable and permanent: a second
+    // rename cannot fix this later, because after a relaunch the stale entry is
+    // under the OLD path and `planFolderRenameBatch` keys its rewrite off the
+    // CURRENT one, so nothing matches and this block does not even run.
+    expect(result.deliberateWriteFailed).toBe(false);
+    expect(result.failed).toEqual([]);
+    expect(result.moved).toEqual(["n"]);
+  });
+
+  it("reports a twice-failed deliberate write rather than throwing it", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock.mockRejectedValue(new Error("disk full"));
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], ["P/"]);
+
+    expect(setDeliberateFoldersMock).toHaveBeenCalledTimes(2);
+    expect(result.deliberateWriteFailed).toBe(true);
+    // And the rename is still reported as landed, which is the whole reason this
+    // is a value and not a throw: the caller runs the decoration and
+    // archived-folder re-rooting off `moved` and `nextDeliberate`.
+    expect(result.failed).toEqual([]);
+    expect(result.moved).toEqual(["n"]);
+    expect(result.nextDeliberate).toEqual(["Q/"]);
+  });
+
+  it("does not report a failure when there was no deliberate entry to write", async () => {
+    // The other direction. A rename with nothing in the deliberate set skips the
+    // write entirely, and a flag that turned on there would put a notice about a
+    // setting on a rename that had none.
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock.mockRejectedValue(new Error("never called"));
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], []);
+
+    expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
+    expect(result.deliberateWriteFailed).toBe(false);
   });
 
   it("flushes open dirty panes BEFORE reading any body (WL-8 pre-flight)", async () => {
@@ -277,7 +346,9 @@ describe("renameFolder — async apply (transactional)", () => {
     expect(result.failed).toEqual([]);
     expect(result.moved.sort()).toEqual(["n", "ref"]);
     // The two writes the recovery pass will NOT redo happen anyway.
-    expect(setDeliberateFoldersMock).toHaveBeenCalledWith(["Q/"]);
+    expect(setDeliberateFoldersMock).toHaveBeenCalledWith({
+      renamePrefix: [{ from: "p/", to: "Q/" }],
+    });
     expect(reindexMock).toHaveBeenCalledWith("n", expect.stringContaining("folder: Q/"));
   });
 
