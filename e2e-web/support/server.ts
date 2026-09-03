@@ -51,6 +51,30 @@ export interface BundleServerOptions {
   readonly port?: number;
   /** The sync origin baked into the CSP's `connect-src`. */
   readonly syncOrigin: string;
+  /**
+   * Header names to STRIP from every response — a misconfigured deployment,
+   * served for real (myne-md/myne#556).
+   *
+   * The one thing this exists for is the cross-origin-isolation pair. Without
+   * `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` the browser
+   * reports `crossOriginIsolated === false` and `SharedArrayBuffer` is
+   * undefined; `web/src/environment-gate.ts` refuses to boot on exactly that,
+   * and its comment explains why the alternative is so much worse than a
+   * refusal — the sync backoff sleeps via `Atomics.wait` on a
+   * `SharedArrayBuffer`, the wasm instance aborts when it cannot, and the page
+   * then rejects every later `invoke` for the rest of its life while the
+   * aborted Worker's memory, which held the vault keys, stays resident until
+   * the tab is reloaded.
+   *
+   * That refusal is the mitigation `docs/self-host-web.md` calls fatal to get
+   * wrong, and nothing exercised it: every scenario in this lane is served the
+   * correct headers by construction. Making the header set a PARAMETER is what
+   * lets a scenario be the misconfigured operator.
+   *
+   * Case-insensitive, because the header map is written in canonical case and
+   * a caller naming `coep` in lower case should not silently strip nothing.
+   */
+  readonly stripHeaders?: readonly string[];
 }
 
 export interface BundleServer {
@@ -108,7 +132,11 @@ export function resolveWithinRoot(root: string, urlPath: string): string | null 
 export async function startBundleServer(opts: BundleServerOptions): Promise<BundleServer> {
   const port =
     opts.port ?? Number(process.env.MYNE_WEB_E2E_BUNDLE_PORT ?? "4545");
-  const headers = securityHeaders({ syncOrigin: opts.syncOrigin });
+  const allHeaders = securityHeaders({ syncOrigin: opts.syncOrigin });
+  const stripped = new Set((opts.stripHeaders ?? []).map((h) => h.toLowerCase()));
+  const headers: Record<string, string> = Object.fromEntries(
+    Object.entries(allHeaders).filter(([k]) => !stripped.has(k.toLowerCase())),
+  );
   // A duplicate of the ENFORCED policy, in report-only mode, aimed at this
   // server. It changes nothing about what the page may do — report-only never
   // blocks — and is what makes boot-time violations of the real policy

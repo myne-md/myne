@@ -231,6 +231,17 @@ export function UnlinkedMentionsSection({
 
   return (
     <div
+      // Observability only (`src/CLAUDE.md` "Test observability"). This surface
+      // carried NO testid at all, which made it invisible to the E2E lane: the
+      // `links.backlinks-and-mentions` roster row asks whether the df ceiling
+      // engages on a ~25-note corpus, and there was nothing for a scenario to
+      // look at. The two `data-*` values are the section's own state, so a
+      // scenario asserts what the section IS rather than scraping how it looks
+      // — `data-busy` distinguishes "still searching" from "found nothing",
+      // which is exactly the pair a settle-time assertion has to tell apart.
+      data-testid="editor.unlinked-mentions"
+      data-busy={busy ? "true" : "false"}
+      data-count={String(mentions.length)}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -319,6 +330,8 @@ export function UnlinkedMentionsSection({
               {mentions.map((mention) => (
                 <div
                   key={mention.noteId}
+                  data-testid="editor.unlinked-mention-row"
+                  data-note-id={mention.noteId}
                   style={{
                     ...SIDEBAR_CARD_STYLE,
                     cursor: "default",

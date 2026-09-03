@@ -9,11 +9,22 @@
 //      TEXT + a live-region role, not animation alone, so zeroing motion can't
 //      erase the signal (Toast shown here; banners covered by announce.test).
 //
-// The E2E variant that FORCES `prefers-reduced-motion` in the real WebView is
-// gated on a harness capability gap: WebKitGTK has no WebDriver media-emulation
-// hook and the suite is zero-hook, so forcing the media query is not yet wired.
-// This Vitest guard verifies the actual requirement (motion zeroed + state
-// text-bearing) without needing to force the query.
+// The E2E variant now EXISTS — `e2e/reduced-motion.e2e.ts` (rm1,
+// myne-md/myne#555). The gap recorded here was real about WebDriver and wrong
+// about the platform: WebKitGTK does not take the preference from a driver
+// command, it takes it from GTK, and GTK takes it from
+// `$XDG_CONFIG_HOME/gtk-3.0/settings.ini` — a file the harness already owns,
+// because it points `XDG_CONFIG_HOME` at a per-scenario temp tree before
+// launch. So the query is forced through the real OS-level path and the suite's
+// zero-hook rule is intact. Measured: the WebView reports
+// `prefers-reduced-motion: reduce`, and rm1 asserts that before anything else
+// precisely so a lever that stopped connecting fails loudly instead of turning
+// the whole scenario into a vacuous pass.
+//
+// The split between the two files: this one pins the STYLESHEET (the rule is
+// declared, and state surfaces carry text rather than motion); rm1 pins the
+// EFFECT (nothing on screen still animates, and the one documented exemption
+// still does).
 
 import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";

@@ -105,3 +105,87 @@ describeE2E("bb1 bottom-bar item hide/show persists (bottom-bar customization)",
     );
   });
 });
+
+// bb2 — myne-md/myne#557's `workspace.bottom-bar` / `sidebar.notes-and-folders`
+// bullet.
+//
+// # What the roster row asked, and what it could not distinguish
+//
+// "Right-click a sidebar note row and confirm the platform's own menu does not
+// appear on top of Myne's." On WebKitGTK that observation is worthless, for the
+// same reason it is worthless for the spell squiggle (SP-5): the engine offers
+// no native context menu there at all, so "no native menu appeared" is true
+// whether or not the app asked for it. The reviewer on the container seat and
+// the reviewer on macOS are answering two different questions and reporting the
+// same word.
+//
+// # What is assertable everywhere
+//
+// Suppression IS `preventDefault()` on the `contextmenu` event, and
+// `dispatchEvent` returns `false` exactly when a cancelable event was
+// prevented. So the app's decision is readable from inside the page, on any
+// engine, independent of what the host would have drawn — and it is the same
+// decision on every platform, because it is one React handler.
+//
+// Two-finger tap and Control-click arrive as the same `contextmenu` event, so
+// this covers the trackpad and the mouse gesture at once. What it does NOT
+// cover is whether the OS honours the prevention, which is the platform's
+// contract rather than Myne's.
+describeE2E("bb2 a sidebar row's context menu replaces the platform's (myne-md/myne#557)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("prevents the contextmenu on a note row and opens Myne's own menu", async () => {
+    let password = "";
+    await scenario(
+      "bb2-row-contextmenu",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Baglam Menusu Notu");
+
+        // Dispatch a real cancelable contextmenu at the row's own centre.
+        // Coordinates matter: the handler forwards `clientX`/`clientY` to place
+        // the menu, and a 0,0 event would place it off the row even where the
+        // prevention itself does not depend on them (SP-5 learned this the
+        // expensive way).
+        const prevented = await s.execute<boolean | null>(
+          "var el = document.querySelector('[data-testid=\"notes.row\"]');" +
+            "if (!el) return null;" +
+            "var r = el.getBoundingClientRect();" +
+            "var ev = new MouseEvent('contextmenu', {" +
+            "  bubbles: true, cancelable: true," +
+            "  clientX: Math.round(r.left + r.width / 2)," +
+            "  clientY: Math.round(r.top + r.height / 2)" +
+            "});" +
+            "return el.dispatchEvent(ev) === false;",
+        );
+
+        expect(prevented, "no sidebar note row to dispatch on").not.toBeNull();
+        expect(
+          prevented,
+          "the contextmenu was NOT prevented on a note row, so on a seat with a " +
+            "native menu the platform's would open instead of (or on top of) " +
+            "Myne's row menu",
+        ).toBe(true);
+
+        // …and the prevention was in service of the ROW's menu, not just of
+        // something. Two corrections are folded into this assertion, and both
+        // came from injecting the defect:
+        //
+        //  1. Deleting the row's own `preventDefault()` did NOT fail an earlier
+        //     draft, because `NoteList.tsx`'s background handler prevents any
+        //     contextmenu a row did not (`if (e.defaultPrevented) return`). So
+        //     "was it prevented" alone cannot tell the row's menu from the
+        //     sidebar's — the sidebar covers for the row.
+        //  2. The distinguishing fact is WHICH menu opened. `open-in-new-tab`
+        //     is a note action; the background menu (new note, new folder) has
+        //     no such item, so its presence is the row menu and nothing else.
+        await s.waitForElement(
+          testIdSelector("notes.context-menu-item", { "data-item-id": "open-in-new-tab" }),
+          { timeoutMs: 10_000 },
+        );
+      },
+    );
+  });
+});

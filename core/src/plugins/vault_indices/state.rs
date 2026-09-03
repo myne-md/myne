@@ -1176,6 +1176,129 @@ mod tests {
         assert_eq!(node.subtree_count, 2);
     }
 
+    /// The tag browser's ordering is a property of the DATA, not of the host —
+    /// myne-md/myne#555, the `tags.browser` bullet ("stable ordering, no tag
+    /// twice").
+    ///
+    /// The roster row asked a person to open the tag browser on a vault with
+    /// nested tags and check that the order looked right and nothing appeared
+    /// twice. Both are decided here, by the `BTreeMap` this function
+    /// accumulates into, and neither is checked anywhere: the two tests above
+    /// assert counts and the display choice, and would pass on a tree that
+    /// emitted its nodes in note-insertion order with duplicates in it.
+    ///
+    /// Insertion order is the lever, because it is the one thing that differs
+    /// between two users looking at the same vault: notes arrive from the index
+    /// rebuild in whatever order the `HashMap` iterates, which Rust
+    /// deliberately does not fix. If the output were assembled from that
+    /// iteration rather than through the `BTreeMap`, two clients would draw the
+    /// same tag tree in two different orders and each would be stable on its own
+    /// machine — the shape a hand-walk cannot see, because a hand-walk is one
+    /// machine.
+    #[test]
+    fn tag_tree_order_does_not_depend_on_the_order_notes_arrived() {
+        // Deliberately not alphabetical, and deliberately overlapping: several
+        // notes contribute the SAME intermediate nodes, which is where a
+        // duplicate would come from.
+        let tags = [
+            ("zeta", "Zeta"),
+            ("area/project/alpha", "Area/Project/Alpha"),
+            ("area", "Area"),
+            ("area/project", "Area/Project"),
+            ("beta/one", "Beta/One"),
+            ("area/notes", "Area/Notes"),
+            ("beta", "Beta"),
+        ];
+
+        let forwards = VaultIndicesState::default();
+        for (i, (folded, display)) in tags.iter().enumerate() {
+            let mut r = rec(&format!("N{i}"), None);
+            r.tags = vec![tag(folded, display)];
+            forwards.apply(&format!("n{i}"), r);
+        }
+
+        let backwards = VaultIndicesState::default();
+        for (i, (folded, display)) in tags.iter().enumerate().rev() {
+            let mut r = rec(&format!("N{i}"), None);
+            r.tags = vec![tag(folded, display)];
+            backwards.apply(&format!("n{i}"), r);
+        }
+
+        let a = forwards.tag_tree();
+        let b = backwards.tag_tree();
+        let keys = |t: &Vec<TagTreeNode>| t.iter().map(|n| n.key.clone()).collect::<Vec<_>>();
+        assert_eq!(
+            keys(&a),
+            keys(&b),
+            "the tag tree came out in a different order depending on which order \
+             the notes were applied, so two clients with the same vault would \
+             draw two different trees"
+        );
+
+        // Sorted by folded key, which is what makes the order reproducible
+        // rather than merely repeatable.
+        let mut sorted = keys(&a);
+        sorted.sort();
+        assert_eq!(keys(&a), sorted, "the tag tree is not in folded-key order");
+
+        // No tag twice — the other half of the row's own acceptance. Overlapping
+        // ancestors are the case that produces one.
+        let mut seen = std::collections::BTreeSet::new();
+        for n in &a {
+            assert!(
+                seen.insert(n.key.clone()),
+                "the tag `{}` appears more than once in the tree",
+                n.key
+            );
+        }
+
+        // Non-vacuity: the ancestors really were contributed by more than one
+        // note, so the dedup above had something to do.
+        let area = a.iter().find(|n| n.key == "area").expect("area node");
+        assert_eq!(
+            area.subtree_count, 4,
+            "four notes sit under #area (area, area/project, area/project/alpha, \
+             area/notes), so the ancestor node is genuinely shared"
+        );
+    }
+
+    /// Ordering is byte order over the folded key, and no locale can move it.
+    ///
+    /// The other half of the same bullet: the tag path consults no host
+    /// collation. In Rust that is true by construction — `BTreeMap<String, _>`
+    /// orders by `Ord for str`, which is UTF-8 byte order and takes no locale —
+    /// and this pins it against a change to a locale-aware collator, which is
+    /// exactly the kind of change somebody makes to "sort Turkish tags
+    /// properly".
+    ///
+    /// `ç`/`i`/`ı`/`ş` are the interesting inputs: a `tr_TR` collation orders
+    /// `ı` before `i` and puts `ç` immediately after `c`, while byte order puts
+    /// every non-ASCII letter after every ASCII one. The two disagree, so an
+    /// implementation that started asking the host would fail here rather than
+    /// silently giving two users different trees.
+    #[test]
+    fn tag_tree_order_is_byte_order_and_not_a_locale_collation() {
+        let state = VaultIndicesState::default();
+        for (i, folded) in ["zebra", "çay", "ısı", "index", "cay"].iter().enumerate() {
+            let mut r = rec(&format!("N{i}"), None);
+            r.tags = vec![tag(folded, folded)];
+            state.apply(&format!("n{i}"), r);
+        }
+        let keys = state
+            .tag_tree()
+            .iter()
+            .map(|n| n.key.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            keys,
+            vec!["cay", "index", "zebra", "çay", "ısı"],
+            "the tag tree is no longer in UTF-8 byte order. A locale-aware \
+             collation here would order these by the machine's language settings, \
+             so the same vault would draw a different tag browser on a Turkish \
+             desktop than on an English one."
+        );
+    }
+
     #[test]
     fn clear_wipes_the_whole_index() {
         let state = VaultIndicesState::default();

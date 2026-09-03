@@ -423,6 +423,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      "e2e/hard-kill-recovery.e2e.ts",
       "e2e/state-machine.e2e.ts",
       "e2e/vault-unlock.e2e.ts",
     ],
@@ -464,6 +465,8 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/rtl-mirror-sweep.e2e.ts",
+      "e2e/i18n-overflow-sweep.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/rtl-layout.e2e.ts",
       "e2e/a11y-axe.e2e.ts",
@@ -573,6 +576,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      "e2e/reduced-motion.e2e.ts",
       "e2e/clipboard-copy.e2e.ts",
       "e2e/note-export.e2e.ts",
       "e2e/attachment-cleanup.e2e.ts",
@@ -607,6 +611,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      "e2e/window-close-flush.e2e.ts",
       "e2e/workspace-state.e2e.ts",
       "e2e/plaintext-residue.e2e.ts",
       "e2e/tab-switch-flush.e2e.ts",
@@ -1587,7 +1592,9 @@ export const ROSTER = Object.freeze([
       "mobile/src/styles/",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
-    automatedBy: [],
+    automatedBy: [
+      "e2e/code-block-typography.e2e.ts",
+    ],
     manual: [
       {
         see: "Open the same fenced-code note on an iPhone (WKWebView) and an Android phone (System WebView). Confirm the monospace face resolves to a real monospaced font on both, that a long code line scrolls horizontally inside its own block rather than stretching the note body, and that the highlighting colours are the same ones the desktop shows for the same theme.",
@@ -1727,6 +1734,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/floating-toolbar-placement.e2e.ts",
       "e2e/toolbar-customize.e2e.ts",
       "e2e/highlight-color.e2e.ts",
       "e2e/hotkeys.e2e.ts",
@@ -1922,6 +1930,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/table-overflow-containment.e2e.ts",
       "e2e/table-editing.e2e.ts",
     ],
     manual: [
@@ -2167,6 +2176,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/window-resize-collapse.e2e.ts",
       "e2e/reading-source-modes.e2e.ts",
       "e2e/focus-mode.e2e.ts",
       "e2e/editor-scroll-slack.e2e.ts",
@@ -2273,6 +2283,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/wikilink-hover.e2e.ts",
       "e2e/wikilink-deep-links.e2e.ts",
       "e2e/rename-inbound-links.e2e.ts",
       "e2e/links-tab.e2e.ts",
@@ -3455,6 +3466,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      "e2e/daily-note-timezone.e2e.ts",
       "e2e/slash-datetime.e2e.ts",
     ],
     manual: [],
@@ -3933,6 +3945,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      "e2e/search-casefold-highlight.e2e.ts",
       "e2e/search-palette.e2e.ts",
       "e2e/search-query-operators.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
@@ -4382,6 +4395,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/typewriter-anchor.e2e.ts",
       "e2e/focus-mode.e2e.ts",
     ],
     manual: [
@@ -4942,6 +4956,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/amoled-surfaces.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/accent-color.e2e.ts",
       "e2e/custom-themes.e2e.ts",
@@ -4971,6 +4986,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/editor-specimen-parity.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/focus-mode.e2e.ts",
       "e2e/toolbar-customize.e2e.ts",
@@ -5062,6 +5078,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      "e2e/storage-panel.e2e.ts",
       "e2e/backup-restore.e2e.ts",
       "e2e/scheduled-backup.e2e.ts",
       "e2e/vault-export.e2e.ts",
@@ -5163,6 +5180,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/settings-nested-dismiss.e2e.ts",
       "e2e/settings-search.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
       "e2e/developer-mode.e2e.ts",
@@ -7036,6 +7054,7 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      "e2e/hard-kill-recovery.e2e.ts",
       "e2e/named-workspaces.e2e.ts",
       "e2e/workspace-state.e2e.ts",
       "e2e/tab-modes.e2e.ts",

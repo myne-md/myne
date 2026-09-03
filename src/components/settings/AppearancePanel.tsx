@@ -245,7 +245,7 @@ const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 /** Accent-color row (device-local, `lib/accentColor.ts`): a full-color swatch
  *  that opens a picker POPOVER (preset hues + a paste-any-hex field), plus an
  *  icon reset that restores the theme's own accent. */
-function AccentColorRow() {
+function AccentColorRow({ onDialogOpenChange }: { onDialogOpenChange?: (open: boolean) => void }) {
   const { t } = useTranslation();
   const [accent, setAccent] = useState<string | null>(() => readAccent());
   const [open, setOpen] = useState(false);
@@ -266,6 +266,21 @@ function AccentColorRow() {
     applyAccent(color);
     setAccent(color);
   };
+
+  // Tell the Settings shell a child surface is up, for as long as it is.
+  //
+  // Without this ONE Escape closes both. The popover's own handler below is on
+  // `document` and `SettingsModal`'s is on `window`; neither stops propagation,
+  // so a single keypress reaches both and the user loses the Settings modal
+  // they were working in along with the picker they meant to dismiss. The
+  // shell's guard is `if (childDialogOpenRef.current) return;`, and the flag is
+  // raised only through this prop — `SyncPanel` and `AiPanel` already do it.
+  // `handleBackdropClick` consults the same flag, so the click-outside path is
+  // fixed by the same line.
+  useEffect(() => {
+    onDialogOpenChange?.(open);
+    return () => onDialogOpenChange?.(false);
+  }, [open, onDialogOpenChange]);
 
   // Outside-click / Esc close the popover.
   useEffect(() => {
@@ -509,9 +524,16 @@ interface AppearancePanelProps {
    * is always supplied).
    */
   onOpenGraph?: () => void;
+  /**
+   * Raised while this panel has a child surface on screen — today the accent
+   * picker popover. The Settings shell stands its own Escape and backdrop
+   * handlers down while it is true, so one Escape dismisses the child and the
+   * next one dismisses Settings. Same contract as `SyncPanel` and `AiPanel`.
+   */
+  onDialogOpenChange?: (open: boolean) => void;
 }
 
-export function AppearancePanel({ onOpenGraph }: AppearancePanelProps = {}) {
+export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearancePanelProps = {}) {
   const { t } = useTranslation();
   // Default is "system" — it matches the `None ≡ system` storage default, so a
   // fresh vault (no theme chosen) shows "System" selected, not a misleading
@@ -627,7 +649,7 @@ export function AppearancePanel({ onOpenGraph }: AppearancePanelProps = {}) {
         }
       />
 
-      <AccentColorRow />
+      <AccentColorRow onDialogOpenChange={onDialogOpenChange} />
 
       <SettingRow
         label={t("settings.appearance.showEditTimesLabel")}

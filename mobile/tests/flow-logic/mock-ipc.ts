@@ -89,6 +89,13 @@ export interface MockConfig {
   joinError?: { kind: string };
   /** `qr-scan|scan` outcome (MYND-466 device-join QR). */
   qrScan?: { value: string | null };
+  /** `qr-scan|scan` REFUSAL. The plugin's non-iOS arm answers
+   *  `Error::Unsupported` (`mobile/src-tauri/tauri-plugin-qr-scan`), so every
+   *  Android build and every desktop-hosted mobile shell takes this path — and
+   *  it is the only one where "Scan" is a button that appears to do nothing
+   *  unless the flow says why. Distinct from `qrDecodeError`, which is a bad
+   *  PAYLOAD from a scanner that worked. */
+  qrScanError?: { kind: string };
   /** `sync_decode_join_qr` outcome. */
   qrDecode?: {
     endpoint_url: string;
@@ -1135,7 +1142,10 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           }
         );
       },
-      "plugin:qr-scan|scan": () => config.qrScan ?? { value: null },
+      "plugin:qr-scan|scan": () => {
+        if (config.qrScanError) throw config.qrScanError;
+        return config.qrScan ?? { value: null };
+      },
       "plugin:sync|sync_decode_join_qr": () => {
         if (config.qrDecodeError) throw config.qrDecodeError;
         return (

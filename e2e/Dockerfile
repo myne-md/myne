@@ -61,6 +61,35 @@ RUN ARCH="$(uname -m)" \
 # docs/dev/e2e.md note, not a drive-by).
 RUN cargo install tauri-driver --locked --version 2.0.6
 
+# xdotool + python3 — the only way this seat can drive the TOPLEVEL window.
+#
+# WebKitWebDriver accepts `POST /window/rect` and silently does nothing: the
+# request returns 200 with the window's UNCHANGED rect, and `window.innerWidth`
+# in the page confirms nothing moved (measured: asked 800, granted 1100, page
+# 1100, with a 1280x1024 screen underneath — so it is not a ceiling, it is a
+# no-op). A driver that accepts a command it does not implement is the worst
+# shape a capability gap can take, because every caller reads success.
+#
+# xdotool talks to the X server directly, which under xvfb is the whole story —
+# there is no window manager to arbitrate, so `windowsize` becomes a plain
+# XConfigureWindow and `windowclose` a WM_DELETE_WINDOW ClientMessage. GTK turns
+# the first into a reflow and the second into `delete-event`, which tao raises as
+# `CloseRequested`: the exact chain the app listens on.
+#
+# python3 is named explicitly even though the base image already carries it.
+# `e2e/support/wm-delete-window.py` needs it to send a real WM_DELETE_WINDOW
+# ClientMessage (xdotool's `windowclose` is XDestroyWindow and never reaches the
+# app's close handler — that file's header carries the measurement). Naming it
+# here is also what puts it under `check-e2e-toolchain.mjs`'s seat comparison, so
+# a CI step that lacks it fails by name instead of at a scenario's ENOENT.
+#
+# Placed AFTER `cargo install tauri-driver` on purpose. It is a two-package apt
+# layer, and putting it up with the other apt line would invalidate the Node and
+# tauri-driver layers on every image this line is edited in.
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends xdotool python3 \
+    && rm -rf /var/lib/apt/lists/*
+
 # The vault_unlock/vault_delete test suites assert UNIX permission-denial
 # paths and chmod-based fault injection — root bypasses DAC, so the
 # harness must run unprivileged (same rule as CI's cargo-test-tauri step).

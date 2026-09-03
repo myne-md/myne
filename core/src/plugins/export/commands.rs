@@ -936,32 +936,13 @@ fn record_dir_chain(dirs: &mut BTreeSet<String>, segs: &[String]) -> String {
     acc
 }
 
-/// The key a name occupies in a directory's assigned set.
+/// The collision oracle, shared with every other export surface.
 ///
-/// ASCII-lowercased, because the export writes with create-new semantics onto
-/// whatever volume the user chose, and on macOS and Windows that volume is
-/// case-INSENSITIVE by default (myne#311). A byte-exact dedup let `README.md`
-/// and `readme.md` both be "unused", and the second write then returned
-/// `AlreadyExists` — which propagates, discards the staging tree, and aborts
-/// the WHOLE export with a generic write-failure line naming no file. It is
-/// fully deterministic, so retrying never helped and the vault could never be
-/// exported to such a volume again; the only workaround was renaming a note or
-/// attachment the user had no reason to suspect.
-///
-/// Folding the ORACLE only — the emitted name keeps its original case, so
-/// nothing about a successful export changes. This is a strict superset of the
-/// old behaviour: byte-identical names still collide and still dedup, and the
-/// case-differing pair now produces `readme (1).md` instead of failing.
-///
-/// `to_ascii_lowercase`, not `to_lowercase`: it matches what the platforms
-/// actually do closely enough for a collision oracle and cannot change a
-/// string's length, so the suffix arithmetic is unaffected. A pair that differs
-/// only in non-ASCII case still collides on the volume and would still fail —
-/// that is a narrower residue than the one this closes, and full Unicode
-/// case-folding is not what either filesystem implements either.
-fn dedup_key(name: &str) -> String {
-    name.to_ascii_lowercase()
-}
+/// Lives in `export_naming` rather than here because it is vocabulary rather
+/// than a loop, and because a second copy is how one exporter starts folding a
+/// case the other does not. Its doc comment carries the argument for what it
+/// folds and why folding may only ever add collisions.
+use crate::export_naming::export_dedup_key as dedup_key;
 
 /// Deterministic `" (1)"` suffix-dedup against the names already
 /// assigned in one directory (staging starts empty — pre-existing files

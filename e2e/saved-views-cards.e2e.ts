@@ -49,7 +49,16 @@ async function cardTitles(s: Session): Promise<string[]> {
 // `notes.rename-input` never paints within budget under suite-length
 // degradation (heavy windowed cards render). Green 1× on 2026-07-26; regressed,
 // not a cards logic bug. Debt: boot-cost investigation (nav1/tp1 family).
-describeE2E.flaky("svc1 cards view renders live notes as image-less cards (MYND-275)", () => {
+// DE-QUARANTINED (myne-md/myne#555). The quarantine reason was
+// runner contention, and it was wrong for the same reason it was wrong for
+// `nav1`: the first seeding test in a vitest process builds `e2e-fixture-gen`
+// with `cargo build --release` INSIDE its own budget, ~171 s against a 180 s
+// `testTimeout`. Which spec paid it depended only on which one seeded first,
+// which is why the victim moved between runs and read as a loaded host.
+// `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
+// before any worker starts. Measured after the fix, `--retry=0`, warm
+// container: 16 consecutive clean runs, which is the bar `e2e/CLAUDE.md` sets.
+describeE2E("svc1 cards view renders live notes as image-less cards (MYND-275)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("opens a blank cards view as a tab and renders one card per note", async () => {
     let password = "";

@@ -610,3 +610,102 @@ describeE2E("cli6 hiding the Terminal-access control does not close the door (#1
     );
   });
 });
+
+// cli7 — myne-md/myne#555's `cli.read_commands` bullet:
+//
+//   > a note body containing raw ANSI escapes: passing them through verbatim
+//   > and neutralising them are DIFFERENT byte streams, so asserting which one
+//   > stdout carries settles whether a terminal can be cleared.
+//
+// # This scenario SETTLES a question rather than asserting a preference
+//
+// `print_show`'s own doc calls human mode "the `cat` this feature exists to
+// restore — the body verbatim on stdout, no decoration, no trailing chrome,
+// pipe-clean". Verbatim is therefore the deliberate design and this scenario
+// pins it; what it adds is that the consequence is now written down and
+// machine-checked rather than implied.
+//
+// The consequence, stated plainly because a reader of this file is the person
+// who would need it: **a note body can drive the terminal that shows it.** An
+// ESC sequence in a note reaches the tty unmodified, so `myne show` can clear
+// the screen, move the cursor, or repaint earlier output, exactly as `cat` on
+// any file can. That is `cat`'s contract and Myne chose it knowingly.
+//
+// What makes it worth a scenario rather than a shrug is where a note body can
+// come from. `myne-clipper`'s capture walker runs "in the adversary-controlled
+// page DOM (A14 / TB10)" and its text normaliser is
+// `text.replace(/\s+/g, " ")` — and JavaScript's `\s` does NOT include U+001B.
+// So a page's ESC bytes survive capture into a note, and the note is later
+// `myne show`n into a terminal. Whether that chain should be closed, and on
+// which side, is a decision; this scenario makes the CLI half of it a
+// measured fact instead of an assumption.
+//
+// The note is written through the CLI's own `new` rather than typed into the
+// editor, deliberately: driving raw control characters through CodeMirror would
+// test the driver's key handling, and what is under test is the byte path.
+describeE2E("cli7 a note body reaches stdout byte-for-byte (myne-md/myne#555)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("passes ANSI escapes through verbatim in human mode and escapes them in --json", async () => {
+    // ESC[2J is "clear screen"; ESC[1;1H is "cursor home". Built from the code
+    // point rather than pasted, so the file itself stays free of control bytes.
+    const ESC = String.fromCharCode(0x1b);
+    const CLEAR = `${ESC}[2J${ESC}[1;1H`;
+    const MARKER = "clianseescapemarkerzzz";
+    const BODY = `# ansi\n\n${CLEAR}${MARKER}\n`;
+
+    let password = "";
+    await scenario(
+      "cli7-ansi-passthrough",
+      {
+        seed: (dir) => {
+          password = seedVault(dir).password;
+        },
+      },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await enableCliAccess(s);
+        await waitForDoor(app, "O");
+
+        // Write the hostile-shaped body in through the door.
+        const created = runCli(app, ["--json", "new"], BODY);
+        expect(created.code).toBe(EXIT.OK);
+        const id = envelope(created).id;
+        expect(id, "myne new returned no id").toBeTruthy();
+
+        // 1. HUMAN MODE: verbatim. The ESC bytes are on stdout, unmodified and
+        //    uncounted — this is the `cat` contract, and it is what makes a
+        //    note able to drive the terminal showing it.
+        const human = runCli(app, ["show", id!]);
+        expect(human.code).toBe(EXIT.OK);
+        expect(
+          human.stdout.includes(CLEAR),
+          "the ESC sequence did not survive `myne show` verbatim. If it is now " +
+            "neutralised that is a deliberate change to the `cat` contract " +
+            "print_show documents — update this scenario and say so.",
+        ).toBe(true);
+        expect(human.stdout).toContain(MARKER);
+        // The count matters as much as the presence: a partial strip that left
+        // one of the two sequences would still contain `CLEAR`… but not twice.
+        expect(human.stdout.split(ESC).length - 1).toBe(2);
+
+        // 2. --json: the SAME bytes, but JSON-escaped, so a script parsing the
+        //    envelope never has them applied to its own terminal. The two
+        //    streams differ, which is the bullet's whole point — one is safe to
+        //    pipe into a parser and the other is safe to look at.
+        const json = runCli(app, ["--json", "show", id!]);
+        expect(json.code).toBe(EXIT.OK);
+        expect(
+          json.stdout.includes(ESC),
+          "the --json envelope carried a raw ESC byte. A script that prints " +
+            "the envelope before parsing it would then apply the note's " +
+            "escapes to its own terminal.",
+        ).toBe(false);
+        // …and the escape survives the round trip as DATA: parsing gives the
+        // original bytes back, so nothing was lost, only encoded.
+        expect(envelope(json).body ?? "").toContain(CLEAR);
+      },
+    );
+  });
+});

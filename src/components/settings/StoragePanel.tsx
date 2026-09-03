@@ -141,9 +141,12 @@ export function StoragePanel({
         helper={t("settings.storage.locationHelper")}
         control={
           <div style={PATH_ROW_STYLE}>
-            <code style={PATH_DISPLAY_STYLE}>{displayPath}</code>
+            <code style={PATH_DISPLAY_STYLE} data-testid="storage.vault-path">
+              {displayPath}
+            </code>
             <Button
               variant="secondary"
+              data-testid="storage.open-in-files"
               onClick={() => {
                 if (pathPending) return;
                 void openPath(vaultPath).catch(() => {

@@ -106,12 +106,25 @@ export function extractTemplateBody(plaintext: string): string {
  * `note_create`. Returns the new `NoteId`. `name` must be non-blank — an empty
  * name is not a valid entry into this flow (`{{title}}` is only meaningful with a
  * real title). Rejects with whatever `noteRead` / `noteCreate` propagate.
+ *
+ * `now` is REQUIRED, and deliberately so (`CLAUDE.md`, "A guard parameter with a
+ * default value is an opt-in guard"). It used to default to `new Date()`, which
+ * meant a test could pass a fixed instant and prove the rendering while the two
+ * production call sites went on reading the wall clock, unchecked — and one of
+ * them, the daily-notes branch, had already resolved the note's TITLE from a
+ * different `new Date()` a few statements earlier, so a call straddling midnight
+ * would stamp yesterday's title on a note whose `{{date}}` said today. The
+ * mobile twin (`mobile/src/lib/daily.ts`) has always required it; the compiler
+ * now names every desktop site instead of excusing them in advance.
  */
 export async function createNoteFromTemplate(
   templateId: string,
   name: string,
-  folder: string | null = null,
-  now: Date = new Date(),
+  // No defaults on either, and `period` required below: reaching `period` means
+  // passing both positionally, so the defaults these two used to carry were
+  // already dead the moment that parameter landed. Removing them says so.
+  folder: string | null,
+  now: Date,
   // LAST, and deliberately: this parameter was added after the function had
   // positional callers, and inserting it before `now` re-bound every one of
   // them silently (`tests/` is outside `tsc`'s `include`, so only Vitest reads

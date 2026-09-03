@@ -117,7 +117,10 @@ describe("surfaceStateOf", () => {
       embedding: { available: false, cause: "remote_barred" },
       transcription: { available: false, cause: "unreachable" },
       autoTag: { available: true, cause: null },
-      // Coherent with `embedding` above: nothing to index against.
+      // Coherent with `embedding` above: nothing to index against. The field
+      // itself is myne-md/myne#545 — whether the embedding index is BUILT, as
+      // distinct from whether an embedding model exists at all. Required here,
+      // and irrelevant to what this test asserts, which is the causes above.
       indexReady: false,
     };
     // Three unavailable features, three DIFFERENT reasons. Before this task all

@@ -175,3 +175,123 @@ export async function waitForAnyTestId(
     { label: `one of [${testIds.join(", ")}]`, timeoutMs },
   );
 }
+
+// ── Typing into the editor, which took four attempts to get right ──────────
+//
+// Everything below exists because getting one keystroke into the web editor is
+// not the desktop lane's `typeIntoEditor`, and three of the obvious routes fail
+// DIFFERENTLY (myne-md/myne#556):
+//
+//   * `Element.click()` on `.cm-content` times out on the driver's
+//     interactability check ("element interactable + clicked" after 10s);
+//   * a scripted `.focus()` leaves CodeMirror without a selection, so the
+//     keystrokes go nowhere and the buffer stays empty — the worst of the three,
+//     because nothing errors;
+//   * `Element.sendKeys` on that handle is refused outright ("element not
+//     interactable"), which is chromedriver's view of a contenteditable div.
+//
+// …and none of them land at all until the importer overlay is dismissed.
+
+/**
+ * Dismiss the fresh-vault importer onboarding overlay, if it is up.
+ *
+ * It covers the editor and SWALLOWS the click that would place the caret —
+ * probed: `document.activeElement` stayed `BODY` and `.cm-editor.cm-focused`
+ * was `false` after an `actionClick` that reported success. The desktop lane's
+ * `dismissImporterOffer` exists for the same reason; this lane had no
+ * equivalent because nothing here had needed to type into a fresh vault.
+ *
+ * Tolerant by design: a vault that already holds notes shows no overlay, and a
+ * hard wait would burn its budget on something correctly absent.
+ */
+export async function dismissImporterOfferIfPresent(session: Session): Promise<void> {
+  const present = await session.findElements('[data-testid="importer.offer-root"]');
+  if (present.length === 0) return;
+  await session.execute(
+    "document.querySelector('[data-testid=\"importer.offer-dismiss\"]')?.click();",
+  );
+  await session.waitForGone('[data-testid="importer.offer-root"]', { timeoutMs: 15_000 });
+}
+
+/**
+ * Create a note through the sidebar's `+` menu and wait for its editor.
+ *
+ * NO rename step, unlike the desktop helper: probed, the `+` menu holds
+ * `notes.create`, `notes.new-from-template`, `notes.new-drawing` and
+ * `notes.new-folder`, and clicking `notes.create` lands directly on a mounted
+ * `editor.content` with no `notes.rename-input` anywhere in the tree. A helper
+ * copied from `e2e/support/flows.ts` waits fifteen seconds for that input and
+ * then reports a timeout that reads like a broken sidebar.
+ *
+ * Scripted clicks rather than driver clicks, which is this lane's working idiom
+ * — `quarantine-roundtrip.e2e.ts` records that the driver cannot click a
+ * settings tab here.
+ */
+export async function createNote(session: Session): Promise<void> {
+  await session.execute(
+    "document.querySelector('[data-testid=\"notes.new-menu\"]').click();",
+  );
+  await session.waitForElement('[data-testid="notes.new-menu-dropdown"]', {
+    timeoutMs: 15_000,
+  });
+  await session.execute(
+    "document.querySelector('[data-testid=\"notes.create\"]').click();",
+  );
+  await session.waitForElement('[data-testid="editor.content"] .cm-content', {
+    timeoutMs: 20_000,
+  });
+}
+
+/**
+ * Type into the editor: dismiss the overlay, place a real caret, send keys to
+ * whatever has focus.
+ *
+ * The click is `actionClick` (a real pointer move + press through the W3C
+ * Actions API) because that is what places a caret, and the keys go through the
+ * Actions KEYBOARD source, which has no element target and therefore reaches
+ * the focused node — the same thing a user's keyboard does.
+ *
+ * Asserts the text landed rather than trusting that the driver accepted it: a
+ * `sendKeys` that resolves means the DRIVER took the keys, not that CodeMirror
+ * applied them, and the desktop lane has paid for that distinction more than
+ * once (`e2e/CLAUDE.md`, the `typeEmbedIntoEditor` note).
+ */
+export async function typeIntoEditor(session: Session, text: string): Promise<void> {
+  await dismissImporterOfferIfPresent(session);
+  const content = await session.waitForElement(
+    '[data-testid="editor.content"] .cm-content',
+    { timeoutMs: 20_000 },
+  );
+  await content.actionClick();
+  await session.send("POST", "/actions", {
+    actions: [
+      {
+        type: "key",
+        id: "keyboard",
+        actions: [...text].flatMap((ch) => [
+          { type: "keyDown", value: ch },
+          { type: "keyUp", value: ch },
+        ]),
+      },
+    ],
+  });
+  let seen = "";
+  await session.waitUntil(
+    async () => {
+      seen =
+        (await session.execute<string>(
+          "var c = document.querySelector('[data-testid=\"editor.content\"] .cm-content');" +
+            "return c ? (c.textContent || '') : '';",
+        )) ?? "";
+      return seen.includes(text.trim()) ? true : null;
+    },
+    {
+      label: () =>
+        `the editor buffer to carry the typed text — it reads ${JSON.stringify(seen)}. ` +
+        `An empty buffer after a click that reported success is the importer ` +
+        `overlay swallowing the caret placement, or a focus that CodeMirror did ` +
+        `not act on; see this module's header for the routes that fail that way.`,
+      timeoutMs: 15_000,
+    },
+  );
+}
