@@ -28,8 +28,37 @@
 //!
 //! See: main repo `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
+// The command core and its error enums are `myne-core`'s (myne-md/myne#479).
+//
+// This module used to carry a 297-line local fork, and its own header named the
+// exit condition: "If desktop is ever migrated to a shared core, this module is
+// what gets deleted." Desktop migrated (`src-tauri/src/plugins/workspace/mod.rs`
+// is `pub use myne_core::plugins::workspace::{commands, error};`), and the fork
+// outlived its condition by long enough to fall behind in two ways that no
+// compiler and no guard could see:
+//
+//   1. It parsed `vault.meta` with `protocol::parse_vault_meta`, the v0.1-only
+//      reader, while the core uses `parse_vault_meta_any`. `parse_vault_meta`
+//      hard-rejects the `NTV5` magic, so on a MIGRATED vault this client's
+//      `workspace_read` and `workspace_write` both failed with
+//      `InvalidVaultMeta`, the sidebar folder-expand set silently stopped
+//      persisting, while every other mobile plugin, going through the core,
+//      kept working. `scripts/check-version-routing.mjs` exists to catch exactly
+//      that and its `ROOTS` did not include `mobile/src-tauri/src`, so it
+//      reported "0 still debt" over a tree it never read.
+//   2. It read through a flat `std::fs::read` rather than the core's
+//      `singleton::open_newest_and_sweep`, so it had none of myne#301's
+//      torn-write recovery.
+//
+// The swap fixes both by construction. What does NOT change is the command SET:
+// the core exports a third `#[tauri::command]`, `workspace_stage`, for desktop's
+// Cmd+Q RAM-staging, and this client registers two. `generate_handler!` is what
+// registers, so a `pub use` widens nothing, but `build.rs` and
+// `permissions/workspace/default.toml` stay two wide as well, deliberately, and
+// must not be copied from desktop: granting a permission for a command that is
+// not registered authorizes something that does not exist.
+#[allow(unused_imports)]
+pub use myne_core::plugins::workspace::{commands, error};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

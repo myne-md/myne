@@ -52,6 +52,10 @@ RUN_FLAGS=(
   --user root
 )
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true MYNE_E2E_AI=1 npm_config_store_dir=/home/e2e/.pnpm-store'
+# Host-side append, NOT inside the single-quoted literal above: that string is
+# passed through to the container's bash, where `$E2E_CARGO_JOBS` is unset and
+# would expand to nothing. See scripts/lib/e2e-docker.sh.
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS"
 
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "

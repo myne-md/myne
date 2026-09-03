@@ -131,7 +131,14 @@ fn read_account_number_hash(
     vault_dir: &Path,
 ) -> Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]> {
     let bytes = std::fs::read(vault_dir.join("vault.meta")).ok()?;
-    protocol::parse_vault_meta(&bytes)
+    // Either generation (myne-md/myne#433), which this twin did not get until
+    // myne-md/myne#479. `parse_vault_meta` hard-rejects the `NTV5` magic, and
+    // this reader answers `None` rather than erroring, so on a MIGRATED vault
+    // the AAD binding silently failed to resolve and the transcript cache
+    // simply stopped sealing, no error, no log, a plausible "nothing cached".
+    // That is the exact silent shape `scripts/check-version-routing.mjs`
+    // exists to catch, and its `ROOTS` had never included this tree.
+    protocol::parse_vault_meta_any(&bytes)
         .map(|m| m.account_number_hash)
         .ok()
 }

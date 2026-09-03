@@ -2662,6 +2662,32 @@ The recorded classification of every twin module: both paths, a mechanical byte-
 
 Used in: `scripts/check-twin-inventory.mjs`, `docs/dev/twin-inventory.md`, `decisions.md` 2026-08-15 (twin inventory, myne-md/myne#472)
 
+### **twin-drift ratchet** &nbsp; 🛠️ *Tooling*
+
+The recorded SET of twin pairs that currently differ semantically. It may shrink, never grow: a pair appearing in it that was not there before fails the build, and `--record` REFUSES to write a grown set, so the command the failure message suggests cannot be used to make the failure go away. A set rather than a count, because the case that actually happens is one pair converging while another diverges, which leaves a count unmoved. Only the SEMANTIC field gates: 15 of the tree's byte-different pairs differ only in a comment or the platform-seam import, and gating the byte flag would redden `pre-commit` for adding a comment to either side of a byte-identical pair. Its denominator has a separate floor, `EXAMINED_FLOOR`, kept in the guard rather than in the record, because shrinking the twin roster would shrink the set for free and read as progress.
+
+Used in: `scripts/check-twin-drift-ratchet.mjs`, `scripts/twin-drift-ratchet.json`, `decisions.md` 2026-09-02 (twin-drift ratchet, myne-md/myne#473)
+
+### **`@myne/client-core`** &nbsp; 🛠️ *Tooling*
+
+The cross-client DECISION layer: a source package holding what desktop, web and mobile all answer identically, consumed the way `@myne/copy` and `@myne/dialect` are. Its entry criterion is narrow and mechanically enforced: a module belongs there only if both clients answer the same question AND it reaches no host, which is `scripts/check-platform-seam.mjs`'s `seam: null`. That is what keeps the `src/lib/vault-*.ts` family OUT, seven of those nine call `invoke` at module scope, and their shared answer lives in `myne-core` behind an IPC command instead. Holds the Rust-error mirrors, the design-token sheet, the auto-lock envelope and the [boot decision](#boot-decision); both clients keep one-line re-export shims at the old paths, so importers are unchanged and the twin pairs collapse to byte-identical, EXCEPT where the shared thing is a decision rather than a value: the two stage machines still differ, on purpose, because what they share is the answer and not the screen.
+
+Used in: `client-core/`, `scripts/lib/shared-roots.mjs`, `scripts/check-platform-seam.mjs`, `decisions.md` 2026-09-02 (myne-md/myne#242)
+
+### **boot decision** &nbsp; 🛠️ *Tooling*
+
+What the boot probe FOUND, as a six-variant union with no screen in it: a resumable recovery, a live session, a failed vault-list read, no vaults, exactly one vault (carrying its id and status), or two or more. Shared by every client in `@myne/client-core/stage-decision`; each client maps it to its own `Stage`, which is where the capability gates live because a `has()` query is a fact about the host and that package reaches none.
+
+The split is at the decision rather than at the screen deliberately. A shared `Stage` union would be the obvious answer and the wrong one: mobile has no `account-entry` and no `pending-approval`, so widening its union would put a dead arm in every exhaustive switch for two states it cannot reach, against `decisions.md` 0488's line that the screens SHOULD differ. Measured before it moved: the two implementations were byte-identical except for the two capability ternaries, and of the twenty legal transitions the two tables shared, not one routed differently.
+
+Used in: `client-core/src/stage-decision.ts`, `src/lib/stage.ts`, `mobile/src/lib/stage.ts`, `tests/lib/stageDecision.test.ts`, `decisions.md` 2026-09-03 (myne-md/myne#477)
+
+### **token parity** &nbsp; 🛠️ *Tooling*
+
+Two rules over the design-token layer. One token name may have one declaration, so a name declared by both the shared sheet and a client sheet, or by two client sheets, is either a recorded override with a stated reason or a failure. And a `var(--x)` with NO fallback must name a token something declares, because an undeclared one resolves to nothing and the property is simply not applied, which reads as a deliberate flat surface rather than a bug. Scoped to fallback-less references on purpose: `var(--x, #fff)` degrades to a stated value and is a choice. Its first run found eight `var(--paper-1)` call sites, one of them in the shared `@myne/editor` package, against a token `src/CLAUDE.md` warns by name does not exist.
+
+Used in: `scripts/check-token-parity.mjs`, `client-core/src/tokens.css`, `decisions.md` 2026-09-02 (myne-md/myne#478)
+
 ### **decision (twin verdict)** &nbsp; 🛠️ *Tooling*
 
 The verdict for a twin where both clients answer the same question, so a divergence is a bug by definition. It belongs in a shared package and its entry carries a destination, which may be `undecided` where the destination turns on a question another sub-feature settles. The majority verdict by a wide margin; `docs/dev/twin-inventory.md` carries the current count, which is generated rather than hand-copied.
@@ -2706,12 +2732,12 @@ Used in: `src/editor/code-highlight.ts`, `docs/decisions.md` (2026-05-29).
 
 ### **diagram surface (`--diagram-*` tokens)** &nbsp; 📦 *Product*
 
-The three CSS design tokens that keep a rendered [mermaid diagram](#mermaid-diagram) legible on every theme: `--diagram-surface` (the card behind it), `--diagram-ink` (the text on that card) and `--diagram-danger` (the render-failure line on the same card). They are **not** aliases of `--paper` and `--ink-1`, and the distinction is the whole point: mermaid's node palette is baked light in `themeVariables`, so the card has to stay light whatever the editor theme does, and a surface that follows the theme while the ink does not is the drift that produced dark text on a dark card. Surface and ink are a PAIR rather than two independent values, which is why naming only one of them was the bug. Every built-in theme block leaves all three alone; a custom theme can set them, because `theme-validator` accepts any name that is not `--_`-prefixed, so the invariant is a convention rather than a construction. Defined in the runtime `src/styles/tokens.css` and `mobile/src/styles/tokens.css`, mirrored in the canonical `docs/design/colors_and_type.css`, and consumed by the editor card and the HTML/PDF export stylesheet. Introduced myne-md/myne#629.
+The three CSS design tokens that keep a rendered [mermaid diagram](#mermaid-diagram) legible on every theme: `--diagram-surface` (the card behind it), `--diagram-ink` (the text on that card) and `--diagram-danger` (the render-failure line on the same card). They are **not** aliases of `--paper` and `--ink-1`, and the distinction is the whole point: mermaid's node palette is baked light in `themeVariables`, so the card has to stay light whatever the editor theme does, and a surface that follows the theme while the ink does not is the drift that produced dark text on a dark card. Surface and ink are a PAIR rather than two independent values, which is why naming only one of them was the bug. Every built-in theme block leaves all three alone; a custom theme can set them, because `theme-validator` accepts any name that is not `--_`-prefixed, so the invariant is a convention rather than a construction. Defined in the runtime `client-core/src/tokens.css`, which every client imports (myne-md/myne#478; it was two per-client sheets until then), mirrored in the canonical `docs/design/colors_and_type.css`, and consumed by the editor card and the HTML/PDF export stylesheet. Introduced myne-md/myne#629.
 
 Used in: `src/styles/tokens.css`, `mobile/src/styles/tokens.css`, `docs/design/colors_and_type.css`, `editor/src/theme.ts`, `src/dialect/html/print-stylesheet.ts`.
 
 ### **syntax palette (`--syntax-*` tokens)** &nbsp; 📦 *Product*
-The family of CSS design tokens (`--syntax-keyword`, `--syntax-string`, `--syntax-comment`, …) defining the syntax-highlighting colors, with a light and a dark value each. Every hue clears WCAG AA (≥4.5:1) contrast against the `--paper-2` code-card fill in both themes. The editor's code `HighlightStyle` maps Lezer code tags onto these tokens; no ad-hoc hex. Defined in the runtime `src/styles/tokens.css` (what the app loads) and mirrored in the canonical `docs/design/colors_and_type.css`. Introduced MYND-154.
+The family of CSS design tokens (`--syntax-keyword`, `--syntax-string`, `--syntax-comment`, …) defining the syntax-highlighting colors, with a light and a dark value each. Every hue clears WCAG AA (≥4.5:1) contrast against the `--paper-2` code-card fill in both themes. The editor's code `HighlightStyle` maps Lezer code tags onto these tokens; no ad-hoc hex. Defined in the runtime `client-core/src/tokens.css` (what every client loads) and mirrored in the canonical `docs/design/colors_and_type.css`. Introduced MYND-154.
 Used in: `src/styles/tokens.css`, `docs/design/colors_and_type.css`, `src/editor/code-highlight.ts`.
 
 ### **template variable** &nbsp; 📦 *Product*

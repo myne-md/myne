@@ -117,8 +117,8 @@
 //
 // The third clause is not decoration and it used to be missing from every
 // published statement of this rule. It does the most work of the three:
-// comments and the seam alone give 78 semantic / 2 cosmetic, and the elision
-// gives 65 / 15, so thirteen of the fifteen cosmetic-only verdicts come from
+// comments and the seam alone give 78 semantic and 2 cosmetic when that measurement was taken, and the elision
+// gave 65 / 15 when measured (67 / 15 today), so thirteen of the fifteen cosmetic-only verdicts come from
 // that clause alone. A reader given the two-clause rule could not reproduce the
 // number the projection publishes. `normalize` states what it costs.
 //
@@ -234,6 +234,14 @@ const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", "gen"]);
 // at all.
 const SHIM_REASON =
   "Host-registration shim. Both sides carry `pub use myne_core::plugins::<flow>` and keep only the Tauri plugin builder and its capability grant, so the shared answer is already in `myne-core` and the divergence is the wiring. Measured, not inferred: the `pub use` is on both sides. NOT measured, and deliberately not claimed: that the two capability grants match. That comparison is myne-md/myne#473's, and until it runs this verdict says nothing about the ACL.";
+
+// The fourteen Rust-error mirrors that myne-md/myne#475 hoisted into
+// `@myne/client-core`. Hoisted like `SHIM_REASON` above and for the same reason:
+// fourteen entries saying one thing is fourteen places for it to be said
+// differently, and the difference between them is only which enum they mirror,
+// which the parity test already knows by name.
+const TYPE_SHIM_REASON =
+  "Re-export shim into `@myne/client-core/types/…`, one line, byte-identical on both sides (myne-md/myne#475). The mirror itself is now a single file rather than two hand copies, so a variant added to the Rust enum can no longer reach one client and not the other. Its agreement with the Rust source is asserted by `tests/types/rustEnumParity.test.ts`, which parses the enum rather than trusting a comment, and fails BY NAME when the Rust file moves, which twelve of these files' header comments had silently done.";
 
 const CURATED_TWINS = [
   {
@@ -637,7 +645,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "@myne/copy",
     reason:
-      "SYNC-42 strings whose exact wording is a privacy property. The destination is not undecided: @myne/copy exists, desktop already re-exports from it, and mobile's 256-line file is a hand copy. myne-md/myne#474 does the wiring.",
+      "RESOLVED in myne-md/myne#474. SYNC-42 strings whose exact wording is a privacy property: both sides now re-export the shared family from `@myne/copy` rather than declaring it, so the literals are byte-identical BY CONSTRUCTION, which is what `pnpm-workspace.yaml` had claimed while mobile imported the package zero times. Mobile also gained the five beta-terms clauses it could not reach, because those are text a user AGREED to and an acceptance recorded against a paraphrase on one client is not an acceptance of what another asked. What still differs is each client's own surface copy, which is per-client by design.",
   },
   {
     a: "src/lib/password-generator.ts",
@@ -677,7 +685,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "The Stage and Action unions plus the transition table. Set-differencing the two LEGAL tables yields exactly ONE substantive disagreement (unlock.join-success against editor.join-success), so this is the most shareable large module in the tree rather than the least. myne-md/myne#477.",
+      "The Stage and Action unions plus the transition table. Set-differencing the two LEGAL tables yields exactly ONE substantive disagreement, `unlock.join-success` against `editor.join-success`, and that one is DELIBERATE: desktop routes the account-chip join through `unlock` because `leaveActiveVault` must tear the vault down first, while mobile re-addresses the payload in place. The other three differences follow from mobile shipping seven Stage variants to desktop's nine (`account-entry` and `pending-approval` are web-first surfaces), which is a screen difference rather than a routing one. So this is the most shareable large module in the tree rather than the least. myne-md/myne#477 removed the concrete divergence that WAS here, two orphaned docblocks arguing post-delete should route to `welcome`, attached to no union member, which is the pair `check-twin-drift.mjs`'s header records as unseen for seven months, and left the extraction itself for a dedicated pass, because moving a 1300-line state machine in the same change as six other slices is how a PR becomes unreviewable.",
   },
   {
     a: "src/lib/themes.ts",
@@ -717,7 +725,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "What a destructive action targets. Mobile still declares deleteVault(vaultId?: string), the optional shape myne-md/myne#250 removed because the fallback was the bug, with a docstring promising a backend fallback the shared Rust core has not accepted since. myne-md/myne#476.",
+      "RESOLVED in myne-md/myne#476. What a destructive action targets. Mobile declared `deleteVault(vaultId?: string)`, the optional shape myne-md/myne#250 removed because THE FALLBACK WAS THE BUG, under a docstring promising a backend fallback the shared Rust core stopped accepting at the same time, so `deleteVault(undefined)` was a deserialization rejection wearing a reassuring comment. The parameter is required on both sides now, which moved the mistake to compile time and named the two call sites that were passing an optional prop straight through; both refuse an unresolved target instead. Also cut: a 110-line copy of desktop's `mapDeleteVaultError` with zero callers here, whose own docstring named three desktop components as its consumers.",
   },
   {
     a: "src/lib/vault-label.ts",
@@ -733,7 +741,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Which vault is active. Mobile still exports resolveActiveVaultId(), deleted from desktop in myne-md/myne#250 for naming the wrong vault after a quick-unlock or a recovery. Zero production callers today, which makes it a landmine rather than a live bug. myne-md/myne#476.",
+      "RESOLVED in myne-md/myne#476. Which vault is active. Mobile exported `resolveActiveVaultId()`, deleted from desktop in myne-md/myne#250 for naming the wrong vault after a quick-unlock or a recovery, zero production callers, so a landmine rather than a live bug, and the first caller reaching for the obvious-sounding name would have reproduced a data-loss defect on a device whose vault is often the only copy. It could not simply be ported over, because the authoritative answer is an IPC command mobile registered NOWHERE: `vault_active_id` has lived in `myne-core` since #250 and only desktop's `generate_handler!`, `build.rs` and ACL knew about it. Mobile now registers it across all three, and carries the same `activeVaultId()` and `soleVaultId()` with the same `null` contracts: `null` means no target, never `use whichever one looks most recent`.",
   },
   {
     a: "src/lib/vault-recover.ts",
@@ -847,98 +855,87 @@ const ROSTER = [
   {
     a: "src/styles/tokens.css",
     b: "mobile/src/styles/tokens.css",
-    verdict: "decision",
-    destination: "undecided",
+    verdict: "delegated",
+    destination: "@myne/client-core",
     reason:
-      "The design token table. Twenty token names exist on desktop and on no mobile surface, and two shared names carry DIFFERENT values, so a name-only comparison would pass over the second class entirely. A token a theme can set is vault content. myne-md/myne#478.",
+      "The design TOKENS moved to `client-core/src/tokens.css` (myne-md/myne#478); what these two files still hold is each client's component-local custom properties, which is per-client wiring over a shared answer. The gap they used to carry was 105 declarations across four palette blocks, the earlier count of twenty was the `:root` block alone, plus two shared names carrying DIFFERENT values, so a name-only comparison would have passed over the second class entirely. Both classes are now `scripts/check-token-parity.mjs`'s, which fires on one name with two independent declarations and on a fallback-less `var()` naming a token nothing declares. The AMOLED grey pair survives as a RECORDED override with its reason (mobile's recessed surfaces overlay the page rather than adjoining it), which is why this pair still differs and correctly so.",
   },
   {
     a: "src/types/note-create-error.ts",
     b: "mobile/src/types/note-create-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Byte-identical. Mirrors core/src/plugins/notes/error.rs, measured, so discriminator 5 puts it in the shared column.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/note-delete-error.ts",
     b: "mobile/src/types/note-delete-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Byte-identical. Mirrors core/src/plugins/notes/error.rs.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/note-list-error.ts",
     b: "mobile/src/types/note-list-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Byte-identical. Mirrors core/src/plugins/notes/error.rs.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/note-read-error.ts",
     b: "mobile/src/types/note-read-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Byte-identical. Mirrors core/src/plugins/notes/error.rs.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/note-update-error.ts",
     b: "mobile/src/types/note-update-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Mirrors core/src/plugins/notes/error.rs. Already partly shared by accident: mobile/src/lib/tasks.ts imports @myne/task-write, aliased into src/notes/taskWriteCore.ts, which imports THIS desktop module. So the desktop variant list and mobile's drifted copy are already in one bundle together.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/protocol-error.ts",
     b: "mobile/src/types/protocol-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Mirrors protocol/src/error.rs, measured.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/quick-unlock-error.ts",
     b: "mobile/src/types/quick-unlock-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Mirrors core/src/plugins/quick_unlock/error.rs, measured. Mobile is missing QuickUnlockError::VaultBusyAuth, which its own backend can return.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/slot-kind.ts",
     b: "mobile/src/types/slot-kind.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Byte-identical. The runtime slot map's shape, reported by a shared core.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/vault-change-password-error.ts",
     b: "mobile/src/types/vault-change-password-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Mirrors core/src/plugins/vault_change_password/error.rs, measured.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/vault-delete-error.ts",
     b: "mobile/src/types/vault-delete-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Byte-identical. Mirrors core/src/plugins/vault_delete/error.rs, measured.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/vault-recovery-error.ts",
     b: "mobile/src/types/vault-recovery-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Byte-identical. Mirrors core/src/plugins/vault_recover/error.rs, measured.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/vault-repair-error.ts",
@@ -946,31 +943,28 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "The one src/types twin whose Rust source is NOT in core/: it mirrors src-tauri/src/plugins/vault_repair/error.rs, which is itself an unresolved twin of mobile's copy. So discriminator 5 cannot answer this one, and it is a decision on the merits instead: the variant sets are identical and only doc comments diverge, which means both clients already agree and nothing holds them there. myne-md/myne#479.",
+      "The one src/types twin that did NOT move into `@myne/client-core` with its fourteen siblings (myne-md/myne#475), and the rubric is what held it back rather than an oversight: discriminator 5 shares a Rust-mirroring TS module iff the Rust source is in `core/` or `protocol/`, and this one mirrors src-tauri/src/plugins/vault_repair/error.rs, which is itself an unresolved twin of mobile's copy. Hoisting the mirror above the thing it mirrors would put the shared answer one layer higher than the question. What actually differs is narrower than an earlier version of this reason claimed, and the correction is worth keeping: the two RUST enums already agree, variant for variant (`VaultBusyAuth`, `VaultPresent`, `NothingToRepair`, `PartialDelete`, `Io`), differing only in comments. The split is on the TS side, where desktop reaches for `IoErrorKind` from protocol-error and mobile for `IoFailureKind` from vault-unlock-error, the same four strings under two spellings. Both mirrors are held to their own Rust enum by `tests/types/rustEnumParity.test.ts`, which covers the mobile side too: package membership and parity coverage are independent decisions, and using one reason to skip both is how the uncovered mirror would have been the excused one.",
   },
   {
     a: "src/types/vault-status.ts",
     b: "mobile/src/types/vault-status.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Byte-identical. What vault_status reports is one answer from a shared core.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/vault-summary.ts",
     b: "mobile/src/types/vault-summary.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Cosmetic-only, and mobile's copy is the better one: its icon paragraph carries the SYNC-1 and SYNC-3 reasoning desktop's lacks. A reminder that 'desktop wins' is not a rule this record follows.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
   {
     a: "src/types/vault-unlock-error.ts",
     b: "mobile/src/types/vault-unlock-error.ts",
-    verdict: "decision",
-    destination: "undecided",
-    reason:
-      "Mirrors core/src/plugins/vault_unlock/error.rs, measured. Mobile is missing VaultUpgradedUnsupported, the protocol.md 10.5 anti-downgrade refusal that desktop handles at src/screens/Unlock.tsx:295.",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason: TYPE_SHIM_REASON,
   },
 
 
@@ -1107,7 +1101,7 @@ const ROSTER = [
     verdict: "delegated",
     destination: "myne-core",
     reason:
-      "The per-client implementation of `myne_core::hooks::VaultLifecycleHooks`. One per client IS the seam, not drift: this is where a client that has no equivalent of a desktop side-effect says so, by leaving the method a no-op. Note for myne-md/myne#479: `check-twin-drift.mjs`'s header still records `emit_snapshot_write_failed` as a bare empty body on mobile, and that has been fixed. The guard header is what is stale.",
+      "The per-client implementation of `myne_core::hooks::VaultLifecycleHooks`. One per client IS the seam, not drift: this is where a client that has no equivalent of a desktop side-effect says so, by leaving the method a no-op. But 'no-op' and 'the guarantee, unenforced' look identical in this file, and myne-md/myne#479 found one of each. `emit_snapshot_write_failed` was a bare empty body while mobile really does capture snapshots, fixed before that issue ran, and `check-twin-drift.mjs`'s header was the thing left stale, now corrected. `effective_auto_lock_secs` was the second and the more instructive: mobile returned `prefs_value.unwrap_or(DEFAULT)` with NO clamp, and so did web. Stated at its real size, because the first version of this reason overstated it: that value is read only by the desktop tick loop, which neither client compiles, so it was a trap for the next Rust-side reader rather than a shipped A6 window. Chasing it is what surfaced the exposure that WAS live, one language over, in the web client's `useIdleAutoLock` call sites, which took the raw pref and read `null` as 'disabled' against `threat-model.md` §7. The fix moved the envelope into `myne-core`, gave the trait method a clamping DEFAULT, and routed both WebView call sites through the TypeScript mirror.",
   },
   {
     a: "src-tauri/src/plugins/mod.rs",
@@ -1256,10 +1250,10 @@ const ROSTER = [
   {
     a: "src-tauri/src/plugins/workspace/mod.rs",
     b: "mobile/src-tauri/src/plugins/workspace/mod.rs",
-    verdict: "decision",
+    verdict: "delegated",
     destination: "myne-core",
     reason:
-      "A fork whose own comment names its exit condition, and that condition is now met. Desktop delegates (`pub use myne_core::plugins::workspace`); mobile still ships local `commands.rs` and `error.rs` justified by 'hoisting would mean migrating desktop in the same change'. Desktop was migrated. Mobile's copy is also behind: core reads through `singleton::open_newest_and_sweep`, the myne-md/myne#301 torn-write recovery, and parses via `parse_vault_meta_any`, while mobile uses a plain read and the v0.1-only parser. myne-md/myne#479.",
+      "RESOLVED in myne-md/myne#479. Both sides now carry `pub use myne_core::plugins::workspace::{commands, error}` and keep only the Tauri plugin builder, so what remains is the wiring. Mobile's 297-line fork was justified by 'hoisting would mean migrating desktop in the same change' and desktop had since been migrated, so the fork outlived its own stated exit condition, and had fallen behind in two ways nothing could see: it parsed `vault.meta` with the v0.1-only `parse_vault_meta`, which hard-rejects `NTV5`, so on a MIGRATED vault this client's workspace reads and writes both failed while every other plugin worked; and it read through a flat `std::fs::read` rather than `singleton::open_newest_and_sweep`, so it had none of myne-md/myne#301's torn-write recovery. The command SET stays asymmetric and correctly so: the core exports a third `#[tauri::command]`, `workspace_stage`, for desktop's Cmd+Q RAM-staging, and mobile's `generate_handler!`, `build.rs` and ACL are all two wide.",
   },
   {
     a: "src-tauri/src/plugins/vault_repair/commands.rs",
@@ -1347,7 +1341,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "STRAINED VERDICT, recorded as such, and it carries a LIVE DEFECT. Mobile registers exactly two commands (`transcribe`, `read_transcript`, measured) against desktop's full set, so most of this file is a surface mobile does not ship, and `absent` is the dominant reading. The two it does ship are duplicated logic, and the duplication is not faithful at the crypto boundary: desktop reads the vault meta with `protocol::parse_vault_meta_any` (commands.rs:645), mobile with the v0.1-only `protocol::parse_vault_meta` (commands.rs:133), while every vault created today is v0.2 (`core/src/plugins/vault_creation/commands.rs` writes `VAULT_META_V0_2_MAGIC`). Both sides swallow the result with `.ok()?`, so on mobile the MYE1 attachments-text cache is silently never written and never read. Same shape as `workspace/mod.rs` below, which records it correctly. `check-version-routing.mjs` cannot see it: its ROOTS are `core/src` and `src-tauri/src`, so mobile's call site is outside every recorded budget. Fixing it belongs to the version-routing work, not here; recording it is this row's job.",
+      "STRAINED VERDICT, recorded as such. Mobile registers exactly two commands (`transcribe`, `read_transcript`, measured) against desktop's full set, so most of this file is a surface mobile does not ship, and `absent` is the dominant reading. The two it does ship are duplicated logic. The LIVE DEFECT this row used to record is FIXED in myne-md/myne#479: mobile read the vault meta with the v0.1-only `protocol::parse_vault_meta` where desktop uses `parse_vault_meta_any`, and since both swallow the result with `.ok()?`, on a MIGRATED vault the MYE1 attachments-text cache was silently never written and never read, no error, no log, a plausible nothing-cached. Its `derive_subkey` sites remain and are legitimate for the same reason the desktop twin's are (a rebuildable cache the migration drops), and are now RECORDED in `check-version-routing.mjs` rather than merely invisible to it: that guard's ROOTS were `core/src` and `src-tauri/src`, so it reported `0 still debt` over a tree it never opened, and `mobile/src-tauri/src` joined them in the same change.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/mod.rs",
@@ -2206,5 +2200,11 @@ export {
   seamAliases,
   stripComments,
   normalize,
+  // Exported for `scripts/check-twin-drift-ratchet.mjs` (myne-md/myne#473),
+  // which compares INJECTED text rather than paths so its own test can drive it
+  // against synthetic pairs. `compare` reads from disk, so a ratchet built on it
+  // has a seam that does not actually inject, which is what that guard's first
+  // version had, and what its first test caught.
+  grammarFor,
   compare,
 };

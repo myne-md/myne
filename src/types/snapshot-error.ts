@@ -1,8 +1,8 @@
 // TODO(Phase-1-end): Replace this hand-written file with a `ts-rs`
 // auto-generated artifact + a CI drift check. The Rust types live in:
-//   - src-tauri/src/io_failure_kind.rs                  (IoFailureKind)
-//   - src-tauri/src/plugins/snapshots/error.rs          (SnapshotError)
-//   - src-tauri/src/plugins/snapshots/commands.rs       (SnapshotMeta)
+//   - core/src/io_failure_kind.rs                       (IoFailureKind)
+//   - core/src/plugins/snapshots/error.rs               (SnapshotError)
+//   - core/src/plugins/snapshots/commands.rs            (SnapshotMeta)
 
 import type { IoFailureKind } from "./vault-unlock-error";
 

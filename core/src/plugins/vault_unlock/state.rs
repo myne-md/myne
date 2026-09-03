@@ -137,7 +137,7 @@ pub struct VaultRuntimeState {
     last_activity_millis: AtomicU64,
 
     /// Cached **effective** auto-lock timeout in seconds (MYND-121),
-    /// already resolved through `auto_lock::effective_auto_lock_secs` —
+    /// already resolved through `crate::effective_auto_lock_secs`:
     /// set at unlock (from `vault.prefs`) and by the timeout-setter IPC
     /// (task 9). The idle timer reads this lock-free each tick instead of
     /// re-decrypting `vault.prefs` (prefs are not cached in
@@ -415,7 +415,7 @@ impl VaultRuntimeState {
     /// Set the cached effective auto-lock timeout (seconds). Lock-free.
     /// Called at unlock (from `vault.prefs`) and by the timeout-setter IPC
     /// (MYND-121 task 9). Callers pass the value already through the
-    /// protective envelope (`auto_lock::effective_auto_lock_secs`).
+    /// protective envelope (`crate::effective_auto_lock_secs`).
     pub fn set_auto_lock_timeout_secs(&self, secs: u32) {
         self.auto_lock_timeout_secs.store(secs, Ordering::Relaxed);
     }

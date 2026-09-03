@@ -1,10 +1,12 @@
 /* =========================================================================
    Myne Mobile — extension layer on top of the canonical tokens.css.
 
-   tokens.css is copied verbatim from the desktop client (the shared design
-   canon: colours, type scale, dark/amoled themes). This file adds ONLY what is
-   mobile-specific and overrides the few desktop-only rules that don't fit a
-   scrolling design-gallery / phone canvas:
+   The design tokens are no longer a copy of anything: they live once in
+   `@myne/client-core/tokens.css`, which every client imports (myne-md/myne#478).
+   This sentence used to read "copied verbatim from the desktop client", and the
+   copy was 105 tokens behind. This file adds ONLY what is mobile-specific and
+   overrides the few desktop-only rules that don't fit a scrolling
+   design-gallery / phone canvas:
 
      1. device-frame + liquid-glass geometry tokens (iOS 26 / Material 3)
      2. mobile type-size aliases (phone body is 16px, not the desktop 14px)

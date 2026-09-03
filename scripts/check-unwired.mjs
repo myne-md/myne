@@ -38,7 +38,19 @@ import { basename, join, relative } from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname;
 
 /** Trees whose modules must be reachable from production code. */
-const WATCHED = ["web/src", "src/lib", "src/hooks", "mobile/src/lib", "mobile/src/hooks"];
+const WATCHED = [
+  "web/src",
+  "src/lib",
+  "src/hooks",
+  "mobile/src/lib",
+  "mobile/src/hooks",
+  // The shared decision layer (myne-md/myne#242). It joined
+  // `scripts/lib/shared-roots.mjs` in the change that created it and NOT this
+  // list, which is the gap this guard exists to close one tree over: a new
+  // shared package whose first module has no importer is exactly the shape,
+  // and nothing would have said so.
+  "client-core/src",
+];
 
 /** Every tree that may contain an importer (production or test). */
 const IMPORTER_TREES = ["src", "web/src", "mobile/src", "editor/src", "dialect/src", "copy/src", "tests", "e2e", "e2e-web", "mobile/tests"];
@@ -144,6 +156,20 @@ for (const tree of IMPORTER_TREES) {
         const spec = m[1];
         // Only relative/aliased module specifiers can name a file in this repo.
         if (!spec.startsWith(".") && !spec.startsWith("@myne/")) continue;
+        // A BARE workspace specifier (`@myne/client-core`, no subpath) names
+        // that package's `src/index.ts`, which every `@myne/*` package's
+        // exports map points `"."` at. Without this arm the basename is the
+        // PACKAGE name and the barrel it actually imports looks unimported: a
+        // package front door reads as dead code no matter how many production
+        // call sites use it, and the only way past the guard is an exemption
+        // that would be false. Found when `client-core/src` joined `WATCHED`
+        // (myne-md/myne#242) and three production importers left the count at
+        // zero.
+        const bare = /^@myne\/[^/]+$/.test(spec);
+        if (bare) {
+          note("index", rel);
+          continue;
+        }
         const leaf = basename(spec).replace(/\.(ts|tsx|js|jsx)$/, "");
         note(leaf === "index" ? basename(spec.slice(0, spec.lastIndexOf("/"))) : leaf, rel);
       }

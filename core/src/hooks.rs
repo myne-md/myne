@@ -169,10 +169,25 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     fn emit_snapshot_write_failed(&self, note_id: &str);
 
     // ---- Group 5: prefs-application side-effects (post-unlock) -------------
-    /// Clamp a persisted `auto_lock_seconds` value into the effective range
-    /// (desktop applies the `MIN..=CEILING` clamp; mobile has no auto-lock so
-    /// it returns the value or the shared `DEFAULT_AUTO_LOCK_SECS` default).
-    fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32;
+    /// Clamp a persisted `auto_lock_seconds` value into the effective range.
+    ///
+    /// **Defaulted, and the default is the security-relevant answer**
+    /// (myne-md/myne#479). This used to be a required method whose docstring
+    /// said "desktop applies the `MIN..=CEILING` clamp; mobile has no auto-lock
+    /// so it returns the value or the shared default", and by then mobile did
+    /// have an auto-lock, so what it actually had was an unclamped one. Both
+    /// unclamped bodies (mobile's hook and `NoopHooks` below) were a plausible
+    /// `unwrap_or`, which is why nothing reported them.
+    ///
+    /// `vault.prefs` is a replayable on-disk blob, so the clamp is what keeps a
+    /// tampered `auto_lock_seconds` able only to SHORTEN the timeout, never
+    /// lengthen it past [`crate::AUTO_LOCK_CEILING_SECS`]
+    /// (`threat-model.md` §7). A defaulted method makes a client that says
+    /// nothing land on that guarantee rather than off it; a client with a
+    /// genuinely different policy overrides it and argues for the difference.
+    fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
+        crate::effective_auto_lock_secs(prefs_value)
+    }
     /// Hydrate the browser-clipper pairing-token registry from the just-read
     /// `vault.prefs` `paired_extensions` array (desktop-only; mobile no-op).
     fn hydrate_clipper_pairing(&self, paired: &[protocol::PairedExtension]);
@@ -267,11 +282,9 @@ impl VaultLifecycleHooks for NoopHooks {
     fn bump_local_change(&self) {}
     fn emit_snapshot_write_failed(&self, _: &str) {}
 
-    fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-        // Mobile has no auto-lock policy; fall back to the shared default the
-        // runtime state seeds itself with (no desktop clamp range available).
-        prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
-    }
+    // `effective_auto_lock_secs` is deliberately NOT overridden here: the
+    // trait's default clamps, and a no-op host wanting the unclamped value is
+    // exactly the shape myne-md/myne#479 removed.
     fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
 
     fn preempt_inflight_backup<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
@@ -392,9 +405,11 @@ pub mod test_hooks {
             self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
         fn emit_snapshot_write_failed(&self, _: &str) {}
-        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
-        }
+        // `effective_auto_lock_secs` deliberately not overridden: the trait's
+        // default clamps (myne-md/myne#479). This body used to be the unclamped
+        // `unwrap_or`, which is the exact shape that change removed from two
+        // production clients, so a fixture carrying it handed the next author
+        // the defect as the copyable example.
         fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
         fn preempt_inflight_backup<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
             Box::pin(std::future::ready(()))

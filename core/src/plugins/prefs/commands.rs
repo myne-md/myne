@@ -4737,9 +4737,16 @@ pub async fn set_auto_lock_timeout_with_dir(
     .await?;
 
     // Effect SECOND (only on disk success): refresh the cached effective
-    // timeout the running idle timer reads, clamped through the envelope so
-    // a live change can never exceed the ceiling. The clamp is desktop-only
-    // (auto_lock stays in the desktop crate) and is threaded via the hook.
+    // timeout, clamped through the envelope so a live change can never exceed
+    // the ceiling. The clamp is SHARED since myne-md/myne#479
+    // (`crate::effective_auto_lock_secs`) and is the hook trait's DEFAULT, so a
+    // client that overrides nothing still gets it.
+    //
+    // What reads the value it writes is DESKTOP only: `VaultRuntimeState::
+    // auto_lock_timeout_secs` is consumed by `src-tauri/src/auto_lock.rs`'s tick
+    // loop and by nothing else. The WebView timers on mobile and web read the
+    // pref themselves and clamp with the TypeScript mirror
+    // (`@myne/client-core`), so this line is not what bounds them.
     state.set_auto_lock_timeout_secs(hooks.effective_auto_lock_secs(Some(seconds)));
 
     tracing::info!(
@@ -5581,9 +5588,14 @@ mod tests {
             .expect("current-thread runtime build")
     }
 
-    /// A `Hooks` whose `effective_auto_lock_secs` is a no-op (returns the value
-    /// unchanged) — the core has no desktop clamp range. The clamp-WIRING
-    /// assertion lives desktop-side (`auto_lock` owns the clamp + its tests).
+    /// A `Hooks` that overrides nothing.
+    ///
+    /// **It CLAMPS**, and an earlier version of this doc said the opposite
+    /// ("a no-op, returns the value unchanged, the core has no desktop clamp
+    /// range"). Since myne-md/myne#479 the envelope is shared and
+    /// `VaultLifecycleHooks::effective_auto_lock_secs` is defaulted to it, which
+    /// `NoopHooks` inherits. A test written on the old belief would assert
+    /// against a clamped value and read as passing for the wrong reason.
     fn noop_hooks() -> crate::hooks::Hooks {
         std::sync::Arc::new(crate::hooks::NoopHooks)
     }
@@ -6745,10 +6757,13 @@ mod tests {
     }
 
     // The clamp-WIRING test (`set_auto_lock_timeout_stores_raw_but_caches_clamped`)
-    // asserts the cached effective timeout is clamped to the desktop ceiling. The
-    // clamp is desktop-only (`auto_lock`), so that test lives desktop-side
-    // (`src-tauri/src/plugins/prefs/mod.rs` tests) where a real clamping hook is
-    // available; the clamp function itself is unit-tested in `auto_lock.rs`.
+    // asserts the cached effective timeout is clamped to the ceiling, and it
+    // still lives desktop-side (`src-tauri/src/plugins/prefs/mod.rs` tests) for
+    // historical reasons rather than because the clamp is desktop-only: since
+    // myne-md/myne#479 it is shared and defaulted, so `noop_hooks()` above
+    // clamps too. The clamp FUNCTION is unit-tested beside itself in
+    // `core/src/lib.rs::auto_lock_envelope_tests`, and the trait DEFAULT is
+    // covered in `core/src/hooks.rs`.
 
     #[test]
     fn deliberate_folders_round_trip_via_set_then_read() {
