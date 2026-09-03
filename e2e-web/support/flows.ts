@@ -243,6 +243,91 @@ export async function createNote(session: Session): Promise<void> {
 }
 
 /**
+ * Click one open context-menu item by its `data-item-id`, and wait for the
+ * menu to react.
+ *
+ * A DOM `click()`, for the reason {@link openNoteContextMenu} records about the
+ * gesture that opens the menu: the driver's synthesized pointer does not reach
+ * this surface in Chromium. Measured here too — the driver click on the
+ * `export` parent row spends its whole 10 s interactability budget and lands
+ * nothing, while a dispatched click mounts the submenu at once.
+ *
+ * Returns the item ids present after the click, so a caller asserting what a
+ * submenu contains reads one value rather than re-querying.
+ */
+export async function clickContextMenuItem(
+  session: Session,
+  itemId: string,
+  waitForItemId?: string,
+): Promise<string[]> {
+  await session.execute(
+    `var el = document.querySelector('[data-testid="notes.context-menu-item"][data-item-id="${itemId}"]');` +
+      `if (!el) throw new Error('no context-menu item ${itemId} to click');` +
+      "el.click();",
+  );
+  return session.waitUntil(
+    async () => {
+      const raw = await session.execute<string>(
+        "return JSON.stringify([].slice.call(" +
+          "document.querySelectorAll('[data-testid=\"notes.context-menu-item\"]')" +
+          ").map(function (e) { return e.getAttribute('data-item-id'); }));",
+      );
+      const ids = JSON.parse(raw) as string[];
+      if (waitForItemId === undefined) return ids.length > 0 ? ids : null;
+      return ids.includes(waitForItemId) ? ids : null;
+    },
+    { label: `context menu after clicking ${itemId}`, timeoutMs: 15_000 },
+  );
+}
+
+/**
+ * Open a note row's context menu, and wait until it has items.
+ *
+ * **A dispatched `contextmenu`, not the driver's right-click, and that is a
+ * MEASUREMENT rather than a shortcut.** `Element.rightClick()` in the shared
+ * W3C client is a real pointer press with button 2, and it is what the desktop
+ * lane uses successfully against WebKitGTK. In Chromium it produces nothing:
+ * the Actions request is accepted (no "not interactable", no "click
+ * intercepted") and no `contextmenu` event reaches the page. Measured side by
+ * side in one session on a seeded vault, on the same row, one line apart: the
+ * driver press left 0 menu items and a dispatched event left 10.
+ *
+ * Nothing in this lane had ever opened a context menu before, so the primitive
+ * was carried, unexercised, from a suite where it works. A scenario reaching
+ * for it would have timed out and read as "the web client has no context menu",
+ * which is the wrong finding: the product's handler is on the row, shared with
+ * desktop, and it fires.
+ *
+ * The event carries `bubbles` because the handler is on the row itself and the
+ * menu positions from `clientX`/`clientY`, so both are supplied rather than
+ * defaulted to the origin, where a menu would render in the page corner.
+ */
+export async function openNoteContextMenu(
+  session: Session,
+  opts: { x?: number; y?: number } = {},
+): Promise<string[]> {
+  const x = opts.x ?? 40;
+  const y = opts.y ?? 40;
+  await session.execute(
+    "var r = document.querySelector('[data-testid=\"notes.row\"]');" +
+      "if (!r) throw new Error('no notes.row to open a context menu on');" +
+      `r.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: ${x}, clientY: ${y} }));`,
+  );
+  return session.waitUntil(
+    async () => {
+      const raw = await session.execute<string>(
+        "return JSON.stringify([].slice.call(" +
+          "document.querySelectorAll('[data-testid=\"notes.context-menu-item\"]')" +
+          ").map(function (e) { return e.getAttribute('data-item-id'); }));",
+      );
+      const ids = JSON.parse(raw) as string[];
+      return ids.length > 0 ? ids : null;
+    },
+    { label: "the note context menu opened", timeoutMs: 15_000 },
+  );
+}
+
+/**
  * Type into the editor: dismiss the overlay, place a real caret, send keys to
  * whatever has focus.
  *
