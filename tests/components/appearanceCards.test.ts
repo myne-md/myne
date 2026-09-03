@@ -32,7 +32,16 @@ const PANEL = readFileSync(
   join(REPO_ROOT, "src/components/settings/AppearancePanel.tsx"),
   "utf8",
 );
-const TOKENS = readFileSync(join(REPO_ROOT, "src/styles/tokens.css"), "utf8");
+// **Both sheets, concatenated.** myne-md/myne#478 moved the design TOKENS to
+// `client-core/src/tokens.css` and left `src/styles/tokens.css` as this
+// client's component layer; its own header says so. Reading one of them
+// means a token that moves between them turns this into a test that fails
+// about its own input, which is how this file came to report 167 missing
+// tokens against a palette that was entirely present.
+const TOKENS = [
+  readFileSync(join(REPO_ROOT, "client-core/src/tokens.css"), "utf8"),
+  readFileSync(join(REPO_ROOT, "src/styles/tokens.css"), "utf8"),
+].join("\n");
 
 /**
  * Resolve a custom property to a literal hex, following `var()` indirections

@@ -346,7 +346,12 @@ describe("the exported card takes its background from the live theme", () => {
     expect(tokens.length, "no cssVar call sites found — the scan is stale").toBeGreaterThan(
       0,
     );
-    const sheet = fs.readFileSync("src/styles/tokens.css", "utf8");
+    // Both sheets: myne-md/myne#478 moved the design tokens to
+    // `client-core/src/tokens.css` and left the component layer behind.
+    const sheet = [
+      fs.readFileSync("client-core/src/tokens.css", "utf8"),
+      fs.readFileSync("src/styles/tokens.css", "utf8"),
+    ].join("\n");
     for (const token of tokens) {
       expect(
         sheet.includes(`${token}:`),
