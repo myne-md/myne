@@ -5875,6 +5875,7 @@ export const ROSTER = Object.freeze([
       "e2e/vault-unlock.e2e.ts",
       "e2e/state-machine.e2e.ts",
       "e2e/vault-label.e2e.ts",
+      "e2e/vault-delete-targeting.e2e.ts",
     ],
     manual: [
       {

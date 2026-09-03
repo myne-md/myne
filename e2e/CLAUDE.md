@@ -250,6 +250,25 @@
   code: `CARGO_BUILD_JOBS=3` costs wall clock and changes nothing about the artifact, so the
   run still proves what the 3× gate asks. `docker stats --no-stream` during the build is how
   you confirm it, and it is worth doing before believing a red build on an unchanged tree.
+
+  **Measured 2026-09-03, and the job cap did NOT fix it, so the paragraph above is right about
+  the symptom and wrong about the lever.** On a 16 GB host with an 8 GiB colima VM, the same
+  SIGKILL landed at `CARGO_BUILD_JOBS=3` and again at `CARGO_BUILD_JOBS=1`. One rustc invocation
+  is what does not fit: `myne_desktop_lib` is built `--crate-type staticlib --crate-type cdylib
+  --crate-type rlib` at `opt-level=3` with candle, tokenizers, tauri and webkit in the closure,
+  and there is no `[profile.release]` override anywhere in the workspace, so the default 16
+  codegen units are all this crate gets. Capping concurrent CRATES cannot reduce the peak of a
+  single one. Raising the VM to 12 GiB built it in 1m 56s on the same tree.
+
+  So the order to try is memory first, jobs second. Two traps on the memory side, both paid for.
+  `colima start --memory N` silently keeps the disk size from the FIRST start, and a mismatch
+  against the real image aborts every later start with `disk shrinking is not supported`, which
+  names neither memory nor the file to edit; the stale target lives in
+  `~/.colima/_lima/colima/colima.yaml` and `~/.colima/_lima/colima/lima.yaml`, and no combination
+  of flags overrides it. And the job cap is now reachable at all: every runner built its
+  `E2E_ENV` as a fixed `export …` string, so `CARGO_BUILD_JOBS` was documented here and wired to
+  nothing (`scripts/lib/e2e-docker.sh`, myne-md/myne#476). Export it on the host and it lands in
+  the container; leave it unset and the command line is byte-identical to what it was.
 - Post-exit assertions (disk state AFTER the app quit): launch with
   `keepDataDir: true`, capture `dataHome` in the SEED callback (the
   launch-failure path leaks the dir otherwise), gate on

@@ -2029,6 +2029,28 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     setDeleteBusy(true);
     setDeleteError(null);
     try {
+      // Id-targeted erase (SYNC-6), and the id is REQUIRED since
+      // myne-md/myne#476, the same contract `AccountPanel` has held on desktop
+      // since #250. An unresolved target means we do not know which vault the
+      // user is looking at, and this button is irreversible. Refuse, do not
+      // guess: this prop is optional, so before the signature change it was
+      // passed straight through as `undefined` and the backend answered with a
+      // deserialization rejection the catch below reported as a delete failure.
+      if (vaultId == null) {
+        // Refuse quietly rather than with `deleteVault.deleteError`, which reads
+        // "Couldn't fully delete the vault. Please try again." Nothing was
+        // attempted, so it misdescribes what happened, and "try again" is advice
+        // that cannot work while the id is unresolved. The window is real rather
+        // than purely defensive: `EditorFlow` resolves `activeVaultId()`
+        // asynchronously on the post-reload entry, so this prop is briefly
+        // undefined there.
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[SettingsSheet] vault_delete refused: no resolved vault id");
+        }
+        setDeleteBusy(false);
+        return;
+      }
       if (HAS_TAURI) await deleteVault(vaultId);
       onDeleteVaultSuccess();
     } catch {

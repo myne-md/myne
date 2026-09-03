@@ -180,7 +180,7 @@ export async function exportSelectionAsImage(): Promise<ImageExportOutcome> {
       contentWidth: selection.width,
       contentHeight: selection.height,
       padding: SELECTION_CARD_PADDING,
-      background: cssVar("--paper-1", "#faf8f3"),
+      background: cssVar("--paper", "#fbfbfa"),
       fontFamily: cssVar("--font-sans", "sans-serif"),
     };
     const svg = buildSelectionCardSvg(selection.xhtml, opts);

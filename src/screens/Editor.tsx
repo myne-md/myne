@@ -215,6 +215,7 @@ import { createInAppNotifier } from "../lib/reminderNotifier";
 import { useLiveVaultTasks } from "../notes/taskIndex";
 import i18n from "../i18n";
 import { useIdleAutoLock } from "../hooks/useIdleAutoLock";
+import { effectiveAutoLockSecs } from "@myne/client-core";
 import { runFlushChain } from "../lib/flush-chain";
 import {
   ContextMenu,
@@ -1767,7 +1768,20 @@ function EditorChrome({
   // the flush would lose the last edits of exactly the session the user walked
   // away from.
   useIdleAutoLock({
-    timeoutSecs: barPrefs.auto_lock_seconds ?? 0,
+    // Through the SHARED envelope, not `?? 0` (myne-md/myne#479). This hook is
+    // the timer that fires on the web client, where `?? 0` meant a `null`
+    // `auto_lock_seconds` DISABLED the idle lock: `useIdleAutoLock` activates on
+    // `timeoutSecs > 0`, and `protocol.md` §9.5.5 collapses an absent, tampered
+    // or replayed `vault.prefs` to exactly that null. `threat-model.md` §7 puts
+    // this timeout in the code-enforced class and says a replayed prefs blob
+    // "can only make auto-lock stricter, never disable it or exceed the
+    // ceiling", so the raw pref was the one input that could.
+    //
+    // The Rust-side clamp does not reach here: it feeds
+    // `VaultRuntimeState::auto_lock_timeout_secs`, whose only reader is the
+    // desktop Rust timer. Desktop is unaffected either way, since this hook is
+    // inactive wherever `osIdleAutoLock` is present.
+    timeoutSecs: effectiveAutoLockSecs(barPrefs.auto_lock_seconds ?? null),
     onIdle: () => void handleLockFlushed(),
   });
 

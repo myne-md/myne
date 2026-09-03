@@ -14,6 +14,12 @@ import { initDeepLinks } from "./lib/deep-link";
 import { initCaptures } from "./lib/captures";
 import { initShareIntent } from "./lib/shareImport";
 import { initReminderTaps } from "./lib/reminderTap";
+// The shared token layer (myne-md/myne#478), the SAME sheet the desktop client
+// loads, so a synced folder-group colour and a synced text highlight resolve to
+// the same value here. This file used to carry its own copy of it, 105 tokens
+// behind. FIRST, because the app-shell sheet below overrides two of its values
+// and both later sheets read the rest.
+import "@myne/client-core/tokens.css";
 import "./styles/tokens.css";
 // The shared ornament layer (myne#394) — same sheet the desktop client loads, so
 // a synced theme's ornament renders identically here. Draws nothing until a

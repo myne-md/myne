@@ -37,7 +37,7 @@ import {
 import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 import type { NoteListError } from "../../lib/notes";
 import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
-import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
+import { activeVaultId, listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { HAS_TAURI } from "../../lib/app-window";
 import { effectiveMobileAutoLockSecs } from "../../lib/auto-lock";
 import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../lib/deep-link";
@@ -118,6 +118,7 @@ import { buildNoteGraphAndModel, clientEdges } from "../../lib/backend-graph";
 import { MarkdownView } from "../../components/MarkdownView";
 import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
+import type { VaultId } from "../../lib/stage";
 import { SettingsSheet, applyStoredTheme } from "./SettingsSheet";
 import { useSizeClass } from "../../formfactor/SizeClassContext";
 import { EmptyDetail } from "./editor/EmptyDetail";
@@ -334,8 +335,36 @@ function useIndexDeltaTracker(): IndexDeltaTracker {
 }
 
 
-export function EditorFlow({ vaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
+export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const { t } = useTranslation();
+  // The authoritative active-vault id for every vault-targeting surface below,
+  // mirroring `src/screens/Editor.tsx` since myne-md/myne#476. Prefer the id
+  // the stage already carries; fall back to the runtime slot ONLY where the
+  // stage has none, which is the post-reload editor entry. This client used to
+  // pass the possibly-undefined prop straight to the danger-zone delete, and
+  // the answer it could have fallen back to, `resolveActiveVaultId()`, sitting
+  // uncalled in `lib/vault-list.ts`, was the very function myne-md/myne#250
+  // deleted from desktop for ordering the non-authoritative `registry.json`
+  // cache, which only the password path ever stamped, so a quick-unlocked or
+  // recovered session pointed the delete at another vault (#241).
+  const [resolved, setResolved] = useState<VaultId | undefined>(undefined);
+  useEffect(() => {
+    // Only the fallback lives in state. Mirroring the prop into state as well
+    // meant `vaultId` transitioned `undefined -> id` one IPC round-trip after
+    // mount on the post-reload path, which re-ran three `vaultId`-keyed effects
+    //, including `bumpPrefsNonce()`, where each advance is a full backend
+    // round-trip per mounted `usePrefs` (its own docstring says so) and the two
+    // fires straddle this await, so the microtask coalescing cannot merge them.
+    if (stageVaultId != null) return;
+    let cancelled = false;
+    void activeVaultId().then((id) => {
+      if (!cancelled) setResolved(id ?? undefined);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [stageVaultId]);
+  const vaultId = stageVaultId ?? resolved;
   const [view, setView] = useState<"list" | "editor">("list");
   const [tab, setTab] = useState<WorkspaceTab>("notes");
   // Layout axis (SizeClassContext): compact = the phone's full-screen list ⇄

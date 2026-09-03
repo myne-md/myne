@@ -603,7 +603,7 @@ const NEW_FOLDER_INPUT_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-semibold)",
   color: "var(--fg-1)",
-  background: "var(--paper-1)",
+  background: "var(--paper)",
   border: "1px solid var(--accent)",
   borderRadius: "var(--radius-1)",
   padding: "3px 6px",
@@ -613,7 +613,7 @@ const NEW_FOLDER_INPUT_STYLE: CSSProperties = {
 const BLOCK_NOTICE_STYLE: CSSProperties = {
   margin: "6px 10px",
   padding: "8px 10px",
-  background: "var(--warning-soft, var(--paper-1))",
+  background: "var(--warning-soft, var(--paper))",
   borderInlineStart: "2px solid var(--line-3)",
   borderRadius: "var(--radius-1)",
   fontFamily: "var(--font-sans)",
