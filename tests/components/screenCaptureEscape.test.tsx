@@ -359,37 +359,40 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(false);
   });
 
-  it("leaves the per-vault switch LIVE on a client that has no override to read", async () => {
-    // The web regression this gate exists for (myne-md/myne#482, found by
-    // review). `useScreenCaptureOverride` returns early where there is no
-    // capture affinity to suppress, so `override` stays `null` there
-    // PERMANENTLY: nothing will ever publish. Reading that as "unknown" made
-    // `superseded` true forever, so the switch this same change rosters in
-    // `check-web-surfaces.mjs` and indexes in `settingsSearchIndex.ts` was inert
-    // on web, under a sentence about a control that client does not have.
+  it("renders NO per-vault switch on a client without the capability", async () => {
+    // **myne-md/myne#556 supersedes myne-md/myne#482's web arm, and both halves
+    // of that are worth stating.**
     //
-    // The distinction is between "the override could not be read", which fails
-    // towards protection and is right, and "no override exists here", which
-    // supersedes nothing.
+    // #482 found the switch INERT on web: `useScreenCaptureOverride` returns
+    // early where there is no capture affinity to suppress, so `override` stays
+    // `null` there permanently, `superseded` read true forever, and the control
+    // sat dead under a sentence about a control that client does not have. Its
+    // fix was the `overrideApplies` gate, which made the switch live again.
     //
-    // Deleting the `overrideApplies` gate in `PrivacyPanel` makes this fail.
+    // #556 asked the prior question and answered it differently: a page cannot
+    // stop a screenshot at all, so `screenCaptureProtection` is absent on web
+    // and `decisions.md` 2026-07-26 makes OMISSION normative for an absent
+    // capability. A live switch there is worse than an inert one — it reports a
+    // change the platform never makes, on the one panel whose whole job is
+    // saying what is and is not protected. So the row is not rendered, which
+    // removes #482's state rather than fixing it.
+    //
+    // The `overrideApplies` gate stays and is still asserted by the cases
+    // above, for a client that HAS the capability. What changed is only what a
+    // client WITHOUT it sees, which is nothing.
+    //
+    // `e2e-web/capability-row-coherence.e2e.ts` is the same assertion against a
+    // real browser; this is the one that fails fast.
     capabilityPresent = false;
     try {
       stub({});
       render(<PrivacyPanel />);
-      const row = await screen.findByTestId("settings.screen-capture");
-      await waitFor(() =>
-        expect(row.getAttribute("data-superseded")).toBe("false"),
-      );
-      expect(
-        screen.queryByText(t("settings.privacy.screenCaptureSuperseded")),
-      ).toBeNull();
-      expect(
-        screen.queryByText(t("settings.privacy.screenCaptureSupersededByFlag")),
-      ).toBeNull();
-      expect(
-        screen.getByTestId("settings.screen-capture-toggle").getAttribute("aria-disabled"),
-      ).not.toBe("true");
+      // The panel MOUNTED, waited on positively through a row it always renders.
+      // Without it "the screen-capture row is absent" is also what an unmounted
+      // panel looks like, and the assertion would pass on a render that threw.
+      await waitFor(() => expect(screen.queryByTestId("settings.auto-lock-select")).not.toBeNull());
+      expect(screen.queryByTestId("settings.screen-capture")).toBeNull();
+      expect(screen.queryByTestId("settings.screen-capture-toggle")).toBeNull();
     } finally {
       capabilityPresent = true;
     }
