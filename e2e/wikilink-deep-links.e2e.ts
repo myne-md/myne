@@ -70,24 +70,43 @@ async function scrollTop(s: Session): Promise<number> {
   );
 }
 
-/** Click a wikilink chip by its display text via a native DOM `click()`. The
- *  WebDriver synthetic pointer click does NOT generate a click that reaches CM6's
- *  chip `domEventHandlers.click` (an atomic-widget + WebKit-synthetic-event
- *  limitation — verified: the pointer click never navigates, a real DOM click
- *  does), so dispatch the real click event the production handler listens for. */
+/** Press-and-release a wikilink chip by its display text, via a REAL pointer
+ *  (W3C Actions: move to the chip, button-0 down, button-0 up).
+ *
+ *  This helper previously dispatched a native DOM `element.click()`, and its
+ *  comment recorded a measurement for doing so: a synthetic pointer click did not
+ *  reach CM6's chip `domEventHandlers.click`, while a DOM click did. That
+ *  measurement was taken while the production handler listened on `click`.
+ *  myne-md/myne#601 moved chip navigation onto `mousedown` + `mouseup`
+ *  (`editor/src/wikilink/chip-widget.ts`) after measuring the opposite problem:
+ *  the press REVEALS the raw `[[…]]` source, so the chip is gone by the time the
+ *  button comes up, press and release no longer share a target, and the browser
+ *  synthesises no `click` at all. A DOM `.click()` dispatches `click` alone and
+ *  so reaches neither handler — which is why this scenario stopped navigating
+ *  while every other assertion in it kept passing.
+ *
+ *  Re-measured against the current handler before this was changed: a DOM
+ *  `.click()` navigates nowhere, the pointer press does. */
 async function clickChipByText(s: Session, needle: string): Promise<void> {
   await s.waitUntil(
-    async () =>
-      (await s.execute<number>(
-        "var cs = [].slice.call(document.querySelectorAll('.cm-wikilink-chip'));" +
-          "var c = cs.find(function(e){ return e.textContent.indexOf(" +
-          JSON.stringify(needle) +
-          ") >= 0; });" +
-          "if (c) { c.click(); return 1; } return 0;",
-      )) === 1
-        ? true
-        : null,
-    { label: `clicked the "${needle}" chip`, timeoutMs: 10_000 },
+    async () => {
+      const chips = await s.findElements(".cm-wikilink-chip");
+      for (const chip of chips) {
+        let text: string;
+        try {
+          text = await chip.textContent();
+        } catch {
+          // The chip list re-renders under us; let the outer budget re-query
+          // rather than failing on a handle that staled between the two calls.
+          return null;
+        }
+        if (!text.includes(needle)) continue;
+        await chip.actionClick();
+        return true;
+      }
+      return null;
+    },
+    { label: `pressed the "${needle}" chip`, timeoutMs: 10_000 },
   );
 }
 

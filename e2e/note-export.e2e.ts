@@ -104,11 +104,22 @@ describeE2E("ne1 no-attachments export is byte-verbatim (MYND-116)", () => {
         await unlockToEditor(s, seeded.password);
         await dismissImporterOffer(s);
 
-        // The live note row's context menu carries "Export as Markdown…"
+        // The live note row's context menu carries the export entry
         // (data-item-id rides the existing notes.context-menu-item
         // scheme — no new testid).
+        //
+        // myne-md/myne#611 split the single "Export as Markdown…" row into an
+        // `Export…` parent and a per-format leaf, so the sentence the user
+        // reads now spans TWO rows. Both halves are asserted here: updating
+        // only the leaf would leave the word "Export" covered by nothing,
+        // which is how this assertion came to name a string the product had
+        // already stopped rendering.
         const item = await openExportMenuItem(s, suite.plainNoteId);
-        expect(await item.text()).toBe("Export as Markdown…");
+        const exportParent = await s.waitForElement(
+          testIdSelector("notes.context-menu-item", { "data-item-id": "export" }),
+        );
+        expect(await exportParent.text()).toBe("Export…");
+        expect(await item.text()).toBe("Markdown");
         // Esc-dismiss WITHOUT selecting: clicking would open the native
         // save dialog WebDriver cannot drive (ne3 covers the UI path
         // with the dialog stubbed).

@@ -72,7 +72,12 @@ describeE2E("rc1 ticking a recurring task materializes its next occurrence", () 
           label: "next occurrence materialized",
         });
 
-        const text = await editorText(s);
+        // SOURCE text, for the reason myne-md/myne#609 gave rc2 one line down:
+        // the due chip prints the reader's CHOSEN date format, so both ISO dates
+        // live in the document and neither is in the render. rc2 was moved off
+        // `editorText` in that change and rc1 was not, which is why this one
+        // asserted a string the editor had stopped displaying.
+        const text = await editorSourceText(s);
         // The completed line keeps its own date; the new one carries the
         // advanced one. Both present is what proves it was an INSERT rather than
         // a rewrite of the line the user ticked.
