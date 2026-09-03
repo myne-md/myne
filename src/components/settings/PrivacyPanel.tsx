@@ -435,40 +435,57 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
 
   return (
     <div style={PANEL_ROOT_STYLE}>
-      <SettingRow
-        label={t("settings.privacy.screenCaptureLabel")}
-        helper={
-          overrideUnknown
-            ? t("settings.privacy.screenCaptureOverrideUnknown")
-            : supersededByFlagOnly
-              ? t("settings.privacy.screenCaptureSupersededByFlag")
-              : superseded
-                ? t("settings.privacy.screenCaptureSuperseded")
-                : screenCaptureHelperText(prefs.screen_capture_protection, t)
-        }
-        anchorId="privacy.screen-capture"
-        testId="settings.screen-capture"
-        stateAttrs={{ "data-superseded": String(superseded) }}
-        control={(helperId) => (
-          <Switch
-            checked={prefs.screen_capture_protection}
-            // Inert while the device override is on: the per-vault preference
-            // still records what the user wants, and it still governs nothing.
-            // Disabling it is the honest state; leaving it live would let a
-            // click report a change the window does not make.
-            onChange={
-              superseded
-                ? undefined
-                : (next) => {
-                    void toggleScreenCapture(next);
-                  }
-            }
-            ariaLabel={t("settings.privacy.screenCaptureLabel")}
-            ariaDescribedBy={helperId}
-            testId="settings.screen-capture-toggle"
-          />
-        )}
-      />
+      {/* Gated on the capability, because a page cannot stop a screenshot
+          (myne-md/myne#556). `web/src/platform/capabilities.ts` has listed
+          `screenCaptureProtection` in its ABSENT set all along; rendered
+          ungated, a web user sees a Privacy toggle, turns it on, and is told
+          their screen is protected by something with no way to protect it.
+
+          OMITTED rather than disabled or re-worded, which is what
+          `decisions.md` 2026-07-26 makes normative for an absent capability: a
+          greyed control is an offer the platform cannot honour.
+
+          The row's own superseded/override states are a DIFFERENT question —
+          they say why a capability the client HAS is not governing right now —
+          so they do not stand in for this gate, and the override row below
+          carrying the same `has()` is not this row's gate either. Reading that
+          one as this one is how the gate came to be dropped in a merge. */}
+      {has("screenCaptureProtection") && (
+        <SettingRow
+          label={t("settings.privacy.screenCaptureLabel")}
+          helper={
+            overrideUnknown
+              ? t("settings.privacy.screenCaptureOverrideUnknown")
+              : supersededByFlagOnly
+                ? t("settings.privacy.screenCaptureSupersededByFlag")
+                : superseded
+                  ? t("settings.privacy.screenCaptureSuperseded")
+                  : screenCaptureHelperText(prefs.screen_capture_protection, t)
+          }
+          anchorId="privacy.screen-capture"
+          testId="settings.screen-capture"
+          stateAttrs={{ "data-superseded": String(superseded) }}
+          control={(helperId) => (
+            <Switch
+              checked={prefs.screen_capture_protection}
+              // Inert while the device override is on: the per-vault preference
+              // still records what the user wants, and it still governs nothing.
+              // Disabling it is the honest state; leaving it live would let a
+              // click report a change the window does not make.
+              onChange={
+                superseded
+                  ? undefined
+                  : (next) => {
+                      void toggleScreenCapture(next);
+                    }
+              }
+              ariaLabel={t("settings.privacy.screenCaptureLabel")}
+              ariaDescribedBy={helperId}
+              testId="settings.screen-capture-toggle"
+            />
+          )}
+        />
+      )}
       {has("screenCaptureProtection") && (
         <ScreenCaptureOverrideRow
           view={override}
