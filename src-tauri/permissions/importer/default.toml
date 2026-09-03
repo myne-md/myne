@@ -79,4 +79,3 @@ commands.allow = ["import_source_read_note"]
 identifier = "allow-import-source-reseal-attachment"
 description = "Allow invoking importer:import_source_reseal_attachment (decrypt ONE attachment from a source vault and re-seal it under the target vault's keys). Runs entirely host-side, so the decrypted file never crosses IPC. Copies filename and created_at from the source catalog row; keeps the MIME allowlist re-sniff so a type the allowlist has since narrowed away is a reported rejection rather than a silent drop; skips ingest re-compression because the bytes are already a Myne vault's canonical bytes. The target id falls out of the target vault's own root_key-keyed HMAC, so dedup against what the target already holds is automatic."
 commands.allow = ["import_source_reseal_attachment"]
-

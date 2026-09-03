@@ -469,6 +469,14 @@ const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_INTERVAL_MS = 100;
 
 /** One WebDriver session against a running tauri-driver. */
+/** A toplevel window's geometry, as W3C `GET/POST /window/rect` reports it. */
+export interface WindowRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export class Session {
   constructor(
     readonly baseUrl: string,
@@ -596,6 +604,53 @@ export class Session {
    *  is served over HTTP and every scenario starts by going there. */
   navigate(url: string): Promise<void> {
     return this.send("POST", "/url", { url });
+  }
+
+  /** The BROWSER's own Back (W3C `POST /back`).
+   *
+   *  Unused by the desktop lane, which has no browser chrome and no session
+   *  history to walk — its navigation history is in-app and driven through the
+   *  UI. The web lane needs the real thing: the claim under test in
+   *  `history-privacy.e2e.ts` is about what the browser stores and restores,
+   *  and an in-app "back" control would answer a different question entirely.
+   *
+   *  Waits for nothing. A back navigation may be served from the bfcache
+   *  (instant, no re-execution) or as a fresh load, and which one it is depends
+   *  on the engine and the page — so the caller settles on what it actually
+   *  cares about rather than on a fixed delay here. */
+  back(): Promise<void> {
+    return this.send("POST", "/back");
+  }
+
+  /** The toplevel window's geometry (W3C `GET /window/rect`). */
+  windowRect(): Promise<WindowRect> {
+    return this.send<WindowRect>("GET", "/window/rect");
+  }
+
+  /**
+   * Resize/move the toplevel window (W3C `POST /window/rect`), returning what
+   * the window manager actually granted.
+   *
+   * The return value is not a formality: a request is a REQUEST. Under xvfb
+   * there is no window manager to honour or refuse one, the X server's screen
+   * size is a hard ceiling, and GTK enforces the window's own minimum size — so
+   * a caller that assumes it got what it asked for can silently measure a
+   * layout at a width it never reached. Every caller in this suite asserts on
+   * the granted rect.
+   *
+   * This is the primitive `src/screens/responsiveCollapse.ts` said the harness
+   * did not have ("the trigger is a window resize, which the tauri-driver
+   * harness has no primitive to drive"). It has had it since W3C WebDriver;
+   * nothing here had needed it, and that comment was read as a statement about
+   * the harness rather than about that file's coverage (myne-md/myne#555).
+   */
+  setWindowRect(rect: Partial<WindowRect>): Promise<WindowRect> {
+    return this.send<WindowRect>("POST", "/window/rect", {
+      x: rect.x ?? null,
+      y: rect.y ?? null,
+      width: rect.width ?? null,
+      height: rect.height ?? null,
+    });
   }
 
   /** The current top-level browsing context's handle (W3C `GET /window`).

@@ -59,6 +59,27 @@ export interface BrowserSessionOptions {
    * desktop browser and must not set it.
    */
   readonly emulateMobile?: boolean;
+  /**
+   * Reuse an EXISTING browser profile instead of making a throwaway one.
+   *
+   * The one thing this is for is a scenario whose subject is what survives the
+   * browser going away — a tab closed, a browser quit — where the second
+   * session has to open the SAME origin storage the first one wrote. OPFS lives
+   * in the profile, so a fresh `--user-data-dir` is a fresh, empty vault, and a
+   * scenario that took one would be asserting a re-bootstrap rather than a
+   * flush.
+   *
+   * The caller owns the directory it passes: teardown will not remove it, since
+   * a harness that deleted a profile it did not create could take a caller's
+   * evidence with it. `removeProfile()` is still available and still does what
+   * it says.
+   *
+   * Every other scenario must leave this unset. Profile isolation between
+   * SUCCESSIVE scenarios in one slot is what stops test 2 opening test 1's
+   * vault (see the two-isolations note in `e2e-web/CLAUDE.md`), and reusing a
+   * profile is opting out of it deliberately, for one scenario, on purpose.
+   */
+  readonly profileDir?: string;
 }
 
 /** The phone the device-class scenario emulates. Chrome's own device list. */
@@ -175,7 +196,10 @@ export async function newBrowserSession(
   opts: BrowserSessionOptions,
 ): Promise<BrowserSession> {
   const headless = opts.headless ?? process.env.MYNE_WEB_E2E_HEADED !== "1";
-  const profileDir = mkdtempSync(join(tmpdir(), "myne-web-e2e-profile-"));
+  // A caller-supplied profile is BORROWED, not owned — see `profileDir` on the
+  // options. `owned` is what every cleanup path below keys on.
+  const owned = opts.profileDir === undefined;
+  const profileDir = opts.profileDir ?? mkdtempSync(join(tmpdir(), "myne-web-e2e-profile-"));
   let session: Session;
   try {
     const value = await wireNewSession(
@@ -184,12 +208,15 @@ export async function newBrowserSession(
     );
     session = new Session(opts.baseUrl, value.sessionId);
   } catch (e) {
-    // The profile is this function's to clean up until a session owns it.
-    rmSync(profileDir, { recursive: true, force: true });
+    // The profile is this function's to clean up until a session owns it — and
+    // only if this function CREATED it.
+    if (owned) rmSync(profileDir, { recursive: true, force: true });
     throw e;
   }
 
   let torn = false;
+  // Explicit, so it still works on a borrowed profile: a caller that asked for
+  // one is the party that knows when it is finished with it.
   const removeProfile = () => rmSync(profileDir, { recursive: true, force: true });
   return {
     session,
@@ -206,8 +233,11 @@ export async function newBrowserSession(
         // removing, and failing here would hide that.
       });
       // The residue scan needs the profile to outlive the session — the whole
-      // question it asks is what the browser flushed on the way out.
-      if (!opts?.keepProfile) removeProfile();
+      // question it asks is what the browser flushed on the way out. A BORROWED
+      // profile always outlives it, whatever the caller passed: a harness that
+      // deleted a directory it did not create could take a caller's evidence
+      // with it, and the caller has `removeProfile()` for when it is done.
+      if (owned && !opts?.keepProfile) removeProfile();
     },
   };
 }

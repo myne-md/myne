@@ -481,6 +481,25 @@ pre-commit:
       glob: "*.{rs,json}"
       run: node scripts/check-cli-sidecar.mjs
 
+    clipper-identifiers:
+      # The clipper's three load-bearing identifiers (myne-md/myne#558). Every
+      # pairing token binds to an extension ID, and the native-messaging host
+      # manifests are generated from these constants — so drift means the browser
+      # refuses to start the host for an origin nobody allowlisted, and the user
+      # sees "clipping does nothing" with no error on either side.
+      #
+      # The Chromium half is CROSS-REPO: the pinned ID is derived from the key
+      # committed to `myne-clipper/src/manifest.json`, which is why nothing could
+      # check it before. Where the companion is absent (a fresh clone, CI) the
+      # guard REPORTS what it could not check rather than reporting ok — the
+      # silent-skip failure `check-embed-layout-drift.mjs` records about the
+      # published vectors.
+      #
+      # Whole-contract, like cli-sidecar above: a rename on one side never
+      # touches the other side's file.
+      glob: "*.{rs,json,md}"
+      run: node scripts/check-clipper-identifiers.mjs
+
     i18n-catalog:
       # Guards the i18n migration (decisions.md 2026-06-25): fails if
       # locales/en/common.json has any EMPTY English source value, or if a

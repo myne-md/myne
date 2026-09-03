@@ -180,6 +180,13 @@ export async function exportSelectionAsImage(): Promise<ImageExportOutcome> {
       contentWidth: selection.width,
       contentHeight: selection.height,
       padding: SELECTION_CARD_PADDING,
+      // `--paper`, not `--paper-1`: there is no `--paper-1` token
+      // (`client-core/src/tokens.css` names the light end of the surface ramp
+      // plain `--paper`, and `src/CLAUDE.md` says so), so the old name resolved
+      // to nothing and every exported card carried the hardcoded fallback
+      // whatever theme was active — contradicting this function's own "come
+      // from the ACTIVE theme" contract on dark and AMOLED. The fallback is the
+      // token's own light value, so the two agree when the var is missing.
       background: cssVar("--paper", "#fbfbfa"),
       fontFamily: cssVar("--font-sans", "sans-serif"),
     };

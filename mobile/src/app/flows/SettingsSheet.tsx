@@ -2135,7 +2135,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 onClick={() => setPanel("ai")}
               />
               <CategoryRow glyph="sync" label={t("settings.shell.panels.sync")} value={syncSummary(syncStatus, t)} onClick={() => setPanel("sync")} />
-              <CategoryRow glyph="about" label={t("settings.shell.panels.about")} value="0.1.0" onClick={() => setPanel("about")} />
+              <CategoryRow glyph="about" label={t("settings.shell.panels.about")} value={__APP_VERSION__} onClick={() => setPanel("about")} />
             </Group>
 
             <button
@@ -2640,8 +2640,15 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             <Group>
               <Row first>
                 <span style={rowLabel}>{t("settings.about.version")}</span>
+                {/* `__APP_VERSION__`, not a literal. `mobile/vite.config.ts`
+                    injects it from `mobile/package.json` and says in its own
+                    comment that this row reads it — which was not true: the
+                    literal here said `0.1.0` while the app shipped 0.5.0, so a
+                    mobile About screen named a version four minors old and every
+                    bug report from it pointed at a source tree that could not
+                    contain the bug. myne-md/myne#555, `settings.panel.about`. */}
                 <span style={{ fontSize: 16, color: "var(--fg-3)" }}>
-                  0.1.0 · {import.meta.env.MODE === "production" ? t("settings.about.buildChannelStable") : t("settings.about.dev")}
+                  {__APP_VERSION__} · {import.meta.env.MODE === "production" ? t("settings.about.buildChannelStable") : t("settings.about.dev")}
                 </span>
               </Row>
               <Row>
@@ -2756,11 +2763,20 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               </div>
             ) : (
               <>
-                <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
+                {/* Observability only (`src/CLAUDE.md` "Test observability"): the
+                    PIN path is what must SURVIVE on a platform with no biometric
+                    provider, so a scenario asserting the biometric toggle's
+                    absence needs a stable handle on the thing that stayed.
+                    Without one the absence assertion passes just as well on a
+                    panel that rendered nothing at all. */}
+                <div
+                  data-testid="settings.quick-unlock-pin-setup"
+                  style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}
+                >
                   {t("settings.quickUnlock.pinSetupHelper")}
                 </div>
                 <FieldLabel mt={14}>{t("settings.quickUnlock.methodPin")}</FieldLabel>
-                <SheetInput type="password" inputMode="numeric" value={pin} onChange={setPin} placeholder={t("settings.quickUnlock.pinPlaceholder6")} />
+                <SheetInput type="password" inputMode="numeric" value={pin} onChange={setPin} placeholder={t("settings.quickUnlock.pinPlaceholder6")}  />
                 <FieldLabel mt={12}>{t("settings.quickUnlock.confirmPin")}</FieldLabel>
                 <SheetInput type="password" inputMode="numeric" value={pinConfirm} onChange={setPinConfirm} placeholder={t("settings.quickUnlock.reenterPin")} />
                 <div style={{ marginTop: 18 }}>

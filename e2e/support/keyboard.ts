@@ -23,6 +23,16 @@ export const KEY = {
   SPACE: String.fromCharCode(0xe00d),
   SHIFT: String.fromCharCode(0xe008),
   CONTROL: String.fromCharCode(0xe009),
+  /** W3C `Meta` — Command on macOS.
+   *
+   *  Needed by the BROWSER lane rather than this one (myne-md/myne#556): the
+   *  desktop suite runs on Linux, where the app's `Mod` resolves to Ctrl, so
+   *  `CONTROL` was the only modifier any chord here ever needed. The web lane
+   *  runs on whatever OS the developer or runner has, and on macOS the same
+   *  binding is Cmd — a `Ctrl+K` sent there opens nothing, and the scenario
+   *  times out on a dialog that was never asked for. Resolve the modifier from
+   *  the page's own `navigator.platform`, the way `src/commands/chord.ts` does. */
+  META: String.fromCharCode(0xe03d),
   DELETE: String.fromCharCode(0xe017),
   /** W3C `Home`. Selecting with Shift+Home is how a scenario gets a
    *  selection without depending on the app's `Mod-a` binding, which is
@@ -58,6 +68,29 @@ export async function pressKey(
   });
   // Release the driver's input-source state between chains (W3C "release
   // actions") so a held modifier never leaks into the next press.
+  await session.send("DELETE", "/actions");
+}
+
+/**
+ * Type `text` at whatever currently holds focus, one key action per character.
+ *
+ * The distinction from `Element.sendKeys` is the whole reason this exists:
+ * element-scoped typing FOCUSES the element first, so a scenario asserting that
+ * a field already owned focus cannot use it — the helper would create the
+ * condition it is meant to observe. Driving the keyboard input source instead
+ * sends the burst wherever focus actually is, which is what VU-13
+ * (`vault-unlock.e2e.ts`) is about: the password field owning focus early
+ * enough at first paint that a burst typed immediately arrives whole.
+ */
+export async function typeIntoActive(session: Session, text: string): Promise<void> {
+  const actions: Array<Record<string, unknown>> = [];
+  for (const ch of text) {
+    actions.push({ type: "keyDown", value: ch });
+    actions.push({ type: "keyUp", value: ch });
+  }
+  await session.send("POST", "/actions", {
+    actions: [{ type: "key", id: "kbd", actions }],
+  });
   await session.send("DELETE", "/actions");
 }
 

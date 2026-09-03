@@ -132,6 +132,55 @@ test.describe("sync join flow", () => {
     await expect(page.getByTestId("sync.join.qr-confirm")).toHaveCount(0);
   });
 
+  // myne-md/myne#557, the `enrolment.qr-scan` bullet:
+  //
+  //   > both halves are code: the Rust arm returns `Error::Unsupported` off iOS
+  //   > and `JoinFlow.tsx` maps `errKind === "Unsupported"` to
+  //   > `t("join.qr.scanUnavailable")`, so making the mocked IPC return
+  //   > `Unsupported` and asserting that message IS the "button that appears to
+  //   > do nothing" check.
+  //
+  // The scanner plugin has an iOS arm and nothing else — `Error::Unsupported` on
+  // Android and on any desktop-hosted shell — so this branch is what the
+  // MAJORITY of installs take. It is also the branch a hand-walk on an iPhone
+  // structurally cannot reach, and the failure it guards against is silent:
+  // without the mapping the catch falls through to `qrErrorMessage`'s default,
+  // "Couldn't scan", which tells an Android user their camera failed and invites
+  // them to try again forever. The correct message tells them scanning is not a
+  // thing here and points at the form that is.
+  //
+  // Asserted by LITERAL, because the whole defect is which of two messages
+  // rendered — a visible-error assertion passes on either one. The Rust half is
+  // pinned separately in
+  // `mobile/src-tauri/tauri-plugin-qr-scan/tests/unsupported_contract.rs`.
+  test("scanner unavailable → says so, and leaves the form usable", async ({ page }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      qrScanError: { kind: "Unsupported" },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("sync.join.scan-qr").click();
+
+    await expect(page.getByTestId("sync.join.error")).toHaveText(
+      "Scanning isn’t available on this device — enter your details below.",
+    );
+    // Not the generic scan failure, which would read as "your camera didn't
+    // work, try again" on a device where trying again can never work.
+    await expect(page.getByTestId("sync.join.error")).not.toHaveText(
+      "Couldn’t scan. Try again, or enter your details manually.",
+    );
+
+    // The message points at the form, so the form has to still be there and
+    // still work. A refusal that also disabled the manual path would be a
+    // dead end rather than a redirect.
+    await expect(page.getByTestId("sync.join.qr-confirm")).toHaveCount(0);
+    await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
+    await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+    await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");
+    await expect(page.getByTestId("sync.join.submit")).toBeEnabled();
+  });
+
   // ── The join door on a device that ALREADY holds vaults (myne-mobile#40) ────
   //
   // The regression these two cover is not inside JoinFlow — it is that nothing

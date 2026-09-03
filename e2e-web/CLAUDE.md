@@ -119,6 +119,53 @@ Both runners live on the **host**, not in a container: containerising would
 remove the Safari seat, which has no other home. `--skip-build` is the only flag
 `e2e-web-local.sh` takes; anything else is refused rather than ignored.
 
+### Seating a driver on a developer machine
+
+Both runners refuse to start without `chromedriver` on `PATH`, and until
+myne-md/myne#556 nothing here said where a macOS developer gets one — so the
+whole lane read as blocked on a dependency decision. It is not. The driver's
+only hard requirement is that its MAJOR matches the installed browser's
+(chromedriver refuses a session one major off), and npm publishes it per major:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version   # → 151.x
+npx --yes chromedriver@151 --version                                       # fetch that major
+find ~/.npm/_npx -name chromedriver -type f                                # where it landed
+PATH="$(dirname "$(find ~/.npm/_npx -path '*chromedriver/bin/chromedriver')")":$PATH \
+  ./scripts/e2e-web-one.sh smoke
+```
+
+Nothing is installed globally and nothing on the machine changes — the binary
+lives in the npm cache. This is a LOCAL seat only: the "no unpinned
+release-archive download in a blocking step" rule above still binds CI, which
+keeps seating `chromium` + `chromium-driver` as a matched pair from its base
+image's signed Debian archive.
+
+**A fast green here is not evidence on its own.** The smoke spec passed in
+1.4 s, and the default chromedriver log shows only its startup banner — which
+looks exactly like a session that never happened, and this lane's whole gate
+design assumes a skip reports the same green as a run. Re-run with
+`chromedriver --port=4544 --verbose` and read the log: a real run leaves
+thousands of lines ending in `RESPONSE Quit`. (Grepping for `NewSession` finds
+nothing even on a good run — chromedriver logs `InitSession`.)
+
+**An injection is evidence only if the REBUILD is confirmed.** The lane serves
+`web/dist`, so breaking a source file proves nothing until `pnpm web:build` has
+actually re-emitted it — and a failed build leaves the previous bundle in place,
+which the runner then serves without complaint. Both times this bit, the injected
+defect was real and the test reported green: once on an invalid comment position
+in JSX, once on an unused binding under `noUnusedLocals`. Both are `tsc` errors,
+so `pnpm web:build` exits non-zero and prints nothing the test run echoes. Read
+the build's last line (`emit-web-version: sha256:…`) before believing a green
+run, or pipe the build through something that fails loudly. Without it,
+"verified by breaking it" silently becomes "verified against the unbroken
+build", which is the exact non-evidence the root `CLAUDE.md` guard rules are
+about.
+
+Also: the lane needs `web/wasm/pkg`, which is a derived artefact and is NOT in
+the repo. `pnpm web:build` fails with `Could not resolve
+'../../wasm/pkg/myne_web_wasm.js'` until `./scripts/build-wasm.sh` has run once.
+
 Underneath them is `pnpm web:build` (the lane refuses to run without a built
 bundle) and `pnpm test:e2e:web`. Calling those two by hand works, with one
 caveat that costs an afternoon to rediscover: `MYNE_WEB_E2E_DRIVER_PORT` is an

@@ -26,7 +26,7 @@ import type {
 } from "@myne/editor/decorations/task-query-block";
 import type { EditorView } from "@codemirror/view";
 import { taskDescription } from "../dialect/taskFieldWriter";
-import { todayLocal } from "./taskFilters";
+import { useLocalToday } from "./useLocalToday";
 import { parseTaskQuery } from "./taskQuery";
 import { runTaskQuery } from "./taskQueryRun";
 import { taskRowKey, type VaultTask } from "./taskWriteCore";
@@ -134,10 +134,14 @@ export function useTaskQueryResults(
     };
   }, [tagKey, indexNonce]);
 
+  // myne#279: "today" follows the display timezone when one is set. Resolved
+  // through `useLocalToday` rather than inline, so a query block's "today"
+  // re-resolves when the day rolls over instead of only when the task list or
+  // the tag index happens to change (myne-md/myne#557).
+  const today = useLocalToday(dateTimeDisplay().timeZone);
+
   const results = useMemo(() => {
     if (queries.length === 0) return EMPTY_RESULTS;
-    // myne#279: "today" follows the display timezone when one is set.
-    const today = todayLocal(new Date(), dateTimeDisplay().timeZone);
     const tagsOf = (noteId: string): readonly string[] => {
       const out: string[] = [];
       for (const [tag, ids] of tagNotes) if (ids.has(noteId)) out.push(tag);
@@ -156,7 +160,7 @@ export function useTaskQueryResults(
       });
     }
     return map;
-  }, [queries, tasks, tagNotes]);
+  }, [queries, tasks, tagNotes, today]);
 
   const byRowKey = useMemo(() => {
     const map = new Map<string, VaultTask>();

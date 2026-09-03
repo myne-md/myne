@@ -29,6 +29,7 @@ import {
   type SeededVault,
 } from "./support/fixtures";
 import { seedProductionVault } from "./support/realistic-fixture";
+import { activeTestId, typeIntoActive } from "./support/keyboard";
 import { ioBanner } from "../src/lib/io-banner";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../src/lib/load-bearing-copy";
 
@@ -439,6 +440,75 @@ describeE2E("VU-12 lost-credentials delete-vault sub-view (MYND-125 task 7)", ()
         await submit2.click();
         await app.session.byTestId("welcome.root", { timeoutMs: 20_000 });
         expect(existsSync(join(app.appDataDir, "vaults", fixture.vaultId))).toBe(false);
+      },
+    );
+  });
+});
+
+// VU-13 — myne-md/myne#557's `vault.unlock` bullet: "the password field owns
+// focus at first paint and keys typed immediately all land".
+//
+// # Why this was a roster row, and why it does not need to be
+//
+// It reads like a thing only a person can judge — you open the app, you start
+// typing, and either your first characters are there or they are not. Two facts
+// make it mechanical. `launchApp` IS a cold boot, so "first paint" is the state
+// every scenario already starts in; and `support/keyboard.ts::activeTestId`
+// reads `document.activeElement`'s testid, so "owns focus" is a string
+// comparison.
+//
+// # The second half is the one with teeth
+//
+// A focus that arrives one frame LATE passes an `activeElement` check taken a
+// moment later and still eats the user's first keystrokes: they land on the
+// document, not the field. So the assertion that matters is not where focus is,
+// it is that a burst typed at the earliest possible moment arrives WHOLE. This
+// types immediately after the element resolves — no settle, no focus click, no
+// intervening wait — and compares the field's `value` against the payload
+// character for character. A dropped prefix fails on the exact characters lost.
+//
+// The payload is a scenario constant and not a credential (SYNC-13): it is never
+// submitted, and nothing about it reaches a failure diff that a password would.
+describeE2E("VU-13 the unlock field owns focus at first paint (myne-md/myne#557)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("focuses the password field on a cold boot and loses no keystroke typed into it", async () => {
+    // Deliberately not a password shape: mixed case, digits and punctuation, so
+    // a dropped leading character cannot be mistaken for a shift-key artefact.
+    const BURST = "abcdefghij0123456789";
+    await scenario(
+      "vu13-first-paint-focus",
+      { seed: (dir) => void seedVault(dir) },
+      async (app) => {
+        const s = app.session;
+
+        // Cold boot. Resolve the field and do NOTHING else — no click, no
+        // settle. Anything here would hand focus to the field ourselves and
+        // make the assertion about our own click.
+        const field = await s.byTestId("unlock.password-input", { timeoutMs: 20_000 });
+
+        // 1. Focus is already there.
+        await s.waitUntil(
+          async () =>
+            (await activeTestId(s)) === "unlock.password-input" ? true : null,
+          {
+            label: "the password field owns focus at first paint",
+            timeoutMs: 10_000,
+          },
+        );
+
+        // 2. …and it owned focus early enough that a burst typed right now
+        //    arrives whole. `typeIntoActive`, not `Element.sendKeys`:
+        //    element-scoped typing FOCUSES the element first, which is exactly
+        //    the thing under test.
+        await typeIntoActive(s, BURST);
+        await s.waitUntil(
+          async () => ((await field.property<string>("value")) === BURST ? true : null),
+          {
+            label: `every keystroke of a ${BURST.length}-character burst landed`,
+            timeoutMs: 10_000,
+          },
+        );
+        expect(await field.property<string>("value")).toBe(BURST);
       },
     );
   });

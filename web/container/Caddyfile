@@ -60,10 +60,18 @@
 	@assets path /assets/*
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 
-	# `version.json` must describe the SERVED build, so it is never cached and
-	# is excluded from the service worker's pinned cache (task 54). It is what
-	# lets anyone compare a running instance against the published hash record
-	# without downloading and hashing the bundle by hand.
+	# `version.json` must describe the SERVED build, so it is never cached
+	# (task 54). It is what lets anyone compare a running instance against the
+	# published hash record without downloading and hashing the bundle by hand.
+	#
+	# This comment used to give a second reason that named a cache this
+	# container does not deploy. The header was right and the reason was not,
+	# which is the worse half to be wrong about in a file operators read to
+	# learn what their container does. `tests/web/serviceWorkerClaim.test.ts`
+	# holds it now, in both directions — including the day the missing
+	# mechanism lands, when that test fails and the pair gets re-examined
+	# together instead of one of them going stale again. Do not restate the
+	# mechanism's name here: the test greps this file for it.
 	@version path /version.json
 	header @version Cache-Control "no-store"
 

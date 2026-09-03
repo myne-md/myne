@@ -21,6 +21,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   createNote,
+  ipcOk,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   editorText,
@@ -199,6 +200,162 @@ describeE2E("lt1 links tab — incoming + outgoing sections (MYND-604)", () => {
         await clickLinksTab(s);
         await s.byTestId("editor.backlink-row");
         await s.byTestId("editor.outgoing-link-row");
+      },
+    );
+  });
+});
+
+// lt2 — myne-md/myne#555's `links.backlinks-and-mentions` bullet:
+//
+//   > `MENTION_DF_MIN_CORPUS` is 20, not 2000, so ~25 seeded notes engage the
+//   > df ceiling; `passesMentionFloor` is pure and already unit-tested, and
+//   > settle time is a measured wait.
+//
+// # What was actually missing
+//
+// The pure half IS covered — `tests/notes/unlinkedMentions.test.ts` pins the
+// word-boundary rule, the df ceiling, the ≤2-character suppression and the
+// corpus minimum, boundary included. What nothing covered is the surface: on a
+// real vault, does the section reach a settled answer, and is that answer the
+// filtered one rather than every note containing the word?
+//
+// It could not be covered, because `UnlinkedMentionsSection.tsx` carried **no
+// testid at all** — the whole surface was invisible to this lane. The testid
+// pass landed with this scenario (`src/CLAUDE.md`: production code may gain
+// `data-testid` / `data-*` observability attributes, and a flow without them is
+// invisible to E2E).
+//
+// # Why the corpus size is the point
+//
+// Below `MENTION_DF_MIN_CORPUS` the df clause is SKIPPED entirely, so a small
+// vault is not blinded by a word that happens to be common in it. That means a
+// scenario seeding three notes proves nothing about the ceiling: it exercises
+// the small-corpus arm. Twenty-five notes cross the line, so the suppression is
+// live and its effect is observable.
+//
+// # What this scenario can and cannot reach
+//
+// Measured, by injecting each layer's defect and watching what happened:
+//
+//  * **The floor is reachable.** Making `passesMentionFloor` refuse empties the
+//    section, and the row-count assertion below names it.
+//  * **The word-boundary verify is NOT reachable from here**, and that is a
+//    fact about the architecture rather than a gap to paper over. Deleting
+//    `foldedTitleMatches` from `verifyMentionCandidates` left this scenario
+//    green, because the BM25 candidate recall has already narrowed the set to
+//    notes carrying the title as a token — the verify is a second filter with
+//    nothing left to remove on a corpus like this one. A decoy note carrying
+//    the title only as a substring would not help either: a different token is
+//    a different token, so recall never returns it.
+//
+//    That layer stays where it is already covered, in
+//    `tests/notes/unlinkedMentions.test.ts` ("does NOT match a substring —
+//    word boundary ('Index' ⊄ 'reindex')"), which drives the matcher directly
+//    and does not have a recall stage in front of it.
+//
+// # `data-busy` is what makes the settle honest
+//
+// "No mentions" and "still searching" render as different sentences and would
+// otherwise both read as "no rows". A wait keyed on the row count alone can
+// therefore pass the instant the tab opens, before the search has run — the
+// classic vacuous green. The wait below is keyed on `data-busy` first.
+describeE2E("lt2 unlinked mentions settle, and the df ceiling engages (myne-md/myne#555)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("reaches a settled answer on a corpus past MENTION_DF_MIN_CORPUS", async () => {
+    // A distinctive title, and a word common enough across the corpus that the
+    // df ceiling has something to suppress.
+    const RARE_TITLE = "Zephyrion";
+    const COMMON = "meeting";
+    let password = "";
+    await scenario(
+      "lt2-unlinked-mentions-corpus",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // The corpus. `passesMentionFloor` takes the note COUNT as its corpus
+        // measure, so the filler notes need no bodies at all — creating them is
+        // enough to cross MENTION_DF_MIN_CORPUS. That matters for more than
+        // tidiness: typing and saving twenty-two bodies took this scenario past
+        // its own 180 s budget on the first run, and none of it was doing any
+        // work the assertion depends on.
+        for (let i = 0; i < 21; i += 1) {
+          await createNote(s, `Filler ${i}`);
+        }
+        // The three that actually mention the target's title, as plain text.
+        for (let i = 0; i < 3; i += 1) {
+          await createNote(s, `Mentions ${i}`);
+          await typeIntoEditor(s, ` a note about ${RARE_TITLE} and the ${COMMON}`);
+          await waitForSaved(s);
+        }
+
+        // The note the section is ABOUT: its title is the rare word, so the
+        // three notes above mention it without linking it.
+        await createNote(s, RARE_TITLE);
+        await typeIntoEditor(s, " the target");
+        await waitForSaved(s);
+        const targetId = await selectedNoteId(s);
+
+        await openNoteById(s, targetId, "the target");
+
+        // The unlinked mentions are their OWN right-panel tab (`unlinked`), not
+        // a section of the backlinks tab — `clickLinksTab` opens the wrong one
+        // and the section never mounts. rp2 already names both ids.
+        await (
+          await s.waitForElement(
+            testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "unlinked" }),
+          )
+        ).click();
+
+        // Settle on `data-busy`, not on the row count: an empty list and an
+        // unfinished search are the same DOM by row count, so a count-keyed
+        // wait would pass before the search ran.
+        const section = await s.waitForElement(
+          testIdSelector("editor.unlinked-mentions"),
+          { timeoutMs: 20_000 },
+        );
+        await s.waitUntil(
+          async () => ((await section.attribute("data-busy")) === "false" ? true : null),
+          { label: "the unlinked-mentions search settled", timeoutMs: 30_000 },
+        );
+
+        // The corpus really is past the minimum, so the df clause is live
+        // rather than skipped.
+        //
+        // Counted through `note_list` rather than by counting `notes.row`
+        // elements, and that is a correction rather than a preference: the
+        // sidebar is VIRTUALISED, so a first draft counting rendered rows saw
+        // 14 of 25 and failed a scenario whose seeding was fine. A rendered-row
+        // count answers "how many rows fit on screen", which is not a fact
+        // about the vault.
+        const ids = (await ipcOk(s, "plugin:notes|note_list")) as string[];
+        expect(
+          ids.length,
+          `the vault holds ${ids.length} notes; below MENTION_DF_MIN_CORPUS ` +
+            `(20) the df clause is skipped entirely and this scenario would be ` +
+            `exercising the small-vault arm instead`,
+        ).toBeGreaterThanOrEqual(20);
+
+        // The answer is the FILTERED one. Three notes mention the rare title;
+        // twenty-two more carry only the common word and must not appear.
+        const rows = await s.byTestIdAll("editor.unlinked-mention-row");
+        expect(
+          rows.length,
+          `the section listed ${rows.length} mentions. Three notes mention the ` +
+            `title; the other twenty-two share only a high-df word, so listing ` +
+            `them would mean the ceiling never engaged.`,
+        ).toBe(3);
+        expect(await section.attribute("data-count")).toBe("3");
+
+        // Every listed row is one of the three, identified by note id rather
+        // than by title text.
+        for (const row of rows) {
+          const id = await row.attribute("data-note-id");
+          expect(id, "a mention row carries no note id").toBeTruthy();
+          expect(id).not.toBe(targetId);
+        }
       },
     );
   });

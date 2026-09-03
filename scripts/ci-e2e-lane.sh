@@ -66,9 +66,21 @@ esac
 # Runtime-only set: this consumes a PREBUILT binary, so the GTK -dev header
 # chains are unnecessary (webkit2gtk-driver drags the runtime libs
 # transitively); pkg-config/libssl-dev stay for the tauri-driver cargo install.
+# `xdotool` + `python3` are the TOPLEVEL-window levers, and they are here
+# rather than in the base image on purpose. WebKitWebDriver accepts
+# `POST /window/rect` and silently does nothing, and `xdotool windowclose`
+# is `XDestroyWindow`, so neither drives the app's close handler; the
+# graceful close is a real `WM_DELETE_WINDOW` ClientMessage sent by
+# `e2e/support/wm-delete-window.py` (myne-md/myne#577). They belong in
+# `ghcr.io/myne-md/myne-ci` beside the rest of this set, and that is a
+# by-hand republish (`myne-ops/runbooks/ci-base-image.md`) which
+# `check-ci-image.mjs` refuses to let a source edit anticipate: editing
+# `ci/Dockerfile` without republishing makes its recorded digest describe
+# an image the file no longer produces. Installed here until that lands,
+# so this seat matches `e2e/Dockerfile`'s.
 apt-get update
 apt-get install -y --no-install-recommends \
-  curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth mold
+  curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth xdotool python3 mold
 
 # The Node tarball is version-pinned and fetched over TLS from the first-party
 # distribution origin, and it is NOT sha256-pinned. `.woodpecker/e2e.yml` states

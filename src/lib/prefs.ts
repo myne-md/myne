@@ -10,7 +10,7 @@
 //   consistency per MYND-160 grill Q5.2.
 
 import { invoke } from "../platform/core";
-import { bumpPrefsNonce } from "../notes/prefsNonce";
+import { bumpPrefsNonce, getPrefsNonce } from "../notes/prefsNonce";
 import { blockSeedingOfExistingTurns } from "../notes/ai/chatStore";
 
 /**
@@ -777,9 +777,71 @@ export interface PrefsView {
   view_order: string[];
 }
 
-/** Read vault.prefs from the unlocked vault; defaults to safer state. */
+/**
+ * The read that is currently in flight, and the nonce it was started at.
+ *
+ * See {@link prefsRead}. Held at module scope because the callers that need to
+ * share it are separate React hook instances that cannot see each other.
+ */
+let inFlightRead: { readonly at: number; readonly promise: Promise<PrefsView> } | null =
+  null;
+
+/**
+ * Read vault.prefs from the unlocked vault; defaults to safer state.
+ *
+ * CONCURRENT CALLS AT THE SAME NONCE SHARE ONE ROUND-TRIP (myne-md/myne#556),
+ * and that is a correctness fix rather than an optimisation.
+ *
+ * Every mounted `usePrefs` subscribes to the prefs nonce, and a bump notifies
+ * all of them in ONE synchronous loop — so a single settings change made
+ * fourteen instances call this function in the same tick, each triggering a
+ * full backend round-trip for the same bytes (read `vault.meta`, derive the
+ * subkey, decrypt `vault.prefs`, deserialize). Most of those concurrent reads
+ * FAILED, with `Io`. Measured in a browser, instrumenting this function and
+ * adding no traffic of its own, on one Settings write:
+ *
+ *     read-ok als=60   x6      <- six instances reloaded and got the new value
+ *     read-fail Io     x10     <- and the rest did not
+ *     read-ok als=60   x1
+ *     read-fail Io     x8
+ *
+ * `usePrefs`'s `reload` catches and keeps the current cache ("safer state per
+ * spec 9.5.5"), so every instance that lost the race stayed on DEFAULT_PREFS,
+ * silently, for the rest of the session — with WHICH instances lost varying per
+ * run. The case that surfaced it is auto-lock: `Editor.tsx`'s instance kept
+ * `auto_lock_seconds: null`, so `useIdleAutoLock` never armed and the vault
+ * never locked on idle, while Settings showed the timeout the user had chosen.
+ *
+ * Keyed on the NONCE, not on time. Sharing an in-flight read with a caller that
+ * arrived after a WRITE published would hand back pre-write bytes; the nonce is
+ * exactly the "something changed" signal, so a caller at a higher nonce starts
+ * its own read. Callers at the same nonce cannot be asking for different bytes.
+ *
+ * A rejection is shared too, which is intended: one failure reported to every
+ * waiter beats ten separate ones, and there is nothing left to retry against.
+ */
 export async function prefsRead(): Promise<PrefsView> {
-  return await invoke<PrefsView>("plugin:prefs|prefs_read");
+  const at = getPrefsNonce();
+  const current = inFlightRead;
+  if (current !== null && current.at === at) return await current.promise;
+
+  const promise = invoke<PrefsView>("plugin:prefs|prefs_read");
+  const entry = { at, promise };
+  inFlightRead = entry;
+  try {
+    return await promise;
+  } finally {
+    // Only clear OUR entry: a newer read (higher nonce) may have replaced it
+    // while this one was still settling, and clearing that would leave the next
+    // burst uncoalesced.
+    if (inFlightRead === entry) inFlightRead = null;
+  }
+}
+
+/** Test seam: drop any shared in-flight read so one test cannot leak into the
+ *  next. Not used in production. */
+export function __resetPrefsReadForTest(): void {
+  inFlightRead = null;
 }
 
 /**

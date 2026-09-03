@@ -903,6 +903,79 @@ mod tests {
         teardown(Some(handle));
     }
 
+    // ── myne-md/myne#555, `cli.socket_transport` ───────────────────────────
+    //
+    // > bind at a deliberately over-cap path (both the Linux ~108 and macOS
+    // > ~104 caps are exceeded by the same construction) and assert the failure
+    // > is reported rather than the door appearing enabled while bound to
+    // > nothing. Designing the case out of the run is the bug.
+    //
+    // `ShortDir` above exists precisely to keep every other test in this module
+    // UNDER the kernel's `sun_path` cap, and its comment says so. That is the
+    // right call for tests about what happens when a bind succeeds — and it
+    // means the over-cap path is the one condition this file has arranged never
+    // to encounter. It is not exotic: an app-data dir under a long profile
+    // name, a deeply nested `$XDG_DATA_HOME`, or a macOS container path is
+    // enough, and `SOCKET_BASENAME` is short "by design" exactly because the
+    // margin is thin.
+    //
+    // What must NOT happen is the shape myne#314 already fixed one instance of:
+    // an `Err` swallowed while `spawn` still reports success, leaving a status
+    // marker that says the door is open and nothing behind it. Every `myne`
+    // command then fails with a generic IO error instead of the
+    // app-not-running / vault-locked / cli-disabled answer the marker exists to
+    // give.
+    //
+    // Two things are asserted, and the second is the one a swallowed error
+    // passes: `spawn` REPORTS the failure, and it leaves no socket file
+    // advertising a door nobody serves.
+    #[cfg(unix)]
+    #[test]
+    fn spawn_reports_a_path_over_the_kernel_sun_path_cap() {
+        // One construction that exceeds BOTH caps: Linux's ~108 and macOS's
+        // ~104. Built from nested components rather than one long name so it
+        // also clears any per-component `NAME_MAX`, and rooted at `/tmp` so the
+        // absolute length is under our control rather than the runner's.
+        let mut dir = std::path::PathBuf::from("/tmp");
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        dir.push(format!("myne-cap-{stamp}"));
+        for i in 0..6 {
+            dir.push(format!("segment-that-is-deliberately-long-{i}"));
+        }
+        std::fs::create_dir_all(&dir).expect("create over-cap dir");
+
+        let socket = socket_path(&dir);
+        assert!(
+            socket.as_os_str().len() > 108,
+            "the probe path is {} bytes, which is under the Linux cap — this test \
+             would then be asserting nothing. Lengthen the construction.",
+            socket.as_os_str().len()
+        );
+
+        let result = spawn(&dir, test_lister(), open_limiter(), test_marker());
+
+        assert!(
+            result.is_err(),
+            "spawn reported SUCCESS for a socket path of {} bytes, which no kernel \
+             can bind. A handle recorded here means the status marker says the CLI \
+             door is open while nothing is listening, and every `myne` command \
+             fails with a generic IO error instead of a diagnosis.",
+            socket.as_os_str().len()
+        );
+        assert!(
+            !socket.exists(),
+            "a socket FILE was left at an unbindable path. A file that answers \
+             ECONNREFUSED is a worse answer than one that is simply absent — \
+             `spawn`'s own thread-failure arm says so and removes it."
+        );
+
+        std::fs::remove_dir_all(std::path::PathBuf::from("/tmp").join(format!("myne-cap-{stamp}")))
+            .ok();
+    }
+
     #[cfg(unix)]
     #[test]
     fn a_connected_client_can_send_a_frame_and_get_a_reply() {

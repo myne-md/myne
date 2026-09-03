@@ -16,10 +16,12 @@
 // no-ops. The user must wait for the backend response before the modal
 // becomes dismissable again.
 //
-// Child-dialog gating: a panel that opens a `ModalShell` of its own (the AI
-// provider consent, the beta terms) raises `childDialogOpen`. Both this shell
-// and `ModalShell` listen for Esc on `window`, so ungated one press would close
-// the child AND this modal under it. It gates Esc and the backdrop only —
+// Child-dialog gating: a panel that puts a surface of its own on screen (the AI
+// provider consent, the beta terms, the Appearance accent picker) raises
+// `childDialogOpen`. This shell listens for Esc on `window` and each child
+// listens on `window` or `document`; none of them stops propagation, so ungated
+// one press would close the child AND this modal under it. It gates Esc and the
+// backdrop only —
 // NOT the × the way `childInFlight` does, because the child's own backdrop
 // already covers the header and a greyed close button would be claiming a
 // restriction that isn't one.
@@ -445,7 +447,10 @@ export function SettingsModal({
   const contentRef = useRef<HTMLDivElement>(null);
   // Narrow-dialog restack (#391): watch the content area's width and let every
   // panel's rows (and the Editor preview column) respond via context.
-  const compact = useSettingsCompactObserver(contentRef);
+  // `open` is passed because the content div does not exist while the dialog is
+  // closed, and a ref filling in does not re-render — see the parameter's own
+  // doc (myne-md/myne#556). Without it the observer was never attached.
+  const compact = useSettingsCompactObserver(contentRef, open);
   // The setting to scroll to + flash once the target panel has mounted (a result
   // was selected). Held across the panel switch; consumed by the effect below.
   const [pendingScroll, setPendingScroll] = useState<SettingsIndexEntry | null>(
@@ -681,7 +686,9 @@ export function SettingsModal({
     files: <FilesPanel />,
     transcription: <TranscriptionPanel />,
     hotkeys: <HotkeysPanel />,
-    appearance: <AppearancePanel onOpenGraph={onOpenGraph} />,
+    appearance: (
+      <AppearancePanel onOpenGraph={onOpenGraph} onDialogOpenChange={setChildDialogOpen} />
+    ),
     storage: (
       <StoragePanel
         vaultId={vaultId}
