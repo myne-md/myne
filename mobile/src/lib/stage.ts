@@ -721,54 +721,58 @@ export type SlotMap = Record<VaultId, SlotKind>;
  * slot-priority preserves the silent-recovery posture (Q4) at the boundary.
  */
 export function initialStageFromProbe(vaultList: VaultListResult, slotMap: SlotMap): Stage {
-  // Slot-priority: a non-Empty runtime slot pins the boot stage
-  // regardless of disk state / vault count. Under SYNC-1 at most one
-  // slot is non-Empty; we scan defensively and let `Recovering` win
-  // over `Unlocked` (the non-dismissible chained recovery step).
-  const slots = Object.values(slotMap);
-  if (slots.includes("Recovering")) {
-    return { name: "recover", subStep: "password-reset" };
+  // The DECISION is shared (myne-md/myne#477): slot priority, the fail-closed
+  // `err` arm and the 0 / 1 / >=2 count split live once, in
+  // `@myne/client-core/stage-decision`. What stays here is this client's SCREEN
+  // mapping, which is the half that is allowed to differ.
+  //
+  // Two arms below read as unconditional where desktop's are gated on a
+  // capability, and that is the whole of the difference between the two
+  // mappings: on a Tauri client `localOnlyVault` and `backup` are both present,
+  // so desktop's ternaries produce exactly these answers. This client has no
+  // `account-entry` stage to route to, which is why the gate is absent rather
+  // than hard-coded true.
+  const decision = bootDecision(vaultList, slotMap);
+  switch (decision.kind) {
+    case "resume-recovery":
+      return { name: "recover", subStep: "password-reset" };
+    case "resume-editor":
+      return { name: "editor" };
+    case "list-io-error":
+      return { name: "unlock", initialStatus: { kind: "IoError", ioKind: decision.ioKind } };
+    case "no-vaults":
+      return { name: "welcome" };
+    case "single-vault":
+      return singleVaultStage(decision.vaultId, decision.status);
+    case "multiple-vaults":
+      // >=2 vaults: show the picker (SYNC-7a).
+      return { name: "picker" };
+    default:
+      return assertNever(decision);
   }
-  if (slots.includes("Unlocked")) {
-    return { name: "editor" };
-  }
+}
 
-  // All slots Empty (or no live slots) — fall through to list-based
-  // routing. A list-level IO failure is fail-closed regardless of count.
-  if ("err" in vaultList) {
-    return {
-      name: "unlock",
-      initialStatus: { kind: "IoError", ioKind: vaultList.err.detail.io_error_kind },
-    };
+/**
+ * The single-vault arm's screen mapping.
+ *
+ * Exactly one vault, unlocked directly (SYNC-7a: no picker for the
+ * single-vault user). Map its on-disk health to the unlock screen's fail-closed
+ * surfaces. Carry the lone vault's id as the unlock target (task 8) so the
+ * single-vault path also unlocks explicitly, in parity with the picker path, and
+ * a clean migration to the vault-addressed `unlock` IPC even when there is only
+ * one vault on disk. (A `Corrupted` vault never reaches an unlock IPC:
+ * `<Unlock>` renders the fail-closed surface for the first frame, so its
+ * `vaultId` is moot, but set for uniformity.)
+ */
+function singleVaultStage(vaultId: VaultId, status: VaultSummary["status"]): Stage {
+  switch (status.kind) {
+    case "Exists":
+      return { name: "unlock", initialStatus: { kind: "Exists" }, vaultId };
+    case "Corrupted":
+      return { name: "unlock", initialStatus: { kind: "Corrupted" }, vaultId };
+    default:
+      return assertNever(status);
   }
-
-  const vaults = vaultList.ok;
-  if (vaults.length === 0) {
-    return { name: "welcome" };
-  }
-  if (vaults.length === 1) {
-    // Exactly one vault — unlock it directly (SYNC-7a: no picker for the
-    // single-vault user). Map its on-disk health to the unlock screen's
-    // fail-closed surfaces. Carry the lone vault's id as the unlock target
-    // (task 8) so the single-vault path also unlocks explicitly — parity
-    // with the picker path, and a clean migration to the vault-addressed
-    // `unlock` IPC even when there is only one vault on disk. (A `Corrupted`
-    // vault never reaches an unlock IPC — `<Unlock>` renders the fail-closed
-    // surface for the first frame — so its `vaultId` is moot, but set for
-    // uniformity.)
-    const vaultId = vaults[0].id;
-    const status = vaults[0].status;
-    switch (status.kind) {
-      case "Exists":
-        return { name: "unlock", initialStatus: { kind: "Exists" }, vaultId };
-      case "Corrupted":
-        return { name: "unlock", initialStatus: { kind: "Corrupted" }, vaultId };
-      default:
-        return assertNever(status);
-    }
-  }
-  // ≥2 vaults — show the picker (SYNC-7a).
-  return { name: "picker" };
 }
 
 function rejectIllegal(prev: Stage, action: Action): Stage {
@@ -785,6 +789,7 @@ function assertNever(x: never): never {
   throw new Error(`[stage] Unhandled stage variant: ${JSON.stringify(x)}`);
 }
 
+import { bootDecision, SHARED_LEGAL } from "@myne/client-core/stage-decision";
 import type { SlotKind } from "../types/slot-kind";
 import type { VaultListResult, VaultSummary } from "../types/vault-summary";
 
@@ -806,37 +811,21 @@ import type { VaultListResult, VaultSummary } from "../types/vault-summary";
  * sub-step dispatches each action.
  */
 const LEGAL: Record<string, Stage["name"]> = {
-  "welcome|create-vault.start": "create-vault",
-  // Back-from-create is reprobe-based (MYND-219 / SYNC-16) — no
-  // `create-vault.back` action exists; App.tsx calls `reprobe()`.
-  "create-vault|create-vault.commit-success": "unlock",
-  "create-vault|create-vault.auto-unlock-success": "editor",
-  "unlock|unlock.success": "editor",
-  "editor|editor.lock": "unlock",
-  "editor|editor.switch-vault": "unlock",
-  "editor|editor.create-vault": "create-vault",
-  "unlock|unlock.start-recovery": "recover",
-  "unlock|unlock.resume-recovery": "recover",
-  "recover|recover.cancel": "unlock",
-  "recover|recover.complete-success": "editor",
-  "picker|picker.select-vault": "unlock",
-  "unlock|unlock.back-to-picker": "picker",
-  "picker|picker.create-vault": "create-vault",
-  // Restore-from-backup entries (MYND-56). Exit is reprobe-based — no
-  // `restore-backup.*` exit arms exist by design (same posture as
-  // back-from-create).
-  "welcome|welcome.restore-backup": "restore-backup",
-  "welcome|welcome.join-success": "editor",
+  ...(SHARED_LEGAL as Record<string, Stage["name"]>),
+
+  // ---- mobile-only row --------------------------------------------------
+  //
   // The same join door from the two surfaces that offer "create another vault"
   // (myne-mobile#40). `editor|editor.join-success` is the one legal pair whose
   // resulting `name` equals its source — the transition is real, it re-addresses
   // the stage at the joined vault (the table tracks `name` only, so the walk
   // below cannot tell the two apart; the payload assertion lives in the tests).
-  "picker|picker.join-success": "editor",
+  //
+  // Desktop reaches the same destination from `unlock` instead, because its
+  // switcher entry locks the active vault and routes there before the join
+  // runs. Same answer, different origin, which is why neither row is in
+  // `SHARED_LEGAL` and neither is a drift.
   "editor|editor.join-success": "editor",
-  "picker|picker.restore-backup": "restore-backup",
-  "unlock|unlock.restore-backup": "restore-backup",
-  "editor|editor.restore-backup": "restore-backup",
 };
 
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [

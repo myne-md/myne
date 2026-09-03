@@ -2670,9 +2670,17 @@ Used in: `scripts/check-twin-drift-ratchet.mjs`, `scripts/twin-drift-ratchet.jso
 
 ### **`@myne/client-core`** &nbsp; 🛠️ *Tooling*
 
-The cross-client DECISION layer: a source package holding what desktop, web and mobile all answer identically, consumed the way `@myne/copy` and `@myne/dialect` are. Its entry criterion is narrow and mechanically enforced: a module belongs there only if both clients answer the same question AND it reaches no host, which is `scripts/check-platform-seam.mjs`'s `seam: null`. That is what keeps the `src/lib/vault-*.ts` family OUT, seven of those nine call `invoke` at module scope, and their shared answer lives in `myne-core` behind an IPC command instead. Holds the Rust-error mirrors and the design-token sheet; both clients keep one-line re-export shims at the old paths, so importers are unchanged and the twin pairs collapse to byte-identical.
+The cross-client DECISION layer: a source package holding what desktop, web and mobile all answer identically, consumed the way `@myne/copy` and `@myne/dialect` are. Its entry criterion is narrow and mechanically enforced: a module belongs there only if both clients answer the same question AND it reaches no host, which is `scripts/check-platform-seam.mjs`'s `seam: null`. That is what keeps the `src/lib/vault-*.ts` family OUT, seven of those nine call `invoke` at module scope, and their shared answer lives in `myne-core` behind an IPC command instead. Holds the Rust-error mirrors, the design-token sheet, the auto-lock envelope and the [boot decision](#boot-decision); both clients keep one-line re-export shims at the old paths, so importers are unchanged and the twin pairs collapse to byte-identical, EXCEPT where the shared thing is a decision rather than a value: the two stage machines still differ, on purpose, because what they share is the answer and not the screen.
 
 Used in: `client-core/`, `scripts/lib/shared-roots.mjs`, `scripts/check-platform-seam.mjs`, `decisions.md` 2026-09-02 (myne-md/myne#242)
+
+### **boot decision** &nbsp; 🛠️ *Tooling*
+
+What the boot probe FOUND, as a six-variant union with no screen in it: a resumable recovery, a live session, a failed vault-list read, no vaults, exactly one vault (carrying its id and status), or two or more. Shared by every client in `@myne/client-core/stage-decision`; each client maps it to its own `Stage`, which is where the capability gates live because a `has()` query is a fact about the host and that package reaches none.
+
+The split is at the decision rather than at the screen deliberately. A shared `Stage` union would be the obvious answer and the wrong one: mobile has no `account-entry` and no `pending-approval`, so widening its union would put a dead arm in every exhaustive switch for two states it cannot reach, against `decisions.md` 0488's line that the screens SHOULD differ. Measured before it moved: the two implementations were byte-identical except for the two capability ternaries, and of the twenty legal transitions the two tables shared, not one routed differently.
+
+Used in: `client-core/src/stage-decision.ts`, `src/lib/stage.ts`, `mobile/src/lib/stage.ts`, `tests/lib/stageDecision.test.ts`, `decisions.md` 2026-09-03 (myne-md/myne#477)
 
 ### **token parity** &nbsp; 🛠️ *Tooling*
 
