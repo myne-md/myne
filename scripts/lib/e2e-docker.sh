@@ -123,3 +123,29 @@ E2E_CARGO_HOME_CHOWN='chown e2e:e2e /home/e2e/.cargo /home/e2e/.cargo/registry'
 # rather than seven. It is still a convention rather than a property, and the
 # honest version of that sentence is this one.
 E2E_FIX_PERMS="chown -R e2e:e2e /work/node_modules /work/target$E2E_MEMBER_NM_PATHS"
+
+# The cargo job cap, opt-in from the host, and the reason it needs a home here.
+#
+# `e2e/CLAUDE.md` records `rustc … (signal: 9, SIGKILL)` on `myne_desktop_lib` as
+# the OOM killer rather than a compile error, and names the fix in one line:
+# `CARGO_BUILD_JOBS=3`. No runner exposed it. Every one of them builds its
+# `E2E_ENV` as a fixed `export …` string that `docker run` cannot be told to
+# extend, so the documented fix was unreachable from a developer machine, which
+# is the same shape this directory already recorded for `MYNE_E2E_RETRIES` and
+# `MYNE_E2E_QUARANTINE`: a knob written down in prose and wired to nothing.
+#
+# Measured on a 16 GB host with an 8 GB colima VM: the release build of
+# `myne-desktop` is killed at the `myne_desktop_lib` link with eight concurrent
+# `opt-level=3` jobs, on a tree that compiles fine on the host, and the message
+# names neither memory nor a line. Capping at 3 costs wall clock and changes
+# nothing about the artifact, so a run under the cap still proves what the
+# green-3x gate asks.
+#
+# Opt-in rather than a default: on a machine with room, capping is pure lost
+# time, and a default that silently halves everyone's build to rescue one
+# configuration is the wrong trade. Unset on the host, this expands to nothing
+# and the command line is byte-identical to what it was.
+E2E_CARGO_JOBS=""
+if [[ -n "${CARGO_BUILD_JOBS:-}" ]]; then
+  E2E_CARGO_JOBS="CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS"
+fi

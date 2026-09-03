@@ -828,60 +828,67 @@ export function initialStageFromProbe(
   vaultList: VaultListResult,
   slotMap: SlotMap,
 ): Stage {
-  // Slot-priority: a non-Empty runtime slot pins the boot stage
-  // regardless of disk state / vault count. Under SYNC-1 at most one
-  // slot is non-Empty; we scan defensively and let `Recovering` win
-  // over `Unlocked` (the non-dismissible chained recovery step).
-  const slots = Object.values(slotMap);
-  if (slots.includes("Recovering")) {
-    return { name: "recover", subStep: "password-reset" };
+  // The DECISION is shared (myne-md/myne#477): slot priority, the fail-closed
+  // `err` arm and the 0 / 1 / >=2 count split live once, in
+  // `@myne/client-core/stage-decision`. What stays here is the SCREEN mapping,
+  // which is where this client's two capability gates belong: `has()` is a fact
+  // about the host, and that package is `seam: null`.
+  //
+  // Before the split these two functions were byte-identical except for the two
+  // ternaries below, and mobile's answers were exactly what these gates produce
+  // when both capabilities are present. Everything above them was duplicated
+  // with no variance at all.
+  const decision = bootDecision(vaultList, slotMap);
+  switch (decision.kind) {
+    case "resume-recovery":
+      return { name: "recover", subStep: "password-reset" };
+    case "resume-editor":
+      return { name: "editor" };
+    case "list-io-error":
+      return { name: "unlock", initialStatus: { kind: "IoError", ioKind: decision.ioKind } };
+    case "no-vaults":
+      // On the web client the empty state is not "no vault yet, make one", it is
+      // "this browser has not been told which account to pull"
+      // (phase3-web-client task 85: the `Missing → welcome` mapping is wrong
+      // there, and it is wrong in the direction that dead-ends the user).
+      //
+      // **Gated on `localOnlyVault`, not on `vaultCreation`** (`decisions.md`
+      // 2026-08-15). Those two were the same question for as long as the web
+      // client could not create an account; they stopped being the same question
+      // the day it could. What actually decides this arm is whether a vault on
+      // this client may be the only copy: where sync is required, the first
+      // question is still which account, and `AccountBootstrap` is what asks it,
+      // now with a "create one" affordance beside the sign-in, since creation
+      // ships here too. Keeping the old `vaultCreation` gate would have routed the
+      // browser to `welcome`, which is substituted out of that bundle and would
+      // have rendered a stub as the entry screen.
+      return has("localOnlyVault") ? { name: "welcome" } : { name: "account-entry" };
+    case "single-vault":
+      return singleVaultStage(decision.vaultId, decision.status);
+    case "multiple-vaults":
+      // >=2 vaults: show the picker (SYNC-7a).
+      return { name: "picker" };
+    default:
+      return assertNever(decision);
   }
-  if (slots.includes("Unlocked")) {
-    return { name: "editor" };
-  }
+}
 
-  // All slots Empty (or no live slots) — fall through to list-based
-  // routing. A list-level IO failure is fail-closed regardless of count.
-  if ("err" in vaultList) {
-    return {
-      name: "unlock",
-      initialStatus: { kind: "IoError", ioKind: vaultList.err.detail.io_error_kind },
-    };
-  }
-
-  const vaults = vaultList.ok;
-  if (vaults.length === 0) {
-    // On the web client the empty state is not "no vault yet, make one", it is
-    // "this browser has not been told which account to pull"
-    // (phase3-web-client task 85: the `Missing → welcome` mapping is wrong
-    // there, and it is wrong in the direction that dead-ends the user).
-    //
-    // **Gated on `localOnlyVault`, not on `vaultCreation`** (`decisions.md`
-    // 2026-08-15). Those two were the same question for as long as the web
-    // client could not create an account; they stopped being the same question
-    // the day it could. What actually decides this arm is whether a vault on
-    // this client may be the only copy: where sync is required, the first
-    // question is still which account, and `AccountBootstrap` is what asks it —
-    // now with a "create one" affordance beside the sign-in, since creation
-    // ships here too. Keeping the old `vaultCreation` gate would have routed the
-    // browser to `welcome`, which is substituted out of that bundle and would
-    // have rendered a stub as the entry screen.
-    return has("localOnlyVault") ? { name: "welcome" } : { name: "account-entry" };
-  }
-  if (vaults.length === 1) {
-    // Exactly one vault — unlock it directly (SYNC-7a: no picker for the
-    // single-vault user). Map its on-disk health to the unlock screen's
-    // fail-closed surfaces. Carry the lone vault's id as the unlock target
-    // (task 8) so the single-vault path also unlocks explicitly — parity
-    // with the picker path, and a clean migration to the vault-addressed
-    // `unlock` IPC even when there is only one vault on disk. (A `Corrupted`
-    // vault never reaches an unlock IPC — `<Unlock>` renders the fail-closed
-    // surface for the first frame — so its `vaultId` is moot, but set for
-    // uniformity.)
-    const vaultId = vaults[0].id;
-    const status = vaults[0].status;
-    switch (status.kind) {
-      case "Exists":
+/**
+ * The single-vault arm's screen mapping, split out so `initialStageFromProbe`
+ * above reads as the six-way map it now is.
+ *
+ * Exactly one vault, unlocked directly (SYNC-7a: no picker for the
+ * single-vault user). Map its on-disk health to the unlock screen's fail-closed
+ * surfaces. Carry the lone vault's id as the unlock target (task 8) so the
+ * single-vault path also unlocks explicitly, in parity with the picker path, and
+ * a clean migration to the vault-addressed `unlock` IPC even when there is only
+ * one vault on disk. (A `Corrupted` vault never reaches an unlock IPC:
+ * `<Unlock>` renders the fail-closed surface for the first frame, so its
+ * `vaultId` is moot, but set for uniformity.)
+ */
+function singleVaultStage(vaultId: VaultId, status: VaultSummary["status"]): Stage {
+  switch (status.kind) {
+    case "Exists":
         // The password form, unconditionally, including for a device that
         // reads as awaiting approval (myne-md/myne#535, correcting MYND-635).
         //
@@ -919,15 +926,12 @@ export function initialStageFromProbe(
         // that does not exist on web (backup is an absent capability) while the
         // real one — re-enter the account number and re-sync — sits one screen
         // away. Task 22 makes that path incremental; this is its entry point.
-        return has("backup")
-          ? { name: "unlock", initialStatus: { kind: "Corrupted" }, vaultId }
-          : { name: "account-entry" };
-      default:
-        return assertNever(status);
-    }
+      return has("backup")
+        ? { name: "unlock", initialStatus: { kind: "Corrupted" }, vaultId }
+        : { name: "account-entry" };
+    default:
+      return assertNever(status);
   }
-  // ≥2 vaults — show the picker (SYNC-7a).
-  return { name: "picker" };
 }
 
 function rejectIllegal(prev: Stage, action: Action): Stage {
@@ -945,6 +949,7 @@ function assertNever(x: never): never {
 }
 
 import { has } from "../platform/capabilities";
+import { bootDecision, SHARED_LEGAL } from "@myne/client-core/stage-decision";
 import type { SlotKind } from "../types/slot-kind";
 import type { VaultListResult, VaultSummary } from "../types/vault-summary";
 
@@ -964,45 +969,37 @@ import type { VaultListResult, VaultSummary } from "../types/vault-summary";
  * `recover.cancel` and `recover.complete-success` are legal from
  * any recover sub-step; the recover-screen component gates which
  * sub-step dispatches each action.
+ *
+ * **Composed from `SHARED_LEGAL`, not restated** (myne-md/myne#477). The twenty
+ * rows both clients agree on have ONE definition, in
+ * `@myne/client-core/stage-decision`, so a shared transition cannot be silently
+ * retargeted on one client: doing it here is a visible override of a shared
+ * key, and `tests/lib/stageDecision.test.ts` fails on one. What stays below is
+ * this client's own three rows and the reasons they are its own.
  */
 const LEGAL: Record<string, Stage["name"]> = {
-  "welcome|create-vault.start": "create-vault",
+  ...(SHARED_LEGAL as Record<string, Stage["name"]>),
+
+  // ---- desktop-only rows ------------------------------------------------
+  //
+  // All three exist because this client has two stages mobile does not
+  // (`account-entry`, `pending-approval`) or reaches the same destination from
+  // a different origin. None of them is a different ANSWER to a shared
+  // question, which is the distinction `SHARED_LEGAL`'s own docblock draws.
+
   // `decisions.md` 2026-08-15. The web client's entry screen gained a "create an
   // account" affordance, so `account-entry` has one legal exit that is a real
   // stage change rather than a reprobe.
   "account-entry|create-vault.start": "create-vault",
-  // Back-from-create is reprobe-based (MYND-219 / SYNC-16) — no
-  // `create-vault.back` action exists; App.tsx calls `reprobe()`.
-  "create-vault|create-vault.commit-success": "unlock",
-  "create-vault|create-vault.auto-unlock-success": "editor",
-  "unlock|unlock.success": "editor",
-  "editor|editor.lock": "unlock",
-  "editor|editor.switch-vault": "unlock",
-  "editor|editor.create-vault": "create-vault",
   // #535, the awaiting-approval verdict, taken after unlock rather than at
   // boot. The only inbound edge this stage has; its exit stays reprobe-based.
   "editor|editor.awaiting-approval": "pending-approval",
-  "unlock|unlock.start-recovery": "recover",
-  "unlock|unlock.resume-recovery": "recover",
-  "recover|recover.cancel": "unlock",
-  "recover|recover.complete-success": "editor",
-  "picker|picker.select-vault": "unlock",
-  "unlock|unlock.back-to-picker": "picker",
-  "picker|picker.create-vault": "create-vault",
-  // Restore-from-backup entries (MYND-56). Exit is reprobe-based — no
-  // `restore-backup.*` exit arms exist by design (same posture as
-  // back-from-create).
-  "welcome|welcome.restore-backup": "restore-backup",
-  // The three device-join doors (MYND-424 welcome; myne#221 picker + switcher).
-  // One action per SOURCE stage, as with `*.create-vault` / `*.restore-backup`.
-  // The switcher's is keyed on `unlock` because that entry locks the active
-  // vault and routes there before the join runs.
-  "welcome|welcome.join-success": "editor",
-  "picker|picker.join-success": "editor",
+  // The third device-join door (MYND-424 welcome; myne#221 picker + switcher).
+  // The other two are shared; this one is keyed on `unlock` because the
+  // switcher entry locks the active vault and routes there before the join
+  // runs, which mobile has no analogue of (it re-addresses the load in place
+  // from `editor`, its own one-row override).
   "unlock|unlock.join-success": "editor",
-  "picker|picker.restore-backup": "restore-backup",
-  "unlock|unlock.restore-backup": "restore-backup",
-  "editor|editor.restore-backup": "restore-backup",
 };
 
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
