@@ -2381,6 +2381,11 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
+      // The capability half, which only a browser can drive: the submenu is
+      // built from `hasCapability("pdfExport")`, desktop HAS it, so the four
+      // scenarios below exercise the branch where every format is offered and
+      // none of them can reach the branch where one is withheld.
+      "e2e-web/note-export-capability.e2e.ts",
       "e2e/note-export.e2e.ts",
       "e2e/note-export-html.e2e.ts",
       "e2e/note-export-txt.e2e.ts",
