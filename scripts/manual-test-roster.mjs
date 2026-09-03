@@ -6553,6 +6553,13 @@ export const ROSTER = Object.freeze([
   {
     id: "web.lifecycle.refresh-mid-edit",
     title: "An unsaved edit across refresh, tab close and OS kill",
+    automatedBy: [
+      // `it.skip`: the scenario is written and measured, and it FAILS on
+      // develop. Claimed here rather than left blank because this entry had no
+      // verdict of any kind — zero manual items and zero automation — so the
+      // surface read as covered while nothing checked it.
+      "e2e-web/refresh-mid-edit.e2e.ts",
+    ],
     paths: [
       "web/src/platform/exit-signals.ts",
       "src/platform/exit-signals.ts",
