@@ -4431,6 +4431,16 @@ function SidebarPane({
 
   return (
     <div
+      // The pane's own box, and the element a layout scenario measures. It is
+      // rendered in BOTH states — a collapsed pane is this same div at width 0,
+      // not an absent one — so a width read distinguishes collapsed from open
+      // without a scenario having to tell "collapsed" from "not mounted yet".
+      // That distinction is the whole of what `e2e/window-resize-collapse.e2e.ts`
+      // and `e2e/rtl-mirror-sweep.e2e.ts` assert, and both were written against
+      // this testid before it existed: `paneWidths` found nothing and reported
+      // "no pane" at a window width where both panes were open and visible.
+      // A literal per side, never an expression carrying content.
+      data-testid={side === "left" ? "editor.sidebar-left" : "editor.sidebar-right"}
       // A sidebar pane is a SURFACE for ornament purposes (myne#394): the theme
       // decides what a panel ground wears. Declared on the outer pane rather
       // than the inner wrapper so the ornament spans the pane's full height
