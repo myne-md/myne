@@ -28,7 +28,15 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  mkdirSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -66,7 +74,7 @@ function companion(opts: { key?: string; gecko?: string | null } = {}): string {
   scratch.push(dir);
   mkdirSync(join(dir, "src"), { recursive: true });
   const real = JSON.parse(
-    readFileSync(join(REPO_ROOT, "..", "..", "..", "myne-clipper", "src", "manifest.json"), "utf8"),
+    readFileSync(join(REAL_COMPANION, "src", "manifest.json"), "utf8"),
   ) as Record<string, unknown>;
   const manifest: Record<string, unknown> = { ...real };
   if (opts.key !== undefined) manifest.key = opts.key;
@@ -109,7 +117,18 @@ function patchManifestRs(dir: string, from: string, to: string): void {
 
 // The real companion, needed for the cross-repo assertions. Skipped rather than
 // silently passing where it is absent — the guard's own posture.
-const REAL_COMPANION = join(REPO_ROOT, "..", "..", "..", "myne-clipper");
+//
+// **Both layouts, for the reason the guard now carries in its own comment.**
+// Companions are cloned NESTED at `<repo>/myne-clipper`
+// (`workspace/manifest.txt`); from a worktree under `.claude/worktrees/<name>`
+// that same directory is three levels up. This file hardcoded only the second,
+// so it passed from a worktree and failed from the ordinary checkout with the
+// guard reporting NOT CHECKED — four cross-repo assertions that looked like a
+// broken guard and were a broken path.
+const REAL_COMPANION =
+  [join(REPO_ROOT, "myne-clipper"), join(REPO_ROOT, "..", "..", "..", "myne-clipper")].find((c) =>
+    existsSync(join(c, "src", "manifest.json")),
+  ) ?? join(REPO_ROOT, "myne-clipper");
 
 describe("the clipper-identifier guard", () => {
   it("passes on the tree as it stands", () => {

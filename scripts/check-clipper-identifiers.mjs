@@ -63,9 +63,31 @@ const read = (rel) => readFileSync(join(repoRoot, rel), "utf8");
  * it on a machine that HAS the companion, which is every machine where anyone
  * would think to test this. `tests/scripts/clipperIdentifiers.test.ts` uses it.
  */
+/**
+ * Where the companion checkout is, tried in the order the two layouts occur.
+ *
+ * **A single hardcoded `../../../` was worktree-only, and it degraded into the
+ * exact silence the paragraph above warns about.** Companions are cloned
+ * NESTED, at `<repo>/myne-clipper` (`workspace/manifest.txt`). From a worktree
+ * under `.claude/worktrees/<name>` that sits three levels up, which is the path
+ * this used to hardcode, so the check verified the derivation from a worktree
+ * and reported a shorter `ok` from the ordinary checkout, where it resolved
+ * `<parent-of-repo>/../myne-clipper` and found nothing. Green either way, and
+ * only the cross-repo half of a check whose whole point is the cross-repo half
+ * silently stopped running.
+ *
+ * Both candidates, first hit wins. `MYNE_CLIPPER_DIR` still overrides, and
+ * still exists so the absent branch stays exercisable on a machine that has the
+ * companion.
+ */
+const COMPANION_CANDIDATES = [
+  resolve(repoRoot, "myne-clipper"),
+  resolve(repoRoot, "..", "..", "..", "myne-clipper"),
+];
 const COMPANION = process.env.MYNE_CLIPPER_DIR
   ? resolve(process.env.MYNE_CLIPPER_DIR)
-  : resolve(repoRoot, "..", "..", "..", "myne-clipper");
+  : (COMPANION_CANDIDATES.find((c) => existsSync(join(c, "src", "manifest.json"))) ??
+    COMPANION_CANDIDATES[0]);
 const COMPANION_MANIFEST = join(COMPANION, "src", "manifest.json");
 
 const MANIFEST_RS = "src-tauri/src/clipper/manifest.rs";
