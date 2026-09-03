@@ -218,9 +218,17 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
 
           // Consent is STORED, not merely displayed — asserted positively so
           // the revoke assertion below cannot pass by the field never existing.
+          //
+          // The stored value is DEVICE-SCOPED (`protocol::prefs::CONSENT_DEVICE_SUFFIX`),
+          // and asserting the bare wire name here would assert the legacy shape
+          // the gate now refuses: `consent_is_device_scoped` requires the suffix,
+          // so a bare `openrouter` reaching this field means an agreement made on
+          // another device has synced in and would authorize sending note text to
+          // a remote provider from THIS one. The suffix is the whole point of the
+          // field, so the scenario names it.
           const consented = await pageSeatInvoke(s, "plugin:prefs|prefs_read", {}, 15_000);
           expect((consented.ok as { ai_provider_consent?: unknown }).ai_provider_consent).toBe(
-            "openrouter",
+            "openrouter@device",
           );
 
           // ── consented, but no key: the panel says so, distinctly from

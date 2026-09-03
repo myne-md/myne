@@ -620,18 +620,59 @@ enum Framed<'a> {
 /// note is the final N CHARACTERS (not bytes: the count the host writes is
 /// `chars().count()`).
 #[cfg_attr(not(feature = "local-inference-stub"), allow(dead_code))]
+/// `read_note`'s answer (`core/src/plugins/agent/run_loop.rs`).
+const READ_NOTE_OPENER: &str = "read_note returned the body of that note,";
+/// The OPENING message for a single-note scope, which carries the body before
+/// anything asks for it (myne-md/myne#578).
+const OPENING_NOTE_OPENER: &str = "Your scope is one note. Its id is ";
+const OPENING_NOTE_ID_TAIL: &str = " and its whole text follows";
+const OPENING_NOTE_LEN_MARKER: &str = "The text is ";
+
+/// The note inside whichever frame the host used, by the length the host stated.
+///
+/// **There are TWO frames, and knowing only one of them is what broke `ag1`,
+/// `ag3` and `ag4` at once.** myne-md/myne#578 made the loop OPEN with the
+/// listing and, when the scope is exactly one note, that note's body, so the
+/// model "does not need list_scope or read_note". This function knew only
+/// `read_note`'s wording, so the opening message read as `Framed::Bare`, the
+/// whole host sentence counted as the note, `unique_body_lines` found no line
+/// that occurs once in it, step 3 answered `None`, and the script fell back to
+/// walking `list_scope` then `read_note` anyway. The host then answered the
+/// re-read with "You have already read that note in this run", the stub took
+/// THAT sentence for the body, and proposed a single edit anchored on host
+/// prose: one edit where `ag1` needs two, an anchor that cannot `place` so
+/// `ag4`'s apply never completes and its dialog never dismisses, and no
+/// `title:` line for `ag3`'s trash branch so no proposal rendered at all.
 fn note_after_frame(body: &str) -> Framed<'_> {
-    const OPENER: &str = "read_note returned the body of that note,";
-    if !body.starts_with(OPENER) {
-        return Framed::Bare;
+    if body.starts_with(READ_NOTE_OPENER) {
+        let Some(chars) = body
+            .split_once(READ_NOTE_OPENER)
+            .and_then(|(_, rest)| rest.split_once(" characters"))
+            .and_then(|(count, _)| count.trim().parse::<usize>().ok())
+        else {
+            return Framed::Unreadable;
+        };
+        return note_tail(body, chars);
     }
-    let Some(chars) = body
-        .split_once(OPENER)
-        .and_then(|(_, rest)| rest.split_once(" characters"))
-        .and_then(|(count, _)| count.trim().parse::<usize>().ok())
-    else {
-        return Framed::Unreadable;
-    };
+    if body.starts_with(OPENING_NOTE_OPENER) {
+        // `split_once` rather than `rsplit_once`: the prose comes FIRST, so the
+        // first marker is the host's own. A note whose text happens to contain
+        // "The text is 12 characters:" would otherwise redefine the boundary.
+        let Some(chars) = body
+            .split_once(OPENING_NOTE_LEN_MARKER)
+            .and_then(|(_, rest)| rest.split_once(" characters:"))
+            .and_then(|(count, _)| count.trim().parse::<usize>().ok())
+        else {
+            return Framed::Unreadable;
+        };
+        return note_tail(body, chars);
+    }
+    Framed::Bare
+}
+
+/// The last `chars` characters of `body`, which is where every frame puts the
+/// note: the host states the length and appends the text with no separator.
+fn note_tail(body: &str, chars: usize) -> Framed<'_> {
     let total = body.chars().count();
     let Some(skip) = total.checked_sub(chars) else {
         return Framed::Unreadable;
@@ -639,9 +680,30 @@ fn note_after_frame(body: &str) -> Framed<'_> {
     match body.char_indices().nth(skip) {
         Some((at, _)) => Framed::Note(&body[at..]),
         // The stated length is the whole message, which cannot be true of a
-        // framed one.
+        // framed one. An EMPTY note reaches here too (`chars` 0, `skip` total),
+        // and answering `Unreadable` for it is right: there is no body to anchor
+        // in, which is the state `append_to_note` exists for.
         None => Framed::Unreadable,
     }
+}
+
+/// The id of the note the model has in hand, from EITHER frame.
+///
+/// The assistant's own `read_note` action is preferred, so the edit and the read
+/// cannot name different notes. The opening message is the fallback, because on
+/// the turn it arrives there is no assistant turn at all.
+fn note_id_in_hand<'a>(last_assistant: &'a str, last_user: &'a str) -> Option<&'a str> {
+    if let Some(id) = last_assistant
+        .split("\"note_id\":\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+    {
+        return Some(id);
+    }
+    last_user
+        .strip_prefix(OPENING_NOTE_OPENER)
+        .and_then(|rest| rest.split_once(OPENING_NOTE_ID_TAIL))
+        .map(|(id, _)| id)
 }
 
 /// Body lines that occur EXACTLY ONCE in the whole note, frontmatter skipped.
@@ -780,9 +842,35 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
         .map(|m| m.content.as_str())
         .unwrap_or("");
 
-    // A scope expansion, asked once: after the listing, before any read.
+    // **What the model has in hand, from EITHER frame the host uses.**
+    //
+    // The branches below used to key on `last_assistant` naming a `read_note`,
+    // which was the only way a body could arrive before myne-md/myne#578 made
+    // the loop pre-answer both tools for a single-note scope. Keying on the
+    // ANSWER rather than on the question is what lets the script propose on the
+    // turn the body actually arrives, instead of asking for a re-read the host
+    // refuses. `note_after_frame` carries the full account of that failure.
+    let note_in_hand: Option<&str> = match note_after_frame(last_user) {
+        Framed::Note(note) => Some(note),
+        // A bare message is a unit-test fixture passing a body directly, and it
+        // is a body only when the assistant asked for one.
+        Framed::Bare if last_assistant.contains("\"action\":\"read_note\"") => Some(last_user),
+        Framed::Bare | Framed::Unreadable => None,
+    };
+
+    // A scope expansion, asked once: as soon as the host has said what is in
+    // scope, and before any edit is proposed.
+    //
+    // **The trigger is the ANSWER, not the question.** This used to require the
+    // previous assistant turn to have asked `list_scope`, which stopped being
+    // reachable the moment the script learned to propose straight from the
+    // opening message: a single-note scope pre-answers `list_scope`
+    // (myne-md/myne#578), so the stub no longer asks it and `ag5` went from
+    // `dialog` to `settled` with the expansion path never entered. The host
+    // having answered is what this branch actually depends on, and the guard
+    // below is still what keeps it to exactly one request per run.
     if task.contains("other folders")
-        && last_assistant.contains("\"action\":\"list_scope\"")
+        && last_user != task
         && !messages
             .iter()
             .any(|m| m.content.contains("\"action\":\"request_scope\""))
@@ -802,12 +890,9 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
     // `approveAll` sends an empty list, the apply returns early on it, and no
     // report renders. The scenario then times out on a report that was never
     // going to appear, which reads as a product defect and is a harness one.
-    if task.contains("trash this") && last_assistant.contains("\"action\":\"read_note\"") {
-        let id = last_assistant
-            .split("\"note_id\":\"")
-            .nth(1)
-            .and_then(|rest| rest.split('"').next())?;
-        let body = last_user;
+    if task.contains("trash this") && note_in_hand.is_some() {
+        let id = note_id_in_hand(last_assistant, last_user)?;
+        let body = note_in_hand?;
         // The frontmatter's own title line is the anchor for the trashing edit,
         // because appending a `trashed:` line after it is what trashing a note
         // actually looks like at the byte level (`markdown-dialect.md` §3.6.1).
@@ -837,11 +922,13 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
     //
     // Keyed off the task text like its two siblings above, so the scenario asks
     // for what it needs in the sentence a user would type.
-    if task.contains("append") && last_assistant.contains("\"action\":\"read_note\"") {
-        let id = last_assistant
-            .split("\"note_id\":\"")
-            .nth(1)
-            .and_then(|rest| rest.split('"').next())?;
+    if task.contains("append") {
+        // No `note_in_hand` guard, deliberately: an EMPTY note frames as
+        // `Unreadable` (a stated length of zero), and writing into one is the
+        // whole of what this verb is for. The id is the only thing it needs, so
+        // an id from either frame is enough and a turn without one falls
+        // through to the steps below rather than answering.
+        let id = note_id_in_hand(last_assistant, last_user)?;
         return Some(format!(
             "{{\"action\":\"append_to_note\",\"note_id\":\"{id}\",\
              \"text\":\"appended by the stub\"}}\n\
@@ -849,16 +936,13 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
         ));
     }
 
-    // Step 3: the previous turn asked to read a note, so this user turn is the
-    // body. Checked before step 2 so each check stays a simple containment.
-    if last_assistant.contains("\"action\":\"read_note\"") {
-        // The id the previous turn named, rather than re-derived, so the edit
-        // and the read cannot name different notes.
-        let id = last_assistant
-            .split("\"note_id\":\"")
-            .nth(1)
-            .and_then(|rest| rest.split('"').next())?;
-        let body = last_user;
+    // Step 3: a note body is in this user turn, whether the previous turn asked
+    // for it or the host opened with it. Checked before step 2 so each check
+    // stays a simple containment.
+    if let Some(body) = note_in_hand {
+        // The id the previous turn named where there is one, rather than
+        // re-derived, so the edit and the read cannot name different notes.
+        let id = note_id_in_hand(last_assistant, last_user)?;
         // Up to TWO edits, one per eligible line. Not richness for its own
         // sake: "reject one, approve the rest" is a real user path and an
         // acceptance criterion, and with a single proposed edit rejecting it
@@ -1965,5 +2049,155 @@ mod agent_script_tests {
             crate::plugins::agent::edit::place(body, anchor, replacement)
                 .unwrap_or_else(|e| panic!("anchor {anchor:?} must place: {e:?}"));
         }
+    }
+
+    /// The same premise as the test above, over the message shape `ag1` actually
+    /// produces: FRAMED by `read_note`'s prose and carrying frontmatter.
+    ///
+    /// The test above passes a BARE body, which `note_after_frame` classifies as
+    /// `Framed::Bare` and uses as-is, so it exercises neither the length-derived
+    /// note boundary nor the frontmatter skip. `the_anchor_comes_from_the_note_
+    /// not_from_the_framing` drives the framed path but asks only for the anchor
+    /// LIST; nothing asked the framed path for two PROPOSED EDITS that both
+    /// place, which is the one property `ag1` rests on.
+    ///
+    /// The frame is built the way `run_loop.rs` builds it: prose then body, no
+    /// separator, because `chat_shape` concatenates a message's spans.
+    #[test]
+    fn a_framed_frontmattered_two_line_note_still_yields_two_placing_edits() {
+        let note = "---\ntitle: ag1note\n---\nalpha beta gamma delta\nepsilon zeta eta theta";
+        let framed = format!(
+            "read_note returned the body of that note, {} characters, and it follows. \
+             Propose an edit whose anchor is copied exactly from it, or finish and say \
+             what you found.{note}",
+            note.chars().count(),
+        );
+        let actions = parse_actions(&ask(&[
+            turn(ChatRole::User, "tidy this note"),
+            turn(ChatRole::Assistant, r#"{"action":"list_scope"}"#),
+            turn(ChatRole::User, "note-aaa ag1note"),
+            turn(
+                ChatRole::Assistant,
+                r#"{"action":"read_note","note_id":"note-aaa"}"#,
+            ),
+            turn(ChatRole::User, &framed),
+        ]));
+        let edits: Vec<&AgentAction> = actions
+            .iter()
+            .filter(|a| matches!(a, AgentAction::ProposeEdit { .. }))
+            .collect();
+        assert_eq!(edits.len(), 2, "got {actions:?}");
+        for e in edits {
+            let AgentAction::ProposeEdit {
+                anchor,
+                replacement,
+                ..
+            } = e
+            else {
+                unreachable!()
+            };
+            assert!(
+                !anchor.starts_with("title:"),
+                "an anchor may not be a managed frontmatter field: {anchor:?}"
+            );
+            crate::plugins::agent::edit::place(note, anchor, replacement)
+                .unwrap_or_else(|e| panic!("anchor {anchor:?} must place: {e:?}"));
+        }
+    }
+
+    /// The OPENING message carries the body for a single-note scope, so the
+    /// script must propose on the FIRST turn, with no assistant turn behind it.
+    ///
+    /// This is the shape `ag1`, `ag3` and `ag4` actually run in
+    /// (myne-md/myne#578), and nothing here drove it: every other test in this
+    /// module hands the body over after an assistant `read_note`. Walking
+    /// `list_scope` then `read_note` anyway earns the host's "you have already
+    /// read that note" refusal, and the script then anchors an edit on that
+    /// sentence. The prose is built to `opening_scope`'s wording in
+    /// `core/src/plugins/agent/run_loop.rs`; if that wording moves, this fails
+    /// by name rather than the suite going quietly red three scenarios later.
+    #[test]
+    fn the_opening_single_note_message_is_proposed_from_on_the_first_turn() {
+        let note = "---\ntitle: ag1note\n---\nalpha beta gamma delta\nepsilon zeta eta theta";
+        let opening = format!(
+            "Your scope is one note. Its id is note-aaa and its whole text \
+             follows, so you do not need list_scope or read_note. Answer the \
+             user's question from it, or propose an edit whose anchor is copied \
+             exactly from it, then finish. The text is {} characters:{note}",
+            note.chars().count(),
+        );
+        let actions = parse_actions(&ask(&[
+            turn(ChatRole::User, "tidy this note"),
+            turn(ChatRole::User, &opening),
+        ]));
+        let edits: Vec<&AgentAction> = actions
+            .iter()
+            .filter(|a| matches!(a, AgentAction::ProposeEdit { .. }))
+            .collect();
+        assert_eq!(
+            edits.len(),
+            2,
+            "the opening body must be proposed from at once: {actions:?}"
+        );
+        for e in edits {
+            let AgentAction::ProposeEdit {
+                note_id,
+                anchor,
+                replacement,
+            } = e
+            else {
+                unreachable!()
+            };
+            // The id comes out of the opening prose, since no assistant turn
+            // named one.
+            assert_eq!(note_id, "note-aaa", "got {e:?}");
+            // The anchor is the NOTE's, never the host's sentence. This is the
+            // assertion that fails when the frame goes unrecognised: the whole
+            // message then counts as the note.
+            assert!(
+                !anchor.contains("Your scope is one note"),
+                "an anchor may not be host prose: {anchor:?}"
+            );
+            crate::plugins::agent::edit::place(note, anchor, replacement)
+                .unwrap_or_else(|e| panic!("anchor {anchor:?} must place: {e:?}"));
+        }
+    }
+
+    /// `ag5`'s premise, on the opening message: a task that names other folders
+    /// asks for the scope BEFORE it proposes anything.
+    ///
+    /// Written because nothing here held it. Teaching the script to propose from
+    /// the opening message took this branch's trigger away with it (it keyed on
+    /// the stub having asked `list_scope`, which a pre-answered scope means it
+    /// never does), every test in this module still passed, and `ag5` was the
+    /// only thing that noticed — after a container build and nine specs. The
+    /// expansion is the injection-reachable path `docs/decisions/ai/0518` puts a
+    /// user gate in front of, so "unreachable" is the one way it must not fail.
+    #[test]
+    fn a_task_naming_other_folders_requests_scope_before_proposing() {
+        let note = "---\ntitle: ag5note\n---\nalpha beta gamma delta\nepsilon zeta eta theta";
+        let opening = format!(
+            "Your scope is one note. Its id is note-aaa and its whole text \
+             follows, so you do not need list_scope or read_note. Answer the \
+             user's question from it, or propose an edit whose anchor is copied \
+             exactly from it, then finish. The text is {} characters:{note}",
+            note.chars().count(),
+        );
+        let actions = parse_actions(&ask(&[
+            turn(ChatRole::User, "tidy the notes in other folders too"),
+            turn(ChatRole::User, &opening),
+        ]));
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, AgentAction::RequestScope { .. })),
+            "the expansion must be asked for, not skipped: {actions:?}"
+        );
+        assert!(
+            !actions
+                .iter()
+                .any(|a| matches!(a, AgentAction::ProposeEdit { .. })),
+            "and it must be asked BEFORE anything is proposed: {actions:?}"
+        );
     }
 }

@@ -79,7 +79,7 @@ describeE2E("tt1 plain-text export writes the stripped file (MYND-340)", () => {
         await dismissImporterOffer(s);
 
         const item = await openTxtExportMenuItem(s, suite.plainNoteId);
-        expect(await item.text()).toBe("Export as Plain Text…");
+        expect(await item.text()).toBe("Plain text");
         // Esc-dismiss WITHOUT selecting (clicking opens the undriveable
         // save dialog; tt2 covers the UI path with the dialog stubbed).
         await s.execute(

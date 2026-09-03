@@ -89,7 +89,7 @@ describeE2E("hh1 no-attachments HTML export writes a standalone doc (MYND-340)",
         // (data-item-id rides the existing notes.context-menu-item scheme
         // — no new testid).
         const item = await openHtmlExportMenuItem(s, suite.plainNoteId);
-        expect(await item.text()).toBe("Export as HTML…");
+        expect(await item.text()).toBe("HTML");
         // Esc-dismiss WITHOUT selecting (clicking opens the undriveable
         // save dialog; hh3 covers the UI path with the dialog stubbed).
         await s.execute(

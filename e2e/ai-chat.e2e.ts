@@ -37,12 +37,23 @@ import {
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
-import { testIdSelector } from "./support/webdriver";
+import { testIdSelector, type Session } from "./support/webdriver";
 
 /** Only run when the binary under test is the AI-feature (`local-inference-stub`)
  *  build — the default production bundle has no AI commands, so these testids
  *  never appear there. The feature-flagged build sets `MYNE_E2E_AI=1`. */
 const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
+
+/** Wait for the run's review screen and close it.
+ *
+ *  Every message is a run since `docs/decisions/ai/0524`, so a proposal takes
+ *  the screen after each send and the composer is unreachable until it goes.
+ *  `ag6` in `agent-run.e2e.ts` does the same thing for the same reason. */
+async function dismissRunProposal(s: Session): Promise<void> {
+  await s.waitForElement(testIdSelector("agentReview.screen"), { timeoutMs: 30_000 });
+  await (await s.byTestId("agentReview.close")).click();
+  await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 10_000 });
+}
 
 aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
@@ -75,7 +86,16 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears"
         await composer.sendKeys("what is this note about?");
         await (await s.byTestId("ai.composer-send")).click();
 
-        // The transcript appears with a user turn + a streamed assistant turn.
+        // **A question is a RUN now, so the send opens the review screen over the
+        // composer.** `docs/decisions/ai/0524` removed the Ask/Edit split: every
+        // message goes through the agent loop, the stub proposes for any task,
+        // and the proposal takes the screen. This scenario is about the
+        // transcript and the lock, not about reviewing a proposal (`ag1` and
+        // `ag3` are), so it closes the screen the way `ag6` does — and it has to,
+        // or the follow-up below clicks a Send button behind a modal.
+        await dismissRunProposal(s);
+
+        // The transcript appears with a user turn + an assistant turn.
         await s.waitForElement(testIdSelector("ai.transcript"), { timeoutMs: 15_000 });
         await s.waitUntil(
           async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
@@ -85,13 +105,19 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears"
         expect(turns.length).toBe(2);
         expect(await turns[0]!.attribute("data-role")).toBe("user");
         expect(await turns[1]!.attribute("data-role")).toBe("assistant");
-        // The stub engine's deterministic marker proves the token stream arrived.
+        // **The stub's deterministic marker, in the shape the run produces it.**
+        // This used to look for the plain echo `stub-infer:`, which is what the
+        // engine answers a NON-agent chat with — and after `0524` there is no
+        // such chat, so the marker could never appear again and the scenario
+        // timed out on it. A run ends by finishing with a summary, the stub's is
+        // the fixed string below, and it reaches the transcript only if the loop
+        // actually ran and streamed back. Same property, current architecture.
         await s.waitUntil(
           async () =>
-            (await (await s.byTestIdAll("ai.turn"))[1]!.textContent()).includes("stub-infer:")
+            (await (await s.byTestIdAll("ai.turn"))[1]!.textContent()).includes("stub run")
               ? true
               : null,
-          { label: "assistant turn streamed the stub output", timeoutMs: 15_000 },
+          { label: "assistant turn carries the stub run's summary", timeoutMs: 15_000 },
         );
         // No error state on the happy path.
         expect((await s.byTestIdAll("ai.turn-error")).length).toBe(0);
@@ -100,6 +126,7 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears"
         const composer2 = await s.byTestId("ai.composer-input");
         await composer2.sendKeys("say more");
         await (await s.byTestId("ai.composer-send")).click();
+        await dismissRunProposal(s);
         await s.waitUntil(
           async () => ((await s.byTestIdAll("ai.turn")).length >= 4 ? true : null),
           { label: "follow-up appended a second exchange", timeoutMs: 15_000 },

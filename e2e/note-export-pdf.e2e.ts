@@ -82,7 +82,7 @@ describeE2E("np1 pdf-embedding note raises the exclusion notice (MYND-255)", () 
         // sibling of the markdown entry (data-item-id rides the existing
         // notes.context-menu-item scheme — no new testid).
         const item = await openPdfExportMenuItem(s, suite.pdfNoteId);
-        expect(await item.text()).toBe("Export as PDF…");
+        expect(await item.text()).toBe("PDF");
 
         // Selecting it on the `.pdf`-embedding note runs the CHEAP
         // pre-flight scan (scanExcludedAttachments — no emitter import)

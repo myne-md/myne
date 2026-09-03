@@ -125,6 +125,15 @@ async function openComposer(session: Session): Promise<void> {
   });
 }
 
+/** The active editor tab's note id ("note:<id>"), so a failing assertion can say
+ *  whether the agent reviewed the note the scenario just wrote. */
+async function noteIdUnderTest(session: Session): Promise<string | null> {
+  const tabs = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+  if (tabs.length === 0) return null;
+  const raw = (await tabs[0].attribute("data-tab-id")) ?? "";
+  return raw.startsWith("note:") ? raw.slice("note:".length) : null;
+}
+
 /** Start a run on whatever note is open and wait for the review takeover. */
 async function startRun(session: Session, task: string): Promise<void> {
   const input = await session.byTestId("ai.composer-input");
@@ -165,9 +174,21 @@ aiDescribe("ag1 agent run → review → reject one → approve rest", () => {
 
         // The proposal renders as grouped diffs rather than as prose.
         const edits = await s.byTestIdAll("agentReview.edit");
+        // The count alone says "expected 1 to be greater than 1", which names
+        // neither the note the agent actually read nor what it proposed for it —
+        // and those are the two facts that separate "the stub proposed one edit"
+        // from "the agent read a DIFFERENT note than the one under test". Both
+        // are read here so a failure carries them into the report.
+        const reviewedNoteIds = await Promise.all(
+          (await s.byTestIdAll("agentReview.noteId")).map((n) => n.textContent()),
+        );
+        const proposedDiffs = await Promise.all(edits.map((e) => e.textContent()));
         expect(
             edits.length,
-            "this scenario rejects one edit and approves the rest, so it needs at least two",
+            "this scenario rejects one edit and approves the rest, so it needs at least two. " +
+              `Reviewed note ids: ${JSON.stringify(reviewedNoteIds)}; ` +
+              `note under test: ${JSON.stringify(await noteIdUnderTest(s))}; ` +
+              `proposed: ${JSON.stringify(proposedDiffs)}`,
         ).toBeGreaterThan(1);
 
         // Reject exactly one, and assert the row says so rather than trusting
