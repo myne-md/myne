@@ -62,7 +62,7 @@ function runOpencode() {
     // --print-logs pushes opencode's own diagnostics to stderr, which is how a
     // cold-start stall (model fetch, provider auth) becomes visible in CI instead
     // of reading as a silent timeout.
-    const child = spawn('opencode', ['run', '--print-logs', '--format', 'json', '--model', MODEL, prompt], {
+    const child = spawn('opencode', ['run', '--print-logs', '--log-level', 'DEBUG', '--format', 'json', '--model', MODEL, prompt], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
     });
