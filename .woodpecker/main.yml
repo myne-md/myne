@@ -713,6 +713,15 @@ steps:
       # webkit/gtk -dev chains the base image bakes. No frontend dist needed,
       # since myne-core has no `generate_context!`.
       - cargo clippy -p myne-core --all-targets -- -D warnings
+      # Lint the SHIPPED desktop configuration too (myne-md/myne#648): every
+      # other clippy invocation in this file misses it — the slim step is
+      # `-p protocol`, the wasm steps are cross-target, and the line below is
+      # `--no-default-features`. An unused parameter on the AI path survived a
+      # whole merge train that way: the parameters still parse, the command
+      # still succeeded, and no gate compiled the default-features test tree
+      # that would have named them. Same image and warm cache as the line
+      # above, so it costs a lint, not a build.
+      - cargo clippy -p myne-desktop --all-targets -- -D warnings
       # Default build now compiles the on-device AI (local-inference is in
       # `default` as of decisions.md 2026-07-02) — no `--features` flag needed.
       # `-c` overrides beforeBuildCommand to reuse the dist/ already built by the
