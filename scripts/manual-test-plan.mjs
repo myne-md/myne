@@ -53,10 +53,11 @@
 // promoted, which is the right answer when there is no previous tag to diff
 // against rather than a reason to schedule less.
 
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { runTool } from "./lib/run-tool.mjs";
 
 import { WALK_PREAMBLE, gates, gatedMinutes, hours, totalMinutes, writeAtomically } from "./check-manual-test-roster.mjs";
 
@@ -83,19 +84,21 @@ const arg = (argv, name, fallback = null) => {
 /** Repo-relative paths changed since `ref`, or null when the ref is unusable. */
 export function changedSince(ref, rootDir = ROOT) {
   if (!ref) return null;
-  try {
-    const out = execFileSync("git", ["diff", "--name-only", `${ref}..HEAD`], {
-      cwd: rootDir,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return out
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  } catch {
-    return null;
-  }
+  // EMPTY with a stated reason, not a bare catch (myne#528): an unusable ref
+  // schedules the full plan (every entry, nothing promoted), which the header
+  // records as the right answer when there is no previous tag to diff against —
+  // rather than a reason to schedule less. The helper still prints the
+  // diagnostics, so a `git` that could not run says so.
+  const r = runTool(["git", "diff", "--name-only", `${ref}..HEAD`], {
+    cwd: rootDir,
+    onToolFailure: "empty",
+    reason: "an unusable ref schedules the full plan, which is the documented fallback",
+  });
+  if (r === null) return null;
+  return (r.stdout ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /** Does this entry own any of the changed files? Directory paths end in a slash. */
