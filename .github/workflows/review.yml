@@ -29,14 +29,21 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
           persist-credentials: false
+
+      # Every clone and artefact below lives under runner.temp, OUTSIDE the working
+      # tree. The tree must contain only the checked-out branch, so the "assert tree
+      # clean" gate after the review measures the reviewer's behaviour, not the
+      # workflow's own clones (review.sh kept the same separation: branch in
+      # /work/repo, everything else in /work).
 
       # The skill body and the reviewer rulebooks live in myne-agents (private).
       - name: Clone myne-agents (skill + reviewers)
         env:
           MYNE_BOT_PAT: ${{ secrets.MYNE_BOT_PAT }}
         run: |
-          git clone --depth 1 https://x-access-token:${MYNE_BOT_PAT}@github.com/myne-md/myne-agents.git myne-agents
+          git clone --depth 1 https://x-access-token:${MYNE_BOT_PAT}@github.com/myne-md/myne-agents.git "$RUNNER_TEMP/myne-agents"
 
       # Companion repos do not carry the specs. When the PR is NOT in myne, clone
       # the main repo read-only so the crypto/threat-model/spec dimensions have
@@ -46,7 +53,7 @@ jobs:
         env:
           MYNE_BOT_PAT: ${{ secrets.MYNE_BOT_PAT }}
         run: |
-          git clone --depth 1 https://x-access-token:${MYNE_BOT_PAT}@github.com/myne-md/myne.git spec-repo
+          git clone --depth 1 https://x-access-token:${MYNE_BOT_PAT}@github.com/myne-md/myne.git "$RUNNER_TEMP/spec-repo"
 
       # The legal texts live in companion repos. myne-website is published content
       # (full clone); myne-ops is sparse — only legal/**/*.md is materialised, so
@@ -56,11 +63,11 @@ jobs:
         env:
           MYNE_BOT_PAT: ${{ secrets.MYNE_BOT_PAT }}
         run: |
-          git clone --depth 1 https://x-access-token:${MYNE_BOT_PAT}@github.com/myne-md/myne-website.git legal/website
-          git clone --depth 1 --no-checkout --filter=blob:none https://x-access-token:${MYNE_BOT_PAT}@github.com/myne-md/myne-ops.git legal/ops
-          git -C legal/ops sparse-checkout init --no-cone
-          git -C legal/ops sparse-checkout set '/legal/**/*.md'
-          git -C legal/ops checkout
+          git clone --depth 1 https://x-access-token:${MYNE_BOT_PAT}@github.com/myne-md/myne-website.git "$RUNNER_TEMP/legal/website"
+          git clone --depth 1 --no-checkout --filter=blob:none https://x-access-token:${MYNE_BOT_PAT}@github.com/myne-md/myne-ops.git "$RUNNER_TEMP/legal/ops"
+          git -C "$RUNNER_TEMP/legal/ops" sparse-checkout init --no-cone
+          git -C "$RUNNER_TEMP/legal/ops" sparse-checkout set '/legal/**/*.md'
+          git -C "$RUNNER_TEMP/legal/ops" checkout
 
       - uses: actions/setup-node@v4
         with:
@@ -74,19 +81,21 @@ jobs:
           MYNE_BOT_PAT: ${{ secrets.MYNE_BOT_PAT }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
           GITHUB_WORKSPACE: ${{ github.workspace }}
-          SPEC_REPO_DIR: ${{ github.event.repository.name != 'myne' && 'spec-repo' || '' }}
-          LEGAL_REPO_DIR: legal
-          REVIEW_OUT_DIR: scripts/github-review/.review
+          SPEC_REPO_DIR: ${{ github.event.repository.name != 'myne' && runner.temp && format('{0}/spec-repo', runner.temp) || '' }}
+          LEGAL_REPO_DIR: ${{ runner.temp }}/legal
+          REVIEW_OUT_DIR: ${{ runner.temp }}/review
         run: node scripts/github-review/build-context.mjs
 
       - name: Classify (opencode run, read-only)
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           REVIEW_MODEL: ${{ vars.REVIEW_MODEL }}
-          REVIEW_PACKET: scripts/github-review/.review/packet.json
-          REVIEW_SKILL: myne-agents/skills/pr-review-bot/SKILL.md
-          REVIEW_OUT: scripts/github-review/.review/verdict.json
+          REVIEW_PACKET: ${{ runner.temp }}/review/packet.json
+          REVIEW_SKILL: ${{ runner.temp }}/myne-agents/skills/pr-review-bot/SKILL.md
+          REVIEW_OUT: ${{ runner.temp }}/review/verdict.json
           REVIEW_DIR: ${{ github.workspace }}
+          SPEC_REPO_DIR: ${{ github.event.repository.name != 'myne' && format('{0}/spec-repo', runner.temp) || '' }}
+          LEGAL_REPO_DIR: ${{ runner.temp }}/legal
         run: node scripts/github-review/classify.mjs
 
       # The reviewer must never modify the tree. Assert it after the run, exactly
@@ -102,6 +111,6 @@ jobs:
       - name: Apply verdict
         env:
           MYNE_BOT_PAT: ${{ secrets.MYNE_BOT_PAT }}
-          REVIEW_PACKET: scripts/github-review/.review/packet.json
-          REVIEW_VERDICT: scripts/github-review/.review/verdict.json
+          REVIEW_PACKET: ${{ runner.temp }}/review/packet.json
+          REVIEW_VERDICT: ${{ runner.temp }}/review/verdict.json
         run: node scripts/github-review/apply-verdict.mjs
