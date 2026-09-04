@@ -83,10 +83,14 @@ every session sitting in the directory, so switching it puts their next commit o
 committing from it lands your work on whatever branch the last session left it on. The shared
 checkout stays on the default branch and is for reading.
 
-A worktree for this repo is created **only** with `EnterWorktree`, or with `git worktree add` into
-`.claude/worktrees/<name>`, and never anywhere else. It branches from **`origin/develop`**, always:
-that is what `worktree.baseRef: fresh` in `.claude/settings.json` pins (the setting is checked in so
-a fresh clone inherits it), and a hand-made `git worktree add` passes `origin/develop` explicitly.
+A worktree for this repo is created **only** with the harness's sanctioned mechanism, into
+`.claude/worktrees/<name>`, and never anywhere else: Claude Code uses `EnterWorktree` (or the
+equivalent hand command), opencode has no worktree tool and always uses `git worktree add`. Both
+branch from **`origin/develop`**, always: that is what `worktree.baseRef: fresh` in
+`.claude/settings.json` pins for Claude Code (the setting is checked in so a fresh clone inherits
+it), and a hand-made `git worktree add` passes `origin/develop` explicitly (that is the ONLY
+mechanism under opencode, whose `git worktree add .claude/worktrees/<name> -b <branch>
+origin/develop` spells the base ref on every invocation).
 Branching from the current local HEAD instead carries whatever the working checkout happens to be
 sitting on into the new branch, which is how a feature branch picks up an unrelated half-finished
 change and a PR arrives with a diff nobody can explain. The session scratchpad under `/private/tmp` is
@@ -111,6 +115,17 @@ cannot be closed out in one sitting. `/done` commits and PRs the main repo, Gate
 worktree, and the companion PR is opened after that, from a session that is no longer isolated. Plan
 the merge order around it rather than discovering it at the gate. Full rule:
 `myne-agents/reference/worktrees.md`.
+
+## Dual harness (Claude Code + opencode)
+
+This repo runs under **both** Claude Code and opencode, by design. The division of labour:
+
+- **`CLAUDE.md` (this file) is the single source of truth for rules.** Both harnesses read it (opencode falls back to it when no `AGENTS.md` exists; do not create a root `AGENTS.md`, it would silently override this file for opencode and split the two tools' instructions).
+- **Skills are shared in place.** opencode discovers `.claude/skills/*/SKILL.md` natively; there is no opencode copy of any skill. opencode's slash-command UX for the workflow chain lives in `.opencode/command/` as thin wrappers that route to the skill tool.
+- **Subagents are mirrored, not shared.** `.opencode/agent/issue-pm.md` and `.opencode/agent/legal-work.md` are verbatim body-copies of `myne-agents/agents/*.md` with opencode frontmatter (`mode: subagent` replaces `name`/`color`). **Edit the `myne-agents` original, then re-copy the body into the mirror**; each mirror's own header says this.
+- **The adhd/diverge convention loads differently per harness.** Claude Code: the hooks in `.claude/settings.json` (session injection + per-turn restatement). opencode: the `instructions` entries in `opencode.json` (always in context, so no per-turn re-injection is needed) plus `.opencode/plugins/compaction.ts` for compaction survival. The content is the same two SKILL.md files.
+- **Permissions.** Claude Code: `.claude/settings*.json`. opencode: `opencode.json`. The two are independent; keep the effective behaviour equivalent when either changes. `opencode.json` deliberately configures **no MCP servers**.
+- Nothing in `.claude/` was removed or renamed for opencode, and the bot lanes (issue-triage, PR-review bot, the jailed runner, all `claude -p` invocations) remain Claude Code. Deleting or weakening the Claude side is a regression, not a cleanup.
 
 ## Project status
 
