@@ -1982,6 +1982,12 @@ The hosted-sync expiry ladder (`decisions.md` 2026-07-13): when a paid term laps
 
 Used in: `decisions.md` 2026-07-13
 
+### **reclaim floor** &nbsp; 📋 *Protocol*
+
+The per-vault high-water mark of Layer-2 storage reclamation (`spec/sync-protocol.md` §11.3): the highest change-position whose tombstone body the server has dropped, keeping only `(uuid, final_version, marker)`. A pull whose cursor sits below the floor is rejected with `cursor_expired`, forcing a [full-reconcile](#full-reconcile) that carries an explicit reconcile flag exempting it from that check. Distinct from [blob reclaimed](#blob-reclaimed), which names one record's outcome; the floor is the vault-wide cursor boundary that outcome advances.
+
+Used in: `spec/sync-protocol.md` §11.2, §11.3
+
 ### **Recovering** (slot state) &nbsp; 📦 *Product*
 
 The intermediate variant of the [`Slot`] enum representing a vault that has successfully completed phrase-based recovery (`vault_recover_with_phrase`) but has not yet committed a new master password (`vault_complete_recovery`). Carries `root_key`, `items_key`, `items_key_id`, and `recovered_at: Instant` in `Zeroizing` wrappers — both keys are derived eagerly during the recovery step so the entire credential chain is verified before the slot transitions. Editor commands cannot pattern-match `Slot::Recovering` and are therefore structurally denied access during this window per `recovery-flow.md` §4.1's non-dismissible chained step. The only legal transitions out are `Slot::Recovering → Slot::Unlocked` (via `vault_complete_recovery` success) or `Slot::Recovering → Slot::Empty` (via `vault_lock` — the §4.3 within-session bail case).
