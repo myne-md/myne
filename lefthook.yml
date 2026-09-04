@@ -500,6 +500,19 @@ pre-commit:
       glob: "*.{rs,json,md}"
       run: node scripts/check-clipper-identifiers.mjs
 
+    npm-license-mirror:
+      # myne#527: the npm allowlist in check-npm-licenses.mjs claims, in a
+      # comment, to mirror deny.toml's [licenses].allow — and it had already
+      # drifted (deny.toml gained CDLA-Permissive-2.0 for webpki-roots without
+      # the npm list hearing about it). Two committed files, one asserting a
+      # relationship to the other in prose, and no compiler relates them.
+      # Compares BOTH directions plus a reason-carrying npm-only additions
+      # list, the same one-file-agreement shape as check-embed-layout-drift.
+      # Pre-commit rather than CI: both inputs are committed text, so the check
+      # needs no install, no network and no build.
+      glob: "{deny.toml,scripts/check-npm-licenses.mjs,scripts/check-npm-license-mirror.mjs}"
+      run: node scripts/check-npm-license-mirror.mjs
+
     i18n-catalog:
       # Guards the i18n migration (decisions.md 2026-06-25): fails if
       # locales/en/common.json has any EMPTY English source value, or if a
