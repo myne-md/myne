@@ -35,6 +35,9 @@ use myne_core::inference::provider_transport::ProviderTransport;
 use myne_core::plugins::agent::apply::{ApplyOutcome, Approval};
 use myne_core::plugins::agent::edit::ProposedEdit;
 use myne_core::plugins::agent::error::AgentError;
+use myne_core::plugins::agent::history::{
+    history_budget, seed_messages, HistoryTurn, SeedControls,
+};
 use myne_core::plugins::agent::host_commands::{
     apply_from_host, probe_threshold, require_ai_enabled, require_unlocked, step, undo_from_host,
     AgentSessionState, AgentStepResult, AgentUndoResult, GrantPreview, HostScopeSource,
@@ -63,6 +66,13 @@ pub async fn agent_start<R: Runtime>(
     app: AppHandle<R>,
     task: String,
     grant: ScopeGrant,
+    // The visible conversation and the interface language, read at run start
+    // like desktop does (myne-md/myne#648). Declared here because the shared
+    // binding sends both on every call and Tauri drops unknown arguments
+    // silently — without these the phone's runs answer in English about a
+    // conversation they cannot see, and nothing complains.
+    language: Option<String>,
+    history: Vec<HistoryTurn>,
     on_open: Channel<AgentRunView>,
     on_progress: Channel<RunProgress>,
     runs: State<'_, Arc<AgentRunState>>,
@@ -88,7 +98,26 @@ pub async fn agent_start<R: Runtime>(
     };
     let run_id = new_run_id();
     let (resolved, cancel) = start_run(&runs, run_id.clone(), &grant, &source).await?;
-    sessions.open(&run_id, task, &runs.live_ids());
+    // Seeded exactly as desktop seeds: the budget read at run start from this
+    // client's own prefs read, the seed dropped by `step` when the live
+    // controls no longer match the snapshot below (myne-md/myne#648).
+    let prefs = prefs_read_from_host(&TauriHost::new(app.clone()), vault.inner(), &StdVaultIo)
+        .await
+        .map_err(|_| AgentError::ReadFailed)?;
+    let seed = seed_messages(&history, history_budget(&prefs));
+    let seed_controls = if seed.is_empty() {
+        None
+    } else {
+        Some(SeedControls::from_view(&prefs))
+    };
+    sessions.open(
+        &run_id,
+        task,
+        &runs.live_ids(),
+        language,
+        seed,
+        seed_controls,
+    );
     // Before the loop, not after it: this call returns only when the loop has
     // stopped, and until then the surface would have a `running` run with no id
     //: no status, no scope total and no Stop, on a run that is at that moment

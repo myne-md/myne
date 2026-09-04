@@ -129,6 +129,65 @@ pub const DEFAULT_HISTORY_BUDGET: usize = 3000;
 /// would make one run's off-device volume open-ended.
 pub const MAX_HISTORY_BUDGET: usize = 12_000;
 
+/// Resolve the seed budget for a run from the vault's prefs.
+///
+/// `None` (the user never touched the setting) is the default; a stored value
+/// is clamped again here even though the setter clamps at the write, because a
+/// setter-side clamp holds while every writer clamps and this holds whoever
+/// wrote the value (`docs/decisions/ai/0553` records the distinction against
+/// `auto_lock_seconds`, which resolves on every read). Read at run start, not
+/// per iteration: the seed is built once and re-sent verbatim.
+pub fn history_budget(view: &protocol::PrefsView) -> usize {
+    view.chat_history_budget
+        .map(|b| (b as usize).min(MAX_HISTORY_BUDGET))
+        .unwrap_or(DEFAULT_HISTORY_BUDGET)
+}
+
+/// The egress controls a seed was built under, snapshotted at seed time.
+///
+/// **This is the `SeedContext` half of myne-md/myne#648, and the name it carries
+/// here is what it is rather than what it was.** The 2026-08-16 merge dropped
+/// the seed's invalidation along with the seed: `docs/decisions/ai/0553`
+/// records that changing `ai_excluded_folders` cuts the seed and changing the
+/// provider cuts it too, with a host-side half (a run paused for a scope
+/// approval is a user-length window in which either can move), and none of that
+/// has run since. Re-seeding the history without this would put conversation
+/// text back on the wire with the control that bounds it still missing — the
+/// half the issue says is worse than leaving the seed off.
+///
+/// Compared as values, not as blobs: the exclusion set is order-insensitive
+/// (a prefs vec that merely reordered is not a policy change), and the
+/// provider is the stored `ai_provider` name including `None` — clearing the
+/// provider to none sends future runs to a local runtime, which
+/// `threat-model.md` TB12 names as a boundary in its own right, so the cut
+/// fires on every change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeedControls {
+    excluded: Vec<String>,
+    provider: Option<String>,
+}
+
+impl SeedControls {
+    pub fn from_view(view: &protocol::PrefsView) -> Self {
+        let mut excluded = view.ai_excluded_folders.clone();
+        excluded.sort();
+        SeedControls {
+            excluded,
+            provider: view.ai_provider.clone(),
+        }
+    }
+
+    /// Whether a seed built under `self` may still be sent under `live`.
+    ///
+    /// Pure so the rule is testable without a vault: the one question is
+    /// whether either control moved, and a moved control drops the seed
+    /// rather than filtering it, because a turn carries text and no note
+    /// provenance (`docs/decisions/ai/0553`).
+    pub fn survives(&self, live: &protocol::PrefsView) -> bool {
+        *self == SeedControls::from_view(live)
+    }
+}
+
 /// What a truncated turn is marked with, so the model does not read a cut-off
 /// list as a complete one.
 const TRUNCATION_MARKER: &str = "\n[... this earlier message was shortened ...]";
@@ -219,6 +278,80 @@ mod tests {
             role: HistoryRole::Assistant,
             text: Zeroizing::new(text.to_string()),
         }
+    }
+
+    fn view_with(
+        budget: Option<u32>,
+        excluded: Vec<String>,
+        provider: Option<String>,
+    ) -> protocol::PrefsView {
+        protocol::PrefsView {
+            chat_history_budget: budget,
+            ai_excluded_folders: excluded,
+            ai_provider: provider,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn unset_budget_is_the_default() {
+        assert_eq!(
+            history_budget(&view_with(None, vec![], None)),
+            DEFAULT_HISTORY_BUDGET
+        );
+    }
+
+    #[test]
+    fn a_stored_budget_is_read_at_run_start() {
+        assert_eq!(history_budget(&view_with(Some(500), vec![], None)), 500);
+    }
+
+    #[test]
+    fn a_stored_budget_above_the_ceiling_is_clamped_on_read() {
+        // The setter clamps at the write; this holds whoever wrote the value
+        // (a blob predating the clamp, a hand-edited one). `docs/decisions/ai/0553`
+        // records the distinction against `auto_lock_seconds`.
+        assert_eq!(
+            history_budget(&view_with(Some(999_999), vec![], None)),
+            MAX_HISTORY_BUDGET
+        );
+    }
+
+    #[test]
+    fn unchanged_controls_let_the_seed_survive() {
+        let live = view_with(
+            None,
+            vec!["b".to_string(), "a".to_string()],
+            Some("openrouter".to_string()),
+        );
+        let stored = SeedControls::from_view(&view_with(
+            None,
+            vec!["a".to_string(), "b".to_string()],
+            Some("openrouter".to_string()),
+        ));
+        assert!(stored.survives(&live));
+    }
+
+    #[test]
+    fn an_added_exclusion_drops_the_seed() {
+        let stored =
+            SeedControls::from_view(&view_with(None, vec![], Some("openrouter".to_string())));
+        let live = view_with(
+            None,
+            vec!["Secret/".to_string()],
+            Some("openrouter".to_string()),
+        );
+        assert!(!stored.survives(&live));
+    }
+
+    #[test]
+    fn a_changed_provider_drops_the_seed() {
+        // Including clearing it to none: a conversation held on-device must not
+        // be re-sent in full to a provider configured afterwards.
+        let stored =
+            SeedControls::from_view(&view_with(None, vec![], Some("openrouter".to_string())));
+        assert!(!stored.survives(&view_with(None, vec![], None)));
+        assert!(!stored.survives(&view_with(None, vec![], Some("other".to_string()))));
     }
 
     #[test]
