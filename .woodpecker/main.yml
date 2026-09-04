@@ -496,6 +496,13 @@ steps:
       # lock shipped that way while the OPFS write path skipped its TOCTOU guard
       # believing the lock was held.
       - node scripts/check-unwired.mjs
+      # Adversary-coverage binding (myne#553): every threat-model row carries a
+      # myne-range scenario or a written out-of-scope reason, in both directions.
+      # Sits inside the filtered pnpm-build on purpose: a docs-only threat-model
+      # edit skips this step, but the pre-commit hook carries the same guard
+      # unfiltered, and --emit is a repo change too, so the filter's blind side is
+      # covered. Sub-second and node-builtins only, so it runs with the guards.
+      - node scripts/check-adversary-coverage.mjs
       # IPC bindings with no caller (myne#529): the layer above the ratchet
       # above. A command declared, permitted, registered and mirrored in TS can
       # still be called by nothing, and then the feature behind it ships inert.
