@@ -30,7 +30,7 @@ const PACKET = process.env.TRIAGE_PACKET || join(__dirname, '..', '.triage', 'pa
 const SKILL = process.env.TRIAGE_SKILL || join(__dirname, '..', '..', '..', 'myne-agents', 'skills', 'issue-triage', 'SKILL.md');
 const MODEL = process.env.TRIAGE_MODEL || 'opencode-go/deepseek-v4-flash';
 const OUT = process.env.TRIAGE_OUT || join(dirname(PACKET), 'verdict.json');
-const TIMEOUT_MS = Number(process.env.TRIAGE_TIMEOUT_MS || 120000);
+const TIMEOUT_MS = Number(process.env.TRIAGE_TIMEOUT_MS || 300000);
 
 const packetRaw = readFileSync(PACKET, 'utf8');
 let packet;
@@ -59,13 +59,16 @@ const prompt =
 
 function runOpencode() {
   return new Promise((resolve, reject) => {
-    const child = spawn('opencode', ['run', '--format', 'json', '--model', MODEL, prompt], {
+    // --print-logs pushes opencode's own diagnostics to stderr, which is how a
+    // cold-start stall (model fetch, provider auth) becomes visible in CI instead
+    // of reading as a silent timeout.
+    const child = spawn('opencode', ['run', '--print-logs', '--format', 'json', '--model', MODEL, prompt], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
     });
 
     let stdout = '', stderr = '';
-    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('opencode timeout')); }, TIMEOUT_MS);
+    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`opencode timeout after ${TIMEOUT_MS} ms; stderr tail: ${stderr.slice(-1200)}`)); }, TIMEOUT_MS);
 
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
