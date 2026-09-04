@@ -64,6 +64,19 @@ jobs:
           TRIAGE_OUT: scripts/github-triage/.triage/verdict.json
         run: node scripts/github-triage/classify.mjs
 
+      - name: Diagnose opencode.ai reachability
+        if: failure()
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          echo "=== curl opencode.ai/zen/go/v1/models ==="
+          curl -sS -m 20 -o /dev/null -w "http=%{http_code} time=%{time_total}s\n" \
+            -H "Authorization: Bearer ${OPENCODE_API_KEY}" \
+            https://opencode.ai/zen/go/v1/models || echo "curl failed (exit $?)"
+          echo "=== curl opencode.ai root ==="
+          curl -sS -m 20 -o /dev/null -w "http=%{http_code} time=%{time_total}s\n" \
+            https://opencode.ai/ || echo "curl failed (exit $?)"
+
       - name: Apply verdict
         env:
           MYNE_BOT_PAT: ${{ secrets.MYNE_BOT_PAT }}
