@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    ".claude/skills/adhd/SKILL.md",
+    ".claude/skills/diverge/SKILL.md"
+  ],
+  "permission": {
+    "bash": {
+      "git merge-tree *": "allow"
+    }
+  }
+}
