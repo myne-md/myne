@@ -235,6 +235,78 @@ export async function hydrate(): Promise<void> {
       "src/lib/agent-run.ts:agentStart",
     ]);
   });
+
+  it("recognises a binding behind the prefs chokepoint", () => {
+    // Blind spot A (myne-md/myne#605): prefs writes carry no direct `invoke`
+    // — the literal sits as `writePref`'s first argument, and `writePref` is
+    // module-private and the only thing that calls `invoke`. The success line
+    // still counted; it just counted almost nothing (3 of 70 desktop prefs
+    // bindings). A `writePref("plugin:…")` body is a binding too.
+    const PREFS = `export async function setFoo(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_foo", { enabled });
+}
+`;
+    const { dead, checked } = deadBindings({
+      bindings: new Map([["src/lib/prefs.ts", PREFS]]),
+      callers: new Map([
+        ["src/lib/prefs.ts", PREFS],
+        ["src/components/settings/Foo.tsx", `await setFoo(true);`],
+      ]),
+    });
+    expect(checked).toBe(1);
+    expect(dead).toEqual([]);
+  });
+
+  it("names a chokepoint binding with no caller in its own tree", () => {
+    // Forward injection for the widening above: the new denominator must
+    // actually report, by path and symbol. This is `setDailyDateFormat`'s
+    // shape — consumed on its client, settable on neither.
+    const PREFS = `export async function setFoo(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_foo", { enabled });
+}
+`;
+    const { dead } = deadBindings({
+      bindings: new Map([["mobile/src/lib/prefs.ts", PREFS]]),
+      callers: new Map([["mobile/src/lib/prefs.ts", PREFS]]),
+    });
+    expect(dead).toEqual(["mobile/src/lib/prefs.ts:setFoo"]);
+  });
+
+  it("does not let the other client's caller answer for a chokepoint binding", () => {
+    // The tree-scoping rule applies to chokepoint bindings exactly as to
+    // direct ones: a desktop caller must not keep a mobile setter alive. The
+    // sixteen mobile prefs setters this widening surfaced were held alive only
+    // by `src/` files.
+    const PREFS = `export async function setFoo(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_foo", { enabled });
+}
+`;
+    const { dead } = deadBindings({
+      bindings: new Map([["mobile/src/lib/prefs.ts", PREFS]]),
+      callers: new Map([
+        ["mobile/src/lib/prefs.ts", PREFS],
+        ["src/components/settings/Foo.tsx", `await setFoo(true);`],
+      ]),
+    });
+    expect(dead).toEqual(["mobile/src/lib/prefs.ts:setFoo"]);
+  });
+
+  it("accepts a chokepoint binding called from its own client", () => {
+    // The passing direction of the same rule: the identical setter called
+    // from `mobile/src` is live.
+    const PREFS = `export async function setFoo(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_foo", { enabled });
+}
+`;
+    const { dead } = deadBindings({
+      bindings: new Map([["mobile/src/lib/prefs.ts", PREFS]]),
+      callers: new Map([
+        ["mobile/src/lib/prefs.ts", PREFS],
+        ["mobile/src/app/flows/Settings.tsx", `await setFoo(true);`],
+      ]),
+    });
+    expect(dead).toEqual([]);
+  });
 });
 
 describe("check-ipc-binding-callers: the ratchet", () => {
