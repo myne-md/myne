@@ -3181,8 +3181,6 @@
         "localModelMissing": "Le modèle local enregistré dans les paramètres ne se trouve plus sur cet appareil. Rien n'a été envoyé nulle part. Choisissez de nouveau un modèle, ou désignez un fournisseur, dans Paramètres → Développeur → IA.",
         "noCredential": "Aucune clé API n'est définie pour ce fournisseur. Ajoutez-en une dans Paramètres → Développeur → IA.",
         "notReady": "Rien n'est encore prêt à répondre. Rien n'a été envoyé nulle part. Choisissez un modèle, ou désignez un fournisseur, dans Paramètres → Développeur → IA.",
-        "noEmbeddingModel": "Poser une question recherche dans vos notes sur cet appareil, ce qui nécessite un modèle de recherche ici. Un fournisseur ne peut pas le faire. Rien n'a été envoyé nulle part. Choisissez un modèle de recherche dans Paramètres → Développeur → IA.",
-        "indexNotReady": "Vos notes sont encore en cours d'indexation pour la recherche. Rien n'a été envoyé nulle part. Réessayez dans un instant.",
         "requestRejected": "Le fournisseur n'a pas accepté cette requête. Rien n'a été enregistré. L'erreur vient de ce que Myne a envoyé, pas de votre configuration ni de vos notes.",
         "policyRefused": "Le fournisseur a refusé cette requête en vertu de ses propres règles : une protection de compte, une politique d'espace de travail, ou un modèle que votre formule n'inclut pas. Cela doit se régler auprès du fournisseur, pas dans Myne.",
         "quotaExhausted": "Le fournisseur a refusé la requête : vous n'avez plus de crédit ou vous avez dépassé une limite de débit. Cela doit se régler auprès du fournisseur, pas dans Myne.",

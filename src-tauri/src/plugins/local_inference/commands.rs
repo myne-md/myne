@@ -21,28 +21,25 @@
 //! current-thread runtime — the codebase's "avoid the `tauri::test` harness"
 //! discipline (TB9 Cargo.lock), mirroring `notes::…_with_dir`.
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, Runtime, State};
 use zeroize::Zeroizing;
 
 use myne_core::plugins::attachments::extract_types::{ExtractStatus, SourceFormat};
 use myne_core::plugins::notes::commands::note_read_with_dir;
-use myne_core::plugins::notes::note_id::NoteId;
 
 use super::cancel::{guarded_on_token, CancelReach, CancelRegistry, CancelToken, RequestCancel};
 use super::compute_priority::ComputePriority;
 use super::endpoint_config;
-use super::engine::{ChatMessage, ChatRole, Engine};
+use super::engine::Engine;
 use super::error::EngineError;
 use super::hydrate::{folder_is_excluded, folder_of};
 use super::model_store::{self, ModelRole, ModelStoreError};
-use super::rag;
 use super::retrieval::{self, ScoredChunk};
 use super::state::LocalInferenceState;
 use super::state::RequestClass;
@@ -56,15 +53,6 @@ use crate::plugins::vault_unlock::state::VaultRuntimeState;
 pub fn local_inference_error_kind(e: &EngineError) -> &'static str {
     e.kind()
 }
-
-/// Minimum cosine score for a retrieved chunk to ground (and cite) a chat turn
-/// (conversational-ai-chat). Below this the turn answers conversationally
-/// without inventing note citations. Chosen from a real-vault measurement with a
-/// **multilingual** embedding model, where cosines discriminate (relevant
-/// ~0.5–0.8, weak/off-note ~0.2–0.35). An English-only model gives a flat
-/// ~0.83–0.98 distribution where this cutoff is a no-op — the multilingual
-/// model is the load-bearing fix; this threshold is the complementary gate.
-const CHAT_RELEVANCE_THRESHOLD: f32 = 0.30;
 
 /// One-shot completion. Blocking (no stream, SYNC-7).
 ///
@@ -353,73 +341,11 @@ pub async fn ai_capability_report<R: Runtime>(
         has(ModelRole::Generation),
         embedding_present,
         transcription_model,
-        // The same flag `chat_stream` and `ask` gate on, read through the same
-        // lock. A header derived from anything else would be a second opinion
-        // about whether asking can answer.
+        // The same flag the retrieval-grounded commands gate on, read through
+        // the same lock. A header derived from anything else would be a second
+        // opinion about whether asking can answer.
         vector_state.lock().is_enabled(),
     ))
-}
-
-/// Why a retrieval-grounded turn cannot run when the vector store is off.
-///
-/// Two states wearing one refusal until myne-md/myne#545: Ask is grounded on
-/// the embedding index, that index is refused a remote provider outright
-/// (SYNC-16), and the embedding model is not bundled. So a user with a working
-/// provider and no local search model was told to "pick a model, or name a
-/// provider", which is the one thing they had already done — and no amount of
-/// provider configuration was ever going to help, because the missing piece is
-/// on the other side of a bar that exists on purpose.
-///
-/// Reads the same two facts `capability_report_from`'s embedding row reads, in
-/// the same order, so the sentence the user is shown and the chip in the chat
-/// header cannot disagree: is a local embedding model selected, or does the
-/// active local arm carry its own weights.
-fn retrieval_refusal<R: Runtime>(app: &AppHandle<R>, state: &LocalInferenceState) -> EngineError {
-    let base = crate::paths::app_data_dir(app).unwrap_or_else(|_| std::path::PathBuf::from("."));
-    // **Two reads, because "recorded" and "still there" are different facts and
-    // the first version asked only the first one** (myne-md/myne#545 follow-up).
-    // A marker written weeks ago for a model since deleted comes back from
-    // `selected_model` as confidently as a live one, so a user whose model file
-    // was gone was told their notes were "still being indexed" — forever, since
-    // the walk that would index them cannot load the model either.
-    let recorded = model_store::selected_model(&base, ModelRole::Embedding)
-        .ok()
-        .flatten()
-        .is_some();
-    let present = model_store::selected_model_verified(&base, ModelRole::Embedding)
-        .ok()
-        .flatten()
-        .is_some();
-    // `embedding_engine()` is the SYNC-16 door: on a remote backend it hands
-    // back the local arm, and errors only when there is no local arm at all.
-    // Either way, a model that cannot be reached is a model that is not there.
-    let carries_own = state
-        .embedding_engine()
-        .map(|e| e.carries_own_models())
-        .unwrap_or(false);
-    retrieval_refusal_from(recorded, present, carries_own)
-}
-
-/// The decision itself, split from its two host reads so it is testable — the
-/// same split `capability_report_from` uses one screen up, and for the same
-/// reason: the command that would exercise this takes an `AppHandle`, five
-/// `State`s and a `Channel`, none of which a unit test can build.
-pub(super) fn retrieval_refusal_from(
-    recorded: bool,
-    present: bool,
-    carries_own: bool,
-) -> EngineError {
-    if present || carries_own {
-        // A model that can actually be loaded: the index is a matter of time.
-        EngineError::IndexNotReady
-    } else if recorded {
-        // A marker pointing at nothing. The sentence for this already exists
-        // and names the one action that helps, which is choosing again — where
-        // "still indexing" names an action that does not exist.
-        EngineError::LocalModelMissing
-    } else {
-        EngineError::NoEmbeddingModel
-    }
 }
 
 /// The models the **named remote provider** currently publishes (myne#415
@@ -531,8 +457,8 @@ pub async fn set_ai_endpoint<R: Runtime>(
 /// Deliberately NOT registered as interactive compute: this command is the
 /// primitive the background embed-walk drives, and a walk that counted as
 /// user-initiated would starve auto-tag for the whole of a large re-index. The
-/// user-initiated embeds are the ones inside [`semantic_search`] / [`ask`] /
-/// [`chat_stream`], which register there.
+/// user-initiated embeds are the ones inside [`semantic_search`], which
+/// registers there.
 #[tauri::command]
 pub async fn embed(
     text: String,
@@ -626,8 +552,7 @@ pub async fn transcribe<R: Runtime>(
 
     // Embedding path (SYNC-16): the strict accessor, which never hands back a
     // remote backend. This surface only embeds — there is no generation here to
-    // split off (#415 task 18 split the two handles in `ask` and `chat_stream`,
-    // where there was one).
+    // split off (#415 task 18 split the two handles where there was one).
     let engine = engine_state.embedding_engine()?;
     let cancel_token: CancelToken = cancel_guard.token().clone();
     // Kept for the out-of-band search refresh below (the closure consumes the id).
@@ -856,8 +781,7 @@ pub async fn semantic_search(
     let _interactive = priority.interactive();
     // Embedding path (SYNC-16): the strict accessor, which never hands back a
     // remote backend. This surface only embeds — there is no generation here to
-    // split off (#415 task 18 split the two handles in `ask` and `chat_stream`,
-    // where there was one).
+    // split off (#415 task 18 split the two handles where there was one).
     let engine = engine_state.embedding_engine()?;
     // Embed off the async thread (CPU-bound); the wrapper zeroizes on drop.
     let query_vec = tokio::task::spawn_blocking(move || engine.embed(&query))
@@ -875,428 +799,15 @@ pub async fn semantic_search(
     Ok(to_search_hits(hits))
 }
 
-/// Which backend is serving right now, as an answer records it
-/// (myne-md/myne#440). Read at the moment the turn is built rather than by the
-/// frontend afterwards — the selection is re-read per request, so a report
-/// fetched after the answer can name a different backend than the one that
-/// produced it.
-fn served_by_of(state: &LocalInferenceState) -> ServedBy {
-    let class = state.active_class();
-    ServedBy {
-        class: class.as_str(),
-        name: state.served_by_name(class),
-    }
-}
-
-/// A grounded Q&A answer crossing IPC (semantic-search-qa tasks 6 + 7): the
-/// answer text plus the source chunks it was grounded on, for citation.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct AskResult {
-    pub answer: String,
-    pub sources: Vec<SearchHit>,
-    /// **Which backend served THIS turn** (myne-md/myne#440).
-    ///
-    /// Reported by the request rather than read after it. The chat surface used
-    /// to call `ai_capability_report()` once the answer was in and label the
-    /// turn from the CURRENT selection — so a backend switch mid-session
-    /// relabelled turns that a different backend had produced. Attribution of
-    /// where a note's text went is a trust surface, not a caption; it has to
-    /// come from the request that actually sent it.
-    pub served_by: ServedBy,
-}
-
-/// The backend that produced one answer, as the turn records it.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ServedBy {
-    /// The `BackendClass` wire form — `in_process_local` / `loopback_local` /
-    /// `remote`.
-    pub class: &'static str,
-    /// The runtime or provider by name, when the class has one to give.
-    ///
-    /// `None` for the in-process arm, which is Myne itself and needs no name.
-    /// Populated for BOTH the loopback and remote arms — the loopback one used
-    /// to render as an empty string, because the frontend derived every name
-    /// from the *remote provider's* wire value, which a loopback answer does not
-    /// have. "Answered by" with nothing after it is worse than no indicator.
-    pub name: Option<String>,
-}
-
-/// Resolve retrieved hits to their chunk texts from resident note bodies,
-/// skipping any hit whose body is missing (note evicted) or whose byte-range is
-/// stale (not a char boundary / out of range — the note changed since
-/// embedding). Returns the resolved chunk texts (under `Zeroizing`) paired with
-/// the sources that resolved, in retrieval order. Pure + testable.
-fn resolve_hit_texts<'b>(
-    hits: &[ScoredChunk],
-    body_of: impl Fn(&NoteId) -> Option<&'b str>,
-) -> (Vec<Zeroizing<String>>, Vec<ScoredChunk>) {
-    let mut texts = Vec::new();
-    let mut sources = Vec::new();
-    for h in hits {
-        let Some(body) = body_of(&h.key.note_id) else {
-            continue;
-        };
-        let (s, e) = (h.key.start, h.key.end);
-        if e <= body.len() && body.is_char_boundary(s) && body.is_char_boundary(e) {
-            texts.push(Zeroizing::new(body[s..e].to_string()));
-            sources.push(*h);
-        }
-    }
-    (texts, sources)
-}
-
-/// Grounded Q&A over the resident vault (semantic-search-qa tasks 6 + 7). Embeds
-/// the question, retrieves top-k chunks, reads each source note body via the
-/// sanctioned `note_read` path, assembles a grounding context under `Zeroizing`,
-/// and calls the blocking `Engine.infer`. Returns the answer + the source set
-/// for citation. No streaming, no network; plaintext never hits disk/log here.
-#[tauri::command]
-#[allow(clippy::too_many_arguments)] // Tauri State injections, not a design smell
-pub async fn ask<R: Runtime>(
-    question: String,
-    k: usize,
-    app: AppHandle<R>,
-    vault_state: State<'_, VaultRuntimeState>,
-    engine_state: State<'_, LocalInferenceState>,
-    vector_state: State<'_, LocalInferenceVectorState>,
-    cancel_state: State<'_, CancelRegistry>,
-    priority: State<'_, ComputePriority>,
-) -> Result<AskResult, EngineError> {
-    let question = Zeroizing::new(question);
-    // User-initiated: covers BOTH model calls below (embed + generate), so a
-    // background auto-tag pass cannot slip between them (MYND-651 task 4).
-    let _interactive = priority.interactive();
-    // TWO handles (#415 task 18). Retrieval embeds on the LOCAL embedder —
-    // SYNC-16, and mixing embedders is a retrieval-correctness bug before it is
-    // a privacy one. The generation is user-initiated and MAY be the provider
-    // the user named. Sharing one handle meant this surface could never reach a
-    // provider no matter what the user configured, which was most of why the
-    // remote arm was unreachable.
-    engine_state.refresh().await;
-    let engine = engine_state.embedding_engine()?;
-    let generator = engine_state.engine_for(RequestClass::UserInitiated)?;
-
-    // 1. Embed the question off the async thread.
-    let query_vec = {
-        let engine = Arc::clone(&engine);
-        let q = question.clone();
-        tokio::task::spawn_blocking(move || engine.embed(&q))
-            .await
-            .map_err(|_| EngineError::EmbeddingFailed)??
-    };
-
-    // 2. Retrieve top-k (sync scan; the std-Mutex guard never spans an await).
-    //    Host-side opt-in + excluded-folder gates enforced here (see
-    //    `semantic_search`), so a compromised WebView cannot ground an answer on
-    //    a disabled feature or an excluded note (SYNC-14).
-    let hits = {
-        let store = vector_state.lock();
-        if !store.is_enabled() {
-            // **A typed refusal, not an empty answer** — the correction
-            // `chat_stream` already carries (myne-md/myne#466), applied to the
-            // other retrieval-grounded command. An empty successful turn renders
-            // "No answer — try rephrasing", so a user whose index is not built
-            // was told their WORDING was the problem and rewording could never
-            // fix it. Which refusal is `retrieval_refusal`'s call
-            // (myne-md/myne#545): no local search model is a different next step
-            // from an index that is still being built.
-            drop(store);
-            return Err(retrieval_refusal(&app, &engine_state));
-        }
-        retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
-    };
-    if hits.is_empty() {
-        // Nothing resident to ground on — no model call, empty answer.
-        return Ok(AskResult {
-            answer: String::new(),
-            sources: Vec::new(),
-            served_by: served_by_of(&engine_state),
-        });
-    }
-
-    // 3. Read each unique source note body via the sanctioned decrypt path.
-    let notes_dir = myne_core::paths::notes_dir_for(&app, vault_state.active_vault_id().await)
-        .map_err(|_| EngineError::NotReady)?;
-    let mut bodies: HashMap<NoteId, Zeroizing<String>> = HashMap::new();
-    for h in &hits {
-        if bodies.contains_key(&h.key.note_id) {
-            continue;
-        }
-        if let Ok(body) = note_read_with_dir(
-            notes_dir.clone(),
-            vault_state.inner(),
-            h.key.note_id.to_string(),
-            &myne_core::vault_io::StdVaultIo,
-            &myne_core::host::tauri_host::TauriHost::new(app.clone()),
-        )
-        .await
-        {
-            bodies.insert(h.key.note_id, Zeroizing::new(body));
-        }
-    }
-
-    // 4. Resolve chunk texts (char-boundary-safe) + assemble the grounding
-    //    prompt under Zeroizing.
-    let (chunk_texts, sources) = resolve_hit_texts(&hits, |id| bodies.get(id).map(|b| b.as_str()));
-    let prompt = rag::assemble_rag_prompt(&question, &chunk_texts);
-
-    // 5. Generate off the async thread (blocking, no stream) — on the
-    //    GENERATION handle, which may be the named provider. Registered so the
-    //    vault-lock teardown can abort it (#445); `LockOnly` because the Q&A
-    //    surface offers no Stop.
-    let cancel_guard = cancel_state.begin(CancelReach::LockOnly);
-    let answer = {
-        let engine = Arc::clone(&generator);
-        let cancel = cancel_guard.request_cancel();
-        tokio::task::spawn_blocking(move || {
-            engine.infer_cancellable(prompt.as_str(), None, cancel.as_fn())
-        })
-        .await
-        .map_err(|_| EngineError::InferenceFailed)??
-    };
-
-    Ok(AskResult {
-        answer,
-        sources: to_search_hits(sources),
-        served_by: served_by_of(&engine_state),
-    })
-}
-
-/// A conversation message crossing IPC from the WebView (conversational-ai-chat
-/// task 5). `content` is UNTRUSTED plaintext (may echo note content) — never
-/// logged; the engine tokenizes it with the Special-Token-Injection defense
-/// (task 2, `chat_streaming`).
-#[derive(Debug, Clone, Deserialize)]
-pub struct ChatMessageDto {
-    pub role: String,
-    pub content: String,
-}
-
-impl ChatMessageDto {
-    /// Map to the engine `ChatMessage`. An unrecognized role is treated as
-    /// `User` — role is a quality hint only (content is always untrusted-
-    /// tokenized regardless), so a lenient default is safe.
-    fn into_message(self) -> ChatMessage {
-        let role = if self.role == "assistant" {
-            ChatRole::Assistant
-        } else {
-            ChatRole::User
-        };
-        ChatMessage {
-            role,
-            content: self.content,
-        }
-    }
-}
-
-/// Streaming grounded chat over the resident vault (conversational-ai-chat task
-/// 5). Embeds the question, retrieves top-k non-excluded chunks, reads their
-/// source note bodies, frames a grounded multi-turn conversation, and streams
-/// the assistant's answer token-by-token over `on_token` (a Tauri `Channel`).
-/// Returns the full answer + the source set for citation when generation ends.
-///
-/// Cancellation: the shared [`CancelToken`] is `reset()` at the start; the
-/// composer "Stop" command ([`chat_stop`]) and the vault-lock teardown both
-/// `cancel()` it. The [`guarded_on_token`] publish-guard checks the flag BEFORE
-/// each channel send, so a lock mid-generation never emits into a torn-down
-/// transcript.
-///
-/// **Not local-only, and this doc used to say it was.** That claim has been
-/// false since the remote arm shipped (#414 / #415):
-/// `engine_for(RequestClass::UserInitiated)` can resolve to a named provider,
-/// and then this call sends the framed question, grounded on note text, off the
-/// device. The guarantee is the narrower, true one: no byte leaves the device
-/// unless the user has named a provider, consented and stored a key, which the
-/// host re-reads on every call (`RemoteEngine::ready`). The frontend half of
-/// this same call carries the identical correction (`src/lib/ai-chat.ts`);
-/// fixing one side and leaving the other is how the next reader of the backend
-/// gets told the path cannot egress.
-///
-/// Plaintext (question, history, chunk texts, tokens) never hits disk or log
-/// (DENY-list); the question is `Zeroizing`-wrapped. A vector store that is not
-/// enabled is a typed [`EngineError::NotReady`] rather than an empty answer: an
-/// empty answer renders "try rephrasing", and no rephrasing fixes an index that
-/// has not been built yet.
-#[tauri::command]
-#[allow(clippy::too_many_arguments)] // Tauri State/Channel injections, not a design smell
-pub async fn chat_stream<R: Runtime>(
-    question: String,
-    history: Vec<ChatMessageDto>,
-    k: usize,
-    on_token: Channel<String>,
-    app: AppHandle<R>,
-    vault_state: State<'_, VaultRuntimeState>,
-    engine_state: State<'_, LocalInferenceState>,
-    vector_state: State<'_, LocalInferenceVectorState>,
-    cancel_state: State<'_, CancelRegistry>,
-    priority: State<'_, ComputePriority>,
-) -> Result<AskResult, EngineError> {
-    // First statement: bound the question plaintext to a Zeroizing wrapper.
-    let question = Zeroizing::new(question);
-    // User-initiated: registered for the whole turn, including the streamed
-    // generation, which is the longest compute hold in the app (MYND-651 task 4).
-    let _interactive = priority.interactive();
-    // TWO handles (#415 task 18). Retrieval embeds on the LOCAL embedder —
-    // SYNC-16, and mixing embedders is a retrieval-correctness bug before it is
-    // a privacy one. The generation is user-initiated and MAY be the provider
-    // the user named. Sharing one handle meant this surface could never reach a
-    // provider no matter what the user configured, which was most of why the
-    // remote arm was unreachable.
-    engine_state.refresh().await;
-    let engine = engine_state.embedding_engine()?;
-    let generator = engine_state.engine_for(RequestClass::UserInitiated)?;
-    let messages: Vec<ChatMessage> = history
-        .into_iter()
-        .map(ChatMessageDto::into_message)
-        .collect();
-
-    // Fresh generation → its own token (see the transcribe path above). No
-    // reset: a new turn cannot inherit a stale flag it never shared.
-    //
-    // `StopAndLock`: the composer's Stop targets the newest turn with a Stop
-    // button, and this is the only surface that has one.
-    let cancel_guard = cancel_state.begin(CancelReach::StopAndLock);
-    let cancel = cancel_guard.token().clone();
-    let request_cancel = cancel_guard.request_cancel();
-
-    // 0. Refuse BEFORE embedding, because the refusal's copy says "Nothing was
-    //    sent anywhere" and that has to be true.
-    //
-    //    `embedding_engine()` refuses only `BackendClass::Remote`; it returns
-    //    the active LoopbackLocal arm, which is what answers whenever a
-    //    device-local runtime endpoint is configured. So with an Ollama
-    //    endpoint set and the embed-on-unlock pass not yet finished, embedding
-    //    first sent the user's question over loopback to a daemon Myne does not
-    //    ship (threat-model TB12: separately distributed, unsigned by Myne,
-    //    absent from `Cargo.lock`, reachable by A16's unprivileged same-machine
-    //    peer) and only then returned `NotReady`, whose sentence denies it.
-    //
-    //    The check at step 2 stays where it is: it holds the lock across the
-    //    check and the scan, which is what makes "enabled" true for the
-    //    retrieval that follows. This one is an early exit, not a replacement.
-    if !vector_state.lock().is_enabled() {
-        return Err(retrieval_refusal(&app, &engine_state));
-    }
-
-    // 1. Embed the question off the async thread.
-    let query_vec = {
-        let engine = Arc::clone(&engine);
-        let q = question.clone();
-        tokio::task::spawn_blocking(move || engine.embed(&q))
-            .await
-            .map_err(|_| EngineError::EmbeddingFailed)??
-    };
-
-    // 2. Retrieve top-k (sync scan; host-side opt-in + excluded-folder gates, so
-    //    a compromised WebView cannot ground on a disabled feature / excluded
-    //    note — SYNC-14). The store is off → a typed refusal, NOT an empty
-    //    answer (myne-md/myne#466).
-    //
-    //    This used to return `Ok(AskResult { answer: "" })`. An empty successful
-    //    turn is exactly what renders "No answer — try rephrasing", so a user
-    //    whose index had not been built yet was told their WORDING was the
-    //    problem, and rewording could never fix it. The store only becomes
-    //    enabled inside the embed-on-unlock pass (`hydrate.rs`'s
-    //    `set_policy(true, …)`), so "not enabled" means the index is not ready —
-    //    a state, not an answer. `NotReady` says so and names the next step.
-    let hits = {
-        let store = vector_state.lock();
-        if !store.is_enabled() {
-            // Resolved outside the guard would be tidier and would be wrong:
-            // the lock is what makes "enabled" true for the scan below, and
-            // this arm is the one where it is not.
-            drop(store);
-            return Err(retrieval_refusal(&app, &engine_state));
-        }
-        retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
-    };
-    // Relevance gate: drop weakly-matching chunks so chit-chat / off-note
-    // questions don't ground on — or cite — irrelevant notes. Below the
-    // threshold the turn answers conversationally (rag's empty-context branch).
-    // Tunable; MiniLM cosine for a genuinely relevant chunk is well above this.
-    let hits: Vec<ScoredChunk> = hits
-        .into_iter()
-        .filter(|h| h.score >= CHAT_RELEVANCE_THRESHOLD)
-        .collect();
-
-    // 3. Read each unique source note body via the sanctioned decrypt path.
-    let notes_dir = myne_core::paths::notes_dir_for(&app, vault_state.active_vault_id().await)
-        .map_err(|_| EngineError::NotReady)?;
-    let mut bodies: HashMap<NoteId, Zeroizing<String>> = HashMap::new();
-    for h in &hits {
-        if bodies.contains_key(&h.key.note_id) {
-            continue;
-        }
-        if let Ok(body) = note_read_with_dir(
-            notes_dir.clone(),
-            vault_state.inner(),
-            h.key.note_id.to_string(),
-            &myne_core::vault_io::StdVaultIo,
-            &myne_core::host::tauri_host::TauriHost::new(app.clone()),
-        )
-        .await
-        {
-            bodies.insert(h.key.note_id, Zeroizing::new(body));
-        }
-    }
-
-    // 4. Resolve chunk texts (char-boundary-safe) + frame the grounded chat.
-    let (chunk_texts, sources) = resolve_hit_texts(&hits, |id| bodies.get(id).map(|b| b.as_str()));
-    let grounded = rag::frame_grounded_chat(
-        &messages,
-        &question,
-        &chunk_texts,
-        &sources.iter().map(|s| s.key).collect::<Vec<_>>(),
-        rag::ChatBudget::default(),
-    );
-    // The budget keeps a prefix of `sources` (same order) — take that many for
-    // citation, preserving the cosine score `frame_grounded_chat` drops.
-    let cite_sources = to_search_hits(sources.into_iter().take(grounded.sources.len()).collect());
-
-    // 5. Stream the assistant answer off the async thread. The guarded callback
-    //    forwards each token to the channel unless a Stop/lock cancelled first.
-    let system = grounded.system;
-    let messages = grounded.messages;
-    let channel = on_token;
-    let answer = {
-        let engine = Arc::clone(&generator);
-        tokio::task::spawn_blocking(move || {
-            let mut cb = guarded_on_token(&cancel, |t| {
-                let _ = channel.send(t.to_string());
-            });
-            // The publish-guard above stops a STREAMING engine at its emit seam.
-            // A provider does not stream — it blocks on one request and calls
-            // back once with the whole reply — so the predicate handed here is
-            // the only thing that can abort it mid-flight (#445), and it reads
-            // this turn's token rather than "is anything cancelled".
-            engine.chat_streaming_cancellable(
-                system.as_str(),
-                &messages,
-                &mut cb,
-                request_cancel.as_fn(),
-            )
-        })
-        .await
-        .map_err(|_| EngineError::InferenceFailed)??
-    };
-
-    Ok(AskResult {
-        answer,
-        sources: cite_sources,
-        served_by: served_by_of(&engine_state),
-    })
-}
-
-/// Signal the active streaming generation to stop (composer "Stop" — task 5).
+/// Signal the active streaming generation to stop (transcription's "Stop").
 /// Idempotent; a no-op when nothing is streaming. Sets the shared cancel flag
-/// the running [`chat_stream`]'s guarded callback observes before its next send.
+/// the running generation's guarded callback observes before its next send.
 #[tauri::command]
 pub async fn chat_stop(cancel_state: State<'_, CancelRegistry>) -> Result<(), EngineError> {
-    // The composer's single Stop means "the generation I am looking at", which
-    // is the newest in flight while chat is the only streaming surface. The
-    // registry can already cancel any request by id, so a second streaming
-    // surface needs an id on the wire and no redesign here. A no-op when
-    // nothing is running — Stop on an idle composer is not an error.
+    // The single Stop means "the generation I am looking at", which is the
+    // newest in flight. The registry can already cancel any request by id, so
+    // a second streaming surface needs an id on the wire and no redesign
+    // here. A no-op when nothing is running — Stop while idle is not an error.
     cancel_state.cancel_newest();
     Ok(())
 }
@@ -1654,94 +1165,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_retrieval_refusal_separates_no_model_from_an_index_still_building() {
-        // Nothing recorded, nothing on disk, no arm carrying its own weights:
-        // asking can never run here, and naming another provider will not
-        // change that.
-        assert_eq!(
-            retrieval_refusal_from(false, false, false),
-            EngineError::NoEmbeddingModel
-        );
-        // A model is recorded AND present, so the index is a matter of time.
-        assert_eq!(
-            retrieval_refusal_from(true, true, false),
-            EngineError::IndexNotReady
-        );
-        // **Recorded and gone.** The case that sent a real user in circles: the
-        // marker survives, the file does not, so the walk cannot load it and
-        // "still indexing" describes work that will never start. The sentence
-        // that names the one action that helps is `LocalModelMissing`'s.
-        assert_eq!(
-            retrieval_refusal_from(true, false, false),
-            EngineError::LocalModelMissing
-        );
-        // …and an arm that brings its own weights counts as having one, which
-        // is the case a disk check alone gets wrong: the E2E stub answers every
-        // role from code with no file anywhere.
-        assert_eq!(
-            retrieval_refusal_from(false, false, true),
-            EngineError::IndexNotReady
-        );
-    }
-
-    /// The refusals stay content-free and keep their own tags, which is what
-    /// the frontend narrows on. A tag collision here would render one state's
-    /// sentence for the other with nothing failing.
-    #[test]
-    fn the_two_retrieval_refusals_carry_distinct_tags() {
-        assert_eq!(EngineError::NoEmbeddingModel.kind(), "no_embedding_model");
-        assert_eq!(EngineError::IndexNotReady.kind(), "index_not_ready");
-        assert_ne!(
-            EngineError::NoEmbeddingModel.kind(),
-            EngineError::NotReady.kind()
-        );
-    }
-
     /// A manual current-thread runtime — `spawn_blocking` works on it, and this
     /// avoids adding tokio's `macros` feature just for `#[tokio::test]`.
     fn rt() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
             .build()
             .expect("current-thread runtime")
-    }
-
-    /// The `NotReady` refusal must come BEFORE the question is embedded, and
-    /// the order is the whole guarantee: its user-facing sentence says "Nothing
-    /// was sent anywhere".
-    ///
-    /// `embedding_engine()` refuses only `BackendClass::Remote`. It returns the
-    /// active LoopbackLocal arm, so with a device-local runtime endpoint
-    /// configured, embedding first sends the user's question to a daemon Myne
-    /// does not ship (threat-model TB12) and the refusal then denies it.
-    ///
-    /// Asserted over the source rather than by driving the command, because
-    /// `chat_stream` is a `#[tauri::command]` with `State` and `Channel`
-    /// injections and no seam that lets a test observe the ordering. This is the
-    /// same shape `state.rs` uses to pin the engine doors, and for the same
-    /// reason: the property is positional, so a positional check is what holds
-    /// it. Reordering the two lines makes this fail.
-    #[test]
-    fn chat_stream_refuses_before_it_embeds() {
-        let src = include_str!("commands.rs");
-        let start = src
-            .find("pub async fn chat_stream<R: Runtime>")
-            .expect("chat_stream");
-        let body = &src[start..];
-        let end = body.find("\n}\n").expect("body end");
-        let body = &body[..end];
-
-        let refusal = body
-            .find("if !vector_state.lock().is_enabled() {")
-            .expect("the early NotReady refusal");
-        let embed = body
-            .find("engine.embed(&q)")
-            .expect("the question embedding");
-        assert!(
-            refusal < embed,
-            "chat_stream embeds the question at byte {embed} and refuses at {refusal}: \
-             the refusal says nothing was sent anywhere, so it has to come first"
-        );
     }
 
     /// A `RequestCancel` for a test that is not exercising cancellation.
@@ -1889,9 +1318,9 @@ mod tests {
         // and `contains` would not see it.
         assert_eq!(
             production.matches(".begin(CancelReach::").count(),
-            5,
-            "expected exactly five registered surfaces — infer, infer_ambient, \
-             transcribe, ask, chat_stream. A new prompt-bearing command owes a \
+            3,
+            "expected exactly three registered surfaces — infer, infer_ambient, \
+             transcribe. A new prompt-bearing command owes a \
              registration; a vanished one is a request the lock cannot abort"
         );
     }
@@ -1916,71 +1345,6 @@ mod tests {
         assert_eq!(hits[0].byte_start, 4);
         assert_eq!(hits[0].byte_end, 20);
         assert!((hits[0].score - 0.87).abs() < 1e-6);
-    }
-
-    #[test]
-    fn resolve_hit_texts_slices_skips_missing_and_stale_ranges() {
-        use super::super::vector_store::ChunkKey;
-        use myne_core::plugins::notes::note_id::NoteId;
-
-        let a = NoteId::parse("01970e83-4f2f-7000-8000-000000000061").unwrap();
-        let missing = NoteId::parse("01970e83-4f2f-7000-8000-000000000062").unwrap();
-        let hits = vec![
-            // valid slice of note a
-            ScoredChunk {
-                key: ChunkKey {
-                    note_id: a,
-                    start: 0,
-                    end: 5,
-                },
-                score: 1.0,
-            },
-            // body missing → skipped
-            ScoredChunk {
-                key: ChunkKey {
-                    note_id: missing,
-                    start: 0,
-                    end: 5,
-                },
-                score: 0.9,
-            },
-            // stale range (out of bounds) → skipped
-            ScoredChunk {
-                key: ChunkKey {
-                    note_id: a,
-                    start: 0,
-                    end: 999,
-                },
-                score: 0.8,
-            },
-        ];
-        let body = "Hello world";
-        let (texts, sources) =
-            resolve_hit_texts(&hits, |id| if *id == a { Some(body) } else { None });
-        assert_eq!(texts.len(), 1);
-        assert_eq!(texts[0].as_str(), "Hello");
-        assert_eq!(sources.len(), 1);
-        assert_eq!(sources[0].key.note_id, a);
-    }
-
-    #[test]
-    fn resolve_hit_texts_skips_non_char_boundary_range() {
-        use super::super::vector_store::ChunkKey;
-        use myne_core::plugins::notes::note_id::NoteId;
-
-        let a = NoteId::parse("01970e83-4f2f-7000-8000-000000000063").unwrap();
-        // "😀" is 4 bytes; a range ending at byte 1 is mid-codepoint → skip.
-        let hits = vec![ScoredChunk {
-            key: ChunkKey {
-                note_id: a,
-                start: 0,
-                end: 1,
-            },
-            score: 1.0,
-        }];
-        let (texts, sources) = resolve_hit_texts(&hits, |_| Some("😀"));
-        assert!(texts.is_empty(), "mid-codepoint range must be skipped");
-        assert!(sources.is_empty());
     }
 
     /// The tag prompt used across the gate tests. Real prompts embed the note
@@ -2225,31 +1589,5 @@ mod tests {
             "deferred"
         );
         assert_ne!(EngineError::Deferred, EngineError::NotReady);
-    }
-
-    #[test]
-    fn chat_message_dto_maps_roles_leniently() {
-        let u = ChatMessageDto {
-            role: "user".into(),
-            content: "a".into(),
-        }
-        .into_message();
-        assert_eq!(u.role, ChatRole::User);
-        assert_eq!(u.content, "a");
-
-        let a = ChatMessageDto {
-            role: "assistant".into(),
-            content: "b".into(),
-        }
-        .into_message();
-        assert_eq!(a.role, ChatRole::Assistant);
-
-        // Unknown role → User (lenient; content is untrusted-tokenized anyway).
-        let s = ChatMessageDto {
-            role: "system".into(),
-            content: "c".into(),
-        }
-        .into_message();
-        assert_eq!(s.role, ChatRole::User);
     }
 }

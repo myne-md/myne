@@ -3076,8 +3076,6 @@
         "localModelMissing": "Ayarlarda kayıtlı yerel model artık bu cihazda yok. Hiçbir yere hiçbir şey gönderilmedi. Ayarlar → Geliştirici → Yapay Zeka bölümünden yeniden bir model seçin ya da bir sağlayıcı belirtin.",
         "noCredential": "Bu sağlayıcı için API anahtarı ayarlanmamış. Ayarlar → Geliştirici → Yapay Zeka bölümünden bir tane ekleyin.",
         "notReady": "Yanıt verebilecek hiçbir şey henüz hazır değil. Hiçbir yere hiçbir şey gönderilmedi. Ayarlar → Geliştirici → Yapay Zeka bölümünden bir model seçin ya da bir sağlayıcı belirtin.",
-        "noEmbeddingModel": "Soru sormak, notlarınızı bu cihazda arar ve bunun için burada bir arama modeli gerekir. Bunu bir sağlayıcı yapamaz. Hiçbir yere hiçbir şey gönderilmedi. Ayarlar → Geliştirici → Yapay Zeka bölümünden bir arama modeli seçin.",
-        "indexNotReady": "Notlarınız arama için hâlâ dizinleniyor. Hiçbir yere hiçbir şey gönderilmedi. Birazdan tekrar deneyin.",
         "requestRejected": "Sağlayıcı bu isteği kabul etmedi. Hiçbir şey kaydedilmedi. Bu, Myne’in gönderdiği şeydeki bir hatadır; kurulumunuzdaki ya da notlarınızdaki değil.",
         "policyRefused": "Sağlayıcı bu isteği kendi kurallarına dayanarak reddetti: bir hesap kısıtı, bir çalışma alanı politikası ya da planınızda bulunmayan bir model. Bunun Myne’de değil, sağlayıcıda çözülmesi gerekir.",
         "quotaExhausted": "Sağlayıcı isteği geri çevirdi: krediniz bitmiş ya da bir hız sınırını aşmışsınız. Bunun Myne’de değil, sağlayıcıda çözülmesi gerekir.",

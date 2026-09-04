@@ -209,7 +209,6 @@ export const ROSTER = Object.freeze([
       "src/lib/agent-run-core.ts",
       "src/lib/agent-protocol.ts",
       "src/notes/agent/agentStore.ts",
-      "src/notes/ai/runAskToStore.ts",
       "src/notes/components/AiHydrationProbe.tsx",
       "src-tauri/src/plugins/local_inference/",
       "mobile/src/app/flows/AiChatFlow.tsx",

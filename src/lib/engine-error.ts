@@ -70,14 +70,6 @@ export type ProviderErrorCause =
   | "empty_completion"
   | "local_model_missing"
   | "not_ready"
-  /** Asking cannot run: no on-device embedding model is selected, and a remote
-   *  provider cannot supply one (SYNC-16). Split out of `not_ready` because
-   *  that sentence sends the user to name a provider, which is exactly what
-   *  they have already done (myne-md/myne#545). */
-  | "no_embedding_model"
-  /** An embedding model is selected and the vault's index is still being
-   *  built. A state, not a failure: the next move is to wait. */
-  | "index_not_ready"
   /** The provider rejected the REQUEST (HTTP 400), rather than the credential
    *  or the cost. Split out because the fix is on Myne's side, not the
    *  user's, and because collapsed into the generic failure it reached the
@@ -152,8 +144,6 @@ const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
   "empty_completion",
   "local_model_missing",
   "not_ready",
-  "no_embedding_model",
-  "index_not_ready",
   "request_rejected",
   "feature_off",
   "consent_missing",
@@ -217,8 +207,6 @@ const PROVIDER_ERROR_KEY: Readonly<Record<ProviderErrorCause, string>> = {
   policy_refused: "settings.ai.providerError.policyRefused",
   local_model_missing: "settings.ai.providerError.localModelMissing",
   not_ready: "settings.ai.providerError.notReady",
-  no_embedding_model: "settings.ai.providerError.noEmbeddingModel",
-  index_not_ready: "settings.ai.providerError.indexNotReady",
   request_rejected: "settings.ai.providerError.requestRejected",
   feature_off: "settings.ai.providerError.featureOff",
   consent_missing: "settings.ai.providerError.consentMissing",

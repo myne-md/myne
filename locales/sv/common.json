@@ -3076,8 +3076,6 @@
         "localModelMissing": "Den lokala modellen som är sparad i inställningarna finns inte längre på den här enheten. Ingenting skickades någonstans. Välj en modell igen, eller ange en leverantör, under Inställningar → Utvecklare → AI.",
         "noCredential": "Ingen API-nyckel är angiven för den här leverantören. Lägg till en i Inställningar → Utvecklare → AI.",
         "notReady": "Ingenting är redo att svara ännu. Ingenting skickades någonstans. Välj en modell, eller ange en leverantör, under Inställningar → Utvecklare → AI.",
-        "noEmbeddingModel": "När du ställer en fråga söks dina anteckningar igenom på den här enheten, och det kräver en sökmodell här. En leverantör kan inte göra det. Ingenting skickades någonstans. Välj en sökmodell under Inställningar → Utvecklare → AI.",
-        "indexNotReady": "Dina anteckningar indexeras fortfarande för sökning. Ingenting skickades någonstans. Försök igen om en stund.",
         "requestRejected": "Leverantören ville inte acceptera den här begäran. Ingenting sparades. Det är ett fel i det Myne skickade, inte i din konfiguration eller dina anteckningar.",
         "policyRefused": "Leverantören avvisade den här begäran enligt sina egna regler: en kontospärr, en arbetsytepolicy, eller en modell som din plan inte omfattar. Det måste lösas hos leverantören, inte i Myne.",
         "quotaExhausted": "Leverantören avvisade begäran: ditt saldo är slut eller så har du passerat en hastighetsgräns. Det måste lösas hos leverantören, inte i Myne.",

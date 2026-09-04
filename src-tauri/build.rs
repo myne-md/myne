@@ -634,8 +634,6 @@ fn main() {
                 "infer_ambient",
                 "embed",
                 "semantic_search",
-                "ask",
-                "chat_stream",
                 "chat_stop",
                 "transcribe",
                 "read_transcript",

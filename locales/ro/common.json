@@ -3181,8 +3181,6 @@
         "localModelMissing": "Modelul local înregistrat în setări nu mai există pe acest dispozitiv. Nu s-a trimis nimic nicăieri. Alege din nou un model sau indică un furnizor din Setări → Developer → AI.",
         "noCredential": "Nu este setată nicio cheie API pentru acest furnizor. Adaugă una din Setări → Developer → AI.",
         "notReady": "Nimic nu este încă pregătit să răspundă. Nu s-a trimis nimic nicăieri. Alege un model sau indică un furnizor din Setări → Developer → AI.",
-        "noEmbeddingModel": "Întrebarea caută în notele tale pe acest dispozitiv, iar pentru asta este nevoie de un model de căutare aici. Un furnizor nu poate face acest lucru. Nu s-a trimis nimic nicăieri. Alege un model de căutare din Setări → Developer → AI.",
-        "indexNotReady": "Notele tale sunt încă indexate pentru căutare. Nu s-a trimis nimic nicăieri. Încearcă din nou peste puțin timp.",
         "requestRejected": "Furnizorul nu a acceptat această solicitare. Nu s-a salvat nimic. Este o eroare în ceea ce a trimis Myne, nu în configurația sau în notele tale.",
         "policyRefused": "Furnizorul a refuzat această solicitare conform propriilor reguli: o restricție de cont, o politică a spațiului de lucru sau un model pe care planul tău nu îl include. Acest lucru trebuie rezolvat cu furnizorul, nu în Myne.",
         "quotaExhausted": "Furnizorul a refuzat solicitarea: nu mai ai credit sau ai depășit o limită de rată. Acest lucru trebuie rezolvat cu furnizorul, nu în Myne.",
