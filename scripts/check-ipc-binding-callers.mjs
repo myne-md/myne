@@ -76,6 +76,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, relative, resolve } from "node:path";
+import { SHARED_ROOTS } from "./lib/shared-roots.mjs";
 
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
 const RECORD = join(ROOT, "scripts", "ipc-binding-callers.json");
@@ -102,6 +103,34 @@ const CALLERS_FOR = new Map([
   ["src/lib", ["src", "web/src", "editor/src", "dialect/src"]],
   ["mobile/src/lib", ["mobile/src", "editor/src", "dialect/src"]],
 ]);
+
+// The mapping above is this guard's POLICY — which client answers for which
+// binding tree is a decision, not a roster — but the tree NAMES in it are not
+// this guard's to own (myne-md/myne#605). Every root named here must exist in
+// `scripts/lib/shared-roots.mjs`'s roster, checked below at startup: a renamed
+// or deleted tree must fail by name rather than silently narrow the search.
+// The reverse is deliberately NOT checked: a new shared tree joining the roster
+// does not automatically become a caller root. The header's measured decision
+// above ("WHY THE SCOPE IS src/lib + mobile/src/lib") is what admits a tree,
+// and that admission belongs in review, not in a glob.
+for (const [bindingRoot, callers] of CALLERS_FOR) {
+  for (const root of [bindingRoot, ...callers]) {
+    // A binding root is a SUBDIRECTORY of a shared root (`src/lib` under
+    // `src`); either shape counts, since the question is whether the tree the
+    // name points at still exists under a known root.
+    const known =
+      SHARED_ROOTS.includes(root) || SHARED_ROOTS.some((s) => root.startsWith(`${s}/`));
+    if (!known) {
+      console.error(
+        `ipc-binding-callers: CALLERS_FOR names "${root}", which is neither in ` +
+          `scripts/lib/shared-roots.mjs nor under one of its roots. A renamed ` +
+          `tree narrows this guard's search silently; map the new name or ` +
+          `remove the stale one.`,
+      );
+      process.exit(1);
+    }
+  }
+}
 
 /** The caller trees that answer for the binding file at `rel`. */
 export function callerRootsFor(rel) {
@@ -151,11 +180,39 @@ export function bindingsInSource(src) {
     const start = marks[i].at;
     const end = i + 1 < marks.length ? marks[i + 1].at : src.length;
     const body = src.slice(start, end);
-    if (/invoke\s*<?[^(]*\(\s*["'`]plugin:[a-z0-9-]+\|/.test(body)) {
+    if (invokesCommand(body) || invokesThroughChokepoint(body)) {
       found.push(marks[i].name);
     }
   }
   return found.concat(reexportedBindings(src));
+}
+
+/** A direct `invoke("plugin:x|y", …)` in the body. */
+function invokesCommand(body) {
+  return /invoke\s*<?[^(]*\(\s*["'`]plugin:[a-z0-9-]+\|/.test(body);
+}
+
+/**
+ * The mandated-write-path chokepoints: a function whose body must reach its
+ * command through one of these rather than through a direct `invoke`.
+ *
+ * **The shape that made this guard blind, found by measurement (myne-md/myne#605).**
+ * `check-prefs-nonce.mjs` rule 1 requires every prefs write to carry its
+ * `plugin:prefs|…` literal as `writePref`'s first argument — and `writePref` is
+ * module-private and the only thing that calls `invoke`. So one guard's rule
+ * structurally made the other guard blind, and neither said so: the success
+ * line still counted, it just counted almost nothing (2 of 49 mobile prefs
+ * bindings, 3 of 70 desktop). A named constant rather than a regex
+ * alternation, so adding a third write path is a one-line edit at a place a
+ * reviewer will see.
+ */
+const CHOKEPOINTS = ["writePref"];
+
+/** `writePref("plugin:x|y", …)` — the literal as the chokepoint's first argument. */
+function invokesThroughChokepoint(body) {
+  return CHOKEPOINTS.some((fn) =>
+    new RegExp(`${fn}\\s*\\(\\s*["'\`]plugin:[a-z0-9-]+\\|`).test(body),
+  );
 }
 
 /**
@@ -380,7 +437,9 @@ export function deadBindings({ bindings, callers }) {
        * ONE hop, deliberately. A chain the guard follows arbitrarily far stops
        * being able to say a binding is unreachable, because a cycle of dead
        * functions inside one file would carry each other. One hop covers the
-       * shape that occurs and refuses the shape that hides. */
+       * shape that occurs and refuses the shape that hides. (The case that
+       * named this limit — a binding called only by `persistHorizon`, itself
+       * uncalled — has since left the tree; the limit stands without it.) */
       function reaches(wanted) {
         if (reachedFromAnotherFile(wanted)) return true;
         for (const [fn, body] of exportedBodies(src)) {
