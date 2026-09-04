@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorState, EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
+import { assertParsed } from "./_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import { InlineTag } from "../../src/dialect/lezer/inline-tag";
@@ -33,7 +33,7 @@ function mount(doc: string, anchor = 0, head = 0): EditorView {
     }),
     parent: host,
   });
-  forceParsing(view);
+  assertParsed(view);
   return view;
 }
 

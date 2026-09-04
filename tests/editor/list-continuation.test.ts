@@ -11,7 +11,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorSelection, EditorState, type Transaction } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
+import { assertParsed } from "./_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { continueListMarkup } from "@myne/editor/list-continuation";
 
@@ -40,7 +40,7 @@ function mount(doc: string, anchor: number): Mounted {
     }),
     parent: host,
   });
-  forceParsing(view);
+  assertParsed(view);
   return { view, host };
 }
 
@@ -253,7 +253,7 @@ describe("a multi-cursor keeps every caret", () => {
       }),
       parent: host,
     });
-    forceParsing(view);
+    assertParsed(view);
     m = { view, host };
     let applied: Transaction | null = null;
     continueListMarkup({

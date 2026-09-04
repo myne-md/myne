@@ -17,8 +17,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing, syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { assertParsed } from "./_parse-budget";
 import { codeNestMarkdownExtension } from "../../src/editor/code-highlight";
 import { buildCodeBlockDecorations } from "../../src/editor/decorations/fenced-code";
 
@@ -37,7 +38,7 @@ function mount(doc: string): Mounted {
     }),
     parent: host,
   });
-  forceParsing(view);
+  assertParsed(view);
   return { view, host };
 }
 

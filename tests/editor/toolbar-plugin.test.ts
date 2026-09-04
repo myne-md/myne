@@ -17,7 +17,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { HIGHLIGHT_CLASSES } from "../../editor/src/html/sanitize";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
+import { assertParsed } from "./_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { codeNestMarkdownExtension } from "../../src/editor/code-highlight";
 import { selectionToolbarExtension } from "../../src/editor/toolbar/plugin";
@@ -47,7 +47,7 @@ function mount(doc: string, anchor: number, head: number): Mounted {
   // jsdom has no geometry — `coordsAtPos` does real math and would throw/null.
   // Return a fixed rect so the render path positions and mounts the toolbar.
   view.coordsAtPos = () => ({ left: 10, right: 20, top: 10, bottom: 24 });
-  forceParsing(view);
+  assertParsed(view);
   // The plugin only refreshes on selectionSet/docChanged/viewportChanged — none
   // of which fire on bare mount under jsdom. Re-dispatch the selection so the
   // toolbar's `update()` runs and (when applicable) schedules a render.

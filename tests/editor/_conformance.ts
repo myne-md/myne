@@ -10,8 +10,7 @@
 //
 // Test files that import this MUST declare `// @vitest-environment jsdom`.
 
-import { forceParsing } from "@codemirror/language";
-import { PARSE_BUDGET_MS } from "./_parse-budget";
+import { assertParsed } from "./_parse-budget";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { myneExtensions } from "../../src/editor/extensions";
@@ -98,15 +97,7 @@ export interface Mounted {
  *  0 ms budget reaches this throw, and the small documents in this tree do
  *  not. */
 export function forceCompleteParse(view: EditorView): void {
-  const upto = view.state.doc.length;
-  if (!forceParsing(view, upto, PARSE_BUDGET_MS)) {
-    throw new Error(
-      `conformance mount: the syntax parse did not reach ${upto} within ` +
-        `${PARSE_BUDGET_MS} ms, so the tree is PARTIAL and every tree-derived ` +
-        `decoration below is unreliable. The decoration is not necessarily ` +
-        `missing: the parser had not reached it.`,
-    );
-  }
+  assertParsed(view);
 }
 
 /** Mount the full Myne editor over `doc`, cursor parked at `selectionPos`

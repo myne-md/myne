@@ -22,7 +22,7 @@
 
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
-import { ensureSyntaxTree } from "@codemirror/language";
+import { assertParsedState } from "./_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { trimRowNewline } from "@myne/editor/task-selection";
 
@@ -40,7 +40,7 @@ function stateFor(doc = DOC): EditorState {
   // then finds no `TaskMarker` on the row and `trimRowNewline` correctly
   // declines, so the test fails on a real answer to a half-parsed document.
   // Passing alone and failing in the suite is the signature.
-  ensureSyntaxTree(state, doc.length, 5_000);
+  assertParsedState(state);
   return state;
 }
 

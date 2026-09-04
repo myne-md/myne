@@ -16,8 +16,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing, syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { assertParsed } from "./_parse-budget";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import {
   noteSetExtension,
@@ -45,7 +46,7 @@ function mount(doc: string, notes: readonly ResolverNote[]): Mounted {
     parent: host,
   });
   view.dispatch({ effects: reconfigureNoteSet(notes) });
-  forceParsing(view);
+  assertParsed(view);
   return { view, host };
 }
 

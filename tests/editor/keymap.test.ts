@@ -13,8 +13,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState, Text } from "@codemirror/state";
 import { EditorView, type Command, type KeyBinding } from "@codemirror/view";
-import { foldedRanges, forceParsing, syntaxTree } from "@codemirror/language";
+import { foldedRanges, syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { assertParsed } from "./_parse-budget";
 import { codeNestMarkdownExtension } from "../../src/editor/code-highlight";
 import { myneFolding } from "../../src/editor/folding";
 import {
@@ -77,7 +78,7 @@ function mount(doc: string, anchor: number, head = anchor): Mounted {
     }),
     parent: host,
   });
-  forceParsing(view);
+  assertParsed(view);
   syntaxTree(view.state);
   return { view, host };
 }

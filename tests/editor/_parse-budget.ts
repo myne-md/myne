@@ -37,9 +37,44 @@
 // THE HALF THAT ACTUALLY CARRIES THE FIX
 //
 // Both CodeMirror entry points REPORT whether they finished — `forceParsing`
-// returns a boolean, `ensureSyntaxTree` returns `null` — and both call sites
-// discarded that, so a test could proceed on a partial tree with nothing saying
-// so. Each caller now throws. That turns "this decoration is missing" into "the
-// parse did not complete", and unlike the budget it holds at every document
-// size rather than only at large ones.
+// returns a boolean, `ensureSyntaxTree` returns `null` — and a caller that
+// discards that report silently proceeds on a partial tree. That is myne#567's
+// failure class in miniature: an assertion against a node the parser had not
+// reached fails on a well-formed document, only under load, only in the full
+// suite. The helpers below throw instead, so an incomplete parse is a loud,
+// named test-harness defect rather than a flaky assertion in a random file.
+//
+// Use `assertParsed(view)` after mounting and `assertParsedState(state)` for a
+// bare state. Do NOT call `forceParsing`/`ensureSyntaxTree` directly from a
+// test: every pre-existing direct call site in this tree was found discarding
+// the result, and that is how the class recurs.
+import { ensureSyntaxTree, forceParsing } from "@codemirror/language";
+import type { EditorState } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
+
 export const PARSE_BUDGET_MS = 30_000;
+
+/** Throw unless the view's syntax tree covers the whole document. */
+export function assertParsed(view: EditorView, budgetMs = PARSE_BUDGET_MS): void {
+  const upto = view.state.doc.length;
+  if (!forceParsing(view, upto, budgetMs)) {
+    throw incompleteParseError(upto, budgetMs);
+  }
+}
+
+/** Throw unless the state's syntax tree covers the whole document. */
+export function assertParsedState(state: EditorState, budgetMs = PARSE_BUDGET_MS): void {
+  const upto = state.doc.length;
+  if (ensureSyntaxTree(state, upto, budgetMs) === null) {
+    throw incompleteParseError(upto, budgetMs);
+  }
+}
+
+function incompleteParseError(upto: number, budgetMs: number): Error {
+  return new Error(
+    `editor test: the syntax parse did not reach ${upto} within ` +
+      `${budgetMs} ms, so the tree is PARTIAL and every tree-derived ` +
+      `assertion below is unreliable. The assertion is not necessarily ` +
+      `failing: the parser had not reached it (myne#567).`,
+  );
+}

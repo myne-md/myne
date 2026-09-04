@@ -14,9 +14,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { PARSE_BUDGET_MS } from "./_parse-budget";
+import { assertParsed } from "./_parse-budget";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import { horizontalRuleDecorations } from "../../src/editor/decorations/horizontal-rule";
 import { frontmatterDecorations } from "../../src/editor/decorations/frontmatter";
@@ -66,13 +65,7 @@ function mount(doc: string): Mounted {
   // Same fix, same budget and same reasoning as the shared conformance mount;
   // `tests/editor/_parse-budget.ts` carries the measurements and records what
   // is NOT the cause (the budget is not reached at these document sizes).
-  if (!forceParsing(view, view.state.doc.length, PARSE_BUDGET_MS)) {
-    throw new Error(
-      `hr-frontmatter: the syntax parse did not reach ${view.state.doc.length} ` +
-        `within ${PARSE_BUDGET_MS} ms, so the tree is PARTIAL. The decoration ` +
-        `asserted below is not necessarily missing: the parser had not reached it.`,
-    );
-  }
+  assertParsed(view);
   return { view, host };
 }
 

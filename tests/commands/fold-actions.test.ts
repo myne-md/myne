@@ -14,7 +14,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { foldedRanges, forceParsing, syntaxTree } from "@codemirror/language";
+import { foldedRanges, syntaxTree } from "@codemirror/language";
+import { assertParsed } from "../editor/_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { COMMAND_ACTIONS } from "../../src/commands";
 import type { CommandAction, CommandContext } from "../../src/commands";
@@ -75,7 +76,7 @@ function mount(): EditorView {
     }),
     parent: host,
   });
-  forceParsing(v);
+  assertParsed(v);
   syntaxTree(v.state);
   v.focus(); // registers as the active view
   view = v;

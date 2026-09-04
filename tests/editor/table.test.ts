@@ -12,7 +12,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
+import { assertParsed } from "./_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import {
@@ -326,7 +326,7 @@ describe("GFM table widget (jsdom)", () => {
       "\n",
     );
     mounted = mount(doc);
-    forceParsing(mounted.view, doc.length, 5000);
+    assertParsed(mounted.view);
 
     const covers = (pos: number): boolean => {
       let hit = false;
@@ -345,7 +345,7 @@ describe("GFM table widget (jsdom)", () => {
   it("typing on the blank line directly below a table is not absorbed into it (feedback #4)", () => {
     const doc = ["| a | b |", "| --- | --- |", "| 1 | 2 |", ""].join("\n");
     mounted = mount(doc);
-    forceParsing(mounted.view, doc.length, 5000);
+    assertParsed(mounted.view);
     const blankLine = mounted.view.state.doc.line(4).from;
     mounted.view.dispatch({
       changes: { from: blankLine, insert: "x" },
@@ -487,7 +487,7 @@ describe("reveal gating (buildTableDecorations)", () => {
       }),
       parent: host,
     });
-    forceParsing(view, doc.length, 5000);
+    assertParsed(view);
     return view.state;
   }
 
@@ -550,7 +550,7 @@ describe("findTableEntry (arrow-into-table)", () => {
       }),
       parent: host,
     });
-    forceParsing(view, DOC.length, 5000);
+    assertParsed(view);
     return view.state;
   }
 
@@ -608,7 +608,7 @@ describe("cursor movement never mutates the buffer", () => {
       }),
       parent: host,
     });
-    forceParsing(view, doc.length, 5000);
+    assertParsed(view);
 
     const before = view.state.doc.toString();
     // Cursor into the table (reveal attempt), then back out (re-render).
