@@ -34,12 +34,23 @@ const TIMEOUT_MS = Number(process.env.REVIEW_TIMEOUT_MS || 1800000);
 // pass spawns one via `Agent`). bash is restricted to read-only git plumbing; a
 // subagent inherits the parent's permission gates, so it can do no more than the
 // parent. This is the direct port of review.sh's allowlist.
+// The spec and legal trees live under runner.temp, OUTSIDE the working tree (the
+// branch under review). The reviewer must read them, so the external_directory
+// guard is opened for exactly those roots — not globally. read/grep/glob remain
+// the only tools that can reach anything, and edit/write/webfetch/websearch stay
+// denied, so an open external path still cannot exfiltrate or mutate anything.
+const externalRoots = [process.env.SPEC_REPO_DIR, process.env.LEGAL_REPO_DIR].filter(Boolean);
+const externalDirectory = externalRoots.length
+  ? Object.fromEntries(externalRoots.map((r) => [r.replace(/\/$/, '') + '/**', 'allow']))
+  : {};
+
 const PERMISSION = {
   '*': 'deny',
   read: 'allow',
   grep: 'allow',
   glob: 'allow',
   task: 'allow',
+  ...(externalRoots.length ? { external_directory: externalDirectory } : {}),
   bash: {
     'git diff *': 'allow',
     'git log *': 'allow',
