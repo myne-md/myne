@@ -36,7 +36,7 @@ vi.mock("../../src/editor/attachments/toast", () => ({
 
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
+import { assertParsed } from "./_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import {
@@ -79,7 +79,7 @@ function mount(doc: string): EditorView {
     parent: host,
   });
   // The remove path walks the syntax tree; force a full parse synchronously.
-  forceParsing(view, view.state.doc.length, 5_000);
+  assertParsed(view);
   return view;
 }
 

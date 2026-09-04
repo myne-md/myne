@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
+import { assertParsed } from "./_parse-budget";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Footnote } from "../../src/dialect/lezer/footnote";
 import { collectFootnotes } from "../../src/editor/decorations/footnote-collector";
@@ -25,7 +25,7 @@ function parsedState(doc: string): EditorState {
     }),
     parent: host,
   });
-  forceParsing(view, doc.length, 5000);
+  assertParsed(view);
   return view.state;
 }
 
