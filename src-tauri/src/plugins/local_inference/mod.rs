@@ -52,7 +52,6 @@ pub mod engine_ollama;
 pub mod hydrate;
 pub mod indexing;
 pub mod model_store;
-pub mod rag;
 pub mod retrieval;
 pub mod vector_store;
 pub mod whisper;
@@ -116,9 +115,9 @@ use tauri::{Manager, Runtime};
 /// be scanned + dangle in the feature-OFF build.
 const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
   "identifier": "local-inference",
-  "description": "On-device AI inference + retrieval + grounded Q&A commands (infer/embed/semantic_search/ask) for the main window; no core/fs/dialog/clipboard. This grant confers no network capability, but that is a property of the ACL entry, not of the AI path: since decisions.md 2026-08-09 the path may open a socket to a user-named provider.",
+  "description": "On-device AI inference + retrieval commands (infer/embed/semantic_search) for the main window; no core/fs/dialog/clipboard. This grant confers no network capability, but that is a property of the ACL entry, not of the AI path: since decisions.md 2026-08-09 the path may open a socket to a user-named provider.",
   "windows": ["main"],
-  "permissions": ["local-inference:allow-infer", "local-inference:allow-infer-ambient", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-suggest-tags", "local-inference:allow-tag-model-available", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path", "local-inference:allow-ai-capability-report", "local-inference:allow-get-ai-endpoint", "local-inference:allow-set-ai-endpoint", "local-inference:allow-list-provider-models"]
+  "permissions": ["local-inference:allow-infer", "local-inference:allow-infer-ambient", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-suggest-tags", "local-inference:allow-tag-model-available", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path", "local-inference:allow-ai-capability-report", "local-inference:allow-get-ai-endpoint", "local-inference:allow-set-ai-endpoint", "local-inference:allow-list-provider-models"]
 }"#;
 
 /// Best-effort zeroize + reset of the in-RAM AI vector store on lock teardown
@@ -166,8 +165,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::infer_ambient,
             commands::embed,
             commands::semantic_search,
-            commands::ask,
-            commands::chat_stream,
             commands::chat_stop,
             commands::transcribe,
             commands::read_transcript,

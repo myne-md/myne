@@ -3076,8 +3076,6 @@
         "localModelMissing": "Mô hình cục bộ được ghi trong cài đặt không còn trên thiết bị này nữa. Không có gì được gửi đi đâu cả. Hãy chọn lại một mô hình, hoặc chỉ định một nhà cung cấp, trong Cài đặt → Nhà phát triển → AI.",
         "noCredential": "Chưa đặt khóa API nào cho nhà cung cấp này. Hãy thêm một khóa trong Cài đặt → Nhà phát triển → AI.",
         "notReady": "Chưa có gì sẵn sàng để trả lời. Không có gì được gửi đi đâu cả. Hãy chọn một mô hình, hoặc chỉ định một nhà cung cấp, trong Cài đặt → Nhà phát triển → AI.",
-        "noEmbeddingModel": "Việc hỏi sẽ tìm trong ghi chú của bạn ngay trên thiết bị này, và điều đó cần một mô hình tìm kiếm tại đây. Nhà cung cấp không làm được việc đó. Không có gì được gửi đi đâu cả. Hãy chọn một mô hình tìm kiếm trong Cài đặt → Nhà phát triển → AI.",
-        "indexNotReady": "Ghi chú của bạn vẫn đang được lập chỉ mục để tìm kiếm. Không có gì được gửi đi đâu cả. Hãy thử lại sau giây lát.",
         "requestRejected": "Nhà cung cấp không chấp nhận yêu cầu này. Không có gì được lưu. Đây là lỗi ở nội dung Myne đã gửi, không phải ở thiết lập hay ghi chú của bạn.",
         "policyRefused": "Nhà cung cấp đã từ chối yêu cầu này theo quy định riêng của họ: một rào chắn tài khoản, một chính sách không gian làm việc, hoặc một mô hình không có trong gói của bạn. Việc này phải được xử lý với nhà cung cấp, không phải trong Myne.",
         "quotaExhausted": "Nhà cung cấp đã từ chối yêu cầu: bạn đã hết số dư hoặc vượt quá giới hạn tần suất. Việc này phải được xử lý với nhà cung cấp, không phải trong Myne.",

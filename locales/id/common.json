@@ -3076,8 +3076,6 @@
         "localModelMissing": "Model lokal yang tercatat di pengaturan tidak ada lagi di perangkat ini. Tidak ada yang dikirim ke mana pun. Pilih model lagi, atau tentukan penyedia, di Pengaturan → Developer → AI.",
         "noCredential": "Belum ada kunci API yang disetel untuk penyedia ini. Tambahkan di Pengaturan → Developer → AI.",
         "notReady": "Belum ada yang siap menjawab. Tidak ada yang dikirim ke mana pun. Pilih model, atau tentukan penyedia, di Pengaturan → Developer → AI.",
-        "noEmbeddingModel": "Bertanya berarti mencari catatan Anda di perangkat ini, dan itu memerlukan model pencarian di sini. Penyedia tidak dapat melakukannya. Tidak ada yang dikirim ke mana pun. Pilih model pencarian di Pengaturan → Developer → AI.",
-        "indexNotReady": "Catatan Anda masih diindeks untuk pencarian. Tidak ada yang dikirim ke mana pun. Coba lagi sebentar lagi.",
         "requestRejected": "Penyedia tidak mau menerima permintaan ini. Tidak ada yang disimpan. Ini kesalahan pada apa yang dikirim Myne, bukan pada pengaturan atau catatan Anda.",
         "policyRefused": "Penyedia menolak permintaan ini berdasarkan aturannya sendiri: pembatas akun, kebijakan ruang kerja, atau model yang tidak tercakup dalam paket Anda. Ini harus diperbaiki di sisi penyedia, bukan di Myne.",
         "quotaExhausted": "Penyedia menolak permintaan itu: kredit Anda habis atau Anda melewati batas laju. Ini harus dibereskan dengan penyedianya, bukan di Myne.",

@@ -3076,8 +3076,6 @@
         "localModelMissing": "Het lokale model dat in de instellingen staat, staat niet meer op dit apparaat. Er is niets verzonden. Kies opnieuw een model, of geef een provider op, in Instellingen → Developer → AI.",
         "noCredential": "Voor deze provider is geen API-sleutel ingesteld. Voeg er een toe via Instellingen → Developer → AI.",
         "notReady": "Er is nog niets klaar om te antwoorden. Er is niets verzonden. Kies een model, of geef een provider op, in Instellingen → Developer → AI.",
-        "noEmbeddingModel": "Vragen stellen doorzoekt je notities op dit apparaat, en daarvoor is hier een zoekmodel nodig. Een provider kan dat niet doen. Er is niets verzonden. Kies een zoekmodel in Instellingen → Developer → AI.",
-        "indexNotReady": "Je notities worden nog geïndexeerd voor zoeken. Er is niets verzonden. Probeer het zo meteen opnieuw.",
         "requestRejected": "De provider heeft dit verzoek niet geaccepteerd. Er is niets opgeslagen. Dit is een fout in wat Myne heeft verzonden, niet in je configuratie of je notities.",
         "policyRefused": "De provider heeft dit verzoek geweigerd op grond van zijn eigen regels: een accountbeperking, een werkruimtebeleid, of een model dat niet in je abonnement zit. Dit moet bij de provider worden opgelost, niet in Myne.",
         "quotaExhausted": "De provider heeft het verzoek geweigerd: je tegoed is op of je hebt een limiet overschreden. Dit moet je bij de provider oplossen, niet in Myne.",

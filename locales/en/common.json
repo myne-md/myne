@@ -3049,8 +3049,6 @@
         "localModelMissing": "The local model recorded in settings is not on this device any more. Nothing was sent anywhere. Pick a model again, or name a provider, in Settings → Developer → AI.",
         "noCredential": "No API key is set for this provider. Add one in Settings → Developer → AI.",
         "notReady": "Nothing is ready to answer yet. Nothing was sent anywhere. Pick a model, or name a provider, in Settings → Developer → AI.",
-        "noEmbeddingModel": "Asking searches your notes on this device, and that needs a search model here. A provider cannot do it. Nothing was sent anywhere. Choose a search model in Settings → Developer → AI.",
-        "indexNotReady": "Your notes are still being indexed for search. Nothing was sent anywhere. Try again in a moment.",
         "requestRejected": "The provider would not accept this request. Nothing was saved. This is a fault in what Myne sent, not in your setup or your notes.",
         "policyRefused": "The provider refused this request under its own rules: an account guardrail, a workspace policy, or a model your plan does not carry. This has to be fixed with the provider, not in Myne.",
         "quotaExhausted": "The provider declined the request: you are out of credit or over a rate limit. This has to be fixed with the provider, not in Myne.",

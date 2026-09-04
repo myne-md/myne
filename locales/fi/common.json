@@ -3076,8 +3076,6 @@
         "localModelMissing": "Asetuksiin merkittyä paikallista mallia ei ole enää tällä laitteella. Mitään ei lähetetty minnekään. Valitse malli uudelleen tai nimeä palveluntarjoaja kohdasta Asetukset → Kehittäjä → Tekoäly.",
         "noCredential": "Tälle palveluntarjoajalle ei ole asetettu API-avainta. Lisää sellainen kohdassa Asetukset → Kehittäjä → Tekoäly.",
         "notReady": "Mikään ei ole vielä valmis vastaamaan. Mitään ei lähetetty minnekään. Valitse malli tai nimeä palveluntarjoaja kohdasta Asetukset → Kehittäjä → Tekoäly.",
-        "noEmbeddingModel": "Kysyminen hakee muistiinpanoistasi tällä laitteella, ja se vaatii hakumallin tänne. Palveluntarjoaja ei voi tehdä sitä. Mitään ei lähetetty minnekään. Valitse hakumalli kohdasta Asetukset → Kehittäjä → Tekoäly.",
-        "indexNotReady": "Muistiinpanojasi indeksoidaan vielä hakua varten. Mitään ei lähetetty minnekään. Yritä uudelleen hetken kuluttua.",
         "requestRejected": "Palveluntarjoaja ei hyväksynyt tätä pyyntöä. Mitään ei tallennettu. Vika on siinä, mitä Myne lähetti, ei asetuksissasi eikä muistiinpanoissasi.",
         "policyRefused": "Palveluntarjoaja hylkäsi tämän pyynnön omien sääntöjensä nojalla: tilin rajoitus, työtilan käytäntö tai malli, joka ei kuulu tilaukseesi. Tämä on korjattava palveluntarjoajan kanssa, ei Mynessä.",
         "quotaExhausted": "Palveluntarjoaja hylkäsi pyynnön: saldosi on lopussa tai olet ylittänyt käyttörajan. Tämä on korjattava palveluntarjoajan kanssa, ei Mynessä.",
