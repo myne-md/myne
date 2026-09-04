@@ -89,7 +89,20 @@ function referencedIn(trees: readonly string[]): Map<string, string> {
   const found = new Map<string, string>();
   for (const tree of trees) {
     for (const file of walk(join(REPO_ROOT, tree))) {
-      const source = readFileSync(file, "utf8");
+      // A walk of a LIVE tree races sibling tests that inject scratch files
+      // into it (manualTestRosterCli.test.ts writes and deletes
+      // src/screens/ZzGuardProbe.tsx). ENOENT between the readdir and the open
+      // is that scratch file's lifecycle, not a defines finding; skip THIS
+      // file only, and any file whose read fails for another reason still
+      // fails the spec. Observed once as a full-suite red in pre-push (myne#567's
+      // load-shape: passes alone, passes on re-run).
+      let source: string;
+      try {
+        source = readFileSync(file, "utf8");
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw err;
+      }
       for (const line of source.split("\n")) {
         const code = line.replace(/^\s*(\/\/|\*|\/\*).*$/, "");
         for (const m of code.matchAll(DEFINE_RE)) {
