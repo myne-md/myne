@@ -29,12 +29,12 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  confirmDeleteWithEnter,
   createNote,
   dismissImporterOffer,
   runPaletteAction,
   unlockToEditor,
 } from "./support/flows";
-import { KEY, pressKey } from "./support/keyboard";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 /** Right-click an element and pick a context-menu item by its
@@ -139,9 +139,7 @@ describeE2E("et1 palette empty-trash confirms with count; cancel keeps, confirm 
         // presses again gets a confirm, and a user who simply holds the key does
         // not. `pressKey` sends a keydown and a keyup, which is that sequence.
         await runPaletteAction(s, "trash.empty", "Empty trash");
-        await s.byTestId("delete-confirm.confirm");
-        await pressKey(s, KEY.ENTER);
-        await s.waitForGone(testIdSelector("delete-confirm.confirm"));
+        await confirmDeleteWithEnter(s);
         await expectTrashCount(s, 0);
 
         // The purged notes are gone from the working tree too (not restored).

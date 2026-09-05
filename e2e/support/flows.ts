@@ -7,6 +7,7 @@
 
 import { expect } from "vitest";
 import { testIdSelector, WebDriverError, type Element, type Session } from "./webdriver";
+import { KEY, activeTestId, pressKey } from "./keyboard";
 
 /**
  * Fire one production IPC from the page seat and settle-poll its result
@@ -1289,6 +1290,45 @@ export async function createNote(session: Session, title: string): Promise<void>
     throw new Error(`${(e as Error).message}\n  create-state: ${diag}`);
   }
   await session.waitForGone(testIdSelector("notes.rename-input"));
+}
+
+/** Confirm an open delete-confirm dialog with Enter (myne-md/myne#676).
+ *
+ * Two load races, both measured on the trash-empty dialog and both silent:
+ * the trap places the focus ring asynchronously after mount (pressing into an
+ * unfocused dialog is a no-op that reads as a dead surface), and a key
+ * opener's keyup can outrun the dialog's listener attach (guard 4 then eats
+ * the first press: its keydown arrives unreleased, its keyup merely arms).
+ * Wait for the ring — the dialog's own contract — press, and press once more
+ * iff the dialog is still up after a grace period: the same recovery a user
+ * performs when the first press visibly does nothing. Never presses blind
+ * twice, so a slow confirm can never eat a double.
+ */
+export async function confirmDeleteWithEnter(session: Session): Promise<void> {
+  await session.byTestId("delete-confirm.confirm");
+  await waitForDeleteRing(session);
+  await pressKey(session, KEY.ENTER);
+  try {
+    await session.waitForGone(testIdSelector("delete-confirm.confirm"), { timeoutMs: 5_000 });
+  } catch {
+    // Re-verify the ring before recovering: focus may have left between the
+    // first check and the press (remount under load drops it to body), in
+    // which case a blind second press is another no-op. If the ring is gone
+    // for good, this fails naming it.
+    await waitForDeleteRing(session);
+    await pressKey(session, KEY.ENTER);
+    await session.waitForGone(testIdSelector("delete-confirm.confirm"));
+  }
+}
+
+/** The delete-confirm focus ring: the precondition every Enter press on the
+ *  dialog needs, and the thing that distinguishes "Enter is broken" from
+ *  "Enter never had a ring to follow". */
+async function waitForDeleteRing(session: Session): Promise<void> {
+  await session.waitUntil(
+    async () => ((await activeTestId(session)) === "delete-confirm.confirm" ? true : null),
+    { label: "focus ring on delete-confirm.confirm", timeoutMs: 15_000 },
+  );
 }
 
 /** Re-open the FIRST sidebar note after a `refresh()` and wait until its editor
