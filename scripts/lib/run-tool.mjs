@@ -50,6 +50,20 @@ export class ToolRunError extends Error {
   }
 }
 
+/**
+ * What `formatDiagnostic` prints. `reason` is optional: a tool that ran fine
+ * carries no tolerance verdict, and only the failure path fills it in.
+ *
+ * @typedef {object} DiagnosticInput
+ * @property {string[]} argv
+ * @property {number | null} status
+ * @property {string} stdout
+ * @property {string} stderr
+ * @property {string} cwd
+ * @property {string} [reason]
+ */
+
+/** @param {DiagnosticInput} input */
 export function formatDiagnostic({ argv, status, stdout, stderr, cwd, reason }) {
   const lines = [];
   if (reason) lines.push(`  tolerated as an empty result: ${reason}`);
@@ -69,6 +83,22 @@ export function formatDiagnostic({ argv, status, stdout, stderr, cwd, reason }) 
  * see (`expectStatus`, default 0). Any other outcome is a tool failure and is
  * handled per `onToolFailure`. Spawning at all counts as running; a tool that
  * ran and found nothing exits 0.
+ *
+ * The options type is declared rather than inferred: without it the checker
+ * sees only the defaulted properties (`cwd`, `expectStatus`) and every call
+ * site passing the documented `onToolFailure` fails — the exact inversion of
+ * the lock this helper exists to enforce.
+ *
+ * @typedef {object} RunToolOptions
+ * @property {string} [cwd]
+ * @property {"fatal" | "empty"} onToolFailure
+ * @property {string} [reason]
+ * @property {number} [expectStatus]
+ * @property {number} [maxBuffer]
+ * @property {(argv0: string, args: string[], opts: { cwd: string, encoding: string, maxBuffer: number }) => { status: number | null, stdout: string, stderr: string, error?: Error }} [spawner]
+ *
+ * @param {string[]} argv
+ * @param {RunToolOptions} [opts]
  */
 export function runTool(
   argv,

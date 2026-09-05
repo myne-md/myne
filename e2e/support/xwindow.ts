@@ -31,17 +31,30 @@
 // exact chain `Editor.tsx` listens on. `xdotool key --window <id> alt+F4` would
 // need a WM to mean anything and is not usable here.
 //
-// # The window is found by NAME, and the name is asserted to be unique
+// # The window is found by NAME, scoped by OWNER, and the count is asserted
 //
 // `xdotool search --name` matches a regex against every window on the display,
-// and the harness runs up to MYNE_E2E_SHARDS file-workers in parallel — but
-// each on its OWN Xvfb display (`xvfb-run -a` allocates a free one), so a match
-// set larger than one is not another scenario's app. It means the regex is
-// catching something else on this display, and resizing "something else" would
-// leave the scenario measuring a window it never touched. So the count is
-// checked rather than assumed, and `[0]` is never taken from a longer list.
+// and a full-suite run shares ONE Xvfb display across all its file-workers:
+// `e2e-local.sh` wraps the whole `pnpm test:e2e` in a single `xvfb-run -a`, so
+// two shards' live app windows sit side by side on the same screen, both
+// titled "Myne". Measured on myne-md/myne#555: `wr1` failed 3/3 attempts with
+// "matched 2 windows", then passed 3/3 isolated. The paragraph that used to
+// stand here claimed the opposite — one display per worker — which is true of
+// no runner in this repo; every `e2e-*.sh` starts one X server per CONTAINER,
+// never per worker.
+//
+// So the name match is only the first half. The second half is ownership: the
+// caller hands over its driver pid (`AppSession.driverPid`, also the process
+// group id — driver → WebKitWebDriver → app all live under it), and a candidate
+// window counts only when its `_NET_WM_PID` is that group or one of its
+// descendants, walked through /proc. A sibling shard's window is then someone
+// else's by construction rather than a count to argue with, and taking `[0]`
+// from an unscoped list is never on the table. Without a pid the lookup keeps
+// the old exactly-1 behaviour, so a caller that cannot know its owner still
+// fails loud rather than resizing a stranger.
 
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -81,29 +94,88 @@ function xdotool(args: readonly string[]): string {
  * Fails by name when the match set is not exactly one, because both directions
  * are real failures that would otherwise be silent: zero means the app's window
  * is not mapped yet (or the title changed and this file did not), and more than
- * one means the regex is catching something this scenario must not resize.
+ * one means the caller would be driving a window it did not choose.
+ *
+ * `driverPid` scopes the match to windows owned by this session (see the header:
+ * a full-suite display holds every shard's window). Candidates whose
+ * `_NET_WM_PID` is outside the driver's process group are someone else's and
+ * are dropped before the count, so a sibling shard next door reads as "not
+ * mine" rather than as an error. Omit it only where the owner is unknowable;
+ * the unscoped exactly-1 assertion stays as the fallback.
  */
-export function appWindowId(): string {
+export function appWindowId(driverPid?: number): string {
   const out = xdotool(["search", "--name", WINDOW_NAME_RE]);
   const ids = out
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
-  if (ids.length !== 1) {
+  const ours =
+    driverPid === undefined
+      ? ids
+      : ids.filter((id) => {
+          const pid = windowPid(id);
+          return pid !== null && isInGroup(pid, driverPid);
+        });
+  if (ours.length !== 1) {
     throw new Error(
       `xdotool search --name ${WINDOW_NAME_RE} matched ${ids.length} windows on ` +
-        `this display, expected exactly 1. Zero means the app window is not mapped ` +
-        `yet or its title no longer matches (tauri.conf.json app.windows[0].title); ` +
-        `more than one means this scenario would be resizing a window it did not ` +
-        `choose.`,
+        `this display, ${ours.length} of them owned by driver pid ${String(driverPid)}, ` +
+        `expected exactly 1. Zero means the app window is not mapped yet or its ` +
+        `title no longer matches (tauri.conf.json app.windows[0].title); more than ` +
+        `one of MINE means the regex is catching something this scenario must not ` +
+        `drive; the rest belong to sibling shards sharing this display and are ` +
+        `correctly ignored.`,
     );
   }
-  return ids[0]!;
+  return ours[0]!;
+}
+
+/** A window's owning pid via `_NET_WM_PID`, or null when the window vanished
+ *  between the search and this query or its client never set one. */
+function windowPid(id: string): number | null {
+  let out: string;
+  try {
+    out = execFileSync("xdotool", ["getwindowpid", id], {
+      encoding: "utf8",
+      timeout: 10_000,
+    }) as string;
+  } catch {
+    return null;
+  }
+  const pid = Number(out.trim());
+  return Number.isInteger(pid) && pid > 0 ? pid : null;
+}
+
+/** Is `pid` the group itself or one of its descendants? Walked up through
+ *  /proc rather than via `pgrep -P`, so the lookup needs no binary beyond
+ *  xdotool itself. A pid that vanished mid-walk answers false: a window without
+ *  a live owner is not one this scenario may drive. */
+function isInGroup(pid: number, group: number): boolean {
+  let current = pid;
+  // The ppid field sits right after the comm parenthetical in /proc/<pid>/stat,
+  // which is why the parse anchors on the LAST ") " — comm itself may contain
+  // parens and spaces, and splitting the whole line on spaces misattributes
+  // both (the shape that silently matched the wrong process).
+  for (let i = 0; i < 64; i += 1) {
+    if (current === group) return true;
+    if (current <= 1) return false;
+    let stat: string;
+    try {
+      stat = readFileSync(`/proc/${current}/stat`, "utf8") as string;
+    } catch {
+      return false;
+    }
+    const after: string = stat.slice(stat.lastIndexOf(") ") + 2);
+    const ppid = Number(after.split(" ")[1]);
+    if (!Number.isInteger(ppid) || ppid <= 0) return false;
+    current = ppid;
+  }
+  return false;
 }
 
 /** Resize the app's toplevel window. Returns the window id it acted on. */
-export function resizeAppWindow(width: number, height: number): string {
-  const id = appWindowId();
+export function resizeAppWindow(width: number, height: number, driverPid?: number): string {
+  const id = appWindowId(driverPid);
   xdotool(["windowsize", id, String(width), String(height)]);
   return id;
 }
@@ -122,8 +194,8 @@ export function resizeAppWindow(width: number, height: number): string {
  * a ~20-line ctypes Xlib script, which needs no window manager and no package
  * the image does not already have.
  */
-export function closeAppWindow(): string {
-  const id = appWindowId();
+export function closeAppWindow(driverPid?: number): string {
+  const id = appWindowId(driverPid);
   const script = join(dirname(fileURLToPath(import.meta.url)), "wm-delete-window.py");
   try {
     execFileSync("python3", [script, id], { encoding: "utf8", timeout: 10_000 });

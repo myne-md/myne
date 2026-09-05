@@ -100,7 +100,10 @@ function referencedIn(trees: readonly string[]): Map<string, string> {
       try {
         source = readFileSync(file, "utf8");
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+        // Structural cast, not `NodeJS.ErrnoException`: this tree has no
+        // @types/node, so the namespace does not resolve here (the shape
+        // e2e/support/xwindow.ts uses for the same reason).
+        if ((err as { code?: unknown }).code === "ENOENT") continue;
         throw err;
       }
       for (const line of source.split("\n")) {

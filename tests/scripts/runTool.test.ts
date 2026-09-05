@@ -37,10 +37,14 @@ const spawner = (result: ReturnType<typeof stub>) => vi.fn().mockReturnValueOnce
 describe("runTool: the forcing lock", () => {
   it("refuses to run without an explicit onToolFailure verdict", () => {
     // The whole point of the helper (myne#528): silence is not a default.
+    // @ts-expect-error: the omission IS the test — the type requires the
+    // verdict precisely so skipping it fails loudly at runtime instead.
     expect(() => runTool(["true"], {})).toThrow(/onToolFailure is REQUIRED/);
   });
 
   it("refuses a bogus verdict value", () => {
+    // @ts-expect-error: the bogus value IS the test — the union type exists
+    // precisely so a typo fails here instead of at runtime.
     expect(() => runTool(["true"], { onToolFailure: "whatever" })).toThrow(/onToolFailure is REQUIRED/);
   });
 
