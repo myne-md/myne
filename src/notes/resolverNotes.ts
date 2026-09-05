@@ -9,6 +9,7 @@
 // (archived out), resolver → `resolverCache` (archived in).
 
 import { useMemo, useRef } from "react";
+import { usePrefs } from "../hooks/usePrefs";
 import { useIndexNonce } from "./indexNonce";
 import type { TitleRecord } from "./loadNoteBatch";
 import type { ResolverNote } from "./resolveWikilink";
@@ -22,6 +23,13 @@ import { resolverCache, useSelectedNote, type NoteId } from "./sidebarState";
  */
 export function resolverNotesFromCache(
   cache: ReadonlyMap<NoteId, TitleRecord>,
+  // Folder-notes feature gate (myne-md/myne#661). When `false`, every note is
+  // projected with `folderIndex: false`, so folder-target wikilink resolution
+  // (`resolveWikilink`), the chip broken-styling and the graph all treat folder
+  // notes as ordinary, the same "not honoured for presentation" state the
+  // sidebar shows. Defaults `true` so non-reactive callers (rename inbound, clip
+  // assembly) keep honouring the on-disk field.
+  folderNotesEnabled: boolean = true,
 ): ResolverNote[] {
   const out: ResolverNote[] = [];
   for (const r of resolverCache(cache).values()) {
@@ -32,7 +40,7 @@ export function resolverNotesFromCache(
       noteUuid: r.noteUuid,
       title: r.title,
       folder: r.folder,
-      folderIndex: r.folderIndex,
+      folderIndex: folderNotesEnabled && r.folderIndex,
       // SF6 inline-embed reads this to pick a drawing-thumbnail widget over a
       // text chip synchronously from the note-set (drawing-notes SF2, MYND-499).
       isDrawing: r.kind === "drawing",
@@ -48,7 +56,16 @@ export function resolverNotesFromCache(
  */
 export function useResolverNotes(): ResolverNote[] {
   const { cache } = useSelectedNote();
-  return useMemo(() => resolverNotesFromCache(cache), [cache]);
+  // Folder-notes feature gate (myne-md/myne#661): read through `usePrefs` so a
+  // Settings toggle re-projects the note-set live (the setter's prefs-nonce
+  // bump). When off, folder-target wikilinks, chips and the graph stop honouring
+  // `folder_index`, matching the sidebar.
+  const { prefs } = usePrefs();
+  const folderNotesEnabled = prefs.folder_notes_enabled;
+  return useMemo(
+    () => resolverNotesFromCache(cache, folderNotesEnabled),
+    [cache, folderNotesEnabled],
+  );
 }
 
 /**
