@@ -2206,7 +2206,8 @@
       "taskBadgeTitle": "Task note",
       "unsyncedLabel": "Not yet on the server",
       "unsyncedTitle": "This note's latest changes are only on this device",
-      "untitled": "Untitled"
+      "untitled": "Untitled",
+      "untitledDrawing": "Untitled drawing"
     },
     "savedView": {
       "defaultName": "Filtered view"
