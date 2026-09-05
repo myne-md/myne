@@ -1240,11 +1240,54 @@ export async function rowMenuPick(
 }
 
 /** Create a note via the sidebar CTA and commit `title` through the
- *  inline-rename input (Enter). Leaves the note selected. */
+ *  inline-rename input (Enter). Leaves the note selected.
+ *
+ *  Both halves re-resolve rather than reuse a handle (myne-md/myne#676). The
+ *  sidebar re-renders around the new row mount: the rename node can arrive
+ *  late under load, and a node fetched a moment ago can go stale under the
+ *  keystrokes (measured twice: a 45 s wait on an input that never mounted,
+ *  and a stale-element on the sendKeys itself). `waitUntil` already treats a
+ *  stale poll as falsy, so every attempt re-queries from the document root
+ *  and only a non-stale error escapes. Retries overwrite rather than append
+ *  (`replaceText`: select-all first), so a half-typed attempt cannot strand a
+ *  doubled title. */
 export async function createNote(session: Session, title: string): Promise<void> {
   await clickNewMenuItem(session, "notes.create");
-  const rename = await session.byTestId("notes.rename-input");
-  await rename.sendKeys(`${title}`);
+  try {
+    await session.waitUntil(
+      async () => {
+        const inputs = await session.byTestIdAll("notes.rename-input");
+        if (inputs.length === 0) return null;
+        await inputs[0]!.replaceText(title);
+        // U+E007 is W3C Enter (the literal char the previous version sent).
+        await inputs[0]!.sendKeys("");
+        return true;
+      },
+      { label: "rename typed and committed" },
+    );
+  } catch (e) {
+    // Name the state the gesture left behind before rethrowing: the menu
+    // resolved (else clickNewMenuItem would have thrown instead), so a
+    // missing rename means the commit landed without its rename — a new row
+    // titled Untitled — or landed nowhere at all. Focus state decides between
+    // "the app never engaged rename" and "rename opened unfocused and blur-
+    // committed instantly", which look identical from a bare timeout.
+    const diag = await session
+      .execute<string>(
+        "var a = document.activeElement;" +
+          "var t = a && a.getAttribute ? a.getAttribute('data-testid') : null;" +
+          "var folders = [].slice.call(document.querySelectorAll('[data-testid=\"notes.folder-row\"]'))" +
+          ".map(function (e) { return (e.getAttribute('data-folder-path') || '?') + ':' + e.getAttribute('aria-expanded'); });" +
+          "return JSON.stringify({" +
+          "  hasFocus: document.hasFocus()," +
+          "  active: (a ? a.tagName : 'none') + '#' + (t || '-')," +
+          "  rows: document.querySelectorAll('[data-testid=\"notes.row\"]').length," +
+          "  folders: folders" +
+          "});",
+      )
+      .catch(() => "probe failed");
+    throw new Error(`${(e as Error).message}\n  create-state: ${diag}`);
+  }
   await session.waitForGone(testIdSelector("notes.rename-input"));
 }
 
