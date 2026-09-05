@@ -108,6 +108,7 @@ const V = {
     "Prefs-backed. The panel renders on web; the transcribe ACTION is desktop-only\n     (the local-inference plugin has no web counterpart), so the switch there governs\n     a preference that syncs to a device which can act on it.",
   ],
   "src/components/settings/FocusModeSettings.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/FolderNotesSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/HotkeysPanel.tsx": [
     "adapted",
     "Ships; host-reserved chords are refused at bind time and existing ones badged (task 66).",

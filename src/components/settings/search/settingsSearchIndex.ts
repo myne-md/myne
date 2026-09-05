@@ -479,6 +479,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.newNoteLocation",
   },
   {
+    id: "files.folder-notes",
+    panelId: "files",
+    testid: "settings.folder-notes-toggle",
+    titleKey: "settings.folderNotes.label",
+    descriptionKey: "settings.folderNotes.helper",
+    keywordsKey: "settings.search.keywords.folderNotes",
+  },
+  {
     id: "files.attachment-compression",
     panelId: "files",
     testid: "settings.attachment-compression",

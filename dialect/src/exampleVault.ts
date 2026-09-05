@@ -44,7 +44,13 @@ export interface ExampleNoteSpec {
   readonly titleKey: string;
   readonly bodyKey: string;
   /** The folder index note (`folder_index: true`) and the tab opened on first
-   *  run. Exactly one spec carries it. */
+   *  run. Exactly one spec carries it. The `folder_index: true` flag is seeded
+   *  unconditionally (myne-md/myne#661): folder notes are OFF by default, so on
+   *  first run this note renders and opens as an ORDINARY note; the flag stays on
+   *  disk untouched, so a user who later enables folder notes gets it as the
+   *  folder's index with no re-seed. (The tab-open keys off this `index` spec
+   *  flag, not off reading `folder_index` back, so first run is unaffected by the
+   *  feature default.) */
   readonly index?: true;
 }
 
