@@ -102,22 +102,27 @@ async function frame(
 
 /** Create a note via the sidebar CTA and commit `title` (inline rename).
  *  The CTA can no-op when fired while the previous note is mid-autosave,
- *  so settle first and retry the click until the rename input appears.
- *  Enter commits the rename; waitForGone confirms the input closed. */
+ *  so settle first and retry the click until the title field appears.
+ *
+ *  myne#653 moved naming out of the sidebar: creating a note no longer opens
+ *  the inline-rename input, it opens the note with its own `title:` field
+ *  focused. The retry loop is unchanged and still earns its place, since the
+ *  create click itself is what can miss. */
 async function createNote(session: Session, title: string): Promise<void> {
   await sleep(500); // let any prior autosave/remount finish
-  let rename: Element | null = null;
-  for (let attempt = 0; attempt < 3 && !rename; attempt++) {
+  let field: Element | null = null;
+  for (let attempt = 0; attempt < 3 && !field; attempt++) {
     await clickNewMenuItem(session, "notes.create");
     try {
-      rename = await session.byTestId("notes.rename-input", { timeoutMs: 4000 });
+      field = await session.byTestId("editor.frontmatter-title", { timeoutMs: 4000 });
     } catch {
       await sleep(600);
     }
   }
-  if (!rename) throw new Error("notes.rename-input never appeared after 3 create attempts");
-  await rename.sendKeys(title + ENTER);
-  await session.waitForGone(testIdSelector("notes.rename-input"));
+  if (!field) {
+    throw new Error("editor.frontmatter-title never appeared after 3 create attempts");
+  }
+  await field.sendKeys(title + ENTER);
 }
 
 /** Create a top-level folder named `name`. Enter commits the name input;
@@ -448,9 +453,12 @@ runner(
             { timeoutMs: 6000 },
           )
         ).click();
-        const rename = await s.byTestId("notes.rename-input", { timeoutMs: 6000 });
-        await rename.sendKeys("Projects overview" + ENTER);
-        await s.waitForGone(testIdSelector("notes.rename-input"));
+        // myne#653: a folder create names the note in the note, not in the
+        // sidebar (the rename input is not opened any more).
+        const titleField = await s.byTestId("editor.frontmatter-title", {
+          timeoutMs: 6000,
+        });
+        await titleField.sendKeys("Projects overview" + ENTER);
         await sleep(500);
         const note = await noteRowByTitle(s, "Projects overview");
         await note.rightClick();

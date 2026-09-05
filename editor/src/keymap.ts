@@ -9,7 +9,8 @@ import { EditorSelection, type Text } from "@codemirror/state";
 import { type KeyBinding, type Command } from "@codemirror/view";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { selectNextOccurrence } from "@codemirror/search";
-import { undo, redo, indentMore, indentLess } from "@codemirror/commands";
+import { undo, redo, indentLess } from "@codemirror/commands";
+import { listAwareIndent } from "./list-indent";
 import { toggleWrap } from "./wrap-toggle";
 // List-prefix toggles are shared with the toolbar surfaces (single source).
 import { toggleListPrefix } from "./toolbar/commands";
@@ -144,7 +145,11 @@ const REBINDABLE_EDITOR_BINDINGS: readonly RebindableEditorBinding[] = [
   // Indent / outdent (#184): the two halves of `@codemirror/commands`'
   // `indentWithTab` ({key:"Tab", run:indentMore, shift:indentLess}) split into
   // two rebindable chords — behaviour-identical, but now override-driven.
-  { id: "editor.indent", defaultKeys: ["Tab"], run: indentMore },
+  // `listAwareIndent`, not `indentMore` (myne-md/myne#658): a list line indents
+  // to its parent's content column, because nesting is a column and a fixed
+  // width satisfies at most one marker. Everything else falls through to
+  // `indentMore` inside it, so this stays behaviour-identical off a list.
+  { id: "editor.indent", defaultKeys: ["Tab"], run: listAwareIndent },
   { id: "editor.outdent", defaultKeys: ["Shift-Tab"], run: indentLess },
 ];
 

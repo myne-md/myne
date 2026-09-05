@@ -98,6 +98,18 @@ export type SidebarState = {
    *  so successive shift-clicks extend from a stable origin. */
   anchorId: NoteId | null;
   renamingId: NoteId | null;
+  /**
+   * The note created most recently in this session, pinned to the top of its
+   * container in the tree (myne#654).
+   *
+   * **Transient and never persisted**, which is the design rather than a
+   * shortcut: it is a "here is the thing you just made" affordance, not an
+   * ordering the user chose, so it must not reach `item_order` in `vault.prefs`
+   *: see `orderContainerChildren`'s header for the two persisted alternatives
+   * and why each is worse. Overwritten by the next create and dropped with the
+   * session.
+   */
+  justCreatedId: NoteId | null;
   cache: Map<NoteId, TitleRecord>;
   /**
    * Bumped whenever the currently-open note is mutated on disk by a
@@ -116,6 +128,7 @@ export const EMPTY_SIDEBAR_STATE: SidebarState = {
   selectedIds: new Set(),
   anchorId: null,
   renamingId: null,
+  justCreatedId: null,
   cache: new Map(),
   contentReloadNonce: 0,
 };
@@ -376,6 +389,11 @@ export function applyOptimisticDelete(
     cache,
     selectedId: wasSelected ? null : state.selectedId,
     renamingId: state.renamingId === id ? null : state.renamingId,
+    // A pin on a row that no longer exists (myne#654 + #655). Harmless to the
+    // ordering, which only compares keys of children that are present, but a
+    // dangling id is exactly the kind of state that becomes a real bug the next
+    // time somebody reads it for something else.
+    justCreatedId: state.justCreatedId === id ? null : state.justCreatedId,
   };
   return { next, snapshot: { record, wasSelected } };
 }
@@ -658,6 +676,9 @@ export type UseSelectedNoteReturn = {
   /** Range-selection pivot (MYND-367). */
   anchorId: NoteId | null;
   renamingId: NoteId | null;
+  /** The session's most recent create, pinned to the top of its container in
+   *  the tree, see [`SidebarState.justCreatedId`] (myne#654). */
+  justCreatedId: NoteId | null;
   cache: ReadonlyMap<NoteId, TitleRecord>;
   /** Re-sync signal for the open note's body — see [`SidebarState.contentReloadNonce`]. */
   contentReloadNonce: number;
@@ -905,12 +926,20 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
-  // Shared create-then-select-then-rename core, parameterized by the `mint`
-  // function so notes (`createNote`) and drawings (`createDrawing`) reuse the
-  // identical default-location resolution + optimistic UI + rename entry.
+  // Shared create-then-select core, parameterized by the `mint` function so
+  // notes (`createNote`) and drawings (`createDrawing`) reuse the identical
+  // default-location resolution and optimistic UI.
+  //
+  // `startRename` is REQUIRED rather than defaulted, and myne#653 is why a
+  // default here would be the wrong shape: it decides whether creating a note
+  // takes focus away from that note, and a defaulted argument excuses the next
+  // create path from making the choice at all (`CLAUDE.md`, "a default is the
+  // arm that never fires"). The two callers answer it differently on the
+  // merits, see each.
   const createWithMintAndStartRename = useCallback(
     async (
       mint: (folder: string | null) => Promise<NoteId>,
+      startRename: boolean,
       folder: string | null = null,
     ): Promise<NoteId> => {
       // MYND-462 — resolve the configured "Default location for new notes" when
@@ -941,10 +970,15 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       void reindexNote(newId);
       setState((prev) => {
         const seeded = applyOptimisticCreate(prev, newId);
-        return { ...seeded, selectedId: newId, renamingId: newId };
+        return {
+          ...seeded,
+          selectedId: newId,
+          justCreatedId: newId,
+          renamingId: startRename ? newId : prev.renamingId,
+        };
       });
       // A foldered create writes `folder:` at create (a2); settle it into the
-      // cache so the new row appears under its folder while still in rename mode.
+      // cache so the new row appears under its folder.
       if (target !== null) void refreshOne(newId);
       return newId;
     },
@@ -952,13 +986,21 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
   );
   const createAndStartRename = useCallback(
     (folder: string | null = null): Promise<NoteId> =>
-      createWithMintAndStartRename(createNote, folder),
+      // `false` (myne#653). A markdown note is created with a `title:` field of
+      // its own now, so the name is typed IN the note. Seeding rename here
+      // pulled focus into the sidebar input instead, and that input vanishes on
+      // blur: so a freshly created note could not be titled from either place.
+      // The name is kept for the callers and the palette action it backs.
+      createWithMintAndStartRename(createNote, false, folder),
     [createWithMintAndStartRename],
   );
   const createDrawingAndStartRename = useCallback(
     (folder: string | null = null): Promise<NoteId> =>
-      // Unnamed (empty-title → inline rename, like createNote's empty note).
-      createWithMintAndStartRename((f) => createDrawing(undefined, f), folder),
+      // `true`, and this is not an oversight left behind by myne#653. A drawing
+      // opens on its Excalidraw surface, whose body is a fenced scene with no
+      // `title:` field to type into (`createDrawing`: "empty-title UX, grill
+      // Q3"), so the sidebar rename is the only place its name can come from.
+      createWithMintAndStartRename((f) => createDrawing(undefined, f), true, folder),
     [createWithMintAndStartRename],
   );
 
@@ -1280,6 +1322,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       selectedIds: state.selectedIds,
       anchorId: state.anchorId,
       renamingId: state.renamingId,
+      justCreatedId: state.justCreatedId,
       cache: state.cache,
       contentReloadNonce: state.contentReloadNonce,
       reloadOpenNote,

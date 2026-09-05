@@ -43,6 +43,68 @@ export type ScrollAnchor = {
 const anchors = new Map<string, ScrollAnchor>();
 
 /**
+ * Notes whose remembered anchor is currently being RESTORED, and must therefore
+ * not be re-remembered from the scroll that restore is producing (myne#651).
+ *
+ * # The loop this breaks
+ *
+ * `applyScrollAnchor` scrolls the pane. That scroll fires the pane's own scroll
+ * listener, which remembers the position it lands at. So the restore writes its
+ * own result back over the anchor it was restoring from.
+ *
+ * If a restore were exact that would be harmless: it would rewrite the same
+ * value. It cannot be exact, and the reason is the reason the restore exists at
+ * all. `readScrollAnchor` records a LINE plus the fraction of it scrolled off,
+ * and a restore runs after the pane's width changed and re-wrapped the text , 
+ * so the line is put back, and its sub-pixel offset within a viewport of
+ * different line heights is not. The residue is small and it is written back,
+ * so the next restore starts from the drifted anchor and adds its own residue.
+ *
+ * Toggling a sidebar is exactly that, once per toggle, which is why the note
+ * walked one notch down the viewport per open/close and never walked back.
+ *
+ * # Why a suppression window rather than a flag around the call
+ *
+ * The scroll `applyScrollAnchor` causes does not happen during the call. It is
+ * dispatched as a CodeMirror effect, lands after the next measure, and the
+ * pane's listener coalesces on a trailing timer. A flag cleared when the
+ * function returns would already be off by the time the write it is meant to
+ * suppress arrives. The window has to outlive that whole chain.
+ */
+const restoring = new Map<string, number>();
+
+/**
+ * How long a restore suppresses re-remembering, in ms. Comfortably longer than
+ * `PaneView`'s `SCROLL_SETTLE_MS` (120), because the write to suppress happens
+ * on the trailing edge of that timer, one full settle AFTER the scroll lands.
+ *
+ * Being generous costs only that a genuine user scroll within the window is not
+ * remembered; the next one is. Being tight costs the bug back.
+ */
+const RESTORE_SUPPRESSION_MS = 500;
+
+/**
+ * Mark `noteId` as being restored, so scroll writes are ignored for a moment.
+ *
+ * Exported for `tests/notes/scrollMemory.test.ts` and for a future restore path
+ * that does not go through {@link applyScrollAnchor}. Every path today does, so
+ * this has no production caller, said plainly rather than claiming one, which
+ * an earlier version of this comment did.
+ */
+export function beginScrollRestore(noteId: string, now = Date.now()): void {
+  restoring.set(noteId, now);
+}
+
+/** Whether a restore of `noteId` is still settling. */
+export function isRestoringScroll(noteId: string, now = Date.now()): boolean {
+  const started = restoring.get(noteId);
+  if (started === undefined) return false;
+  if (now - started <= RESTORE_SUPPRESSION_MS) return true;
+  restoring.delete(noteId);
+  return false;
+}
+
+/**
  * Read the reading position out of a live view, or `null` when it cannot be
  * measured (a detached view, a pane with no height yet).
  */
@@ -71,12 +133,15 @@ export function readScrollAnchor(
 }
 
 /** Remember `view`'s current reading position for `noteId`. No-op when it cannot
- *  be measured, so a bad moment never overwrites a good anchor. */
+ *  be measured, so a bad moment never overwrites a good anchor, and no-op while
+ *  a restore of this note is still settling, so the restore cannot write its own
+ *  rounding error back over the anchor it came from (myne#651). */
 export function rememberScroll(
   noteId: string,
   view: EditorView,
   scroller: HTMLElement,
 ): void {
+  if (isRestoringScroll(noteId)) return;
   const anchor = readScrollAnchor(view, scroller);
   if (anchor !== null) anchors.set(noteId, anchor);
 }
@@ -89,6 +154,11 @@ export function recallScroll(noteId: string): ScrollAnchor | undefined {
 /** Forget `noteId`, for a closed tab whose reopen should start at the top. */
 export function forgetScroll(noteId: string): void {
   anchors.delete(noteId);
+  // Both maps, not just the anchors. `evictClosedTabs` routes here, so leaving
+  // the suppression mark behind would accumulate one entry per note restored
+  // and then closed, for the life of the session, with nothing able to read it
+  // again. The note is gone; its mark cannot matter.
+  restoring.delete(noteId);
 }
 
 /**
@@ -140,9 +210,20 @@ export function evictClosedTabs(
  * `y: "start"` puts the line at the top of the viewport and `yMargin` restores
  * the fraction of it that was scrolled off, so the restore is exact when nothing
  * changed and still on the right LINE when the pane's width did.
+ *
+ * `noteId` is what suppresses the write-back this scroll would otherwise cause
+ * (see {@link beginScrollRestore}). It is **required**, deliberately: an
+ * optional one would let the next caller reintroduce myne#651 by omitting it,
+ * and a default is the arm that never fires.
  */
-export function applyScrollAnchor(view: EditorView, anchor: ScrollAnchor): void {
+export function applyScrollAnchor(
+  view: EditorView,
+  anchor: ScrollAnchor,
+  noteId: string,
+): void {
   const pos = Math.min(anchor.pos, view.state.doc.length);
+  // BEFORE the dispatch: the scroll it causes can land in the same frame.
+  beginScrollRestore(noteId);
   view.dispatch({
     effects: EditorView.scrollIntoView(pos, {
       y: "start",
@@ -160,4 +241,10 @@ export function applyScrollAnchor(view: EditorView, anchor: ScrollAnchor): void 
  * tests use between cases. */
 export function resetScrollMemory(): void {
   anchors.clear();
+  // The in-flight restore marks too (myne#651). Both maps are module scope and
+  // no leaving path reloads the WebView, so a mark left behind here outlives the
+  // vault it belongs to and silences the FIRST scroll write of the next
+  // session's note with the same id. It cost a test before it could cost a user,
+  // which is the cheap version of the same bug.
+  restoring.clear();
 }

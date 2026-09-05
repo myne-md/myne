@@ -46,37 +46,92 @@ import {
 import { pickerActiveFromField } from "./picker";
 import { enclosingWikilink } from "./hover";
 import { hasAnchor, type WikilinkAnchor } from "./anchor";
-import { isCursorLine, readingModeFacet } from "../decorations/cursor-aware";
+import { revealsAtOrInside, readingModeFacet } from "../decorations/cursor-aware";
 import i18n from "@myne/editor/i18n";
 
 /**
  * Whether a wikilink chip spanning `[from, to]` should LIFT to its raw, editable
- * `[[…]]` text — so the user can edit the target / add a `#heading` anchor by
- * arrow-keying onto its line. This is LINE-level reveal via `isCursorLine` (the
- * exact predicate every other cursor-aware decoration uses): focused + not
- * Reading view + a selection touching the link's line. Line-level (not char) is
- * deliberate — the chip is an ATOMIC range, so a char-level caret could never
- * land on it to trigger reveal (atomic motion skips it); revealing the whole line
- * means links on the caret's line are non-atomic, so arrow keys move into them
- * freely. Consistent with how the rest of Myne's editor reveals markup.
+ * `[[…]]` text.
+ *
+ * **Per-range since myne-md/myne#659; it used to be `isCursorLine`.** That was a
+ * reasoned choice, not an oversight, and the reasoning is worth keeping because
+ * it is what any replacement has to answer: the chip is an ATOMIC range, so a
+ * caret can never be strictly inside one to trigger a reveal, and revealing the
+ * whole line was the way to make links on the caret's line non-atomic so arrow
+ * keys could move into them.
+ *
+ * What it cost was reported twice over. Putting the caret anywhere on a row , 
+ * the far end of the line, or passing through on the way somewhere else, tore
+ * every link on it open, while the task checkbox on the same row stayed
+ * rendered. And a link you had just typed never rendered at all, because the
+ * caret is by definition still on that line, so nothing ever confirmed that a
+ * link had been created.
+ *
+ * {@link revealsAtOrInside} answers the atomicity problem without the line: it
+ * reveals at `from` (reachable by arrowing across an atomic range) and not at
+ * `to` (where typing `]]` leaves the caret, so the chip renders immediately).
+ * Its own doc carries the full argument for that asymmetry.
  */
 function isWikilinkRevealed(view: EditorView, from: number, to: number): boolean {
-  return isCursorLine(view, from, to);
+  return revealsAtOrInside(view, from, to);
 }
 
-/** A cheap, line-granular signature of where reveal is active — the sorted set of
- *  line numbers any selection range touches (focused + not Reading, else ""). The
- *  decoration / atomic caches key on this, so it changes only when the caret
- *  crosses to a different line; intra-line caret moves stay cache hits. */
+/** A signature of WHICH CHIPS are revealed (focused + not Reading, else ""). The
+ *  decoration / atomic caches key on this.
+ *
+ *  It was line-granular until myne#659. Reveal is now per-range
+ *  (`revealsAtOrInside`), so a line-granular key would hand back a cached set
+ *  describing the previous caret position, which is the reveal not happening.
+ *
+ *  **But keying on the raw caret OFFSETS is the wrong repair, and it is not a
+ *  small mistake.** The key would then change on every caret move by
+ *  construction, and the atomic-range set is rebuilt from a cache miss by
+ *  walking the WHOLE document, `EditorView.atomicRanges` is read inside the
+ *  keydown handler, before the transaction dispatches, so the walk is
+ *  synchronous ahead of every arrow press. Measured on a 531 KB note with 1600
+ *  links: 34 ms per press, against 0.0004 ms for a hit. Horizontal navigation
+ *  went from one rebuild per line crossing to one per character.
+ *
+ *  What the predicate actually depends on, for an empty range, is which chip the
+ *  caret is INSIDE (`from <= head < to`), not where it is. So the key is the
+ *  set of revealed chip starts, found with the same O(log n) `resolveInner`
+ *  probe `hover.ts` uses. Every caret position outside a chip yields the same
+ *  key, so ordinary navigation is a cache hit again, and the key changes exactly
+ *  when the revealed set does.
+ *
+ *  A non-empty range keeps the endpoint form: `revealsAtOrInside`'s overlap
+ *  clause depends on the range itself, extending a selection is a rarer gesture
+ *  than walking a line, and being conservative here costs a rebuild rather than
+ *  a wrong answer. */
 function revealKey(view: EditorView): string {
   const state = view.state;
   if (!view.hasFocus || state.facet(readingModeFacet)) return "";
-  const lines = new Set<number>();
+  const tree = syntaxTree(state);
+  const parts = new Set<string>();
   for (const r of state.selection.ranges) {
-    lines.add(state.doc.lineAt(r.from).number);
-    lines.add(state.doc.lineAt(r.to).number);
+    if (r.empty) {
+      const wl = enclosingWikilink(tree.resolveInner(r.head, 1));
+      // `r.head < wl.to` mirrors the predicate exactly: a caret AT the closing
+      // `]]` reveals nothing, which is what makes a freshly typed link render.
+      if (wl !== null && r.head >= wl.from && r.head < wl.to) parts.add(`@${wl.from}`);
+      continue;
+    }
+    // A non-empty range keyed on its raw endpoints would miss on every press of
+    // a held Shift+Arrow and on every `mousemove` of a drag-select, which is the
+    // same full-document rebuild the caret branch above exists to avoid. The
+    // predicate's overlap clause depends only on WHICH chips the range crosses,
+    // so key on those, found with a walk bounded by the range rather than by the
+    // document.
+    tree.iterate({
+      from: r.from,
+      to: r.to,
+      enter: (node) => {
+        if (node.name === "Wikilink") parts.add(`@${node.from}`);
+        return undefined;
+      },
+    });
   }
-  return [...lines].sort((a, b) => a - b).join(",");
+  return [...parts].sort().join(",");
 }
 
 export type WikilinkParts = {
@@ -263,10 +318,10 @@ const atomicRangesCache = new WeakMap<
 function cachedWikilinkAtomicRanges(view: EditorView) {
   const tree = syntaxTree(view.state);
   const activeFrom = view.state.field(pickerActiveFromField, false) ?? null;
-  // Links on the caret's line are NOT atomic — their chips are lifted to raw text
-  // and the cursor must be able to move into / edit them (cursor reveal). The
-  // cache keys on a line-granular `revealKey`, so the atomic set rebuilds only
-  // when the caret crosses to a different line; intra-line moves stay cache hits.
+  // A REVEALED chip is not atomic, it is lifted to raw text and the cursor must
+  // be able to move into and edit it. Since myne#659 that is the chip the caret
+  // is actually at rather than every chip on its line, so the cache keys on an
+  // offset-granular `revealKey` and the atomic set rebuilds on each caret move.
   const key = revealKey(view);
   const cached = atomicRangesCache.get(tree);
   if (cached !== undefined && cached.activeFrom === activeFrom && cached.revealKey === key) {

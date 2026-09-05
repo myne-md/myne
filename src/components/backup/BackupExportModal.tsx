@@ -16,17 +16,14 @@ import { save as saveFileDialog } from "../../platform/dialog";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
 import { Spinner } from "../Spinner";
-import { exportErrorMessage } from "../../lib/backup-errors";
+import { exportFailureMessage } from "../../lib/backup-errors";
 import {
   backupCancel,
   backupDefaultFilename,
   exportBackup,
   onBackupProgress,
 } from "../../lib/vault-backup";
-import type {
-  BackupExportError,
-  BackupProgress,
-} from "../../types/backup-export-error";
+import type { BackupProgress } from "../../types/backup-export-error";
 
 type ExportState =
   | { step: "running"; progress: BackupProgress | null }
@@ -110,10 +107,22 @@ export function BackupExportModal({
       const suggested = await backupDefaultFilename().catch(
         () => "Myne backup.myne-backup",
       );
-      const destination = await saveFileDialog({
-        defaultPath: suggested,
-        filters: [{ name: "Myne backup", extensions: ["myne-backup"] }],
-      }).catch(() => null);
+      // Dismissed and FAILED are two different outcomes and used to collapse
+      // into one (myne#662): a `.catch(() => null)` here made an ACL denial or a
+      // platform failure in the save dialog indistinguishable from the user
+      // pressing Cancel, so the modal closed and reported nothing at all. A
+      // dismissal still closes silently, that is the user's own answer, but a
+      // throw is a failure and says so.
+      let destination: string | null;
+      try {
+        destination = await saveFileDialog({
+          defaultPath: suggested,
+          filters: [{ name: "Myne backup", extensions: ["myne-backup"] }],
+        });
+      } catch (raw) {
+        setState({ step: "error", message: exportFailureMessage(raw) });
+        return;
+      }
       if (typeof destination !== "string") {
         callbacksRef.current.onClose(); // dialog dismissed — nothing started
         return;
@@ -125,10 +134,10 @@ export function BackupExportModal({
         );
         callbacksRef.current.onClose();
       } catch (raw) {
-        setState({
-          step: "error",
-          message: exportErrorMessage(raw as BackupExportError),
-        });
+        // `exportFailureMessage`, not `exportErrorMessage(raw as …)`: the cast
+        // let a non-enum throw fall through the exhaustive switch and render as
+        // `undefined`, which is the empty error modal of myne#662.
+        setState({ step: "error", message: exportFailureMessage(raw) });
       }
     })();
 

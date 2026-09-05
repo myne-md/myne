@@ -36,6 +36,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   clickNewMenuItem,
+  nameNewNote,
   createNote,
   dismissImporterOffer,
   editorText,
@@ -116,8 +117,7 @@ async function createNoteInFolder(
   // Trailing `` (W3C Enter) commits the inline rename; without it the
   // rename input never closes and `waitForGone` below times out. Mirrors the
   // canonical `flows.ts::createNote`, which carries the same commit key.
-  await (await s.byTestId("notes.rename-input")).sendKeys(`${title}`);
-  await s.waitForGone(testIdSelector("notes.rename-input"));
+  await nameNewNote(s, title);
 }
 
 /** Read the `data-note-id` of the currently-selected sidebar row — the row

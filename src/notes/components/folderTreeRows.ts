@@ -74,6 +74,9 @@ export function flattenVisibleRows(
   cache: ReadonlyMap<NoteId, TitleRecord>,
   collapsed: ReadonlySet<string>,
   itemOrder: ItemOrderMap = {},
+  /** The session's newest create, pinned to the top of its container
+   *  (myne#654). Required for the same reason `orderContainerChildren`'s is. */
+  pinFirst: NoteId | null,
 ): VisibleRow[] {
   const rows: VisibleRow[] = [];
 
@@ -101,6 +104,7 @@ export function flattenVisibleRows(
           node.noteIds,
           cache,
           buildContainerRank(itemOrder[node.key] ?? []),
+          pinFirst,
         ),
         depth + 1,
       );
@@ -115,6 +119,7 @@ export function flattenVisibleRows(
       tree.unfiledNoteIds,
       cache,
       buildContainerRank(itemOrder[""] ?? []),
+      pinFirst,
     ),
     0,
   );

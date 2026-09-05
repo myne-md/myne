@@ -82,7 +82,15 @@ export function installTaskChipEditor(): () => void {
     const view = EditorView.findFromDOM(anchor);
     if (view === null) return;
 
-    openTaskFieldMenu({ view, anchor, lineFrom: detail.lineFrom });
+    // Two different jobs, two different elements (myne#660). `anchor` carries
+    // `data-task-add` because it is the widget ROOT, which is the only node
+    // `findFromDOM` answers for. It is also the zero-size slot the `+` overflows
+    // out of, so positioning the menu against it would place it against a rect
+    // whose top equals its bottom: the menu lands on top of the `+` instead of
+    // below it. The button is what the user sees and what the menu belongs to.
+    const positionAnchor =
+      anchor.querySelector<HTMLElement>(".cm-task-add") ?? anchor;
+    openTaskFieldMenu({ view, anchor: positionAnchor, lineFrom: detail.lineFrom });
   };
 
   window.addEventListener(TASK_CHIP_EVENT, onOpenChip);

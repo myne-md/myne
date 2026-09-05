@@ -54,6 +54,10 @@ import {
 } from "../frontmatter-properties";
 import i18n from "@myne/editor/i18n";
 
+/** Testid for the promoted note-title field (myne#653). Exported so the desktop
+ *  E2E helper and the pane's focus-on-create effect name it once. */
+export const TITLE_FIELD_TESTID = "editor.frontmatter-title";
+
 /** Testid for the "Add cover" control on the promoted title row. */
 export const ADD_COVER_TESTID = "editor.cover-add";
 
@@ -193,6 +197,11 @@ class PropertiesWidget extends WidgetType {
     input.spellcheck = false;
     input.autocomplete = "off";
     input.setAttribute("aria-label", i18n.t("editor.frontmatter.titleAriaLabel"));
+    // myne#653: this is now where a note gets its name, since creating one no
+    // longer opens the sidebar's inline rename. It had no testid, so the E2E
+    // suite had nothing to type into (`src/CLAUDE.md`: "A screen without
+    // testids is invisible to E2E").
+    input.setAttribute("data-testid", TITLE_FIELD_TESTID);
 
     input.addEventListener("change", () => {
       this.commitTitle(view, input, displayValue);

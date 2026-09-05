@@ -25,6 +25,7 @@
 import "./base.css";
 
 import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
+import { selectionRemeasure } from "./selection-remeasure";
 import {
   defaultKeymap,
   history,
@@ -263,6 +264,11 @@ export function myneExtensions(opts?: {
     //      decoration / cursor-aware-reveal layers run.
     EditorState.allowMultipleSelections.of(true),
     drawSelection(),
+    // myne#660: give the layer above a second look after a selection change
+    // that moved the line's DOM with it. Immediately after `drawSelection()`
+    // deliberately, it exists only to correct that layer, and reading the two
+    // lines together is how the next person finds out why.
+    selectionRemeasure(),
     // focus-mode (MYND-348): mark the active line(s) so focus-mode line-dimming
     // (pure CSS, gated by the editor's `data-focus-dim` ancestor in tokens.css)
     // can keep them bright. The active-line BACKGROUND is neutralized in theme.ts
@@ -430,14 +436,24 @@ export function myneExtensions(opts?: {
       { key: "Mod-u", run: undoSelection, preventDefault: true },
     ]),
     myneTheme,
-    // MYND-626: Tab indents by FOUR spaces, not CodeMirror's default two.
-    // Two is too shallow to read as a level in a nested task list — the child
-    // sits so close to its parent that the tree reads flat. Four is also the
-    // width every CommonMark parser accepts unambiguously for a nested item
-    // under any marker, so a Myne-indented list keeps its shape when it leaves
-    // the app. This is the editor-wide indent unit, so it applies to plain
-    // lists and indented code alike; the `editor.indent` chord (indentMore, in
-    // the rebindable Compartment above) reads this facet.
+    // MYND-626: Tab indents by FOUR spaces, not CodeMirror's default two, for
+    // non-list lines. Two is too shallow to read as a level, and four is the
+    // width indented code needs.
+    //
+    // **The rest of MYND-626's rationale was wrong and myne#658 measured it.**
+    // It said four is "the width every CommonMark parser accepts unambiguously
+    // for a nested item under any marker". It is not: four or more spaces after
+    // a PARAGRAPH make the line a lazy continuation rather than a list item, so
+    // a Tab on a `- [ ]` line under prose destroyed the task. Nesting under an
+    // existing item is a COLUMN (`- ` is 2, `1. ` is 3, `10. ` is 4), which no
+    // single width satisfies. `list-indent.ts` carries the whole argument.
+    // Still four (myne-md/myne#658 changed the COMMAND, not this facet). A width
+    // cannot solve the list case: two spaces breaks nesting under `1. `, whose
+    // content column is 3, and two presses reach four columns anyway. The Tab
+    // chord routes through `listAwareIndent` (`editor/src/list-indent.ts`),
+    // which indents a list line to its parent's content column and falls through
+    // to `indentMore`, and this facet, for everything else, indented code
+    // included.
     indentUnit.of("    "),
     EditorView.lineWrapping,
     // The sticky character column the arrow bindings above read (myne#631).

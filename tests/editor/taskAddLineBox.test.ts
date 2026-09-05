@@ -81,3 +81,33 @@ describe(".cm-task-add is line-box neutral", () => {
     expect(block(".cm-task-add")).toMatch(/font-size\s*:\s*[\d.]+em/);
   });
 });
+
+// myne-md/myne#660, the horizontal half of the same rule, which #560 named and
+// deferred in its own comment: "the box below still contributes inline WIDTH
+// when the caret arrives, so on a row near the wrap width it can still force a
+// wrap … taking the widget out of flow would close that".
+//
+// It did not close it, and the double highlight came back on `Cmd+Shift+←` and
+// on a double-click. The `+` now lives in a zero-size slot, so a line measures
+// identically whether or not the widget is in the DOM, which is what stops its
+// arrival and departure moving a wrap point mid-measure.
+describe(".cm-task-add-slot takes the widget out of flow in BOTH axes", () => {
+  it("has zero width and zero height", () => {
+    const rule = block(".cm-task-add-slot");
+    expect(rule).toMatch(/(^|[\s;])width\s*:\s*0\s*;/);
+    expect(rule).toMatch(/(^|[\s;])height\s*:\s*0\s*;/);
+  });
+
+  it("does not clip the button it holds", () => {
+    expect(block(".cm-task-add-slot")).toMatch(/overflow\s*:\s*visible\s*;/);
+  });
+
+  // Non-vacuity: "contributes no geometry" must not be satisfied by an
+  // invisible affordance. The button inside still has a real box, in `em`, for
+  // the reason the suite above spends four tests on.
+  it("still holds a button with a visible em-sized box", () => {
+    const button = block(".cm-task-add");
+    expect(em(button, "width")).toBe(1.35);
+    expect(em(button, "height")).toBe(1.35);
+  });
+});
