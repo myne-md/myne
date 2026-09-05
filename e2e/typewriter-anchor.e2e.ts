@@ -52,10 +52,13 @@
 // The exception is deliberate and is in the source: the write is
 // `Math.max(0, target)`. Near the TOP of a document the ideal scrollTop is
 // negative, the clamp takes over, and the caret legitimately sits above centre
-// — there is nothing above it to scroll. So the band is asserted only from the
-// point where `scrollTop > 0`, and the scenario asserts separately that that
-// point was reached, because "the clamp was active the whole time" would
-// otherwise make every band assertion vacuous.
+// — there is nothing above it to scroll. The mirror holds at the BOTTOM:
+// past the last scrollable position the caret legitimately sits below centre.
+// So the band is asserted only from the point where `scrollTop > 0` up to the
+// point where it reaches its max, and the scenario asserts separately that
+// those points were both reached and that at least one line was asserted,
+// because "the clamp was active the whole time" would otherwise make every
+// band assertion vacuous.
 //
 // BAND_FRACTION is 0.15 of the pane height rather than a pixel count. The
 // failure it separates is large: with no pin, CodeMirror's default behaviour
@@ -156,6 +159,10 @@ interface Anchor {
   readonly paneHeight: number;
   /** The host scroller's current scrollTop — 0 means the clamp is holding. */
   readonly scrollTop: number;
+  /** Max scrollTop (scrollHeight - clientHeight) — at it the BOTTOM clamp is
+   *  holding, the mirror of the top clamp: the ideal target exceeds what the
+   *  host can scroll, so the caret legitimately sits below centre. */
+  readonly scrollMax: number;
   /** `.cm-scroller`'s scrollTop — the element `focus-mode.ts` writes. */
   readonly cmScrollTop: number;
   /** Whether `.cm-scroller` has anything to scroll at all. */
@@ -201,6 +208,7 @@ async function readAnchor(s: Session): Promise<Anchor | null> {
       "  offset: (lr.top + lr.bottom) / 2 - (sr.top + sr.bottom) / 2," +
       "  paneHeight: sr.height," +
       "  scrollTop: host.scrollTop," +
+      "  scrollMax: host.scrollHeight - host.clientHeight," +
       "  cmScrollTop: cm.scrollTop," +
       "  cmScrolls: cm.scrollHeight > cm.clientHeight + 1," +
       "  hostIsCm: host === cm," +
@@ -233,25 +241,42 @@ async function waitForAnchor(s: Session, what: string): Promise<Anchor> {
  * A genuinely broken pin never settles and fails here by name instead. */
 async function waitForPinned(s: Session, band: number, what: string): Promise<Anchor> {
   let last: Anchor | null = null;
-  return await s.waitUntil(
-    async () => {
-      const a = await readAnchor(s);
-      last = a;
-      return a !== null && Math.abs(a.offset) <= band ? a : null;
-    },
-    {
-      label: () =>
-        `${what}: the caret line to settle inside the ${Math.round(band)}px centre ` +
-        `band. Last settled reading: ` +
-        (last === null
-          ? "no active line yet"
-          : `offset ${Math.round(last.offset)}px on a ${Math.round(last.paneHeight)}px ` +
-            `pane at scrollTop ${Math.round(last.scrollTop)}`) +
-        `. A pin that never settles is the defect; a single unsettled frame is the ` +
-        `scheduler.`,
-      timeoutMs: 5_000,
-    },
-  );
+  try {
+    return await s.waitUntil(
+      async () => {
+        const a = await readAnchor(s);
+        last = a;
+        return a !== null && Math.abs(a.offset) <= band ? a : null;
+      },
+      {
+        label: () =>
+          `${what}: the caret line to settle inside the ${Math.round(band)}px centre ` +
+          `band. Last settled reading: ` +
+          (last === null
+            ? "no active line yet"
+            : `offset ${Math.round(last.offset)}px on a ${Math.round(last.paneHeight)}px ` +
+              `pane at scrollTop ${Math.round(last.scrollTop)}`) +
+          `. A pin that never settles is the defect; a single unsettled frame is the ` +
+          `scheduler.`,
+        timeoutMs: 5_000,
+      },
+    );
+  } catch (e) {
+    // Name the plugin's inputs before rethrowing: the pin needs DOM focus in
+    // the editor AND the typewriter gate, and a bare timeout cannot tell "the
+    // plugin is broken" from "focus left" or "the gate dropped".
+    const diag = await s
+      .execute<string>(
+        "var inEd = false;" +
+          "for (var el = document.activeElement; el; el = el.parentElement) {" +
+          "  if (el.getAttribute && el.getAttribute('data-testid') === 'editor.content') { inEd = true; break; }" +
+          "}" +
+          "var gate = !!document.querySelector('[data-focus-typewriter]');" +
+          "return 'focusInEd=' + inEd + ' typewriterGate=' + gate;",
+      )
+      .catch(() => "probe failed");
+    throw new Error(`${(e as Error).message}\n  pin-state: ${diag}`);
+  }
 }
 
 /** What sits under viewport point (x, y): tag, id, testid and class, for the
@@ -319,6 +344,7 @@ describeE2E("tw1 the typewriter pin holds across a typing burst (myne-md/myne#55
         const content = await s.findElement('[data-testid="editor.content"] .cm-content');
 
         let clampReleased = false;
+        let settledCount = 0;
 
         for (let i = 0; i < BURST_LINES; i += 1) {
           await content.sendKeys(`${KEY.ENTER}line ${i} of the burst`);
@@ -329,6 +355,13 @@ describeE2E("tw1 the typewriter pin holds across a typing burst (myne-md/myne#55
           // the loop below would be measuring nothing.
           if (a.scrollTop <= 0) continue;
           clampReleased = true;
+
+          // The mirror at the bottom: past the last scrollable position the
+          // host cannot centre the caret either, and it legitimately sits
+          // below the band. Same rule as the top clamp, same non-vacuity
+          // accounting below.
+          if (a.scrollTop >= a.scrollMax - 1) continue;
+          settledCount += 1;
 
           // Settled, not sampled: one read here can catch the frame between the
           // edit and the measure-phase re-centre, which under load is a fail on
@@ -345,6 +378,13 @@ describeE2E("tw1 the typewriter pin holds across a typing burst (myne-md/myne#55
             `legitimately sits above centre. Either the pane is tall enough to hold ` +
             `the whole burst — make it longer — or the editor is not scrolling at all.`,
         ).toBe(true);
+
+        expect(
+          settledCount,
+          `no burst line was asserted: every one of the ${BURST_LINES} lines sat in ` +
+            `the top or bottom clamp. The burst is too short for this pane, or the ` +
+            `editor is not scrolling at all — either way the pin was never under test.`,
+        ).toBeGreaterThan(0);
       },
     );
   });
@@ -373,8 +413,12 @@ describeE2E("tw2 scrolling away and typing re-establishes the pin (myne-md/myne#
         for (let i = 0; i < BURST_LINES; i += 1) {
           await content.sendKeys(`${KEY.ENTER}line ${i} before the scroll`);
         }
-        const pinned = await waitForAnchor(s, "before scrolling away");
-        const band = pinned.paneHeight * BAND_FRACTION;
+        // Settled, not sampled: a single read here can catch the frame between
+        // the last edit and its re-centre, which under full-suite load fails
+        // the precondition on a working pin.
+        const first = await waitForAnchor(s, "before scrolling away");
+        const band = first.paneHeight * BAND_FRACTION;
+        const pinned = await waitForPinned(s, band, "before scrolling away");
         expect(
           pinned.scrollTop,
           "the pane never scrolled, so scrolling it AWAY cannot be distinguished " +
@@ -389,14 +433,9 @@ describeE2E("tw2 scrolling away and typing re-establishes the pin (myne-md/myne#
         // that pre-existing offset rather than by the wheel, and CodeMirror's
         // own scroll-into-view happened to land inside the band afterwards. A
         // re-pin test that never establishes the pin is not testing a re-pin.
-        expect(
-          Math.abs(pinned.offset),
-          `the caret line sat ${Math.round(pinned.offset)}px from the centre of a ` +
-            `${Math.round(pinned.paneHeight)}px pane at the END of the burst, outside ` +
-            `the ${Math.round(band)}px band. The pin is not holding, so there is no ` +
-            `pin for the wheel below to disturb and nothing for the keystroke to ` +
-            `restore.`,
-        ).toBeLessThanOrEqual(band);
+        // `pinned` above already IS that proof: `waitForPinned` resolves only
+        // inside the band, so a second band assertion here would pass by
+        // construction rather than by measurement.
 
         // Scroll the pane away from the caret. Driven as a real wheel gesture
         // through the W3C Actions API rather than by writing `scrollTop`: the
@@ -410,31 +449,39 @@ describeE2E("tw2 scrolling away and typing re-establishes the pin (myne-md/myne#
         // scrolls — so the gesture can be accepted and move nothing while the
         // timeout blames the pin (measured 4/4 isolated on myne-md/myne#555).
         // A user scrolls over the pane they are reading; so does this.
+        //
+        // Driven TWICE at most, and the second gesture goes out only when the
+        // first demonstrably moved nothing: the driver also drops an
+        // acknowledged wheel once in a while (measured: centred aim, scroller
+        // unmoved for the full budget), and a single fire-and-hope has the
+        // same shape as the (0, 0) defect above. The movement assertion is
+        // what makes the retry safe rather than hopeful.
         const wheelX = Math.round(pinned.hostCx);
         const wheelY = Math.round(pinned.hostCy);
-        await s.send("POST", "/actions", {
-          actions: [
-            {
-              type: "wheel",
-              id: "wheel",
-              actions: [
-                {
-                  type: "scroll",
-                  x: wheelX,
-                  y: wheelY,
-                  deltaX: 0,
-                  deltaY: -Math.round(pinned.paneHeight),
-                  duration: 100,
-                  origin: "viewport",
-                },
-              ],
-            },
-          ],
-        });
+        async function driveWheel(): Promise<void> {
+          await s.send("POST", "/actions", {
+            actions: [
+              {
+                type: "wheel",
+                id: "wheel",
+                actions: [
+                  {
+                    type: "scroll",
+                    x: wheelX,
+                    y: wheelY,
+                    deltaX: 0,
+                    deltaY: -Math.round(pinned.paneHeight),
+                    duration: 100,
+                    origin: "viewport",
+                  },
+                ],
+              },
+            ],
+          });
+        }
 
-        let scrolledAway: Anchor;
-        try {
-          scrolledAway = await s.waitUntil(
+        async function waitScrolledAway(): Promise<Anchor> {
+          return await s.waitUntil(
             async () => {
               const a = await readAnchor(s);
               // BOTH conditions. The offset alone is the vacuous one — see the
@@ -456,17 +503,37 @@ describeE2E("tw2 scrolling away and typing re-establishes the pin (myne-md/myne#
               timeoutMs: 15_000,
             },
           );
-        } catch (e) {
-          // Name what the gesture hit before rethrowing: without this the
-          // timeout reads as a broken pin when the wheel never reached the pane.
-          const under = await elementAt(s, wheelX, wheelY).catch(() => "probe failed");
-          const now = await readAnchor(s).catch(() => null);
-          throw new Error(
-            `${(e as Error).message}\n  wheel-target diagnosis: aimed at (${wheelX}, ${wheelY}), ` +
-              `under it: ${under}; host scrollTop now ` +
-              (now === null ? "unreadable" : String(Math.round(now.scrollTop))) +
-              ` (was ${Math.round(pinned.scrollTop)}).`,
+        }
+
+        let scrolledAway: Anchor;
+        await driveWheel();
+        try {
+          scrolledAway = await waitScrolledAway();
+        } catch {
+          // First gesture demonstrably moved nothing — drive once more before
+          // calling it. Anything else (a move without the caret leaving, a
+          // partial move) is a product observation, not a dropped gesture,
+          // and goes straight to the diagnosis below.
+          const still = await readAnchor(s).catch(() => null);
+          if (still !== null && still.scrollTop !== pinned.scrollTop) throw new Error(
+            `the pane moved without carrying the caret out of the band — not a ` +
+              `dropped gesture, not the subject of a retry.`,
           );
+          await driveWheel();
+          try {
+            scrolledAway = await waitScrolledAway();
+          } catch (e) {
+            // Name what the gesture hit before rethrowing: without this the
+            // timeout reads as a broken pin when the wheel never reached the pane.
+            const under = await elementAt(s, wheelX, wheelY).catch(() => "probe failed");
+            const now = await readAnchor(s).catch(() => null);
+            throw new Error(
+              `${(e as Error).message}\n  wheel-target diagnosis: aimed at (${wheelX}, ${wheelY}), ` +
+                `under it: ${under}; host scrollTop now ` +
+                (now === null ? "unreadable" : String(Math.round(now.scrollTop))) +
+                ` (was ${Math.round(pinned.scrollTop)}).`,
+            );
+          }
         }
 
         // One keystroke. The plugin re-pins on the next selection/doc change,
