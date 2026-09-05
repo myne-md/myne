@@ -20,7 +20,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { defaultKeymap } from "@codemirror/commands";
+import { cursorCharLeft, cursorCharRight, defaultKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import { wikilinkChipExtensions } from "../../src/editor/wikilink";
@@ -36,30 +36,30 @@ describe("Wikilink chip atomic-range — keystroke smoke", () => {
     host = null;
   });
 
-  it("synthetic Backspace right-of-chip edits the cursor-revealed link (char delete)", () => {
-    const doc = "before [[Note]] after";
-    const rightOfChip = doc.indexOf("]]") + 2;
-
+  /** Mount `doc` with the caret at `caret`, wired for chip + keymap behaviour. */
+  function mountAt(doc: string, caret: number): EditorView {
     host = document.createElement("div");
     document.body.appendChild(host);
     view = new EditorView({
       state: EditorState.create({
         doc,
-        selection: { anchor: rightOfChip, head: rightOfChip },
+        selection: { anchor: caret, head: caret },
         extensions: [
-          markdown({
-            base: markdownLanguage,
-            extensions: [Wikilink],
-          }),
+          markdown({ base: markdownLanguage, extensions: [Wikilink] }),
           wikilinkChipExtensions(),
           keymap.of(defaultKeymap),
         ],
       }),
       parent: host,
     });
+    view.focus(); // so the keymap fires and reveal is not focus-suppressed
+    return view;
+  }
 
-    // Focus so the keymap fires.
-    view.focus();
+  it("synthetic Backspace right-of-chip deletes the atomic chip", () => {
+    const doc = "before [[Note]] after";
+    const rightOfChip = doc.indexOf("]]") + 2;
+    view = mountAt(doc, rightOfChip);
     const event = new KeyboardEvent("keydown", {
       key: "Backspace",
       code: "Backspace",
@@ -68,9 +68,50 @@ describe("Wikilink chip atomic-range — keystroke smoke", () => {
     });
     view.contentDOM.dispatchEvent(event);
 
-    // The caret is on the link's line → the chip is revealed (raw, non-atomic),
-    // so Backspace deletes ONE char (the trailing `]`) — edit mode, not an atomic
-    // whole-chip delete. Confirms the keymap → deleteCharBackward pipeline fired.
-    expect(view.state.doc.toString()).toBe("before [[Note] after");
+    // myne#659 changed this, deliberately, and the trade is worth stating.
+    //
+    // Reveal used to be LINE-scoped, so a caret anywhere on the row lifted the
+    // chip to raw text and Backspace deleted one character, leaving a broken
+    // `[[Note]`. It is now half-open per range: `from` reveals, `to` does not.
+    //
+    // `to` is where the caret sits the instant you finish typing `]]`, and
+    // revealing there was the reason a link you had just written never rendered
+    //. There was no moment at which the editor confirmed a link existed. That
+    // was the half of #659 that bit hardest, so it wins the position.
+    //
+    // What that costs is exactly this keystroke: Backspace immediately after a
+    // chip now deletes the whole chip, because it is still atomic there. That
+    // is the better answer for an atomic range anyway, the old one left the
+    // document holding malformed `[[Note]`, but it IS a behaviour change, and
+    // asserting the new bytes rather than deleting the test is how it stays
+    // visible. Editing from the right still works: one more Left press parks the
+    // caret at `from`, which reveals.
+    expect(view.state.doc.toString()).toBe("before  after");
+  });
+
+  it("a caret at the chip's START reveals it, so Backspace edits char-wise", () => {
+    // The other side of the half-open rule, and the non-vacuity partner of the
+    // case above: if `from` stopped revealing too, the chip would be permanently
+    // uneditable by keyboard and the test above would still pass.
+    const doc = "before [[Note]] after";
+    const chipFrom = doc.indexOf("[[");
+
+    // Drive it through the path atomicity actually governs. A programmatic
+    // `dispatch` of a selection is NEVER adjusted by `atomicRanges`, CM6
+    // consults them in cursor MOTION, the pointer path and the selection layer,
+    // never in a transaction filter, so asserting a dispatched caret position
+    // proves nothing. Measured: the same assertion passes on an unfocused view,
+    // where reveal is off and the chip IS atomic.
+    view = mountAt(doc, doc.indexOf("]]") + 2);
+    cursorCharLeft(view);
+    // Atomic from the right (`to` does not reveal), so the motion skips the
+    // whole chip and parks at `from`, which DOES reveal, dropping atomicity.
+    expect(view.state.selection.main.head).toBe(chipFrom);
+    cursorCharRight(view);
+    // Now non-atomic, so one press moves one character INTO the raw text
+    // rather than jumping the chip again. This is the half that keeps a
+    // wikilink keyboard-editable, and it is what would break if `from` stopped
+    // revealing.
+    expect(view.state.selection.main.head).toBe(chipFrom + 1);
   });
 });

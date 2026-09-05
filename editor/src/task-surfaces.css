@@ -281,6 +281,29 @@
    is zero-height at EVERY `--editor-line-spacing`. A px box that merely happens
    to fit at the default typography would grow the line again at the small text
    size or the tight line spacing. */
+/* The zero-size slot the `+` lives in (myne-md/myne#660).
+
+   The block above closed the VERTICAL half of #560 and named the half it left
+   open: the button still contributed inline WIDTH, so on a row near the wrap
+   width its arrival could still move the wrap point, the two `wrappedLine()`
+   probes could still disagree, and the two-rectangle branch still painted the
+   double highlight. It reproduced on `Cmd+Shift+←` and on a double-click.
+
+   A `width: 0; height: 0` box with `overflow: visible` takes the widget out of
+   flow in both axes, so a line measures identically with and without it. The
+   button keeps every metric it had and simply overflows this box.
+
+   `overflow: visible` is not decorative: a zero-size box clips its content by
+   default in no browser, but stating it makes the intent unmistakable and
+   survives someone adding a shorthand that sets it. */
+.cm-task-add-slot {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  vertical-align: middle;
+}
+
 .cm-task-add {
   display: inline-flex;
   align-items: center;

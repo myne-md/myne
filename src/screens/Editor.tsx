@@ -40,6 +40,10 @@ import {
   type SetStateAction,
 } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  shouldMirrorSelection,
+  shouldOpenIntoFocusedPane,
+} from "../notes/selectionBridges";
 import { CommandPalette } from "../components/CommandPalette";
 import type { CommandContext } from "../commands";
 import { useKeybindDispatcher } from "../commands/useKeybindDispatcher";
@@ -1313,17 +1317,35 @@ function EditorChrome({
   //     keep tracking the focused pane.
   const { openInFocused } = ws;
   const selectedId = ctx.selectedId;
+  // myne#655: never OPEN a note that no longer exists. Bridge B below stops
+  // mirroring a dead id; this stops resurrecting one that reached `selectedId`
+  // by any other route. Either check alone would break the loop, and both are
+  // here because each is the correct rule for its own direction: a bridge that
+  // opens deleted notes is wrong whether or not anything is feeding it one.
+  //
+  // Liveness is a DEP, not a fire-time read, and that distinction is the whole
+  // fix. Reading `ctx.cache` inside the effect with `cache` left out of the
+  // deps makes the guard latch: at boot the workspace blob (one small read)
+  // can restore a tab before `refreshAll` has decrypted the note list, so the
+  // guard rejects once against an empty cache and, since nothing in the dep
+  // array changed, never runs again. `selectedId` then stays wrong for the
+  // whole session. A boolean keyed on this one id costs none of the per-render
+  // re-runs that reading the whole `Map` would.
+  const selectedIsLive = selectedId !== null && ctx.cache.has(selectedId);
   useEffect(() => {
-    if (selectedId === null) return;
-    const where = findItemPane(
-      { root: ws.root, focusedPaneId: ws.focusedPaneId },
-      { kind: "note", id: selectedId },
-    );
-    if (where === null) openInFocused(selectedId);
+    const where =
+      selectedId === null
+        ? null
+        : findItemPane(
+            { root: ws.root, focusedPaneId: ws.focusedPaneId },
+            { kind: "note", id: selectedId },
+          );
+    if (!shouldOpenIntoFocusedPane(selectedId, selectedIsLive, where !== null)) return;
+    openInFocused(selectedId!);
     // `ws.root` is read at fire time; the effect triggers only on a real
-    // selection change, never per-render.
+    // selection change or a liveness flip, never per-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, openInFocused]);
+  }, [selectedId, selectedIsLive, openInFocused]);
 
   const focusedActive = ws.focusedLeaf.activeTab;
   // reading-source-modes (MYND-299): the focused note tab's effective view mode
@@ -1345,9 +1367,30 @@ function EditorChrome({
   const focusedNoteUnsynced =
     focusedActiveNoteId !== null && unsyncedNoteIds.has(focusedActiveNoteId);
   const select = ctx.select;
+  // Same shape as bridge A's `selectedIsLive`, and required for the same
+  // reason: a fire-time cache read with the cache out of the deps latches on
+  // the boot race and never re-evaluates.
+  const focusedIsLive =
+    focusedActiveNoteId === null || ctx.cache.has(focusedActiveNoteId);
   useEffect(() => {
+    // myne-md/myne#655: mirror only a note that still EXISTS.
+    //
+    // The two bridges are documented above as one-way and non-looping, and they
+    // are: for a note that is alive. A note being deleted breaks the premise
+    // for a moment: the cache row is dropped optimistically, and the tab is
+    // removed from every pane by a separate `setState`. In between, the focused
+    // pane's active tab can still be the dead note. This bridge then mirrors the
+    // dead id into `selectedId`, bridge A finds it open in no pane (its tabs are
+    // going away) and re-opens it into the focused pane, which makes it the
+    // active tab again, and the two hand it back and forth, remounting the pane
+    // each time. That is the flashing, unstoppable swap that was reported.
+    //
+    // The cache is the liveness roster the sidebar already renders from, so
+    // checking it here costs nothing and closes the loop at its source: a
+    // deleted note stops being mirrored, so it stops being re-opened.
+    if (!shouldMirrorSelection(focusedActiveNoteId, focusedIsLive)) return;
     select(focusedActiveNoteId);
-  }, [focusedActiveNoteId, select]);
+  }, [focusedActiveNoteId, focusedIsLive, select]);
 
   // MYND-121 — report window-level activity to the backend auto-lock idle
   // timer. The Editor is mounted iff the vault is Unlocked, so the heartbeat

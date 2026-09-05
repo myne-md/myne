@@ -22,13 +22,17 @@ afterEach(() => {
   invokeMock.mockReset();
 });
 
-describe("createNote — Q8 zero-payload action", () => {
-  it("invokes note_create with empty plaintext", async () => {
+describe("createNote, action helper", () => {
+  // myne#653: a root note used to be created with EMPTY plaintext, so it had no
+  // frontmatter block and therefore no `title:` line to type into, on a client
+  // where the title is frontmatter-only. It now carries one, exactly as a
+  // foldered create already did.
+  it("invokes note_create with a frontmatter block carrying an empty title", async () => {
     invokeMock.mockResolvedValueOnce("00000000-0000-7000-8000-000000000001");
     const id = await createNote();
     expect(invokeMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenCalledWith("plugin:notes|note_create", {
-      plaintext: "",
+      plaintext: '---\ntitle: ""\n---\n\n',
     });
     expect(id).toBe("00000000-0000-7000-8000-000000000001");
   });

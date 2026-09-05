@@ -1239,13 +1239,41 @@ export async function rowMenuPick(
   ).click();
 }
 
-/** Create a note via the sidebar CTA and commit `title` through the
- *  inline-rename input (Enter). Leaves the note selected. */
+/** Create a note via the sidebar CTA and commit `title` through the note's own
+ *  promoted title field (Enter). Leaves the note selected.
+ *
+ *  **This drove the sidebar inline-rename input until myne#653 removed it.**
+ *  Creating a note no longer seeds `renamingId`, because that input takes focus
+ *  away from the note and vanishes on blur, which left a freshly created note
+ *  untitleable from either place: no `title:` field in the note, and a sidebar
+ *  input that disappeared the moment you looked elsewhere. The name is now typed
+ *  in the note, so this types there.
+ *
+ *  100 spec files reach this helper, so the old shape did not degrade, it
+ *  blocked forever on an element that never renders. The pane focuses the field
+ *  on create; this wait is what proves it did. */
+/** Type `title` into the promoted title field of the note just created and
+ *  commit it with Enter.
+ *
+ *  Split out because myne#653 moved naming from the sidebar into the note, and
+ *  four call sites carried their own copy of the old two-line sidebar shape: the
+ *  `createNoteInFolder` helpers in `folder-archive` and `folder-notes`, the two
+ *  inline folder-note creates in `notes.e2e.ts`, and the capture lane. One
+ *  helper means the next move costs one edit rather than five.
+ *
+ *  A DRAWING is deliberately not this: its body is a fenced Excalidraw scene
+ *  with no title field, so it still names through the sidebar rename input and
+ *  `drawing-notes.e2e.ts` is right to keep driving that. */
+export async function nameNewNote(session: Session, title: string): Promise<void> {
+  const field = await session.waitForElement(
+    testIdSelector("editor.frontmatter-title"),
+  );
+  await field.sendKeys(`${title}`);
+}
+
 export async function createNote(session: Session, title: string): Promise<void> {
   await clickNewMenuItem(session, "notes.create");
-  const rename = await session.byTestId("notes.rename-input");
-  await rename.sendKeys(`${title}`);
-  await session.waitForGone(testIdSelector("notes.rename-input"));
+  await nameNewNote(session, title);
 }
 
 /** Re-open the FIRST sidebar note after a `refresh()` and wait until its editor

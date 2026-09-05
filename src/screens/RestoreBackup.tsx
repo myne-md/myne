@@ -24,7 +24,12 @@ import { Trans, useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../platform/dialog";
 import { Button } from "../components/primitives/Button";
 import { CenteredCard } from "../components/primitives/CenteredCard";
-import { restoreErrorMessage } from "../lib/backup-errors";
+import {
+  isBackupRestoreError,
+  restoreErrorMessage,
+  restoreFailureMessage,
+  unknownRestoreMessage,
+} from "../lib/backup-errors";
 import {
   backupCancel,
   onBackupProgress,
@@ -32,7 +37,6 @@ import {
 } from "../lib/vault-backup";
 import type {
   BackupProgress,
-  BackupRestoreError,
   CollisionIntent,
   RestoreOutcome,
 } from "../types/backup-export-error";
@@ -84,7 +88,19 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
       const outcome = await restoreBackup(source, options);
       setState({ step: "summary", outcome });
     } catch (raw) {
-      const e = raw as BackupRestoreError;
+      // Narrow rather than cast (myne#662). The cast was worse here than in the
+      // export modal: it read `.kind` and `.detail.vault_id` off an unvalidated
+      // value, so a throw from outside the enum either fell through to
+      // `restoreErrorMessage` and rendered `undefined`, or threw a TypeError
+      // inside the catch block itself.
+      if (!isBackupRestoreError(raw)) {
+        // `unknownRestoreMessage`, not `restoreFailureMessage`: the latter
+        // re-runs the guard we just answered, and would always take its
+        // fallback arm.
+        setState({ step: "error", message: unknownRestoreMessage() });
+        return;
+      }
+      const e = raw;
       if (e.kind === "VaultAlreadyExists") {
         setState({
           step: "collision",
@@ -100,10 +116,23 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
   }
 
   async function pickFile() {
-    const picked = await openFileDialog({
-      multiple: false,
-      filters: [{ name: "Myne backup", extensions: ["myne-backup"] }],
-    }).catch(() => null);
+    // Dismissed and FAILED are two different outcomes, and a `.catch(() => null)`
+    // here collapsed them into one (myne#662, the same defect the export modal
+    // fixed one file over). A dialog that THROWS, a capability-ACL denial, a
+    // platform failure, a renamed command, was indistinguishable from the user
+    // pressing Cancel: the function returned and the screen said nothing at all.
+    // This is the screen somebody reaches after losing a vault, so a Choose-file
+    // button that does nothing and explains nothing is the worst place for it.
+    let picked: string | string[] | null;
+    try {
+      picked = await openFileDialog({
+        multiple: false,
+        filters: [{ name: "Myne backup", extensions: ["myne-backup"] }],
+      });
+    } catch (raw) {
+      setState({ step: "error", message: restoreFailureMessage(raw) });
+      return;
+    }
     if (typeof picked === "string") {
       void runRestore(picked);
     }

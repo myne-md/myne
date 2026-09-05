@@ -14,6 +14,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import { moveNote, bulkMoveNotes } from "../../src/notes/moveNote";
 import { createNote } from "../../src/notes/createNote";
+import { buildInitialPlaintext } from "../../dialect/src/surgery";
 
 beforeEach(() => invokeMock.mockReset());
 afterEach(() => invokeMock.mockReset());
@@ -127,30 +128,47 @@ describe("bulkMoveNotes — N independent best-effort moves", () => {
 });
 
 describe("createNote(folder) — a2 create-timing", () => {
+  // myne#653 added `title: ""` to BOTH shapes. Before it, the two paths
+  // disagreed, a foldered create carried frontmatter and a root create sent
+  // nothing. And the root note came out with nowhere to put its name. These
+  // assert the bytes rather than a call count precisely because that is what
+  // went wrong: the write happened, with the wrong payload.
   it("sends a foldered FM block at create for a folder", async () => {
     invokeMock.mockResolvedValueOnce("new-id");
     await createNote("Projects/");
     const [, args] = invokeMock.mock.calls[0] ?? [];
     expect((args as { plaintext: string }).plaintext).toBe(
-      "---\nfolder: Projects/\n---\n\n",
+      '---\nfolder: Projects/\ntitle: ""\n---\n\n',
     );
   });
 
-  it("sends empty plaintext for a root note (no arg / null)", async () => {
+  it("sends a title-carrying FM block for a root note (no arg / null)", async () => {
     invokeMock.mockResolvedValue("new-id");
     await createNote();
-    expect((invokeMock.mock.calls[0]?.[1] as { plaintext: string }).plaintext).toBe("");
+    expect((invokeMock.mock.calls[0]?.[1] as { plaintext: string }).plaintext).toBe(
+      '---\ntitle: ""\n---\n\n',
+    );
     invokeMock.mockClear();
     await createNote(null);
-    expect((invokeMock.mock.calls[0]?.[1] as { plaintext: string }).plaintext).toBe("");
+    expect((invokeMock.mock.calls[0]?.[1] as { plaintext: string }).plaintext).toBe(
+      '---\ntitle: ""\n---\n\n',
+    );
   });
 
   it("normalizes the folder before writing", async () => {
     invokeMock.mockResolvedValueOnce("new-id");
     await createNote("Projects/Myne"); // no trailing slash
     expect((invokeMock.mock.calls[0]?.[1] as { plaintext: string }).plaintext).toBe(
-      "---\nfolder: Projects/Myne/\n---\n\n",
+      '---\nfolder: Projects/Myne/\ntitle: ""\n---\n\n',
     );
+  });
+
+  // The `dialect/` primitive keeps its identity: myne#653 patched the title on
+  // TOP of it at the action layer precisely so the state-D folder-delete
+  // collapse stays byte-identical to an FM-less root note. If this ever fails,
+  // the fix moved into the wrong layer.
+  it("leaves buildInitialPlaintext(null) empty, the state-D symmetry", () => {
+    expect(buildInitialPlaintext(null)).toBe("");
   });
 });
 

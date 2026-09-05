@@ -116,7 +116,11 @@ export function orderedChildren(
 ): Child[] {
   const { folders, noteIds } = containerNodes(tree, containerPath);
   const rank = buildContainerRank(itemOrder[containerKeyOf(containerPath)] ?? []);
-  return orderContainerChildren(folders, noteIds, cache, rank);
+  // `null`: mobile has no just-created pin (myne#654 is a desktop sidebar
+  // affordance and mobile has no sidebar). Stated rather than defaulted,
+  // because the parameter is required precisely so a client that HAS one
+  // cannot forget to pass it.
+  return orderContainerChildren(folders, noteIds, cache, rank, null);
 }
 
 /** {@link orderedChildren} projected to each child's `item_order` key (note UUID
