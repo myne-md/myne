@@ -1,5 +1,5 @@
-// Re-measure the selection layer after a selection change that also moved the
-// line's DOM (myne-md/myne#660).
+// Give `drawSelection` a second look after a selection change that also moved
+// the line's DOM (myne-md/myne#660).
 //
 // # The failure
 //
@@ -18,78 +18,97 @@
 //   - the `- [ ] ` run stops being a checkbox widget and becomes source, since
 //     `revealsRange` fires once the selection overlaps it.
 //
-// The first is now geometry-neutral (`task-add-affordance.ts`'s zero-size
-// slot). The second cannot be: showing the markup is a real width change, and
-// it is the CORRECT behaviour, it is what keeps a translucent band off the
-// checkbox's opaque fill. So the fix cannot be to stop the geometry moving.
+// The first is now geometry-neutral (`task-surfaces.css`'s out-of-flow button).
+// The second cannot be: showing the markup is a real width change, and it is
+// the CORRECT behaviour, it is what keeps a translucent band off the checkbox's
+// opaque fill. So the fix cannot be to stop the geometry moving.
 //
-// # Why a re-measure, and why this is not a workaround
+// # Why a re-measure, and why the FIRST version of this file did nothing
 //
 // `cursor-aware.ts` records the missing step exactly: "Nothing recomputes it
 // afterwards, so the wrong pair of rectangles stays until the next selection
 // change." The layer is perfectly capable of painting this correctly, it just
 // measured one frame too early, and never looks again.
 //
-// There is precedent for this recovery in this editor, on the same gesture.
-// `toolbar/plugin.ts` re-attempts its positioning on `update.geometryChanged`
-// because "a double-click right after a re-focus can fire selectionSet before
-// the layout is measured, so the first `coordsAtPos` is null; the following
-// geometry update recovers it". Same race, same window, same answer.
+// The first version asked for that second look with an empty
+// `view.requestMeasure({ read: () => null })`, on the strength of a claim in
+// this comment that `LayerView.docViewUpdate` re-queues the selection layer's
+// own `measureReq` "whenever one runs". **That claim is false**, and the source
+// is unambiguous about it: `EditorView` calls `this.docViewUpdate()` only under
+// `if (redrawn)`, at both of its two call sites, where `redrawn` is the return
+// of `this.docView.update(update)`. An empty measure request produces no
+// update, so nothing redraws, so `docViewUpdate` never runs and the selection
+// layer is never re-queued. The plugin ran on every keystroke and achieved
+// nothing, while its own comment explained why it worked.
 //
-// # What it costs, measured rather than asserted
+// What actually re-queues that layer is visible in the same file, and there are
+// exactly two doors:
 //
-// `decorations/embedded-html.ts` carries an explicit "do NOT call
-// `view.requestMeasure()` here", because there it would run mid-scroll on every
-// open block, so the cost of this one is owed an honest answer.
+//     LayerView.update(update) {
+//       if (this.layer.update(update, this.dom) || update.geometryChanged) {
+//         this.scale();
+//         update.view.requestMeasure(this.measureReq);
+//       }
+//     }
 //
-// The predicate fires on **every keystroke**, not only on the task-row gesture:
-// `geometryChanged` is defined to include `docChanged`. An earlier version of
-// this comment claimed otherwise and was wrong.
+// and `selectionLayer`'s own `update` is
+// `docChanged || selectionSet || viewportChanged || configChanged`. So the one
+// supported way to make this layer look again is an update that sets one of
+// those. This plugin dispatches the cheapest of them: a transaction whose
+// selection is the CURRENT selection, on the next frame. It changes no document
+// and no selection value, and it is a genuine second measure against settled
+// geometry rather than a no-op wearing a comment.
 //
-// It is still close to free, for a reason worth writing down so nobody
-// "optimises" it later. `EditorView.update` runs plugin updates (where the rAF
-// below is registered) and then calls `this.requestMeasure()` itself whenever
-// the view redrew. rAF callbacks run in registration order, so this one runs
-// first and finds CM's own measure already scheduled, `requestMeasure` is
-// `if (this.measureScheduled < 0)`, so the call is a no-op. In the case this
-// exists for, a decoration change riding a selection change, the view HAS
-// redrawn, so what is added per keystroke is one rAF registration and one
-// no-op. A genuinely extra measure cycle happens only on the rare update that
-// changed geometry without redrawing.
+// # Why the trigger is a non-empty selection rather than `geometryChanged`
+//
+// The predicate could ask for `geometryChanged`, which is what the first
+// version did. Two reasons not to.
+//
+// It is too wide: `ViewUpdate.geometryChanged` is defined as
+// `docChanged || (flags & (Geometry|Height))`, so it is true on every
+// keystroke, and dispatching a transaction per keystroke is a real cost rather
+// than the no-op the old empty measure was.
+//
+// It is also not clearly wide ENOUGH for the case this exists for, which is a
+// decoration swap riding a pure selection move, and betting the fix on a flag
+// whose exact semantics we would be guessing at is how the first version got
+// here. A non-empty selection is the complete and exactly-stated set of updates
+// that can paint a band at all: a caret paints none, so there is nothing to get
+// wrong. That set is entered only while the user is selecting, so the cost is
+// bounded by the gesture rather than by typing.
 
 import { EditorView, ViewPlugin, type PluginValue, type ViewUpdate } from "@codemirror/view";
-import type { Extension } from "@codemirror/state";
+import { Annotation, Transaction, type Extension } from "@codemirror/state";
+
+/** Marks this plugin's own re-dispatch, so it cannot answer itself. The
+ *  predicate below would already refuse the echo (the re-dispatch sets
+ *  `selectionSet`, and its selection is non-empty, so only this annotation
+ *  separates them), which makes this the whole recursion stop rather than a
+ *  belt on top of one. */
+const remeasureDispatch = Annotation.define<boolean>();
 
 /**
- * True when this update is the shape that can leave `drawSelection` holding a
- * stale rectangle pair: the selection moved, AND the line's DOM moved with it.
+ * True when this update can leave `drawSelection` holding a stale rectangle
+ * pair: the selection moved, it is non-empty (so a band is painted at all), and
+ * this is not the echo of our own re-dispatch.
  *
  * Exported for `tests/editor/selectionRemeasure.test.ts`. The predicate is the
- * decision; the plugin around it is plumbing, and asserting the plumbing would
- * be asserting a `requestMeasure` spy rather than the rule that calls it.
+ * decision; the plugin around it is plumbing.
  */
 export function needsSelectionRemeasure(update: {
   selectionSet: boolean;
-  viewportChanged: boolean;
-  geometryChanged: boolean;
+  hasNonEmptySelection: boolean;
+  isRemeasureEcho: boolean;
 }): boolean {
-  // A selection change is necessary: with no selection there is no rectangle
-  // pair to get wrong, and this must not fire on scrolling or on typing that
-  // leaves the selection alone.
+  if (update.isRemeasureEcho) return false;
+  // Necessary: with no selection change there is no new rectangle pair, and
+  // this must not fire on scrolling or on typing that leaves the selection
+  // alone.
   if (!update.selectionSet) return false;
-  // A plain caret move within an already-settled line needs nothing; a
-  // selection change that arrived WITH a layout change is the case.
-  //
-  // No `|| update.docChanged` here: `ViewUpdate.geometryChanged` is defined as
-  // `docChanged || (flags & (Geometry|Height))`, so the disjunct could never
-  // change the answer. Which also means this DOES return true on every
-  // keystroke, not only on the task-row gesture, see the cost note below.
-  return update.geometryChanged || update.viewportChanged;
+  // Sufficient and exact: `drawSelection` paints a band only for a non-empty
+  // range, so an empty one has nothing that can be painted wrong.
+  return update.hasNonEmptySelection;
 }
-
-/** A stable key so a burst of updates coalesces to ONE measure per frame, the
- *  `scroll-slack.ts` idiom, for the same reason it gives there. */
-const remeasureKey = {};
 
 class SelectionRemeasurePlugin implements PluginValue {
   private frame: number | null = null;
@@ -97,18 +116,32 @@ class SelectionRemeasurePlugin implements PluginValue {
   constructor(private readonly view: EditorView) {}
 
   update(update: ViewUpdate): void {
-    if (!needsSelectionRemeasure(update)) return;
-    // Next FRAME, not this measure cycle, and the hop is the whole point: a
-    // request queued inside this cycle runs against the same transient layout
-    // the first probe read, which is the state being recovered from. The keyed
-    // request coalesces the measure; the frame is what makes it a later one.
+    const shouldRemeasure = needsSelectionRemeasure({
+      selectionSet: update.selectionSet,
+      hasNonEmptySelection: update.state.selection.ranges.some((r) => !r.empty),
+      isRemeasureEcho: update.transactions.some(
+        (tr) => tr.annotation(remeasureDispatch) === true,
+      ),
+    });
+    if (!shouldRemeasure) return;
+    // Next FRAME, and the hop is the whole point: a re-measure queued inside
+    // this cycle would run against the same transient layout the first probe
+    // read, which is the state being recovered from.
     if (this.frame !== null) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = null;
-      // Empty read/write: asking for a cycle is enough. `LayerView`'s
-      // `docViewUpdate` re-queues the selection layer's own `measureReq`
-      // whenever one runs, so the layer looks again on its own.
-      this.view.requestMeasure({ key: remeasureKey, read: () => null });
+      // Read the selection HERE rather than closing over the update's, so a
+      // selection that moved in the meantime is respected and this stays a
+      // value-preserving transaction in every case.
+      this.view.dispatch({
+        selection: this.view.state.selection,
+        annotations: [
+          remeasureDispatch.of(true),
+          // Not a user action: it must not become an undo step, and
+          // `undoSelection` must not walk back onto it.
+          Transaction.addToHistory.of(false),
+        ],
+      });
     });
   }
 
