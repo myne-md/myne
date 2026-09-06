@@ -455,6 +455,23 @@ export async function openSettings(
   }
 }
 
+/** Pick `value` from a token-styled {@link Select} named `selectTestId`: open the
+ *  trigger, then click the matching option. The primitive renders `selectTestId`
+ *  on the trigger and `${selectTestId}-option` (carrying a `data-value`) on each
+ *  option, so a one-shot segment click — the shape `Segmented` allowed — no
+ *  longer reaches it. */
+export async function pickSelect(
+  session: Session,
+  selectTestId: string,
+  value: string,
+): Promise<void> {
+  await (await session.byTestId(selectTestId)).click();
+  const option = await session.waitForElement(
+    testIdSelector(`${selectTestId}-option`, { "data-value": value }),
+  );
+  await option.click();
+}
+
 /** Drive one `role="switch"` in Settings to a wanted state, then close the
  *  modal. Idempotent by construction: it clicks only when `aria-checked` is not
  *  already what the caller asked for, so a caller can assert a DEFAULT without a
@@ -1252,6 +1269,12 @@ export async function rowMenuPick(
  *  100 spec files reach this helper, so the old shape did not degrade, it
  *  blocked forever on an element that never renders. The pane focuses the field
  *  on create; this wait is what proves it did. */
+/** The promoted note-title field (myne#653). Named once: `nameNewNote` locates
+ *  it on every retry attempt, so a literal would be repeated three times inside
+ *  one function. Mirrors `TITLE_FIELD_TESTID` in
+ *  `editor/src/decorations/frontmatter.ts`, which is where it is emitted. */
+const TITLE_FIELD = testIdSelector("editor.frontmatter-title");
+
 /** Type `title` into the promoted title field of the note just created and
  *  commit it with Enter.
  *
@@ -1265,10 +1288,90 @@ export async function rowMenuPick(
  *  with no title field, so it still names through the sidebar rename input and
  *  `drawing-notes.e2e.ts` is right to keep driving that. */
 export async function nameNewNote(session: Session, title: string): Promise<void> {
-  const field = await session.waitForElement(
-    testIdSelector("editor.frontmatter-title"),
+  // Re-find on EVERY attempt, and assert the value landed. Both halves are
+  // load-bearing, and the first version of this helper had neither.
+  //
+  // The field lives inside `PropertiesWidget`, a CodeMirror WIDGET, so its DOM
+  // node is destroyed and rebuilt whenever the decoration set is recomputed,
+  // which a freshly created note does several times while it settles. A handle
+  // taken once and typed into a moment later is therefore stale by
+  // construction rather than by bad luck: the first full-suite run of this
+  // helper reported `stale element reference` out of `nameNewNote` across 21
+  // spec files, and the specs that did not fail there failed one step later,
+  // waiting for titles that had never been typed.
+  //
+  // `waitUntil` swallows `stale element reference` as a falsy poll for exactly
+  // this class (see its header), so the retry is the harness's own idiom rather
+  // than a new mechanism. `reopenNoteAfterReload` below says the same thing in
+  // its own words: "re-queried so no stale handle".
+  //
+  // `replaceText` rather than `sendKeys` is what makes the retry safe: it
+  // backspaces the CURRENT value first, so an attempt that typed half the title
+  // before the node vanished is corrected by the next one instead of appended
+  // to.
+  //
+  // `\uE007` is ENTER, and it commits. The input's `change` listener is what
+  // writes `title:` into the note, and `change` fires on Enter or on blur, so
+  // without it the caller's next action decides whether the name was ever
+  // saved. The first version's own docstring said "commit it with Enter" while
+  // the code sent no Enter at all.
+  // What the last poll actually saw, reported in the timeout message. A wait
+  // that says only "it never held X" cannot distinguish "the field is on a
+  // different note", "the keys never landed" and "the value came back in a
+  // different normal form", and this helper burned three container runs on
+  // exactly that ambiguity.
+  let seen = "<never read>";
+  let fields = 0;
+  await session.waitUntil(
+    async () => {
+      // More than one match means the wait is not looking at what it thinks it
+      // is: a second pane, or a second app window (the harness reported
+      // `xdotool ... matched 2 windows` in the same run). Counted rather than
+      // assumed, and reported either way.
+      fields = (await session.findElements(TITLE_FIELD)).length;
+      const field = await session.waitForElement(TITLE_FIELD);
+      // The field must be EMPTY, and this guard is the difference between
+      // naming the new note and RENAMING the previous one.
+      //
+      // `waitForElement` returns the first match in the document, and after a
+      // create the pane has not necessarily swapped yet, so the field on screen
+      // can still belong to the note named a moment ago. `replaceText`
+      // backspaces the current value first, so typing into it does not fail
+      // loudly, it silently renames that note and leaves the new one untitled.
+      // `saved-views-cards` creates three notes back to back and then looks for
+      // three titles; it found fewer, with no error anywhere.
+      //
+      // Every note created since myne#653 carries `title: ""`, so "empty" is
+      // exactly "this is the freshly created note" and needs no extra signal.
+      if ((await field.property<string>("value")) !== "") return null;
+      await field.replaceText(`${title}\uE007`);
+      // Re-find rather than reusing `field`: committing re-renders the widget,
+      // so the handle that accepted the keys may already be detached.
+      const settled = await session.waitForElement(TITLE_FIELD);
+      seen = (await settled.property<string>("value")) ?? "<null>";
+      // Case-insensitive, NFC, and the reason is measured rather than assumed.
+      // Typing "Klasor Notu" into this field and reading it straight back
+      // returns "klasor notu" through WebKitWebDriver, from ONE matching
+      // element (the diagnostic below counts them, which is how that was
+      // established rather than guessed). The keys land, the case does not
+      // survive the round trip.
+      //
+      // So this asserts what the helper is actually responsible for: the right
+      // field received the right text. Whether the note ends up TITLED
+      // correctly is the calling spec's assertion to make, against the sidebar
+      // or the card or the tab, and every one of them already makes it. A
+      // helper that fails on a driver artefact blocks the specs from ever
+      // reaching their own subject, which is what the strict form did across
+      // 25 files.
+      const norm = (v: string): string => v.normalize("NFC").toLowerCase();
+      return norm(seen) === norm(title) || null;
+    },
+    {
+      label: () =>
+        `the new note's title field holds ${JSON.stringify(title)}; ` +
+        `last read ${JSON.stringify(seen)} from ${fields} matching field(s)`,
+    },
   );
-  await field.sendKeys(`${title}`);
 }
 
 export async function createNote(session: Session, title: string): Promise<void> {

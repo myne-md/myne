@@ -50,6 +50,12 @@ import type { TitleRecord } from "../../src/notes/loadNoteBatch";
  * carries a dozen members the daily resolver never reads, and enumerating them
  * here would put this file in the way of every future field.
  */
+/** "Nothing configured": the default folder, the default format, no template.
+ *  These assertions are about the CLOCK, so every field is null on purpose, and
+ *  a literal `{}` stopped type-checking when `PeriodSettings` made all three
+ *  required. */
+const NO_PERIOD_SETTINGS = { folder: null, format: null, template: null };
+
 function note(over: { id: string; title: string; folder: string | null }): TitleRecord {
   return {
     noteUuid: over.id,
@@ -214,14 +220,14 @@ describe("the daily note resolves at invocation, not at page load", () => {
     // because the result now also carries the `range` the create path fills
     // `{{period_start}}` from, and pinning it here would assert the calendar
     // rather than the clock, which is this file's subject.
-    const monday = resolvePeriodNote(local(2026, 3, 10), "daily", {}, notes);
-    const tuesday = resolvePeriodNote(local(2026, 3, 11), "daily", {}, notes);
+    const monday = resolvePeriodNote(local(2026, 3, 10), "daily", NO_PERIOD_SETTINGS, notes);
+    const tuesday = resolvePeriodNote(local(2026, 3, 11), "daily", NO_PERIOD_SETTINGS, notes);
     expect(monday).toMatchObject({ kind: "open", id: "a", dateTitle: "2026-03-10" });
     expect(tuesday).toMatchObject({ kind: "open", id: "b", dateTitle: "2026-03-11" });
   });
 
   it("asks to CREATE for a day with no note, in the configured folder", () => {
-    const res = resolvePeriodNote(local(2026, 3, 12), "daily", {}, [
+    const res = resolvePeriodNote(local(2026, 3, 12), "daily", NO_PERIOD_SETTINGS, [
       note({ id: "a", title: "2026-03-10", folder: "Daily/" }),
     ]);
     expect(res.kind).toBe("create");
