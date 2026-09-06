@@ -52,19 +52,36 @@ const NOT_A_READ = new Set(["vite-env.d.ts"]);
  * Identifiers in `__NAME__` shape that are NOT compile-time defines, so no
  * config is expected to supply them.
  *
- * Exactly one family, and it earns the exemption by being injected by the HOST
- * at runtime rather than substituted at build time: `__TAURI_INTERNALS__` is
- * what the Tauri WebView puts on `window`, and reading it is how a client asks
- * "am I running inside Tauri at all". A build that "defined" it would be
- * answering that question at compile time, which is the opposite of what the
- * probe is for. Root `CLAUDE.md` names the same two files as the platform-seam
- * guard's only runtime-global exemptions, for the same reason.
+ * Two families, each earning the exemption the same way: the HOST injects it
+ * onto `window` at runtime rather than Vite substituting it at build time, so a
+ * config that "defined" it would be freezing a per-window runtime answer into
+ * every bundle.
  *
- * Deliberately a PREFIX rather than a wildcard: a new `__SOMETHING__` that no
+ * 1. `__TAURI*` (`__TAURI_INTERNALS__`) is what the Tauri WebView puts on
+ *    `window`, and reading it is how a client asks "am I running inside Tauri at
+ *    all". A build that "defined" it would be answering that question at compile
+ *    time, which is the opposite of what the probe is for. Root `CLAUDE.md`
+ *    names the same two files as the platform-seam guard's only runtime-global
+ *    exemptions, for the same reason.
+ * 2. `__MYNE_DETACHED*` (`__MYNE_DETACHED__`, `__MYNE_DETACHED_NOTE_ID__`) is
+ *    what the desktop host stamps onto a detached (pop-out) note window via
+ *    `detached_window_open`'s WebView init script (myne-md/myne#678, epic #173).
+ *    The main window and the pop-out run the SAME bundle; the only thing that
+ *    tells them apart is this per-window injection, so it is a runtime value by
+ *    construction and never a compile-time one. `src/lib/detachedWindow.ts`
+ *    reads it as `window.__MYNE_DETACHED__` (a property access, which answers
+ *    `undefined` off a detached window rather than throwing), and it is
+ *    UPPERCASE so `check-web-no-test-hooks.mjs`'s lowercase `__myne*` scan never
+ *    matches it.
+ *
+ * Deliberately PREFIXES rather than a wildcard: a new `__SOMETHING__` that no
  * config defines is the failure this file exists to catch, and an exemption
- * list that grew by pattern would swallow it.
+ * list that grew by pattern would swallow it. `__MYNE_DETACHED` is the exact
+ * detached-window family and nothing wider, so a future `__MYNE_*` compile-time
+ * define bug still fails here.
  */
-const RUNTIME_GLOBALS = (name: string) => name.startsWith("__TAURI");
+const RUNTIME_GLOBALS = (name: string) =>
+  name.startsWith("__TAURI") || name.startsWith("__MYNE_DETACHED");
 
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[];

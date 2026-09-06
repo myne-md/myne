@@ -67,10 +67,35 @@ pub const SCHEME: &str = "attachment";
 /// `pdf-export:page`). A future window gets no access by accident — it
 /// has to be added here, in the file whose whole job is saying who may
 /// read decrypted attachment bytes.
+///
+/// **Detached note windows** (myne-md/myne#677, epic #173) are admitted by
+/// the [`DETACHED_NOTE_LABEL_PREFIX`] rule below rather than a fixed entry,
+/// because there is one host-spawned window per note (`note-<id>`, SYNC-1).
+/// The same reasoning holds: the label is HOST-assigned (page context cannot
+/// set its own window label), the window loads a bundled `WebviewUrl::App`
+/// page, and it carries the narrow `detached-note` capability. A detached
+/// window renders the same embeds a split pane already renders, so granting
+/// it attachment reads is the same exposure already permitted (sync-ledger
+/// SYNC-12).
 const ALLOWED_WEBVIEW_LABELS: [&str; 2] = [
     "main",
     crate::plugins::pdf_export::commands::PDF_EXPORT_WINDOW_LABEL,
 ];
+
+/// Label prefix for a detached (pop-out) note window: one host-spawned window
+/// per note, labelled `note-<id>` (SYNC-1). The window-creation side
+/// (myne#678) must spawn under this exact prefix; the capability
+/// `capabilities/detached-note.json` matches the same `note-*` glob, and the
+/// lock-teardown (myne#679) enumerates detached windows by it. Kept here as
+/// the one source of truth until #678's window module lands and imports it.
+pub const DETACHED_NOTE_LABEL_PREFIX: &str = "note-";
+
+/// Whether a webview label may fetch `attachment://` URIs: a fixed allowlist
+/// entry, or a detached note window (`note-<id>`). Pure and unit-tested so the
+/// fence is checked without a Tauri runtime; the caller ([`serve`]) applies it.
+fn is_allowed_webview_label(label: &str) -> bool {
+    ALLOWED_WEBVIEW_LABELS.contains(&label) || label.starts_with(DETACHED_NOTE_LABEL_PREFIX)
+}
 
 /// The Tauri async-URI-scheme handler entry point. Registered in
 /// `lib.rs`. Spawns the decrypt + serve work onto the async runtime so
@@ -107,7 +132,7 @@ async fn serve<R: Runtime>(
     // (1) Webview-label fence. Any originating webview outside the
     //     allowlist → 403. The label is a `&'static str` comparison
     //     against our own constants; nothing user-controlled reaches it.
-    if !ALLOWED_WEBVIEW_LABELS.contains(&webview_label) {
+    if !is_allowed_webview_label(webview_label) {
         tracing::warn!(
             stage = "scheme_label_check",
             status = 403,
@@ -198,5 +223,39 @@ mod tests {
             crate::plugins::pdf_export::commands::PDF_EXPORT_WINDOW_LABEL,
             "pdf-export"
         );
+    }
+
+    /// The fence predicate, both directions (myne#677, epic #173): it admits the
+    /// app window, the pdf-export window, and any detached note window
+    /// (`note-<id>`, host-assigned), and rejects everything else, including a
+    /// label that merely contains "note" without the `note-` prefix boundary.
+    #[test]
+    fn predicate_admits_main_pdf_export_and_detached_notes_only() {
+        // Admitted.
+        assert!(is_allowed_webview_label("main"));
+        assert!(is_allowed_webview_label(
+            crate::plugins::pdf_export::commands::PDF_EXPORT_WINDOW_LABEL
+        ));
+        assert!(is_allowed_webview_label(
+            "note-0192f0a1b2c3d4e5f60718293a4b5c6d"
+        ));
+
+        // Rejected: no `note-` prefix, or the prefix not at the start.
+        for label in [
+            "",
+            "evil",
+            "clipper",
+            "settings",
+            "devtools",
+            "note",      // no dash boundary
+            "notemain",  // no dash boundary
+            "xnote-abc", // prefix not at the start
+            "-note-abc",
+        ] {
+            assert!(
+                !is_allowed_webview_label(label),
+                "label {label:?} must not reach attachment bytes"
+            );
+        }
     }
 }

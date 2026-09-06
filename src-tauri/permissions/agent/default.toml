@@ -3,15 +3,21 @@
 # as an `InlinedPlugin`. Capability files reference these as `agent:default`.
 #
 # Every command here reaches decrypted note plaintext and two of them WRITE to
-# notes (`agent_apply` and `agent_undo`), so all eight inherit the
-# main-window-only invariant the other vault plugins share: v0.2 multi-window
-# MUST NOT grant `agent:allow-agent-apply`, `agent:allow-agent-undo` or any of
-# the others to a non-main window.
+# notes (`agent_apply` and `agent_undo`). The `default` bundle was reserved
+# main-window-only anticipating multi-window; myne#677 (epic #173, sync-ledger
+# SYNC-12) resolves that reservation: a detached (pop-out) note window is granted
+# `agent:default` via capabilities/detached-note.json (windows: ["note-*"]), the
+# same AI-editing surface a split pane already has. A detached `note-*` window
+# runs the same bundled code (same origin, same CSP) and holds the same plaintext
+# a split pane does, so the exposure is the same one already permitted; and its
+# agent proposal + apply plaintext is torn down on lock by myne#679 (the #529
+# lock-teardown lineage). The runtime scope clamp is unchanged: `agent_apply`
+# refuses anything outside the run's approved scope regardless of window.
 #
 # `agent_apply` is the only one that writes, and it is not the only one that
 # matters: `agent_start` and `agent_approve_scope` are what set and widen the
 # run's scope, so granting them is granting the ability to decide what a later
-# apply may touch.
+# apply may touch. omerdduran reviews this reversal in the myne#677 PR.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 

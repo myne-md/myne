@@ -9,6 +9,7 @@
 
 import { invoke } from "../platform/core";
 import { decodeGraphSettings, encodeGraphSettings } from "../notes/graphSettings";
+import type { DetachedEntry } from "../notes/detachedRestore";
 import {
   collectLeaves,
   findLeaf,
@@ -137,7 +138,78 @@ export function serializeWorkspaces(container: NamedWorkspaces): string {
       ? { expandedFolders: [...container.expandedFolders] }
       : {}),
     ...(encodedGraphSettings ? { graphSettings: encodedGraphSettings } : {}),
+    // myne#678 task 6 (SYNC-10): open detached (pop-out) windows to restore next
+    // launch, omit-when-empty (same discipline as `expandedFolders`). A
+    // pre-feature reader tolerates the unknown field; a reader on a vault with no
+    // pop-outs sees no key at all, so the blob stays byte-identical.
+    ...(container.detached && container.detached.length > 0
+      ? {
+          detached: container.detached.map((d) => ({
+            noteId: d.noteId,
+            geometry: { ...d.geometry },
+          })),
+        }
+      : {}),
   });
+}
+
+/**
+ * Splice the current detached-window snapshot into an already-serialized MYW1
+ * descriptor (myne#678 task 6), read-modify-write.
+ *
+ * The detached geometry is fetched from the host asynchronously at persist time
+ * (a detached window's move is not a main-window event, so the snapshot has to be
+ * taken when the blob is written), while the descriptor itself is serialized
+ * synchronously each render. Splicing the two here keeps the pane-tree
+ * serialization untouched and is the same read-modify-write mobile uses for
+ * `expandedFolders`. An empty list removes the key (omit-when-empty); a
+ * malformed base descriptor is returned unchanged rather than dropped.
+ */
+export function withDetached(descriptor: string, detached: DetachedEntry[]): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(descriptor);
+  } catch {
+    return descriptor;
+  }
+  if (typeof parsed !== "object" || parsed === null) return descriptor;
+  const obj = parsed as Record<string, unknown>;
+  if (detached.length > 0) {
+    obj.detached = detached.map((d) => ({ noteId: d.noteId, geometry: { ...d.geometry } }));
+  } else {
+    delete obj.detached;
+  }
+  return JSON.stringify(obj);
+}
+
+/** Parse the persisted detached-window list defensively (myne#678 task 6). A
+ *  malformed entry is skipped rather than rejecting the whole blob (a bad
+ *  geometry must not lose every open note), the same tolerance `expandedFolders`
+ *  and `graphSettings` take. */
+function parseDetachedEntries(raw: unknown): DetachedEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DetachedEntry[] = [];
+  for (const e of raw) {
+    if (typeof e !== "object" || e === null) continue;
+    const o = e as Record<string, unknown>;
+    if (typeof o.noteId !== "string" || o.noteId === "") continue;
+    const g = o.geometry;
+    if (typeof g !== "object" || g === null) continue;
+    const gg = g as Record<string, unknown>;
+    if (
+      typeof gg.x !== "number" ||
+      typeof gg.y !== "number" ||
+      typeof gg.width !== "number" ||
+      typeof gg.height !== "number"
+    ) {
+      continue;
+    }
+    out.push({
+      noteId: o.noteId,
+      geometry: { x: gg.x, y: gg.y, width: gg.width, height: gg.height },
+    });
+  }
+  return out;
 }
 
 /**
@@ -209,9 +281,14 @@ export function deserializeWorkspaces(
   const decodedGraphSettings = decodeGraphSettings(obj.graphSettings);
   const graphSettings = encodeGraphSettings(decodedGraphSettings) ? decodedGraphSettings : undefined;
 
+  // myne#678 task 6: the detached-window restore list (optional, forward/backward
+  // compatible), parsed defensively like the two fields above.
+  const detached = parseDetachedEntries(obj.detached);
+
   const result: NamedWorkspaces = { slots, activeId: obj.activeId };
   if (expandedFolders && expandedFolders.length > 0) result.expandedFolders = expandedFolders;
   if (graphSettings) result.graphSettings = graphSettings;
+  if (detached.length > 0) result.detached = detached;
   return result;
 }
 

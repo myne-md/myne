@@ -405,6 +405,19 @@ fn main() {
             ]),
         )
         .plugin(
+            "detached-window",
+            // myne#678 (epic #173). One MAIN-window command,
+            // `detached_window_open`, host-spawns a `note-<id>` pop-out
+            // window carrying the narrow `detached-note` capability
+            // (myne#677). Adding a command here without a matching
+            // `commands.allow` entry in
+            // `permissions/detached-window/default.toml` is a security
+            // regression (the InlinedPlugin mirror is load-bearing per the
+            // `vault-creation` note above).
+            tauri_build::InlinedPlugin::new()
+                .commands(&["detached_window_open", "detached_window_snapshot"]),
+        )
+        .plugin(
             "workspace",
             // MYND-166: the `workspace_read` + `workspace_write` +
             // `workspace_stage` commands (encrypted vault.workspace

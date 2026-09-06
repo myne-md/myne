@@ -27,6 +27,7 @@ pub mod agent;
 pub mod attachments;
 pub mod backup;
 pub mod clipper_pairing;
+pub mod detached_window;
 pub mod export;
 pub mod graph_layout;
 pub mod importer;

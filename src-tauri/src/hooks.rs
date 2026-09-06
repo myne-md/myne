@@ -187,6 +187,14 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
         #[cfg(feature = "local-inference")]
         crate::plugins::agent::teardown_on_lock(&self.app);
     }
+    /// myne#679: destroy every open detached (`note-<id>`) pop-out window and
+    /// clear the registry. A detached window is a second plaintext-bearing
+    /// WebView (the same shape as the hidden pdf-export window above), so on lock
+    /// its V8 heap must be dropped along with the main window's — a locked vault
+    /// leaves no note text on screen in ANY window (threat-model A6).
+    fn detached_windows_teardown_on_lock(&self) {
+        crate::plugins::detached_window::teardown_on_lock(&self.app);
+    }
     fn clear_staged_descriptor(&self) {
         crate::plugins::workspace::commands::clear_staged_descriptor();
     }
@@ -260,6 +268,14 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
         let _ = self
             .app
             .emit(crate::plugins::notes::SNAPSHOT_WRITE_FAILED_EVENT, note_id);
+    }
+    fn emit_notes_deleted(&self, note_id: &str) {
+        // myne#681: tell every window a note was deleted, so a detached (pop-out)
+        // window holding it shows the terminal "deleted elsewhere" state rather
+        // than autosaving its stale buffer back. note_id only, never plaintext.
+        let _ = self
+            .app
+            .emit(crate::plugins::notes::NOTES_DELETED_EVENT, note_id);
     }
 
     // ---- Group 5: prefs application ---------------------------------------

@@ -505,6 +505,9 @@
       "duplicateNote": {
         "label": "Duplicate note"
       },
+      "openInNewWindow": {
+        "label": "Open note in new window"
+      },
       "archiveNote": {
         "label": "Archive note"
       },
@@ -1165,12 +1168,18 @@
       "rename": "Rename",
       "move": "Move to folder…",
       "duplicate": "Duplicate",
+      "openInNewWindow": "Open in new window",
       "convertToTemplate": "Turn into template",
       "convertToNote": "Convert to note",
       "turnedIntoTemplate": "Turned into template",
       "convertedToNote": "Converted to note",
       "versionHistory": "Version history",
       "trash": "Move to trash"
+    },
+    "detachedDeleted": {
+      "title": "This note was deleted elsewhere",
+      "body": "It was deleted from another window or synced from another device. Any unsaved changes in this window were kept as a separate copy.",
+      "close": "Close window"
     },
     "codeBlock": {
       "copyCode": "Copy code",
