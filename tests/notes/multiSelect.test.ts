@@ -21,6 +21,10 @@ function stateWith(
     selectedIds: new Set(),
     anchorId: null,
     renamingId: null,
+    // Required since myne#654 put the newest create at the top of its
+    // container. A fixture that omits it is not a smaller state, it is a state
+    // the reducer cannot be handed.
+    justCreatedId: null,
     cache: new Map(),
     contentReloadNonce: 0,
     ...over,
