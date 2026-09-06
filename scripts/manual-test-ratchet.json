@@ -367,7 +367,39 @@
     "anyway would look identical on screen, and a capture across two enrolled",
     "devices is the only place that difference is visible. Deleting an item",
     "because the code now claims to be right is how a gate stops checking the",
-    "thing it was built for."
+    "thing it was built for.",
+    "",
+    "CEILING RAISED 10511 -> 10533 by myne-md/myne#680, in the sanctioned direction:",
+    "a new surface that genuinely needs a human, and where the one client that could",
+    "verify the protection is the one the gate excludes.",
+    "",
+    "  + detached (pop-out) note window screen-capture protection. The Windows check",
+    "    is whether a popped-out note is actually excluded from a capture pipeline: no",
+    "    lane can read it, design-notes/security/0378 records the native side as not",
+    "    E2E-observable, the tao Windows arm discards SetWindowDisplayAffinity's return",
+    "    BOOL, and the harness runs WebKitGTK on Linux where the call is a compile-time",
+    "    no-op. 10 minutes on desktop-windows, the one client the gate excludes, so",
+    "    this raises the ceiling and not gatedMinutes. The macOS/Linux half is a",
+    "    standard 6 minutes on each of those two clients (12 total), confirming the",
+    "    ABSENCE of a false protection claim, which no assertion in the suite",
+    "    expresses. 10 + 12 = 22, the whole of 10511 -> 10533; gatedMinutes is",
+    "    unchanged because neither half gates.",
+    "",
+    "CEILING RAISED 10533 -> 10587 by myne-md/myne#678 + #681 (epic #173), in the",
+    "sanctioned direction: a genuinely new surface no lane can judge.",
+    "",
+    "  + detached (pop-out) note window behaviour, in two items. The first (10",
+    "    minutes, core, all three desktop clients = 30) is create/move/single-",
+    "    instance/close/delete-terminal: a SECOND OS window, its focus, a tab drag",
+    "    across the window boundary and a second WebView reacting to a cross-window",
+    "    event are multi-window and OS-input behaviours the Linux WebKitGTK",
+    "    container's single tauri-driver session does not drive. It gates on macOS",
+    "    and Linux (windows is excluded), so 20 of its 30 minutes are gated. The",
+    "    second (8 minutes, standard, all three = 24) is geometry restore onto a",
+    "    specific monitor + clamping off a disconnected one + the unsaved-edit",
+    "    keep-both, which need a real multi-monitor session and observe a file on",
+    "    disk across two windows; standard, so it gates nothing. 30 + 24 = 54, the",
+    "    whole of 10533 -> 10587; gatedMinutes rises by the 20 core-gated minutes."
   ],
   "gatedTiers": [
     "core"
@@ -381,6 +413,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10511,
-  "gatedMinutes": 3789
+  "totalMinutesCeiling": 10587,
+  "gatedMinutes": 3809
 }

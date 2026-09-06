@@ -201,6 +201,10 @@ impl VaultLifecycleHooks for WebHooks {
     /// `Class::Unsupported` (task 48).
     fn pdf_export_teardown_on_lock(&self) {}
     fn agent_teardown_on_lock(&self) {}
+    /// **Decided absent.** Detached pop-out windows are OS windows; a browser tab
+    /// cannot open one, so `detached-window` is `Class::Unsupported` and this
+    /// client holds no registry to tear down.
+    fn detached_windows_teardown_on_lock(&self) {}
 
     /// **Implemented (task 65).** The staged descriptor is the WORKSPACE one —
     /// the pane tree the frontend mirrors into RAM on every layout change — and
@@ -272,6 +276,9 @@ impl VaultLifecycleHooks for WebHooks {
             EventPayload::Text(note_id.to_string()),
         );
     }
+    // myne#681: no-op. Detached (pop-out) note windows are OS windows a browser
+    // tab cannot open, so the web client has nothing to notify of a delete.
+    fn emit_notes_deleted(&self, _: &str) {}
 
     // ── Group 5/6: policy + auth-flow side-effects ──────────────────────────
 

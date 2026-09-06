@@ -52,10 +52,12 @@
 //!
 //! Every other hook stays a no-op until its subsystem lands on mobile (see
 //! `mobile/CLAUDE.md`) — `zeroize_spell`, `abort_active_recording`,
-//! `pdf_export_teardown_on_lock` and `clear_staged_descriptor` are empty
-//! because mobile holds no spell engine, no in-process recording session, no
-//! pdf-export window and no staged workspace descriptor (it does not register
-//! `workspace_stage`). Those are absences, not omissions.
+//! `pdf_export_teardown_on_lock`, `detached_windows_teardown_on_lock` and
+//! `clear_staged_descriptor` are empty because mobile holds no spell engine, no
+//! in-process recording session, no pdf-export window, no detached (pop-out)
+//! note windows (there are no OS windows to pop out into) and no staged
+//! workspace descriptor (it does not register `workspace_stage`). Those are
+//! absences, not omissions.
 
 use myne_core::hooks::{BoxFuture, VaultLifecycleHooks};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
@@ -191,6 +193,7 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     fn agent_teardown_on_lock(&self) {
         crate::plugins::agent::teardown_on_lock(&self.app);
     }
+    fn detached_windows_teardown_on_lock(&self) {}
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, enabled: bool, site: &'static str) {
         // Native screen-capture protection lives in `crate::screen_guard`,
@@ -236,6 +239,9 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
             note_id,
         );
     }
+    // myne#681: no-op. Detached (pop-out) note windows are desktop-only; mobile
+    // has no OS window to notify of an out-of-band delete.
+    fn emit_notes_deleted(&self, _: &str) {}
 
     // ---- Group 5: prefs application ---------------------------------------
     // `effective_auto_lock_secs` is deliberately NOT overridden: the trait's

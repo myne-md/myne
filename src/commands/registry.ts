@@ -144,6 +144,8 @@ export type CommandContext = {
   onNewNote: () => void;
   /** Duplicate the selected note (clone → open the copy). */
   onDuplicateNote: () => void;
+  /** Pop the selected note out into its own OS window (desktop-only, myne#173). */
+  onOpenInNewWindow: () => void;
   /** Archive the selected note. */
   onArchiveNote: () => void;
   /** Start inline rename of the selected note. */
