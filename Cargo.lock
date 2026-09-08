@@ -712,6 +712,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90dbd31c98227229239363921e60fcf5e558e43ec69094d46fc4996f08d1d5bc"
 dependencies = [
  "bitcoin_hashes",
+ "serde",
  "unicode-normalization",
 ]
 
@@ -4741,6 +4742,7 @@ dependencies = [
  "getrandom 0.2.17",
  "getrandom 0.4.2",
  "image",
+ "myne-format",
  "postcard",
  "protocol",
  "rten",
@@ -4769,6 +4771,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "myne-decrypt"
+version = "0.1.0"
+dependencies = [
+ "automerge",
+ "bip39",
+ "myne-format",
+ "protocol",
+ "rpassword",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "myne-desktop"
 version = "0.7.0"
 dependencies = [
@@ -4785,6 +4800,7 @@ dependencies = [
  "libc",
  "lopdf",
  "myne-core",
+ "myne-format",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
@@ -4822,6 +4838,24 @@ dependencies = [
  "x11rb",
  "zeroize",
  "zip 2.4.2",
+]
+
+[[package]]
+name = "myne-format"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "automerge",
+ "protocol",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.18",
+ "tracing",
+ "unicode-normalization",
+ "uuid",
+ "windows-sys 0.60.2",
+ "zeroize",
 ]
 
 [[package]]
@@ -6720,6 +6754,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rpassword"
+version = "7.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2da316a15f47e3d053de9cb2c439650bd8fa4aaeb9365f2e5f27f492ff73c196"
+dependencies = [
+ "libc",
+ "rtoolbox",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "rsa"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6839,6 +6884,16 @@ checksum = "9574ddebf5671bc08ceb76e2e1638fadc57fdeff318634eab2c29e9a803cff64"
 dependencies = [
  "rten-base",
  "rten-simd",
+]
+
+[[package]]
+name = "rtoolbox"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a1efe12a1469752d0e6ff5ebec0b6ef4924cc5c4c71046b0ec730040535819d"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
