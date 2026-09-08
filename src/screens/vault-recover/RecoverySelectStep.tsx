@@ -44,6 +44,8 @@ import {
   orderByLastUnlock,
   stableVaultNumber,
 } from "../../lib/vault-list";
+import { listAccounts, accountCommandErrorKind, groupVaultsByAccount } from "../../lib/account";
+import type { AccountView } from "../../lib/account";
 import { resolveVaultByAccountNumber } from "../../lib/vault-recover";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { formatRelativeTime, useTick } from "../../notes/components/relativeTime";
@@ -62,17 +64,17 @@ interface RecoverySelectStepProps {
 
 type ListState =
   | { kind: "loading" }
-  | { kind: "loaded"; vaults: VaultSummary[] }
+  | { kind: "loaded"; vaults: VaultSummary[]; accounts: AccountView[] }
   | { kind: "failed" };
 
 type ListAction =
-  | { type: "loaded"; vaults: VaultSummary[] }
+  | { type: "loaded"; vaults: VaultSummary[]; accounts: AccountView[] }
   | { type: "failed" };
 
 function listReducer(state: ListState, action: ListAction): ListState {
   switch (action.type) {
     case "loaded":
-      return { kind: "loaded", vaults: action.vaults };
+      return { kind: "loaded", vaults: action.vaults, accounts: action.accounts };
     case "failed":
       return { kind: "failed" };
     default:
@@ -98,6 +100,13 @@ function lastUnlockText(lastUnlock: number | null): string {
   if (lastUnlock == null) return "";
   const rel = formatRelativeTime(new Date(lastUnlock));
   return rel === "" ? "" : i18n.t("vaultRecover.select.openedRelative", { rel });
+}
+
+/** Grouping lives in `../../lib/account` (`groupVaultsByAccount`, shared with
+ *  the picker and the mobile flow); this file keeps only the label. */
+function accountLabel(account: AccountView | null): string {
+  if (account === null) return "";
+  return account.label === "" ? i18n.t("vaultRecover.select.accountFallback") : account.label;
 }
 
 const LIST_STYLE: CSSProperties = {
@@ -147,6 +156,14 @@ function rowLabelStyle(real: boolean): CSSProperties {
 const ROW_META_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
+};
+
+const GROUP_HEADER_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  fontWeight: "var(--weight-medium)",
+  color: "var(--fg-3)",
+  padding: "var(--space-2) var(--space-1) 0",
 };
 
 const DIVIDER_ROW_STYLE: CSSProperties = {
@@ -218,6 +235,7 @@ export function RecoverySelectStep({
   const [list, dispatchList] = useReducer(listReducer, { kind: "loading" });
   const [accountNumber, setAccountNumber] = useState("");
   const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   // Keep the row timestamps live (shared 30s tick).
   useTick();
@@ -225,10 +243,32 @@ export function RecoverySelectStep({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // Grouping failure is not list failure, same contract as the picker:
+      // only KeychainUnavailable degrades silently to standalone. Any other
+      // grouping error renders the vaults ungrouped plus a banner: phrase
+      // recovery must not fail over organisational chrome.
+      let accounts: AccountView[];
+      try {
+        accounts = await listAccounts();
+        if (!cancelled) setAccountsError(null);
+      } catch (e) {
+        if (cancelled) return;
+        if (accountCommandErrorKind(e) === "KeychainUnavailable") {
+          accounts = [];
+          setAccountsError(null);
+        } else {
+          accounts = [];
+          setAccountsError(t("vaultRecover.select.accountsError"));
+        }
+      }
       const result = await listVaults();
       if (cancelled) return;
       if ("ok" in result) {
-        dispatchList({ type: "loaded", vaults: orderByLastUnlock(result.ok) });
+        dispatchList({
+          type: "loaded",
+          vaults: orderByLastUnlock(result.ok),
+          accounts,
+        });
       } else {
         dispatchList({ type: "failed" });
       }
@@ -285,14 +325,26 @@ export function RecoverySelectStep({
 
       {list.kind === "loaded" && (
         <div style={LIST_STYLE}>
-          {list.vaults.map((vault) => (
-            <VaultRow
-              key={vault.id}
-              vault={vault}
-              label={rowLabel(vault, list.vaults)}
-              meta={lastUnlockText(vault.last_unlock)}
-              onSelect={() => onVaultSelected(vault.id)}
-            />
+          {groupVaultsByAccount(list.vaults, list.accounts).map((group) => (
+            <div
+              key={group.account?.id ?? "__standalone__"}
+              style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
+            >
+              {group.account !== null && (
+                <p style={GROUP_HEADER_STYLE} data-testid="recover.select-account-header">
+                  {accountLabel(group.account)}
+                </p>
+              )}
+              {group.vaults.map((vault) => (
+                <VaultRow
+                  key={vault.id}
+                  vault={vault}
+                  label={rowLabel(vault, list.vaults)}
+                  meta={lastUnlockText(vault.last_unlock)}
+                  onSelect={() => onVaultSelected(vault.id)}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -300,6 +352,16 @@ export function RecoverySelectStep({
       {list.kind === "failed" && (
         <p style={{ color: "var(--fg-3)", fontSize: "var(--text-base)" }}>
           {t("vaultRecover.select.loadFailed")}
+        </p>
+      )}
+
+      {accountsError !== null && (
+        <p
+          role="alert"
+          data-testid="recover.select-accounts-error"
+          style={{ color: "var(--danger)", fontSize: "var(--text-sm)" }}
+        >
+          {accountsError}
         </p>
       )}
 

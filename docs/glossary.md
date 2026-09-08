@@ -56,6 +56,33 @@ The 10-byte ASCII string `"myne.v0.1|"` (including the trailing pipe) that begin
 
 Used in: `spec/protocol.md` §5.2
 
+### **account** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
+
+*(Myne-divergent: yes (redefined 2026-09-07). Before that date "account" meant the vault itself; the two were one and the same.)*
+
+The client-side ownership layer above the vault: one account can own multiple vaults. An account is a
+purely local, sealed grouping: an **account record** (the device-local half) plus a sealed
+**vault membership** field inside each member vault's metadata (the per-vault half). It carries no
+cryptography of its own: each vault keeps its own account number, recovery phrase and `root_key`,
+and the server's view is byte-identical to the pre-split world (it still sees unrelated per-vault
+accounts). The account id is a random UUIDv7, distinct from the account number and from
+`account_number_hash`. Grouping is a per-device organisational choice, so it never syncs and never
+converges across devices (`sync-protocol.md` §10.3). Where the OS keychain is unavailable there is
+no record and no grouping, and vaults keep working standalone.
+
+Used in: `spec/protocol.md` §9.3.1, `spec/sync-protocol.md` §10.3
+
+### **account record** &nbsp; 📦 *Product*
+
+The device-local half of the account/vault split: a sealed record holding the account id, the member
+vault ids and the account label, stored under an OS-keychain wrap key (the sealed-label-store
+pattern). It is rebuilt from the on-disk vault scan when missing or corrupt, reconciled against
+discovery (adopting appearing vaults, pruning deleted ones, pruning emptied accounts), and never
+written in plaintext on any platform. Where the keychain is unavailable there is no record and no
+grouping. The per-vault half is the **vault membership** field.
+
+Used in: `spec/protocol.md` §9.3.1
+
 ### **account_number** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
 Myne's user identifier. A 20-character canonical value composed of 19 random Crockford base32 characters (95 bits of entropy) plus 1 Damm-32 check character, displayed as `MY-XXXX-XXXX-XXXX-XXXX-X`. The account number replaces email at signup; it is bearer-token semantics in Phase 2+ (anyone in possession of it can authenticate sync requests for that account, like a Mullvad VPN account) but it is **not** a key — it does not encrypt anything, and possession alone does not unlock a vault. The cryptographic role is via `account_number_hash`, which binds Argon2id salts to this account and prevents pre-computation attacks across accounts. In **multi-vault recovery** the account number gains an *optional selector* role: a user **may** type it so the host matches `account_number_hash` against on-disk `vault.meta` headers and jumps to that vault — **never required** (the picker is the primary path; the 24-word phrase stays the sole recovery secret; `decisions.md` 2026-06-09 "Multi-vault recovery").
@@ -2331,6 +2358,12 @@ The 512-bit Secure Hash Algorithm 2. **Not used by Myne** — referenced only wh
 
 Used in: `spec/protocol.md` §7.1
 
+### **sibling notice** &nbsp; 📦 *Product*
+
+The post-recovery notice shown when the just-recovered vault belongs to an [account](#account) holding other vaults. It names how many siblings remain and offers a recover-another path, so a user with several vaults does not silently leave one unrecovered. A count only: it reveals nothing about the other vaults beyond what the [vault picker](#vault-picker) already shows, and when the grouping cannot be read it renders a warning instead of claiming zero siblings.
+
+Used in: `src/screens/vault-recover/PasswordResetStep.tsx`; `design-notes/storage/0575-account-and-vault-split-into-a-client-side-ownership-layer.md`
+
 ### **signed bundle update** &nbsp; 📦 *Product*
 
 The verification story the web client is **laid out for but does not yet have**: a released bundle whose hashes are published to a public append-only record, reproducible from source so a third party can rebuild and compare, and structured so it can later enrol in an external code-transparency scheme without restructuring. It is deliberately *detection*, not prevention — it makes a silent later substitution discoverable after the fact, and closes nothing about targeted first delivery. **Two clauses here describe an intent rather than a state, and both were read as fact until 2026-08-25** (`decisions.md` entry 0534). The record of released bundle hashes lives in a private repository today, so the reader this definition addresses cannot open it. And the contrast this entry used to draw against the native `TB7` channel, "where a signature is verified before any code runs and a failed check refuses the update outright", is false in every clause: no desktop artifact carries a signature any OS checks, nothing verifies one at launch, and there is no update for a check to refuse. What genuinely distinguishes `TB7` is persistence: a native artifact is downloaded once and stays on disk, so a substitution reaches only whoever downloaded during the window and the file is still there to compare by hand against the published `SHA256SUMS`. A web bundle is re-sent on every visit, can be aimed at one visitor, and leaves nothing behind to check.
@@ -2944,9 +2977,21 @@ A per-vault human-readable name shown in the [vault picker](#vault-picker) and [
 
 Used in: `decisions.md` 2026-06-09 "Multi-vault in-app switcher + label management"
 
+### **vault membership** &nbsp; 📦 *Product*
+
+The per-vault half of the account/vault split: a sealed field inside a vault's `vault.meta` carrying
+the 16-byte account id of the account the vault belongs to. Sealed under a `root_key`-derived KEK
+(`membership-key`) with `account_number_hash` bound into the AAD, so it is invisible to the server
+and to a filesystem adversary, and a field copied from another vault fails AEAD. Absent means
+unmigrated (the vault groups via the device-local **account record** alone), never a parse error.
+Written eagerly at vault creation and lazily on each natural unlock, never gating the unlock. The
+device-local half is the **account record**.
+
+Used in: `spec/protocol.md` §9.3.1
+
 ### **vault picker** &nbsp; 📦 *Product*
 
-The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly) — a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Pre-unlock it surfaces only the vault **count + last-unlock timing** (an accepted leak, `threat-model.md` §7) — never names, content, or account identity. The recovery picker reuses the same view-model.
+The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly) — a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Vaults that belong to an [account](#account) are grouped under that account's label, which is user-renamable and likewise readable pre-unlock from the sealed device-local account record. Pre-unlock it surfaces only the vault **count + last-unlock timing** plus account **labels and grouping** (accepted leaks, `threat-model.md` §7). It never shows note content, passwords, or recovery material. Vault names and account labels both follow the [hide vault names](#hide-vault-names) option: with it on, the picker lists every vault individually with no headers and the account actions are refused. The recovery picker reuses the same view-model.
 
 Used in: `decisions.md` 2026-06-09 "Multi-vault onboarding + vault picker"
 

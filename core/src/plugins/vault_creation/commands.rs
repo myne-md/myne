@@ -316,12 +316,52 @@ pub fn build_session(
 // off a `#[tauri::command]` item made it visible to these lints for the first
 // time (task 79). Scoped to this item, not the crate.
 #[allow(clippy::doc_overindented_list_items, clippy::doc_lazy_continuation)]
+/// Best-effort sealed membership for a vault under creation (myne-md/myne#684).
+///
+/// Adopts the not-yet-written vault into the recency-rule account via
+/// [`crate::account::store::ensure_vault_membership`] and seals the id THAT
+/// call returns, so the sealed field and the record derive from ONE write and
+/// can never disagree (the review-round defect was sealing a recency/fresh id
+/// here while unlock-time reconcile adopted the vault into the first account
+/// and the stamp then skipped as already-present). `None` on ANY failure (no
+/// keychain, no registry info, CSPRNG hiccup): the lazy unlock stamp heals the
+/// field later, so creation never gates or fails on grouping. Every fallible
+/// step maps to `None` rather than `AppError`, which is the one place in this
+/// file that shape is correct: grouping is organisational chrome on a vault
+/// that must exist either way.
+///
+/// A failed commit after a successful adoption leaves a ghost member; the next
+/// reconcile prunes it (the vault never landed on disk), so the ghost is
+/// self-healing rather than structural.
+#[cfg(not(target_arch = "wasm32"))]
+async fn eager_membership(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
+    new_vault_id: crate::vault_id::VaultId,
+    root_key: &[u8; protocol::AEAD_KEY_LEN],
+    account_number_hash: &[u8; 16],
+) -> Option<protocol::Membership> {
+    let base = host.app_data_dir().ok()?;
+    let config = host.app_config_dir().ok()?;
+    let account_id =
+        crate::account::store::ensure_vault_membership(io, &config, &base, keychain, new_vault_id)
+            .await
+            .ok()?;
+    let nonce: [u8; protocol::AEAD_NONCE_LEN] = random_bytes().ok()?;
+    protocol::seal_membership_raw(root_key, &account_id, account_number_hash, &nonce).ok()
+}
+
+// `keychain` is unused on wasm32 (no eager seal there); the allow keeps
+// `-D warnings` green on that target without renaming a live param.
+#[cfg_attr(target_arch = "wasm32", allow(unused_variables))]
 pub async fn commit_from_host(
     vault_id: Option<String>,
     session_token: String,
     state: &VaultCreationState,
     runtime_state: &VaultRuntimeState,
     host: &dyn HostCtx,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<Option<String>, AppError> {
     let token = Uuid::parse_str(&session_token).map_err(|_| AppError::SessionNotFound)?;
     // SYNC-6 create targeting. Resolution precedence for the write
@@ -347,7 +387,40 @@ pub async fn commit_from_host(
     // a future retry once the underlying condition is fixed).
     let vault_dir = crate::paths::vault_dir_for_id_from_host(host, target)?;
     let vault_path = vault_dir.join("vault.meta");
-    commit_with_permit(token, vault_path, state, runtime_state.auth_permits()).await?;
+    // Seal the membership field while the session is still in the map: a
+    // resolution failure here leaves the session intact for retry, and a
+    // `None` (no keychain, no recency info, CSPRNG hiccup) degrades to the
+    // lazy unlock stamp rather than failing creation.
+    //
+    // `StdVaultIo` does not exist on wasm32 (no `std::fs` behind the seam),
+    // and the web client holds one vault per profile with no grouping
+    // surface, so that target skips the eager seal by construction and the
+    // lazy stamp heals the field on first unlock like every other path.
+    #[cfg(not(target_arch = "wasm32"))]
+    let membership = match (state.peek_seal_inputs(token), target) {
+        (Some((root_key, hash)), Some(new_vault_id)) => {
+            eager_membership(
+                host,
+                &crate::vault_io::StdVaultIo,
+                keychain,
+                new_vault_id,
+                &root_key,
+                &hash,
+            )
+            .await
+        }
+        _ => None,
+    };
+    #[cfg(target_arch = "wasm32")]
+    let membership = None;
+    commit_with_permit(
+        token,
+        vault_path,
+        state,
+        runtime_state.auth_permits(),
+        membership,
+    )
+    .await?;
     // Surface the written-to vault id so the frontend's chained auto-unlock can
     // target it explicitly (`target` is `Copy`, untouched by the path resolve).
     Ok(target.map(|id| id.to_string()))
@@ -370,6 +443,7 @@ pub async fn commit<R: Runtime>(
         state.inner(),
         runtime_state.inner(),
         &TauriHost::new(app),
+        crate::vault_label::key::platform_keychain(),
     )
     .await
 }
@@ -399,6 +473,7 @@ pub(crate) async fn commit_with_permit(
     vault_path: PathBuf,
     state: &VaultCreationState,
     auth_permits: &tokio::sync::Semaphore,
+    membership: Option<protocol::Membership>,
 ) -> Result<(), AppError> {
     let _permit = match auth_permits.try_acquire() {
         Ok(p) => p,
@@ -411,7 +486,7 @@ pub(crate) async fn commit_with_permit(
             return Err(AppError::VaultBusyAuth);
         }
     };
-    commit_with_vault_path(token, vault_path, state).await
+    commit_with_vault_path(token, vault_path, state, membership).await
     // `_permit` drops here on every return path → released before the
     // frontend's subsequent auto-unlock `vault_unlock` acquires.
 }
@@ -581,6 +656,7 @@ pub(crate) async fn commit_with_vault_path(
     token: Uuid,
     vault_path: PathBuf,
     state: &VaultCreationState,
+    membership: Option<protocol::Membership>,
 ) -> Result<(), AppError> {
     let session: VaultCreationSession = match state.take(token) {
         SessionLookup::Found(boxed) => *boxed,
@@ -636,7 +712,7 @@ pub(crate) async fn commit_with_vault_path(
     // clippy::result_large_err (new in Rust 1.96) otherwise flags the ~824-byte
     // payload moving on the stack; the box is on the rare error path only.
     let outcome: Result<(), Box<(AppError, VaultCreationSession)>> =
-        crate::task::run_blocking(move || match build_and_serialize_vault_meta(&session) {
+        crate::task::run_blocking(move || match serialize_meta(&session, &membership) {
             Err(e) => Err(Box::new((e, session))),
             Ok(bytes) => match crate::atomic_write::atomic_write(&vault_path, &bytes, false) {
                 Err(e) => Err(Box::new((AppError::from(e), session))),
@@ -800,6 +876,43 @@ pub fn cancel(session_token: String, state: State<'_, VaultCreationState>) -> Re
 pub fn build_and_serialize_vault_meta(
     session: &VaultCreationSession,
 ) -> Result<[u8; protocol::VAULT_META_LEN], AppError> {
+    let meta = build_vault_meta(session, None)?;
+    Ok(protocol::serialize_vault_meta_v0_2(&meta)
+        .try_into()
+        .expect("creation path always emits the 345-byte base layout (membership: None)"))
+}
+
+/// [`build_and_serialize_vault_meta`] with the sealed membership field stamped
+/// in (the account/vault split, myne-md/myne#684). The vault is open at creation
+/// time, so the field is sealed eagerly into the account the recency rule
+/// selects. Returns a `Vec<u8>` because the field makes the blob 417 bytes.
+pub fn build_and_serialize_vault_meta_with_membership(
+    session: &VaultCreationSession,
+    membership: protocol::Membership,
+) -> Result<Vec<u8>, AppError> {
+    let meta = build_vault_meta(session, Some(membership))?;
+    Ok(protocol::serialize_vault_meta_v0_2(&meta))
+}
+
+/// Commit-time serializer: the eager membership when creation resolved one,
+/// the base 345-byte layout otherwise. One return type (`Vec<u8>`) so both
+/// commit paths share the write below.
+fn serialize_meta(
+    session: &VaultCreationSession,
+    membership: &Option<protocol::Membership>,
+) -> Result<Vec<u8>, AppError> {
+    match membership {
+        Some(m) => build_and_serialize_vault_meta_with_membership(session, m.clone()),
+        None => build_and_serialize_vault_meta(session).map(|b| b.to_vec()),
+    }
+}
+
+/// Build the [`protocol::VaultMeta`] for a creation session, with an optional
+/// sealed membership field. The shared body of the two serializers above.
+fn build_vault_meta(
+    session: &VaultCreationSession,
+    membership: Option<protocol::Membership>,
+) -> Result<protocol::VaultMeta, AppError> {
     // Wrap root_key under password_wrap_key.
     let aad_pw = protocol::aad_password_wrap_v0_2(&session.kdf_params);
     let (nonce_password_wrap, enc_root_key_password) =
@@ -824,7 +937,12 @@ pub fn build_and_serialize_vault_meta(
     let (items_key_nonce, enc_items_key) =
         seal_32_byte_secret(&items_wrap_key, &items_key, &aad_items)?;
 
-    let meta = protocol::VaultMeta {
+    // The wrapped-itemsKey blob length matches the wrapped-root-key
+    // blob length (both are 32-byte secrets sealed under the same
+    // CTX-commitment AEAD shape). Compile-time guard:
+    const _: () = assert!(VAULT_META_WRAPPED_ITEMS_KEY_LEN == VAULT_META_WRAPPED_ROOT_KEY_LEN);
+
+    Ok(protocol::VaultMeta {
         account_number_hash: session.account.hash,
         kdf_params: session.kdf_params,
         random_salt_password: session.salt_password,
@@ -836,13 +954,8 @@ pub fn build_and_serialize_vault_meta(
         items_key_id,
         items_key_nonce,
         enc_items_key,
-    };
-    // The wrapped-itemsKey blob length matches the wrapped-root-key
-    // blob length (both are 32-byte secrets sealed under the same
-    // CTX-commitment AEAD shape). Compile-time guard:
-    const _: () = assert!(VAULT_META_WRAPPED_ITEMS_KEY_LEN == VAULT_META_WRAPPED_ROOT_KEY_LEN);
-
-    Ok(protocol::serialize_vault_meta_v0_2(&meta))
+        membership,
+    })
 }
 
 /// [`vault_artifacts_present`] over the IO seam (`decisions.md` 2026-08-15).
@@ -940,6 +1053,7 @@ pub async fn commit_with_vault_path_io(
     vault_path: PathBuf,
     state: &VaultCreationState,
     io: &dyn crate::vault_io::VaultIo,
+    membership: Option<protocol::Membership>,
 ) -> Result<(), AppError> {
     let session = match state.take(token) {
         SessionLookup::Found(session) => *session,
@@ -969,7 +1083,7 @@ pub async fn commit_with_vault_path_io(
         }
     }
 
-    let bytes = match build_and_serialize_vault_meta(&session) {
+    let bytes = match serialize_meta(&session, &membership) {
         Ok(bytes) => bytes,
         Err(e) => {
             let _ = state.try_insert(token, session);
@@ -1086,19 +1200,33 @@ pub async fn commit_with_vault_path_io(
 /// and the wasm instance is single-threaded, so the lease would guard a race
 /// that cannot occur. The concurrency bound that DOES apply is unchanged:
 /// `MAX_CONCURRENT_SESSIONS`, enforced at `begin` by the slot reservation.
+#[cfg_attr(target_arch = "wasm32", allow(unused_variables))]
 pub async fn commit_from_host_io(
     vault_id: Option<String>,
     session_token: String,
     state: &VaultCreationState,
     host: &dyn HostCtx,
     io: &dyn crate::vault_io::VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<Option<String>, AppError> {
     let token = Uuid::parse_str(&session_token).map_err(|_| AppError::SessionNotFound)?;
     let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref())
         .or_else(|| state.peek_vault_id(token));
     let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, target).await?;
     let vault_path = vault_dir.join("vault.meta");
-    commit_with_vault_path_io(token, vault_path, state, io).await?;
+    // wasm32 skips the eager seal like the native path does (see above): no
+    // `std::fs` behind the seam, one vault per browser profile, no grouping
+    // surface. The lazy stamp heals the field on first unlock.
+    #[cfg(not(target_arch = "wasm32"))]
+    let membership = match (state.peek_seal_inputs(token), target) {
+        (Some((root_key, hash)), Some(new_vault_id)) => {
+            eager_membership(host, io, keychain, new_vault_id, &root_key, &hash).await
+        }
+        _ => None,
+    };
+    #[cfg(target_arch = "wasm32")]
+    let membership = None;
+    commit_with_vault_path_io(token, vault_path, state, io, membership).await?;
     Ok(target.map(|id| id.to_string()))
 }
 
@@ -1328,7 +1456,7 @@ mod tests {
             let token = seed_session_into_state(&state);
 
             let result =
-                commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None).await;
 
             assert!(
                 matches!(result, Err(AppError::VaultArtifactsPresent)),
@@ -1362,7 +1490,7 @@ mod tests {
             let token = seed_session_into_state(&state);
 
             let result =
-                commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None).await;
             assert!(matches!(result, Err(AppError::VaultArtifactsPresent)));
 
             // Session must still be takeable under the same token.
@@ -1396,7 +1524,8 @@ mod tests {
             let state = VaultCreationState::default();
             let token = seed_session_into_state(&state);
 
-            let result = commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+            let result =
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None).await;
 
             // Either Ok (full happy path completed) or some non-
             // VaultArtifactsPresent error. The point is: guard did not
@@ -1423,7 +1552,8 @@ mod tests {
             let unknown_token = Uuid::new_v4();
 
             let result =
-                commit_with_vault_path(unknown_token, scratch.path().to_path_buf(), &state).await;
+                commit_with_vault_path(unknown_token, scratch.path().to_path_buf(), &state, None)
+                    .await;
             assert!(
                 matches!(result, Err(AppError::SessionNotFound)),
                 "expected SessionNotFound, got {result:?}"
@@ -1431,6 +1561,128 @@ mod tests {
         });
     }
 
+    // ---- myne-md/myne#684: the eager membership path ----------------------
+
+    /// `commit` seals the membership field when it resolved one: the committed
+    /// blob is 417 bytes, parses, and opens under the v0.2 membership KEK to
+    /// the sealed account id. This is the test that fails when the commit
+    /// paths call the membership-None serializer (the helper with no caller).
+    #[test]
+    fn commit_with_membership_seals_the_field_eagerly() {
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            std::fs::create_dir_all(scratch.path()).expect("vault dir");
+            let state = VaultCreationState::default();
+            let session = build_session(VaultId::mint(), "any password", FAST_TEST_KDF).unwrap();
+            let root_key = *session.root_key;
+            let hash = session.account.hash;
+            let account_id = [0xAB; 16];
+            let membership = protocol::seal_membership_raw(
+                &root_key,
+                &account_id,
+                &hash,
+                &[0xCD; protocol::AEAD_NONCE_LEN],
+            )
+            .expect("seal");
+            let token = Uuid::new_v4();
+            state.try_insert(token, session).expect("insert");
+            commit_with_vault_path(
+                token,
+                scratch.path().join("vault.meta"),
+                &state,
+                Some(membership),
+            )
+            .await
+            .expect("commit");
+            let bytes = std::fs::read(scratch.path().join("vault.meta")).expect("read");
+            assert_eq!(
+                bytes.len(),
+                protocol::VAULT_META_V0_2_WITH_MEMBERSHIP_LEN,
+                "eager commit must emit the 417-byte layout"
+            );
+            let meta = protocol::parse_vault_meta_any(&bytes).expect("parse");
+            let sealed = meta.membership.expect("field present");
+            let opened = protocol::unseal_membership(&root_key, &sealed, &hash).expect("unseal");
+            assert_eq!(opened.as_slice(), account_id);
+        });
+    }
+
+    /// The sealed field and the record agree: `commit_from_host` adopts the
+    /// new vault into the record and seals the id THAT adoption returns, so no
+    /// later reconcile can adopt it elsewhere while the stamp skips as
+    /// already-present. Fails when the two halves derive from two writes.
+    #[test]
+    fn commit_from_host_seals_the_adopted_account() {
+        use crate::host::test_host::TestHost;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+        rt().block_on(async {
+            let scratch =
+                crate::test_support::ScopedTempDir::new("commit-eager-agree").expect("scratch");
+            let host = TestHost::new(scratch.path());
+            let keychain = FakeKeychain::empty();
+            let creation = VaultCreationState::default();
+            let runtime = VaultRuntimeState::default();
+            let vault_id = VaultId::mint();
+            let session = build_session(vault_id, "any password", FAST_TEST_KDF).expect("session");
+            let root_key = *session.root_key;
+            let hash = session.account.hash;
+            // The vault directory must exist before commit writes into it, and
+            // the config directory before the record adoption persists.
+            std::fs::create_dir_all(
+                scratch
+                    .path()
+                    .join("data")
+                    .join("vaults")
+                    .join(vault_id.to_string()),
+            )
+            .expect("vault dir");
+            std::fs::create_dir_all(scratch.path().join("config")).expect("config dir");
+            let token = Uuid::new_v4();
+            creation.try_insert(token, session).expect("insert");
+
+            let returned = commit_from_host(
+                None,
+                token.to_string(),
+                &creation,
+                &runtime,
+                &host,
+                &keychain,
+            )
+            .await
+            .expect("commit");
+            assert_eq!(returned, Some(vault_id.to_string()));
+
+            let meta_path = scratch
+                .path()
+                .join("data")
+                .join("vaults")
+                .join(vault_id.to_string())
+                .join("vault.meta");
+            let bytes = std::fs::read(&meta_path).expect("meta written");
+            let meta = protocol::parse_vault_meta_any(&bytes).expect("parse");
+            let sealed = meta.membership.expect("eager field present");
+            let sealed_id = protocol::unseal_membership(&root_key, &sealed, &hash).expect("unseal");
+
+            let record = crate::account::store::load_account(
+                &crate::vault_io::StdVaultIo,
+                &scratch.path().join("config"),
+                &scratch.path().join("data"),
+                &keychain,
+            )
+            .await
+            .expect("record loads");
+            let owner = record
+                .accounts
+                .iter()
+                .find(|a| a.vaults.contains(&vault_id))
+                .expect("record adopted the new vault");
+            assert_eq!(
+                owner.account_id.as_slice(),
+                sealed_id.as_slice(),
+                "sealed field and record must name the same account"
+            );
+        });
+    }
     // ---- MYND-159: commit pulled into auth_permits ----------------------
 
     /// `commit` is pulled into the `auth_permits` mutex (MYND-159). When the
@@ -1453,6 +1705,7 @@ mod tests {
                 tmp.path().join("vault.meta"),
                 &creation,
                 runtime.auth_permits(),
+                None,
             )
             .await;
 
@@ -1482,6 +1735,7 @@ mod tests {
                 tmp.path().join("vault.meta"),
                 &creation,
                 runtime.auth_permits(),
+                None,
             )
             .await;
             assert!(
@@ -1681,7 +1935,8 @@ mod tests {
             let state = VaultCreationState::default();
             let token = seed_session_into_state(&state);
 
-            let result = commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+            let result =
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None).await;
             assert!(
                 result.is_ok(),
                 "commit happy-path must succeed; got {result:?}"
@@ -1725,7 +1980,7 @@ mod tests {
             let state = VaultCreationState::default();
             let token = seed_session_into_state(&state);
 
-            commit_with_vault_path(token, vault_path.clone(), &state)
+            commit_with_vault_path(token, vault_path.clone(), &state, None)
                 .await
                 .expect("commit to the explicit vaults/<id>/ path must succeed");
 
@@ -1788,7 +2043,7 @@ mod tests {
 
             // The guard must NOT fire (the sibling lives in a different dir),
             // and the full write pipeline must complete.
-            commit_with_vault_path(token, fresh_meta.clone(), &state)
+            commit_with_vault_path(token, fresh_meta.clone(), &state, None)
                 .await
                 .expect("creating the Nth vault with a populated sibling present must succeed");
 
@@ -1824,7 +2079,7 @@ mod tests {
                 .try_insert(token, session)
                 .expect("scratch state has room");
 
-            commit_with_vault_path(token, scratch.path().to_path_buf(), &state)
+            commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None)
                 .await
                 .expect("commit happy-path");
 
@@ -1918,7 +2173,7 @@ mod tests {
                 .try_insert(token, session)
                 .expect("scratch state has room");
 
-            commit_with_vault_path(token, scratch.path().to_path_buf(), &state)
+            commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None)
                 .await
                 .expect("commit happy-path");
 
@@ -1959,7 +2214,7 @@ mod tests {
                 .try_insert(token, session)
                 .expect("scratch state has room");
 
-            commit_with_vault_path(token, scratch.path().to_path_buf(), &state)
+            commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None)
                 .await
                 .expect("commit happy-path");
 
@@ -2076,7 +2331,7 @@ mod tests {
             let token = seed_session_into_state(&state);
 
             let result =
-                commit_with_vault_path(token, scratch.path().to_path_buf(), &state).await;
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None).await;
 
             assert!(
                 matches!(result, Err(AppError::VaultArtifactsPresent)),

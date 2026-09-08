@@ -356,6 +356,18 @@
     "    process, a memory-pressure judgement about real hardware that no",
     "    simulator, container or flow tier reproduces.",
     "",
+    "CEILING RAISED 10511 -> 10527 by myne-md/myne#684, in the sanctioned",
+    "direction. What added the minutes, named so the raise is an argument:",
+    "",
+    "  + the grouped picker on macOS, 10 minutes, core. The account record is",
+    "    sealed under a keychain key (core/src/account/key.rs reuses",
+    "    platform_keychain, Apple-only), so account-grouping.e2e.ts can only",
+    "    exercise the no-keychain branch in the Linux container; the grouped",
+    "    picker, rename, move and split all need a real Apple keychain.",
+    "  + the Android standalone degrade, 6 minutes, standard. The whole check is",
+    "    what a device WITHOUT a keychain backend shows before unlock, a runtime",
+    "    probe of real OS key storage on a platform no CI lane builds for.",
+    "",
     "NOTHING WAS SUBTRACTED, and one item that could have been is worth naming.",
     "The second-device item under settings.block.ai-provider was written against",
     "the SYNC-22 residual: consent was vault content, so it synced, and a newly",
@@ -381,6 +393,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10511,
+  "totalMinutesCeiling": 10527,
   "gatedMinutes": 3789
 }

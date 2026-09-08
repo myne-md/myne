@@ -4168,15 +4168,26 @@
     }
   },
   "vaultPicker": {
+    "accountFallback": "Account",
     "createAnother": "Create another vault",
     "heading": "Choose a vault",
     "joinDevice": "Add this device to an account",
     "loading": "Loading your vaults…",
+    "moveToAccount": "Move to account…",
+    "moveToNewAccount": "Move to new account",
     "noneLoaded": "No vaults could be loaded right now.",
     "openedRelative": "opened {{rel}}",
+    "renameAccount": "Rename account",
     "restoreFromBackup": "Restore from backup",
     "subline": "You have more than one vault on this device. Pick one to unlock.",
-    "vaultFallback": "Vault {{n}}"
+    "vaultFallback": "Vault {{n}}",
+    "accountError": "Could not update the account grouping. Nothing was changed.",
+    "accountHidden": "Account actions are unavailable while vault names are hidden.",
+    "labelTooLong": "That name is too long. Keep it under 512 characters.",
+    "renameCancel": "Cancel",
+    "renamePlaceholder": "Account name",
+    "renameSave": "Rename",
+    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4221,7 +4232,15 @@
       "or": "or",
       "title": "Choose a vault to recover",
       "useAccountNumber": "Use account number",
-      "vaultFallback": "Vault {{index}}"
+      "vaultFallback": "Vault {{index}}",
+      "accountFallback": "Account",
+      "accountsError": "Could not load the account grouping. Vaults are listed ungrouped; nothing about recovery changes."
+    },
+    "siblingNotice": {
+      "body_one": "This account holds {{count}} more vault. Recover it too so nothing is left behind.",
+      "body_other": "This account holds {{count}} more vaults. Recover them too so nothing is left behind.",
+      "recoverAnother": "Recover another vault",
+      "unknown": "Could not check whether this account holds other vaults. If you keep more than one vault, recover each one with its own phrase."
     }
   },
   "vaultSwitcher": {
@@ -4344,7 +4363,18 @@
     "openedLastYear": "opened last year",
     "openedYearsAgo_one": "opened {{count}} year ago",
     "openedYearsAgo_other": "opened {{count}} years ago",
-    "corruptedBadge": "Corrupted"
+    "corruptedBadge": "Corrupted",
+    "accountFallback": "Account",
+    "renameAccount": "Rename account",
+    "moveToNewAccount": "Move to new account",
+    "moveToAccount": "Move to account…",
+    "accountError": "Could not update the account grouping. Nothing was changed.",
+    "accountHidden": "Account actions are unavailable while vault names are hidden.",
+    "labelTooLong": "That name is too long. Keep it under 512 characters.",
+    "renameCancel": "Cancel",
+    "renamePlaceholder": "Account name",
+    "renameSave": "Rename",
+    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed."
   },
   "join": {
     "transportError": "Couldn't reach that sync server. Check the address and your connection, then try again.",

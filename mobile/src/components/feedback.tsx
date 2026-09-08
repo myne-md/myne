@@ -15,15 +15,18 @@ export function Banner({
   icon = true,
   children,
   style,
+  testID,
 }: {
   kind?: BannerKind;
   icon?: boolean;
   children: ReactNode;
   style?: CSSProperties;
+  testID?: string;
 }) {
   const s = BANNER[kind];
   return (
     <div
+      data-testid={testID}
       style={{
         display: "flex",
         gap: 10,

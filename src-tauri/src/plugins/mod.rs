@@ -49,6 +49,7 @@ pub mod vault_change_password;
 // `myne-core` (shared with the mobile client). Re-exported so existing
 // `crate::plugins::vault_creation::…` paths keep resolving.
 pub use myne_core::plugins::vault_creation;
+pub mod account;
 pub mod vault_delete;
 pub mod vault_indices;
 pub mod vault_label;

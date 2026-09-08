@@ -195,6 +195,10 @@ const CAPABILITY_BACKING = {
     // Task 8: the live posture read behind the connection-state UI.
     "plugin:sync|sync_get_tor_state",
   ],
+  // myne-md/myne#684: the account/vault split. The whole `account` plugin is
+  // absent on web (one vault per origin, no keychain), so the grouping UI is
+  // omitted rather than rendered against commands that reject.
+  accountGrouping: ["account"],
 };
 
 const descriptor = readFileSync(DESCRIPTOR, "utf8");

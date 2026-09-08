@@ -520,6 +520,14 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // `lockedVaultNames`, absent in the web descriptor, so `PrivacyPanel`
     // omits the row instead of rendering one whose three probes all reject.
     ("vault-label", Class::Unsupported),
+    // myne-md/myne#684: the device-local account record (the account/vault
+    // split). Absent on web because the thing it governs is absent: a browser
+    // holds exactly one vault per origin and has no OS keychain, so there is no
+    // grouping to render and nowhere to keep the wrap key whose seal is the
+    // record. `Unsupported` rather than `Pending` for the reason `vault-label`
+    // above gives: `Pending` promises a port, and no port makes grouping
+    // meaningful when there is one vault and no keychain.
+    ("account", Class::Unsupported),
     // myne-md/myne#482 + #483: the device-local screen-capture escape hatch
     // and the WebView-side re-assert. Absent on web because the thing they
     // govern is absent: a page cannot ask a browser to exclude itself from the
