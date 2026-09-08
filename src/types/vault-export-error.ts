@@ -116,6 +116,10 @@ export interface VaultExportSummary {
   excluded_trashed: number;
   /** `snapshots/` files excluded (counted, never decrypted). */
   excluded_snapshots: number;
+  /** Notes that could not be decoded, preserved under `_undecodable/`. */
+  failed: number;
+  /** Notes written into `_trash/` (the CLI's `trashed:` mode). */
+  trashed: number;
 }
 
 /**

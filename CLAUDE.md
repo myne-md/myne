@@ -217,6 +217,8 @@ myne/
 ├── protocol/            ← Rust crypto crate
 ├── core/                ← myne-core: shared backend plugin cores + the host/IO/task seams; consumed by desktop, mobile AND the web wasm entry crate
 │   └── src/inference/   ← the AI seam (myne#456): the Engine trait, the backend registry holding the ambient-vs-remote refusal, and the remote-provider arm. Behind the DEFAULT-OFF `remote-ai` feature, which desktop's `local-inference` implies and mobile enables directly: that chain is what keeps `cargo build -p myne-desktop --no-default-features` free of remote-provider code now that the files live in a crate compiling unconditionally
+├── format/              ← myne-format: the on-disk-format crate (NC05 read path, MYB1 read half, the VaultIo trait, export-naming, the export walk). Native-only; consumed by desktop and the `myne-decrypt` CLI
+├── decrypt/             ← myne-decrypt: the app-independent decrypter CLI (myne-md/myne#166). Exports a vault to plain markdown without the app installed
 ├── cli/                 ← myne-cli: the `myne` terminal client (MYND-490). Ships as a Tauri `externalBin` sidecar INSIDE the desktop bundle (staged by scripts/build-cli-sidecar.mjs, PATH shim by src-tauri/src/cli_bridge/path_shim.rs) and drives the running, unlocked desktop over its local command socket — it never opens the vault and depends on neither myne-core nor protocol
 ├── tor-sidecar/         ← myne-tor-sidecar: arti (Rust Tor) as a standalone loopback SOCKS5 proxy, shipped as a second Tauri `externalBin` sidecar (MYND-650). NOTHING links it — the desktop spawns it as a subprocess when the device-local Tor routing option is on, which is exactly what keeps arti out of `myne-desktop`'s `cargo tree -e normal` closure and leaves the no-egress gate scanning a tree with no networked crate in it
 ├── theme-validator/     ← shared custom-theme value-shape allowlist — SECURITY-LOAD-BEARING: the WebView CSP carries style-src 'unsafe-inline', so a theme value that reaches the DOM executes. Desktop themes plugin and myne-themes marketplace CI run this exact crate so the grammar cannot drift (threat-model.md "Custom-theme CSS-value surface"; MYND-508)
@@ -229,7 +231,7 @@ myne/
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
 ├── pnpm-workspace.yaml  ← pnpm workspace members (mobile, dialect, editor, copy, client-core, ornaments, preview)
-├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, cli, tor-sidecar, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm, mobile/src-tauri + its five tauri-plugin-* crates)
+├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, format, decrypt, cli, tor-sidecar, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm, mobile/src-tauri + its five tauri-plugin-* crates)
 ├── Cargo.lock           ← single shared lockfile (TB9 audit anchor). It became the mobile client's anchor too on 2026-08-13: mobile shipped from a SECOND lock in which 62 of 572 shared crates had drifted, `bitcoin_hashes` under `bip39` among them
 ├── rust-toolchain.toml  ← pinned Rust toolchain
 ├── package.json         ← pnpm + Vite + React 19 + TS toolchain
