@@ -4442,6 +4442,7 @@ export const ROSTER = Object.freeze([
       "e2e/vault-label.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/prefs-sync.e2e.ts",
+      "e2e/account-grouping.e2e.ts",
     ],
     manual: [
       {
@@ -4498,6 +4499,20 @@ export const ROSTER = Object.freeze([
         whyNotAutomated: "prefs-sync.e2e.ts proves the rename reaches device B's decrypted prefs, but both devices there are Linux containers with no keychain, so the second leg, the new name reaching B's locked picker, cannot happen on that harness at all.",
         clients: ["desktop-macos", "ios", "android"],
         estimateMin: 12,
+        tier: "standard",
+      },
+      {
+        see: "On macOS with three vaults, unlock each once, then quit and relaunch to the locked picker. Confirm the three rows are grouped under one account header (the neutral \"Account\" label, since no label was set). Right-click a row and rename the account to \"Work\"; confirm the header updates. Right-click another row and choose \"Move to new account\"; confirm it now sits under a second header. Right-click it again and choose \"Move to account…\" back into the first; confirm the two headers collapse to one.",
+        whyNotAutomated: "The account record is sealed under a keychain key (core/src/account/key.rs reuses platform_keychain, Apple-only), so account-grouping.e2e.ts can only exercise the no-keychain branch in the Linux container; the grouped picker, rename, move and split all need a real Apple keychain.",
+        clients: ["desktop-macos"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "On an Android phone with two vaults, unlock each once, force-quit and relaunch to the locked picker. Confirm the rows show as standalone vaults with no account header and no error surface (the shared platform_keychain has no Android backend, so account_list answers empty).",
+        whyNotAutomated: "The whole check is what a device WITHOUT a keychain backend shows before unlock, which is a runtime probe of real OS key storage on a platform no CI lane builds for.",
+        clients: ["android"],
+        estimateMin: 6,
         tier: "standard",
       },
     ],

@@ -1661,6 +1661,7 @@ mod tests {
             items_key_id: OLD_ITEMS_ID,
             items_key_nonce: items_nonce,
             enc_items_key: enc_items,
+            membership: None,
         };
         io.write(
             &vault_root.join("vault.meta"),

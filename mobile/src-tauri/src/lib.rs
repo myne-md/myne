@@ -215,6 +215,12 @@ pub fn run() {
         // lockstep with build.rs + permissions/vault-label/default.toml or the
         // ACL resolver fails closed.
         .plugin(plugins::vault_label::init())
+        // Account record (the account/vault split, myne-md/myne#684). Shared
+        // from `myne-core`; the same four commands the desktop registers, all
+        // reachable PRE-UNLOCK because the surface they govern is the picker.
+        // The command list must stay in lockstep with build.rs +
+        // permissions/account/default.toml or the ACL resolver fails closed.
+        .plugin(plugins::account::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::attachments::init())

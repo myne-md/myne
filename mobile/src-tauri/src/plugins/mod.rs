@@ -69,6 +69,10 @@ pub mod vault_change_password;
 // side-effect to attach, so the whole module is re-exported. The
 // `plugins::vault_creation::init()` call in `lib.rs` resolves through this.
 pub use myne_core::plugins::vault_creation;
+// Account record (the account/vault split, myne-md/myne#684): a thin re-export
+// wrapper over `myne_core::account`. All FOUR of desktop's commands; on Android
+// the store holds nothing and vaults show standalone.
+pub mod account;
 pub mod vault_delete;
 pub mod vault_indices;
 // Sealed label store (MYL1, §9.22): a thin re-export wrapper over

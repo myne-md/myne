@@ -1151,101 +1151,186 @@ fn vault_meta_rewrite_vectors() {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn hkdf_sha256_vectors() {
-    use protocol::{derive_subkey, SubkeyRole};
-
-    let Some(raw) = cases_json("hkdf-sha256") else {
-        return;
-    };
-    let doc: serde_json::Value = serde_json::from_str(&raw)
-        .unwrap_or_else(|e| panic!("[hkdf-sha256] parse cases.json: {e}"));
-
-    assert_eq!(doc["schema"], "hkdf-sha256");
-    assert_eq!(doc["protocol_version"], "v0.1");
-
-    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
-    assert!(
-        cases.len() >= 10,
-        "hkdf-sha256 must carry at least 10 vectors (per PRD); found {}",
-        cases.len()
-    );
-    assert_unique_vector_ids("hkdf-sha256", cases);
+    use protocol::{derive_subkey, derive_subkey_v0_2, SubkeyRole};
 
     let mut seen_roles: Vec<SubkeyRole> = Vec::new();
 
-    for case in cases {
-        let id = case["vector_id"]
-            .as_str()
-            .expect("vector_id must be a string");
+    // Skip contract (`missing_fixture`): with no companion at all there is
+    // nothing to verify. The ALL pin below runs only when at least one file
+    // loaded; a present-but-old companion (v0.1 without the v0.2 category)
+    // fails the pin on MembershipKey by design, which is the stale-companion
+    // signal, not a skip.
+    let v01 = cases_json("hkdf-sha256");
+    let v02 = cases_json_for("hkdf-sha256", "v0.2");
+    if v01.is_none() && v02.is_none() {
+        return;
+    }
 
-        let root_key: [u8; 32] = hex_decode_array(
-            case["input_root_key_hex"]
-                .as_str()
-                .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+    // v0.1 file: every role except MembershipKey, derived under the v0.1
+    // prefix. MembershipKey lives in the v0.2 file below: pinning it here
+    // would bless a KEK no shipped path derives (myne-md/myne#684 review).
+    if let Some(raw) = v01 {
+        let doc: serde_json::Value = serde_json::from_str(&raw)
+            .unwrap_or_else(|e| panic!("[hkdf-sha256] parse cases.json: {e}"));
+
+        assert_eq!(doc["schema"], "hkdf-sha256");
+        assert_eq!(doc["protocol_version"], "v0.1");
+
+        let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+        assert!(
+            cases.len() >= 10,
+            "hkdf-sha256 must carry at least 10 vectors (per PRD); found {}",
+            cases.len()
         );
-        let role_str = case["input_role"]
-            .as_str()
-            .unwrap_or_else(|| panic!("[{id}] missing input_role"));
-        let expected = hex_decode(
-            case["expected_subkey_hex"]
+        assert_unique_vector_ids("hkdf-sha256", cases);
+
+        for case in cases {
+            let id = case["vector_id"]
                 .as_str()
-                .unwrap_or_else(|| panic!("[{id}] missing expected_subkey_hex")),
-        );
+                .expect("vector_id must be a string");
 
-        let role = match role_str {
-            "itemsKey-wrap" => SubkeyRole::ItemsKeyWrap,
-            "prefs-key" => SubkeyRole::PrefsKey,
-            "search-index-key" => SubkeyRole::SearchIndexKey,
-            "attachments-catalog-key" => SubkeyRole::AttachmentsCatalogKey,
-            "attachments-id-hmac" => SubkeyRole::AttachmentsIdHmac,
-            "session-state-key" => SubkeyRole::SessionStateKey,
-            "personal-dictionary-key" => SubkeyRole::PersonalDictKey,
-            "vault-indices-key" => SubkeyRole::VaultIndicesKey,
-            "attachment-text-key" => SubkeyRole::AttachmentTextKey,
-            "ai-embeddings-key" => SubkeyRole::AiEmbeddingsKey,
-            "catalog-sync-id" => SubkeyRole::CatalogSyncId,
-            "prefs-sync-id" => SubkeyRole::PrefsSyncId,
-            "custom-themes-key" => SubkeyRole::CustomThemesKey,
-            "themes-sync-id" => SubkeyRole::ThemesSyncId,
-            "vault-head-mac" => SubkeyRole::VaultHeadMac,
-            "server-auth" => SubkeyRole::ServerAuth,
-            "graph-layout-key" => SubkeyRole::GraphLayoutKey,
-            other => panic!(
-                "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
-            ),
-        };
-        if !seen_roles.contains(&role) {
-            seen_roles.push(role);
-        }
+            let root_key: [u8; 32] = hex_decode_array(
+                case["input_root_key_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+            );
+            let role_str = case["input_role"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_role"));
+            let expected = hex_decode(
+                case["expected_subkey_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_subkey_hex")),
+            );
 
-        // Defensive cross-check: if the case carries the optional
-        // `informational_info_utf8_hex` field, verify it matches the
-        // canonical `"myne.v0.1 " || role_str` assembly. The schema's
-        // "verified implicitly via expected_subkey_hex" claim is true
-        // only when this field is correct; the check catches typos in
-        // the informational field that would mislead cross-implementation
-        // reviewers verifying their info-parameter assembly.
-        if let Some(info_hex) = case
-            .get("informational_info_utf8_hex")
-            .and_then(|v| v.as_str())
-        {
-            let info_bytes = hex_decode(info_hex);
-            let mut expected_info = b"myne.v0.1 ".to_vec();
-            expected_info.extend_from_slice(role_str.as_bytes());
+            let role = match role_str {
+                "itemsKey-wrap" => SubkeyRole::ItemsKeyWrap,
+                "prefs-key" => SubkeyRole::PrefsKey,
+                "search-index-key" => SubkeyRole::SearchIndexKey,
+                "attachments-catalog-key" => SubkeyRole::AttachmentsCatalogKey,
+                "attachments-id-hmac" => SubkeyRole::AttachmentsIdHmac,
+                "session-state-key" => SubkeyRole::SessionStateKey,
+                "personal-dictionary-key" => SubkeyRole::PersonalDictKey,
+                "vault-indices-key" => SubkeyRole::VaultIndicesKey,
+                "attachment-text-key" => SubkeyRole::AttachmentTextKey,
+                "ai-embeddings-key" => SubkeyRole::AiEmbeddingsKey,
+                "catalog-sync-id" => SubkeyRole::CatalogSyncId,
+                "prefs-sync-id" => SubkeyRole::PrefsSyncId,
+                "custom-themes-key" => SubkeyRole::CustomThemesKey,
+                "themes-sync-id" => SubkeyRole::ThemesSyncId,
+                "vault-head-mac" => SubkeyRole::VaultHeadMac,
+                "server-auth" => SubkeyRole::ServerAuth,
+                "graph-layout-key" => SubkeyRole::GraphLayoutKey,
+                "membership-key" => panic!(
+                    "[{id}] membership-key MUST NOT appear in the v0.1 file: it derives under the v0.2 prefix (see the v0.2 file below)"
+                ),
+                other => panic!(
+                    "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
+                ),
+            };
+            if !seen_roles.contains(&role) {
+                seen_roles.push(role);
+            }
+
+            // Defensive cross-check: if the case carries the optional
+            // `informational_info_utf8_hex` field, verify it matches the
+            // canonical `"myne.v0.1 " || role_str` assembly. The schema's
+            // "verified implicitly via expected_subkey_hex" claim is true
+            // only when this field is correct; the check catches typos in
+            // the informational field that would mislead cross-implementation
+            // reviewers verifying their info-parameter assembly.
+            if let Some(info_hex) = case
+                .get("informational_info_utf8_hex")
+                .and_then(|v| v.as_str())
+            {
+                let info_bytes = hex_decode(info_hex);
+                let mut expected_info = b"myne.v0.1 ".to_vec();
+                expected_info.extend_from_slice(role_str.as_bytes());
+                assert_eq!(
+                    info_bytes, expected_info,
+                    "[{id}] informational_info_utf8_hex disagrees with the canonical \"myne.v0.1 \" || role assembly",
+                );
+            }
+
+            let actual = derive_subkey(&root_key, role);
+
             assert_eq!(
-                info_bytes, expected_info,
-                "[{id}] informational_info_utf8_hex disagrees with the canonical \"myne.v0.1 \" || role assembly",
+                actual.as_slice(),
+                expected.as_slice(),
+                "[{id}] hkdf-sha256 subkey mismatch (role={role_str})\n  expected_hex: {}\n  actual_hex:   {}",
+                hex_encode(&expected),
+                hex_encode(&*actual),
             );
         }
+    }
 
-        let actual = derive_subkey(&root_key, role);
+    // v0.2 file: exactly the membership KEK, derived under the v0.2 prefix.
+    // The envelope (vector_id, protocol_version, info assembly) must all say
+    // v0.2; a v0.1 info here would re-bless the wrong KEK.
+    if let Some(raw) = v02 {
+        let doc: serde_json::Value = serde_json::from_str(&raw)
+            .unwrap_or_else(|e| panic!("[hkdf-sha256/v0.2] parse cases.json: {e}"));
 
-        assert_eq!(
-            actual.as_slice(),
-            expected.as_slice(),
-            "[{id}] hkdf-sha256 subkey mismatch (role={role_str})\n  expected_hex: {}\n  actual_hex:   {}",
-            hex_encode(&expected),
-            hex_encode(&*actual),
-        );
+        assert_eq!(doc["schema"], "hkdf-sha256");
+        assert_eq!(doc["protocol_version"], "v0.2");
+
+        let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+        assert_unique_vector_ids("hkdf-sha256/v0.2", cases);
+
+        for case in cases {
+            let id = case["vector_id"]
+                .as_str()
+                .expect("vector_id must be a string");
+            assert!(
+                id.starts_with("hkdf-sha256/v0.2/"),
+                "[{id}] v0.2 file must carry v0.2 vector ids"
+            );
+
+            let root_key: [u8; 32] = hex_decode_array(
+                case["input_root_key_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+            );
+            let role_str = case["input_role"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_role"));
+            assert_eq!(
+                role_str, "membership-key",
+                "[{id}] the v0.2 file pins exactly the membership KEK"
+            );
+            let expected = hex_decode(
+                case["expected_subkey_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_subkey_hex")),
+            );
+
+            if !seen_roles.contains(&SubkeyRole::MembershipKey) {
+                seen_roles.push(SubkeyRole::MembershipKey);
+            }
+
+            if let Some(info_hex) = case
+                .get("informational_info_utf8_hex")
+                .and_then(|v| v.as_str())
+            {
+                let info_bytes = hex_decode(info_hex);
+                let mut expected_info = b"myne.v0.2 ".to_vec();
+                expected_info.extend_from_slice(role_str.as_bytes());
+                assert_eq!(
+                    info_bytes, expected_info,
+                    "[{id}] informational_info_utf8_hex disagrees with the canonical \"myne.v0.2 \" || role assembly",
+                );
+            }
+
+            let actual = derive_subkey_v0_2(&root_key, SubkeyRole::MembershipKey);
+
+            assert_eq!(
+                actual.as_slice(),
+                expected.as_slice(),
+                "[{id}] hkdf-sha256/v0.2 subkey mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                hex_encode(&expected),
+                hex_encode(&*actual),
+            );
+        }
     }
 
     // Structural coverage pin: every registered SubkeyRole must appear in the
@@ -1394,6 +1479,7 @@ fn vault_meta_vectors() {
                     items_key_id,
                     items_key_nonce,
                     enc_items_key,
+                    membership: None,
                 };
 
                 let actual = serialize_vault_meta(&meta);
@@ -2669,8 +2755,8 @@ fn aad_construction_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_v0_2_vectors() {
     use protocol::{
-        aad_password_wrap_v0_2, aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2,
-        aad_vault_items_key_wrap_v0_2,
+        aad_membership_blob, aad_password_wrap_v0_2, aad_recovery_wrap_v0_2,
+        aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
     };
 
     let Some(raw) = cases_json_v0_2("aad-construction") else {
@@ -2732,6 +2818,7 @@ fn aad_construction_v0_2_vectors() {
                 singleton_roles.insert(role.clone());
                 aad_singleton_blob_v0_2(role.as_bytes(), &account_number_hash())
             }
+            "aad_membership_blob" => aad_membership_blob(&account_number_hash()),
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — update this match arm in lockstep with the schema"
             ),
@@ -2793,11 +2880,12 @@ fn aad_construction_v0_2_vectors() {
         pinned_builders.insert(builder_name.to_string());
     }
 
-    let required: [&str; 4] = [
+    let required: [&str; 5] = [
         "aad_password_wrap_v0_2",
         "aad_recovery_wrap_v0_2",
         "aad_vault_items_key_wrap_v0_2",
         "aad_singleton_blob_v0_2",
+        "aad_membership_blob",
     ];
     for builder in required {
         assert!(
@@ -5432,6 +5520,7 @@ fn vault_meta_v0_2_vectors() {
                     items_key_id: hex_decode_array(field(case, id, "input_items_key_id_hex")),
                     items_key_nonce: hex_decode_array(field(case, id, "input_items_key_nonce_hex")),
                     enc_items_key: hex_decode_array(field(case, id, "input_enc_items_key_hex")),
+                    membership: None,
                 };
                 let actual = serialize_vault_meta_v0_2(&meta);
                 assert_eq!(
@@ -5456,6 +5545,52 @@ fn vault_meta_v0_2_vectors() {
                     "[{id}] the v0.1 parser must reject an NTV5 blob"
                 );
             }
+            "membership_absent" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] absent membership must parse: {e:?}"));
+                assert!(
+                    meta.membership.is_none(),
+                    "[{id}] absent membership must report None"
+                );
+            }
+            "membership_present" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] present membership must parse: {e:?}"));
+                let membership = meta
+                    .membership
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] membership must be present"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_number_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                let account_id =
+                    protocol::unseal_membership(&root_key, membership, &account_number_hash)
+                        .unwrap_or_else(|e| panic!("[{id}] unseal: {e:?}"));
+                assert_eq!(
+                    hex_encode(&*account_id),
+                    field(case, id, "expected_account_id_hex"),
+                    "[{id}] account id"
+                );
+            }
+            "membership_tampered" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] tampered membership must parse: {e:?}"));
+                let membership = meta
+                    .membership
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] membership must be present"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_number_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                assert!(
+                    protocol::unseal_membership(&root_key, membership, &account_number_hash)
+                        .is_err(),
+                    "[{id}] a tampered membership field must fail closed"
+                );
+            }
             other => panic!("[{id}] unknown case_kind {other}"),
         }
     }
@@ -5463,6 +5598,16 @@ fn vault_meta_v0_2_vectors() {
     // cases would otherwise still pass, and the rejects are the whole point.
     for k in ["roundtrip", "parse_fail", "parse_fail_v0_1"] {
         assert!(seen.contains(k), "vault-meta/v0.2 must cover case_kind {k}");
+    }
+    for k in [
+        "membership_absent",
+        "membership_present",
+        "membership_tampered",
+    ] {
+        assert!(
+            seen.contains(k),
+            "vault-meta/v0.2 must cover membership case_kind {k}"
+        );
     }
 }
 

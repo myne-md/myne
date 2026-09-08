@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { Screen, ScreenScroll, Title, FooterBar, Button, Banner, Spinner, MyneMark } from "../../components";
+import { Screen, ScreenScroll, Title, FooterBar, Button, Banner, Spinner, MyneMark, Sheet, ListGroup, ListRow } from "../../components";
 import { listVaults, orderByLastUnlock, stableVaultNumber } from "../../lib/vault-list";
+import { listAccounts, renameAccount, moveVault, splitVault, accountIdForVault, accountCommandErrorKind, groupVaultsByAccount, truncateLabelToBytes } from "../../lib/account";
+import type { AccountView, AccountCommandErrorKind } from "../../lib/account";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { ioBanner } from "../../lib/io-banner";
 import { HAS_TAURI } from "../../lib/app-window";
+import { useHold } from "./editor/chrome/useHold";
 import type { VaultSummary } from "../../types/vault-summary";
 import type { PickerFlowProps } from "./types";
 
@@ -17,6 +20,11 @@ import type { PickerFlowProps } from "./types";
  * carries the same pair of doors Welcome does — vault creation (`onCreate`) and
  * the sync-join flow (`onJoin`, myne-mobile#40). Carries no secret material —
  * the list is the DENY-list-clean `VaultSummary` projection only.
+ *
+ * The account/vault split (myne-md/myne#684) groups rows under the account
+ * label; a long-press on a row opens a sheet with rename / move-to-new-account /
+ * move-to-account. On Android the keychain has no backend, so `account_list`
+ * answers empty and every vault shows standalone (no header, no error).
  */
 
 /** Dot palette for labeled vaults (cycled by position); placeholder rows use a muted dot. */
@@ -99,6 +107,7 @@ function VaultRow({
   italic,
   corrupted,
   onClick,
+  onHold,
 }: {
   dot: string;
   name: string;
@@ -106,11 +115,17 @@ function VaultRow({
   italic: boolean;
   corrupted: boolean;
   onClick: () => void;
+  onHold: () => void;
 }) {
   const { t } = useTranslation();
+  const { handlers, consumeHeldClick } = useHold(onHold);
   return (
     <button
-      onClick={onClick}
+      onClick={() => {
+        if (consumeHeldClick()) return;
+        onClick();
+      }}
+      {...handlers}
       style={{
         display: "flex",
         alignItems: "center",
@@ -184,11 +199,24 @@ function VaultRow({
 export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
   const { t } = useTranslation();
   const [vaults, setVaults] = useState<VaultSummary[] | null>(null);
+  const [accounts, setAccounts] = useState<AccountView[]>([]);
   const [ioError, setIoError] = useState<string | null>(null);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [heldVault, setHeldVault] = useState<VaultSummary | null>(null);
+  // Sheet mode: the action menu, the inline rename form, or the
+  // destination-account list for a move. One sheet, three faces.
+  const [sheetMode, setSheetMode] = useState<"menu" | "rename" | "move">("menu");
+  const [renameDraft, setRenameDraft] = useState("");
 
-  useEffect(() => {
+  const accountErrorCopy = (kind: AccountCommandErrorKind | null): string => {
+    if (kind === "Hidden") return t("picker.accountHidden");
+    if (kind === "LabelTooLong") return t("picker.labelTooLong");
+    if (kind === "RecordUnreadable") return t("picker.accountUnreadable");
+    return t("picker.accountError");
+  };
+
+  const reload = () => {
     let cancelled = false;
-
     async function load() {
       if (!HAS_TAURI) {
         // Browser dev (no Tauri host) — show demo vaults so the picker is
@@ -197,20 +225,71 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
         return;
       }
       const result = await listVaults();
+      // Grouping failure is not list failure: only KeychainUnavailable
+      // degrades silently to standalone; the rest surfaces the banner.
+      let accts: AccountView[] = [];
+      try {
+        accts = await listAccounts();
+        if (!cancelled) setAccountsError(null);
+      } catch (e) {
+        if (cancelled) return;
+        if (accountCommandErrorKind(e) === "KeychainUnavailable") {
+          setAccountsError(null);
+        } else {
+          setAccountsError(accountErrorCopy(accountCommandErrorKind(e)));
+        }
+      }
       if (cancelled) return;
       if ("ok" in result) {
         setVaults(orderByLastUnlock(result.ok));
+        setAccounts(accts);
       } else {
         setIoError(ioBanner(result.err.detail.io_error_kind));
         setVaults([]);
       }
     }
-
     void load();
     return () => {
       cancelled = true;
     };
-  }, []);
+  };
+
+  useEffect(reload, []);
+
+  const runAccountAction = (fn: () => Promise<unknown>) => {
+    setAccountsError(null);
+    setHeldVault(null);
+    void (async () => {
+      try {
+        await fn();
+      } catch (e) {
+        setAccountsError(accountErrorCopy(accountCommandErrorKind(e)));
+      }
+      reload();
+    })();
+  };
+
+  // Grouping lives in `../../lib/account` (`groupVaultsByAccount`, shared with
+  // both desktop pickers); this file keeps only the label.
+  const groupVaults = (): { account: AccountView | null; vaults: VaultSummary[] }[] => {
+    if (vaults === null) return [];
+    return groupVaultsByAccount(vaults, accounts);
+  };
+
+  const accountLabel = (account: AccountView | null): string => {
+    if (account === null) return "";
+    return account.label === "" ? t("picker.accountFallback") : account.label;
+  };
+
+  const holdActions = (vault: VaultSummary): void => {
+    if (!HAS_TAURI) return;
+    // Account actions are offered only for member vaults: a standalone
+    // vault has no account to rename or move from, and every command would
+    // answer VaultNotFound.
+    if (accountIdForVault(accounts, vault.id) === null) return;
+    setSheetMode("menu");
+    setHeldVault(vault);
+  };
 
   return (
     <Screen>
@@ -230,29 +309,40 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {ioError && <Banner kind="danger">{ioError}</Banner>}
-            {vaults.map((vault) => {
-              const corrupted = vault.status.kind === "Corrupted";
-              const labeled = vault.label !== null;
-              // Both the dot and the fallback number are keyed off the vault's
-              // stable rank rather than its row position (myne-md/myne#411).
-              // They used to be `i`, over a list ordered by last unlock, so
-              // every recognition cue on this screen moved as the app was used:
-              // open the green "Vault 3" and it came back slate, called
-              // "Vault 1". The LIST keeps its last-unlock ordering; only what
-              // identifies a row stopped following it.
-              const n = stableVaultNumber(vaults, vault.id);
-              return (
-                <VaultRow
-                  key={vault.id}
-                  dot={labeled ? DOT_PALETTE[(n - 1) % DOT_PALETTE.length] : "var(--line-2)"}
-                  name={vaultDisplayLabel(vault.label, n)}
-                  when={openedWhen(vault.last_unlock, t)}
-                  italic={!labeled}
-                  corrupted={corrupted}
-                  onClick={() => onSelect(vault.id, true)}
-                />
-              );
-            })}
+            {accountsError && (
+              <Banner kind="danger" testID="picker.account-error">
+                {accountsError}
+              </Banner>
+            )}
+            {groupVaults().map((group) => (
+              <div key={group.account?.id ?? "__standalone__"} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                {group.account !== null && (
+                  <div
+                    data-testid="picker.account-header"
+                    style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-semibold)", color: "var(--fg-3)", padding: "var(--space-1) var(--space-1) 0" }}
+                  >
+                    {accountLabel(group.account)}
+                  </div>
+                )}
+                {group.vaults.map((vault) => {
+                  const corrupted = vault.status.kind === "Corrupted";
+                  const labeled = vault.label !== null;
+                  const n = stableVaultNumber(vaults, vault.id);
+                  return (
+                    <VaultRow
+                      key={vault.id}
+                      dot={labeled ? DOT_PALETTE[(n - 1) % DOT_PALETTE.length] : "var(--line-2)"}
+                      name={vaultDisplayLabel(vault.label, n)}
+                      when={openedWhen(vault.last_unlock, t)}
+                      italic={!labeled}
+                      corrupted={corrupted}
+                      onClick={() => onSelect(vault.id, true)}
+                      onHold={() => holdActions(vault)}
+                    />
+                  );
+                })}
+              </div>
+            ))}
           </div>
         )}
       </ScreenScroll>
@@ -268,6 +358,134 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
           {t("welcome.connect")}
         </Button>
       </FooterBar>
+
+      {heldVault !== null && (
+        <Sheet
+          onClose={() => {
+            setHeldVault(null);
+            setSheetMode("menu");
+          }}
+        >
+          {(() => {
+            const heldAccountId = accountIdForVault(accounts, heldVault.id);
+            const destinations = accounts.filter(
+              (a) => a.id !== heldAccountId && a.vaults.length > 0,
+            );
+            if (sheetMode === "rename") {
+              return (
+                <ListGroup>
+                  <ListRow
+                    title={
+                      <input
+                        // eslint-disable-next-line jsx-a11y/no-autofocus
+                        autoFocus
+                        value={renameDraft}
+                        maxLength={512}
+                        placeholder={t("picker.renamePlaceholder")}
+                        aria-label={t("picker.renameAccount")}
+                        data-testid="picker.rename-input"
+                        style={{
+                          width: "100%",
+                          fontSize: "var(--text-base)",
+                          color: "var(--fg-1)",
+                          background: "transparent",
+                          border: "none",
+                          outline: "none",
+                        }}
+                        onChange={(e) =>
+                          setRenameDraft(truncateLabelToBytes(e.target.value, 512))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            setHeldVault(null);
+                            setSheetMode("menu");
+                          }
+                        }}
+                      />
+                    }
+                    isLast={false}
+                  />
+                  <ListRow
+                    title={t("picker.renameSave")}
+                    isLast={false}
+                    testID="picker.rename-save"
+                    onClick={() => {
+                      const vault = heldVault;
+                      const label = renameDraft.trim();
+                      if (label === "") return;
+                      runAccountAction(() => renameAccount(vault.id, label));
+                      setSheetMode("menu");
+                    }}
+                  />
+                  <ListRow
+                    title={t("picker.renameCancel")}
+                    isLast
+                    testID="picker.rename-cancel"
+                    onClick={() => {
+                      setHeldVault(null);
+                      setSheetMode("menu");
+                    }}
+                  />
+                </ListGroup>
+              );
+            }
+            if (sheetMode === "move") {
+              return (
+                <ListGroup>
+                  {destinations.map((a, i) => (
+                    <ListRow
+                      key={a.id}
+                      title={accountLabel(a)}
+                      isLast={i === destinations.length - 1}
+                      testID={`picker.account-move-to-${a.id}`}
+                      onClick={() => {
+                        const vault = heldVault;
+                        const anchor = a.vaults[0];
+                        if (anchor === undefined) return;
+                        runAccountAction(() => moveVault(vault.id, anchor));
+                        setSheetMode("menu");
+                      }}
+                    />
+                  ))}
+                </ListGroup>
+              );
+            }
+            return (
+              <ListGroup>
+                <ListRow
+                  title={t("picker.renameAccount")}
+                  isLast={false}
+                  testID="picker.account-rename"
+                  onClick={() => {
+                    const current =
+                      accounts.find((a) => a.id === heldAccountId)?.label ?? "";
+                    setRenameDraft(current);
+                    setSheetMode("rename");
+                  }}
+                />
+                <ListRow
+                  title={t("picker.moveToNewAccount")}
+                  isLast={destinations.length === 0}
+                  testID="picker.account-move-new"
+                  onClick={() => {
+                    const vault = heldVault;
+                    runAccountAction(() => splitVault(vault.id));
+                  }}
+                />
+                {destinations.length > 0 && (
+                  <ListRow
+                    title={t("picker.moveToAccount")}
+                    isLast
+                    testID="picker.account-move"
+                    chevron
+                    onClick={() => setSheetMode("move")}
+                  />
+                )}
+              </ListGroup>
+            );
+          })()}
+        </Sheet>
+      )}
     </Screen>
   );
 }

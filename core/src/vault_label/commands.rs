@@ -202,6 +202,16 @@ pub async fn set_hide_vault_names_at(
         // Erase FIRST. A `?` here is what stops the flag being persisted over
         // an erase that did not complete.
         erase_all_labels(io, base, keychain).await?;
+        // The account record names accounts on the same lock screen, so hide
+        // destroys it with the same erase semantics (myne-md/myne#684): the
+        // file goes and its wrap key goes, and re-disabling resurrects
+        // nothing but empty labels. `flag_path` lives next to the record
+        // (`<app_config_dir>`), so its parent is the record's directory.
+        if let Some(config_dir) = flag_path.parent() {
+            crate::account::store::delete_account_record(io, config_dir, keychain)
+                .await
+                .map_err(|_| HideVaultNamesError::EraseIncomplete)?;
+        }
     }
 
     write_hide_vault_names(io, flag_path, HideVaultNamesConfig { hidden }).await?;

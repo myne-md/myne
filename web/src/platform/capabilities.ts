@@ -184,6 +184,12 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // tunnel would be, which is Tor Browser (docs, task 12). The Developer
   // Options block is omitted here rather than greyed.
   "torRouting",
+  // myne-md/myne#684: the account/vault split. A browser holds exactly one
+  // vault per origin and has no OS keychain, so there is no grouping to render
+  // and nowhere to keep the wrap key whose seal is the account record. The
+  // picker grouping UI is omitted rather than rendered against commands that
+  // reject.
+  "accountGrouping",
 ]);
 
 export function has(cap: Capability): boolean {

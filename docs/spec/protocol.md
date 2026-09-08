@@ -241,6 +241,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 prefs-sync-id"` | Reserved sync blob-id for `vault.prefs` (Phase 2 sync; `sync-protocol.md` §10.2.1) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.prefs` (MYND-478). Like the attachments catalog, `vault.prefs` is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `prefs_sync_id = DeriveSubkey(root_key, "prefs-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (keyed pseudorandom bytes, not a recognizable sentinel). Like `catalog-sync-id`, this derives an *identifier*, not key material — the prefs KEK remains `prefs-key`. |
 | `"myne.v0.1 custom-themes-key"` | KEK for the `vault.themes` blob (§9.21) | Active when `vault.themes` is written (MYND-486). `root_key`-derived (itemsKey-independent), like prefs/search/workspace/dictionary — so a custom-theme palette survives a later epoch-rotation `itemsKey` evolution. |
 | `"myne.v0.1 themes-sync-id"` | Reserved sync blob-id for `vault.themes` (Phase 2 sync; `sync-protocol.md` §10.2.2) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.themes` (MYND-486). Like `vault.prefs` and the attachments catalog, `vault.themes` is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (keyed pseudorandom bytes, not a recognizable sentinel). Like `catalog-sync-id` / `prefs-sync-id`, this derives an *identifier*, not key material — the themes KEK remains `custom-themes-key`. |
+| `"myne.v0.2 membership-key"` | KEK for the sealed vault membership field (`vault.meta` §9.3.1) | Active when the membership field is written (the account/vault split, `decisions.md` 2026-09-07). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. So a vault's account membership survives a later epoch-rotation `itemsKey` evolution. Derived under the **v0.2** context prefix because the field is `NTV5`-only. Distinct from the AAD role string `"membership-blob"` (§5.2). |
 | (future next-major contexts) | reserved | not derived in v0.1. |
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "`, and the next major version's context strings use its own prefix, which is not pre-allocated in v0.1.
@@ -411,6 +412,9 @@ AAD_attachments_catalog =
 
 AAD_ai_embeddings_blob =
   AAD_prefix || protocol_version (1 B) || "ai-embeddings-blob" || account_number_hash (16 B)
+
+AAD_membership_blob =
+  AAD_prefix || protocol_version (1 B) || "membership-blob" || account_number_hash (16 B)
 ```
 
 `AAD_wrap_items_key` is the AAD bound into the AEAD wrap of the singleton v0.1 `itemsKey` (`vault.meta` §9.3 offset 281). It is distinct from `AAD_wrap_item_key`, which binds the per-note `item_key` wrap and additionally carries the per-note UUID. The singleton `itemsKey` has no per-note UUID, so the AAD reduces accordingly.
@@ -427,9 +431,13 @@ AAD_ai_embeddings_blob =
 
 `AAD_ai_embeddings_blob` is the AAD bound into the AEAD wrap of `vault.embeddings` (`MYR1`, §9.17), the encrypted AI embedding index. It mirrors `AAD_search_index_blob` exactly, with the role string `"ai-embeddings-blob"` (length-prefixed UTF-8: 2-B big-endian length + 18 ASCII bytes, total 20 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the index blob to its specific vault. As with prefs and search, `items_key_id` is **not** bound: the embeddings KEK derives directly from `root_key` via `"myne.v0.1 ai-embeddings-key"` (§3.4), independent of the `itemsKey` lineage. The model-identity tuple that invalidates the cache on a model / dimension / chunker change is carried **inside** the engine-opaque payload (§9.17.2), not in this AAD — matching the `vault.search` `extractor_version` precedent.
 
+`AAD_membership_blob` is the AAD bound into the AEAD seal of the vault membership field (`vault.meta` §9.3.1). It mirrors `AAD_prefs_blob` exactly, with the role string `"membership-blob"` (length-prefixed UTF-8: 2-B big-endian length + 15 ASCII bytes, total 17 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the field to its specific vault. As with prefs/search/workspace, `items_key_id` is **not** bound: the membership KEK derives directly from `root_key` via `"myne.v0.2 membership-key"` (§3.4), independent of the `itemsKey` lineage. Total AAD length: `10 + 1 + 17 + 16 = 44 bytes`.
+
 `AAD_pending_capture_blob` is the AAD bound into the AEAD seal of a pending-capture queue entry (`captures/<capture-id>`, `MYK1`, §9.18). It is the one blob AAD that binds **neither** `account_number_hash` **nor** `items_key_id`: the queue is written while the vault is locked and is vault-agnostic (§9.18), so it instead binds the per-entry `capture_id` (16 bytes, also the queue filename) after the role string `"pending-capture-blob"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes). Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. There is no `DeriveSubkey` role — the KEK is a device-local key held in the OS keychain, not `root_key`-derived (§9.18.2).
 
 `AAD_vault_label_blob` is the AAD bound into the AEAD seal of the sealed label store (`vault.label`, `MYL1`, §9.22). Like `AAD_pending_capture_blob` it binds **neither** `account_number_hash` **nor** `items_key_id`, and it has no `DeriveSubkey` role, because its KEK is a **per-vault** device-local key held in the OS keychain rather than a `root_key` product (§9.22.2), and because the file belongs to a vault *directory* rather than to an account (one account can hold two vault directories on one device). It instead binds the 16-byte `vault_id` after the role string `"vault-label-blob"` (length-prefixed UTF-8: 2-B big-endian length + 16 ASCII bytes). Total AAD length: `10 + 1 + 18 + 16 = 45 bytes`. One property is stronger here than in §9.18/§9.20: the bound `vault_id` is the one the **reader expected**, not merely the one the blob's own header carries, so a sealed file moved between vault directories fails AEAD instead of relying on an implementer's comparison. §9.22.3 states that as a MUST.
+
+`AAD_account_record` is the AAD bound into the AEAD seal of the device-local account record (`<app_config_dir>/account.json`, §9.3.1 counterpart). It is the fixed domain string `"myne.v0.1 account-record"` (24 ASCII bytes), deliberately NOT in the prefix-plus-version framing above: the record is device-global, so there is no vault, no `account_number_hash`, and no `items_key_id` to bind, and it never crosses the sync boundary, so no generation byte is needed. Registered here (rather than exempted) so a second device-local sealed file cannot collide with it by accident.
 
 `AAD_graph_layout_blob` is the AAD bound into the AEAD seal of `vault.graph` (`MYG1`, §9.19), the encrypted knowledge-graph layout cache. It mirrors `AAD_workspace_blob` exactly, with the role string `"graph-layout-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes, total 19 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the layout blob to its specific vault. Total AAD length: `10 + 1 + 19 + 16 = 46 bytes`. As with prefs/search/workspace, `items_key_id` is **not** bound: `graph_layout_key` derives directly from `root_key` via `"myne.v0.1 graph-layout-key"` (§3.4), independent of the `itemsKey` lineage.
 
@@ -824,6 +832,67 @@ Offset  Size       Field                       Description
 The KDF parameter block at offset 22 is the canonical encoding referenced in §4.3 and bound into both wrap AADs (§3.1). Tampering with any parameter byte invalidates the AEAD tag on `enc_root_key_password` and `enc_root_key_recovery`. The "v0.1 baseline" values in the rows above are exactly that — a baseline, not a bound: this table is the **encoding** contract, and the cost values a client may act on are constrained at the derivation site by §4.2.1, not here.
 
 The two encrypted root_key copies (`enc_root_key_password`, `enc_root_key_recovery`) hold the same 32-byte plaintext under independent wrap keys. Either is sufficient to unlock the vault.
+
+#### 9.3.1 Vault membership field (sealed account id)
+
+The **vault membership field** is an optional, AEAD-sealed extension of `vault.meta` carrying the
+16-byte **account id** of the account this vault belongs to (the client-side ownership layer,
+`decisions.md` 2026-09-07). It is the on-disk half of the account/vault split: the account record
+(`vault membership` in the glossary) is the device-local half, and this field is the per-vault half
+that lets a vault name its owner without the device record being present.
+
+**Placement and framing.** The field is an **NTV5-only** extension: it is appended after the base
+layout's `future fields` space at offset 345, and its presence is signalled by the `reserved` byte
+at offset 5 carrying `0x01` (the base layout carries `0x00`). When present, an `NTV5` `vault.meta`
+is **417 bytes** (345 + 72); when absent it is the base 345 bytes. `MYV1` is **untouched**: it is
+always 345 bytes, its `reserved` byte stays `0x00`, and it never carries the field: an unmigrated
+(`MYV1`) vault groups via the device-local account record alone. The field is a self-contained
+sealed blob:
+
+```
+Offset  Size       Field                       Description
+------  ---------  --------------------------  ---------------------------------
+345     24 bytes   membership_nonce            192-bit random nonce for the AEAD
+                                               seal of the account id.
+369     48 bytes   enc_membership              account_id (16 B) AEAD-sealed
+                                               under membership_key, followed by
+                                               the 32-byte CTX commitment tag.
+```
+
+**Seal.** `membership_key = DeriveSubkey_v0_2(root_key, "membership-key")` (§3.4), a
+`root_key`-derived KEK independent of the `itemsKey` lineage, exactly like the prefs/search/workspace
+KEKs. Because the field is `NTV5`-only, the KEK is derived under the **v0.2** context prefix
+(`"myne.v0.2 membership-key"`), not v0.1's. The AAD is `AAD_membership_blob = "myne.v0.2|" ||
+protocol_version (1 B, 0x02) || "membership-blob" || account_number_hash (16 B)` (§5.2), mirroring
+`AAD_prefs_blob` in shape but under the v0.2 prefix: the `account_number_hash` binds the field to its
+specific vault, so a field copied from another vault fails AEAD rather than silently regrouping. The
+`account_id` is a random UUIDv7 minted with the same mint-and-retry collision story as the vault id;
+it is **not** the account number and **not** `account_number_hash`.
+
+**Absent means unmigrated, never an error.** A reader that does not find the field (reserved byte
+`0x00`, or a 345-byte blob) treats the vault as **unmigrated**: it has no membership, and grouping
+falls back to the device-local account record alone. A reader MUST NOT reject a 345-byte blob for
+lacking the field, and MUST NOT treat a 417-byte blob as truncated. A tampered field (a flipped
+ciphertext byte) fails the AEAD tag and rejects the parse, never a partial read.
+
+**Generation.** The field is a property of the vault, not of the generation, but it is written into
+`NTV5` only: the two codecs share one `VaultMeta` struct, and the `NTV5` serializer emits the field
+while the `MYV1` serializer does not. The `reserved` byte at offset 5 is the minor-revision flag for
+`NTV5` (the §9.4 "anchor for future flags" role); a reader that predates this field and sees `0x01`
+rejects the blob per §10.3.1 strict-trailing (the fleet-event shape §10.3.1 point 2 already names).
+One device's lazy stamp is a fleet event: the sync meta phase pushes the stamped bytes, so until
+every device updates, an older build rejects the stamped vault until it is updated. That window
+loses no data (the pre-stamp bytes remain valid to the older reader's rule; updating heals), but
+it is a lockout, not a shrug, and "ships atomically" is the deployment plan that keeps it short,
+not the reason it is safe. The field
+is written eagerly at vault creation and lazily on each natural unlock, never gating the unlock
+itself.
+
+**Write-once, record-authoritative.** The field is sealed at most once per vault: moves and splits
+update the device-local account record only and never re-seal `vault.meta`, so after a regroup the
+record and the sealed field can disagree, and on any disagreement the **record wins**. No shipped
+reader consumes the field yet (it is forward-planted for grouping repair and record rebuild); when
+one lands, it MUST treat the record as authoritative and the field as corroboration.
 
 The artefacts that leave the device under Phase-2 sync are exactly the **sync-taxonomy authoritative + identity members** (`sync-protocol.md` §9): `.myn` notes, `vault.prefs`, `vault.dictionary`, attachment blobs, the `vault.attachments` catalog, and `vault.meta` — **not** `snapshots/` (authoritative but deliberately local-only, §9.2 there) and **not** the rebuildable-cache / device-local families. Every synced artefact is opaque ciphertext + a small public header (magic, version, IDs, nonces, salts, account-hash). No plaintext note content, no plaintext titles, no plaintext recovery-phrase material is ever stored.
 
