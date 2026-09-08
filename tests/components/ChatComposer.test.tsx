@@ -291,6 +291,21 @@ describe("ChatComposer", () => {
     );
   });
 
+  it("names the excluded-folders control when the host refuses an emptied scope", async () => {
+    // myne-md/myne#675: `start_run` refuses with `EmptyGrant` before any model
+    // call when the clamp emptied the scope, and the turn must name the list
+    // and where it lives, not the generic "could not start", which sends the
+    // user to check their setup for a preference doing its job.
+    agentStart.mockRejectedValue({ kind: "EmptyGrant" });
+    mount();
+    type("summarize this");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(getChat().turns.at(-1)?.text).toContain("settings.ai.providerError.emptyGrant"),
+    );
+  });
+
   it("says the size could not be checked rather than showing nothing", async () => {
     agentPreviewGrant.mockRejectedValue(new Error("no"));
     mount();

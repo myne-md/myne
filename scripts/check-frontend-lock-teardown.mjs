@@ -206,8 +206,28 @@ export const TEARDOWN_CALLS = [
     },
   },
   {
-    call: "clearAiOutput",
-    declaredIn: "src/notes/ai/aiOutputStore.ts",
+    call: "clearChatPersistForLock",
+    declaredIn: "src/notes/ai/chatPersist.ts",
+    holds:
+      "the persisted-transcript write state: the last serialized conversation payload, one stashed failed append, the lagging flag, and any scheduled persist retry",
+    // Every leaving path, next to `clearChat` above and for its reason plus
+    // one of its own: the stash exists precisely to survive `clearChat` (the
+    // unlock replay), so without this call a failed lock-time persist keeps
+    // vault A's full transcript plaintext resident into vault B's session and
+    // replays it into B's store on the next unlock (myne-md/myne#675 review).
+    // It cannot live inside `clearChat` itself, which also runs on
+    // in-session clears where the stash and the flag are still owed.
+    appliesTo: ["desktop-lock", "desktop-switch"],
+    skips: {
+      "mobile-lock": SKIP_DESKTOP_ONLY,
+      "mobile-delete": SKIP_DESKTOP_ONLY,
+      "desktop-delete": SKIP_ERASED,
+      "mobile-background":
+        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on either mobile path to clear.",
+    },
+  },
+    {
+    call: "clearAiOutput",    declaredIn: "src/notes/ai/aiOutputStore.ts",
     holds: "the rendered AI output: a summary of a note, and every Q and A answer over note content that src/lib/ai-qa.ts routes through this same store",
     // Every leaving path, and it was left on the OLD teardown when `clearChat`
     // moved onto these two. It sits one line above `clearChat` in the same
@@ -305,6 +325,29 @@ export const TEARDOWN_CALLS = [
       "mobile-delete": SKIP_ERASED,
       "mobile-background":
         "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, so clearing here would cost a re-decrypt on resume while protecting nothing the lock path does not already protect. What backgrounding owes is a FLUSH of unsaved state, which is why `flushAll` is the function on the roster.",
+    },
+  },
+  {
+    call: "clearChatHistoryPersistForLock",
+    declaredIn: "mobile/src/lib/chatHistory.ts",
+    holds:
+      "the staged conversation write state: one staged full-transcript payload plus the last-written payload, both serialized plaintext",
+    // Mobile lock only. The desktop twin of this state (`clearChatPersistForLock`
+    // above) lives in a module the desktop client compiles and this one does
+    // not touch, and vice versa: the two persists are separate implementations
+    // sharing a shape, not a store. The vault switch routes through
+    // `lockVault`, so the one call covers both; the delete erases the vault
+    // whose content the stash describes.
+    appliesTo: ["mobile-lock"],
+    skips: {
+      "desktop-lock":
+        "the store is MOBILE-only (it lives under `mobile/src/lib/`, which the desktop client does not compile), so there is nothing on the desktop paths to clear. Verified by searching the desktop tree for the symbol rather than assumed from the path.",
+      "desktop-switch":
+        "the store is MOBILE-only (it lives under `mobile/src/lib/`, which the desktop client does not compile), so there is nothing on the desktop paths to clear. Verified by searching the desktop tree for the symbol rather than assumed from the path.",
+      "desktop-delete": SKIP_ERASED,
+      "mobile-delete": SKIP_ERASED,
+      "mobile-background":
+        "backgrounding is not a vault-LEAVING event: the vault stays unlocked and the same session resumes, and the background flush exists precisely to WRITE staged state rather than drop it (`flushChatHistoryNow` in `flushAll`). Clearing here would lose turns the flush was built to save.",
     },
   },
   {

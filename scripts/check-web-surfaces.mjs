@@ -258,6 +258,10 @@ const V = {
     "Pairing IPC; leaves with ConnectedExtensions.",
     "clipper-pairing|pairing_list_paired",
   ],
+  "src/lib/chats.ts": [
+    "ported",
+    "The conversations plugin's IPC bindings (create/append/read/list/rename/delete, myne-md/myne#675). All six commands are Dispatched in web/wasm/src/dispatch.rs against the OPFS-backed store, so the history list/open/rename/delete run in the browser exactly as written. That makes it the one AI surface that survives the `agent` plugin's Unsupported classification.",
+  ],
   "src/lib/device-name.ts": ["adapted", "The `web` platform token maps to 'Browser' so a browser device is distinguishable in the list (task 69)."],
   "src/lib/deviceJoinQr.ts": ["ported", "Pure payload encoding."],
   "src/lib/enroll-gate.ts": [

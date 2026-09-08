@@ -1123,7 +1123,19 @@
           "tagsThinking": "Címkék javaslása…",
           "thinking": "Az AI gondolkodik…",
           "truncated": "Az első {{count}} karakter összefoglalva.",
-          "you": "Ön"
+          "you": "Ön",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Minden lap el van rejtve. A visszaállításhoz kattints jobb gombbal.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Mi hagyja el az eszközödet",
         "whenLabel": "Mikor hagyja el",
         "whoLabel": "Ki kapja meg",
-        "connectionLabel": "Hogyan utazik"
+        "connectionLabel": "Hogyan utazik",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Hogyan működik ez?",
       "enableHelper": "Egy általad biztosított modellt futtat. Hogy hol fut, és hogy a jegyzeteid elhagyják-e ezt az eszközt, az attól a szolgáltatótól függ, amelyet alább megnevezel. Kísérleti, alapértelmezés szerint kikapcsolva.",

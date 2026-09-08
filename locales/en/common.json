@@ -1112,7 +1112,21 @@
           "tagsThinking": "Suggesting tags…",
           "thinking": "AI is thinking…",
           "truncated": "Summarized the first {{count}} characters.",
-          "you": "You"
+          "you": "You",
+          "history": "History",
+          "historyCancel": "Cancel",
+          "historyDelete": "Delete",
+          "historyDeleteBody": "This deletes the conversation from every device the next time it connects. This can't be undone.",
+          "historyDeleteTitle": "Delete conversation",
+          "historyEmpty": "No conversations yet. New chats appear here.",
+          "historyError": "Couldn't load conversations. Try again.",
+          "historyLoading": "Loading…",
+          "historyProposalAfter": "After",
+          "historyProposalBefore": "Before",
+          "historyProposalNewNote": "New note",
+          "historyRename": "Rename",
+          "historyTitle": "Chat history",
+          "persistWarning": "Saving to the vault failed. Your messages are still here and will be retried."
         },
         "allHidden": "All tabs are hidden. Right-click to restore.",
         "outline": {
@@ -3021,12 +3035,13 @@
         "title": "Before Myne sends anything to {{provider}}",
         "whatLabel": "What leaves your device",
         "whenLabel": "When it leaves",
-        "whoLabel": "Who receives it"
+        "whoLabel": "Who receives it",
+        "excludedLabel": "Excluded folders"
       },
       "disclosureToggle": "How does this work?",
       "enableHelper": "Runs a model you provide. Where it runs, and whether your notes leave this device, both depend on the provider you name below. Experimental, off by default.",
       "enableLabel": "Enable local AI",
-      "excludedHelper": "Notes in these folders are never read or indexed by AI. One folder path per line.",
+      "excludedHelper": "Notes in these folders are never read or indexed by AI. Empty means the AI can see everything; this is the same list the command-line client honors. One folder path per line.",
       "excludedLabel": "Excluded folders",
       "excludedPlaceholder": "Private/\nJournal/",
       "endpointHelper": "If you already run a model runtime on this computer, point Myne at it instead of picking model files. Leave this empty to use the files above.",
@@ -3057,7 +3072,8 @@
         "refused": "The provider refused the connection. It may be down or blocking this network.",
         "timeout": "The provider did not answer in time. Nothing was left running.",
         "unauthorized": "The provider rejected your API key. Replace it: it may be wrong, revoked, or for a different account.",
-        "unreachable": "Could not reach the provider. Check your network connection."
+        "unreachable": "Could not reach the provider. Check your network connection.",
+        "emptyGrant": "Everything this run could read is in folders the AI never sees. Nothing was sent. Change it in Settings, AI, Excluded folders."
       },
       "modelChoose": "Choose file…",
       "modelEmbeddingLabel": "Search model: semantic search & Q&A",

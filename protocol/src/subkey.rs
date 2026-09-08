@@ -45,8 +45,11 @@
 //! | [`SubkeyRole::AttachmentTextKey`]      | `attachment-text-key`     |
 //! | [`SubkeyRole::CatalogSyncId`]          | `catalog-sync-id`         |
 //! | [`SubkeyRole::PrefsSyncId`]            | `prefs-sync-id`           |
-//! | [`SubkeyRole::CustomThemesKey`]        | `custom-themes-key`       |
-//! | [`SubkeyRole::ThemesSyncId`]           | `themes-sync-id`          |
+//! | [`SubkeyRole::CustomThemesKey`]           | `custom-themes-key`       |
+//! | [`SubkeyRole::ThemesSyncId`]              | `themes-sync-id`          |
+//! | [`SubkeyRole::ChatsCatalogKey`]           | `chats-catalog-key`       |
+//! | [`SubkeyRole::ChatsCatalogSyncId`]        | `chats-catalog-sync-id`   |
+//! | [`SubkeyRole::ChatsKey`]                  | `chats-key`               |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -203,6 +206,41 @@ const ROLE_STR_CUSTOM_THEMES_KEY: &[u8] = b"custom-themes-key";
 /// Load-bearing: drift silently splits vault.themes into a second sync
 /// record on every existing account.
 const ROLE_STR_THEMES_SYNC_ID: &[u8] = b"themes-sync-id";
+
+/// Registered role string for the v0.1 AI conversations-catalog blob KEK
+/// (myne-md/myne#675; encrypts the `vault.chats` conversation roster:
+/// `chats_catalog_blob.rs`, `MYM1`, `protocol.md` § 9.23 + § 3.4).
+/// Load-bearing: drift silently changes the KEK. `root_key`-derived (like
+/// prefs/search/themes), so it is `itemsKey`-independent and survives a
+/// later epoch rotation. DISTINCT from the AAD role string
+/// `"chats-catalog"` and from the per-file family KEK `"chats-key"`.
+const ROLE_STR_CHATS_CATALOG_KEY: &[u8] = b"chats-catalog-key";
+
+/// Registered role string for the Phase 2 sync blob-id of `vault.chats`
+/// (myne-md/myne#675; `protocol.md` § 3.4, `sync-protocol.md` § 4.2). Like
+/// the attachments catalog, `vault.prefs` and `vault.themes`, the
+/// conversations catalog is a synced singleton outside the head manifest,
+/// so it needs a deterministic, device-independent 16-byte identifier in
+/// the sync metadata plane:
+/// `chats_catalog_sync_id = derive_subkey(root_key, ChatsCatalogSyncId)[0..16]`.
+/// Like `catalog-sync-id` this derives an *identifier*, NOT key material:
+/// the catalog KEK stays `chats-catalog-key`. The per-conversation `MYJ1`
+/// files need no sync-id role: their sync blob-id is the conversation id's
+/// own 16 bytes (the attachment-id pattern). Load-bearing: drift silently
+/// splits the catalog into a second sync record on every existing account.
+const ROLE_STR_CHATS_CATALOG_SYNC_ID: &[u8] = b"chats-catalog-sync-id";
+
+/// Registered role string for the v0.1 per-conversation AI chat blob KEK
+/// (myne-md/myne#675; encrypts the `chats/<id-hex>` turn lists:
+/// `chats_blob.rs`, `MYJ1`, `protocol.md` § 9.24 + § 3.4). One KEK for the
+/// whole family; per-conversation separation comes from the
+/// `conversation_id` AAD binding (§ 9.24.3), the `attachment-text-key`
+/// archetype. Load-bearing: drift silently changes the KEK.
+/// `root_key`-derived (like prefs/search/attachment-text), so it is
+/// `itemsKey`-independent and survives a later epoch rotation. DISTINCT
+/// from the AAD role string `"chats-blob"` and from the catalog KEK
+/// `"chats-catalog-key"`.
+const ROLE_STR_CHATS_KEY: &[u8] = b"chats-key";
 /// Registered role string for the v0.1 graph-layout blob KEK (encrypts the
 /// `vault.graph` on-device knowledge-graph layout cache — `graph_layout_blob.rs`,
 /// `MYG1`, `protocol.md` § 9.19). Load-bearing: drift silently changes the KEK.
@@ -331,6 +369,36 @@ pub enum SubkeyRole {
     /// backed up. Distinct from every other blob KEK so the families stay
     /// domain-separated.
     GraphLayoutKey,
+    /// KEK for the v0.1 AI conversations-catalog blob (`vault.chats`, `MYM1`,
+    /// myne-md/myne#675). Encrypts the canonical-JSON conversation roster
+    /// (id / title / timestamps / causal version / tombstone) under
+    /// XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived (like
+    /// prefs/search/themes), so it is `itemsKey`-independent and survives a
+    /// later epoch rotation. Distinct from every other blob KEK so the
+    /// families stay domain-separated; distinct from the per-file family KEK
+    /// `ChatsKey` and from the AAD role `"chats-catalog"`.
+    ChatsCatalogKey,
+    /// Phase 2 sync blob-id derivation for `vault.chats` (myne-md/myne#675;
+    /// `protocol.md` § 3.4, `sync-protocol.md` § 4.2). The first 16 bytes of
+    /// the derived output are the catalog's reserved sync-plane blob-id:
+    /// deterministic across the fleet, indistinguishable from a note UUID to
+    /// the server. Derives an **identifier**, NOT key material (like
+    /// `ThemesSyncId` / `PrefsSyncId` / `CatalogSyncId`); the catalog KEK
+    /// stays `ChatsCatalogKey`. The per-conversation `MYJ1` files carry no
+    /// sync-id role: their blob-id is the conversation id itself.
+    /// Domain-separated from every other role.
+    ChatsCatalogSyncId,
+    /// KEK for the v0.1 per-conversation AI chat blobs (`chats/<id-hex>`,
+    /// `MYJ1`, myne-md/myne#675). Encrypts each conversation's ordered
+    /// immutable turn list under XChaCha20-Poly1305 (CTX commitment outer).
+    /// ONE KEK for the whole family; per-conversation safety comes from the
+    /// `conversation_id` AAD binding (§ 9.24.3), the `AttachmentTextKey`
+    /// archetype. `root_key`-derived (like prefs/search/attachment-text), so
+    /// it is `itemsKey`-independent and survives a later epoch rotation.
+    /// Distinct from every other blob KEK so the families stay
+    /// domain-separated; distinct from the catalog KEK `ChatsCatalogKey`
+    /// and from the AAD role `"chats-blob"`.
+    ChatsKey,
 }
 
 impl SubkeyRole {
@@ -346,7 +414,7 @@ impl SubkeyRole {
     ///
     /// **Adding a `SubkeyRole` variant means adding it here too** — the
     /// `all_covers_every_registered_role` test fails compilation until you do.
-    pub const ALL: [SubkeyRole; 17] = [
+    pub const ALL: [SubkeyRole; 20] = [
         SubkeyRole::ItemsKeyWrap,
         SubkeyRole::PrefsKey,
         SubkeyRole::SearchIndexKey,
@@ -364,6 +432,9 @@ impl SubkeyRole {
         SubkeyRole::CustomThemesKey,
         SubkeyRole::ThemesSyncId,
         SubkeyRole::GraphLayoutKey,
+        SubkeyRole::ChatsCatalogKey,
+        SubkeyRole::ChatsCatalogSyncId,
+        SubkeyRole::ChatsKey,
     ];
 
     /// Registered role string (the part appended after the
@@ -388,6 +459,9 @@ impl SubkeyRole {
             SubkeyRole::CustomThemesKey => ROLE_STR_CUSTOM_THEMES_KEY,
             SubkeyRole::ThemesSyncId => ROLE_STR_THEMES_SYNC_ID,
             SubkeyRole::GraphLayoutKey => ROLE_STR_GRAPH_LAYOUT_KEY,
+            SubkeyRole::ChatsCatalogKey => ROLE_STR_CHATS_CATALOG_KEY,
+            SubkeyRole::ChatsCatalogSyncId => ROLE_STR_CHATS_CATALOG_SYNC_ID,
+            SubkeyRole::ChatsKey => ROLE_STR_CHATS_KEY,
         }
     }
 }
@@ -500,6 +574,9 @@ mod tests {
                 SubkeyRole::CustomThemesKey => 14,
                 SubkeyRole::ThemesSyncId => 15,
                 SubkeyRole::GraphLayoutKey => 16,
+                SubkeyRole::ChatsCatalogKey => 17,
+                SubkeyRole::ChatsCatalogSyncId => 18,
+                SubkeyRole::ChatsKey => 19,
             }
         }
 
@@ -1023,6 +1100,9 @@ mod tests {
                 SubkeyRole::CustomThemesKey => "custom-themes-key",
                 SubkeyRole::ThemesSyncId => "themes-sync-id",
                 SubkeyRole::GraphLayoutKey => "graph-layout-key",
+                SubkeyRole::ChatsCatalogKey => "chats-catalog-key",
+                SubkeyRole::ChatsCatalogSyncId => "chats-catalog-sync-id",
+                SubkeyRole::ChatsKey => "chats-key",
             }
         }
 

@@ -45,18 +45,6 @@ const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrows
 const SYNC_ORIGIN = "https://sync.example.test";
 const UNLOCK_TIMEOUT_MS = 30_000;
 
-/** The `data-item-id`s present in the open context menu, in DOM order. */
-async function menuItemIds(session: {
-  execute: <T>(script: string) => Promise<T>;
-}): Promise<string[]> {
-  const raw = await session.execute<string>(
-    "return JSON.stringify([].slice.call(" +
-      "document.querySelectorAll('[data-testid=\"notes.context-menu-item\"]')" +
-      ").map(function (e) { return e.getAttribute('data-item-id'); }));",
-  );
-  return JSON.parse(raw) as string[];
-}
-
 describeE2E("the export submenu withholds the format a page cannot produce", () => {
   it("offers Markdown, HTML and plain text, and no PDF row exists at all", async () => {
     const vault = loadVaultFixture();

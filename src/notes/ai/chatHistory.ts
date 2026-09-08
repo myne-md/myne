@@ -18,7 +18,6 @@
 // are not on screen. They live in `agentStore`, which every vault-leaving path
 // clears (`design-notes/ai/0518`).
 
-import { isSeedable } from "./chatStore";
 import type { ChatTurn } from "./chatStore";
 
 /** One visible turn, in the shape the host's `HistoryTurn` deserializes. */
@@ -43,12 +42,6 @@ export function visibleHistory(turns: readonly ChatTurn[]): HistoryTurn[] {
   const out: HistoryTurn[] = [];
   for (const turn of turns) {
     if (turn.streaming || turn.error) continue;
-    // A turn that predates a change to `ai_excluded_folders` is on screen and
-    // is not sent. An agent summary is model prose derived from notes it read,
-    // and the exclusion set is the control a user tightens precisely to stop
-    // that content reaching a provider; SYNC-14 carries no in-flight carve-out,
-    // so the newest answer decides here as it does at the apply.
-    if (!isSeedable(turn.id)) continue;
     if (turn.role === "user") {
       const text = turn.text.trim();
       if (text.length > 0) out.push({ role: "user", text });

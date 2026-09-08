@@ -156,6 +156,174 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // ── AI conversations (myne-md/myne#675) ─────────────────────────────
+        //
+        // The `MYM1` vault.chats catalog + `MYJ1` chats/<id-hex> per-file
+        // store. Same storage pair as the other vault blobs (OPFS
+        // double-buffered, unlocked-slot-gated). A browser tab is the client
+        // that loses conversations most often (every reload), so the whole
+        // six-command surface is ported.
+        "plugin:chats|chats_create" => {
+            use myne_core::plugins::chats::commands::chats_create_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                first_turn_payload: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match chats_create_from_host(
+                host_ctx(),
+                vault_io(),
+                crate::session::state(),
+                crate::session::hooks(),
+                &a.first_turn_payload,
+            )
+            .await
+            {
+                Ok(id) => Outcome::ok(&id),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:chats|chats_append_turn" => {
+            use myne_core::plugins::chats::commands::chats_append_turn_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                conversation_id_hex: String,
+                turns_payload: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match chats_append_turn_from_host(
+                host_ctx(),
+                vault_io(),
+                crate::session::state(),
+                crate::session::hooks(),
+                &a.conversation_id_hex,
+                &a.turns_payload,
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:chats|chats_read" => {
+            use myne_core::plugins::chats::commands::chats_read_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                conversation_id_hex: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match chats_read_from_host(
+                host_ctx(),
+                vault_io(),
+                crate::session::state(),
+                &a.conversation_id_hex,
+            )
+            .await
+            {
+                Ok(payload) => Outcome::ok(&payload),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:chats|chats_list" => {
+            use myne_core::plugins::chats::commands::chats_list_from_host;
+            match chats_list_from_host(host_ctx(), vault_io(), crate::session::state()).await {
+                Ok(rows) => Outcome::ok(&rows),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:chats|chats_rename" => {
+            use myne_core::plugins::chats::commands::chats_rename_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                conversation_id_hex: String,
+                new_title: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match chats_rename_from_host(
+                host_ctx(),
+                vault_io(),
+                crate::session::state(),
+                crate::session::hooks(),
+                &a.conversation_id_hex,
+                &a.new_title,
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:chats|chats_delete" => {
+            use myne_core::plugins::chats::commands::chats_delete_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                conversation_id_hex: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match chats_delete_from_host(
+                host_ctx(),
+                vault_io(),
+                crate::session::state(),
+                crate::session::hooks(),
+                &a.conversation_id_hex,
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         // ── workspace / pane layout (task 65) ───────────────────────────────
         //
         // `MYW1` carries the pane tree: which notes are open, in which split, at

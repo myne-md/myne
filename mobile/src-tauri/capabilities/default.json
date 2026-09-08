@@ -23,6 +23,7 @@
     "share-import:default",
     "vault-indices:default",
     "graph-layout:default",
+    "chats:default",
     "vault-label:default",
     "themes:default",
     "workspace:default",

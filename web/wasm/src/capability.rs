@@ -213,6 +213,18 @@ pub const DISPATCHED: &[&str] = &[
     // which is exactly what makes it safe on an evictable store.
     "plugin:graph-layout|graph_layout_read",
     "plugin:graph-layout|graph_layout_write",
+    // AI conversations (myne-md/myne#675): the `MYM1` catalog + `MYJ1`
+    // per-conversation files. Synced Class-1 vault content behind the same
+    // OPFS double-buffered store the other vault blobs use; all six commands
+    // Slot::Unlocked-gated host-side. The web client is the client that
+    // needs persistence MOST (a tab reload is the everyday case), so the
+    // surface is ported whole rather than capability-gated.
+    "plugin:chats|chats_create",
+    "plugin:chats|chats_append_turn",
+    "plugin:chats|chats_read",
+    "plugin:chats|chats_list",
+    "plugin:chats|chats_rename",
+    "plugin:chats|chats_delete",
     // Workspace / pane layout (task 65) — the `MYW1` pane tree. A tab loses its
     // layout on every reload without this, which is a worse loss on web than the
     // same feature is on desktop, not a smaller one.

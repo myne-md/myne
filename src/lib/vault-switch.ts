@@ -32,6 +32,7 @@
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
+import { clearChatPersistForLock } from "../notes/ai/chatPersist";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import { resetSessionIgnored } from "../editor/decorations/spell";
 import { resetScrollMemory } from "../notes/scrollMemory";
@@ -125,6 +126,11 @@ export async function leaveActiveVault(deps: {
   // a later refactor could stop routing through that call without anything
   // noticing (`scripts/check-frontend-lock-teardown.mjs`).
   clearChat();
+  // The persist module's write state with it: a stash that survived a switch
+  // would replay vault A's turns into vault B's store on the next unlock.
+  // (`lockVault()` above clears both too; this call is asserted separately
+  // for the same reason `clearChat()`'s own call here is.)
+  clearChatPersistForLock();
   // The rendered AI output, on the same reasoning: a summary of a note in the
   // vault being left, and the Q and A answers over its content, are as
   // vault-specific as the conversation above.

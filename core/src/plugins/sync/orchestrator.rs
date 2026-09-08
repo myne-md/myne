@@ -33,8 +33,9 @@ use protocol::{
     compute_manifest_hash, derive_subkey, derive_subkey_versioned,
     encode_attachments_catalog_versioned, parse_vault_meta_any, serialize_vault_meta,
     AttachmentsCatalog, ManifestEntry, MetaVersion, SubkeyRole, VaultHead, VvEntry,
-    CATALOG_BLOB_MAGIC, CATALOG_BLOB_V0_2_MAGIC, PREFS_BLOB_MAGIC, PREFS_BLOB_V0_2_MAGIC,
-    THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC, VAULT_HEAD_FORMAT_V1,
+    CATALOG_BLOB_MAGIC, CATALOG_BLOB_V0_2_MAGIC, CHATS_BLOB_MAGIC, CHATS_BLOB_V0_2_MAGIC,
+    CHATS_CATALOG_BLOB_MAGIC, CHATS_CATALOG_BLOB_V0_2_MAGIC, PREFS_BLOB_MAGIC,
+    PREFS_BLOB_V0_2_MAGIC, THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC, VAULT_HEAD_FORMAT_V1,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -95,6 +96,12 @@ pub struct SyncSummary {
     /// conflict surface), and the WebView re-reads themes over IPC on demand.
     /// The live-refresh event is a follow-on that needs a frontend listener.
     pub themes_applied_remote: bool,
+    /// A remote `vault.chats` change was merged onto the on-disk catalog this
+    /// cycle (myne-md/myne#675): a conversation added, renamed or deleted on
+    /// a peer. Reported for the same reason as `themes_applied_remote` (the
+    /// WebView re-reads the roster over IPC on demand).
+    pub chats_applied_remote: bool,
+
     /// Changed-note downloads skipped WITHOUT any local mutation this cycle:
     /// the body was 404/410 (reclaimed, §11.3) or its bytes failed the header
     /// nonce-vs-record check (empty / junk / mismatch). Never written to disk,
@@ -208,8 +215,17 @@ async fn server_meta_of_newer_generation(
 
 /// Parse a 32-hex blob-id key from `state.blobs` back to its 16 bytes. `None`
 /// for anything malformed (defensive — the state file is device-local JSON).
+/// Lowercase-only, like its `is_32_hex` / `is_lower_hex` twins: conversation
+/// ids are minted lowercase, and every caller passes own-writer data (catalog
+/// keys, scan names). (The byte-length gate before the slices is also the
+/// panic guard: a multibyte name fails the hex check before any index lands
+/// mid-character.)
 fn from_hex16(s: &str) -> Option<[u8; 16]> {
-    if s.len() != 32 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if s.len() != 32
+        || !s
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
         return None;
     }
     let mut out = [0u8; 16];
@@ -816,6 +832,56 @@ pub fn themes_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 fn read_themes_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
     read_singleton_nonce(bytes, &THEMES_BLOB_MAGIC, &[&THEMES_BLOB_V0_2_MAGIC])
 }
+
+/// `vault.chats`' reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, "chats-catalog-sync-id")[0..16]` (`protocol.md`
+/// § 3.4, myne-md/myne#675): the `catalog_sync_id` / `prefs_sync_id` /
+/// `themes_sync_id` twin.
+pub fn chats_catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
+    sync_id_for(root_key, SubkeyRole::ChatsCatalogSyncId)
+}
+
+/// The conversations-catalog blob's sync discriminator
+/// (`read_singleton_nonce` over MYM1/MYM5 (both generations, the § 10.4.1
+/// envelope convention: the nonce sits at the same offset in both, so one
+/// reader covers the family. Accepting only v0.1 would make every reader
+/// `None` on a migrated vault (myne-md/myne#638).
+fn read_chats_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(
+        bytes,
+        &CHATS_CATALOG_BLOB_MAGIC,
+        &[&CHATS_CATALOG_BLOB_V0_2_MAGIC],
+    )
+}
+
+/// A conversation file's sync discriminator (`read_singleton_nonce` over
+/// MYJ1/MYJ5, both generations, same envelope, same offset). The nonce
+/// carries the per-conversation change, and an unchanged outer nonce proves
+/// the file untouched since the last sync (no decrypt needed).
+fn read_chats_blob_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(bytes, &CHATS_BLOB_MAGIC, &[&CHATS_BLOB_V0_2_MAGIC])
+}
+
+/// `<vault>/vault.chats`: the MYM1 conversations-catalog singleton.
+fn chats_catalog_file_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("vault.chats")
+}
+
+/// `<vault>/chats`: the MYJ1 per-conversation files directory.
+fn chats_dir(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("chats")
+}
+
+// NOTE: no pending-chats-tombstone queue exists, by spec. The attachments
+// family needs one because attachment BLOBS are immutable and
+// content-addressed, so a deletion must be re-pushed as a blob-plane record
+// with a fresh nonce (`sync-protocol.md` §11.4). A conversation deletion is
+// a tombstone ROW in `vault.chats`, and the catalog rides the themes
+// pattern: the row's causal version is the tombstone, the per-id causal
+// join discards a concurrent append at merge, and no device ever pulls a
+// conversation file its catalog does not name. A queue would add a
+// deletion channel the spec does not describe (and "Tombstone GC: none"
+// already fixes the catalog as the sole tombstone home).
 
 /// `<vault>/vault.themes` — the MYT1 custom-themes singleton.
 fn themes_file_path(vault_root: &Path) -> std::path::PathBuf {
@@ -1679,6 +1745,530 @@ struct ThemesPhase {
     push_bytes: Option<Vec<u8>>,
 }
 
+/// The outcome of the chats catalog phase, consumed by the conversation-file
+/// loop (the merged catalog is the authoritative § 11.4 roster) and the push
+/// phase (a dirty catalog rides the same batch).
+struct ChatsPhase {
+    /// The post-merge catalog (== the on-disk catalog when this returns).
+    merged: crate::plugins::chats::commands::ChatsCatalogMap,
+    /// The catalog needs a push (local-only change, or a merge that differed
+    /// from the server's plaintext).
+    dirty: bool,
+    /// A remote change was merged onto the on-disk catalog this cycle.
+    applied_remote: bool,
+    /// The exact bytes to push, carried out of the phase whenever `dirty`:
+    /// the myne#436 single-derivation discipline (the push site never
+    /// re-derives the KEK).
+    push_bytes: Option<Vec<u8>>,
+    /// The chats plane was refused this cycle (unreadable local catalog, or
+    /// a verified remote record that failed schema parse): no reconciliation
+    /// ran, nothing is dirty, nothing pushes. Scoped here rather than
+    /// aborting the whole cycle: an unreadable chats store must never stall
+    /// note or attachment sync, and skipping satisfies the same
+    /// never-merge-over-unreadable guarantee (no reconciliation is no
+    /// adoption). Implies `dirty == false`, `applied_remote == false`, and
+    /// an empty `merged` (so the catalog-guarded loops downstream are inert
+    /// by construction, not by coincidence).
+    skipped: bool,
+}
+
+/// The one refused outcome every `sync_chats_phase` refusal arm returns: no
+/// reconciliation, nothing dirty, nothing to push. A constructor rather than
+/// five hand-written literals, so a sixth arm cannot invent a new shape.
+fn skipped_chats_phase() -> ChatsPhase {
+    ChatsPhase {
+        merged: crate::plugins::chats::commands::ChatsCatalogMap::default(),
+        dirty: false,
+        applied_remote: false,
+        push_bytes: None,
+        skipped: true,
+    }
+}
+
+/// Pull-side `vault.chats` reconciliation (myne-md/myne#675). The
+/// `sync_themes_phase` twin, minus the fall-back-to-empty arm: conversations
+/// are load-bearing user content, so the read semantic is
+/// report-don't-empty (§ 9.23.3) and the catalog phase MUST behave
+/// accordingly:
+///
+/// - An unreadable local catalog refuses reconciliation outright: the phase
+///   returns the SKIPPED outcome (no chats reconciliation this cycle, the
+///   rest of sync proceeds), so an unreadable store can never be adopted as
+///   the merge base and then re-pushed over the server (the
+///   reconstruction-over-real-content failure the fall-back rule forbids).
+///   No remote pull can heal a corrupt local catalog except an adoption, and
+///   adoption requires the remote write to win the causal merge, which it
+///   cannot do against unknown local content, so the plane stands down and
+///   the user is told (`tracing::warn`, the per-conversation arm's surface).
+///   The refusal is scoped to the chats plane rather than aborting the whole
+///   cycle: an unreadable chats store must never stall note or attachment
+///   sync.
+/// - A remote record whose bytes verify merges per-id (causal `version`,
+///   remove-wins ties (`merge_chats_catalog`), then either adopts the
+///   server bytes verbatim (merge equal to the remote map: re-encrypting
+///   would nonce-churn an endless push loop) or writes the merged catalog
+///   freshly (dirty, pushed this cycle against the server's version). A
+///   verified remote record that fails schema parse is the same skipped
+///   refusal, local store untouched.
+/// - No changed remote record: dirty iff the local catalog drifted from the
+///   synced baseline. A virgin no-conversations vault (no file, no baseline)
+///   is deliberately NOT pushed: it stays chats-silent exactly as an
+///   attachment-less vault stays catalog-silent.
+///
+/// `merged == remote_map` comparison is on the DECODED maps (not bytes): the
+/// local re-encode of an identical map is byte-identical under the canonical
+/// JSON, so no spurious dirty.
+///
+/// Holds the chats plugin's write mutex across the read-merge-write: the
+/// CALLER takes it before invoking this phase and holds it through the
+/// conversation loop that follows (ONE critical section, taken at the call
+/// site because a tokio Mutex is not reentrant; shared with the plugin
+/// commands). Each argument is a distinct cycle input (same shape as the
+/// sibling phases); a bundling struct would not aid clarity at this single
+/// internal call site.
+#[allow(clippy::too_many_arguments)]
+async fn sync_chats_phase(
+    io: &dyn crate::vault_io::VaultIo,
+    transport: &dyn SyncTransport,
+    token: &str,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    state: &mut SyncState,
+    chats_catalog_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+    version: MetaVersion,
+) -> Result<ChatsPhase, SyncCycleError> {
+    use crate::plugins::chats::commands::ChatsCatalogMap;
+    use protocol::{
+        decode_chats_catalog_blob, decode_chats_catalog_blob_versioned,
+        encode_chats_catalog_blob_versioned,
+    };
+
+    let chats_catalog_key = derive_subkey_versioned(version, root_key, SubkeyRole::ChatsCatalogKey);
+
+    // Read + decode the local catalog. A refusal (unreadable store) degrades
+    // to a skipped phase: no reconciliation this cycle, nothing pushed, the
+    // rest of sync proceeds. Never-merge-over-unreadable holds by
+    // construction: an unreadable store is never adopted as the merge base
+    // and never re-pushed over the server.
+    let path = chats_catalog_file_path(vault_root);
+    let local_bytes: Option<Vec<u8>> = match crate::singleton::open_newest_and_sweep(
+        io,
+        &path,
+        |bytes| {
+            decode_chats_catalog_blob(&chats_catalog_key, account_number_hash, bytes).map(|_| ())
+        },
+    )
+    .await
+    {
+        Ok(()) => match io.read(&path).await {
+            Ok(bytes) => Some(bytes),
+            // The sweep just proved the file exists and decodes: a
+            // failed re-read is a read FAILURE, not an absence. Treating
+            // it as `None` would decode to the empty roster and adopt the
+            // server bytes verbatim over a live local catalog, dropping
+            // local-only rows. Same skipped refusal as the `Io` arm.
+            Err(kind) => {
+                tracing::warn!(
+                    stage = "chats-catalog",
+                    io_failure_kind = ?kind,
+                    "local conversations catalog re-read failed after a successful sweep; skipping the chats plane this cycle"
+                );
+                return Ok(skipped_chats_phase());
+            }
+        },
+        Err(crate::singleton::OpenOutcome::Absent) => None,
+        Err(crate::singleton::OpenOutcome::Undecodable(_)) => {
+            tracing::warn!(
+                stage = "chats-catalog",
+                "local conversations catalog is unreadable; skipping the chats plane this cycle"
+            );
+            return Ok(skipped_chats_phase());
+        }
+        Err(crate::singleton::OpenOutcome::Io(kind)) => {
+            tracing::warn!(
+                stage = "chats-catalog",
+                io_failure_kind = ?kind,
+                "local conversations catalog read failed; skipping the chats plane this cycle"
+            );
+            return Ok(skipped_chats_phase());
+        }
+    };
+    let decode_map = |bytes: Option<&[u8]>| -> Result<ChatsCatalogMap, ()> {
+        match bytes {
+            None => Ok(ChatsCatalogMap::default()),
+            Some(b) => {
+                let plaintext = decode_chats_catalog_blob_versioned(
+                    version,
+                    &chats_catalog_key,
+                    account_number_hash,
+                    b,
+                )
+                .map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ())
+            }
+        }
+    };
+    let local_map = match decode_map(local_bytes.as_deref()) {
+        Ok(map) => map,
+        Err(()) => {
+            tracing::warn!(
+                stage = "chats-catalog",
+                "local conversations catalog does not parse; skipping the chats plane this cycle"
+            );
+            return Ok(skipped_chats_phase());
+        }
+    };
+    let local_nonce = local_bytes.as_deref().and_then(read_chats_catalog_nonce);
+
+    let id_hex = hex(chats_catalog_id);
+    let baseline_nonce_hex = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+
+    // A remote record whose nonce we already hold needs no download.
+    let remote_changed = remote_record
+        .map(|r| Some(r.content_nonce) != local_nonce)
+        .unwrap_or(false);
+
+    // §11.3 gate: an unverified remote adoption MUST NOT write over the live
+    // catalog (the empty-read reconstruction failure).
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_chats_catalog_nonce,
+        "chats-catalog",
+    )?;
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
+        // The remote bytes verified against the record: decode them into the
+        // remote map for the merge. An unverifiable remote payload (decodable
+        // as a file but not as the catalog schema) is treated as refused: the
+        // local store stays untouched and the chats plane is skipped for the
+        // cycle (same scoped refusal as the unreadable-local arm; merging an
+        // unparseable remote map is never an option).
+        let remote_map: ChatsCatalogMap = match decode_chats_catalog_blob_versioned(
+            version,
+            &chats_catalog_key,
+            account_number_hash,
+            &remote_bytes,
+        ) {
+            Ok(plaintext) => match serde_json::from_slice(&plaintext) {
+                Ok(map) => map,
+                Err(_) => {
+                    tracing::warn!(
+                        stage = "chats-catalog",
+                        "verified remote conversations catalog does not parse; \
+                         skipping the chats plane this cycle"
+                    );
+                    return Ok(skipped_chats_phase());
+                }
+            },
+            Err(_) => {
+                tracing::warn!(
+                    stage = "chats-catalog",
+                    "verified remote conversations catalog does not decrypt; \
+                     skipping the chats plane this cycle"
+                );
+                return Ok(skipped_chats_phase());
+            }
+        };
+        let merged = crate::plugins::sync::conflict::merge_chats_catalog(&local_map, &remote_map);
+        let applied_remote = merged != local_map;
+
+        let (bytes, dirty) = if merged == remote_map {
+            // Adopt the server bytes VERBATIM: byte-identical store +
+            // baseline == server (version, nonce); nothing to push.
+            (remote_bytes, false)
+        } else {
+            // The merge beat the server's store → write it fresh and push it
+            // this cycle against the server's current version.
+            let plaintext = serde_json::to_vec(&merged).map_err(|_| SyncCycleError::Io)?;
+            let sealed = encode_chats_catalog_blob_versioned(
+                version,
+                &chats_catalog_key,
+                account_number_hash,
+                &plaintext,
+            )
+            .map_err(|_| SyncCycleError::Io)?;
+            (sealed, true)
+        };
+        io.write(&path, &bytes, crate::vault_io::WriteOpts::default())
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
+        record_blob_baseline(state, &id_hex, &rec);
+        return Ok(ChatsPhase {
+            merged,
+            dirty,
+            applied_remote,
+            push_bytes: dirty.then_some(bytes),
+            skipped: false,
+        });
+    }
+
+    // The local catalog always decodes here (a decode failure skipped above),
+    // so this arm is exactly the "local readable, remote unchanged" case.
+
+    // No (changed) remote catalog: dirty iff the local file drifted from the
+    // synced baseline. A virgin no-conversations vault (no file, no baseline)
+    // is NOT pushed: chats-silent by default.
+    let local_nonce_hex = local_nonce.map(|n| hex(&n));
+    let dirty = local_bytes.is_some()
+        && local_nonce_hex != baseline_nonce_hex
+        && !(baseline_nonce_hex.is_none() && local_map.is_empty());
+    Ok(ChatsPhase {
+        merged: local_map,
+        dirty,
+        applied_remote: false,
+        // `dirty` already implies `local_bytes.is_some()`, the VERIFIED
+        // bytes (a failed decode skipped above): the same ones the push
+        // must carry (the myne#436 single-derivation discipline).
+        push_bytes: if dirty { local_bytes } else { None },
+        skipped: false,
+    })
+}
+
+/// A decoded conversation payload: turn ids in file order, the turn objects,
+/// and the `title_derived_from` snapshot when the file carries one.
+type DecodedConversationTurns = (Vec<String>, Vec<serde_json::Value>, Option<String>);
+
+/// The outcome of one conversation-file reconcile: what the cycle must push
+/// (if anything) and the merged bytes already on disk.
+#[derive(Debug)]
+struct ChatsConversationPhase {
+    /// The merged store was written this cycle and differs from the server's
+    /// plaintext: push these exact bytes (myne#436 single-derivation: the
+    /// push site never re-derives the KEK).
+    push_bytes: Option<Vec<u8>>,
+    /// The remote record this merge reconciled, if any (its version is the
+    /// CAS base; its nonce is the baseline either way).
+    remote: Option<ChangedBlob>,
+}
+
+/// Pull-side reconcile of ONE per-conversation file (`chats/<id-hex>`,
+/// `MYJ1`, § 9.24 + `sync-protocol.md` § 10.2.5). Called for every live
+/// catalog row (after the catalog phase merged) under the chats plugin's
+/// write mutex:
+///
+/// - No remote change: the file is verified-nonce-clean or left alone.
+/// - Remote change: verified download → decrypt both sides → parse both turn
+///   lists (§ 9.24.2 schema) → `merge_chats_turns` on the id lists (common
+///   prefix kept, both suffixes kept in id order; an id on both sides is one
+///   turn, with the LOCAL turn object winning a content mismatch. Settled
+///   turns are immutable, so a mismatch is unreachable and determinism beats
+///   argument-sensitivity) → adopt the server bytes verbatim when the merge
+///   equals the remote list (no nonce churn), else write the merged file
+///   freshly (pushed this cycle against the server's current version).
+///
+/// Anything that fails schema or AEAD on EITHER side refuses this
+/// conversation's reconcile for the cycle (Err): a half-decoded turn list
+/// merged and pushed would persist a parse artifact over real turns. The
+/// same class the catalog's report-don't-empty closes for the roster.
+#[allow(clippy::too_many_arguments)]
+async fn sync_chats_conversation_phase(
+    io: &dyn crate::vault_io::VaultIo,
+    transport: &dyn SyncTransport,
+    token: &str,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    conversation_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+    version: MetaVersion,
+) -> Result<ChatsConversationPhase, SyncCycleError> {
+    use protocol::{decode_chats_blob_versioned, encode_chats_blob_versioned};
+
+    let chats_key = derive_subkey_versioned(version, root_key, SubkeyRole::ChatsKey);
+
+    let id_hex = hex(conversation_id);
+    let dir = chats_dir(vault_root);
+    let path = dir.join(&id_hex);
+
+    // Absent and unreadable are different answers (the catalog phase's
+    // re-read lesson one function up): a conversation file that exists but
+    // cannot be read must refuse this reconcile for the cycle, never merge
+    // as the empty turn list (which would adopt the remote bytes verbatim
+    // over turns that never reached the server).
+    let local_bytes: Option<Vec<u8>> = match io.read(&path).await {
+        Ok(bytes) => Some(bytes),
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => None,
+        Err(_) => return Err(SyncCycleError::Io),
+    };
+    let local_nonce = local_bytes.as_deref().and_then(read_chats_blob_nonce);
+
+    let remote_changed = remote_record
+        .map(|r| Some(r.content_nonce) != local_nonce)
+        .unwrap_or(false);
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_chats_blob_nonce,
+        "chats-conversation",
+    )?;
+
+    let decode_turns = |bytes: &[u8]| -> Result<DecodedConversationTurns, SyncCycleError> {
+        let plaintext = decode_chats_blob_versioned(
+            version,
+            &chats_key,
+            account_number_hash,
+            conversation_id,
+            bytes,
+        )
+        .map_err(|_| SyncCycleError::Io)?;
+        let v: serde_json::Value =
+            serde_json::from_slice(&plaintext).map_err(|_| SyncCycleError::Io)?;
+        let turns = v
+            .get("turns")
+            .and_then(|t| t.as_array())
+            .ok_or(SyncCycleError::Io)?;
+        let mut ids = Vec::with_capacity(turns.len());
+        for t in turns {
+            let id = t
+                .get("id")
+                .and_then(|i| i.as_str())
+                .ok_or(SyncCycleError::Io)?;
+            ids.push(id.to_string());
+        }
+        // The title-derivation snapshot rides the merge like a turn with
+        // no id: it is normative file content (§ 9.24.2), not a cache,
+        // so a merge that dropped it would permanently un-derive every
+        // synced conversation's title on the other devices.
+        let title = v
+            .get("title_derived_from")
+            .and_then(|s| s.as_str())
+            .map(str::to_string);
+        Ok((ids, turns.clone(), title))
+    };
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
+        // Remote verified against the record: decode + parse both sides.
+        // Schema/AEAD failure on EITHER side refuses this conversation for
+        // the cycle (report-don't-merge: a parse artifact must never ride a
+        // merge onto the push batch).
+        let remote_plaintext = decode_chats_blob_versioned(
+            version,
+            &chats_key,
+            account_number_hash,
+            conversation_id,
+            &remote_bytes,
+        )
+        .map_err(|_| SyncCycleError::Io)?;
+        let remote_v: serde_json::Value =
+            serde_json::from_slice(&remote_plaintext).map_err(|_| SyncCycleError::Io)?;
+        let remote_turns = remote_v
+            .get("turns")
+            .and_then(|t| t.as_array())
+            .ok_or(SyncCycleError::Io)?;
+        let remote_ids: Vec<String> = remote_turns
+            .iter()
+            .map(|t| {
+                t.get("id")
+                    .and_then(|i| i.as_str())
+                    .ok_or(SyncCycleError::Io)
+                    .map(|s| s.to_string())
+            })
+            .collect::<Result<_, _>>()?;
+        let remote_title = remote_v
+            .get("title_derived_from")
+            .and_then(|s| s.as_str())
+            .map(str::to_string);
+
+        let (local_ids, local_turns, local_title) = match local_bytes.as_deref() {
+            Some(b) => decode_turns(b)?,
+            None => (Vec::new(), Vec::new(), None),
+        };
+        // Local wins the title (the turn-object rule one paragraph down);
+        // an absent local file takes the remote's.
+        let merged_title = local_title.or(remote_title.clone());
+
+        // Merge on the id lists; objects come from a by-id union with LOCAL
+        // winning a content mismatch (unreachable in practice: settled turns
+        // are immutable; determinism requires a rule, and local-wins is the
+        // argument-independent fixed point the tests pin).
+        let merged_ids = crate::plugins::sync::conflict::merge_chats_turns(&local_ids, &remote_ids);
+        let mut by_id: std::collections::HashMap<&str, &serde_json::Value> =
+            std::collections::HashMap::new();
+        for (id, obj) in local_ids.iter().zip(local_turns.iter()) {
+            by_id.insert(id.as_str(), obj);
+        }
+        for (id, obj) in remote_ids.iter().zip(remote_turns.iter()) {
+            by_id.entry(id.as_str()).or_insert(obj);
+        }
+        let merged_turns: Vec<serde_json::Value> = merged_ids
+            .iter()
+            .map(|id| {
+                by_id
+                    .remove(id.as_str())
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null)
+            })
+            .collect();
+        // The merged file keeps the § 9.24.2 shape: `turns` plus the
+        // title snapshot when either side carries one. The verbatim-adoption
+        // comparison below is built the same way, so an agreed title does
+        // not churn the nonce and a disagreed one re-encrypts with ours.
+        let payload_with_title =
+            |turns: Vec<serde_json::Value>, title: Option<String>| -> serde_json::Value {
+                let mut map = serde_json::Map::with_capacity(2);
+                map.insert("turns".to_string(), serde_json::Value::Array(turns));
+                if let Some(t) = title {
+                    map.insert(
+                        "title_derived_from".to_string(),
+                        serde_json::Value::String(t),
+                    );
+                }
+                serde_json::Value::Object(map)
+            };
+        let merged_payload = payload_with_title(merged_turns, merged_title);
+        let merged_plaintext =
+            serde_json::to_vec(&merged_payload).map_err(|_| SyncCycleError::Io)?;
+
+        // Verbatim adoption when the merge equals the remote plaintext: no
+        // nonce churn, no re-encrypt (the myne#436 lesson). The equality is
+        // on the DECODED turn lists. Re-serializing an identical list is
+        // kept byte-stable by key order, but the server bytes are the
+        // canonical form and cost nothing to keep.
+        let remote_turns_json = payload_with_title(remote_turns.clone(), remote_title);
+        let (bytes, dirty) = if merged_payload == remote_turns_json {
+            (remote_bytes, false)
+        } else {
+            let sealed = encode_chats_blob_versioned(
+                version,
+                &chats_key,
+                account_number_hash,
+                conversation_id,
+                &merged_plaintext,
+            )
+            .map_err(|_| SyncCycleError::Io)?;
+            (sealed, true)
+        };
+        io.create_dir_all(&dir)
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
+        io.write(&path, &bytes, crate::vault_io::WriteOpts::default())
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
+        return Ok(ChatsConversationPhase {
+            push_bytes: dirty.then_some(bytes),
+            remote: Some(rec),
+        });
+    }
+
+    // No (changed) remote record for this conversation: nothing to reconcile.
+    // Dirty-vs-clean is the push-detect phase's job (nonce vs baseline), not
+    // this function's: this arm reports no push and no baseline move.
+    Ok(ChatsConversationPhase {
+        push_bytes: None,
+        remote: None,
+    })
+}
+
 /// Pull-side `vault.themes` reconciliation (MYND-486). The `sync_catalog_phase`
 /// twin: `vault.themes` carries **no device-local subset** (every theme is
 /// shared vault content), so the push gate is the blob nonce vs the synced
@@ -1776,7 +2366,7 @@ async fn sync_themes_phase(
         let applied_remote = merged != local_map;
 
         let (bytes, dirty) = if merged == remote_map {
-            // Adopt the server bytes VERBATIM — byte-identical store + baseline
+            // Adopt the server bytes VERBATIM: byte-identical store + baseline
             // == server (version, nonce); nothing to push. Re-encrypting an
             // already-agreeing store would churn the nonce and push forever.
             (remote_bytes, false)
@@ -2436,6 +3026,33 @@ async fn sync_cycle_attempt(
     // maintained manifests instead of re-walking every blob header.
     let cat_id = attachment_keys.map(|_| catalog_sync_id(root_key));
     let themes_id = themes_sync_id(root_key);
+    // The chats catalog is unconditional like themes (a synced singleton that
+    // exists for every holding vault), while the per-conversation files are
+    // scanned below like attachments (an id-named per-file family).
+    let chats_catalog_id = chats_catalog_sync_id(root_key);
+    // In-memory union of the per-conversation files (conversation id →
+    // on-disk nonce), maintained by the pull loop like `att_scan`.
+    let mut chats_scan: BTreeMap<[u8; 16], [u8; 24]> = BTreeMap::new();
+    {
+        if let Ok(entries) = io.read_dir(&chats_dir(vault_root)).await {
+            for entry in entries {
+                // Names, not paths: OPFS has no path API at all. The canonical
+                // check is the attachments one (64 lowercase hex is an
+                // attachment; ours is 32). A non-canonical name is skipped, and
+                // the file-never-written question is what the header answers.
+                if let Some(id) = from_hex16(&entry.name) {
+                    if let Ok(header) = io
+                        .read_prefix(&chats_dir(vault_root).join(&entry.name), 34)
+                        .await
+                    {
+                        if let Some(nonce) = read_chats_blob_nonce(&header) {
+                            chats_scan.insert(id, nonce);
+                        }
+                    }
+                }
+            }
+        }
+    }
     let mut att_scan: BTreeMap<[u8; 16], AttachmentManifestEntry> = if attachment_keys.is_some() {
         scan_attachments_manifest(io, &attachments_dir(vault_root)).await
     } else {
@@ -2467,6 +3084,18 @@ async fn sync_cycle_attempt(
         .and_then(read_themes_nonce)
     {
         local.insert(themes_id, n);
+    }
+    if let Some(n) = io
+        .read(&chats_catalog_file_path(vault_root))
+        .await
+        .ok()
+        .as_deref()
+        .and_then(read_chats_catalog_nonce)
+    {
+        local.insert(chats_catalog_id, n);
+    }
+    for (cid, n) in &chats_scan {
+        local.insert(*cid, *n);
     }
     // This device re-keyed the vault locally (§10.4.1 migration, #429), so the
     // head the server still holds cannot open under the new `root_key`. Let the
@@ -2585,6 +3214,122 @@ async fn sync_cycle_attempt(
                 .map_err(|_| SyncCycleError::Io)?;
         }
     }
+
+    // --- chats phase (myne-md/myne#675): unconditional, every cycle ---
+    // Like the themes singleton, the conversations catalog is never
+    // head-committed; its dirty blob rides the push batch below so the CAS/409
+    // machinery covers it. ONE critical section: the chats plugin's write
+    // mutex is taken HERE, before the catalog read-merge-write, and held
+    // through the conversation loop below, so a chats plugin command cannot
+    // interleave between the roster the phase merged and the per-file
+    // reconcile that follows it (the shape the sync_chats_phase docblock
+    // describes; the phases' own guard is the call site's because a tokio
+    // Mutex is not reentrant).
+    let remote_chats_cat_rec = page
+        .all_metas
+        .iter()
+        .find(|m| m.id == chats_catalog_id && m.attachment_id.is_none());
+    let chats_write_mutex = crate::plugins::chats::commands::write_mutex();
+    let chats_write_guard = chats_write_mutex.lock().await;
+    let mut chats_phase = sync_chats_phase(
+        io,
+        transport,
+        token,
+        root_key,
+        &account_number_hash,
+        vault_root,
+        state,
+        &chats_catalog_id,
+        remote_chats_cat_rec,
+        version,
+    )
+    .await?;
+
+    // --- conversation pull loop (catalog-guarded) ---
+    // For every LIVE catalog row, reconcile the per-conversation file. A row
+    // whose record is a tombstone erases the local file instead (deletion
+    // propagation); an id with no catalog row is never downloaded blind.
+    // A locally-dirty file is skipped: our on-disk copy diverges from the
+    // synced baseline and downloading the server's copy would clobber it.
+    // The whole loop stands down when the catalog phase was refused
+    // (`skipped`): with no merged roster there is nothing to reconcile
+    // against, and deleting or adopting per-file on a refused catalog would
+    // act without its guard.
+
+    let mut conversations_pulled: usize = 0;
+    for (conv_hex, entry) in chats_phase.merged.iter() {
+        let Some(conv_id) = from_hex16(conv_hex) else {
+            // The catalog is canonical JSON from our own writer; a malformed
+            // id is a schema violation, not a download candidate.
+            continue;
+        };
+        if !entry.is_live() {
+            // Remote deletion propagation: erase the local body (+ nothing
+            // else (the tombstone row itself already merged above).
+            let path = chats_dir(vault_root).join(conv_hex);
+            match io.remove_file(&path).await {
+                Ok(()) => {
+                    chats_scan.remove(&conv_id);
+                    state.blobs.remove(conv_hex);
+                }
+                Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
+                    state.blobs.remove(conv_hex);
+                }
+                Err(_) => {}
+            }
+            continue;
+        }
+        // Locally-dirty skip (the notes candidates' cheap filter, same rule).
+        let baseline_nonce_hex = state.blobs.get(conv_hex).map(|b| &b.content_nonce_hex);
+        let local_nonce_hex = chats_scan.get(&conv_id).map(|n| hex(&n[..]));
+        if baseline_nonce_hex.is_some() && baseline_nonce_hex != local_nonce_hex.as_ref() {
+            continue;
+        }
+        let remote_rec = page
+            .all_metas
+            .iter()
+            .find(|m| m.id == conv_id && m.attachment_id.is_none());
+        let conv_phase = match sync_chats_conversation_phase(
+            io,
+            transport,
+            token,
+            root_key,
+            &account_number_hash,
+            vault_root,
+            &conv_id,
+            remote_rec,
+            version,
+        )
+        .await
+        {
+            Ok(p) => p,
+            Err(e) => {
+                // No conversation id on the record: it is a vault-stable
+                // correlation tag in the DENY-listed class (`note_id`, salts,
+                // nonces), and no other sync arm logs one.
+                tracing::warn!(
+                    stage = "chats-conversation",
+                    error = ?e,
+                    "a conversation failed to reconcile; skipping it for this cycle"
+                );
+                continue;
+            }
+        };
+        if let Some(rec) = conv_phase.remote {
+            record_blob_baseline(state, conv_hex, &rec);
+            // `pulled` counts remote-adopted blobs (the notes twin): a
+            // merged conversation is a download + a local write, same class.
+            conversations_pulled += 1;
+            // Mirror the write into the in-memory scan (ONE scan per attempt):
+            // an adopted or merged file's fresh nonce is now the local one.
+            if let Ok(bytes) = io.read(&chats_dir(vault_root).join(conv_hex)).await {
+                if let Some(n) = read_chats_blob_nonce(&bytes) {
+                    chats_scan.insert(conv_id, n);
+                }
+            }
+        }
+    }
+    drop(chats_write_guard);
 
     // --- catalog phase (MUST precede any attachment record — §11.4 rule 5) ---
     // The merged catalog is the resurrection guard: a tombstoned id is erased
@@ -2826,10 +3571,16 @@ async fn sync_cycle_attempt(
                 && Some(c.id) != cat_id
                 && c.id != prefs_id
                 && c.id != themes_id
+                && c.id != chats_catalog_id
+                && !chats_scan.contains_key(&c.id)
         })
         .count() as u32;
     super::progress::begin(note_record_count);
     let mut pulled = 0;
+    // Conversations reconciled by the chats loop above (declared before the
+    // notes drain so the accounting reads in one place): remote-adopted
+    // blobs, same class as `pulled`, folded in at the summary.
+    pulled += conversations_pulled;
     // The ids this cycle WRITES, for the boundary's re-index (myne#305).
     let mut pulled_note_ids: Vec<String> = Vec::new();
     // The ASM-6/#422 "updated from another device" signal — NC05 notes an
@@ -2859,7 +3610,9 @@ async fn sync_cycle_attempt(
             !(c.attachment_id.is_some()
                 || Some(c.id) == cat_id
                 || c.id == prefs_id
-                || c.id == themes_id)
+                || c.id == themes_id
+                || c.id == chats_catalog_id
+                || chats_scan.contains_key(&c.id))
         })
         .filter(|c| {
             let baseline_nonce = state.blobs.get(&hex(&c.id)).map(|b| &b.content_nonce_hex);
@@ -3054,7 +3807,14 @@ async fn sync_cycle_attempt(
         let authoritative: HashMap<[u8; 16], [u8; 24]> = page
             .all_metas
             .iter()
-            .filter(|m| m.attachment_id.is_none() && Some(m.id) != cat_id && m.id != prefs_id)
+            .filter(|m| {
+                m.attachment_id.is_none()
+                    && Some(m.id) != cat_id
+                    && m.id != prefs_id
+                    && m.id != themes_id
+                    && m.id != chats_catalog_id
+                    && !chats_scan.contains_key(&m.id)
+            })
             .map(|m| (m.id, m.content_nonce))
             .collect();
         let previously_synced: HashSet<[u8; 16]> =
@@ -3564,6 +4324,95 @@ async fn sync_cycle_attempt(
                 }
             }
         }
+
+        // A dirty chats catalog (local-only change, or a merge that beat the
+        // server's store) rides the same batch as an inline blob
+        // (myne-md/myne#675). Same single-derivation discipline as themes
+        // (myne#436): the bytes come from the phase, never re-derived here.
+        if chats_phase.dirty {
+            if let Some(bytes) = chats_phase.push_bytes.take() {
+                if let Some(nonce) = read_chats_catalog_nonce(&bytes) {
+                    let base = state
+                        .blobs
+                        .get(&hex(&chats_catalog_id))
+                        .map(|b| b.version)
+                        .unwrap_or(0);
+                    to_push.push(PushBlob {
+                        id: chats_catalog_id,
+                        base_version: base,
+                        content_nonce: nonce,
+                        ciphertext: bytes,
+                        tombstone: false,
+                        attachment_id: None,
+                    });
+                }
+            }
+        }
+
+        // Changed conversation files ride the same batch as inline blobs
+        // (the notes twin: conversation-id sync blob-id, content_nonce from
+        // the on-disk header, base_version from the recorded CAS base). A
+        // conversation whose catalog row is a tombstone is NEVER pushed here
+        // (the delete propagates through the catalog tombstone; pushing the
+        // file would resurrect content against its own tombstone). A file
+        // that fails its nonce read is skipped (report-don't-empty: the
+        // merge arm decides, not the push arm).
+        if gate.allows_content() {
+            for (conv_hex, _) in chats_phase.merged.iter().filter(|(_, e)| e.is_live()) {
+                let Some(conv_id) = from_hex16(conv_hex) else {
+                    // The catalog is canonical JSON from our own writer; a
+                    // malformed id is a schema violation, not a push.
+                    continue;
+                };
+                let synced = state.blobs.get(conv_hex).cloned();
+                // The skip decision reads the CURRENT on-disk file, never
+                // the pre-guard `chats_scan` snapshot: a chats command may
+                // have rewritten (or created) the file after the scan, and
+                // trusting the snapshot would judge a mutated file "already
+                // in sync" and hold its turns for a cycle behind a catalog
+                // row that did push. Iterating the merged roster (fresh from
+                // under the guard) rather than the scan closes the same hole
+                // for files created after the scan.
+                let Ok(bytes) = io.read(&chats_dir(vault_root).join(conv_hex)).await else {
+                    // Absent (deletion propagation erased it) or unreadable
+                    // (the merge arm decides, not the push arm): skip.
+                    continue;
+                };
+                let Some(file_nonce) = read_chats_blob_nonce(&bytes) else {
+                    continue;
+                };
+                if synced.as_ref().map(|b| b.content_nonce_hex.as_str())
+                    == Some(hex(&file_nonce).as_str())
+                {
+                    continue; // already in sync
+                }
+                // A concurrent remote edit past our synced baseline: the
+                // conversation phase merged and wrote it already, and the
+                // bytes above are the merged file's. Push it with the
+                // server's current version as the CAS base.
+                let base_version = if let Some(b) = &synced {
+                    if let Some((server_version, _)) = server_meta.get(&conv_id) {
+                        if *server_version > b.version {
+                            *server_version
+                        } else {
+                            b.version
+                        }
+                    } else {
+                        b.version
+                    }
+                } else {
+                    0
+                };
+                to_push.push(PushBlob {
+                    id: conv_id,
+                    base_version,
+                    content_nonce: file_nonce,
+                    ciphertext: bytes,
+                    tombstone: false,
+                    attachment_id: None,
+                });
+            }
+        }
     }
 
     let mut pushed = 0;
@@ -3852,6 +4701,7 @@ async fn sync_cycle_attempt(
         credential_ambiguous: false,
         prefs_applied_remote: prefs_phase.applied_remote,
         themes_applied_remote: themes_phase.applied_remote,
+        chats_applied_remote: chats_phase.applied_remote,
         pull_skipped,
         dropped,
         pulled_note_ids,
@@ -9717,6 +10567,364 @@ mod tests {
             );
 
             std::fs::remove_dir_all(&dir_a).ok();
+        }
+    }
+
+    // ---- myne-md/myne#675: vault.chats phases (sync_chats_phase,
+    // sync_chats_conversation_phase) --------------------
+
+    mod chats_phase {
+        // The parent module's seam shims (task 86).
+        use super::{blocking, IO};
+
+        use super::super::*;
+        use crate::plugins::sync::state::SyncState;
+        use crate::plugins::sync::transport::FakeTransport;
+        use crate::vault_io::{IoResult, VaultIo};
+        use base64::engine::general_purpose::STANDARD as B64;
+        use base64::Engine as _;
+
+        const ROOT: [u8; 32] = [0x42; 32];
+        const HASH: [u8; 16] = [0x33; 16];
+        const CONV: [u8; 16] = [0xAA; 16];
+
+        fn scratch(tag: &str) -> std::path::PathBuf {
+            let d = std::env::temp_dir().join(format!(
+                "myne-chatsphase-{tag}-{}-{:p}",
+                std::process::id(),
+                &tag
+            ));
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        fn chats_key() -> zeroize::Zeroizing<[u8; 32]> {
+            derive_subkey_versioned(MetaVersion::V0_1, &ROOT, SubkeyRole::ChatsKey)
+        }
+
+        fn chats_catalog_key() -> zeroize::Zeroizing<[u8; 32]> {
+            derive_subkey_versioned(MetaVersion::V0_1, &ROOT, SubkeyRole::ChatsCatalogKey)
+        }
+
+        fn turn(id: &str, text: &str) -> serde_json::Value {
+            serde_json::json!({"id": id, "kind": "text", "role": "user", "text": text})
+        }
+
+        fn seal_conversation(turns: Vec<serde_json::Value>, title: Option<&str>) -> Vec<u8> {
+            let mut map = serde_json::Map::new();
+            map.insert("turns".to_string(), serde_json::Value::Array(turns));
+            if let Some(t) = title {
+                map.insert(
+                    "title_derived_from".to_string(),
+                    serde_json::Value::String(t.to_string()),
+                );
+            }
+            let plaintext = serde_json::to_vec(&serde_json::Value::Object(map)).unwrap();
+            protocol::encode_chats_blob_versioned(
+                MetaVersion::V0_1,
+                &chats_key(),
+                &HASH,
+                &CONV,
+                &plaintext,
+            )
+            .unwrap()
+        }
+
+        fn open_conversation(bytes: &[u8]) -> serde_json::Value {
+            let plaintext = protocol::decode_chats_blob_versioned(
+                MetaVersion::V0_1,
+                &chats_key(),
+                &HASH,
+                &CONV,
+                bytes,
+            )
+            .unwrap();
+            serde_json::from_slice(&plaintext).unwrap()
+        }
+
+        fn turn_ids(v: &serde_json::Value) -> Vec<String> {
+            v.get("turns")
+                .and_then(|t| t.as_array())
+                .unwrap()
+                .iter()
+                .map(|t| t.get("id").and_then(|i| i.as_str()).unwrap().to_string())
+                .collect()
+        }
+
+        /// Encode a remote conversation blob and register it under
+        /// `/sync/blob?id=…`.
+        fn serve_remote(t: &FakeTransport, bytes: &[u8], version: u64) -> ChangedBlob {
+            let nonce = read_chats_blob_nonce(bytes).unwrap();
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(&CONV)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            ChangedBlob {
+                id: CONV,
+                content_nonce: nonce,
+                version,
+                size: bytes.len(),
+                attachment_id: None,
+            }
+        }
+
+        fn write_local(dir: &Path, bytes: &[u8]) {
+            std::fs::create_dir_all(dir.join("chats")).unwrap();
+            std::fs::write(dir.join("chats").join(hex(&CONV)), bytes).unwrap();
+        }
+
+        fn run_conversation_phase(
+            io: &dyn VaultIo,
+            t: &FakeTransport,
+            dir: &Path,
+            rec: Option<&ChangedBlob>,
+        ) -> Result<ChatsConversationPhase, SyncCycleError> {
+            blocking(sync_chats_conversation_phase(
+                io,
+                t,
+                "tok",
+                &ROOT,
+                &HASH,
+                dir,
+                &CONV,
+                rec,
+                MetaVersion::V0_1,
+            ))
+        }
+
+        /// A `VaultIo` whose reads always fail with a non-`NotFound` kind:
+        /// pins the absent-vs-unreadable distinction (a wrapper that failed
+        /// everything would prove nothing about the `NotFound` arm, which is
+        /// exactly why the absent test below uses the real `IO`).
+        struct FailReads;
+        #[async_trait::async_trait]
+        impl VaultIo for FailReads {
+            async fn read(&self, _path: &Path) -> IoResult<Vec<u8>> {
+                Err(crate::io_failure_kind::IoFailureKind::Other)
+            }
+            async fn read_prefix(&self, path: &Path, len: usize) -> IoResult<Vec<u8>> {
+                crate::vault_io::StdVaultIo.read_prefix(path, len).await
+            }
+            async fn write(
+                &self,
+                path: &Path,
+                bytes: &[u8],
+                opts: crate::vault_io::WriteOpts,
+            ) -> IoResult<()> {
+                crate::vault_io::StdVaultIo.write(path, bytes, opts).await
+            }
+            async fn remove_file(&self, path: &Path) -> IoResult<()> {
+                crate::vault_io::StdVaultIo.remove_file(path).await
+            }
+            async fn remove_dir_all(&self, path: &Path) -> IoResult<()> {
+                crate::vault_io::StdVaultIo.remove_dir_all(path).await
+            }
+            async fn create_dir_all(&self, path: &Path) -> IoResult<()> {
+                crate::vault_io::StdVaultIo.create_dir_all(path).await
+            }
+            async fn read_dir(&self, path: &Path) -> IoResult<Vec<crate::vault_io::DirEntry>> {
+                crate::vault_io::StdVaultIo.read_dir(path).await
+            }
+            async fn exists(&self, path: &Path) -> IoResult<bool> {
+                crate::vault_io::StdVaultIo.exists(path).await
+            }
+            async fn is_dir(&self, path: &Path) -> IoResult<bool> {
+                crate::vault_io::StdVaultIo.is_dir(path).await
+            }
+            async fn rename(&self, from: &Path, to: &Path) -> IoResult<()> {
+                crate::vault_io::StdVaultIo.rename(from, to).await
+            }
+        }
+
+        // The refused outcome's contract, pinned where a sixth arm cannot
+        // silently invent a new shape: nothing dirty, nothing applied,
+        // an empty roster (so the catalog-guarded loops are inert), skipped.
+        #[test]
+        fn skipped_outcome_holds_its_invariants() {
+            let phase = skipped_chats_phase();
+            assert!(phase.skipped);
+            assert!(!phase.dirty);
+            assert!(!phase.applied_remote);
+            assert!(phase.push_bytes.is_none());
+            assert!(phase.merged.is_empty());
+        }
+
+        // A virgin no-conversations vault stays chats-silent: no file, no
+        // record, nothing to push.
+        #[test]
+        fn virgin_vault_stays_chats_silent() {
+            let dir = scratch("virgin");
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let catid = chats_catalog_sync_id(&ROOT);
+            let phase = blocking(sync_chats_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &catid,
+                None,
+                MetaVersion::V0_1,
+            ))
+            .unwrap();
+            assert!(!phase.dirty);
+            assert!(!phase.skipped);
+            assert!(phase.push_bytes.is_none());
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // An unreadable local catalog refuses the plane even against a live
+        // remote record: the garbage on disk is untouched (never adopted as
+        // the merge base, never re-pushed over the server).
+        #[test]
+        fn unreadable_local_catalog_skips_the_plane() {
+            let dir = scratch("unreadable");
+            std::fs::write(dir.join("vault.chats"), b"torn-bytes").unwrap();
+            let remote_bytes = protocol::encode_chats_catalog_blob_versioned(
+                MetaVersion::V0_1,
+                &chats_catalog_key(),
+                &HASH,
+                b"{}",
+            )
+            .unwrap();
+            let t = FakeTransport::new();
+            let catid = chats_catalog_sync_id(&ROOT);
+            let nonce = read_chats_catalog_nonce(&remote_bytes).unwrap();
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(&remote_bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(&catid)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            let rec = ChangedBlob {
+                id: catid,
+                content_nonce: nonce,
+                version: 3,
+                size: remote_bytes.len(),
+                attachment_id: None,
+            };
+            let mut st = SyncState::default();
+            let phase = blocking(sync_chats_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &catid,
+                Some(&rec),
+                MetaVersion::V0_1,
+            ))
+            .unwrap();
+            assert!(phase.skipped, "an unreadable store refuses, never merges");
+            assert!(!phase.dirty);
+            assert_eq!(
+                std::fs::read(dir.join("vault.chats")).unwrap(),
+                b"torn-bytes",
+                "the refused store is never written"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Absent local file + a verified remote record: the remote is
+        // adopted verbatim (the `NotFound`-is-absent arm, not a refusal).
+        #[test]
+        fn absent_conversation_file_adopts_verified_remote() {
+            let dir = scratch("absent");
+            let t = FakeTransport::new();
+            let remote_bytes = seal_conversation(vec![turn("t1", "hello")], Some("remote-title"));
+            let rec = serve_remote(&t, &remote_bytes, 2);
+            let phase = run_conversation_phase(&IO, &t, &dir, Some(&rec)).unwrap();
+            assert!(
+                phase.push_bytes.is_none(),
+                "verbatim adoption pushes nothing"
+            );
+            assert!(phase.remote.is_some());
+            assert_eq!(
+                std::fs::read(dir.join("chats").join(hex(&CONV))).unwrap(),
+                remote_bytes,
+                "adoption is byte-verbatim"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A conversation file that exists but cannot be READ refuses for the
+        // cycle: it must not merge as the empty turn list (which would adopt
+        // the remote over turns that never reached the server).
+        #[test]
+        fn unreadable_conversation_file_refuses_for_the_cycle() {
+            let dir = scratch("unreadable-conv");
+            let io = FailReads;
+            let t = FakeTransport::new();
+            let remote_bytes = seal_conversation(vec![turn("t1", "hello")], Some("remote-title"));
+            let rec = serve_remote(&t, &remote_bytes, 2);
+            let err = run_conversation_phase(&io, &t, &dir, Some(&rec)).unwrap_err();
+            assert!(
+                matches!(err, SyncCycleError::Io),
+                "a failed read refuses, never merges-as-empty"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // The merge carries the title snapshot: local wins on disagreement,
+        // and the merged file keeps the § 9.24.2 shape.
+        #[test]
+        fn conversation_merge_keeps_the_local_title() {
+            let dir = scratch("title");
+            let t = FakeTransport::new();
+            write_local(
+                &dir,
+                &seal_conversation(vec![turn("t1", "hello")], Some("local-title")),
+            );
+            let remote_bytes = seal_conversation(
+                vec![turn("t1", "hello"), turn("t2", "and more")],
+                Some("remote-title"),
+            );
+            let rec = serve_remote(&t, &remote_bytes, 2);
+            let phase = run_conversation_phase(&IO, &t, &dir, Some(&rec)).unwrap();
+            assert!(
+                phase.push_bytes.is_some(),
+                "a merge that beats the server pushes"
+            );
+            let merged =
+                open_conversation(&std::fs::read(dir.join("chats").join(hex(&CONV))).unwrap());
+            assert_eq!(turn_ids(&merged), vec!["t1".to_string(), "t2".to_string()]);
+            assert_eq!(
+                merged.get("title_derived_from").and_then(|s| s.as_str()),
+                Some("local-title"),
+                "the local snapshot survives the merge"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // An agreed title does not churn the nonce: identical turns and an
+        // identical snapshot adopt the server bytes verbatim.
+        #[test]
+        fn conversation_agreed_title_adopts_verbatim() {
+            let dir = scratch("title-agree");
+            let t = FakeTransport::new();
+            let local_bytes = seal_conversation(vec![turn("t1", "hello")], Some("shared-title"));
+            write_local(&dir, &local_bytes);
+            // A distinct seal of the same turns and title: same plaintext,
+            // different outer nonce, so verbatim adoption is observable.
+            let remote_bytes = seal_conversation(vec![turn("t1", "hello")], Some("shared-title"));
+            let rec = serve_remote(&t, &remote_bytes, 5);
+            let phase = run_conversation_phase(&IO, &t, &dir, Some(&rec)).unwrap();
+            assert!(phase.push_bytes.is_none(), "an agreed merge pushes nothing");
+            assert_eq!(
+                std::fs::read(dir.join("chats").join(hex(&CONV))).unwrap(),
+                remote_bytes,
+                "adoption is byte-verbatim"
+            );
+            std::fs::remove_dir_all(&dir).ok();
         }
     }
 

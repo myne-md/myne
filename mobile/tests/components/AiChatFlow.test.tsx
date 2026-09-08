@@ -19,7 +19,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 
 import { clearAgent, clearAgentForLock, getAgent } from "@myne/agent-store";
 import type { AgentRunView, RunProgress } from "@myne/agent-protocol";
-
 // The COMPLETE binding mock, from one place. A per-file mock breaks whenever a
 // different task wires a new call into a surface this file mounts, and the spec
 // that then fails is never the one whose subject changed.
@@ -34,6 +33,25 @@ import {
 
 vi.mock("../../src/lib/agent-run", () => agentRunModule());
 
+const {
+  mockChatsList,
+  mockChatsRead,
+  mockChatsCreate,
+  mockChatsAppendTurn,
+} = vi.hoisted(() => ({
+  mockChatsList: vi.fn(),
+  mockChatsRead: vi.fn(),
+  mockChatsCreate: vi.fn(),
+  mockChatsAppendTurn: vi.fn(),
+}));
+
+vi.mock("../../src/lib/chats", () => ({
+  chatsList: mockChatsList,
+  chatsRead: mockChatsRead,
+  chatsCreate: mockChatsCreate,
+  chatsAppendTurn: mockChatsAppendTurn,
+}));
+
 // The scope strip reads the provider to decide whether it may say the notes
 // leave the device. Stubbed so this file's subject stays the cost disclosure;
 // the strip's own claims are asserted in `AiScopeSheet.test.tsx`.
@@ -42,6 +60,7 @@ vi.mock("../../src/lib/use-prefs", () => ({
 }));
 
 const { AiChatFlow } = await import("../../src/app/flows/AiChatFlow");
+const { __resetChatHistoryForTest } = await import("../../src/lib/chatHistory");
 
 const VIEW: AgentRunView = { runId: "run-1", scopeTotal: 3 };
 
@@ -71,6 +90,16 @@ beforeEach(() => {
   // and the three that assert a refusal would find a passing verdict already in
   // the store and never probe at all. That is exactly how it failed once.
   clearAgentForLock();
+  // The transcript write-dedup is module state too: without the reset, one
+  // test's persisted payload is the next test's "already written".
+  __resetChatHistoryForTest();
+  // No conversations by default: continue-last and persistence specs opt in.
+  // Without this the mount effect's chatsList rejects (no Tauri in jsdom)
+  // and every mount renders the history-error paragraph.
+  mockChatsList.mockReset().mockResolvedValue([]);
+  mockChatsRead.mockReset().mockRejectedValue(new Error("no conversation"));
+  mockChatsCreate.mockReset().mockResolvedValue("c0ffee".padEnd(32, "0"));
+  mockChatsAppendTurn.mockReset().mockResolvedValue(undefined);
 });
 afterEach(cleanup);
 
@@ -113,9 +142,9 @@ describe("AiChatFlow", () => {
       // The interface language and the chat-history seed, which develop's
       // myne-md/myne#618 and #617 made REQUIRED arguments. Asserted rather
       // than skipped: the whole point of checking the whole call is that a new
-      // argument cannot be added without someone deciding it should be, and
-      // the empty history is a claim about this flow (its turns live in
-      // component state, so there is nothing to seed) rather than an oversight.
+      // argument cannot be added without someone deciding it should be. Empty
+      // here because no conversation is open; the seeding spec below pins the
+      // non-empty case.
       "en",
       [],
       expect.any(Function),
@@ -402,5 +431,67 @@ describe("AiChatFlow: the capability gate", () => {
     await waitFor(() => expect(agentStart).toHaveBeenCalledTimes(2));
 
     expect(agentCapability).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AiChatFlow: conversation history (myne-md/myne#675)", () => {
+  const ROWS = [
+    { id: "a1", created_at: 100, title: "Older", updated_at: 100, version: 1 },
+    { id: "b2", created_at: 200, title: "Newer", updated_at: 300, version: 2 },
+  ];
+  const PAYLOAD = JSON.stringify({
+    title_derived_from: "Newer",
+    turns: [
+      { id: "h1", kind: "text", role: "user", text: "previous question" },
+      { id: "h2", kind: "text", role: "assistant", text: "previous answer" },
+    ],
+  });
+
+  it("continues the newest conversation on mount", async () => {
+    mockChatsList.mockResolvedValue(ROWS);
+    mockChatsRead.mockResolvedValue(PAYLOAD);
+    mount();
+
+    // The newest row's turns render; the older row's id is never read.
+    await waitFor(() => expect(mockChatsRead).toHaveBeenCalledWith("b2"));
+    expect(screen.getByTestId("ai.chat").textContent).toContain("previous question");
+    expect(screen.getByTestId("ai.chat").textContent).toContain("previous answer");
+  });
+
+  it("appends the settled pair to the open conversation", async () => {
+    mockChatsList.mockResolvedValue([]);
+    agentStart.mockResolvedValue(finished("settled answer"));
+    mount();
+    type("a fresh question");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    // First send creates (no conversation open yet) with both turns.
+    await waitFor(() => expect(mockChatsCreate).toHaveBeenCalledTimes(1));
+    const created = JSON.parse(mockChatsCreate.mock.calls[0]![0] as string);
+    expect(created.turns.map((t: { text: string }) => t.text)).toEqual([
+      "a fresh question",
+      "",
+    ]);
+    expect(created.turns[1].agentSummary.summary).toBe("settled answer");
+    // And the pair renders in the transcript.
+    expect(screen.getByTestId("ai.chat").textContent).toContain("a fresh question");
+  });
+
+  it("seeds the next run with the open conversation", async () => {
+    mockChatsList.mockResolvedValue(ROWS);
+    mockChatsRead.mockResolvedValue(PAYLOAD);
+    agentStart.mockResolvedValue(finished("follow-up answer"));
+    mount();
+    await waitFor(() => expect(mockChatsRead).toHaveBeenCalled());
+
+    type("follow up");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalled());
+    // Fourth argument is the history seed: the continued turns, not [].
+    const seed = agentStart.mock.calls[0]![3] as { role: string; text: string }[];
+    expect(seed).toEqual([
+      { role: "user", text: "previous question" },
+      { role: "assistant", text: "previous answer" },
+    ]);
   });
 });

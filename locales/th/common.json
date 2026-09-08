@@ -1114,7 +1114,19 @@
           "tagsThinking": "กำลังแนะนำแท็ก…",
           "thinking": "AI กำลังคิด…",
           "truncated": "สรุปจาก {{count}} อักขระแรก",
-          "you": "คุณ"
+          "you": "คุณ",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "แท็บทั้งหมดถูกซ่อนอยู่ คลิกขวาเพื่อเรียกคืน",
         "outline": {
@@ -3030,7 +3042,8 @@
         "whatLabel": "อะไรจะออกจากอุปกรณ์ของคุณ",
         "whenLabel": "ออกไปเมื่อใด",
         "whoLabel": "ใครเป็นผู้รับ",
-        "connectionLabel": "ส่งผ่านอย่างไร"
+        "connectionLabel": "ส่งผ่านอย่างไร",
+        "excludedLabel": ""
       },
       "disclosureToggle": "ทำงานอย่างไร",
       "enableHelper": "เรียกใช้โมเดลที่คุณจัดหามาเอง โมเดลจะทำงานที่ใด และโน้ตของคุณจะออกจากอุปกรณ์นี้หรือไม่ ขึ้นอยู่กับผู้ให้บริการที่คุณระบุไว้ด้านล่าง อยู่ในขั้นทดลอง ปิดอยู่ตามค่าเริ่มต้น",

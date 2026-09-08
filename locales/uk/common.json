@@ -1221,7 +1221,19 @@
           "tagsThinking": "Пропонуємо теги…",
           "thinking": "ШІ думає…",
           "truncated": "Підсумовано перші {{count}} символів.",
-          "you": "Ви"
+          "you": "Ви",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Усі вкладки сховані. Клацніть правою кнопкою, щоб відновити.",
         "outline": {
@@ -3260,7 +3272,8 @@
         "whatLabel": "Що залишає ваш пристрій",
         "whenLabel": "Коли воно залишає пристрій",
         "whoLabel": "Хто це отримує",
-        "connectionLabel": "Як це передається"
+        "connectionLabel": "Як це передається",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Як це працює?",
       "enableHelper": "Запускає надану вами модель. Де вона працює і чи залишають ваші нотатки цей пристрій, залежить від постачальника, якого ви вкажете нижче. Експериментально, вимкнено за замовчуванням.",

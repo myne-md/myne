@@ -11,6 +11,7 @@ import { resetTaskIndexCache } from "../notes/taskIndex";
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
+import { clearChatPersistForLock } from "../notes/ai/chatPersist";
 import { resetScrollMemory } from "../notes/scrollMemory";
 import { resetRecentNotes } from "../notes/recentNotes";
 import { resetDecodedAspects } from "../editor/attachments/decoded-aspect";
@@ -93,6 +94,12 @@ export async function lockVault(): Promise<void> {
   // session comes through here. `design-notes/ai/0276` rests its
   // no-new-blob-family argument on the transcript not outliving the session.
   teardownStep("clearChat", () => clearChat());
+  teardownStep("clearChatPersistForLock", () => clearChatPersistForLock());
+  // The persist module's write state, on the same leg: the last serialized
+  // payload, one stashed failed append, and the lagging flag are the same
+  // plaintext the transcript is, and module state survives the wipe above
+  // (myne-md/myne#675 review: a stash that survived the lock kept vault A's
+  // turns resident into vault B's session, and replayed them there).
   // The rendered AI output, on the same leg and for the same reason. It holds a
   // note's summary and, through `src/lib/ai-qa.ts`, every Q and A answer over
   // note content, and its own header calls that an AS1-class RAM artifact

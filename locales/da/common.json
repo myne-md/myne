@@ -1123,7 +1123,19 @@
           "tagsThinking": "Foreslår tags…",
           "thinking": "AI tænker…",
           "truncated": "Opsummerede de første {{count}} tegn.",
-          "you": "Dig"
+          "you": "Dig",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Alle faner er skjult. Højreklik for at gendanne.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Hvad der forlader din enhed",
         "whenLabel": "Hvornår det sendes",
         "whoLabel": "Hvem der modtager det",
-        "connectionLabel": "Hvordan det rejser"
+        "connectionLabel": "Hvordan det rejser",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Hvordan fungerer det?",
       "enableHelper": "Kører en model, du selv leverer. Hvor den kører, og om dine noter forlader denne enhed, afhænger begge dele af den udbyder, du angiver nedenfor. Eksperimentel, slået fra som standard.",

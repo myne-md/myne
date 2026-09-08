@@ -1123,7 +1123,19 @@
           "tagsThinking": "Etiketler öneriliyor…",
           "thinking": "Yapay zeka düşünüyor…",
           "truncated": "İlk {{count}} karakter özetlendi.",
-          "you": "Siz"
+          "you": "Siz",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Tüm sekmeler gizli. Geri yüklemek için sağ tıklayın.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Cihazınızdan ne çıkıyor",
         "whenLabel": "Ne zaman çıkıyor",
         "whoLabel": "Kim alıyor",
-        "connectionLabel": "Nasıl iletiliyor"
+        "connectionLabel": "Nasıl iletiliyor",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Bu nasıl çalışır?",
       "enableHelper": "Sağladığınız bir modeli çalıştırır. Nerede çalıştığı ve notlarınızın bu cihazdan çıkıp çıkmadığı, aşağıda belirttiğiniz sağlayıcıya bağlıdır. Deneyseldir, varsayılan olarak kapalıdır.",
