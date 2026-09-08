@@ -547,6 +547,41 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     );
   });
 
+  // myne-md/myne#675. A settled turn carries its run's frozen proposal, so
+  // history shows what was proposed after `agentStore` drops the live copy on
+  // lock. Read-only: a frozen proposal may quote a note that has since
+  // changed, been trashed, or moved folders, so NOTHING in the section may
+  // write: no insert control, no apply button, no button at all.
+  it("renders a settled run's frozen proposal, and offers no way to apply it", () => {
+    sendAgentTurn("tidy the headings", "Projects");
+    settleAgentTurn({
+      ...SUMMARY,
+      proposal: {
+        edits: [{ noteId: "n1", anchor: "old words", replacement: "new words" }],
+        newNotes: [{ title: "Scratch", body: "fresh text", folder: null }],
+      },
+    });
+    render(<AiChatTab />);
+
+    const section = screen.getByTestId("ai.agent-proposal");
+    expect(section.textContent).toContain("old words");
+    expect(section.textContent).toContain("new words");
+    expect(section.textContent).toContain("Scratch");
+    expect(section.textContent).toContain("fresh text");
+    expect(
+      section.querySelector('[data-testid="ai.proposal-edit"]')?.getAttribute("data-note-id"),
+    ).toBe("n1");
+    expect(section.querySelector('[data-testid="ai.insert-turn"]')).toBeNull();
+    expect(section.querySelector("button")).toBeNull();
+  });
+
+  it("renders no proposal section for a run that proposed nothing", () => {
+    sendAgentTurn("how many tasks", "This note");
+    settleAgentTurn({ ...SUMMARY, edits: 0, newNotes: 0 });
+    render(<AiChatTab />);
+    expect(screen.queryByTestId("ai.agent-proposal")).toBeNull();
+  });
+
   // myne-md/myne#568. In one mode a question is a run like any other and
   // `finish` is how it is answered, so the summary IS the reply. It used to
   // render only inside the review dialog, which is how a question about a note

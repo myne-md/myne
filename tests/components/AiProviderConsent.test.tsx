@@ -98,6 +98,7 @@ vi.mock("react-i18next", () => ({
 
 import { AiPanel } from "../../src/components/settings/AiPanel";
 import {
+  CONSENT_EXCLUDED_FOLDERS,
   CONSENT_WHAT_LEAVES,
   CONSENT_WHEN_IT_LEAVES,
   consentCannotVerify,
@@ -170,6 +171,19 @@ describe("the per-provider consent screen", () => {
     // applies here.
     expect(screen.getByTestId("ai-consent.connection").textContent).toContain(
       "direct",
+    );
+  });
+
+  it("states what new reads never touch: the excluded-folders list", async () => {
+    // myne-md/myne#675. The clause about the content control rather than the
+    // disclosure: excluded folders are closed to new reads, the list is the
+    // same one the CLI honors, empty excludes nothing, and saved conversation
+    // text keeps seeding. Identity, like every other clause on this screen.
+    render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.provider-choice-openrouter"));
+    await screen.findByTestId("ai-consent.screen");
+    expect(screen.getByTestId("ai-consent.excluded").textContent).toBe(
+      CONSENT_EXCLUDED_FOLDERS,
     );
   });
 

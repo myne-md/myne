@@ -262,6 +262,21 @@ fn main() {
                     .commands(&["graph_layout_read", "graph_layout_write"]),
             )
             .plugin(
+                // AI conversations (MYM1 catalog + MYJ1 files, myne-md/myne#675):
+                // shared from `myne-core`; the same six commands the desktop
+                // registers. Adding a command here without a matching entry in
+                // `permissions/chats/default.toml` is a security bug.
+                "chats",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "chats_create",
+                    "chats_append_turn",
+                    "chats_read",
+                    "chats_list",
+                    "chats_rename",
+                    "chats_delete",
+                ]),
+            )
+            .plugin(
                 // Sealed label store (MYL1, §9.22): the device-local
                 // hide-vault-names option (myne-md/myne#411): shared from
                 // `myne-core`; the same THREE commands the desktop registers, and

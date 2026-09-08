@@ -1123,7 +1123,19 @@
           "tagsThinking": "Đang gợi ý thẻ…",
           "thinking": "AI đang suy nghĩ…",
           "truncated": "Đã tóm tắt {{count}} ký tự đầu tiên.",
-          "you": "Bạn"
+          "you": "Bạn",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Tất cả tab đều bị ẩn. Nhấp chuột phải để khôi phục.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Những gì rời khỏi thiết bị của bạn",
         "whenLabel": "Khi nào nó rời đi",
         "whoLabel": "Ai nhận được nó",
-        "connectionLabel": "Cách nó được truyền đi"
+        "connectionLabel": "Cách nó được truyền đi",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Cách này hoạt động thế nào?",
       "enableHelper": "Chạy một mô hình do bạn cung cấp. Việc nó chạy ở đâu, và ghi chú của bạn có rời khỏi thiết bị này hay không, đều phụ thuộc vào nhà cung cấp mà bạn khai báo bên dưới. Thử nghiệm, tắt theo mặc định.",

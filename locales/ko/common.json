@@ -1123,7 +1123,19 @@
           "tagsThinking": "태그 제안 중…",
           "thinking": "AI가 생각 중…",
           "truncated": "처음 {{count}}자를 요약했습니다.",
-          "you": "나"
+          "you": "나",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "모든 탭이 숨겨졌습니다. 마우스 오른쪽 버튼으로 복원하세요.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "기기를 떠나는 것",
         "whenLabel": "언제 떠나는지",
         "whoLabel": "누가 받는지",
-        "connectionLabel": "어떻게 전송되는지"
+        "connectionLabel": "어떻게 전송되는지",
+        "excludedLabel": ""
       },
       "disclosureToggle": "어떻게 작동하나요?",
       "enableHelper": "사용자가 제공한 모델을 실행합니다. 모델이 어디에서 실행되는지, 그리고 노트가 이 기기를 떠나는지는 아래에서 지정하는 제공업체에 따라 달라집니다. 실험적이며 기본적으로 꺼져 있습니다.",

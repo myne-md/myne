@@ -1114,7 +1114,19 @@
           "tagsThinking": "ٹیگز تجویز ہو رہے ہیں…",
           "thinking": "AI سوچ رہا ہے…",
           "truncated": "پہلے {{count}} حروف کا خلاصہ کیا گیا۔",
-          "you": "آپ"
+          "you": "آپ",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "تمام ٹیبس چھپے ہوئے ہیں۔ بحال کرنے کے لیے دائیں کلک کریں۔",
         "outline": {
@@ -3030,7 +3042,8 @@
         "whatLabel": "آپ کے آلے سے کیا باہر جاتا ہے",
         "whenLabel": "یہ کب باہر جاتا ہے",
         "whoLabel": "اسے کون وصول کرتا ہے",
-        "connectionLabel": "یہ کیسے جاتا ہے"
+        "connectionLabel": "یہ کیسے جاتا ہے",
+        "excludedLabel": ""
       },
       "disclosureToggle": "یہ کیسے کام کرتا ہے؟",
       "enableHelper": "آپ کا فراہم کردہ ماڈل چلاتا ہے۔ یہ کہاں چلتا ہے، اور آیا آپ کے نوٹس اس آلے سے باہر جاتے ہیں، اس کا انحصار اس فراہم کنندہ پر ہے جس کا نام آپ نیچے درج کرتے ہیں۔ تجرباتی، طے شدہ طور پر بند۔",

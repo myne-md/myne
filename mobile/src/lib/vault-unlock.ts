@@ -11,6 +11,7 @@ import {
 } from "./graph-layout-persist";
 import { flushWorkspaceNow, resetWorkspaceOnLock } from "./workspace-persist";
 import { endAgentRun } from "./agent-lifetime";
+import { clearChatHistoryPersistForLock } from "./chatHistory";
 // The attachment caches live in the SHARED editor package, and mobile compiles
 // it: `editor-host.ts` wires a real `attachments` host, so the same decoration
 // fills the same module-scope maps here that it does on desktop. Cleared from
@@ -63,6 +64,12 @@ export async function lockVault(): Promise<void> {
   // first await rather than after: an await that rejects must not be able to
   // skip it.
   endAgentRun("lock", "");
+  // The staged conversation write state, on the same leg and for the same
+  // reason: a staged transcript is the full serialized plaintext, and every
+  // vault change on mobile comes through here, so a survivor would carry one
+  // vault's conversation into the next session's RAM. Synchronous like the
+  // drop above, before the first await.
+  clearChatHistoryPersistForLock();
   await flushGraphLayoutNow();
   resetGraphLayoutOnLock();
   await flushWorkspaceNow();

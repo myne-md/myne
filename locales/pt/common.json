@@ -1172,7 +1172,19 @@
           "tagsThinking": "A sugerir etiquetas…",
           "thinking": "A IA está a pensar…",
           "truncated": "Foram resumidos os primeiros {{count}} caracteres.",
-          "you": "Você"
+          "you": "Você",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Todos os separadores estão ocultos. Clique com o botão direito para restaurar.",
         "outline": {
@@ -3155,7 +3167,8 @@
         "whatLabel": "O que sai do seu dispositivo",
         "whenLabel": "Quando sai",
         "whoLabel": "Quem o recebe",
-        "connectionLabel": "Como viaja"
+        "connectionLabel": "Como viaja",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Como funciona?",
       "enableHelper": "Executa um modelo fornecido por si. Onde é executado, e se as suas notas saem deste dispositivo, depende do fornecedor que indicar abaixo. Experimental, desativado por predefinição.",

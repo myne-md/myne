@@ -241,6 +241,9 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 prefs-sync-id"` | Reserved sync blob-id for `vault.prefs` (Phase 2 sync; `sync-protocol.md` §10.2.1) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.prefs` (MYND-478). Like the attachments catalog, `vault.prefs` is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `prefs_sync_id = DeriveSubkey(root_key, "prefs-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (keyed pseudorandom bytes, not a recognizable sentinel). Like `catalog-sync-id`, this derives an *identifier*, not key material — the prefs KEK remains `prefs-key`. |
 | `"myne.v0.1 custom-themes-key"` | KEK for the `vault.themes` blob (§9.21) | Active when `vault.themes` is written (MYND-486). `root_key`-derived (itemsKey-independent), like prefs/search/workspace/dictionary — so a custom-theme palette survives a later epoch-rotation `itemsKey` evolution. |
 | `"myne.v0.1 themes-sync-id"` | Reserved sync blob-id for `vault.themes` (Phase 2 sync; `sync-protocol.md` §10.2.2) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.themes` (MYND-486). Like `vault.prefs` and the attachments catalog, `vault.themes` is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (keyed pseudorandom bytes, not a recognizable sentinel). Like `catalog-sync-id` / `prefs-sync-id`, this derives an *identifier*, not key material — the themes KEK remains `custom-themes-key`. |
+| `"myne.v0.1 chats-catalog-key"` | KEK for the `vault.chats` conversations catalog singleton (§9.23) | Active when `vault.chats` is written (myne-md/myne#675). `root_key`-derived (itemsKey-independent), like prefs/search/themes. |
+| `"myne.v0.1 chats-catalog-sync-id"` | Reserved sync blob-id for `vault.chats` (Phase 2 sync; `sync-protocol.md` §4.2). **Not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls the conversations catalog (myne-md/myne#675). Like prefs/themes, the catalog is a synced singleton outside the head manifest, so it needs a deterministic, device-independent 16-byte identifier: `chats_catalog_sync_id = DeriveSubkey(root_key, "chats-catalog-sync-id")[0..16]`. This derives an *identifier*, not key material: the catalog's KEK remains `chats-catalog-key`. The per-conversation files of §9.24 need no sync-id role of their own: their sync blob-id is the conversation id's own 16 bytes, the attachment-id pattern (id-generic server). |
+| `"myne.v0.1 chats-key"` | KEK for the per-conversation AI chat blobs (`chats/<id>`, §9.24, `MYJ1`) | Active when a conversation file is written (myne-md/myne#675). `root_key`-derived (itemsKey-independent), like prefs/search/attachment-text. One KEK for the whole family; per-conversation separation comes from the `conversation_id` AAD binding (§9.24.3), the `MYE1` archetype. |
 | (future next-major contexts) | reserved | not derived in v0.1. |
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "`, and the next major version's context strings use its own prefix, which is not pre-allocated in v0.1.
@@ -432,6 +435,10 @@ AAD_ai_embeddings_blob =
 `AAD_vault_label_blob` is the AAD bound into the AEAD seal of the sealed label store (`vault.label`, `MYL1`, §9.22). Like `AAD_pending_capture_blob` it binds **neither** `account_number_hash` **nor** `items_key_id`, and it has no `DeriveSubkey` role, because its KEK is a **per-vault** device-local key held in the OS keychain rather than a `root_key` product (§9.22.2), and because the file belongs to a vault *directory* rather than to an account (one account can hold two vault directories on one device). It instead binds the 16-byte `vault_id` after the role string `"vault-label-blob"` (length-prefixed UTF-8: 2-B big-endian length + 16 ASCII bytes). Total AAD length: `10 + 1 + 18 + 16 = 45 bytes`. One property is stronger here than in §9.18/§9.20: the bound `vault_id` is the one the **reader expected**, not merely the one the blob's own header carries, so a sealed file moved between vault directories fails AEAD instead of relying on an implementer's comparison. §9.22.3 states that as a MUST.
 
 `AAD_graph_layout_blob` is the AAD bound into the AEAD seal of `vault.graph` (`MYG1`, §9.19), the encrypted knowledge-graph layout cache. It mirrors `AAD_workspace_blob` exactly, with the role string `"graph-layout-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes, total 19 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the layout blob to its specific vault. Total AAD length: `10 + 1 + 19 + 16 = 46 bytes`. As with prefs/search/workspace, `items_key_id` is **not** bound: `graph_layout_key` derives directly from `root_key` via `"myne.v0.1 graph-layout-key"` (§3.4), independent of the `itemsKey` lineage.
+
+`AAD_chats_catalog` is the AAD bound into the AEAD wrap of `vault.chats` (`MYM1`, §9.23), the encrypted AI conversations catalog. It mirrors `AAD_prefs_blob` exactly, with the role string `"chats-catalog"` (length-prefixed UTF-8: 2-B big-endian length + 13 ASCII bytes, total 15 bytes) and the same 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the catalog to its specific vault. Total AAD length: `10 + 1 + 15 + 16 = 42 bytes`. As with prefs/search/themes, `items_key_id` is **not** bound: the catalog KEK derives directly from `root_key` via `"myne.v0.1 chats-catalog-key"` (§3.4), independent of the `itemsKey` lineage.
+
+`AAD_chats_blob` is the AAD bound into the AEAD seal of a per-conversation AI chat file (`chats/<conversation-id-hex>`, `MYJ1`, §9.24). It follows the `AAD_attachment_text` per-entry pattern with the conversation id in the per-entry position: the role string `"chats-blob"` (length-prefixed UTF-8: 2-B big-endian length + 10 ASCII bytes, total 12 bytes), then the 16-byte `conversation_id` (also the on-disk filename, hex), then the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6). Total AAD length: `10 + 1 + 12 + 16 + 16 = 55 bytes`. Binding both ids prevents substituting one conversation's blob for another within the same vault and porting a blob across vaults at the AEAD layer. As with the whole `root_key`-derived family, `items_key_id` is **not** bound: `chats_key` derives via `"myne.v0.1 chats-key"` (§3.4), one KEK for the family with per-conversation separation from this AAD, the `MYE1` archetype.
 
 **Length-prefix encoding for variable-width AAD fields.** All length-prefixed UTF-8 fields in this section and in §3.1 — the `password-wrap` and `recovery-wrap` role strings in `AAD_password_wrap` / `AAD_recovery_wrap`, and the `content_type` field in `AAD_encrypt_content` — are encoded as a **2-byte big-endian unsigned length** followed by the UTF-8 bytes. This matches the binary-format convention elsewhere in this spec (§9.2 reads `enc_item_key_len` as 2 bytes big-endian).
 
@@ -709,6 +716,7 @@ A Myne vault is a directory on the user's filesystem containing:
 ├── vault.embeddings      ← encrypted AI embedding index (MYR1, §9.17)
 ├── vault.graph           ← encrypted graph-layout cache (MYG1, §9.19)
 ├── vault.themes          ← encrypted custom-theme palettes (MYT1, §9.21)
+├── vault.chats           ← encrypted AI conversations catalog (MYM1, §9.23)
 ├── notes/
 │   ├── 0184a2b3-...myn   ← one encrypted note per file
 │   ├── 0184a2b4-...myn
@@ -720,6 +728,9 @@ A Myne vault is a directory on the user's filesystem containing:
 │                            <attachment-id-hex>; catalog is vault.attachments (MYC1, §9.10)
 └── attachments-text/     ← encrypted per-attachment extracted-text cache (MYE1,
                              §9.15), one per <attachment-id-hex>
+    chats/                ← encrypted AI conversation turn lists (MYJ1, §9.24),
+                             one per <conversation-id-hex>; catalog is vault.chats
+                             (MYM1, §9.23)
 ```
 
 - **Only `vault.meta` and `notes/` are required.** Every other entry is created lazily, the first time the feature that owns it writes; the tree above is an index, and each `vault.*` singleton's own §9.x section is normative for its envelope, KEK, AAD, size cap, and backup/sync class. A vault missing any of them is well-formed — the reader falls back per §9.x (rebuild for a cache, empty/default for a preference blob), never a parse failure.
@@ -1447,6 +1458,8 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.prefs` | IN if present | User data (label, deliberate folders, ordering — AS3) |
 | `vault.dictionary` | IN if present | Personal dictionary is authoritative user data (§9.13) — a Class-1 sync member, so `sync ⊆ backup` (`sync-protocol.md` §9) requires it here |
 | `vault.themes` | IN if present | Custom themes are authoritative user data (§9.21) — hand-authored palettes, a Class-1 sync member, so `sync ⊆ backup` (`sync-protocol.md` §9) requires it here |
+| `vault.chats` | IN if present | The AI conversations catalog is authoritative user content (§9.23, myne-md/myne#675): a Class-1 sync member, so `sync ⊆ backup` requires it here. Carrying the tombstones is load-bearing: a restore must not resurrect a conversation deleted before the backup |
+| `chats/` (per-conversation files) | IN if present | One `MYJ1` file per catalog entry (§9.24). A conversation whose catalog row is a tombstone is absent by construction (delete removes the file first), so the pair restores coherently |
 | `notes/<uuid>.myn` | IN | Note content; trash rides inside (`trashed:` frontmatter) |
 | `snapshots/<note-uuid>__<snap-uuid>.myn` | IN | Version history is user data (`decisions.md` 2026-06-10) |
 | `vault.attachments` | IN if present | Authoritative attachment metadata (§9.10) |
@@ -2456,6 +2469,106 @@ Three limits are recorded here rather than rounded off; the first two are stated
 
 **Falling back to a plaintext name when no keychain is available is forbidden.** It would look identical on screen while voiding the erase guarantee and making the threat-model paragraph false.
 
+### 9.23 AI conversations catalog (`vault.chats`, `MYM1`)
+
+`vault.chats` is a vault-level singleton artifact carrying the **conversation roster** for the AI chat history (myne-md/myne#675): one entry per persisted conversation, holding its id, title, created/updated timestamps, causal `version`, and deletion tombstone. The turn text itself lives in the per-conversation files of §9.24; this catalog is the enumerable index over them, the same pair shape as `vault.attachments` (§9.10) over `attachments/` (§9.9). It is **Class-1 Authoritative data** (`sync-protocol.md` §9): synced, backed up (§9.11.3), addressed by the reserved blob-id `chats_catalog_sync_id` (§3.4).
+
+The plaintext inside is **canonical JSON** of an object whose keys are conversation ids (hex strings) and whose values are conversation-record objects. Per-record keys, emitted in lexicographic order: `created_at` (epoch-ms integer), `deleted_at` (epoch-ms integer, present only on a tombstone), `title` (NFC-normalized string, at most 48 Unicode scalar values after the derivation rule in §9.24.2), `updated_at` (epoch-ms integer), `version` (monotonic causal counter, non-negative integer; absent ≡ 0, the §11.4 discipline). Floats are FORBIDDEN, as everywhere in this section. The object is omitted-when-empty at the file level: a vault with no conversations has no `vault.chats` file at all, and the first conversation create writes it.
+
+#### 9.23.1 Outer envelope layout
+
+The header is 34 bytes, identical in shape to `vault.prefs` (§9.5.1) / `vault.themes` (§9.21.1):
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 B | magic, ASCII `MYM1` on a v0.1 vault, `MYM5` on a v0.2 vault (§10.3; one magic per generation, the themes-family convention) |
+| 4 | 1 B | `protocol_version` = `0x01` always (the envelope version, not the vault generation; the generation travels in the magic + AAD, exactly as the shared `encode_blob_envelope` path writes it for every singleton family) |
+| 5 | 1 B | `chats_catalog_format_version` = `0x01` (inner schema, evolves independently) |
+| 6 | 24 B | `nonce` (random, §5.3 policy inherited) |
+| 30 | 4 B | `ciphertext_len` (u32 BE) |
+
+Then the CTX-committed XChaCha20-Poly1305 ciphertext of the canonical JSON. Strict-trailing (§10.3.1): total length MUST be exactly `34 + ciphertext_len`.
+
+The KEK is `chats_catalog_key = DeriveSubkey(root_key, "chats-catalog-key")` (§3.2 + §3.4), `root_key`-derived and `itemsKey`-independent like prefs/search/themes, so the roster survives a later epoch-rotation. No public key-id field appears.
+
+#### 9.23.2 AAD construction
+
+`AAD_chats_catalog` mirrors `AAD_prefs_blob` exactly, with the role string `"chats-catalog"` (length-prefixed UTF-8: 2-B big-endian length + 13 ASCII bytes, total 15 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the catalog to its specific vault. Total AAD length: `10 + 1 + 15 + 16 = 42 bytes`. As with prefs/search/themes, `items_key_id` is **not** bound.
+
+#### 9.23.3 Size cap and read semantics
+
+Implementations MUST reject `ciphertext_len > 4194304 + 32` (4 MiB plaintext cap + 32-byte CTX tag) before allocating (the §9.5.4 / §9.21.4 DoS-allocation discipline; the themes cap precedent). An over-cap catalog is refused at write time rather than truncated.
+
+Read semantic differs from the cosmetic singletons, and the difference is load-bearing: **conversations are user content, so a read failure is REPORTED, never silently emptied.** The §9.21.4 fall-back-to-empty rule applies only to non-load-bearing data where an empty result is a safe degradation; here an unreadable catalog read as empty would, on the next write, persist that emptiness over real conversation records (the sync-protocol empty-read warning). A read failure surfaces as an error naming the artifact; the client MUST NOT offer conversation creation as a repair path that writes over the unreadable blob without an explicit user acknowledgement of the loss.
+
+### 9.24 AI conversation blob (`chats/<conversation-id>`, `MYJ1`)
+
+Each conversation's turn list is one file under `<vault-root>/chats/<conversation-id-hex>`, the structural sibling of `attachments/<attachment-id-hex>` (§9.9) and `attachments-text/<attachment-id-hex>` (§9.15): a per-entry file family enumerated by its catalog (§9.23), one KEK for the whole family with per-entry separation from the AAD (the `MYE1` archetype). A conversation file holds **load-bearing user content** (AS1/AS2-class transcript text), encrypted at rest, synced, backed up.
+
+#### 9.24.1 Outer envelope layout
+
+The header is 34 bytes, identical in shape to `vault.chats` (§9.23.1) with two field changes:
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 B | magic, ASCII `MYJ1` on a v0.1 vault, `MYJ5` on a v0.2 vault (§10.3; one magic per generation) |
+| 4 | 1 B | `protocol_version` (`0x01` v0.1 / `0x02` v0.2, travelling with the magic) |
+| 5 | 1 B | `chats_format_version` = `0x01` (inner turn schema) |
+| 6 | 24 B | `nonce` (random, §5.3) |
+| 30 | 4 B | `ciphertext_len` (u32 BE) |
+
+Strict-trailing (§10.3.1): total length MUST be exactly `34 + ciphertext_len`.
+
+The KEK is `chats_key = DeriveSubkey(root_key, "chats-key")` (§3.4), `root_key`-derived, `itemsKey`-independent, **one KEK for the whole family**; per-conversation separation comes from the AAD binding below, exactly as one `attachment-text-key` serves every `MYE1` blob (§9.15).
+
+#### 9.24.2 Inner plaintext (the turn list)
+
+A JSON object with two keys (key order is NOT significant; writers emit
+`turns` first, the shipped `serializeTranscript` shape, and parsers accept
+either order):
+
+- `turns`: an array of turn objects. Each turn carries a string `id` (a
+  monotonic per-client sequence number plus a client discriminator, the
+  deterministic total-order source for the §9.23 sync merge). Every other
+  turn field is the frontend's own rendering state, opaque to the backend
+  (the host validates only that `turns` is present and that each turn has a
+  string `id`; the merge operates on decoded ids, never on bytes). The
+  shipped writer emits, where applicable: `kind` (`"text"` or `"agent"`),
+  `role` (`"user"` or `"assistant"`), `text` (as authored, possibly empty on
+  a failed turn), `error` (bool), `errorCause`, `insertable` (bool),
+  `answeredBy`, `scopeLabel` (string), and `agentSummary` (object with the
+  frozen counts, `charsOffDevice`, the closed `end` tag, and the frozen
+  `proposal` payload of anchors/replacements, persisted verbatim and
+  READ-ONLY in history; no historical re-apply exists anywhere in the client
+  surface). Field names are the writer's camelCase verbatim: a second
+  implementation MUST NOT re-derive snake_case forms (`answered_by`,
+  `scope_label`, `agent_summary`), which no shipped writer emits and no
+  reader accepts as aliases.
+- `title_derived_from` (string): the derivation input snapshot (the first user turn's first 48 Unicode scalar values, newlines stripped) so the title can be re-derived deterministically and a rename is detectable as a deliberate divergence from it. Informational: readers that do not derive titles ignore it.
+
+Turns are **immutable once settled**: the write path is append-at-finalize (a turn is persisted the moment its stream closes, its run settles, or it fails, including the partial text of an interrupted stream), and no turn is ever rewritten in place. The `version` counter that sync races on lives in the catalog record (§9.23), not in this file: a conversation file is content-addressed by its id and pushed whenever its bytes change, while causal ordering is the catalog's job.
+
+#### 9.24.3 AAD construction
+
+`AAD_chats_blob` follows the `MYE1` per-entry pattern with the conversation id in the per-entry position:
+
+```
+AAD_chats_blob =
+  AAD_prefix || protocol_version (1 B) || "chats-blob" || conversation_id (16 B) || account_number_hash (16 B)
+```
+
+`"chats-blob"` is length-prefixed UTF-8 (2-B big-endian length + 10 ASCII bytes, total 12 bytes); `conversation_id` is the 16-byte conversation UUIDv7 (also the on-disk filename, hex); `account_number_hash` is the 16-byte field from `vault.meta` (§9.3 offset 6). Total AAD length: `10 + 1 + 12 + 16 + 16 = 55 bytes`. Binding both ids prevents substituting one conversation's blob for another within the same vault and porting a blob across vaults. As with the whole `root_key`-derived family, `items_key_id` is **not** bound.
+
+#### 9.24.4 Size cap, write cadence, and read semantics
+
+Implementations MUST reject `ciphertext_len > 16777216 + 32` (16 MiB plaintext cap + 32-byte CTX tag) before allocating (the graph-layout §9.19 cap precedent, generous for ~200k small turns). An over-cap conversation is refused at write time rather than truncated: a silently shortened conversation is a wrong conversation.
+
+**Write cadence is append-at-finalize**: one small blob write per settled turn, no coalescing window. A lock that cuts a stream settles its partial text first and attempts the write with that snapshot (best effort: the lock wipe keeps no retry state, so a persist that fails at lock is lost with the RAM copy). The §9.7.4 mtime-leak rationale does not transfer: workspace state is activity metadata whose timing is itself sensitive, while a conversation write is user content the user just authored, and the vault's other writes already carry the same coarse signal.
+
+Read semantic is **report-don't-empty**, the §9.23.3 rule verbatim: a conversation file that fails any check (absent from under a live catalog entry, magic/version mismatch, AEAD failure, over-cap, unparseable JSON) surfaces as an error naming the conversation. The catalog row MUST NOT be silently dropped in response: the roster is the index of record and a single unreadable conversation must not hide or destroy the rest.
+
+**Deletion** follows the attachments-catalog tombstone discipline: deleting a conversation writes the tombstone into its `vault.chats` record (§9.23) and removes the `chats/<id>` file; the tombstone is what syncs (remove-wins over a concurrent append, the §11.4 catalogue rule), so a delete propagates to every device rather than resurrecting from a peer's copy.
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -2513,9 +2626,11 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 | Share-import staging queue (`pending-shares/<id>`) | `MYF1` | `MYF5` | §9.20 | MYND-507 |
 | Custom-themes blob (`vault.themes`) | `MYT1` | `MYT5` (allocated, v0.2) | §9.21 | MYND-486 |
 | Sealed label store (`vault.label`) | `MYL1` | `MYL5` | §9.22 | myne-md/myne#411 |
+| AI conversations catalog (`vault.chats`) | `MYM1` | `MYM5` (allocated, v0.2) | §9.23 | myne-md/myne#675 |
+| AI conversation blob (`chats/<id>`) | `MYJ1` | `MYJ5` (allocated, v0.2) | §9.24 | myne-md/myne#675 |
 | CRDT note-type (`.myn`, v0.2) | — | `NC05` (allocated, v0.2) | §10.7 | automerge-sync-migration / #418 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `MYP5`, `MYA5`, `MYC5`, `MYD5` and `MYT5` name bytes on disk today rather than a reservation. The remaining next-major values (`NT05`, `MYS5`, `MYW5`, `MYI5`, `MYB5`, `MYQ5`, `MYE5`, `MYH5`, `MYR5`, `MYK5`, `MYG5`, `MYF5`, `MYL5`) are still placeholders that the next major version finalizes. The distinction is load-bearing rather than editorial: reading an allocated magic as an unallocated placeholder is the mental model behind myne-md/myne#638, where a reader taught only `MYA1` returned `None` for every body on a migrated vault and stopped attachment sync in both directions. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The **CRDT note-type** row (`NC05`) is **next-major-only** — it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09 — the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family).
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `MYP5`, `MYA5`, `MYC5`, `MYD5`, `MYT5`, `MYM5` and `MYJ5` name bytes on disk today rather than a reservation. The remaining next-major values (`NT05`, `MYS5`, `MYW5`, `MYI5`, `MYB5`, `MYQ5`, `MYE5`, `MYH5`, `MYR5`, `MYK5`, `MYG5`, `MYF5`, `MYL5`) are still placeholders that the next major version finalizes. The distinction is load-bearing rather than editorial: reading an allocated magic as an unallocated placeholder is the mental model behind myne-md/myne#638, where a reader taught only `MYA1` returned `None` for every body on a migrated vault and stopped attachment sync in both directions. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The **CRDT note-type** row (`NC05`) is **next-major-only** — it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09 — the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family).
 
 **One row's next-major reservation means something different from every other row's: the sealed label store.** `vault.label` is **generation-independent** (§9.22): it stays `MYL1` inside a v0.2 vault, beside that vault's `NTV5` and `MY?5` neighbours, so `MYL5` is **not** the magic a version cut moves this family to. It is reserved against a future revision of **this family's own** layout, and against nothing else. What lets it be that is the key: the file is sealed under an OS-keychain `wrap_key` rather than any `root_key` product (§9.22.2), so no KDF, KEK context or AAD prefix inherited from the vault ties its bytes to a generation. §10.4.1 point 2 records the migration's matching behaviour, which is that the file is left alone.
 

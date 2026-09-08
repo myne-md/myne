@@ -431,6 +431,22 @@ fn main() {
                 .commands(&["graph_layout_read", "graph_layout_write"]),
         )
         .plugin(
+            "chats",
+            // myne-md/myne#675: the AI conversations store (vault.chats MYM1
+            // catalog + chats/<id-hex> MYJ1 per-conversation files). Each of
+            // the six commands needs its matching `commands.allow` entry in
+            // `permissions/chats/default.toml` or the ACL resolver never
+            // authorizes the `plugin:chats|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "chats_create",
+                "chats_append_turn",
+                "chats_read",
+                "chats_list",
+                "chats_rename",
+                "chats_delete",
+            ]),
+        )
+        .plugin(
             "vault-label",
             // myne-md/myne#411: the device-local hide-vault-names option:
             // `hide_vault_names` (read) + `set_hide_vault_names` (write, and

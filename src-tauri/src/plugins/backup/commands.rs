@@ -322,13 +322,14 @@ fn collect_members(vault_dir: &Path) -> Result<Vec<(String, PathBuf, bool)>, Bac
         "vault.dictionary",
         "vault.themes",
         "vault.attachments",
+        "vault.chats",
     ] {
         let path = vault_dir.join(singleton);
         if path.is_file() {
             members.push((singleton.to_string(), path, false));
         }
     }
-    for dir in ["notes", "snapshots", "attachments"] {
+    for dir in ["notes", "snapshots", "attachments", "chats"] {
         let dir_path = vault_dir.join(dir);
         if !dir_path.is_dir() {
             continue;
@@ -490,6 +491,12 @@ mod tests {
         // offered — so it was absent from every backup, silently.
         fs::write(root.join("vault.themes"), vec![0x03; 128]).unwrap();
         fs::write(root.join("vault.attachments"), vec![0x02; 64]).unwrap();
+        // #675: same #256 class: the chats catalog and conversation files
+        // are vault CONTENT (Class-1 sync members); a backup that omits them
+        // restores a vault with the conversation history gone.
+        fs::write(root.join("vault.chats"), vec![0x04; 96]).unwrap();
+        fs::create_dir_all(root.join("chats")).unwrap();
+        fs::write(root.join("chats/0123456789abcdef0123456789abcdef"), b"conv").unwrap();
         fs::write(root.join(format!("notes/{NOTE_A}.myn")), b"note-a").unwrap();
         fs::write(root.join(format!("notes/{NOTE_B}.myn")), vec![0xCD; 2048]).unwrap();
         fs::write(
@@ -528,7 +535,7 @@ mod tests {
         let dest = dir.path().join("Myne backup 2026-06-10 1200.myne-backup");
 
         let summary = export_backup_with_dir(&vault, &dest).expect("export");
-        assert_eq!(summary.members, 8); // 4 singletons + 2 notes + 1 snapshot + 1 blob
+        assert_eq!(summary.members, 10); // 5 singletons + 2 notes + 1 snapshot + 1 blob + 1 conversation
         assert_eq!(summary.notes, 2);
         assert_eq!(summary.snapshots, 1);
         assert_eq!(summary.attachments, 1);
@@ -536,7 +543,7 @@ mod tests {
 
         // The destination verifies (SYNC-4: a file that exists has verified).
         let records = crate::backup_container::read_and_verify_container(&dest).expect("verify");
-        assert_eq!(records.len(), 8);
+        assert_eq!(records.len(), 10);
         let paths: Vec<&str> = records.iter().map(|r| r.path.as_str()).collect();
         // #256: custom themes are vault CONTENT — encrypted, synced, and not
         // rebuildable from anything else. A verified backup that omits them
@@ -547,6 +554,17 @@ mod tests {
         );
         assert!(!paths.contains(&"vault.search"));
         assert!(paths.iter().all(|p| !p.ends_with(".tmp")));
+        // #675: the chats catalog and its conversation files are vault
+        // CONTENT (Class-1 sync members). A backup that omits them restores
+        // a vault with the conversation history gone.
+        assert!(
+            paths.contains(&"vault.chats"),
+            "a verified backup must carry the conversations catalog"
+        );
+        assert!(
+            paths.contains(&"chats/0123456789abcdef0123456789abcdef"),
+            "a verified backup must carry the conversation files"
+        );
         // No temp sibling left behind.
         assert!(!temp_sibling(&dest).exists());
     }

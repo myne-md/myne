@@ -8,8 +8,10 @@
 //
 //   ac1 — enable AI → open the AI Chat tab → send a message → a streamed
 //         assistant turn appears in the transcript → a follow-up appends another
-//         exchange (multi-turn) → lock + re-unlock clears the transcript
-//         (RAM-only, dropped on lock).
+//         exchange (multi-turn) → lock + re-unlock CONTINUES the transcript
+//         (persisted conversations, myne-md/myne#675 Q9; this tail used to
+//         pin the RAM-only wipe and was updated with that change; the delete
+//         half lives in `chat-history.e2e.ts` ch1).
 //
 // The stub engine returns deterministic `stub-infer: …` output over the token
 // `Channel`, so the transcript is assertable without shipping a model. The hard
@@ -55,9 +57,9 @@ async function dismissRunProposal(s: Session): Promise<void> {
   await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 10_000 });
 }
 
-aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears", () => {
+aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
-  it("streams a chat answer, remembers a follow-up, and wipes the transcript on lock", async () => {
+  it("streams a chat answer, remembers a follow-up, and continues the transcript on lock", async () => {
     let password = "";
     await scenario(
       "ac1-ai-chat",
@@ -135,8 +137,10 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears"
         // double send, which is the thing the comment above is about.
         expect((await s.byTestIdAll("ai.turn")).length).toBe(4);
 
-        // Lock the vault → the RAM-only transcript is dropped. Re-unlock and
-        // reveal the tab: the transcript is gone (fresh conversation).
+        // Lock the vault → re-unlock CONTINUES the transcript (persisted
+        // conversations, myne-md/myne#675 Q9 (the tab continues the last
+        // conversation by derived recency.) This tail used to pin the
+        // RAM-only wipe; the delete half lives in `chat-history.e2e.ts` ch1.
         await (await s.byTestId("editor.lock-cta")).click();
         const pw = await s.byTestId("unlock.password-input", { timeoutMs: 15_000 });
         await pw.sendKeys(password);
@@ -147,12 +151,12 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears"
         // times out waiting for something that is deliberately absent.
         await dismissImporterOfferIfPresent(s);
         await runPaletteAction(s, "ai.open-chat", "chat");
-        // Transcript cleared on lock (task 12): no turns, no transcript region.
+        // Transcript continued after lock: both exchanges still here.
         await s.waitUntil(
-          async () => ((await s.byTestIdAll("ai.turn")).length === 0 ? true : null),
-          { label: "transcript cleared after lock", timeoutMs: 15_000 },
+          async () => ((await s.byTestIdAll("ai.turn")).length === 4 ? true : null),
+          { label: "transcript continued after lock", timeoutMs: 15_000 },
         );
-        expect((await s.byTestIdAll("ai.turn")).length).toBe(0);
+        expect((await s.byTestIdAll("ai.turn")).length).toBe(4);
       },
     );
   });

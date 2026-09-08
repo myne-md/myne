@@ -1114,7 +1114,19 @@
           "tagsThinking": "टैग सुझाए जा रहे हैं…",
           "thinking": "AI सोच रहा है…",
           "truncated": "पहले {{count}} अक्षरों का सारांश बनाया गया।",
-          "you": "आप"
+          "you": "आप",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "सारे टैब छिपे हुए हैं। वापस लाने के लिए राइट-क्लिक करें।",
         "outline": {
@@ -3030,7 +3042,8 @@
         "whatLabel": "आपके डिवाइस से क्या बाहर जाता है",
         "whenLabel": "यह कब बाहर जाता है",
         "whoLabel": "इसे कौन पाता है",
-        "connectionLabel": "यह कैसे जाता है"
+        "connectionLabel": "यह कैसे जाता है",
+        "excludedLabel": ""
       },
       "disclosureToggle": "यह कैसे काम करता है?",
       "enableHelper": "आपका दिया हुआ मॉडल चलाता है। यह कहाँ चलता है, और आपके नोट इस डिवाइस से बाहर जाते हैं या नहीं, ये दोनों इस बात पर निर्भर करते हैं कि आप नीचे कौन-सा प्रदाता बताते हैं। प्रायोगिक, डिफ़ॉल्ट रूप से बंद।",

@@ -98,9 +98,9 @@ Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
 ### **agent run** &nbsp; 📦 *Product*
 
-One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run survives a vault lock**: the run table and its transcript are dropped on the same leg as the AI vector store, which is why the feature adds no encrypted blob family and owes `myne-test-vectors` nothing. That holds for the turn it leaves in the [conversational AI chat](#conversational-ai-chat) transcript too, on both counts: the turn keeps only the run id, the counts, the scope label the task was sent under, and how the loop ended. It never keeps the [proposed edits](#proposed-edit), whose anchors are text copied verbatim out of note bodies, and the transcript itself is dropped on the same leg. A run never writes; applying is a separate act behind the user's approval.
+One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run's LIVE state survives a vault lock**: the run table and the live transcript store are dropped on the same leg as the AI vector store. What changed with persisted [conversations](#conversation) (myne-md/myne#675): the turn a run leaves behind is now written to its conversation at settle (append-at-finalize), and since `decisions/ai/0577` that settled turn KEEPS the frozen proposal (anchors and replacements, verbatim note-derived text) alongside the run id, the counts, the scope label and the end tag. The historical copy is **read-only**: no re-apply affordance exists anywhere, because a frozen proposal may quote a note that has since changed, been trashed, or moved folders. The RAM half of the old claim still holds: `agentStore`'s live copy is dropped on every vault-leaving path, enforced by the lock-teardown guards. A run never writes; applying is a separate act behind the user's approval.
 
-Used in: `decisions.md` 2026-08-16, 2026-08-19, `threat-model.md` §7
+Used in: `decisions.md` 2026-08-16, 2026-08-19, `decisions/ai/0575`, `decisions/ai/0577`, `threat-model.md` §7
 
 ### **agent scope** &nbsp; 📦 *Product*
 
@@ -135,6 +135,12 @@ The third verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#61
 Two rules keep it from becoming a frontmatter writer, and both are about the RESULT rather than the input. The text is positioned after the note's frontmatter block rather than at the end of the raw file, so in a note that has one, appended text can never be the first line. And an append that would give the note a frontmatter block it did not have is refused outright, which closes the case positioning alone does not: a note whose body merely BEGINS with `---` has an opener nothing closed, and an ordinary `---` separator in the appended text would close it and turn the user's own first lines into frontmatter.
 
 Used in: `decisions/ai/0554`
+
+### **append-at-finalize** &nbsp; 📦 *Product*
+
+The conversation write cadence: a [chat turn](#chat-turn) persists the moment it settles (stream closed, run settled, or failed, including the partial text of a stream interrupted by a lock), with no coalescing window. A lock that cuts a stream settles its partial text first and attempts the write with that snapshot; the lock wipe keeps no retry state, so a persist that fails at lock is lost with the RAM copy. Nothing rewrites a turn in place.
+
+Used in: `spec/protocol.md` §9.24, §9.24.2, §9.24.4; `decisions/ai/0575`
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -418,11 +424,33 @@ Reference: RFC 8439.
 
 The reserved 16-byte sync-plane identifier of the [`vault.attachments`](#vaultattachments) catalog under Phase 2 sync: `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`spec/protocol.md` §3.4; MYND-468). The catalog is a synced singleton **outside** the head manifest (`spec/sync-protocol.md` §4.2), so it needs a stable blob-id every device derives identically; because the id is `root_key`-keyed pseudorandom bytes, the server cannot distinguish the catalog's record from a note's. Derives an *identifier*, not key material — the catalog KEK stays `attachments-catalog-key`. Excluded from the manifest by construction. Phase 2.
 
+### **chat turn** &nbsp; 📦 *Product*
+
+One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled: the write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
+
+Used in: `protocol.md` §9.24.2; `decisions/ai/0575`
+
 ### **chord** &nbsp; 📦 *Product*
 
 A single keyboard-shortcut combination, e.g. `Mod-Shift-g` (hotkeys epic, MYND-304). Myne's canonical chord string is CodeMirror-`KeyBinding.key`-compatible: a `-`-separated sequence of modifier tokens followed by one logical key, using the cross-platform `Mod` token (Cmd on macOS, Ctrl elsewhere) and the layout-respecting *logical* key (what the user sees on the key, not the physical `code`); single-character keys are lowercased. Stored NFC-normalized inside `vault.prefs` (the `keymap` field). See **keymap**, **key binding**.
 
 Used in: `spec/protocol.md` §9.5.2
+
+### **conversation** &nbsp; 📦 *Product*
+
+*(Alias: AI chat, chat thread.)*
+
+One persisted AI chat history unit: an ordered, immutable list of settled [chat turns](#chat-turn) plus a record (id, title, created/updated timestamps, causal version, tombstone) in the [conversation catalog](#conversation-catalog). Conversations survive lock, restart and device changes (encrypted at rest as `MYJ1` files under `chats/`, synced, backed up), are listed by updated-at, continue from where the last one left off when the AI tab opens, and delete everywhere via a catalog tombstone with no trash or undo (`decisions/ai/0575`). Titles derive deterministically from the first user turn (first 48 Unicode scalar values, newlines stripped, no model call) and are user-renameable. An agent turn's frozen [proposal](#agent-run) persists inside its conversation **read-only**: no historical re-apply exists (`decisions/ai/0577`).
+
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0575`, `decisions/ai/0577`
+
+### **conversation catalog** &nbsp; 📦 *Product*
+
+*(Alias: `vault.chats`, chats catalog.)*
+
+The singleton roster blob (`MYM1`, `protocol.md` §9.23) enumerating the vault's [conversations](#conversation): one entry per conversation id carrying title, timestamps, the causal `version` the sync merge races on, and the deletion tombstone. The pair half of the per-conversation `MYJ1` files (the `vault.attachments`/`attachments/` archetype): the catalog is what syncs as one addressed singleton, the files are what a deletion removes. Read semantic is **report-don't-empty** (a corrupt catalog surfaces an error; it is never read as empty and rewritten, because that would persist emptiness over real records, `decisions/ai/0575`).
+
+Used in: `protocol.md` §9.23; `decisions/ai/0575`
 
 ### **CLI-excluded folder** &nbsp; 📦 *Product*
 
@@ -2076,6 +2104,12 @@ Used in: `spec/markdown-dialect.md` §3.8.3; `decisions.md` 2026-07-28
 The empty `.rename-journal` marker file in a vault's notes directory that makes a [wikilink](#wikilink)-rename's multi-note rewrite **all-or-nothing**. A title rename rewrites the renamed note's own `.myn` blob plus every inbound `[[…]]`-bearing note; because a single per-blob atomic write is not collectively atomic across N blobs, the writer stages every updated blob to `<uuid>.myn.tmp`, writes the (content-free) marker, then commits every rename, then clears the marker. On the next vault-open — before the resolution index rebuilds — recovery rolls **forward** (marker present ⇒ rename all staged `.tmp` into place) or **back** (marker absent ⇒ delete orphan `.tmp`), so a crash mid-commit never leaves a half-renamed vault with broken title-keyed links. The marker carries no data (no UUIDs, no titles), is not a magic-byte format, and is excluded from backups; rolled-forward blobs are still AEAD/CTX-verified on read, so it adds no tamper surface. See also [wikilink](#wikilink), [wikilink chip](#wikilink-chip).
 
 Used in: `spec/protocol.md` §9.12, §9.11.3; `decisions.md` 2026-06-13
+
+### **report-don't-empty** &nbsp; 📋 *Protocol*
+
+The read semantic for load-bearing synced singletons ([conversation catalog](#conversation-catalog), per-conversation files): a store that fails any check (absent under a live roster entry, magic/version mismatch, AEAD failure, over-cap, unparseable payload) surfaces an error naming it, and is never collapsed to the empty value. Collapsing would let the next write persist emptiness over real records; refusing keeps the roster (the index of record) intact while the failure is surfaced.
+
+Used in: `spec/protocol.md` §9.23.3, §9.24.4; `decisions/ai/0575`
 
 ### **reproducible builds** &nbsp; 🛠️ *Tooling*
 

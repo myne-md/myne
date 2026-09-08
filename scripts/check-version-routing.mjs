@@ -240,7 +240,7 @@ const ALLOWED = new Map([
   ["core/src/plugins/sync/orchestrator.rs#kek", [2, "sync: `sync_id_for` (the reserved singleton sync-ids) + the ServerAuth secret for the #429 verifier replace"]],
 
   // ── legitimately v0.1: THE V0.1 SIDE, BY CONSTRUCTION ─────────────────────
-  ["core/src/plugins/vault_migrate/mod.rs#kek", [4, "the migration reads the OLD vault under the OLD keys (incl. the #441 fail-closed pre-flight)"]],
+  ["core/src/plugins/vault_migrate/mod.rs#kek", [5, "the migration reads the OLD vault under the OLD keys (incl. the #441 fail-closed pre-flight, and the #675 chats re-seal under the OLD chats/catalog KEKs)"]],
   ["core/src/plugins/vault_migrate/mod.rs#meta", [1, "the migration parses the OLD `MYV1` meta"]],
   ["core/src/plugins/vault_migrate/mod.rs#note", [1, "the migration decodes the OLD `MY01` notes"]],
   ["core/src/plugins/vault_migrate/mod.rs#pwkdf", [2, "the migration verifies BOTH old credentials against the OLD salt domain"]],

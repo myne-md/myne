@@ -274,6 +274,8 @@ function healthyFiles(): Record<string, string> {
   return {
     "src/notes/agent/agentStore.ts": `export function clearAgentForLock(): void {}\n`,
     "src/notes/ai/chatStore.ts": `export function clearChat(): void {}\n`,
+    "src/notes/ai/chatPersist.ts": `export function clearChatPersistForLock(): void {}\n`,
+    "mobile/src/lib/chatHistory.ts": `export function clearChatHistoryPersistForLock(): void {}\n`,
     "src/notes/ai/aiOutputStore.ts": `export function clearAiOutput(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
     "editor/src/host/lib/datetimeFormat.ts": `export function resetDateTimeDisplayForLock(): void {}\n`,
@@ -299,6 +301,7 @@ export function resetTranscripts(): void {}\n`,
     "src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   clearAgentForLock();
   clearChat();
+  clearChatPersistForLock();
   clearAiOutput();
   await invoke("plugin:vault_unlock|vault_lock");
   resetScrollMemory();
@@ -314,6 +317,7 @@ export function resetTranscripts(): void {}\n`,
 }): Promise<void> {
   clearAgentForLock();
   clearChat();
+  clearChatPersistForLock();
   clearAiOutput();
   resetSessionIgnored();
   await lockVault();
@@ -330,6 +334,7 @@ export function resetTranscripts(): void {}\n`,
     // the host-side run.
     "mobile/src/lib/vault-unlock.ts": `export async function lockVault(): Promise<void> {
   endAgentRun("lock", "");
+  clearChatHistoryPersistForLock();
   await invoke("plugin:vault-unlock|lock");
   resetDecodedAspects();
   resetPreviewCache();

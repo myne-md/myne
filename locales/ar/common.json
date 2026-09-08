@@ -1310,7 +1310,19 @@
           "tagsThinking": "جارٍ اقتراح الوسوم…",
           "thinking": "AI يفكّر…",
           "truncated": "تم تلخيص أول {{count}} حرف.",
-          "you": "أنت"
+          "you": "أنت",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "كل التبويبات مخفية. انقر بالزر الأيمن للاستعادة.",
         "outline": {
@@ -3450,7 +3462,8 @@
         "whatLabel": "ما الذي يغادر جهازك",
         "whenLabel": "متى يغادر",
         "whoLabel": "من يستقبله",
-        "connectionLabel": "كيف ينتقل"
+        "connectionLabel": "كيف ينتقل",
+        "excludedLabel": ""
       },
       "disclosureToggle": "كيف يعمل هذا؟",
       "enableHelper": "يشغّل نموذجًا توفّره أنت. ومكان تشغيله، وما إذا كانت ملاحظاتك تغادر هذا الجهاز، يتوقّفان على المزوّد الذي تسمّيه أدناه. تجريبي، ومعطّل افتراضيًا.",

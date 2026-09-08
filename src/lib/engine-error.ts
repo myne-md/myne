@@ -111,6 +111,18 @@ export type ProviderErrorCause =
    *  there is nothing to send, the other that you have not agreed to send it,
    *  and the fixes are in different places. */
   | "consent_missing"
+  /** The scope resolved empty after the `ai_excluded_folders` clamp: every
+   *  note the run was granted sits in a folder the AI never sees. The host
+   *  refused before any model call or tool use, so nothing was sent, and the
+   *  fix is one list (Settings, AI, Excluded folders) rather than the setup
+   *  the generic start failure points at (myne-md/myne#675).
+   *
+   *  **Added because it was reachable and collapsed.** `start_run` returns
+   *  `AgentError::EmptyGrant` on exactly this path, and the chat surface read
+   *  only `ProviderRejected` versus everything-else, so an excluded note
+   *  rendered "The agent could not start", which names no control and no fix:
+   *  the same collapse `feature_off` documents above. */
+  | "empty_grant"
   | "failed";
 
 /**
@@ -157,6 +169,7 @@ const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
   "request_rejected",
   "feature_off",
   "consent_missing",
+  "empty_grant",
   "failed",
 ]);
 
@@ -222,6 +235,7 @@ const PROVIDER_ERROR_KEY: Readonly<Record<ProviderErrorCause, string>> = {
   request_rejected: "settings.ai.providerError.requestRejected",
   feature_off: "settings.ai.providerError.featureOff",
   consent_missing: "settings.ai.providerError.consentMissing",
+  empty_grant: "settings.ai.providerError.emptyGrant",
   unreachable: "settings.ai.providerError.unreachable",
   refused: "settings.ai.providerError.refused",
   timeout: "settings.ai.providerError.timeout",

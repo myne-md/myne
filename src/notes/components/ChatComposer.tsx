@@ -53,6 +53,7 @@ import {
   type ProbeVerdict,
   type ScopeGrant,
 } from "../../lib/agent-run";
+import { providerErrorKey } from "../../lib/engine-error";
 import {
   getAgent,
   setAutoApply,
@@ -263,6 +264,10 @@ export function ChatComposer({
           startFailed: t("agent.composer.startFailed"),
           autoApplyFailed: t("agent.composer.autoApplyFailed"),
           providerRejected: t("agent.composer.providerRejected"),
+          // Resolved through the shared taxonomy key rather than a second
+          // chat-only key, so this turn and the mobile run-failure banner read
+          // the same sentence by construction (myne-md/myne#675).
+          scopeExcluded: t(providerErrorKey("empty_grant")),
         },
         i18n.language || null,
         onNotesWritten,

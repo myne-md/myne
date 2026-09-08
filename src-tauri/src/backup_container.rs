@@ -91,6 +91,13 @@ pub enum MemberFamily {
     AttachmentsCatalog,
     /// `attachments/<64-hex attachment id>` (§9.9).
     AttachmentBlob,
+    /// `vault.chats` conversations catalog (§9.23, myne-md/myne#675):
+    /// authoritative user data and a Class-1 sync member, so `sync ⊆ backup`
+    /// requires it here (the #256 class: a member the classifier accepts but
+    /// the collector never offers is missing from every backup, silently).
+    ChatsCatalog,
+    /// `chats/<32-hex conversation id>` (§9.24, myne-md/myne#675).
+    ConversationFile,
 }
 
 /// Allocation-bound cap for a member of `family` (§9.11.6 — the exact cap
@@ -130,6 +137,16 @@ fn family_member_cap(family: MemberFamily) -> u64 {
         MemberFamily::AttachmentsCatalog => 17 * 1024 * 1024,
         // §9.9: 64 MiB plaintext cap + envelope overhead, rounded up.
         MemberFamily::AttachmentBlob => 65 * 1024 * 1024,
+        // §9.23.3: 4 MiB plaintext cap + 34-byte header + 32-byte CTX tag
+        // (a strict consumer rejects an over-sized catalog member, so the
+        // export must too (mirrors the VaultDictionary bound above)).
+        MemberFamily::ChatsCatalog => {
+            (protocol::chats_catalog_blob::MAX_CHATS_CATALOG_PLAINTEXT_LEN
+                + protocol::chats_catalog_blob::CHATS_CATALOG_HEADER_LEN
+                + 32) as u64
+        }
+        // §9.24.4: 16 MiB plaintext cap + envelope overhead, rounded up.
+        MemberFamily::ConversationFile => 17 * 1024 * 1024,
     }
 }
 
@@ -297,6 +314,7 @@ pub fn classify_member_path(path: &str) -> Option<MemberFamily> {
         "vault.dictionary" => return Some(MemberFamily::VaultDictionary),
         "vault.themes" => return Some(MemberFamily::VaultThemes),
         "vault.attachments" => return Some(MemberFamily::AttachmentsCatalog),
+        "vault.chats" => return Some(MemberFamily::ChatsCatalog),
         _ => {}
     }
     if let Some(rest) = path.strip_prefix("notes/") {
@@ -310,6 +328,13 @@ pub fn classify_member_path(path: &str) -> Option<MemberFamily> {
     }
     if let Some(rest) = path.strip_prefix("attachments/") {
         return (rest.len() == 64 && is_lower_hex(rest)).then_some(MemberFamily::AttachmentBlob);
+    }
+    if let Some(rest) = path.strip_prefix("chats/") {
+        // Conversation ids are 16 bytes (32 lower-hex chars, no separators):
+        // the bare-directory check the notes twin needs does not apply: a
+        // stray file in `chats/` that is not a conversation id is not
+        // containerized (same discipline as `mode_for`).
+        return (rest.len() == 32 && is_lower_hex(rest)).then_some(MemberFamily::ConversationFile);
     }
     None
 }
@@ -1432,6 +1457,8 @@ mod tests {
             MemberFamily::Snapshot => "snapshot",
             MemberFamily::AttachmentsCatalog => "attachments-catalog",
             MemberFamily::AttachmentBlob => "attachment-blob",
+            MemberFamily::ChatsCatalog => "chats-catalog",
+            MemberFamily::ConversationFile => "conversation-file",
         }
     }
 

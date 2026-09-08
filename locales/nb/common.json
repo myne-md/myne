@@ -1123,7 +1123,19 @@
           "tagsThinking": "Foreslår etiketter…",
           "thinking": "AI tenker…",
           "truncated": "Oppsummerte de første {{count}} tegnene.",
-          "you": "Du"
+          "you": "Du",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Alle faner er skjult. Høyreklikk for å gjenopprette.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Hva som forlater enheten din",
         "whenLabel": "Når det forlater den",
         "whoLabel": "Hvem som mottar det",
-        "connectionLabel": "Hvordan det reiser"
+        "connectionLabel": "Hvordan det reiser",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Hvordan fungerer dette?",
       "enableHelper": "Kjører en modell du oppgir. Hvor den kjører, og om notatene dine forlater denne enheten, avhenger begge deler av leverandøren du oppgir nedenfor. Eksperimentell, av som standard.",

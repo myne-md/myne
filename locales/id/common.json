@@ -1123,7 +1123,19 @@
           "tagsThinking": "Menyarankan tag…",
           "thinking": "AI sedang berpikir…",
           "truncated": "Meringkas {{count}} karakter pertama.",
-          "you": "Anda"
+          "you": "Anda",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Semua tab tersembunyi. Klik kanan untuk memulihkan.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Apa yang keluar dari perangkat Anda",
         "whenLabel": "Kapan itu keluar",
         "whoLabel": "Siapa yang menerimanya",
-        "connectionLabel": "Bagaimana ia dikirim"
+        "connectionLabel": "Bagaimana ia dikirim",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Bagaimana ini bekerja?",
       "enableHelper": "Menjalankan model yang Anda sediakan. Di mana model itu berjalan, dan apakah catatan Anda keluar dari perangkat ini, bergantung pada penyedia yang Anda sebutkan di bawah. Eksperimental, mati secara bawaan.",

@@ -1172,7 +1172,19 @@
           "tagsThinking": "Sugiriendo etiquetas…",
           "thinking": "La IA está pensando…",
           "truncated": "Se resumieron los primeros {{count}} caracteres.",
-          "you": "Tú"
+          "you": "Tú",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Todas las pestañas están ocultas. Haz clic derecho para restaurarlas.",
         "outline": {
@@ -3155,7 +3167,8 @@
         "whatLabel": "Qué sale de tu dispositivo",
         "whenLabel": "Cuándo sale",
         "whoLabel": "Quién lo recibe",
-        "connectionLabel": "Cómo viaja"
+        "connectionLabel": "Cómo viaja",
+        "excludedLabel": ""
       },
       "disclosureToggle": "¿Cómo funciona esto?",
       "enableHelper": "Ejecuta un modelo que tú proporcionas. Dónde se ejecuta, y si tus notas salen de este dispositivo, depende del proveedor que indiques más abajo. Experimental, desactivado de forma predeterminada.",
