@@ -5,7 +5,7 @@
 //! run the same export the desktop app runs, without pulling `myne-core`'s TLS
 //! stack and ML runtime. The walk takes the key material (`items_key`,
 //! `items_key_id`, `root_key`) directly rather than a `VaultRuntimeState`, and
-//! uses `std::fs` (it is native-only by design — the CLI and the desktop both
+//! uses `std::fs` (it is native-only by design: the CLI and the desktop both
 //! run it on a real filesystem).
 //!
 //! Tree mapping (the importer's inversion): FM `folder:` → directories; FM
@@ -18,7 +18,7 @@
 //!
 //! Staging: the destination itself is the new tree directory; the tree builds
 //! at the sibling `<dest>.staging-<pid>` and publishes via `finalize_atomic`.
-//! Failure / cancel discards staging — NOTHING ever appears at the destination
+//! Failure / cancel discards staging: NOTHING ever appears at the destination
 //! unless the export completed.
 //!
 //! Logging: counts-only; no paths, no titles, no note/attachment ids.
@@ -166,7 +166,7 @@ pub fn stage_export_tree(
     })?;
 
     // The staging tree holds decrypted plaintext for the whole export, so it is
-    // created owner-only (0700) on unix — a sibling local account must not read
+    // created owner-only (0700) on unix: a sibling local account must not read
     // the note corpus mid-export. The destination itself is the user's own
     // choice; the staging sibling is ours.
     #[cfg(unix)]
