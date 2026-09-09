@@ -9,6 +9,8 @@ own `LICENSE` file, which governs that subtree.
 | `src/`, `src-tauri/` (desktop client) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `web/` (Phase 3 browser client: bundle, seam implementation, self-host container) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `core/` (myne-core shared backend crate) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `format/` (myne-format on-disk-format crate) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `decrypt/` (myne-decrypt CLI) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `protocol/` (cryptographic crate) | **AGPL-3.0** | [`protocol/LICENSE`](protocol/LICENSE) |
 | `docs/` (specifications, threat model) | **CC-BY-4.0** | [`docs/LICENSE`](docs/LICENSE) |
 

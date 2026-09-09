@@ -119,6 +119,19 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     /// can only speak for a hook that exists, which is why this one does.
     /// `pdf_export_teardown_on_lock` above is the same shape for the same reason.
     fn agent_teardown_on_lock(&self);
+    /// Destroy every open detached (pop-out) note window and clear the registry
+    /// on lock (myne-md/myne#679, epic #173).
+    ///
+    /// A hook of its own for the same reason as `pdf_export_teardown_on_lock`
+    /// above: a detached window is a SECOND plaintext-bearing WebView, and its
+    /// note body lives in that window's own V8 heap, which the main window's
+    /// teardown cannot reach. Destroying the window drops that heap
+    /// (`threat-model.md` A6); leaving it would keep a locked vault's note text
+    /// on screen in the pop-out. Desktop holds the [`DetachedWindowRegistry`] and
+    /// wires the real body; mobile and web have no OS windows and no-op it.
+    /// `scripts/check-lock-teardown.mjs` keys a PAIRS row on that registry so a
+    /// client that holds it cannot ship the body empty.
+    fn detached_windows_teardown_on_lock(&self);
     fn clear_staged_descriptor(&self);
     /// `site` is the `&'static str` tracing tag the desktop free-fn expects.
     fn apply_screen_capture(&self, enabled: bool, site: &'static str);
@@ -167,6 +180,17 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     fn bump_local_change(&self);
     /// `app.emit(SNAPSHOT_WRITE_FAILED_EVENT, note_id)`.
     fn emit_snapshot_write_failed(&self, note_id: &str);
+    /// Emit a global "this note was deleted" event (myne-md/myne#681).
+    ///
+    /// Called from `note_delete_from_host` after a successful delete. A detached
+    /// (pop-out) note window holding this id shows the terminal "deleted
+    /// elsewhere" state instead of autosaving its stale buffer back over nothing.
+    /// Carries only the `note_id` (already an IPC value), never plaintext.
+    /// Desktop emits it; mobile and web have no OS windows to notify and no-op.
+    /// Deletes are one-shot, so unlike the change/rename reload (which reuses the
+    /// existing `sync://changed`) this needs its own event and is not an autosave
+    /// storm.
+    fn emit_notes_deleted(&self, note_id: &str);
 
     // ---- Group 5: prefs-application side-effects (post-unlock) -------------
     /// Clamp a persisted `auto_lock_seconds` value into the effective range.
@@ -271,6 +295,7 @@ impl VaultLifecycleHooks for NoopHooks {
     fn abort_active_recording(&self) {}
     fn pdf_export_teardown_on_lock(&self) {}
     fn agent_teardown_on_lock(&self) {}
+    fn detached_windows_teardown_on_lock(&self) {}
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, _: bool, _: &'static str) {}
 
@@ -281,6 +306,7 @@ impl VaultLifecycleHooks for NoopHooks {
     fn ai_policy_changed(&self, _: bool, _: &[String]) {}
     fn bump_local_change(&self) {}
     fn emit_snapshot_write_failed(&self, _: &str) {}
+    fn emit_notes_deleted(&self, _: &str) {}
 
     // `effective_auto_lock_secs` is deliberately NOT overridden here: the
     // trait's default clamps, and a no-op host wanting the unclamped value is
@@ -394,6 +420,7 @@ pub mod test_hooks {
         fn abort_active_recording(&self) {}
         fn pdf_export_teardown_on_lock(&self) {}
         fn agent_teardown_on_lock(&self) {}
+        fn detached_windows_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
@@ -405,6 +432,7 @@ pub mod test_hooks {
             self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
         fn emit_snapshot_write_failed(&self, _: &str) {}
+        fn emit_notes_deleted(&self, _: &str) {}
         // `effective_auto_lock_secs` deliberately not overridden: the trait's
         // default clamps (myne-md/myne#479). This body used to be the unclamped
         // `unwrap_or`, which is the exact shape that change removed from two

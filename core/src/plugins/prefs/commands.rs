@@ -980,6 +980,75 @@ pub(crate) async fn set_show_task_marker_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the folder-notes feature off-switch
+/// (myne-md/myne#661). Read-modify-write under the per-plugin write mutex; no
+/// native side-effect. This is a **presentation gate only**: it never rewrites
+/// a note's `folder_index:` frontmatter, so a note keeping `folder_index: true`
+/// while the feature is off is a correct, fully-reversible state. Omit-when-
+/// default keeps a vault that never enabled folder notes byte-identical to a
+/// pre-feature `vault.prefs`. Non-load-bearing (it can at worst show or hide a
+/// sidebar affordance) → no protective-envelope clamp.
+pub async fn set_folder_notes_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_folder_notes_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_folder_notes_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_folder_notes_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_folder_notes_enabled`].
+pub(crate) async fn set_folder_notes_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.folder_notes_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "folder_notes_enabled",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for whether speech-to-text may run on this
 /// vault's audio attachments (MYND-592). Shared / scalar-LWW: a bundled model
 /// every client carries, so wanting the feature is a vault-level preference
@@ -5640,6 +5709,54 @@ mod tests {
         });
     }
 
+    // folder_notes_enabled setter (myne-md/myne#661): default off, round-trips.
+
+    #[test]
+    fn set_folder_notes_enabled_persists_and_reads_back() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+
+            // Default off: a fresh vault never enabled folder notes.
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(!prefs.folder_notes_enabled);
+
+            // Turn it on, read it back.
+            set_folder_notes_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("enable folder notes");
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(prefs.folder_notes_enabled);
+
+            // Turn it back off.
+            set_folder_notes_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("disable folder notes");
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(!prefs.folder_notes_enabled);
+        });
+    }
+
     // periodic_notes setter (myne#177).
 
     #[test]
@@ -6489,6 +6606,7 @@ mod tests {
                     reminder_horizon_days: None,
                     show_task_marker: true,
                     folder_icons: Default::default(),
+                    folder_notes_enabled: false,
                     hidden_bar_items: Vec::new(),
                     icon: None,
                     item_colors: Default::default(),

@@ -149,6 +149,14 @@ describe("deriveFolderTree — folder-index note (MYND-370)", () => {
   });
 });
 
+// The folder-notes off-switch (myne-md/myne#661) does NOT gate here: the sidebar
+// and resolver readers both zero `folderIndex` in their PROJECTION when the
+// feature is off, so `deriveFolderTree` sees ordinary notes and needs no flag of
+// its own. The "flagged note reads as ordinary" behaviour that gate relies on is
+// already covered by the folder-index cases above (an absent/false flag → null
+// indexNoteId, note stays in noteIds); the projection expression itself is
+// covered by `resolverNotes.test.ts`, and the end-to-end toggle by `e2e/folder-notes.e2e.ts` fn3.
+
 describe("deriveFolderTree — union + dedup", () => {
   it("merges a note folder and a deliberate folder into one node", () => {
     const tree = deriveFolderTree([note("n1", "Projects/")], ["Projects/"], []);

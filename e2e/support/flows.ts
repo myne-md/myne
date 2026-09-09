@@ -456,6 +456,23 @@ export async function openSettings(
   }
 }
 
+/** Pick `value` from a token-styled {@link Select} named `selectTestId`: open the
+ *  trigger, then click the matching option. The primitive renders `selectTestId`
+ *  on the trigger and `${selectTestId}-option` (carrying a `data-value`) on each
+ *  option, so a one-shot segment click (the shape `Segmented` allowed) no
+ *  longer reaches it. */
+export async function pickSelect(
+  session: Session,
+  selectTestId: string,
+  value: string,
+): Promise<void> {
+  await (await session.byTestId(selectTestId)).click();
+  const option = await session.waitForElement(
+    testIdSelector(`${selectTestId}-option`, { "data-value": value }),
+  );
+  await option.click();
+}
+
 /** Drive one `role="switch"` in Settings to a wanted state, then close the
  *  modal. Idempotent by construction: it clicks only when `aria-checked` is not
  *  already what the caller asked for, so a caller can assert a DEFAULT without a
@@ -521,6 +538,25 @@ export async function setViewsEnabled(
     toggleTestId: "settings.views-enabled",
     enabled,
     label: "views_enabled",
+  });
+}
+
+/** Toggle the folder-notes feature via Settings → Files (myne-md/myne#661).
+ *  Folder notes are OFF by default, so a scenario that drives the folder-index
+ *  entry points must enable them first. On the shared idempotent switch driver,
+ *  so it also waits for the pref to LAND (aria-checked reflects the persisted
+ *  value), which is what makes the sidebar's own `usePrefs` reflect it before
+ *  the next step. */
+export async function setFolderNotesEnabled(
+  session: Session,
+  enabled: boolean,
+): Promise<void> {
+  await setSettingsSwitch(session, {
+    tab: "files",
+    panelTestId: "settings.files-panel",
+    toggleTestId: "settings.folder-notes-toggle",
+    enabled,
+    label: "folder_notes_enabled",
   });
 }
 

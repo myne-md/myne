@@ -199,6 +199,9 @@ const CAPABILITY_BACKING = {
   // absent on web (one vault per origin, no keychain), so the grouping UI is
   // omitted rather than rendered against commands that reject.
   accountGrouping: ["account"],
+  // myne#678 (epic #173): the pop-out spawn plugin. Desktop-only; a browser page
+  // cannot open a second OS window.
+  detachedWindows: ["detached-window"],
 };
 
 const descriptor = readFileSync(DESCRIPTOR, "utf8");
