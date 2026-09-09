@@ -79,7 +79,7 @@ test.describe("phone conversation history", () => {
     await expect(turns.nth(1)).toContainText("older answer");
   });
 
-  test("new chat clears the transcript; the next send creates", async ({ page }) => {
+  test("new chat clears the transcript", async ({ page }) => {
     await installMockIpc(page, {
       prefs: { ai_enabled: true },
       chats: { rows: ROWS, payloads: PAYLOADS },
