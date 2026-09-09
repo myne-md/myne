@@ -32,17 +32,14 @@ use automerge::transaction::Transactable;
 use automerge::{AutoCommit, ObjId, ObjType, ReadDoc, ROOT};
 use protocol::{decode_crdt_note_blob, encode_crdt_note_blob, ProtocolError};
 
-/// Root-map key under which the whole note lives as one `Text`. Part of the
-/// `NC05` document schema (task 1's single-`Text` mapping); a fixed, internal
-/// name — never a theme/user-supplied key.
-pub const NOTE_TEXT_KEY: &str = "text";
-
-/// A structurally-invalid `NC05` Automerge payload — the decrypted bytes did not
-/// `load()` as an Automerge document, or lacked the single root `Text`. Callers
-/// fall back per the sibling-blob discipline (rebuild / non-distinguishing
-/// error), never panic. Deliberately carries no detail (it reaches no IPC sink).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MalformedCrdtNote;
+// The host-free decode half of the NC05 bridge lives in `myne-format` so the
+// `myne-decrypt` CLI can read an NC05 note without pulling this crate's host
+// clock + actor CSPRNG. Re-exported here so the encode half below (and every
+// existing `crate::plugins::notes::crdt::…` caller) keeps resolving.
+pub use myne_format::notes::crdt_decode::{
+    blob_magic, decode_note, decode_note_blob, is_nc05_blob, DecodeNoteBlobError,
+    MalformedCrdtNote, NOTE_TEXT_KEY,
+};
 
 /// Encode a whole note (frontmatter + body, arbitrary UTF-8 markdown) into a
 /// fresh Automerge document holding the exact string as one root `Text`, and
@@ -70,31 +67,6 @@ pub fn encode_note_at_millis(markdown: &str, actor: &[u8], now_millis: u64) -> V
         .expect("seed note text");
     commit_at_millis(&mut doc, now_millis);
     doc.save()
-}
-
-/// Decode an `NC05` document's plaintext `save()` bytes back to the exact
-/// markdown string, or [`MalformedCrdtNote`] if the bytes are not a well-formed
-/// document with the single root `Text`.
-pub fn decode_note(saved: &[u8]) -> Result<String, MalformedCrdtNote> {
-    let doc = AutoCommit::load(saved).map_err(|_| MalformedCrdtNote)?;
-    let (_, text_id) = doc
-        .get(ROOT, NOTE_TEXT_KEY)
-        .map_err(|_| MalformedCrdtNote)?
-        .ok_or(MalformedCrdtNote)?;
-    doc.text(&text_id).map_err(|_| MalformedCrdtNote)
-}
-
-/// Failure decoding an encrypted `NC05` note blob back to markdown — either the
-/// AEAD did not open (wrong key / tamper / not an `NC05` blob) or the decrypted
-/// payload was not a well-formed single-`Text` Automerge document. Non-
-/// distinguishing at the boundary is the caller's concern; the two are split
-/// here only so a caller can tell "cannot decrypt" from "decrypts but corrupt".
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DecodeNoteBlobError {
-    /// The `NC05` AEAD envelope did not open (§ 6.4 collapse).
-    CannotDecrypt,
-    /// It opened, but the plaintext was not a valid single-`Text` document.
-    Malformed,
 }
 
 /// Encode a whole note (markdown) into a sealed `NC05` blob: bridge it into a
@@ -140,21 +112,6 @@ pub fn encode_note_blob_at_millis(
 ) -> Result<Vec<u8>, ProtocolError> {
     let save = encode_note_at_millis(markdown, actor, now_millis);
     encode_crdt_note_blob(items_key, items_key_id, note_uuid, &save)
-}
-
-/// Decode a sealed `NC05` blob back to the exact markdown string: open the AEAD
-/// envelope, then bridge the opaque Automerge `save()` bytes back through the
-/// single-`Text` mapping. The byte-exact §6 C1 round-trip survives the full
-/// encrypt→decrypt path.
-pub fn decode_note_blob(
-    blob: &[u8],
-    note_uuid: &[u8; 16],
-    items_key: &[u8; 32],
-    items_key_id: &[u8; 16],
-) -> Result<String, DecodeNoteBlobError> {
-    let save = decode_crdt_note_blob(blob, note_uuid, items_key, items_key_id)
-        .map_err(|_| DecodeNoteBlobError::CannotDecrypt)?;
-    decode_note(&save).map_err(|_| DecodeNoteBlobError::Malformed)
 }
 
 /// Failure of an `NC05` edit or merge operation (both decode a source blob,
@@ -404,19 +361,6 @@ pub fn merge_crdt_note_blobs(
 fn doc_text(doc: &AutoCommit) -> Result<String, CrdtNoteOpError> {
     let text_id = note_text_id(doc)?;
     doc.text(&text_id).map_err(|_| CrdtNoteOpError::Malformed)
-}
-
-/// Read a blob's 4-byte magic from its cleartext header (decryption-free) — how
-/// the sync orchestrator dispatches `MY01` (keep-both) vs `NC05` (merge) before
-/// decrypting anything. `None` if the blob is shorter than the 4-byte magic.
-pub fn blob_magic(blob: &[u8]) -> Option<[u8; 4]> {
-    blob.get(0..4).map(|m| [m[0], m[1], m[2], m[3]])
-}
-
-/// Is this blob a next-major `NC05` CRDT note (vs a v0.1 `MY01` note)? Read from
-/// the cleartext magic — no decryption.
-pub fn is_nc05_blob(blob: &[u8]) -> bool {
-    blob_magic(blob).as_ref() == Some(protocol::NC05_MAGIC)
 }
 
 /// For an `NC05` note whose on-disk `content_nonce` changed since last sync,

@@ -817,7 +817,7 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build actually runs.
       # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
       # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core --no-fail-fast'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core -p myne-format -p myne-decrypt --no-fail-fast'
 
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a

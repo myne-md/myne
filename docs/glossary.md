@@ -35,6 +35,12 @@ Three small reference tables at the bottom (§ "Quick-reference indices") cover 
 
 ## Term entries
 
+### **`_undecodable/`** &nbsp; 📦 *Product*
+
+The directory the [myne-decrypt](#myne-decrypt) CLI writes a note's raw ciphertext blob into when that note fails to decode during a best-effort export. It is the salvage half of the "never produce a folder the user believes is complete" rule: the undecodable bytes are preserved rather than dropped, so nothing is destroyed even when the export is incomplete, and the `_FAILED.txt` manifest names what could not be read. The leading underscore keeps it out of the way of the exported note tree.
+
+Used in: `decisions.md` 2026-09-07 (myne-md/myne#166)
+
 ### **AAD (Associated Authenticated Data)** &nbsp; 🏗️ *Construction*
 
 *(Aliases: Associated Data, AD. Myne-divergent: no, but the canonical construction §5.2 is project-specific.)*
@@ -981,8 +987,13 @@ The integrity property a [vault head](#vault-head) provides against a malicious 
 
 Used in: `spec/sync-protocol.md` (vault head); `threat-model.md` §7
 
-### **forward-incompatible major version** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
+### **`format/` crate** &nbsp; 🛠️ *Tooling*
 
+The in-repo Rust workspace member (`myne-format`) that carries the host-free half of Myne's on-disk format: the `VaultIo` filesystem-seam trait, the closed `IoFailureKind` error categorization, the export-naming vocabulary, the `NC05` note decode path, and the `MYB1` backup-container read half. Extracted from `myne-core` so the [myne-decrypt](#myne-decrypt) CLI can read a vault without pulling `myne-core`'s unconditional TLS stack (`rustls`+`ring`) and ML runtime (`rten`, `image`). Native-only by design: the export walk and the MYB1 container read half use `std::fs` directly and are gated out of the wasm build; the `VaultIo` trait is carried for the CLI's future use.
+
+Used in: `decisions.md` 2026-09-07 (myne-md/myne#166)
+
+### **forward-incompatible major version** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 Myne's architectural commitment that each major protocol version (v0.1, the next major version, v006, …) is a closed, complete specification with distinct magic bytes, AAD prefix, and context-string prefix. Cross-major reads happen only via explicit user-initiated migration (`spec/protocol.md` §10.4); a later-major client refuses to silently parse a v0.1 blob, and vice versa. The choice contradicts the additive-extension model common in TLS 1.0–1.2 and OpenPGP; the reasoning is that those protocols' downgrade-attack history (POODLE, FREAK, Logjam, MEGA-2022) shows additive extension to be a structural risk. The next major version's anticipated changes (PQ hybrid wrap, MLS multi-device, OPAQUE auth, KT log) are too deep to be additive in any honest sense.
 
 Used in: `spec/protocol.md` §10.1
@@ -1584,6 +1595,12 @@ Used in: `decisions.md` 2026-07-13
 A YAML frontmatter field whose value is written by the Myne dialect surgery module (`src/dialect/surgery.ts`) rather than left purely user-authored. v0.1 defines **thirteen** such fields, enumerated in `markdown-dialect.md` §3.6.1 and exported as the single `MANAGED_FRONTMATTER_FIELDS` constant (`dialect/src/managedFields.ts`) that the importers' reject list consumes: `updated` / `title` / `folder` / `trashed` / `template` / `folder_index` / `kind` / `done` / `archived` / `cover` / `deleted` / `conflict` / `conflict_of`. The first two are the original pair — `updated` (RFC 3339 string, UTC, **autosave-driven** — overwritten on every `note_update` via `patchUpdatedField` to record the user's last-edit timestamp on the device) and `title` (YAML string scalar, **rename-driven** — overwritten only when the user renames a note from the sidebar AND the read-precedence chain resolves to the frontmatter slot, via `patchTitleField`; the `<NoteRow>` sidebar reads from the same field per the mirror-existing source-of-truth decision tree). All are **unprefixed** (no `myne_` namespace) to align with Obsidian / Logseq / Bear convention and the `PRODUCT.md` plain-markdown-portability commitment. Other frontmatter fields (`tags:`, user-defined keys) are user-authored and preserved per `markdown-dialect.md` §3.6 "Unknown frontmatter fields are preserved on write." The set of Myne-managed canonical fields is forward-incompatible-by-design with a later major version.
 
 Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-05-07 "User-meaningful timestamp storage path"; `decisions.md` 2026-05-15 "Note title write target"
+
+### **myne-decrypt** &nbsp; 🛠️ *Tooling*
+
+The app-independent decrypter (myne-md/myne#166): a standalone Rust CLI, shipped as four minisign-signed native binaries (macOS universal, Linux x64, Linux arm64, Windows x64) on `downloads.myne.md` in the same tag as `myne`, that reads a vault (or a `.myne-backup` container) and writes the notes and attachments out as plain markdown without the app installed. It is the escape hatch behind the no-lock-in commitment (`vision.md`): "plain markdown" is only true after decryption, so walking away without the app requires a tool that decrypts. It covers both on-disk format generations (v0.1 and `NC05`), exports best-effort with an honest accounting of what it could not read (the [`_undecodable/`](#_undecodable) salvage directory + a `_FAILED.txt` manifest), and describes itself without claiming a verifiability the private source cannot deliver. It reads the on-disk format through the [`format/` crate](#format-crate).
+
+Used in: `decisions.md` 2026-09-07 (myne-md/myne#166)
 
 ### **`myne.v0.1` prefix** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 
