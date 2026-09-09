@@ -1114,7 +1114,19 @@
           "tagsThinking": "Inapendekeza lebo…",
           "thinking": "AI inafikiri…",
           "truncated": "Imefupisha herufi {{count}} za mwanzo.",
-          "you": "Wewe"
+          "you": "Wewe",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Vichupo vyote vimefichwa. Bofya kulia ili kuvirejesha.",
         "outline": {
@@ -3030,7 +3042,8 @@
         "whatLabel": "Kinachotoka kwenye kifaa chako",
         "whenLabel": "Wakati kinapotoka",
         "whoLabel": "Nani anayekipokea",
-        "connectionLabel": "Jinsi inavyosafiri"
+        "connectionLabel": "Jinsi inavyosafiri",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Hii inafanyaje kazi?",
       "enableHelper": "Huendesha modeli unayoitoa wewe. Mahali inapoendeshwa, na iwapo madokezo yako yanatoka kwenye kifaa hiki, hutegemea mtoa huduma unayemtaja hapa chini. Ya majaribio, imezimwa kwa chaguomsingi.",

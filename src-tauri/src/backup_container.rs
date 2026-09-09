@@ -1002,6 +1002,8 @@ mod tests {
             MemberFamily::Snapshot => "snapshot",
             MemberFamily::AttachmentsCatalog => "attachments-catalog",
             MemberFamily::AttachmentBlob => "attachment-blob",
+            MemberFamily::ChatsCatalog => "chats-catalog",
+            MemberFamily::ConversationFile => "conversation-file",
         }
     }
 

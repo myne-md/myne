@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   CHAT_INITIAL,
@@ -7,8 +7,12 @@ import {
   clearChat,
   failChatTurn,
   finalizeChatTurn,
+  getActiveConversationId,
   getChat,
+  hydrateChatTurns,
   sendChatMessage,
+  setActiveConversationId,
+  setChatPersister,
   stopChatTurn,
   __resetChatForTest,
   type ChatState,
@@ -293,5 +297,178 @@ describe("an ask terminal may not close an agent run's turn", () => {
     s = chatReducer(s, { type: "AGENT_SETTLE", summary });
     expect(s.turns[1]!.agentSummary).toEqual(summary);
     expect(s.turns[3]!.agentSummary).toBeUndefined();
+  });
+});
+
+// Persistence wiring (myne-md/myne#675): the store notifies a persister after
+// every terminal reduce, settles a cut-off stream inside clearChat, and
+// re-hydrates on unlock. The persister itself (IPC, dedup) lives in
+// chatPersist.ts and is faked here; these tests pin the store half.
+
+describe("persistence hook", () => {
+  it("notifies the persister on every terminal action, and on none other", () => {
+    const seen: number[] = [];
+    setChatPersister(() => seen.push(getChat().turns.length));
+    const token = sendChatMessage("q");
+    expect(seen).toHaveLength(0); // SEND is unsettled: nothing to persist
+    appendChatToken(token, "partial");
+    expect(seen).toHaveLength(0); // TOKEN is unsettled too
+    finalizeChatTurn(token);
+    expect(seen).toEqual([2]);
+    // A late second terminal on the same settled transcript still notifies;
+    // the dedup lives in the persister, not here.
+    stopChatTurn();
+    expect(seen).toHaveLength(2);
+  });
+
+  it("clearChat settles a cut-off stream before wiping, then unbinds", () => {
+    const snapshots: string[][] = [];
+    setChatPersister(() =>
+      snapshots.push(getChat().turns.map((t) => t.text)),
+    );
+    setActiveConversationId("deadbeef".padEnd(32, "0"));
+    const token = sendChatMessage("q");
+    appendChatToken(token, "partial answer");
+    clearChat();
+    // The persister saw the settled partial text exactly once, then the wipe.
+    expect(snapshots).toEqual([["q", "partial answer"]]);
+    expect(getChat()).toEqual(CHAT_INITIAL);
+    expect(getActiveConversationId()).toBeNull();
+  });
+
+  it("clearChat on a settled transcript only wipes", () => {
+    const notify = vi.fn();
+    setChatPersister(notify);
+    const token = sendChatMessage("q");
+    finalizeChatTurn(token);
+    notify.mockClear();
+    clearChat();
+    expect(notify).not.toHaveBeenCalled();
+    expect(getChat()).toEqual(CHAT_INITIAL);
+  });
+
+  it("hydrateChatTurns replaces the transcript and invalidates the old epoch", () => {
+    const stale = sendChatMessage("before hydrate");
+    hydrateChatTurns([
+      {
+        id: "h1",
+        kind: "text",
+        role: "user",
+        text: "restored",
+        streaming: false,
+        error: false,
+        insertable: false,
+      },
+    ]);
+    expect(getChat().turns.map((t) => t.text)).toEqual(["restored"]);
+    expect(getChat().streaming).toBe(false);
+    // The pre-hydrate run is stale now: its tokens must not mutate the
+    // restored transcript.
+    appendChatToken(stale, "intruder");
+    expect(getChat().turns.map((t) => t.text)).toEqual(["restored"]);
+  });
+
+  it("HYDRATED always lands non-streaming", () => {
+    const out = chatReducer(CHAT_INITIAL, {
+      type: "HYDRATED",
+      turns: [
+        {
+          id: "h1",
+          kind: "text",
+          role: "assistant",
+          text: "x",
+          streaming: true,
+          error: false,
+          insertable: false,
+        },
+      ],
+    });
+    expect(out.turns[0]!.streaming).toBe(false);
+    expect(out.streaming).toBe(false);
+  });
+});
+
+describe("turn ids carry a client discriminator (myne-md/myne#675)", () => {  it("mints boot-scoped monotonic ids that sort in append order", () => {
+    sendChatMessage("first");
+    sendChatMessage("second");
+    const ids = getChat().turns.map((t) => t.id);
+    expect(ids).toHaveLength(4);
+    for (const id of ids) {
+      expect(id).toMatch(/^[0-9a-f]{16}-\d{10}$/);
+    }
+    const sorted = [...ids].sort();
+    expect(sorted).toEqual(ids);
+    // Same boot discriminator across the session, distinct sequences.
+    const boots = new Set(ids.map((id) => id.split("-")[0]));
+    expect(boots.size).toBe(1);
+    expect(new Set(ids).size).toBe(4);
+  });
+});
+
+// A settled turn freezes its proposal (myne-md/myne#675): the store keeps a
+// plain-data copy of the anchors, replacements and new notes as they stood at
+// settle time, never a reference into the live run. Without the copy, a run
+// that resumes after a scope approval (or re-runs) would rewrite what
+// history shows, and the transcript would alias `agentStore`'s live state.
+describe("a settled turn freezes its proposal", () => {
+  it("stores a copy, not the live proposal object", () => {
+    let s = chatReducer(CHAT_INITIAL, {
+      type: "AGENT_SEND",
+      userId: "u1",
+      agentId: "a1",
+      task: "tidy the headings",
+      scopeLabel: "This note",
+    });
+    const live = {
+      edits: [{ noteId: "n1", anchor: "old words", replacement: "new words" }],
+      newNotes: [] as { title: string; body: string; folder: string | null }[],
+    };
+    s = chatReducer(s, {
+      type: "AGENT_SETTLE",
+      summary: {
+        runId: "r1",
+        summary: "",
+        edits: 1,
+        newNotes: 0,
+        notesRead: 2,
+        iterations: 3,
+        charsOffDevice: null,
+        end: "finished" as const,
+        proposal: live,
+      },
+    });
+    // The run continues after the settle and mutates its live proposal.
+    // History must not follow.
+    live.edits[0]!.replacement = "REWRITTEN AFTER SETTLE";
+    live.edits.push({ noteId: "n2", anchor: "x", replacement: "y" });
+    const kept = s.turns[1]!.agentSummary!.proposal!;
+    expect(kept).not.toBe(live);
+    expect(kept.edits).toEqual([
+      { noteId: "n1", anchor: "old words", replacement: "new words" },
+    ]);
+  });
+
+  it("a settle without a proposal stores no proposal key", () => {
+    let s = chatReducer(CHAT_INITIAL, {
+      type: "AGENT_SEND",
+      userId: "u1",
+      agentId: "a1",
+      task: "tidy the headings",
+      scopeLabel: "This note",
+    });
+    s = chatReducer(s, {
+      type: "AGENT_SETTLE",
+      summary: {
+        runId: "r1",
+        summary: "",
+        edits: 0,
+        newNotes: 0,
+        notesRead: 0,
+        iterations: 1,
+        charsOffDevice: null,
+        end: "finished" as const,
+      },
+    });
+    expect(s.turns[1]!.agentSummary!.proposal).toBeUndefined();
   });
 });

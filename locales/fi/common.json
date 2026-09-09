@@ -1123,7 +1123,19 @@
           "tagsThinking": "Ehdotetaan tunnisteita…",
           "thinking": "Tekoäly ajattelee…",
           "truncated": "Tiivistettiin ensimmäiset {{count}} merkkiä.",
-          "you": "Sinä"
+          "you": "Sinä",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Kaikki välilehdet on piilotettu. Palauta napsauttamalla hiiren oikealla.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Mitä laitteeltasi lähtee",
         "whenLabel": "Milloin se lähtee",
         "whoLabel": "Kuka sen vastaanottaa",
-        "connectionLabel": "Miten se kulkee"
+        "connectionLabel": "Miten se kulkee",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Miten tämä toimii?",
       "enableHelper": "Suorittaa antamasi mallin. Se, missä se suoritetaan ja poistuvatko muistiinpanosi tältä laitteelta, riippuu alla nimeämästäsi palveluntarjoajasta. Kokeellinen, oletuksena pois päältä.",

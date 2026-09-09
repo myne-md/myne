@@ -343,6 +343,7 @@ pub fn run() {
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::graph_layout::init())
+        .plugin(plugins::chats::init())
         // myne#411: the device-local hide-vault-names option. Registered
         // unconditionally and reachable pre-unlock, because the picker it
         // governs is the screen that renders before any vault is open.

@@ -30,7 +30,7 @@
 // about which one to use. `ChatComposer` is now the single one; `AgentProgress`
 // and the run's outcome render as a turn in this transcript.
 
-import { memo, useEffect, useRef, type CSSProperties } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
 import { providerErrorKey } from "../../lib/engine-error";
 import { useTranslation } from "react-i18next";
 
@@ -46,6 +46,13 @@ import {
   type AgentTurnEnd,
   type ChatTurn,
 } from "../ai/chatStore";
+import {
+  hydrateActiveConversation,
+  installChatPersistence,
+  isChatHydrateFailed,
+  isChatPersistLagging,
+  subscribeChatPersistHealth,
+} from "../ai/chatPersist";
 import { agentCancel } from "../../lib/agent-run";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
@@ -53,6 +60,7 @@ import { Button } from "../../components/primitives/Button";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { CAPTION_STYLE, SECTION_HEADING_STYLE } from "./sharedStyles";
 import { ChatComposer } from "./ChatComposer";
+import { ChatHistoryModal } from "./ChatHistoryModal";
 import { clearAgent, useAgent } from "../agent/agentStore";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
 import { RunCostLine } from "../agent/components/RunCostLine";
@@ -318,6 +326,67 @@ function AgentTurnView({
               {endStatusLabel(s.end, t)}
             </div>
           ) : null}
+          {/* **The frozen proposal, read-only** (myne-md/myne#675). A settled
+              turn carries what its run proposed as plain data, so history
+              shows it after `agentStore` drops the live copy on lock. There
+              is deliberately NO apply/insert affordance here: a frozen
+              proposal may quote a note that has since changed, been trashed,
+              or moved folders, and re-applying it would write stale bytes
+              over live content. Apply stays a live-session flow through the
+              review screen, which is a different component. */}
+          {s.proposal !== undefined &&
+          (s.proposal.edits.length > 0 || s.proposal.newNotes.length > 0) ? (
+            <div
+              data-testid="ai.agent-proposal"
+              style={{ ...TURN_TEXT_STYLE, marginTop: "var(--space-2)" }}
+            >
+              {s.proposal.edits.map((edit, i) => (
+                <div
+                  key={`e${i}`}
+                  data-testid="ai.proposal-edit"
+                  data-note-id={edit.noteId}
+                  style={{ marginTop: i === 0 ? 0 : "var(--space-2)" }}
+                >
+                  {edit.anchor.length > 0 ? (
+                    <>
+                      <div style={CAPTION_STYLE}>
+                        {t("editor.chrome.rightPanel.aiChat.historyProposalBefore")}
+                      </div>
+                      <div
+                        style={{
+                          ...TURN_TEXT_STYLE,
+                          color: "var(--fg-3)",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {edit.anchor}
+                      </div>
+                    </>
+                  ) : null}
+                  <div style={CAPTION_STYLE}>
+                    {t("editor.chrome.rightPanel.aiChat.historyProposalAfter")}
+                  </div>
+                  <div style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}>
+                    {edit.replacement}
+                  </div>
+                </div>
+              ))}
+              {s.proposal.newNotes.map((note, i) => (
+                <div
+                  key={`n${i}`}
+                  data-testid="ai.proposal-new-note"
+                  style={{ marginTop: "var(--space-2)" }}
+                >
+                  <div style={CAPTION_STYLE}>
+                    {t("editor.chrome.rightPanel.aiChat.historyProposalNewNote")}: {note.title}
+                  </div>
+                  <div style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}>
+                    {note.body}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -503,6 +572,10 @@ export function AiChatTab({
   const ready = aiEnabled && !noModel;
   const chat = useChat();
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Conversation history modal (myne-md/myne#675): tab-local boolean, mounted
+  // only while open so every opening re-fetches the roster (including sync
+  // arrivals) rather than showing a stale list.
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // ONE subscription to the run store, at the tab rather than one per agent
   // turn: the transcript's turns render frozen counts, which need no live read.
@@ -541,6 +614,28 @@ export function AiChatTab({
   const lastTurn = chat.turns[chat.turns.length - 1];
   const turnCount = chat.turns.length;
   const tailLength = lastTurn?.text.length ?? 0;
+  // Persist health (myne-md/myne#675 review): a failed persist retries and
+  // stashes for the unlock replay, and is no longer silent while it does.
+  // Subscribed, not polled: the flag changes at most once per failure or
+  // success.
+  const [persistLagging, setPersistLagging] = useState(isChatPersistLagging());
+  const [hydrateFailed, setHydrateFailedState] = useState(isChatHydrateFailed());
+  useEffect(
+    () =>
+      subscribeChatPersistHealth(() => {
+        setPersistLagging(isChatPersistLagging());
+        setHydrateFailedState(isChatHydrateFailed());
+      }),
+    [],
+  );
+  // Persistence wiring (myne-md/myne#675): install the store's settle listener
+  // once, then re-hydrate the last active conversation. Both are idempotent
+  // (the persister dedupes by payload; hydrate no-ops when bound or when the
+  // store is non-empty), so a strict-mode double-mount only double-fetches.
+  useEffect(() => {
+    installChatPersistence();
+    void hydrateActiveConversation();
+  }, []);
   useEffect(() => {
     if (!atBottomRef.current) return;
     cancelAnimationFrame(frameRef.current);
@@ -567,6 +662,14 @@ export function AiChatTab({
           {t("editor.chrome.rightPanel.tabs.aiChat")}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="ai.history-button"
+            onClick={() => setHistoryOpen(true)}
+          >
+            {t("editor.chrome.rightPanel.aiChat.history")}
+          </Button>
           {chat.turns.length > 0 ? (
             <Button
               type="button"
@@ -603,6 +706,17 @@ export function AiChatTab({
             >
               {t("editor.chrome.rightPanel.aiChat.newChat")}
             </Button>
+          ) : null}
+          {persistLagging ? (
+            <span
+              data-testid="ai.persist-warning"
+              style={{
+                fontSize: "var(--text-xs)",
+                color: "var(--danger)",
+              }}
+            >
+              {t("editor.chrome.rightPanel.aiChat.persistWarning")}
+            </span>
           ) : null}
           <span
             data-testid="ai.chrome-status"
@@ -645,6 +759,19 @@ export function AiChatTab({
           {aiChatHonestyNote(activeProviderName)}
         </p>
       )}
+
+      {/* The unreadable conversation store (review I9): an empty transcript
+          must not read as "no conversations yet" when the roster refused to
+          open. Shown only while the tab is actually empty; a hydrate,
+          a replay, or an explicit open that succeeds clears the flag. */}
+      {hydrateFailed && chat.turns.length === 0 ? (
+        <p
+          data-testid="ai.hydrate-error"
+          style={{ fontSize: "var(--text-xs)", lineHeight: 1.4, color: "var(--danger)", margin: 0 }}
+        >
+          {t("editor.chrome.rightPanel.aiChat.historyError")}
+        </p>
+      ) : null}
 
       {/* The one scrolling region. Everything above and below it stays put. */}
       <div
@@ -730,6 +857,9 @@ export function AiChatTab({
           onNotesWritten={onNotesWritten}
         />
       )}
+      {historyOpen ? (
+        <ChatHistoryModal open onClose={() => setHistoryOpen(false)} />
+      ) : null}
     </div>
   );
 }

@@ -1221,7 +1221,19 @@
           "tagsThinking": "Sugerowanie tagów…",
           "thinking": "AI myśli…",
           "truncated": "Podsumowano pierwsze {{count}} znaków.",
-          "you": "Ty"
+          "you": "Ty",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Wszystkie karty są ukryte. Kliknij prawym przyciskiem, aby przywrócić.",
         "outline": {
@@ -3260,7 +3272,8 @@
         "whatLabel": "Co opuszcza Twoje urządzenie",
         "whenLabel": "Kiedy opuszcza urządzenie",
         "whoLabel": "Kto to otrzymuje",
-        "connectionLabel": "Jak to podróżuje"
+        "connectionLabel": "Jak to podróżuje",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Jak to działa?",
       "enableHelper": "Uruchamia dostarczony przez Ciebie model. To, gdzie działa i czy Twoje notatki opuszczają to urządzenie, zależy od dostawcy, którego wskażesz poniżej. Eksperymentalne, domyślnie wyłączone.",

@@ -1172,7 +1172,19 @@
           "tagsThinking": "Suggestion d'étiquettes…",
           "thinking": "L'IA réfléchit…",
           "truncated": "Résumé des {{count}} premiers caractères.",
-          "you": "Vous"
+          "you": "Vous",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Tous les onglets sont masqués. Clic droit pour les restaurer.",
         "outline": {
@@ -3155,7 +3167,8 @@
         "whatLabel": "Ce qui quitte votre appareil",
         "whenLabel": "Quand cela quitte votre appareil",
         "whoLabel": "Qui le reçoit",
-        "connectionLabel": "Comment cela circule"
+        "connectionLabel": "Comment cela circule",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Comment ça marche ?",
       "enableHelper": "Exécute un modèle que vous fournissez. L'endroit où il s'exécute, et le fait que vos notes quittent ou non cet appareil, dépendent du fournisseur que vous indiquez ci-dessous. Expérimental, désactivé par défaut.",

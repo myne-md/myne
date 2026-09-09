@@ -344,3 +344,16 @@ export const CONSENT_DEVICE_SCOPE =
  *  myne-md/myne#607; until then, this is the honest sentence. */
 export const CONSENT_DIRECT_CONNECTION =
   "The connection is direct. The provider sees this device's IP address, and your network can see which provider you use.";
+
+/** WHAT NEW READS NEVER TOUCH. Added by myne-md/myne#675, and it is the one clause
+ *  about the content control rather than the disclosure: folders on the
+ *  excluded list are closed to new reads on any arm. Worth a clause of its
+ *  own because the rest of this screen says what leaves once the user agrees,
+ *  and a reader agreeing here should know the one list that withholds whole
+ *  folders from that agreement: an empty list withholds nothing, and it is
+ *  the same list the command-line client honors, so the two surfaces cannot
+ *  be played against each other. Text already saved in a conversation is
+ *  outside this clause: it stays as it is and keeps seeding new runs, which
+ *  the user guide states in the same words. */
+export const CONSENT_EXCLUDED_FOLDERS =
+  "Notes in excluded folders are closed to new reads: the AI will not open, search, or suggest from them, and nothing is sent on their behalf. The list lives under Settings, AI, Excluded folders; empty, it excludes nothing, and it is the same list the command-line client uses. Text already saved in a conversation stays as it is and keeps seeding new runs.";

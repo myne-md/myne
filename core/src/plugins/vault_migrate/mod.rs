@@ -33,8 +33,10 @@ use protocol::aead::{ROLE_STR_CUSTOM_THEMES_BLOB, ROLE_STR_PERSONAL_DICT_BLOB};
 use protocol::{
     decode_attachments_catalog, decode_note, decode_prefs_blob, derive_subkey, derive_subkey_v0_2,
     encode_attachments_catalog_versioned, encode_prefs_blob_versioned, encode_vault_meta_v0_2_raw,
-    reseal_attachment_v0_2, reseal_kek_envelope_v0_2, KdfParams, MetaVersion, SubkeyRole,
-    DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_V0_2_MAGIC, THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC,
+    reseal_attachment_v0_2, reseal_chats_blob_v0_2, reseal_kek_envelope_v0_2, KdfParams,
+    MetaVersion, SubkeyRole, CHATS_CATALOG_BLOB_AAD_ROLE, CHATS_CATALOG_BLOB_MAGIC,
+    CHATS_CATALOG_BLOB_V0_2_MAGIC, DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_V0_2_MAGIC,
+    THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC,
 };
 use std::path::Path;
 use zeroize::Zeroizing;
@@ -80,8 +82,20 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         kek_role: SubkeyRole::PersonalDictKey,
         cap: 4 * 1024 * 1024,
     },
+    // AI conversations catalog (MYM1 → MYM5, myne-md/myne#675): same
+    // KEK-envelope re-seal as the other singletons. The per-conversation
+    // files (`chats/<id>`) re-seal separately below (they need their
+    // conversation id for the AAD, which this table's shape cannot carry).
+    KekSingleton {
+        filename: "vault.chats",
+        old_magic: &CHATS_CATALOG_BLOB_MAGIC,
+        new_magic: &CHATS_CATALOG_BLOB_V0_2_MAGIC,
+        format_version: 0x01,
+        aad_role: CHATS_CATALOG_BLOB_AAD_ROLE,
+        kek_role: SubkeyRole::ChatsCatalogKey,
+        cap: 4 * 1024 * 1024,
+    },
 ];
-
 /// A note re-encrypted from `MY01` to `NC05` by the migration.
 #[derive(Debug, Clone)]
 pub struct MigratedNote {
@@ -858,6 +872,27 @@ pub enum OnDiskMigrationError {
 /// caller derives the new-vs-old KEKs (`derive_subkey`/`derive_subkey_v0_2`) and
 /// threads catalog `content_type`s. `old_items_key` comes from a completed v0.1
 /// unlock; crypto-erase of `legacy/` + the old `root_key` is a post-confirm step.
+/// Decode a 32-char lowercase-hex `<conversation-id-hex>` filename
+/// (`chats/<id>`, § 9.24) to its 16 bytes. The chats plugin's own helper is
+/// module-private; this duplicates the small shape rather than widening a
+/// plugin API for one migration caller.
+fn hex_decode_16_conversation(s: &str) -> Option<[u8; 16]> {
+    // The ASCII gate is load-bearing, not a nicety: `s.len()` counts BYTES
+    // and the slices below index bytes, so a 32-BYTE name containing a
+    // multi-byte character would put a slice boundary mid-character and
+    // panic (`byte index N is not a char boundary`). A filename is
+    // attacker-renameable input (A5), and a panic inside the migration
+    // would strand the whole half-rewritten vault.
+    if s.len() != 32 || !s.is_ascii() {
+        return None;
+    }
+    let mut out = [0u8; 16];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn migrate_vault_notes_on_disk(
     io: &dyn VaultIo,
@@ -1214,6 +1249,60 @@ pub async fn migrate_vault_notes_on_disk(
         }
     }
 
+    // (5b) Re-seal the AI conversation files (`chats/<id-hex>`) present on
+    //      disk: `MYJ1` → `MYJ5` under the v0.2 chats KEK (myne-md/myne#675).
+    //      Same stage-first, skip-dead discipline as the attachment loop
+    //      above: the catalog was re-sealed by the KEK_SINGLETONS pass just
+    //      before (so its causal versions survive), and each conversation
+    //      file re-seals independently. A file that will not re-seal (torn,
+    //      or a name that is not a conversation id) is left in place AND
+    //      staged to legacy/: aborting would strand the whole half-rewritten
+    //      vault for one dead conversation; silence here would lose it. The
+    //      sync-id of each conversation (its own id bytes) does not change
+    //      across the cut, so no stranded-sync-id tombstone is owed (§5.6.1
+    //      applies to root_key-derived sync-ids; conversation ids are
+    //      client-minted, not derived).
+    {
+        let chats_dir = vault_root.join("chats");
+        let legacy_chats = legacy.join("chats");
+        let old_chats_key = derive_subkey(old_root_key, SubkeyRole::ChatsKey);
+        let new_chats_key = derive_subkey_v0_2(&out.new_root_key, SubkeyRole::ChatsKey);
+        if let Ok(entries) = io.read_dir(&chats_dir).await {
+            for entry in entries {
+                if entry.is_dir {
+                    continue;
+                }
+                let Some(conv_id) = hex_decode_16_conversation(&entry.name) else {
+                    continue; // stray file: leave it, do not abort
+                };
+                let blob_path = chats_dir.join(&entry.name);
+                let Ok(old_blob) = io.read(&blob_path).await else {
+                    continue;
+                };
+                io.create_dir_all(&legacy_chats).await.map_err(|_| Io)?;
+                io.write(
+                    &legacy_chats.join(&entry.name),
+                    &old_blob,
+                    WriteOpts::default(),
+                )
+                .await
+                .map_err(|_| Io)?;
+                let Ok(resealed) = reseal_chats_blob_v0_2(
+                    &old_blob,
+                    &old_chats_key,
+                    &new_chats_key,
+                    account_number_hash,
+                    &conv_id,
+                ) else {
+                    continue;
+                };
+                io.write(&blob_path, &resealed, WriteOpts::default())
+                    .await
+                    .map_err(|_| Io)?;
+            }
+        }
+    }
+
     // (5c) Drop the rebuildable / device-local caches and the quick-unlock
     //      credential. Each is either reconstructable from the notes (search,
     //      indices, graph, embeddings), device-local editor state (workspace), or
@@ -1294,7 +1383,9 @@ async fn rebase_sync_plane_after_rekey(
     old_root_key: &[u8; 32],
     new_root_key: &[u8; 32],
 ) {
-    use crate::plugins::sync::orchestrator::{catalog_sync_id, prefs_sync_id, themes_sync_id};
+    use crate::plugins::sync::orchestrator::{
+        catalog_sync_id, chats_catalog_sync_id, prefs_sync_id, themes_sync_id,
+    };
     use crate::plugins::sync::state::{mark_vault_meta_dirty, read_sync_state, write_sync_state};
 
     let Ok(mut state) = read_sync_state(io, vault_root).await else {
@@ -1311,6 +1402,13 @@ async fn rebase_sync_plane_after_rekey(
         catalog_sync_id(old_root_key),
         prefs_sync_id(old_root_key),
         themes_sync_id(old_root_key),
+        // The conversations catalog (myne-md/myne#675): same root_key-derived
+        // sync-id shape as the three above, so the old id strands a server
+        // record on re-key and owes the same orphan tombstone. The
+        // per-conversation files do NOT appear here: their sync blob-ids are
+        // the client-minted conversation ids, not root_key derivations, so a
+        // re-key does not strand them.
+        chats_catalog_sync_id(old_root_key),
     ] {
         let hex = crate::plugins::sync::to_hex(&id);
         // Queue the tombstone BEFORE dropping the baseline (#443): the removal
@@ -1383,6 +1481,30 @@ mod tests {
     /// Seed a v0.1 `MY01` note under the OLD itemsKey (the pre-migration shape).
     fn my01(uuid: &[u8; 16], markdown: &str) -> Vec<u8> {
         encode_new_note(&OLD_ITEMS, &OLD_ITEMS_ID, uuid, markdown.as_bytes()).expect("MY01")
+    }
+
+    #[test]
+    fn hex_decode_16_rejects_a_32_byte_non_ascii_name_without_panicking() {
+        // 16 two-byte characters = exactly 32 BYTES: the length gate alone
+        // passes, and the byte-indexed slices would land mid-character
+        // (byte index 1 is not a char boundary) without the ASCII gate.
+        let multibyte = "é".repeat(16);
+        assert_eq!(multibyte.len(), 32, "fixture must be 32 bytes");
+        assert_eq!(multibyte.chars().count(), 16, "fixture must be multi-char");
+        assert!(hex_decode_16_conversation(&multibyte).is_none());
+        // The valid shape still decodes.
+        let valid = "0123456789abcdef0123456789abcdef";
+        assert_eq!(
+            hex_decode_16_conversation(valid),
+            Some([
+                0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab,
+                0xcd, 0xef
+            ])
+        );
+        // Wrong length still rejects.
+        assert!(hex_decode_16_conversation("0123").is_none());
+        // Non-hex ASCII still rejects.
+        assert!(hex_decode_16_conversation(&"z".repeat(32)).is_none());
     }
 
     #[test]
@@ -2239,18 +2361,31 @@ mod tests {
         tomb_id_hex: String,
         /// That leftover blob's exact bytes.
         tomb_blob: Vec<u8>,
+        /// The `MYM1` chats catalog: one live conversation row.
+        chats_catalog: crate::plugins::chats::commands::ChatsCatalogMap,
+        /// The live conversation's client-minted id (stable across the re-key:
+        /// conversation sync-ids are the ids themselves, not derivations).
+        chats_conv_id: [u8; 16],
+        /// …and its lowercase-hex form, which is the `chats/` filename.
+        chats_conv_id_hex: String,
+        /// The exact turn-list payload the `MYJ1` file wrapped.
+        chats_turns_payload: Vec<u8>,
     }
 
     /// Seed the v0.1 shape of every family the note pass does not touch:
     /// `vault.themes` (`MYT1`), `vault.prefs` (`MYP1`), `vault.dictionary`
     /// (`MYD1`), `vault.attachments` (`MYC1`) and two `attachments/<id>` blobs
-    /// (`MYA1`) — one live, one behind a tombstone.
+    /// (`MYA1`, one live and one behind a tombstone) plus the AI conversations
+    /// pair: `vault.chats` (`MYM1`) with one live row and one `chats/<id>`
+    /// file (`MYJ1`) (myne-md/myne#675).
     async fn seed_v0_1_singletons(io: &StdVaultIo, vault_root: &Path) -> SeededV0_1 {
         use crate::plugins::attachments::commands::hex_encode;
+        use crate::plugins::chats::commands::{ChatsCatalogMap, ConversationEntry};
         use crate::plugins::themes::commands::{encode_themes_map, ThemeEntry, ThemesMap};
         use protocol::{
             compute_attachment_id, decode_themes_blob, encode_attachment_blob,
-            encode_attachments_catalog, encode_prefs_blob, AttachmentMeta, AttachmentsCatalog,
+            encode_attachments_catalog, encode_chats_blob, encode_chats_catalog_blob,
+            encode_prefs_blob, AttachmentMeta, AttachmentsCatalog,
         };
 
         // vault.themes (MYT1) under the OLD CustomThemesKey.
@@ -2369,6 +2504,49 @@ mod tests {
         .await
         .unwrap();
 
+        // vault.chats (MYM1) under the OLD ChatsCatalogKey: one live row.
+        // chats/<id-hex> (MYJ1) under the OLD ChatsKey: its turn list.
+        let chats_conv_id = [0xC0u8; 16];
+        let chats_conv_id_hex = hex_encode(&chats_conv_id[..]);
+        let mut chats_map = ChatsCatalogMap::new();
+        chats_map.insert(
+            chats_conv_id_hex.clone(),
+            ConversationEntry {
+                created_at: 1_000,
+                deleted_at: None,
+                title: "migrate me".to_string(),
+                updated_at: 2_000,
+                version: 2,
+            },
+        );
+        let old_chats_catalog_kek = derive_subkey(&OLD_ROOT, SubkeyRole::ChatsCatalogKey);
+        let chats_catalog_plaintext = serde_json::to_vec(&chats_map).expect("seed roster JSON");
+        let chats_catalog_blob =
+            encode_chats_catalog_blob(&old_chats_catalog_kek, &ACCT, &chats_catalog_plaintext)
+                .expect("seed MYM1");
+        io.write(
+            &vault_root.join("vault.chats"),
+            &chats_catalog_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+        let chats_turns_payload =
+            br#"{"turns":[{"id":"m1-1","kind":"text","role":"user","text":"migrate this chat"}]}"#
+                .to_vec();
+        let old_chats_key = derive_subkey(&OLD_ROOT, SubkeyRole::ChatsKey);
+        let chats_file_blob =
+            encode_chats_blob(&old_chats_key, &ACCT, &chats_conv_id, &chats_turns_payload)
+                .expect("seed MYJ1");
+        io.create_dir_all(&vault_root.join("chats")).await.unwrap();
+        io.write(
+            &vault_root.join("chats").join(&chats_conv_id_hex),
+            &chats_file_blob,
+            WriteOpts::default(),
+        )
+        .await
+        .unwrap();
+
         SeededV0_1 {
             themes_plaintext,
             prefs,
@@ -2377,6 +2555,10 @@ mod tests {
             live_id_hex,
             tomb_id_hex,
             tomb_blob,
+            chats_catalog: chats_map,
+            chats_conv_id,
+            chats_conv_id_hex,
+            chats_turns_payload,
         }
     }
 
@@ -2450,12 +2632,13 @@ mod tests {
             .await
             .expect("on-disk migration");
 
-            // FOUR families were re-sealed: themes + dictionary (the KEK table),
-            // prefs (hand-rolled) and the catalog. A dropped leg shows up here
-            // before any of the per-family assertions below.
+            // FIVE families were re-sealed: themes + dictionary + chats catalog
+            // (the KEK table), prefs (hand-rolled) and the attachments catalog.
+            // A dropped leg shows up here before any of the per-family
+            // assertions below.
             assert_eq!(
-                summary.singletons_migrated, 4,
-                "themes + dictionary + prefs + attachments-catalog"
+                summary.singletons_migrated, 5,
+                "themes + dictionary + chats-catalog + prefs + attachments-catalog"
             );
 
             let (new_root, new_items, new_items_key_id) =
@@ -2490,6 +2673,72 @@ mod tests {
                 protocol::decode_themes_blob(&old_themes_kek, &ACCT, &legacy_themes).is_ok(),
                 "legacy/ preserves the original openable MYT1 themes blob"
             );
+
+            // ── vault.chats: MYM5 under derive_subkey_v0_2(new_root, ChatsCatalogKey)
+            // (myne-md/myne#675). The catalog re-seals through the KEK table;
+            // the causal versions survive, so the merge clock is not reset.
+            let new_chats_catalog_kek = derive_subkey_v0_2(&new_root, SubkeyRole::ChatsCatalogKey);
+            let chats_catalog = io.read(&vault_root.join("vault.chats")).await.unwrap();
+            assert_eq!(
+                &chats_catalog[0..4],
+                b"MYM5",
+                "chats catalog must land in the v0.2 family"
+            );
+            let catalog_plaintext = protocol::decode_chats_catalog_blob_versioned(
+                protocol::MetaVersion::V0_2,
+                &new_chats_catalog_kek,
+                &ACCT,
+                &chats_catalog,
+            )
+            .expect("MYM5 decodes under the v0.2 catalog KEK");
+            let catalog_map: crate::plugins::chats::commands::ChatsCatalogMap =
+                serde_json::from_slice(&catalog_plaintext).expect("catalog JSON parses");
+            let row = &catalog_map[&seeded.chats_conv_id_hex];
+            assert_eq!(row.title, "migrate me");
+            assert_eq!(row.version, 2, "the causal version survives the re-key");
+            assert!(row.deleted_at.is_none());
+            assert_eq!(
+                catalog_map, seeded.chats_catalog,
+                "the roster survives the re-key entry-for-entry"
+            );
+            let legacy_catalog = io
+                .read(&vault_root.join("legacy/vault.chats"))
+                .await
+                .unwrap();
+            assert_eq!(&legacy_catalog[0..4], b"MYM1");
+
+            // ── chats/<id>: MYJ5 under derive_subkey_v0_2(new_root, ChatsKey).
+            // Each conversation file re-seals independently (stage-first,
+            // skip-dead); the turn list passes through opaquely.
+            let new_chats_key = derive_subkey_v0_2(&new_root, SubkeyRole::ChatsKey);
+            let conv_path = vault_root.join("chats").join(&seeded.chats_conv_id_hex);
+            let conv_blob = io.read(&conv_path).await.unwrap();
+            assert_eq!(
+                &conv_blob[0..4],
+                b"MYJ5",
+                "conversation file must land in the v0.2 family"
+            );
+            let conv_plaintext = protocol::decode_chats_blob_v0_2(
+                &new_chats_key,
+                &ACCT,
+                &seeded.chats_conv_id,
+                &conv_blob,
+            )
+            .expect("MYJ5 decodes under the v0.2 chats KEK");
+            assert_eq!(
+                conv_plaintext.as_slice(),
+                seeded.chats_turns_payload.as_slice(),
+                "the turn list survived the re-key byte-exact"
+            );
+            let legacy_conv = io
+                .read(
+                    &vault_root
+                        .join("legacy/chats")
+                        .join(&seeded.chats_conv_id_hex),
+                )
+                .await
+                .unwrap();
+            assert_eq!(&legacy_conv[0..4], b"MYJ1");
 
             // ── vault.prefs: MYP5 under derive_subkey_v0_2(new_root, PrefsKey)
             let old_prefs_kek = derive_subkey(&OLD_ROOT, SubkeyRole::PrefsKey);
@@ -2790,8 +3039,9 @@ mod tests {
             .await
             .expect("a corrupt catalog must not abort the whole migration");
 
-            // themes + dictionary + prefs re-sealed; the catalog did not.
-            assert_eq!(summary.singletons_migrated, 3);
+            // themes + dictionary + prefs + chats-catalog re-sealed; the
+            // attachments catalog did not.
+            assert_eq!(summary.singletons_migrated, 4);
 
             // Both blobs — the live one AND the tombstoned leftover — are in
             // legacy/, byte-identical, because without the catalog neither can be
@@ -2875,8 +3125,9 @@ mod tests {
             .await
             .expect("an undecodable prefs blob must not abort the migration");
 
-            // themes + dictionary + catalog re-sealed; prefs did not.
-            assert_eq!(summary.singletons_migrated, 3);
+            // themes + dictionary + catalog + chats-catalog re-sealed;
+            // prefs did not.
+            assert_eq!(summary.singletons_migrated, 4);
 
             // The old bytes are staged AND left in place, unreadable under v0.2.
             assert_eq!(

@@ -99,9 +99,24 @@ pub(crate) async fn promote_incoming_meta(io: &dyn VaultIo, vault_root: &Path, b
     super::drop_artefacts_sealed_under_replaced_root(
         io,
         vault_root,
-        &["vault.prefs", "vault.attachments", "vault.themes"],
+        &[
+            "vault.prefs",
+            "vault.attachments",
+            "vault.themes",
+            "vault.chats",
+        ],
     )
     .await;
+
+    // `chats/` (`MYJ1` per-conversation files, myne-md/myne#675) is the
+    // per-file twin of the catalog drop above: sealed under the old
+    // `chats-key`, so the whole subtree goes with it. The files come back
+    // from the server under the new generation (the conversation id is
+    // generation-independent, so the roster re-resolves by id). This lives
+    // HERE, on the peer-promotion path only: the migrating device re-seals
+    // these files in place instead (it holds both keys for one moment), so
+    // the shared drop helper must not touch the subtree.
+    let _ = io.remove_dir_all(&vault_root.join("chats")).await;
 
     // The personal dictionary (`MYD1`) is dropped with them and is NOT
     // recoverable: it is sealed under the old root and is not synced, and the

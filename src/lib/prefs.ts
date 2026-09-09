@@ -11,7 +11,6 @@
 
 import { invoke } from "../platform/core";
 import { bumpPrefsNonce, getPrefsNonce } from "../notes/prefsNonce";
-import { blockSeedingOfExistingTurns } from "../notes/ai/chatStore";
 
 /**
  * Editor three-pane layout — sidebar widths (px) + collapsed flags (MYND-137).
@@ -1103,16 +1102,10 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
  * **The cut lives here rather than in `usePrefs`**, unlike the exclusion one,
  * because this binding is the single point every provider change passes
  * through: `AiPanel` calls it from three places (clear, re-select an already
- * consented provider, and accept consent), and a cut in the caller would be
- * three chances to miss one. `vault-switch.ts` reaches into stores from this
- * layer for the same reason.
- *
- * It fires BEFORE the write, and before any await: a failed persist does not
- * withdraw the intent, and the other order leaves a window in which a run could
- * seed the turns this is protecting.
+ * consented provider, and accept consent). `vault-switch.ts` reaches into
+ * stores from this layer for the same reason.
  */
 export async function setAiProvider(provider: string | null): Promise<void> {
-  blockSeedingOfExistingTurns();
   await writePref("plugin:prefs|set_ai_provider", { provider });
 }
 
@@ -1244,30 +1237,11 @@ export async function setChatHistoryBudget(budget: number | null): Promise<void>
  * **The seed cut lives here, beside the one in [`setAiProvider`], rather than in
  * `usePrefs`.** This binding is the single point every exclusion write passes
  * through, and the two controls bound the same thing, so splitting them across
- * two layers meant a reader had to find both to know the rule. It fires BEFORE
- * the write and before any await: the user has stated an intent about what may
- * reach a provider, and a failed disk write does not withdraw it.
- *
- * It is not the only trigger, and the other one is the reason this control needs
- * two. `ai_excluded_folders` is classified `Shared(SetUnion)`, so it also
- * arrives by SYNC MERGE, where no setter on this machine runs at all;
- * `chatStore.observeEgressControls` catches that by watching the value on every
- * prefs read. This one catches the stated intent, including when the write
- * fails; that one catches the arrival, whatever route it took.
+ * two layers meant a reader had to find both to know the rule.
  */
 export async function mutateAiExcludedFolders(
   mutation: SetMutation,
 ): Promise<number> {
-  // BEFORE the write, and before any await, for the reason `setAiProvider`'s
-  // doc gives: a failed persist does not withdraw the intent, and the other
-  // order leaves a window in which a run could seed the turns this protects.
-  //
-  // develop added this to `setAiExcludedFolders` (myne-md/myne#617 review)
-  // while this branch replaced that whole-set writer with the add/remove verb,
-  // so the merge had two functions and one call. Without it a user who excludes
-  // a folder keeps every turn already on screen seedable into the next run,
-  // which is exactly what SYNC-14 has no in-flight carve-out for.
-  blockSeedingOfExistingTurns();
   return await writePref<number>("plugin:prefs|set_ai_excluded_folders", { mutation });
 }
 

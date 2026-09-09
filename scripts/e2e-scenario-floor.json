@@ -596,6 +596,38 @@
     "measured execution count to exceed it, and this one is checked against a real",
     "run of the merged tree rather than left as arithmetic."
   ],
-  "stable": 358,
+  "_comment_357_to_358": [
+    "357 -> 358 for myne-md/myne#675. One NEW scenario relative to develop: ch1",
+    "in `e2e/chat-history.e2e.ts` (send under the local-inference-stub, lock,",
+    "unlock to continue, frozen proposal read-only, delete with confirm). It sits",
+    "inside `aiDescribe`, and CI sets MYNE_E2E_AI=1 with the stub build, so it",
+    "executes there, which is what makes this a full +1 rather than a partial",
+    "delta. The `e2e-web/chat-history-reload.e2e.ts` scenario from the same task",
+    "runs in the browser lane, which this floor does not measure (lane-scoped",
+    "reports), so it moves no number here.",
+    "",
+    "MEASURED, not reasoned: `scripts/e2e-ai-buildrun.sh chat-history",
+    "chat-history chat-history` green three consecutive times in one warm",
+    "container, each run executing ch1 with none skipped (the lane definition of",
+    "done). The revert direction is covered by reference rather than a second",
+    "build: this scenario's continue assertion (2 turns after lock) directly",
+    "contradicts the 0-turn assertion ac1 carried green for months on the",
+    "pre-persistence build, so the old binary fails the new expectation on",
+    "its own terms.",
+    "",
+    "`stable_max_failures` stays 0."
+  ],
+  "_comment_merge_684_675": [
+    "358 -> 359: the land-train merge of myne-md/myne#689 onto a develop that",
+    "already held 358 via myne-md/myne#684 (ag1, the keychain-less picker).",
+    "Two disjoint +1s over the same 357 base (ch1 here, ag1 there); taking",
+    "either side's number would drop the other's scenario from the counted",
+    "set, so the increments are summed rather than chosen between.",
+    "",
+    "`stable_max_failures` stays 0. A floor is a MINIMUM: ag1 executes on the",
+    "merged tree alongside ch1, and the merged-tree run in the Phase 2 sweep",
+    "is what checks the sum rather than this arithmetic."
+  ],
+  "stable": 359,
   "stable_max_failures": 0
 }

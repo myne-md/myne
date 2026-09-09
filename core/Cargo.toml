@@ -330,6 +330,10 @@ name = "emit-vault-fixture"
 required-features = ["test-support"]
 
 [[example]]
+name = "emit-chats-fixture"
+required-features = ["test-support"]
+
+[[example]]
 name = "emit-double-buffer-fixtures"
 required-features = ["test-support"]
 

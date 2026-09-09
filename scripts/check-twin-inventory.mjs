@@ -624,6 +624,14 @@ const ROSTER = [
       "Byte-identical. Recovery-phrase normalization has exactly one right answer and it is on the credential path, so a divergence here is a correctness bug rather than a style difference.",
   },
   {
+    a: "src/lib/chats.ts",
+    b: "mobile/src/lib/chats.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "IPC wrapper and DTO mirror over the shared chats core, the attachments-twin shape: six commands plus the two error-kind unions plus ConversationEntry. Both sides register the full subset the shared ACL grants, so unlike attachments there is no per-command absence question here: the wrapper shape is one answer. Its error taxonomy overlaps myne-md/myne#475.",
+  },
+  {
     a: "src/lib/device-name.ts",
     b: "mobile/src/lib/device-name.ts",
     verdict: "decision",
@@ -1122,6 +1130,14 @@ const ROSTER = [
   {
     a: "src-tauri/src/plugins/attachments/mod.rs",
     b: "mobile/src-tauri/src/plugins/attachments/mod.rs",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      SHIM_REASON,
+  },
+  {
+    a: "src-tauri/src/plugins/chats/mod.rs",
+    b: "mobile/src-tauri/src/plugins/chats/mod.rs",
     verdict: "delegated",
     destination: "myne-core",
     reason:

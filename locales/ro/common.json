@@ -1172,7 +1172,19 @@
           "tagsThinking": "Se sugerează etichete…",
           "thinking": "AI gândește…",
           "truncated": "S-au rezumat primele {{count}} caractere.",
-          "you": "Tu"
+          "you": "Tu",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Toate filele sunt ascunse. Clic dreapta pentru a le restaura.",
         "outline": {
@@ -3155,7 +3167,8 @@
         "whatLabel": "Ce părăsește dispozitivul tău",
         "whenLabel": "Când pleacă",
         "whoLabel": "Cine le primește",
-        "connectionLabel": "Cum călătorește"
+        "connectionLabel": "Cum călătorește",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Cum funcționează?",
       "enableHelper": "Rulează un model furnizat de tine. Unde rulează și dacă notele tale părăsesc acest dispozitiv depind amândouă de furnizorul pe care îl indici mai jos. Experimental, dezactivat implicit.",

@@ -1123,7 +1123,19 @@
           "tagsThinking": "Föreslår taggar…",
           "thinking": "AI tänker…",
           "truncated": "Sammanfattade de första {{count}} tecknen.",
-          "you": "Du"
+          "you": "Du",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Alla flikar är dolda. Högerklicka för att återställa.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Vad som lämnar din enhet",
         "whenLabel": "När det lämnar enheten",
         "whoLabel": "Vem som tar emot det",
-        "connectionLabel": "Hur det färdas"
+        "connectionLabel": "Hur det färdas",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Hur fungerar det här?",
       "enableHelper": "Kör en modell du tillhandahåller. Var den körs, och om dina anteckningar lämnar den här enheten, beror på leverantören du anger nedan. Experimentell, av som standard.",
