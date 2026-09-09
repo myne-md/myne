@@ -47,7 +47,7 @@ export function FolderNotesSettings() {
       await setFolderNotesEnabled(next);
       setError(null);
     } catch {
-      setEnabled(prev); // rollback — never leave the UI asserting an unsaved value
+      setEnabled(prev); // rollback: never leave the UI asserting an unsaved value
       setError(t("settings.folderNotes.errorSaveSetting"));
     }
   }
