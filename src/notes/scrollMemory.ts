@@ -55,7 +55,7 @@ const anchors = new Map<string, ScrollAnchor>();
  * If a restore were exact that would be harmless: it would rewrite the same
  * value. It cannot be exact, and the reason is the reason the restore exists at
  * all. `readScrollAnchor` records a LINE plus the fraction of it scrolled off,
- * and a restore runs after the pane's width changed and re-wrapped the text , 
+ * and a restore runs after the pane's width changed and re-wrapped the text ,
  * so the line is put back, and its sub-pixel offset within a viewport of
  * different line heights is not. The residue is small and it is written back,
  * so the next restore starts from the drifted anchor and adds its own residue.

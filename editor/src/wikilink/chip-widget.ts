@@ -60,7 +60,7 @@ import i18n from "@myne/editor/i18n";
  * whole line was the way to make links on the caret's line non-atomic so arrow
  * keys could move into them.
  *
- * What it cost was reported twice over. Putting the caret anywhere on a row , 
+ * What it cost was reported twice over. Putting the caret anywhere on a row ,
  * the far end of the line, or passing through on the way somewhere else, tore
  * every link on it open, while the task checkbox on the same row stayed
  * rendered. And a link you had just typed never rendered at all, because the
