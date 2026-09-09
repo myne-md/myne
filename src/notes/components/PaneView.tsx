@@ -1758,6 +1758,7 @@ export function PaneView({
         }
         insetLeft={insetLeft}
         insetRight={insetRight}
+        onDetachNote={ws.detachNote}
       />
       <div
         ref={outlineScrollerRef}

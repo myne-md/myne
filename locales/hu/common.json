@@ -1123,7 +1123,19 @@
           "tagsThinking": "Címkék javaslása…",
           "thinking": "Az AI gondolkodik…",
           "truncated": "Az első {{count}} karakter összefoglalva.",
-          "you": "Ön"
+          "you": "Ön",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Minden lap el van rejtve. A visszaállításhoz kattints jobb gombbal.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Mi hagyja el az eszközödet",
         "whenLabel": "Mikor hagyja el",
         "whoLabel": "Ki kapja meg",
-        "connectionLabel": "Hogyan utazik"
+        "connectionLabel": "Hogyan utazik",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Hogyan működik ez?",
       "enableHelper": "Egy általad biztosított modellt futtat. Hogy hol fut, és hogy a jegyzeteid elhagyják-e ezt az eszközt, az attól a szolgáltatótól függ, amelyet alább megnevezel. Kísérleti, alapértelmezés szerint kikapcsolva.",
@@ -3076,8 +3089,6 @@
         "localModelMissing": "A beállításokban rögzített helyi modell már nincs ezen az eszközön. Semmi nem lett elküldve sehová. Válassz újra modellt, vagy adj meg szolgáltatót a Beállítások → Fejlesztő → AI menüben.",
         "noCredential": "Ehhez a szolgáltatóhoz nincs beállítva API-kulcs. Adj hozzá egyet a Beállítások → Fejlesztő → AI menüben.",
         "notReady": "Egyelőre semmi nem áll készen a válaszadásra. Semmi nem lett elküldve sehová. Válassz modellt, vagy adj meg szolgáltatót a Beállítások → Fejlesztő → AI menüben.",
-        "noEmbeddingModel": "A kérdezés ezen az eszközön keres a jegyzeteid között, ehhez pedig itt helyben kell egy keresőmodell. Szolgáltató ezt nem tudja elvégezni. Semmi nem lett elküldve sehová. Válassz keresőmodellt a Beállítások → Fejlesztő → AI menüben.",
-        "indexNotReady": "A jegyzeteid indexelése a kereséshez még tart. Semmi nem lett elküldve sehová. Próbáld újra egy pillanat múlva.",
         "requestRejected": "A szolgáltató nem fogadta el ezt a kérést. Semmi nem lett elmentve. A hiba abban van, amit a Myne küldött, nem a beállításaidban vagy a jegyzeteidben.",
         "policyRefused": "A szolgáltató a saját szabályai alapján utasította el ezt a kérést: fiókkorlát, munkaterületi szabály, vagy olyan modell, amely nem tartozik a csomagodhoz. Ezt a szolgáltatónál kell rendezni, nem a Myne-ban.",
         "quotaExhausted": "A szolgáltató elutasította a kérést: elfogyott a kereted, vagy túllépted a sebességkorlátot. Ezt a szolgáltatónál kell rendezni, nem a Myne-ban.",

@@ -496,6 +496,13 @@ steps:
       # lock shipped that way while the OPFS write path skipped its TOCTOU guard
       # believing the lock was held.
       - node scripts/check-unwired.mjs
+      # Adversary-coverage binding (myne#553): every threat-model row carries a
+      # myne-range scenario or a written out-of-scope reason, in both directions.
+      # Sits inside the filtered pnpm-build on purpose: a docs-only threat-model
+      # edit skips this step, but the pre-commit hook carries the same guard
+      # unfiltered, and --emit is a repo change too, so the filter's blind side is
+      # covered. Sub-second and node-builtins only, so it runs with the guards.
+      - node scripts/check-adversary-coverage.mjs
       # IPC bindings with no caller (myne#529): the layer above the ratchet
       # above. A command declared, permitted, registered and mirrored in TS can
       # still be called by nothing, and then the feature behind it ships inert.
@@ -706,6 +713,15 @@ steps:
       # webkit/gtk -dev chains the base image bakes. No frontend dist needed,
       # since myne-core has no `generate_context!`.
       - cargo clippy -p myne-core --all-targets -- -D warnings
+      # Lint the SHIPPED desktop configuration too (myne-md/myne#648): every
+      # other clippy invocation in this file misses it — the slim step is
+      # `-p protocol`, the wasm steps are cross-target, and the line below is
+      # `--no-default-features`. An unused parameter on the AI path survived a
+      # whole merge train that way: the parameters still parse, the command
+      # still succeeded, and no gate compiled the default-features test tree
+      # that would have named them. Same image and warm cache as the line
+      # above, so it costs a lint, not a build.
+      - cargo clippy -p myne-desktop --all-targets -- -D warnings
       # Default build now compiles the on-device AI (local-inference is in
       # `default` as of decisions.md 2026-07-02) — no `--features` flag needed.
       # `-c` overrides beforeBuildCommand to reuse the dist/ already built by the
@@ -801,7 +817,7 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build actually runs.
       # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
       # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core --no-fail-fast'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core -p myne-format -p myne-decrypt --no-fail-fast'
 
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
@@ -815,7 +831,7 @@ steps:
   # `myne_server_token` secret is configured the step SKIPS cleanly (exit 0) so
   # it never blocks a merge. Add the secret in the Woodpecker UI
   # (repo → Settings → Secrets):
-  #   name=myne_server_token  value=<Forgejo PAT with read access to Myne/myne-server>
+  #   name=myne_server_token  value=<GitHub PAT with read access to myne-md/myne-server>
   #
   # depends_on cargo-test-tauri: keeps the heavy compile steps serial on the
   # shared host and reuses the warm workspace `dist/` (generate_context! embeds
@@ -1300,9 +1316,13 @@ steps:
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
-      # Forgejo PAT (read:repository on Myne/myne-server) for the private-
+      # GitHub PAT (read on private myne-md/myne-server) for the private-
       # companion clone below. The secret `myne_server_token` is configured on
-      # THIS repo (Woodpecker → repo → Settings → Secrets). The guard below
+      # THIS repo (Woodpecker → repo → Settings → Secrets) and now holds the
+      # GitHub PAT (omerdduran), NOT a Forgejo PAT: the clone pulls straight
+      # from github.com, dropping the git.myne.md mirror hop whose token kept
+      # expiring (sync-sim red on 2026-09-05/06, "Credentials are incorrect or
+      # have expired"). The guard below
       # still `exit 0`s when it resolves empty (e.g. a fork PR), so sync-sim
       # never blocks a merge. CAUTION for future edits: a from_secret pointing
       # at a secret this repo cannot see errors the WHOLE pipeline at
@@ -1332,11 +1352,10 @@ steps:
       # Sysdeps to compile/link myne-desktop's test binary (same set as
       # cargo-test-tauri) + git for the clone. node/pnpm NOT needed: dist/ is
       # already in the shared workspace from the pnpm-build step.
-      # Clone the private companion via the Forgejo mirror (git.myne.md/Myne/
-      # myne-server — the in-house source a Forgejo PAT authenticates against,
-      # NOT github.com; it tracks develop on a 10-minute interval) + build a
-      # static binary.
-      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server"
+      # Clone the private companion straight from GitHub (myne-md/myne-server,
+      # the source of truth; x-access-token form is what GitHub expects for PAT
+      # git auth) + build a static binary.
+      - git clone --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-server.git" "$CI_WORKSPACE/myne-server"
       - cd "$CI_WORKSPACE/myne-server" && CGO_ENABLED=0 /usr/local/go/bin/go build -o myne-server ./cmd/myne-server
       - cd "$CI_WORKSPACE"
       # Point the harness at the freshly built server and run ONLY the sim suite.

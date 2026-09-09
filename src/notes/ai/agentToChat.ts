@@ -29,9 +29,11 @@
 // the question are separate decisions, and only the second one is this
 // paragraph's.
 //
-// Both stores are AS1-class RAM, dropped on lock: the transcript through
-// `clearChat`, the proposal through `clearAgentForLock`. Nothing here writes to
-// disk and nothing here logs the task, which is the user's own words.
+// Both stores hold AS1-class RAM, dropped on lock: the transcript through
+// `clearChat`, the proposal through `clearAgentForLock`. Settled transcript
+// turns additionally persist into the encrypted conversation store
+// (myne-md/myne#675); the live proposal never does. Nothing here logs the
+// task, which is the user's own words.
 
 import {
   agentApply,
@@ -77,6 +79,15 @@ export interface AgentRunCopy {
    *  what Myne sent, so telling the user to check their setup is telling them
    *  to fix something that is not broken (myne-md/myne#547). */
   providerRejected: string;
+  /** The sentence for a start the HOST refused because the scope resolved
+   *  empty under `ai_excluded_folders` (`AgentError::EmptyGrant`).
+   *
+   *  Separate for the same reason `providerRejected` is: the generic sentence
+   *  names no control and no fix, while this one names the list and where it
+   *  lives. Resolved by the caller through `providerErrorKey("empty_grant")`
+   *  rather than a second key, so the chat turn and the mobile run-failure
+   *  banner read the same sentence by construction (myne-md/myne#675). */
+  scopeExcluded: string;
 }
 
 /**
@@ -88,10 +99,12 @@ export interface AgentRunCopy {
  * putting to the user, and freezing there would print "the agent proposed no
  * changes" underneath a dialog about to make it propose some.
  *
- * The turn takes the counts AND the model's closing summary. It does not take
- * the proposal: anchors and replacements are text copied verbatim out of note
- * bodies, and they stay in `agentStore`, which every vault-leaving path clears
- * (`docs/decisions/ai/0518`).
+ * The turn takes the counts AND the model's closing summary. It takes the
+ *  proposal too, FROZEN: a plain-data copy of the anchors, replacements and
+ *  new notes as they stood at settle time (myne-md/myne#675). The live
+ *  proposal still stays in `agentStore` (which every vault-leaving path
+ *  clears); the frozen copy is what history renders, read-only, after the
+ *  live one is gone.
  *
  * **The summary has to come here, and that is the half one mode was missing**
  * (myne-md/myne#568). The agent answers a question through `finish`, so in one
@@ -116,6 +129,11 @@ export function settleRunIntoChat(result: AgentStepResult, epoch: number): void 
     iterations: agent.iterations,
     charsOffDevice: agent.charsOffDevice,
     end: agent.end?.kind ?? "finished",
+    // The frozen proposal rides the turn (myne-md/myne#675): the store copies
+    // it to plain data on settle, so history keeps what the run proposed even
+    // after `agentStore` drops the live copy on lock. Read-only there: the
+    // review screen stays the only surface that can apply anything.
+    proposal: { edits: agent.proposal.edits, newNotes: agent.proposal.newNotes },
   });
 }
 
@@ -207,12 +225,16 @@ export async function startAgentRun(
     // has none, because `beginRun()` nulled it, so the progress strip does not
     // mount and `failAgentTurn` is what the user actually reads.
     // Which sentence, from the host's own tag. `AgentError` serializes with a
-    // `kind` field, and the two failures a user can tell apart are "the
-    // provider would not take this request" and everything else.
+    // `kind` field, and the three failures a user can tell apart are "the
+    // provider would not take this request", "the scope fell entirely inside
+    // the excluded folders", and everything else.
+    const tag = engineErrorTag(failure);
     const sentence =
-      engineErrorTag(failure) === "ProviderRejected"
+      tag === "ProviderRejected"
         ? copy.providerRejected
-        : copy.startFailed;
+        : tag === "EmptyGrant"
+          ? copy.scopeExcluded
+          : copy.startFailed;
     failRun(sentence);
     failAgentTurn(sentence);
   }

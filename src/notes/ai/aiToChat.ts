@@ -9,8 +9,10 @@
 // chips. MYND-651 retired that surface: tags now render in the inline
 // suggestion band at the frontmatter boundary, which is the single tag surface.
 //
-// The transcript is AS1-class RAM, dropped on lock (`clearChat`). No plaintext is
-// logged here (the summary is the model's own words).
+// The transcript persists across lock and restart (myne-md/myne#675): the RAM
+// copy is still dropped on lock (`clearChat`), while settled turns survive in
+// the encrypted conversation store. No plaintext is logged here (the summary
+// is the model's own words).
 
 import type { EditorState } from "@codemirror/state";
 

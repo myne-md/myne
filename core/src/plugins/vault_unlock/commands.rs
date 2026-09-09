@@ -217,6 +217,9 @@ pub async fn unlock_from_host(
         // survive the switch into vault B's session.
         hooks.pdf_export_teardown_on_lock();
         hooks.agent_teardown_on_lock();
+        // myne#679: destroy vault A's detached (pop-out) note windows before
+        // vault B hydrates: its plaintext must not survive the switch.
+        hooks.detached_windows_teardown_on_lock();
         hooks.zeroize_vault_indices();
         hooks.zeroize_attachment_refs();
         // MYND-259: abort any in-progress voice recording so the mic + RAM
@@ -392,6 +395,109 @@ pub(crate) async fn run_post_unlock_pipeline(
     // (feature-off) desktop build install a no-op. Best-effort: it can never
     // block or fail the unlock the user just completed.
     hooks.hydrate_ai_vectors(state).await;
+
+    // ---- myne-md/myne#684: stamp the sealed membership field, lazily ----
+    //
+    // On every natural unlock, write the membership field when absent and skip
+    // when present. The vault is open here (root_key is in the slot), so the
+    // field can be sealed; the account id comes from the recency rule. Best-
+    // effort end-to-end: a failure degrades to retry-next-unlock and never
+    // gates or delays the unlock the user just completed.
+    //
+    // The stamp holds NO lock of its own, so it takes the lifecycle permit
+    // instead: `auth_permits` serializes every vault.meta-lifecycle mutation,
+    // and stamping while a change-password holds it would interleave a
+    // whole-blob write with a rotation (the loser silently reverts the
+    // winner's section). A busy permit skips the stamp (retry on next unlock)
+    // rather than queueing behind a credential op. Residual: the sync meta
+    // phase is not a permit holder, so a merge landing in the read-write gap
+    // still wins by last-write; both blobs stay AEAD-valid and the next
+    // unlock heals, which bounds it to a regroup cycle rather than damage.
+    if let Ok(_stamp_permit) = state.auth_permits().try_acquire() {
+        stamp_membership_best_effort(host, state, io, keychain).await;
+    }
+}
+
+/// The unlock-time membership stamp, extracted so the permit gate above reads
+/// as one decision. See the gate comment for the serialization argument.
+async fn stamp_membership_best_effort(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
+) {
+    if let Some(active) = state.active_vault_id().await {
+        if let (Ok(base), Ok(config_dir)) = (host.app_data_dir(), host.app_config_dir()) {
+            if let Some(root_key) = state.peek_unlocked_root_key_clone().await {
+                let meta_path =
+                    crate::paths::vault_root_for_id_from_base(&base, active).join("vault.meta");
+                if let Ok(meta_bytes) = io.read(&meta_path).await {
+                    if let Ok(meta) = protocol::parse_vault_meta_any(&meta_bytes) {
+                        // The field is NTV5-only; a MYV1 vault groups via the
+                        // record alone, so skip it (and mint no account key).
+                        if meta.membership.is_none()
+                            && protocol::meta_version_of(&meta_bytes)
+                                == Some(protocol::MetaVersion::V0_2)
+                        {
+                            if let Ok(account_id) = crate::account::store::ensure_vault_membership(
+                                io,
+                                &config_dir,
+                                &base,
+                                keychain,
+                                active,
+                            )
+                            .await
+                            {
+                                let stamped = crate::account::store::stamp_membership_field(
+                                    &root_key,
+                                    &account_id,
+                                    &meta.account_number_hash,
+                                    &meta_bytes,
+                                );
+                                if stamped != meta_bytes {
+                                    // Disk CAS: re-read and skip when the bytes
+                                    // moved under us (a rotation or sync merge
+                                    // landing in the gap wins; we retry next
+                                    // unlock). A blind whole-blob write would
+                                    // revert the other writer's section.
+                                    if let Ok(current) = io.read(&meta_path).await {
+                                        if current == meta_bytes
+                                            && io
+                                                .write(
+                                                    &meta_path,
+                                                    &stamped,
+                                                    crate::vault_io::WriteOpts::default(),
+                                                )
+                                                .await
+                                                .is_ok()
+                                        {
+                                            // The slot captured its
+                                            // `vault_meta_bytes_hash` from the
+                                            // pre-stamp bytes; refresh the
+                                            // anchor so change-password's disk
+                                            // CAS compares against what is
+                                            // actually on disk now.
+                                            state
+                                                .refresh_meta_hash_if(
+                                                    active,
+                                                    crate::vault_meta_hash::vault_meta_sha256(
+                                                        &meta_bytes,
+                                                    ),
+                                                    crate::vault_meta_hash::vault_meta_sha256(
+                                                        &stamped,
+                                                    ),
+                                                )
+                                                .await;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -1139,6 +1245,10 @@ pub async fn lock_from_host(
     // not just "main".
     hooks.pdf_export_teardown_on_lock();
     hooks.agent_teardown_on_lock();
+    // myne#679: destroy every open detached (pop-out) note window on the same
+    // manual-lock path: a detached window is a second plaintext-bearing WebView,
+    // so locking means locked for it too, not just "main".
+    hooks.detached_windows_teardown_on_lock();
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
@@ -2214,6 +2324,7 @@ mod tests {
                     "clear_staged_descriptor",
                     "pdf_export_teardown_on_lock",
                     "agent_teardown_on_lock",
+                    "detached_windows_teardown_on_lock",
                     "zeroize_vault_indices",
                     "zeroize_attachment_refs",
                     "abort_active_recording",
@@ -2792,6 +2903,7 @@ mod tests {
                     reminder_horizon_days: None,
                     show_task_marker: true,
                     folder_icons: Default::default(),
+                    folder_notes_enabled: false,
                     hidden_bar_items: Vec::new(),
                     icon: None,
                     item_colors: Default::default(),
@@ -2967,6 +3079,7 @@ mod tests {
                 reminder_horizon_days: None,
                 show_task_marker: true,
                 folder_icons: Default::default(),
+                folder_notes_enabled: false,
                 hidden_bar_items: Vec::new(),
                 icon: None,
                 item_colors: Default::default(),

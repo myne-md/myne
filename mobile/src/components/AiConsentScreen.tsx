@@ -34,6 +34,7 @@ import {
   AI_TRUST_A7_RESIDUAL,
   CONSENT_DEVICE_SCOPE,
   CONSENT_DIRECT_CONNECTION,
+  CONSENT_EXCLUDED_FOLDERS,
   CONSENT_HOW_TO_REVOKE,
   CONSENT_WHAT_LEAVES,
   CONSENT_WHEN_IT_LEAVES,
@@ -191,6 +192,11 @@ export function AiConsentScreen({
           label={t("settings.ai.consent.connectionLabel")}
           body={CONSENT_DIRECT_CONNECTION}
           testId="ai-consent.connection"
+        />
+        <Clause
+          label={t("settings.ai.consent.excludedLabel")}
+          body={CONSENT_EXCLUDED_FOLDERS}
+          testId="ai-consent.excluded"
         />
 
         {/* The A7 residual, the eighth element the desktop screen has always

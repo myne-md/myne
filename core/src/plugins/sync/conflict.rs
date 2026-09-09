@@ -331,6 +331,117 @@ fn theme_tie_break(a: &ThemeEntry, b: &ThemeEntry) -> Ordering {
     }
 }
 
+// ---- AI conversations (myne-md/myne#675) ----
+//
+// Two merges, one per half of the storage pair:
+//
+// 1. `merge_chats_catalog`: the `MYM1` roster, structurally the themes merge:
+//    a per-key join over the causal `version` with a remove-wins total-order
+//    tie-break. A conversation deleted on one device while appended-to on
+//    another resolves remove-wins (the appended turns are discarded at merge,
+//    `decisions/ai/0575` records the cost and the confirm modal as the
+//    user-facing guard).
+//
+// 2. `merge_chats_turns`: the `MYJ1` turn list, the one NEW shape: an
+//    append-ordered transcript where turns are immutable and ids are unique
+//    per client. The common prefix is kept verbatim; both divergent suffixes
+//    are kept, ordered by the turn-id total order (lexicographic on the id
+//    string: the id scheme embeds a client discriminator, so cross-client
+//    collisions cannot arise and the byte order is argument-independent).
+//    "Keep both suffixes in a deterministic order" is commutative,
+//    idempotent and associative, which is what closes the CAS ping-pong.
+
+use crate::plugins::chats::commands::{ChatsCatalogMap, ConversationEntry};
+
+/// Merge two `vault.chats` catalog maps: the per-key causal join with
+/// remove-wins tombstone ties (the `merge_custom_themes` discipline applied to
+/// the conversation roster, § 9.23 + `sync-protocol.md` § 11.4).
+pub fn merge_chats_catalog(local: &ChatsCatalogMap, remote: &ChatsCatalogMap) -> ChatsCatalogMap {
+    let mut merged = ChatsCatalogMap::new();
+    let ids = merge_set_union(
+        &local.keys().cloned().collect::<Vec<_>>(),
+        &remote.keys().cloned().collect::<Vec<_>>(),
+    );
+    for id in ids {
+        let entry = match (local.get(&id), remote.get(&id)) {
+            (Some(l), None) => l.clone(),
+            (None, Some(r)) => r.clone(),
+            (Some(l), Some(r)) => join_by_version(l, r, |e| e.version, chats_entry_tie_break),
+            (None, None) => unreachable!("id came from the key union"),
+        };
+        merged.insert(id, entry);
+    }
+    merged
+}
+
+/// Total-order tie-break for two catalog rows at an equal `version`
+/// (a true concurrent mutation pair). **Remove-wins**: a tombstone outranks a
+/// live row. Within a class it compares every retained field so the order is
+/// total (`Equal` only when the rows are byte-identical).
+fn chats_entry_tie_break(a: &ConversationEntry, b: &ConversationEntry) -> Ordering {
+    match (a.deleted_at.is_some(), b.deleted_at.is_some()) {
+        (true, false) => Ordering::Greater, // remove-wins
+        (false, true) => Ordering::Less,
+        (true, true) => (a.deleted_at, a.created_at, a.updated_at, &a.title).cmp(&(
+            b.deleted_at,
+            b.created_at,
+            b.updated_at,
+            &b.title,
+        )),
+        (false, false) => {
+            (a.updated_at, &a.title, a.created_at).cmp(&(b.updated_at, &b.title, b.created_at))
+        }
+    }
+}
+
+/// Merge two versions of one conversation's turn list (the `MYJ1` payload's
+/// `turns` array): keep the common prefix verbatim, keep BOTH divergent
+/// suffixes, order the suffix turns by the turn-id total order (lexicographic
+/// on the id string: the ids embed a client discriminator, so the order is
+/// deterministic and argument-independent). Commutative, idempotent and
+/// associative by construction; no turn is ever dropped.
+///
+/// The input lists are each assumed internally sorted by the same id order
+/// (the write path appends under the id scheme's monotonic counter). An
+/// id present on both sides contributes ONE turn (the ids are unique per
+/// client; an equal id on both sides is the same settled turn).
+pub fn merge_chats_turns(local: &[String], remote: &[String]) -> Vec<String> {
+    // Longest common prefix.
+    let mut prefix_len = 0;
+    while prefix_len < local.len()
+        && prefix_len < remote.len()
+        && local[prefix_len] == remote[prefix_len]
+    {
+        prefix_len += 1;
+    }
+    let mut out = Vec::with_capacity(local.len() + remote.len() - prefix_len);
+    out.extend_from_slice(&local[..prefix_len]);
+    // Both divergent suffixes, merged by the id total order.
+    let mut i = prefix_len;
+    let mut j = prefix_len;
+    while i < local.len() && j < remote.len() {
+        match local[i].cmp(&remote[j]) {
+            Ordering::Equal => {
+                // The same id on both sides: one turn.
+                out.push(local[i].clone());
+                i += 1;
+                j += 1;
+            }
+            Ordering::Less => {
+                out.push(local[i].clone());
+                i += 1;
+            }
+            Ordering::Greater => {
+                out.push(remote[j].clone());
+                j += 1;
+            }
+        }
+    }
+    out.extend_from_slice(&local[i..]);
+    out.extend_from_slice(&remote[j..]);
+    out
+}
+
 /// Which side's password-side wrap wins the `vault.meta` merge (the sync layer
 /// decides via the head VV / blob version; this type just names the choice).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -420,6 +531,11 @@ pub fn merge_vault_meta(
     merged.random_salt_recovery = local.random_salt_recovery;
     merged.nonce_recovery_wrap = local.nonce_recovery_wrap;
     merged.enc_root_key_recovery = local.enc_root_key_recovery;
+    // The membership field is device-local: the LOCAL value always survives,
+    // regardless of which side won the password-side. Grouping is a per-device
+    // organisational choice, so a divergent grouping across devices must never
+    // converge and never produce a conflict surface (`sync-protocol.md` §10.3).
+    merged.membership = local.membership.clone();
     Ok(merged)
 }
 
@@ -430,6 +546,101 @@ mod tests {
         VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_NONCE_LEN, VAULT_META_SALT_RANDOM_LEN,
         VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
     };
+
+    /// Cross-implementation vector runner for the chats merges
+    /// (myne-md/myne#675). Reads
+    /// `../myne-test-vectors/vectors/chats-merge/v0.1/cases.json` and drives
+    /// [`merge_chats_catalog`] + [`merge_chats_turns`] over the fixture maps
+    /// and id lists.
+    ///
+    /// Skips when the companion is not cloned, matching the `tls-exporter`
+    /// precedent: a contributor not touching sync should not see a red test
+    /// about their checkout layout. `MYNE_VECTORS_REQUIRED=1` inverts the
+    /// skip, and an empty case set fails rather than passing vacuously.
+    /// Every two-sided case runs in BOTH argument orders, so commutativity is
+    /// structural rather than restated in the expected value.
+    #[test]
+    fn chats_merge_matches_every_published_vector() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../myne-test-vectors/vectors/chats-merge/v0.1/cases.json");
+        let Ok(raw) = std::fs::read_to_string(&path) else {
+            assert!(
+                std::env::var_os("MYNE_VECTORS_REQUIRED").is_none(),
+                "MYNE_VECTORS_REQUIRED is set but the chats-merge vectors are absent at {}",
+                path.display(),
+            );
+            eprintln!("[skip] chats-merge vectors absent at {}", path.display());
+            return;
+        };
+        let doc: serde_json::Value = serde_json::from_str(&raw).expect("vectors parse as JSON");
+        assert_eq!(doc["schema"], "chats-merge");
+        assert_eq!(doc["protocol_version"], "v0.1");
+        let cases = doc["cases"]
+            .as_array()
+            .expect("vectors carry a cases array");
+        assert!(!cases.is_empty(), "chats-merge vectors must not be empty");
+
+        fn catalog_map(case: &serde_json::Value, id: &str, field: &str) -> ChatsCatalogMap {
+            serde_json::from_value(case[field].clone())
+                .unwrap_or_else(|e| panic!("[{id}] {field} parses as a chats catalog map: {e}"))
+        }
+        fn id_list(case: &serde_json::Value, id: &str, field: &str) -> Vec<String> {
+            serde_json::from_value(case[field].clone())
+                .unwrap_or_else(|e| panic!("[{id}] {field} parses as a turn-id list: {e}"))
+        }
+
+        for case in cases {
+            let id = case["vector_id"]
+                .as_str()
+                .expect("case carries a vector_id");
+            let kind = case["case_kind"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+            match kind {
+                "catalog_merge" => {
+                    let local = catalog_map(case, id, "input_local");
+                    let remote = catalog_map(case, id, "input_remote");
+                    let expected = catalog_map(case, id, "expected_merged");
+                    assert_eq!(
+                        merge_chats_catalog(&local, &remote),
+                        expected,
+                        "[{id}] catalog merge"
+                    );
+                    assert_eq!(
+                        merge_chats_catalog(&remote, &local),
+                        expected,
+                        "[{id}] catalog merge, swapped (commutativity)"
+                    );
+                }
+                "catalog_merge_assoc" => {
+                    let a = catalog_map(case, id, "input_a");
+                    let b = catalog_map(case, id, "input_b");
+                    let c = catalog_map(case, id, "input_c");
+                    let expected = catalog_map(case, id, "expected_merged");
+                    let left = merge_chats_catalog(&merge_chats_catalog(&a, &b), &c);
+                    let right = merge_chats_catalog(&a, &merge_chats_catalog(&b, &c));
+                    assert_eq!(left, expected, "[{id}] (A+B)+C");
+                    assert_eq!(right, expected, "[{id}] A+(B+C)");
+                }
+                "turns_merge" => {
+                    let local = id_list(case, id, "input_local");
+                    let remote = id_list(case, id, "input_remote");
+                    let expected = id_list(case, id, "expected_merged");
+                    assert_eq!(
+                        merge_chats_turns(&local, &remote),
+                        expected,
+                        "[{id}] turns merge"
+                    );
+                    assert_eq!(
+                        merge_chats_turns(&remote, &local),
+                        expected,
+                        "[{id}] turns merge, swapped (commutativity)"
+                    );
+                }
+                other => panic!("[{id}] unknown case_kind '{other}'"),
+            }
+        }
+    }
 
     #[test]
     fn keep_both_plan_records_original_and_remote_body() {
@@ -931,6 +1142,225 @@ mod tests {
         );
     }
 
+    // ---- AI conversations (myne-md/myne#675) ----
+
+    fn conv_live(version: u64, created_at: u64, updated_at: u64, title: &str) -> ConversationEntry {
+        ConversationEntry {
+            created_at,
+            deleted_at: None,
+            title: title.to_string(),
+            updated_at,
+            version,
+        }
+    }
+
+    fn conv_tomb(
+        version: u64,
+        created_at: u64,
+        updated_at: u64,
+        deleted_at: u64,
+    ) -> ConversationEntry {
+        ConversationEntry {
+            created_at,
+            deleted_at: Some(deleted_at),
+            title: String::new(),
+            updated_at,
+            version,
+        }
+    }
+
+    #[test]
+    fn chats_catalog_entry_merge_is_associative_commutative_idempotent() {
+        // EXHAUSTIVE property check over a representative row-state space (the
+        // themes discipline; proptest is deliberately not a dependency). The
+        // per-row join is `join_by_version` under the total order
+        // (`version`, then `chats_entry_tie_break`), so it MUST be commutative,
+        // idempotent AND associative.
+        use crate::plugins::chats::commands::ConversationEntry;
+        fn join(a: &ConversationEntry, b: &ConversationEntry) -> ConversationEntry {
+            join_by_version(a, b, |e| e.version, chats_entry_tie_break)
+        }
+        let mut states: Vec<ConversationEntry> = Vec::new();
+        for &version in &[0u64, 1, 2, 3] {
+            for &ts in &[1u64, 2] {
+                for title in &["alpha", "beta"] {
+                    states.push(conv_live(version, ts, ts, title));
+                    states.push(conv_tomb(version, ts, ts, ts + 5));
+                }
+            }
+        }
+        for a in &states {
+            assert_eq!(join(a, a), *a, "idempotent: {a:?}");
+            for b in &states {
+                assert_eq!(join(a, b), join(b, a), "commutative: {a:?} ∨ {b:?}");
+                for c in &states {
+                    assert_eq!(
+                        join(&join(a, b), c),
+                        join(a, &join(b, c)),
+                        "associative: {a:?} ∨ {b:?} ∨ {c:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn chats_catalog_remove_wins_on_concurrent_delete_vs_append() {
+        // A conversation deleted on device B (tombstone, version bumped) while
+        // device A appended (live, same version, truly concurrent): the
+        // tombstone wins, the appended turns are discarded at merge. Recorded
+        // as an accepted cost in decisions/ai/0575 (the confirm modal is the
+        // user-facing guard).
+        let appended = conv_live(2, 1, 100, "appended");
+        let deleted = conv_tomb(2, 1, 1, 100);
+        let merged = join_by_version(&appended, &deleted, |e| e.version, chats_entry_tie_break);
+        assert!(merged.deleted_at.is_some(), "remove-wins");
+    }
+
+    #[test]
+    fn chats_catalog_merge_key_union_and_higher_version_wins() {
+        let mut local = ChatsCatalogMap::new();
+        local.insert("a1".to_string(), conv_live(1, 1, 1, "only local"));
+        local.insert("b2".to_string(), conv_live(2, 1, 1, "local newer"));
+        let mut remote = ChatsCatalogMap::new();
+        remote.insert("b2".to_string(), conv_live(1, 1, 2, "remote older"));
+        remote.insert("c3".to_string(), conv_live(1, 1, 3, "only remote"));
+        let merged = merge_chats_catalog(&local, &remote);
+        assert_eq!(merged.len(), 3, "key union");
+        assert_eq!(
+            merged.get("b2").map(|e| e.version),
+            Some(2),
+            "higher causal version wins regardless of arg order"
+        );
+        assert_eq!(
+            merge_chats_catalog(&remote, &local)
+                .get("b2")
+                .map(|e| e.version),
+            Some(2),
+            "commutative at the map level"
+        );
+    }
+
+    #[test]
+    fn chats_turns_common_prefix_kept_both_suffixes_ordered() {
+        // Two devices diverge after the common prefix [a1, a2]: A appended
+        // [a3, a4], B appended [b3]. The merge keeps all five turns with the
+        // suffixes interleaved in id order.
+        let local = vec![
+            "a1".to_string(),
+            "a2".to_string(),
+            "a3".to_string(),
+            "a4".to_string(),
+        ];
+        let remote = vec!["a1".to_string(), "a2".to_string(), "b3".to_string()];
+        let merged = merge_chats_turns(&local, &remote);
+        assert_eq!(
+            merged,
+            vec![
+                "a1".to_string(),
+                "a2".to_string(),
+                "a3".to_string(),
+                "a4".to_string(),
+                "b3".to_string(),
+            ],
+            "prefix verbatim, then both suffixes in id order"
+        );
+    }
+
+    #[test]
+    fn chats_turns_merge_is_commutative_idempotent_associative_exhaustive() {
+        // EXHAUSTIVE over a space of id sequences built from three clients'
+        // interleavings (the themes discipline). The merge keeps the common
+        // prefix and both suffixes in a deterministic total order, so it MUST
+        // be commutative, idempotent and associative.
+        fn seq(ids: &[&str]) -> Vec<String> {
+            ids.iter().map(|s| s.to_string()).collect()
+        }
+        let mut states: Vec<Vec<String>> = Vec::new();
+        let samples: &[&[&str]] = &[
+            &[],
+            &["a1"],
+            &["a1", "a2"],
+            &["a1", "a3"],
+            &["b1"],
+            &["a1", "b1"],
+            &["b1", "b2"],
+            &["a1", "a2", "b1"],
+            &["a1", "b1", "b2"],
+            &["a1", "a2", "a3"],
+            &["c1", "c2"],
+        ];
+        for s in samples {
+            states.push(seq(s));
+        }
+        for a in &states {
+            assert_eq!(merge_chats_turns(a, a), *a, "idempotent: {a:?}");
+            for b in &states {
+                assert_eq!(
+                    merge_chats_turns(a, b),
+                    merge_chats_turns(b, a),
+                    "commutative: {a:?} ∨ {b:?}"
+                );
+                for c in &states {
+                    assert_eq!(
+                        merge_chats_turns(&merge_chats_turns(a, b), c),
+                        merge_chats_turns(a, &merge_chats_turns(b, c)),
+                        "associative: {a:?} ∨ {b:?} ∨ {c:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn chats_turns_no_turn_is_ever_dropped() {
+        // The no-data-loss property: every id present on EITHER side is
+        // present in the merge (possibly once when both sides hold it).
+        let local = vec!["a1".to_string(), "a2".to_string(), "a9".to_string()];
+        let remote = vec!["a1".to_string(), "b1".to_string(), "b2".to_string()];
+        let merged = merge_chats_turns(&local, &remote);
+        for id in local.iter().chain(remote.iter()) {
+            assert!(merged.contains(id), "turn {id} survived the merge");
+        }
+        // The shared id appears exactly once.
+        assert_eq!(
+            merged.iter().filter(|t| t.as_str() == "a1").count(),
+            1,
+            "a shared settled turn is one turn"
+        );
+    }
+
+    #[test]
+    fn chats_turns_three_devices_converge_byte_identically() {
+        // The fleet shape the associative law buys: three devices hold three
+        // pairwise-divergent suffixes; every pairing order converges to the
+        // same list.
+        let a = vec!["a1".to_string(), "a2".to_string(), "a3".to_string()];
+        let b = vec![
+            "a1".to_string(),
+            "a2".to_string(),
+            "b3".to_string(),
+            "b4".to_string(),
+        ];
+        let c = vec!["a1".to_string(), "c3".to_string()];
+        let left = merge_chats_turns(&merge_chats_turns(&a, &b), &c);
+        let right = merge_chats_turns(&a, &merge_chats_turns(&b, &c));
+        let mid = merge_chats_turns(&merge_chats_turns(&a, &c), &b);
+        assert_eq!(left, right);
+        assert_eq!(left, mid);
+        assert_eq!(
+            left,
+            vec![
+                "a1".to_string(),
+                "a2".to_string(),
+                "a3".to_string(),
+                "b3".to_string(),
+                "b4".to_string(),
+                "c3".to_string(),
+            ]
+        );
+    }
+
     #[test]
     fn themes_merge_absent_version_zero_loses_to_stamped() {
         // A legacy entry decodes with version 0 (absent field); the first stamped
@@ -954,6 +1384,7 @@ mod tests {
             items_key_id: [0x07; VAULT_META_ITEMS_KEY_ID_LEN],
             items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
             enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            membership: None,
         }
     }
 
@@ -979,6 +1410,63 @@ mod tests {
             merged_local.enc_root_key_recovery,
             [0x55; VAULT_META_WRAPPED_ROOT_KEY_LEN]
         );
+    }
+
+    #[test]
+    fn vault_meta_merge_keeps_local_membership_regardless_of_winner() {
+        // The membership field is device-local: the LOCAL value always survives,
+        // even when the remote side wins the password-side. Grouping must never
+        // converge across devices (`sync-protocol.md` §10.3).
+        let mut local = meta(0xAA, 0x55);
+        local.membership = Some(protocol::Membership {
+            nonce: [0x11; protocol::AEAD_NONCE_LEN],
+            enc: [0x22; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+        });
+        let mut remote = meta(0xBB, 0x55);
+        remote.membership = Some(protocol::Membership {
+            nonce: [0x33; protocol::AEAD_NONCE_LEN],
+            enc: [0x44; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+        });
+
+        // Remote wins the password-side, but the membership stays local.
+        let merged = merge_vault_meta(&local, &remote, MetaWinner::Remote).unwrap();
+        assert_eq!(merged.nonce_password_wrap, [0xBB; VAULT_META_NONCE_LEN]);
+        assert_eq!(merged.membership, local.membership);
+
+        // Local wins: membership is local's anyway.
+        let merged_local = merge_vault_meta(&local, &remote, MetaWinner::Local).unwrap();
+        assert_eq!(merged_local.membership, local.membership);
+    }
+
+    #[test]
+    fn merged_meta_with_membership_parses_under_both_generation_codecs() {
+        // The merged blob must stay well-formed for both generations: the
+        // membership field is NTV5-only, so a v0.2 merge re-serializes with the
+        // field, and a v0.1 merge (no field) re-serializes as MYV1.
+        let mut local = meta(0xAA, 0x55);
+        local.membership = Some(protocol::Membership {
+            nonce: [0x11; protocol::AEAD_NONCE_LEN],
+            enc: [0x22; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+        });
+        let mut remote = meta(0xBB, 0x55);
+        remote.membership = Some(protocol::Membership {
+            nonce: [0x33; protocol::AEAD_NONCE_LEN],
+            enc: [0x44; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+        });
+
+        let merged = merge_vault_meta(&local, &remote, MetaWinner::Remote).unwrap();
+        // v0.2: the field is present, so the NTV5 serializer emits 417 bytes.
+        let ntv5 = protocol::serialize_vault_meta_v0_2(&merged);
+        assert_eq!(ntv5.len(), protocol::VAULT_META_V0_2_WITH_MEMBERSHIP_LEN);
+        let reparsed = protocol::parse_vault_meta_v0_2(&ntv5).expect("NTV5 parse");
+        assert_eq!(reparsed.membership, local.membership);
+
+        // v0.1: no field, so the MYV1 serializer emits 345 bytes and the field
+        // is dropped (a MYV1 vault groups via the record alone).
+        let myv1 = protocol::serialize_vault_meta(&merged);
+        assert_eq!(myv1.len(), protocol::VAULT_META_LEN);
+        let reparsed_v0_1 = protocol::parse_vault_meta(&myv1).expect("MYV1 parse");
+        assert!(reparsed_v0_1.membership.is_none());
     }
 
     #[test]

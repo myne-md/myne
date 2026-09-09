@@ -325,7 +325,7 @@ pub fn aad_prefs_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// account_number_hash             16 bytes  (vault identity binding, § 9.3 offset 6)
 /// ```
 ///
-/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
 /// search index lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob`.
 pub fn aad_search_index_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
@@ -360,7 +360,7 @@ pub fn aad_search_index_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// account_number_hash                   16 bytes  (vault identity binding, § 9.3 offset 6)
 /// ```
 ///
-/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
 /// dictionary lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob`. DISTINCT from the subkey role `"personal-dictionary-key"`.
 pub fn aad_personal_dictionary_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
@@ -395,7 +395,7 @@ pub fn aad_personal_dictionary_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// account_number_hash               16 bytes  (vault identity binding, § 9.3 offset 6)
 /// ```
 ///
-/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
 /// custom-themes blob lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob` (the KEK derives directly from `root_key` via
 /// `"myne.v0.1 custom-themes-key"`, so it survives a later epoch rotation).
@@ -432,7 +432,7 @@ pub fn aad_custom_themes_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// provider_kind                       1 byte   (§ 9.14.1 offset 5)
 /// ```
 ///
-/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
 /// quick-unlock blob wraps `root_key` itself and lives outside any `items_key`
 /// lineage. The blob has no `DeriveSubkey` role (its KEK is provider-supplied,
 /// not `root_key`-derived — that would be circular; § 3.4).
@@ -475,7 +475,7 @@ pub fn aad_quick_unlock_blob(account_number_hash: &[u8; 16], provider_kind: u8) 
 /// extractor_version                      1 byte   (binds the extractor generation, § 9.15.1)
 /// ```
 ///
-/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
 /// attachment-text KEK derives directly from `root_key` via
 /// `"myne.v0.1 attachment-text-key"`, independent of the `items_key` lineage
 /// (survives a later epoch rotation, same rationale as prefs/search/dictionary).
@@ -520,7 +520,7 @@ pub fn aad_attachment_text_blob(
 /// account_number_hash           16 bytes  (vault identity binding, § 9.3 offset 6)
 /// ```
 ///
-/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
 /// workspace blob lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob`.
 pub fn aad_workspace_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
@@ -549,7 +549,7 @@ pub fn aad_workspace_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// account_number_hash              16 bytes  (vault identity binding, § 9.3 offset 6)
 /// ```
 ///
-/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
 /// graph-layout blob lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob` / `aad_workspace_blob`.
 pub fn aad_graph_layout_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
@@ -587,7 +587,7 @@ pub fn aad_graph_layout_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 /// account_number_hash               16 bytes  (vault identity binding, § 9.3 offset 6)
 /// ```
 ///
-/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
 /// vault-indices blob lives outside the `items_key` lineage, same rationale as
 /// `aad_prefs_blob` (the KEK derives directly from `root_key` via
 /// `"myne.v0.1 vault-indices-key"`, so it survives a later epoch rotation).
@@ -635,6 +635,148 @@ pub fn aad_ai_embeddings_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     aad.extend_from_slice(AAD_PREFIX_V0_1);
     aad.push(PROTOCOL_VERSION_V0_1);
     push_length_prefixed_u16_be(&mut aad, ROLE_STR_AI_EMBEDDINGS_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
+/// Build the AAD bound into the AEAD encryption of the v0.1 AI conversations
+/// catalog (`vault.chats`, `MYM1`, myne-md/myne#675; `protocol.md` § 9.23.2).
+/// Same shape as [`aad_prefs_blob`] / [`aad_custom_themes_blob`] with a
+/// distinct role string `"chats-catalog"`, so the catalog is cryptographically
+/// domain-separated from every other singleton: a catalog blob can never
+/// AEAD-verify under another family's key/AAD.
+///
+/// This builder stamps v0.1 ONLY (`AAD_PREFIX_V0_1` + `PROTOCOL_VERSION_V0_1`;
+/// the v0.2 stamp lives in the dedicated `*_v0_2` mirrors): one magic travels
+/// across generations and the generations separate at the AAD (§ 10.3.1), so a
+/// cross-generation serve fails AEAD.
+///
+/// Layout (42 bytes for the v0.1 stamp):
+///
+/// ```text
+/// "myne.v0.1|"                        10 bytes  (AAD prefix, § 5.2)
+/// protocol_version                     1 byte   (caller's vault generation)
+/// u16_be(13) || "chats-catalog"       15 bytes  (length-prefixed role)
+/// account_number_hash                 16 bytes  (vault identity, § 9.3 offset 6)
+/// ```
+///
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
+/// catalog KEK derives directly from `root_key` via
+/// `"myne.v0.1 chats-catalog-key"`, independent of the `itemsKey` lineage.
+/// DISTINCT from the subkey role `"chats-catalog-key"` and from the per-file
+/// role `"chats-blob"`.
+///
+/// The PREFIX follows the generation too (not just the version byte): `0x01`
+/// stamps `"myne.v0.1|"`, `0x02` stamps `"myne.v0.2|"`. A v0.1-prefix/0x02-byte
+/// (or v0.2-prefix/0x01-byte) hybrid matches nothing either generation seals,
+/// so the two generations are separated at the AEAD layer, not just by the
+/// magic. (The codecs validate the stamp before this builder is ever reached.)
+pub fn aad_chats_catalog(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_CHATS_CATALOG: &[u8] = b"chats-catalog";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_CHATS_CATALOG.len() + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_CHATS_CATALOG);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
+/// Build the AAD bound into the AEAD encryption of a per-conversation AI chat
+/// blob (`chats/<conversation-id-hex>`, `MYJ1`, myne-md/myne#675;
+/// `protocol.md` § 9.24.3). Follows the [`aad_attachment_text_blob`]
+/// per-entry pattern with the 16-byte conversation id in the per-entry
+/// position. This builder stamps v0.1 ONLY; the v0.2 stamp lives in the
+/// dedicated `*_v0_2` mirror.
+///
+/// Layout (55 bytes for the v0.1 stamp):
+///
+/// ```text
+/// "myne.v0.1|"                        10 bytes  (AAD prefix, § 5.2)
+/// protocol_version                     1 byte   (caller's vault generation)
+/// u16_be(10) || "chats-blob"          12 bytes  (length-prefixed role)
+/// conversation_id                     16 bytes  (the conversation UUIDv7, § 9.24)
+/// account_number_hash                 16 bytes  (vault identity, § 9.3 offset 6)
+/// ```
+///
+/// Binding both ids prevents substituting one conversation's blob for another
+/// within the same vault (the per-blob-safety property that lets ONE KEK
+/// serve every conversation file, the `MYE1` archetype) and porting a blob
+/// across vaults at the AEAD layer. `account_number_hash` (NOT `items_key_id`)
+/// binds vault identity: `chats_key` derives via
+/// `"myne.v0.1 chats-key"`, independent of the `items_key` lineage. DISTINCT
+/// from the subkey role `"chats-key"` and from the singleton role
+/// `"chats-catalog"`.
+///
+/// Like [`aad_chats_catalog`], the PREFIX follows the generation: `0x01`
+/// stamps `"myne.v0.1|"`, `0x02` stamps `"myne.v0.2|"`, so no hybrid AAD is
+/// expressible through the codec path.
+pub fn aad_chats_blob(account_number_hash: &[u8; 16], conversation_id: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_CHATS_BLOB: &[u8] = b"chats-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len()
+            + 1
+            + 2
+            + ROLE_STR_CHATS_BLOB.len()
+            + conversation_id.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_CHATS_BLOB);
+    aad.extend_from_slice(conversation_id);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
+/// Generic **v0.2** conversation-file AAD, the next-major mirror of
+/// [`aad_chats_blob`], stamped with the v0.2 prefix + version. The migration
+/// re-seals a conversation file by decoding under `aad_chats_blob` and
+/// re-encoding under this (§10.4.1).
+pub fn aad_chats_blob_v0_2(account_number_hash: &[u8; 16], conversation_id: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_CHATS_BLOB: &[u8] = b"chats-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_CHATS_BLOB.len()
+            + conversation_id.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_CHATS_BLOB);
+    aad.extend_from_slice(conversation_id);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+/// Build the AAD bound into the AEAD seal of the vault membership field
+/// (`vault.meta` §9.3.1, the account/vault split). The field is `NTV5`-only, so
+/// this AAD is stamped with the **v0.2** prefix + version, mirroring
+/// [`aad_prefs_blob`] in shape but under the v0.2 domain.
+///
+/// Layout (44 bytes):
+///
+/// ```text
+/// "myne.v0.2|"                    10 bytes  (v0.2 AAD prefix, § 10.5)
+/// 0x02                             1 byte   (protocol_version, § 9.3)
+/// u16_be(15) || "membership-blob" 17 bytes  (length-prefixed role, § 5.2)
+/// account_number_hash             16 bytes  (vault identity binding, § 9.3 offset 6)
+/// ```
+///
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity: the
+/// membership field lives outside the `items_key` lineage, same rationale as
+/// `aad_prefs_blob`. The KEK is `membership_key` (`SubkeyRole::MembershipKey`),
+/// derived under the v0.2 context prefix.
+pub fn aad_membership_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_MEMBERSHIP_BLOB: &[u8] = b"membership-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len() + 1 + 2 + ROLE_STR_MEMBERSHIP_BLOB.len() + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_MEMBERSHIP_BLOB);
     aad.extend_from_slice(account_number_hash);
     aad
 }
@@ -1266,7 +1408,7 @@ mod tests {
         ];
         let aad = aad_prefs_blob(&account_number_hash);
         let expected: [u8; 39] = [
-            // "myne.v0.1|" — 10 bytes
+            // "myne.v0.1|": 10 bytes
             0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
             // protocol_version
             0x01, // length-prefixed role string: u16_be(10) || "prefs-blob"
@@ -1319,7 +1461,7 @@ mod tests {
         ];
         let aad = aad_vault_indices_blob(&account_number_hash);
         let expected: [u8; 47] = [
-            // "myne.v0.1|" — 10 bytes
+            // "myne.v0.1|": 10 bytes
             0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
             // protocol_version
             0x01, // length-prefixed role string: u16_be(18) || "vault-indices-blob"
@@ -1375,7 +1517,7 @@ mod tests {
         ];
         let aad = aad_custom_themes_blob(&account_number_hash);
         let expected: [u8; 47] = [
-            // "myne.v0.1|" — 10 bytes
+            // "myne.v0.1|": 10 bytes
             0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
             // protocol_version
             0x01, // length-prefixed role string: u16_be(18) || "custom-themes-blob"
@@ -1401,6 +1543,90 @@ mod tests {
     }
 
     #[test]
+    fn aad_chats_catalog_default_matches_pinned_hex() {
+        // Spec § 5.2 + § 9.23.2: 42 bytes = prefix (10) + version (1) +
+        // u16_be(13) + "chats-catalog" (13) + account_number_hash (16).
+        let account_number_hash: [u8; 16] = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        let aad = aad_chats_catalog(&account_number_hash);
+        let expected: [u8; 42] = [
+            // "myne.v0.1|": 10 bytes
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
+            // protocol_version (the caller's vault generation; 0x01 here)
+            0x01, // length-prefixed role string: u16_be(13) || "chats-catalog"
+            0x00, 0x0D, // u16_be(13)
+            0x63, 0x68, 0x61, 0x74, 0x73, 0x2D, // "chats-"
+            0x63, 0x61, 0x74, 0x61, 0x6C, 0x6F, 0x67, // "catalog"
+            // account_number_hash
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+        assert_eq!(aad.len(), 42, "spec § 9.23.2 mandates 42-byte AAD");
+        // The v0.2 form comes from the generic singleton helper with the
+        // same role string (no per-family v0.2 builder, the themes-family
+        // convention): prefix AND version byte both follow the generation,
+        // so no hybrid AAD is expressible.
+        let aad_v2 = aad_singleton_blob_v0_2(b"chats-catalog", &account_number_hash);
+        assert_ne!(aad, aad_v2);
+        assert_eq!(aad_v2[10], 0x02);
+        assert_eq!(&aad_v2[..10], b"myne.v0.2|");
+        assert_eq!(&aad[..10], b"myne.v0.1|");
+        // Domain-separation from the singleton siblings.
+        assert_ne!(aad, aad_prefs_blob(&account_number_hash));
+        assert_ne!(aad, aad_custom_themes_blob(&account_number_hash));
+    }
+
+    #[test]
+    fn aad_chats_blob_default_matches_pinned_hex() {
+        // Spec § 5.2 + § 9.24.3: 55 bytes = prefix (10) + version (1) +
+        // u16_be(10) + "chats-blob" (10) + conversation_id (16) +
+        // account_number_hash (16).
+        let account_number_hash: [u8; 16] = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        let conversation_id: [u8; 16] = [
+            0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+            0x18, 0x19,
+        ];
+        let aad = aad_chats_blob(&account_number_hash, &conversation_id);
+        let expected: [u8; 55] = [
+            // "myne.v0.1|": 10 bytes
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
+            // protocol_version (the caller's vault generation; 0x01 here)
+            0x01, // length-prefixed role string: u16_be(10) || "chats-blob"
+            0x00, 0x0A, // u16_be(10)
+            0x63, 0x68, 0x61, 0x74, 0x73, 0x2D, 0x62, 0x6C, 0x6F, 0x62, // "chats-blob"
+            // conversation_id
+            0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+            0x18, 0x19, // account_number_hash
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+        assert_eq!(aad.len(), 55, "spec § 9.24.3 mandates 55-byte AAD");
+        // Per-entry binding: a different conversation_id produces a different
+        // AAD in exactly the id region: the per-blob-safety property that
+        // lets one KEK serve every conversation file.
+        let other_id = [0x99u8; 16];
+        let aad_other = aad_chats_blob(&account_number_hash, &other_id);
+        assert_ne!(aad, aad_other);
+        assert_eq!(&aad[..23], &aad_other[..23]);
+        // The generation stamp (prefix + version byte) separates the
+        // generations (§ 10.3, one magic per generation).
+        let aad_v2 = aad_chats_blob_v0_2(&account_number_hash, &conversation_id);
+        assert_ne!(aad, aad_v2);
+        assert_eq!(&aad_v2[..10], b"myne.v0.2|");
+        assert_eq!(&aad[..10], b"myne.v0.1|");
+        // Domain-separation from the catalog sibling: same family, different
+        // role + the per-entry id, so no cross-verify even at equal hashes.
+        assert_ne!(aad, aad_chats_catalog(&account_number_hash));
+    }
+
+    #[test]
     fn aad_capture_blob_default_matches_pinned_hex() {
         // § 5.2 + § 9.18.3: 49 bytes = prefix (10) + version (1) +
         // u16_be(20) + "pending-capture-blob" (20) + capture_id (16).
@@ -1410,7 +1636,7 @@ mod tests {
         ];
         let aad = aad_capture_blob(&capture_id);
         let expected: [u8; 49] = [
-            // "myne.v0.1|" — 10 bytes
+            // "myne.v0.1|": 10 bytes
             0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
             // protocol_version
             0x01, // length-prefixed role: u16_be(20) || "pending-capture-blob"
@@ -1439,7 +1665,7 @@ mod tests {
         ];
         let aad = aad_share_import_blob(&share_id);
         let expected: [u8; 46] = [
-            // "myne.v0.1|" — 10 bytes
+            // "myne.v0.1|": 10 bytes
             0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
             // protocol_version
             0x01, // length-prefixed role: u16_be(17) || "share-import-blob"
@@ -2725,6 +2951,7 @@ mod tests {
         let aad_vik = aad_vault_items_key_wrap_v0_2(&items_key_id);
         let aad_prefs = aad_singleton_blob_v0_2(b"prefs-blob", &account_number_hash);
         let aad_themes = aad_singleton_blob_v0_2(b"custom-themes-blob", &account_number_hash);
+        let aad_membership = aad_membership_blob(&account_number_hash);
 
         // The property that makes the v0.2 prefix worth a vector at all: the same
         // role under the two majors produces different AAD, so a v0.1 blob cannot
@@ -2760,7 +2987,7 @@ mod tests {
         dump.push_str("  \"schema\": \"aad-construction\",\n");
         dump.push_str("  \"protocol_version\": \"v0.2\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §10.4.1 + §10.5 + §5.2\",\n");
-        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for the v0.2 aad_* builders (protocol/src/aead.rs) — the next-major mirrors of the v0.1 family, stamped with the AAD prefix 'myne.v0.2|' and protocol_version byte 0x02. Both are major-version-event constants: the same role under the two majors yields different AAD, which is precisely the §10.5 anti-downgrade separation that stops a v0.1 blob verifying as v0.2 or the reverse. These builders are the §10.4.1 whole-vault migration's re-seal path, so a port that gets the framing wrong migrates a vault into bytes no other implementation can open. 5 cases: the password/recovery wraps, the itemsKey wrap, and the generic KEK-singleton builder shown under two different roles (v0.2 has no per-family singleton builders — the migration rebuilds any family's AAD from its role string, so the role is an INPUT here rather than baked into the function name). The two aad_nc05_* builders are the other half of the v0.2 family and are pinned by crdt-note-blob/v0.2's own aad_construction cases rather than duplicated here. NOTE on kdf_params: v0.2's KDF is not allocated yet, so the password/recovery cases carry the v0.1 canonical block — what they pin is the framing (where the block sits, that it is bound), not a v0.2 parameter choice. Cases generated by `cargo test -p protocol --lib emit_aad_construction_v0_2_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for the v0.2 aad_* builders (protocol/src/aead.rs). These are the next-major mirrors of the v0.1 family, stamped with the AAD prefix 'myne.v0.2|' and protocol_version byte 0x02. Both are major-version-event constants: the same role under the two majors yields different AAD, which is precisely the §10.5 anti-downgrade separation that stops a v0.1 blob verifying as v0.2 or the reverse. These builders are the §10.4.1 whole-vault migration's re-seal path, so a port that gets the framing wrong migrates a vault into bytes no other implementation can open. 6 cases: the password/recovery wraps, the itemsKey wrap, the generic KEK-singleton builder shown under two different roles (v0.2 has no per-family singleton builders. The migration rebuilds any family's AAD from its role string, so the role is an INPUT here rather than baked into the function name), and the membership-field builder (aad_membership_blob, §9.3.1). The two aad_nc05_* builders are the other half of the v0.2 family and are pinned by crdt-note-blob/v0.2's own aad_construction cases rather than duplicated here. NOTE on kdf_params: v0.2's KDF is not allocated yet, so the password/recovery cases carry the v0.1 canonical block. What they pin is the framing (where the block sits, that it is bound), not a v0.2 parameter choice. Cases generated by `cargo test -p protocol --lib emit_aad_construction_v0_2_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // `case_slug` and `builder_name` are separate on purpose: the generic
@@ -2903,6 +3130,22 @@ mod tests {
                 ("account_number_hash", 16),
             ],
             &role_and_hash_json("custom-themes-blob"),
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_membership_blob",
+            "aad_membership_blob",
+            "AAD bound into the AEAD seal of the vault membership field (§9.3.1, the account/vault split). The field is NTV5-only, so this AAD is stamped with the v0.2 prefix + version, mirroring aad_prefs_blob in shape (role 'membership-blob' + account_number_hash) but under the v0.2 domain. The KEK is membership_key (SubkeyRole::MembershipKey), derived under the v0.2 context prefix.",
+            &aad_membership,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 15),
+                ("account_number_hash", 16),
+            ],
+            &role_and_hash_json("membership-blob"),
             false,
         );
 

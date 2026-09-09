@@ -19,11 +19,11 @@ import {
   foldable,
   foldAll,
   foldedRanges,
-  forceParsing,
   syntaxTree,
   unfoldAll,
 } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { assertParsed } from "./_parse-budget";
 import { myneFolding } from "../../src/editor/folding";
 
 type Mounted = { view: EditorView; host: HTMLElement };
@@ -38,7 +38,7 @@ function mount(doc: string): Mounted {
     }),
     parent: host,
   });
-  forceParsing(view);
+  assertParsed(view);
   syntaxTree(view.state);
   return { view, host };
 }

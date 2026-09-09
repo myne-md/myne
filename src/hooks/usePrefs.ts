@@ -20,7 +20,6 @@
 // past ~5 fields, revisit (separate PRD).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { observeEgressControls } from "../notes/ai/chatStore";
 import i18n from "../i18n";
 import {
   PrefsView,
@@ -129,6 +128,7 @@ const DEFAULT_PREFS: PrefsView = {
   cli_rate_limit_disabled: null,
   theme: null,
   folder_icons: {},
+  folder_notes_enabled: false,
   device_names: {},
   hidden_bar_items: [],
   bar_items_order: [],
@@ -322,12 +322,6 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
         // every consumer that reads a field off it.
         if (!cancelled && view && mine > applied.current) {
           applied.current = mine;
-          // Every applied view is observed, so a change to the egress controls
-          // cuts the chat-history seed whichever way it arrived. See
-          // `chatStore.observeEgressControls`: `ai_excluded_folders` is
-          // Shared(SetUnion), so it also arrives by sync merge, where no setter
-          // on this machine is called.
-          observeEgressControls(view.ai_excluded_folders, view.ai_provider);
           setPrefs(view);
         }
       } catch {
@@ -810,11 +804,6 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       const view = await prefsRead();
       if (mine <= applied.current) return;
       applied.current = mine;
-      // Same observation as the mount read, and this is the path a synced
-      // change actually takes: the sync apply bumps the prefs nonce, every
-      // `usePrefs` re-reads, and the change is visible here with no setter
-      // having run.
-      observeEgressControls(view.ai_excluded_folders, view.ai_provider);
       setPrefs(view);
     } catch {
       // Keep the current cache (safer-state per spec § 9.5.5).

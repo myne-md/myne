@@ -54,6 +54,7 @@ pub mod search_sync;
 // shared desktop↔mobile); `hooks::DesktopHooks` calls it directly. The
 // event-name const stays in the core CRUD module (`note_update` emits it via
 // the hook seam).
+pub(crate) use myne_core::plugins::notes::commands::NOTES_DELETED_EVENT;
 pub(crate) use myne_core::plugins::notes::commands::SNAPSHOT_WRITE_FAILED_EVENT;
 
 use tauri::plugin::{Builder, TauriPlugin};

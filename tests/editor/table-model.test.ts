@@ -7,8 +7,9 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing, syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { assertParsed } from "./_parse-budget";
 import type { SyntaxNode } from "@lezer/common";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import { buildTableModel, gridFromModel } from "../../src/editor/decorations/table";
@@ -276,7 +277,7 @@ describe("live buildTableModel → gridFromModel → serialize", () => {
       }),
       parent: host,
     });
-    forceParsing(view, doc.length, 5000);
+    assertParsed(view);
     let node: SyntaxNode | null = null;
     syntaxTree(view.state).iterate({
       enter: (n) => {

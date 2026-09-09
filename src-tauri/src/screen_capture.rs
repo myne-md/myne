@@ -35,7 +35,9 @@
 //! in tracing output (`"startup_init"` / `"runtime_apply"` /
 //! `"lock_reset"` / `"pdf_export_window"`, and now
 //! `"single_instance_show"` / `"macos_reopen"` / `"clipper_raise"` /
-//! `"webview_reveal"`) without expanding the public API. Semantic
+//! `"webview_reveal"`, and the detached-window pair
+//! `"detached_window_create"` / `"detached_window_reveal"` of myne#680)
+//! without expanding the public API. Semantic
 //! intent travels in tracing labels rather than additional functions.
 //! There is **no** `reset_to_default` function; lock-time callers use
 //! `apply(app, true)` with the appropriate site label.
@@ -53,6 +55,14 @@
 //! to the control. It is **device-wide, not pre-unlock-only**: an
 //! override that lapsed at unlock would put the black window straight
 //! back in front of the person it exists for.
+//!
+//! The DETACHED-WINDOW entry points ([`apply_to`], [`raise_protected`],
+//! myne-md/myne#680) honor the same override, through [`mirror_effective`]
+//! rather than [`resolve`]: a detached note window MIRRORS the main window's
+//! current requested state and never records a request of its own, so
+//! `last_requested`'s sole writer stays [`apply`]. The value they apply is the
+//! same `requested && !override` the main window is showing, so an opted-out
+//! device leaves a pop-out unprotected exactly as it leaves the main window.
 //!
 //! [`apply_inner`] is deliberately outside that sentence, and the four
 //! lines above say why it is `pub(crate)`: the pdf-export plugin drives
@@ -489,6 +499,90 @@ pub fn apply<R: tauri::Runtime>(app: &tauri::AppHandle<R>, enabled: bool, site: 
         return;
     };
     apply_inner(&window, effective, site);
+    // myne#680: a runtime protection change reaches every live detached
+    // (pop-out) note window too, so a Settings toggle or a device-override
+    // change never leaves one window protected and another not. `resolve` above
+    // recorded the new `last_requested`, so the fan-out mirrors the new state.
+    // On lock this finds nothing (the pop-outs are destroyed first, #679), and
+    // at unlock there are none yet.
+    fan_out_to_detached(app, site);
+}
+
+/// Re-apply the current effective protection to every live detached (`note-*`)
+/// window (myne#680). Called at the tail of [`apply`], so any runtime change to
+/// the main window's protection propagates to the pop-outs by construction. Each
+/// window mirrors the main window's state via [`apply_to`] (it never records a
+/// new request). Absent registry (no detached-window plugin, or none open) is a
+/// no-op.
+fn fan_out_to_detached<R: tauri::Runtime>(app: &tauri::AppHandle<R>, site: &'static str) {
+    let Some(registry) =
+        app.try_state::<crate::plugins::detached_window::state::DetachedWindowRegistry>()
+    else {
+        return;
+    };
+    for label in registry.all_labels() {
+        if let Some(window) = app.get_webview_window(&label) {
+            apply_to(app, &window, site);
+        }
+    }
+}
+
+/// The effective protection a SECONDARY (detached note) window should currently
+/// show: the main window's last requested state folded with the device-wide
+/// override, recording nothing (myne#680, SYNC-5).
+///
+/// A detached window MIRRORS the main window rather than holding its own request,
+/// so it must not move `last_requested` (whose sole writer stays [`apply`]). It
+/// still honors the device-wide override, so an opted-out device leaves a pop-out
+/// unprotected exactly as it leaves the main window, and a `--disable-screen-
+/// capture-protection` run never hands the user a black pop-out. Unmanaged state
+/// warns and protects, the same fail-towards-protection direction as [`resolve`].
+fn mirror_effective<R: tauri::Runtime>(app: &tauri::AppHandle<R>, site: &'static str) -> bool {
+    match app.try_state::<ScreenCaptureState>() {
+        Some(state) => state.last_requested() && !state.override_disabled(),
+        None => {
+            tracing::warn!(
+                event = "screen_capture_state_absent",
+                site,
+                "screen-capture state not managed; protecting the detached window"
+            );
+            true
+        }
+    }
+}
+
+/// Apply the mirrored protection to one already-shown detached window (myne#680).
+///
+/// The window-parameterized twin of the main-window [`apply`], for a surface that
+/// is already visible and only needs its protection re-asserted (the fan-out
+/// after a runtime toggle). Resolves through [`mirror_effective`] so the
+/// device-wide override is honored and `last_requested` is never written.
+pub fn apply_to<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    window: &tauri::WebviewWindow<R>,
+    site: &'static str,
+) {
+    apply_inner(window, mirror_effective(app, site), site);
+}
+
+/// Bring a detached (pop-out) note window forward and keep it protected across
+/// the trip, mirroring the main window's state (myne#680, SYNC-5).
+///
+/// The window-parameterized twin of [`show_protected`]: same `raise_sequence`
+/// (protect -> unminimize -> show -> protect -> focus, the #483 both-sides-of-
+/// show discipline for the Windows affinity that resets across a show), applied
+/// to the PASSED window with the value [`mirror_effective`] resolves. The
+/// single-instance reveal of an already-open note routes through this rather
+/// than a hand-rolled `unminimize`/`set_focus`, which is what keeps the
+/// protect/show/protect ordering a property of the code for detached windows too
+/// (and keeps `the_reshow_sequence_is_not_hand_rolled_anywhere_else` green).
+pub fn raise_protected<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    window: &tauri::WebviewWindow<R>,
+    site: &'static str,
+) {
+    let effective = mirror_effective(app, site);
+    raise_sequence(&TauriRaise { window, site }, effective);
 }
 
 /// The main window, or a warn and `None`.
@@ -821,6 +915,72 @@ mod tests {
         // somehow beat the first `apply` re-showed an unprotected window.
         assert!(ScreenCaptureState::new(false, false).last_requested());
         assert!(ScreenCaptureState::new(true, false).last_requested());
+    }
+
+    #[test]
+    fn a_detached_window_mirrors_the_main_state_without_recording() {
+        // myne#680: the value `mirror_effective` resolves for a detached window is
+        // `last_requested() && !override_disabled()`: the main window's current
+        // requested state folded with the device-wide override. This asserts that
+        // algebra AND that reading it never moves `last_requested` (a pop-out
+        // mirrors the main window; opening one must not change what the main
+        // window replays). `mirror_effective` itself needs a running app, so the
+        // read-only property is asserted on the state it reads.
+        let state = ScreenCaptureState::new(false, false);
+        assert!(state.record_and_resolve(true), "main asked protection on");
+        let mirrored = state.last_requested() && !state.override_disabled();
+        assert!(mirrored, "no override, main on -> pop-out protected");
+        assert!(
+            state.last_requested(),
+            "a mirror read must not move last_requested"
+        );
+
+        assert!(
+            !state.record_and_resolve(false),
+            "main turned protection off"
+        );
+        let mirrored_off = state.last_requested() && !state.override_disabled();
+        assert!(!mirrored_off, "main off -> pop-out unprotected too");
+
+        // An opted-out device leaves the pop-out unprotected even when the main
+        // window asked for protection, and the override never moves last_requested.
+        let opted_out = ScreenCaptureState::new(true, false);
+        assert!(!opted_out.record_and_resolve(true));
+        let mirrored_override = opted_out.last_requested() && !opted_out.override_disabled();
+        assert!(
+            !mirrored_override,
+            "override removes protection from the pop-out too"
+        );
+        assert!(
+            opted_out.last_requested(),
+            "override does not touch last_requested"
+        );
+    }
+
+    #[test]
+    fn the_detached_mirror_reads_the_request_and_never_records_one() {
+        // The invariant `apply` rests on ("the only writer of last_requested is
+        // apply") extends to the detached entry points: they MIRROR, never set.
+        // Read the source because the writing path needs a running app; what this
+        // catches is someone swapping mirror_effective to `record_and_resolve`,
+        // which would let opening a pop-out move what the main window replays.
+        let src = include_str!("screen_capture.rs");
+        let body = src
+            .split_once("fn mirror_effective<R: tauri::Runtime>")
+            .expect("mirror_effective must still be named that")
+            .1
+            .split_once("\n}\n")
+            .expect("mirror_effective must have an end")
+            .0;
+        assert!(
+            !body.contains("record_and_resolve") && !body.contains(".store("),
+            "mirror_effective must READ last_requested + override, never record; a \
+             detached window mirrors the main window and may not move last_requested"
+        );
+        assert!(
+            body.contains("last_requested()") && body.contains("override_disabled()"),
+            "mirror_effective must fold the device-wide override into last_requested"
+        );
     }
 
     #[test]

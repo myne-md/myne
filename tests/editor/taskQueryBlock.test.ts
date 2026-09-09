@@ -11,7 +11,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
+import { assertParsed } from "./_parse-budget";
 import { markdown } from "@codemirror/lang-markdown";
 import { parser } from "../../src/dialect/lezer/parser";
 import {
@@ -229,7 +229,7 @@ describe("an all-dropped query refuses, visibly", () => {
 describe("reveal is whole-block (buildTaskQueryDecorations)", () => {
   function parsedState(doc = DOC): { state: EditorState; done: () => void } {
     const { view, host } = mount(doc);
-    forceParsing(view, doc.length, 5000);
+    assertParsed(view);
     return { state: view.state, done: () => teardown(view, host) };
   }
 

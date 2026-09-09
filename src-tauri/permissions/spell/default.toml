@@ -3,9 +3,13 @@
 # as an `InlinedPlugin`. Capability files reference `spell:default`.
 #
 # The two write commands (add_to_personal_dictionary / ignore_word_in_vault)
-# inherit the same main-window-only invariant as the prefs setters — v0.2
-# multi-window MUST NOT grant them to any non-main window (they write the
-# encrypted vault.dictionary blob).
+# write the encrypted vault.dictionary blob and were reserved main-window-only
+# anticipating multi-window; myne#677 (epic #173, sync-ledger SYNC-12) resolves
+# that reservation: a detached (pop-out) note window is granted `spell:default`
+# via capabilities/detached-note.json (windows: ["note-*"]), because "add to
+# dictionary" / "ignore word" are ordinary editor actions a split pane already
+# performs, and the exposure (same bundled code, same plaintext) is the same one
+# already permitted. omerdduran reviews this reversal in the myne#677 PR.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 

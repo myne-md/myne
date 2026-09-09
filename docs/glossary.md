@@ -35,6 +35,12 @@ Three small reference tables at the bottom (§ "Quick-reference indices") cover 
 
 ## Term entries
 
+### **`_undecodable/`** &nbsp; 📦 *Product*
+
+The directory the [myne-decrypt](#myne-decrypt) CLI writes a note's raw ciphertext blob into when that note fails to decode during a best-effort export. It is the salvage half of the "never produce a folder the user believes is complete" rule: the undecodable bytes are preserved rather than dropped, so nothing is destroyed even when the export is incomplete, and the `_FAILED.txt` manifest names what could not be read. The leading underscore keeps it out of the way of the exported note tree.
+
+Used in: `decisions.md` 2026-09-07 (myne-md/myne#166)
+
 ### **AAD (Associated Authenticated Data)** &nbsp; 🏗️ *Construction*
 
 *(Aliases: Associated Data, AD. Myne-divergent: no, but the canonical construction §5.2 is project-specific.)*
@@ -55,6 +61,33 @@ Used in: `spec/protocol.md` §5.2
 The 10-byte ASCII string `"myne.v0.1|"` (including the trailing pipe) that begins every AAD in this protocol version. The next major version defines its own AAD prefix (not pre-allocated). The prefix domain-separates protocol versions at the AEAD tag level — a later-major client cannot accidentally decrypt a v0.1 blob.
 
 Used in: `spec/protocol.md` §5.2
+
+### **account** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
+
+*(Myne-divergent: yes (redefined 2026-09-07). Before that date "account" meant the vault itself; the two were one and the same.)*
+
+The client-side ownership layer above the vault: one account can own multiple vaults. An account is a
+purely local, sealed grouping: an **account record** (the device-local half) plus a sealed
+**vault membership** field inside each member vault's metadata (the per-vault half). It carries no
+cryptography of its own: each vault keeps its own account number, recovery phrase and `root_key`,
+and the server's view is byte-identical to the pre-split world (it still sees unrelated per-vault
+accounts). The account id is a random UUIDv7, distinct from the account number and from
+`account_number_hash`. Grouping is a per-device organisational choice, so it never syncs and never
+converges across devices (`sync-protocol.md` §10.3). Where the OS keychain is unavailable there is
+no record and no grouping, and vaults keep working standalone.
+
+Used in: `spec/protocol.md` §9.3.1, `spec/sync-protocol.md` §10.3
+
+### **account record** &nbsp; 📦 *Product*
+
+The device-local half of the account/vault split: a sealed record holding the account id, the member
+vault ids and the account label, stored under an OS-keychain wrap key (the sealed-label-store
+pattern). It is rebuilt from the on-disk vault scan when missing or corrupt, reconciled against
+discovery (adopting appearing vaults, pruning deleted ones, pruning emptied accounts), and never
+written in plaintext on any platform. Where the keychain is unavailable there is no record and no
+grouping. The per-vault half is the **vault membership** field.
+
+Used in: `spec/protocol.md` §9.3.1
 
 ### **account_number** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
@@ -98,9 +131,9 @@ Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
 ### **agent run** &nbsp; 📦 *Product*
 
-One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run survives a vault lock**: the run table and its transcript are dropped on the same leg as the AI vector store, which is why the feature adds no encrypted blob family and owes `myne-test-vectors` nothing. That holds for the turn it leaves in the [conversational AI chat](#conversational-ai-chat) transcript too, on both counts: the turn keeps only the run id, the counts, the scope label the task was sent under, and how the loop ended. It never keeps the [proposed edits](#proposed-edit), whose anchors are text copied verbatim out of note bodies, and the transcript itself is dropped on the same leg. A run never writes; applying is a separate act behind the user's approval.
+One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run's LIVE state survives a vault lock**: the run table and the live transcript store are dropped on the same leg as the AI vector store. What changed with persisted [conversations](#conversation) (myne-md/myne#675): the turn a run leaves behind is now written to its conversation at settle (append-at-finalize), and since `decisions/ai/0583` that settled turn KEEPS the frozen proposal (anchors and replacements, verbatim note-derived text) alongside the run id, the counts, the scope label and the end tag. The historical copy is **read-only**: no re-apply affordance exists anywhere, because a frozen proposal may quote a note that has since changed, been trashed, or moved folders. The RAM half of the old claim still holds: `agentStore`'s live copy is dropped on every vault-leaving path, enforced by the lock-teardown guards. A run never writes; applying is a separate act behind the user's approval.
 
-Used in: `decisions.md` 2026-08-16, 2026-08-19, `threat-model.md` §7
+Used in: `decisions.md` 2026-08-16, 2026-08-19, `decisions/ai/0581`, `decisions/ai/0583`, `threat-model.md` §7
 
 ### **agent scope** &nbsp; 📦 *Product*
 
@@ -135,6 +168,12 @@ The third verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#61
 Two rules keep it from becoming a frontmatter writer, and both are about the RESULT rather than the input. The text is positioned after the note's frontmatter block rather than at the end of the raw file, so in a note that has one, appended text can never be the first line. And an append that would give the note a frontmatter block it did not have is refused outright, which closes the case positioning alone does not: a note whose body merely BEGINS with `---` has an opener nothing closed, and an ordinary `---` separator in the appended text would close it and turn the user's own first lines into frontmatter.
 
 Used in: `decisions/ai/0554`
+
+### **append-at-finalize** &nbsp; 📦 *Product*
+
+The conversation write cadence: a [chat turn](#chat-turn) persists the moment it settles (stream closed, run settled, or failed, including the partial text of a stream interrupted by a lock), with no coalescing window. A lock that cuts a stream settles its partial text first and attempts the write with that snapshot; the lock wipe keeps no retry state, so a persist that fails at lock is lost with the RAM copy. Nothing rewrites a turn in place.
+
+Used in: `spec/protocol.md` §9.24, §9.24.2, §9.24.4; `decisions/ai/0581`
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -418,11 +457,33 @@ Reference: RFC 8439.
 
 The reserved 16-byte sync-plane identifier of the [`vault.attachments`](#vaultattachments) catalog under Phase 2 sync: `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`spec/protocol.md` §3.4; MYND-468). The catalog is a synced singleton **outside** the head manifest (`spec/sync-protocol.md` §4.2), so it needs a stable blob-id every device derives identically; because the id is `root_key`-keyed pseudorandom bytes, the server cannot distinguish the catalog's record from a note's. Derives an *identifier*, not key material — the catalog KEK stays `attachments-catalog-key`. Excluded from the manifest by construction. Phase 2.
 
+### **chat turn** &nbsp; 📦 *Product*
+
+One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled: the write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
+
+Used in: `protocol.md` §9.24.2; `decisions/ai/0581`
+
 ### **chord** &nbsp; 📦 *Product*
 
 A single keyboard-shortcut combination, e.g. `Mod-Shift-g` (hotkeys epic, MYND-304). Myne's canonical chord string is CodeMirror-`KeyBinding.key`-compatible: a `-`-separated sequence of modifier tokens followed by one logical key, using the cross-platform `Mod` token (Cmd on macOS, Ctrl elsewhere) and the layout-respecting *logical* key (what the user sees on the key, not the physical `code`); single-character keys are lowercased. Stored NFC-normalized inside `vault.prefs` (the `keymap` field). See **keymap**, **key binding**.
 
 Used in: `spec/protocol.md` §9.5.2
+
+### **conversation** &nbsp; 📦 *Product*
+
+*(Alias: AI chat, chat thread.)*
+
+One persisted AI chat history unit: an ordered, immutable list of settled [chat turns](#chat-turn) plus a record (id, title, created/updated timestamps, causal version, tombstone) in the [conversation catalog](#conversation-catalog). Conversations survive lock, restart and device changes (encrypted at rest as `MYJ1` files under `chats/`, synced, backed up), are listed by updated-at, continue from where the last one left off when the AI tab opens, and delete everywhere via a catalog tombstone with no trash or undo (`decisions/ai/0581`). Titles derive deterministically from the first user turn (first 48 Unicode scalar values, newlines stripped, no model call) and are user-renameable. An agent turn's frozen [proposal](#agent-run) persists inside its conversation **read-only**: no historical re-apply exists (`decisions/ai/0583`).
+
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`
+
+### **conversation catalog** &nbsp; 📦 *Product*
+
+*(Alias: `vault.chats`, chats catalog.)*
+
+The singleton roster blob (`MYM1`, `protocol.md` §9.23) enumerating the vault's [conversations](#conversation): one entry per conversation id carrying title, timestamps, the causal `version` the sync merge races on, and the deletion tombstone. The pair half of the per-conversation `MYJ1` files (the `vault.attachments`/`attachments/` archetype): the catalog is what syncs as one addressed singleton, the files are what a deletion removes. Read semantic is **report-don't-empty** (a corrupt catalog surfaces an error; it is never read as empty and rewritten, because that would persist emptiness over real records, `decisions/ai/0581`).
+
+Used in: `protocol.md` §9.23; `decisions/ai/0581`
 
 ### **CLI-excluded folder** &nbsp; 📦 *Product*
 
@@ -685,6 +746,12 @@ A folder the user means to keep, which persists in the sidebar tree even when it
 **Revised by myne-md/myne#613, in both halves.** The set used to be *cold*, written on explicit folder create and delete alone, which meant a folder made by dragging a note into a new name was never recorded and vanished the moment it was emptied. It is now written by [at-fill registration](#at-fill-registration) as well, and bounded by a [set-field byte budget](#set-field-byte-budget). And it used to merge as a clockless add-wins union, under which a folder delete could never reach a second device; it now carries per-entry removal clocks (`spec/sync-protocol.md` §10.2). The two egress-control sets that share its codec, [AI-excluded folder](#ai-excluded-folder) and [CLI-excluded folder](#cli-excluded-folder), deliberately kept the clockless union. See also [folder](#folder), [item order](#item-order).
 
 Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2, `spec/sync-protocol.md` §10.2; `decisions.md` 2026-05-29, myne-md/myne#613
+
+### **detached note window (pop-out window)** &nbsp; 📦 *Product*
+
+A single note opened in its own OS-level window (a "pop-out"), for the second-monitor case, alongside the in-window split panes. Desktop client only: the web (single-tab OPFS lock) and mobile clients cannot spawn OS windows, so the affordance is absent there. The window is host-spawned (page context holds no window-create grant), labelled `note-<id>` (SYNC-1), and carries a narrow per-webview capability set (read-only prefs, no `prefs:allow-set-*`, per `decisions.md` clients/0136). A second WebView holding decrypted plaintext is a new trust-boundary surface, so it tears down on every vault lock (hide-then-destroy) and applies the same screen-capture protection as the main window (`threat-model.md` §7). SYNC-6, one note one surface: popping a note out MOVES it, so the source tab closes and re-opening the note reveals the pop-out rather than duplicating it (which would give the note two autosaving surfaces over one blob). Its geometry is persisted device-local in the `MYW1` workspace blob for restore, never synced.
+
+Used in: `threat-model.md` §7; `decisions.md` 2026-09-06 (clients/0578, clients/0579); myne-md/myne#173 (#677 to #681)
 
 ### **Developer mode** &nbsp; 📦 *Product*
 
@@ -953,7 +1020,7 @@ Used in: `decisions/ai/0554`, `threat-model.md` §7
 
 ### **folder note** &nbsp; 📦 *Product*
 
-A note designated the **index note** of its [folder](#folder) via the value-strict `folder_index: true` frontmatter flag — the sixth [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field) (`spec/markdown-dialect.md` §3.6.1). The note indexes whichever folder its own `folder:` names; the binding is the boolean alone and carries **no path**, so a folder rename rewrites `folder:` and the binding follows for free (rename drift is structurally impossible). A folder has **exactly one** folder note. It is **hidden from the sidebar folder tree** — no separate row, no pin, no badge — and is opened (or lazily created on first activation) by **double-clicking the folder**; the undesignate inverse lives on the folder's context menu ("Remove folder note"). The hiding is **sidebar-tree-only**: unlike a [note template](#note-template) or a trashed note (hidden everywhere), a folder note stays a fully real, enumerable note in **search, saved views, backlinks, the graph**, and [`[[<folder>/]]`](#folder-target-wikilink) resolution — it is content the user reads, not a hidden skeleton (decisions.md 2026-06-27, supersedes the original "fully visible, pinned, badged" behaviour). Value-strict exactly like `template:`: only the canonical unquoted `true` designates it; `1` / `yes` / `"true"` / absence leave the note ordinary. Owned by the folder-note designate / undesignate actions (`src/notes/folderNote.ts`) only — never written by body autosave; surgery via `patchFolderIndexField`, read via `readFolderIndexFromFmBody`. If two in-folder notes both carry the flag (legacy / imported data only — the UI now prevents a second designation), a deterministic winner is chosen (smallest `note_uuid`) and the rest stay visible, flagged for the user to resolve. Rides the existing `.myn` AEAD envelope — no new magic byte, no AAD / version bump, no on-disk-layout change (within v0.1; forward-incompatible-by-design with a later major version). See also [folder](#folder), [folder-target wikilink](#folder-target-wikilink), [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field). (MYND-370)
+A note designated the **index note** of its [folder](#folder) via the value-strict `folder_index: true` frontmatter flag — the sixth [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field) (`spec/markdown-dialect.md` §3.6.1). The note indexes whichever folder its own `folder:` names; the binding is the boolean alone and carries **no path**, so a folder rename rewrites `folder:` and the binding follows for free (rename drift is structurally impossible). A folder has **exactly one** folder note. It is **hidden from the sidebar folder tree** — no separate row, no pin, no badge — and is opened (or lazily created on first activation) by **double-clicking the folder**; the undesignate inverse lives on the folder's context menu ("Remove folder note"). The hiding is **sidebar-tree-only**: unlike a [note template](#note-template) or a trashed note (hidden everywhere), a folder note stays a fully real, enumerable note in **search, saved views, backlinks, the graph**, and [`[[<folder>/]]`](#folder-target-wikilink) resolution — it is content the user reads, not a hidden skeleton (decisions.md 2026-06-27, supersedes the original "fully visible, pinned, badged" behaviour). **Gated by the `folder_notes_enabled` vault preference, default off (myne-md/myne#661)**: with the feature off (the default), the create/designate entry points are hidden and `folder_index: true` is not honoured for presentation, so the note renders and opens as an ordinary note. The switch touches no bytes (the flag stays on disk), so turning it back on restores exactly the behaviour above. Value-strict exactly like `template:`: only the canonical unquoted `true` designates it; `1` / `yes` / `"true"` / absence leave the note ordinary. Owned by the folder-note designate / undesignate actions (`src/notes/folderNote.ts`) only — never written by body autosave; surgery via `patchFolderIndexField`, read via `readFolderIndexFromFmBody`. If two in-folder notes both carry the flag (legacy / imported data only — the UI now prevents a second designation), a deterministic winner is chosen (smallest `note_uuid`) and the rest stay visible, flagged for the user to resolve. Rides the existing `.myn` AEAD envelope — no new magic byte, no AAD / version bump, no on-disk-layout change (within v0.1; forward-incompatible-by-design with a later major version). See also [folder](#folder), [folder-target wikilink](#folder-target-wikilink), [Myne-managed canonical frontmatter field](#myne-managed-canonical-frontmatter-field). (MYND-370)
 
 Used in: `spec/markdown-dialect.md` §3.6.1, `spec/wikilink.md` §5.5; `decisions.md` 2026-06-17
 
@@ -981,8 +1048,13 @@ The integrity property a [vault head](#vault-head) provides against a malicious 
 
 Used in: `spec/sync-protocol.md` (vault head); `threat-model.md` §7
 
-### **forward-incompatible major version** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
+### **`format/` crate** &nbsp; 🛠️ *Tooling*
 
+The in-repo Rust workspace member (`myne-format`) that carries the host-free half of Myne's on-disk format: the `VaultIo` filesystem-seam trait, the closed `IoFailureKind` error categorization, the export-naming vocabulary, the `NC05` note decode path, and the `MYB1` backup-container read half. Extracted from `myne-core` so the [myne-decrypt](#myne-decrypt) CLI can read a vault without pulling `myne-core`'s unconditional TLS stack (`rustls`+`ring`) and ML runtime (`rten`, `image`). Native-only by design: the export walk and the MYB1 container read half use `std::fs` directly and are gated out of the wasm build; the `VaultIo` trait is carried for the CLI's future use.
+
+Used in: `decisions.md` 2026-09-07 (myne-md/myne#166)
+
+### **forward-incompatible major version** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 Myne's architectural commitment that each major protocol version (v0.1, the next major version, v006, …) is a closed, complete specification with distinct magic bytes, AAD prefix, and context-string prefix. Cross-major reads happen only via explicit user-initiated migration (`spec/protocol.md` §10.4); a later-major client refuses to silently parse a v0.1 blob, and vice versa. The choice contradicts the additive-extension model common in TLS 1.0–1.2 and OpenPGP; the reasoning is that those protocols' downgrade-attack history (POODLE, FREAK, Logjam, MEGA-2022) shows additive extension to be a structural risk. The next major version's anticipated changes (PQ hybrid wrap, MLS multi-device, OPAQUE auth, KT log) are too deep to be additive in any honest sense.
 
 Used in: `spec/protocol.md` §10.1
@@ -1593,6 +1665,12 @@ A YAML frontmatter field whose value is written by the Myne dialect surgery modu
 
 Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-05-07 "User-meaningful timestamp storage path"; `decisions.md` 2026-05-15 "Note title write target"
 
+### **myne-decrypt** &nbsp; 🛠️ *Tooling*
+
+The app-independent decrypter (myne-md/myne#166): a standalone Rust CLI, shipped as four minisign-signed native binaries (macOS universal, Linux x64, Linux arm64, Windows x64) on `downloads.myne.md` in the same tag as `myne`, that reads a vault (or a `.myne-backup` container) and writes the notes and attachments out as plain markdown without the app installed. It is the escape hatch behind the no-lock-in commitment (`vision.md`): "plain markdown" is only true after decryption, so walking away without the app requires a tool that decrypts. It covers both on-disk format generations (v0.1 and `NC05`), exports best-effort with an honest accounting of what it could not read (the [`_undecodable/`](#_undecodable) salvage directory + a `_FAILED.txt` manifest), and describes itself without claiming a verifiability the private source cannot deliver. It reads the on-disk format through the [`format/` crate](#format-crate).
+
+Used in: `decisions.md` 2026-09-07 (myne-md/myne#166)
+
 ### **`myne.v0.1` prefix** &nbsp; 📋 *Protocol* (deep entry, *Myne-divergent*)
 
 The literal string `"myne.v0.1 "` (with trailing space) used as the prefix for HKDF context strings in §3.2 of the protocol. Distinct from the AAD prefix `"myne.v0.1|"` (with trailing pipe, no space) used in AAD construction in §5.2. The two prefixes are deliberately non-identical because they live in different cryptographic call sites — context strings feed `info` to HKDF-Expand, while AAD bytes feed Poly1305 MAC and the CTX outer hash. Mistakenly using one for the other is a protocol violation. The next major version defines its own context-string and AAD prefixes (not pre-allocated).
@@ -2085,6 +2163,12 @@ The empty `.rename-journal` marker file in a vault's notes directory that makes 
 
 Used in: `spec/protocol.md` §9.12, §9.11.3; `decisions.md` 2026-06-13
 
+### **report-don't-empty** &nbsp; 📋 *Protocol*
+
+The read semantic for load-bearing synced singletons ([conversation catalog](#conversation-catalog), per-conversation files): a store that fails any check (absent under a live roster entry, magic/version mismatch, AEAD failure, over-cap, unparseable payload) surfaces an error naming it, and is never collapsed to the empty value. Collapsing would let the next write persist emptiness over real records; refusing keeps the roster (the index of record) intact while the failure is surfaced.
+
+Used in: `spec/protocol.md` §9.23.3, §9.24.4; `decisions/ai/0581`
+
 ### **reproducible builds** &nbsp; 🛠️ *Tooling*
 
 Build artifacts that can be regenerated bit-for-bit from public source code by independent third parties. Part of the compensating-controls plan in lieu of a paid third-party audit.
@@ -2338,6 +2422,12 @@ Reference: FIPS 180-4.
 The 512-bit Secure Hash Algorithm 2. **Not used by Myne** — referenced only when explaining the standard BIP-39 derivation (PBKDF2-HMAC-SHA512) that Myne explicitly avoids.
 
 Used in: `spec/protocol.md` §7.1
+
+### **sibling notice** &nbsp; 📦 *Product*
+
+The post-recovery notice shown when the just-recovered vault belongs to an [account](#account) holding other vaults. It names how many siblings remain and offers a recover-another path, so a user with several vaults does not silently leave one unrecovered. A count only: it reveals nothing about the other vaults beyond what the [vault picker](#vault-picker) already shows, and when the grouping cannot be read it renders a warning instead of claiming zero siblings.
+
+Used in: `src/screens/vault-recover/PasswordResetStep.tsx`; `docs/decisions/storage/0580-account-and-vault-split-into-a-client-side-ownership-layer.md`
 
 ### **signed bundle update** &nbsp; 📦 *Product*
 
@@ -2952,9 +3042,21 @@ A per-vault human-readable name shown in the [vault picker](#vault-picker) and [
 
 Used in: `decisions.md` 2026-06-09 "Multi-vault in-app switcher + label management"
 
+### **vault membership** &nbsp; 📦 *Product*
+
+The per-vault half of the account/vault split: a sealed field inside a vault's `vault.meta` carrying
+the 16-byte account id of the account the vault belongs to. Sealed under a `root_key`-derived KEK
+(`membership-key`) with `account_number_hash` bound into the AAD, so it is invisible to the server
+and to a filesystem adversary, and a field copied from another vault fails AEAD. Absent means
+unmigrated (the vault groups via the device-local **account record** alone), never a parse error.
+Written eagerly at vault creation and lazily on each natural unlock, never gating the unlock. The
+device-local half is the **account record**.
+
+Used in: `spec/protocol.md` §9.3.1
+
 ### **vault picker** &nbsp; 📦 *Product*
 
-The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly) — a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Pre-unlock it surfaces only the vault **count + last-unlock timing** (an accepted leak, `threat-model.md` §7) — never names, content, or account identity. The recovery picker reuses the same view-model.
+The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly): a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Vaults that belong to an [account](#account) are grouped under that account's label, which is user-renamable and likewise readable pre-unlock from the sealed device-local account record. Pre-unlock it surfaces only the vault **count + last-unlock timing** plus account **labels and grouping** (accepted leaks, `threat-model.md` §7). It never shows note content, passwords, or recovery material. Vault names and account labels both follow the [hide vault names](#hide-vault-names) option: with it on, the picker lists every vault individually with no headers and the account actions are refused. The recovery picker reuses the same view-model.
 
 Used in: `decisions.md` 2026-06-09 "Multi-vault onboarding + vault picker"
 

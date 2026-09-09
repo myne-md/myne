@@ -24,23 +24,27 @@
 // Node built-ins only — adding a dependency is a security decision in this
 // repo, and a benchmark is not a reason to make one.
 
-import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runTool, ToolRunError } from "./lib/run-tool.mjs";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const benchDir = join(repoRoot, "web", "bench");
 const pkgDir = join(benchDir, "pkg");
 const PORT = Number(process.env.BENCH_PORT ?? 1422);
 
+// FATAL (myne#528): a benchmark driver (pnpm/wasm-bindgen/cargo) that cannot
+// run must fail the run with its diagnostics printed, not exit 0 against a
+// half-built page. The uncaught ToolRunError keeps the non-zero exit.
 function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { stdio: "inherit", cwd: repoRoot, ...opts });
-  if (r.status !== 0) {
-    console.error(`\n${cmd} ${args.join(" ")} failed (exit ${r.status})`);
-    process.exit(r.status ?? 1);
+  try {
+    runTool([cmd, ...args], { cwd: repoRoot, onToolFailure: "fatal", ...opts });
+  } catch (err) {
+    if (!(err instanceof ToolRunError)) throw err;
+    process.exit(1);
   }
 }
 
@@ -52,16 +56,14 @@ function run(cmd, args, opts = {}) {
 let nativeJson = null;
 if (process.argv.includes("--native")) {
   console.error("== native Argon2id reference ==");
-  const r = spawnSync(
-    "cargo",
-    ["run", "--release", "-p", "protocol", "--example", "bench-kdf", "5"],
-    { cwd: repoRoot, encoding: "utf8" },
-  );
-  if (r.status !== 0) {
-    console.error(r.stderr);
-    process.exit(r.status ?? 1);
-  }
-  nativeJson = r.stdout.trim().split("\n").pop();
+  // FATAL: without the reference the page reports milliseconds only, which the
+  // header above says do not transfer between machines — running without it
+  // after the user asked for --native is a broken run, not a degraded one.
+  const r = runTool(["cargo", "run", "--release", "-p", "protocol", "--example", "bench-kdf", "5"], {
+    cwd: repoRoot,
+    onToolFailure: "fatal",
+  });
+  nativeJson = (r.stdout ?? "").trim().split("\n").pop();
   console.error(`   ${nativeJson}`);
 } else {
   console.error(

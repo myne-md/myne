@@ -1,0 +1,52 @@
+# Permissions for the in-app `chats` Tauri plugin.
+# Picked up under the `chats:` ACL namespace because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these
+# as `chats:default` (or `chats:allow-chats-read` / … individually).
+#
+# All six commands are Slot::Unlocked-gated reads/writes of the encrypted
+# conversation store and inherit the main-window-only invariant shared by the
+# other vault plugins: v0.2 multi-window MUST NOT grant a chats write
+# permission to any non-main window.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the chats plugin: the six AI-conversation storage commands."
+permissions = [
+    "allow-chats-create",
+    "allow-chats-append-turn",
+    "allow-chats-read",
+    "allow-chats-list",
+    "allow-chats-rename",
+    "allow-chats-delete",
+]
+
+[[permission]]
+identifier = "allow-chats-create"
+description = "Allow invoking chats:chats_create (Slot::Unlocked-gated conversation create: mints the UUIDv7 id, derives the title from the first user turn, writes the MYJ1 file + the MYM1 catalog row)."
+commands.allow = ["chats_create"]
+
+[[permission]]
+identifier = "allow-chats-append-turn"
+description = "Allow invoking chats:chats_append_turn (Slot::Unlocked-gated settle-time write of a conversation's turn list + the catalog version/updated_at bump)."
+commands.allow = ["chats_append_turn"]
+
+[[permission]]
+identifier = "allow-chats-read"
+description = "Allow invoking chats:chats_read (Slot::Unlocked-gated read of one conversation's turn-list payload; corrupt files surface ConversationUnreadable, never a silent empty)."
+commands.allow = ["chats_read"]
+
+[[permission]]
+identifier = "allow-chats-list"
+description = "Allow invoking chats:chats_list (Slot::Unlocked-gated roster read ordered by updated_at desc, tombstones excluded)."
+commands.allow = ["chats_list"]
+
+[[permission]]
+identifier = "allow-chats-rename"
+description = "Allow invoking chats:chats_rename (Slot::Unlocked-gated catalog-row rename; bumps version + updated_at)."
+commands.allow = ["chats_rename"]
+
+[[permission]]
+identifier = "allow-chats-delete"
+description = "Allow invoking chats:chats_delete (Slot::Unlocked-gated tombstone delete: marks the catalog row, removes the MYJ1 file; idempotent)."
+commands.allow = ["chats_delete"]

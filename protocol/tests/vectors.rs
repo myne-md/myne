@@ -246,6 +246,26 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/bip39-recovery/v0.1/cases.json"),
         ),
         (
+            "chats-blob",
+            "v0.1",
+            include_str!("../../myne-test-vectors/vectors/chats-blob/v0.1/cases.json"),
+        ),
+        (
+            "chats-blob",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/chats-blob/v0.2/cases.json"),
+        ),
+        (
+            "chats-catalog",
+            "v0.1",
+            include_str!("../../myne-test-vectors/vectors/chats-catalog/v0.1/cases.json"),
+        ),
+        (
+            "chats-catalog",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/chats-catalog/v0.2/cases.json"),
+        ),
+        (
             "color-group",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/color-group/v0.1/cases.json"),
@@ -1151,101 +1171,189 @@ fn vault_meta_rewrite_vectors() {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn hkdf_sha256_vectors() {
-    use protocol::{derive_subkey, SubkeyRole};
-
-    let Some(raw) = cases_json("hkdf-sha256") else {
-        return;
-    };
-    let doc: serde_json::Value = serde_json::from_str(&raw)
-        .unwrap_or_else(|e| panic!("[hkdf-sha256] parse cases.json: {e}"));
-
-    assert_eq!(doc["schema"], "hkdf-sha256");
-    assert_eq!(doc["protocol_version"], "v0.1");
-
-    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
-    assert!(
-        cases.len() >= 10,
-        "hkdf-sha256 must carry at least 10 vectors (per PRD); found {}",
-        cases.len()
-    );
-    assert_unique_vector_ids("hkdf-sha256", cases);
+    use protocol::{derive_subkey, derive_subkey_v0_2, SubkeyRole};
 
     let mut seen_roles: Vec<SubkeyRole> = Vec::new();
 
-    for case in cases {
-        let id = case["vector_id"]
-            .as_str()
-            .expect("vector_id must be a string");
+    // Skip contract (`missing_fixture`): with no companion at all there is
+    // nothing to verify. The ALL pin below runs only when at least one file
+    // loaded; a present-but-old companion (v0.1 without the v0.2 category)
+    // fails the pin on MembershipKey by design, which is the stale-companion
+    // signal, not a skip.
+    let v01 = cases_json("hkdf-sha256");
+    let v02 = cases_json_for("hkdf-sha256", "v0.2");
+    if v01.is_none() && v02.is_none() {
+        return;
+    }
 
-        let root_key: [u8; 32] = hex_decode_array(
-            case["input_root_key_hex"]
-                .as_str()
-                .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+    // v0.1 file: every role except MembershipKey, derived under the v0.1
+    // prefix. MembershipKey lives in the v0.2 file below: pinning it here
+    // would bless a KEK no shipped path derives (myne-md/myne#684 review).
+    if let Some(raw) = v01 {
+        let doc: serde_json::Value = serde_json::from_str(&raw)
+            .unwrap_or_else(|e| panic!("[hkdf-sha256] parse cases.json: {e}"));
+
+        assert_eq!(doc["schema"], "hkdf-sha256");
+        assert_eq!(doc["protocol_version"], "v0.1");
+
+        let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+        assert!(
+            cases.len() >= 10,
+            "hkdf-sha256 must carry at least 10 vectors (per PRD); found {}",
+            cases.len()
         );
-        let role_str = case["input_role"]
-            .as_str()
-            .unwrap_or_else(|| panic!("[{id}] missing input_role"));
-        let expected = hex_decode(
-            case["expected_subkey_hex"]
+        assert_unique_vector_ids("hkdf-sha256", cases);
+
+        for case in cases {
+            let id = case["vector_id"]
                 .as_str()
-                .unwrap_or_else(|| panic!("[{id}] missing expected_subkey_hex")),
-        );
+                .expect("vector_id must be a string");
 
-        let role = match role_str {
-            "itemsKey-wrap" => SubkeyRole::ItemsKeyWrap,
-            "prefs-key" => SubkeyRole::PrefsKey,
-            "search-index-key" => SubkeyRole::SearchIndexKey,
-            "attachments-catalog-key" => SubkeyRole::AttachmentsCatalogKey,
-            "attachments-id-hmac" => SubkeyRole::AttachmentsIdHmac,
-            "session-state-key" => SubkeyRole::SessionStateKey,
-            "personal-dictionary-key" => SubkeyRole::PersonalDictKey,
-            "vault-indices-key" => SubkeyRole::VaultIndicesKey,
-            "attachment-text-key" => SubkeyRole::AttachmentTextKey,
-            "ai-embeddings-key" => SubkeyRole::AiEmbeddingsKey,
-            "catalog-sync-id" => SubkeyRole::CatalogSyncId,
-            "prefs-sync-id" => SubkeyRole::PrefsSyncId,
-            "custom-themes-key" => SubkeyRole::CustomThemesKey,
-            "themes-sync-id" => SubkeyRole::ThemesSyncId,
-            "vault-head-mac" => SubkeyRole::VaultHeadMac,
-            "server-auth" => SubkeyRole::ServerAuth,
-            "graph-layout-key" => SubkeyRole::GraphLayoutKey,
-            other => panic!(
-                "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
-            ),
-        };
-        if !seen_roles.contains(&role) {
-            seen_roles.push(role);
-        }
+            let root_key: [u8; 32] = hex_decode_array(
+                case["input_root_key_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+            );
+            let role_str = case["input_role"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_role"));
+            let expected = hex_decode(
+                case["expected_subkey_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_subkey_hex")),
+            );
 
-        // Defensive cross-check: if the case carries the optional
-        // `informational_info_utf8_hex` field, verify it matches the
-        // canonical `"myne.v0.1 " || role_str` assembly. The schema's
-        // "verified implicitly via expected_subkey_hex" claim is true
-        // only when this field is correct; the check catches typos in
-        // the informational field that would mislead cross-implementation
-        // reviewers verifying their info-parameter assembly.
-        if let Some(info_hex) = case
-            .get("informational_info_utf8_hex")
-            .and_then(|v| v.as_str())
-        {
-            let info_bytes = hex_decode(info_hex);
-            let mut expected_info = b"myne.v0.1 ".to_vec();
-            expected_info.extend_from_slice(role_str.as_bytes());
+            let role = match role_str {
+                "itemsKey-wrap" => SubkeyRole::ItemsKeyWrap,
+                "prefs-key" => SubkeyRole::PrefsKey,
+                "search-index-key" => SubkeyRole::SearchIndexKey,
+                "attachments-catalog-key" => SubkeyRole::AttachmentsCatalogKey,
+                "attachments-id-hmac" => SubkeyRole::AttachmentsIdHmac,
+                "session-state-key" => SubkeyRole::SessionStateKey,
+                "personal-dictionary-key" => SubkeyRole::PersonalDictKey,
+                "vault-indices-key" => SubkeyRole::VaultIndicesKey,
+                "attachment-text-key" => SubkeyRole::AttachmentTextKey,
+                "ai-embeddings-key" => SubkeyRole::AiEmbeddingsKey,
+                "catalog-sync-id" => SubkeyRole::CatalogSyncId,
+                "prefs-sync-id" => SubkeyRole::PrefsSyncId,
+                "custom-themes-key" => SubkeyRole::CustomThemesKey,
+                "themes-sync-id" => SubkeyRole::ThemesSyncId,
+                "chats-catalog-key" => SubkeyRole::ChatsCatalogKey,
+                "chats-catalog-sync-id" => SubkeyRole::ChatsCatalogSyncId,
+                "chats-key" => SubkeyRole::ChatsKey,
+                "vault-head-mac" => SubkeyRole::VaultHeadMac,
+                "server-auth" => SubkeyRole::ServerAuth,
+                "graph-layout-key" => SubkeyRole::GraphLayoutKey,
+                "membership-key" => panic!(
+                    "[{id}] membership-key MUST NOT appear in the v0.1 file: it derives under the v0.2 prefix (see the v0.2 file below)"
+                ),
+                other => panic!(
+                    "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
+                ),
+            };
+            if !seen_roles.contains(&role) {
+                seen_roles.push(role);
+            }
+
+            // Defensive cross-check: if the case carries the optional
+            // `informational_info_utf8_hex` field, verify it matches the
+            // canonical `"myne.v0.1 " || role_str` assembly. The schema's
+            // "verified implicitly via expected_subkey_hex" claim is true
+            // only when this field is correct; the check catches typos in
+            // the informational field that would mislead cross-implementation
+            // reviewers verifying their info-parameter assembly.
+            if let Some(info_hex) = case
+                .get("informational_info_utf8_hex")
+                .and_then(|v| v.as_str())
+            {
+                let info_bytes = hex_decode(info_hex);
+                let mut expected_info = b"myne.v0.1 ".to_vec();
+                expected_info.extend_from_slice(role_str.as_bytes());
+                assert_eq!(
+                    info_bytes, expected_info,
+                    "[{id}] informational_info_utf8_hex disagrees with the canonical \"myne.v0.1 \" || role assembly",
+                );
+            }
+
+            let actual = derive_subkey(&root_key, role);
+
             assert_eq!(
-                info_bytes, expected_info,
-                "[{id}] informational_info_utf8_hex disagrees with the canonical \"myne.v0.1 \" || role assembly",
+                actual.as_slice(),
+                expected.as_slice(),
+                "[{id}] hkdf-sha256 subkey mismatch (role={role_str})\n  expected_hex: {}\n  actual_hex:   {}",
+                hex_encode(&expected),
+                hex_encode(&*actual),
             );
         }
+    }
 
-        let actual = derive_subkey(&root_key, role);
+    // v0.2 file: exactly the membership KEK, derived under the v0.2 prefix.
+    // The envelope (vector_id, protocol_version, info assembly) must all say
+    // v0.2; a v0.1 info here would re-bless the wrong KEK.
+    if let Some(raw) = v02 {
+        let doc: serde_json::Value = serde_json::from_str(&raw)
+            .unwrap_or_else(|e| panic!("[hkdf-sha256/v0.2] parse cases.json: {e}"));
 
-        assert_eq!(
-            actual.as_slice(),
-            expected.as_slice(),
-            "[{id}] hkdf-sha256 subkey mismatch (role={role_str})\n  expected_hex: {}\n  actual_hex:   {}",
-            hex_encode(&expected),
-            hex_encode(&*actual),
-        );
+        assert_eq!(doc["schema"], "hkdf-sha256");
+        assert_eq!(doc["protocol_version"], "v0.2");
+
+        let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+        assert_unique_vector_ids("hkdf-sha256/v0.2", cases);
+
+        for case in cases {
+            let id = case["vector_id"]
+                .as_str()
+                .expect("vector_id must be a string");
+            assert!(
+                id.starts_with("hkdf-sha256/v0.2/"),
+                "[{id}] v0.2 file must carry v0.2 vector ids"
+            );
+
+            let root_key: [u8; 32] = hex_decode_array(
+                case["input_root_key_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+            );
+            let role_str = case["input_role"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_role"));
+            assert_eq!(
+                role_str, "membership-key",
+                "[{id}] the v0.2 file pins exactly the membership KEK"
+            );
+            let expected = hex_decode(
+                case["expected_subkey_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_subkey_hex")),
+            );
+
+            if !seen_roles.contains(&SubkeyRole::MembershipKey) {
+                seen_roles.push(SubkeyRole::MembershipKey);
+            }
+
+            if let Some(info_hex) = case
+                .get("informational_info_utf8_hex")
+                .and_then(|v| v.as_str())
+            {
+                let info_bytes = hex_decode(info_hex);
+                let mut expected_info = b"myne.v0.2 ".to_vec();
+                expected_info.extend_from_slice(role_str.as_bytes());
+                assert_eq!(
+                    info_bytes, expected_info,
+                    "[{id}] informational_info_utf8_hex disagrees with the canonical \"myne.v0.2 \" || role assembly",
+                );
+            }
+
+            let actual = derive_subkey_v0_2(&root_key, SubkeyRole::MembershipKey);
+
+            assert_eq!(
+                actual.as_slice(),
+                expected.as_slice(),
+                "[{id}] hkdf-sha256/v0.2 subkey mismatch\n  expected_hex: {}\n  actual_hex:   {}",
+                hex_encode(&expected),
+                hex_encode(&*actual),
+            );
+        }
     }
 
     // Structural coverage pin: every registered SubkeyRole must appear in the
@@ -1394,6 +1502,7 @@ fn vault_meta_vectors() {
                     items_key_id,
                     items_key_nonce,
                     enc_items_key,
+                    membership: None,
                 };
 
                 let actual = serialize_vault_meta(&meta);
@@ -2465,11 +2574,11 @@ fn bip39_recovery_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_vectors() {
     use protocol::{
-        aad_ai_embeddings_blob, aad_attachment_text_blob, aad_custom_themes_blob,
-        aad_graph_layout_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
-        aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
-        aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
-        aad_workspace_blob,
+        aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob, aad_chats_catalog,
+        aad_custom_themes_blob, aad_graph_layout_blob, aad_note_content_encrypt,
+        aad_note_item_key_wrap, aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob,
+        aad_quick_unlock_blob, aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob,
+        aad_vault_items_key_wrap, aad_workspace_blob,
     };
 
     let Some(raw) = cases_json("aad-construction") else {
@@ -2538,6 +2647,13 @@ fn aad_construction_vectors() {
                     .unwrap_or_else(|| panic!("[{id}] missing input_attachment_id_hex")),
             )
         };
+        let conversation_id = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_conversation_id_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_conversation_id_hex")),
+            )
+        };
         let extractor_version = || -> u8 {
             case["input_extractor_version"]
                 .as_u64()
@@ -2567,6 +2683,10 @@ fn aad_construction_vectors() {
                 aad_attachment_text_blob(&account_number_hash(), &attachment_id(), extractor_version())
             }
             "aad_custom_themes_blob" => aad_custom_themes_blob(&account_number_hash()),
+            "aad_chats_catalog" => aad_chats_catalog(&account_number_hash()),
+            "aad_chats_blob" => {
+                aad_chats_blob(&account_number_hash(), &conversation_id())
+            }
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — schema enforces enum; update this match arm in lockstep with the schema"
             ),
@@ -2627,7 +2747,7 @@ fn aad_construction_vectors() {
     // outside this family's enumeration. Their canonical bytes are pinned by
     // the aad_*_default_matches_pinned_hex unit tests in aead.rs plus the
     // pending-capture / share-import encrypt cases.
-    let required: [&str; 15] = [
+    let required: [&str; 17] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -2643,6 +2763,8 @@ fn aad_construction_vectors() {
         "aad_note_content_encrypt",
         "aad_attachment_text_blob",
         "aad_custom_themes_blob",
+        "aad_chats_catalog",
+        "aad_chats_blob",
     ];
     for builder in required {
         assert!(
@@ -2669,8 +2791,8 @@ fn aad_construction_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_v0_2_vectors() {
     use protocol::{
-        aad_password_wrap_v0_2, aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2,
-        aad_vault_items_key_wrap_v0_2,
+        aad_membership_blob, aad_password_wrap_v0_2, aad_recovery_wrap_v0_2,
+        aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
     };
 
     let Some(raw) = cases_json_v0_2("aad-construction") else {
@@ -2732,6 +2854,7 @@ fn aad_construction_v0_2_vectors() {
                 singleton_roles.insert(role.clone());
                 aad_singleton_blob_v0_2(role.as_bytes(), &account_number_hash())
             }
+            "aad_membership_blob" => aad_membership_blob(&account_number_hash()),
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — update this match arm in lockstep with the schema"
             ),
@@ -2793,11 +2916,12 @@ fn aad_construction_v0_2_vectors() {
         pinned_builders.insert(builder_name.to_string());
     }
 
-    let required: [&str; 4] = [
+    let required: [&str; 5] = [
         "aad_password_wrap_v0_2",
         "aad_recovery_wrap_v0_2",
         "aad_vault_items_key_wrap_v0_2",
         "aad_singleton_blob_v0_2",
+        "aad_membership_blob",
     ];
     for builder in required {
         assert!(
@@ -5432,6 +5556,7 @@ fn vault_meta_v0_2_vectors() {
                     items_key_id: hex_decode_array(field(case, id, "input_items_key_id_hex")),
                     items_key_nonce: hex_decode_array(field(case, id, "input_items_key_nonce_hex")),
                     enc_items_key: hex_decode_array(field(case, id, "input_enc_items_key_hex")),
+                    membership: None,
                 };
                 let actual = serialize_vault_meta_v0_2(&meta);
                 assert_eq!(
@@ -5456,6 +5581,52 @@ fn vault_meta_v0_2_vectors() {
                     "[{id}] the v0.1 parser must reject an NTV5 blob"
                 );
             }
+            "membership_absent" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] absent membership must parse: {e:?}"));
+                assert!(
+                    meta.membership.is_none(),
+                    "[{id}] absent membership must report None"
+                );
+            }
+            "membership_present" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] present membership must parse: {e:?}"));
+                let membership = meta
+                    .membership
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] membership must be present"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_number_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                let account_id =
+                    protocol::unseal_membership(&root_key, membership, &account_number_hash)
+                        .unwrap_or_else(|e| panic!("[{id}] unseal: {e:?}"));
+                assert_eq!(
+                    hex_encode(&*account_id),
+                    field(case, id, "expected_account_id_hex"),
+                    "[{id}] account id"
+                );
+            }
+            "membership_tampered" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                let meta = parse_vault_meta_v0_2(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] tampered membership must parse: {e:?}"));
+                let membership = meta
+                    .membership
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("[{id}] membership must be present"));
+                let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+                let account_number_hash: [u8; 16] =
+                    hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+                assert!(
+                    protocol::unseal_membership(&root_key, membership, &account_number_hash)
+                        .is_err(),
+                    "[{id}] a tampered membership field must fail closed"
+                );
+            }
             other => panic!("[{id}] unknown case_kind {other}"),
         }
     }
@@ -5463,6 +5634,16 @@ fn vault_meta_v0_2_vectors() {
     // cases would otherwise still pass, and the rejects are the whole point.
     for k in ["roundtrip", "parse_fail", "parse_fail_v0_1"] {
         assert!(seen.contains(k), "vault-meta/v0.2 must cover case_kind {k}");
+    }
+    for k in [
+        "membership_absent",
+        "membership_present",
+        "membership_tampered",
+    ] {
+        assert!(
+            seen.contains(k),
+            "vault-meta/v0.2 must cover membership case_kind {k}"
+        );
     }
 }
 
@@ -5499,13 +5680,17 @@ fn vault_themes_v0_2_vectors() {
                 let expected = hex_decode(field(case, id, "expected_blob_hex"));
                 // Read the two conventions straight off the bytes rather than
                 // inferring them from a successful decode — the decode would
-                // succeed under a different version byte too, since the byte is
-                // not AEAD-bound in this family.
-                assert_eq!(&expected[0..4], b"MYT5", "[{id}] magic");
+                // succeed under a different magic too, since the magic selects
+                // the generation before the AEAD stage.
+                assert_eq!(
+                    &expected[0..4],
+                    field(case, id, "expected_magic_ascii").as_bytes(),
+                    "[{id}] magic"
+                );
                 assert_eq!(
                     format!("{:02x}", expected[4]),
                     field(case, id, "expected_version_byte_hex"),
-                    "[{id}] KEK-singleton families keep 0x01 in v0.2"
+                    "[{id}] catalog singletons keep 0x01 in v0.2"
                 );
                 let opened =
                     decode_themes_blob_versioned(MetaVersion::V0_2, &kek, &acct, &expected)
@@ -5531,6 +5716,613 @@ fn vault_themes_v0_2_vectors() {
             seen.contains(k),
             "vault-themes/v0.2 must cover case_kind {k}"
         );
+    }
+}
+
+/// `MYM1` conversations-catalog codec vectors (§9.23, myne-md/myne#675).
+/// Mirrors `vault_search_vectors`: the catalog plaintext is the client
+/// layer's opaque roster bytes here (the canonical roster JSON is pinned by
+/// the cases' byte content, not by a protocol-side canonicalizer).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn chats_catalog_vectors() {
+    use protocol::{
+        decode_chats_catalog_blob, derive_subkey, encode_chats_catalog_blob_raw, ChatsCatalogError,
+        SubkeyRole,
+    };
+
+    let Some(raw) = cases_json("chats-catalog") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[chats-catalog] parse cases.json: {e}"));
+
+    assert_eq!(doc["schema"], "chats-catalog");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 13,
+        "chats-catalog must carry at least 13 vectors (3 encrypt + 2 decrypt_ok + 2 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("chats-catalog", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encrypt" => {
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let plaintext = hex_decode(
+                    case["input_plaintext_canonical_utf8_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{id}] missing input_plaintext_canonical_utf8_hex")
+                        }),
+                );
+                let nonce: [u8; 24] = hex_decode_array(
+                    case["input_catalog_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_catalog_nonce_hex")),
+                );
+                let expected = hex_decode(
+                    case["expected_catalog_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_catalog_blob_hex")),
+                );
+
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::ChatsCatalogKey);
+                if let Some(info_hex) = case
+                    .get("informational_catalog_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
+                    assert_eq!(
+                        catalog_key.as_slice(),
+                        info_bytes.as_slice(),
+                        "[{id}] informational_catalog_key_hex disagrees with derive_subkey(root_key, ChatsCatalogKey)",
+                    );
+                }
+
+                let actual =
+                    encode_chats_catalog_blob_raw(&catalog_key, &account_hash, &plaintext, &nonce)
+                        .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] chats-catalog encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+                let expected_plaintext = hex_decode(
+                    case["expected_plaintext_canonical_utf8_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{id}] missing expected_plaintext_canonical_utf8_hex")
+                        }),
+                );
+
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::ChatsCatalogKey);
+                let decoded = decode_chats_catalog_blob(&catalog_key, &account_hash, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] chats-catalog decrypt plaintext mismatch ({} bytes)",
+                    expected_plaintext.len(),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let root_key: [u8; 32] = hex_decode_array(
+                    case["input_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+                );
+
+                let catalog_key = derive_subkey(&root_key, SubkeyRole::ChatsCatalogKey);
+                match decode_chats_catalog_blob(&catalog_key, &account_hash, &blob) {
+                    Err(ChatsCatalogError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected ChatsCatalogError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(plaintext) => panic!(
+                        "[{id}] expected aead_fail, decode_chats_catalog_blob returned Ok ({} byte plaintext)",
+                        plaintext.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_error = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => ChatsCatalogError::MagicMismatch,
+                    "protocol_version_mismatch" => ChatsCatalogError::ProtocolVersionMismatch,
+                    "format_unsupported" => ChatsCatalogError::FormatUnsupported,
+                    "header_too_short" => ChatsCatalogError::HeaderTooShort,
+                    "ciphertext_truncated" => ChatsCatalogError::CiphertextTruncated,
+                    "ciphertext_len_overflow" => ChatsCatalogError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}': schema enforces enum, so update this match arm in lockstep with ChatsCatalogError"
+                    ),
+                };
+
+                let dummy_key = [0u8; 32];
+                let dummy_hash = [0u8; 16];
+                match decode_chats_catalog_blob(&dummy_key, &dummy_hash, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode_chats_catalog_blob returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "chats-catalog missing every case of case_kind '{kind}': coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 6] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "format_unsupported",
+        "header_too_short",
+        "ciphertext_truncated",
+        "ciphertext_len_overflow",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "chats-catalog missing parse_fail coverage for ChatsCatalogError '{err}': every structural reject must be pinned"
+        );
+    }
+}
+
+/// `MYM5` migrated-catalog envelope vectors (§10.4.1, myne-md/myne#675).
+/// Mirrors `vault_themes_v0_2_vectors`, except the KEK is derived (v0.2
+/// generation) rather than fixed, so the cases carry their root key and
+/// account hash inputs.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn chats_catalog_v0_2_vectors() {
+    use protocol::{decode_chats_catalog_blob_versioned, derive_subkey_versioned, MetaVersion};
+
+    let Some(raw) = cases_json_v0_2("chats-catalog") else {
+        return;
+    };
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[chats-catalog/v0.2] parse: {e}"));
+    assert_eq!(doc["schema"], "chats-catalog");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("chats-catalog/v0.2", cases);
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] case_kind"));
+        seen.insert(kind.to_string());
+        let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+        let account_hash: [u8; 16] =
+            hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+        let kek_v0_1 = derive_subkey_versioned(
+            MetaVersion::V0_1,
+            &root_key,
+            protocol::SubkeyRole::ChatsCatalogKey,
+        );
+        let kek_v0_2 = derive_subkey_versioned(
+            MetaVersion::V0_2,
+            &root_key,
+            protocol::SubkeyRole::ChatsCatalogKey,
+        );
+        match kind {
+            "encrypt" => {
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+                // Read the two conventions straight off the bytes rather than
+                // inferring them from a successful decode.
+                assert_eq!(&expected[0..4], b"MYM5", "[{id}] magic");
+                assert_eq!(
+                    format!("{:02x}", expected[4]),
+                    field(case, id, "expected_version_byte_hex"),
+                    "[{id}] catalog singletons keep 0x01 in v0.2"
+                );
+                let opened = decode_chats_catalog_blob_versioned(
+                    MetaVersion::V0_2,
+                    &kek_v0_2,
+                    &account_hash,
+                    &expected,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] decode: {e:?}"));
+                assert_eq!(
+                    hex_encode(&opened),
+                    field(case, id, "input_plaintext_hex"),
+                    "[{id}] plaintext"
+                );
+            }
+            "decode_fail_v0_1" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert_eq!(
+                    field(case, id, "expected_error"),
+                    "magic_mismatch",
+                    "[{id}] the v0.1 expectation refuses a next-major blob at the magic check"
+                );
+                assert!(
+                    decode_chats_catalog_blob_versioned(
+                        MetaVersion::V0_1,
+                        &kek_v0_1,
+                        &account_hash,
+                        &blob
+                    )
+                    .is_err(),
+                    "[{id}] a MYM5 blob must not open under the v0.1 expectation"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind {other}"),
+        }
+    }
+    for k in ["encrypt", "decode_fail_v0_1"] {
+        assert!(
+            seen.contains(k),
+            "chats-catalog/v0.2 must cover case_kind {k}"
+        );
+    }
+}
+
+/// `MYJ1` conversation-file codec vectors (§9.24, myne-md/myne#675). The
+/// per-conversation-file twin of `chats_catalog_vectors`, plus the
+/// cross-conversation-id AEAD refusal the per-entry AAD binding owes.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn chats_blob_vectors() {
+    use protocol::{
+        decode_chats_blob, derive_subkey, encode_chats_blob_raw, ChatsBlobError, SubkeyRole,
+    };
+
+    let Some(raw) = cases_json("chats-blob") else {
+        return;
+    };
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[chats-blob] parse cases.json: {e}"));
+
+    assert_eq!(doc["schema"], "chats-blob");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 13,
+        "chats-blob must carry at least 13 vectors (3 encrypt + 1 decrypt_ok + 3 decrypt_aead_fail + 6 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("chats-blob", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        // Every arm needs the same four inputs; read once.
+        let root_key: [u8; 32] = hex_decode_array(
+            case["input_root_key_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
+        );
+        let account_hash: [u8; 16] = hex_decode_array(
+            case["input_account_number_hash_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
+        );
+        let conv_id: [u8; 16] = hex_decode_array(
+            case["input_conversation_id_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_conversation_id_hex")),
+        );
+        let chats_key = derive_subkey(&root_key, SubkeyRole::ChatsKey);
+
+        match case_kind {
+            "encrypt" => {
+                let plaintext = hex_decode(
+                    case["input_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_plaintext_hex")),
+                );
+                let nonce: [u8; 24] = hex_decode_array(
+                    case["input_blob_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_nonce_hex")),
+                );
+                let expected = hex_decode(
+                    case["expected_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_blob_hex")),
+                );
+
+                if let Some(info_hex) = case
+                    .get("informational_chats_key_hex")
+                    .and_then(|v| v.as_str())
+                {
+                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
+                    assert_eq!(
+                        chats_key.as_slice(),
+                        info_bytes.as_slice(),
+                        "[{id}] informational_chats_key_hex disagrees with derive_subkey(root_key, ChatsKey)",
+                    );
+                }
+
+                let actual =
+                    encode_chats_blob_raw(&chats_key, &account_hash, &conv_id, &plaintext, &nonce)
+                        .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] chats-blob encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_plaintext = hex_decode(
+                    case["expected_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_plaintext_hex")),
+                );
+
+                let decoded = decode_chats_blob(&chats_key, &account_hash, &conv_id, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] chats-blob decrypt plaintext mismatch ({} bytes)",
+                    expected_plaintext.len(),
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+
+                match decode_chats_blob(&chats_key, &account_hash, &conv_id, &blob) {
+                    Err(ChatsBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected ChatsBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(plaintext) => panic!(
+                        "[{id}] expected aead_fail, decode_chats_blob returned Ok ({} byte plaintext)",
+                        plaintext.len()
+                    ),
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_error = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => ChatsBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => ChatsBlobError::ProtocolVersionMismatch,
+                    "format_unsupported" => ChatsBlobError::FormatUnsupported,
+                    "header_too_short" => ChatsBlobError::HeaderTooShort,
+                    "ciphertext_truncated" => ChatsBlobError::CiphertextTruncated,
+                    "ciphertext_len_overflow" => ChatsBlobError::CiphertextLenOverflow,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}': schema enforces enum, so update this match arm in lockstep with ChatsBlobError"
+                    ),
+                };
+
+                let dummy_key = [0u8; 32];
+                let dummy_hash = [0u8; 16];
+                let dummy_conv = [0u8; 16];
+                match decode_chats_blob(&dummy_key, &dummy_hash, &dummy_conv, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode_chats_blob returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "chats-blob missing every case of case_kind '{kind}': coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 6] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "format_unsupported",
+        "header_too_short",
+        "ciphertext_truncated",
+        "ciphertext_len_overflow",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "chats-blob missing parse_fail coverage for ChatsBlobError '{err}': every structural reject must be pinned"
+        );
+    }
+}
+
+/// `MYJ5` migrated conversation-file envelope vectors (§10.4.1,
+/// myne-md/myne#675). Unlike the catalog/themes singletons, the
+/// conversation-file header version byte IS the generation (`0x02` here).
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn chats_blob_v0_2_vectors() {
+    use protocol::{decode_chats_blob_versioned, derive_subkey_versioned, MetaVersion};
+
+    let Some(raw) = cases_json_v0_2("chats-blob") else {
+        return;
+    };
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[chats-blob/v0.2] parse: {e}"));
+    assert_eq!(doc["schema"], "chats-blob");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("chats-blob/v0.2", cases);
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] case_kind"));
+        seen.insert(kind.to_string());
+        let root_key: [u8; 32] = hex_decode_array(field(case, id, "input_root_key_hex"));
+        let account_hash: [u8; 16] =
+            hex_decode_array(field(case, id, "input_account_number_hash_hex"));
+        let conv_id: [u8; 16] = hex_decode_array(field(case, id, "input_conversation_id_hex"));
+        let kek_v0_1 =
+            derive_subkey_versioned(MetaVersion::V0_1, &root_key, protocol::SubkeyRole::ChatsKey);
+        let kek_v0_2 =
+            derive_subkey_versioned(MetaVersion::V0_2, &root_key, protocol::SubkeyRole::ChatsKey);
+        match kind {
+            "encrypt" => {
+                let expected = hex_decode(field(case, id, "expected_blob_hex"));
+                assert_eq!(
+                    &expected[0..4],
+                    field(case, id, "expected_magic_ascii").as_bytes(),
+                    "[{id}] magic"
+                );
+                assert_eq!(
+                    format!("{:02x}", expected[4]),
+                    field(case, id, "expected_version_byte_hex"),
+                    "[{id}] the conversation-file header version byte is the generation"
+                );
+                let opened = decode_chats_blob_versioned(
+                    MetaVersion::V0_2,
+                    &kek_v0_2,
+                    &account_hash,
+                    &conv_id,
+                    &expected,
+                )
+                .unwrap_or_else(|e| panic!("[{id}] decode: {e:?}"));
+                assert_eq!(
+                    hex_encode(&opened),
+                    field(case, id, "input_plaintext_hex"),
+                    "[{id}] plaintext"
+                );
+            }
+            "decode_fail_v0_1" => {
+                let blob = hex_decode(field(case, id, "input_blob_hex"));
+                assert_eq!(
+                    field(case, id, "expected_error"),
+                    "magic_mismatch",
+                    "[{id}] the v0.1 expectation refuses a next-major blob at the magic check"
+                );
+                assert!(
+                    decode_chats_blob_versioned(
+                        MetaVersion::V0_1,
+                        &kek_v0_1,
+                        &account_hash,
+                        &conv_id,
+                        &blob
+                    )
+                    .is_err(),
+                    "[{id}] a MYJ5 blob must not open under the v0.1 expectation"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind {other}"),
+        }
+    }
+    for k in ["encrypt", "decode_fail_v0_1"] {
+        assert!(seen.contains(k), "chats-blob/v0.2 must cover case_kind {k}");
     }
 }
 

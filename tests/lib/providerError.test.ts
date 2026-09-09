@@ -54,6 +54,7 @@ const ALL: ProviderErrorCause[] = [
   "empty_completion",
   "local_model_missing",
   "not_ready",
+  "empty_grant",
   "failed",
 ];
 
@@ -77,6 +78,10 @@ describe("provider failure causes", () => {
       ["EmptyCompletion", "empty_completion", "empty_completion"],
       ["LocalModelMissing", "local_model_missing", "local_model_missing"],
       ["NotReady", "not_ready", "not_ready"],
+      // myne-md/myne#675: the host refused a scope the exclusion clamp
+      // emptied, before any model call. Reachable and previously collapsed
+      // into the generic failure, which named no control and no fix.
+      ["EmptyGrant", "empty_grant", "empty_grant"],
     ];
     for (const [variant, tag, expected] of pairs) {
       expect(normalizeProviderError(variant)).toBe(expected);

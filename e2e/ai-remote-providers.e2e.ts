@@ -157,7 +157,7 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
             async () => (await s.byTestIdAll("ai-consent.screen")).at(0) ?? null,
             { label: "the consent dialog", timeoutMs: 15_000 },
           );
-          // All SEVEN disclosures are on screen BEFORE the accepting action:
+          // All EIGHT disclosures are on screen BEFORE the accepting action:
           // and the accepting action exists nowhere else, so there is no route
           // that skips them.
           for (const id of [
@@ -171,6 +171,10 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
             // roster is what keeps it on the screen: a disclosure that can be
             // dropped without a test failing is a disclosure that gets dropped.
             "ai-consent.connection",
+            // What never leaves (myne-md/myne#675). Same doctrine: the
+            // excluded-folders clause is a disclosure, so it joins the roster
+            // rather than relying on the unit suite alone.
+            "ai-consent.excluded",
           ]) {
             const el = await s.byTestId(id);
             expect((await el.textContent())?.length ?? 0).toBeGreaterThan(20);

@@ -15,6 +15,7 @@ publish = false
 # extracted into this crate (decisions.md 2026-07-07).
 [dependencies]
 protocol = { path = "../protocol" }
+myne-format = { path = "../format" }
 # The single source-of-truth custom-theme value-shape allowlist (MYND-508),
 # shared with the desktop client + the myne-themes marketplace CI. The
 # `themes` core plugin (MYND-486) validates every imported palette through
@@ -326,6 +327,10 @@ local-inference-stub = ["remote-ai"]
 # default `--all-targets` build that currently type-checks them.
 [[example]]
 name = "emit-vault-fixture"
+required-features = ["test-support"]
+
+[[example]]
+name = "emit-chats-fixture"
 required-features = ["test-support"]
 
 [[example]]

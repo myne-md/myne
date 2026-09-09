@@ -343,10 +343,15 @@ pub fn run() {
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::graph_layout::init())
+        .plugin(plugins::chats::init())
         // myne#411: the device-local hide-vault-names option. Registered
         // unconditionally and reachable pre-unlock, because the picker it
         // governs is the screen that renders before any vault is open.
         .plugin(plugins::vault_label::init())
+        // myne#684: the device-local account record (the account/vault split).
+        // Registered unconditionally and reachable pre-unlock, because the
+        // picker it governs is the screen that renders before any vault is open.
+        .plugin(plugins::account::init())
         // myne#482 + #483: the device-local screen-capture escape hatch and
         // the WebView-side re-assert. Registered unconditionally and
         // reachable pre-unlock, because the pre-unlock set is exactly what a
@@ -354,6 +359,7 @@ pub fn run() {
         .plugin(plugins::screen_capture::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
+        .plugin(plugins::detached_window::init())
         // ext-foundation-handoff task 4: the browser-extension pairing
         // dialog's narrow Accept/Reject IPC surface (TB6-governed; the
         // stdio host is the separate, ACL-exempt ingress). Manages the

@@ -26,6 +26,7 @@ import { seedVault } from "./support/fixtures";
 import {
   clickNewMenuItem,
   nameNewNote,
+  confirmDeleteWithEnter,
   createNote,
   dismissImporterOffer,
   editorText,
@@ -194,8 +195,7 @@ describeE2E("nc5 keyboard Delete confirms before soft-trash (MYND-487)", () => {
         // component default since #628), so Enter soft-trashes it.
         await (await s.byTestId("notes.row")).click();
         await pressKey(s, KEY.DELETE);
-        await s.byTestId("delete-confirm.confirm");
-        await pressKey(s, KEY.ENTER);
+        await confirmDeleteWithEnter(s);
         await s.waitForGone(testIdSelector("notes.row"));
 
         // Soft-trash, not gone — the note is recoverable from the Trash panel.

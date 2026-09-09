@@ -6,12 +6,19 @@
 # `attachments:allow-catalog-list` /
 # `attachments:allow-attachment-delete`).
 #
-# Main-window-only invariant: import + delete write vault state and the
-# catalog read decrypts vault metadata, so all three are privileged. v0.2
-# multi-window MUST NOT grant any of these to a non-main window. The
-# `attachment://` URI scheme is NOT a command — it is registered on the
-# Builder in `lib.rs` and gated inside its own handler (unlock + main-
-# window-label), so it has no ACL entry here.
+# Multi-window (myne#677, epic #173, sync-ledger SYNC-12): the `default` bundle stays
+# MAIN-WINDOW-ONLY. The library-management + ref-graph commands (delete, rename, export,
+# clean-unused, unused-list, refs-apply/remove/referencing, voice capture) write vault state or
+# drive the whole-vault reference graph, so they are NOT granted to a non-main window. What a
+# detached (pop-out) note EDITOR needs to render and paste into its own note IS granted, via the
+# `detached` set below: import (paste an image) + the read commands (catalog list + inline
+# text/structured/extracted-text previews). This is the deliberate resolution of the former
+# blanket "MUST NOT grant any of these to a non-main window" reservation: a detached `note-*`
+# window runs the same bundled code and holds the same plaintext a split pane already does, so
+# rendering/pasting attachments there is the same exposure a split pane already has. The
+# `attachment://` URI scheme is NOT a command: it is registered on the Builder in `lib.rs` and
+# gated inside its own handler (unlock + a label allowlist); myne#677 task 2 widens that allowlist
+# to the `note-` prefix so embeds render in the pop-out.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -34,6 +41,22 @@ permissions = [
   "allow-voice-record-start",
   "allow-voice-record-stop",
   "allow-voice-record-cancel",
+]
+
+# Detached (pop-out) note-window seat (myne#677, epic #173; capabilities/detached-note.json,
+# windows: ["note-*"]). Render + paste only: import (paste an image while editing) + the read
+# commands the inline preview uses. Deliberately excludes every library-management + ref-graph +
+# voice-capture command (delete/rename/export/clean-unused/unused-list/refs-*/voice), which stay
+# main-window-only per the header above.
+[[set]]
+identifier = "detached-read"
+description = "Detached note-window attachment seat: import (paste) + catalog list + inline text/structured/extracted-text reads. No delete/rename/export/clean/refs/voice. Granted exclusively by capabilities/detached-note.json (windows: [\"note-*\"])."
+permissions = [
+  "allow-attachment-import",
+  "allow-catalog-list",
+  "allow-attachment-read-text",
+  "allow-attachment-read-structured",
+  "allow-attachment-read-extracted-text",
 ]
 
 [[permission]]

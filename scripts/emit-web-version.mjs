@@ -18,9 +18,9 @@
 // new build's identity and the smoke gate would pass against a stale deploy.
 
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { runTool } from "./lib/run-tool.mjs";
 
 const DIST = process.argv[2] ?? "web/dist";
 if (!existsSync(DIST)) {
@@ -28,12 +28,14 @@ if (!existsSync(DIST)) {
   process.exit(2);
 }
 
+// EMPTY with a stated reason, not a bare catch (myne#528): version.json is
+// emitted on every web build, and a git that cannot run falls back to
+// "unknown" below rather than failing the build — a version stamp is metadata
+// for the deploy record, not a build product. The helper still prints the
+// diagnostics, so the "unknown" is visible in the build log rather than silent.
 function git(...args) {
-  try {
-    return execFileSync("git", args, { encoding: "utf8" }).trim();
-  } catch {
-    return "";
-  }
+  const r = runTool(["git", ...args], { onToolFailure: "empty", reason: "version.json carries \"unknown\"; a build must not fail on a version stamp" });
+  return r === null ? "" : r.stdout.trim();
 }
 
 /**

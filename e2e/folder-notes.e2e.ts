@@ -25,11 +25,13 @@
 // Vault-count precondition: 1 per scenario (weak KDF generator fixture — legal:
 // unlock reads params from vault.meta).
 //
-// VERIFICATION STATUS: authored to the harness conventions but NOT yet run on
-// this dev platform (macOS; the suite is Linux/tauri-driver only — `pnpm
-// test:e2e` self-skips off-platform). Definition of done per e2e/CLAUDE.md is
-// "green 3× in the container" (./scripts/e2e-local.sh) and MUST be met before
-// merge. Run ISOLATED per the full-suite-contamination note.
+// VERIFICATION STATUS: verified green 3x consecutive in the container on
+// 2026-09-05 (myne-md/myne#661; OrbStack on macOS via
+// `./scripts/e2e-buildrun.sh folder-notes folder-notes folder-notes`,
+// MYNE_E2E_RETRIES=0), covering fn1/fn2 (feature enabled first) and the new fn3
+// off-switch scenario. The suite is Linux/tauri-driver only, so `pnpm test:e2e`
+// self-skips on a bare macOS host; run ISOLATED per the full-suite-contamination
+// note.
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
@@ -40,6 +42,7 @@ import {
   createNote,
   dismissImporterOffer,
   editorText,
+  setFolderNotesEnabled,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -88,6 +91,49 @@ async function contextMenuOffers(
     testIdSelector("notes.context-menu-item", { "data-item-id": anchorItemId }),
   );
   return hits.length > 0;
+}
+
+/** Robust "does `targetSelector`'s context menu offer `itemId`?" that RE-FINDS
+ *  the target by selector on every attempt. A Settings toggle (fn3) re-renders
+ *  the sidebar, which can collapse the folder or replace the row handle mid-poll,
+ *  so a captured handle goes stale; re-finding inside the retry survives both.
+ *  Waits on the always-present `anchorItemId` (short timeout) to confirm the menu
+ *  mounted before reading `itemId`, then dismisses via an outside click. */
+async function menuOffers(
+  s: Session,
+  targetSelector: string,
+  itemId: string,
+  anchorItemId: string,
+): Promise<boolean> {
+  const anchor = testIdSelector("notes.context-menu-item", {
+    "data-item-id": anchorItemId,
+  });
+  const wanted = testIdSelector("notes.context-menu-item", {
+    "data-item-id": itemId,
+  });
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      // Short per-attempt waits: a transient miss (row absent mid re-render, a
+      // right-click that did not land) must retry fast, never burn the default
+      // 45s budget, or a handful of misses would blow the 180s test timeout.
+      await (await s.waitForElement(targetSelector, { timeoutMs: 6000 })).rightClick();
+      await s.waitForElement(anchor, { timeoutMs: 4000 }); // menu mounted
+      const hits = await s.findElements(wanted);
+      await (await s.waitForElement(CM_CONTENT)).click(); // outside click → dismiss
+      await s.waitForGone(anchor);
+      return hits.length > 0;
+    } catch (e) {
+      lastErr = e;
+      // Dismiss any half-open menu, then retry with a freshly-found handle.
+      try {
+        await (await s.waitForElement(CM_CONTENT)).click();
+      } catch {
+        /* nothing to dismiss */
+      }
+    }
+  }
+  throw lastErr;
 }
 
 /** Create a folder via the sidebar "New folder" CTA + its inline input (the
@@ -157,6 +203,9 @@ describeE2E("fn1 folder index: designate → hidden → double-click open → li
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Folder notes ship OFF by default (myne-md/myne#661); this suite drives
+        // the folder-index entry points, so enable the feature first.
+        await setFolderNotesEnabled(s, true);
 
         // ── A folder + two notes inside it. ──
         await createFolder(s, FOLDER);
@@ -249,6 +298,9 @@ describeE2E("fn2 folder index: double-click a folder with none creates exactly o
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // Folder notes ship OFF by default (myne-md/myne#661); this suite drives
+        // the folder-index entry points, so enable the feature first.
+        await setFolderNotesEnabled(s, true);
 
         // An empty (deliberate) folder with no index note.
         await createFolder(s, FOLDER);
@@ -280,6 +332,59 @@ describeE2E("fn2 folder index: double-click a folder with none creates exactly o
         );
         expect((await editorText(s)).includes("looseonlyzzq4n7")).toBe(false);
         expect((await s.byTestIdAll("notes.row")).length).toBe(1);
+      },
+    );
+  });
+});
+
+describeE2E("fn3 folder-notes off-switch: default off hides the entry points; enabling reveals them (myne-md/myne#661)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("offers no folder-index create/set-index actions until the Files setting is turned on", async () => {
+    const FOLDER = "notebook";
+    let password = "";
+    await scenario(
+      "fn3-folder-notes-off-switch",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // A folder with one ordinary note inside it. The feature is OFF by
+        // default, so nothing here is a folder note yet.
+        await createFolder(s, FOLDER);
+        await createNoteInFolder(s, await s.byTestId("notes.folder-row"), "page");
+        const noteId = await selectedNoteId(s);
+
+        // Expand the folder so the note's row is addressable.
+        const folderRow = await s.byTestId("notes.folder-row");
+        if ((await folderRow.attribute("aria-expanded")) === "false") {
+          await folderRow.click();
+        }
+
+        const noteRowSel = testIdSelector("notes.row", { "data-note-id": noteId });
+        const folderRowSel = testIdSelector("notes.folder-row");
+
+        // ── Feature OFF (the default): neither entry point is offered. ──
+        // `color` / `new-note` are the always-present anchor items of the note /
+        // folder menus.
+        expect(await menuOffers(s, noteRowSel, "note.set-index", "color")).toBe(false);
+        expect(
+          await menuOffers(s, folderRowSel, "folder.create-index", "new-note"),
+        ).toBe(false);
+
+        // ── Turn the feature ON via Settings → Files. ──
+        await setFolderNotesEnabled(s, true);
+
+        // ── The entry point now appears (no reload needed; the prefs-nonce bump
+        // reaches the sidebar's own usePrefs). `menuOffers` re-finds the folder
+        // row per attempt, so the Settings-toggle re-render cannot stale it. The
+        // folder menu is checked here (its row is stable across the re-render);
+        // the note "Set as folder note" ON path is covered by fn1, which enables
+        // the feature and designates a note through it. ──
+        expect(
+          await menuOffers(s, folderRowSel, "folder.create-index", "new-note"),
+        ).toBe(true);
       },
     );
   });

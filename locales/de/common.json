@@ -1123,7 +1123,19 @@
           "tagsThinking": "Tags werden vorgeschlagen…",
           "thinking": "KI denkt nach…",
           "truncated": "Die ersten {{count}} Zeichen zusammengefasst.",
-          "you": "Du"
+          "you": "Du",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Alle Tabs sind ausgeblendet. Rechtsklick zum Wiederherstellen.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Was Ihr Gerät verlässt",
         "whenLabel": "Wann es das Gerät verlässt",
         "whoLabel": "Wer es empfängt",
-        "connectionLabel": "Wie es übertragen wird"
+        "connectionLabel": "Wie es übertragen wird",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Wie funktioniert das?",
       "enableHelper": "Führt ein von Ihnen bereitgestelltes Modell aus. Wo es läuft und ob Ihre Notizen dieses Gerät verlassen, hängt davon ab, welchen Anbieter Sie unten benennen. Experimentell, standardmäßig aus.",
@@ -3076,8 +3089,6 @@
         "localModelMissing": "Das in den Einstellungen hinterlegte lokale Modell ist nicht mehr auf diesem Gerät. Es wurde nichts gesendet. Wählen Sie unter Einstellungen → Developer → KI erneut ein Modell aus oder geben Sie einen Anbieter an.",
         "noCredential": "Für diesen Anbieter ist kein API-Schlüssel hinterlegt. Fügen Sie einen unter Einstellungen → Developer → KI hinzu.",
         "notReady": "Es ist noch nichts bereit zu antworten. Es wurde nichts gesendet. Wählen Sie unter Einstellungen → Developer → KI ein Modell aus oder geben Sie einen Anbieter an.",
-        "noEmbeddingModel": "Beim Fragen werden Ihre Notizen auf diesem Gerät durchsucht, und dafür wird hier ein Suchmodell benötigt. Ein Anbieter kann das nicht leisten. Es wurde nichts gesendet. Wählen Sie unter Einstellungen → Developer → KI ein Suchmodell aus.",
-        "indexNotReady": "Ihre Notizen werden noch für die Suche indexiert. Es wurde nichts gesendet. Versuchen Sie es gleich noch einmal.",
         "requestRejected": "Der Anbieter hat diese Anfrage nicht angenommen. Es wurde nichts gespeichert. Der Fehler liegt in dem, was Myne gesendet hat, nicht an Ihrer Konfiguration oder Ihren Notizen.",
         "policyRefused": "Der Anbieter hat diese Anfrage nach seinen eigenen Regeln abgelehnt: eine Schutzregel Ihres Kontos, eine Workspace-Richtlinie oder ein Modell, das Ihr Tarif nicht enthält. Das lässt sich nur beim Anbieter klären, nicht in Myne.",
         "quotaExhausted": "Der Anbieter hat die Anfrage abgelehnt: Ihr Guthaben ist aufgebraucht oder ein Ratenlimit ist überschritten. Das lässt sich nur beim Anbieter klären, nicht in Myne.",
