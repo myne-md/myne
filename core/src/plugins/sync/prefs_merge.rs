@@ -653,6 +653,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // stays device-local below, which is what keeps a synced `true` from
         // starting inference on a device that never opted into AI.
         auto_tag_enabled: lww!("auto_tag_enabled", auto_tag_enabled),
+        // myne-md/myne#661: the folder-notes off-switch is shared for the
+        // `show_task_marker` reason: honouring folder notes is a note-list
+        // presentation preference (taste), not a device capability.
+        folder_notes_enabled: lww!("folder_notes_enabled", folder_notes_enabled),
         // myne#279: how a date and a time are PRINTED is taste, so both merge
         // last-writer-wins alongside `daily_date_format`. `timezone` is the
         // exception and stays device-local below — see its comment there.
