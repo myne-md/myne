@@ -1352,7 +1352,7 @@ steps:
       # Sysdeps to compile/link myne-desktop's test binary (same set as
       # cargo-test-tauri) + git for the clone. node/pnpm NOT needed: dist/ is
       # already in the shared workspace from the pnpm-build step.
-      # Clone the private companion straight from GitHub (myne-md/myne-server —
+      # Clone the private companion straight from GitHub (myne-md/myne-server,
       # the source of truth; x-access-token form is what GitHub expects for PAT
       # git auth) + build a static binary.
       - git clone --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-server.git" "$CI_WORKSPACE/myne-server"
