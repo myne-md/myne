@@ -1245,7 +1245,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "The `attachment://` URI-scheme handler. No `pub use` on either side, so both hold real logic, and what a scheme request is allowed to read out of a vault is one answer rather than two. 202 lines against 84.",
+      "The `attachment://` URI-scheme handler. No `pub use` on either side, so both hold real logic, and what a scheme request is allowed to read out of a vault is one answer rather than two. 261 lines against 84.",
   },
   {
     a: "src-tauri/src/plugins/workspace/mod.rs",

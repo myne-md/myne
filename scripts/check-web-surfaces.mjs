@@ -178,6 +178,10 @@ const V = {
   // ── src/lib ─────────────────────────────────────────────────────────────
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
+  "src/lib/detachedWindow.ts": [
+    "typed-unsupported",
+    "The pop-out spawn binding (myne#173). The `detached-window` plugin is `Class::Unsupported` in web/wasm/src/capability.rs (a browser page cannot open an OS window), so its one command answers the typed unsupported refusal; the affordance is also gated off, since `detachedWindows` is absent on web.",
+  ],
   "src/lib/agent-protocol.ts": [
     "ported",
     "The wire TYPES and the pure predicates over them, split out of `agent-run.ts` so mobile could share them. It has no host reach at all \u2014 type declarations, a marker table and four functions over their own arguments \u2014 so it compiles and runs in the browser exactly as written. It is unreachable there for the same reason its siblings are (`agent` is `Class::Unsupported` in web/wasm/src/capability.rs), but unreachable is not the same as adapted: nothing about this module changes shape on web, and marking it `adapted` would claim a divergence that does not exist.",

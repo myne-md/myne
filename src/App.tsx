@@ -40,6 +40,7 @@ import { applyAccent, readAccent } from "./lib/accentColor";
 import { useStageRoute } from "./lib/routing";
 import { HAS_NATIVE_TITLE_BAR, dragRegionProps } from "./screens/titlebar";
 import { readCustomTheme } from "./lib/themes";
+import { detachedNoteId as readDetachedNoteId } from "./lib/detachedWindow";
 
 // Editor (the post-unlock workspace) is the app's heaviest screen — CodeMirror,
 // the shared @myne/editor engine, and every code-block language grammar hang off
@@ -90,6 +91,15 @@ const VaultRecover = lazy(() =>
 const ACTIVE_SLOT_KEY = "active-slot";
 
 function App() {
+  // myne#678 render (epic #173): the note id this window was popped out for, or
+  // null in the main window / on web / on mobile (no OS window is spawned there).
+  // Read once from the host-injected global; stable for the window's lifetime.
+  // When set, the editor stage renders a single-note, sidebar-collapsed surface
+  // (see `<Editor detachedNoteId>`). The rest of the boot machine is unchanged:
+  // the detached window still probes and, with the backend already unlocked by
+  // the main window, routes to `editor` (and #679 destroys it on lock).
+  const detachedId = readDetachedNoteId();
+
   // Initial stage is `null` until the boot probe resolves (loading
   // shim renders blank). Production has no shortcut to bypass the
   // probe — MYND-80 acceptance forbids prod-guard bypass even in dev,
@@ -629,6 +639,10 @@ function App() {
         return (
           <Suspense fallback={null}>
             <Editor
+              // myne#678: in a detached (pop-out) window this is the one note the
+              // window opens (single pane, sidebars collapsed); null in the main
+              // window and on web/mobile, where the editor is the full workspace.
+              detachedNoteId={detachedId}
               // #250: the authoritative target for every vault-scoped surface
               // inside the editor. `undefined` only on the boot-probe
               // slot-priority entry, where Editor asks the runtime slot

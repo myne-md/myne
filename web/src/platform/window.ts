@@ -8,6 +8,26 @@
 import { unsupported } from "../../../src/platform/unsupported";
 import { listen } from "./event";
 
+/** A display's bounds in physical pixels (myne#678 task 6), local to match the
+ *  desktop/mobile seams' shape without a cross-tree import. */
+type Display = { x: number; y: number; width: number; height: number };
+
+/**
+ * A single virtual display (myne#678 task 6 parity). The web client spawns no
+ * detached windows, so the detached-restore path that reads this never runs on
+ * web; the seam still exports it so the contract matches, answering with the
+ * screen bounds this tab sees rather than a refusal (a harmless read).
+ */
+export async function readDisplays(): Promise<{ displays: Display[]; primary: Display }> {
+  const d: Display = {
+    x: 0,
+    y: 0,
+    width: window.screen?.width ?? window.innerWidth,
+    height: window.screen?.height ?? window.innerHeight,
+  };
+  return { displays: [d], primary: d };
+}
+
 export function getCurrentWindow(): {
   destroy: () => Promise<void>;
   isFullscreen: () => Promise<boolean>;

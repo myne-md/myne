@@ -29,6 +29,31 @@ permissions = [
     "allow-note-image-export",
 ]
 
+# Detached (pop-out) note-window seat (myne#677, epic #173; capabilities/detached-note.json,
+# windows: ["note-*"]). The split-pane editor surface for notes, WITHOUT the two sidebar/global
+# actions: `note_delete` (a sidebar action) and `note_write_batch_transactional` (wikilink-rename
+# auto-update, a global action). Per-note export commands ARE included (grill #677 export decision).
+# Granting this set to a non-main window is the deliberate multi-window resolution recorded in
+# sync-ledger SYNC-12 + the decisions entry; notes carries no blanket main-window-only reservation
+# (decision 0136 blesses a detached note editor), so this set adds no header reversal.
+[[set]]
+identifier = "detached"
+description = "Detached note-window seat: read/update/create + list/titles/search + snapshot-flush + per-note export. Withholds note_delete and note_write_batch_transactional. Granted exclusively by capabilities/detached-note.json (windows: [\"note-*\"])."
+permissions = [
+    "allow-note-create",
+    "allow-note-read",
+    "allow-note-update",
+    "allow-note-list",
+    "allow-note-titles-batch",
+    "allow-note-search",
+    "allow-note-snapshot-flush",
+    "allow-note-export-as-markdown",
+    "allow-note-export-attachments",
+    "allow-note-export-html",
+    "allow-note-export-html-attachments",
+    "allow-note-image-export",
+]
+
 [[permission]]
 identifier = "allow-note-create"
 description = "Allow invoking notes:note_create (encrypt + atomically write a new .myn note under <vault>/notes/<UUIDv7>.myn — backend-generated NoteId returned to the UI)."

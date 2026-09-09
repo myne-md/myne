@@ -1606,6 +1606,64 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "editor.detached-window-pop-out",
+    title: "Detached (pop-out) note windows: create, move, restore, consistency",
+    paths: [
+      "src-tauri/src/plugins/detached_window/",
+      "src/lib/detachedWindow.ts",
+      "src/notes/detachedRestore.ts",
+      "src/notes/detachedGeometry.ts",
+      "src/screens/Editor.tsx",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/detached-windows.e2e.ts"],
+    manual: [
+      {
+        see: "Pop a note out three ways (command palette 'Open note in new window', the note's ... menu, and dragging its tab out of the window). Each time confirm: a second OS window opens showing ONLY that note with no sidebar; the note's tab in the main window is gone (it MOVED, not copied); running the pop-out action again for that note focuses the existing window rather than opening a second; and closing the pop-out window closes the note entirely (it does not reappear as a main-window tab). Then delete that popped-out note from the main window's sidebar and confirm the pop-out shows a 'this note was deleted elsewhere' state with a Close button rather than an empty editor.",
+        whyNotAutomated: "A second OS window, its focus, and a tab drag across the window boundary are multi-window and OS-input behaviours the Linux WebKitGTK container's single tauri-driver session does not drive, and the cross-window delete state is a second WebView reacting to an event the driver cannot observe across windows.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "With 'reopen last session' on, pop a note out, move its window onto a SECOND monitor, and quit. Unplug (or disable) that second monitor, relaunch, and confirm the pop-out comes back on the PRIMARY display fully on-screen rather than off in the void. Repeat with the second monitor still connected and confirm the window returns to roughly where it was. Then edit the popped-out note without saving and delete it from the main sidebar: confirm the unsaved edit survives as a separate copy before the terminal state appears.",
+        whyNotAutomated: "Restoring a window onto a specific monitor and clamping off a disconnected one needs a real multi-monitor session the container does not have, and the unsaved-edit keep-both is an autosave-versus-delete race whose outcome is a file on disk no headless lane observes across two windows.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 8,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
+    id: "editor.detached-window-screen-capture",
+    title: "Detached (pop-out) note window screen-capture protection",
+    paths: [
+      "src-tauri/src/screen_capture.rs",
+      "src-tauri/src/plugins/detached_window/",
+      "src/lib/detachedWindow.ts",
+      "src/screens/Editor.tsx",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    manual: [
+      {
+        see: "On Windows 10 build 19041 or later with screen-capture protection ON, pop a note out into its own window and start a screen recording or a screen-share. Confirm the pop-out is excluded (black or absent) exactly as the main window is, including when it sits on a second monitor. Toggle protection OFF in Settings while the pop-out is open and confirm the pop-out stops being excluded (the fan-out reached it), then ON again and confirm it returns. Relaunch with --disable-screen-capture-protection and confirm the pop-out is NOT blacked out. Lock the vault and confirm the pop-out is gone rather than showing note text.",
+        whyNotAutomated: "set_content_protected is native window state no WebDriver can read back (decision 0378), and the exclusion only manifests inside a real Desktop Window Manager capture pipeline; no CI lane runs a Windows desktop with a capture tool, and the WebKitGTK container the desktop E2E suite uses observes none of it.",
+        clients: ["desktop-windows"],
+        estimateMin: 10,
+        tier: "core",
+      },
+      {
+        see: "On macOS and on Linux, pop a note out and confirm it is capturable exactly as the main window already is: no black window, no per-window badge, and the same behaviour the main window shows for the same Settings state. Then lock the vault (idle, manual and quit) and confirm the pop-out is torn down with no note text left on screen in any window.",
+        whyNotAutomated: "The macOS and Linux capture paths are OS compositor behaviour no headless lane reproduces (the container is WebKitGTK with no compositor capture surface), and set_content_protected is native window state WebDriver cannot read (decision 0378); what remains is confirming the ABSENCE of a false protection claim, which no assertion in the suite expresses.",
+        clients: ["desktop-macos", "desktop-linux"],
+        estimateMin: 6,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "editor.drawing-notes",
     title: "Drawing notes and inline sketches",
     paths: [

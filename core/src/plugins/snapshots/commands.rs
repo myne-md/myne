@@ -791,6 +791,7 @@ mod tests {
         fn abort_active_recording(&self) {}
         fn pdf_export_teardown_on_lock(&self) {}
         fn agent_teardown_on_lock(&self) {}
+        fn detached_windows_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
@@ -800,6 +801,7 @@ mod tests {
         fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
+        fn emit_notes_deleted(&self, _: &str) {}
         // `effective_auto_lock_secs` deliberately not overridden: the trait's
         // default clamps (myne-md/myne#479). This body used to be the unclamped
         // `unwrap_or`, which is the exact shape that change removed from two

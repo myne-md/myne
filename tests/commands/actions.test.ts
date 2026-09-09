@@ -138,6 +138,9 @@ describe("Command palette action registry", () => {
       "note.export-txt",
       "note.move",
       "note.new",
+      // myne-md/myne#678 (epic #173): pop the active note out into its own
+      // OS window. Desktop-only (gated on the `detachedWindows` capability).
+      "note.open-in-new-window",
       "note.remove-cover",
       "note.rename",
       "note.set-cover",

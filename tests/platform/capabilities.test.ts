@@ -165,6 +165,12 @@ describe("capability descriptor", () => {
       // `cliAccess` and with the same consequence: nothing to port. The
       // browser's answer is Tor Browser, which routes the whole page.
       "torRouting",
+      // myne-md/myne#677 (epic #173), a third platform-fact entry alongside
+      // `cliAccess` and `torRouting`. Popping a note out spawns an OS-level
+      // window; a browser tab cannot open one (and mobile cannot either), so
+      // there is nothing a later port could deliver. The pop-out affordance is
+      // gated on this and omitted where it is absent.
+      "detachedWindows",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());
