@@ -408,7 +408,7 @@ pub(crate) async fn run_post_unlock_pipeline(
     // instead: `auth_permits` serializes every vault.meta-lifecycle mutation,
     // and stamping while a change-password holds it would interleave a
     // whole-blob write with a rotation (the loser silently reverts the
-    // winner's section). A busy permit skips the stamp — retry-next-unlock —
+    // winner's section). A busy permit skips the stamp (retry on next unlock)
     // rather than queueing behind a credential op. Residual: the sync meta
     // phase is not a permit holder, so a merge landing in the read-write gap
     // still wins by last-write; both blobs stay AEAD-valid and the next

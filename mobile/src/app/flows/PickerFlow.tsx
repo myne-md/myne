@@ -437,7 +437,7 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
                       key={a.id}
                       title={accountLabel(a)}
                       isLast={i === destinations.length - 1}
-                      testID={`picker.account-move-to-${a.id}`}
+                      testID={`picker.account-move-to-${i}`}
                       onClick={() => {
                         const vault = heldVault;
                         const anchor = a.vaults[0];

@@ -154,7 +154,7 @@ fn parse_record(bytes: &[u8]) -> Option<AccountRecord> {
     Some(AccountRecord { accounts })
 }
 
-fn hex(bytes: [u8; ACCOUNT_ID_LEN]) -> String {
+pub(crate) fn hex(bytes: [u8; ACCOUNT_ID_LEN]) -> String {
     let mut s = String::with_capacity(ACCOUNT_ID_LEN * 2);
     for b in bytes {
         s.push_str(&format!("{b:02x}"));

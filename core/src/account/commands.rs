@@ -15,7 +15,7 @@
 
 use crate::account::error::AccountError;
 use crate::account::store::{
-    hide_names_on, load_account, load_account_tracked, write_account, Account, ACCOUNT_ID_LEN,
+    hex, hide_names_on, load_account, load_account_tracked, write_account, Account, ACCOUNT_ID_LEN,
     ACCOUNT_LABEL_MAX_LEN,
 };
 use crate::io_failure_kind::IoFailureKind;
@@ -46,14 +46,6 @@ impl From<&Account> for AccountView {
             vaults: a.vaults.iter().map(|v| v.to_string()).collect(),
         }
     }
-}
-
-fn hex(bytes: [u8; ACCOUNT_ID_LEN]) -> String {
-    let mut s = String::with_capacity(ACCOUNT_ID_LEN * 2);
-    for b in bytes {
-        s.push_str(&format!("{b:02x}"));
-    }
-    s
 }
 
 /// Failure surface for the command set. No `String` and no path, and **no

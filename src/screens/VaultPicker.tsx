@@ -764,8 +764,8 @@ export function VaultPicker({ onSelect, onCreateAnother,
                 {
                   id: "picker.account-move",
                   label: t("vaultPicker.moveToAccount"),
-                  children: moveDestinations.map((a) => ({
-                    id: `picker.account-move-to-${a.id}`,
+                  children: moveDestinations.map((a, i) => ({
+                    id: `picker.account-move-to-${i}`,
                     label: accountLabel(a, t),
                     onSelect: () => {
                       const vault = menu.vault;
