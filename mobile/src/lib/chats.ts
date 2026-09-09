@@ -67,9 +67,12 @@ export interface ConversationPayload {
 /** Create a conversation; returns the new conversation id (32-char hex). */
 export async function chatsCreate(
   firstTurnPayload: string,
+  // Client-minted id for idempotent retry (same contract as desktop).
+  requestedIdHex?: string,
 ): Promise<string> {
   return await invoke<string>("plugin:chats|chats_create", {
     firstTurnPayload,
+    ...(requestedIdHex !== undefined ? { requestedIdHex } : {}),
   });
 }
 

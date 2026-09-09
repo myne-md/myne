@@ -300,6 +300,10 @@ export function clearChatHistoryPersistForLock(): void {
 interface PendingWrite {
   id: string | null;
   payload: string;
+  /** Client-minted id for idempotent retry, fixed at stage time: every flush
+   *  of this pending write carries the same id, so a create that succeeded
+   *  with a lost response is adopted rather than duplicated. */
+  clientId: string;
 }
 
 let pending: PendingWrite | null = null;
@@ -336,7 +340,11 @@ export function subscribeChatHistoryHealth(listener: () => void): () => void {
  *  staged but never got to await (an in-flight append promise may die with
  *  the foreground (the ordinary case on a phone, not the exotic one). */
 export function stageTranscript(id: string | null, turns: readonly ChatTurnJson[]): void {
-  pending = { id, payload: serializeTranscript(turns) };
+  pending = {
+    id,
+    payload: serializeTranscript(turns),
+    clientId: crypto.randomUUID().replace(/-/g, ""),
+  };
 }
 
 /** Write the staged transcript, if any, and report the conversation id it
@@ -365,7 +373,7 @@ let flushChain: Promise<string | null> = Promise.resolve(null);
 
 async function flushOnce(): Promise<string | null> {
   if (pending === null) return lastPersisted?.id ?? null;
-  const { id, payload } = pending;
+  const { id, payload, clientId } = pending;
   if (
     lastPersisted !== null &&
     lastPersisted.id === id &&
@@ -375,7 +383,7 @@ async function flushOnce(): Promise<string | null> {
     return lastPersisted.id;
   }
   try {
-    const liveId = id === null ? await chatsCreate(payload) : id;
+    const liveId = id === null ? await chatsCreate(payload, clientId) : id;
     if (id !== null) await chatsAppendTurn(id, payload);
     lastPersisted = { id: liveId, payload };
     pending = null;

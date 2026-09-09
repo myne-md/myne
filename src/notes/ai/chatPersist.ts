@@ -368,6 +368,11 @@ export interface ChatPersistSnapshot {
    *  retrying, so an in-flight persist can never resurrect plaintext after
    *  the wipe nor replay vault A's turns into vault B's store. */
   epoch: number;
+  /** Client-minted conversation id, fixed at snapshot time. Every attempt of
+   *  this snapshot (including retries after a lost response) carries the
+   *  same id, so a create that succeeded server-side is adopted rather than
+   *  duplicated. */
+  clientId: string;
 }
 
 let persistSeq = 0;
@@ -397,7 +402,7 @@ async function persistSnapshotOnce(attempt: number, snap: ChatPersistSnapshot): 
   }
   try {
     if (snap.id === null) {
-      const created = await chatsCreate(snap.payload);
+      const created = await chatsCreate(snap.payload, snap.clientId);
       setActiveConversationId(created);
       lastPersisted = { id: created, payload: snap.payload, seq: snap.seq };
     } else {
@@ -418,7 +423,7 @@ async function persistSnapshotOnce(attempt: number, snap: ChatPersistSnapshot): 
     // (a create replays as a create). Dropped by `clearChatPersistForLock`
     // on the vault-leaving paths: the lock wipe is total, and a replay that
     // crossed a vault switch would write vault A's turns into vault B's store.
-    unsavedAppend = { id: snap.id, payload: snap.payload, seq: snap.seq, epoch: snap.epoch };
+    unsavedAppend = { id: snap.id, payload: snap.payload, seq: snap.seq, epoch: snap.epoch, clientId: snap.clientId };
     setLagging(true);
     if (attempt < PERSIST_RETRIES) {
       if (retryTimer !== null) clearTimeout(retryTimer);
@@ -463,6 +468,7 @@ export function installChatPersistence(): void {
       payload: serializeTranscript(getChat().turns),
       seq: ++persistSeq,
       epoch: persistWipeEpoch,
+      clientId: crypto.randomUUID().replace(/-/g, ""),
     };
     void enqueueSnapshot(0, snap).catch(() => {
       // Unreachable (persistSnapshotOnce catches internally); kept so the
@@ -553,7 +559,7 @@ export async function hydrateActiveConversation(): Promise<void> {
     } else
     try {
       if (stash.id === null) {
-        const created = await chatsCreate(stash.payload);
+        const created = await chatsCreate(stash.payload, stash.clientId);
         const turns = parseTranscript(stash.payload);
         setActiveConversationId(created);
         lastPersisted = { id: created, payload: stash.payload, seq: stash.seq };

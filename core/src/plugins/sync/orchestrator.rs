@@ -872,16 +872,18 @@ fn chats_dir(vault_root: &Path) -> std::path::PathBuf {
     vault_root.join("chats")
 }
 
-// NOTE: no pending-chats-tombstone queue exists, by spec. The attachments
-// family needs one because attachment BLOBS are immutable and
-// content-addressed, so a deletion must be re-pushed as a blob-plane record
-// with a fresh nonce (`sync-protocol.md` §11.4). A conversation deletion is
-// a tombstone ROW in `vault.chats`, and the catalog rides the themes
-// pattern: the row's causal version is the tombstone, the per-id causal
-// join discards a concurrent append at merge, and no device ever pulls a
-// conversation file its catalog does not name. A queue would add a
-// deletion channel the spec does not describe (and "Tombstone GC: none"
-// already fixes the catalog as the sole tombstone home).
+// NOTE: conversation deletions reclaim their server copy through the
+// `pending-chats-tombstones` queue (one line per deleted conversation id),
+// drained as blob-plane tombstone records in the chats push below. The
+// attachments family needs a separate queue shape because attachment BLOBS
+// are immutable and content-addressed, so a deletion must be re-pushed with
+// a fresh nonce (`sync-protocol.md` §11.4). A conversation deletion is ALSO
+// a catalog tombstone row (the row's causal version is the tombstone, the
+// per-id causal join discards a concurrent append at merge, and no device
+// ever pulls a conversation file its catalog does not name) — the queue
+// exists only for the server-side reclaim the catalog row cannot express:
+// without a blob-plane record the server ciphertext is orphaned permanently
+// (never downloaded, never classified, never deleted).
 
 /// `<vault>/vault.themes` — the MYT1 custom-themes singleton.
 fn themes_file_path(vault_root: &Path) -> std::path::PathBuf {
@@ -4196,6 +4198,7 @@ async fn sync_cycle_attempt(
     // durably stored (SYNC-5 blobs-first-then-head, extended to attachments).
     let mut attachments_pushed = 0usize;
     let mut pushed_att_tombstones: HashSet<[u8; 32]> = HashSet::new();
+    let mut pushed_chats_tombstones: Vec<[u8; 16]> = Vec::new();
     if gate.allows_content() {
         if let Some(_keys) = attachment_keys {
             let cid = cat_id.expect("cat_id set whenever attachment_keys is Some");
@@ -4432,6 +4435,48 @@ async fn sync_cycle_attempt(
                     attachment_id: None,
                 });
             }
+
+            // Queued conversation deletions → blob-plane tombstone records. A
+            // queued id whose catalog row is live again is a STALE tombstone
+            // (re-created after delete): dropped, never pushed. An id with no
+            // synced baseline has no server-side record to reclaim (the
+            // migration rule): dropped. Otherwise the empty-ciphertext record
+            // marks the server copy deleted so horizon-GC reclaims it; without
+            // this the catalog tombstone erases every device copy while the
+            // server ciphertext is orphaned permanently.
+            let mut stale_chats: Vec<[u8; 16]> = Vec::new();
+            for t in
+                crate::plugins::chats::commands::read_pending_chats_tombstones(io, vault_root).await
+            {
+                let live_again = chats_phase
+                    .merged
+                    .get(&hex(&t.conv_id))
+                    .map(|e| e.is_live())
+                    .unwrap_or(false);
+                let Some(baseline) = state.blobs.get(&hex(&t.conv_id)) else {
+                    stale_chats.push(t.conv_id);
+                    continue;
+                };
+                if live_again {
+                    stale_chats.push(t.conv_id);
+                    continue;
+                }
+                to_push.push(PushBlob {
+                    id: t.conv_id,
+                    base_version: baseline.version,
+                    content_nonce: t.content_nonce,
+                    ciphertext: Vec::new(),
+                    tombstone: true,
+                    attachment_id: None,
+                });
+                pushed_chats_tombstones.push(t.conv_id);
+            }
+            let _ = crate::plugins::chats::commands::clear_pending_chats_tombstones(
+                io,
+                vault_root,
+                &stale_chats,
+            )
+            .await;
         }
     }
 
@@ -4639,6 +4684,15 @@ async fn sync_cycle_attempt(
         }
         // The attachment-tombstone queue drains only after its records landed.
         let _ = clear_pending_attachment_tombstones(io, vault_root, &pushed_att_tombstones).await;
+        // Same for the conversation-tombstone queue: records that rode the
+        // content push are dropped so they are not re-flagged every cycle.
+        // (A failed cycle returns before this point, so the queue is kept.)
+        let _ = crate::plugins::chats::commands::clear_pending_chats_tombstones(
+            io,
+            vault_root,
+            &pushed_chats_tombstones,
+        )
+        .await;
         // The blobs a re-key stranded (#443). Deliberately AFTER the content
         // push and in a request of its own — see `drain_orphan_tombstones` for
         // why mixing them in could wedge every future push cycle.

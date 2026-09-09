@@ -397,20 +397,74 @@ pub async fn chats_create_with_dir(
     hooks: &Hooks,
     first_turn_payload: &str,
     now_unix_millis: u64,
+    requested_id_hex: Option<&str>,
 ) -> Result<String, ChatsMutateError> {
     let _guard = lock_write().await;
     validate_turn_payload(first_turn_payload)?;
     let (root_key, seal) = seal_from_slot(io, vault_dir, state).await?;
     let map = load_catalog_for_mutation(io, vault_dir, &seal).await?;
 
+    // Idempotent create: a retry of a create whose response was lost carries
+    // the same client-minted id and adopts the existing row instead of
+    // minting a second conversation with identical turns.
+    if let Some(wanted) = requested_id_hex {
+        let wanted_id = hex_decode_16(wanted).ok_or(ChatsMutateError::ConversationNotFound)?;
+        if map.contains_key(wanted) {
+            return Ok(wanted.to_string());
+        }
+        return create_with_id(
+            io,
+            vault_dir,
+            hooks,
+            root_key,
+            seal,
+            map,
+            wanted_id,
+            wanted.to_string(),
+            first_turn_payload,
+            now_unix_millis,
+        )
+        .await;
+    }
+
     let conversation_id = Uuid::now_v7();
     let conversation_id_hex = hex_encode_16(conversation_id.as_bytes());
+    create_with_id(
+        io,
+        vault_dir,
+        hooks,
+        root_key,
+        seal,
+        map,
+        *conversation_id.as_bytes(),
+        conversation_id_hex,
+        first_turn_payload,
+        now_unix_millis,
+    )
+    .await
+}
+
+/// Shared create body: write the file, then the catalog row (file-first so a
+/// catalog-write failure cannot leave an orphan no roster names).
+#[allow(clippy::too_many_arguments)]
+async fn create_with_id(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    hooks: &Hooks,
+    root_key: Zeroizing<[u8; 32]>,
+    seal: VaultSeal,
+    map: ChatsCatalogMap,
+    conversation_id: [u8; 16],
+    conversation_id_hex: String,
+    first_turn_payload: &str,
+    now_unix_millis: u64,
+) -> Result<String, ChatsMutateError> {
     let title = derive_title(first_turn_payload);
 
     write_conversation_file(
         io,
         vault_dir,
-        conversation_id.as_bytes(),
+        &conversation_id,
         &seal,
         first_turn_payload.as_bytes(),
     )
@@ -649,6 +703,14 @@ pub async fn chats_delete_with_dir(
     // push loop skips absent files and no remote arm reconciles it).
     write_catalog_in_dir(io, vault_dir, &next, &seal).await?;
 
+    // Queue the server-side tombstone so the next push reclaims the server
+    // copy instead of orphaning it. Best-effort: a queue failure must not
+    // fail the delete itself (the catalog tombstone already propagated the
+    // deletion to every device; only the server reclaim is at stake).
+    if let Some(conv_id) = hex_decode_16(conversation_id_hex) {
+        let _ = add_pending_chats_tombstone(io, vault_dir, &conv_id).await;
+    }
+
     // Remove the conversation file (the tombstone stays in the catalog).
     let path = conversation_path(vault_dir, conversation_id_hex);
     match io.remove_file(&path).await {
@@ -662,6 +724,156 @@ pub async fn chats_delete_with_dir(
 }
 
 // ---------------------------------------------------------------------------
+// pending-chats-tombstones: server-side reclaim for deleted conversations
+// ---------------------------------------------------------------------------
+
+/// The device-local "this conversation id is tombstoned server-side" queue:
+/// conversation ids (32-hex) the delete path tombstoned, so the next push
+/// sets the server's tombstone flag (horizon-GC). Without it the catalog
+/// tombstone erases every device copy while the server ciphertext is
+/// orphaned permanently: never downloaded (no catalog row names it), never
+/// classified as dropped, never deleted. `<vault>/pending-chats-tombstones`,
+/// newline-separated `"<conv-id-hex> <fresh-nonce-hex>"`. The fresh random
+/// nonce becomes the tombstone record's `content_nonce` (a visible change on
+/// the blob plane). Mirrors the attachment-tombstone queue shape.
+fn pending_chats_tombstones_path(vault_root: &Path) -> PathBuf {
+    vault_root.join("pending-chats-tombstones")
+}
+
+/// One queued conversation tombstone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingChatsTombstone {
+    /// The 16-byte conversation id (blob-plane key).
+    pub conv_id: [u8; 16],
+    /// The fresh tombstone `content_nonce`.
+    pub content_nonce: [u8; 24],
+}
+
+/// Read the pending conversation-tombstone queue (absent → empty; a malformed
+/// line is skipped rather than wedging the cycle).
+pub async fn read_pending_chats_tombstones(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+) -> Vec<PendingChatsTombstone> {
+    let Some(body) = io
+        .read(&pending_chats_tombstones_path(vault_root))
+        .await
+        .ok()
+        .and_then(|b| String::from_utf8(b).ok())
+    else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let mut parts = line.split_whitespace();
+        let (Some(c), Some(n)) = (parts.next(), parts.next()) else {
+            continue;
+        };
+        let (Some(conv_id), Some(content_nonce)) = (hex_decode_16(c), hex_decode_24(n)) else {
+            continue;
+        };
+        out.push(PendingChatsTombstone {
+            conv_id,
+            content_nonce,
+        });
+    }
+    out
+}
+
+/// Queue a conversation deletion for the next push (called by the delete path
+/// right after the catalog-tombstone rewrite). Mints the fresh tombstone
+/// nonce internally. Idempotent per conversation id.
+pub async fn add_pending_chats_tombstone(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    conv_id: &[u8; 16],
+) -> Result<(), IoFailureKind> {
+    let mut queue = read_pending_chats_tombstones(io, vault_root).await;
+    if queue.iter().any(|t| &t.conv_id == conv_id) {
+        return Ok(());
+    }
+    let mut nonce = [0u8; 24];
+    getrandom::getrandom(&mut nonce).map_err(|_| IoFailureKind::Other)?;
+    queue.push(PendingChatsTombstone {
+        conv_id: *conv_id,
+        content_nonce: nonce,
+    });
+    write_pending_chats_tombstones(io, vault_root, &queue).await
+}
+
+/// Drop queue entries (after their tombstone records pushed, or when a re-add
+/// made them stale).
+pub async fn clear_pending_chats_tombstones(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    drop_ids: &[[u8; 16]],
+) -> Result<(), IoFailureKind> {
+    if drop_ids.is_empty() {
+        return Ok(());
+    }
+    let queue: Vec<PendingChatsTombstone> = read_pending_chats_tombstones(io, vault_root)
+        .await
+        .into_iter()
+        .filter(|t| !drop_ids.contains(&t.conv_id))
+        .collect();
+    write_pending_chats_tombstones(io, vault_root, &queue).await
+}
+
+async fn write_pending_chats_tombstones(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    queue: &[PendingChatsTombstone],
+) -> Result<(), IoFailureKind> {
+    let mut lines: Vec<String> = queue
+        .iter()
+        .map(|t| {
+            format!(
+                "{} {}",
+                hex_encode_16(&t.conv_id),
+                hex_encode_24(&t.content_nonce)
+            )
+        })
+        .collect();
+    lines.sort();
+    let body = if lines.is_empty() {
+        Vec::new()
+    } else {
+        format!("{}\n", lines.join("\n")).into_bytes()
+    };
+    io.write(
+        &pending_chats_tombstones_path(vault_root),
+        &body,
+        WriteOpts::default(),
+    )
+    .await
+}
+
+fn hex_decode_24(s: &str) -> Option<[u8; 24]> {
+    if s.len() != 48
+        || !s
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return None;
+    }
+    let mut out = [0u8; 24];
+    for (i, pair) in s.as_bytes().chunks(2).enumerate() {
+        let hi = (pair[0] as char).to_digit(16)?;
+        let lo = (pair[1] as char).to_digit(16)?;
+        out[i] = (hi * 16 + lo) as u8;
+    }
+    Some(out)
+}
+
+fn hex_encode_24(bytes: &[u8; 24]) -> String {
+    let mut s = String::with_capacity(48);
+    for b in bytes {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
+// ---------------------------------------------------------------------------
 // from_host + cfg-gated Tauri wrappers
 // ---------------------------------------------------------------------------
 
@@ -671,11 +883,21 @@ pub async fn chats_create_from_host(
     state: &VaultRuntimeState,
     hooks: &Hooks,
     first_turn_payload: &str,
+    requested_id_hex: Option<&str>,
 ) -> Result<String, ChatsMutateError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(ChatsMutateError::from)?;
     let now = host.now_unix_millis();
-    chats_create_with_dir(io, &dir, state, hooks, first_turn_payload, now).await
+    chats_create_with_dir(
+        io,
+        &dir,
+        state,
+        hooks,
+        first_turn_payload,
+        now,
+        requested_id_hex,
+    )
+    .await
 }
 
 pub async fn chats_append_turn_from_host(
@@ -759,6 +981,7 @@ pub async fn chats_create<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, Hooks>,
     first_turn_payload: String,
+    requested_id_hex: Option<String>,
 ) -> Result<String, ChatsMutateError> {
     chats_create_from_host(
         &TauriHost::new(app),
@@ -766,6 +989,7 @@ pub async fn chats_create<R: Runtime>(
         state.inner(),
         hooks.inner(),
         &first_turn_payload,
+        requested_id_hex.as_deref(),
     )
     .await
 }
@@ -925,6 +1149,7 @@ mod tests {
                 &hooks,
                 FIRST_TURN,
                 1_000,
+                None,
             ))
             .expect("create");
         // 32-char lowercase hex UUIDv7.
@@ -946,6 +1171,44 @@ mod tests {
             .block_on(chats_read_with_dir(&StdVaultIo, tmp.path(), &state, &id))
             .expect("read");
         assert!(payload.contains("tax folder"));
+    }
+
+    #[test]
+    fn create_with_requested_id_is_idempotent() {
+        // A retry of a create whose response was lost carries the same
+        // client-minted id and adopts the existing row instead of minting a
+        // duplicate conversation with identical turns.
+        let (tmp, state) = rt().block_on(unlocked_vault());
+        let hooks: Hooks = std::sync::Arc::new(NoopHooks);
+        let wanted = "0190a00000007000800000000000000b";
+        let first = rt()
+            .block_on(chats_create_with_dir(
+                &StdVaultIo,
+                tmp.path(),
+                &state,
+                &hooks,
+                FIRST_TURN,
+                1_000,
+                Some(wanted),
+            ))
+            .expect("create");
+        assert_eq!(first, wanted);
+        let second = rt()
+            .block_on(chats_create_with_dir(
+                &StdVaultIo,
+                tmp.path(),
+                &state,
+                &hooks,
+                FIRST_TURN,
+                1_000,
+                Some(wanted),
+            ))
+            .expect("retry adopts");
+        assert_eq!(second, wanted);
+        let rows = rt()
+            .block_on(chats_list_with_dir(&StdVaultIo, tmp.path(), &state))
+            .expect("list");
+        assert_eq!(rows.len(), 1);
     }
 
     #[test]
@@ -975,6 +1238,7 @@ mod tests {
                 &hooks,
                 FIRST_TURN,
                 1_000,
+                None,
             ))
             .expect("create");
         let second = r#"{"turns":[{"id":"c1-1","kind":"text","role":"user","text":"q"},{"id":"c1-2","kind":"text","role":"assistant","text":"a"}]}"#;
@@ -1011,6 +1275,7 @@ mod tests {
                 &hooks,
                 FIRST_TURN,
                 1_000,
+                None,
             ))
             .expect("create");
         assert!(tmp.path().join("chats").join(&id).exists());
@@ -1069,6 +1334,7 @@ mod tests {
                 &hooks,
                 FIRST_TURN,
                 1_000,
+                None,
             ))
             .expect("create");
         rt().block_on(chats_rename_with_dir(
@@ -1099,6 +1365,7 @@ mod tests {
             &hooks,
             FIRST_TURN,
             1_000,
+            None,
         ))
         .expect("create");
         // Corrupt the catalog bytes (not the header: a byte in the middle of
@@ -1122,6 +1389,7 @@ mod tests {
                 &hooks,
                 FIRST_TURN,
                 2_000,
+                None,
             ))
             .unwrap_err();
         assert_eq!(err, ChatsMutateError::CatalogUnreadable);
@@ -1141,6 +1409,7 @@ mod tests {
                 &hooks,
                 FIRST_TURN,
                 1_000,
+                None,
             ))
             .unwrap_err();
         assert_eq!(err, ChatsMutateError::SlotNotUnlocked);
@@ -1162,6 +1431,7 @@ mod tests {
                 &hooks,
                 r#"{"turns":[{"id":"a1","kind":"text","role":"user","text":"first"}]}"#,
                 1_000,
+                None,
             ))
             .expect("create a");
         let b = rt()
@@ -1172,6 +1442,7 @@ mod tests {
                 &hooks,
                 r#"{"turns":[{"id":"b1","kind":"text","role":"user","text":"second"}]}"#,
                 2_000,
+                None,
             ))
             .expect("create b");
         // Touch A so it becomes the most recently updated.
