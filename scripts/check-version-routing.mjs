@@ -71,7 +71,7 @@ import { join, relative, sep } from "node:path";
 // never opened. A root list that omits a whole client is the
 // `check-prefs-nonce.mjs` shape the root CLAUDE.md records: the success line
 // says `ok` and means it about less than the reader assumes.
-const ROOTS = ["core/src", "src-tauri/src", "mobile/src-tauri/src"];
+const ROOTS = ["core/src", "src-tauri/src", "mobile/src-tauri/src", "format/src", "decrypt/src"];
 
 /**
  * The call classes. `re` is matched per non-comment, non-test line.
@@ -246,7 +246,7 @@ const ALLOWED = new Map([
   ["core/src/plugins/vault_migrate/mod.rs#pwkdf", [2, "the migration verifies BOTH old credentials against the OLD salt domain"]],
   ["core/src/plugins/vault_migrate/mod.rs#aadwrap", [2, "the migration opens the OLD wraps under the OLD AADs"]],
   ["core/src/plugins/vault_migrate/mod.rs#items", [1, "the migration unwraps the OLD `itemsKey`"]],
-  ["core/src/plugins/notes/decode.rs#note", [1, "IS the dispatcher's v0.1 arm"]],
+  ["format/src/notes/decode.rs#note", [1, "IS the dispatcher's v0.1 arm"]],
   ["core/src/test_support.rs#metaw", [1, "test-support builds a v0.1 vault fixture on purpose (the migration's input)"]],
 
   // ── legitimately v0.1: THE V0.1 ARM OF AN EXPLICIT BRANCH ─────────────────
@@ -264,6 +264,9 @@ const ALLOWED = new Map([
   ["core/src/plugins/vault_recover/commands.rs#pwkdf", [1, "the v0.1 arm of an explicit `version == V0_2` branch"]],
   ["core/src/plugins/vault_recover/commands.rs#aadwrap", [2, "the v0.1 arm of an explicit `version == V0_2` branch"]],
   ["core/src/plugins/sync/orchestrator.rs#metaw", [1, "the v0.1 arm of the meta merge's explicit generation match (a cross-generation merge is refused outright)"]],
+  ["decrypt/src/unlock.rs#pwkdf", [2, "the v0.1 arms of the CLI unlock's explicit `version` match (password + recovery)"]],
+  ["decrypt/src/unlock.rs#aadwrap", [2, "the v0.1 AADs of the same two arms"]],
+  ["decrypt/src/unlock.rs#items", [1, "`derive_items_key`, the v0.1 twin of `derive_items_key_v0_2` in the CLI unlock"]],
   // NOTE: `vault_creation/commands.rs` used to hold eleven entries here — the
   // last v0.1 writer in the product. The birth-format flip to v0.2 removed all
   // of them, and this script is what proved it: every one went stale (recorded

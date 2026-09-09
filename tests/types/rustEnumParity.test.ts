@@ -72,7 +72,7 @@ const MIRRORS: Mirror[] = [
   {
     ts: "client-core/src/types/vault-unlock-error.ts",
     tsType: "IoFailureKind",
-    rs: "core/src/io_failure_kind.rs",
+    rs: "format/src/io_failure_kind.rs",
     rsEnum: "IoFailureKind",
   },
   {
@@ -260,7 +260,7 @@ const MIRRORS: Mirror[] = [
   {
     ts: "src/types/vault-export-error.ts",
     tsType: "VaultExportError",
-    rs: "core/src/plugins/export/error.rs",
+    rs: "format/src/export_error.rs",
     rsEnum: "VaultExportError",
   },
 ];

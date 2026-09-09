@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: AGPL-3.0
+[package]
+name = "myne-decrypt"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+publish = false
+description = "myne-decrypt: export a Myne vault to plain markdown without the app installed"
+
+[[bin]]
+name = "myne-decrypt"
+path = "src/main.rs"
+
+[dependencies]
+# The on-disk format (NC05 read path, MYB1 container, VaultIo, export-naming).
+myne-format = { path = "../format" }
+# The crypto primitives: KDF, phrase normalization, blob decode.
+protocol = { path = "../protocol" }
+# BIP-39 checksum validation for the recovery phrase, checked BEFORE the
+# Argon2id KDF so a typo is caught in milliseconds rather than after a 1-3 s
+# derivation. Already in the shared lock via `protocol`; this is a
+# transitive->direct promotion, not a new supply-chain edge.
+bip39 = "2"
+# Zeroizing the password / phrase bytes on drop.
+zeroize = { version = "1.8", features = ["alloc"] }
+# TTY password prompt with echo off. A leaf crate (libc on unix, windows-sys
+# on windows, both already in the lock); hand-rolling echo-off is the
+# platform-specific terminal-state code that is easy to get wrong (restoring
+# ECHO on panic/SIGINT), so the tiny well-maintained crate is the honest call.
+rpassword = "7"
+# A randomized temp-dir name for the container-materialisation path (a
+# predictable pid-based name is a symlink-clobber target). Already in the
+# shared lock via `myne-format`; a transitive->direct promotion.
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+# The round-trip test seals an NC05 note by building a single-`Text` Automerge
+# document inline (the encode half of the bridge lives in `myne-core`).
+automerge = "0.10"
