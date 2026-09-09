@@ -560,6 +560,21 @@ The AI chat history is a storage PAIR, and each half syncs through the mechanism
 
 **Reconcile mechanics (how the merge is driven).** A credential change pushes the new `vault.meta` to the server immediately (best-effort; an offline failure leaves a device-local `vault.meta-dirty` marker). Each sync cycle then runs a **meta phase** independent of the head/blob plane (`vault.meta` is never head-committed): the device does an authed `GET /vault.meta` and compares the server copy against a device-local **baseline** (the SHA-256 of the `vault.meta` it last saw as synced). This distinguishes *only I changed since the baseline* (server unchanged → push my copy) from *the server also changed* (someone else rotated → a genuine concurrent change). The concurrent case merges with a **deterministic, commutative tiebreak** — the greater `enc_root_key_password` (byte-lexicographic) wins — so both devices independently pick the same winner and converge with **no server-side version counter and no ping-pong** (CRDT-style, exactly like the §10.2 attachments-catalog merge). A device with no local change simply adopts the server's copy (after validating the invariant). The loser of a concurrent password change finds only the winning password valid afterward — the deterministic, expected resolution of two simultaneous credential rotations.
 
+**The membership field is device-local, and the local value always survives.** The sealed vault
+membership field (`vault.meta` §9.3.1) is classified **device-local** in this bespoke merge: it is
+**not** one of the invariants the merge validates, and it is **not** reconciled across devices. When
+the merge produces a winner, the winning device's membership field is **not** adopted by the loser;
+each device keeps the membership field it already held, and a device that had none keeps none. The
+reason is the account/vault split (`decisions.md` 2026-09-07): grouping is a per-device
+organisational choice, not a vault property, so two devices grouping the same vault differently must
+never produce a conflict surface and must never converge. The same holds on the pure-adopt path (no
+local change): the adopted bytes carry the local field transplanted in, never the server's, and the
+baseline advances to what was written. The field is carried inside the
+`vault.meta` blob (so it travels with the credential wraps), but its *value* is local-wins: a
+divergent grouping across devices merges silently, with each device preserving its own. No new
+conflict UX is reachable from this field, and the merged blob stays well-formed for both generations
+(the field is an `NTV5`-only extension, `vault.meta` §9.3.1; an `MYV1` blob never carries it).
+
 ---
 
 ## 11. Deletion & tombstone horizon-GC

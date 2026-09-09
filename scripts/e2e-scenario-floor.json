@@ -617,6 +617,18 @@
     "",
     "`stable_max_failures` stays 0."
   ],
+  "_comment_merge_684_675": [
+    "358 -> 359: the land-train merge of myne-md/myne#689 onto a develop that",
+    "already held 358 via myne-md/myne#684 (ag1, the keychain-less picker).",
+    "Two disjoint +1s over the same 357 base (ch1 here, ag1 there); taking",
+    "either side's number would drop the other's scenario from the counted",
+    "set, so the increments are summed rather than chosen between.",
+    "",
+    "`stable_max_failures` stays 0. A floor is a MINIMUM: ag1 executes on the",
+    "merged tree alongside ch1, and the merged-tree run in the Phase 2 sweep",
+    "is what checks the sum rather than this arithmetic."
+  ],
+  "stable": 359,
   "stable": 358,
   "stable_max_failures": 0
 }

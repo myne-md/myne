@@ -202,7 +202,7 @@ describeE2E("wc1 closing the window flushes unsaved work (myne-md/myne#555)", ()
         // title-bar X sends. Not `teardown` and not a signal — both of those
         // kill the app, which is the opposite of asking it to leave, and the
         // whole subject here is what the app does when asked.
-        closeAppWindow();
+        closeAppWindow(app.driverPid);
 
         // The app's EXIT is the signal that the flush finished: the handler
         // destroys the window only after flushAll + persistWorkspace +

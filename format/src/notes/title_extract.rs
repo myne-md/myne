@@ -1,0 +1,452 @@
+// SPDX-License-Identifier: AGPL-3.0
+//! Hybrid byte-range slice extractor for `note_titles_batch`.
+//!
+//! Per the 2026-05-15 MYND-82 grill Q3 (hybrid byte-range parse), this
+//! module performs the **minimum** structural scan on decrypted note
+//! plaintext: locate the YAML frontmatter block (if present) and the
+//! first ATX-H1 line in the body region. Both are returned as borrowed
+//! byte slices into the input — the TS dialect module
+//! (`src/dialect/parse.ts` + visitors) does the actual YAML / markdown
+//! parsing on the WebView side.
+//!
+//! Rationale: keeping markdown / YAML parsing TS-side preserves a
+//! single dialect source-of-truth and avoids expanding the Rust audit
+//! surface (TB9). The scanner here is ~30 LOC of byte-level line walks
+//! — no regex, no markdown parser, no YAML parser.
+//!
+//! Spec touchpoints:
+//!
+//! - `docs/decisions.md` 2026-05-15 "Note title write target" (the
+//!   read-precedence chain whose source slices this function returns).
+//! - `myne-agents/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
+//!   Q3 (hybrid byte-range design rationale).
+
+const FM_OPENER: &[u8] = b"---\n";
+const FM_DELIMITER: &[u8] = b"---";
+const H1_PREFIX: &[u8] = b"# ";
+
+/// Byte slices extracted from a single note's decrypted plaintext.
+///
+/// Both slices borrow into the input buffer; no allocation. `None`
+/// means the corresponding region was not found (no FM opener / no
+/// matching closer / no ATX-H1 in the body).
+pub struct TitleSlices<'a> {
+    pub frontmatter_bytes: Option<&'a [u8]>,
+    pub first_h1_line: Option<&'a [u8]>,
+}
+
+/// Locate the FM block boundary and the first H1 line.
+///
+/// FM detection follows `docs/spec/markdown-dialect.md` §3.6
+/// "line-1-anchored detection": the source must begin with `"---\n"`,
+/// and the closer is the next line that consists exactly of `"---"`.
+/// An opener without a matching closer is treated as **no
+/// frontmatter** (body starts at offset 0).
+///
+/// H1 detection follows CommonMark ATX-H1 strict shape: a line
+/// beginning with literal `"# "` (hash + space). `"#hashtag"` is NOT
+/// a heading. Leading-indent ATX (`"   # text"`) is not supported in
+/// v0.1 — the sidebar's mirror-existing-source-of-truth read precedence
+/// (Q2) is "frontmatter `title:` ↳ first `# H1` ↳ None", and indented
+/// headings are deliberately routed through the FM `title:` slot
+/// instead (negligible Phase 1 dogfood prevalence).
+pub fn extract_title_slices(plaintext: &[u8]) -> TitleSlices<'_> {
+    let (frontmatter_bytes, body_offset) = scan_frontmatter(plaintext);
+
+    // --- First-H1 line scan -----------------------------------------
+    let body = &plaintext[body_offset..];
+    let first_h1_line = body
+        .split(|b| *b == b'\n')
+        .find(|line| line.starts_with(H1_PREFIX));
+
+    TitleSlices {
+        frontmatter_bytes,
+        first_h1_line,
+    }
+}
+
+/// The FM boundary scan shared by [`extract_title_slices`] and
+/// [`body_after_frontmatter`] — locates the frontmatter block (if any) and
+/// returns it alongside the byte offset where the body region starts.
+fn scan_frontmatter(plaintext: &[u8]) -> (Option<&[u8]>, usize) {
+    let mut frontmatter_bytes: Option<&[u8]> = None;
+    let mut body_offset: usize = 0;
+
+    if plaintext.starts_with(FM_OPENER) {
+        let body_start = FM_OPENER.len();
+        let mut cursor = body_start;
+        loop {
+            let rel_nl = plaintext[cursor..].iter().position(|b| *b == b'\n');
+            match rel_nl {
+                Some(rel) => {
+                    let line_end = cursor + rel;
+                    let line = &plaintext[cursor..line_end];
+                    if line == FM_DELIMITER {
+                        frontmatter_bytes = Some(&plaintext[body_start..cursor]);
+                        body_offset = line_end + 1;
+                        break;
+                    }
+                    cursor = line_end + 1;
+                }
+                None => {
+                    // Trailing line without newline — accept it as the
+                    // closer if its content equals "---".
+                    let line = &plaintext[cursor..];
+                    if line == FM_DELIMITER {
+                        frontmatter_bytes = Some(&plaintext[body_start..cursor]);
+                        body_offset = plaintext.len();
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    (frontmatter_bytes, body_offset)
+}
+
+/// The plaintext after its frontmatter block (or the whole input when there
+/// is none), with a single leading blank-line FM/body separator stripped —
+/// mirrors `newNoteFromTemplate.ts::extractTemplateBody` exactly. Used to
+/// extract a template note's body for daily-note instantiation
+/// (cli-thin-client task 9; `myne daily`'s create path has no WebView to run
+/// that TS function, so this is the Rust-side equivalent over the same FM
+/// scan `extract_title_slices` already performs).
+pub fn body_after_frontmatter(plaintext: &[u8]) -> &[u8] {
+    let (_, body_offset) = scan_frontmatter(plaintext);
+    let body = &plaintext[body_offset..];
+    body.strip_prefix(b"\n").unwrap_or(body)
+}
+
+/// Extract the H1 title from an already-located first-H1 line (`"# "` prefix
+/// stripped, trimmed; `None` when the line is absent or blank). The H1 half of
+/// [`resolve_note_title`]'s `FM title ↳ H1 ↳ None` precedence — takes the slice
+/// the caller already holds so the plaintext is scanned only once.
+fn h1_title_from_line(first_h1_line: Option<&[u8]>) -> Option<String> {
+    let line = first_h1_line?;
+    let text = line.strip_prefix(H1_PREFIX).unwrap_or(line);
+    let title = String::from_utf8_lossy(text).trim().to_string();
+    (!title.is_empty()).then_some(title)
+}
+
+/// Resolve the note title the SAME way the sidebar does (MYND-40 bug fix):
+/// frontmatter `title:` ↳ first `# H1` ↳ None. The search index uses this so a
+/// search result shows the title the sidebar shows — e.g. a note with
+/// `title: Dali` in frontmatter and a `# Done` body heading resolves to "Dali",
+/// not "Done". Frontmatter parsing is a MINIMAL top-level `title:` scan (bare or
+/// single/double-quoted scalar); a block/flow-scalar, empty, or otherwise exotic
+/// `title:` falls back to the first H1 (full YAML resolution stays TS-side, the
+/// sidebar's domain — this module only does byte-level line walks, TB9).
+pub fn resolve_note_title(plaintext: &[u8]) -> Option<String> {
+    let slices = extract_title_slices(plaintext);
+    if let Some(fm) = slices.frontmatter_bytes {
+        if let Some(title) = fm_title(fm) {
+            return Some(title);
+        }
+    }
+    h1_title_from_line(slices.first_h1_line)
+}
+
+/// Minimal top-level `title:` extractor for a YAML frontmatter block. Returns
+/// the trimmed scalar value (surrounding single/double quotes stripped), or
+/// `None` when there is no top-level `title:`, its value is empty, or it begins
+/// a block/flow scalar this scanner deliberately does not parse.
+///
+/// `pub(crate)`: also the filename source of the whole-vault export engine
+/// (`plugins::export`, MYND-211) — the tree filename rule is FM `title:`
+/// ONLY (no H1 fallback; the importer inversion injects `title:` for every
+/// imported note, so the FM field is the round-trip identity).
+pub fn fm_title(frontmatter: &[u8]) -> Option<String> {
+    fm_scalar(frontmatter, b"title:")
+}
+
+/// Minimal top-level `folder:` extractor — the canonical trailing-slash
+/// Myne-managed field (`markdown-dialect.md` §3.6.2) the whole-vault export
+/// engine (`plugins::export`, MYND-211) inverts into tree directories. Same
+/// scanner discipline as [`fm_title`]: first top-level line decides, quotes
+/// stripped, block/flow scalars declined, `None` for absent/empty (= root).
+pub fn fm_folder(frontmatter: &[u8]) -> Option<String> {
+    fm_scalar(frontmatter, b"folder:")
+}
+
+/// Locate the FIRST top-level `<key>` line in a frontmatter block and
+/// return the raw value bytes after the key (untrimmed). The first
+/// matching line decides — a later duplicate never rescues an
+/// unusable first value. `pub(crate)`: the shared line-locating loop
+/// of [`fm_scalar`] here and `export_mtime::fm_rfc3339_field_in` —
+/// each caller keeps its OWN value-parsing semantics (the
+/// comment-stripping divergence between them is TS-lockstep
+/// deliberate).
+pub fn fm_raw_value<'a>(frontmatter: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
+    frontmatter.split(|b| *b == b'\n').find_map(|line| {
+        // Top-level key only — a leading space/indent means a nested mapping,
+        // which `strip_prefix` correctly rejects.
+        line.strip_prefix(key)
+    })
+}
+
+/// Shared body of [`fm_title`] / [`fm_folder`]: extract the first top-level
+/// `<key>` line's scalar value from a frontmatter block.
+fn fm_scalar(frontmatter: &[u8], key: &[u8]) -> Option<String> {
+    let rest = fm_raw_value(frontmatter, key)?;
+    let raw = String::from_utf8_lossy(rest).trim().to_string();
+    // Block/flow-scalar indicator or empty inline value → decline; the
+    // caller falls back to the first H1.
+    if raw.is_empty() || raw.starts_with('|') || raw.starts_with('>') {
+        return None;
+    }
+    let trimmed = strip_matching_quotes(&raw).trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_string())
+}
+
+/// Strip one layer of matching surrounding single or double quotes, if present.
+fn strip_matching_quotes(s: &str) -> &str {
+    let b = s.as_bytes();
+    if b.len() >= 2
+        && ((b[0] == b'"' && b[b.len() - 1] == b'"') || (b[0] == b'\'' && b[b.len() - 1] == b'\''))
+    {
+        &s[1..s.len() - 1]
+    } else {
+        s
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_fm_no_h1_returns_both_none() {
+        let result = extract_title_slices(b"plain body content\nno headings\n");
+        assert!(result.frontmatter_bytes.is_none());
+        assert!(result.first_h1_line.is_none());
+    }
+
+    #[test]
+    fn fm_only_no_h1_returns_fm_some_h1_none() {
+        let input = b"---\ntags: [a]\n---\n\nbody here\n";
+        let result = extract_title_slices(input);
+        assert_eq!(result.frontmatter_bytes, Some(b"tags: [a]\n".as_ref()));
+        assert!(result.first_h1_line.is_none());
+    }
+
+    #[test]
+    fn h1_only_no_fm_returns_h1_some_fm_none() {
+        let input = b"# Heading\nbody\n";
+        let result = extract_title_slices(input);
+        assert!(result.frontmatter_bytes.is_none());
+        assert_eq!(result.first_h1_line, Some(b"# Heading".as_ref()));
+    }
+
+    #[test]
+    fn fm_and_h1_returns_both_some() {
+        let input = b"---\ntitle: Foo\n---\n\n# Body Heading\nmore\n";
+        let result = extract_title_slices(input);
+        assert_eq!(result.frontmatter_bytes, Some(b"title: Foo\n".as_ref()));
+        assert_eq!(result.first_h1_line, Some(b"# Body Heading".as_ref()));
+    }
+
+    #[test]
+    fn malformed_fm_opener_only_no_closer_falls_back_to_no_fm() {
+        // No closing `---` line → not a frontmatter block; entire input
+        // is treated as body. The opening `---` itself is then a normal
+        // body line; not an H1 (no `# ` prefix).
+        let input = b"---\nfoo: bar\nbody but no closer\n";
+        let result = extract_title_slices(input);
+        assert!(result.frontmatter_bytes.is_none());
+        assert!(result.first_h1_line.is_none());
+    }
+
+    #[test]
+    fn fm_with_multi_line_yaml_value_preserves_full_block() {
+        // The block-scalar value spans multiple lines; the closer is
+        // still the literal `---` line that terminates the YAML block.
+        let input = b"---\ntitle: |\n  Multi-line\n  value\nupdated: 2026-01-01\n---\n\nbody\n";
+        let result = extract_title_slices(input);
+        assert_eq!(
+            result.frontmatter_bytes,
+            Some(b"title: |\n  Multi-line\n  value\nupdated: 2026-01-01\n".as_ref())
+        );
+    }
+
+    #[test]
+    fn h2_first_then_h1_finds_h1_deeper_in_body() {
+        let input = b"## H2 first\n### H3 next\n# Real H1\nbody\n";
+        let result = extract_title_slices(input);
+        assert_eq!(result.first_h1_line, Some(b"# Real H1".as_ref()));
+    }
+
+    #[test]
+    fn hashtag_without_space_is_not_an_h1() {
+        let input = b"#hashtag-like\n# Real H1\nbody\n";
+        let result = extract_title_slices(input);
+        assert_eq!(result.first_h1_line, Some(b"# Real H1".as_ref()));
+    }
+
+    #[test]
+    fn indented_hash_is_not_an_h1() {
+        let input = b"  # indented hash\n# Real H1\n";
+        let result = extract_title_slices(input);
+        assert_eq!(result.first_h1_line, Some(b"# Real H1".as_ref()));
+    }
+
+    #[test]
+    fn fm_followed_by_h1_finds_h1_after_block() {
+        let input = b"---\ntags: [a]\n---\n# Heading right after FM\nbody\n";
+        let result = extract_title_slices(input);
+        assert_eq!(result.frontmatter_bytes, Some(b"tags: [a]\n".as_ref()));
+        assert_eq!(
+            result.first_h1_line,
+            Some(b"# Heading right after FM".as_ref())
+        );
+    }
+
+    #[test]
+    fn empty_input_returns_both_none() {
+        let result = extract_title_slices(b"");
+        assert!(result.frontmatter_bytes.is_none());
+        assert!(result.first_h1_line.is_none());
+    }
+
+    #[test]
+    fn fm_closer_without_trailing_newline_still_recognized() {
+        // Last line is the closer with no trailing newline.
+        let input = b"---\nfoo: bar\n---";
+        let result = extract_title_slices(input);
+        assert_eq!(result.frontmatter_bytes, Some(b"foo: bar\n".as_ref()));
+        assert!(result.first_h1_line.is_none());
+    }
+
+    #[test]
+    fn empty_fm_block_returns_empty_slice_not_none() {
+        // `---\n---\n` — opener immediately followed by closer.
+        let input = b"---\n---\n\nbody\n";
+        let result = extract_title_slices(input);
+        assert_eq!(result.frontmatter_bytes, Some(b"".as_ref()));
+    }
+
+    #[test]
+    fn just_hash_space_is_an_empty_h1() {
+        // Edge: `"# "` is a valid (empty-content) ATX-H1.
+        let input = b"# \nbody\n";
+        let result = extract_title_slices(input);
+        assert_eq!(result.first_h1_line, Some(b"# ".as_ref()));
+    }
+
+    #[test]
+    fn resolve_h1_fallback_strips_prefix_trims_and_drops_empty() {
+        // No frontmatter → H1 fallback: strip "# ", trim.
+        assert_eq!(
+            resolve_note_title(b"#   My Note  \nbody here"),
+            Some("My Note".to_string())
+        );
+        // No H1 at all → None.
+        assert_eq!(resolve_note_title(b"plain body, no heading"), None);
+        // Empty H1 → None.
+        assert_eq!(resolve_note_title(b"# \nbody"), None);
+    }
+
+    // ---- resolve_note_title (MYND-40 bug fix: FM title ↳ H1 ↳ None) ------
+
+    #[test]
+    fn resolve_prefers_frontmatter_title_over_h1() {
+        // The real-world bug: FM `title: Dali` + body heading `# Done` → "Dali"
+        // (the search index must match the sidebar's title, not show "Done").
+        assert_eq!(
+            resolve_note_title(
+                b"---\ntitle: Dali\nfolder: 1-PROJECTS/\n---\n# Done\nkortikal here"
+            ),
+            Some("Dali".to_string())
+        );
+    }
+
+    #[test]
+    fn resolve_falls_back_to_h1_when_no_fm_title() {
+        assert_eq!(
+            resolve_note_title(b"---\nfolder: x\n---\n# Done\nbody"),
+            Some("Done".to_string())
+        );
+        assert_eq!(
+            resolve_note_title(b"# Done\nbody"),
+            Some("Done".to_string())
+        );
+    }
+
+    #[test]
+    fn resolve_strips_quotes_on_fm_title() {
+        assert_eq!(
+            resolve_note_title(b"---\ntitle: \"Dali\"\n---\n# Done"),
+            Some("Dali".to_string())
+        );
+        assert_eq!(
+            resolve_note_title(b"---\ntitle: 'Dali'\n---\n# Done"),
+            Some("Dali".to_string())
+        );
+    }
+
+    #[test]
+    fn resolve_block_scalar_or_empty_title_falls_back_to_h1() {
+        // Block-scalar title indicator → minimal scanner declines → H1.
+        assert_eq!(
+            resolve_note_title(b"---\ntitle: |\n  Multi\n  line\n---\n# Done\nx"),
+            Some("Done".to_string())
+        );
+        // Empty inline value → H1.
+        assert_eq!(
+            resolve_note_title(b"---\ntitle:\n---\n# Done"),
+            Some("Done".to_string())
+        );
+        // Quoted-empty value → H1.
+        assert_eq!(
+            resolve_note_title(b"---\ntitle: \"\"\n---\n# Done"),
+            Some("Done".to_string())
+        );
+    }
+
+    #[test]
+    fn resolve_none_when_neither_fm_title_nor_h1() {
+        assert_eq!(resolve_note_title(b"plain body, no heading"), None);
+        assert_eq!(resolve_note_title(b"---\nfolder: x\n---\nbody only"), None);
+    }
+
+    // ---- body_after_frontmatter (template-body extraction, task 9) -------
+
+    #[test]
+    fn body_after_frontmatter_strips_fm_block_and_one_blank_line() {
+        let input = b"---\ntitle: T\n---\n\nbody line 1\nbody line 2\n";
+        assert_eq!(
+            body_after_frontmatter(input),
+            b"body line 1\nbody line 2\n".as_ref()
+        );
+    }
+
+    #[test]
+    fn body_after_frontmatter_with_no_blank_separator_keeps_body_intact() {
+        // FM closer immediately followed by body content with no blank line.
+        let input = b"---\ntitle: T\n---\nno blank line here";
+        assert_eq!(
+            body_after_frontmatter(input),
+            b"no blank line here".as_ref()
+        );
+    }
+
+    #[test]
+    fn body_after_frontmatter_with_no_fm_returns_whole_input() {
+        let input = b"just a plain body\nno frontmatter";
+        assert_eq!(body_after_frontmatter(input), input.as_ref());
+    }
+
+    #[test]
+    fn body_after_frontmatter_with_empty_body_returns_empty() {
+        let input = b"---\ntitle: T\n---\n";
+        assert_eq!(body_after_frontmatter(input), b"".as_ref());
+    }
+
+    #[test]
+    fn body_after_frontmatter_strips_only_one_leading_blank_line() {
+        // Two blank lines after the FM closer: only the FIRST (the FM/body
+        // separator) is stripped — the second is real body content.
+        let input = b"---\ntitle: T\n---\n\n\nbody\n";
+        assert_eq!(body_after_frontmatter(input), b"\nbody\n".as_ref());
+    }
+}

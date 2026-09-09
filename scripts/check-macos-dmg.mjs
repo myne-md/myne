@@ -47,11 +47,11 @@
 // Zero dependencies, hand-runnable:
 //   node scripts/check-macos-dmg.mjs ~/.cargo/shared-target/.../Myne_0.1.0_aarch64.dmg
 
-import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, readlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runTool } from "./lib/run-tool.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -84,27 +84,29 @@ const ok = (message) => console.log(`  ok   ${message}`);
 /** kHasCustomIcon lives at FinderInfo bytes 8-9 for both FInfo and DInfo. */
 const K_HAS_CUSTOM_ICON = 0x0400;
 
-/** Raw com.apple.FinderInfo bytes, or null when the attribute is absent. */
+/** Raw com.apple.FinderInfo bytes, or null when the attribute is absent.
+ *
+ *  FATAL on a tool failure (myne#528): the bare catch here used to return null
+ *  when `xattr` could not run too, and null is read below as "the icon is NOT
+ *  flagged" — a tool that could not run would have failed the DMG check as a
+ *  missing flag, i.e. as a product finding. macOS ships /usr/bin/xattr with the
+ *  OS, so could-not-run is a broken machine, not a verdict. */
 function finderInfo(path) {
-  try {
-    const hex = execFileSync("/usr/bin/xattr", ["-px", "com.apple.FinderInfo", path], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    return Buffer.from(hex.replace(/\s+/g, ""), "hex");
-  } catch {
-    return null;
-  }
+  const r = runTool(["/usr/bin/xattr", "-px", "com.apple.FinderInfo", path], {
+    onToolFailure: "fatal",
+    maxBuffer: 1 << 20,
+  });
+  return Buffer.from((r.stdout ?? "").replace(/\s+/g, ""), "hex");
 }
 
 const mountPoint = mkdtempSync(join(tmpdir(), "myne-dmg-check-"));
 let attached = false;
 try {
-  execFileSync(
-    "/usr/bin/hdiutil",
-    ["attach", dmgPath, "-readonly", "-nobrowse", "-noverify", "-mountpoint", mountPoint],
-    { stdio: ["ignore", "ignore", "pipe"] },
-  );
+  // FATAL: an image that cannot attach is a DMG the check cannot make, not a
+  // DMG with findings (the uncaught ToolRunError exits non-zero).
+  runTool(["/usr/bin/hdiutil", "attach", dmgPath, "-readonly", "-nobrowse", "-noverify", "-mountpoint", mountPoint], {
+    onToolFailure: "fatal",
+  });
   attached = true;
 
   // 1. The payload.
@@ -183,19 +185,20 @@ try {
   }
 } finally {
   if (attached) {
-    try {
-      execFileSync("/usr/bin/hdiutil", ["detach", mountPoint, "-quiet"], { stdio: "ignore" });
-    } catch {
-      // A busy volume (Finder, Spotlight) can refuse the first detach; force it
-      // rather than leaving a stray mount behind.
-      try {
-        execFileSync("/usr/bin/hdiutil", ["detach", mountPoint, "-force", "-quiet"], {
-          stdio: "ignore",
-        });
-      } catch {
-        console.error(`  warn  could not unmount ${mountPoint} — detach it by hand`);
-      }
-    }
+    // Cleanup, deliberately tolerated-empty with reasons: a busy volume
+    // (Finder, Spotlight) can refuse the first detach, so force it before
+    // leaving a stray mount behind; failing even that is reported, not folded
+    // into a green run (myne#528).
+    runTool(["/usr/bin/hdiutil", "detach", mountPoint, "-quiet"], {
+      onToolFailure: "empty",
+      reason: "a busy volume can refuse the first detach; forced detach follows",
+      maxBuffer: 1 << 20,
+    });
+    runTool(["/usr/bin/hdiutil", "detach", mountPoint, "-force", "-quiet"], {
+      onToolFailure: "empty",
+      reason: "best-effort cleanup; the warn below still says so when it fails",
+      maxBuffer: 1 << 20,
+    });
   }
   rmSync(mountPoint, { recursive: true, force: true });
 }

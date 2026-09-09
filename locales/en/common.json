@@ -505,6 +505,9 @@
       "duplicateNote": {
         "label": "Duplicate note"
       },
+      "openInNewWindow": {
+        "label": "Open note in new window"
+      },
       "archiveNote": {
         "label": "Archive note"
       },
@@ -1179,12 +1182,18 @@
       "rename": "Rename",
       "move": "Move to folder…",
       "duplicate": "Duplicate",
+      "openInNewWindow": "Open in new window",
       "convertToTemplate": "Turn into template",
       "convertToNote": "Convert to note",
       "turnedIntoTemplate": "Turned into template",
       "convertedToNote": "Converted to note",
       "versionHistory": "Version history",
       "trash": "Move to trash"
+    },
+    "detachedDeleted": {
+      "title": "This note was deleted elsewhere",
+      "body": "It was deleted from another window or synced from another device. Any unsaved changes in this window were kept as a separate copy.",
+      "close": "Close window"
     },
     "codeBlock": {
       "copyCode": "Copy code",
@@ -2731,6 +2740,11 @@
       "processing_one": "Reading 1 attachment…",
       "processing_other": "Reading {{count}} attachments…"
     },
+    "folderNotes": {
+      "label": "Folder notes",
+      "helper": "Let a note act as its folder's index: it opens when you double-click the folder, and folder links like [[Projects/]] point to it. Off by default. Turning it off hides the buttons that create folder notes and shows any you already have as ordinary notes; it changes nothing on disk, so turning it back on restores them exactly.",
+      "errorSaveSetting": "Could not save this setting."
+    },
     "autoBackup": {
       "backupFolder": "Backup folder",
       "chooseFolder": "Choose folder…",
@@ -3064,8 +3078,6 @@
         "localModelMissing": "The local model recorded in settings is not on this device any more. Nothing was sent anywhere. Pick a model again, or name a provider, in Settings → Developer → AI.",
         "noCredential": "No API key is set for this provider. Add one in Settings → Developer → AI.",
         "notReady": "Nothing is ready to answer yet. Nothing was sent anywhere. Pick a model, or name a provider, in Settings → Developer → AI.",
-        "noEmbeddingModel": "Asking searches your notes on this device, and that needs a search model here. A provider cannot do it. Nothing was sent anywhere. Choose a search model in Settings → Developer → AI.",
-        "indexNotReady": "Your notes are still being indexed for search. Nothing was sent anywhere. Try again in a moment.",
         "requestRejected": "The provider would not accept this request. Nothing was saved. This is a fault in what Myne sent, not in your setup or your notes.",
         "policyRefused": "The provider refused this request under its own rules: an account guardrail, a workspace policy, or a model your plan does not carry. This has to be fixed with the provider, not in Myne.",
         "quotaExhausted": "The provider declined the request: you are out of credit or over a rate limit. This has to be fixed with the provider, not in Myne.",
@@ -3419,6 +3431,7 @@
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
         "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
+        "folderNotes": "folder note index folder_index landing page double click folder link projects off switch disable",
         "attachmentCompression": "compress compression image shrink downscale resize webp jpeg import paste vault size storage",
         "transcription": "transcribe transcription speech voice audio dictation subtitle whisper recording sound to text",
         "syncAddDevice": "add device pair link phone laptop sync",
@@ -4186,15 +4199,26 @@
     }
   },
   "vaultPicker": {
+    "accountFallback": "Account",
     "createAnother": "Create another vault",
     "heading": "Choose a vault",
     "joinDevice": "Add this device to an account",
     "loading": "Loading your vaults…",
+    "moveToAccount": "Move to account…",
+    "moveToNewAccount": "Move to new account",
     "noneLoaded": "No vaults could be loaded right now.",
     "openedRelative": "opened {{rel}}",
+    "renameAccount": "Rename account",
     "restoreFromBackup": "Restore from backup",
     "subline": "You have more than one vault on this device. Pick one to unlock.",
-    "vaultFallback": "Vault {{n}}"
+    "vaultFallback": "Vault {{n}}",
+    "accountError": "Could not update the account grouping. Nothing was changed.",
+    "accountHidden": "Account actions are unavailable while vault names are hidden.",
+    "labelTooLong": "That name is too long. Keep it under 512 characters.",
+    "renameCancel": "Cancel",
+    "renamePlaceholder": "Account name",
+    "renameSave": "Rename",
+    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed."
   },
   "vaultRecover": {
     "decrypting": {
@@ -4239,7 +4263,15 @@
       "or": "or",
       "title": "Choose a vault to recover",
       "useAccountNumber": "Use account number",
-      "vaultFallback": "Vault {{index}}"
+      "vaultFallback": "Vault {{index}}",
+      "accountFallback": "Account",
+      "accountsError": "Could not load the account grouping. Vaults are listed ungrouped; nothing about recovery changes."
+    },
+    "siblingNotice": {
+      "body_one": "This account holds {{count}} more vault. Recover it too so nothing is left behind.",
+      "body_other": "This account holds {{count}} more vaults. Recover them too so nothing is left behind.",
+      "recoverAnother": "Recover another vault",
+      "unknown": "Could not check whether this account holds other vaults. If you keep more than one vault, recover each one with its own phrase."
     }
   },
   "vaultSwitcher": {
@@ -4362,7 +4394,18 @@
     "openedLastYear": "opened last year",
     "openedYearsAgo_one": "opened {{count}} year ago",
     "openedYearsAgo_other": "opened {{count}} years ago",
-    "corruptedBadge": "Corrupted"
+    "corruptedBadge": "Corrupted",
+    "accountFallback": "Account",
+    "renameAccount": "Rename account",
+    "moveToNewAccount": "Move to new account",
+    "moveToAccount": "Move to account…",
+    "accountError": "Could not update the account grouping. Nothing was changed.",
+    "accountHidden": "Account actions are unavailable while vault names are hidden.",
+    "labelTooLong": "That name is too long. Keep it under 512 characters.",
+    "renameCancel": "Cancel",
+    "renamePlaceholder": "Account name",
+    "renameSave": "Rename",
+    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed."
   },
   "join": {
     "transportError": "Couldn't reach that sync server. Check the address and your connection, then try again.",

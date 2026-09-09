@@ -29,10 +29,10 @@
 //
 // Node built-ins only.
 
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { runTool } from "./lib/run-tool.mjs";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const RECORD = "docs/web-bundle-hashes.md";
@@ -52,16 +52,18 @@ function parseRows(markdown) {
 }
 
 function readRecordAt(ref) {
-  try {
-    return execFileSync("git", ["show", `${ref}:${RECORD}`], {
-      cwd: repoRoot,
-      encoding: "utf8",
-    });
-  } catch {
-    // Absent at that ref is not a failure: the record has a first commit, and
-    // before it there was nothing to preserve.
-    return null;
-  }
+  // EMPTY with a stated reason, not a bare catch: absent at that ref is not a
+  // failure — the record has a first commit, and before it there was nothing
+  // to preserve. The helper still prints the diagnostics on a failure, so a
+  // `git` that could not run is visible rather than folded into "absent"
+  // (myne#528). A spawn error, unlike exit 128 with "does not exist" on
+  // stderr, is still FATAL below.
+  const r = runTool(["git", "show", `${ref}:${RECORD}`], {
+    cwd: repoRoot,
+    onToolFailure: "empty",
+    reason: "the record has a first commit; before it there was nothing to preserve",
+  });
+  return r === null ? null : r.stdout;
 }
 
 const args = process.argv.slice(2);

@@ -651,6 +651,16 @@ export interface PrefsView {
    */
   folder_icons: Record<string, string>;
   /**
+   * Folder-notes feature off-switch (myne-md/myne#661). When `false` (the
+   * default), the folder-index entry points are hidden and a note's
+   * `folder_index: true` flag is NOT honoured for sidebar / link presentation,
+   * so an existing folder note renders as an ordinary note. Purely a
+   * presentation gate: it never rewrites frontmatter, so turning it back on
+   * restores exactly what was there. Persisted only when `true`. Serialized from
+   * Rust `bool`.
+   */
+  folder_notes_enabled: boolean;
+  /**
    * Friendly device names (MYND-548 / SYNC-41) — a map from a `device_id` (hex)
    * to the user-chosen label the device list shows for it. The single home for
    * device names across clients, so no client ships a second default-name
@@ -1749,6 +1759,18 @@ export async function setShowNoteTimestamps(enabled: boolean): Promise<void> {
  */
 export async function setShowTaskMarker(enabled: boolean): Promise<void> {
   await writePref("plugin:prefs|set_show_task_marker", { enabled });
+}
+
+/**
+ * Turn the folder-notes feature on or off (myne-md/myne#661). Default off.
+ * Shared across devices (scalar LWW), like the task-marker toggle above: whether
+ * folder notes are honoured is a note-list presentation preference, not a device
+ * capability. Goes through `writePref`, so it bumps the prefs nonce and a
+ * sidebar reading prefs through its own `usePrefs` reflects the toggle live,
+ * the same chokepoint discipline the note-list presentation prefs rely on.
+ */
+export async function setFolderNotesEnabled(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_folder_notes_enabled", { enabled });
 }
 
 /**

@@ -2689,16 +2689,36 @@ pub(crate) async fn sync_meta_phase(
         if merge_vault_meta(&local_meta, &server_meta, MetaWinner::Remote).is_err() {
             return MetaPhaseOutcome::Skipped;
         }
+        // The device-local membership field is never adopted: it names THIS
+        // device's account, and the server copy names another device's (or
+        // none). Adopting it verbatim would strand a foreign owner that the
+        // unlock stamp never repairs (it skips as already-present), so the
+        // local field is transplanted into the adopted bytes. NTV5 only: a
+        // MYV1 server blob has no field slot, and dropping the local field
+        // there heals on next unlock (absent re-stamps), so that path stays
+        // verbatim rather than version-upgrading the file on adopt.
+        let adopted_bytes =
+            if protocol::meta_version_of(&server_bytes) == Some(protocol::MetaVersion::V0_2) {
+                let mut adopted_meta = server_meta.clone();
+                adopted_meta.membership = local_meta.membership.clone();
+                protocol::serialize_vault_meta_v0_2(&adopted_meta)
+            } else {
+                server_bytes.clone()
+            };
         if io
             .write(
                 &meta_path,
-                &server_bytes,
+                &adopted_bytes,
                 crate::vault_io::WriteOpts::default(),
             )
             .await
             .is_ok()
         {
-            state.meta_baseline_hex = Some(server_hash);
+            // Baseline is what was WRITTEN, not what the server sent: the
+            // transplant above means those differ exactly when the local
+            // field existed, and baselining the server bytes would read our
+            // own transplant back as local dirt on every cycle.
+            state.meta_baseline_hex = Some(sha256_hex(&adopted_bytes));
             let _ = clear_vault_meta_dirty(io, vault_root).await;
             return MetaPhaseOutcome::Adopted;
         }
@@ -2740,7 +2760,7 @@ pub(crate) async fn sync_meta_phase(
     };
     let merged_bytes = match local_gen {
         Some(protocol::MetaVersion::V0_2) => protocol::serialize_vault_meta_v0_2(&merged),
-        _ => serialize_vault_meta(&merged),
+        _ => serialize_vault_meta(&merged).to_vec(),
     };
     let merged_hash = sha256_hex(&merged_bytes);
     if io
@@ -11596,6 +11616,7 @@ mod tests {
                 items_key_id: [0x07; VAULT_META_ITEMS_KEY_ID_LEN],
                 items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
                 enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+                membership: None,
             };
             serialize_vault_meta(&m).to_vec()
         }
@@ -11881,6 +11902,7 @@ mod tests {
                 items_key_id: [0x07; VAULT_META_ITEMS_KEY_ID_LEN],
                 items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
                 enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+                membership: None,
             };
             protocol::serialize_vault_meta_v0_2(&m).to_vec()
         }
@@ -11941,6 +11963,7 @@ mod tests {
                 items_key_id: [0x07; VAULT_META_ITEMS_KEY_ID_LEN],
                 items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
                 enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+                membership: None,
             };
             bad.enc_items_key = [0xEE; VAULT_META_WRAPPED_ITEMS_KEY_LEN]; // divergent!
             let server = serialize_vault_meta(&bad).to_vec();
@@ -12675,6 +12698,7 @@ mod tests {
             items_key_id: [0x07; protocol::VAULT_META_ITEMS_KEY_ID_LEN],
             items_key_nonce: [0x08; protocol::VAULT_META_NONCE_LEN],
             enc_items_key: [0x09; protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            membership: None,
         }
     }
 

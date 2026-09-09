@@ -3089,8 +3089,6 @@
         "localModelMissing": "Den lokale modellen som er registrert i innstillingene, finnes ikke lenger på denne enheten. Ingenting ble sendt noe sted. Velg en modell på nytt, eller oppgi en leverandør, i Innstillinger → Utvikler → AI.",
         "noCredential": "Ingen API-nøkkel er angitt for denne leverandøren. Legg til en i Innstillinger → Utvikler → AI.",
         "notReady": "Ingenting er klart til å svare ennå. Ingenting ble sendt noe sted. Velg en modell, eller oppgi en leverandør, i Innstillinger → Utvikler → AI.",
-        "noEmbeddingModel": "Når du spør, søkes det i notatene dine på denne enheten, og det krever en søkemodell her. En leverandør kan ikke gjøre det. Ingenting ble sendt noe sted. Velg en søkemodell i Innstillinger → Utvikler → AI.",
-        "indexNotReady": "Notatene dine indekseres fortsatt for søk. Ingenting ble sendt noe sted. Prøv igjen om et øyeblikk.",
         "requestRejected": "Leverandøren ville ikke godta denne forespørselen. Ingenting ble lagret. Dette er en feil i det Myne sendte, ikke i oppsettet ditt eller notatene dine.",
         "policyRefused": "Leverandøren avslo denne forespørselen etter sine egne regler: en kontosperre, en retningslinje for arbeidsområdet, eller en modell abonnementet ditt ikke omfatter. Dette må løses hos leverandøren, ikke i Myne.",
         "quotaExhausted": "Leverandøren avslo forespørselen: du er tom for kreditt eller over en hastighetsgrense. Dette må ordnes hos leverandøren, ikke i Myne.",

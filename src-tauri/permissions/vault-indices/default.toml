@@ -8,8 +8,17 @@
 # `VaultRuntimeState` singleton (registered by `vault-unlock::init`); the
 # index itself (`VaultIndicesState`) is registered in `lib.rs` setup. The
 # index is plaintext-derived RAM, so every command requires an unlocked
-# vault. These are write commands → main-window-only invariant, same as
-# the prefs setters (v0.2 multi-window MUST NOT grant them to sub-windows).
+# vault. The `default` bundle was reserved main-window-only anticipating
+# multi-window; myne#677 (epic #173, sync-ledger SYNC-12) resolves that
+# reservation: a detached (pop-out) note window is granted `vault-indices:default`
+# via capabilities/detached-note.json (windows: ["note-*"]), because a note
+# editor pane needs the wikilink/backlink/tag/task/heading pickers (reads) and
+# must index the note it edits (apply/remove on save). A detached `note-*`
+# window reads the same in-RAM index and holds the same plaintext a split pane
+# already does, so the exposure is the same one already permitted. The
+# per-command "main-window-only" notes below predate this resolution and are
+# superseded for the detached `note-*` grant by SYNC-12; they still hold for
+# any OTHER non-main window. omerdduran reviews this reversal in the myne#677 PR.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 

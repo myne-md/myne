@@ -104,6 +104,7 @@ pub fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
         items_key_id: [7u8; 16],
         items_key_nonce: [8u8; 24],
         enc_items_key: [9u8; 64],
+        membership: None,
     };
     std::fs::write(
         dir.join("vault.meta"),
@@ -434,6 +435,9 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     fn agent_teardown_on_lock(&self) {
         self.record("agent_teardown_on_lock");
     }
+    fn detached_windows_teardown_on_lock(&self) {
+        self.record("detached_windows_teardown_on_lock");
+    }
     fn clear_staged_descriptor(&self) {
         self.record("clear_staged_descriptor");
     }
@@ -447,6 +451,9 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     fn ai_policy_changed(&self, _: bool, _: &[String]) {}
     fn bump_local_change(&self) {}
     fn emit_snapshot_write_failed(&self, _: &str) {}
+    fn emit_notes_deleted(&self, _: &str) {
+        self.record("emit_notes_deleted");
+    }
     // `effective_auto_lock_secs` deliberately not overridden: the trait's
     // default clamps (myne-md/myne#479). This body used to be the unclamped
     // `unwrap_or`, which is the exact shape that change removed from two

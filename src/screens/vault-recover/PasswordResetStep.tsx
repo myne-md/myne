@@ -25,12 +25,14 @@
 // master password", info-box explains phrase preservation + old
 // password death (`recovery-flow.md` §4.4).
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { DestructiveBanner } from "../../components/DestructiveBanner";
 import { PasswordCreateForm } from "../../components/PasswordCreateForm";
 import { completeRecovery } from "../../lib/vault-recover";
+import { listAccounts, accountIdForVault, accountCommandErrorKind } from "../../lib/account";
+import type { AccountView } from "../../lib/account";
 import { ioBanner } from "../../lib/io-banner";
 import type { VaultRecoveryError } from "../../types/vault-recovery-error";
 import type { Action, PasswordOutcome, VaultRecoverState } from "./reducer";
@@ -40,6 +42,9 @@ interface PasswordResetStepProps {
   state: VaultRecoverState;
   dispatch: (action: Action) => void;
   onCompleteSuccess: () => void;
+  /** Recover another vault: the sibling notice's action. The orchestrator
+   *  routes back to the select step (or phrase-entry for a single vault). */
+  onRecoverAnother: () => void;
 }
 
 /** Map a `VaultRecoveryError` from A8f to a `PasswordOutcome` per
@@ -177,9 +182,54 @@ export function PasswordResetStep({
   state,
   dispatch,
   onCompleteSuccess,
+  onRecoverAnother,
 }: PasswordResetStepProps) {
   const { t } = useTranslation();
   const [inFlight, setInFlight] = useState(false);
+  // The sibling count: how many OTHER vaults the recovered vault's account
+  // holds. `null` while loading, `0` when there are none (or no account).
+  const [siblingCount, setSiblingCount] = useState<number | null>(null);
+  // A non-keychain grouping failure leaves the count unknown AND says so: the
+  // notice hides (it must not claim siblings it never verified), but a
+  // warning renders in its place so unknown never looks like zero.
+  const [siblingsUnknown, setSiblingsUnknown] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      let accounts: AccountView[];
+      try {
+        accounts = await listAccounts();
+      } catch (e) {
+        if (cancelled) return;
+        // Standalone by design (no keychain, no grouping) is the only silent
+        // degrade: there are no siblings to miss. Any other failure warns.
+        if (accountCommandErrorKind(e) === "KeychainUnavailable") {
+          setSiblingCount(0);
+        } else {
+          setSiblingsUnknown(true);
+        }
+        return;
+      }
+      if (cancelled) return;
+      const vaultId = state.vaultId;
+      if (vaultId == null) {
+        setSiblingCount(0);
+        return;
+      }
+      const accountId = accountIdForVault(accounts, vaultId);
+      if (accountId == null) {
+        setSiblingCount(0);
+        return;
+      }
+      const account = accounts.find((a) => a.id === accountId);
+      const count = account ? account.vaults.length - 1 : 0;
+      setSiblingCount(Math.max(0, count));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.vaultId]);
 
   const handleSubmit = (newPassword: string) => {
     if (inFlight) return;
@@ -230,6 +280,57 @@ export function PasswordResetStep({
             </div>
           }
         />
+
+        {siblingsUnknown && (
+          <p
+            role="status"
+            data-testid="recover.sibling-unknown"
+            style={{
+              margin: 0,
+              fontSize: "var(--text-sm)",
+              lineHeight: 1.6,
+              color: "var(--ink-2)",
+            }}
+          >
+            {t("vaultRecover.siblingNotice.unknown")}
+          </p>
+        )}
+        {siblingCount != null && siblingCount > 0 && (
+          <div            style={{
+              padding: "var(--space-3)",
+              background: "var(--paper-2)",
+              border: "1px solid var(--line-1)",
+              borderRadius: "var(--radius-2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-2)",
+            }}
+            data-testid="recover.sibling-notice"
+          >
+            <span style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--fg-2)" }}>
+              {t("vaultRecover.siblingNotice.body", { count: siblingCount })}
+            </span>
+            <button
+              type="button"
+              onClick={onRecoverAnother}
+              data-testid="recover.sibling-recover-another"
+              style={{
+                alignSelf: "flex-start",
+                background: "transparent",
+                border: 0,
+                padding: "var(--space-2) var(--space-1)",
+                borderRadius: "var(--radius-2)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-base)",
+                fontWeight: "var(--weight-medium)",
+                color: "var(--accent)",
+                cursor: "pointer",
+              }}
+            >
+              {t("vaultRecover.siblingNotice.recoverAnother")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

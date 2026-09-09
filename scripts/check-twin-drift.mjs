@@ -54,7 +54,7 @@
 // Run by hand:  node scripts/check-twin-drift.mjs [<changed-file>...]
 // With no arguments it reads the working tree's changed files from git.
 
-import { execFileSync } from "node:child_process";
+import { runTool } from "./lib/run-tool.mjs";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
@@ -86,16 +86,14 @@ const NAMED_TWINS = CURATED_TWINS.map((t) => ({ a: t.a, b: t.b, what: t.what }))
 function changedFiles() {
   const args = process.argv.slice(2);
   if (args.length > 0) return args;
-  try {
-    const out = execFileSync(
-      "git",
-      ["diff", "--name-only", "HEAD"],
-      { cwd: ROOT, encoding: "utf8" },
-    );
-    return out.split("\n").filter(Boolean);
-  } catch {
-    return [];
-  }
+  // FATAL, deliberately: a `git diff` that cannot run used to return [] here,
+  // which silently shrinks the sweep to zero files and the warning to nothing —
+  // a warn-only guard that checks nothing reads as "no twins touched" (myne#528).
+  const r = runTool(["git", "diff", "--name-only", "HEAD"], {
+    cwd: ROOT,
+    onToolFailure: "fatal",
+  });
+  return (r.stdout ?? "").split("\n").filter(Boolean);
 }
 
 /** Every file under `dir`, repo-relative. */

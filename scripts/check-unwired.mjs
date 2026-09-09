@@ -50,6 +50,12 @@ const WATCHED = [
   // shared package whose first module has no importer is exactly the shape,
   // and nothing would have said so.
   "client-core/src",
+  // `src/notes` joined with myne#587, which found this guard's WATCHED list
+  // stopped at `src/lib` + `src/hooks` and so never saw `src/notes` — where
+  // the deleted Ask mode's orchestration (`runAskToStore.ts`, imported only by
+  // its own test) sat unreported. Measured before adding: zero unwired modules
+  // under it, so the addition costs nothing and closes the blind spot.
+  "src/notes",
 ];
 
 /** Every tree that may contain an importer (production or test). */
@@ -86,10 +92,12 @@ const EXEMPT = new Map([
   ["web/src/platform/path.ts", "platform-seam twin"],
   ["web/src/platform/window.ts", "platform-seam twin"],
   ["web/src/platform/webviewWindow.ts", "platform-seam twin"],
-  ["web/src/platform/clipboard.ts", "platform-seam twin"],
   ["web/src/platform/deepLink.ts", "platform-seam twin"],
-  ["web/src/platform/unsupported.ts", "platform-seam twin"],
   ["mobile/src/lib/graph-layout.worker.ts", "worker entry — `WikiGraph.tsx` loads it with `new Worker(new URL(…, import.meta.url))`, a real edge that a static import scan cannot see"],
+  // Same shape as the mobile twin above, measured the first time `src/notes`
+  // joined WATCHED (myne#587): `GraphCanvas.tsx` loads the worker through
+  // `new Worker(new URL("../graphLayout.worker.ts", import.meta.url))`.
+  ["src/notes/graphLayout.worker.ts", "worker entry — `src/notes/components/GraphCanvas.tsx` loads it with `new Worker(new URL(…, import.meta.url))`, a real edge that a static import scan cannot see"],
 
   // ---- RECORDED VIOLATIONS (the starting list; may shrink, never grow) ----
   //
@@ -101,13 +109,22 @@ const EXEMPT = new Map([
   ["web/src/platform/conformance.ts", "UNWIRED — the seam-conformance probe. Nothing calls it, in production or in a test; only a comment in `web/src/platform/event.ts` mentions it."],
   ["web/src/quota-precheck.ts", "UNWIRED — the storage-quota precheck. Its unit test imports it; the boot path does not, so the precheck the web client is documented to run does not run."],
   ["web/src/sw/update-policy.ts", "UNWIRED — the service-worker update policy. Test-only importer."],
-  ["src/lib/ai-qa.ts", "UNWIRED — the AI question-answering binding. `ai-chat.ts` names it in a comment and imports nothing."],
   ["src/lib/reminderLifecycle.ts", "UNWIRED — the reminder lifecycle (cancel-everything-on-lock). `Editor.tsx` names it in a comment; no import."],
   ["src/lib/reminderPermission.ts", "UNWIRED — the notification-permission request. Nothing asks for the permission reminders need."],
   // The first three findings this guard produced against the mobile tree, which
   // it could not see until the client moved in-repo.
   ["mobile/src/lib/query-engine.ts", "UNWIRED — a pure `export * from \"@myne/editor/host/notes/queryEngine\"` shim. Every consumer imports that shared module directly, so the shim forwards for nobody. Dead rather than dangerous; the fix is deleting it."],
   ["mobile/src/lib/reminderPass.ts", "UNWIRED — `runBoundedReminderPass`, the pass that applies the shared scheduling decision core (`@myne/reminder-schedule`) to the OS. Two test files import it; NOTHING in `mobile/src` or `mobile/src-tauri` calls it, so the reminders plugin is installed, the decision core is shared, and the step that would act on either never runs. Note the company it keeps two lines up: `src/lib/reminderLifecycle.ts` and `src/lib/reminderPermission.ts` are the same subsystem, inert on the desktop side. The reminder feature is partly unwired on BOTH clients."],
+  // ---- found the first time `src/notes` joined WATCHED (myne#587) ----------
+  //
+  // All four were already this guard's subject the whole time; the tree was
+  // outside WATCHED, so nobody was told. Recorded rather than fixed here for
+  // the same reason as the list above: wiring each is its own change with its
+  // own reasoning, and recording them is what makes the rule enforceable today.
+  ["src/notes/ai/runSummarizeToStore.ts", "UNWIRED — the summarize → render-store orchestration. Production calls `runSummarizeToChat` (`aiToChat.ts`) out of `Editor.tsx`'s `onSummarizeNote` instead; `Editor.tsx:3176` names this module only in a comment. Its test still pins the orchestration shape."],
+  ["src/notes/graphLayoutProtocol.ts", "UNWIRED — a pure `export * from \"@myne/editor/host/notes/graphLayout\"` shim; every consumer imports the shared module directly. Dead rather than dangerous; the fix is deleting it."],
+  ["src/notes/wordCount.ts", "UNWIRED as production code — `documentStats.ts`'s `computeDocStats` is the live bottom-bar counter (MYND-339). `countBodyWords` survives as the parity oracle `tests/notes/documentStats.test.ts` pins `.words` against, so the fix is moving the oracle INTO that test rather than deleting the guarantee."],
+  ["src/notes/workspaceBuffers.tsx", "UNWIRED — the multi-buffer residency layer (MYND-166 task 2). Zero production importers; whether the pane architecture it was written for shipped around it is its own question, and this entry is the question being on the record."],
 ]);
 
 function* walk(dir) {
@@ -206,6 +223,36 @@ if (unwired.length > 0) {
       "the single-tab vault lock shipped this way and the OPFS write path skipped its\n" +
       "TOCTOU guard on the strength of it.",
   );
+  process.exit(1);
+}
+
+// ---- a stale exemption is a module told to stop being looked at (myne#587) --
+//
+// `ai-qa.ts` was recorded as UNWIRED, deleted with the Ask mode, and this guard
+// kept printing `ok (24 recorded exemption(s))` while one of the twenty-four
+// described a file that no longer existed. `check-ipc-binding-callers.mjs`
+// already fails on a stale exemption and `check-twin-inventory.mjs` on a
+// verdict whose files are gone; this is the same arm here, so an exemption can
+// only shrink with the tree rather than outlive it.
+const stale = [];
+for (const rel of EXEMPT.keys()) {
+  let present;
+  try {
+    statSync(join(ROOT, rel));
+    present = true;
+  } catch {
+    present = false;
+  }
+  if (!present) stale.push(rel);
+}
+if (stale.length > 0) {
+  for (const rel of stale) {
+    console.error(
+      `✗ unwired: STALE EXEMPTION — scripts/check-unwired.mjs records ${rel},\n` +
+        "    which does not exist. Delete the entry; an exemption nobody can\n" +
+        "    re-read is a module this guard has been told to stop looking at.",
+    );
+  }
   process.exit(1);
 }
 

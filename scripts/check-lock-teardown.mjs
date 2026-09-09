@@ -175,6 +175,12 @@ const PAIRS = [
   // clears went missing, because the body is still non-empty. The row records the
   // state; review is what enforces it.
   { hook: "agent_teardown_on_lock", holder: { kind: "state", type: "AgentInferenceState" } },
+  // A detached (pop-out) note window is a second plaintext-bearing WebView, and
+  // the desktop holds the label->note-id map that names the ones it must destroy
+  // on lock (myne-md/myne#679, epic #173). An empty hook body would leave a
+  // locked vault's note text on screen in the pop-out; only desktop opens OS
+  // windows, so mobile and web hold no registry and owe nothing.
+  { hook: "detached_windows_teardown_on_lock", holder: { kind: "state", type: "DetachedWindowRegistry" } },
   { hook: "clear_staged_descriptor", holder: { kind: "command", name: "workspace_stage" } },
 ];
 

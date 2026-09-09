@@ -41,7 +41,12 @@ use tauri::{AppHandle, Runtime, State};
 use crate::plugins::agent::adapters::{EngineAdapter, SearchAdapter};
 use crate::plugins::local_inference::state::LocalInferenceState;
 use crate::plugins::local_inference::vector_store::LocalInferenceVectorState;
-use myne_core::plugins::agent::history::HistoryTurn;
+use myne_core::host::tauri_host::TauriHost;
+use myne_core::plugins::agent::history::{
+    history_budget, seed_messages, HistoryTurn, SeedControls,
+};
+use myne_core::plugins::prefs::commands::prefs_read_from_host;
+use myne_core::vault_io::StdVaultIo;
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
@@ -49,37 +54,13 @@ pub async fn agent_start<R: Runtime>(
     app: AppHandle<R>,
     task: String,
     grant: ScopeGrant,
-    // **ACCEPTED AND IGNORED, and that is a defect rather than a design**
-    // (myne-md/myne#648). The WebView sends both on every run and this host
-    // reads neither, so a run gets no conversation and no language instruction:
-    // the model answers in English about a conversation it cannot see. Core is
-    // fully wired for both — `host_commands::step` reads `Session::language` and
-    // `Session::history` and hands them to `prompt::build_request` — and the one
-    // missing link is `AgentSessionState::open`, which fills those two fields
-    // with `Default` and has no parameter to fill them from.
-    //
-    // The wiring existed. It landed in 5ecddce9 (myne-md/myne#622) as a
-    // prune-then-insert that seeded `language`, `seed_messages(&history,
-    // budget)` and a `SeedContext`, and the merge train replaced that block with
-    // `open()`, which is #456's newer API, keeping the newer call and losing the
-    // three seeded fields. Nothing reported it: the parameters still parse, the
-    // command still succeeds, and CI never runs `cargo clippy -p myne-desktop
-    // --all-targets` with default features, so the unused bindings are invisible
-    // to every gate except the local pre-push battery.
-    //
-    // **Restoring HALF of it would be worse than leaving it.** `SeedContext` is
-    // gone from the tree entirely, and it is what dropped the seed when the
-    // exclusion set or the provider changed mid-run. `docs/decisions/ai/0541`
-    // rests the seed's egress bound on exactly that invalidation, so re-seeding
-    // the history without it would put conversation text back on the wire with
-    // the control that bounds it still missing. Both halves come back together,
-    // in #648, with the tests that pin them.
-    //
-    // Kept in the signature rather than deleted, because deleting them changes
-    // the IPC wire shape while `src/lib/agent-run-core.ts` still sends both as
-    // required arguments, and a silent shape change is how this got here.
-    #[allow(unused_variables)] language: Option<String>,
-    #[allow(unused_variables)] history: Vec<HistoryTurn>,
+    // The visible conversation and the interface language, both read at run
+    // start (myne-md/myne#648 restored the wiring the 2026-08-16 merge
+    // dropped: these parsed and were ignored, so every run answered in English
+    // about a conversation it could not see). `language` shapes the system
+    // instruction; `history` is budgeted and seeded below, marked untrusted.
+    language: Option<String>,
+    history: Vec<HistoryTurn>,
     on_open: Channel<AgentRunView>,
     // The run's cost as it accrues (myne-md/myne#456). A second channel rather
     // than a variant on `on_open`, because the two say different things at
@@ -134,9 +115,32 @@ pub async fn agent_start<R: Runtime>(
     // widen what crosses TB13.
     let run_id = myne_core::plugins::agent::run::new_run_id();
     let (resolved, cancel) = start_run(&runs, run_id.clone(), &grant, &source).await?;
+    // Seed the run with the visible conversation, under the user's budget and
+    // the snapshotted egress controls (myne-md/myne#648). The budget is read
+    // here, at run start, from the same prefs read and clamped again on the
+    // way in; `step` re-reads the live prefs on every leg and drops the seed
+    // when the controls no longer match, so a scope approval waited out while
+    // the exclusion set or the provider moved resumes unseeded rather than
+    // re-sending a conversation the user just withdrew.
+    let prefs = prefs_read_from_host(&TauriHost::new(app.clone()), vault.inner(), &StdVaultIo)
+        .await
+        .map_err(|_| AgentError::ReadFailed)?;
+    let seed = seed_messages(&history, history_budget(&prefs));
+    let seed_controls = if seed.is_empty() {
+        None
+    } else {
+        Some(SeedControls::from_view(&prefs))
+    };
     // Prune-then-insert, in that order, and the order is why this is one call
     // rather than two here: see `AgentSessionState::open`.
-    sessions.open(&run_id, task, &runs.live_ids());
+    sessions.open(
+        &run_id,
+        task,
+        &runs.live_ids(),
+        language,
+        seed,
+        seed_controls,
+    );
     // **Before the loop, not after it.** This command returns once the loop has
     // stopped, which on a remote provider is minutes, and until myne-md/myne#544
     // that return was the only thing that ever handed the surface a run id. So

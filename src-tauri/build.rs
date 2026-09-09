@@ -163,6 +163,8 @@ fn main() {
                 // registered in the handler list and in default.toml but are
                 // MISSING from this mirror — pre-existing, not introduced here.
                 "set_show_task_marker",
+                // myne-md/myne#661: the folder-notes feature off-switch.
+                "set_folder_notes_enabled",
                 "set_transcription_enabled",
                 // MYND-651.
                 "set_auto_tag_enabled",
@@ -405,6 +407,19 @@ fn main() {
             ]),
         )
         .plugin(
+            "detached-window",
+            // myne#678 (epic #173). One MAIN-window command,
+            // `detached_window_open`, host-spawns a `note-<id>` pop-out
+            // window carrying the narrow `detached-note` capability
+            // (myne#677). Adding a command here without a matching
+            // `commands.allow` entry in
+            // `permissions/detached-window/default.toml` is a security
+            // regression (the InlinedPlugin mirror is load-bearing per the
+            // `vault-creation` note above).
+            tauri_build::InlinedPlugin::new()
+                .commands(&["detached_window_open", "detached_window_snapshot"]),
+        )
+        .plugin(
             "workspace",
             // MYND-166: the `workspace_read` + `workspace_write` +
             // `workspace_stage` commands (encrypted vault.workspace
@@ -463,6 +478,21 @@ fn main() {
                 "hide_vault_names",
                 "set_hide_vault_names",
                 "vault_label_keychain_status",
+            ]),
+        )
+        .plugin(
+            "account",
+            // myne-md/myne#684: the device-local account record (the
+            // account/vault split). `account_list` (read) + `account_rename` +
+            // `account_move` + `account_split` (writes). Same InlinedPlugin
+            // discipline as the plugins above; without a matching
+            // `commands.allow` entry in `permissions/account/default.toml` the
+            // ACL resolver never authorizes the `plugin:account|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "account_list",
+                "account_rename",
+                "account_move",
+                "account_split",
             ]),
         )
         .plugin(
@@ -650,8 +680,6 @@ fn main() {
                 "infer_ambient",
                 "embed",
                 "semantic_search",
-                "ask",
-                "chat_stream",
                 "chat_stop",
                 "transcribe",
                 "read_transcript",

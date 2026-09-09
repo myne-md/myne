@@ -47,7 +47,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-// Mirror of deny.toml `[licenses].allow`, plus three npm-ecosystem additions:
+// Mirror of deny.toml `[licenses].allow`, plus npm-ecosystem additions, each
+// with its reason:
 //   0BSD       — BSD Zero-Clause; public-domain-equivalent (≡ CC0-1.0 / Unlicense,
 //                which ARE on the Rust allowlist). Dep: tslib.
 //   Python-2.0 — PSF license; permissive + GPL-compatible. Dep: argparse.
@@ -55,10 +56,13 @@ import { join } from "node:path";
 // AGPL-3.0 SPDX id variants are included for completeness (our own packages are
 // AGPL-3.0; they aren't listed by `pnpm licenses list`, but this is harmless).
 //
-// The mirror is asserted here and machine-checked NOWHERE, and it has already
-// drifted: deny.toml carries `CDLA-Permissive-2.0` (webpki-roots, with its own
-// note there) and this list does not. Latent today because that is a Rust-side
-// license, and filed rather than fixed here.
+// The mirror itself is machine-checked by scripts/check-npm-license-mirror.mjs
+// (pre-commit): a license added to deny.toml but not here fails the commit by
+// name, and so does one removed there. Until that guard landed the mirror was
+// asserted here and checked nowhere, and it drifted: deny.toml gained
+// `CDLA-Permissive-2.0` (webpki-roots) without this list hearing about it
+// (myne-md/myne#527, which closed the gap and added both the entry and the
+// check).
 const ALLOW = new Set([
   "AGPL-3.0",
   "AGPL-3.0-only",
@@ -69,6 +73,7 @@ const ALLOW = new Set([
   "BSD-3-Clause",
   "BSL-1.0",
   "CC0-1.0",
+  "CDLA-Permissive-2.0",
   "ISC",
   "MIT",
   "MIT-0",
