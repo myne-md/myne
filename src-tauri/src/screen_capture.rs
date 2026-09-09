@@ -920,7 +920,7 @@ mod tests {
     #[test]
     fn a_detached_window_mirrors_the_main_state_without_recording() {
         // myne#680: the value `mirror_effective` resolves for a detached window is
-        // `last_requested() && !override_disabled()` — the main window's current
+        // `last_requested() && !override_disabled()`: the main window's current
         // requested state folded with the device-wide override. This asserts that
         // algebra AND that reading it never moves `last_requested` (a pop-out
         // mirrors the main window; opening one must not change what the main

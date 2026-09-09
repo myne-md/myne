@@ -196,11 +196,22 @@ function parseDetachedEntries(raw: unknown): DetachedEntry[] {
     const g = o.geometry;
     if (typeof g !== "object" || g === null) continue;
     const gg = g as Record<string, unknown>;
+    // Persisted geometry is untrusted input (written by an earlier session,
+    // possibly hand-edited on disk): shape alone is not enough, since NaN,
+    // Infinity, and zero or negative sizes would reach the host spawn and fail
+    // there. Reject non-finite and non-positive sizes here with the same
+    // skip-the-entry tolerance as a malformed entry.
     if (
       typeof gg.x !== "number" ||
       typeof gg.y !== "number" ||
       typeof gg.width !== "number" ||
-      typeof gg.height !== "number"
+      typeof gg.height !== "number" ||
+      !Number.isFinite(gg.x) ||
+      !Number.isFinite(gg.y) ||
+      !Number.isFinite(gg.width) ||
+      !Number.isFinite(gg.height) ||
+      gg.width <= 0 ||
+      gg.height <= 0
     ) {
       continue;
     }

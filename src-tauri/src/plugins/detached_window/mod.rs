@@ -1,4 +1,4 @@
-//! `detached-window` plugin — host-spawned pop-out note windows (myne-md/myne#678,
+//! `detached-window` plugin: host-spawned pop-out note windows (myne-md/myne#678,
 //! epic #173).
 //!
 //! One command, `detached_window_open`, granted to the MAIN window by

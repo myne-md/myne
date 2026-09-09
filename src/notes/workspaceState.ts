@@ -976,9 +976,9 @@ export type NamedWorkspaces = {
    *  unset. */
   graphSettings?: GraphSettings;
   /** Open detached (pop-out) note windows to restore on the next launch
-   *  (myne#678 task 6, SYNC-10) — each a note id + its last PHYSICAL geometry.
+   *  (myne#678 task 6, SYNC-10): each a note id + its last PHYSICAL geometry.
    *  Device-local and window-global like `expandedFolders`; omit-when-empty on
-   *  serialize (no format bump — a pre-feature reader tolerates the unknown
+   *  serialize (no format bump: a pre-feature reader tolerates the unknown
    *  field, a fresh container has none). Restored clamped onto a currently-
    *  connected display (`planDetachedRestore`). */
   detached?: readonly DetachedEntry[];

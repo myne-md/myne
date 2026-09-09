@@ -16,7 +16,7 @@
 # blanket "MUST NOT grant any of these to a non-main window" reservation: a detached `note-*`
 # window runs the same bundled code and holds the same plaintext a split pane already does, so
 # rendering/pasting attachments there is the same exposure a split pane already has. The
-# `attachment://` URI scheme is NOT a command — it is registered on the Builder in `lib.rs` and
+# `attachment://` URI scheme is NOT a command: it is registered on the Builder in `lib.rs` and
 # gated inside its own handler (unlock + a label allowlist); myne#677 task 2 widens that allowlist
 # to the `note-` prefix so embeds render in the pop-out.
 

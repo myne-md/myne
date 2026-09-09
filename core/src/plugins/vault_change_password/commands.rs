@@ -115,7 +115,7 @@ pub async fn change_password_from_host(
         hooks.pdf_export_teardown_on_lock();
         hooks.agent_teardown_on_lock();
         // myne#679: destroy every open detached (pop-out) note window on the
-        // force-relock path too — locking means locked for every plaintext
+        // force-relock path too: locking means locked for every plaintext
         // surface, not just "main".
         hooks.detached_windows_teardown_on_lock();
         // MYND-31: wipe the plaintext-derived VaultIndices — note titles,

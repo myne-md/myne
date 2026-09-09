@@ -190,7 +190,7 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     /// myne#679: destroy every open detached (`note-<id>`) pop-out window and
     /// clear the registry. A detached window is a second plaintext-bearing
     /// WebView (the same shape as the hidden pdf-export window above), so on lock
-    /// its V8 heap must be dropped along with the main window's — a locked vault
+    /// its V8 heap must be dropped along with the main window's: a locked vault
     /// leaves no note text on screen in ANY window (threat-model A6).
     fn detached_windows_teardown_on_lock(&self) {
         crate::plugins::detached_window::teardown_on_lock(&self.app);

@@ -58,22 +58,6 @@ export async function detachedWindowsSnapshot(): Promise<DetachedEntry[]> {
 }
 
 /**
- * True inside a detached (pop-out) note window (myne#678 render, epic #173).
- *
- * Read from the host-injected `window.__MYNE_DETACHED__`. On web and mobile the
- * global is never set (no OS window is spawned), so this is always `false`
- * there, which is what keeps `App.tsx`'s detached branch desktop-only without a
- * capability check on the boot path.
- */
-export function isDetachedWindow(): boolean {
-  try {
-    return window.__MYNE_DETACHED__ === true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * The note id a detached window was opened for (SYNC-1 `note-<id>`), or `null`
  * outside a detached window. `App.tsx` passes it to `<Editor detachedNoteId>` so
  * the pop-out opens that one note in a single pane with no sidebar (SYNC-6: the

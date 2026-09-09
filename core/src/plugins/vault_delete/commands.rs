@@ -253,7 +253,7 @@ async fn run_post_delete_teardown(
         hooks.pdf_export_teardown_on_lock();
         hooks.agent_teardown_on_lock();
         // myne#679: destroy the deleted vault's detached (pop-out) note windows
-        // on the same delete-proceeded path — its plaintext must not outlive the
+        // on the same delete-proceeded path: its plaintext must not outlive the
         // vault in a second window.
         hooks.detached_windows_teardown_on_lock();
         // MYND-31: wipe the plaintext-derived VaultIndices on the same
