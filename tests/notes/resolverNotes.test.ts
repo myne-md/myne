@@ -17,6 +17,7 @@ function rec(p: Partial<TitleRecord> & { noteUuid: string }): TitleRecord {
     trashed: p.trashed ?? null,
     template: p.template ?? false,
     kind: p.kind ?? null,
+    folderIndex: p.folderIndex ?? false,
   };
 }
 
@@ -30,7 +31,7 @@ describe("resolverNotesFromCache", () => {
       cache([rec({ noteUuid: "a", title: "Alpha", folder: "f/" })]),
     );
     expect(out).toEqual([
-      { noteUuid: "a", title: "Alpha", folder: "f/", isDrawing: false },
+      { noteUuid: "a", title: "Alpha", folder: "f/", folderIndex: false, isDrawing: false },
     ]);
   });
 
@@ -48,7 +49,7 @@ describe("resolverNotesFromCache", () => {
   it("carries null title/folder for untitled, unfiled notes", () => {
     const out = resolverNotesFromCache(cache([rec({ noteUuid: "a" })]));
     expect(out).toEqual([
-      { noteUuid: "a", title: null, folder: null, isDrawing: false },
+      { noteUuid: "a", title: null, folder: null, folderIndex: false, isDrawing: false },
     ]);
   });
 
@@ -61,5 +62,26 @@ describe("resolverNotesFromCache", () => {
     );
     expect(out.find((n) => n.noteUuid === "d")?.isDrawing).toBe(true);
     expect(out.find((n) => n.noteUuid === "n")?.isDrawing).toBe(false);
+  });
+
+  // myne-md/myne#661: the folder-notes off-switch. The resolver note-set is the
+  // one input every wikilink / chip / graph reader consumes, so gating
+  // folderIndex here is what makes `[[Projects/]]` stop resolving when off.
+  it("carries folderIndex through by default (feature honoured)", () => {
+    const out = resolverNotesFromCache(
+      cache([rec({ noteUuid: "i", title: "Index", folder: "f/", folderIndex: true })]),
+    );
+    expect(out[0]!.folderIndex).toBe(true);
+  });
+
+  it("projects folderIndex:false for every note when the feature is off", () => {
+    const out = resolverNotesFromCache(
+      cache([
+        rec({ noteUuid: "i", title: "Index", folder: "f/", folderIndex: true }),
+        rec({ noteUuid: "n", title: "Note", folder: "f/" }),
+      ]),
+      false,
+    );
+    expect(out.every((n) => n.folderIndex === false)).toBe(true);
   });
 });

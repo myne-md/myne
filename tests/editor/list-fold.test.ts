@@ -16,10 +16,10 @@
 
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
-import { ensureSyntaxTree, foldable } from "@codemirror/language";
+import { foldable } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { listFoldRange, listFoldService } from "../../src/editor/list-fold";
-import { PARSE_BUDGET_MS } from "./_parse-budget";
+import { assertParsedState } from "./_parse-budget";
 
 /** A markdown-parsed EditorState with the list-fold service mounted. The docs
  *  here are tiny, but the lezer parse is lazy — `syntaxTree` alone only reads
@@ -43,20 +43,13 @@ import { PARSE_BUDGET_MS } from "./_parse-budget";
  *  without anybody being able to tell. `ensureSyntaxTree` returns `null` when it
  *  did not finish, discarding that let an incomplete tree reach `listFoldRange`,
  *  and the result would be `null` — identical to a genuinely non-foldable item.
- *  If this test fails again, the message now distinguishes the two. */
+  *  If this test fails again, the message now distinguishes the two. */
 function parsed(doc: string): EditorState {
   const s = EditorState.create({
     doc,
     extensions: [markdown({ base: markdownLanguage }), listFoldService()],
   });
-  if (ensureSyntaxTree(s, s.doc.length, PARSE_BUDGET_MS) === null) {
-    throw new Error(
-      `list-fold: the syntax parse did not reach ${s.doc.length} within ` +
-        `${PARSE_BUDGET_MS} ms, so the tree is PARTIAL and listFoldRange below ` +
-        `reads an incomplete tree. The list item below is not necessarily ` +
-        `non-foldable: the parser had not reached it.`,
-    );
-  }
+  assertParsedState(s);
   return s;
 }
 

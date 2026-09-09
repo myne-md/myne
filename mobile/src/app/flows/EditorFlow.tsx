@@ -81,6 +81,7 @@ import { deriveTree, subtreeCount, orderedChildren, childOrderIndex, reorderChil
 import type { Child, OrderedNoteRecord } from "@myne/editor/host/notes/itemOrder";
 import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expand-store";
 import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
+import { flushChatHistoryNow } from "../../lib/chatHistory";
 import { endAgentRun } from "../../lib/agent-lifetime";
 import { resolvePeriodNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
 import { periodSettings, zonedNow } from "../../lib/daily";
@@ -544,6 +545,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     const flushAll = () => {
       flushRef.current();
       void flushWorkspaceNow();
+      // Settled chat turns a backgrounding interrupted (myne-md/myne#675): the
+      // AI flow stages its transcript on every settle and this flushes what is
+      // still staged. Best-effort and independent like its neighbours; a run
+      // lost to the pocket keeps its settled turns.
+      void flushChatHistoryNow();
       // **Not a flush.** The other two here are writes racing an OS kill; this
       // is a drop. The OS suspends a backgrounded WebView and may reclaim the
       // process, so an in-flight run's reply can simply never arrive, leaving a

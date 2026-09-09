@@ -59,6 +59,8 @@ pub mod blob;
 pub(crate) mod blob_envelope;
 pub(crate) mod canonical_json;
 pub mod capture_blob;
+pub mod chats_blob;
+pub mod chats_catalog_blob;
 pub mod color_group;
 pub mod crdt_note_blob;
 pub mod dictionary_blob;
@@ -101,13 +103,14 @@ pub use account_number::{
     ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
-    aad_ai_embeddings_blob, aad_attachment_text_blob, aad_custom_themes_blob,
-    aad_graph_layout_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
-    aad_password_wrap_v0_2, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
-    aad_recovery_wrap, aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob,
-    aad_singleton_blob_v0_2, aad_vault_indices_blob, aad_vault_items_key_wrap,
-    aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
-    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob, aad_chats_blob_v0_2,
+    aad_chats_catalog, aad_custom_themes_blob, aad_graph_layout_blob, aad_membership_blob,
+    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2,
+    aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
+    aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob, aad_singleton_blob_v0_2,
+    aad_vault_indices_blob, aad_vault_items_key_wrap, aad_vault_items_key_wrap_v0_2,
+    aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
+    CTX_COMMITMENT_TAG_LEN,
 };
 pub use attachment_blob::{
     aad_encrypt_attachment, aad_encrypt_attachment_v0_2, aad_wrap_attachment_key,
@@ -136,6 +139,21 @@ pub use attachments_catalog::{
 pub use blob::{
     decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,
     DecryptError, DecryptedNote,
+};
+pub use chats_blob::{
+    decode_chats_blob, decode_chats_blob_v0_2, decode_chats_blob_versioned, encode_chats_blob,
+    encode_chats_blob_raw, encode_chats_blob_v0_2, encode_chats_blob_v0_2_raw,
+    encode_chats_blob_versioned, reseal_chats_blob_v0_2, ChatsBlobError, CHATS_BLOB_AAD_ROLE,
+    CHATS_BLOB_ACCOUNT_HASH_LEN, CHATS_BLOB_FORMAT_VERSION, CHATS_BLOB_HEADER_LEN,
+    CHATS_BLOB_MAGIC, CHATS_BLOB_PROTOCOL_VERSION_V0_1, CHATS_BLOB_PROTOCOL_VERSION_V0_2,
+    CHATS_BLOB_V0_2_MAGIC, CONVERSATION_ID_LEN, MAX_CHATS_PLAINTEXT_LEN,
+};
+pub use chats_catalog_blob::{
+    decode_chats_catalog_blob, decode_chats_catalog_blob_versioned, encode_chats_catalog_blob,
+    encode_chats_catalog_blob_raw, encode_chats_catalog_blob_versioned, ChatsCatalogError,
+    CHATS_CATALOG_ACCOUNT_HASH_LEN, CHATS_CATALOG_BLOB_AAD_ROLE, CHATS_CATALOG_BLOB_MAGIC,
+    CHATS_CATALOG_BLOB_PROTOCOL_VERSION, CHATS_CATALOG_BLOB_V0_2_MAGIC,
+    CHATS_CATALOG_FORMAT_VERSION, CHATS_CATALOG_HEADER_LEN, MAX_CHATS_CATALOG_PLAINTEXT_LEN,
 };
 pub use color_group::{
     canonical_encode_color_groups, parse_color_groups_array, ColorGroup, ColorGroupParseError,
@@ -234,16 +252,18 @@ pub use vault_indices_blob::{
 };
 pub use vault_meta::{
     derive_items_key, parse_vault_meta, rewrite_vault_meta_password_side, serialize_vault_meta,
-    VaultMeta, VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
+    Membership, VaultMeta, MEMBERSHIP_ACCOUNT_ID_LEN, MEMBERSHIP_CIPHERTEXT_LEN,
+    MEMBERSHIP_FIELD_LEN, VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
     VAULT_META_MAGIC, VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
-    VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
+    VAULT_META_SALT_RANDOM_LEN, VAULT_META_V0_2_WITH_MEMBERSHIP_LEN,
+    VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
 pub use vault_meta_v0_2::{
     derive_items_key_v0_2, derive_items_key_versioned, encode_vault_meta_v0_2_raw, meta_version_of,
     parse_vault_meta_any, parse_vault_meta_v0_2, rewrite_vault_meta_password_side_v0_2,
-    rewrite_vault_meta_password_side_versioned, serialize_vault_meta_v0_2,
+    rewrite_vault_meta_password_side_versioned, seal_membership_raw, serialize_vault_meta_v0_2,
     serialize_vault_meta_versioned, unlock_root_key_v0_2_password, unlock_root_key_v0_2_recovery,
-    VAULT_META_V0_2_MAGIC, VAULT_META_V0_2_PROTOCOL_VERSION,
+    unseal_membership, VAULT_META_V0_2_MAGIC, VAULT_META_V0_2_PROTOCOL_VERSION,
 };
 pub use workspace_blob::{
     decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,

@@ -21,6 +21,7 @@ import {
   AI_TRUST_A7_RESIDUAL,
   CONSENT_DEVICE_SCOPE,
   CONSENT_DIRECT_CONNECTION,
+  CONSENT_EXCLUDED_FOLDERS,
   CONSENT_HOW_TO_REVOKE,
   CONSENT_WHAT_LEAVES,
   CONSENT_WHEN_IT_LEAVES,
@@ -71,6 +72,12 @@ describe("AiConsentScreen", () => {
     );
     expect(screen.getByTestId("ai-consent.connection").textContent).toBe(
       CONSENT_DIRECT_CONNECTION,
+    );
+    // WHAT NEW READS NEVER TOUCH (myne-md/myne#675): the excluded-folders list
+    // withholds whole folders from new reads under the agreement above, and
+    // it is the same list the command-line client honors.
+    expect(screen.getByTestId("ai-consent.excluded").textContent).toBe(
+      CONSENT_EXCLUDED_FOLDERS,
     );
     // The EIGHTH element, which this screen omitted while the desktop screen
     // rendered it (myne-md/myne#456, found by review). This file's own subject

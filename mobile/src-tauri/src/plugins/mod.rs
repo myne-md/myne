@@ -28,6 +28,10 @@ pub mod export;
 // `myne_core::plugins::graph_layout` — read/write of the encrypted
 // `vault.graph` node-position cache (Class 3, never synced/backed up).
 pub mod graph_layout;
+// AI conversations (MYM1 catalog + MYJ1 files, myne-md/myne#675): a thin
+// re-export wrapper over `myne_core::plugins::chats`: the six conversation
+// storage commands, Class-1 synced vault content.
+pub mod chats;
 // On-device speech-to-text (Whisper, MYND-563) — a NEW mobile plugin (not a
 // `myne-core` re-export: `local_inference` is desktop-side and `core/` must stay
 // wasm-clean, so the whisper subset is copied here). Declared unconditionally;
@@ -69,6 +73,10 @@ pub mod vault_change_password;
 // side-effect to attach, so the whole module is re-exported. The
 // `plugins::vault_creation::init()` call in `lib.rs` resolves through this.
 pub use myne_core::plugins::vault_creation;
+// Account record (the account/vault split, myne-md/myne#684): a thin re-export
+// wrapper over `myne_core::account`. All FOUR of desktop's commands; on Android
+// the store holds nothing and vaults show standalone.
+pub mod account;
 pub mod vault_delete;
 pub mod vault_indices;
 // Sealed label store (MYL1, §9.22): a thin re-export wrapper over

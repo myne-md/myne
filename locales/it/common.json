@@ -1172,7 +1172,19 @@
           "tagsThinking": "Suggerimento tag…",
           "thinking": "L'AI sta pensando…",
           "truncated": "Riassunti i primi {{count}} caratteri.",
-          "you": "Tu"
+          "you": "Tu",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Tutte le schede sono nascoste. Fai clic destro per ripristinarle.",
         "outline": {
@@ -3155,7 +3167,8 @@
         "whatLabel": "Cosa esce dal tuo dispositivo",
         "whenLabel": "Quando esce",
         "whoLabel": "Chi lo riceve",
-        "connectionLabel": "Come viaggia"
+        "connectionLabel": "Come viaggia",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Come funziona?",
       "enableHelper": "Esegue un modello fornito da te. Dove viene eseguito, e se le tue note escono da questo dispositivo, dipende dal provider che indichi qui sotto. Sperimentale, disattivato per impostazione predefinita.",
@@ -3181,8 +3194,6 @@
         "localModelMissing": "Il modello locale registrato nelle impostazioni non è più su questo dispositivo. Non è stato inviato nulla da nessuna parte. Scegli di nuovo un modello, o indica un provider, in Impostazioni → Developer → AI.",
         "noCredential": "Per questo provider non è impostata alcuna chiave API. Aggiungine una in Impostazioni → Developer → AI.",
         "notReady": "Non c'è ancora nulla di pronto a rispondere. Non è stato inviato nulla da nessuna parte. Scegli un modello, o indica un provider, in Impostazioni → Developer → AI.",
-        "noEmbeddingModel": "Le domande cercano tra le tue note su questo dispositivo, e per farlo serve un modello di ricerca qui. Un provider non può farlo. Non è stato inviato nulla da nessuna parte. Scegli un modello di ricerca in Impostazioni → Developer → AI.",
-        "indexNotReady": "Le tue note sono ancora in fase di indicizzazione per la ricerca. Non è stato inviato nulla da nessuna parte. Riprova tra un momento.",
         "requestRejected": "Il provider non ha accettato questa richiesta. Non è stato salvato nulla. È un difetto in ciò che Myne ha inviato, non nella tua configurazione o nelle tue note.",
         "policyRefused": "Il provider ha rifiutato questa richiesta in base alle proprie regole: una protezione dell'account, una policy dell'area di lavoro o un modello che il tuo piano non include. Va risolto con il provider, non in Myne.",
         "quotaExhausted": "Il provider ha rifiutato la richiesta: hai esaurito il credito o superato un limite di frequenza. Va risolto con il provider, non in Myne.",

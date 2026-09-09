@@ -1221,7 +1221,19 @@
           "tagsThinking": "Sugerowanie tagów…",
           "thinking": "AI myśli…",
           "truncated": "Podsumowano pierwsze {{count}} znaków.",
-          "you": "Ty"
+          "you": "Ty",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Wszystkie karty są ukryte. Kliknij prawym przyciskiem, aby przywrócić.",
         "outline": {
@@ -3260,7 +3272,8 @@
         "whatLabel": "Co opuszcza Twoje urządzenie",
         "whenLabel": "Kiedy opuszcza urządzenie",
         "whoLabel": "Kto to otrzymuje",
-        "connectionLabel": "Jak to podróżuje"
+        "connectionLabel": "Jak to podróżuje",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Jak to działa?",
       "enableHelper": "Uruchamia dostarczony przez Ciebie model. To, gdzie działa i czy Twoje notatki opuszczają to urządzenie, zależy od dostawcy, którego wskażesz poniżej. Eksperymentalne, domyślnie wyłączone.",
@@ -3286,8 +3299,6 @@
         "localModelMissing": "Modelu lokalnego zapisanego w ustawieniach nie ma już na tym urządzeniu. Nic nigdzie nie zostało wysłane. Wybierz model ponownie albo wskaż dostawcę w Ustawienia → Deweloper → AI.",
         "noCredential": "Dla tego dostawcy nie ustawiono klucza API. Dodaj go w Ustawienia → Deweloper → AI.",
         "notReady": "Nic nie jest jeszcze gotowe do odpowiadania. Nic nigdzie nie zostało wysłane. Wybierz model albo wskaż dostawcę w Ustawienia → Deweloper → AI.",
-        "noEmbeddingModel": "Zadane pytanie przeszukuje Twoje notatki na tym urządzeniu, a do tego potrzebny jest tutaj model wyszukiwania. Dostawca tego nie zrobi. Nic nigdzie nie zostało wysłane. Wybierz model wyszukiwania w Ustawienia → Deweloper → AI.",
-        "indexNotReady": "Twoje notatki są jeszcze indeksowane do wyszukiwania. Nic nigdzie nie zostało wysłane. Spróbuj ponownie za chwilę.",
         "requestRejected": "Dostawca nie przyjął tego żądania. Nic nie zostało zapisane. To błąd w tym, co wysłało Myne, a nie w Twojej konfiguracji ani w Twoich notatkach.",
         "policyRefused": "Dostawca odmówił wykonania tego żądania na podstawie własnych zasad: zabezpieczenia konta, polityki obszaru roboczego albo modelu, którego nie obejmuje Twój plan. Trzeba to rozwiązać u dostawcy, nie w Myne.",
         "quotaExhausted": "Dostawca odrzucił żądanie: skończyły się środki albo przekroczono limit zapytań. Trzeba to rozwiązać u dostawcy, nie w Myne.",

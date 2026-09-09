@@ -1053,6 +1053,7 @@ mod tests {
             items_key_id: [7u8; 16],
             items_key_nonce: [8u8; 24],
             enc_items_key: [9u8; 64],
+            membership: None,
         };
         std::fs::write(
             tmp.path().join("vault.meta"),

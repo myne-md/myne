@@ -30,6 +30,7 @@ import {
   createNote,
   dismissImporterOffer,
   openSettings,
+  pickSelect,
   unlockToEditor,
 } from "./support/flows";
 import { type Element, type Session, testIdSelector } from "./support/webdriver";
@@ -37,19 +38,6 @@ import { type Element, type Session, testIdSelector } from "./support/webdriver"
 // Distinct note titles — single lowercase-alnum tokens (residue needle rule).
 const NOTE_TITLE = "filesnotealpha7k2m9qx4w8e5rj0";
 const TARGET_FOLDER = "filesinbox7c2vb5kk0/";
-
-/** Pick `value` from a plain Select identified by `selectTestId`. */
-async function pickSelect(
-  session: Session,
-  selectTestId: string,
-  value: string,
-): Promise<void> {
-  await (await session.byTestId(selectTestId)).click();
-  const option = await session.waitForElement(
-    testIdSelector(`${selectTestId}-option`, { "data-value": value }),
-  );
-  await option.click();
-}
 
 /** The sidebar rows' note-ids, in DOM order, once exactly `expected` exist. */
 async function noteRowIds(session: Session, expected: number): Promise<string[]> {

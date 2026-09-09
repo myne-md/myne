@@ -188,6 +188,7 @@ const ROOT = FIXTURE_RUN
 const SCANNED_TREES = [
   "protocol/src",
   "core/src",
+  "format/src",
   ...RUST_CLIENT_TREES,
   "e2e/fixture-gen/src",
 ];

@@ -9,8 +9,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { forceParsing } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { assertParsed } from "./_parse-budget";
 import {
   codeNestMarkdownExtension,
   codeSyntaxHighlighting,
@@ -34,7 +34,7 @@ function mount(doc: string): Mounted {
     }),
     parent: host,
   });
-  forceParsing(view, doc.length, 2000);
+  assertParsed(view);
   return { view, host };
 }
 
@@ -63,7 +63,7 @@ describe("code-block rendering (jsdom)", () => {
     m = mount("```rust\nlet answer = 42;\n```");
     // eager `support` → the wrap nests on the first parse; drive it to completion
     // (jsdom has no background worker)
-    for (let i = 0; i < 5; i++) forceParsing(m.view, m.view.state.doc.length, 2000);
+    assertParsed(m.view);
     // highlightTree applies CM's generated (ͼ-prefixed) classes to colored tokens
     const colored = [...m.host.querySelectorAll(".cm-content span")].filter((s) =>
       /ͼ/.test(s.className),

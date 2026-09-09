@@ -154,6 +154,11 @@ pub mod task;
 // replaces. The desktop crate re-exports it via `pub use myne_core::search;`;
 // mobile does not wire it (the search-index feed hangs off the desktop-only
 // `search_upsert`/`hydrate` hooks, absent in mobile's `NoopHooks`).
+/// The account record (the account/vault split, `decisions.md` 2026-09-07): the
+/// device-local sealed record that groups vaults under an account. Top-level
+/// rather than under `plugins/` for the same reason `vault_label` is: the picker
+/// and the account commands both consume it and neither owns it.
+pub mod account;
 pub mod search;
 /// Opening a singleton vault file with crash recovery (phase3-web-client task
 /// 18) — the one place that implements "newest copy that verifies wins", so the

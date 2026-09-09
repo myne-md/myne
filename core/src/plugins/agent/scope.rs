@@ -478,6 +478,13 @@ mod tests {
         .unwrap_err();
         assert!(matches!(err, AgentError::EmptyGrant));
         assert!(runs.is_empty(), "no run is created for an empty grant");
+        // The refusal reads the CURRENT exclusions and the index first, then
+        // refuses: a clamp decided on stale prefs, or a refusal issued before
+        // the read, would both compile. Nothing is sent and no tool runs
+        // anywhere on this path (`start_run` has no such call), so the order
+        // plus the absent run is the whole "refused before anything is sent"
+        // property (myne-md/myne#675).
+        assert_eq!(*src.asked.lock().unwrap(), vec!["excluded", "records"]);
     }
 
     // The order, asserted rather than commented: a host that snapshotted the

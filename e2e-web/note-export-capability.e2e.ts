@@ -45,7 +45,6 @@ const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrows
 const SYNC_ORIGIN = "https://sync.example.test";
 const UNLOCK_TIMEOUT_MS = 30_000;
 
-
 describeE2E("the export submenu withholds the format a page cannot produce", () => {
   it("offers Markdown, HTML and plain text, and no PDF row exists at all", async () => {
     const vault = loadVaultFixture();

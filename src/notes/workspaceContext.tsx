@@ -27,6 +27,7 @@ import {
 } from "react";
 import { DEFAULT_GRAPH_SETTINGS, encodeGraphSettings, type GraphSettings } from "./graphSettings";
 import type { NoteId } from "./sidebarState";
+import { openDetachedWindow } from "../lib/detachedWindow";
 import {
   activeSlotState,
   allOpenItems,
@@ -244,6 +245,19 @@ export type WorkspaceApi = {
    *  (trash / archive) so no stale, still-editable buffer is left behind for an
    *  autosave to write back and silently un-trash / un-archive it (#219). */
   closeNoteEverywhere: (id: NoteId) => void;
+  /** Pop `id` out into its own OS window and MOVE it there (SYNC-6): reveal or
+   *  spawn the pop-out, then, only on success, close the note's main-window tabs
+   *  so the two never autosave the same blob concurrently. No-op off desktop. */
+  detachNote: (id: NoteId) => void;
+  /** Record that `id` now lives in a pop-out (the Editor calls this after a
+   *  successful detach), so a later open of it reveals the window, not a tab. */
+  markDetached: (id: NoteId) => void;
+  /** Forget that `id` was in a pop-out (the Editor calls this on the window's
+   *  close/delete event), so opening it again opens a normal tab. */
+  unmarkDetached: (id: NoteId) => void;
+  /** Whether `id` is currently held in a pop-out on this device (drives the
+   *  pop-out affordance's reveal-vs-spawn decision). */
+  isDetached: (id: NoteId) => boolean;
   /** Drop a note onto a pane's tab strip (tab drag OR sidebar drag): an
    *  already-open note moves/reorders, a fresh one is inserted + activated. */
   dropNoteOnPane: (toPaneId: PaneId, id: NoteId, toIndex: number) => void;
@@ -361,8 +375,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setPendingNewTabPaneIdState(v);
   }, []);
 
+  // Notes currently held in a detached (pop-out) OS window on THIS device
+  // (SYNC-6: one note, one surface). A note in this set lives in its pop-out, not
+  // in a main-window tab, so opening it in the main window must REVEAL the pop-out
+  // rather than spawn a second autosaving surface over the same blob. A ref (not
+  // state) because the open ops read it synchronously; the Editor keeps it in step
+  // via markDetached (on a successful pop-out) and unmarkDetached (on the pop-out's
+  // close/delete event). Empty on web/mobile, where nothing ever detaches.
+  const detachedIdsRef = useRef<Set<NoteId>>(new Set());
+  const markDetached = useCallback((id: NoteId) => {
+    detachedIdsRef.current.add(id);
+  }, []);
+  const unmarkDetached = useCallback((id: NoteId) => {
+    detachedIdsRef.current.delete(id);
+  }, []);
+  const isDetached = useCallback(
+    (id: NoteId): boolean => detachedIdsRef.current.has(id),
+    [],
+  );
+  // SYNC-6 reveal guard: if the note is in a pop-out, focus that window (the host
+  // reveals an already-open note) instead of opening a second surface here.
+  const revealIfDetached = useCallback((id: NoteId): boolean => {
+    if (!detachedIdsRef.current.has(id)) return false;
+    void openDetachedWindow(id).catch(() => {});
+    return true;
+  }, []);
+
   const openInFocused = useCallback(
     (id: NoteId) => {
+      if (revealIfDetached(id)) return;
       const wasPending = pendingRef.current;
       setPending(null);
       setState((s) =>
@@ -371,21 +412,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           : openInFocusedTab(s, noteItem(id)),
       );
     },
-    [setPending],
+    [setPending, revealIfDetached],
   );
   const openNewTabInFocused = useCallback(
     (id: NoteId) => {
+      if (revealIfDetached(id)) return;
       setPending(null);
       setState((s) => openInNewTab(s, noteItem(id)));
     },
-    [setPending],
+    [setPending, revealIfDetached],
   );
   const openToSide = useCallback(
     (id: NoteId) => {
+      if (revealIfDetached(id)) return;
       setPending(null);
       setState((s) => openToSideOp(s, noteItem(id), newPaneId));
     },
-    [setPending],
+    [setPending, revealIfDetached],
   );
   const splitFocused = useCallback((direction: SplitDirection) => {
     setState((s) => splitPane(s, s.focusedPaneId, direction, newPaneId));
@@ -490,6 +533,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       });
     },
     [setPending],
+  );
+  // Pop `id` out into its own OS window and MOVE it there (SYNC-6: one note, one
+  // surface). Opens (or reveals) the pop-out, and ONLY once the host confirms the
+  // window is up drops the note's main-window tabs, so a popped-out note is never
+  // a live main-window tab AND a live pop-out autosaving the same blob at once
+  // (the concurrent-writer clobber, myne#681 / #678 task 5). If the spawn is
+  // refused the tab is left in place: no move, and nothing is lost. No-op on
+  // web/mobile, where the pop-out affordance is absent (has("detachedWindows")).
+  const detachNote = useCallback(
+    (id: NoteId) => {
+      void openDetachedWindow(id)
+        .then(() => {
+          markDetached(id);
+          closeNoteEverywhere(id);
+        })
+        .catch(() => {});
+    },
+    [markDetached, closeNoteEverywhere],
   );
   // Begin an empty "new tab" in `paneId` (focuses it + shows the chooser).
   const beginNewTab = useCallback(
@@ -787,6 +848,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activateInPane,
       closeTabInPane,
       closeNoteEverywhere,
+      detachNote,
+      markDetached,
+      unmarkDetached,
+      isDetached,
       dropNoteOnPane,
       splitPaneWithNote,
       openView,
@@ -837,6 +902,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activateInPane,
       closeTabInPane,
       closeNoteEverywhere,
+      detachNote,
+      markDetached,
+      unmarkDetached,
+      isDetached,
       dropNoteOnPane,
       splitPaneWithNote,
       openView,

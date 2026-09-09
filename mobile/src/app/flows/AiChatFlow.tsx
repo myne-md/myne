@@ -57,6 +57,19 @@ import {
   agentPreviewGrant,
   agentStart,
 } from "../../lib/agent-run";
+import { chatsList, chatsRead } from "../../lib/chats";
+import {
+  flushPendingTranscript,
+  isChatHistoryLagging,
+  newestConversation,
+  newTurnId,
+  parseTranscript,
+  stageTranscript,
+  subscribeChatHistoryHealth,
+  toHistorySeed,
+  type ChatTurnJson,
+} from "../../lib/chatHistory";
+import { AiHistorySheet } from "./AiHistorySheet";
 import { usePrefs } from "../../lib/use-prefs";
 import { Button } from "../../components/Button";
 import { ScreenScroll } from "../../components/layout";
@@ -159,7 +172,66 @@ export function AiChatFlow({
   // In flight only. The VERDICT is session state and lives in the run store, so
   // a remount does not pay for it twice and the lock teardown drops it.
   const [probing, setProbing] = useState(false);
+  // The persisted conversation layer (myne-md/myne#675). `activeId` is the
+  // conversation new turns append to (`null` = the next send creates);
+  // `openTurns` is its transcript for display. Both are component state by
+  // the same rule that keeps turns out of a module store on this client
+  // (myne-md/myne#617), and the CONTINUATION behind them is derived, not
+  // stored: mount opens the most-recently-updated conversation (the desktop
+  // Task 8 definition), so there is no pointer state to sync, lose, or
+  // disagree about.
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [openTurns, setOpenTurns] = useState<ChatTurnJson[]>([]);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
+  // Persist health (myne-md/myne#675 review): a failed flush keeps the write
+  // staged and raises this until a flush lands, so "shown but unsaved" never
+  // looks exactly like saved.
+  const [historyLagging, setHistoryLagging] = useState(isChatHistoryLagging());
+  useEffect(
+    () => subscribeChatHistoryHealth(() => setHistoryLagging(isChatHistoryLagging())),
+    [],
+  );
 
+  // Continue-last, derived: mount lists the roster and opens the newest
+  // conversation, so a returning user lands where they left off with no
+  // stored pointer. A vault with no readable conversation is a fresh tab,
+  // not an error surface. A send that settles inside the fetch window wins
+  // over the hydrate (the desktop `hydrateActiveConversation` guards, same
+  // rule): the functional updates below keep user-typed turns and their
+  // binding over the fetched ones.
+  useEffect(() => {
+    let live = true;
+    void chatsList()
+      .then((rows) => {
+        if (!live) return;
+        const newest = newestConversation(rows);
+        if (newest === null) return;
+        return chatsRead(newest.id)
+          .then((payload) => {
+            if (!live) return;
+            const turns = parseTranscript(payload);
+            // A file that decrypts but does not parse is an unreadable
+            // store, not an empty one: surface it like the explicit-open
+            // arm does rather than rendering a fresh tab.
+            if (turns === null) {
+              if (live) setHistoryError(true);
+              return;
+            }
+            setOpenTurns((cur) => (cur.length > 0 ? cur : turns));
+            setActiveId((cur) => (cur ?? newest.id));
+          })
+          .catch(() => {
+            if (live) setHistoryError(true);
+          });
+      })
+      .catch(() => {
+        if (live) setHistoryError(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
   // **The arm is read from the prefs, not probed.** A probe is a third-party
   // request (TB13), and this line renders before the user has asked for
   // anything, so probing here would make opening a tab an act of egress.
@@ -293,6 +365,52 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
     }
   }, [t]);
 
+  /** The settled run as a transcript turn: empty text with the summary and
+   *  counts on `agentSummary` (the desktop turn shape), the proposal frozen
+   *  to plain data so later mutations of the live run cannot rewrite history
+   *  (the Task 9 discipline, mirrored here rather than imported: the chat
+   *  store is not a `@myne/*` alias). */
+  function assistantTurnFromAgent(): ChatTurnJson {
+    const a = getAgent();
+    return {
+      id: newTurnId(),
+      kind: "agent",
+      role: "assistant",
+      text: "",
+      agentSummary: {
+        runId: a.view?.runId ?? "",
+        summary: a.proposal.summary,
+        edits: a.proposal.edits.length,
+        newNotes: a.proposal.newNotes.length,
+        notesRead: a.notesRead,
+        iterations: a.iterations,
+        charsOffDevice: a.charsOffDevice,
+        end: a.end?.kind ?? "finished",
+      proposal: JSON.parse(
+        JSON.stringify({ edits: a.proposal.edits, newNotes: a.proposal.newNotes }),
+      ) as {
+        edits: { noteId: string; anchor: string; replacement: string }[];
+        newNotes: { title: string; body: string; folder: string | null }[];
+      },
+      },
+    };
+  }
+
+  /** Append a settled pair to the open transcript and persist it (create on
+   *  first write). The whole transcript is the write unit: appends are
+   *  state writes, not deltas, so the display update and the staged payload
+   *  are built from the same array. */
+  async function persistPair(pair: [ChatTurnJson, ChatTurnJson]): Promise<void> {
+    const next = [...openTurns, ...pair];
+    setOpenTurns(next);
+    stageTranscript(activeId, next);
+    const id = await flushPendingTranscript();
+    // A null activeId that now has an id means the create landed: bind it so
+    // the next send appends. Any other outcome keeps the current binding:
+    // a failed append stays staged for the next flush rather than rebinding.
+    if (activeId === null && id !== null) setActiveId(id);
+  }
+
   const send = useCallback(async () => {
     const task = draft.trim();
     if (task.length === 0 || agent.running || grant === null) return;
@@ -317,14 +435,10 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         // (myne-md/myne#618). Required rather than optional so a call site
         // cannot quietly omit it and put the model back on English answers.
         i18n.language ?? null,
-        // No chat history on mobile YET (myne-md/myne#617). The seed is the
-        // VISIBLE transcript, and this flow keeps its turns in component state
-        // rather than in a module store the way the desktop chat does, so there
-        // is nothing here to read that the desktop's `visibleHistory` reads.
-        // An empty array is the honest value: a run with no prior turns to
-        // refer to. Stated rather than left as a bare `[]`, because the day
-        // this flow grows a store the omission would otherwise be invisible.
-        [],
+        // The open conversation, when there is one: prior turns seed the run
+        // the way the desktop's `visibleHistory` seeds its own. Empty when no
+        // conversation is open (a run with no prior turns to refer to).
+        toHistorySeed(openTurns),
         // The run becomes addressable here, long before the promise resolves.
         // Without it Stop has no id for the whole first leg.
         (view) => void openRun(view, epoch),
@@ -336,6 +450,18 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         (progress) => void reportRunProgress(progress, epoch),
       );
       settleStep(result, epoch);
+      // Persist the settled pair (myne-md/myne#675): the user turn plus the
+      // assistant turn as the transcript will show them. Staged then flushed
+      // in the same tick, so a backgrounding between staging and writing
+      // still reaches the vault through `flushChatHistoryNow`: a run lost
+      // to the pocket keeps its settled turns. The question moves into the
+      // transcript with the pair, so `asked` clears rather than echoing it
+      // twice.
+      await persistPair([
+        { id: newTurnId(), kind: "text", role: "user", text: task },
+        assistantTurnFromAgent(),
+      ]);
+      setAsked(null);
     } catch (e) {
       // **The cause, named, rather than one sentence for everything.** The gate
       // refuses in four distinct ways and the network fails in several more,
@@ -351,9 +477,18 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
       // Nothing about the task is in the message. The task is the user's own
       // words, and the taxonomy is content-free by construction: a variant tag,
       // never a prompt, a note body or a provider's response.
-      failRun(t(providerErrorKey(normalizeProviderError(e))));
+      const sentence = t(providerErrorKey(normalizeProviderError(e)));
+      failRun(sentence);
+      // A failed send is a turn too (the desktop error-turn discipline): the
+      // question and the refusal persist together, so history shows what was
+      // asked and why nothing came back.
+      await persistPair([
+        { id: newTurnId(), kind: "text", role: "user", text: task },
+        { id: newTurnId(), kind: "agent", role: "assistant", text: sentence, error: true },
+      ]);
+      setAsked(null);
     }
-  }, [draft, agent.running, grant, t, ensureCapability]);
+  }, [draft, agent.running, grant, t, ensureCapability, openTurns, activeId]);
 
   const stop = useCallback(() => {
     // The id may genuinely be null: the window between `beginRun()` and the
@@ -392,8 +527,51 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
 
   return (
     <>
+      <div style={{ flex: "none", padding: "var(--space-2) var(--space-3) 0" }}>
+        <Button
+          variant="ghost"
+          full={false}
+          data-testid="ai.history-button"
+          onClick={() => setSheetOpen(true)}
+        >
+          {t("editor.chrome.rightPanel.aiChat.historyTitle")}
+        </Button>
+      </div>
       <ScreenScroll>
         <div data-testid="ai.chat" style={{ padding: "var(--space-3)" }}>
+          {/* The open conversation's settled turns, read-only and oldest-first.
+              The live run below is the present; this is the past. Assistant
+              turns show the run's own closing summary (the answer in one
+              mode), never the proposal: applying is a live-session flow
+              through the review screen, here as on desktop. */}
+          {openTurns.map((turn) => (
+            <div
+              key={turn.id}
+              data-testid="ai.history-turn"
+              data-role={turn.role}
+              data-kind={turn.kind}
+            >
+              {turn.role === "user" ? (
+                <p style={MUTED}>{turn.text}</p>
+              ) : (
+                <p style={BODY_TEXT}>
+                  {turn.agentSummary !== undefined && turn.agentSummary.summary.length > 0
+                    ? turn.agentSummary.summary
+                    : turn.text}
+                </p>
+              )}
+            </div>
+          ))}
+          {historyError ? (
+            <p data-testid="ai.history-error" style={MUTED}>
+              {t("editor.chrome.rightPanel.aiChat.historyError")}
+            </p>
+          ) : null}
+          {historyLagging ? (
+            <p data-testid="ai.persist-warning" style={MUTED}>
+              {t("editor.chrome.rightPanel.aiChat.persistWarning")}
+            </p>
+          ) : null}
           {/* **The empty state, which the tab had none of.** Opening a
               destination and finding a blank area above a text box reads as a
               screen that failed to load, not as one waiting for you. Desktop's
@@ -407,12 +585,17 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           {/* Derived from the RUN, not from `asked`. `asked` is component state
               and the answer lives in a module-scope store, so leaving the tab
               and coming back rendered "nothing here yet" above the previous
-              answer, with the question it belongs to gone. */}
-          {agent.end === null && !agent.running && agent.error === null && agent.iterations === 0 && (
-            <p data-testid="ai.chat-empty" style={MUTED}>
-              {t("editor.chrome.rightPanel.aiChat.empty")}
-            </p>
-          )}
+              answer, with the question it belongs to gone. Suppressed once the
+              transcript holds turns: the question lives there now. */}
+          {agent.end === null &&
+            !agent.running &&
+            agent.error === null &&
+            agent.iterations === 0 &&
+            openTurns.length === 0 && (
+              <p data-testid="ai.chat-empty" style={MUTED}>
+                {t("editor.chrome.rightPanel.aiChat.empty")}
+              </p>
+            )}
 
           {asked !== null && (
             // The user's own words, echoed so the answer below has something to
@@ -608,6 +791,36 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
           onDecline={() => void agentCancel(runId)}
         />
       )}
+      {sheetOpen ? (
+        <AiHistorySheet
+          activeId={activeId}
+          onOpen={(id) => {
+            void chatsRead(id)
+              .then((payload) => {
+                const turns = parseTranscript(payload);
+                if (turns === null) {
+                  setHistoryError(true);
+                  return;
+                }
+                setActiveId(id);
+                setOpenTurns(turns);
+                setSheetOpen(false);
+              })
+              .catch(() => setHistoryError(true));
+          }}
+          onNew={() => {
+            setActiveId(null);
+            setOpenTurns([]);
+          }}
+          onDeleted={(id) => {
+            if (activeId === id) {
+              setActiveId(null);
+              setOpenTurns([]);
+            }
+          }}
+          onClose={() => setSheetOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

@@ -1123,7 +1123,19 @@
           "tagsThinking": "Foreslår tags…",
           "thinking": "AI tænker…",
           "truncated": "Opsummerede de første {{count}} tegn.",
-          "you": "Dig"
+          "you": "Dig",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Alle faner er skjult. Højreklik for at gendanne.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Hvad der forlader din enhed",
         "whenLabel": "Hvornår det sendes",
         "whoLabel": "Hvem der modtager det",
-        "connectionLabel": "Hvordan det rejser"
+        "connectionLabel": "Hvordan det rejser",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Hvordan fungerer det?",
       "enableHelper": "Kører en model, du selv leverer. Hvor den kører, og om dine noter forlader denne enhed, afhænger begge dele af den udbyder, du angiver nedenfor. Eksperimentel, slået fra som standard.",
@@ -3076,8 +3089,6 @@
         "localModelMissing": "Den lokale model, der er registreret i indstillingerne, findes ikke længere på denne enhed. Intet blev sendt nogen steder hen. Vælg en model igen, eller angiv en udbyder, under Indstillinger → Developer → AI.",
         "noCredential": "Der er ikke angivet nogen API-nøgle for denne udbyder. Tilføj en under Indstillinger → Developer → AI.",
         "notReady": "Intet er klar til at svare endnu. Intet blev sendt nogen steder hen. Vælg en model, eller angiv en udbyder, under Indstillinger → Developer → AI.",
-        "noEmbeddingModel": "Når du spørger, søges der i dine noter på denne enhed, og det kræver en søgemodel her. En udbyder kan ikke gøre det. Intet blev sendt nogen steder hen. Vælg en søgemodel under Indstillinger → Developer → AI.",
-        "indexNotReady": "Dine noter er stadig ved at blive indekseret til søgning. Intet blev sendt nogen steder hen. Prøv igen om et øjeblik.",
         "requestRejected": "Udbyderen ville ikke acceptere denne anmodning. Intet blev gemt. Det er en fejl i det, Myne sendte, ikke i din opsætning eller dine noter.",
         "policyRefused": "Udbyderen afviste denne anmodning efter sine egne regler: en kontobegrænsning, en politik for arbejdsområdet eller en model, din plan ikke omfatter. Det skal løses hos udbyderen, ikke i Myne.",
         "quotaExhausted": "Udbyderen afviste anmodningen: du er løbet tør for kredit eller har overskredet en hastighedsgrænse. Det skal løses hos udbyderen, ikke i Myne.",

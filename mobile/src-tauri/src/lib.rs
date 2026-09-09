@@ -193,6 +193,11 @@ pub fn run() {
         // lockstep with build.rs + permissions/graph-layout/default.toml or
         // the ACL resolver fails closed.
         .plugin(plugins::graph_layout::init())
+        // AI conversations (MYM1 catalog + MYJ1 files, myne-md/myne#675):
+        // the six storage commands, shared from `myne-core`. Commands must
+        // stay in lockstep with build.rs + permissions/chats/default.toml or
+        // the ACL resolver fails closed.
+        .plugin(plugins::chats::init())
         // Workspace state (MYW1, §9.7): read/write of the encrypted
         // vault.workspace descriptor, which on mobile carries the sidebar
         // folder-expand set (MYND-561). Mobile-LOCAL, not a `myne-core`
@@ -215,6 +220,12 @@ pub fn run() {
         // lockstep with build.rs + permissions/vault-label/default.toml or the
         // ACL resolver fails closed.
         .plugin(plugins::vault_label::init())
+        // Account record (the account/vault split, myne-md/myne#684). Shared
+        // from `myne-core`; the same four commands the desktop registers, all
+        // reachable PRE-UNLOCK because the surface they govern is the picker.
+        // The command list must stay in lockstep with build.rs +
+        // permissions/account/default.toml or the ACL resolver fails closed.
+        .plugin(plugins::account::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::attachments::init())

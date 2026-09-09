@@ -1172,7 +1172,19 @@
           "tagsThinking": "Sugiriendo etiquetas…",
           "thinking": "La IA está pensando…",
           "truncated": "Se resumieron los primeros {{count}} caracteres.",
-          "you": "Tú"
+          "you": "Tú",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Todas las pestañas están ocultas. Haz clic derecho para restaurarlas.",
         "outline": {
@@ -3155,7 +3167,8 @@
         "whatLabel": "Qué sale de tu dispositivo",
         "whenLabel": "Cuándo sale",
         "whoLabel": "Quién lo recibe",
-        "connectionLabel": "Cómo viaja"
+        "connectionLabel": "Cómo viaja",
+        "excludedLabel": ""
       },
       "disclosureToggle": "¿Cómo funciona esto?",
       "enableHelper": "Ejecuta un modelo que tú proporcionas. Dónde se ejecuta, y si tus notas salen de este dispositivo, depende del proveedor que indiques más abajo. Experimental, desactivado de forma predeterminada.",
@@ -3181,8 +3194,6 @@
         "localModelMissing": "El modelo local registrado en los ajustes ya no está en este dispositivo. No se envió nada a ninguna parte. Vuelve a elegir un modelo, o indica un proveedor, en Ajustes → Desarrollador → IA.",
         "noCredential": "No hay ninguna clave de API configurada para este proveedor. Añade una en Ajustes → Desarrollador → IA.",
         "notReady": "Todavía no hay nada listo para responder. No se envió nada a ninguna parte. Elige un modelo, o indica un proveedor, en Ajustes → Desarrollador → IA.",
-        "noEmbeddingModel": "Preguntar implica buscar en tus notas de este dispositivo, y para eso hace falta aquí un modelo de búsqueda. Un proveedor no puede hacerlo. No se envió nada a ninguna parte. Elige un modelo de búsqueda en Ajustes → Desarrollador → IA.",
-        "indexNotReady": "Todavía se están indexando tus notas para la búsqueda. No se envió nada a ninguna parte. Inténtalo de nuevo en un momento.",
         "requestRejected": "El proveedor no aceptó esta solicitud. No se guardó nada. Es un fallo en lo que envió Myne, no en tu configuración ni en tus notas.",
         "policyRefused": "El proveedor rechazó esta solicitud por sus propias normas: una restricción de la cuenta, una política del espacio de trabajo o un modelo que tu plan no incluye. Esto hay que resolverlo con el proveedor, no en Myne.",
         "quotaExhausted": "El proveedor rechazó la solicitud: te has quedado sin crédito o has superado un límite de ritmo. Esto hay que resolverlo con el proveedor, no en Myne.",

@@ -47,6 +47,7 @@ const COPY = {
   startFailed: "start failed",
   autoApplyFailed: "auto apply failed",
   providerRejected: "provider rejected",
+  scopeExcluded: "scope excluded",
 };
 
 const ORDINARY: ProposedEdit = {

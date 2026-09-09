@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState, type Transaction } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
+import { assertParsedState } from "./_parse-budget";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import { rangeOverlapsAttachmentEmbed } from "../../src/editor/decorations/attachment-embed";
 import { toggleWrap } from "../../src/editor/wrap-toggle";
@@ -23,7 +23,7 @@ function stateWith(doc: string, anchor: number, head: number): EditorState {
     extensions: [markdown({ base: markdownLanguage, extensions: [Wikilink] })],
   });
   // Force a complete parse so syntaxTree() sees the Wikilink node.
-  ensureSyntaxTree(state, doc.length, 5000);
+  assertParsedState(state);
   return state;
 }
 

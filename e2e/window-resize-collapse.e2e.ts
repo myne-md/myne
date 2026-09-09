@@ -214,7 +214,7 @@ async function paneWidths(s: Session): Promise<Widths | null> {
  * partway through an expand; requiring the same pair twice in a row costs one
  * poll and removes that whole class of false reading.
  */
-async function step(s: Session, spec: Step): Promise<Widths> {
+async function step(s: Session, spec: Step, driverPid: number | undefined): Promise<Widths> {
   let innerWidth = -1;
   let attempts = 0;
   await s.waitUntil(
@@ -226,7 +226,7 @@ async function step(s: Session, spec: Step): Promise<Widths> {
       // seat: a sweep descending in small steps reached 560px, and the identical
       // target requested in one jump reported 880px.
       attempts += 1;
-      resizeAppWindow(spec.width, WINDOW_HEIGHT_PX);
+      resizeAppWindow(spec.width, WINDOW_HEIGHT_PX, driverPid);
       const next = (await s.execute<number>("return window.innerWidth;")) ?? -1;
       innerWidth = next;
       return Math.abs(next - spec.width) <= WIDTH_TOLERANCE_PX ? true : null;
@@ -287,7 +287,7 @@ describeE2E("wr1 window width collapses the sidebars at the layout's thresholds 
 
         const measured: Widths[] = [];
         for (const spec of SWEEP) {
-          measured.push(await step(s, spec));
+          measured.push(await step(s, spec, app.driverPid));
         }
 
         // The first and last steps are the same window width, so the widths have

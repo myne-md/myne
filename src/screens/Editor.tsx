@@ -71,12 +71,26 @@ import { DeviceRevoked } from "./DeviceRevoked";
 import { useSyncStatus } from "../hooks/useSyncStatus";
 import { has } from "../platform/capabilities";
 import { deleteVault } from "../lib/vault-delete";
+import {
+  openDetachedWindow,
+  detachedWindowsSnapshot,
+  detachedNoteId as currentDetachedNoteId,
+} from "../lib/detachedWindow";
+import { decidePopOutRoute } from "../notes/detachedRoute";
+import { planDetachedRestore } from "../notes/detachedRestore";
+import { readDisplays, getCurrentWindow } from "../platform/window";
 import { activeVaultId } from "../lib/vault-list";
 import { useUnsyncedEdits } from "../hooks/useUnsyncedEdits";
 import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
 import { RemoteMergeHint } from "../components/sync/RemoteMergeHint";
 import { Icon } from "../components/primitives/Icon";
+import {
+  CenteredCard,
+  CARD_TITLE_STYLE,
+  CARD_BODY_STYLE,
+} from "../components/primitives/CenteredCard";
+import { Button } from "../components/primitives/Button";
 import { PanelToggleGlyph } from "../components/primitives/PanelToggleGlyph";
 import { Tooltip } from "../components/primitives/Tooltip";
 import {
@@ -267,6 +281,7 @@ import {
   workspaceRead,
   workspaceStage,
   workspaceWrite,
+  withDetached,
 } from "../lib/workspace-persist";
 import {
   setActiveWorkspace,
@@ -470,6 +485,15 @@ interface EditorProps {
    * per-row "switching…" caption.
    */
   switching?: boolean;
+  /**
+   * Set only inside a detached (pop-out) note window (myne#678 render, epic
+   * #173). When present, this Editor instance opens that ONE note in a single
+   * pane with both sidebars collapsed and skips the saved-workspace restore, so
+   * a pop-out is the note's own focused surface rather than a second full app
+   * window that could open other notes (SYNC-6: one note, one surface). `null`
+   * everywhere else, including web/mobile where no OS window is ever spawned.
+   */
+  detachedNoteId?: string | null;
 }
 
 /**
@@ -491,6 +515,7 @@ export function Editor({
   onCreateAnother,
   onJoinDevice,
   switching = false,
+  detachedNoteId = null,
 }: EditorProps) {
   const [slotPopulated, setSlotPopulated] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -680,6 +705,7 @@ export function Editor({
           onCreateAnother={onCreateAnother}
           onJoinDevice={onJoinDevice}
           switching={switching}
+          detachedNoteId={detachedNoteId}
           settingsOpen={settingsOpen}
           onRestoreBackup={onRestoreBackup}
           setSettingsOpen={setSettingsOpen}
@@ -718,6 +744,8 @@ type EditorChromeProps = {
   onCreateAnother?: () => void;
   onJoinDevice?: () => void;
   switching: boolean;
+  /** Detached (pop-out) note id, or null in the main window. See `EditorProps`. */
+  detachedNoteId: string | null;
   settingsOpen: boolean;
   onRestoreBackup: () => void;
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
@@ -734,6 +762,7 @@ function EditorChrome({
   onCreateAnother,
   onJoinDevice,
   switching,
+  detachedNoteId,
   settingsOpen,
   onRestoreBackup,
   setSettingsOpen,
@@ -743,6 +772,12 @@ function EditorChrome({
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+  // myne#681 task 2 (SYNC-11): in a detached (pop-out) window, set when the note
+  // this window holds is deleted from ANOTHER surface (a `notes://deleted` event
+  // whose payload matches `detachedNoteId`). The window then shows a terminal
+  // "deleted elsewhere" state rather than reloading to an empty editor or yanking
+  // shut mid-edit. Never set in the main window (`detachedNoteId` is null there).
+  const [deletedElsewhere, setDeletedElsewhere] = useState(false);
   // Keep-both (MYND-427): drain the sync engine's staged concurrent-edit
   // conflicts → materialize each remote revision as a `conflict_of:` copy →
   // refresh the sidebar so it appears. Both edits survive; nothing is lost.
@@ -1081,10 +1116,14 @@ function EditorChrome({
   const [focusActive, setFocusActive] = useState(false);
   const toggleFocus = useCallback(() => setFocusActive((v) => !v), []);
   const exitFocus = useCallback(() => setFocusActive(false), []);
+  // myne#678: a detached (pop-out) window force-collapses BOTH sidebars, so the
+  // note it was popped out for is its only surface and no sidebar can open
+  // another (SYNC-6). This is the render half of the single-note seed above.
+  const detached = detachedNoteId != null;
   const leftCollapsed =
-    layout.leftCollapsed || forced.forceLeftCollapsed || focusActive;
+    layout.leftCollapsed || forced.forceLeftCollapsed || focusActive || detached;
   const rightCollapsed =
-    layout.rightCollapsed || forced.forceRightCollapsed || focusActive;
+    layout.rightCollapsed || forced.forceRightCollapsed || focusActive || detached;
   // macOS floats the traffic lights over the top-left, so windowed builds inset
   // the sidebar toggle past them. In fullscreen the traffic lights are hidden —
   // drop that gap so the toggle sits flush-left (matching the non-mac layout).
@@ -1415,6 +1454,78 @@ function EditorChrome({
   // re-sync (rename / snapshot restore) — so the chrome only orchestrates
   // the cross-pane flush.
   const flushAll = ws.flushAll;
+  const markDetached = ws.markDetached;
+  const unmarkDetached = ws.unmarkDetached;
+
+  // myne#681 task 2 (SYNC-11): a detached (pop-out) window reacts to its note
+  // being deleted from ANOTHER surface. Change and rename already reload through
+  // the `sync://changed` listener below (a rename keeps the note id); a DELETE
+  // instead shows the terminal "deleted elsewhere" state, after flushing so an
+  // unsaved edit survives as a conflict copy rather than being yanked away
+  // mid-sentence. Main-window instances never subscribe (`detachedNoteId` is
+  // null there), so a sidebar delete of a non-popped-out note follows its normal
+  // path. The event is the backend `NOTES_DELETED_EVENT` (`note_delete_from_host`).
+  useEffect(() => {
+    if (detachedNoteId == null) return;
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void listen<string>("notes://deleted", (e) => {
+      if (e.payload !== detachedNoteId) return;
+      void flushAll().finally(() => setDeletedElsewhere(true));
+    }).then((h) => {
+      if (cancelled) h();
+      else unlisten = h;
+    });
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
+    };
+  }, [detachedNoteId, flushAll]);
+
+  // myne#681 (SYNC-6, cross-window): EVERY window keeps the workspace's
+  // detached-note set in step, so the reveal-guard holds no matter which window
+  // performed the detach. The host broadcasts `detached://opened` when a pop-out
+  // is shown or revealed and `detached://closed` when one is destroyed (user
+  // close, lock teardown, or a failed show); both carry the note id only. The
+  // window that detached also marks/reveals locally (immediate); these listeners
+  // are what keep the OTHER windows consistent, closing the cross-window clobber
+  // where a detach done in one pop-out was invisible to the main window and it
+  // then opened the same note as a second live tab.
+  useEffect(() => {
+    let cancelled = false;
+    const unlisteners: Array<() => void> = [];
+    void (async () => {
+      const handles = await Promise.all([
+        listen<string>("detached://opened", (e) => markDetached(e.payload)),
+        listen<string>("detached://closed", (e) => unmarkDetached(e.payload)),
+      ]);
+      if (cancelled) handles.forEach((h) => h());
+      else unlisteners.push(...handles);
+    })();
+    return () => {
+      cancelled = true;
+      unlisteners.forEach((h) => h());
+    };
+  }, [markDetached, unmarkDetached]);
+
+  // myne#681 (data): a detached (pop-out) window flushes its buffer when it loses
+  // OS focus. Every non-idle vault lock (manual lock, vault switch, change-
+  // password force-relock, vault delete) is triggered from the MAIN window, which
+  // blurs the pop-out first, so this persists the pop-out's unsaved edits before
+  // the lock teardown destroys it (`teardown_on_lock` uses `destroy()`, which by
+  // design bypasses the close-intercept flush, SYNC-8). The idle path is already
+  // covered by the `vault-lock-imminent` grace below. Now that a popped-out note
+  // is its SOLE surface (SYNC-6 move), there is no main-window tab to catch the
+  // edit, so this blur flush is what the earlier per-tab flush used to provide.
+  // Best-effort + detached-only; a clean buffer flushes to a no-op.
+  useEffect(() => {
+    if (detachedNoteId == null) return;
+    const onBlur = () => {
+      void flushAll().catch(() => {});
+    };
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, [detachedNoteId, flushAll]);
 
   // MYND-166 / MYND-308 — restore the persisted workspace CONTAINER ONCE on
   // mount (unlock). A missing / unreadable / malformed descriptor leaves the
@@ -1443,6 +1554,25 @@ function EditorChrome({
     restoredRef.current = true;
     void (async () => {
       try {
+        // myne#678 render (epic #173): a detached (pop-out) window opens ONE
+        // note in a fresh single-slot workspace and never restores the saved
+        // layout, so a pop-out is that note's own focused surface. This reuses
+        // the exact single-note seed the "specific" startup mode below uses.
+        // SYNC-6 (one note, one surface) is what makes this the FIRST branch:
+        // with both sidebars force-collapsed (see `leftCollapsed`/`rightCollapsed`)
+        // the detached window cannot open another note, so the note it was
+        // popped out for is the only one it ever holds.
+        if (detachedNoteId) {
+          nonDefaultStartupRef.current = true;
+          const single = openInFocusedTab(emptyWorkspace(crypto.randomUUID()), {
+            kind: "note",
+            id: detachedNoteId,
+          });
+          restoreContainer(
+            wrapAsSingleSlot(single, crypto.randomUUID(), defaultSlotName()),
+          );
+          return;
+        }
         // MYND-462 — read the "Default file to open" preference first; it decides
         // whether we restore the saved workspace at all. `prefsRead` also carries
         // the MYP1 `active_workspace` pointer used by the "last" branch below.
@@ -1493,13 +1623,50 @@ function EditorChrome({
         // first slot.
         const resolvedId = resolveActiveSlot(container.slots, activePref);
         restoreContainer(switchToSlot(container, resolvedId));
+
+        // myne#678 task 6 (SYNC-10): the MAIN window re-spawns the detached
+        // (pop-out) windows this container remembers, each clamped onto a
+        // currently-connected display (`planDetachedRestore`) so an entry saved
+        // on an unplugged monitor comes back on the primary rather than
+        // off-screen. Desktop-only (`detachedWindows`) + best-effort. A detached
+        // WINDOW never reaches here (its own branch returned at the top of this
+        // effect), so pop-outs never recursively restore pop-outs.
+        // Seed the last-known-good snapshot from the restored list, so a
+        // snapshot-IPC failure before the first successful snapshot preserves
+        // what was restored rather than erasing it.
+        if (container.detached) lastDetachedRef.current = [...container.detached];
+        if (container.detached && container.detached.length > 0 && has("detachedWindows")) {
+          try {
+            const { displays, primary } = await readDisplays();
+            const plan = planDetachedRestore(container.detached, displays, primary);
+            for (const spawn of plan) {
+              try {
+                await openDetachedWindow(spawn.noteId, spawn.geometry);
+              } catch {
+                // One bad entry (a note that no longer exists, a rejected
+                // spawn) skips itself and the loop continues with its
+                // siblings: a single deterministic failure must not veto
+                // every later pop-out.
+                continue;
+              }
+              // SYNC-6: a restored pop-out owns its note, so record it in the
+              // detached set. Without this a relaunch's pop-outs are unknown to
+              // the main window and opening one of their notes would spawn a
+              // duplicate main-window tab (the concurrent-writer clobber again).
+              markDetached(spawn.noteId);
+            }
+          } catch {
+            // A failed monitor read or spawn leaves the pop-outs unrestored
+            // rather than failing the main workspace restore.
+          }
+        }
       } catch {
         // Read failure → keep the default workspace (best-effort restore).
       } finally {
         setRestoreSettled(true);
       }
     })();
-  }, [restoreContainer]);
+  }, [restoreContainer, detachedNoteId, markDetached]);
 
   // Latest serialized container descriptor, refreshed every render so the
   // graceful-exit hooks (which capture a stale closure) always persist the
@@ -1521,9 +1688,29 @@ function EditorChrome({
   // Persist the workspace container + the MYP1 active pointer (graceful-exit /
   // coalesced — never on every switch, so the blob mtime stays a low-resolution
   // signal). Writes the descriptor first, then the active-slot pointer.
+  // The last successful detached-window snapshot, so a transient snapshot IPC
+  // failure during a persist falls back to it instead of erasing the restore
+  // list. Seeded from the restored MYW1 `detached` list at mount, so a failure
+  // before the first successful snapshot still preserves what was restored.
+  const lastDetachedRef = useRef<Awaited<ReturnType<typeof detachedWindowsSnapshot>>>([]);
   const persistWorkspace = useCallback(async () => {
     try {
-      await workspaceWrite(descriptorRef.current);
+      // myne#678 task 6 (SYNC-10): splice the current detached (pop-out) windows'
+      // geometry into the descriptor at write time (a pop-out move is not a
+      // main-window event, so the snapshot is taken here). Desktop-only + best
+      // effort; on web the empty list removes the key.
+      // A transient snapshot IPC failure returns null (distinct from "no
+      // pop-outs" = []). Fall back to the last-known-good snapshot rather than
+      // persisting an empty list (which `withDetached` treats as "delete the
+      // key", erasing the restore list while pop-outs are open) or skipping the
+      // whole write (which would also drop the descriptor + active-slot pointer).
+      // The rest of the persist proceeds normally. (SYNC-10; device-local only.)
+      const snap = has("detachedWindows")
+        ? await detachedWindowsSnapshot().catch(() => null)
+        : [];
+      if (snap !== null) lastDetachedRef.current = snap;
+      const detached = snap ?? lastDetachedRef.current;
+      await workspaceWrite(withDetached(descriptorRef.current, detached));
       await setActiveWorkspace(activeWorkspaceIdRef.current);
       // Graceful-exit save counts as a flush — reset the coalescing window so
       // the timer doesn't redundantly re-write moments later.
@@ -1580,7 +1767,21 @@ function EditorChrome({
       return;
     }
     workspaceDirtyRef.current = true;
-    void workspaceStage(serializeWorkspaces(ws.workspacesSnapshot())).catch(() => {
+    // myne#678 task 6: stage the detached (pop-out) snapshot alongside the pane
+    // tree, so a Cmd+Q (which flushes the STAGED container) restores the pop-outs
+    // too. Desktop-only + best-effort; the snapshot is async, hence the wrapper.
+    void (async () => {
+      const base = serializeWorkspaces(ws.workspacesSnapshot());
+      // null = snapshot IPC failed (distinct from [] = no pop-outs). Fall back to
+      // the last-known-good list rather than staging withDetached([]) (which
+      // deletes the key) so a transient failure never erases the restore list.
+      const snap = has("detachedWindows")
+        ? await detachedWindowsSnapshot().catch(() => null)
+        : [];
+      if (snap !== null) lastDetachedRef.current = snap;
+      const detached = snap ?? lastDetachedRef.current;
+      await workspaceStage(withDetached(base, detached));
+    })().catch(() => {
       // Best-effort; outside Tauri (browser dev shim) the invoke rejects.
     });
     // `slots` identity changes on save-as/switch/rename/delete; `root` /
@@ -1898,6 +2099,46 @@ function EditorChrome({
     () => ({ view: centerView, setView: setCenterView }),
     [centerView],
   );
+
+  // myne#681 task 2 (SYNC-11): terminal "deleted elsewhere" state for a detached
+  // window whose note was deleted from another surface. Every hook above has run,
+  // so this conditional return does not reorder hooks. The dirty buffer was
+  // already flushed (keep-both) by the notes://deleted listener; closing the
+  // window closes the note entirely (task 4). Only tokens + primitives here, so
+  // `check-token-adoption` sees no new hardcoded value.
+  if (deletedElsewhere) {
+    return (
+      <CenteredCard>
+        {/* role="alert" so a screen reader announces the terminal state, and a
+            real heading + body via the shared card styles so this takeover matches
+            every other CenteredCard takeover (e.g. DeviceRevoked), rather than
+            two default-weight divs. display:contents keeps CenteredCard's own
+            layout of its children. */}
+        <div
+          role="alert"
+          aria-live="assertive"
+          data-testid="detached.deleted-elsewhere"
+          style={{ display: "contents" }}
+        >
+          <h1 style={CARD_TITLE_STYLE}>{t("editor.detachedDeleted.title")}</h1>
+          <p style={CARD_BODY_STYLE}>{t("editor.detachedDeleted.body")}</p>
+        </div>
+        <Button
+          data-testid="detached.deleted-elsewhere.close"
+          onClick={() => {
+            // `destroy()` (non-cancellable) rather than `close()`: it is on both
+            // the desktop and web window seams, and this path is desktop-only
+            // anyway (detachedNoteId is null on web). Closing the pop-out closes
+            // the note entirely (task 4): its registry entry is dropped by the
+            // Rust Destroyed handler.
+            void getCurrentWindow().destroy();
+          }}
+        >
+          {t("editor.detachedDeleted.close")}
+        </Button>
+      </CenteredCard>
+    );
+  }
 
   return (
     <CenterViewProvider value={centerViewValue}>
@@ -3114,6 +3355,28 @@ function CommandPaletteHost({
       onDuplicateNote: () => {
         if (ctx.selectedId !== null) void ctx.duplicateAndOpen(ctx.selectedId).catch(() => {});
       },
+      onOpenInNewWindow: () => {
+        // Desktop-only; the palette/menu already gate on has("detachedWindows"),
+        // and on any non-desktop reach the host dispatcher answers the typed
+        // unsupported refusal. SYNC-6 (one note, one surface): route rather than
+        // always spawn. Suppress a detached window re-popping its OWN note; reveal
+        // an already popped-out note; otherwise MOVE it (detachNote spawns the
+        // pop-out and closes the source tab) so a note is never a live main-window
+        // tab AND a live pop-out autosaving the same blob at once.
+        const id = ctx.selectedId;
+        if (id === null) return;
+        const route = decidePopOutRoute({
+          noteId: id,
+          isDetached: paletteWs.isDetached,
+          requestingDetachedNoteId: currentDetachedNoteId(),
+        });
+        if (route === "suppress") return;
+        if (route === "reveal") {
+          void openDetachedWindow(id).catch(() => {});
+          return;
+        }
+        paletteWs.detachNote(id);
+      },
       onArchiveNote: () => {
         if (ctx.selectedId !== null) void ctx.archiveWithRollback(ctx.selectedId).catch(() => {});
       },
@@ -3615,6 +3878,20 @@ function CommandPaletteHost({
       label: t("editor.noteActions.duplicate"),
       onSelect: commandCtx.onDuplicateNote,
     },
+    // Desktop-only (myne#173): omitted where the pop-out capability is absent,
+    // so web/mobile never show an item the host would refuse. `data-action`
+    // ("open-in-new-window") is the E2E testid the menu surfaces.
+    ...((has("detachedWindows")
+      ? [
+          {
+            kind: "action",
+            action: "open-in-new-window",
+            icon: "maximize-2",
+            label: t("editor.noteActions.openInNewWindow"),
+            onSelect: commandCtx.onOpenInNewWindow,
+          },
+        ]
+      : []) as NoteActionMenuItem[]),
     {
       kind: "action",
       action: "version-history",

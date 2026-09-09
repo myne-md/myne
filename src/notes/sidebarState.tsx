@@ -159,15 +159,24 @@ export function applyCacheUpdate(
  * and `updatedAt: null` (sort fallback to UUIDv7-derived created_at
  * per Q1; the new note's UUIDv7 timestamp is the latest, so it lands
  * at the top of the list).
+ *
+ * `folder` is the create target the caller already resolved (myne-md/myne#676):
+ * seeding it here — rather than root and letting the post-create refresh move
+ * the row under its folder — is what keeps the inline-rename input alive. The
+ * move unmounts the row mid-rename; the unmount guard then cancels the rename
+ * and the note lands "Untitled" with no input ever observable. That race is
+ * load-dependent (the refresh IPC landing after the mount) and hits foldered
+ * creates only, which is why it read as flake in exactly one scenario.
  */
 export function applyOptimisticCreate(
   state: SidebarState,
   id: NoteId,
+  folder: string | null = null,
 ): SidebarState {
   return applyCacheUpdate(state, id, {
     noteUuid: id,
     title: null,
-    folder: null,
+    folder,
     updatedAt: null,
     trashed: null,
     deleted: null,
@@ -969,7 +978,9 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       // MYND-31: register the new note in the index (live).
       void reindexNote(newId);
       setState((prev) => {
-        const seeded = applyOptimisticCreate(prev, newId);
+        // Seed WITH the target folder (myne-md/myne#676): the row mounts where
+        // it will live, so the post-create refresh never moves it mid-rename.
+        const seeded = applyOptimisticCreate(prev, newId, target);
         return {
           ...seeded,
           selectedId: newId,

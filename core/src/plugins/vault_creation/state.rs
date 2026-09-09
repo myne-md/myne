@@ -254,6 +254,28 @@ impl VaultCreationState {
         }
     }
 
+    /// Non-consuming peek of the membership-seal inputs (myne-md/myne#684).
+    ///
+    /// `commit` seals the membership field BEFORE consuming the session via
+    /// [`Self::take`]. The seal inputs must be resolved while the session is
+    /// still in the map so a resolution failure leaves it intact for a future
+    /// retry (mirrors the `peek_vault_id` ordering). Returns `None` for an
+    /// absent / TTL-evicted token (the subsequent `take` surfaces the precise
+    /// `SessionNotFound` / `SessionExpired`, and the missing membership
+    /// degrades to the lazy unlock stamp). Does NOT touch the `in_flight`
+    /// counter. The clone is transient: it seals one field and drops
+    /// (zeroized) without ever re-entering the map.
+    pub fn peek_seal_inputs(
+        &self,
+        token: Uuid,
+    ) -> Option<(Zeroizing<[u8; AEAD_KEY_LEN]>, [u8; 16])> {
+        self.sessions
+            .lock()
+            .expect("session map poisoned")
+            .get(&token)
+            .map(|s| (s.root_key.clone(), s.account.hash))
+    }
+
     /// Non-consuming peek of a live session's minted [`VaultId`].
     ///
     /// `commit` resolves the write destination to `vaults/<vault_id>/` from

@@ -110,6 +110,11 @@ export type Action =
    *  Stores the id and advances `select → phrase-entry`. No-op outside the
    *  `select` sub-step. */
   | { type: "vault-selected"; vaultId: string }
+  /** myne-md/myne#684: the sibling notice's "recover another" action. From
+   *  `password-reset`, returns to the `select` sub-step so the user can pick
+   *  the next sibling vault. Wipes the password (the field's React state drops
+   *  on unmount, but the reducer mirror is wiped for hygiene). */
+  | { type: "recover-another" }
   /** User typed into a single phrase cell. Whitespace is filtered
    *  (Q5 P5: typed spaces rejected). */
   | { type: "set-cell"; index: number; value: string }
@@ -212,6 +217,12 @@ export function vaultRecoverReducer(
       // phrase-entry with `vaultId = null`).
       if (state.subStep !== "select") return state;
       return { ...state, subStep: "phrase-entry", vaultId: action.vaultId };
+    }
+    case "recover-another": {
+      // myne-md/myne#684: from password-reset, return to the select sub-step so
+      // the user can pick the next sibling vault. Wipe the password mirror.
+      if (state.subStep !== "password-reset") return state;
+      return { ...state, subStep: "select", password: "", banner: null };
     }
     case "set-cell": {
       if (state.subStep !== "phrase-entry") return state;

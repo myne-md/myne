@@ -122,6 +122,20 @@ describe("applyOptimisticCreate + rollback", () => {
     expect(rec?.updatedAt).toBeNull();
   });
 
+  it("seeds the create target folder so the row never moves mid-rename", () => {
+    // myne-md/myne#676: a foldered create seeded at root, then moved under its
+    // folder by the post-create refresh — unmounting the rename input, which
+    // the unmount guard reads as a cancel. Seeding the target mounts the row
+    // where it lives.
+    const next = applyOptimisticCreate(EMPTY_SIDEBAR_STATE, "new-id", "Inbox/");
+    expect(next.cache.get("new-id")?.folder).toBe("Inbox/");
+  });
+
+  it("defaults the seed folder to root", () => {
+    const next = applyOptimisticCreate(EMPTY_SIDEBAR_STATE, "new-id");
+    expect(next.cache.get("new-id")?.folder).toBeNull();
+  });
+
   it("rollback drops the row", () => {
     const seeded = applyOptimisticCreate(EMPTY_SIDEBAR_STATE, "new-id");
     const rolled = rollbackOptimisticCreate(seeded, "new-id");

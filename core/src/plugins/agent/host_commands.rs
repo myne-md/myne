@@ -152,6 +152,18 @@ struct Session {
     /// the seed halfway through would leave the model answering the second half
     /// of a conversation it can no longer see the first half of.
     history: Vec<Message>,
+    /// The egress controls the seed was built under, or `None` when the run
+    /// was seeded with nothing.
+    ///
+    /// `step` re-reads the live prefs on every leg and drops `history` when
+    /// these no longer match — an exclusion added mid-run, or a provider
+    /// changed or cleared while the run waited on a scope approval, stops the
+    /// seed without stopping the run (`design-notes/ai/0553`, myne-md/myne#648).
+    /// A drop rather than a filter, because a turn carries text and no note
+    /// provenance. The run's own transcript is deliberately untouched: those
+    /// are this run's reads, and the tools clamp them against the live
+    /// exclusion set on every call.
+    seed_controls: Option<super::history::SeedControls>,
     /// Which notes this run has already read, across every leg.
     ///
     /// Held here rather than re-created per `step` for the reason the transcript
@@ -349,7 +361,15 @@ impl AgentSessionState {
     /// A client that wrote these two steps itself would be a client that could
     /// get the order wrong, and the failure is silent: everything works, and
     /// note plaintext outlives the run that read it.
-    pub fn open(&self, run_id: &str, task: String, live_ids: &BTreeSet<String>) {
+    pub fn open(
+        &self,
+        run_id: &str,
+        task: String,
+        live_ids: &BTreeSet<String>,
+        language: Option<String>,
+        history: Vec<Message>,
+        seed_controls: Option<super::history::SeedControls>,
+    ) {
         self.prune_to(live_ids);
         self.sessions
             .lock()
@@ -358,6 +378,9 @@ impl AgentSessionState {
                 run_id.to_string(),
                 Session {
                     task,
+                    language,
+                    history,
+                    seed_controls,
                     ..Default::default()
                 },
             );
@@ -644,7 +667,7 @@ pub async fn step<R: Runtime>(
     // Claimed under the SAME lock the take happens under, so there is no window
     // between deciding to proceed and emptying the session. Released in the
     // write-back below, on every exit from this function.
-    let (task, language, history, mut read_ids, mut transcript, mut proposal) = {
+    let (task, language, mut history, mut read_ids, mut transcript, mut proposal, seed_controls) = {
         let mut table = sessions
             .sessions
             .lock()
@@ -661,7 +684,27 @@ pub async fn step<R: Runtime>(
             std::mem::take(&mut s.read_ids),
             std::mem::take(&mut s.transcript),
             std::mem::take(&mut s.proposal),
+            s.seed_controls.clone(),
         )
+    };
+
+    // **The resume-path half of the seed bound** (`design-notes/ai/0553`,
+    // myne-md/myne#648). The seed was built under snapshotted egress controls;
+    // a run paused for a scope approval is a user-length window in which the
+    // exclusion set or the provider can move, so every leg re-reads the live
+    // prefs and drops the seed on a mismatch. A drop, not a filter, and the
+    // run continues unseeded rather than refusing: the gate already passed,
+    // and only the seed's bounds are unverifiable, not the run's.
+    let seed_dropped = match seed_controls {
+        None => false,
+        Some(stored) => {
+            let live = prefs_read_from_host(&TauriHost::new(app.clone()), vault, &StdVaultIo).await;
+            let survives = live.map(|view| stored.survives(&view)).unwrap_or(false);
+            if !survives {
+                history = Vec::new();
+            }
+            !survives
+        }
     };
 
     let reader = NoteReadAdapter {
@@ -732,6 +775,12 @@ pub async fn step<R: Runtime>(
             if let Some(s) = table.get_mut(&run_id) {
                 s.transcript = transcript;
                 s.proposal = proposal;
+                // A dropped seed stays dropped: later legs must not resurrect
+                // what this leg's control comparison refused.
+                if seed_dropped {
+                    s.history = Vec::new();
+                    s.seed_controls = None;
+                }
                 // **And the flag, on the FAILURE path too.** Releasing only on
                 // success is how an in-flight marker turns one failed model call
                 // into a permanently wedged run: the flag stays set, every later
@@ -772,6 +821,10 @@ pub async fn step<R: Runtime>(
             s.transcript = transcript;
             s.proposal = proposal.clone();
             s.in_flight = false;
+            if seed_dropped {
+                s.history = Vec::new();
+                s.seed_controls = None;
+            }
         }
     }
 
@@ -973,6 +1026,39 @@ pub struct AgentUndoResult {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    /// `open` stores the language, the budgeted seed and its controls, rather
+    /// than `Default` (myne-md/myne#648). The merge that replaced the
+    /// prune-then-insert with `open()` kept the newer call and lost all three
+    /// seeded fields, and the only signal was an unused-variables lint no CI
+    /// step ran. This pins the storage so the wiring has something to read.
+    #[test]
+    fn open_stores_language_history_and_controls() {
+        let state = AgentSessionState::default();
+        let live = BTreeSet::new();
+        let seed = vec![Message {
+            role: crate::plugins::agent::engine::Role::User,
+            content: vec![],
+        }];
+        let controls = super::super::history::SeedControls::from_view(&protocol::PrefsView {
+            ai_excluded_folders: vec!["Secret/".to_string()],
+            ai_provider: Some("openrouter".to_string()),
+            ..Default::default()
+        });
+        state.open(
+            "run-1",
+            "do the thing".to_string(),
+            &live,
+            Some("tr".to_string()),
+            seed,
+            Some(controls.clone()),
+        );
+        let table = state.sessions.lock().expect("poisoned");
+        let s = table.get("run-1").expect("session stored");
+        assert_eq!(s.language.as_deref(), Some("tr"));
+        assert_eq!(s.history.len(), 1);
+        assert_eq!(s.seed_controls, Some(controls));
+    }
 
     // ---- the run id reaches the surface before the loop runs -------------
 
