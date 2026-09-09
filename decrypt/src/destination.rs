@@ -31,8 +31,9 @@ struct CloudRoot {
 /// false positive blocks the export at the worst possible moment for this
 /// tool, so only the well-known default-sync locations are named.
 const CLOUD_ROOTS: &[CloudRoot] = &[
-    // iCloud Drive (macOS): "Desktop & Documents Folders" sync is on by
-    // default for many users, so ~/Documents and ~/Desktop upload by default.
+    // iCloud Drive (macOS): the CloudDocs marker covers iCloud Drive itself.
+    // ~/Documents and ~/Desktop (the "Desktop & Documents Folders" default)
+    // carry no marker and are matched home-relative in `detect_cloud_root`.
     CloudRoot {
         name: "iCloud Drive",
         marker: "Mobile Documents/com~apple~CloudDocs",
@@ -56,10 +57,34 @@ const CLOUD_ROOTS: &[CloudRoot] = &[
 /// clearance: the unconditional closing line is the guarantee.
 pub fn detect_cloud_root(path: &Path) -> Option<&'static str> {
     let s = path.to_string_lossy();
-    CLOUD_ROOTS
+    if let Some(hit) = CLOUD_ROOTS
         .iter()
         .find(|r| s.contains(r.marker))
         .map(|r| r.name)
+    {
+        return Some(hit);
+    }
+    // macOS "Desktop & Documents Folders" iCloud sync is on by default for
+    // many users, so ~/Documents and ~/Desktop upload by default, yet neither
+    // path contains the CloudDocs marker above. Match them home-relative.
+    // Other platforms have no default-on folder sync in this tool's scope, so
+    // the marker list is the whole check there.
+    #[cfg(target_os = "macos")]
+    if under_macos_default_sync(path) {
+        return Some("iCloud Drive");
+    }
+    None
+}
+
+/// macOS only: true when `path` sits under ~/Documents or ~/Desktop, the two
+/// folders "Desktop & Documents Folders" iCloud sync uploads by default.
+#[cfg(target_os = "macos")]
+fn under_macos_default_sync(path: &Path) -> bool {
+    let Some(home) = std::env::var_os("HOME") else {
+        return false;
+    };
+    let home = Path::new(&home);
+    path.starts_with(home.join("Documents")) || path.starts_with(home.join("Desktop"))
 }
 
 /// Create the output directory with `0700` permissions (owner-only), creating
@@ -119,6 +144,26 @@ mod tests {
     fn a_plain_directory_is_not_detected() {
         let p = Path::new("/Users/x/notes-export");
         assert_eq!(detect_cloud_root(p), None);
+    }
+
+    // macOS only: ~/Documents and ~/Desktop upload by default under
+    // "Desktop & Documents Folders" sync, with no CloudDocs marker in the
+    // path. Runs only on macOS because the check itself is macOS-gated.
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn detects_macos_default_sync_folders_home_relative() {
+        let prev = std::env::var_os("HOME");
+        std::env::set_var("HOME", "/Users/x");
+        let documents = detect_cloud_root(Path::new("/Users/x/Documents/export"));
+        let desktop = detect_cloud_root(Path::new("/Users/x/Desktop/export"));
+        let plain = detect_cloud_root(Path::new("/Users/x/notes-export"));
+        match prev {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
+        assert_eq!(documents, Some("iCloud Drive"));
+        assert_eq!(desktop, Some("iCloud Drive"));
+        assert_eq!(plain, None);
     }
 
     #[test]
