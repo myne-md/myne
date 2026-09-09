@@ -696,7 +696,7 @@ Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2, `spec/s
 
 A single note opened in its own OS-level window (a "pop-out"), for the second-monitor case, alongside the in-window split panes. Desktop client only: the web (single-tab OPFS lock) and mobile clients cannot spawn OS windows, so the affordance is absent there. The window is host-spawned (page context holds no window-create grant), labelled `note-<id>` (SYNC-1), and carries a narrow per-webview capability set (read-only prefs, no `prefs:allow-set-*`, per `decisions.md` clients/0136). A second WebView holding decrypted plaintext is a new trust-boundary surface, so it tears down on every vault lock (hide-then-destroy) and applies the same screen-capture protection as the main window (`threat-model.md` §7). SYNC-6, one note one surface: popping a note out MOVES it, so the source tab closes and re-opening the note reveals the pop-out rather than duplicating it (which would give the note two autosaving surfaces over one blob). Its geometry is persisted device-local in the `MYW1` workspace blob for restore, never synced.
 
-Used in: `threat-model.md` §7; `decisions.md` 2026-09-06 (clients/0575, clients/0576); myne-md/myne#173 (#677 to #681)
+Used in: `threat-model.md` §7; `decisions.md` 2026-09-06 (clients/0578, clients/0579); myne-md/myne#173 (#677 to #681)
 
 ### **Developer mode** &nbsp; 📦 *Product*
 

@@ -218,7 +218,7 @@ pub async fn unlock_from_host(
         hooks.pdf_export_teardown_on_lock();
         hooks.agent_teardown_on_lock();
         // myne#679: destroy vault A's detached (pop-out) note windows before
-        // vault B hydrates — its plaintext must not survive the switch.
+        // vault B hydrates: its plaintext must not survive the switch.
         hooks.detached_windows_teardown_on_lock();
         hooks.zeroize_vault_indices();
         hooks.zeroize_attachment_refs();
@@ -1143,7 +1143,7 @@ pub async fn lock_from_host(
     hooks.pdf_export_teardown_on_lock();
     hooks.agent_teardown_on_lock();
     // myne#679: destroy every open detached (pop-out) note window on the same
-    // manual-lock path — a detached window is a second plaintext-bearing WebView,
+    // manual-lock path: a detached window is a second plaintext-bearing WebView,
     // so locking means locked for it too, not just "main".
     hooks.detached_windows_teardown_on_lock();
 

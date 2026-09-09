@@ -2,7 +2,7 @@
 // #681 cross-window). Drives the pop-out affordance on the real tauri-driver
 // harness against the production desktop bundle.
 //
-//   dw1 — with a note open, the "Open note in new window" command is in the
+//   dw1: with a note open, the "Open note in new window" command is in the
 //         palette (the affordance is wired and capability-gated to desktop, which
 //         the Linux container is), and invoking it does not error the editor out.
 //
@@ -18,7 +18,7 @@
 // real: the command exists, is gated correctly, and invoking it leaves the app
 // running rather than crashing or falling closed.
 //
-// KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
+// KDF: weak generator fixture (SYNC-9: params are vault.meta-resident).
 // Vault-count precondition: 1.
 
 import { it } from "vitest";

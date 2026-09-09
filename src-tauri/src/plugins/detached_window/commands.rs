@@ -15,7 +15,7 @@
 //! SYNC-5), single-instance routing + move (task 5 / #681), persistence (task 6),
 //! lock-teardown wiring (#679).
 //!
-//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging discipline" — stage
+//! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging discipline": stage
 //! tags + closed error kinds; never the note id or a path.
 
 use super::state::DetachedWindowRegistry;

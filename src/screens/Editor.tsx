@@ -1597,7 +1597,15 @@ function EditorChrome({
             const { displays, primary } = await readDisplays();
             const plan = planDetachedRestore(container.detached, displays, primary);
             for (const spawn of plan) {
-              await openDetachedWindow(spawn.noteId, spawn.geometry);
+              try {
+                await openDetachedWindow(spawn.noteId, spawn.geometry);
+              } catch {
+                // One bad entry (a note that no longer exists, a rejected
+                // spawn) skips itself and the loop continues with its
+                // siblings: a single deterministic failure must not veto
+                // every later pop-out.
+                continue;
+              }
               // SYNC-6: a restored pop-out owns its note, so record it in the
               // detached set. Without this a relaunch's pop-outs are unknown to
               // the main window and opening one of their notes would spawn a
@@ -2078,7 +2086,7 @@ function EditorChrome({
             // `destroy()` (non-cancellable) rather than `close()`: it is on both
             // the desktop and web window seams, and this path is desktop-only
             // anyway (detachedNoteId is null on web). Closing the pop-out closes
-            // the note entirely (task 4) — its registry entry is dropped by the
+            // the note entirely (task 4): its registry entry is dropped by the
             // Rust Destroyed handler.
             void getCurrentWindow().destroy();
           }}
