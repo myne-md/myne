@@ -90,9 +90,15 @@ export interface ConversationPayload {
 /** Create a conversation; returns the new conversation id (32-char hex). */
 export async function chatsCreate(
   firstTurnPayload: string,
+  // Client-minted id for idempotent retry: a retry of a create whose
+  // response was lost carries the same id and adopts the existing row
+  // instead of minting a duplicate conversation. Optional so older callers
+  // keep working (backend mints).
+  requestedIdHex?: string,
 ): Promise<string> {
   return await invoke<string>("plugin:chats|chats_create", {
     firstTurnPayload,
+    ...(requestedIdHex !== undefined ? { requestedIdHex } : {}),
   });
 }
 

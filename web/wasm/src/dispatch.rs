@@ -169,6 +169,8 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             #[serde(rename_all = "camelCase")]
             struct Args {
                 first_turn_payload: String,
+                #[serde(default)]
+                requested_id_hex: Option<String>,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -185,6 +187,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 crate::session::state(),
                 crate::session::hooks(),
                 &a.first_turn_payload,
+                a.requested_id_hex.as_deref(),
             )
             .await
             {
