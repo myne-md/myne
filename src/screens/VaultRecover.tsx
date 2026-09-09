@@ -312,6 +312,7 @@ export function VaultRecover({
           state={state}
           dispatch={dispatch}
           onCompleteSuccess={() => onCompleteSuccess(state.vaultId ?? undefined)}
+          onRecoverAnother={() => dispatch({ type: "recover-another" })}
         />
       );
     case "delete-confirm": {

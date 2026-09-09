@@ -61,6 +61,7 @@ export function ListRow({
   isLast = false,
   onClick,
   style,
+  testID,
 }: {
   title: ReactNode;
   detail?: ReactNode;
@@ -70,10 +71,12 @@ export function ListRow({
   isLast?: boolean;
   onClick?: () => void;
   style?: CSSProperties;
+  testID?: string;
 }) {
   return (
     <div
       onClick={onClick}
+      data-testid={testID}
       style={{
         display: "flex",
         alignItems: "center",

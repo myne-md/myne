@@ -627,7 +627,7 @@ mod bootstrap_meta_tests {
         };
         let patched = match meta_version_of(&bad).expect("known generation") {
             MetaVersion::V0_2 => protocol::serialize_vault_meta_v0_2(&rebuilt),
-            MetaVersion::V0_1 => protocol::serialize_vault_meta(&rebuilt),
+            MetaVersion::V0_1 => protocol::serialize_vault_meta(&rebuilt).to_vec(),
         };
         bad.copy_from_slice(&patched);
         (bad, hash)
@@ -1027,6 +1027,7 @@ mod enrol_root_key_tests {
             items_key_id: [0x07u8; 16],
             items_key_nonce: [0x51u8; 24],
             enc_items_key: [0u8; 64],
+            membership: None,
         }
     }
 

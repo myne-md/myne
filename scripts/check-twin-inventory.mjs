@@ -744,6 +744,14 @@ const ROSTER = [
       "RESOLVED in myne-md/myne#476. Which vault is active. Mobile exported `resolveActiveVaultId()`, deleted from desktop in myne-md/myne#250 for naming the wrong vault after a quick-unlock or a recovery, zero production callers, so a landmine rather than a live bug, and the first caller reaching for the obvious-sounding name would have reproduced a data-loss defect on a device whose vault is often the only copy. It could not simply be ported over, because the authoritative answer is an IPC command mobile registered NOWHERE: `vault_active_id` has lived in `myne-core` since #250 and only desktop's `generate_handler!`, `build.rs` and ACL knew about it. Mobile now registers it across all three, and carries the same `activeVaultId()` and `soleVaultId()` with the same `null` contracts: `null` means no target, never `use whichever one looks most recent`.",
   },
   {
+    a: "src/lib/account.ts",
+    b: "mobile/src/lib/account.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "Byte-identical by construction (myne-md/myne#684): the account-record command mirrors plus the `accountIdForVault` grouping helper. Both sides import from their own `../platform/core` seam, and the shared answer is `myne_core::account` behind the IPC. The helper lives here rather than in `vault-list.ts` precisely so the `vault-list.ts` twin stays byte-identical and the twin-drift ratchet stays green.",
+  },
+  {
     a: "src/lib/vault-recover.ts",
     b: "mobile/src/lib/vault-recover.ts",
     verdict: "decision",
@@ -1222,6 +1230,14 @@ const ROSTER = [
     destination: "myne-core",
     reason:
       "Host-registration shim, and the one that does NOT match `SHIM_REASON`'s stated evidence: the shared answer is re-exported as `pub use myne_core::vault_label::{...}`, a crate-root module rather than one under `myne_core::plugins::`. Same verdict, different citation. The MYL1 sealed label store is myne-md/myne#411; per its own header the desktop ACL deliberately withholds a permission for a screen desktop does not render, so the two grants are known to differ here BY DESIGN, which is exactly why the blanket ACL claim was removed from `SHIM_REASON`.",
+  },
+  {
+    a: "src-tauri/src/plugins/account/mod.rs",
+    b: "mobile/src-tauri/src/plugins/account/mod.rs",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "Host-registration shim for the account record (the account/vault split, myne-md/myne#684). Both sides carry `pub use myne_core::account::{...}` (a crate-root module, like `vault_label`) and keep only the Tauri plugin builder and its capability grant, so the shared answer is already in `myne-core` and the divergence is the wiring. The two grants are known to differ BY DESIGN: desktop and mobile both register all four commands, but on Android the keychain has no backend so the record holds nothing and vaults show standalone.",
   },
   {
     a: "src-tauri/src/plugins/vault_recover/mod.rs",

@@ -165,6 +165,12 @@ describe("capability descriptor", () => {
       // `cliAccess` and with the same consequence: nothing to port. The
       // browser's answer is Tor Browser, which routes the whole page.
       "torRouting",
+      // myne-md/myne#684, the account/vault split. A browser holds exactly one
+      // vault per origin and has no OS keychain, so there is no grouping to
+      // render and nowhere to keep the wrap key whose seal is the account
+      // record. The picker grouping UI is omitted rather than rendered against
+      // commands that reject.
+      "accountGrouping",
       // myne-md/myne#677 (epic #173), a third platform-fact entry alongside
       // `cliAccess` and `torRouting`. Popping a note out spawns an OS-level
       // window; a browser tab cannot open one (and mobile cannot either), so

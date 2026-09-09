@@ -109,6 +109,7 @@ fn build_meta() -> VaultMeta {
         items_key_id: [0; 16],
         items_key_nonce: [0; 24],
         enc_items_key: [0; 64],
+        membership: None,
     }
 }
 

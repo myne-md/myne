@@ -279,7 +279,7 @@ pub(crate) async fn change_password_with_path(
     //     `vault_lock` fires during the Argon2id window, we bail
     //     WITHOUT touching `vault.meta`.
     let derive_outcome = crate::task::run_blocking(
-        move || -> Result<[u8; protocol::VAULT_META_LEN], VaultChangePasswordError> {
+        move || -> Result<Vec<u8>, VaultChangePasswordError> {
             // (a) Read existing vault.meta.
             let bytes = std::fs::read(&vault_path_for_pipeline).map_err(|e| {
                 let io_kind = from_io_error_kind(e.kind());

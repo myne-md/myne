@@ -613,8 +613,8 @@ pub(crate) async fn complete_recovery_with_path(
     //     Returns the freshly-built vault.meta bytes WITHOUT writing
     //     them to disk — disk write is conditional on the post-Argon2id
     //     slot peek (step 5).
-    let derive_outcome = crate::task::run_blocking(
-        move || -> Result<[u8; protocol::VAULT_META_LEN], VaultRecoveryError> {
+    let derive_outcome =
+        crate::task::run_blocking(move || -> Result<Vec<u8>, VaultRecoveryError> {
             // (a) Fresh CSPRNG salt + nonce.
             let mut fresh_salt = [0u8; ARGON2_SALT_LEN];
             getrandom::getrandom(&mut fresh_salt).map_err(|_| {
@@ -687,9 +687,8 @@ pub(crate) async fn complete_recovery_with_path(
             })?;
 
             Ok(new_bytes)
-        },
-    )
-    .await;
+        })
+        .await;
 
     let new_bytes = match derive_outcome {
         Ok(Ok(b)) => b,

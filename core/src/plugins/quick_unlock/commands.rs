@@ -896,6 +896,7 @@ mod tests {
             items_key_id,
             items_key_nonce: nonce,
             enc_items_key,
+            membership: None,
         };
         std::fs::write(dir.join("vault.meta"), serialize_vault_meta(&meta)).expect("write meta");
     }
@@ -925,6 +926,7 @@ mod tests {
             items_key_id,
             items_key_nonce: nonce,
             enc_items_key,
+            membership: None,
         };
         std::fs::write(
             dir.join("vault.meta"),
