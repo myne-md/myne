@@ -36,7 +36,7 @@ function buildHardBreakDecorations(view: EditorView): DecorationSet {
         //
         // Hiding the markers is right for prose: the rendered break IS the
         // signal, and two invisible spaces at the end of a paragraph are noise.
-        // Inside a list item it reads as the editor eating what you typed , 
+        // Inside a list item it reads as the editor eating what you typed ,
         // the item is a short labelled row whose text the reader is holding in
         // one line, so a space that is in the file and not on screen makes live
         // view and the source disagree about how long the label is, with nothing

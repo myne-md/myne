@@ -206,7 +206,7 @@ describe("evictClosedTabs", () => {
 // restore starts from the drifted value and adds its own.
 describe("a restore does not write its own drift back", () => {
   it("holds the anchor steady across ten restore cycles", () => {
-    // Each cycle reports a position 3px off from where it was asked to land , 
+    // Each cycle reports a position 3px off from where it was asked to land ,
     // the residue a re-wrap leaves. Before the fix that compounded to 30px,
     // which is more than a line.
     rememberScroll("n1", stubbedView(120, 80), stubbedScroller());

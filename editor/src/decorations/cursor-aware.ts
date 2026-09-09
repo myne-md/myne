@@ -154,7 +154,7 @@ export function revealsRange(view: EditorView, from: number, to: number): boolea
 
 /**
  * The shared body of {@link revealsRange} and {@link revealsAtOrInside}. They
- * differ in one operator and nothing else, and the selection-overlap clause , 
+ * differ in one operator and nothing else, and the selection-overlap clause ,
  * which both docs argue about at length, is the same rule for both, so it
  * exists once. `inclusiveEnd` is REQUIRED rather than defaulted, per this file's
  * own subject matter: a default here would silently pick one predicate's

@@ -146,7 +146,7 @@ export function orderContainerChildren(
 
   children.sort((a, b) => {
     // myne#654: the just-created note sorts above everything in its container,
-    // folders included. It outranks the manual sequence too, deliberately , 
+    // folders included. It outranks the manual sequence too, deliberately ,
     // this is a transient "here is the thing you just made" pin, not an
     // ordering opinion, and it must not be silently outvoted by a container the
     // user had already arranged by hand.

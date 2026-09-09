@@ -9,7 +9,7 @@
 // on create, a freshly made note could not be titled at all.
 //
 // These assert the BYTES rather than a call count, because that is the shape of
-// what went wrong: the write happened, with the wrong payload. No IPC here , 
+// what went wrong: the write happened, with the wrong payload. No IPC here ,
 // `initialNotePlaintext` is pure, which is why it is exported.
 
 import { describe, expect, it } from "vitest";

@@ -66,7 +66,7 @@ class TaskAddWidget extends WidgetType {
     // `data-task-add` lives on the SLOT, not the button, and it has to.
     // `task-chip-listener.ts` resolves the editor with
     // `EditorView.findFromDOM(target.closest("[data-task-add]"))`, and
-    // `findFromDOM` answers only for a node CM6 has attached a ContentView to , 
+    // `findFromDOM` answers only for a node CM6 has attached a ContentView to ,
     // which is the widget's root. With the marker on the button it resolved
     // null, `onOpenAdd` returned early, and the whole `+` menu stopped opening
     // while every other symptom (the widget renders, the event fires, `closest`
