@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! `myne-format` — the on-disk format crate.
+//! `myne-format`: the on-disk format crate.
 //!
 //! The host-free half of Myne's on-disk format, extracted so the
 //! `myne-decrypt` CLI can read a vault without pulling `myne-core`'s TLS stack

@@ -34,7 +34,7 @@ import { fileURLToPath } from "node:url";
 // on-disk-format crate extracted for the `myne-decrypt` CLI, myne-md/myne#166).
 // `format/` is native-only by design, but it is an unconditional dependency of
 // `myne-core`, so its `std::fs` calls are in the wasm graph exactly as core's
-// are — the ratchet must see them or it is blind to a whole crate.
+// are: the ratchet must see them or it is blind to a whole crate.
 const ROOTS = ["core/src", "format/src"];
 
 /**
@@ -54,15 +54,15 @@ const ALLOWED = new Map([
   ["core/src/vault_io.rs", "IS the seam"],
   ["core/src/test_support.rs", "test fixtures; compiled only under `test`/`test-support`"],
 
-  // ── `format/` — the on-disk-format crate (myne-md/myne#166) ────────────────
+  // `format/`: the on-disk-format crate (myne-md/myne#166)
   // Native-only by design: the export walk and the backup-container read half
   // are gated out of the wasm build (`#[cfg(not(target_arch = "wasm32"))]` in
   // `format/src/lib.rs`), so their `std::fs` is correct. `atomic_write` is the
   // durability mechanics the native arm delegates to, the same role
   // `core/src/atomic_write.rs` played before it became a re-export shim.
   ["format/src/atomic_write.rs", "the durability mechanics the native arm delegates to (native-only)"],
-  ["format/src/backup_container.rs", "native-only (cfg not wasm32) — the MYB1 read half is a seek-based reader"],
-  ["format/src/export_walk.rs", "native-only (cfg not wasm32) — the whole-vault export walk"],
+  ["format/src/backup_container.rs", "native-only (cfg not wasm32): the MYB1 read half is a seek-based reader"],
+  ["format/src/export_walk.rs", "native-only (cfg not wasm32): the whole-vault export walk"],
   ["format/src/test_support.rs", "test fixtures; compiled only under `test`"],
 
   // ── writes to a path the USER chose, outside the vault ────────────────────
