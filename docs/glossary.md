@@ -131,9 +131,9 @@ Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
 ### **agent run** &nbsp; 📦 *Product*
 
-One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run's LIVE state survives a vault lock**: the run table and the live transcript store are dropped on the same leg as the AI vector store. What changed with persisted [conversations](#conversation) (myne-md/myne#675): the turn a run leaves behind is now written to its conversation at settle (append-at-finalize), and since `decisions/ai/0577` that settled turn KEEPS the frozen proposal (anchors and replacements, verbatim note-derived text) alongside the run id, the counts, the scope label and the end tag. The historical copy is **read-only**: no re-apply affordance exists anywhere, because a frozen proposal may quote a note that has since changed, been trashed, or moved folders. The RAM half of the old claim still holds: `agentStore`'s live copy is dropped on every vault-leaving path, enforced by the lock-teardown guards. A run never writes; applying is a separate act behind the user's approval.
+One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run's LIVE state survives a vault lock**: the run table and the live transcript store are dropped on the same leg as the AI vector store. What changed with persisted [conversations](#conversation) (myne-md/myne#675): the turn a run leaves behind is now written to its conversation at settle (append-at-finalize), and since `decisions/ai/0583` that settled turn KEEPS the frozen proposal (anchors and replacements, verbatim note-derived text) alongside the run id, the counts, the scope label and the end tag. The historical copy is **read-only**: no re-apply affordance exists anywhere, because a frozen proposal may quote a note that has since changed, been trashed, or moved folders. The RAM half of the old claim still holds: `agentStore`'s live copy is dropped on every vault-leaving path, enforced by the lock-teardown guards. A run never writes; applying is a separate act behind the user's approval.
 
-Used in: `decisions.md` 2026-08-16, 2026-08-19, `decisions/ai/0575`, `decisions/ai/0577`, `threat-model.md` §7
+Used in: `decisions.md` 2026-08-16, 2026-08-19, `decisions/ai/0581`, `decisions/ai/0583`, `threat-model.md` §7
 
 ### **agent scope** &nbsp; 📦 *Product*
 
@@ -173,7 +173,7 @@ Used in: `decisions/ai/0554`
 
 The conversation write cadence: a [chat turn](#chat-turn) persists the moment it settles (stream closed, run settled, or failed, including the partial text of a stream interrupted by a lock), with no coalescing window. A lock that cuts a stream settles its partial text first and attempts the write with that snapshot; the lock wipe keeps no retry state, so a persist that fails at lock is lost with the RAM copy. Nothing rewrites a turn in place.
 
-Used in: `spec/protocol.md` §9.24, §9.24.2, §9.24.4; `decisions/ai/0575`
+Used in: `spec/protocol.md` §9.24, §9.24.2, §9.24.4; `decisions/ai/0581`
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
 
@@ -461,7 +461,7 @@ The reserved 16-byte sync-plane identifier of the [`vault.attachments`](#vaultat
 
 One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled: the write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
 
-Used in: `protocol.md` §9.24.2; `decisions/ai/0575`
+Used in: `protocol.md` §9.24.2; `decisions/ai/0581`
 
 ### **chord** &nbsp; 📦 *Product*
 
@@ -473,17 +473,17 @@ Used in: `spec/protocol.md` §9.5.2
 
 *(Alias: AI chat, chat thread.)*
 
-One persisted AI chat history unit: an ordered, immutable list of settled [chat turns](#chat-turn) plus a record (id, title, created/updated timestamps, causal version, tombstone) in the [conversation catalog](#conversation-catalog). Conversations survive lock, restart and device changes (encrypted at rest as `MYJ1` files under `chats/`, synced, backed up), are listed by updated-at, continue from where the last one left off when the AI tab opens, and delete everywhere via a catalog tombstone with no trash or undo (`decisions/ai/0575`). Titles derive deterministically from the first user turn (first 48 Unicode scalar values, newlines stripped, no model call) and are user-renameable. An agent turn's frozen [proposal](#agent-run) persists inside its conversation **read-only**: no historical re-apply exists (`decisions/ai/0577`).
+One persisted AI chat history unit: an ordered, immutable list of settled [chat turns](#chat-turn) plus a record (id, title, created/updated timestamps, causal version, tombstone) in the [conversation catalog](#conversation-catalog). Conversations survive lock, restart and device changes (encrypted at rest as `MYJ1` files under `chats/`, synced, backed up), are listed by updated-at, continue from where the last one left off when the AI tab opens, and delete everywhere via a catalog tombstone with no trash or undo (`decisions/ai/0581`). Titles derive deterministically from the first user turn (first 48 Unicode scalar values, newlines stripped, no model call) and are user-renameable. An agent turn's frozen [proposal](#agent-run) persists inside its conversation **read-only**: no historical re-apply exists (`decisions/ai/0583`).
 
-Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0575`, `decisions/ai/0577`
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`
 
 ### **conversation catalog** &nbsp; 📦 *Product*
 
 *(Alias: `vault.chats`, chats catalog.)*
 
-The singleton roster blob (`MYM1`, `protocol.md` §9.23) enumerating the vault's [conversations](#conversation): one entry per conversation id carrying title, timestamps, the causal `version` the sync merge races on, and the deletion tombstone. The pair half of the per-conversation `MYJ1` files (the `vault.attachments`/`attachments/` archetype): the catalog is what syncs as one addressed singleton, the files are what a deletion removes. Read semantic is **report-don't-empty** (a corrupt catalog surfaces an error; it is never read as empty and rewritten, because that would persist emptiness over real records, `decisions/ai/0575`).
+The singleton roster blob (`MYM1`, `protocol.md` §9.23) enumerating the vault's [conversations](#conversation): one entry per conversation id carrying title, timestamps, the causal `version` the sync merge races on, and the deletion tombstone. The pair half of the per-conversation `MYJ1` files (the `vault.attachments`/`attachments/` archetype): the catalog is what syncs as one addressed singleton, the files are what a deletion removes. Read semantic is **report-don't-empty** (a corrupt catalog surfaces an error; it is never read as empty and rewritten, because that would persist emptiness over real records, `decisions/ai/0581`).
 
-Used in: `protocol.md` §9.23; `decisions/ai/0575`
+Used in: `protocol.md` §9.23; `decisions/ai/0581`
 
 ### **CLI-excluded folder** &nbsp; 📦 *Product*
 
@@ -2159,7 +2159,7 @@ Used in: `spec/protocol.md` §9.12, §9.11.3; `decisions.md` 2026-06-13
 
 The read semantic for load-bearing synced singletons ([conversation catalog](#conversation-catalog), per-conversation files): a store that fails any check (absent under a live roster entry, magic/version mismatch, AEAD failure, over-cap, unparseable payload) surfaces an error naming it, and is never collapsed to the empty value. Collapsing would let the next write persist emptiness over real records; refusing keeps the roster (the index of record) intact while the failure is surfaced.
 
-Used in: `spec/protocol.md` §9.23.3, §9.24.4; `decisions/ai/0575`
+Used in: `spec/protocol.md` §9.23.3, §9.24.4; `decisions/ai/0581`
 
 ### **reproducible builds** &nbsp; 🛠️ *Tooling*
 

@@ -294,7 +294,16 @@ fn hex_encode_16(bytes: &[u8; 16]) -> String {
 }
 
 fn hex_decode_16(s: &str) -> Option<[u8; 16]> {
-    if s.len() != 32 {
+    // Lowercase-only, matching `from_hex16` (sync orchestrator), `is_32_hex`
+    // (double_buffer) and `is_lower_hex` (backup classifier): conversation ids
+    // are minted lowercase, so an uppercase id decodes nowhere. Divergent
+    // strictness here would decode in chats commands what the sync scan and
+    // the container classifier skip.
+    if s.len() != 32
+        || !s
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
         return None;
     }
     let mut out = [0u8; 16];
@@ -506,6 +515,11 @@ fn live_entry<'a>(
 
 /// Read one conversation's canonical turn-list payload (the host-layer JSON
 /// string it sealed).
+///
+/// Consults catalog liveness first: a tombstoned row (or no row) answers
+/// `ConversationNotFound` even when the file bytes are still on disk (a
+/// tombstone merge whose local file erase failed must not leave the deleted
+/// conversation readable by id).
 pub async fn chats_read_with_dir(
     io: &dyn VaultIo,
     vault_dir: &Path,
@@ -513,6 +527,11 @@ pub async fn chats_read_with_dir(
     conversation_id_hex: &str,
 ) -> Result<String, ChatsReadError> {
     let (_, seal) = seal_from_slot_for_read(io, vault_dir, state).await?;
+    let map = read_catalog_in_dir(io, vault_dir, &seal).await?;
+    match map.get(conversation_id_hex) {
+        Some(entry) if entry.deleted_at.is_none() => {}
+        _ => return Err(ChatsReadError::ConversationNotFound),
+    }
     let plaintext = read_conversation_in_dir(io, vault_dir, conversation_id_hex, &seal).await?;
     Ok(String::from_utf8_lossy(&plaintext).into_owned())
 }
@@ -624,6 +643,12 @@ pub async fn chats_delete_with_dir(
         e.updated_at = now_unix_millis;
     });
 
+    // Tombstone FIRST, file second: a crash between the two must leave a
+    // hidden row plus an orphan file (which the pull loop already erases),
+    // never a live row with no body (which the sync layer cannot repair: the
+    // push loop skips absent files and no remote arm reconciles it).
+    write_catalog_in_dir(io, vault_dir, &next, &seal).await?;
+
     // Remove the conversation file (the tombstone stays in the catalog).
     let path = conversation_path(vault_dir, conversation_id_hex);
     match io.remove_file(&path).await {
@@ -631,7 +656,6 @@ pub async fn chats_delete_with_dir(
         Err(e) => return Err(ChatsMutateError::Io { io_error_kind: e }),
     }
 
-    write_catalog_in_dir(io, vault_dir, &next, &seal).await?;
     drop(root_key);
     hooks.bump_local_change();
     Ok(())
@@ -865,6 +889,7 @@ mod tests {
             items_key_id: [7u8; 16],
             items_key_nonce: [8u8; 24],
             enc_items_key: [9u8; 64],
+            membership: None,
         };
         std::fs::write(
             dir.join("vault.meta"),
