@@ -7,6 +7,7 @@
 
 import { StartupOpenSettings } from "./StartupOpenSettings";
 import { NewNoteLocationSettings } from "./NewNoteLocationSettings";
+import { FolderNotesSettings } from "./FolderNotesSettings";
 import { AttachmentCompressionSettings } from "./AttachmentCompressionSettings";
 import { AttachmentOcrSettings } from "./AttachmentOcrSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
@@ -21,6 +22,12 @@ export function FilesPanel() {
       {/* Default location for new notes (MYND-462) — vault root / current note's
           folder / a specific folder. */}
       <NewNoteLocationSettings />
+
+      {/* Folder-notes feature off-switch (myne-md/myne#661), default off. Gates
+          the folder-index entry points and whether folder_index: true is
+          honoured for sidebar / link presentation. A files-and-links behaviour,
+          so it sits with the other note-organization preferences here. */}
+      <FolderNotesSettings />
 
       {/* Whether an imported image is downscaled + re-encoded at ingest time
           (ingest-image-compression). Shared vault-wide, unlike its neighbor

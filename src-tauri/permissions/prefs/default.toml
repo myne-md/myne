@@ -39,6 +39,7 @@ permissions = [
   "allow-set-editor-vim-mode",
   "allow-set-archive-disabled",
   "allow-set-show-task-marker",
+  "allow-set-folder-notes-enabled",
   "allow-set-transcription-enabled",
   "allow-set-auto-tag-enabled",
   "allow-set-ai-provider",
@@ -539,6 +540,11 @@ commands.allow = ["set_reminder_horizon_days"]
 identifier = "allow-set-show-task-marker"
 description = "Allow invoking prefs:set_show_task_marker (Slot::Unlocked-gated setter for the note-task marker's visibility in the sidebar row and the tab, MYND-613). A plain bool defaulting true, omitted from the canonical encoding at its default so an untouched vault stays byte-identical to a pre-feature vault.prefs. Classified Shared / scalar last-write-wins — a marker's visibility is taste, not device capability, so it should not be re-chosen on every new device. Non-load-bearing: a tampered or replayed value can at worst show or hide a glyph. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
 commands.allow = ["set_show_task_marker"]
+
+[[permission]]
+identifier = "allow-set-folder-notes-enabled"
+description = "Allow invoking prefs:set_folder_notes_enabled (Slot::Unlocked-gated setter for the folder-notes feature off-switch, myne-md/myne#661). A plain bool defaulting FALSE (feature off), emitted from the canonical encoding only when true so an untouched vault stays byte-identical to a pre-feature vault.prefs. Presentation gate only: it never rewrites a note's folder_index: frontmatter, so a note keeping folder_index: true while the feature is off is a correct, fully-reversible state. Classified Shared / scalar last-write-wins, because whether folder notes are honoured is a note-list presentation preference (taste), not a device capability, so it should not be re-chosen on every new device. Non-load-bearing: a tampered or replayed value can at worst show or hide a sidebar affordance. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_folder_notes_enabled"]
 
 [[permission]]
 identifier = "allow-set-transcription-enabled"

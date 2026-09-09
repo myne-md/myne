@@ -983,18 +983,28 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     () => liveCache(ctx.cache, archivedKeys),
     [ctx.cache, archivedKeys],
   );
+  // Folder-notes feature gate (myne-md/myne#661). Read through this screen's own
+  // `usePrefs` so a toggle from Settings re-derives the tree live (the prefs
+  // nonce bump the setter performs). When off, every note is projected with
+  // `folderIndex: false`, so `deriveFolderTree` treats it as ordinary: no index
+  // note is hidden or badged, and the create/open affordances (driven by
+  // `indexNoteId`) never appear. Zeroing the field in the projection, rather
+  // than teaching `deriveFolderTree` about the pref, keeps this gate identical
+  // to the resolver-note one (`resolverNotesFromCache`), the vault's other
+  // folder_index reader.
+  const folderNotesEnabled = viewsPrefs.folder_notes_enabled;
   const tree = useMemo(
     () =>
       deriveFolderTree(
         Array.from(live.values()).map((r) => ({
           noteUuid: r.noteUuid,
           folder: r.folder,
-          folderIndex: r.folderIndex,
+          folderIndex: folderNotesEnabled && r.folderIndex,
         })),
         fm.deliberate,
         fm.archivedFolders,
       ),
-    [live, fm.deliberate, fm.archivedFolders],
+    [live, fm.deliberate, fm.archivedFolders, folderNotesEnabled],
   );
   // Keep the handlers' tree reference current (delete-emptiness, case-merge).
   fm.treeRef.current = tree;
@@ -1558,6 +1568,12 @@ function PopulatedList({
   // a prop — same independent-`usePrefs` pattern as the parent sidebar list.)
   const { prefs: rowPrefs } = usePrefs();
   const archiveDisabled = rowPrefs.archive_disabled ?? false;
+  // Folder-notes feature gate (myne-md/myne#661): read here (same independent-
+  // `usePrefs` pattern as `archiveDisabled` above) so a Settings toggle hides or
+  // reveals the folder-note entry points live. When off, the create/set-index
+  // affordances are suppressed; the parent's `deriveFolderTree` already leaves
+  // `indexNoteId` null, so the open/remove variants never render regardless.
+  const folderNotesEnabled = rowPrefs.folder_notes_enabled;
   // SYNC-9 exclusive active-state (MYND-164): opening a note from the sidebar
   // returns the center pane to the editor. The `selectedId`-keyed effect in
   // Editor.tsx covers note-to-note switches; this explicit reset also handles
@@ -1962,9 +1978,12 @@ function PopulatedList({
   const handleFolderActivate = useCallback(
     (node: FolderNode) => {
       if (node.indexNoteId !== null) handleOpenIndexNote(node.indexNoteId);
-      else void handleCreateFolderNote(node.path);
+      // With folder notes off, a double-click must not mint one (myne-md/myne#661).
+      // `indexNoteId` is already null in that mode, so this guard is what stops
+      // the create branch from firing.
+      else if (folderNotesEnabled) void handleCreateFolderNote(node.path);
     },
-    [handleOpenIndexNote, handleCreateFolderNote],
+    [handleOpenIndexNote, handleCreateFolderNote, folderNotesEnabled],
   );
 
   // Designate / undesignate a note as its folder's index, then refresh its
@@ -2231,6 +2250,8 @@ function PopulatedList({
       // as folder note" inverse is NOT here: the index note is hidden from the tree
       // (its row is unreachable), so undesignate lives on the FOLDER menu instead.
       ...(() => {
+        // Suppressed entirely when the folder-notes feature is off (myne-md/myne#661).
+        if (!folderNotesEnabled) return [];
         const rec = ctx.cache.get(menu.id);
         if (rec?.folder == null) return [];
         if (folderIndexByKey.get(folderKey(rec.folder)) != null) return [];
@@ -2316,6 +2337,7 @@ function PopulatedList({
     exportHooks,
     folderIndexByKey,
     handleSetIndex,
+    folderNotesEnabled,
     t,
   ]);
 
@@ -2354,18 +2376,23 @@ function PopulatedList({
           fm.newDrawingHere(node.path);
         },
       },
-      // Folder note (MYND-370): open the existing index, or create one.
-      node.indexNoteId !== null
-        ? {
-            id: "folder.open-index",
-            label: t("notes.list.openFolderNote"),
-            onSelect: () => handleOpenIndexNote(node.indexNoteId as string),
-          }
-        : {
-            id: "folder.create-index",
-            label: t("notes.list.createFolderNote"),
-            onSelect: () => void handleCreateFolderNote(node.path),
-          },
+      // Folder note (MYND-370): open the existing index, or create one; both
+      // suppressed entirely when the feature is off (myne-md/myne#661).
+      ...(folderNotesEnabled
+        ? [
+            node.indexNoteId !== null
+              ? {
+                  id: "folder.open-index",
+                  label: t("notes.list.openFolderNote"),
+                  onSelect: () => handleOpenIndexNote(node.indexNoteId as string),
+                }
+              : {
+                  id: "folder.create-index",
+                  label: t("notes.list.createFolderNote"),
+                  onSelect: () => void handleCreateFolderNote(node.path),
+                },
+          ]
+        : []),
       // Undesignate the folder note (MYND-370): the only reachable "remove" path
       // now that the index note is hidden from the tree. Non-destructive — the
       // note returns to an ordinary, visible note (re-appears as a row).
@@ -2425,6 +2452,7 @@ function PopulatedList({
     handleOpenIndexNote,
     handleCreateFolderNote,
     handleUnsetIndex,
+    folderNotesEnabled,
     t,
   ]);
 
@@ -2679,8 +2707,13 @@ function PopulatedList({
                     }
                     onCancelRename={fm.cancelRenameFolder}
                     onOpenIndexNote={handleOpenIndexNote}
-                    onCreateFolderNote={(folderPath) =>
-                      void handleCreateFolderNote(folderPath)
+                    onCreateFolderNote={
+                      // Withheld when the feature is off (myne-md/myne#661): the
+                      // hover "create folder note" button is guarded on this
+                      // callback's presence, so passing undefined hides it.
+                      folderNotesEnabled
+                        ? (folderPath) => void handleCreateFolderNote(folderPath)
+                        : undefined
                     }
                     onActivate={handleFolderActivate}
                   />
