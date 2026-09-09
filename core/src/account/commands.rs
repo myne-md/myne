@@ -77,6 +77,12 @@ pub enum AccountCommandError {
     /// refused; the caller keeps the in-memory view.
     #[error("account record unreadable, refusing to overwrite")]
     RecordUnreadable,
+    /// No vault is unlocked. Rename, move and split are refused on a locked
+    /// device: a locked-screen observer may read labels and grouping but must
+    /// not persist a regrouping without any vault password (myne-md/myne#684
+    /// land gate).
+    #[error("account mutations require an unlocked vault")]
+    Locked,
 }
 
 impl From<AccountError> for AccountCommandError {
@@ -317,13 +323,22 @@ pub async fn account_list<R: tauri::Runtime>(
 }
 
 /// Rename the account owning `vault_id`.
+///
+/// Refused while hide-vault-names is on (a mutation applied invisibly would be
+/// worse than an honest refusal), when the label exceeds
+/// `ACCOUNT_LABEL_MAX_LEN` bytes, and when no vault is unlocked (a locked
+/// observer reads grouping but never regroups).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn account_rename<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
+    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
     vault_id: String,
     label: String,
 ) -> Result<AccountView, AccountCommandError> {
+    if state.inner().active_vault_id().await.is_none() {
+        return Err(AccountCommandError::Locked);
+    }
     let host = crate::host::tauri_host::TauriHost::new(app);
     let vault_id = VaultId::parse(&vault_id).map_err(|_| AccountCommandError::VaultNotFound)?;
     rename_account_from_host(
@@ -337,13 +352,20 @@ pub async fn account_rename<R: tauri::Runtime>(
 }
 
 /// Move `vault_id` into the account owning `target_vault_id`.
+///
+/// Refused while hide-vault-names is on, like the other mutations, and when
+/// no vault is unlocked.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn account_move<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
+    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
     vault_id: String,
     target_vault_id: String,
 ) -> Result<Vec<AccountView>, AccountCommandError> {
+    if state.inner().active_vault_id().await.is_none() {
+        return Err(AccountCommandError::Locked);
+    }
     let host = crate::host::tauri_host::TauriHost::new(app);
     let vault_id = VaultId::parse(&vault_id).map_err(|_| AccountCommandError::VaultNotFound)?;
     let target_vault_id =
@@ -359,12 +381,18 @@ pub async fn account_move<R: tauri::Runtime>(
 }
 
 /// Split `vault_id` into a fresh account.
+///
+/// Refused when no vault is unlocked, like the other mutations.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn account_split<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
+    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
     vault_id: String,
 ) -> Result<Vec<AccountView>, AccountCommandError> {
+    if state.inner().active_vault_id().await.is_none() {
+        return Err(AccountCommandError::Locked);
+    }
     let host = crate::host::tauri_host::TauriHost::new(app);
     let vault_id = VaultId::parse(&vault_id).map_err(|_| AccountCommandError::VaultNotFound)?;
     split_vault_from_host(

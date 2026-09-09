@@ -6,6 +6,7 @@ import { listVaults, orderByLastUnlock, stableVaultNumber } from "../../lib/vaul
 import { listAccounts, renameAccount, moveVault, splitVault, accountIdForVault, accountCommandErrorKind, groupVaultsByAccount, truncateLabelToBytes } from "../../lib/account";
 import type { AccountView, AccountCommandErrorKind } from "../../lib/account";
 import { vaultDisplayLabel } from "../../lib/vault-label";
+import { isVaultUnlocked } from "../../lib/vault-unlock";
 import { ioBanner } from "../../lib/io-banner";
 import { HAS_TAURI } from "../../lib/app-window";
 import { useHold } from "./editor/chrome/useHold";
@@ -203,6 +204,10 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
   const [ioError, setIoError] = useState<string | null>(null);
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [heldVault, setHeldVault] = useState<VaultSummary | null>(null);
+  // Whether some vault is unlocked. Account mutations are refused while
+  // locked (backend `Locked`), so the hold sheet opens only when unlocked;
+  // the locked picker stays a read surface.
+  const [unlocked, setUnlocked] = useState(false);
   // Sheet mode: the action menu, the inline rename form, or the
   // destination-account list for a move. One sheet, three faces.
   const [sheetMode, setSheetMode] = useState<"menu" | "rename" | "move">("menu");
@@ -232,7 +237,6 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
         accts = await listAccounts();
         if (!cancelled) setAccountsError(null);
       } catch (e) {
-        if (cancelled) return;
         if (accountCommandErrorKind(e) === "KeychainUnavailable") {
           setAccountsError(null);
         } else {
@@ -240,6 +244,9 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
         }
       }
       if (cancelled) return;
+      void isVaultUnlocked().then((ok) => {
+        if (!cancelled) setUnlocked(ok);
+      });
       if ("ok" in result) {
         setVaults(orderByLastUnlock(result.ok));
         setAccounts(accts);
@@ -283,6 +290,9 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
 
   const holdActions = (vault: VaultSummary): void => {
     if (!HAS_TAURI) return;
+    // Mutations are refused while locked (backend `Locked`): the hold sheet
+    // is the mutation surface, so it opens only when unlocked.
+    if (!unlocked) return;
     // Account actions are offered only for member vaults: a standalone
     // vault has no account to rename or move from, and every command would
     // answer VaultNotFound.
