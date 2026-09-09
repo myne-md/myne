@@ -831,7 +831,7 @@ steps:
   # `myne_server_token` secret is configured the step SKIPS cleanly (exit 0) so
   # it never blocks a merge. Add the secret in the Woodpecker UI
   # (repo → Settings → Secrets):
-  #   name=myne_server_token  value=<Forgejo PAT with read access to Myne/myne-server>
+  #   name=myne_server_token  value=<GitHub PAT with read access to myne-md/myne-server>
   #
   # depends_on cargo-test-tauri: keeps the heavy compile steps serial on the
   # shared host and reuses the warm workspace `dist/` (generate_context! embeds
@@ -1316,9 +1316,13 @@ steps:
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
-      # Forgejo PAT (read:repository on Myne/myne-server) for the private-
+      # GitHub PAT (read on private myne-md/myne-server) for the private-
       # companion clone below. The secret `myne_server_token` is configured on
-      # THIS repo (Woodpecker → repo → Settings → Secrets). The guard below
+      # THIS repo (Woodpecker → repo → Settings → Secrets) and now holds the
+      # GitHub PAT (omerdduran), NOT a Forgejo PAT: the clone pulls straight
+      # from github.com, dropping the git.myne.md mirror hop whose token kept
+      # expiring (sync-sim red on 2026-09-05/06, "Credentials are incorrect or
+      # have expired"). The guard below
       # still `exit 0`s when it resolves empty (e.g. a fork PR), so sync-sim
       # never blocks a merge. CAUTION for future edits: a from_secret pointing
       # at a secret this repo cannot see errors the WHOLE pipeline at
@@ -1348,11 +1352,10 @@ steps:
       # Sysdeps to compile/link myne-desktop's test binary (same set as
       # cargo-test-tauri) + git for the clone. node/pnpm NOT needed: dist/ is
       # already in the shared workspace from the pnpm-build step.
-      # Clone the private companion via the Forgejo mirror (git.myne.md/Myne/
-      # myne-server — the in-house source a Forgejo PAT authenticates against,
-      # NOT github.com; it tracks develop on a 10-minute interval) + build a
-      # static binary.
-      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server"
+      # Clone the private companion straight from GitHub (myne-md/myne-server,
+      # the source of truth; x-access-token form is what GitHub expects for PAT
+      # git auth) + build a static binary.
+      - git clone --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-server.git" "$CI_WORKSPACE/myne-server"
       - cd "$CI_WORKSPACE/myne-server" && CGO_ENABLED=0 /usr/local/go/bin/go build -o myne-server ./cmd/myne-server
       - cd "$CI_WORKSPACE"
       # Point the harness at the freshly built server and run ONLY the sim suite.
