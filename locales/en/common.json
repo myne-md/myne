@@ -505,6 +505,9 @@
       "duplicateNote": {
         "label": "Duplicate note"
       },
+      "openInNewWindow": {
+        "label": "Open note in new window"
+      },
       "archiveNote": {
         "label": "Archive note"
       },
@@ -1165,12 +1168,18 @@
       "rename": "Rename",
       "move": "Move to folder…",
       "duplicate": "Duplicate",
+      "openInNewWindow": "Open in new window",
       "convertToTemplate": "Turn into template",
       "convertToNote": "Convert to note",
       "turnedIntoTemplate": "Turned into template",
       "convertedToNote": "Converted to note",
       "versionHistory": "Version history",
       "trash": "Move to trash"
+    },
+    "detachedDeleted": {
+      "title": "This note was deleted elsewhere",
+      "body": "It was deleted from another window or synced from another device. Any unsaved changes in this window were kept as a separate copy.",
+      "close": "Close window"
     },
     "codeBlock": {
       "copyCode": "Copy code",
@@ -2717,6 +2726,11 @@
       "processing_one": "Reading 1 attachment…",
       "processing_other": "Reading {{count}} attachments…"
     },
+    "folderNotes": {
+      "label": "Folder notes",
+      "helper": "Let a note act as its folder's index: it opens when you double-click the folder, and folder links like [[Projects/]] point to it. Off by default. Turning it off hides the buttons that create folder notes and shows any you already have as ordinary notes; it changes nothing on disk, so turning it back on restores them exactly.",
+      "errorSaveSetting": "Could not save this setting."
+    },
     "autoBackup": {
       "backupFolder": "Backup folder",
       "chooseFolder": "Choose folder…",
@@ -3401,6 +3415,7 @@
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
         "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
+        "folderNotes": "folder note index folder_index landing page double click folder link projects off switch disable",
         "attachmentCompression": "compress compression image shrink downscale resize webp jpeg import paste vault size storage",
         "transcription": "transcribe transcription speech voice audio dictation subtitle whisper recording sound to text",
         "syncAddDevice": "add device pair link phone laptop sync",

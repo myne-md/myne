@@ -358,6 +358,7 @@ pub fn run() {
         .plugin(plugins::screen_capture::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
+        .plugin(plugins::detached_window::init())
         // ext-foundation-handoff task 4: the browser-extension pairing
         // dialog's narrow Accept/Reject IPC surface (TB6-governed; the
         // stdio host is the separate, ACL-exempt ingress). Manages the

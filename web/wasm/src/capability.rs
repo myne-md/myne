@@ -590,6 +590,13 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // port — the capability backing it (`cliAccess`) is absent by platform fact,
     // and the Settings block is omitted rather than greyed.
     ("cli-bridge", Class::Unsupported),
+    // myne#678 (epic #173): the pop-out spawn command. A detached note window is
+    // a second host-spawned OS window; a browser page has one tab context and
+    // cannot open one (the single-tab OPFS lock is the model). `Unsupported`
+    // rather than `Pending` because there is nothing to port: the capability
+    // backing it (`detachedWindows`) is absent by platform fact, and the affordance
+    // is omitted rather than greyed.
+    ("detached-window", Class::Unsupported),
 ];
 
 /// Per-command overrides of [`PLUGIN_DEFAULT`]. Each one is a place where a

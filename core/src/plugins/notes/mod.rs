@@ -26,9 +26,11 @@ pub mod daily_match;
 pub mod decode;
 pub mod drawing_text;
 pub mod error;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod export_mtime;
 pub mod note_id;
 pub mod search_sync_core;
 pub mod title_extract;
 
+pub use commands::NOTES_DELETED_EVENT;
 pub use commands::SNAPSHOT_WRITE_FAILED_EVENT;

@@ -22,6 +22,19 @@ permissions = [
   "allow-themes-delete",
 ]
 
+# Detached (pop-out) note-window seat (myne#677, epic #173). Read side only: list + read + export.
+# This needs NO reversal of the header above, which already scopes only import/delete to
+# main-window-only; a detached window reading the active theme to render its note is the same
+# read a split pane already does. Granted by capabilities/detached-note.json (windows: ["note-*"]).
+[[set]]
+identifier = "detached-read"
+description = "Detached note-window theme seat: list + read + export (read). No import/delete (those stay main-window-only per the header above)."
+permissions = [
+  "allow-themes-list",
+  "allow-themes-read",
+  "allow-themes-export",
+]
+
 [[permission]]
 identifier = "allow-themes-list"
 description = "Allow invoking themes:themes_list (Slot::Unlocked-gated read of the sorted custom-theme names in the vault.themes MYT1 blob; falls back to an empty list on absence / AEAD-fail / parse-fail per protocol.md § 9.21.4)."

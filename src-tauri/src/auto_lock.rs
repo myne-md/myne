@@ -400,6 +400,10 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
                 hooks.zeroize_spell();
                 hooks.clear_staged_descriptor();
                 hooks.pdf_export_teardown_on_lock();
+                // myne#679: the idle auto-lock tears down detached (pop-out) note
+                // windows too, so an idle lock leaves no note text on screen in
+                // any window (the same guarantee the manual lock gives).
+                hooks.detached_windows_teardown_on_lock();
                 hooks.zeroize_vault_indices();
                 hooks.zeroize_attachment_refs();
                 hooks.abort_active_recording();

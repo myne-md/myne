@@ -307,7 +307,13 @@ export type Capability =
    * The picker grouping UI is omitted rather than rendered against commands
    * that reject.
    */
-  | "accountGrouping";
+  | "accountGrouping"
+  /**
+   * Desktop pop-out: open a note in its own OS-level window (second monitor;
+   * myne-md/myne#173). Host-spawned `WebviewWindow`; web (single-tab OPFS) and
+   * mobile cannot spawn OS windows, so the affordance is absent there.
+   */
+  | "detachedWindows";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -354,6 +360,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   lockedVaultNames: true,
   torRouting: true,
   accountGrouping: true,
+  detachedWindows: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */

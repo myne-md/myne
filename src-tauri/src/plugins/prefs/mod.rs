@@ -86,6 +86,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_vim_mode,
             commands::set_archive_disabled,
             commands::set_show_task_marker,
+            commands::set_folder_notes_enabled,
             commands::set_transcription_enabled,
             commands::set_auto_tag_enabled,
             commands::set_ai_provider,
@@ -229,6 +230,7 @@ mod desktop_tests {
         fn abort_active_recording(&self) {}
         fn pdf_export_teardown_on_lock(&self) {}
         fn agent_teardown_on_lock(&self) {}
+        fn detached_windows_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
@@ -238,6 +240,7 @@ mod desktop_tests {
         fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
+        fn emit_notes_deleted(&self, _: &str) {}
         // `effective_auto_lock_secs` deliberately not overridden: the trait's
         // default clamps (myne-md/myne#479), and a test hook that restated the
         // delegation would be a fourth place the envelope is named.
