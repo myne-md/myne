@@ -2,7 +2,7 @@
 [package]
 name = "myne-format"
 version = "0.1.0"
-description = "Myne — the on-disk format crate: NC05 read path, MYB1 backup container, the VaultIo seam, and the export-naming vocabulary"
+description = "Myne: the on-disk format crate: NC05 read path, MYB1 backup container, the VaultIo seam, and the export-naming vocabulary"
 edition = "2021"
 license = "AGPL-3.0"
 repository = "https://github.com/myne-md/myne"
@@ -16,7 +16,7 @@ publish = false
 [dependencies]
 protocol = { path = "../protocol" }
 # The Automerge CRDT (myne-md/myne#417): the NC05 note-type's single-`Text`
-# bridge. Decode-only here — the encode half stays in `myne-core`, which needs
+# bridge. Decode-only here: the encode half stays in `myne-core`, which needs
 # `HostCtx` + the sync `crdt_doc` seam. Merges already-decrypted content; NOT
 # crypto (its `sha2` is content-addressed change hashing, not key material).
 automerge = "0.10"
@@ -28,7 +28,7 @@ async-trait = "0.1"
 # NFC + case folding for the export-dedup collision oracle (export_naming).
 unicode-normalization = { version = "0.1.25", default-features = false }
 # SHA-256 for the MYB1 backup-container member hashes (unkeyed: corruption
-# detection only, never tamper resistance — §9.11.4).
+# detection only, never tamper resistance (see §9.11.4).
 sha2 = { version = "0.10", default-features = false }
 # `Zeroizing` for the decoded note plaintext (decode_note_any returns
 # `Zeroizing<Vec<u8>>`).
@@ -38,7 +38,7 @@ zeroize = { version = "1.8", features = ["alloc"] }
 # the shared lock via `myne-core`; a transitive->direct promotion.
 uuid = { version = "1", features = ["v4", "v7"] }
 # The export walk emits stage-tagged tracing records (counts only, no paths,
-# no ids — the DENY-list discipline). Same facade `protocol` already uses.
+# no ids: the DENY-list discipline). Same facade `protocol` already uses.
 tracing = "0.1"
 
 # Windows durability primitive for `atomic_write`'s `MoveFileExW` arm.

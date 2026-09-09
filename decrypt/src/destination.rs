@@ -53,7 +53,7 @@ const CLOUD_ROOTS: &[CloudRoot] = &[
 
 /// Detect whether `path` is under a known cloud-sync root, returning the
 /// provider name. `None` means "not detected", which is deliberately NOT a
-/// clearance — the unconditional closing line is the guarantee.
+/// clearance: the unconditional closing line is the guarantee.
 pub fn detect_cloud_root(path: &Path) -> Option<&'static str> {
     let s = path.to_string_lossy();
     CLOUD_ROOTS
@@ -83,9 +83,7 @@ pub fn create_output_dir(path: &Path) -> std::io::Result<()> {
 /// The unconditional closing line, printed on every run. It names the plaintext
 /// directory so the user is always told where their plaintext now lives.
 ///
-/// Wired into the export path in task 7; until then it is constructed and
-/// tested but has no caller.
-#[allow(dead_code)]
+/// Called by `main.rs` after a successful export; unit-tested below.
 pub fn closing_line(out_dir: &Path) -> String {
     format!("Exported plaintext to: {}", out_dir.to_string_lossy())
 }

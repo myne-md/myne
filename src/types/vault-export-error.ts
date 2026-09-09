@@ -1,9 +1,9 @@
 // TODO(Phase-1-end): Replace this hand-written file with a `ts-rs`
 // auto-generated artifact + a CI drift check. The Rust types live in:
-//   - core/src/io_failure_kind.rs                       (IoFailureKind)
-//   - core/src/plugins/export/error.rs                  (VaultExportError)
-//   - core/src/plugins/export/commands.rs               (VaultExportSummary,
-//                                                        ExportProgressPayload)
+//   - format/src/io_failure_kind.rs                    (IoFailureKind)
+//   - format/src/export_error.rs                       (VaultExportError)
+//   - format/src/export_walk.rs                        (VaultExportSummary,
+//                                                       ExportProgressPayload)
 
 import type { IoFailureKind } from "./vault-unlock-error";
 
@@ -98,7 +98,7 @@ export function isVaultExportIoError(
 
 /**
  * Counts-only summary resolved by `vault_export_markdown` — mirror of
- * the Rust `VaultExportSummary` (`plugins/export/commands.rs`). The
+ * the Rust `VaultExportSummary` (`format/src/export_walk.rs`). The
  * summary phase of the export modal renders these directly.
  */
 export interface VaultExportSummary {
@@ -116,6 +116,11 @@ export interface VaultExportSummary {
   excluded_trashed: number;
   /** `snapshots/` files excluded (counted, never decrypted). */
   excluded_snapshots: number;
+  /**
+   * Snapshots exported into `snapshots/` (the CLI's `--history`).
+   * Always zero on the app path (the app counts snapshots, never exports them).
+   */
+  snapshots: number;
   /** Notes that could not be decoded, preserved under `_undecodable/`. */
   failed: number;
   /** Notes written into `_trash/` (the CLI's `trashed:` mode). */
