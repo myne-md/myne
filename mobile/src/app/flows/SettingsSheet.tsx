@@ -396,8 +396,8 @@ function SegmentBlock<T extends string | number>({
  * Select. Five equal-width segments inside a card about 358 px wide leaves each
  * one around 68 px, which is narrower than the shortest date sample it would
  * have to show. The date format has exactly five, which is what this block was
- * extracted for (myne-md/myne#609); the desktop twin carries the same
- * over-count as a scoped deferral, and its dialog is wide.
+ * extracted for (myne-md/myne#609); the desktop twin is now also a Select for
+ * that row (myne-md/myne#668), and its dialog is wide enough for one.
  *
  * Extracted rather than written a second time: `LanguageBlock` already held one
  * of these inline, hardcoding eight visual values that no custom theme could
