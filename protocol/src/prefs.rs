@@ -949,6 +949,25 @@ pub struct PrefsView {
     #[serde(default)]
     pub folder_icons: BTreeMap<String, String>,
 
+    /// Folder-notes feature off-switch (myne-md/myne#661). Gates the
+    /// folder-index entry points and whether a note's `folder_index: true`
+    /// flag is honoured for sidebar / link presentation. A plain `bool`
+    /// defaulting **`false`** (feature off), so an untouched vault meets folder
+    /// notes hidden; **emitted ONLY when `true`**, omitted entirely at the
+    /// default so a vault that never enabled the feature is byte-identical to a
+    /// pre-#661 `vault.prefs` (existing golden vectors unaffected, the
+    /// `auto_tag_enabled` polarity). The switch touches **no bytes**: a note
+    /// keeping `folder_index: true` while the feature is off is a correct,
+    /// fully-reversible state, so this field never rewrites managed frontmatter.
+    /// Classified **Shared / scalar last-write-wins**, a sibling note-list
+    /// presentation preference (`show_task_marker` class), consistent across a
+    /// user's devices rather than re-chosen per device. **Non-load-bearing**: a
+    /// tampered / replayed value can at worst show or hide a sidebar affordance.
+    /// Canonical key 'f' sorts after `folder_icons` (`folder_i` < `folder_n`),
+    /// before `hidden_bar_items` (`f` < `h`).
+    #[serde(default)]
+    pub folder_notes_enabled: bool,
+
     /// Hidden bottom-bar item ids (MYND bottom-bar customization) — the
     /// **set** of `BottomBar` element ids the user chose to hide via the
     /// bar's right-click menu (e.g. `graph`, `tags`, `word-count`). A
@@ -1461,6 +1480,7 @@ impl Default for PrefsView {
             reminder_horizon_days: None,
             show_task_marker: true,
             folder_icons: Default::default(),
+            folder_notes_enabled: false,
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -2147,6 +2167,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"\"folder_icons\":");
         push_canonical_string_map(&mut out, &prefs.folder_icons);
         out.push(b',');
+    }
+
+    // folder_notes_enabled (canonical key 'folder_n', after 'folder_icons'
+    // ['folder_i' < 'folder_n'], before 'hidden_bar_items' ['f' < 'h']). The
+    // folder-notes feature off-switch (myne-md/myne#661). Emitted ONLY when
+    // true; omitted entirely when false (the default) so a vault that never
+    // enabled folder notes is byte-identical to a pre-feature vault.prefs
+    // (preserves existing KAT vectors), the same discipline as auto_tag_enabled.
+    if prefs.folder_notes_enabled {
+        out.extend_from_slice(b"\"folder_notes_enabled\":true,");
     }
 
     // hidden_bar_items (canonical key 'h' — after 'folder_icons' [f < h], before
@@ -3127,6 +3157,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // from the same monotonic cursor so a later field's key marker is never
     // matched inside a prior field's object/array content.
     let folder_icons = parse_optional_string_map_field(rest, &mut cursor, b"\"folder_icons\":")?;
+    // folder_notes_enabled (key 'folder_n') sits between folder_icons (folder_i)
+    // and hidden_bar_items (h) in canonical order (myne-md/myne#661): the
+    // folder-notes feature off-switch. Absent decodes to false (feature off by
+    // default); parsed from the same monotonic cursor as its neighbours.
+    let folder_notes_enabled =
+        parse_optional_bool_field(rest, &mut cursor, b"\"folder_notes_enabled\":")?
+            .unwrap_or(false);
     // hidden_bar_items (key 'h') sits between folder_icons (f) and item_colors (i)
     // in canonical order. A set-semantics array parsed from the same monotonic
     // cursor so a later field's key marker is never matched inside its content
@@ -3305,6 +3342,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         timezone,
         transcription_enabled,
         folder_icons,
+        folder_notes_enabled,
         hidden_bar_items,
         bar_items_order,
         chat_history_budget,
@@ -4395,6 +4433,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -4476,6 +4515,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -4585,6 +4625,7 @@ mod tests {
         // within each object are emitted in lexicographic order.
         let prefs = PrefsView {
             folder_icons: map_of(&[("Projects/Myne/", "book"), ("Archive/2025/", "archive")]),
+            folder_notes_enabled: false,
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: map_of(&[
@@ -4616,6 +4657,7 @@ mod tests {
             favorites: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
             field_clocks: clocks,
             folder_icons: map_of(&[("Projects/Myne/", "book")]),
+            folder_notes_enabled: false,
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&prefs);
@@ -4689,6 +4731,7 @@ mod tests {
             label: Some(String::from("favorites")),
             favorites: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
             folder_icons: icons,
+            folder_notes_enabled: false,
             ..PrefsView::default()
         };
         let decoded = canonical_json_decode(&canonical_json_encode(&view)).expect("parses");
@@ -4830,6 +4873,7 @@ mod tests {
     fn decoration_maps_round_trip_through_blob() {
         let original = PrefsView {
             folder_icons: map_of(&[("Archive/2025/", "archive"), ("Projects/Myne/", "book")]),
+            folder_notes_enabled: false,
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: map_of(&[
@@ -4931,6 +4975,7 @@ mod tests {
         // emitted in NFC (U+00E9) — byte-stability discipline.
         let prefs = PrefsView {
             folder_icons: map_of(&[("Cafe\u{301}/", "book")]),
+            folder_notes_enabled: false,
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             ..PrefsView::default()
@@ -4966,6 +5011,7 @@ mod tests {
                 timezone: None,
                 transcription_enabled: true,
                 screen_capture_protection: true,
+                folder_notes_enabled: false,
                 bar_items_order: Vec::new(),
                 chat_history_budget: None,
                 cli_enabled: false,
@@ -5049,6 +5095,7 @@ mod tests {
                 timezone: None,
                 transcription_enabled: true,
                 screen_capture_protection: false,
+                folder_notes_enabled: false,
                 bar_items_order: Vec::new(),
                 chat_history_budget: None,
                 cli_enabled: false,
@@ -6873,6 +6920,7 @@ mod tests {
     fn encode_emits_theme_last_dark_with_scp_false() {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             color_groups: Vec::new(),
@@ -6906,6 +6954,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -7255,6 +7304,54 @@ mod tests {
         assert!(decoded.show_task_marker);
     }
 
+    // ---- folder_notes_enabled (myne-md/myne#661) ----------------------
+
+    #[test]
+    fn encode_omits_folder_notes_enabled_when_default() {
+        // Default is `false` (feature off) and false is NOT emitted, so a vault
+        // that never enabled folder notes stays byte-identical to a pre-#661
+        // vault.prefs, which keeps the existing KAT vectors valid.
+        let prefs = PrefsView::default();
+        let encoded = canonical_json_encode(&prefs);
+        assert!(!String::from_utf8_lossy(&encoded).contains("folder_notes_enabled"));
+    }
+
+    #[test]
+    fn encode_emits_folder_notes_enabled_true_in_canonical_order() {
+        // Lexicographic position: after folder_icons (folder_i < folder_n),
+        // before hidden_bar_items (f < h), before screen_capture_protection.
+        let prefs = PrefsView {
+            folder_icons: map_of(&[("Projects/", "book")]),
+            folder_notes_enabled: true,
+            hidden_bar_items: alloc::vec![alloc::string::String::from("graph")],
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"folder_icons":{"Projects/":"book"},"folder_notes_enabled":true,"hidden_bar_items":["graph"],"screen_capture_protection":true}"#
+        );
+    }
+
+    #[test]
+    fn folder_notes_enabled_true_round_trips() {
+        let original = PrefsView {
+            folder_notes_enabled: true,
+            ..PrefsView::default()
+        };
+        let decoded = canonical_json_decode(&canonical_json_encode(&original)).expect("decode");
+        assert!(decoded.folder_notes_enabled);
+    }
+
+    #[test]
+    fn folder_notes_enabled_absent_decodes_to_false() {
+        // A pre-#661 blob carries no such key; it must read as OFF (feature
+        // disabled), the omit-when-default rule read backwards.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert!(!decoded.folder_notes_enabled);
+    }
+
     #[test]
     fn reminders_enabled_false_round_trips() {
         let original = PrefsView {
@@ -7369,6 +7466,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -7456,6 +7554,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -7546,6 +7645,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -7631,6 +7731,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -7776,6 +7877,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -7886,6 +7988,7 @@ mod tests {
             transcription_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -7982,6 +8085,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -8148,6 +8252,7 @@ mod tests {
             transcription_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: false,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -8258,6 +8363,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -8608,6 +8714,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -8692,6 +8799,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -8779,6 +8887,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -8934,6 +9043,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -9063,6 +9173,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -9388,6 +9499,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -9477,6 +9589,7 @@ mod tests {
             timezone: None,
             transcription_enabled: true,
             screen_capture_protection: false,
+            folder_notes_enabled: false,
             bar_items_order: Vec::new(),
             chat_history_budget: None,
             cli_enabled: false,
@@ -9761,6 +9874,7 @@ mod tests {
 
         let prefs = PrefsView {
             folder_icons,
+            folder_notes_enabled: false,
             item_colors,
             ..PrefsView::default()
         };
@@ -9827,6 +9941,7 @@ mod tests {
                 timezone: None,
                 transcription_enabled: true,
                 screen_capture_protection: true,
+                folder_notes_enabled: false,
                 bar_items_order: Vec::new(),
                 chat_history_budget: None,
                 cli_enabled: false,
@@ -9909,6 +10024,7 @@ mod tests {
                 timezone: None,
                 transcription_enabled: true,
                 screen_capture_protection: false,
+                folder_notes_enabled: false,
                 bar_items_order: Vec::new(),
                 chat_history_budget: None,
                 cli_enabled: false,
@@ -10009,6 +10125,7 @@ mod tests {
             ai_enabled: false,
             field_clocks: Default::default(),
             screen_capture_protection: true,
+            folder_notes_enabled: false,
             // sequence array (order preserved verbatim)
             bar_items_order: alloc::vec![
                 alloc::string::String::from("view-mode"),

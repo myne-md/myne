@@ -84,6 +84,20 @@
     "  measurement: an e2e scenario could honestly assert them, so they are not",
     "  manual items at all. Paying that debt is what moves the ceiling down.",
     "",
+    "CEILING RAISED 10511 -> 10519 by myne-md/myne#481 (brand the device-join QR),",
+    "in the sanctioned direction: an existing gated item genuinely grew. What added",
+    "the minutes, named so the raise is an argument rather than a bump:",
+    "",
+    "  + the sync.device-join scan item now runs on BOTH a light and a dark desktop",
+    "    theme and with the LARGEST realistic payload (self-host URL + 64-hex cert",
+    "    pin), and adds the negative-test margin proof (oversize the centre knockout,",
+    "    confirm the scan then fails, restore). Only a phone camera off an emissive",
+    "    screen proves the centre-mark footprint left scan margin; the rqrr decode",
+    "    round-trip and the e2e render check prove the SVG is well-formed and software-",
+    "    decodable but NOT that it scans. +4 min on the ios/android core item = +8",
+    "    across its two gated clients, so this raises gatedMinutes too, not only the",
+    "    ceiling.",
+    "",
     "CEILING RAISED 9407 -> 9822 during the myne-md/myne#548 pr-review fix pass, in",
     "the sanctioned direction (a new surface genuinely needing a human) rather than",
     "the forbidden one. What added the minutes, named so the raise is an argument:",
@@ -413,6 +427,6 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 10587,
-  "gatedMinutes": 3809
+  "totalMinutesCeiling": 10595,
+  "gatedMinutes": 3817
 }

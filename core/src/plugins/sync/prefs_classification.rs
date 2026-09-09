@@ -306,6 +306,14 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "folder_icons",
         PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
     ),
+    // myne-md/myne#661: the folder-notes feature off-switch. **Shared**, the
+    // `show_task_marker` reasoning: whether folder notes are honoured is a
+    // note-list presentation preference (taste), not a device capability, so it
+    // should not be re-chosen on every new device. A scalar bool.
+    (
+        "folder_notes_enabled",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     ("hidden_bar_items", PrefClass::DeviceLocal),
     ("icon", PrefClass::Shared(SharedDiscipline::ScalarLww)),
     (
@@ -485,6 +493,7 @@ mod tests {
             favorites: _,
             field_clocks: _,
             folder_icons: _,
+            folder_notes_enabled: _,
             hidden_bar_items: _,
             icon: _,
             item_colors: _,
@@ -564,6 +573,7 @@ mod tests {
             "favorites",
             "field_clocks",
             "folder_icons",
+            "folder_notes_enabled",
             "hidden_bar_items",
             "icon",
             "item_colors",
