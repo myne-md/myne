@@ -1061,9 +1061,15 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // note. Reveal once per rename session (keyed by the note id) so a manual
   // collapse mid-rename is not fought; the `folder === null` (root) case reveals
   // nothing and needs nothing.
+  // `justCreatedId` joined `renamingId` here with myne#653. Creating a note no
+  // longer enters sidebar rename (the note carries its own `title:` field now),
+  // and this effect was the only thing revealing the destination folder, so
+  // without it a note created into a collapsed folder was selected, opened, and
+  // nowhere to be seen in the tree. A drawing still enters rename and still
+  // arrives through the first branch.
   const revealedRenameId = useRef<NoteId | null>(null);
   useEffect(() => {
-    const id = ctx.renamingId;
+    const id = ctx.renamingId ?? ctx.justCreatedId;
     if (id === null) {
       revealedRenameId.current = null;
       return;
@@ -1074,12 +1080,12 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       revealFolder(folder);
       revealedRenameId.current = id;
     }
-  }, [ctx.renamingId, ctx.cache, revealFolder]);
+  }, [ctx.renamingId, ctx.justCreatedId, ctx.cache, revealFolder]);
   // Unified manual order (item_order) interleaves folders + loose notes per
   // container (MYND-183); flatten owns all display ordering.
   const rows = useMemo(
-    () => flattenVisibleRows(tree, live, collapsed, fm.itemOrder),
-    [tree, live, collapsed, fm.itemOrder],
+    () => flattenVisibleRows(tree, live, collapsed, fm.itemOrder, ctx.justCreatedId),
+    [tree, live, collapsed, fm.itemOrder, ctx.justCreatedId],
   );
   // Per-row disclosure-animation lookup: when `treeAnim` is active, the toggled
   // folder's contiguous descendant rows (depth > the folder's, until the depth

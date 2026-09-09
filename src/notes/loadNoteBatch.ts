@@ -232,7 +232,18 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   const titleRaw = parsed["title"];
   const titleFromFm =
     typeof titleRaw === "string"
-      ? titleRaw
+      ? // An EMPTY title is untitled, not a title that happens to be blank
+        // (myne#653). Every new note is now created carrying `title: ""`, so
+        // without this the sidebar row and the tab handle render an empty
+        // `<bdi>` instead of the italic "Untitled" placeholder, which is a
+        // recorded behaviour (`markdown-dialect.md`: "a note with no FM
+        // `title:` reads as 'Untitled' until named or imported") that myne#653
+        // never asked to remove. Normalised at the READ boundary rather than
+        // at each of the two renderers, because `NoteRow` and `TabStrip` both
+        // special-case `null` alone and a third consumer would inherit the gap.
+        titleRaw === ""
+        ? null
+        : titleRaw
       : titleRaw === undefined || titleRaw === null
         ? null
         : readTitleFromFmBody(slice.frontmatter_bytes ?? "");

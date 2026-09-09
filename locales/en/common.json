@@ -325,6 +325,7 @@
         "ioPermissionDenied": "No permission to write at the destination.",
         "joinFailure": "Backup failed unexpectedly. No file was left behind.",
         "memberTooLarge": "A file in this vault is larger than the backup format allows.",
+        "unknown": "The backup failed for a reason Myne could not identify. Do not rely on any file at the destination; try again.",
         "vaultNotFound": "No vault found to back up.",
         "verifyFailed": "The written backup did not verify, so it was discarded. Try again, on different media if it repeats."
       },
@@ -339,6 +340,7 @@
         "joinFailure": "Restore failed unexpectedly. Nothing was changed.",
         "missingVaultMeta": "This backup is missing its vault metadata and cannot be restored.",
         "notABackupFile": "This file is not a Myne backup.",
+        "unknown": "The restore failed for a reason Myne could not identify. Try again, and check the backup file if it repeats.",
         "vaultAlreadyExists": "A vault from this backup already exists on this device."
       }
     },
@@ -2227,7 +2229,8 @@
       "taskBadgeTitle": "Task note",
       "unsyncedLabel": "Not yet on the server",
       "unsyncedTitle": "This note's latest changes are only on this device",
-      "untitled": "Untitled"
+      "untitled": "Untitled",
+      "untitledDrawing": "Untitled drawing"
     },
     "savedView": {
       "defaultName": "Filtered view"

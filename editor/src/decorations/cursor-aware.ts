@@ -149,15 +149,67 @@ export function isInsideRange(view: EditorView, from: number, to: number): boole
  * boundary touch is harmless where a widget vanishing is not.
  */
 export function revealsRange(view: EditorView, from: number, to: number): boolean {
+  return revealsWith(view, from, to, true);
+}
+
+/**
+ * The shared body of {@link revealsRange} and {@link revealsAtOrInside}. They
+ * differ in one operator and nothing else, and the selection-overlap clause ,
+ * which both docs argue about at length, is the same rule for both, so it
+ * exists once. `inclusiveEnd` is REQUIRED rather than defaulted, per this file's
+ * own subject matter: a default here would silently pick one predicate's
+ * semantics for a caller that never made the choice.
+ */
+function revealsWith(
+  view: EditorView,
+  from: number,
+  to: number,
+  inclusiveEnd: boolean,
+): boolean {
   if (revealSuppressed(view)) return false;
   for (const range of view.state.selection.ranges) {
     if (range.empty) {
-      if (range.head >= from && range.head <= to) return true;
+      if (range.head < from) continue;
+      if (inclusiveEnd ? range.head <= to : range.head < to) return true;
     } else if (range.from < to && range.to > from) {
       return true;
     }
   }
   return false;
+}
+
+/**
+ * Reveal predicate for an ATOMIC replace whose reveal must not swallow the
+ * whole line, the wikilink chip (myne-md/myne#659).
+ *
+ * Half-open on purpose: a caret at `from` or strictly inside reveals, a caret
+ * at `to` does not. Both halves of that asymmetry are load-bearing and each
+ * fixes one half of the reported bug.
+ *
+ *  - **Not at `to`** is what makes a link you just typed RENDER. The caret ends
+ *    up immediately after the closing `]]`, which is `to`; with line-scoped
+ *    reveal (or a closed interval) the chip stayed raw and there was no moment
+ *    at which the editor said "this is a link now". Finishing a wikilink and
+ *    getting no confirmation was the half users hit most.
+ *  - **At `from`** is what keeps it editable by keyboard. The range is atomic
+ *    while it renders, so the caret can never be strictly inside to trigger a
+ *    reveal, atomic motion skips it, which is exactly why the chip used
+ *    line-scoped reveal in the first place. Arrowing leftward across the chip
+ *    parks the caret at `from`, which reveals it and drops the atomicity, so
+ *    the next press moves into the text. Arriving from the right lands on `to`,
+ *    which does not reveal, so the atomic jump carries the caret to `from` and
+ *    the reveal happens one press later.
+ *
+ * A non-empty selection OVERLAPPING the range reveals too, for
+ * {@link revealsRange}'s reason: what is selected is the markup, so the markup
+ * is what should be on screen and on the clipboard.
+ */
+export function revealsAtOrInside(
+  view: EditorView,
+  from: number,
+  to: number,
+): boolean {
+  return revealsWith(view, from, to, false);
 }
 
 /**

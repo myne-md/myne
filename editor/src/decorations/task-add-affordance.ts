@@ -50,10 +50,32 @@ class TaskAddWidget extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
+    // The zero-size slot (myne#660). #560 cancelled this widget's VERTICAL
+    // contribution and said in its own comment that the horizontal half was
+    // still open: "the box below still contributes inline WIDTH when the caret
+    // arrives, so on a row near the wrap width it can still force a wrap …
+    // taking the widget out of flow would close that". This is that.
+    //
+    // A `width: 0; height: 0` inline-block with `overflow: visible` gives the
+    // line the same metrics whether the `+` is in the DOM or not, so the
+    // appearance and disappearance that ride along with every selection change
+    // can no longer move the wrap point mid-measure. The button keeps its own
+    // metrics and simply overflows the slot.
+    const slot = document.createElement("span");
+    slot.className = "cm-task-add-slot";
+    // `data-task-add` lives on the SLOT, not the button, and it has to.
+    // `task-chip-listener.ts` resolves the editor with
+    // `EditorView.findFromDOM(target.closest("[data-task-add]"))`, and
+    // `findFromDOM` answers only for a node CM6 has attached a ContentView to ,
+    // which is the widget's root. With the marker on the button it resolved
+    // null, `onOpenAdd` returned early, and the whole `+` menu stopped opening
+    // while every other symptom (the widget renders, the event fires, `closest`
+    // matches) looked correct.
+    slot.setAttribute("data-task-add", "");
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "cm-task-add";
-    button.setAttribute("data-task-add", "");
     // Observability + the anchor the listener recovers the menu against.
     button.setAttribute("data-testid", "editor.task-add-field");
     button.setAttribute("tabindex", "0");
@@ -63,7 +85,13 @@ class TaskAddWidget extends WidgetType {
     const fire = (): void => {
       // Resolve the line live from the DOM rather than a closure — an edit above
       // shifts every offset below it, and CM6 may reuse this widget's DOM.
-      const pos = view.posAtDOM(button);
+      //
+      // Resolve against the SLOT, not the button. The slot is the widget's root
+      // DOM node, which is what CM6 has registered a position for; asking about
+      // the button, now a child of the slot rather than the root, resolves
+      // against a node the view does not know, and the whole `+` menu silently
+      // stops opening.
+      const pos = view.posAtDOM(slot);
       const line = view.state.doc.lineAt(pos);
       button.dispatchEvent(
         new CustomEvent<TaskAddEventDetail>(TASK_ADD_EVENT, {
@@ -85,7 +113,8 @@ class TaskAddWidget extends WidgetType {
       e.stopPropagation();
       fire();
     });
-    return button;
+    slot.appendChild(button);
+    return slot;
   }
 
   ignoreEvent(): boolean {

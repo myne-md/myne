@@ -25,6 +25,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   clickNewMenuItem,
+  nameNewNote,
   confirmDeleteWithEnter,
   createNote,
   dismissImporterOffer,
@@ -259,8 +260,7 @@ describeE2E("nc4 folder delete soft-trashes its notes (MYND-223 / MYND-144)", ()
         await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv\uE007");
         const folder = await s.byTestId("notes.folder-row");
         await contextMenuPick(s, folder, "new-note");
-        await (await s.byTestId("notes.rename-input")).sendKeys("Klasör Notu\uE007");
-        await s.waitForGone(testIdSelector("notes.rename-input"));
+        await nameNewNote(s, "Klasör Notu");
         await s.byTestId("notes.row");
 
         // Folder delete: non-empty → confirm → subtree soft-trashes.
@@ -307,8 +307,7 @@ describeE2E("nc7 Enter confirms the folder-delete gate (#628)", () => {
         await (await s.byTestId("notes.new-folder-input")).sendKeys("Arsiv\uE007");
         const folder = await s.byTestId("notes.folder-row");
         await contextMenuPick(s, folder, "new-note");
-        await (await s.byTestId("notes.rename-input")).sendKeys("Klasör Notu\uE007");
-        await s.waitForGone(testIdSelector("notes.rename-input"));
+        await nameNewNote(s, "Klasör Notu");
         await s.byTestId("notes.row"); // the in-folder note settled (as in nc4)
 
         // Escape still cancels, and nothing is deleted.

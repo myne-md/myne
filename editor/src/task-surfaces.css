@@ -281,16 +281,105 @@
    is zero-height at EVERY `--editor-line-spacing`. A px box that merely happens
    to fit at the default typography would grow the line again at the small text
    size or the tight line spacing. */
+/* The zero-size slot the `+` lives in (myne-md/myne#660).
+
+   The block above closed the VERTICAL half of #560 and named the half it left
+   open: the button still contributed inline WIDTH, so on a row near the wrap
+   width its arrival could still move the wrap point, the two `wrappedLine()`
+   probes could still disagree, and the two-rectangle branch still painted the
+   double highlight. It reproduced on `Cmd+Shift+←` and on a double-click.
+
+   The button is therefore taken out of flow ENTIRELY: `position: absolute`
+   inside a zero-size positioned slot. A line then measures identically with and
+   without the `+`, in both axes, because the slot has no in-flow content at all.
+
+   # Why not simply `width: 0; height: 0` with the button left in flow
+
+   That was the first version of this rule and it shipped broken, so the reason
+   is recorded rather than left to be rediscovered. A zero-HEIGHT inline-block
+   still establishes an inline formatting context, and the line box inside it is
+   sized by the slot's inherited `line-height`, not by the declared `height: 0`.
+   The button laid out at its natural position in that inner line box and then
+   OVERFLOWED downward by roughly half a line, landing the `+` on top of the
+   following row.
+
+   That was not merely cosmetic, and it is the reason this block is worth
+   reading. `wrappedLine()` locates a visual row with `view.posAtCoords()`, which
+   hit-tests the DOM. A `+` hanging into the neighbouring row is a hit target in
+   that row, so the probe could resolve to a position on the wrong line, the two
+   probes disagreed for a NEW reason, and #660's own symptom came back louder.
+   The same overflow put a `preventDefault()`ing button over text a user was
+   trying to double-click, and over the caret at the end of a task line.
+
+   # Why the slot is zero-WIDTH but keeps a real height
+
+   Zeroing the height as well was the second version, and it took the caret with
+   it. `drawSelection` draws the caret itself, and `RectangleMarker.forRange`
+   takes its height from one call:
+
+       let pos = view.coordsAtPos(range.head, range.assoc || 1);
+       ... new RectangleMarker(className, ..., pos.bottom - pos.top)
+
+   `range.assoc` is 0 for an ordinary caret, so `assoc || 1` associates FORWARD.
+   At the end of a task line the thing forward of the caret is this widget, so
+   the caret's height IS this box's height, and a zero-height box draws a caret
+   zero pixels tall. Typing at the end of a task row showed no caret at all.
+
+   So the height is real and the BLOCK MARGINS cancel it, which is #560's own
+   mechanism reused: `getBoundingClientRect()` reports the border box, while the
+   line box is laid out from the margin box. `1.35em` with `-0.675em` top and
+   bottom is a zero-height margin box (no line contribution, at any
+   `--editor-text-size` or `--editor-line-spacing`, which is why all three are in
+   `em`) around a 1.35em border box (a caret with a height). The value is the
+   button's own, deliberately: it is what shipped before #660 and it is the caret
+   height this line had when nobody was reporting one.
+
+   Only the WIDTH is zero, and that is all #660 ever needed: the wrap point moved
+   because the button added inline width when the caret arrived.
+
+   # Why `top: 50%` plus `translateY(-50%)` rather than a magic offset
+
+   `vertical-align: middle` puts the slot's margin box, which is zero-height and
+   therefore a single point, at the parent's baseline plus half the parent's
+   x-height: the visual middle of the surrounding text. The border box is
+   centred on that point by the symmetric margins, so `top: 50%` (half of
+   `1.35em`) lands on the same point, and `translateY(-50%)` lifts the button by
+   half of ITS height to centre it there. Every term comes from the browser's own
+   font metrics, so this holds at every text size and line spacing without a
+   per-size correction, and the coarse-pointer block below inherits it by
+   changing nothing but the size.
+
+   `overflow: visible` is not decorative: a zero-width box clips its content by
+   default in no browser, but stating it makes the intent unmistakable and
+   survives someone adding a shorthand that sets it. */
+.cm-task-add-slot {
+  display: inline-block;
+  position: relative;
+  width: 0;
+  /* Real border box (the caret measures against it), zero margin box (the line
+     box does not). See the block above before changing either number. */
+  height: 1.35em;
+  margin-block: -0.675em;
+  overflow: visible;
+  vertical-align: middle;
+}
+
 .cm-task-add {
+  /* Out of flow, so the slot holds no in-flow content and cannot be given a line
+     box of its own to overflow. `left` replaces the `margin-left` this rule used
+     to carry; its block margins are gone, since an absolutely positioned box
+     contributes no height to cancel and a margin here would only shift it off
+     the anchor. */
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.35em;
   height: 1.35em;
-  margin-left: 6px;
-  margin-block: -0.675em;
   padding: 0;
-  vertical-align: middle;
   border: 1px solid var(--line-2, #c8c7c1);
   border-radius: var(--radius-2, 6px);
   background: transparent;
@@ -324,12 +413,14 @@
 }
 
 /* Roomier touch target on coarse pointers (mobile), without enlarging the
-   inline glyph on desktop where it would push the line height around. */
+   inline glyph on desktop where it would push the line height around.
+   No `margin-block` correction here any more: the button is absolutely
+   positioned and centred by `translateY(-50%)`, which follows the new height on
+   its own. */
 @media (pointer: coarse) {
   .cm-task-add {
     width: 2em;
     height: 2em;
-    margin-block: -1em;
     font-size: var(--text-lg);
   }
 }

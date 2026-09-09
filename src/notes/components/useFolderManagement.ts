@@ -336,11 +336,48 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       const noteIds =
         containerKey === "" ? tree.unfiledNoteIds : (node?.noteIds ?? []);
       const rank = buildContainerRank(itemOrder[containerKey] ?? []);
-      return orderContainerChildren(folders, noteIds, ctx.cache, rank).map((c) =>
-        c.kind === "folder" ? c.node.path : c.id,
-      );
+      // The pin rides along (myne#654). The comment above promises the reorder
+      // baseline IS the render order, and a just-created note sorts above
+      // everything while its pin is live, so omitting it here would make a drag
+      // compute its indices against a list the user was not looking at. The
+      // required parameter is what surfaced this call site.
+      return orderContainerChildren(
+        folders,
+        noteIds,
+        ctx.cache,
+        rank,
+        ctx.justCreatedId,
+      ).map((c) => (c.kind === "folder" ? c.node.path : c.id));
     },
-    [ctx.cache, itemOrder],
+    [ctx.cache, itemOrder, ctx.justCreatedId],
+  );
+
+  /**
+   * Drop the transient pin out of a sequence about to be PERSISTED.
+   *
+   * The baseline above must contain the pin, so the drag's indices match what
+   * the user sees. The persisted `item_order` must not, and both headers this
+   * feature added say so: `SidebarState.justCreatedId` is "transient and never
+   * persisted … it must not reach `item_order` in `vault.prefs`", and
+   * `orderContainerChildren` names writing the new note into `item_order` at
+   * index 0 as the rejected alternative. Without this the first drag anywhere
+   * in that container writes the pin in permanently, and to every device, which
+   * is that rejected alternative arriving through the back door.
+   *
+   * The pinned note stays out unless the user dragged it themselves, in which
+   * case it is no longer a pin, it is a choice.
+   */
+  const withoutPin = useCallback(
+    (next: Record<string, string[]>, draggedKey: string): Record<string, string[]> => {
+      const pin = ctx.justCreatedId;
+      if (pin === null || pin === draggedKey) return next;
+      const out: Record<string, string[]> = {};
+      for (const [container, seq] of Object.entries(next)) {
+        out[container] = seq.filter((k) => k !== pin);
+      }
+      return out;
+    },
+    [ctx.justCreatedId],
   );
 
   const addDeliberate = useCallback(
@@ -950,14 +987,17 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
           }
         : null,
       computeNext: () =>
-        computeItemOrderAfterReorder({
-          itemOrder: prevOrder,
-          container: containerKeyOf(null), // root container = ""
-          containerChildKeys: containerChildKeys("").filter((k) => k !== id),
-          draggedKey: id,
-          targetKey: "", // no row target → appends at the root end
-          place: "below",
-        }),
+        withoutPin(
+          computeItemOrderAfterReorder({
+            itemOrder: prevOrder,
+            container: containerKeyOf(null), // root container = ""
+            containerChildKeys: containerChildKeys("").filter((k) => k !== id),
+            draggedKey: id,
+            targetKey: "", // no row target → appends at the root end
+            place: "below",
+          }),
+          id,
+        ),
       prevOrder,
       setOrder: setItemOrder,
       persist: persistItemOrder,
@@ -1020,16 +1060,19 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
               }
             : null,
           computeNext: () =>
-            computeItemOrderAfterReorder({
-              itemOrder: prevOrder,
-              container: containerKey,
-              containerChildKeys: containerChildKeys(containerKey).filter(
-                (k) => k !== noteDrag,
-              ),
-              draggedKey: noteDrag,
-              targetKey,
-              place,
-            }),
+            withoutPin(
+              computeItemOrderAfterReorder({
+                itemOrder: prevOrder,
+                container: containerKey,
+                containerChildKeys: containerChildKeys(containerKey).filter(
+                  (k) => k !== noteDrag,
+                ),
+                draggedKey: noteDrag,
+                targetKey,
+                place,
+              }),
+              noteDrag,
+            ),
           prevOrder,
           setOrder: setItemOrder,
           persist: persistItemOrder,
