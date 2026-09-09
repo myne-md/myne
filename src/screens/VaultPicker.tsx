@@ -74,6 +74,7 @@ import {
   truncateLabelToBytes,
 } from "../lib/account";
 import type { AccountView, AccountCommandErrorKind } from "../lib/account";
+import { isVaultUnlocked } from "../lib/vault-unlock";
 import { ContextMenu, type ContextMenuItem } from "../notes/components/ContextMenu";
 import type { VaultId } from "../lib/stage";
 import type { VaultSummary } from "../types/vault-summary";
@@ -585,6 +586,10 @@ export function VaultPicker({ onSelect, onCreateAnother,
   const [accountsError, setAccountsError] = useState<string | null>(null);
   // Inline rename form state. `null` is no form; the menu closes when it opens.
   const [renaming, setRenaming] = useState<{ vault: VaultSummary; draft: string } | null>(null);
+  // Whether some vault is unlocked. Account mutations (rename/move/split) are
+  // refused while locked (backend `Locked`), so the menu offers them only
+  // when unlocked; the locked picker stays a read surface.
+  const [unlocked, setUnlocked] = useState(false);
   // Row buttons by vault id, so closing the menu can return focus to the row
   // that opened it (keyboard path).
   const rowRefs = useRef(new Map<VaultId, HTMLButtonElement>());
@@ -624,6 +629,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
         accountsPromise,
       ]);
       if (cancelled) return;
+      void isVaultUnlocked().then((ok) => {
+        if (!cancelled) setUnlocked(ok);
+      });
       let accounts: AccountView[] = [];
       if (accountsOutcome.ok) {
         accounts = accountsOutcome.accounts;
@@ -735,7 +743,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
         )
       : [];
   const menuItems: ContextMenuItem[] =
-    menu !== null && menuAccount !== null
+    menu !== null && menuAccount !== null && unlocked
       ? [
           {
             id: "picker.account-rename",

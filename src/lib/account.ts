@@ -26,7 +26,8 @@ export type AccountCommandErrorKind =
   | "Backend"
   | "LabelTooLong"
   | "Hidden"
-  | "RecordUnreadable";
+  | "RecordUnreadable"
+  | "Locked";
 
 /** Narrow an unknown thrown value to the backend error's `kind` tag. */
 export function accountCommandErrorKind(e: unknown): AccountCommandErrorKind | null {
@@ -37,7 +38,8 @@ export function accountCommandErrorKind(e: unknown): AccountCommandErrorKind | n
     kind === "Backend" ||
     kind === "LabelTooLong" ||
     kind === "Hidden" ||
-    kind === "RecordUnreadable"
+    kind === "RecordUnreadable" ||
+    kind === "Locked"
     ? kind
     : null;
 }

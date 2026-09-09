@@ -16,11 +16,14 @@
 //!
 //! ## Capability ACL
 //!
-//! `account:default` bundles the four commands, main-window-only. All four are
-//! reachable **pre-unlock** and deliberately so: the picker is the surface they
-//! govern and it runs before any vault is open. None touches vault content, and
-//! the only value that crosses in either direction is the account label (the
-//! user's own text) plus vault ids.
+//! `account:default` bundles the four commands, main-window-only. `list` is
+//! reachable **pre-unlock** and deliberately so: the picker is the surface it
+//! serves and it runs before any vault is open. The three mutations (rename,
+//! move, split) are **refused while no vault is unlocked** (`Locked`): a
+//! locked-screen observer reads labels and grouping but never regroups
+//! without any vault password (myne-md/myne#684 land gate). None touches
+//! vault content, and the only value that crosses in either direction is the
+//! account label (the user's own text) plus vault ids.
 
 // The command bodies and their error enum live in `myne-core` (shared with the
 // desktop client). Re-exported so `crate::plugins::account::…` resolves like
