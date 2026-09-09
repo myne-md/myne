@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
 import { Segmented } from "../primitives/Segmented";
+import { Select } from "../primitives/Select";
 import { prefsRead, setDateFormat, setTimeFormat, setTimezone } from "../../lib/prefs";
 import {
   DATE_FORMATS,
@@ -136,17 +137,17 @@ export function DateTimeSettings() {
         helper={t("settings.dateTime.dateHelper")}
         error={dateError}
         control={
-          // Known deferral (#391): DATE_FORMATS has 5 members, so this is a
-          // 5-option Segmented, over the docs/design "Segmented 2–4, Select 5+"
-          // rule. #391 fixed the reported OVERLAP generally via SettingRow's
-          // narrow-dialog restack, which is the cleaner fix for that bug and
-          // covers every panel; the Segmented→Select migration for this row is
-          // a separate UX change tracked on #391, deliberately not folded in.
-          <Segmented
+          // DATE_FORMATS has 5 members, over the docs/design count rule
+          // (Segmented for 2 to 4 options, Select for 5 to 12), so this row is
+          // a Select (myne-md/myne#668; the deferral #391 opened and closed
+          // without folding in). The time row below stays Segmented (3
+          // options); the zone row is a free-text input. The choice is by
+          // option count, not by taste (docs/design/README.md "Which picker").
+          <Select
             options={dateOptions}
             value={dateFormat}
-            onChange={(v) => void chooseDate(v as DateFormat)}
-            ariaLabel={t("settings.dateTime.dateLabel")}
+            onChange={(v) => void chooseDate(v)}
+            aria-label={t("settings.dateTime.dateLabel")}
             testId="settings.date-format"
           />
         }
