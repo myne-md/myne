@@ -59,13 +59,20 @@ const prompt =
 
 function runOpencode() {
   return new Promise((resolve, reject) => {
+    // The prompt is piped on STDIN, not passed as an argv element. With the
+    // prompt inline, a large issue body pushes the spawn past Linux ARG_MAX
+    // and the child never starts: `classify: spawn E2BIG`, whole run red
+    // (issue #690 triage, 2026-09-08). `opencode run` with no message
+    // argument reads the prompt from stdin, which has no ARG_MAX ceiling.
+    //
     // --print-logs pushes opencode's own diagnostics to stderr, which is how a
     // cold-start stall (model fetch, provider auth) becomes visible in CI instead
     // of reading as a silent timeout.
-    const child = spawn('opencode', ['run', '--print-logs', '--log-level', 'DEBUG', '--format', 'json', '--model', MODEL, prompt], {
-      stdio: ['ignore', 'pipe', 'pipe'],
+    const child = spawn('opencode', ['run', '--print-logs', '--log-level', 'DEBUG', '--format', 'json', '--model', MODEL], {
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env,
     });
+    child.stdin.end(prompt);
 
     let stdout = '', stderr = '';
     const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`opencode timeout after ${TIMEOUT_MS} ms; stderr tail: ${stderr.slice(-1200)}`)); }, TIMEOUT_MS);

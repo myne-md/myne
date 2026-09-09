@@ -111,9 +111,11 @@ myne-core = { path = "../core" }
 uuid = { version = "1", features = ["v4", "v7"] }
 thiserror = "2"
 # QR generation for device-join (MYND-466), desktop-only — mobile scans, never
-# generates, so this dep stays off the mobile build. SVG renderer only (no `image`
-# bitmap backend) to keep the dependency surface minimal (reproducible-builds).
-qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+# generates, so this dep stays off the mobile build. No features: the SVG is
+# self-emitted from the module matrix (`to_colors()`/`width()`) in `plugins/sync/qr.rs`,
+# so the crate's `svg` renderer is not used, and no `image` bitmap backend is pulled
+# (dependency surface stays minimal for reproducible-builds).
+qrcode = { version = "0.14", default-features = false }
 getrandom = "0.2"
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
 # Constant-time comparison for the clipper pairing-token bearer value
@@ -435,3 +437,4 @@ tracing-test = "0.2"
 # seed_real_vault_meta) live in `myne-core`; the `test-support` feature gates
 # them so production builds never compile them. See `core/src/test_support.rs`.
 myne-core = { path = "../core", features = ["test-support"] }
+rqrr = { version = "0.11", default-features = false }
