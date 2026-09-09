@@ -474,6 +474,7 @@ export {
   CONSENT_HOW_TO_REVOKE,
   CONSENT_DEVICE_SCOPE,
   CONSENT_DIRECT_CONNECTION,
+  CONSENT_EXCLUDED_FOLDERS,
   consentToWhom,
   consentCannotVerify,
 } from "@myne/copy";

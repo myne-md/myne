@@ -231,6 +231,15 @@ describe("check-twin-inventory", () => {
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
+    //
+    // Then 112 to 114: myne-md/myne#675 adds the chats pair twice over, once
+    // per tree: the Rust host-registration shim
+    // (`src-tauri/src/plugins/chats/mod.rs` against its mobile twin,
+    // `delegated` like every other `pub use myne_core` shim) and the TS
+    // bindings twin (`src/lib/chats.ts` against `mobile/src/lib/chats.ts`,
+    // same six commands plus the error-kind unions, byte-identical in shape).
+    // Two entries, one decision, both verdicts recorded at entry time rather
+    // than discovered later by the drift ratchet.
   });
 
   it("keeps both counterparts when one desktop file has two", () => {

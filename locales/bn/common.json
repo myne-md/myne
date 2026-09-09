@@ -1114,7 +1114,19 @@
           "tagsThinking": "ট্যাগের পরামর্শ তৈরি হচ্ছে…",
           "thinking": "AI ভাবছে…",
           "truncated": "প্রথম {{count}} অক্ষরের সারসংক্ষেপ করা হয়েছে।",
-          "you": "আপনি"
+          "you": "আপনি",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "সব ট্যাব লুকানো আছে। ফেরাতে ডান-ক্লিক করুন।",
         "outline": {
@@ -3030,7 +3042,8 @@
         "whatLabel": "আপনার ডিভাইস থেকে কী বেরোয়",
         "whenLabel": "কখন বেরোয়",
         "whoLabel": "কে সেটি পায়",
-        "connectionLabel": "এটি কীভাবে যায়"
+        "connectionLabel": "এটি কীভাবে যায়",
+        "excludedLabel": ""
       },
       "disclosureToggle": "এটি কীভাবে কাজ করে?",
       "enableHelper": "আপনার দেওয়া একটি মডেল চালায়। সেটি কোথায় চলে, আর আপনার নোট এই ডিভাইস ছেড়ে যায় কি না, দুটিই নিচে আপনার বলে দেওয়া প্রোভাইডারের উপর নির্ভর করে। পরীক্ষামূলক, ডিফল্টভাবে বন্ধ।",

@@ -28,6 +28,10 @@ pub mod export;
 // `myne_core::plugins::graph_layout` — read/write of the encrypted
 // `vault.graph` node-position cache (Class 3, never synced/backed up).
 pub mod graph_layout;
+// AI conversations (MYM1 catalog + MYJ1 files, myne-md/myne#675): a thin
+// re-export wrapper over `myne_core::plugins::chats`: the six conversation
+// storage commands, Class-1 synced vault content.
+pub mod chats;
 // On-device speech-to-text (Whisper, MYND-563) — a NEW mobile plugin (not a
 // `myne-core` re-export: `local_inference` is desktop-side and `core/` must stay
 // wasm-clean, so the whisper subset is copied here). Declared unconditionally;

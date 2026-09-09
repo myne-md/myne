@@ -103,6 +103,12 @@ pub const DOUBLE_BUFFERED: &[&str] = &[
     "vault.attachments",
     "vault.dictionary",
     "vault.themes",
+    // AI conversations catalog (MYM1, myne-md/myne#675): the singleton roster
+    // over the per-conversation files below. Rewritten on every conversation
+    // create/rename/delete/append-version-bump (the catalog row carries the
+    // causal version), so a torn write would cost the whole roster.
+    // The rewrite cadence is the same one that puts `vault.attachments` on this list.
+    "vault.chats",
     "vault.graph",
     "vault.embeddings",
     "vault.quickunlock",
@@ -188,7 +194,32 @@ pub fn mode_for(path: &str) -> Mode {
     if (parent == "notes" && name.ends_with(".myn")) || staged {
         return Mode::SingleLive;
     }
+    // AI conversation files (`chats/<32-hex>`, MYJ1, myne-md/myne#675): the
+    // notes twin in write shape: small files rewritten in place on every
+    // settle (turn append), so `Doubled` would charge the roster's whole
+    // storage twice while `SingleLive` buys the torn-write → reads-as-absent
+    // property for one slot's cost. The sync merge treats a read-as-absent
+    // conversation under a live catalog row as `ConversationUnreadable`
+    // (§ 9.24.4 report-don't-empty): the catalog row survives, the file
+    // re-arrives from a peer on the next cycle. Hex-name check (not a bare
+    // directory check) so a stray file in `chats/` is not containerized.
+    if parent == "chats" && is_32_hex(name) {
+        return Mode::SingleLive;
+    }
     Mode::Plain
+}
+
+/// Lowercase 32-char hex (`<conversation-id-hex>`), no separators. Lowercase
+/// ONLY, matching the minted-id invariant (`hex_encode_16`): the three
+/// hand-copies of this predicate (`is_lower_hex` in the backup classifier,
+/// `from_hex16` in the sync orchestrator) agree on strictness, so a stray
+/// uppercase-named file is `Plain` everywhere rather than containerized on
+/// one layer and rejected on the next.
+fn is_32_hex(name: &str) -> bool {
+    name.len() == 32
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 /// Whether `path` is stored as a container at all (either mode).
@@ -1214,6 +1245,7 @@ mod tests {
             "vault.embeddings",
             "vault.quickunlock",
             "vault.head-state",
+            "vault.chats",
             "vault.meta-dirty",
             "sync-state.json",
             "sync-config.json",
@@ -1246,6 +1278,16 @@ mod tests {
             // queues are written once and not rewritten in place.
             ("/myne/vaults/019f/attachments/deadbeef", Mode::Plain),
             ("/myne/vaults/019f/attachments-text/deadbeef", Mode::Plain),
+            // AI conversation files (myne-md/myne#675) ARE container-backed,
+            // SingleLive like notes: rewritten on every turn settle, and a
+            // torn write must read as absent rather than as a damaged blob
+            // (which the sync merge would then report per § 9.24.4). The
+            // 32-hex check means a stray non-id file in `chats/` stays Plain.
+            (
+                "/myne/vaults/019f/chats/0184a2b3c4d5e6f708192a3b4c5d6e7f",
+                Mode::SingleLive,
+            ),
+            ("/myne/vaults/019f/chats/README.txt", Mode::Plain),
             ("/myne/captures/019f", Mode::Plain),
             ("/myne/pending-shares/sealed/019f", Mode::Plain),
             // The two staging trees are SingleLive since task 86 — they are

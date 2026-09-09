@@ -1123,7 +1123,19 @@
           "tagsThinking": "Tags werden vorgeschlagen…",
           "thinking": "KI denkt nach…",
           "truncated": "Die ersten {{count}} Zeichen zusammengefasst.",
-          "you": "Du"
+          "you": "Du",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Alle Tabs sind ausgeblendet. Rechtsklick zum Wiederherstellen.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Was Ihr Gerät verlässt",
         "whenLabel": "Wann es das Gerät verlässt",
         "whoLabel": "Wer es empfängt",
-        "connectionLabel": "Wie es übertragen wird"
+        "connectionLabel": "Wie es übertragen wird",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Wie funktioniert das?",
       "enableHelper": "Führt ein von Ihnen bereitgestelltes Modell aus. Wo es läuft und ob Ihre Notizen dieses Gerät verlassen, hängt davon ab, welchen Anbieter Sie unten benennen. Experimentell, standardmäßig aus.",

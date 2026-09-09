@@ -40,6 +40,7 @@ pub mod attachments;
 // The UI's answer is omission (task 27), not a disabled affordance.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod captures;
+pub mod chats;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod export;
 pub mod graph_layout;

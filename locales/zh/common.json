@@ -1123,7 +1123,19 @@
           "tagsThinking": "正在建议标签…",
           "thinking": "AI 正在思考…",
           "truncated": "已总结前 {{count}} 个字符。",
-          "you": "你"
+          "you": "你",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "所有标签页均已隐藏。右键单击以恢复。",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "哪些内容会离开你的设备",
         "whenLabel": "它在什么时候离开",
         "whoLabel": "谁会收到它",
-        "connectionLabel": "如何传输"
+        "connectionLabel": "如何传输",
+        "excludedLabel": ""
       },
       "disclosureToggle": "这是如何运作的？",
       "enableHelper": "运行你提供的模型。它在哪里运行、你的笔记是否会离开此设备，都取决于你在下方指定的服务商。实验性功能，默认关闭。",

@@ -1114,7 +1114,19 @@
           "tagsThinking": "در حال پیشنهاد برچسب…",
           "thinking": "AI در حال فکر کردن است…",
           "truncated": "{{count}} نویسهٔ نخست خلاصه شد.",
-          "you": "شما"
+          "you": "شما",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "همهٔ زبانه‌ها پنهان‌اند. برای بازگرداندن راست‌کلیک کنید.",
         "outline": {
@@ -3030,7 +3042,8 @@
         "whatLabel": "چه چیزی از دستگاه شما خارج می‌شود",
         "whenLabel": "چه وقت خارج می‌شود",
         "whoLabel": "چه کسی آن را دریافت می‌کند",
-        "connectionLabel": "چگونه منتقل می‌شود"
+        "connectionLabel": "چگونه منتقل می‌شود",
+        "excludedLabel": ""
       },
       "disclosureToggle": "این چطور کار می‌کند؟",
       "enableHelper": "مدلی را که خودتان فراهم می‌کنید اجرا می‌کند. اینکه کجا اجرا می‌شود و اینکه آیا یادداشت‌های شما از این دستگاه خارج می‌شوند، هر دو به ارائه‌دهنده‌ای بستگی دارد که در پایین نام می‌برید. آزمایشی، به‌طور پیش‌فرض خاموش.",

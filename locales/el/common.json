@@ -1123,7 +1123,19 @@
           "tagsThinking": "Πρόταση ετικετών…",
           "thinking": "Το AI σκέφτεται…",
           "truncated": "Έγινε σύνοψη των πρώτων {{count}} χαρακτήρων.",
-          "you": "Εσείς"
+          "you": "Εσείς",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Όλες οι καρτέλες είναι κρυμμένες. Κάντε δεξί κλικ για επαναφορά.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Τι φεύγει από τη συσκευή σας",
         "whenLabel": "Πότε φεύγει",
         "whoLabel": "Ποιος το λαμβάνει",
-        "connectionLabel": "Πώς ταξιδεύει"
+        "connectionLabel": "Πώς ταξιδεύει",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Πώς λειτουργεί αυτό;",
       "enableHelper": "Εκτελεί ένα μοντέλο που παρέχετε εσείς. Το πού εκτελείται, και το αν οι σημειώσεις σας φεύγουν από αυτή τη συσκευή, εξαρτώνται και τα δύο από τον πάροχο που ορίζετε παρακάτω. Πειραματικό, ανενεργό από προεπιλογή.",

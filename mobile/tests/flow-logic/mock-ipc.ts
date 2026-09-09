@@ -212,6 +212,23 @@ export interface MockConfig {
    *  `[]`. Lets a transcription test seed an audio attachment for the
    *  Transcribe row to appear on. */
   catalog?: Array<{ id: string; filename: string; content_type: string; size: number }>;
+  /** Seed + capture for `plugin:chats|*` (myne-md/myne#675). `rows` seeds the
+   *  roster `chats_list` returns (each `{ id, created_at, title, updated_at,
+   *  version }`); `payloads` maps conversation id → turn-list payload JSON
+   *  `chats_read` returns. Writes through the UI (create/append/rename/
+   *  delete) mutate this store, so a later list answers from it, with the same
+   *  stateful discipline as the notes store above. Calls land on
+   *  `window.__chatsCalls` for specs that assert what was written. */
+  chats?: {
+    rows?: Array<{
+      id: string;
+      created_at: number;
+      title: string;
+      updated_at: number;
+      version: number;
+    }>;
+    payloads?: Record<string, string>;
+  };
   /** How `plugin:local-inference|transcribe` behaves (MYND-563). `text` →
    *  resolves with that transcript; `"not_ready"` / `"failed"` → rejects with
    *  that serialized `EngineError` kind. Defaults to resolving a canned string. */
@@ -969,6 +986,81 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         };
       },
       "plugin:attachments|catalog_list": () => config.catalog ?? [],
+      // ── AI conversations (myne-md/myne#675) ──
+      // STATEFUL roster + payloads: seeded from `config.chats`, mutated by
+      // the UI's writes, so list/open/new/rename/delete flows assert against
+      // the store rather than the call that just wrote. Mutating calls also
+      // land on `window.__chatsCalls` for specs that assert what was written
+      // (the `__voiceImports` precedent).
+      ...(() => {
+        type Row = {
+          id: string;
+          created_at: number;
+          title: string;
+          updated_at: number;
+          version: number;
+        };
+        const rows: Row[] = (config.chats?.rows ?? []).map((r) => ({ ...r }));
+        const payloads: Record<string, string> = { ...(config.chats?.payloads ?? {}) };
+        const record = (cmd: string, args: Record<string, unknown>) => {
+          const w = window as unknown as { __chatsCalls?: Array<unknown> };
+          (w.__chatsCalls ??= []).push({ cmd, args });
+        };
+        const byUpdatedDesc = () => [...rows].sort((a, b) => b.updated_at - a.updated_at);
+        return {
+          "plugin:chats|chats_list": () => byUpdatedDesc(),
+          "plugin:chats|chats_read": (args: Record<string, unknown>) => {
+            const id = args["conversationIdHex"] as string;
+            const payload = payloads[id];
+            if (payload === undefined) {
+              throw { kind: "ConversationUnreadable" };
+            }
+            return payload;
+          },
+          "plugin:chats|chats_create": (args: Record<string, unknown>) => {
+            record("chats_create", args);
+            const id = "c9".repeat(16);
+            let title = "New conversation";
+            try {
+              const payload = JSON.parse(args["firstTurnPayload"] as string) as {
+                turns?: Array<{ role?: unknown; text?: unknown }>;
+              };
+              const first = (payload.turns ?? []).find(
+                (t) => t.role === "user" && typeof t.text === "string" && t.text.length > 0,
+              );
+              if (first && typeof first.text === "string") {
+                title = first.text.replace(/[\r\n]+/g, " ").slice(0, 48);
+              }
+            } catch {
+              // Title derivation is best-effort here; the id is the contract.
+            }
+            rows.push({ id, created_at: 1, title, updated_at: 1, version: 1 });
+            payloads[id] = args["firstTurnPayload"] as string;
+            return id;
+          },
+          "plugin:chats|chats_append_turn": (args: Record<string, unknown>) => {
+            record("chats_append_turn", args);
+            payloads[args["conversationIdHex"] as string] = args["turnsPayload"] as string;
+            return null;
+          },
+          "plugin:chats|chats_rename": (args: Record<string, unknown>) => {
+            record("chats_rename", args);
+            const row = rows.find((r) => r.id === args["conversationIdHex"]);
+            if (row) {
+              row.title = args["newTitle"] as string;
+              row.version += 1;
+            }
+            return null;
+          },
+          "plugin:chats|chats_delete": (args: Record<string, unknown>) => {
+            record("chats_delete", args);
+            const i = rows.findIndex((r) => r.id === args["conversationIdHex"]);
+            if (i >= 0) rows.splice(i, 1);
+            delete payloads[args["conversationIdHex"] as string];
+            return null;
+          },
+        };
+      })(),
       "plugin:attachments|attachment_unused_list": () => [],
       "plugin:attachments|attachment_refs_apply": () => null,
       "plugin:attachments|attachment_refs_remove": () => null,

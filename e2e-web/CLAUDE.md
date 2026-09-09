@@ -212,15 +212,20 @@ settles any argument with this section):
   (`openApp`, `bootstrapAccount`, `unlockToEditor`, `waitForFirstSync`, …),
   `support/artifacts.ts` (redaction, so a failure dump cannot carry a
   credential) and `support/opfs-seed.ts` (the OPFS fixture seeder).
-- **Fixtures** under `fixtures/`, both emitted by the shared Rust generators
+- **Fixtures** under `fixtures/`, all emitted by the shared Rust generators
   (`cargo run -p myne-core --features test-support --example …`):
-  `double-buffer.json` — the six double-buffer crash cases — and
-  `unlockable-vault.json`.
+  `double-buffer.json` (the six double-buffer crash cases),
+  `unlockable-vault.json`, and `chats-history.json` (an unlockable vault with
+  `vault.prefs` AI-enabled plus one seeded `vault.chats` roster +
+  `chats/<id>` conversation, for the history-reload scenario below).
 - **Scenarios**: `smoke` (production headers over HTTP, then a browser boot to
   the first-run identity step), `capability-gating`, `device-class-refusal`,
   `isolation-and-viewport`, `no-third-party`, `opfs-seed`, `unlock-from-fixture`,
   `pending-approval`, `plaintext-residue-web`, `a11y`, `quarantine-roundtrip`,
-  `single-tab-lock` (#254 — two tabs on one origin; the second is refused).
+  `single-tab-lock` (#254: two tabs on one origin; the second is refused),
+  `chat-history-reload` (myne-md/myne#675: a seeded conversation lists, opens,
+  survives a reload, and deletes with its tombstone surviving a second reload;
+  seeds rather than sends because the agent plugin is Unsupported on web).
 - **Runners and config**: `scripts/e2e-web-local.sh`, `scripts/e2e-web-one.sh`,
   `vitest.web-e2e.config.ts`, `pnpm test:e2e:web`.
 

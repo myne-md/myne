@@ -1123,7 +1123,19 @@
           "tagsThinking": "Tags voorstellen…",
           "thinking": "AI denkt na…",
           "truncated": "De eerste {{count}} tekens zijn samengevat.",
-          "you": "Jij"
+          "you": "Jij",
+          "history": "",
+          "historyCancel": "",
+          "historyDelete": "",
+          "historyDeleteBody": "",
+          "historyEmpty": "",
+          "historyError": "",
+          "historyLoading": "",
+          "historyProposalAfter": "",
+          "historyProposalBefore": "",
+          "historyProposalNewNote": "",
+          "historyRename": "",
+          "historyTitle": ""
         },
         "allHidden": "Alle tabbladen zijn verborgen. Klik met de rechtermuisknop om ze te herstellen.",
         "outline": {
@@ -3050,7 +3062,8 @@
         "whatLabel": "Wat je apparaat verlaat",
         "whenLabel": "Wanneer het wordt verzonden",
         "whoLabel": "Wie het ontvangt",
-        "connectionLabel": "Hoe het reist"
+        "connectionLabel": "Hoe het reist",
+        "excludedLabel": ""
       },
       "disclosureToggle": "Hoe werkt dit?",
       "enableHelper": "Draait een model dat je zelf aanlevert. Waar het draait, en of je notities dit apparaat verlaten, hangt allebei af van de provider die je hieronder aanwijst. Experimenteel, standaard uit.",

@@ -1286,6 +1286,106 @@ fn themes_three_device_counterexample_converges_no_ping_pong() {
     assert_eq!(pushed, 0, "quiesced fleet stays silent (no CAS ping-pong)");
 }
 
+/// AI conversations (myne-md/myne#675): two devices append concurrently to the
+/// SAME conversation while a third holds nothing; the fleet converges to one
+/// catalog and one turn list holding BOTH suffixes, and a further cycle pushes
+/// nothing.
+///
+/// A holds turns [a1, a2, a3], B holds [a1, a2, b3] (common prefix + both
+/// suffixes); C holds no catalog file at all. Both A and B carry the same
+/// catalog row (version 1); the interesting divergence is in the files, not
+/// the roster. After quiesce every device decodes the same catalog row and the
+/// same [a1, a2, a3, b3] turn list (decoded equality: re-seals carry fresh
+/// nonces, so raw bytes differ the way they do for notes too).
+#[test]
+fn chats_concurrent_append_converges_no_ping_pong() {
+    use crate::plugins::chats::commands::{ChatsCatalogMap, ConversationEntry};
+    use protocol::{
+        decode_chats_blob, decode_chats_catalog_blob, derive_subkey, encode_chats_blob,
+        encode_chats_catalog_blob, SubkeyRole,
+    };
+
+    let (_guard, url) = server_or_skip!("chats_concurrent_append");
+    let acct = Account::new(0xA0);
+    let devices = enroll_devices(&acct, &url, 3);
+    let catalog_key = derive_subkey(&acct.root_key, SubkeyRole::ChatsCatalogKey);
+    let chats_key = derive_subkey(&acct.root_key, SubkeyRole::ChatsKey);
+
+    let conv_id = [0xC0u8; 16];
+    let conv_hex = "c0".repeat(16);
+    let row = || ConversationEntry {
+        created_at: 1,
+        deleted_at: None,
+        title: "taxes".to_string(),
+        updated_at: 100,
+        version: 1,
+    };
+    let write_catalog = |d: &Device, map: &ChatsCatalogMap| {
+        let plaintext = serde_json::to_vec(map).unwrap();
+        let bytes =
+            encode_chats_catalog_blob(&catalog_key, &acct.account_hash, &plaintext).unwrap();
+        std::fs::write(d.vault_dir.join("vault.chats"), &bytes).unwrap();
+    };
+    let write_turns = |d: &Device, ids: &[&str]| {
+        let turns: Vec<serde_json::Value> =
+            ids.iter().map(|id| serde_json::json!({"id": id})).collect();
+        let payload = serde_json::to_vec(&serde_json::json!({ "turns": turns })).unwrap();
+        let bytes = encode_chats_blob(&chats_key, &acct.account_hash, &conv_id, &payload).unwrap();
+        std::fs::create_dir_all(d.vault_dir.join("chats")).unwrap();
+        std::fs::write(d.vault_dir.join("chats").join(&conv_hex), &bytes).unwrap();
+    };
+    let read_row = |d: &Device| -> ConversationEntry {
+        let bytes = std::fs::read(d.vault_dir.join("vault.chats")).unwrap();
+        let plaintext =
+            decode_chats_catalog_blob(&catalog_key, &acct.account_hash, &bytes).unwrap();
+        let map: ChatsCatalogMap = serde_json::from_slice(&plaintext).unwrap();
+        map[&conv_hex].clone()
+    };
+    let read_turn_ids = |d: &Device| -> Vec<String> {
+        let bytes = std::fs::read(d.vault_dir.join("chats").join(&conv_hex)).unwrap();
+        let plaintext =
+            decode_chats_blob(&chats_key, &acct.account_hash, &conv_id, &bytes).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&plaintext).unwrap();
+        v["turns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["id"].as_str().unwrap().to_string())
+            .collect()
+    };
+
+    let mut map_a = ChatsCatalogMap::new();
+    map_a.insert(conv_hex.clone(), row());
+    write_catalog(&devices[0], &map_a);
+    write_turns(&devices[0], &["a1", "a2", "a3"]);
+    let mut map_b = ChatsCatalogMap::new();
+    map_b.insert(conv_hex.clone(), row());
+    write_catalog(&devices[1], &map_b);
+    write_turns(&devices[1], &["a1", "a2", "b3"]);
+    // Device C holds nothing: no catalog file, no chats/ dir.
+
+    quiesce(&devices, 16);
+
+    // Every device converged to the same row and the same merged turn list.
+    for d in &devices[1..] {
+        assert_eq!(read_row(&devices[0]), read_row(d), "catalog rows converged");
+        assert_eq!(
+            read_turn_ids(&devices[0]),
+            read_turn_ids(d),
+            "turn lists converged"
+        );
+    }
+    assert_eq!(
+        read_turn_ids(&devices[0]),
+        vec!["a1", "a2", "a3", "b3"],
+        "common prefix kept, both suffixes kept in id order, no turn dropped"
+    );
+
+    // Steady state: a further cycle on every device pushes NOTHING.
+    let pushed: usize = devices.iter().map(|d| d.sync().pushed).sum();
+    assert_eq!(pushed, 0, "quiesced fleet stays silent (no CAS ping-pong)");
+}
+
 /// Two devices create DIFFERENT notes offline; after sync both notes exist on
 /// both devices. Distinct-note concurrency is never a conflict.
 #[test]

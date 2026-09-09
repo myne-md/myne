@@ -1,17 +1,27 @@
-// Conversational AI chat transcript store (conversational-ai-chat task 6).
+// Conversational AI chat transcript store.
 //
-// The RAM home for the multi-turn chat transcript the AI Chat tab renders. Like
-// `aiOutputStore`, this is an **AS1-class RAM artifact**: held only here, never
-// persisted, and dropped on lock / vault teardown via `clearChat()` (a module
-// store survives an Editor unmount on its own, so teardown is EXPLICIT — task 12
-// wires the lock path). No plaintext is ever logged; the turns hold the user's
-// own questions + the model's own words, same drop-on-lock discipline as the
-// summarize output.
+// The RAM home for the multi-turn chat transcript the AI Chat tab renders. The
+// transcript is ALSO persisted: every settled turn is written through to the
+// `vault.chats` conversation store (myne-md/myne#675) at finalize time, and an
+// unlock re-hydrates the active conversation back into this store. The RAM copy
+// is still dropped on lock / vault teardown via `clearChat()` (a module store
+// survives an Editor unmount on its own, so teardown is EXPLICIT), and the
+// lock-teardown guards hold that wipe. What changed is that a second,
+// encrypted, on-disk copy exists under the vault's key hierarchy. No plaintext
+// is ever logged; the turns hold the user's own questions + the model's own
+// words.
 //
-// Streaming (task 7): tokens arriving over the Tauri `Channel` append to the
+// Streaming: tokens arriving over the Tauri `Channel` append to the
 // last (streaming) assistant turn via `appendChatToken`. A monotonic run epoch
 // guards every terminal/append apply — a stream whose vault locked (or that was
 // superseded) can never mutate the transcript after `clearChat()`.
+//
+// Persistence is a fire-and-forget listener, never inline IPC: terminal action
+// creators call `notifySettled()` after dispatching, and the installed
+// persister (wired by the AI tab mount, `chatPersist.ts`) serializes the
+// transcript and writes it. A persist failure never breaks the chat. The
+// persister deduplicates by payload, so a STOP followed by its late FINALIZE
+// writes once.
 //
 // **Two kinds of turn, one transcript** (myne-md/myne#533). A `text` turn is the
 // ask flow's: the user's question and the model's streamed words. An `agent`
@@ -19,13 +29,15 @@
 // whole loop and answers once, so what the turn holds is the run's identity and
 // its COUNTS, never the proposal. The anchors and replacements are text copied
 // verbatim out of note bodies, they live in `agentStore`, and they are dropped
-// by `clearAgentForLock` on every vault-leaving path. Mirroring them here would
-// put note plaintext behind a second teardown that would have to be remembered
-// separately, which is the exact shape myne-md/myne#529 already shipped once.
+// by `clearAgentForLock` on every vault-leaving path. The persisted
+// conversation carries the turn list (including frozen agent summaries);
+// proposals persist inside historical agent turns as read-only records and are
+// never re-applied from history (myne-md/myne#675).
 
 import { useSyncExternalStore } from "react";
 import type { ProviderErrorCause } from "../../lib/engine-error";
 import type { AnsweredBy } from "../../components/AnsweredByIndicator";
+import type { Proposal } from "../../lib/agent-protocol";
 
 /** A source-note citation backing a grounded assistant answer (mirrors the Rust
  *  `SearchHit`; snake_case → camelCase at the IPC boundary). */
@@ -47,20 +59,25 @@ export type AgentTurnEnd =
 
 /** What an agent turn keeps once its run is no longer the open one.
  *
- *  **Counts, plus the model's own closing sentence.** `agentStore` holds exactly
- *  one run, so a turn that is not the newest has no live state to read; this is
- *  what it says instead. Every field but `summary` is a number or a closed tag.
+ *  **Counts, plus the model's own closing sentence, plus the frozen proposal.**
+ *  `agentStore` holds exactly one run, so a turn that is not the newest has no
+ *  live state to read; this is what it says instead. Every field but `summary`
+ *  is a number or a closed tag.
  *
  *  `summary` is the run's `finish` text, and it is here because in one mode it
  *  is the ANSWER (myne-md/myne#568, superseding the counts-only clause of
  *  `docs/decisions/ai/0518`). It is model output, so it can quote note text —
  *  and that is the same class this store already holds, since a `text` turn is
- *  the model's words about the open note. What is still excluded is the
- *  PROPOSAL: anchors and replacements are text copied verbatim out of note
- *  bodies, they stay in `agentStore`, and they are dropped by
- *  `clearAgentForLock`. This store's own teardown is `clearChat`, on the same
- *  roster and on the same paths, so nothing here outlives the unlocked
- *  session. */
+ *  the model's words about the open note.
+ *
+ *  `proposal` is the run's frozen proposal (edits + new notes, verbatim note
+ *  text), copied at settle time and never touched again. The LIVE proposal
+ *  stays in `agentStore` and is dropped by `clearAgentForLock`; the frozen
+ *  copy persists inside the conversation and renders read-only in history.
+ *  What is still excluded from the transcript is anything that would let a
+ *  historical turn WRITE: there is no re-apply affordance anywhere, because a
+ *  frozen proposal may quote a note that has since changed, been trashed, or
+ *  moved folders (myne-md/myne#675). */
 export interface AgentTurnSummary {
   runId: string;
   /** The model's closing summary, or "" when it finished without one.
@@ -82,14 +99,17 @@ export interface AgentTurnSummary {
    *  "remote but nothing was sent" are different statements. */
   charsOffDevice: number | null;
   end: AgentTurnEnd;
+  /** The frozen proposal, present when the settled run proposed anything.
+   *  A verbatim plain-data copy (`Pick` of the live `Proposal`), so later
+   *  mutations of the live run cannot rewrite history. */
+  proposal?: Pick<Proposal, "edits" | "newNotes">;
 }
 
 /** One transcript turn. Assistant turns carry the streaming / error / citation
  *  state; user turns are inert text. */
 export interface ChatTurn {
   /** Stable React key (monotonic, store-assigned). */
-  id: string;
-  /** Which flow produced it. Required rather than optional, so every
+  id: string;  /** Which flow produced it. Required rather than optional, so every
    *  construction site has to say which, because an `agent` turn that defaulted
    *  to `text` would be fed to the ask model as conversation history. */
   kind: ChatTurnKind;
@@ -130,6 +150,13 @@ export interface ChatTurn {
   scopeLabel?: string;
   /** An agent turn's frozen counts. Absent while the run has not settled. */
   agentSummary?: AgentTurnSummary;
+  /**
+   * Opaque carry-through for turn fields this writer does not know
+   * (forward tolerance): a newer writer's field survives a hydrate plus a
+   * re-persist by an older frontend instead of being stripped cluster-wide
+   * on merge. Never read, only re-emitted by `serializeTranscript`.
+   */
+  rest?: Record<string, unknown>;
 }
 
 export interface ChatState {
@@ -161,7 +188,8 @@ export type ChatAction =
     }
   | { type: "AGENT_SETTLE"; summary: AgentTurnSummary }
   | { type: "AGENT_FAIL"; message: string }
-  | { type: "CLEARED" };
+  | { type: "CLEARED" }
+  | { type: "HYDRATED"; turns: ChatTurn[] };
 
 /** Replace the last turn (assumed the streaming assistant turn) with `next`. */
 function replaceLast(turns: ChatTurn[], next: ChatTurn): ChatTurn[] {
@@ -320,7 +348,10 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const turn = state.turns[i];
       if (turn === undefined) return state;
       const next = [...state.turns];
-      next[i] = { ...turn, agentSummary: action.summary };
+      // Frozen on the way in, not by the caller: every settle passes through
+      // this arm, including `settleAgentTurn`, so no dispatch site can hand
+      // the transcript a live reference into `agentStore` by forgetting.
+      next[i] = { ...turn, agentSummary: freezeSummary(action.summary) };
       return { ...state, turns: next };
     }
     case "AGENT_FAIL": {
@@ -333,6 +364,15 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     }
     case "CLEARED":
       return CHAT_INITIAL;
+    case "HYDRATED":
+      // A re-hydrated conversation replaces the empty transcript wholesale.
+      // Streaming is forced off on every turn: only settled turns persist,
+      // so a stored streaming flag would render a bubble with no run behind
+      // it.
+      return {
+        turns: action.turns.map((t) => ({ ...t, streaming: false })),
+        streaming: false,
+      };
     default:
       return state;
   }
@@ -343,11 +383,78 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 let current: ChatState = CHAT_INITIAL;
 const listeners = new Set<() => void>();
 
-// Monotonic id counter for turn keys — deterministic, no Date.now/random.
+// Turn-id scheme (myne-md/myne#675): `<boot>-<seq>`, where `boot` is 16 hex
+// digits minted once per page load and `seq` is a zero-padded monotonic
+// counter. The boot part is the client discriminator the sync merge orders
+// by: two devices never mint the same id space (64 boot-entropy bits make a
+// cross-device collision a non-event), and within one boot the ids sort in
+// append order. Lexicographic order across boots is arbitrary but
+// deterministic, which is all the merge needs; wall-clock ordering is
+// deliberately NOT used (device clocks skew, and the merge layer refuses to
+// trust them anywhere else in this codebase).
 let turnSeq = 0;
+const bootDiscriminator: string = mintBootDiscriminator();
+
+/**
+ * Mint the boot discriminator: 8 bytes (64 bits) from the platform CSPRNG,
+ * with no fallback. This is not a secret (turn ids are visible in the UI),
+ * but the id scheme's uniqueness argument rests on the bits being
+ * unpredictable across devices, and `Math.random` does not provide that
+ * (a seeded PRNG can collide across boots). Every environment this code
+ * ships in (Tauri WebView, evergreen browsers) carries `crypto`; a missing
+ * CSPRNG is an environment failure and fails loudly here rather than
+ * silently minting collidable ids.
+ */
+function mintBootDiscriminator(): string {
+  const bytes = new Uint8Array(8);
+  if (typeof crypto === "undefined" || typeof crypto.getRandomValues !== "function") {
+    throw new Error("crypto.getRandomValues unavailable: cannot mint chat turn ids");
+  }
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function nextTurnId(): string {
   turnSeq += 1;
-  return `t${turnSeq}`;
+  return `${bootDiscriminator}-${String(turnSeq).padStart(10, "0")}`;
+}
+
+// The conversation this transcript is bound to (`vault.chats` catalog id),
+// or null when no conversation is open (fresh tab: the next settled turn
+// creates one). Reset by `clearChat` together with the turns, so a wiped
+// transcript can never keep writing into a conversation it no longer shows.
+let activeConversationId: string | null = null;
+
+/** Which persisted conversation the live transcript is bound to, if any. */
+export function getActiveConversationId(): string | null {
+  return activeConversationId;
+}
+
+/** Bind (or unbind) the live transcript to a persisted conversation. */
+export function setActiveConversationId(id: string | null): void {
+  activeConversationId = id;
+}
+
+// The persistence listener: called after every terminal reduce (finalize,
+// fail, stop, agent settle/fail) and once from `clearChat` after settling a
+// cut-off stream. Fire-and-forget by contract: the implementation
+// (`chatPersist.ts`, installed by the AI tab mount) serializes the transcript
+// and writes it, deduplicates identical payloads, and swallows IPC failures
+// so a persist failure never breaks the chat. Null in tests and wherever no
+// persister was installed.
+let persister: (() => void) | null = null;
+
+/** Install (or remove) the persistence listener. */
+export function setChatPersister(p: (() => void) | null): void {
+  persister = p;
+}
+
+function notifySettled(): void {
+  try {
+    persister?.();
+  } catch {
+    // The chat must survive its own persistence layer failing.
+  }
 }
 
 // Monotonic run epoch: a streaming run captures the epoch on SEND and only its
@@ -404,17 +511,20 @@ export function appendChatToken(token: number, text: string): void {
 export function finalizeChatTurn(token: number, answeredBy?: AnsweredBy): void {
   if (!isChatRunCurrent(token)) return;
   dispatchChat({ type: "FINALIZE", answeredBy });
+  notifySettled();
 }
 
 /** Mark the active assistant turn as errored, iff `token` is current. */
 export function failChatTurn(token: number, cause?: ProviderErrorCause): void {
   if (!isChatRunCurrent(token)) return;
   dispatchChat({ type: "FAIL", cause });
+  notifySettled();
 }
 
 /** User cut the generation short — close the active turn, keep partial text. */
 export function stopChatTurn(): void {
   dispatchChat({ type: "STOP" });
+  notifySettled();
 }
 
 /** Append an agent run's turns: the user's task (carrying the scope it was sent
@@ -441,114 +551,76 @@ export function sendAgentTurn(task: string, scopeLabel: string): void {
  *  scope approval reports the later numbers. */
 export function settleAgentTurn(summary: AgentTurnSummary): void {
   dispatchChat({ type: "AGENT_SETTLE", summary });
+  notifySettled();
+}
+
+/**
+ * Deep-copy the summary's proposal (if any) into plain data, so the settled
+ * turn can never alias the live run: a later mutation of `agentStore`'s
+ * proposal (resume, re-run, clear) must not rewrite what history shows. The
+ * JSON round trip is the freeze: it keeps every field the protocol defines
+ * today and tomorrow with no field list to drift, and rejects nothing (a
+ * freeze that throws would break the settle it rides on).
+ */
+function freezeSummary(summary: AgentTurnSummary): AgentTurnSummary {
+  if (summary.proposal === undefined) return summary;
+  const frozen = JSON.parse(
+    JSON.stringify({ edits: summary.proposal.edits, newNotes: summary.proposal.newNotes }),
+  ) as Pick<Proposal, "edits" | "newNotes">;
+  return { ...summary, proposal: frozen };
 }
 
 /** An agent run never started. `message` is already localized. */
 export function failAgentTurn(message: string): void {
   dispatchChat({ type: "AGENT_FAIL", message });
+  notifySettled();
 }
 
 /** Drop the whole transcript — the lock / vault-teardown wipe (task 12). Bumps
- *  the run epoch so any in-flight stream can no longer mutate the transcript. */
+ *  the run epoch so any in-flight stream can no longer mutate the transcript.
+ *
+ *  Before the wipe, an in-flight stream settles its partial text (the STOP
+ *  close, which keeps what arrived) and the persister writes it: a lock that
+ *  cuts a generation must not silently discard the words that arrived before
+ *  it (myne-md/myne#675). The RAM copy still dies here (the lock-teardown
+ *  guards hold the wipe) while the settled turn survives on disk. */
 export function clearChat(): void {
-  lastEgressControls = null;
+  const active = activeTextTurn(current);
+  if (active !== null && active.streaming) {
+    dispatchChat({ type: "STOP" });
+    notifySettled();
+  }
+  activeConversationId = null;
   runEpoch += 1;
-  // Nothing left to block: the turns the cut was protecting are gone, and a
-  // stale set would silently suppress seeding for turns that do not exist.
-  seedBlocked = new Set();
   dispatchChat({ type: "CLEARED" });
 }
 
-/** Turn ids that may no longer be seeded into a run.
- *
- *  **The exclusion set is a control the user TIGHTENS, and SYNC-14 carries no
- *  in-flight carve-out.** `apply.rs` states that rule for writes: an exclusion
- *  added while a run is open or a review is pending takes effect at once, and
- *  the newest answer decides. Seeding is the same question one door over. An
- *  agent turn's summary is model prose derived from notes it read, so once the
- *  user excludes a folder, re-sending a summary derived from it on every
- *  iteration of every later run is the egress that exclusion was performed to
- *  stop.
- *
- *  The seed cannot be filtered per note, because a turn carries text and no
- *  provenance: nothing records which notes produced which sentence. So the cut
- *  is by TIME, which is the conservative reading, and it is a cut rather than a
- *  `clearChat` so the user keeps the conversation on screen. What they lose is
- *  the model's memory of it, which is exactly what they asked for.
- *
- *  A Set of ids rather than an index, because `replaceLast` keeps turn identity
- *  and a positional cut would slide under a streaming turn. */
-let seedBlocked: ReadonlySet<string> = new Set();
-
-/** Stop every turn currently in the transcript from being seeded into a run.
- *
- *  Called when `ai_excluded_folders` changes. Idempotent, and deliberately not
- *  tied to whether the change widened or narrowed the set: a folder LEAVING the
- *  set does not un-derive the summaries, and reasoning about which direction is
- *  safe is exactly the kind of thing that is wrong once and then stays wrong. */
-export function blockSeedingOfExistingTurns(): void {
-  seedBlocked = new Set(current.turns.map((t) => t.id));
+/**
+ * Drop the whole transcript WITHOUT persisting: the delete-open path
+ * (`ChatHistoryModal` after a successful `chatsDelete`). The transcript is
+ * gone by user intent, so a persist of it would write deleted turns back
+ * (and fail against the fresh tombstone, stashing stale state and raising a
+ * spurious persist warning). Like `clearChat` otherwise: unbinds, bumps the
+ * epoch so in-flight streams cannot repopulate, wipes. Callers drop the
+ * persist module's state (`clearChatPersistForLock`) alongside.
+ */
+export function discardChat(): void {
+  activeConversationId = null;
+  runEpoch += 1;
+  dispatchChat({ type: "CLEARED" });
 }
 
-/** The egress controls as this module last OBSERVED them, or `null` before the
- *  first observation. Module scope rather than per hook instance, because the
- *  question is whether the value changed, not how many components noticed. */
-let lastEgressControls: { excluded: string; provider: string | null } | null = null;
-
-/** Cut the seed when the egress controls have changed since the last read.
- *
- *  **A trigger on the VALUE, not on a code path, and that is the whole point.**
- *  `ai_excluded_folders` is classified `Shared(SetUnion)`, so a folder excluded
- *  on another device arrives here by SYNC MERGE and no setter on this machine is
- *  ever called. The setter-side cut therefore covered one of the two ways the
- *  control changes, while `threat-model.md` TB13 says a change to it stops every
- *  turn then on screen from being seeded into any later run. Observing the value
- *  covers both arrival routes with one mechanism, and a route invented later
- *  inherits it for free.
- *
- *  **The setter-side call stays as well, and is not redundant.** It fires BEFORE
- *  the write, so a failed persist still cuts: the user stated an intent about
- *  what may reach a provider, and a disk error does not withdraw it. This one
- *  fires only when the value actually moved, which is the opposite property.
- *  Both are idempotent, so a local change firing both costs one extra `Set`.
- *
- *  The FIRST observation is recorded rather than treated as a change, since
- *  there is nothing to have changed from. `clearChat` and the test reset drop it
- *  back to `null` so a vault switch starts a fresh baseline instead of comparing
- *  the new vault's controls against the old vault's. */
-export function observeEgressControls(
-  excludedFolders: readonly string[] | undefined,
-  provider: string | null | undefined,
-): void {
-  // **A view that does not carry the fields teaches nothing, so it is not an
-  // observation.** The read paths already treat a malformed or partial response
-  // as "keep what we had", and the honest counterpart here is to leave the
-  // baseline alone: substituting an empty set would compare a real value
-  // against a fabricated one on the next read and cut on a difference nobody
-  // made.
-  if (!Array.isArray(excludedFolders)) return;
-  // Sorted and joined on a byte that cannot occur in a folder path, so set
-  // equality does not depend on the order the merge happened to produce.
-  const now = {
-    excluded: [...excludedFolders].sort().join("\u0000"),
-    provider: provider ?? null,
-  };
-  const before = lastEgressControls;
-  lastEgressControls = now;
-  if (before === null) return;
-  if (before.excluded === now.excluded && before.provider === now.provider) return;
-  blockSeedingOfExistingTurns();
-}
-
-/** Whether this turn may still be seeded into a new run. */
-export function isSeedable(turnId: string): boolean {
-  return !seedBlocked.has(turnId);
+/** Replace the transcript with a re-hydrated conversation (unlock path).
+ *  Bumps the epoch so anything older than the hydrate cannot mutate it. */
+export function hydrateChatTurns(turns: ChatTurn[]): void {
+  runEpoch += 1;
+  dispatchChat({ type: "HYDRATED", turns });
 }
 
 /** Test-only reset so the module store doesn't leak across tests. */
 export function __resetChatForTest(): void {
-  lastEgressControls = null;
-  seedBlocked = new Set();
+  activeConversationId = null;
+  persister = null;
   current = CHAT_INITIAL;
   listeners.clear();
   turnSeq = 0;
