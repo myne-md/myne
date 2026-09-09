@@ -114,6 +114,10 @@ pub async fn change_password_from_host(
         // for every plaintext surface, not just "main".
         hooks.pdf_export_teardown_on_lock();
         hooks.agent_teardown_on_lock();
+        // myne#679: destroy every open detached (pop-out) note window on the
+        // force-relock path too: locking means locked for every plaintext
+        // surface, not just "main".
+        hooks.detached_windows_teardown_on_lock();
         // MYND-31: wipe the plaintext-derived VaultIndices — note titles,
         // folders, tags, wikilink targets and typed property values
         // (`spec/protocol.md` §9.8.5) — and, on a `local-inference` desktop
@@ -1516,6 +1520,7 @@ mod tests {
                     "clear_staged_descriptor",
                     "pdf_export_teardown_on_lock",
                     "agent_teardown_on_lock",
+                    "detached_windows_teardown_on_lock",
                     "zeroize_vault_indices",
                     "zeroize_attachment_refs",
                     "abort_active_recording",

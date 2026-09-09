@@ -297,7 +297,13 @@ export type Capability =
    * block governs is where this device's sync traffic goes, and the arti
    * process is an implementation detail of the desktop answer to it.
    */
-  | "torRouting";
+  | "torRouting"
+  /**
+   * Desktop pop-out: open a note in its own OS-level window (second monitor;
+   * myne-md/myne#173). Host-spawned `WebviewWindow`; web (single-tab OPFS) and
+   * mobile cannot spawn OS windows, so the affordance is absent there.
+   */
+  | "detachedWindows";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -343,6 +349,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   cliAccess: true,
   lockedVaultNames: true,
   torRouting: true,
+  detachedWindows: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */

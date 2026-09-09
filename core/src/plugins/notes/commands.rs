@@ -904,6 +904,14 @@ pub async fn note_update<R: Runtime>(
 /// blocks editing and never implies the live note was lost.
 pub const SNAPSHOT_WRITE_FAILED_EVENT: &str = "snapshot://write-failed";
 
+/// Tauri event emitted (non-blocking) when a note is deleted (myne-md/myne#681).
+/// Payload is the note id. A detached (pop-out) note window holding that id shows
+/// the terminal "deleted elsewhere" state instead of autosaving its stale buffer
+/// back; every other window ignores an id it does not hold. The change/rename
+/// reload path reuses the existing `sync://changed` instead (deletes are one-shot,
+/// so this needs its own event and is not the autosave path).
+pub const NOTES_DELETED_EVENT: &str = "notes://deleted";
+
 /// Internal outcome of [`note_update_with_dir`] — carries a non-blocking
 /// snapshot-failure signal out to the `note_update` wrapper without changing the
 /// IPC contract (which stays `Result<(), NoteUpdateError>`).
@@ -1819,6 +1827,11 @@ pub async fn note_delete_from_host(
         // MYND-453: drop the deleted note's vectors from the RAM store
         // (feature/ai-gated; the durable blob is reconciled on next unlock).
         hooks.ai_note_deleted(&note_id);
+        // myne#681: notify any window (the detached one holding this note) that it
+        // was deleted, so a pop-out shows the terminal "deleted elsewhere" state
+        // rather than autosaving its stale buffer back. Same call site as the two
+        // hook side-effects above; emit is desktop-only, mobile/web no-op.
+        hooks.emit_notes_deleted(&note_id);
     }
     result
 }

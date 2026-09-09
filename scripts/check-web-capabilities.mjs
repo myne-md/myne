@@ -195,6 +195,9 @@ const CAPABILITY_BACKING = {
     // Task 8: the live posture read behind the connection-state UI.
     "plugin:sync|sync_get_tor_state",
   ],
+  // myne#678 (epic #173): the pop-out spawn plugin. Desktop-only; a browser page
+  // cannot open a second OS window.
+  detachedWindows: ["detached-window"],
 };
 
 const descriptor = readFileSync(DESCRIPTOR, "utf8");
