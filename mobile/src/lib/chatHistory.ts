@@ -93,7 +93,14 @@ export function serializeTranscript(
   titleDerivedFrom?: string,
 ): string {
   const out: Record<string, unknown> = {
-    turns: turns.map((t) => ({ ...t })),
+    // Unknown fields first, flattened like the desktop twin: a newer
+    // writer's field rides through an older frontend's hydrate plus
+    // re-persist untouched (forward tolerance). Known fields after, so this
+    // writer's own values always win, and no nested `rest` key is emitted.
+    turns: turns.map((t) => {
+      const { rest, ...known } = t;
+      return { ...(rest ?? {}), ...known };
+    }),
   };
   if (titleDerivedFrom !== undefined && titleDerivedFrom.length > 0) {
     out["title_derived_from"] = titleDerivedFrom;

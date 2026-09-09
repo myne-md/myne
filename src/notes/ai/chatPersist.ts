@@ -32,6 +32,7 @@ import {
   hydrateChatTurns,
   setActiveConversationId,
   setChatPersister,
+  type AgentTurnSummary,
   type ChatTurn,
 } from "./chatStore";
 
@@ -123,6 +124,71 @@ const KNOWN_TURN_KEYS: ReadonlySet<string> = new Set([
   "agentSummary",
 ]);
 
+/**
+ * Validate a persisted agent summary. A malformed summary arriving via sync
+ * (unvalidated at every layer) must not reach render paths that read
+ * `summary.length`: returns the summary intact when its shape holds, `null`
+ * otherwise, and the caller keeps the turn's text either way. Mirrors the
+ * mobile twin's validation (same closed end set as `AgentTurnEnd`).
+ */
+function parseAgentSummary(raw: unknown): { agentSummary: AgentTurnSummary } | null {
+  if (!isRecord(raw)) return null;
+  const { runId, summary, end } = raw;
+  if (typeof runId !== "string" || typeof summary !== "string") return null;
+  const nums: unknown[] = [raw["edits"], raw["newNotes"], raw["notesRead"], raw["iterations"]];
+  if (!nums.every((n) => typeof n === "number" && Number.isFinite(n))) return null;
+  const [edits, newNotes, notesRead, iterations] = nums as [number, number, number, number];
+  const { charsOffDevice } = raw;
+  if (charsOffDevice !== null && (typeof charsOffDevice !== "number" || !Number.isFinite(charsOffDevice))) {
+    return null;
+  }
+  if (
+    end !== "finished" &&
+    end !== "awaitingScope" &&
+    end !== "cancelled" &&
+    end !== "exhaustedIterations" &&
+    end !== "stalled"
+  ) {
+    return null;
+  }
+  const out: AgentTurnSummary = {
+    runId,
+    summary,
+    edits,
+    newNotes,
+    notesRead,
+    iterations,
+    charsOffDevice,
+    end,
+  };
+  if (isRecord(raw["proposal"])) {
+    const proposal = raw["proposal"];
+    const editsOk =
+      Array.isArray(proposal["edits"]) &&
+      proposal["edits"].every(
+        (e) =>
+          isRecord(e) &&
+          typeof e["noteId"] === "string" &&
+          typeof e["anchor"] === "string" &&
+          typeof e["replacement"] === "string",
+      );
+    const newNotesOk =
+      Array.isArray(proposal["newNotes"]) &&
+      proposal["newNotes"].every(
+        (n) =>
+          isRecord(n) &&
+          typeof n["title"] === "string" &&
+          typeof n["body"] === "string" &&
+          (typeof n["folder"] === "string" || n["folder"] === null),
+      );
+    if (!editsOk || !newNotesOk) return null;
+    // Shape-checked above: the unknown round-trip is the honest cast for
+    // validated JSON rather than a blind one.
+    out.proposal = proposal as unknown as NonNullable<AgentTurnSummary["proposal"]>;
+  }
+  return { agentSummary: out };
+}
+
 /** Parse a persisted conversation back into turns. Returns `null` when the
  *  payload is not a conversation at all; drops malformed TURNS individually
  *  (one bad turn must not hide the rest) and forces `streaming: false`
@@ -166,7 +232,11 @@ export function parseTranscript(json: string): ChatTurn[] | null {
       ...(raw["errorCause"] !== undefined ? { errorCause: raw["errorCause"] } : {}),
       ...(raw["insertable"] === true ? { insertable: true } : {}),
       ...(raw["answeredBy"] !== undefined ? { answeredBy: raw["answeredBy"] } : {}),
-      ...(isRecord(raw["agentSummary"]) ? { agentSummary: raw["agentSummary"] } : {}),
+      // Validated like the mobile twin: a malformed summary arriving via sync
+      // (unvalidated at every layer) must not reach render paths that read
+      // `summary.length`. The turn keeps its text; only the summary is
+      // dropped, so user content is never the price of bad metadata.
+      ...(parseAgentSummary(raw["agentSummary"]) ?? {}),
       ...(typeof raw["scopeLabel"] === "string" ? { scopeLabel: raw["scopeLabel"] } : {}),
       ...(Object.keys(rest).length > 0 ? { rest } : {}),
     } as ChatTurn);
