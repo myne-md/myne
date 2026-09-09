@@ -5192,13 +5192,14 @@ export const ROSTER = Object.freeze([
       "e2e/sync-replication.e2e.ts",
       "e2e/sync-attachments.e2e.ts",
       "e2e/prefs-sync.e2e.ts",
+      "e2e/device-join-qr.e2e.ts",
     ],
     manual: [
       {
-        see: "Generate a device-join QR on desktop and scan it with a real iPhone and a real Android phone from Myne's add-device flow. Confirm the camera permission prompt appears the first time with Myne's own wording, the scan fills the server address and account number, the phone then shows the awaiting-approval state, and the phone gains NO vault access until you approve it in the desktop's device list. Let one code sit until it regenerates, then scan the stale one and confirm it is refused.",
-        whyNotAutomated: "Scanning needs a camera pointed at a screen; there is no camera in any harness here and no lane drives a handset, so the QR has only ever been generated and never read.",
+        see: "Generate a device-join QR on desktop and scan it with a real iPhone and a real Android phone from Myne's add-device flow. Confirm the camera permission prompt appears the first time with Myne's own wording, the scan fills the server address and account number, the phone then shows the awaiting-approval state, and the phone gains NO vault access until you approve it in the desktop's device list. Let one code sit until it regenerates, then scan the stale one and confirm it is refused. Do the scan on BOTH a light and a dark desktop theme, and with the LARGEST realistic payload (a self-hosted server URL plus a 64-hex cert pin), confirming the code carries the Myne mark centred and still reads first-try at ~30 cm on each phone. The margin proof is the negative case: temporarily oversize the centre knockout in render_qr_svg, confirm the scan then actually fails, and restore it (this is what makes the shipped footprint's margin real rather than assumed).",
+        whyNotAutomated: "Scanning needs a camera pointed at a screen; there is no camera in any harness here and no lane drives a handset, so the QR has only ever been generated and never read. The branded overlay makes this sharper, not softer: a Rust decode round-trip (rqrr) and the e2e render check prove the SVG is well-formed and decodable by software, but only a phone camera off an emissive screen proves the centre-mark footprint left enough margin to scan.",
         clients: ["ios", "android"],
-        estimateMin: 18,
+        estimateMin: 22,
         tier: "core",
       },
       {
@@ -5387,6 +5388,7 @@ export const ROSTER = Object.freeze([
       "src/notes/folderIcons.ts",
       "src/notes/components/FolderGlyph.tsx",
       "src/notes/folderNote.ts",
+      "src/components/settings/FolderNotesSettings.tsx",
       "src/notes/components/DecorationPopover.tsx",
       "src/notes/folderBackfill.ts",
       "mobile/src/lib/folderBackfill.ts",
