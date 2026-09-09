@@ -25,6 +25,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  closeSettings,
   createNote,
   dismissImporterOffer,
   openSettings,
@@ -253,6 +254,27 @@ describeE2E("fm3 the focus dim stays readable (myne-md/myne#555)", () => {
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+
+        // Pin the dark theme before measuring. The default follows the OS
+        // color scheme, which varies run to run under xvfb, and the dim's
+        // contrast is theme-dependent (see the header): the same scenario
+        // measured 2.50 on light against 3+ on dark. Without this the floor
+        // below asserts a different theme's rendering each run. The light
+        // reading is filed as its own product question rather than asserted
+        // here, because the floor value itself is a design decision.
+        await openSettings(s, "appearance");
+        await (await s.byTestId("settings.theme-dark")).click();
+        await s.waitUntil(
+          async () =>
+            (await s.execute<string>(
+              "return document.documentElement.getAttribute('data-theme');",
+            )) === "dark"
+              ? true
+              : null,
+          { label: "the dark theme reached :root", timeoutMs: 10_000 },
+        );
+        await closeSettings(s);
+
         await createNote(s, "Odak kontrasti");
 
         // Several lines, so there is an inactive one to measure. The caret ends
@@ -287,39 +309,82 @@ describeE2E("fm3 the focus dim stays readable (myne-md/myne#555)", () => {
         expect(active, "no active line to measure").not.toBeNull();
         expect(inactive, "no inactive line to measure").not.toBeNull();
 
-        const activeRatio = effectiveContrast(active!);
-        const inactiveRatio = effectiveContrast(inactive!);
-        expect(activeRatio, `could not parse the active line's colours: ${JSON.stringify(active)}`)
-          .not.toBeNull();
-        expect(
-          inactiveRatio,
-          `could not parse the inactive line's colours: ${JSON.stringify(inactive)}`,
-        ).not.toBeNull();
+        // The dim is a CSS opacity TRANSITION: sampling once right after the
+        // attribute flips can land pre-transition (both lines at full
+        // contrast) and fail a working dim — measured as exact equality,
+        // 16.84 against 16.84. Poll for the SETTLED state instead; a dim that
+        // never separates fails here by name. Settled means separated AND
+        // still across consecutive polls: a mid-transition sample already
+        // clears the separation bar while its absolute value is still moving
+        // (measured: 2.96 against the 3:1 floor on a later assert).
+        let lastActive: unknown = null;
+        let lastInactive: unknown = null;
+        let prev: { activeRatio: number; inactiveRatio: number } | null = null;
+        const settled = await s.waitUntil(
+          async () => {
+            const a = await inkOf(s, '[data-testid="editor.content"] .cm-line.cm-activeLine');
+            const b = await inkOf(
+              s,
+              '[data-testid="editor.content"] .cm-line:not(.cm-activeLine)',
+            );
+            if (a === null || b === null) {
+              prev = null;
+              return null;
+            }
+            const ar = effectiveContrast(a);
+            const br = effectiveContrast(b);
+            lastActive = a;
+            lastInactive = b;
+            if (ar === null || br === null) {
+              prev = null;
+              return null;
+            }
+            const cur = { activeRatio: ar, inactiveRatio: br };
+            const ok =
+              prev !== null &&
+              br <= ar - 0.5 &&
+              prev.inactiveRatio <= prev.activeRatio - 0.5 &&
+              Math.abs(br - prev.inactiveRatio) < 0.05;
+            prev = cur;
+            return ok ? cur : null;
+          },
+          {
+            label: () =>
+              `the inactive-line dim to settle below the active line. Last settled ` +
+              `reading: active ${JSON.stringify(lastActive)?.slice(0, 120)}, inactive ` +
+              `${JSON.stringify(lastInactive)?.slice(0, 120)}. A single pre-transition ` +
+              `sample reads both at full contrast; only a dim that never separates ` +
+              `fails this wait.`,
+            timeoutMs: 10_000,
+          },
+        );
+        const activeRatio: number = settled.activeRatio;
+        const inactiveRatio: number = settled.inactiveRatio;
 
         // 1. The dim does something. Without this the whole scenario passes on a
         //    focus mode that dims nothing at all.
         expect(
-          inactiveRatio!,
-          `the inactive line's contrast is ${inactiveRatio!.toFixed(2)}:1 against the ` +
-            `active line's ${activeRatio!.toFixed(2)}:1 — the dim is not separating ` +
+          inactiveRatio,
+          `the inactive line's contrast is ${inactiveRatio.toFixed(2)}:1 against the ` +
+            `active line's ${activeRatio.toFixed(2)}:1 — the dim is not separating ` +
             `them, so focus mode is not pulling the eye anywhere.`,
-        ).toBeLessThan(activeRatio! - 0.5);
+        ).toBeLessThan(activeRatio - 0.5);
 
         // 2. …and it does not go so far that the surrounding text stops being
         //    text. This is the half a sighted developer on a good monitor does
         //    not notice, and the one that turns a focus aid into a reading
         //    impairment.
         expect(
-          inactiveRatio!,
-          `the dimmed lines sit at ${inactiveRatio!.toFixed(2)}:1, below the 3:1 ` +
+          inactiveRatio,
+          `the dimmed lines sit at ${inactiveRatio.toFixed(2)}:1, below the 3:1 ` +
             `large-text floor. A user reads the paragraph above while writing the ` +
             `one below; dimming it out of legibility is not a focus aid.`,
         ).toBeGreaterThanOrEqual(3);
 
         // 3. The line being written clears the real bar.
         expect(
-          activeRatio!,
-          `the active line sits at ${activeRatio!.toFixed(2)}:1, below WCAG AA's 4.5:1 ` +
+          activeRatio,
+          `the active line sits at ${activeRatio.toFixed(2)}:1, below WCAG AA's 4.5:1 ` +
             `for normal text — and it is the one line the user is definitely reading.`,
         ).toBeGreaterThanOrEqual(4.5);
 
@@ -337,7 +402,7 @@ describeE2E("fm3 the focus dim stays readable (myne-md/myne#555)", () => {
           effectiveContrast(restored!)!,
           "leaving focus mode did not restore the inactive lines' contrast — the dim " +
             "outlived the mode that justified it",
-        ).toBeGreaterThan(inactiveRatio! + 0.5);
+        ).toBeGreaterThan(inactiveRatio + 0.5);
       },
     );
   });

@@ -21,6 +21,7 @@ import {
   editorText,
   editorSourceText,
   openSettings,
+  pickSelect,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -254,7 +255,7 @@ describeE2E("tc4 the chosen date format reaches the chip (myne-md/myne#609)", ()
         // default is the `system` preset, whose output is the platform's to
         // choose, so asserting it would test `Intl` rather than the wiring.
         await openSettings(s, "editor");
-        await (await s.byTestId("settings.date-format-dmy")).click();
+        await pickSelect(s, "settings.date-format", "dmy");
         await closeSettings(s);
 
         await s.waitUntil(
@@ -310,7 +311,7 @@ describeE2E("tc5 the chip repaints while Settings is still open (myne-md/myne#60
         await waitForSaved(s);
 
         await openSettings(s, "editor");
-        await (await s.byTestId("settings.date-format-iso")).click();
+        await pickSelect(s, "settings.date-format", "iso");
 
         const chipText = async (): Promise<string> => {
           const chips = await s.byTestIdAll("editor.task-chip-due");
@@ -321,9 +322,10 @@ describeE2E("tc5 the chip repaints while Settings is still open (myne-md/myne#60
           { label: "chip settled on the ISO baseline before the change under test" },
         );
 
-        // The only action between the two reads. The modal is still up, the
-        // caret has not moved, the document has not changed, nothing scrolled.
-        await (await s.byTestId("settings.date-format-dmy")).click();
+        // The only action between the two reads is re-picking the format. The
+        // modal is still up, the caret has not moved in the editor, the document
+        // has not changed, nothing scrolled.
+        await pickSelect(s, "settings.date-format", "dmy");
 
         await s.waitUntil(
           async () => ((await chipText()) === "01/08/2026" ? true : null),
