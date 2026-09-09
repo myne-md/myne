@@ -163,6 +163,8 @@ fn main() {
                 // registered in the handler list and in default.toml but are
                 // MISSING from this mirror — pre-existing, not introduced here.
                 "set_show_task_marker",
+                // myne-md/myne#661: the folder-notes feature off-switch.
+                "set_folder_notes_enabled",
                 "set_transcription_enabled",
                 // MYND-651.
                 "set_auto_tag_enabled",
