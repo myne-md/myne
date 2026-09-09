@@ -5330,6 +5330,7 @@ export const ROSTER = Object.freeze([
       "src/notes/folderIcons.ts",
       "src/notes/components/FolderGlyph.tsx",
       "src/notes/folderNote.ts",
+      "src/components/settings/FolderNotesSettings.tsx",
       "src/notes/components/DecorationPopover.tsx",
       "src/notes/folderBackfill.ts",
       "mobile/src/lib/folderBackfill.ts",

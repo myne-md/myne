@@ -541,6 +541,25 @@ export async function setViewsEnabled(
   });
 }
 
+/** Toggle the folder-notes feature via Settings → Files (myne-md/myne#661).
+ *  Folder notes are OFF by default, so a scenario that drives the folder-index
+ *  entry points must enable them first. On the shared idempotent switch driver,
+ *  so it also waits for the pref to LAND (aria-checked reflects the persisted
+ *  value), which is what makes the sidebar's own `usePrefs` reflect it before
+ *  the next step. */
+export async function setFolderNotesEnabled(
+  session: Session,
+  enabled: boolean,
+): Promise<void> {
+  await setSettingsSwitch(session, {
+    tab: "files",
+    panelTestId: "settings.files-panel",
+    toggleTestId: "settings.folder-notes-toggle",
+    enabled,
+    label: "folder_notes_enabled",
+  });
+}
+
 /**
  * Turn Developer mode on via Settings → About and wait for the Developer rail
  * group to appear. Leaves the Settings modal OPEN on the About tab, because
