@@ -34,6 +34,7 @@ import {
   editorText,
   editorSourceText,
   openSettings,
+  pickSelect,
   replaceFieldText,
   runPaletteAction,
   typeIntoEditor,
@@ -255,7 +256,7 @@ describeE2E("fr3 a date typed as it is displayed is found, and Replace is off (m
         await waitForSaved(s);
 
         await openSettings(s, "editor");
-        await (await s.byTestId("settings.date-format-dmy")).click();
+        await pickSelect(s, "settings.date-format", "dmy");
         await closeSettings(s);
 
         await openFind(s);

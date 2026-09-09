@@ -6,7 +6,7 @@
 //
 // The canonical grammar is TypeScript (`dialect/src/embedLayout.ts`,
 // source-consumed by all three clients). The attachments-included export needs
-// one narrow slice of it in Rust (`core/src/export_naming.rs`), because that
+// one narrow slice of it in Rust (`format/src/export_naming.rs`), because that
 // rewrite runs backend-side over plaintext the frontend never receives, and the
 // wasm direction is Rust to JS rather than the other way, so calling the TS
 // grammar from there is not available. The duplication is therefore real and
@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const TS_FILE = "dialect/src/embedLayout.ts";
-const RUST_FILE = "core/src/export_naming.rs";
+const RUST_FILE = "format/src/export_naming.rs";
 
 /** `export const MAX_EMBED_DIMENSION_PX = 8192;` */
 const TS_RE = /export const MAX_EMBED_DIMENSION_PX\s*=\s*(\d+)\s*;/;

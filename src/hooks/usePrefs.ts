@@ -128,6 +128,7 @@ const DEFAULT_PREFS: PrefsView = {
   cli_rate_limit_disabled: null,
   theme: null,
   folder_icons: {},
+  folder_notes_enabled: false,
   device_names: {},
   hidden_bar_items: [],
   bar_items_order: [],

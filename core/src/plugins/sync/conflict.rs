@@ -531,6 +531,11 @@ pub fn merge_vault_meta(
     merged.random_salt_recovery = local.random_salt_recovery;
     merged.nonce_recovery_wrap = local.nonce_recovery_wrap;
     merged.enc_root_key_recovery = local.enc_root_key_recovery;
+    // The membership field is device-local: the LOCAL value always survives,
+    // regardless of which side won the password-side. Grouping is a per-device
+    // organisational choice, so a divergent grouping across devices must never
+    // converge and never produce a conflict surface (`sync-protocol.md` §10.3).
+    merged.membership = local.membership.clone();
     Ok(merged)
 }
 
@@ -1379,6 +1384,7 @@ mod tests {
             items_key_id: [0x07; VAULT_META_ITEMS_KEY_ID_LEN],
             items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
             enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            membership: None,
         }
     }
 
@@ -1404,6 +1410,63 @@ mod tests {
             merged_local.enc_root_key_recovery,
             [0x55; VAULT_META_WRAPPED_ROOT_KEY_LEN]
         );
+    }
+
+    #[test]
+    fn vault_meta_merge_keeps_local_membership_regardless_of_winner() {
+        // The membership field is device-local: the LOCAL value always survives,
+        // even when the remote side wins the password-side. Grouping must never
+        // converge across devices (`sync-protocol.md` §10.3).
+        let mut local = meta(0xAA, 0x55);
+        local.membership = Some(protocol::Membership {
+            nonce: [0x11; protocol::AEAD_NONCE_LEN],
+            enc: [0x22; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+        });
+        let mut remote = meta(0xBB, 0x55);
+        remote.membership = Some(protocol::Membership {
+            nonce: [0x33; protocol::AEAD_NONCE_LEN],
+            enc: [0x44; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+        });
+
+        // Remote wins the password-side, but the membership stays local.
+        let merged = merge_vault_meta(&local, &remote, MetaWinner::Remote).unwrap();
+        assert_eq!(merged.nonce_password_wrap, [0xBB; VAULT_META_NONCE_LEN]);
+        assert_eq!(merged.membership, local.membership);
+
+        // Local wins: membership is local's anyway.
+        let merged_local = merge_vault_meta(&local, &remote, MetaWinner::Local).unwrap();
+        assert_eq!(merged_local.membership, local.membership);
+    }
+
+    #[test]
+    fn merged_meta_with_membership_parses_under_both_generation_codecs() {
+        // The merged blob must stay well-formed for both generations: the
+        // membership field is NTV5-only, so a v0.2 merge re-serializes with the
+        // field, and a v0.1 merge (no field) re-serializes as MYV1.
+        let mut local = meta(0xAA, 0x55);
+        local.membership = Some(protocol::Membership {
+            nonce: [0x11; protocol::AEAD_NONCE_LEN],
+            enc: [0x22; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+        });
+        let mut remote = meta(0xBB, 0x55);
+        remote.membership = Some(protocol::Membership {
+            nonce: [0x33; protocol::AEAD_NONCE_LEN],
+            enc: [0x44; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+        });
+
+        let merged = merge_vault_meta(&local, &remote, MetaWinner::Remote).unwrap();
+        // v0.2: the field is present, so the NTV5 serializer emits 417 bytes.
+        let ntv5 = protocol::serialize_vault_meta_v0_2(&merged);
+        assert_eq!(ntv5.len(), protocol::VAULT_META_V0_2_WITH_MEMBERSHIP_LEN);
+        let reparsed = protocol::parse_vault_meta_v0_2(&ntv5).expect("NTV5 parse");
+        assert_eq!(reparsed.membership, local.membership);
+
+        // v0.1: no field, so the MYV1 serializer emits 345 bytes and the field
+        // is dropped (a MYV1 vault groups via the record alone).
+        let myv1 = protocol::serialize_vault_meta(&merged);
+        assert_eq!(myv1.len(), protocol::VAULT_META_LEN);
+        let reparsed_v0_1 = protocol::parse_vault_meta(&myv1).expect("MYV1 parse");
+        assert!(reparsed_v0_1.membership.is_none());
     }
 
     #[test]

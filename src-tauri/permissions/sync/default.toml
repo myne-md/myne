@@ -10,7 +10,14 @@
 # `commands.allow` entry AND remain gated on an authenticated session. The
 # endpoint-config pair is intentionally reachable pre-auth (an operator
 # configures the server before unlocking/enrolling) but moves no vault bytes.
-# Main-window-only, like every other vault plugin.
+# The `default` bundle stays MAIN-WINDOW-ONLY: endpoint config, enrol/join,
+# device approve/remove, tor-routing set, conflict resolution and reset are
+# account/device management + settings, none of which an editor pane has UI
+# for. A detached (pop-out) note window (myne#677, epic #173, sync-ledger
+# SYNC-12) gets the READ-ONLY status seat `detached-status` below, so its
+# per-note unsynced-edit marker shows the same state a split pane's does.
+# No sync mutation, no device management, no endpoint/tor setter to a
+# non-main window.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -47,6 +54,19 @@ permissions = [
     "allow-sync-get-tor-routing",
     "allow-sync-set-tor-routing",
     "allow-sync-get-tor-state",
+]
+
+# Detached (pop-out) note-window seat (myne#677, epic #173; capabilities/detached-note.json,
+# windows: ["note-*"]). READ-ONLY status only, for the per-note unsynced-edit marker + first-sync
+# progress readout the editor pane already shows. No mutation, no device management, no
+# endpoint/tor setter, no enrol/join/conflict.
+[[set]]
+identifier = "detached-status"
+description = "Detached note-window sync seat: read-only status + unsynced-edit marker + materialisation progress. No mutation, no device/endpoint/tor management. Granted exclusively by capabilities/detached-note.json (windows: [\"note-*\"])."
+permissions = [
+    "allow-sync-status",
+    "allow-sync-unsynced-edits",
+    "allow-sync-materialisation-progress",
 ]
 
 [[permission]]

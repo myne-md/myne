@@ -39,6 +39,9 @@ import {
 } from "../../components/primitives/hoverSurface";
 import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
+import { shouldDetachOnDrop } from "../detachDrop";
+import { has } from "../../platform/capabilities";
+import { getCurrentWindow } from "../../platform/window";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { ornamentRole } from "@myne/ornaments";
 
@@ -136,6 +139,12 @@ export type TabStripProps = {
   /** Extra right padding (px) when this strip sits at the window's top-right
    *  corner with no right sidebar — clears the right sidebar toggle. */
   insetRight?: number;
+  /** Drag a tab OUT of the window to pop the note into its own OS window
+   *  (myne#678 / #681, SYNC-6). The workspace owns the MOVE (spawn the pop-out
+   *  and close this tab); the strip only reports the gesture. A dragged tab is
+   *  by definition a live main-window tab, so this is always a fresh spawn.
+   *  Absent off desktop, where the strip never fires it (`has("detachedWindows")`). */
+  onDetachNote?: (noteId: string) => void;
 };
 
 export function TabStrip({
@@ -157,6 +166,7 @@ export function TabStrip({
   onMoveTab,
   insetLeft = 0,
   insetRight = 0,
+  onDetachNote,
 }: TabStripProps) {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -259,6 +269,7 @@ export function TabStrip({
                 ? (x, y) => setTabMenu({ id, x, y })
                 : undefined
             }
+            onDetachNote={onDetachNote}
           />
         ))}
         {pendingNewTab && <NewTabChip onClose={onCloseNewTab} />}
@@ -359,6 +370,9 @@ type TabProps = {
   onClose: (id: string) => void;
   /** Right-click (tab-modes / MYND-320): open the Pin/Unpin menu at the cursor. */
   onContextMenu?: (x: number, y: number) => void;
+  /** Drag this tab OUT of the window to pop its note out (myne#678/#681, SYNC-6);
+   *  the workspace opens the pop-out and closes this tab. Absent off desktop. */
+  onDetachNote?: (noteId: string) => void;
 };
 
 function Tab({
@@ -375,6 +389,7 @@ function Tab({
   onActivate,
   onClose,
   onContextMenu,
+  onDetachNote,
 }: TabProps) {
   const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
@@ -385,6 +400,39 @@ function Tab({
   const handleDragStart = (e: ReactDragEvent<HTMLDivElement>) => {
     writeTabDrag(e.dataTransfer, { tabId: id, fromPaneId: paneId });
     e.dataTransfer.effectAllowed = "move";
+  };
+
+  // Drag-tab-out (myne#173): a tab dropped OUTSIDE the window (no valid drop
+  // target AND the pointer past the window bounds) detaches its note into its
+  // own OS window. Desktop-only. The detach DECISION is unit-tested in
+  // `src/notes/detachDrop.ts`; the drop-outside GESTURE is E2E/manual (headless
+  // drag-and-drop cannot leave the window). Views never detach, only notes.
+  const handleDragEnd = (e: ReactDragEvent<HTMLDivElement>) => {
+    if (!has("detachedWindows")) return;
+    if (e.dataTransfer.dropEffect !== "none") return;
+    if (!id.startsWith("note:")) return;
+    const noteId = id.slice("note:".length);
+    const pointer =
+      e.screenX !== 0 || e.screenY !== 0 ? { x: e.screenX, y: e.screenY } : null;
+    void (async () => {
+      const win = getCurrentWindow();
+      const [pos, size, scale] = await Promise.all([
+        win.outerPosition(),
+        win.outerSize(),
+        win.scaleFactor(),
+      ]);
+      const bounds = {
+        x: pos.x / scale,
+        y: pos.y / scale,
+        width: size.width / scale,
+        height: size.height / scale,
+      };
+      if (shouldDetachOnDrop("none", pointer, bounds)) {
+        // MOVE, not copy (SYNC-6): the workspace opens the pop-out AND closes
+        // this tab, so the note is never a live tab and a live pop-out at once.
+        onDetachNote?.(noteId);
+      }
+    })().catch(() => {});
   };
 
   // Obsidian-style tabs: the active tab is a rounded-top card with a top/side
@@ -467,6 +515,7 @@ function Tab({
       title={text}
       draggable
       onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       style={style}
       onClick={() => onActivate(id)}
       onAuxClick={handleAux}

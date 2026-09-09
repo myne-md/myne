@@ -98,6 +98,13 @@ export interface AppSession {
   /** `<dataHome>/.config/md.myne.desktop` — what `app_config_dir`
    *  resolves to (device-local sync endpoint config lives here, SYNC-14). */
   appConfigDir: string;
+  /** PID of the spawned tauri-driver process. The driver is spawned `detached`,
+   *  so this pid is also the process GROUP id: driver → WebKitWebDriver → the
+   *  app binary all live under it. X-level helpers (`support/xwindow.ts`) use it
+   *  to pick THIS session's toplevel window out of a display shared with sibling
+   *  shards (myne-md/myne#555) — without it a name search cannot tell two live
+   *  "Myne" windows apart. `undefined` when the spawn did not report one. */
+  driverPid: number | undefined;
   /** Stop the app session + driver, remove the temp dir. */
   teardown(): Promise<void>;
   /**
@@ -486,6 +493,7 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       dataHome,
       appDataDir,
       appConfigDir,
+      driverPid: proc.pid,
       teardown,
       hardKill,
       waitForExit,

@@ -75,6 +75,37 @@ pub const VAULT_META_ITEMS_KEY_ID_LEN: usize = 16;
 /// Length of the wrapped `itemsKey` blob (32-byte ct + 32-byte CTX).
 pub const VAULT_META_WRAPPED_ITEMS_KEY_LEN: usize = 64;
 
+/// Length of the sealed account id carried by the vault membership field
+/// (`vault.meta` §9.3.1). The account id is a 16-byte UUIDv7.
+pub const MEMBERSHIP_ACCOUNT_ID_LEN: usize = 16;
+
+/// Length of the sealed membership ciphertext: 16-byte account id + 32-byte
+/// CTX commitment tag.
+pub const MEMBERSHIP_CIPHERTEXT_LEN: usize = 48;
+
+/// Total length of the membership field: 24-byte nonce + 48-byte ciphertext.
+pub const MEMBERSHIP_FIELD_LEN: usize = AEAD_NONCE_LEN + MEMBERSHIP_CIPHERTEXT_LEN;
+
+/// Total `vault.meta` length when the membership field is present (NTV5 only):
+/// 345 base bytes + 72 membership bytes.
+pub const VAULT_META_V0_2_WITH_MEMBERSHIP_LEN: usize = VAULT_META_LEN + MEMBERSHIP_FIELD_LEN;
+
+/// The sealed vault membership field (`vault.meta` §9.3.1): the account id of
+/// the account this vault belongs to, AEAD-sealed under `membership_key`.
+///
+/// Holds the sealed bytes (nonce + ciphertext), not the plaintext account id,
+/// under the same discipline as the wrapped `root_key` / `itemsKey` fields: the seal
+/// happens at the call site (which holds `root_key`), and this struct carries
+/// only the on-disk form. The account id is recovered with
+/// [`crate::vault_meta_v0_2::unseal_membership`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Membership {
+    /// 192-bit nonce used to AEAD-seal the account id.
+    pub nonce: [u8; AEAD_NONCE_LEN],
+    /// 48-byte blob: 16-byte account id ciphertext + 32-byte CTX tag.
+    pub enc: [u8; MEMBERSHIP_CIPHERTEXT_LEN],
+}
+
 /// In-memory representation of `vault.meta` per spec § 9.3.
 ///
 /// The fixed `magic`, `protocol_version`, and `reserved` bytes at
@@ -110,6 +141,10 @@ pub struct VaultMeta {
     pub items_key_nonce: [u8; VAULT_META_NONCE_LEN],
     /// 64-byte blob: 32-byte ciphertext of `itemsKey` + 32-byte CTX tag.
     pub enc_items_key: [u8; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+    /// The sealed vault membership field (`vault.meta` §9.3.1), `None` when the
+    /// vault is unmigrated (no account membership). `NTV5`-only: the `MYV1`
+    /// serializer never emits it and the `MYV1` parser never reads it.
+    pub membership: Option<Membership>,
 }
 
 /// Serialize `meta` to its 345-byte canonical on-disk form (spec § 9.3).
@@ -209,6 +244,7 @@ pub fn parse_vault_meta(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
         items_key_id,
         items_key_nonce,
         enc_items_key,
+        membership: None,
     })
 }
 
@@ -272,6 +308,7 @@ pub fn rewrite_vault_meta_password_side(
         items_key_id: existing.items_key_id,
         items_key_nonce: existing.items_key_nonce,
         enc_items_key: existing.enc_items_key,
+        membership: existing.membership.clone(),
     };
 
     Ok(serialize_vault_meta(&new_meta))
@@ -333,6 +370,7 @@ mod tests {
             items_key_id: [0x80; VAULT_META_ITEMS_KEY_ID_LEN],
             items_key_nonce: [0x90; VAULT_META_NONCE_LEN],
             enc_items_key: [0xA0; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            membership: None,
         }
     }
 
@@ -504,6 +542,7 @@ mod tests {
             items_key_id: [0x77; VAULT_META_ITEMS_KEY_ID_LEN],
             items_key_nonce: [0x88; VAULT_META_NONCE_LEN],
             enc_items_key: [0x99; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            membership: None,
         }
     }
 
@@ -942,6 +981,7 @@ mod tests {
             items_key_id: [0xE1; VAULT_META_ITEMS_KEY_ID_LEN],
             items_key_nonce: [0xE2; VAULT_META_NONCE_LEN],
             enc_items_key: [0xE3; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            membership: None,
         };
 
         let canonical = serialize_vault_meta(&meta);
@@ -1114,6 +1154,7 @@ mod tests {
             items_key_id: [0xE1; VAULT_META_ITEMS_KEY_ID_LEN],
             items_key_nonce: [0xE2; VAULT_META_NONCE_LEN],
             enc_items_key: [0xE3; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            membership: None,
         };
         let canonical = serialize_vault_meta(&meta);
         let _ = parse_vault_meta(&canonical).expect("canonical fixture must parse");

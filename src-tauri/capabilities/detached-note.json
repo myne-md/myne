@@ -1,0 +1,36 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "detached-note",
+  "description": "Capability for a detached (pop-out) note window (myne-md/myne#677, epic #173). Bound to the `note-*` label glob (SYNC-1): one host-spawned window per note. A detached window is a split pane in its own OS window, so it is granted the split-pane EDITOR surface, essentially the main window's set, with four deliberate subtractions recorded in decisions and the epic sync-ledger SYNC-12: (1) prefs-WRITE stays main-only, so it gets `prefs:allow-prefs-read` and NO `prefs:allow-set-*` (decision 0136, the one main-window-only reservation NOT reversed, so preference changes flow through the main Settings UI); (2) no vault-lifecycle / importer / backup / vault-wide-export / secret-export / clipper / cli-bridge / deep-link / screen-capture (host-applied, #680) / workspace / graph-layout, none of which an editor pane needs; (3) window/webview create + mutation is withheld (the window is host-spawned by #678) except `core:window:allow-destroy` for self-close and reads + start-dragging; (4) the `notes` set withholds `note_delete` + `note_write_batch_transactional` and the `attachments` set is import + reads only, both sidebar/library actions rather than pane-editor actions. The five plugins whose headers reserved themselves main-only (attachments, sync, agent, vault-indices, spell) are updated in the same change to record this grant: a detached `note-*` window runs the same bundled code (same origin, same CSP) and holds the same plaintext a split pane already does, so its exposure is materially the same as a split pane's, which is already permitted. omerdduran reviews the reservation resolution in the PR. Keys never cross IPC.",
+  "windows": ["note-*"],
+  "permissions": [
+    "core:path:default",
+    "core:event:default",
+    "core:window:default",
+    "core:window:allow-destroy",
+    "core:window:allow-start-dragging",
+    "opener:default",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "$APPDATA/vaults" },
+        { "path": "$APPDATA/vaults/*" },
+        { "path": "$APPDATA/vault" }
+      ]
+    },
+    "prefs:allow-prefs-read",
+    "themes:detached-read",
+    "notes:detached",
+    "snapshots:default",
+    "sync:detached-status",
+    "vault-indices:default",
+    "attachments:detached-read",
+    "agent:default",
+    "pdf-export:default",
+    "spell:default",
+    "clipboard-manager:allow-write-text",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    "dialog:allow-confirm"
+  ]
+}

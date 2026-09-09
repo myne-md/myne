@@ -27,10 +27,10 @@
 // exactly like `web/wasm/pkg/`: committing one would put a multi-MB binary in
 // every diff and make the bundle's contents depend on whoever last ran a script.
 
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runTool } from "./run-tool.mjs";
 
 /** Repo root, from this file's location (`<root>/scripts/lib/`). */
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -67,12 +67,17 @@ export function parseArgs(argv, scriptName) {
   return args;
 }
 
+// FATAL on a tool failure (myne#528): this used to shell out with NO catch, so
+// a `rustc`/`cargo` that could not run died as a bare stack trace whose
+// diagnosis sat in the error nobody printed. Same verdict, but the helper
+// prints argv, exit, BOTH streams and the cwd first — `cargo` writes its
+// build errors to stderr while `cargo metadata` fails on stdout.
 function run(command, commandArgs) {
-  return execFileSync(command, commandArgs, {
+  const r = runTool([command, ...commandArgs], {
     cwd: repoRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "inherit"],
+    onToolFailure: "fatal",
   });
+  return r.stdout;
 }
 
 /** The host target triple, read from `rustc -vV`'s `host:` line. */
@@ -114,8 +119,9 @@ export function stageSidecar({ scriptName, package: pkg, binName, args }) {
     const cargoArgs = ["build", "-p", pkg, "--bin", binName];
     if (args.profile === "release") cargoArgs.push("--release");
     if (args.target) cargoArgs.push("--target", args.target);
-    // Inherit stdout too: a cargo build is slow enough that silence reads as a hang.
-    execFileSync("cargo", cargoArgs, { cwd: repoRoot, stdio: "inherit" });
+    // FATAL (myne#528). A cargo build is slow enough that silence reads as a
+    // hang, so the diagnostics are what make the wait legible, not noise.
+    runTool(["cargo", ...cargoArgs], { cwd: repoRoot, onToolFailure: "fatal" });
   }
 
   const builtPath = join(

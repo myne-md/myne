@@ -532,6 +532,14 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // `lockedVaultNames`, absent in the web descriptor, so `PrivacyPanel`
     // omits the row instead of rendering one whose three probes all reject.
     ("vault-label", Class::Unsupported),
+    // myne-md/myne#684: the device-local account record (the account/vault
+    // split). Absent on web because the thing it governs is absent: a browser
+    // holds exactly one vault per origin and has no OS keychain, so there is no
+    // grouping to render and nowhere to keep the wrap key whose seal is the
+    // record. `Unsupported` rather than `Pending` for the reason `vault-label`
+    // above gives: `Pending` promises a port, and no port makes grouping
+    // meaningful when there is one vault and no keychain.
+    ("account", Class::Unsupported),
     // myne-md/myne#482 + #483: the device-local screen-capture escape hatch
     // and the WebView-side re-assert. Absent on web because the thing they
     // govern is absent: a page cannot ask a browser to exclude itself from the
@@ -594,6 +602,13 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // port — the capability backing it (`cliAccess`) is absent by platform fact,
     // and the Settings block is omitted rather than greyed.
     ("cli-bridge", Class::Unsupported),
+    // myne#678 (epic #173): the pop-out spawn command. A detached note window is
+    // a second host-spawned OS window; a browser page has one tab context and
+    // cannot open one (the single-tab OPFS lock is the model). `Unsupported`
+    // rather than `Pending` because there is nothing to port: the capability
+    // backing it (`detachedWindows`) is absent by platform fact, and the affordance
+    // is omitted rather than greyed.
+    ("detached-window", Class::Unsupported),
 ];
 
 /// Per-command overrides of [`PLUGIN_DEFAULT`]. Each one is a place where a

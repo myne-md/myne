@@ -7,6 +7,7 @@
 
 import { expect } from "vitest";
 import { testIdSelector, WebDriverError, type Element, type Session } from "./webdriver";
+import { KEY, activeTestId, pressKey } from "./keyboard";
 
 /**
  * Fire one production IPC from the page seat and settle-poll its result
@@ -455,6 +456,23 @@ export async function openSettings(
   }
 }
 
+/** Pick `value` from a token-styled {@link Select} named `selectTestId`: open the
+ *  trigger, then click the matching option. The primitive renders `selectTestId`
+ *  on the trigger and `${selectTestId}-option` (carrying a `data-value`) on each
+ *  option, so a one-shot segment click (the shape `Segmented` allowed) no
+ *  longer reaches it. */
+export async function pickSelect(
+  session: Session,
+  selectTestId: string,
+  value: string,
+): Promise<void> {
+  await (await session.byTestId(selectTestId)).click();
+  const option = await session.waitForElement(
+    testIdSelector(`${selectTestId}-option`, { "data-value": value }),
+  );
+  await option.click();
+}
+
 /** Drive one `role="switch"` in Settings to a wanted state, then close the
  *  modal. Idempotent by construction: it clicks only when `aria-checked` is not
  *  already what the caller asked for, so a caller can assert a DEFAULT without a
@@ -520,6 +538,25 @@ export async function setViewsEnabled(
     toggleTestId: "settings.views-enabled",
     enabled,
     label: "views_enabled",
+  });
+}
+
+/** Toggle the folder-notes feature via Settings → Files (myne-md/myne#661).
+ *  Folder notes are OFF by default, so a scenario that drives the folder-index
+ *  entry points must enable them first. On the shared idempotent switch driver,
+ *  so it also waits for the pref to LAND (aria-checked reflects the persisted
+ *  value), which is what makes the sidebar's own `usePrefs` reflect it before
+ *  the next step. */
+export async function setFolderNotesEnabled(
+  session: Session,
+  enabled: boolean,
+): Promise<void> {
+  await setSettingsSwitch(session, {
+    tab: "files",
+    panelTestId: "settings.files-panel",
+    toggleTestId: "settings.folder-notes-toggle",
+    enabled,
+    label: "folder_notes_enabled",
   });
 }
 
@@ -1240,12 +1277,94 @@ export async function rowMenuPick(
 }
 
 /** Create a note via the sidebar CTA and commit `title` through the
- *  inline-rename input (Enter). Leaves the note selected. */
+ *  inline-rename input (Enter). Leaves the note selected.
+ *
+ *  Both halves re-resolve rather than reuse a handle (myne-md/myne#676). The
+ *  sidebar re-renders around the new row mount: the rename node can arrive
+ *  late under load, and a node fetched a moment ago can go stale under the
+ *  keystrokes (measured twice: a 45 s wait on an input that never mounted,
+ *  and a stale-element on the sendKeys itself). `waitUntil` already treats a
+ *  stale poll as falsy, so every attempt re-queries from the document root
+ *  and only a non-stale error escapes. Retries overwrite rather than append
+ *  (`replaceText`: select-all first), so a half-typed attempt cannot strand a
+ *  doubled title. */
 export async function createNote(session: Session, title: string): Promise<void> {
   await clickNewMenuItem(session, "notes.create");
-  const rename = await session.byTestId("notes.rename-input");
-  await rename.sendKeys(`${title}`);
+  try {
+    await session.waitUntil(
+      async () => {
+        const inputs = await session.byTestIdAll("notes.rename-input");
+        if (inputs.length === 0) return null;
+        await inputs[0]!.replaceText(title);
+        // U+E007 is W3C Enter (the literal char the previous version sent).
+        await inputs[0]!.sendKeys("");
+        return true;
+      },
+      { label: "rename typed and committed" },
+    );
+  } catch (e) {
+    // Name the state the gesture left behind before rethrowing: the menu
+    // resolved (else clickNewMenuItem would have thrown instead), so a
+    // missing rename means the commit landed without its rename — a new row
+    // titled Untitled — or landed nowhere at all. Focus state decides between
+    // "the app never engaged rename" and "rename opened unfocused and blur-
+    // committed instantly", which look identical from a bare timeout.
+    const diag = await session
+      .execute<string>(
+        "var a = document.activeElement;" +
+          "var t = a && a.getAttribute ? a.getAttribute('data-testid') : null;" +
+          "var folders = [].slice.call(document.querySelectorAll('[data-testid=\"notes.folder-row\"]'))" +
+          ".map(function (e) { return (e.getAttribute('data-folder-path') || '?') + ':' + e.getAttribute('aria-expanded'); });" +
+          "return JSON.stringify({" +
+          "  hasFocus: document.hasFocus()," +
+          "  active: (a ? a.tagName : 'none') + '#' + (t || '-')," +
+          "  rows: document.querySelectorAll('[data-testid=\"notes.row\"]').length," +
+          "  folders: folders" +
+          "});",
+      )
+      .catch(() => "probe failed");
+    throw new Error(`${(e as Error).message}\n  create-state: ${diag}`);
+  }
   await session.waitForGone(testIdSelector("notes.rename-input"));
+}
+
+/** Confirm an open delete-confirm dialog with Enter (myne-md/myne#676).
+ *
+ * Two load races, both measured on the trash-empty dialog and both silent:
+ * the trap places the focus ring asynchronously after mount (pressing into an
+ * unfocused dialog is a no-op that reads as a dead surface), and a key
+ * opener's keyup can outrun the dialog's listener attach (guard 4 then eats
+ * the first press: its keydown arrives unreleased, its keyup merely arms).
+ * Wait for the ring — the dialog's own contract — press, and press once more
+ * iff the dialog is still up after a grace period: the same recovery a user
+ * performs when the first press visibly does nothing. Never presses blind
+ * twice, so a slow confirm can never eat a double.
+ */
+export async function confirmDeleteWithEnter(session: Session): Promise<void> {
+  await session.byTestId("delete-confirm.confirm");
+  await waitForDeleteRing(session);
+  await pressKey(session, KEY.ENTER);
+  try {
+    await session.waitForGone(testIdSelector("delete-confirm.confirm"), { timeoutMs: 5_000 });
+  } catch {
+    // Re-verify the ring before recovering: focus may have left between the
+    // first check and the press (remount under load drops it to body), in
+    // which case a blind second press is another no-op. If the ring is gone
+    // for good, this fails naming it.
+    await waitForDeleteRing(session);
+    await pressKey(session, KEY.ENTER);
+    await session.waitForGone(testIdSelector("delete-confirm.confirm"));
+  }
+}
+
+/** The delete-confirm focus ring: the precondition every Enter press on the
+ *  dialog needs, and the thing that distinguishes "Enter is broken" from
+ *  "Enter never had a ring to follow". */
+async function waitForDeleteRing(session: Session): Promise<void> {
+  await session.waitUntil(
+    async () => ((await activeTestId(session)) === "delete-confirm.confirm" ? true : null),
+    { label: "focus ring on delete-confirm.confirm", timeoutMs: 15_000 },
+  );
 }
 
 /** Re-open the FIRST sidebar note after a `refresh()` and wait until its editor

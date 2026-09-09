@@ -3194,8 +3194,6 @@
         "localModelMissing": "O modelo local registado nas definições já não está neste dispositivo. Não foi enviado nada para lado nenhum. Escolha novamente um modelo, ou indique um fornecedor, em Definições → Programador → IA.",
         "noCredential": "Não há nenhuma chave de API definida para este fornecedor. Adicione uma em Definições → Programador → IA.",
         "notReady": "Ainda não há nada pronto para responder. Não foi enviado nada para lado nenhum. Escolha um modelo, ou indique um fornecedor, em Definições → Programador → IA.",
-        "noEmbeddingModel": "Perguntar implica pesquisar as suas notas neste dispositivo, e para isso é preciso um modelo de pesquisa aqui. Um fornecedor não o pode fazer. Não foi enviado nada para lado nenhum. Escolha um modelo de pesquisa em Definições → Programador → IA.",
-        "indexNotReady": "As suas notas ainda estão a ser indexadas para pesquisa. Não foi enviado nada para lado nenhum. Tente novamente daqui a pouco.",
         "requestRejected": "O fornecedor não aceitou este pedido. Nada foi guardado. A falha está no que o Myne enviou, não na sua configuração nem nas suas notas.",
         "policyRefused": "O fornecedor recusou este pedido ao abrigo das suas próprias regras: uma restrição da conta, uma política do espaço de trabalho ou um modelo que o seu plano não inclui. Isto tem de ser resolvido com o fornecedor, não no Myne.",
         "quotaExhausted": "O fornecedor recusou o pedido: ficou sem crédito ou excedeu um limite de utilização. Isto tem de ser resolvido com o fornecedor, não no Myne.",

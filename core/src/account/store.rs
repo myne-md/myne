@@ -1,0 +1,938 @@
+// SPDX-License-Identifier: AGPL-3.0
+//! The account record: the device-local half of the account/vault split
+//! (`decisions.md` 2026-09-07).
+//!
+//! One sealed file per device, at `<app_config_dir>/account.json`, holding a
+//! list of accounts. Each account carries an account id, a label, and its member
+//! vault ids. It is what lets the LOCKED picker group vaults under a name before
+//! any unlock, and it is the device-local counterpart of the sealed membership
+//! field inside each member vault's `vault.meta` (§9.3.1).
+//!
+//! ## Why sealed, and why under a keychain key
+//!
+//! The record carries the account label (AS3-sensitive, the user's own text) and
+//! the grouping itself (a privacy signal: which vaults belong together). It must
+//! be readable while every vault is LOCKED, so it cannot be sealed under a
+//! `root_key`-derived KEK. It is sealed under a device-local keychain wrap key
+//! (see `key::KEYCHAIN_ACCOUNT` for the shared-service namespace partition),
+//! the `vault_label` pattern. Where the keychain is
+//! unavailable there is no record and no grouping, and vaults keep working
+//! standalone. **No path writes the record in plaintext.**
+//!
+//! ## Reconcile against discovery
+//!
+//! The disk-scan is the authority for which vaults exist (`vault_registry`). The
+//! record is reconciled against it: vaults that appeared on disk are adopted
+//! into the account, vaults that vanished are pruned, and an account left with
+//! no members is pruned entirely. A missing or corrupt record is rebuilt from the
+//! scan (one account holding every discovered vault), so a lost record is an
+//! inconvenience, never data loss.
+
+use crate::account::error::AccountError;
+use crate::account::key::{
+    existing_key, get_or_create_key, ACCOUNT_WRAP_KEY_LEN, KEYCHAIN_ACCOUNT,
+};
+use crate::io_failure_kind::IoFailureKind;
+use crate::vault_id::VaultId;
+use crate::vault_io::{VaultIo, WriteOpts};
+use crate::vault_label::hide_flag::{
+    names_hidden_at_rest, read_hide_vault_names, HIDE_FLAG_FILE_NAME,
+};
+use crate::vault_label::key::LabelKeychain;
+use crate::vault_registry::DiscoveredVault;
+use protocol::aead::{aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN};
+use std::path::{Path, PathBuf};
+
+/// The account record file's name under `<app_config_dir>`. Sibling of
+/// `vault-names.json`, `tor-routing.json` and `sync-config.json`.
+pub const ACCOUNT_FILE_NAME: &str = "account.json";
+
+/// Fixed magic at offset 0. Device-local and never synced, so it is NOT a
+/// §10.3 registry entry; it exists only so a corrupt or foreign file is
+/// detected before any decryption. Sealed at rest, which is what makes it safe
+/// inside a platform backup: a backup carries the ciphertext, never the
+/// labels or the grouping in the clear (`threat-model.md` §7 records this).
+const ACCOUNT_MAGIC: [u8; 4] = *b"MYAC";
+
+/// `protocol_version` byte at offset 4.
+const ACCOUNT_VERSION: u8 = 0x01;
+
+/// The AAD bound into the seal. A fixed domain string: the record is
+/// device-global, so there is no `VaultId` or `account_number_hash` to bind.
+const ACCOUNT_AAD: &[u8] = b"myne.v0.1 account-record";
+
+/// The account id: a random UUIDv7, distinct from the account number and from
+/// `account_number_hash`. 16 raw bytes.
+pub const ACCOUNT_ID_LEN: usize = 16;
+
+/// Maximum account label length in bytes. A label is picker chrome, not vault
+/// content: an unbounded label bloats the sealed record on every write, and it
+/// is reachable pre-unlock over IPC, so the bound is enforced at the command
+/// layer (myne-md/myne#684 review).
+pub const ACCOUNT_LABEL_MAX_LEN: usize = 512;
+
+/// One account: an account id, a label, and its member vault ids.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Account {
+    /// The account id (16 raw bytes, hex-encoded in the JSON).
+    pub account_id: [u8; ACCOUNT_ID_LEN],
+    /// The account label (the user's own text; empty means unlabelled).
+    pub label: String,
+    /// The member vault ids, in no particular order.
+    pub vaults: Vec<VaultId>,
+}
+
+/// The device-local account record as persisted: a list of accounts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountRecord {
+    /// The accounts on this device.
+    pub accounts: Vec<Account>,
+}
+
+/// What reading the record answered. See the module header for why the cases are
+/// facts rather than error flavours.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AccountRead {
+    /// No record file for this device.
+    Absent,
+    /// The record.
+    Record(AccountRecord),
+    /// A file exists but can never be decoded again. Rebuild it.
+    Unreadable,
+}
+
+/// `<app_config_dir>/account.json`.
+pub fn account_path(config_dir: &Path) -> PathBuf {
+    config_dir.join(ACCOUNT_FILE_NAME)
+}
+
+/// Serialize the record to its canonical JSON inner plaintext.
+fn serialize_record(record: &AccountRecord) -> Vec<u8> {
+    let value = serde_json::json!({
+        "version": 1,
+        "accounts": record
+            .accounts
+            .iter()
+            .map(|a| serde_json::json!({
+                "account_id": hex(a.account_id),
+                "label": a.label,
+                "vaults": a.vaults.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+            }))
+            .collect::<Vec<_>>(),
+    });
+    serde_json::to_vec(&value).unwrap_or_default()
+}
+
+/// Strict parse of the record JSON. Any structural problem yields `None`.
+fn parse_record(bytes: &[u8]) -> Option<AccountRecord> {
+    let value: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+    let obj = value.as_object()?;
+    if obj.get("version").and_then(|v| v.as_u64()) != Some(1) {
+        return None;
+    }
+    let accounts = obj
+        .get("accounts")?
+        .as_array()?
+        .iter()
+        .map(|a| {
+            let a = a.as_object()?;
+            let account_id = unhex(a.get("account_id")?.as_str()?)?;
+            let label = a.get("label")?.as_str()?.to_string();
+            let vaults = a
+                .get("vaults")?
+                .as_array()?
+                .iter()
+                .map(|v| v.as_str().and_then(|s| VaultId::parse(s).ok()))
+                .collect::<Option<Vec<_>>>()?;
+            Some(Account {
+                account_id,
+                label,
+                vaults,
+            })
+        })
+        .collect::<Option<Vec<_>>>()?;
+    Some(AccountRecord { accounts })
+}
+
+pub(crate) fn hex(bytes: [u8; ACCOUNT_ID_LEN]) -> String {
+    let mut s = String::with_capacity(ACCOUNT_ID_LEN * 2);
+    for b in bytes {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
+}
+
+fn unhex(s: &str) -> Option<[u8; ACCOUNT_ID_LEN]> {
+    if s.len() != ACCOUNT_ID_LEN * 2 {
+        return None;
+    }
+    let mut out = [0u8; ACCOUNT_ID_LEN];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
+
+/// Seal a record into the on-disk blob under the account wrap key.
+fn seal_record(
+    key: &[u8; ACCOUNT_WRAP_KEY_LEN],
+    record: &AccountRecord,
+    nonce: &[u8; AEAD_NONCE_LEN],
+) -> Result<Vec<u8>, AccountError> {
+    let plaintext = serialize_record(record);
+    let sealed =
+        aead_seal_ctx(key, nonce, &plaintext, ACCOUNT_AAD).map_err(|_| AccountError::Backend)?;
+    let mut out = Vec::with_capacity(4 + 1 + AEAD_NONCE_LEN + sealed.len());
+    out.extend_from_slice(&ACCOUNT_MAGIC);
+    out.push(ACCOUNT_VERSION);
+    out.extend_from_slice(nonce);
+    out.extend_from_slice(&sealed);
+    Ok(out)
+}
+
+/// Open a sealed blob into a record.
+fn open_record(
+    key: &[u8; ACCOUNT_WRAP_KEY_LEN],
+    blob: &[u8],
+) -> Result<AccountRecord, AccountError> {
+    if blob.len() < 4 + 1 + AEAD_NONCE_LEN + 32 {
+        return Err(AccountError::Backend);
+    }
+    if blob[0..4] != ACCOUNT_MAGIC || blob[4] != ACCOUNT_VERSION {
+        return Err(AccountError::Backend);
+    }
+    let nonce: &[u8; AEAD_NONCE_LEN] = blob[5..5 + AEAD_NONCE_LEN]
+        .try_into()
+        .map_err(|_| AccountError::Backend)?;
+    let sealed = &blob[5 + AEAD_NONCE_LEN..];
+    let plaintext =
+        aead_open_ctx(key, nonce, sealed, ACCOUNT_AAD).map_err(|_| AccountError::Backend)?;
+    parse_record(&plaintext).ok_or(AccountError::Backend)
+}
+
+/// Read the account record. The file is read FIRST, and only a present file
+/// makes this touch the keychain, so a device with no keychain and no record
+/// gets [`AccountRead::Absent`] rather than an error it would have to swallow.
+pub async fn read_account(
+    io: &dyn VaultIo,
+    config_dir: &Path,
+    keychain: &dyn LabelKeychain,
+) -> Result<AccountRead, AccountError> {
+    let path = account_path(config_dir);
+    let blob = match io.read(&path).await {
+        Ok(bytes) => bytes,
+        Err(IoFailureKind::NotFound) => return Ok(AccountRead::Absent),
+        Err(kind) => return Err(AccountError::Io(kind)),
+    };
+
+    let key = match existing_key(keychain) {
+        Ok(key) => key,
+        Err(AccountError::KeyMissing) => return Ok(AccountRead::Unreadable),
+        Err(e) => return Err(e),
+    };
+
+    match open_record(&key, &blob) {
+        Ok(record) => Ok(AccountRead::Record(record)),
+        Err(_) => Ok(AccountRead::Unreadable),
+    }
+}
+
+/// Write the account record, minting the wrap key on first use.
+pub async fn write_account(
+    io: &dyn VaultIo,
+    config_dir: &Path,
+    keychain: &dyn LabelKeychain,
+    record: &AccountRecord,
+) -> Result<(), AccountError> {
+    let key = get_or_create_key(keychain)?;
+    let mut nonce = [0u8; AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut nonce).map_err(|_| AccountError::Backend)?;
+    let blob = seal_record(&key, record, &nonce)?;
+    io.write(&account_path(config_dir), &blob, WriteOpts::default())
+        .await
+        .map_err(AccountError::Io)?;
+    tracing::info!(event = "account_record_written");
+    Ok(())
+}
+
+/// Reconcile a record against the disk-scan: adopt appearing vaults, prune
+/// vanished ones, and drop accounts left with no members.
+///
+/// Pure: reconciling never touches the disk or the keychain. Persistence is the
+/// caller's decision (`load_account` never writes; mutation paths write back
+/// explicitly), so merely listing the picker cannot regroup vaults.
+pub fn reconcile(
+    record: &AccountRecord,
+    discovered: &[DiscoveredVault],
+) -> Result<AccountRecord, AccountError> {
+    let discovered_ids: std::collections::BTreeSet<VaultId> =
+        discovered.iter().map(|d| d.id).collect();
+    // Prune vanished vaults from each account; drop accounts left empty.
+    let mut accounts: Vec<Account> = record
+        .accounts
+        .iter()
+        .map(|a| Account {
+            account_id: a.account_id,
+            label: a.label.clone(),
+            vaults: a
+                .vaults
+                .iter()
+                .copied()
+                .filter(|v| discovered_ids.contains(v))
+                .collect(),
+        })
+        .filter(|a| !a.vaults.is_empty())
+        .collect();
+
+    // Adopt appearing vaults (not already a member of any account) into the
+    // first account, or a fresh account when none survives. Membership is
+    // independent of well-formedness: a corrupted directory joins the merge
+    // and keeps its corrupted badge (PRD story 13), so migration never hides
+    // damage by stranding it standalone.
+    let member_ids: std::collections::BTreeSet<VaultId> = accounts
+        .iter()
+        .flat_map(|a| a.vaults.iter().copied())
+        .collect();
+    let appearing: Vec<VaultId> = discovered
+        .iter()
+        .filter(|d| !member_ids.contains(&d.id))
+        .map(|d| d.id)
+        .collect();
+
+    if !appearing.is_empty() {
+        if let Some(first) = accounts.first_mut() {
+            first.vaults.extend(appearing);
+        } else if let Some(account) = build_from_scan(discovered)? {
+            accounts.push(account);
+        }
+    }
+
+    Ok(AccountRecord { accounts })
+}
+
+/// Build a fresh record from the disk-scan: one account holding every
+/// discovered vault, with a freshly minted account id and no label.
+///
+/// Corrupted directories join too (PRD story 13): the record tracks
+/// membership, not health, and the picker keeps rendering the corrupted badge
+/// exactly as the vault list reports it.
+///
+/// Fallible: the fresh id mints from the OS CSPRNG, and a CSPRNG failure is an
+/// error, never a zeroed id (myne-md/myne#684 review).
+pub fn build_from_scan(discovered: &[DiscoveredVault]) -> Result<Option<Account>, AccountError> {
+    let vaults: Vec<VaultId> = discovered.iter().map(|d| d.id).collect();
+    if vaults.is_empty() {
+        return Ok(None);
+    }
+    let mut account_id = [0u8; ACCOUNT_ID_LEN];
+    getrandom::getrandom(&mut account_id).map_err(|_| AccountError::Backend)?;
+    Ok(Some(Account {
+        account_id,
+        label: String::new(),
+        vaults,
+    }))
+}
+
+/// The most recently unlocked vault id, from the registry's last-unlock stamps.
+/// `None` when no vault has ever been unlocked on this device.
+pub fn most_recent_vault(registry: &crate::vault_registry::VaultRegistry) -> Option<VaultId> {
+    registry
+        .entries
+        .iter()
+        .filter_map(|e| e.last_unlock_ms.map(|ms| (ms, e.id)))
+        .max_by_key(|(ms, _)| *ms)
+        .map(|(_, id)| id)
+}
+
+/// Resolve the account id a new (or newly-unlocked) vault should join, per the
+/// recency rule: the account owning the most recently unlocked vault, the sole
+/// account when only one exists, or a fresh account for the first vault.
+///
+/// The fresh-account fallback mints a random id; it is the first-vault case
+/// (no account yet) and the no-recency-info case (multiple accounts, none
+/// unlocked). A CSPRNG failure is an error: the caller seals this id into the
+/// vault's membership field, and a zeroed id would merge unrelated vaults
+/// under one owner with zero signal (myne-md/myne#684 review).
+pub fn account_id_for_new_vault(
+    record: &AccountRecord,
+    most_recent_vault_id: Option<VaultId>,
+) -> Result<[u8; ACCOUNT_ID_LEN], AccountError> {
+    if record.accounts.len() == 1 {
+        return Ok(record.accounts[0].account_id);
+    }
+    if let Some(most_recent) = most_recent_vault_id {
+        if let Some(account) = record
+            .accounts
+            .iter()
+            .find(|a| a.vaults.contains(&most_recent))
+        {
+            return Ok(account.account_id);
+        }
+    }
+    let mut id = [0u8; ACCOUNT_ID_LEN];
+    getrandom::getrandom(&mut id).map_err(|_| AccountError::Backend)?;
+    Ok(id)
+}
+
+/// A loaded record plus where it came from. The provenance decides what the
+/// caller may do next: persisting a fresh build is first-write creation,
+/// persisting over undecryptable bytes is evidence destruction, and treating
+/// an in-memory member as persisted strands the sealed field.
+pub struct LoadedAccount {
+    /// The record: read from disk, or rebuilt in memory from the scan.
+    pub record: AccountRecord,
+    /// Whether the record may be persisted, and whether its memberships are.
+    pub kind: LoadKind,
+}
+
+/// Provenance of a [`LoadedAccount`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoadKind {
+    /// Read from `account.json` (reconciled in memory). Memberships are
+    /// persisted; mutations may write back.
+    Stored,
+    /// Built in memory: no source file (or no vaults at all). The first
+    /// persist is creation, never an overwrite.
+    Fresh,
+    /// Rebuilt in memory over undecryptable bytes. Must never persist: a
+    /// restored key could still open the source.
+    Unreadable,
+}
+
+impl LoadedAccount {
+    /// Whether the record may be written back. False exactly for
+    /// `Unreadable`.
+    pub fn writable(&self) -> bool {
+        !matches!(self.kind, LoadKind::Unreadable)
+    }
+}
+
+/// Load the account record, reconciling against the disk-scan and rebuilding
+/// from it when the file is missing or corrupt.
+///
+/// READ-ONLY by construction: reconciling, rebuilding, and pruning all happen
+/// in memory and nothing here writes. Merely listing the picker must not
+/// regroup vaults, so persistence belongs to the mutation paths
+/// (`rename/move/split`, [`ensure_vault_membership`]), which write back
+/// explicitly and propagate the failure. In particular an `Unreadable` source
+/// (key destroyed, or a record restored onto a device that never held it) is
+/// never overwritten: the undecryptable bytes stay on disk and the caller gets
+/// the in-memory rebuild, so keychain loss costs the labels but cannot also
+/// destroy the evidence.
+///
+/// Returns an empty record when there is no account (no vaults, or the keychain
+/// is unavailable), which is the standalone state, never an error.
+pub async fn load_account(
+    io: &dyn VaultIo,
+    config_dir: &Path,
+    base: &Path,
+    keychain: &dyn LabelKeychain,
+) -> Result<AccountRecord, AccountError> {
+    load_account_tracked(io, config_dir, base, keychain)
+        .await
+        .map(|loaded| loaded.record)
+}
+
+/// [`load_account`], plus the provenance that decides what the caller may do
+/// next. Mutations refuse the write-back on `Unreadable` (see
+/// `AccountError::RecordUnreadable`) instead of converting keychain loss into
+/// evidence destruction; `ensure_vault_membership` additionally persists a
+/// fresh in-memory membership, so the sealed field and the record derive from
+/// one write.
+pub async fn load_account_tracked(
+    io: &dyn VaultIo,
+    config_dir: &Path,
+    base: &Path,
+    keychain: &dyn LabelKeychain,
+) -> Result<LoadedAccount, AccountError> {
+    let discovered = crate::vault_registry::discover_vaults(base);
+    if discovered.is_empty() {
+        return Ok(LoadedAccount {
+            record: AccountRecord { accounts: vec![] },
+            kind: LoadKind::Fresh,
+        });
+    }
+
+    match read_account(io, config_dir, keychain).await {
+        Ok(AccountRead::Record(record)) => Ok(LoadedAccount {
+            record: reconcile(&record, &discovered)?,
+            kind: LoadKind::Stored,
+        }),
+        Ok(AccountRead::Absent) => {
+            // A device with no keychain cannot seal a record, so there is no
+            // grouping: return the standalone state rather than a record that
+            // was never persisted. `KeyMissing` (no key yet, keychain present)
+            // is the normal first-run case and must NOT short-circuit.
+            if matches!(
+                existing_key(keychain),
+                Err(AccountError::KeychainUnavailable)
+            ) {
+                return Ok(LoadedAccount {
+                    record: AccountRecord { accounts: vec![] },
+                    kind: LoadKind::Fresh,
+                });
+            }
+            match build_from_scan(&discovered)? {
+                Some(account) => Ok(LoadedAccount {
+                    record: AccountRecord {
+                        accounts: vec![account],
+                    },
+                    kind: LoadKind::Fresh,
+                }),
+                None => Ok(LoadedAccount {
+                    record: AccountRecord { accounts: vec![] },
+                    kind: LoadKind::Fresh,
+                }),
+            }
+        }
+        // Unreadable: the rebuild is in-memory ONLY. The bytes stay.
+        Ok(AccountRead::Unreadable) => {
+            if matches!(
+                existing_key(keychain),
+                Err(AccountError::KeychainUnavailable)
+            ) {
+                return Ok(LoadedAccount {
+                    record: AccountRecord { accounts: vec![] },
+                    kind: LoadKind::Fresh,
+                });
+            }
+            match build_from_scan(&discovered)? {
+                Some(account) => Ok(LoadedAccount {
+                    record: AccountRecord {
+                        accounts: vec![account],
+                    },
+                    kind: LoadKind::Unreadable,
+                }),
+                None => Ok(LoadedAccount {
+                    record: AccountRecord { accounts: vec![] },
+                    kind: LoadKind::Unreadable,
+                }),
+            }
+        }
+        Err(AccountError::KeychainUnavailable) => Ok(LoadedAccount {
+            record: AccountRecord { accounts: vec![] },
+            kind: LoadKind::Fresh,
+        }),
+        Err(e) => Err(e),
+    }
+}
+
+/// Whether the hide-vault-names option is on for this device. The one
+/// implementation the command layer reuses (`commands` calls this): list,
+/// mutation, and adoption reduce through the same fail-closed rule (a damaged
+/// flag file reads as hidden) and cannot disagree about it.
+pub(crate) async fn hide_names_on(io: &dyn VaultIo, config_dir: &Path) -> bool {
+    let outcome = read_hide_vault_names(io, &config_dir.join(HIDE_FLAG_FILE_NAME)).await;
+    names_hidden_at_rest(outcome)
+}
+
+/// Delete the device-local account record: remove `account.json` (a missing
+/// file is a successful delete) and destroy its keychain wrap key.
+///
+/// The working half of the hide-vault-names option alongside
+/// `vault_label::erase_all_labels`: enabling hide must destroy the account
+/// labels with the same cryptographic-erase semantics as the vault names, or
+/// the lock screen keeps naming accounts while claiming names are hidden
+/// (myne-md/myne#684 review). Idempotent.
+pub async fn delete_account_record(
+    io: &dyn VaultIo,
+    config_dir: &Path,
+    keychain: &dyn LabelKeychain,
+) -> Result<(), AccountError> {
+    match io.remove_file(&account_path(config_dir)).await {
+        Ok(()) => {}
+        Err(IoFailureKind::NotFound) => {}
+        Err(kind) => return Err(AccountError::Io(kind)),
+    }
+    // No keychain means no record could ever have been sealed: absence of the
+    // facility is absence of the artefact, so this is a successful no-op
+    // rather than an erase failure (keychain-less devices must still be able
+    // to enable hide-vault-names for the vault-name half).
+    match keychain.delete(KEYCHAIN_ACCOUNT) {
+        Ok(()) => Ok(()),
+        Err(crate::vault_label::error::VaultLabelError::KeychainUnavailable) => Ok(()),
+        Err(e) => Err(AccountError::from(e)),
+    }
+}
+
+/// Resolve the account id a vault should join, and ensure the record lists the
+/// vault as a member of that account. The recency rule: the account owning the
+/// most recently unlocked vault, the sole account when only one exists, or a
+/// fresh account for the first vault.
+///
+/// Returns the account id to seal into the vault's membership field. The record
+/// is written back when it changed (a fresh account was minted, or the vault was
+/// adopted into an existing account), and a write-back failure is an error:
+/// the caller must not report grouping it never persisted.
+pub async fn ensure_vault_membership(
+    io: &dyn VaultIo,
+    config_dir: &Path,
+    base: &Path,
+    keychain: &dyn LabelKeychain,
+    vault_id: VaultId,
+) -> Result<[u8; ACCOUNT_ID_LEN], AccountError> {
+    // Hide-vault-names suppresses grouping entirely: adopting (which mints a
+    // key and writes the record) while hidden would silently undo the erase
+    // the user just asked for, with the resurrection invisible until unhide.
+    // Both callers treat any error as skip-the-stamp, so refusal degrades to
+    // no grouping rather than breaking unlock or creation.
+    if hide_names_on(io, config_dir).await {
+        return Err(AccountError::Hidden);
+    }
+    let mut loaded = load_account_tracked(io, config_dir, base, keychain).await?;
+    let registry = crate::vault_registry::load_or_rebuild_registry(base);
+    let most_recent = most_recent_vault(&registry);
+
+    // A vault already a member of a STORED record returns its account id
+    // unchanged. But membership of a merely in-memory build was never
+    // persisted: returning it would strand the sealed field against a record
+    // that names another account on its next rebuild, so a Fresh member is
+    // persisted below like an adoption. An Unreadable member refuses: the
+    // bytes cannot be written back without destroying them.
+    if let Some(account_id) = loaded
+        .record
+        .accounts
+        .iter()
+        .find(|a| a.vaults.contains(&vault_id))
+        .map(|a| a.account_id)
+    {
+        match loaded.kind {
+            LoadKind::Stored => return Ok(account_id),
+            LoadKind::Fresh => {
+                write_account(io, config_dir, keychain, &loaded.record).await?;
+                return Ok(account_id);
+            }
+            LoadKind::Unreadable => return Err(AccountError::RecordUnreadable),
+        }
+    }
+
+    // Adoption persists, so an undecryptable source refuses rather than
+    // overwriting: the unlock proceeds without grouping (the caller treats
+    // any error as skip-the-stamp), and the bytes survive for a restored key.
+    if !loaded.writable() {
+        return Err(AccountError::RecordUnreadable);
+    }
+    let record = &mut loaded.record;
+
+    let account_id = account_id_for_new_vault(record, most_recent)?;
+
+    // Adopt the vault into the account carrying that id, or mint a fresh account.
+    if let Some(account) = record
+        .accounts
+        .iter_mut()
+        .find(|a| a.account_id == account_id)
+    {
+        account.vaults.push(vault_id);
+    } else {
+        record.accounts.push(Account {
+            account_id,
+            label: String::new(),
+            vaults: vec![vault_id],
+        });
+    }
+
+    write_account(io, config_dir, keychain, &*record).await?;
+    Ok(account_id)
+}
+
+/// Stamp the sealed membership field into a `vault.meta` blob, when absent.
+///
+/// Returns the new blob (417 bytes) when the field was stamped, or the original
+/// bytes unchanged when the field was already present, the vault is not v0.2
+/// (`NTV5`), or any step failed. Best-effort by design: the caller never gates
+/// or delays the unlock on this, and a failure degrades to retry-next-unlock.
+pub fn stamp_membership_field(
+    root_key: &[u8; AEAD_KEY_LEN],
+    account_id: &[u8; ACCOUNT_ID_LEN],
+    account_number_hash: &[u8; 16],
+    meta_bytes: &[u8],
+) -> Vec<u8> {
+    let Ok(meta) = protocol::parse_vault_meta_any(meta_bytes) else {
+        return meta_bytes.to_vec();
+    };
+    if meta.membership.is_some() {
+        return meta_bytes.to_vec();
+    }
+    // The field is NTV5-only; a MYV1 vault groups via the record alone.
+    if protocol::meta_version_of(meta_bytes) != Some(protocol::MetaVersion::V0_2) {
+        return meta_bytes.to_vec();
+    }
+    let mut nonce = [0u8; AEAD_NONCE_LEN];
+    if getrandom::getrandom(&mut nonce).is_err() {
+        return meta_bytes.to_vec();
+    }
+    let Ok(membership) =
+        protocol::seal_membership_raw(root_key, account_id, account_number_hash, &nonce)
+    else {
+        return meta_bytes.to_vec();
+    };
+    let mut stamped = meta;
+    stamped.membership = Some(membership);
+    protocol::serialize_vault_meta_v0_2(&stamped)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::{block_on, ScopedTempDir};
+    use crate::vault_io::StdVaultIo;
+    use crate::vault_label::fake_keychain::FakeKeychain;
+
+    fn account() -> Account {
+        Account {
+            account_id: [0xAB; ACCOUNT_ID_LEN],
+            label: "Work".to_string(),
+            vaults: vec![VaultId::mint(), VaultId::mint()],
+        }
+    }
+
+    fn record() -> AccountRecord {
+        AccountRecord {
+            accounts: vec![account()],
+        }
+    }
+
+    #[test]
+    fn seal_open_round_trips() {
+        let key = [0x11; ACCOUNT_WRAP_KEY_LEN];
+        let nonce = [0x22; AEAD_NONCE_LEN];
+        let r = record();
+        let blob = seal_record(&key, &r, &nonce).expect("seal");
+        let opened = open_record(&key, &blob).expect("open");
+        assert_eq!(opened, r);
+    }
+
+    #[test]
+    fn the_sealed_blob_carries_no_label_substring() {
+        let key = [0x11; ACCOUNT_WRAP_KEY_LEN];
+        let nonce = [0x22; AEAD_NONCE_LEN];
+        let r = record();
+        let blob = seal_record(&key, &r, &nonce).expect("seal");
+        assert_eq!(&blob[0..4], b"MYAC");
+        assert!(
+            !blob.windows(4).any(|w| w == b"Work"),
+            "the plaintext label must not appear anywhere in the file"
+        );
+    }
+
+    #[test]
+    fn a_tampered_blob_fails_closed() {
+        let key = [0x11; ACCOUNT_WRAP_KEY_LEN];
+        let nonce = [0x22; AEAD_NONCE_LEN];
+        let mut blob = seal_record(&key, &record(), &nonce).expect("seal");
+        let last = blob.len() - 1;
+        blob[last] ^= 0xff;
+        assert!(open_record(&key, &blob).is_err());
+    }
+
+    #[test]
+    fn reconcile_adopts_and_prunes() {
+        let a = VaultId::mint();
+        let b = VaultId::mint();
+        let c = VaultId::mint();
+        let r = AccountRecord {
+            accounts: vec![Account {
+                account_id: [0xAB; ACCOUNT_ID_LEN],
+                label: "Work".to_string(),
+                vaults: vec![a, b],
+            }],
+        };
+        let discovered = vec![
+            DiscoveredVault {
+                id: a,
+                root: PathBuf::new(),
+                well_formed: true,
+            },
+            DiscoveredVault {
+                id: c,
+                root: PathBuf::new(),
+                well_formed: true,
+            },
+        ];
+        let reconciled = reconcile(&r, &discovered).expect("reconcile");
+        assert_eq!(reconciled.accounts.len(), 1);
+        assert_eq!(reconciled.accounts[0].vaults, vec![a, c]);
+    }
+
+    #[test]
+    fn reconcile_prunes_an_empty_account() {
+        let a = VaultId::mint();
+        let r = AccountRecord {
+            accounts: vec![Account {
+                account_id: [0xAB; ACCOUNT_ID_LEN],
+                label: "Work".to_string(),
+                vaults: vec![a],
+            }],
+        };
+        let reconciled = reconcile(&r, &[]).expect("reconcile");
+        assert!(reconciled.accounts.is_empty());
+    }
+
+    #[test]
+    fn build_from_scan_includes_corrupted_dirs() {
+        // PRD story 13: a corrupted directory joins the merge and keeps its
+        // badge; migration must not hide damage by stranding it standalone.
+        let a = VaultId::mint();
+        let b = VaultId::mint();
+        let discovered = vec![
+            DiscoveredVault {
+                id: a,
+                root: PathBuf::new(),
+                well_formed: true,
+            },
+            DiscoveredVault {
+                id: b,
+                root: PathBuf::new(),
+                well_formed: false,
+            },
+        ];
+        let account = build_from_scan(&discovered)
+            .expect("csprng")
+            .expect("a vault is a vault");
+        assert_eq!(account.vaults, vec![a, b]);
+    }
+
+    #[test]
+    fn build_from_scan_is_none_when_no_vaults_discovered() {
+        assert_eq!(build_from_scan(&[]).expect("csprng"), None);
+    }
+
+    #[test]
+    fn an_unavailable_keychain_writes_nothing() {
+        let dir = ScopedTempDir::new("account-none").expect("scratch");
+        let keychain = FakeKeychain::unavailable();
+        block_on(async {
+            assert_eq!(
+                write_account(&StdVaultIo, dir.path(), &keychain, &record()).await,
+                Err(AccountError::KeychainUnavailable)
+            );
+        });
+        assert!(!account_path(dir.path()).exists());
+    }
+
+    #[test]
+    fn account_id_for_new_vault_prefers_the_sole_account() {
+        let a = VaultId::mint();
+        let r = AccountRecord {
+            accounts: vec![Account {
+                account_id: [0xAB; ACCOUNT_ID_LEN],
+                label: String::new(),
+                vaults: vec![a],
+            }],
+        };
+        // Sole account wins even with no recency info.
+        assert_eq!(
+            account_id_for_new_vault(&r, None).expect("recency"),
+            [0xAB; ACCOUNT_ID_LEN]
+        );
+    }
+
+    #[test]
+    fn account_id_for_new_vault_prefers_the_most_recent_vaults_account() {
+        let a = VaultId::mint();
+        let b = VaultId::mint();
+        let r = AccountRecord {
+            accounts: vec![
+                Account {
+                    account_id: [0x01; ACCOUNT_ID_LEN],
+                    label: String::new(),
+                    vaults: vec![a],
+                },
+                Account {
+                    account_id: [0x02; ACCOUNT_ID_LEN],
+                    label: String::new(),
+                    vaults: vec![b],
+                },
+            ],
+        };
+        // b is the most recently unlocked vault, so its account wins.
+        assert_eq!(
+            account_id_for_new_vault(&r, Some(b)).expect("recency"),
+            [0x02; ACCOUNT_ID_LEN]
+        );
+    }
+
+    #[test]
+    fn account_id_for_new_vault_mints_a_fresh_id_when_no_account_matches() {
+        let a = VaultId::mint();
+        let b = VaultId::mint();
+        let r = AccountRecord {
+            accounts: vec![
+                Account {
+                    account_id: [0x01; ACCOUNT_ID_LEN],
+                    label: String::new(),
+                    vaults: vec![a],
+                },
+                Account {
+                    account_id: [0x02; ACCOUNT_ID_LEN],
+                    label: String::new(),
+                    vaults: vec![b],
+                },
+            ],
+        };
+        // A most-recent vault that belongs to no account → fresh id.
+        let fresh = account_id_for_new_vault(&r, Some(VaultId::mint())).expect("recency");
+        assert_ne!(fresh, [0x01; ACCOUNT_ID_LEN]);
+        assert_ne!(fresh, [0x02; ACCOUNT_ID_LEN]);
+    }
+
+    #[test]
+    fn stamp_membership_field_is_a_noop_when_already_present() {
+        // Build a real NTV5 meta with a membership field, then confirm stamping
+        // returns the bytes unchanged.
+        let root = [0x11; AEAD_KEY_LEN];
+        let account_id = [0xAB; ACCOUNT_ID_LEN];
+        let hash = [0x44; 16];
+        let nonce = [0xCD; AEAD_NONCE_LEN];
+        let membership =
+            protocol::seal_membership_raw(&root, &account_id, &hash, &nonce).expect("seal");
+        // Build a base NTV5 meta via the v0.2 encoder.
+        let base = protocol::VaultMeta {
+            account_number_hash: hash,
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [0x01; 16],
+            random_salt_recovery: [0x02; 16],
+            nonce_password_wrap: [0x03; 24],
+            enc_root_key_password: [0x04; 64],
+            nonce_recovery_wrap: [0x05; 24],
+            enc_root_key_recovery: [0x06; 64],
+            items_key_id: [0x07; 16],
+            items_key_nonce: [0x08; 24],
+            enc_items_key: [0x09; 64],
+            membership: Some(membership),
+        };
+        let bytes = protocol::serialize_vault_meta_v0_2(&base);
+        let stamped = stamp_membership_field(&root, &account_id, &hash, &bytes);
+        assert_eq!(stamped, bytes, "already-present field must be a no-op");
+    }
+
+    #[test]
+    fn stamp_membership_field_stamps_an_absent_field() {
+        let root = [0x11; AEAD_KEY_LEN];
+        let account_id = [0xAB; ACCOUNT_ID_LEN];
+        let hash = [0x44; 16];
+        let base = protocol::VaultMeta {
+            account_number_hash: hash,
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [0x01; 16],
+            random_salt_recovery: [0x02; 16],
+            nonce_password_wrap: [0x03; 24],
+            enc_root_key_password: [0x04; 64],
+            nonce_recovery_wrap: [0x05; 24],
+            enc_root_key_recovery: [0x06; 64],
+            items_key_id: [0x07; 16],
+            items_key_nonce: [0x08; 24],
+            enc_items_key: [0x09; 64],
+            membership: None,
+        };
+        let bytes = protocol::serialize_vault_meta_v0_2(&base);
+        let stamped = stamp_membership_field(&root, &account_id, &hash, &bytes);
+        assert_eq!(stamped.len(), protocol::VAULT_META_V0_2_WITH_MEMBERSHIP_LEN);
+        let parsed = protocol::parse_vault_meta_v0_2(&stamped).expect("parse");
+        let m = parsed.membership.expect("membership present");
+        assert_eq!(
+            *protocol::unseal_membership(&root, &m, &hash).expect("unseal"),
+            account_id
+        );
+    }
+}

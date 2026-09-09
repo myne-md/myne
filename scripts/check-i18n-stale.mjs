@@ -55,10 +55,10 @@
 // Exit code is 0 even with hits: this is an advisory audit, not a gate. A gate
 // would have to block every English copy edit, which is the wrong trade.
 
-import { execFileSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runTool } from "./lib/run-tool.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EN = "locales/en/common.json";
@@ -67,7 +67,12 @@ const argv = process.argv.slice(2);
 const asJson = argv.includes("--json");
 const only = argv.reduce((acc, a, i) => (a === "--locale" ? [...acc, argv[i + 1]] : acc), []);
 
-const git = (...a) => execFileSync("git", a, { cwd: REPO, maxBuffer: 1 << 28 }).toString();
+// FATAL shell-out (myne#528): a `git` that cannot run must fail this script
+// loudly, not walk a zero-revision history and report "nothing stale". The
+// bare catch below is NOT this — it covers the JSON/`git show` of ONE revision
+// and tolerates only the absent-or-unparsable file, with the reason stated.
+const git = (...a) =>
+  runTool(["git", ...a], { cwd: REPO, onToolFailure: "fatal", maxBuffer: 1 << 28 }).stdout;
 
 function flat(obj, prefix = "", out = {}) {
   for (const [k, v] of Object.entries(obj)) {

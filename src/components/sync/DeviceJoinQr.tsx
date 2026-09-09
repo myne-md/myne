@@ -79,14 +79,22 @@ const QR_WRAP: CSSProperties = {
   alignItems: "center",
   gap: "var(--space-1)",
   padding: "var(--space-3)",
-  background: "var(--bg-2)",
+  // Paper-toned so the QR's own #fbfbfa quiet zone blends into the card with no
+  // visible edge in light theme; the border delineates the card from the panel. In
+  // dark theme --paper re-points dark, so the card is dark and the literal-light QR
+  // shows as a light code on a dark card; the SVG carries its own #fbfbfa quiet zone
+  // around the modules, so it stays scannable either way.
+  background: "var(--paper)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-1)",
 };
 
-// The rendered SVG is self-contained black-on-white (high-contrast, theme-agnostic
-// — a QR must not be tinted), so a fixed square is all the wrapper needs.
-const QR_IMG: CSSProperties = { width: 200, height: 200 };
+// The rendered SVG is self-contained and literal-coloured (theme-agnostic, never
+// tinted) with the Myne mark in a centre knockout. Sized so the largest realistic
+// payload (self-host URL + 64-hex pin, up to ~85 modules incl. quiet zone) clears the
+// ~4 px/module a phone camera needs off a screen: 340 / 85 = 4.0. Smaller payloads
+// render larger than needed, which never hurts scanning.
+const QR_IMG: CSSProperties = { width: 340, height: 340 };
 
 const SCAN_LABEL: CSSProperties = {
   fontSize: "var(--text-xs)",

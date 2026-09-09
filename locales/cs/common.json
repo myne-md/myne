@@ -3299,8 +3299,6 @@
         "localModelMissing": "Místní model uvedený v nastavení už na tomto zařízení není. Nikam se nic neodeslalo. V Nastavení → Developer → AI znovu vyberte model nebo zadejte poskytovatele.",
         "noCredential": "Pro tohoto poskytovatele není nastaven žádný klíč API. Přidejte ho v Nastavení → Developer → AI.",
         "notReady": "Zatím není nic připravené odpovídat. Nikam se nic neodeslalo. V Nastavení → Developer → AI vyberte model nebo zadejte poskytovatele.",
-        "noEmbeddingModel": "Dotaz prohledává vaše poznámky na tomto zařízení a k tomu je zde potřeba vyhledávací model. Poskytovatel to udělat nemůže. Nikam se nic neodeslalo. Vyberte vyhledávací model v Nastavení → Developer → AI.",
-        "indexNotReady": "Vaše poznámky se stále indexují pro vyhledávání. Nikam se nic neodeslalo. Zkuste to za chvíli znovu.",
         "requestRejected": "Poskytovatel tento požadavek nepřijal. Nic se neuložilo. Chyba je v tom, co odeslal Myne, ne ve vašem nastavení ani ve vašich poznámkách.",
         "policyRefused": "Poskytovatel tento požadavek odmítl podle vlastních pravidel: pojistka účtu, zásada pracovního prostoru nebo model, který váš tarif nezahrnuje. Řešit se to musí u poskytovatele, ne v Myne.",
         "quotaExhausted": "Poskytovatel požadavek odmítl: došel vám kredit nebo jste překročili limit požadavků. Vyřešit se to musí u poskytovatele, ne v Myne.",

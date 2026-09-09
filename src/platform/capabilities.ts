@@ -297,7 +297,23 @@ export type Capability =
    * block governs is where this device's sync traffic goes, and the arti
    * process is an implementation detail of the desktop answer to it.
    */
-  | "torRouting";
+  | "torRouting"
+  /**
+   * Grouping vaults under an account (the account/vault split, myne-md/myne#684).
+   *
+   * **Absent on web, and not as a port that is owed.** A browser holds exactly
+   * one vault per origin and has no OS keychain, so there is no grouping to
+   * render and nowhere to keep the wrap key whose seal is the account record.
+   * The picker grouping UI is omitted rather than rendered against commands
+   * that reject.
+   */
+  | "accountGrouping"
+  /**
+   * Desktop pop-out: open a note in its own OS-level window (second monitor;
+   * myne-md/myne#173). Host-spawned `WebviewWindow`; web (single-tab OPFS) and
+   * mobile cannot spawn OS windows, so the affordance is absent there.
+   */
+  | "detachedWindows";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -343,6 +359,8 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   cliAccess: true,
   lockedVaultNames: true,
   torRouting: true,
+  accountGrouping: true,
+  detachedWindows: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */

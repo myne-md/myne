@@ -3069,8 +3069,6 @@
         "localModelMissing": "Modeli ya ndani iliyorekodiwa kwenye mipangilio haipo tena kwenye kifaa hiki. Hakuna kilichotumwa popote. Chagua modeli tena, au mtaje mtoa huduma, katika Mipangilio → Msanidi → AI.",
         "noCredential": "Hakuna ufunguo wa API uliowekwa kwa mtoa huduma huyu. Ongeza mmoja katika Mipangilio → Msanidi → AI.",
         "notReady": "Hakuna kilicho tayari kujibu bado. Hakuna kilichotumwa popote. Chagua modeli, au mtaje mtoa huduma, katika Mipangilio → Msanidi → AI.",
-        "noEmbeddingModel": "Kuuliza hutafuta madokezo yako kwenye kifaa hiki, na hilo linahitaji modeli ya utafutaji hapa. Mtoa huduma hawezi kufanya hivyo. Hakuna kilichotumwa popote. Chagua modeli ya utafutaji katika Mipangilio → Msanidi → AI.",
-        "indexNotReady": "Madokezo yako bado yanafahirisiwa kwa ajili ya utafutaji. Hakuna kilichotumwa popote. Jaribu tena baada ya muda mfupi.",
         "requestRejected": "Mtoa huduma hakukubali ombi hili. Hakuna kilichohifadhiwa. Hii ni kasoro katika kile Myne ilichotuma, si katika mipangilio yako wala madokezo yako.",
         "policyRefused": "Mtoa huduma amekataa ombi hili kwa kanuni zake mwenyewe: kizuizi cha akaunti, sera ya eneo la kazi, au modeli ambayo mpango wako hauna. Hili linapaswa kutatuliwa kwa mtoa huduma, si ndani ya Myne.",
         "quotaExhausted": "Mtoa huduma amekataa ombi: salio lako limeisha au umevuka kikomo cha matumizi. Hili linapaswa kutatuliwa kwa mtoa huduma, si ndani ya Myne.",

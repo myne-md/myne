@@ -461,6 +461,11 @@ const newNoteAction = notesAction(
 const duplicateNoteAction = notesAction("note.duplicate", "commands.actions.duplicateNote.label", (c) =>
   c.onDuplicateNote(),
 );
+const openInNewWindowAction = notesAction(
+  "note.open-in-new-window",
+  "commands.actions.openInNewWindow.label",
+  (c) => c.onOpenInNewWindow(),
+);
 const archiveNoteAction: CommandAction = {
   id: "note.archive",
   get label() {
@@ -1395,6 +1400,10 @@ const ACTION_CAPABILITY: Readonly<Record<string, capabilities.Capability>> = Obj
   // here — their obstacle was where the file goes, and the browser download flow
   // answers that (`src/platform/download.ts`), so they stay reachable.
   "note.export-pdf": "pdfExport",
+  // myne#678 (epic #173): pop a note into its own OS window. Desktop-only; web
+  // and mobile cannot spawn OS windows, so the action is filtered out there and
+  // is unreachable by menu AND by shortcut, per the gate-once discipline above.
+  "note.open-in-new-window": "detachedWindows",
   // `note.export-selection-image` is NOT gated: it renders to a canvas and
   // hands the bytes to a download, which a browser does natively. It is task
   // 48's shape, not `nativeSaveAs`.
@@ -1507,6 +1516,7 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   findReplaceAction,
   newNoteAction,
   duplicateNoteAction,
+  openInNewWindowAction,
   archiveNoteAction,
   renameNoteAction,
   trashNoteAction,
