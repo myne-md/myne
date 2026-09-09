@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Differential test: the app's export path and the CLI's export path are the
 //! SAME walk (`myne_format::export_walk`), so the only divergence is the mode
-//! parameters. This test runs the walk twice over one fixture — once with the
+//! parameters. This test runs the walk twice over one fixture. Once with the
 //! app's parameters (`TrashedMode::Exclude`, `best_effort: false`) and once with
-//! the CLI's (`TrashedMode::Trash`, `best_effort: true`) — and asserts the
+//! the CLI's (`TrashedMode::Trash`, `best_effort: true`), which asserts the
 //! non-trashed, non-failed notes are byte-identical between the two runs.
 //!
 //! Crypto primitive choice is not under test (RustCrypto is trusted); this

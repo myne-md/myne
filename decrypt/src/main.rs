@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! `myne-decrypt` — export a Myne vault to plain markdown without the app
+//! `myne-decrypt`: export a Myne vault to plain markdown without the app
 //! installed (myne-md/myne#166).
 //!
 //! The escape hatch behind the no-lock-in commitment (`vision.md`): "plain
@@ -193,7 +193,13 @@ struct TempDirGuard(std::path::PathBuf);
 
 impl Drop for TempDirGuard {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        if let Err(e) = std::fs::remove_dir_all(&self.0) {
+            eprintln!(
+                "myne-decrypt: warning: temp dir cleanup failed ({}): {}",
+                self.0.to_string_lossy(),
+                e
+            );
+        }
     }
 }
 
