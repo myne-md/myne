@@ -38,8 +38,11 @@ OPTIONS:
 
 The master password (or recovery phrase) is read from the terminal with echo
 off, or piped on stdin for scripting. There is no --password flag and no
-MYNE_PASSWORD environment variable, so the credential never lands in your
-shell history or in a process listing.
+MYNE_PASSWORD environment variable, so the credential never appears in a
+process listing and interactive entry never lands in shell history. A piped
+credential inherits the pipe's own exposure: `echo SECRET |` puts the secret
+in the invoking shell's history and in the echo process argv. Prefer a
+file-descriptor redirect or a file only the owner can read.
 
 The source of this tool is not yet public, so the binary cannot be
 independently verified. It exports your vault to plain markdown without the
@@ -179,7 +182,7 @@ fn main() -> ExitCode {
     );
     if summary.failed > 0 {
         eprintln!(
-            "myne-decrypt: {} note(s) could not be decrypted; see _undecodable/ and _FAILED.txt",
+            "myne-decrypt: {} item(s) could not be decrypted; see _undecodable/ and _FAILED.txt",
             summary.failed
         );
         return ExitCode::FAILURE;
@@ -222,10 +225,24 @@ fn materialize_source(
     // A randomized, create-new temp dir: a predictable pid-based name is a
     // symlink-clobber target, and `create_dir_all` would happily write through
     // a pre-planted symlink. `create_dir` (create-new) fails on an existing
-    // path, and the UUID suffix makes the name unguessable.
+    // path, and the UUID suffix makes the name unguessable. Owner-only
+    // permissions: the members include vault.meta, the complete offline
+    // password-cracking target, so sibling local accounts must not read it.
     let temp =
         std::env::temp_dir().join(format!("myne-decrypt-container-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir(&temp).map_err(|e| format!("could not create temp dir: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(false)
+            .mode(0o700)
+            .create(&temp)
+            .map_err(|e| format!("could not create temp dir: {e}"))?;
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir(&temp).map_err(|e| format!("could not create temp dir: {e}"))?;
+    }
     if let Err(e) = myne_format::backup_container::with_container_file(source, |reader| {
         myne_format::backup_container::extract_all_members(reader, &records, &temp)
     }) {

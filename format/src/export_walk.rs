@@ -51,9 +51,9 @@ pub struct VaultExportSummary {
     pub folders: u32,
     pub excluded_trashed: u32,
     pub excluded_snapshots: u32,
-    /// Notes that could not be decoded, preserved under `_undecodable/` and
-    /// named in `_FAILED.txt`. Zero on the app's all-or-nothing path; non-zero
-    /// only when the CLI runs best-effort.
+    /// Notes and snapshots that could not be decoded, preserved under
+    /// `_undecodable/` and named in `_FAILED.txt`. Zero on the app's
+    /// all-or-nothing path; non-zero only when the CLI runs best-effort.
     pub failed: u32,
     /// Notes written into `_trash/` (the CLI's `trashed:` mode). Zero on the
     /// app's exclude-and-count path.
@@ -265,8 +265,11 @@ fn stage_export_tree_inner(
     // `<note_uuid>__<snapshot_uuid>.myn`; it decodes through the same
     // `decode_note_any` dispatcher as a live note.
     let mut snapshots_written: u32 = 0;
+    let mut snapshot_failed: Vec<String> = Vec::new();
     if params.history {
-        snapshots_written = export_snapshots(vault_dir, staging, params, hooks)?;
+        let (written, failed_names) = export_snapshots(vault_dir, staging, params, hooks)?;
+        snapshots_written = written;
+        snapshot_failed = failed_names;
     }
 
     let account_number_hash = match read_account_number_hash_blocking(vault_dir) {
@@ -299,6 +302,10 @@ fn stage_export_tree_inner(
     let mut trashed_written: u32 = 0;
     let mut failed: u32 = 0;
     let mut failed_names: Vec<String> = Vec::new();
+    // Snapshots ran before the notes loop: fold their best-effort failures
+    // into the same manifest and count, so missing history is never silent.
+    failed += snapshot_failed.len() as u32;
+    failed_names.extend(snapshot_failed);
 
     let total = ids.len() as u32;
     for (i, id) in ids.iter().enumerate() {
@@ -474,10 +481,11 @@ fn stage_export_tree_inner(
         hooks.tick(done, total, "notes");
     }
 
-    // The best-effort manifest: name every note that could not be decoded.
+    // The best-effort manifest: name every note and snapshot that could not
+    // be decoded.
     if !failed_names.is_empty() {
         let mut manifest = String::from(
-            "The following notes could not be decrypted and were preserved under _undecodable/:\n",
+            "The following notes and snapshots could not be decrypted and were preserved under _undecodable/:\n",
         );
         for name in &failed_names {
             manifest.push_str(name);
@@ -746,17 +754,19 @@ fn count_snapshot_files(snapshots_dir: &Path) -> Result<u32, VaultExportError> {
 /// Export every snapshot in `snapshots/` into `staging/snapshots/`, preserving
 /// the `<note_uuid>__<snapshot_uuid>.myn` filename. Each snapshot decodes
 /// through the same `decode_note_any` dispatcher as a live note. Returns the
-/// number written.
+/// number written plus the names that could not be decoded (the best-effort
+/// manifest tail: the caller names them in `_FAILED.txt` and counts them in
+/// `failed`, exactly like undecodable notes).
 fn export_snapshots(
     vault_dir: &Path,
     staging: &Path,
     params: &StageParams,
     hooks: &dyn ExportHooks,
-) -> Result<u32, VaultExportError> {
+) -> Result<(u32, Vec<String>), VaultExportError> {
     let snapshots_dir = vault_dir.join("snapshots");
     let entries = match std::fs::read_dir(&snapshots_dir) {
         Ok(e) => e,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok((0, Vec::new())),
         Err(e) => return Err(e.into()),
     };
     let mut names: Vec<String> = Vec::new();
@@ -775,14 +785,24 @@ fn export_snapshots(
     let dest_dir = staging.join("snapshots");
     let total = names.len() as u32;
     let mut written = 0u32;
+    let mut failed_names: Vec<String> = Vec::new();
     for (i, name) in names.iter().enumerate() {
         hooks.check_cancel()?;
         let blob = std::fs::read(snapshots_dir.join(name))?;
         // The snapshot's note_uuid is the first half of the filename; the blob
-        // binds it in its AAD, so decode under that uuid.
+        // binds it in its AAD, so decode under that uuid. An unparsable name
+        // fails like an undecodable blob: abort outside best-effort, preserve
+        // and name it inside best-effort, so history is never silently missing.
         let note_uuid = name.split("__").next().unwrap_or("");
         let Ok(note_uuid) = uuid::Uuid::parse_str(note_uuid) else {
-            continue;
+            if params.best_effort {
+                let undecodable = staging.join("_undecodable");
+                std::fs::create_dir_all(&undecodable)?;
+                std::fs::write(undecodable.join(name), &blob)?;
+                failed_names.push(name.clone());
+                continue;
+            }
+            return Err(VaultExportError::CannotDecrypt);
         };
         let decrypted = match decode_note_any(
             &blob,
@@ -793,6 +813,10 @@ fn export_snapshots(
             Ok(d) => d,
             Err(_) => {
                 if params.best_effort {
+                    let undecodable = staging.join("_undecodable");
+                    std::fs::create_dir_all(&undecodable)?;
+                    std::fs::write(undecodable.join(name), &blob)?;
+                    failed_names.push(name.clone());
                     continue;
                 }
                 return Err(VaultExportError::CannotDecrypt);
@@ -803,5 +827,5 @@ fn export_snapshots(
         written += 1;
         hooks.tick(i as u32 + 1, total, "snapshots");
     }
-    Ok(written)
+    Ok((written, failed_names))
 }

@@ -207,3 +207,63 @@ fn round_trip_exports_notes_byte_exactly() {
 
     std::fs::remove_dir_all(&scratch).ok();
 }
+
+/// Best-effort rejection case: a corrupt `.myn` blob is preserved under
+/// `_undecodable/`, named in `_FAILED.txt`, and counted in `failed` (which is
+/// what the CLI maps to a failure exit), while decodable notes still export.
+#[test]
+fn best_effort_preserves_and_names_a_corrupt_note() {
+    let scratch = std::env::temp_dir().join(format!("myne-decrypt-rt-bad-{}", uuid_like()));
+    std::fs::create_dir_all(&scratch).expect("scratch");
+    let vault_dir = scratch.join("vault");
+    std::fs::create_dir_all(&vault_dir).expect("vault dir");
+
+    let (root_key, items_key, items_key_id, version) = build_vault(&vault_dir, "pw");
+    write_note(&vault_dir, &items_key, &items_key_id, "a good note");
+
+    // Random bytes under a well-formed UUIDv7 name: undecodable by
+    // construction, with a name the manifest can carry.
+    let bad_uuid = myne_format::notes::note_id::NoteId::new_v7();
+    let bad_uuid = *bad_uuid.as_uuid();
+    let bad_name = format!("{bad_uuid}.myn");
+    let bad_bytes = vec![0x75u8; 64];
+    std::fs::write(vault_dir.join("notes").join(&bad_name), &bad_bytes).expect("write bad note");
+
+    let dest = scratch.join("export-tree");
+    let params = StageParams {
+        vault_dir: vault_dir.clone(),
+        forbidden_roots: vec![vault_dir.clone()],
+        destination: dest.clone(),
+        scope: None,
+        items_key: zeroize::Zeroizing::new(items_key),
+        items_key_id,
+        root_key: zeroize::Zeroizing::new(root_key),
+        version,
+        trashed: TrashedMode::Trash,
+        best_effort: true,
+        history: false,
+    };
+    let hooks = NoopExportHooks;
+    let staged = stage_export_tree(params, &hooks).expect("stage");
+    let summary = finalize_export(
+        staged,
+        &vault_dir,
+        zeroize::Zeroizing::new(items_key),
+        items_key_id,
+        &hooks,
+    )
+    .expect("finalize");
+
+    // The distinguishing behavior: preserved, named, counted.
+    assert_eq!(summary.failed, 1);
+    assert_eq!(
+        std::fs::read(dest.join("_undecodable").join(&bad_name)).unwrap(),
+        bad_bytes
+    );
+    let manifest = std::fs::read_to_string(dest.join("_FAILED.txt")).unwrap();
+    assert!(manifest.contains(&bad_name), "manifest names the bad note");
+    // The good note still exported.
+    assert_eq!(summary.notes, 1);
+
+    std::fs::remove_dir_all(&scratch).ok();
+}
